@@ -346,7 +346,7 @@ impl PullServiceImpl {
     ) -> Result<Vec<PullResponse>, InternalError> {
         let ingest_requests = batch
             .iter()
-            .map(|pi| IngestRequest {
+            .map(|pi| IngestParams {
                 dataset_ref: pi.local_ref.clone(),
                 fetch_override: pi
                     .original_request

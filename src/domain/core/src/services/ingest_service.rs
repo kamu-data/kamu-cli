@@ -46,14 +46,14 @@ pub trait IngestService: Send + Sync {
 
     async fn ingest_multi_ext(
         &self,
-        requests: Vec<IngestRequest>,
+        requests: Vec<IngestParams>,
         options: IngestOptions,
         listener: Option<Arc<dyn IngestMultiListener>>,
     ) -> Vec<(DatasetRef, Result<IngestResult, IngestError>)>;
 }
 
 #[derive(Clone, Debug)]
-pub struct IngestRequest {
+pub struct IngestParams {
     pub dataset_ref: DatasetRef,
     pub fetch_override: Option<FetchStep>,
 }

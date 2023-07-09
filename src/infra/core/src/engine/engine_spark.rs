@@ -12,7 +12,6 @@ use std::path::{Path, PathBuf};
 use std::process::Stdio;
 
 use container_runtime::*;
-use kamu_core::entities::engine::IngestRequest;
 use kamu_core::*;
 use opendatafabric::engine::ExecuteQueryError;
 use opendatafabric::serde::yaml::YamlEngineProtocol;
@@ -92,7 +91,7 @@ impl SparkEngine {
     async fn ingest_impl(
         &self,
         run_info: RunInfo,
-        request: IngestRequest,
+        request: IngestRequestRaw,
     ) -> Result<ExecuteQueryResponseSuccess, EngineError> {
         let request_path = run_info.in_out_dir.join("request.yaml");
         let response_path = run_info.in_out_dir.join("response.yaml");
@@ -195,14 +194,14 @@ impl SparkEngine {
 impl IngestEngine for SparkEngine {
     async fn ingest(
         &self,
-        request: IngestRequest,
+        request: IngestRequestRaw,
     ) -> Result<ExecuteQueryResponseSuccess, EngineError> {
         let run_info = RunInfo::new(&self.run_info_dir, "ingest");
 
         // Remove data_dir if it exists but empty as it will confuse Spark
         let _ = std::fs::remove_dir(&request.data_dir);
 
-        let request_adj = IngestRequest {
+        let request_adj = IngestRequestRaw {
             input_data_path: self.to_container_path(&request.input_data_path),
             // TODO: Not passing any checkpoint currently as Spark ingest doesn't use them
             prev_checkpoint_path: None,

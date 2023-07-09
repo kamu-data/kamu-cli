@@ -1076,7 +1076,7 @@ impl IngestService for TestIngestService {
 
     async fn ingest_multi_ext(
         &self,
-        requests: Vec<IngestRequest>,
+        requests: Vec<IngestParams>,
         _options: IngestOptions,
         _listener: Option<Arc<dyn IngestMultiListener>>,
     ) -> Vec<(DatasetRef, Result<IngestResult, IngestError>)> {

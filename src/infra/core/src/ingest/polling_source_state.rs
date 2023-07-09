@@ -33,10 +33,25 @@ impl PollingSourceState {
                     .int_err()?;
                 Ok(Some(Self::LastModified(dt)))
             } else {
+                tracing::debug!(kind = %source_state.kind, "Ignoring unsupported source state kind");
                 Ok(None)
             }
         } else {
             Ok(None)
+        }
+    }
+
+    pub fn try_from_source_state(source_state: &SourceState) -> Option<Self> {
+        match Self::from_source_state(source_state) {
+            Ok(v) => v,
+            Err(error) => {
+                tracing::warn!(
+                    ?source_state,
+                    %error,
+                    "Could not parse source state - ignoring"
+                );
+                None
+            }
         }
     }
 

@@ -20,4 +20,4 @@ pub mod utils;
 
 pub use entities::{SetRefError, *};
 pub use repos::*;
-pub use services::{IngestRequest, *};
+pub use services::*;

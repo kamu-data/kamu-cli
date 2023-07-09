@@ -19,19 +19,14 @@ use opendatafabric::*;
 use super::*;
 
 pub struct IngestTask {
-    dataset_handle: DatasetHandle,
     dataset: Arc<dyn Dataset>,
-    dataset_data_dir: PathBuf,
+    request: IngestRequest,
     options: IngestOptions,
     fetch_override: Option<FetchStep>,
     listener: Arc<dyn IngestListener>,
 
-    next_offset: i64,
-    source: Option<SetPollingSource>,
     prev_source_state: Option<PollingSourceState>,
-    prev_checkpoint: Option<Multihash>,
-    prev_watermark: Option<DateTime<Utc>>,
-    vocab: DatasetVocabulary,
+    dataset_data_dir: PathBuf,
 
     fetch_service: FetchService,
     prep_service: PrepService,
@@ -41,9 +36,8 @@ pub struct IngestTask {
 
 impl IngestTask {
     pub async fn new<'a>(
-        dataset_handle: DatasetHandle,
         dataset: Arc<dyn Dataset>,
-        dataset_data_dir: &PathBuf,
+        request: IngestRequest,
         options: IngestOptions,
         fetch_override: Option<FetchStep>,
         listener: Arc<dyn IngestListener>,
@@ -52,78 +46,9 @@ impl IngestTask {
         run_info_dir: &PathBuf,
         cache_dir: &PathBuf,
     ) -> Result<Self, InternalError> {
-        // TODO: PERF: This is expensive and could be cached
-        let mut source = None;
-        let mut prev_source_state = None;
-        let mut prev_checkpoint = None;
-        let mut prev_watermark = None;
-        let mut vocab = None;
-        let mut next_offset = None;
-
-        {
-            use futures::stream::TryStreamExt;
-            let mut block_stream = dataset.as_metadata_chain().iter_blocks();
-            while let Some((_, block)) = block_stream.try_next().await.int_err()? {
-                match block.event {
-                    MetadataEvent::AddData(add_data) => {
-                        if next_offset.is_none() {
-                            if let Some(output_data) = &add_data.output_data {
-                                next_offset = Some(output_data.interval.end + 1);
-                            }
-                        }
-                        if prev_checkpoint.is_none() {
-                            prev_checkpoint =
-                                Some(add_data.output_checkpoint.map(|cp| cp.physical_hash));
-                        }
-                        if prev_watermark.is_none() {
-                            prev_watermark = Some(add_data.output_watermark);
-                        }
-                        if prev_source_state.is_none() {
-                            if let Some(source_state) = add_data.source_state {
-                                prev_source_state =
-                                    PollingSourceState::from_source_state(&source_state)?;
-                            }
-                        }
-                    }
-                    MetadataEvent::SetWatermark(set_wm) => {
-                        if prev_watermark.is_none() {
-                            prev_watermark = Some(Some(set_wm.output_watermark));
-                        }
-                    }
-                    MetadataEvent::SetPollingSource(src) => {
-                        if source.is_none() {
-                            source = Some(src);
-                        }
-                    }
-                    MetadataEvent::SetVocab(set_vocab) => {
-                        vocab = Some(set_vocab.into());
-                    }
-                    MetadataEvent::Seed(_) => {
-                        if next_offset.is_none() {
-                            next_offset = Some(0);
-                        }
-                    }
-                    MetadataEvent::ExecuteQuery(_) => unreachable!(),
-                    MetadataEvent::SetAttachments(_)
-                    | MetadataEvent::SetInfo(_)
-                    | MetadataEvent::SetLicense(_)
-                    | MetadataEvent::SetTransform(_) => (),
-                }
-
-                if next_offset.is_some()
-                    && source.is_some()
-                    && vocab.is_some()
-                    && prev_checkpoint.is_some()
-                    && prev_watermark.is_some()
-                {
-                    break;
-                }
-            }
-        }
-
-        if let Some(source) = &source {
+        if let Some(polling_source) = &request.polling_source {
             if fetch_override.is_some() {
-                if let FetchStep::FilesGlob(_) = &source.fetch {
+                if let FetchStep::FilesGlob(_) = &polling_source.fetch {
                     return Err(concat!(
                         "Fetch override use is not supported for glob sources, ",
                         "as globs maintain strict ordering and state"
@@ -133,37 +58,48 @@ impl IngestTask {
             }
         }
 
+        // TODO: This seems dirty
+        let some_random_hash: Multihash = Multihash::from_digest_sha3_256(b"");
+        let dataset_data_dir = PathBuf::from(
+            kamu_data_utils::data::local_url::into_local_path(
+                dataset
+                    .as_data_repo()
+                    .get_internal_url(&some_random_hash)
+                    .await,
+            )
+            .int_err()?
+            .parent()
+            .unwrap(),
+        );
+
         Ok(Self {
-            options,
-            dataset_handle,
-            dataset_data_dir: dataset_data_dir.clone(),
-            next_offset: next_offset.unwrap(),
             dataset,
+            options,
             fetch_override,
             listener,
-            source,
-            prev_source_state,
-            prev_checkpoint: prev_checkpoint.unwrap_or_default(),
-            prev_watermark: prev_watermark.unwrap_or_default(),
-            vocab: vocab.unwrap_or_default(),
+            prev_source_state: request
+                .prev_source_state
+                .as_ref()
+                .and_then(|ss| PollingSourceState::try_from_source_state(&ss)),
+            dataset_data_dir,
             fetch_service: FetchService::new(container_runtime, &run_info_dir),
             prep_service: PrepService::new(),
             read_service: ReadService::new(engine_provisioner),
             cache_dir: cache_dir.clone(),
+            request,
         })
     }
 
     #[tracing::instrument(
         level = "info",
         skip_all,
-        fields(dataset_handle = %self.dataset_handle),
+        fields(dataset_handle = %self.request.dataset_handle),
     )]
     pub async fn ingest(&mut self) -> Result<IngestResult, IngestError> {
         tracing::info!(
-            source = ?self.source,
+            request = ?self.request,
+            options = ?self.options,
             fetch_override = ?self.fetch_override,
-            prev_checkpoint = ?self.prev_checkpoint,
-            vocab = ?self.vocab,
             "Ingest details",
         );
 
@@ -184,7 +120,7 @@ impl IngestTask {
     }
 
     pub async fn ingest_inner(&mut self) -> Result<IngestResult, IngestError> {
-        if self.source.is_none() {
+        if self.request.polling_source.is_none() {
             return Ok(IngestResult::UpToDate {
                 no_polling_source: true,
                 uncacheable: false,
@@ -201,7 +137,7 @@ impl IngestTask {
         self.listener
             .on_stage_progress(IngestStage::CheckCache, 0, TotalSteps::Exact(1));
 
-        let first_ingest = self.next_offset == 0;
+        let first_ingest = self.request.next_offset == 0;
         let uncacheable =
             !first_ingest && self.prev_source_state.is_none() && self.fetch_override.is_none();
 
@@ -255,13 +191,17 @@ impl IngestTask {
                     }),
                     CommitStepResult::Updated(commit) => {
                         // Advance the task state for the next run
-                        self.prev_checkpoint =
+                        self.request.prev_checkpoint =
                             commit.new_event.output_checkpoint.map(|c| c.physical_hash);
-                        self.prev_watermark = commit.new_event.output_watermark;
+                        self.request.prev_watermark = commit.new_event.output_watermark;
                         if let Some(output_data) = commit.new_event.output_data {
-                            self.next_offset = output_data.interval.end + 1;
+                            self.request.next_offset = output_data.interval.end + 1;
                         }
                         self.prev_source_state = savepoint.source_state;
+                        self.request.prev_source_state = self
+                            .prev_source_state
+                            .as_ref()
+                            .map(|ss| ss.to_source_state());
 
                         Ok(IngestResult::Updated {
                             old_head: prev_head,
@@ -362,7 +302,7 @@ impl IngestTask {
             (fetch_override, None)
         } else {
             (
-                &self.source.as_ref().unwrap().fetch,
+                &self.request.polling_source.as_ref().unwrap().fetch,
                 self.prev_source_state.as_ref(),
             )
         };
@@ -423,7 +363,8 @@ impl IngestTask {
     ) -> Result<PrepStepResult, IngestError> {
         let null_steps = Vec::new();
         let prep_steps = self
-            .source
+            .request
+            .polling_source
             .as_ref()
             .unwrap()
             .prepare
@@ -463,7 +404,7 @@ impl IngestTask {
         let out_checkpoint_cache_key = self.get_random_cache_key("read-cpt-");
         let out_checkpoint_path = self.cache_dir.join(&out_checkpoint_cache_key);
 
-        let prev_checkpoint_path = if let Some(cp) = &self.prev_checkpoint {
+        let prev_checkpoint_path = if let Some(cp) = &self.request.prev_checkpoint {
             Some(
                 kamu_data_utils::data::local_url::into_local_path(
                     self.dataset
@@ -480,16 +421,16 @@ impl IngestTask {
         let engine_response = self
             .read_service
             .read(
-                &self.dataset_handle,
+                &self.request.dataset_handle,
                 &self.dataset_data_dir,
-                self.source.as_ref().unwrap(),
+                self.request.polling_source.as_ref().unwrap(),
                 &src_data_path,
-                self.prev_watermark.clone(),
+                self.request.prev_watermark.clone(),
                 prev_checkpoint_path.as_ref().map(|cp| cp.as_path()),
-                &self.vocab,
+                &self.request.vocab,
                 system_time.clone(),
                 source_event_time,
-                self.next_offset,
+                self.request.next_offset,
                 &out_data_path,
                 &out_checkpoint_path,
                 self.listener.clone(),
@@ -533,7 +474,7 @@ impl IngestTask {
             .dataset
             .commit_add_data(
                 AddDataParams {
-                    input_checkpoint: self.prev_checkpoint.clone(),
+                    input_checkpoint: self.request.prev_checkpoint.clone(),
                     output_data: data_interval.clone(),
                     output_watermark,
                     source_state,

@@ -196,7 +196,7 @@ impl TransformServiceImpl {
             dataset_handle: dataset_handle.clone(),
             transform: source.transform,
             system_time,
-            offset: last_offset.map(|v| v + 1).unwrap_or(0),
+            next_offset: last_offset.map(|v| v + 1).unwrap_or(0),
             vocab,
             inputs,
             prev_checkpoint,
@@ -560,7 +560,7 @@ impl TransformServiceImpl {
                     dataset_handle: dataset_handle.clone(),
                     transform: source.transform.clone(),
                     system_time: block.system_time,
-                    offset: block_t
+                    next_offset: block_t
                         .event
                         .output_data
                         .as_ref()

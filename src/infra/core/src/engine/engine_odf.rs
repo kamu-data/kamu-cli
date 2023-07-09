@@ -188,7 +188,7 @@ impl ODFEngine {
             dataset_id: request.dataset_handle.id,
             dataset_name: request.dataset_handle.alias.dataset_name,
             system_time: request.system_time,
-            offset: request.offset,
+            offset: request.next_offset,
             vocab: request.vocab,
             transform: request.transform,
             inputs,

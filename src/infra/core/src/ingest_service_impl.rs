@@ -10,6 +10,7 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use chrono::Utc;
 use container_runtime::ContainerRuntime;
 use dill::*;
 use kamu_core::*;
@@ -109,25 +110,14 @@ impl IngestServiceImpl {
         let listener =
             get_listener(&dataset_handle).unwrap_or_else(|| Arc::new(NullIngestListener));
 
-        let some_random_hash: Multihash = Multihash::from_digest_sha3_256(b"");
-
-        let data_dir_path = PathBuf::from(
-            kamu_data_utils::data::local_url::into_local_path(
-                dataset
-                    .as_data_repo()
-                    .get_internal_url(&some_random_hash)
-                    .await,
-            )
-            .int_err()?
-            .parent()
-            .unwrap(),
-        );
+        let request = self
+            .prepare_ingest_request(dataset_handle, dataset.clone())
+            .await?;
 
         // TODO: create via DI to avoid passing through all dependencies
         let ingest_task = IngestTask::new(
-            dataset_handle.clone(),
             dataset,
-            &data_dir_path,
+            request,
             options.clone(),
             fetch_override,
             listener,
@@ -167,6 +157,91 @@ impl IngestServiceImpl {
         }
         Ok(combined_result.unwrap())
     }
+
+    async fn prepare_ingest_request(
+        &self,
+        dataset_handle: DatasetHandle,
+        dataset: Arc<dyn Dataset>,
+    ) -> Result<IngestRequest, InternalError> {
+        // TODO: PERF: This is expensive and could be cached
+        let mut polling_source = None;
+        let mut prev_source_state = None;
+        let mut prev_checkpoint = None;
+        let mut prev_watermark = None;
+        let mut vocab = None;
+        let mut next_offset = None;
+
+        {
+            use futures::stream::TryStreamExt;
+            let mut block_stream = dataset.as_metadata_chain().iter_blocks();
+            while let Some((_, block)) = block_stream.try_next().await.int_err()? {
+                match block.event {
+                    MetadataEvent::AddData(add_data) => {
+                        if next_offset.is_none() {
+                            if let Some(output_data) = &add_data.output_data {
+                                next_offset = Some(output_data.interval.end + 1);
+                            }
+                        }
+                        if prev_checkpoint.is_none() {
+                            prev_checkpoint =
+                                Some(add_data.output_checkpoint.map(|cp| cp.physical_hash));
+                        }
+                        if prev_watermark.is_none() {
+                            prev_watermark = Some(add_data.output_watermark);
+                        }
+                        if prev_source_state.is_none() {
+                            // TODO: Should we check that this is polling source?
+                            prev_source_state = Some(add_data.source_state);
+                        }
+                    }
+                    MetadataEvent::SetWatermark(set_wm) => {
+                        if prev_watermark.is_none() {
+                            prev_watermark = Some(Some(set_wm.output_watermark));
+                        }
+                    }
+                    MetadataEvent::SetPollingSource(src) => {
+                        if polling_source.is_none() {
+                            polling_source = Some(src);
+                        }
+                    }
+                    MetadataEvent::SetVocab(set_vocab) => {
+                        vocab = Some(set_vocab.into());
+                    }
+                    MetadataEvent::Seed(_) => {
+                        if next_offset.is_none() {
+                            next_offset = Some(0);
+                        }
+                    }
+                    MetadataEvent::ExecuteQuery(_) => unreachable!(),
+                    MetadataEvent::SetAttachments(_)
+                    | MetadataEvent::SetInfo(_)
+                    | MetadataEvent::SetLicense(_)
+                    | MetadataEvent::SetTransform(_) => (),
+                }
+
+                if next_offset.is_some()
+                    && polling_source.is_some()
+                    && vocab.is_some()
+                    && prev_checkpoint.is_some()
+                    && prev_watermark.is_some()
+                {
+                    break;
+                }
+            }
+        }
+
+        Ok(IngestRequest {
+            dataset_handle,
+            polling_source,
+            system_time: Utc::now(),
+            event_time: None,
+            next_offset: next_offset.unwrap_or_default(),
+            vocab: vocab.unwrap_or_default(),
+            prev_checkpoint: prev_checkpoint.unwrap_or_default(),
+            prev_watermark: prev_watermark.unwrap_or_default(),
+            prev_source_state: prev_source_state.clone().unwrap_or_default(),
+        })
+    }
 }
 
 #[async_trait::async_trait]
@@ -203,7 +278,7 @@ impl IngestService for IngestServiceImpl {
         self.ingest_multi_ext(
             dataset_refs
                 .into_iter()
-                .map(|r| IngestRequest {
+                .map(|r| IngestParams {
                     dataset_ref: r,
                     fetch_override: None,
                 })
@@ -216,7 +291,7 @@ impl IngestService for IngestServiceImpl {
 
     async fn ingest_multi_ext(
         &self,
-        requests: Vec<IngestRequest>,
+        requests: Vec<IngestParams>,
         options: IngestOptions,
         maybe_multi_listener: Option<Arc<dyn IngestMultiListener>>,
     ) -> Vec<(DatasetRef, Result<IngestResult, IngestError>)> {

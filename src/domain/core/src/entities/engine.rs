@@ -35,7 +35,7 @@ pub trait Engine: Send + Sync {
 pub trait IngestEngine: Send + Sync {
     async fn ingest(
         &self,
-        request: IngestRequest,
+        request: IngestRequestRaw,
     ) -> Result<ExecuteQueryResponseSuccess, EngineError>;
 }
 
@@ -46,7 +46,7 @@ pub trait IngestEngine: Send + Sync {
 #[skip_serializing_none]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub struct IngestRequest {
+pub struct IngestRequestRaw {
     #[serde(rename = "datasetID")]
     pub dataset_id: DatasetID,
     pub dataset_name: DatasetName,
@@ -68,6 +68,36 @@ pub struct IngestRequest {
     pub data_dir: PathBuf,
 }
 
+/// A request for ingesting new data into a root dataset.
+///
+/// Design notes: This DTO is formed as an intermediate between analyzing
+/// metadata chain and passing a final request to an engine. It contains
+/// enough information to define the entire ingest operation so that no extra
+/// interaction with metadata chain was needed, but it still operates with
+/// higher-level types. This request will be resolved into physical data
+/// locations before passing it to the engine.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IngestRequest {
+    /// Identifies the output dataset
+    pub dataset_handle: DatasetHandle,
+    /// Polling source, if defined
+    pub polling_source: Option<SetPollingSource>,
+    /// System time to use for new records
+    pub system_time: DateTime<Utc>,
+    /// Event time extracted from source's metadata
+    pub event_time: Option<DateTime<Utc>>,
+    /// Starting offset to use for new records
+    pub next_offset: i64,
+    /// Output dataset's vocabulary
+    pub vocab: DatasetVocabulary,
+    /// Previous checkpoint, if any
+    pub prev_checkpoint: Option<Multihash>,
+    /// Previous watermark, if any
+    pub prev_watermark: Option<DateTime<Utc>>,
+    /// Previous source state, if any
+    pub prev_source_state: Option<SourceState>,
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 
 /// A request for derivative (streaming) transformation.
@@ -87,7 +117,7 @@ pub struct TransformRequest {
     /// System time to use for new records
     pub system_time: DateTime<Utc>,
     /// Starting offset to use for new records
-    pub offset: i64,
+    pub next_offset: i64,
     /// Defines the input data
     pub inputs: Vec<TransformRequestInput>,
     /// Output dataset's vocabulary

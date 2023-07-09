@@ -11,7 +11,6 @@ use std::path::Path;
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
-use kamu_core::engine::IngestRequest;
 use kamu_core::*;
 use opendatafabric::*;
 
@@ -59,7 +58,7 @@ impl ReadService {
             .provision_ingest_engine(listener.get_engine_provisioning_listener())
             .await?;
 
-        let request = IngestRequest {
+        let request = IngestRequestRaw {
             dataset_id: dataset_handle.id.clone(),
             dataset_name: dataset_handle.alias.dataset_name.clone(),
             input_data_path: src_data_path.to_owned(),
