@@ -411,6 +411,22 @@ impl<'a> MetadataChain for MetadataChainWithStats<'a> {
         )
     }
 
+    fn iter_blocks_interval_inclusive<'b>(
+        &'b self,
+        head: &'b Multihash,
+        tail: &'b Multihash,
+        ignore_missing_tail: bool,
+    ) -> DynMetadataStream<'b> {
+        Box::pin(
+            self.chain
+                .iter_blocks_interval_inclusive(head, tail, ignore_missing_tail)
+                .map(|v| {
+                    (self.on_read)(1);
+                    v
+                }),
+        )
+    }
+
     fn iter_blocks_interval_ref<'b>(
         &'b self,
         head: &'b BlockRef,

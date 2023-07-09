@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use std::collections::HashSet;
-use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -43,9 +42,9 @@ struct State {
 impl EngineProvisionerLocal {
     pub fn new(
         config: EngineProvisionerLocalConfig,
-        root_dir: PathBuf,
-        run_info_dir: PathBuf,
+        workspace_layout: Arc<WorkspaceLayout>,
         container_runtime: ContainerRuntime,
+        dataset_repo: Arc<dyn DatasetRepository>,
     ) -> Self {
         let engine_config = ODFEngineConfig {
             start_timeout: config.start_timeout,
@@ -56,29 +55,28 @@ impl EngineProvisionerLocal {
             spark_ingest_engine: Arc::new(SparkEngine::new(
                 container_runtime.clone(),
                 &config.spark_image,
-                root_dir.clone(),
-                run_info_dir.clone(),
+                workspace_layout.clone(),
             )),
             spark_engine: Arc::new(ODFEngine::new(
                 container_runtime.clone(),
                 engine_config.clone(),
                 &config.spark_image,
-                root_dir.clone(),
-                run_info_dir.clone(),
+                workspace_layout.clone(),
+                dataset_repo.clone(),
             )),
             flink_engine: Arc::new(ODFEngine::new(
                 container_runtime.clone(),
                 engine_config.clone(),
                 &config.flink_image,
-                root_dir.clone(),
-                run_info_dir.clone(),
+                workspace_layout.clone(),
+                dataset_repo.clone(),
             )),
             datafusion_engine: Arc::new(ODFEngine::new(
                 container_runtime.clone(),
                 engine_config.clone(),
                 &config.datafusion_image,
-                root_dir.clone(),
-                run_info_dir.clone(),
+                workspace_layout.clone(),
+                dataset_repo.clone(),
             )),
             container_runtime,
             state: Mutex::new(State {

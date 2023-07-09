@@ -73,11 +73,8 @@ impl ClientSideHarness {
         b.add::<SyncServiceImpl>()
             .bind::<dyn SyncService, SyncServiceImpl>();
 
-        b.add_builder(
-            builder_for::<TransformServiceImpl>()
-                .with_run_info_dir(workspace_layout.run_info_dir.clone()),
-        )
-        .bind::<dyn TransformService, TransformServiceImpl>();
+        b.add::<TransformServiceImpl>()
+            .bind::<dyn TransformService, TransformServiceImpl>();
 
         b.add::<PullServiceImpl>()
             .bind::<dyn PullService, PullServiceImpl>();

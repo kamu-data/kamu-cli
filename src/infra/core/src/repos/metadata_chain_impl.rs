@@ -444,6 +444,35 @@ where
         })
     }
 
+    fn iter_blocks_interval_inclusive<'a>(
+        &'a self,
+        head_hash: &'a Multihash,
+        tail_hash: &'a Multihash,
+        ignore_missing_tail: bool,
+    ) -> DynMetadataStream<'a> {
+        Box::pin(async_stream::try_stream! {
+            let mut current = head_hash.clone();
+
+            loop {
+                let block = self.get_block(&current).await?;
+                let next = block.prev_block_hash.clone();
+                let done = current == *tail_hash;
+                yield (current.clone(), block);
+                if done || next.is_none() {
+                    break;
+                }
+                current = next.unwrap();
+            }
+
+            if !ignore_missing_tail && current != *tail_hash {
+                Err(IterBlocksError::InvalidInterval(InvalidIntervalError {
+                    head: head_hash.clone(),
+                    tail: tail_hash.clone(),
+                }))?;
+            }
+        })
+    }
+
     fn iter_blocks_interval_ref<'a>(
         &'a self,
         head: &'a BlockRef,

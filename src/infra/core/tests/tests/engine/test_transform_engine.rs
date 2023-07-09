@@ -242,6 +242,7 @@ async fn test_transform_common(transform: Transform) {
         workspace_layout.root_dir.clone(),
         workspace_layout.run_info_dir.clone(),
         ContainerRuntime::default(),
+        dataset_repo.clone(),
     ));
 
     let ingest_svc = IngestServiceImpl::new(
@@ -252,11 +253,7 @@ async fn test_transform_common(transform: Transform) {
         workspace_layout.cache_dir.clone(),
     );
 
-    let transform_svc = TransformServiceImpl::new(
-        dataset_repo.clone(),
-        engine_provisioner.clone(),
-        workspace_layout.run_info_dir.clone(),
-    );
+    let transform_svc = TransformServiceImpl::new(dataset_repo.clone(), engine_provisioner.clone());
 
     ///////////////////////////////////////////////////////////////////////////
     // Root setup

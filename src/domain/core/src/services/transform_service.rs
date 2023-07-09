@@ -116,6 +116,12 @@ pub enum TransformError {
         EngineError,
     ),
     #[error(transparent)]
+    CommitError(
+        #[from]
+        #[backtrace]
+        CommitError,
+    ),
+    #[error(transparent)]
     Internal(
         #[from]
         #[backtrace]

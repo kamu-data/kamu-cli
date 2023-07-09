@@ -196,6 +196,7 @@ impl IngestTestHarness {
             workspace_layout.root_dir.clone(),
             workspace_layout.run_info_dir.clone(),
             ContainerRuntime::default(),
+            dataset_repo.clone(),
         ));
 
         let ingest_svc = Arc::new(IngestServiceImpl::new(

@@ -111,14 +111,21 @@ async fn test_get_next_operation() {
         Arc::new(CurrentAccountSubject::new_test()),
         false,
     ));
-    let transform_svc = TransformServiceImpl::new(
-        dataset_repo.clone(),
-        Arc::new(EngineProvisionerNull),
-        workspace_layout.run_info_dir.clone(),
-    );
+    let transform_svc =
+        TransformServiceImpl::new(dataset_repo.clone(), Arc::new(EngineProvisionerNull));
 
     let foo = new_root(dataset_repo.as_ref(), "foo").await;
-    let foo_dataset = dataset_repo.get_dataset(&foo.as_local_ref()).await.unwrap();
+    let foo_seed = dataset_repo
+        .get_dataset(&foo.as_local_ref())
+        .await
+        .unwrap()
+        .as_metadata_chain()
+        .iter_blocks()
+        .try_last()
+        .await
+        .unwrap()
+        .unwrap()
+        .0;
 
     let (bar, bar_source) = new_deriv(dataset_repo.as_ref(), "bar", &[foo.alias.clone()]).await;
 
@@ -131,27 +138,21 @@ async fn test_get_next_operation() {
         None
     );
 
-    let (_, foo_block) = append_data_block(dataset_repo.as_ref(), &foo.alias, 10).await;
+    let (foo_head, foo_block) = append_data_block(dataset_repo.as_ref(), &foo.alias, 10).await;
     let foo_slice = foo_block.event.output_data.as_ref().unwrap();
-    let data_path = kamu_data_utils::data::local_url::into_local_path(
-        foo_dataset
-            .as_data_repo()
-            .get_internal_url(&foo_slice.physical_hash)
-            .await,
-    )
-    .unwrap();
 
     assert!(matches!(
         transform_svc.get_next_operation(&bar, Utc::now()).await.unwrap(),
-        Some(TransformOperation{ request: ExecuteQueryRequest { transform, inputs, .. }, ..})
+        Some(TransformRequest{ transform, inputs, .. })
         if transform == bar_source.transform &&
-        inputs == vec![ExecuteQueryInput {
-            dataset_id: foo.id.clone(),
-            dataset_name: foo.alias.dataset_name.clone(),
+        inputs == vec![TransformRequestInput {
+            dataset_handle: foo.clone(),
+            alias: foo.alias.dataset_name.to_string(),
             vocab: DatasetVocabulary::default(),
+            block_interval: Some(BlockInterval { start: foo_seed, end: foo_head }),
             data_interval: Some(OffsetInterval {start: 0, end: 9}),
-            data_paths: vec![data_path.clone()],
-            schema_file: data_path,
+            data_slices: vec![foo_slice.physical_hash.clone()],
+            schema_slice: foo_slice.physical_hash.clone(),
             explicit_watermarks: vec![Watermark {
                 system_time: foo_block.system_time,
                 event_time: Utc.with_ymd_and_hms(2020, 1, 1, 10, 0, 0).unwrap(),
@@ -169,11 +170,8 @@ async fn test_get_verification_plan_one_to_one() {
         Arc::new(CurrentAccountSubject::new_test()),
         false,
     ));
-    let transform_svc = TransformServiceImpl::new(
-        dataset_repo.clone(),
-        Arc::new(EngineProvisionerNull),
-        workspace_layout.run_info_dir.clone(),
-    );
+    let transform_svc =
+        TransformServiceImpl::new(dataset_repo.clone(), Arc::new(EngineProvisionerNull));
 
     // Create root dataset
     let t0 = Utc.with_ymd_and_hms(2020, 1, 1, 11, 0, 0).unwrap();
@@ -192,6 +190,7 @@ async fn test_get_verification_plan_one_to_one() {
         .await
         .unwrap();
 
+    let root_head_seed = root_create_result.head;
     let root_head_src = root_create_result
         .dataset
         .commit_event(
@@ -277,7 +276,7 @@ async fn test_get_verification_plan_one_to_one() {
     .unwrap();
     std::fs::write(root_head_t1_path, "<data>").unwrap();
 
-    // T2: Transform [SRC; T1]
+    // T2: Transform [SEED; T1]
     let t2 = Utc.with_ymd_and_hms(2020, 1, 2, 12, 0, 0).unwrap();
     let deriv_req_t2 = transform_svc
         .get_next_operation(&deriv_hdl, t2)
@@ -291,7 +290,7 @@ async fn test_get_verification_plan_one_to_one() {
             input_slices: vec![InputSlice {
                 dataset_id: root_hdl.id.clone(),
                 block_interval: Some(BlockInterval {
-                    start: root_head_src.clone(),
+                    start: root_head_seed.clone(),
                     end: root_head_t1.clone(),
                 }),
                 data_interval: Some(OffsetInterval { start: 0, end: 99 }),
@@ -471,21 +470,7 @@ async fn test_get_verification_plan_one_to_one() {
         deriv_chain.get_block(&deriv_head_t6).await.unwrap()
     );
 
-    assert_requests_eqivalent(&plan[0].operation.request, &deriv_req_t2.request);
-    assert_requests_eqivalent(&plan[1].operation.request, &deriv_req_t4.request);
-    assert_requests_eqivalent(&plan[2].operation.request, &deriv_req_t6.request);
-}
-
-fn assert_requests_eqivalent(lhs: &ExecuteQueryRequest, rhs: &ExecuteQueryRequest) {
-    // Paths are randomly generated, so ignoring them for this check
-    let mut lhs = lhs.clone();
-    let mut rhs = rhs.clone();
-
-    lhs.new_checkpoint_path = Default::default();
-    lhs.out_data_path = Default::default();
-    rhs.new_checkpoint_path = Default::default();
-    rhs.out_data_path = Default::default();
-
-    assert_eq!(lhs.inputs, rhs.inputs);
-    assert_eq!(lhs, rhs);
+    assert_eq!(&plan[0].request, &deriv_req_t2);
+    assert_eq!(&plan[1].request, &deriv_req_t4);
+    assert_eq!(&plan[2].request, &deriv_req_t6);
 }

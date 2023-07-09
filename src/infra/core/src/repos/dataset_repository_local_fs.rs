@@ -232,6 +232,13 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
             .handle_dataset_created(&dataset, &dataset_handle.alias.dataset_name)
             .await?;
 
+        tracing::info!(
+            id = %dataset_handle.id,
+            alias = %dataset_handle.alias,
+            %head,
+            "Created new dataset",
+        );
+
         Ok(CreateDatasetResult {
             dataset_handle,
             dataset: Arc::new(dataset),

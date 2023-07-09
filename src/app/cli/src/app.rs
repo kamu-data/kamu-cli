@@ -169,10 +169,7 @@ pub fn configure_catalog(
     );
     b.bind::<dyn IngestService, IngestServiceImpl>();
 
-    b.add_builder(
-        builder_for::<TransformServiceImpl>()
-            .with_run_info_dir(workspace_layout.run_info_dir.clone()),
-    );
+    b.add::<TransformServiceImpl>();
     b.bind::<dyn TransformService, TransformServiceImpl>();
 
     b.add::<VerificationServiceImpl>();

@@ -102,11 +102,13 @@ async fn test_verify_data_consistency() {
 
     let head = dataset
         .commit_add_data(
-            None,
-            Some(OffsetInterval { start: 0, end: 0 }),
-            Some(data_path.as_path()),
-            None,
-            None,
+            AddDataParams {
+                input_checkpoint: None,
+                output_data: Some(OffsetInterval { start: 0, end: 0 }),
+                output_watermark: None,
+                source_state: None,
+            },
+            Some(OwnedFile::new(data_path)),
             None,
             CommitOpts::default(),
         )

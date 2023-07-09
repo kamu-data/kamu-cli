@@ -18,16 +18,15 @@ use opendatafabric::serde::yaml::*;
 use opendatafabric::*;
 use thiserror::Error;
 
+use crate::OwnedFile;
+
 ///////////////////////////////////////////////////////////////////////////////
 // Engine
 ///////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 pub trait Engine: Send + Sync {
-    async fn transform(
-        &self,
-        request: ExecuteQueryRequest,
-    ) -> Result<ExecuteQueryResponseSuccess, EngineError>;
+    async fn transform(&self, request: TransformRequest) -> Result<TransformResponse, EngineError>;
 }
 
 // TODO: This interface is temporary and will be removed when ingestion is moved
@@ -67,6 +66,76 @@ pub struct IngestRequest {
     #[serde(default, with = "datetime_rfc3339_opt")]
     pub prev_watermark: Option<DateTime<Utc>>,
     pub data_dir: PathBuf,
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+/// A request for derivative (streaming) transformation.
+///
+/// Design notes: This DTO is formed as an intermediate between analyzing
+/// metadata chain and passing a final request to an engine. It contains
+/// enough information to define the entire transform operation so that no extra
+/// interaction with metadata chain was needed, but it still operates with
+/// higher-level types. This request will be resolved into physical data
+/// locations before passing it to the engine.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TransformRequest {
+    /// Identifies the output dataset
+    pub dataset_handle: DatasetHandle,
+    /// Transformation that will be applied to produce new data
+    pub transform: Transform,
+    /// System time to use for new records
+    pub system_time: DateTime<Utc>,
+    /// Starting offset to use for new records
+    pub offset: i64,
+    /// Defines the input data
+    pub inputs: Vec<TransformRequestInput>,
+    /// Output dataset's vocabulary
+    pub vocab: DatasetVocabulary,
+    /// Previous checkpoint, if any
+    pub prev_checkpoint: Option<Multihash>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TransformRequestInput {
+    /// Identifies the input dataset
+    pub dataset_handle: DatasetHandle,
+    /// An alias of this input to be used in queries
+    pub alias: String,
+    /// Input dataset's vocabulary
+    pub vocab: DatasetVocabulary,
+    /// Blocks that went into this transaction
+    pub block_interval: Option<BlockInterval>,
+    /// Data that went into this transaction
+    pub data_interval: Option<OffsetInterval>,
+    /// List of data files that will be read
+    pub data_slices: Vec<Multihash>,
+    /// TODO: replace with actual schema
+    pub schema_slice: Multihash,
+    /// TODO: remove?
+    pub explicit_watermarks: Vec<Watermark>,
+}
+
+#[derive(Debug)]
+pub struct TransformResponse {
+    /// Data slice produced by the transaction, if any
+    pub data_interval: Option<OffsetInterval>,
+    /// Watermark advanced by the transaction, if any
+    pub output_watermark: Option<DateTime<Utc>>,
+    /// New checkpoint written by the engine, if any
+    pub new_checkpoint: Option<OwnedFile>,
+    /// Data produced by the operation, if any
+    pub out_data: Option<OwnedFile>,
+}
+
+impl Into<InputSlice> for TransformRequestInput {
+    fn into(self) -> InputSlice {
+        InputSlice {
+            dataset_id: self.dataset_handle.id,
+            block_interval: self.block_interval,
+            data_interval: self.data_interval,
+        }
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////

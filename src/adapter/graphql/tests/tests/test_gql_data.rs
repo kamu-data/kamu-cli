@@ -69,11 +69,13 @@ async fn create_test_dataset(catalog: &dill::Catalog, tempdir: &Path) {
 
     dataset
         .commit_add_data(
-            None,
-            Some(OffsetInterval { start: 0, end: 3 }),
-            Some(tmp_data_path.as_path()),
-            None,
-            None,
+            AddDataParams {
+                input_checkpoint: None,
+                output_data: Some(OffsetInterval { start: 0, end: 3 }),
+                output_watermark: None,
+                source_state: None,
+            },
+            Some(OwnedFile::new(tmp_data_path)),
             None,
             CommitOpts::default(),
         )

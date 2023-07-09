@@ -571,9 +571,23 @@ async fn test_iter_blocks() {
         ]
     );
 
-    let bad_hash = Multihash::from_digest_sha3_256(b"does-not-exist");
+    // Tailed (inclusive)
+    let hashed_blocks: Result<Vec<_>, _> = chain
+        .iter_blocks_interval_inclusive(&hash_3, &hash_2, false)
+        .collect()
+        .await;
+
+    assert_eq!(
+        hashed_blocks.unwrap(),
+        [
+            (hash_3.clone(), block_3.clone()),
+            (hash_2.clone(), block_2.clone()),
+        ]
+    );
 
     // Tail not found
+    let bad_hash = Multihash::from_digest_sha3_256(b"does-not-exist");
+
     let hashed_blocks: Result<Vec<_>, _> = chain
         .iter_blocks_interval(&hash_3, Some(&bad_hash), false)
         .collect()

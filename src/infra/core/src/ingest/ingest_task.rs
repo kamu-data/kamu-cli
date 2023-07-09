@@ -513,28 +513,33 @@ impl IngestTask {
     ) -> Result<CommitStepResult, IngestError> {
         let data_interval = read_result.engine_response.data_interval.clone();
         let output_watermark = read_result.engine_response.output_watermark;
-        let new_data_path = if data_interval.is_some() {
-            Some(self.cache_dir.join(&read_result.out_data_cache_key))
+        let source_state = source_state.map(|v| v.to_source_state());
+
+        let new_data = if data_interval.is_some() {
+            Some(OwnedFile::new(
+                self.cache_dir.join(&read_result.out_data_cache_key),
+            ))
         } else {
             None
         };
         let new_checkpoint_path = self.cache_dir.join(&read_result.out_checkpoint_cache_key);
-        let new_checkpoint_path = if new_checkpoint_path.exists() {
-            Some(new_checkpoint_path)
+        let new_checkpoint = if new_checkpoint_path.exists() {
+            Some(OwnedFile::new(new_checkpoint_path))
         } else {
             None
         };
-        let source_state = source_state.map(|v| v.to_source_state());
 
         match self
             .dataset
             .commit_add_data(
-                self.prev_checkpoint.clone(),
-                data_interval.clone(),
-                new_data_path.as_ref().map(|p| p.as_path()),
-                new_checkpoint_path.as_ref().map(|p| p.as_path()),
-                output_watermark,
-                source_state,
+                AddDataParams {
+                    input_checkpoint: self.prev_checkpoint.clone(),
+                    output_data: data_interval.clone(),
+                    output_watermark,
+                    source_state,
+                },
+                new_data,
+                new_checkpoint,
                 CommitOpts {
                     block_ref: &BlockRef::Head,
                     system_time: Some(read_result.system_time),

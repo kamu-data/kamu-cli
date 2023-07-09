@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use std::collections::BTreeMap;
-use std::path::PathBuf;
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
@@ -20,7 +19,6 @@ use opendatafabric::*;
 pub struct TransformServiceImpl {
     dataset_repo: Arc<dyn DatasetRepository>,
     engine_provisioner: Arc<dyn EngineProvisioner>,
-    run_info_dir: PathBuf,
 }
 
 #[component(pub)]
@@ -28,12 +26,10 @@ impl TransformServiceImpl {
     pub fn new(
         dataset_repo: Arc<dyn DatasetRepository>,
         engine_provisioner: Arc<dyn EngineProvisioner>,
-        run_info_dir: PathBuf,
     ) -> Self {
         Self {
             dataset_repo,
             engine_provisioner,
-            run_info_dir,
         }
     }
 
@@ -41,19 +37,19 @@ impl TransformServiceImpl {
     #[tracing::instrument(level = "info", skip_all)]
     async fn do_transform<CommitFn, Fut>(
         engine_provisioner: Arc<dyn EngineProvisioner>,
-        operation: TransformOperation,
+        request: TransformRequest,
         commit_fn: CommitFn,
         listener: Arc<dyn TransformListener>,
     ) -> Result<TransformResult, TransformError>
     where
-        CommitFn: FnOnce(DateTime<Utc>, ExecuteQuery, PathBuf, PathBuf) -> Fut,
+        CommitFn: FnOnce(ExecuteQueryParams, Option<OwnedFile>, Option<OwnedFile>) -> Fut,
         Fut: futures::Future<Output = Result<TransformResult, TransformError>>,
     {
-        tracing::info!(?operation, "Transform request");
+        tracing::info!(?request, "Transform request");
 
         listener.begin();
 
-        match Self::do_transform_inner(engine_provisioner, operation, commit_fn, listener.clone())
+        match Self::do_transform_inner(engine_provisioner, request, commit_fn, listener.clone())
             .await
         {
             Ok(res) => {
@@ -72,188 +68,43 @@ impl TransformServiceImpl {
     // Note: Can be called from multiple threads
     async fn do_transform_inner<CommitFn, Fut>(
         engine_provisioner: Arc<dyn EngineProvisioner>,
-        operation: TransformOperation,
+        request: TransformRequest,
         commit_fn: CommitFn,
         listener: Arc<dyn TransformListener>,
     ) -> Result<TransformResult, TransformError>
     where
-        CommitFn: FnOnce(DateTime<Utc>, ExecuteQuery, PathBuf, PathBuf) -> Fut,
+        CommitFn: FnOnce(ExecuteQueryParams, Option<OwnedFile>, Option<OwnedFile>) -> Fut,
         Fut: futures::Future<Output = Result<TransformResult, TransformError>>,
     {
-        let new_checkpoint_path = operation.request.new_checkpoint_path.clone();
-        let system_time = operation.request.system_time.clone();
-        let out_data_path = Arc::new(operation.request.out_data_path.clone());
+        let input_checkpoint = request.prev_checkpoint.clone();
+        let input_slices = request.inputs.iter().map(|i| i.clone().into()).collect();
 
         let engine = engine_provisioner
             .provision_engine(
-                match operation.request.transform {
+                match request.transform {
                     Transform::Sql(ref sql) => &sql.engine,
                 },
                 listener.clone().get_engine_provisioning_listener(),
             )
             .await?;
 
-        let response = engine.transform(operation.request).await?;
+        let response = engine.transform(request).await?;
+        assert_eq!(
+            response.data_interval.is_some(),
+            response.out_data.is_some()
+        );
 
-        let output_data = if let Some(interval) = response.data_interval {
-            if !out_data_path.exists() {
-                return Err(EngineError::contract_error(
-                    "Engine did not write a response data file",
-                    Vec::new(),
-                )
-                .into());
-            }
-            if out_data_path.is_symlink() || !out_data_path.is_file() {
-                return Err(EngineError::contract_error(
-                    "Engine wrote data not as a plain file",
-                    Vec::new(),
-                )
-                .into());
-            }
-
-            // TODO: Move out into data commit procedure of sorts
-            let path = out_data_path.clone();
-            let logical_hash = tokio::task::spawn_blocking(move || {
-                kamu_data_utils::data::hash::get_parquet_logical_hash(&path)
-            })
-            .await
-            .int_err()?
-            .int_err()?;
-
-            let path = out_data_path.clone();
-            let physical_hash = tokio::task::spawn_blocking(move || {
-                kamu_data_utils::data::hash::get_file_physical_hash(&path)
-            })
-            .await
-            .int_err()?
-            .int_err()?;
-
-            let size = std::fs::metadata(out_data_path.as_path()).int_err()?.len() as i64;
-
-            Some(DataSlice {
-                logical_hash,
-                physical_hash,
-                interval,
-                size,
-            })
-        } else if out_data_path.exists() {
-            return Err(EngineError::contract_error(
-                "Engine wrote data file while the ouput slice is empty",
-                Vec::new(),
-            )
-            .into());
-        } else {
-            None
-        };
-
-        let output_checkpoint = if new_checkpoint_path.exists() {
-            if new_checkpoint_path.is_symlink() || !new_checkpoint_path.is_file() {
-                return Err(EngineError::contract_error(
-                    "Engine wrote checkpoint not as a plain file",
-                    Vec::new(),
-                )
-                .into());
-            }
-
-            let physical_hash =
-                kamu_data_utils::data::hash::get_file_physical_hash(&new_checkpoint_path)
-                    .int_err()?;
-
-            let size = std::fs::metadata(&new_checkpoint_path).int_err()?.len() as i64;
-
-            Some(Checkpoint {
-                physical_hash,
-                size,
-            })
-        } else {
-            None
-        };
-
-        let new_event = ExecuteQuery {
-            input_slices: operation.input_slices,
-            input_checkpoint: operation.input_checkpoint,
-            output_data,
-            output_checkpoint,
-            output_watermark: response.output_watermark,
-        };
-
-        let result = commit_fn(
-            system_time,
-            new_event,
-            (*out_data_path).clone(),
-            new_checkpoint_path.clone(),
+        commit_fn(
+            ExecuteQueryParams {
+                input_slices,
+                input_checkpoint,
+                output_data: response.data_interval,
+                output_watermark: response.output_watermark,
+            },
+            response.out_data,
+            response.new_checkpoint,
         )
-        .await?;
-
-        // Commit should clean up
-        assert!(!out_data_path.exists());
-        assert!(!new_checkpoint_path.exists());
-
-        Ok(result)
-    }
-
-    async fn commit_transform(
-        dataset_handle: DatasetHandle,
-        dataset: Arc<dyn Dataset>,
-        system_time: DateTime<Utc>,
-        prev_block_hash: Multihash,
-        prev_sequence_number: i32,
-        new_event: ExecuteQuery,
-        new_data_path: PathBuf,
-        new_checkpoint_path: PathBuf,
-    ) -> Result<TransformResult, TransformError> {
-        // Commit data
-        if let Some(data_slice) = &new_event.output_data {
-            dataset
-                .as_data_repo()
-                .insert_file_move(
-                    &new_data_path,
-                    InsertOpts {
-                        precomputed_hash: Some(&data_slice.physical_hash),
-                        expected_hash: None,
-                        size_hint: Some(data_slice.size as usize),
-                    },
-                )
-                .await
-                .int_err()?;
-        }
-
-        // Commit checkpoint
-        if let Some(checkpoint) = &new_event.output_checkpoint {
-            dataset
-                .as_checkpoint_repo()
-                .insert_file_move(
-                    &new_checkpoint_path,
-                    InsertOpts {
-                        precomputed_hash: Some(&checkpoint.physical_hash),
-                        expected_hash: None,
-                        size_hint: Some(checkpoint.size as usize),
-                    },
-                )
-                .await
-                .int_err()?;
-        }
-
-        let new_block = MetadataBlock {
-            prev_block_hash: Some(prev_block_hash.clone()),
-            system_time,
-            sequence_number: prev_sequence_number + 1,
-            event: new_event.into(),
-        };
-
-        let new_block_hash = dataset
-            .as_metadata_chain()
-            .append(new_block, AppendOpts::default())
-            .await
-            .int_err()?;
-
-        tracing::info!(output_dataset = %dataset_handle, new_head = %new_block_hash, "Committed new block");
-
-        Ok(TransformResult::Updated {
-            old_head: prev_block_hash,
-            new_head: new_block_hash,
-            num_blocks: 1,
-        })
+        .await
     }
 
     // TODO: PERF: Avoid multiple passes over metadata chain
@@ -262,7 +113,7 @@ impl TransformServiceImpl {
         &self,
         dataset_handle: &DatasetHandle,
         system_time: DateTime<Utc>,
-    ) -> Result<Option<TransformOperation>, InternalError> {
+    ) -> Result<Option<TransformRequest>, InternalError> {
         let dataset = self
             .dataset_repo
             .get_dataset(&dataset_handle.as_local_ref())
@@ -307,40 +158,32 @@ impl TransformServiceImpl {
         }
 
         // Prepare inputs
-        let input_slices: Vec<_> = futures::stream::iter(&source.inputs)
-            .then(|input| self.get_input_slice(input.id.as_ref().unwrap(), output_chain))
-            .try_collect()
-            .await
-            .int_err()?;
-
-        let query_inputs: Vec<_> = futures::stream::iter(&input_slices)
-            .zip(futures::stream::iter(&source.inputs))
-            .then(|(slice, input)| self.to_query_input(slice, &input.name, None))
+        let inputs: Vec<_> = futures::stream::iter(&source.inputs)
+            .then(|input| self.get_transform_input(input, output_chain))
             .try_collect()
             .await
             .int_err()?;
 
         // Nothing to do?
-        if query_inputs
+        if inputs
             .iter()
-            .all(|i| i.data_paths.is_empty() && i.explicit_watermarks.is_empty())
+            .all(|i| i.data_slices.is_empty() && i.explicit_watermarks.is_empty())
         {
             return Ok(None);
         }
 
         let vocab = self.get_vocab(&dataset_handle.as_local_ref()).await?;
 
-        // TODO: Checkpoint hash should be contained in metadata explicitly, not
-        // inferred
         let prev_checkpoint = output_chain
             .iter_blocks()
             .filter_map_ok(|(_, b)| b.event.into_variant::<ExecuteQuery>())
-            .filter_map_ok(|b| b.output_checkpoint)
             .try_first()
             .await
-            .int_err()?;
+            .int_err()?
+            .and_then(|b| b.output_checkpoint)
+            .map(|cp| cp.physical_hash);
 
-        let data_offset_end = output_chain
+        let last_offset = output_chain
             .iter_blocks()
             .filter_map_ok(|(_, b)| b.event.into_variant::<ExecuteQuery>())
             .filter_map_ok(|eq| eq.output_data)
@@ -349,41 +192,14 @@ impl TransformServiceImpl {
             .await
             .int_err()?;
 
-        // TODO: This service shouldn't know specifics of dataset layouts
-        let prev_checkpoint_path = if let Some(cp) = prev_checkpoint.as_ref() {
-            Some(
-                kamu_data_utils::data::local_url::into_local_path(
-                    dataset
-                        .as_checkpoint_repo()
-                        .get_internal_url(&cp.physical_hash)
-                        .await,
-                )
-                .int_err()?,
-            )
-        } else {
-            None
-        };
-
-        // TODO: Reconsider where to store staged files
-        let out_data_path = self.run_info_dir.join(super::repos::get_staging_name());
-        let new_checkpoint_path = self.run_info_dir.join(super::repos::get_staging_name());
-
-        Ok(Some(TransformOperation {
+        Ok(Some(TransformRequest {
             dataset_handle: dataset_handle.clone(),
-            input_slices,
-            input_checkpoint: prev_checkpoint.map(|cp| cp.physical_hash),
-            request: ExecuteQueryRequest {
-                dataset_id: dataset_handle.id.clone(),
-                dataset_name: dataset_handle.alias.dataset_name.clone(),
-                system_time,
-                offset: data_offset_end.map(|e| e + 1).unwrap_or(0),
-                vocab,
-                transform: source.transform,
-                inputs: query_inputs,
-                prev_checkpoint_path,
-                new_checkpoint_path,
-                out_data_path,
-            },
+            transform: source.transform,
+            system_time,
+            offset: last_offset.map(|v| v + 1).unwrap_or(0),
+            vocab,
+            inputs,
+            prev_checkpoint,
         }))
     }
 
@@ -401,22 +217,23 @@ impl TransformServiceImpl {
     }
 
     // TODO: Avoid iterating through output chain multiple times
-    async fn get_input_slice(
+    async fn get_transform_input(
         &self,
-        dataset_id: &DatasetID,
+        transform_input: &TransformInput,
         output_chain: &dyn MetadataChain,
-    ) -> Result<InputSlice, InternalError> {
-        let input_handle = self
+    ) -> Result<TransformRequestInput, InternalError> {
+        let dataset_id = transform_input.id.as_ref().unwrap();
+        let dataset_handle = self
             .dataset_repo
             .resolve_dataset_ref(&dataset_id.as_local_ref())
             .await
             .int_err()?;
-        let input_dataset = self
+        let dataset = self
             .dataset_repo
-            .get_dataset(&input_handle.as_local_ref())
+            .get_dataset(&dataset_handle.as_local_ref())
             .await
             .int_err()?;
-        let input_chain = input_dataset.as_metadata_chain();
+        let input_chain = dataset.as_metadata_chain();
 
         // Determine last processed input block
         let last_processed_block = output_chain
@@ -446,7 +263,7 @@ impl TransformServiceImpl {
                 panic!(
                     "Input data for {} is inconsistent - first unprocessed block {} does not \
                      imediately follows last processed block {:?}",
-                    input_handle, first_unprocessed_hash, last_processed_block
+                    dataset_handle, first_unprocessed_hash, last_processed_block
                 );
             }
         }
@@ -480,123 +297,118 @@ impl TransformServiceImpl {
             _ => panic!(
                 "Input data for {} is inconsistent at block interval {:?} - unprocessed offset \
                  range ended up as ({:?}, {:?})",
-                input_handle, block_interval, offset_start, offset_end
+                dataset_handle, block_interval, offset_start, offset_end
             ),
         };
 
-        Ok(InputSlice {
-            dataset_id: dataset_id.to_owned(),
-            block_interval,
-            data_interval,
-        })
+        self.get_transform_input_from_slice(
+            InputSlice {
+                dataset_id: dataset_id.clone(),
+                block_interval: block_interval.clone(),
+                data_interval: data_interval.clone(),
+            },
+            transform_input.name.to_string(),
+            Some(blocks_unprocessed),
+            None,
+        )
+        .await
     }
 
-    // TODO: Avoid traversing same blocks again
-    async fn to_query_input(
+    async fn get_transform_input_from_slice(
         &self,
-        slice: &InputSlice,
-        // Note: The name of the input in metadata can be different from the name in the workspace
-        name: &DatasetName,
+        input_slice: InputSlice,
+        alias: String,
+        blocks_hint: Option<Vec<(Multihash, MetadataBlock)>>,
         vocab_hint: Option<DatasetVocabulary>,
-    ) -> Result<ExecuteQueryInput, InternalError> {
-        let input_handle = self
+    ) -> Result<TransformRequestInput, InternalError> {
+        let dataset_handle = self
             .dataset_repo
-            .resolve_dataset_ref(&slice.dataset_id.as_local_ref())
+            .resolve_dataset_ref(&input_slice.dataset_id.as_local_ref())
             .await
             .int_err()?;
-        let input_dataset = self
+        let dataset = self
             .dataset_repo
-            .get_dataset(&input_handle.as_local_ref())
+            .get_dataset(&dataset_handle.as_local_ref())
             .await
             .int_err()?;
-        let input_chain = input_dataset.as_metadata_chain();
+        let input_chain = dataset.as_metadata_chain();
 
-        // List of part files and watermarks that will be used by the engine
-        // Note: Engine will still filter the records by the offset interval
-        let mut data_paths = Vec::new();
+        // Collect unprocessed input blocks
+        let blocks_unprocessed = if let Some(block_interval) = &input_slice.block_interval {
+            if let Some(blocks) = blocks_hint {
+                assert_eq!(blocks.last().map(|(h, _)| h), Some(&block_interval.start));
+                assert_eq!(blocks.first().map(|(h, _)| h), Some(&block_interval.end));
+                blocks
+            } else {
+                input_chain
+                    .iter_blocks_interval_inclusive(
+                        &block_interval.end,
+                        &block_interval.start,
+                        false,
+                    )
+                    .try_collect()
+                    .await
+                    .int_err()?
+            }
+        } else {
+            Vec::new()
+        };
+
+        let mut data_slices = Vec::new();
         let mut explicit_watermarks = Vec::new();
-
-        if let Some(block_interval) = &slice.block_interval {
-            let hash_to_stop_at = input_chain
-                .get_block(&block_interval.start)
-                .await
-                .expect("Starting block of the interval not found")
-                .prev_block_hash;
-
-            let mut block_stream = input_chain
-                .iter_blocks_interval(&block_interval.end, hash_to_stop_at.as_ref(), false)
-                .filter_data_stream_blocks();
-
-            while let Some((_, block)) = block_stream.try_next().await.int_err()? {
-                if let Some(slice) = &block.event.output_data {
-                    let data_slice_url = input_dataset
-                        .as_data_repo()
-                        .get_internal_url(&slice.physical_hash)
-                        .await;
-                    data_paths.push(
-                        kamu_data_utils::data::local_url::into_local_path(data_slice_url)
-                            .int_err()?,
-                    );
-                }
-
-                if let Some(wm) = block.event.output_watermark {
-                    explicit_watermarks.push(Watermark {
-                        system_time: block.system_time,
-                        event_time: wm,
-                    });
-                }
+        for block in blocks_unprocessed
+            .iter()
+            .rev()
+            .filter_map(|(_, b)| b.as_data_stream_block())
+        {
+            if let Some(slice) = block.event.output_data {
+                data_slices.push(slice.physical_hash.clone());
             }
 
-            // Note: Order is important, so we reverse it to make chronological
-            data_paths.reverse();
-            explicit_watermarks.reverse();
+            if let Some(wm) = block.event.output_watermark {
+                explicit_watermarks.push(Watermark {
+                    system_time: block.system_time.clone(),
+                    event_time: wm.clone(),
+                });
+            }
         }
 
         // TODO: Migrate to providing schema directly
         // TODO: Will not work with schema evolution
-
-        let schema_file = if let Some(p) = data_paths.last() {
-            p.clone()
+        let schema_slice = if let Some(h) = data_slices.last() {
+            h.clone()
         } else {
-            let last_slice = input_chain
+            // TODO: This will not work with schema evolution
+            input_chain
                 .iter_blocks()
                 .filter_data_stream_blocks()
                 .filter_map_ok(|(_, b)| b.event.output_data)
                 .try_first()
                 .await
                 .int_err()?
-                .unwrap();
-            let last_slice_url = input_dataset
-                .as_data_repo()
-                .get_internal_url(&last_slice.physical_hash)
-                .await;
-            kamu_data_utils::data::local_url::into_local_path(last_slice_url).int_err()?
+                .unwrap() // Already checked that none of the inputs are empty
+                .physical_hash
         };
 
         let vocab = match vocab_hint {
             Some(v) => v,
-            None => self.get_vocab(&input_handle.as_local_ref()).await?,
+            None => self.get_vocab(&dataset_handle.as_local_ref()).await?,
         };
 
-        let is_empty = data_paths.is_empty() && explicit_watermarks.is_empty();
+        let is_empty = data_slices.is_empty() && explicit_watermarks.is_empty();
 
-        let input = ExecuteQueryInput {
-            dataset_id: input_handle.id.clone(),
-            dataset_name: name.clone(),
+        let input = TransformRequestInput {
+            dataset_handle,
+            alias,
             vocab,
-            data_interval: slice.data_interval.clone(),
-            data_paths,
-            schema_file,
+            block_interval: input_slice.block_interval,
+            data_interval: input_slice.data_interval,
+            data_slices,
+            schema_slice,
             explicit_watermarks,
         };
 
-        tracing::info!(
-            %input_handle,
-            ?input,
-            ?slice,
-            is_empty,
-            "Computed query input"
-        );
+        tracing::info!(?input, is_empty, "Computed transform input");
 
         Ok(input)
     }
@@ -733,48 +545,31 @@ impl TransformServiceImpl {
                         .map(|v| v.clone())
                         .unwrap();
 
-                    self.to_query_input(slice, name, Some(vocab))
+                    self.get_transform_input_from_slice(
+                        slice.clone(),
+                        name.to_string(),
+                        None,
+                        Some(vocab),
+                    )
                 })
                 .try_collect()
                 .await?;
 
-            let prev_checkpoint_path = if let Some(cp) = block_t.event.input_checkpoint.as_ref() {
-                Some(
-                    kamu_data_utils::data::local_url::into_local_path(
-                        dataset.as_checkpoint_repo().get_internal_url(&cp).await,
-                    )
-                    .int_err()?,
-                )
-            } else {
-                None
-            };
-
-            let out_data_path = self.run_info_dir.join(super::repos::get_staging_name());
-            let new_checkpoint_path = self.run_info_dir.join(super::repos::get_staging_name());
-
             let step = VerificationStep {
-                operation: TransformOperation {
+                request: TransformRequest {
                     dataset_handle: dataset_handle.clone(),
-                    input_slices: block_t.event.input_slices.clone(),
-                    input_checkpoint: block_t.event.input_checkpoint.clone(),
-                    request: ExecuteQueryRequest {
-                        dataset_id: dataset_handle.id.clone(),
-                        dataset_name: dataset_handle.alias.dataset_name.clone(),
-                        system_time: block.system_time,
-                        offset: block_t
-                            .event
-                            .output_data
-                            .as_ref()
-                            .map(|s| s.interval.start)
-                            .unwrap_or(0), /* TODO: Assuming offset does not matter if block is
-                                            * not supposed to produce data */
-                        transform: source.transform.clone(),
-                        vocab: vocab.clone().unwrap_or_default(),
-                        inputs,
-                        prev_checkpoint_path,
-                        new_checkpoint_path,
-                        out_data_path,
-                    },
+                    transform: source.transform.clone(),
+                    system_time: block.system_time,
+                    offset: block_t
+                        .event
+                        .output_data
+                        .as_ref()
+                        .map(|s| s.interval.start)
+                        .unwrap_or(0), /* TODO: Assuming offset does not matter if block is
+                                        * not supposed to produce data */
+                    inputs,
+                    vocab: vocab.clone().unwrap_or_default(),
+                    prev_checkpoint: block_t.event.input_checkpoint.clone(),
                 },
                 expected_block: block,
                 expected_hash: block_hash,
@@ -804,24 +599,32 @@ impl TransformServiceImpl {
                 .await?;
             let meta_chain = dataset.as_metadata_chain();
 
+            let system_time = operation.system_time.clone();
             let head = meta_chain.get_ref(&BlockRef::Head).await.int_err()?;
-
-            let head_block = meta_chain.get_block(&head).await.int_err()?;
 
             Self::do_transform(
                 self.engine_provisioner.clone(),
                 operation,
-                move |system_time, new_event, new_data_path, new_checkpoint_path| {
-                    Self::commit_transform(
-                        dataset_handle,
-                        dataset,
-                        system_time,
-                        head,
-                        head_block.sequence_number,
-                        new_event,
-                        new_data_path,
-                        new_checkpoint_path,
-                    )
+                move |execute_query, new_data, new_checkpoint| async move {
+                    let commit_result = dataset
+                        .commit_execute_query(
+                            execute_query,
+                            new_data,
+                            new_checkpoint,
+                            CommitOpts {
+                                block_ref: &BlockRef::Head,
+                                system_time: Some(system_time),
+                                prev_block_hash: Some(Some(&head)),
+                                check_object_refs: true,
+                            },
+                        )
+                        .await?;
+
+                    Ok(TransformResult::Updated {
+                        old_head: commit_result.old_head.unwrap(),
+                        new_head: commit_result.new_head,
+                        num_blocks: 1,
+                    })
                 },
                 listener,
             )
@@ -885,6 +688,10 @@ impl TransformService for TransformServiceImpl {
         let listener = maybe_listener.unwrap_or(Arc::new(NullVerificationListener {}));
 
         let dataset_handle = self.dataset_repo.resolve_dataset_ref(dataset_ref).await?;
+        let dataset = self
+            .dataset_repo
+            .get_dataset(&dataset_handle.as_local_ref())
+            .await?;
 
         let verification_plan = self
             .get_verification_plan(&dataset_handle, block_range)
@@ -893,13 +700,13 @@ impl TransformService for TransformServiceImpl {
         listener.begin_phase(VerificationPhase::ReplayTransform);
 
         for (step_index, step) in verification_plan.into_iter().enumerate() {
-            let operation = step.operation;
+            let request = step.request;
             let block_hash = step.expected_hash;
             let expected_block = step.expected_block;
             let expected_event = expected_block.event.into_variant::<ExecuteQuery>().unwrap();
 
             // Will be set during "commit" step
-            let mut actual_event = None;
+            let mut actual_event: Option<ExecuteQuery> = None;
 
             tracing::info!(
                 %block_hash,
@@ -918,26 +725,27 @@ impl TransformService for TransformServiceImpl {
                 .get_transform_listener()
                 .unwrap_or_else(|| Arc::new(NullTransformListener));
 
+            let ds = dataset.clone();
+            let out_event = &mut actual_event;
+            let result = TransformResult::Updated {
+                old_head: expected_block.prev_block_hash.clone().unwrap(),
+                new_head: block_hash.clone(),
+                num_blocks: 1,
+            };
+
             Self::do_transform(
                 self.engine_provisioner.clone(),
-                operation,
-                |_system_time, new_event, new_data_path, new_checkpoint_path| async {
-                    // Cleanup not needed outputs
-                    if new_event.output_data.is_some() {
-                        std::fs::remove_file(new_data_path).int_err()?;
-                    }
-                    if new_event.output_checkpoint.is_some() {
-                        std::fs::remove_file(new_checkpoint_path).int_err()?;
-                    }
+                request,
+                |execute_query, data, checkpoint| async move {
+                    // We commit and expect outputs to be cleaned up automatically on drop
+                    let new_event = ds
+                        .prepare_execute_query(execute_query, data.as_ref(), checkpoint.as_ref())
+                        .await?;
 
-                    actual_event = Some(new_event);
+                    *out_event = Some(new_event);
 
                     // This result is ignored
-                    Ok(TransformResult::Updated {
-                        old_head: expected_block.prev_block_hash.clone().unwrap(),
-                        new_head: block_hash.clone(),
-                        num_blocks: 1,
-                    })
+                    Ok(result)
                 },
                 transform_listener,
             )
@@ -999,17 +807,9 @@ impl TransformService for TransformServiceImpl {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, PartialEq)]
-pub struct TransformOperation {
-    pub dataset_handle: DatasetHandle,
-    pub input_slices: Vec<InputSlice>,
-    pub input_checkpoint: Option<Multihash>,
-    pub request: ExecuteQueryRequest,
-}
-
 #[derive(Debug)]
 pub struct VerificationStep {
-    pub operation: TransformOperation,
+    pub request: TransformRequest,
     pub expected_block: MetadataBlock,
     pub expected_hash: Multihash,
 }

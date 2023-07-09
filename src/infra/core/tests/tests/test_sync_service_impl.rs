@@ -61,12 +61,14 @@ async fn append_random_data(
     };
 
     ds.commit_add_data(
-        input_checkpoint,
-        Some(data_interval),
-        Some(data_path.as_path()),
-        Some(checkpoint_path.as_path()),
-        None,
-        None,
+        AddDataParams {
+            input_checkpoint,
+            output_data: Some(data_interval),
+            output_watermark: None,
+            source_state: None,
+        },
+        Some(OwnedFile::new(data_path)),
+        Some(OwnedFile::new(checkpoint_path)),
         CommitOpts::default(),
     )
     .await

@@ -7,9 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::path::Path;
-use std::sync::Arc;
-
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use kamu_core::*;
@@ -187,6 +184,99 @@ where
 
         Ok(increment)
     }
+
+    async fn prepare_objects(
+        &self,
+        data_interval: Option<OffsetInterval>,
+        data: Option<&OwnedFile>,
+        checkpoint: Option<&OwnedFile>,
+    ) -> Result<(Option<DataSlice>, Option<Checkpoint>), InternalError> {
+        let data_slice = if let Some(data_interval) = data_interval {
+            let data = data.unwrap();
+            let path = data.as_path().to_path_buf();
+            let logical_hash = tokio::task::spawn_blocking(move || {
+                kamu_data_utils::data::hash::get_parquet_logical_hash(&path)
+            })
+            .await
+            .int_err()?
+            .int_err()?;
+
+            let path = data.as_path().to_path_buf();
+            let physical_hash = tokio::task::spawn_blocking(move || {
+                kamu_data_utils::data::hash::get_file_physical_hash(&path)
+            })
+            .await
+            .int_err()?
+            .int_err()?;
+
+            Some(DataSlice {
+                logical_hash,
+                physical_hash,
+                interval: data_interval,
+                size: std::fs::metadata(data.as_path()).int_err()?.len() as i64,
+            })
+        } else {
+            assert!(data.is_none());
+            None
+        };
+
+        let checkpoint = if let Some(checkpoint) = checkpoint {
+            let path = checkpoint.as_path().to_path_buf();
+            let physical_hash = tokio::task::spawn_blocking(move || {
+                kamu_data_utils::data::hash::get_file_physical_hash(&path)
+            })
+            .await
+            .int_err()?
+            .int_err()?;
+
+            Some(Checkpoint {
+                physical_hash,
+                size: std::fs::metadata(checkpoint.as_path()).int_err()?.len() as i64,
+            })
+        } else {
+            None
+        };
+
+        Ok((data_slice, checkpoint))
+    }
+
+    async fn commit_objects(
+        &self,
+        data_slice: Option<&DataSlice>,
+        data: Option<OwnedFile>,
+        checkpoint_meta: Option<&Checkpoint>,
+        checkpoint: Option<OwnedFile>,
+    ) -> Result<(), InternalError> {
+        if let Some(data_slice) = data_slice {
+            self.as_data_repo()
+                .insert_file_move(
+                    &data.unwrap().into_inner(),
+                    InsertOpts {
+                        precomputed_hash: Some(&data_slice.physical_hash),
+                        expected_hash: None,
+                        size_hint: Some(data_slice.size as usize),
+                    },
+                )
+                .await
+                .int_err()?;
+        }
+
+        if let Some(checkpoint_meta) = checkpoint_meta {
+            self.as_checkpoint_repo()
+                .insert_file_move(
+                    &checkpoint.unwrap().into_inner(),
+                    InsertOpts {
+                        precomputed_hash: Some(&checkpoint_meta.physical_hash),
+                        expected_hash: None,
+                        size_hint: Some(checkpoint_meta.size as usize),
+                    },
+                )
+                .await
+                .int_err()?;
+        }
+
+        Ok(())
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -345,105 +435,91 @@ where
     /// to be on the same file system as the workspace.
     async fn commit_add_data(
         &self,
-        input_checkpoint: Option<Multihash>,
-        data_interval: Option<OffsetInterval>,
-        movable_data_file: Option<&Path>,
-        movable_checkpoint_file: Option<&Path>,
-        output_watermark: Option<DateTime<Utc>>,
-        source_state: Option<SourceState>,
+        add_data: AddDataParams,
+        data: Option<OwnedFile>,
+        checkpoint: Option<OwnedFile>,
         opts: CommitOpts<'_>,
     ) -> Result<CommitResult, CommitError> {
-        // Commit data
-        let output_data = match data_interval {
-            None => None,
-            Some(data_interval) => {
-                let from_data_path = Arc::new(movable_data_file.unwrap().to_path_buf());
+        let (output_data, output_checkpoint) = self
+            .prepare_objects(add_data.output_data, data.as_ref(), checkpoint.as_ref())
+            .await?;
 
-                let path = from_data_path.clone();
-                let logical_hash = tokio::task::spawn_blocking(move || {
-                    kamu_data_utils::data::hash::get_parquet_logical_hash(&path)
-                })
-                .await
-                .int_err()?
-                .int_err()?;
+        self.commit_objects(
+            output_data.as_ref(),
+            data,
+            output_checkpoint.as_ref(),
+            checkpoint,
+        )
+        .await?;
 
-                let path = from_data_path.clone();
-                let physical_hash = tokio::task::spawn_blocking(move || {
-                    kamu_data_utils::data::hash::get_file_physical_hash(&path)
-                })
-                .await
-                .int_err()?
-                .int_err()?;
-
-                let output_data = DataSlice {
-                    logical_hash,
-                    physical_hash,
-                    interval: data_interval,
-                    size: std::fs::metadata(from_data_path.as_path()).int_err()?.len() as i64,
-                };
-
-                // Move data to repo
-                self.as_data_repo()
-                    .insert_file_move(
-                        from_data_path.as_ref(),
-                        InsertOpts {
-                            precomputed_hash: Some(&output_data.physical_hash),
-                            expected_hash: None,
-                            size_hint: Some(output_data.size as usize),
-                        },
-                    )
-                    .await
-                    .int_err()?;
-
-                Some(output_data)
-            }
-        };
-
-        // Commit checkpoint
-        let output_checkpoint = match movable_checkpoint_file {
-            None => None,
-            Some(checkpoint_file) => {
-                let physical_hash =
-                    kamu_data_utils::data::hash::get_file_physical_hash(checkpoint_file.as_ref())
-                        .int_err()?;
-
-                let size = std::fs::metadata(&checkpoint_file).int_err()?.len() as i64;
-
-                self.as_checkpoint_repo()
-                    .insert_file_move(
-                        checkpoint_file.as_ref(),
-                        InsertOpts {
-                            precomputed_hash: Some(&physical_hash),
-                            expected_hash: None,
-                            size_hint: Some(size as usize),
-                        },
-                    )
-                    .await
-                    .int_err()?;
-
-                Some(Checkpoint {
-                    physical_hash,
-                    size,
-                })
-            }
-        };
-
-        let metadata_event = MetadataEvent::AddData(AddData {
-            input_checkpoint,
+        let metadata_event = AddData {
+            input_checkpoint: add_data.input_checkpoint,
             output_data,
             output_checkpoint,
-            output_watermark,
-            source_state,
-        });
+            output_watermark: add_data.output_watermark,
+            source_state: add_data.source_state,
+        };
 
         self.commit_event(
-            metadata_event,
+            metadata_event.into(),
             CommitOpts {
                 check_object_refs: false, // We just added all objects
                 ..opts
             },
         )
         .await
+    }
+
+    /// Helper function to commit ExecuteQuery event into a local dataset.
+    ///
+    /// Will attempt to atomically move data and checkpoint files, so those have
+    /// to be on the same file system as the workspace.
+    async fn commit_execute_query(
+        &self,
+        execute_query: ExecuteQueryParams,
+        data: Option<OwnedFile>,
+        checkpoint: Option<OwnedFile>,
+        opts: CommitOpts<'_>,
+    ) -> Result<CommitResult, CommitError> {
+        let event = self
+            .prepare_execute_query(execute_query, data.as_ref(), checkpoint.as_ref())
+            .await?;
+
+        self.commit_objects(
+            event.output_data.as_ref(),
+            data,
+            event.output_checkpoint.as_ref(),
+            checkpoint,
+        )
+        .await?;
+
+        self.commit_event(
+            event.into(),
+            CommitOpts {
+                check_object_refs: false, // We just added all objects
+                ..opts
+            },
+        )
+        .await
+    }
+
+    async fn prepare_execute_query(
+        &self,
+        execute_query: ExecuteQueryParams,
+        data: Option<&OwnedFile>,
+        checkpoint: Option<&OwnedFile>,
+    ) -> Result<ExecuteQuery, InternalError> {
+        let (output_data, output_checkpoint) = self
+            .prepare_objects(execute_query.output_data, data, checkpoint)
+            .await?;
+
+        Ok(ExecuteQuery {
+            input_slices: execute_query.input_slices,
+            input_checkpoint: execute_query.input_checkpoint,
+            output_data,
+            output_checkpoint,
+            output_watermark: execute_query.output_watermark,
+        })
     }
 
     async fn get_summary(&self, opts: GetSummaryOpts) -> Result<DatasetSummary, GetSummaryError> {
