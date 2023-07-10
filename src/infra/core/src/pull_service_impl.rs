@@ -267,12 +267,9 @@ impl PullServiceImpl {
 
         // No luck - now have to search through aliases (of current user)
         use tokio_stream::StreamExt;
-        let mut datasets = if self.dataset_repo.is_multi_tenant() {
-            self.dataset_repo
-                .get_account_datasets(self.current_account.account_name.clone())
-        } else {
-            self.dataset_repo.get_all_datasets()
-        };
+        let mut datasets = self
+            .dataset_repo
+            .get_account_datasets(self.current_account.account_name.clone());
         while let Some(dataset_handle) = datasets.next().await {
             let dataset_handle = dataset_handle?;
 

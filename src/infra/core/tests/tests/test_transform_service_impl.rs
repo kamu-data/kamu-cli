@@ -108,7 +108,7 @@ async fn test_get_next_operation() {
     let workspace_layout = Arc::new(WorkspaceLayout::create(tempdir.path(), false).unwrap());
     let dataset_repo = Arc::new(DatasetRepositoryLocalFs::new(
         workspace_layout.datasets_dir.clone(),
-        Arc::new(CurrentAccountConfig::new(DEFAULT_DATASET_OWNER_NAME, false)),
+        Arc::new(CurrentAccountConfig::new("kamu", false)),
         false,
     ));
     let transform_svc = TransformServiceImpl::new(
@@ -166,7 +166,7 @@ async fn test_get_verification_plan_one_to_one() {
     let workspace_layout = Arc::new(WorkspaceLayout::create(tempdir.path(), false).unwrap());
     let dataset_repo = Arc::new(DatasetRepositoryLocalFs::new(
         workspace_layout.datasets_dir.clone(),
-        Arc::new(CurrentAccountConfig::new(DEFAULT_DATASET_OWNER_NAME, false)),
+        Arc::new(CurrentAccountConfig::new("kamu", false)),
         false,
     ));
     let transform_svc = TransformServiceImpl::new(

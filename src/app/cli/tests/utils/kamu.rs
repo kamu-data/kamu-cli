@@ -32,7 +32,7 @@ impl Kamu {
     pub fn new<P: Into<PathBuf>>(workspace_path: P) -> Self {
         let workspace_path = workspace_path.into();
         let workspace_layout = WorkspaceLayout::new(workspace_path.join(".kamu"));
-        let current_account_config = CurrentAccountConfig::new(DEFAULT_DATASET_OWNER_NAME, false);
+        let current_account_config = CurrentAccountConfig::new("kamu", false);
         Self {
             workspace_layout,
             current_account_config,
@@ -124,7 +124,7 @@ impl Kamu {
         let cli = kamu_cli::cli();
         let dataset_repo = Arc::new(DatasetRepositoryLocalFs::new(
             self.workspace_layout.datasets_dir.clone(),
-            Arc::new(CurrentAccountConfig::new(DEFAULT_DATASET_OWNER_NAME, false)),
+            Arc::new(CurrentAccountConfig::new("kamu", false)),
             false,
         ));
         let config_service = Arc::new(ConfigService::new(&self.workspace_layout));

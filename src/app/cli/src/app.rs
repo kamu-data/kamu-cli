@@ -129,7 +129,7 @@ pub async fn run(
 // Public only for tests
 pub fn configure_catalog(
     workspace_layout: &WorkspaceLayout,
-    is_multi_tenant_workspace: bool,
+    multi_tenant_workspace: bool,
 ) -> CatalogBuilder {
     let mut b = CatalogBuilder::new();
 
@@ -142,7 +142,7 @@ pub fn configure_catalog(
     b.add_builder(
         builder_for::<DatasetRepositoryLocalFs>()
             .with_root(workspace_layout.datasets_dir.clone())
-            .with_multi_tenant(is_multi_tenant_workspace),
+            .with_multi_tenant(multi_tenant_workspace),
     );
     b.bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>();
 

@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use dill::*;
-use kamu::domain::{CurrentAccountConfig, DEFAULT_DATASET_OWNER_NAME};
+use kamu::domain::CurrentAccountConfig;
 use kamu::WorkspaceLayout;
 use kamu_cli;
 
@@ -18,7 +18,7 @@ async fn test_di_graph_validates() {
     let workspace_layout = WorkspaceLayout::new(tempdir.path());
     let mut catalog_builder = kamu_cli::configure_catalog(&workspace_layout, false);
     kamu_cli::register_config_in_catalog(&kamu_cli::CLIConfig::default(), &mut catalog_builder);
-    catalog_builder.add_value(CurrentAccountConfig::new(DEFAULT_DATASET_OWNER_NAME, false));
+    catalog_builder.add_value(CurrentAccountConfig::new("kamu", false));
 
     // TODO: We should ensure this test covers parameters requested by commands and
     // types needed for GQL/HTTP adapter that are currently being constructed

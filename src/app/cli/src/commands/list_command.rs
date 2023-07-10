@@ -245,7 +245,7 @@ impl Command for ListCommand {
             if show_owners {
                 owner.push(String::from(match &hdl.alias.account_name {
                     Some(name) => name.as_str(),
-                    None => DEFAULT_DATASET_OWNER_NAME,
+                    None => self.current_account.account_name.as_str(),
                 }));
             }
 

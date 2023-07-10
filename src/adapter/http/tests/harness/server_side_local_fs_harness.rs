@@ -13,13 +13,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use dill::builder_for;
-use kamu::domain::{
-    CurrentAccountConfig,
-    DatasetRepository,
-    InternalError,
-    ResultIntoInternal,
-    DEFAULT_DATASET_OWNER_NAME,
-};
+use kamu::domain::{CurrentAccountConfig, DatasetRepository, InternalError, ResultIntoInternal};
 use kamu::{DatasetLayout, DatasetRepositoryLocalFs, WorkspaceLayout};
 use tempfile::TempDir;
 use url::Url;
@@ -47,7 +41,7 @@ impl ServerSideLocalFsHarness {
                     .with_multi_tenant(false),
             )
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-            .add_value(CurrentAccountConfig::new(DEFAULT_DATASET_OWNER_NAME, false))
+            .add_value(CurrentAccountConfig::new("kamu", false))
             .build();
 
         let api_server = TestAPIServer::new(

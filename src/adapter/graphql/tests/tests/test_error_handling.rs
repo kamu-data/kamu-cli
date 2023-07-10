@@ -58,7 +58,7 @@ async fn test_internal_error() {
     let workspace_layout = Arc::new(WorkspaceLayout::new(tempdir.path()));
     let dataset_repo = DatasetRepositoryLocalFs::new(
         workspace_layout.datasets_dir.clone(),
-        Arc::new(CurrentAccountConfig::new(DEFAULT_DATASET_OWNER_NAME, false)),
+        Arc::new(CurrentAccountConfig::new("kamu", false)),
         false,
     );
 

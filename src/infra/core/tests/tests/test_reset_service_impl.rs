@@ -112,7 +112,7 @@ impl ResetTestHarness {
         let workspace_layout = Arc::new(WorkspaceLayout::create(temp_dir.path(), false).unwrap());
         let dataset_repo = Arc::new(DatasetRepositoryLocalFs::new(
             workspace_layout.datasets_dir.clone(),
-            Arc::new(CurrentAccountConfig::new(DEFAULT_DATASET_OWNER_NAME, false)),
+            Arc::new(CurrentAccountConfig::new("kamu", false)),
             false,
         ));
 

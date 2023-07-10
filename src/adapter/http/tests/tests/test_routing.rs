@@ -43,7 +43,7 @@ async fn setup_repo() -> RepoFixture {
                 .with_multi_tenant(false),
         )
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-        .add_value(CurrentAccountConfig::new(DEFAULT_DATASET_OWNER_NAME, false))
+        .add_value(CurrentAccountConfig::new("kamu", false))
         .build();
 
     let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();

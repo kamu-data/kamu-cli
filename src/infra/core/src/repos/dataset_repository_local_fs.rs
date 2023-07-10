@@ -50,7 +50,10 @@ impl DatasetRepositoryLocalFs {
                     current_account_config,
                 ))
             } else {
-                Box::new(DatasetSingleTenantStorageStrategy::new(root.into()))
+                Box::new(DatasetSingleTenantStorageStrategy::new(
+                    root.into(),
+                    current_account_config,
+                ))
             },
             thrash_lock: tokio::sync::Mutex::new(()),
         }
@@ -335,11 +338,18 @@ enum ResolveDatasetError {
 
 struct DatasetSingleTenantStorageStrategy {
     root: PathBuf,
+    current_account_config: Arc<CurrentAccountConfig>,
 }
 
 impl DatasetSingleTenantStorageStrategy {
-    pub fn new(root: impl Into<PathBuf>) -> Self {
-        Self { root: root.into() }
+    pub fn new(
+        root: impl Into<PathBuf>,
+        current_account_config: Arc<CurrentAccountConfig>,
+    ) -> Self {
+        Self {
+            root: root.into(),
+            current_account_config,
+        }
     }
 
     fn dataset_name<'a>(&self, dataset_alias: &'a DatasetAlias) -> &'a DatasetName {
@@ -406,8 +416,12 @@ impl DatasetStorageStrategy for DatasetSingleTenantStorageStrategy {
         })
     }
 
-    fn get_account_datasets<'s>(&'s self, _account_name: AccountName) -> DatasetHandleStream<'s> {
-        panic!("Single-tenant dataset repository queried by account");
+    fn get_account_datasets<'s>(&'s self, account_name: AccountName) -> DatasetHandleStream<'s> {
+        if account_name == self.current_account_config.account_name {
+            self.get_all_datasets()
+        } else {
+            panic!("Single-tenant dataset repository queried by non-default account");
+        }
     }
 
     async fn resolve_dataset_alias(
