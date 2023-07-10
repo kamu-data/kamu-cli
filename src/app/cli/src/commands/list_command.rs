@@ -18,13 +18,18 @@ use opendatafabric::*;
 
 use super::{CLIError, Command};
 use crate::output::*;
-use crate::{NotInMultiTenantWorkspace, RelatedAccountIndication, TargetAccountSelection};
+use crate::{
+    CurrentAccountIndication,
+    NotInMultiTenantWorkspace,
+    RelatedAccountIndication,
+    TargetAccountSelection,
+};
 
 pub struct ListCommand {
     dataset_repo: Arc<dyn DatasetRepository>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
-    current_account: Arc<CurrentAccountConfig>,
-    related_account_indication: RelatedAccountIndication,
+    current_account: CurrentAccountIndication,
+    related_account: RelatedAccountIndication,
     output_config: Arc<OutputConfig>,
     detail_level: u8,
 }
@@ -33,8 +38,8 @@ impl ListCommand {
     pub fn new(
         dataset_repo: Arc<dyn DatasetRepository>,
         remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
-        current_account: Arc<CurrentAccountConfig>,
-        related_account_indication: RelatedAccountIndication,
+        current_account: CurrentAccountIndication,
+        related_account: RelatedAccountIndication,
         output_config: Arc<OutputConfig>,
         detail_level: u8,
     ) -> Self {
@@ -42,7 +47,7 @@ impl ListCommand {
             dataset_repo,
             remote_alias_reg,
             current_account,
-            related_account_indication,
+            related_account,
             output_config,
             detail_level,
         }
@@ -176,7 +181,7 @@ impl ListCommand {
 
     fn stream_datasets(&self) -> DatasetHandleStream {
         if self.dataset_repo.is_multi_tenant() {
-            match &self.related_account_indication.target_account {
+            match &self.related_account.target_account {
                 TargetAccountSelection::Current => self
                     .dataset_repo
                     .get_account_datasets(self.current_account.account_name.clone()),
@@ -206,8 +211,8 @@ impl Command for ListCommand {
         use datafusion::arrow::record_batch::RecordBatch;
 
         let show_owners = if self.dataset_repo.is_multi_tenant() {
-            self.current_account.is_explicit() || self.related_account_indication.is_explicit()
-        } else if self.related_account_indication.is_explicit() {
+            self.current_account.is_explicit() || self.related_account.is_explicit()
+        } else if self.related_account.is_explicit() {
             return Err(CLIError::usage_error_from(NotInMultiTenantWorkspace));
         } else {
             false

@@ -7,30 +7,32 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use dill::InjectionError;
 use opendatafabric::*;
 
 use crate::commands::*;
-use crate::services::WorkspaceService;
-use crate::{AccountService, CommandInterpretationFailed, RelatedAccountIndication};
+use crate::services::{AccountService, WorkspaceService};
+use crate::CommandInterpretationFailed;
 
 pub fn get_command(
     catalog: &dill::Catalog,
-    matches: clap::ArgMatches,
+    arg_matches: clap::ArgMatches,
 ) -> Result<Box<dyn Command>, CLIError> {
-    let command: Box<dyn Command> = match matches.subcommand() {
-        Some(("add", submatches)) => Box::new(AddCommand::new(
-            catalog.get_one()?,
-            catalog.get_one()?,
-            catalog.get_one()?,
-            submatches
-                .get_many("manifest")
-                .unwrap_or_default()
-                .map(String::as_str),
-            submatches.get_flag("recursive"),
-            submatches.get_flag("replace"),
-            submatches.get_flag("stdin"),
-        )),
+    let command: Box<dyn Command> = match arg_matches.subcommand() {
+        Some(("add", submatches)) => {
+            let account_service = catalog.get_one::<AccountService>()?;
+            Box::new(AddCommand::new(
+                catalog.get_one()?,
+                catalog.get_one()?,
+                account_service.current_account_indication(&arg_matches),
+                submatches
+                    .get_many("manifest")
+                    .unwrap_or_default()
+                    .map(String::as_str),
+                submatches.get_flag("recursive"),
+                submatches.get_flag("replace"),
+                submatches.get_flag("stdin"),
+            ))
+        }
         Some(("complete", submatches)) => {
             let workspace_svc = catalog.get_one::<WorkspaceService>()?;
             let in_workspace =
@@ -141,14 +143,17 @@ pub fn get_command(
             )),
             _ => return Err(CommandInterpretationFailed.into()),
         },
-        Some(("list", submatches)) => Box::new(ListCommand::new(
-            catalog.get_one()?,
-            catalog.get_one()?,
-            catalog.get_one()?,
-            related_account_indication(catalog, submatches)?,
-            catalog.get_one()?,
-            submatches.get_count("wide"),
-        )),
+        Some(("list", submatches)) => {
+            let account_service = catalog.get_one::<AccountService>()?;
+            Box::new(ListCommand::new(
+                catalog.get_one()?,
+                catalog.get_one()?,
+                account_service.current_account_indication(&arg_matches),
+                account_service.related_account_indication(submatches),
+                catalog.get_one()?,
+                submatches.get_count("wide"),
+            ))
+        }
         Some(("log", submatches)) => Box::new(LogCommand::new(
             catalog.get_one()?,
             submatches.get_one::<DatasetRef>("dataset").unwrap().clone(),
@@ -405,12 +410,4 @@ pub fn get_command(
     };
 
     Ok(command)
-}
-
-fn related_account_indication(
-    catalog: &dill::Catalog,
-    submatches: &clap::ArgMatches,
-) -> Result<RelatedAccountIndication, InjectionError> {
-    let account_service = catalog.get_one::<AccountService>()?;
-    Ok(account_service.related_account_indication(submatches))
 }

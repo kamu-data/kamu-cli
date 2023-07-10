@@ -9,7 +9,8 @@
 
 use clap::ArgMatches;
 use dill::component;
-use kamu::domain::CurrentAccountConfig;
+use kamu::domain::CurrentAccountSubject;
+use opendatafabric::AccountName;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -25,7 +26,7 @@ impl AccountService {
         }
     }
 
-    pub fn current_account_config(&self, arg_matches: &ArgMatches) -> CurrentAccountConfig {
+    pub fn current_account_indication(&self, arg_matches: &ArgMatches) -> CurrentAccountIndication {
         let (current_account, specified_explicitly) =
             if let Some(account) = arg_matches.get_one::<String>("account") {
                 (account, true)
@@ -33,16 +34,16 @@ impl AccountService {
                 (&self.default_account_name, false)
             };
 
-        CurrentAccountConfig::new(current_account, specified_explicitly)
+        CurrentAccountIndication::new(current_account, specified_explicitly)
     }
 
-    pub fn related_account_indication(&self, arg_matches: &ArgMatches) -> RelatedAccountIndication {
+    pub fn related_account_indication(&self, sub_matches: &ArgMatches) -> RelatedAccountIndication {
         let target_account =
-            if let Some(target_account) = arg_matches.get_one::<String>("target-account") {
+            if let Some(target_account) = sub_matches.get_one::<String>("target-account") {
                 TargetAccountSelection::Specific {
                     account_name: target_account.clone(),
                 }
-            } else if arg_matches.get_flag("all-accounts") {
+            } else if sub_matches.get_flag("all-accounts") {
                 TargetAccountSelection::AllUsers
             } else {
                 TargetAccountSelection::Current
@@ -74,6 +75,34 @@ pub enum TargetAccountSelection {
     Current,
     Specific { account_name: String },
     AllUsers,
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone)]
+pub struct CurrentAccountIndication {
+    pub account_name: AccountName,
+    pub specified_explicitly: bool,
+}
+
+impl CurrentAccountIndication {
+    pub fn new<S>(account_name: S, specified_explicitly: bool) -> Self
+    where
+        S: Into<String>,
+    {
+        Self {
+            account_name: AccountName::try_from(account_name.into()).unwrap(),
+            specified_explicitly,
+        }
+    }
+
+    pub fn is_explicit(&self) -> bool {
+        self.specified_explicitly
+    }
+
+    pub fn as_current_account_subject(&self) -> CurrentAccountSubject {
+        CurrentAccountSubject::new(self.account_name.clone())
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

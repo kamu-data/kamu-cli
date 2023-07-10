@@ -103,7 +103,7 @@ async fn do_test_sync(
     let workspace_layout = Arc::new(WorkspaceLayout::create(tmp_workspace_dir, false).unwrap());
     let dataset_repo = Arc::new(DatasetRepositoryLocalFs::new(
         workspace_layout.datasets_dir.clone(),
-        Arc::new(CurrentAccountConfig::new("kamu", false)),
+        Arc::new(CurrentAccountSubject::new_test()),
         false,
     ));
     let remote_repo_reg = Arc::new(RemoteRepositoryRegistryImpl::new(

@@ -13,11 +13,12 @@ use kamu::domain::*;
 use opendatafabric::*;
 
 use super::{common, BatchError, CLIError, Command};
+use crate::CurrentAccountIndication;
 
 pub struct AddCommand {
     resource_loader: Arc<dyn ResourceLoader>,
     dataset_repo: Arc<dyn DatasetRepository>,
-    current_account: Arc<CurrentAccountConfig>,
+    current_account: CurrentAccountIndication,
     snapshot_refs: Vec<String>,
     recursive: bool,
     replace: bool,
@@ -28,7 +29,7 @@ impl AddCommand {
     pub fn new<'s, I>(
         resource_loader: Arc<dyn ResourceLoader>,
         dataset_repo: Arc<dyn DatasetRepository>,
-        current_account: Arc<CurrentAccountConfig>,
+        current_account: CurrentAccountIndication,
         snapshot_refs_iter: I,
         recursive: bool,
         replace: bool,

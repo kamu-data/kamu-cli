@@ -47,7 +47,7 @@ pub async fn run(
     let workspace_version = workspace_svc.workspace_version()?;
 
     let account_svc = AccountService::new();
-    let current_account = account_svc.current_account_config(&matches);
+    let current_account = account_svc.current_account_indication(&matches);
 
     prepare_run_dir(&workspace_layout.run_info_dir);
 
@@ -59,8 +59,7 @@ pub async fn run(
 
         let output_config = configure_output_format(&matches, &workspace_svc);
         catalog_builder.add_value(output_config.clone());
-
-        catalog_builder.add_value(current_account.clone());
+        catalog_builder.add_value(current_account.as_current_account_subject());
 
         let guards = configure_logging(&output_config, &workspace_layout);
         tracing::info!(

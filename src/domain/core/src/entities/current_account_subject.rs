@@ -11,25 +11,22 @@ use opendatafabric::AccountName;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone)]
-pub struct CurrentAccountConfig {
+pub struct CurrentAccountSubject {
     pub account_name: AccountName,
-    pub specified_explicitly: bool,
 }
 
-impl CurrentAccountConfig {
-    pub fn new<S>(account_name: S, specified_explicitly: bool) -> Self
+impl CurrentAccountSubject {
+    pub fn new_test() -> Self {
+        CurrentAccountSubject::new("kamu")
+    }
+
+    pub fn new<S>(account_name: S) -> Self
     where
         S: Into<String>,
     {
         Self {
             account_name: AccountName::try_from(account_name.into()).unwrap(),
-            specified_explicitly,
         }
-    }
-
-    pub fn is_explicit(&self) -> bool {
-        self.specified_explicitly
     }
 }
 

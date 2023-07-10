@@ -23,7 +23,7 @@ async fn metadata_chain_append_event() {
     let workspace_layout = Arc::new(WorkspaceLayout::create(tempdir.path(), false).unwrap());
     let dataset_repo = DatasetRepositoryLocalFs::new(
         workspace_layout.datasets_dir.clone(),
-        Arc::new(CurrentAccountConfig::new("kamu", false)),
+        Arc::new(CurrentAccountSubject::new_test()),
         false,
     );
 

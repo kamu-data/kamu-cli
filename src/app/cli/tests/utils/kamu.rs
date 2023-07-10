@@ -15,7 +15,7 @@ use std::sync::Arc;
 use kamu::domain::*;
 use kamu::testing::ParquetReaderHelper;
 use kamu::*;
-use kamu_cli::CLIError;
+use kamu_cli::{CLIError, CurrentAccountIndication};
 use opendatafabric::serde::yaml::*;
 use opendatafabric::*;
 use thiserror::Error;
@@ -23,7 +23,7 @@ use thiserror::Error;
 // Test wrapper on top of CLI library
 pub struct Kamu {
     workspace_layout: WorkspaceLayout,
-    current_account_config: CurrentAccountConfig,
+    current_account: CurrentAccountIndication,
     workspace_path: PathBuf,
     _temp_dir: Option<tempfile::TempDir>,
 }
@@ -32,10 +32,10 @@ impl Kamu {
     pub fn new<P: Into<PathBuf>>(workspace_path: P) -> Self {
         let workspace_path = workspace_path.into();
         let workspace_layout = WorkspaceLayout::new(workspace_path.join(".kamu"));
-        let current_account_config = CurrentAccountConfig::new("kamu", false);
+        let current_account = CurrentAccountIndication::new("kamu", false);
         Self {
             workspace_layout,
-            current_account_config,
+            current_account,
             workspace_path,
             _temp_dir: None,
         }
@@ -66,7 +66,7 @@ impl Kamu {
     pub async fn get_last_data_slice(&self, dataset_name: &DatasetName) -> ParquetReaderHelper {
         let dataset_repo = DatasetRepositoryLocalFs::new(
             self.workspace_layout.datasets_dir.clone(),
-            Arc::new(self.current_account_config.clone()),
+            Arc::new(self.current_account.as_current_account_subject()),
             false,
         );
 
@@ -124,7 +124,7 @@ impl Kamu {
         let cli = kamu_cli::cli();
         let dataset_repo = Arc::new(DatasetRepositoryLocalFs::new(
             self.workspace_layout.datasets_dir.clone(),
-            Arc::new(CurrentAccountConfig::new("kamu", false)),
+            Arc::new(CurrentAccountSubject::new_test()),
             false,
         ));
         let config_service = Arc::new(ConfigService::new(&self.workspace_layout));
@@ -164,7 +164,7 @@ impl Kamu {
     pub fn catalog(&self) -> dill::Catalog {
         let mut builder = kamu_cli::configure_catalog(&self.workspace_layout, false);
         builder.add_value(self.workspace_layout.clone());
-        builder.add_value(self.current_account_config.clone());
+        builder.add_value(self.current_account.as_current_account_subject());
         builder.build()
     }
 }

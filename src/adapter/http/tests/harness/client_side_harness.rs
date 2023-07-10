@@ -36,7 +36,7 @@ impl ClientSideHarness {
 
         let mut b = dill::CatalogBuilder::new();
 
-        b.add_value(CurrentAccountConfig::new("kamu", false));
+        b.add_value(CurrentAccountSubject::new_test());
 
         b.add_builder(
             builder_for::<DatasetRepositoryLocalFs>()

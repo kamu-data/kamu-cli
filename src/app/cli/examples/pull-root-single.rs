@@ -26,7 +26,7 @@ async fn main() {
         pull_svc,
         Arc::new(DatasetRepositoryLocalFs::new(
             workspace_layout.datasets_dir.clone(),
-            Arc::new(CurrentAccountConfig::new("kamu", false)),
+            Arc::new(CurrentAccountSubject::new_test()),
             false,
         )),
         Arc::new(RemoteAliasesRegistryNull),

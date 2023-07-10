@@ -32,27 +32,27 @@ pub struct DatasetRepositoryLocalFs {
 impl DatasetRepositoryLocalFs {
     pub fn new(
         root: PathBuf,
-        current_account_config: Arc<CurrentAccountConfig>,
+        current_account_subject: Arc<CurrentAccountSubject>,
         multi_tenant: bool,
     ) -> Self {
-        Self::from(root, current_account_config, multi_tenant)
+        Self::from(root, current_account_subject, multi_tenant)
     }
 
     pub fn from(
         root: impl Into<PathBuf>,
-        current_account_config: Arc<CurrentAccountConfig>,
+        current_account_subject: Arc<CurrentAccountSubject>,
         multi_tenant: bool,
     ) -> Self {
         Self {
             storage_strategy: if multi_tenant {
                 Box::new(DatasetMultiTenantStorageStrategy::new(
                     root.into(),
-                    current_account_config,
+                    current_account_subject,
                 ))
             } else {
                 Box::new(DatasetSingleTenantStorageStrategy::new(
                     root.into(),
-                    current_account_config,
+                    current_account_subject,
                 ))
             },
             thrash_lock: tokio::sync::Mutex::new(()),
@@ -338,17 +338,17 @@ enum ResolveDatasetError {
 
 struct DatasetSingleTenantStorageStrategy {
     root: PathBuf,
-    current_account_config: Arc<CurrentAccountConfig>,
+    current_account_subject: Arc<CurrentAccountSubject>,
 }
 
 impl DatasetSingleTenantStorageStrategy {
     pub fn new(
         root: impl Into<PathBuf>,
-        current_account_config: Arc<CurrentAccountConfig>,
+        current_account_subject: Arc<CurrentAccountSubject>,
     ) -> Self {
         Self {
             root: root.into(),
-            current_account_config,
+            current_account_subject,
         }
     }
 
@@ -417,7 +417,7 @@ impl DatasetStorageStrategy for DatasetSingleTenantStorageStrategy {
     }
 
     fn get_account_datasets<'s>(&'s self, account_name: AccountName) -> DatasetHandleStream<'s> {
-        if account_name == self.current_account_config.account_name {
+        if account_name == self.current_account_subject.account_name {
             self.get_all_datasets()
         } else {
             panic!("Single-tenant dataset repository queried by non-default account");
@@ -509,17 +509,17 @@ impl DatasetStorageStrategy for DatasetSingleTenantStorageStrategy {
 
 struct DatasetMultiTenantStorageStrategy {
     root: PathBuf,
-    current_account_config: Arc<CurrentAccountConfig>,
+    current_account_subject: Arc<CurrentAccountSubject>,
 }
 
 impl DatasetMultiTenantStorageStrategy {
     pub fn new(
         root: impl Into<PathBuf>,
-        current_account_config: Arc<CurrentAccountConfig>,
+        current_account_subject: Arc<CurrentAccountSubject>,
     ) -> Self {
         Self {
             root: root.into(),
-            current_account_config,
+            current_account_subject,
         }
     }
 
@@ -527,7 +527,7 @@ impl DatasetMultiTenantStorageStrategy {
         if dataset_alias.is_multi_tenant() {
             dataset_alias.account_name.as_ref().unwrap()
         } else {
-            &self.current_account_config.account_name
+            &self.current_account_subject.account_name
         }
     }
 

@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use domain::CurrentAccountConfig;
+use domain::CurrentAccountSubject;
 use kamu::*;
 use tempfile::TempDir;
 
@@ -21,7 +21,7 @@ fn local_fs_repo(tempdir: &TempDir) -> DatasetRepositoryLocalFs {
     let workspace_layout = WorkspaceLayout::create(tempdir.path(), false).unwrap();
     DatasetRepositoryLocalFs::new(
         workspace_layout.datasets_dir.clone(),
-        Arc::new(CurrentAccountConfig::new("kamu", false)),
+        Arc::new(CurrentAccountSubject::new_test()),
         false,
     )
 }

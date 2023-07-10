@@ -23,7 +23,7 @@ pub struct PullServiceImpl {
     ingest_svc: Arc<dyn IngestService>,
     transform_svc: Arc<dyn TransformService>,
     sync_svc: Arc<dyn SyncService>,
-    current_account: Arc<CurrentAccountConfig>,
+    current_account_subject: Arc<CurrentAccountSubject>,
 }
 
 #[component(pub)]
@@ -34,7 +34,7 @@ impl PullServiceImpl {
         ingest_svc: Arc<dyn IngestService>,
         transform_svc: Arc<dyn TransformService>,
         sync_svc: Arc<dyn SyncService>,
-        current_account: Arc<CurrentAccountConfig>,
+        current_account_subject: Arc<CurrentAccountSubject>,
     ) -> Self {
         Self {
             dataset_repo,
@@ -42,7 +42,7 @@ impl PullServiceImpl {
             ingest_svc,
             transform_svc,
             sync_svc,
-            current_account,
+            current_account_subject,
         }
     }
 
@@ -134,7 +134,7 @@ impl PullServiceImpl {
                 ) => DatasetAlias::new(alias.account_name.clone(), alias.dataset_name.clone()),
                 Some(DatasetRefRemote::Url(url)) => DatasetAlias::new(
                     if self.dataset_repo.is_multi_tenant() {
-                        Some(self.current_account.account_name.clone())
+                        Some(self.current_account_subject.account_name.clone())
                     } else {
                         None
                     },
@@ -269,7 +269,7 @@ impl PullServiceImpl {
         use tokio_stream::StreamExt;
         let mut datasets = self
             .dataset_repo
-            .get_account_datasets(self.current_account.account_name.clone());
+            .get_account_datasets(self.current_account_subject.account_name.clone());
         while let Some(dataset_handle) = datasets.next().await {
             let dataset_handle = dataset_handle?;
 

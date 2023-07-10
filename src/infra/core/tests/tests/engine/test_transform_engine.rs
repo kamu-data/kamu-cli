@@ -234,7 +234,7 @@ async fn test_transform_common(transform: Transform) {
 
     let dataset_repo = Arc::new(DatasetRepositoryLocalFs::new(
         workspace_layout.datasets_dir.clone(),
-        Arc::new(CurrentAccountConfig::new("kamu", false)),
+        Arc::new(CurrentAccountSubject::new_test()),
         false,
     ));
     let engine_provisioner = Arc::new(EngineProvisionerLocal::new(

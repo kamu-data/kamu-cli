@@ -204,7 +204,7 @@ async fn create_graph_remote(
         reg.clone(),
         Arc::new(DatasetRepositoryLocalFs::new(
             ws.datasets_dir.clone(),
-            Arc::new(CurrentAccountConfig::new("kamu", false)),
+            Arc::new(CurrentAccountSubject::new_test()),
             false,
         )),
         Arc::new(DatasetFactoryImpl::new(IpfsGateway::default())),
@@ -715,7 +715,7 @@ impl PullTestHarness {
     fn new(tmp_path: &Path) -> Self {
         let calls = Arc::new(Mutex::new(Vec::new()));
         let workspace_layout = Arc::new(WorkspaceLayout::create(tmp_path, false).unwrap());
-        let current_account_config = Arc::new(CurrentAccountConfig::new("kamu", false));
+        let current_account_config = Arc::new(CurrentAccountSubject::new_test());
         let dataset_repo = Arc::new(DatasetRepositoryLocalFs::new(
             workspace_layout.datasets_dir.clone(),
             current_account_config.clone(),
