@@ -17,7 +17,6 @@ use kamu::utils::smart_transfer_protocol::SmartTransferProtocolClient;
 use kamu::*;
 
 use crate::cli_commands;
-use crate::commands::Command;
 use crate::error::*;
 use crate::explore::TraceServer;
 use crate::output::*;
@@ -81,16 +80,19 @@ pub async fn run(
         catalog.get_one::<GcService>()?.evict_cache()?;
     }
 
-    let mut command: Box<dyn Command> = cli_commands::get_command(&catalog, matches)?;
-
-    let result = if command.needs_workspace() && !workspace_svc.is_in_workspace() {
-        Err(CLIError::usage_error_from(NotInWorkspace))
-    } else if command.needs_workspace() && workspace_svc.is_upgrade_needed()? {
-        Err(CLIError::usage_error_from(WorkspaceUpgradeRequired))
-    } else if current_account.is_explicit() && !workspace_svc.is_multi_tenant_workspace() {
-        Err(CLIError::usage_error_from(NotInMultiTenantWorkspace))
-    } else {
-        command.run().await
+    let result = match cli_commands::get_command(&catalog, matches) {
+        Ok(mut command) => {
+            if command.needs_workspace() && !workspace_svc.is_in_workspace() {
+                Err(CLIError::usage_error_from(NotInWorkspace))
+            } else if command.needs_workspace() && workspace_svc.is_upgrade_needed()? {
+                Err(CLIError::usage_error_from(WorkspaceUpgradeRequired))
+            } else if current_account.is_explicit() && !workspace_svc.is_multi_tenant_workspace() {
+                Err(CLIError::usage_error_from(NotInMultiTenantWorkspace))
+            } else {
+                command.run().await
+            }
+        }
+        Err(e) => Err(e),
     };
 
     match &result {

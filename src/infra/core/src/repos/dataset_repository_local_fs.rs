@@ -113,9 +113,6 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
                 .map_err(|e| match e {
                     ResolveDatasetError::Internal(e) => GetDatasetError::Internal(e),
                     ResolveDatasetError::NotFound(e) => GetDatasetError::NotFound(e),
-                    ResolveDatasetError::MultiTenantRefUnexpected(e) => {
-                        GetDatasetError::MultiTenantRefUnexpected(e)
-                    }
                 }),
             DatasetRef::ID(id) => self
                 .storage_strategy
@@ -124,7 +121,6 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
                 .map_err(|e| match e {
                     ResolveDatasetError::Internal(e) => GetDatasetError::Internal(e),
                     ResolveDatasetError::NotFound(e) => GetDatasetError::NotFound(e),
-                    ResolveDatasetError::MultiTenantRefUnexpected(_) => unreachable!(),
                 }),
         }
     }
@@ -220,9 +216,6 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
                     new_name.clone(),
                 ),
             })),
-            Err(ResolveDatasetError::MultiTenantRefUnexpected(e)) => {
-                Err(RenameDatasetError::MultiTenantRefUnexpected(e))
-            }
             Err(ResolveDatasetError::Internal(e)) => Err(RenameDatasetError::Internal(e)),
             Err(ResolveDatasetError::NotFound(_)) => Ok(()),
         }?;
@@ -239,9 +232,6 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
         let dataset_handle = match self.resolve_dataset_ref(dataset_ref).await {
             Ok(h) => Ok(h),
             Err(GetDatasetError::NotFound(e)) => Err(DeleteDatasetError::NotFound(e)),
-            Err(GetDatasetError::MultiTenantRefUnexpected(e)) => {
-                Err(DeleteDatasetError::MultiTenantRefUnexpected(e))
-            }
             Err(GetDatasetError::Internal(e)) => Err(DeleteDatasetError::Internal(e)),
         }?;
 
@@ -324,8 +314,6 @@ enum ResolveDatasetError {
         #[backtrace]
         DatasetNotFoundError,
     ),
-    #[error(transparent)]
-    MultiTenantRefUnexpected(#[from] MultiTenantRefUnexpectedError),
     #[error(transparent)]
     Internal(
         #[from]
@@ -428,13 +416,10 @@ impl DatasetStorageStrategy for DatasetSingleTenantStorageStrategy {
         &self,
         dataset_alias: &DatasetAlias,
     ) -> Result<DatasetHandle, ResolveDatasetError> {
-        if dataset_alias.is_multi_tenant() {
-            return Err(ResolveDatasetError::MultiTenantRefUnexpected(
-                MultiTenantRefUnexpectedError {
-                    dataset_ref: dataset_alias.as_local_ref(),
-                },
-            ));
-        }
+        assert!(
+            !dataset_alias.is_multi_tenant(),
+            "Multi-tenant refs shouldn't have reached down to here with earlier validations"
+        );
 
         let dataset_path = self.dataset_path_impl(&dataset_alias);
         if !dataset_path.exists() {

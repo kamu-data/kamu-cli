@@ -137,13 +137,10 @@ impl DatasetRepository for DatasetRepositoryS3 {
         match dataset_ref {
             DatasetRef::Handle(h) => Ok(h.clone()),
             DatasetRef::Alias(alias) => {
-                if alias.is_multi_tenant() {
-                    return Err(GetDatasetError::MultiTenantRefUnexpected(
-                        MultiTenantRefUnexpectedError {
-                            dataset_ref: dataset_ref.clone(),
-                        },
-                    ));
-                }
+                assert!(
+                    !alias.is_multi_tenant(),
+                    "Multi-tenancy is not yet supported by S3 repo"
+                );
 
                 if self
                     .s3_context
@@ -270,9 +267,6 @@ impl DatasetRepository for DatasetRepositoryS3 {
         let dataset_handle = match self.resolve_dataset_ref(dataset_ref).await {
             Ok(dataset_handle) => dataset_handle,
             Err(GetDatasetError::NotFound(e)) => return Err(DeleteDatasetError::NotFound(e)),
-            Err(GetDatasetError::MultiTenantRefUnexpected(e)) => {
-                return Err(DeleteDatasetError::MultiTenantRefUnexpected(e))
-            }
             Err(GetDatasetError::Internal(e)) => return Err(DeleteDatasetError::Internal(e)),
         };
 

@@ -33,12 +33,6 @@ pub enum GetDatasetUrlError {
         DatasetNotFoundError,
     ),
     #[error(transparent)]
-    MultiTenantRefUnexpected(
-        #[from]
-        #[backtrace]
-        MultiTenantRefUnexpectedError,
-    ),
-    #[error(transparent)]
     Access(
         #[from]
         #[backtrace]
@@ -56,7 +50,6 @@ impl From<GetDatasetError> for GetDatasetUrlError {
     fn from(v: GetDatasetError) -> Self {
         match v {
             GetDatasetError::NotFound(e) => Self::NotFound(e),
-            GetDatasetError::MultiTenantRefUnexpected(e) => Self::MultiTenantRefUnexpected(e),
             GetDatasetError::Internal(e) => Self::Internal(e),
         }
     }

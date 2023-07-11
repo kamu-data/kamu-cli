@@ -284,12 +284,7 @@ pub enum SetWatermarkError {
         #[backtrace]
         DatasetNotFoundError,
     ),
-    #[error(transparent)]
-    MultiTenantRefUnexpected(
-        #[from]
-        #[backtrace]
-        MultiTenantRefUnexpectedError,
-    ),
+
     #[error("Attempting to set watermark on a remote dataset")]
     IsRemote,
     #[error(transparent)]
@@ -306,7 +301,6 @@ impl From<GetDatasetError> for SetWatermarkError {
     fn from(v: GetDatasetError) -> Self {
         match v {
             GetDatasetError::NotFound(e) => Self::NotFound(e),
-            GetDatasetError::MultiTenantRefUnexpected(e) => Self::MultiTenantRefUnexpected(e),
             GetDatasetError::Internal(e) => Self::Internal(e),
         }
     }

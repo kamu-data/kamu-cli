@@ -49,7 +49,6 @@ impl Command for RenameCommand {
             Ok(_) => Ok(()),
             Err(RenameDatasetError::NotFound(e)) => Err(CLIError::failure(e)),
             Err(RenameDatasetError::NameCollision(e)) => Err(CLIError::failure(e)),
-            Err(RenameDatasetError::MultiTenantRefUnexpected(e)) => Err(CLIError::failure(e)),
             Err(e) => Err(CLIError::critical(e)),
         }?;
 

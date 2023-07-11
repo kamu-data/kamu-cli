@@ -214,9 +214,6 @@ impl Datasets {
                         .collect(),
                 })
             }
-            Err(domain::CreateDatasetFromSnapshotError::MultiTenantRefUnexpected(e)) => {
-                return Err(e.int_err().into())
-            }
             Err(domain::CreateDatasetFromSnapshotError::Internal(e)) => return Err(e.into()),
         };
 

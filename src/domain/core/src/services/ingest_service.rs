@@ -165,12 +165,7 @@ pub enum IngestError {
         #[backtrace]
         DatasetNotFoundError,
     ),
-    #[error(transparent)]
-    MultiTenantRefUnexpected(
-        #[from]
-        #[backtrace]
-        MultiTenantRefUnexpectedError,
-    ),
+
     #[error("Source is unreachable at {path}")]
     Unreachable {
         path: String,
@@ -231,7 +226,6 @@ impl From<GetDatasetError> for IngestError {
     fn from(v: GetDatasetError) -> Self {
         match v {
             GetDatasetError::NotFound(e) => Self::DatasetNotFound(e),
-            GetDatasetError::MultiTenantRefUnexpected(e) => Self::MultiTenantRefUnexpected(e),
             GetDatasetError::Internal(e) => Self::Internal(e),
         }
     }

@@ -64,9 +64,6 @@ impl Command for DeleteCommand {
             match self.dataset_repo.resolve_dataset_ref(dataset_ref).await {
                 Ok(_) => Ok(()),
                 Err(GetDatasetError::NotFound(e)) => Err(CLIError::usage_error_from(e)),
-                Err(GetDatasetError::MultiTenantRefUnexpected(e)) => {
-                    Err(CLIError::usage_error_from(e))
-                }
                 Err(GetDatasetError::Internal(e)) => Err(e.into()),
             }?
         }

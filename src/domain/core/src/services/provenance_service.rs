@@ -10,7 +10,7 @@
 use opendatafabric::*;
 use thiserror::Error;
 
-use crate::{DatasetNotFoundError, GetDatasetError, InternalError, MultiTenantRefUnexpectedError};
+use crate::{DatasetNotFoundError, GetDatasetError, InternalError};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -84,12 +84,6 @@ pub enum GetLineageError {
     #[error(transparent)]
     NotFound(#[from] DatasetNotFoundError),
     #[error(transparent)]
-    MultiTenantRefUnexpected(
-        #[from]
-        #[backtrace]
-        MultiTenantRefUnexpectedError,
-    ),
-    #[error(transparent)]
     Internal(
         #[from]
         #[backtrace]
@@ -101,7 +95,6 @@ impl From<GetDatasetError> for GetLineageError {
     fn from(v: GetDatasetError) -> Self {
         match v {
             GetDatasetError::NotFound(e) => Self::NotFound(e),
-            GetDatasetError::MultiTenantRefUnexpected(e) => Self::MultiTenantRefUnexpected(e),
             GetDatasetError::Internal(e) => Self::Internal(e),
         }
     }

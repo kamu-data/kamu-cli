@@ -109,10 +109,6 @@ pub async fn test_rename_dataset(repo: &dyn DatasetRepository) {
     let alias_foo = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
     let alias_bar = DatasetAlias::new(None, DatasetName::new_unchecked("bar"));
     let alias_baz = DatasetAlias::new(None, DatasetName::new_unchecked("baz"));
-    let alias_mul = DatasetAlias::new(
-        Some(AccountName::new_unchecked("test")),
-        DatasetName::new_unchecked("foo"),
-    );
 
     let snapshots = vec![
         MetadataFactory::dataset_snapshot()
@@ -139,12 +135,6 @@ pub async fn test_rename_dataset(repo: &dyn DatasetRepository) {
         repo.rename_dataset(&alias_foo.as_local_ref(), &alias_bar.dataset_name)
             .await,
         Err(RenameDatasetError::NameCollision(_))
-    );
-
-    assert_matches!(
-        repo.rename_dataset(&alias_mul.as_local_ref(), &alias_baz.dataset_name)
-            .await,
-        Err(RenameDatasetError::MultiTenantRefUnexpected(_))
     );
 
     repo.rename_dataset(&alias_foo.as_local_ref(), &alias_baz.dataset_name)
