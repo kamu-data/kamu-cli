@@ -9,6 +9,8 @@
 
 use std::path::PathBuf;
 
+/////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RunArgs {
     pub args: Vec<String>,
@@ -29,9 +31,11 @@ pub struct RunArgs {
     pub remove: bool,
     pub tty: bool,
     pub user: Option<String>,
-    pub volume_map: Vec<(PathBuf, PathBuf)>,
+    pub volumes: Vec<VolumeSpec>,
     pub work_dir: Option<PathBuf>,
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ExecArgs {
@@ -39,6 +43,23 @@ pub struct ExecArgs {
     pub interactive: bool,
     pub work_dir: Option<PathBuf>,
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VolumeSpec {
+    pub source: PathBuf,
+    pub dest: PathBuf,
+    pub access: VolumeAccess,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum VolumeAccess {
+    ReadOnly,
+    ReadWrite,
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
 
 impl Default for RunArgs {
     fn default() -> Self {
@@ -61,7 +82,7 @@ impl Default for RunArgs {
             remove: true,
             tty: false,
             user: None,
-            volume_map: Vec::new(),
+            volumes: Vec::new(),
             work_dir: None,
         }
     }
@@ -73,6 +94,34 @@ impl Default for ExecArgs {
             tty: false,
             interactive: false,
             work_dir: None,
+        }
+    }
+}
+
+impl<P1, P2> Into<VolumeSpec> for (P1, P2)
+where
+    P1: Into<PathBuf>,
+    P2: Into<PathBuf>,
+{
+    fn into(self) -> VolumeSpec {
+        VolumeSpec {
+            source: self.0.into(),
+            dest: self.1.into(),
+            access: VolumeAccess::ReadWrite,
+        }
+    }
+}
+
+impl<P1, P2> Into<VolumeSpec> for (P1, P2, VolumeAccess)
+where
+    P1: Into<PathBuf>,
+    P2: Into<PathBuf>,
+{
+    fn into(self) -> VolumeSpec {
+        VolumeSpec {
+            source: self.0.into(),
+            dest: self.1.into(),
+            access: self.2,
         }
     }
 }

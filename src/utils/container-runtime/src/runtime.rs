@@ -162,13 +162,20 @@ impl ContainerRuntime {
                 cmd.arg("-p");
                 cmd.arg(format!("{}-{}:{}-{}", hl, hr, cl, cr));
             });
-        args.volume_map.into_iter().for_each(|(h, c)| {
+        args.volumes.into_iter().for_each(|v| {
             cmd.arg("-v");
-            cmd.arg(format!(
-                "{}:{}",
-                Self::format_host_path(h),
-                Self::format_container_path(c),
-            ));
+            match v.access {
+                VolumeAccess::ReadOnly => cmd.arg(format!(
+                    "{}:{}:ro",
+                    Self::format_host_path(v.source),
+                    Self::format_container_path(v.dest),
+                )),
+                VolumeAccess::ReadWrite => cmd.arg(format!(
+                    "{}:{}",
+                    Self::format_host_path(v.source),
+                    Self::format_container_path(v.dest),
+                )),
+            };
         });
         args.user.map(|v| cmd.arg(format!("--user={}", v)));
         args.work_dir

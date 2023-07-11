@@ -44,7 +44,7 @@ impl HttpServer {
             .run_attached(Self::IMAGE)
             .container_name_prefix("kamu-test-http-")
             .expose_port(server_port)
-            .volume(server_dir, "/usr/local/apache2/htdocs")
+            .volume((server_dir, "/usr/local/apache2/htdocs"))
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .spawn()

@@ -210,20 +210,25 @@ impl ContainerRunCommand {
         self
     }
 
-    pub fn volumes<I, S1, S2>(mut self, v: I) -> Self
+    /// Adds a range of volume mounts. For convenience mounts can be specified
+    /// as pairs `("/host/path", "/container/paht")` or as triplets
+    /// `("/host", "/container", VolumeAccess::ReadOnly)`
+    pub fn volumes<I, V>(mut self, v: I) -> Self
     where
-        I: IntoIterator<Item = (S1, S2)>,
-        S1: Into<PathBuf>,
-        S2: Into<PathBuf>,
+        I: IntoIterator<Item = V>,
+        V: Into<VolumeSpec>,
     {
-        for (host, container) in v.into_iter() {
-            self.args.volume_map.push((host.into(), container.into()));
+        for spec in v.into_iter() {
+            self.args.volumes.push(spec.into());
         }
         self
     }
 
-    pub fn volume(mut self, host: impl Into<PathBuf>, container: impl Into<PathBuf>) -> Self {
-        self.args.volume_map.push((host.into(), container.into()));
+    /// Add a volume mount. For convenience can be specified as a pair
+    /// `("/host/path", "/container/paht")` or as a triplet `("/host",
+    /// "/container", VolumeAccess::ReadOnly)`
+    pub fn volume(mut self, spec: impl Into<VolumeSpec>) -> Self {
+        self.args.volumes.push(spec.into());
         self
     }
 

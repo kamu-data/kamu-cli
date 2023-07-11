@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 #![feature(assert_matches)]
+#![feature(exit_status_error)]
 
 pub mod common;
 mod tests;

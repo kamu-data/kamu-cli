@@ -64,7 +64,7 @@ impl LivyServerImpl {
             .user("root")
             .map_port_with_address(addr, host_port, LIVY_PORT)
             .work_dir("/opt/bitnami/spark/work-dir")
-            .volume(&datasets_dir, "/opt/bitnami/spark/work-dir")
+            .volume((&datasets_dir, "/opt/bitnami/spark/work-dir"))
             .stdout(if inherit_stdio {
                 Stdio::inherit()
             } else {

@@ -104,7 +104,7 @@ impl NotebookServerImpl {
             .network(network_name)
             .user("root")
             .work_dir("/opt/bitnami/spark/work-dir")
-            .volume(&datasets_dir, "/opt/bitnami/spark/work-dir")
+            .volume((&datasets_dir, "/opt/bitnami/spark/work-dir"))
             .entry_point("/opt/livy/bin/livy-server")
             .stdout(if inherit_stdio {
                 Stdio::inherit()
@@ -127,7 +127,7 @@ impl NotebookServerImpl {
             .user("root")
             .work_dir("/opt/workdir")
             .expose_port(80)
-            .volume(&cwd, "/opt/workdir")
+            .volume((&cwd, "/opt/workdir"))
             .environment_vars(environment_vars)
             .args([
                 "jupyter".to_owned(),
@@ -206,7 +206,7 @@ impl NotebookServerImpl {
                             "/opt/workdir"
                         ))
                         .user("root")
-                        .volume(cwd, "/opt/workdir")
+                        .volume((cwd, "/opt/workdir"))
                         .stdout(Stdio::null())
                         .stderr(Stdio::null())
                         .status()

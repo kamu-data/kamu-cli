@@ -55,7 +55,7 @@ impl MinioServer {
             .container_name_prefix("kamu-test-minio-")
             .args(["server", "/data"])
             .expose_port(server_port)
-            .volume(server_dir, "/data")
+            .volume((server_dir, "/data"))
             .environment_vars([
                 ("MINIO_ACCESS_KEY", access_key),
                 ("MINIO_SECRET_KEY", secret_key),

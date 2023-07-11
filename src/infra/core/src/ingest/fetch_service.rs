@@ -224,7 +224,7 @@ impl FetchService {
                     "/opt/odf/out/new-last-modified".to_owned(),
                 ),
             ])
-            .volume(&out_dir, "/opt/odf/out")
+            .volume((&out_dir, "/opt/odf/out"))
             .stdout(Stdio::piped())
             .stderr(stderr_file);
 
@@ -293,7 +293,7 @@ impl FetchService {
                             "/opt/odf/out"
                         ))
                         .user("root")
-                        .volume(out_dir, "/opt/odf/out")
+                        .volume((out_dir, "/opt/odf/out"))
                         .stdout(Stdio::null())
                         .stderr(Stdio::null())
                         .status()

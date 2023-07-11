@@ -99,3 +99,45 @@ async fn test_container_terminate_awaited() {
 
     assert_matches!(status, TerminateStatus::Exited(_));
 }
+
+#[test_group::group(containerized)]
+#[test_log::test(tokio::test)]
+async fn test_volume_mount_read_write() {
+    let tempdir = tempfile::tempdir().unwrap();
+
+    let rt = ContainerRuntime::default();
+    rt.ensure_image(TEST_IMAGE, None).await.unwrap();
+
+    let mut container = rt
+        .run_attached(TEST_IMAGE)
+        .volume((tempdir.path(), "/out"))
+        .args(["touch", "/out/test"])
+        .init(true)
+        .spawn()
+        .unwrap();
+
+    container.wait().await.unwrap().exit_ok().unwrap();
+
+    assert!(tempdir.path().join("test").exists());
+}
+
+#[test_group::group(containerized)]
+#[test_log::test(tokio::test)]
+async fn test_volume_mount_read_only() {
+    let tempdir = tempfile::tempdir().unwrap();
+
+    let rt = ContainerRuntime::default();
+    rt.ensure_image(TEST_IMAGE, None).await.unwrap();
+
+    let mut container = rt
+        .run_attached(TEST_IMAGE)
+        .volume((tempdir.path(), "/out", VolumeAccess::ReadOnly))
+        .args(["touch", "/out/test"])
+        .init(true)
+        .spawn()
+        .unwrap();
+
+    let res = container.wait().await.unwrap();
+
+    assert_ne!(res.code().unwrap(), 0);
+}
