@@ -20,8 +20,8 @@ doctest = false
 [dependencies]
 opendatafabric = { workspace = true }
 
-arrow-digest = { version = "40", default-features = false }
-datafusion = { version = "26", default-features = false }
+arrow-digest = { version = "42", default-features = false }
+datafusion = { version = "27", default-features = false }
 tracing = { version = "0.1", default-features = false }
 
 digest = "0.10"
