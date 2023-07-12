@@ -25,13 +25,17 @@ use crate::utils::s3_context::S3Context;
 #[component(pub)]
 pub struct DatasetRepositoryS3 {
     s3_context: S3Context,
+    current_account_subject: Arc<CurrentAccountSubject>,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 impl DatasetRepositoryS3 {
-    pub fn new(s3_context: S3Context) -> Self {
-        Self { s3_context }
+    pub fn new(s3_context: S3Context, current_account_subject: Arc<CurrentAccountSubject>) -> Self {
+        Self {
+            s3_context,
+            current_account_subject,
+        }
     }
 
     fn get_s3_bucket_path(&self, dataset_alias: &DatasetAlias) -> Url {
@@ -99,16 +103,6 @@ impl DatasetRepositoryS3 {
             .await?;
 
         Ok(())
-    }
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-impl Clone for DatasetRepositoryS3 {
-    fn clone(&self) -> Self {
-        Self {
-            s3_context: self.s3_context.clone(),
-        }
     }
 }
 
@@ -190,10 +184,12 @@ impl DatasetRepository for DatasetRepositoryS3 {
         })
     }
 
-    fn get_account_datasets<'s>(&'s self, _account_name: AccountName) -> DatasetHandleStream<'s> {
-        unimplemented!(
-            "Account-based dataset filtering is not yet supported by S3 dataset repository"
-        );
+    fn get_account_datasets<'s>(&'s self, account_name: AccountName) -> DatasetHandleStream<'s> {
+        if account_name == self.current_account_subject.account_name {
+            self.get_all_datasets()
+        } else {
+            panic!("Single-tenant dataset repository queried by non-default account");
+        }
     }
 
     async fn get_dataset(

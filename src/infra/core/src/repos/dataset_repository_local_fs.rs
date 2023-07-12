@@ -143,12 +143,57 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
         Ok(Arc::new(dataset))
     }
 
-    // TODO: name collision check for multi-tenant case
     async fn create_dataset(
         &self,
         dataset_alias: &DatasetAlias,
         seed_block: MetadataBlockTyped<Seed>,
     ) -> Result<CreateDatasetResult, CreateDatasetError> {
+        // Check if a dataset with the same alias can be resolved succesfully
+        let maybe_existing_dataset_handle = match self
+            .resolve_dataset_ref(&dataset_alias.as_local_ref())
+            .await
+        {
+            Ok(existing_handle) => Ok(Some(existing_handle)),
+            Err(GetDatasetError::NotFound(_)) => Ok(None),
+            Err(GetDatasetError::Internal(e)) => Err(e),
+        }?;
+
+        // If so, there are 2 possibilities:
+        // - Dataset was partially created before (no head yet) and was not GC'd - so we
+        //   assume ownership
+        // - Dataset existed before (has valid head) - we should error out with name
+        //   collision
+        if let Some(existing_dataset_handle) = maybe_existing_dataset_handle {
+            let existing_dataset = self
+                .get_dataset(&existing_dataset_handle.as_local_ref())
+                .await
+                .int_err()?;
+
+            match existing_dataset
+                .as_metadata_chain()
+                .get_ref(&BlockRef::Head)
+                .await
+            {
+                // Existing head
+                Ok(_) => {
+                    return Err(CreateDatasetError::NameCollision(NameCollisionError {
+                        alias: dataset_alias.clone(),
+                    }));
+                }
+
+                // No head, so continue creating
+                Err(GetRefError::NotFound(_)) => {}
+
+                // Errors...
+                Err(GetRefError::Access(e)) => {
+                    return Err(CreateDatasetError::Internal(e.int_err()))
+                }
+                Err(GetRefError::Internal(e)) => return Err(CreateDatasetError::Internal(e)),
+            }
+        }
+
+        // It's okay to create a new dataset by this point
+
         let dataset_id = seed_block.event.dataset_id.clone();
         let dataset_handle = DatasetHandle::new(dataset_id, dataset_alias.clone());
         let dataset_path = self.storage_strategy.get_dataset_path(&dataset_handle);
@@ -176,14 +221,12 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
             )
             .await
         {
-            Ok(head) => Ok(head),
+            Ok(head) => head,
             Err(AppendError::RefCASFailed(_)) => {
-                Err(CreateDatasetError::NameCollision(NameCollisionError {
-                    alias: dataset_alias.clone(),
-                }))
+                unreachable!("The duplication protection should have triggered by now");
             }
-            Err(err) => Err(err.int_err().into()),
-        }?;
+            Err(err) => return Err(err.int_err().into()),
+        };
 
         self.storage_strategy
             .handle_dataset_created(&dataset, &dataset_handle.alias.dataset_name)
@@ -656,31 +699,34 @@ impl DatasetStorageStrategy for DatasetMultiTenantStorageStrategy {
     ) -> Result<DatasetHandle, ResolveDatasetError> {
         let effective_account_name = self.effective_account_name(dataset_alias);
 
-        let read_dataset_dir =
-            std::fs::read_dir(self.root.join(effective_account_name)).int_err()?;
+        let account_dataset_dir_path = self.root.join(effective_account_name);
+        if account_dataset_dir_path.is_dir() {
+            let read_dataset_dir = std::fs::read_dir(account_dataset_dir_path).int_err()?;
 
-        for r_dataset_dir in read_dataset_dir {
-            let dataset_dir_entry = r_dataset_dir.int_err()?;
-            if let Some(s) = dataset_dir_entry.file_name().to_str() {
-                if s.starts_with(".") {
-                    continue;
+            for r_dataset_dir in read_dataset_dir {
+                let dataset_dir_entry = r_dataset_dir.int_err()?;
+                if let Some(s) = dataset_dir_entry.file_name().to_str() {
+                    if s.starts_with(".") {
+                        continue;
+                    }
                 }
-            }
 
-            let dataset_file_name = String::from(dataset_dir_entry.file_name().to_str().unwrap());
+                let dataset_file_name =
+                    String::from(dataset_dir_entry.file_name().to_str().unwrap());
 
-            let dataset_id =
-                DatasetID::from_did_string(format!("did:odf:{}", dataset_file_name).as_str())
-                    .int_err()?;
+                let dataset_id =
+                    DatasetID::from_did_string(format!("did:odf:{}", dataset_file_name).as_str())
+                        .int_err()?;
 
-            let dataset_path = dataset_dir_entry.path();
+                let dataset_path = dataset_dir_entry.path();
 
-            let dataset_name = self
-                .attempt_resolving_dataset_name_via_path(&dataset_path, &dataset_id)
-                .await?;
+                let dataset_name = self
+                    .attempt_resolving_dataset_name_via_path(&dataset_path, &dataset_id)
+                    .await?;
 
-            if dataset_name == dataset_alias.dataset_name {
-                return Ok(DatasetHandle::new(dataset_id, dataset_alias.to_owned()));
+                if dataset_name == dataset_alias.dataset_name {
+                    return Ok(DatasetHandle::new(dataset_id, dataset_alias.to_owned()));
+                }
             }
         }
 

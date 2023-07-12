@@ -144,7 +144,10 @@ async fn create_catalog_with_local_workspace(tempdir: &Path) -> dill::Catalog {
 async fn create_catalog_with_s3_workspace(s3: &S3) -> dill::Catalog {
     let (endpoint, bucket, key_prefix) = S3Context::split_url(&s3.url);
     let s3_context = S3Context::from_items(endpoint.clone(), bucket, key_prefix).await;
-    let dataset_repo = DatasetRepositoryS3::new(s3_context.clone());
+    let dataset_repo = DatasetRepositoryS3::new(
+        s3_context.clone(),
+        Arc::new(CurrentAccountSubject::new_test()),
+    );
 
     let s3_credentials = s3_context.credentials().await;
 

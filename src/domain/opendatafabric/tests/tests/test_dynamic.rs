@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::convert::TryFrom;
+use std::sync::Arc;
 
 use chrono::prelude::*;
 use opendatafabric::*;
@@ -28,7 +29,7 @@ fn load() -> MetadataBlock {
                 TransformInput {
                     id: Some(DatasetID::from_pub_key_ed25519(b"input2")),
                     name: DatasetName::try_from("input2").unwrap(),
-                    dataset_ref: None,
+                    dataset_ref: Some(DatasetRefAny::try_from("kamu/input2").unwrap()),
                 },
             ],
             transform: Transform::Sql(TransformSql {
@@ -71,7 +72,10 @@ fn test_accessors() {
             TransformInput {
                 id: Some(DatasetID::from_pub_key_ed25519(b"input2")),
                 name: DatasetName::try_from("input2").unwrap(),
-                dataset_ref: None,
+                dataset_ref: Some(DatasetRefAny::AmbiguousAlias(
+                    Arc::from("kamu"),
+                    DatasetName::try_from("input2").unwrap()
+                )),
             },
         ]
     );

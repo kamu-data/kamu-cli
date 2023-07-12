@@ -50,6 +50,17 @@ impl MetadataFactory {
         SetTransformBuilder::new(inputs.into_iter())
     }
 
+    pub fn set_transform_names_and_refs<N, R, I>(inputs: I) -> SetTransformBuilder
+    where
+        I: IntoIterator<Item = (N, R)>,
+        N: TryInto<DatasetName>,
+        <N as TryInto<DatasetName>>::Error: std::fmt::Debug,
+        R: TryInto<DatasetRefAny>,
+        <R as TryInto<DatasetRefAny>>::Error: std::fmt::Debug,
+    {
+        SetTransformBuilder::from_names_and_refs(inputs.into_iter())
+    }
+
     pub fn metadata_block<E: Into<MetadataEvent>>(event: E) -> MetadataBlockBuilder<E> {
         MetadataBlockBuilder::new(event)
     }
@@ -247,6 +258,28 @@ impl SetTransformBuilder {
                         id: None,
                         name: s.try_into().unwrap(),
                         dataset_ref: None,
+                    })
+                    .collect(),
+                transform: TransformSqlBuilder::new().build(),
+            },
+        }
+    }
+
+    fn from_names_and_refs<N, R, I>(inputs: I) -> Self
+    where
+        I: Iterator<Item = (N, R)>,
+        N: TryInto<DatasetName>,
+        <N as TryInto<DatasetName>>::Error: std::fmt::Debug,
+        R: TryInto<DatasetRefAny>,
+        <R as TryInto<DatasetRefAny>>::Error: std::fmt::Debug,
+    {
+        Self {
+            v: SetTransform {
+                inputs: inputs
+                    .map(|s| TransformInput {
+                        id: None,
+                        name: s.0.try_into().unwrap(),
+                        dataset_ref: Some(s.1.try_into().unwrap()),
                     })
                     .collect(),
                 transform: TransformSqlBuilder::new().build(),

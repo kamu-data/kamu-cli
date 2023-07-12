@@ -9,20 +9,21 @@
 
 use std::sync::Arc;
 
-use domain::CurrentAccountSubject;
+use domain::{CurrentAccountSubject, TEST_ACCOUNT_NAME};
 use kamu::*;
+use opendatafabric::AccountName;
 use tempfile::TempDir;
 
 use super::test_dataset_repository_shared;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-fn local_fs_repo(tempdir: &TempDir) -> DatasetRepositoryLocalFs {
+fn local_fs_repo(tempdir: &TempDir, multi_tenant: bool) -> DatasetRepositoryLocalFs {
     let workspace_layout = WorkspaceLayout::create(tempdir.path(), false).unwrap();
     DatasetRepositoryLocalFs::new(
         workspace_layout.datasets_dir.clone(),
         Arc::new(CurrentAccountSubject::new_test()),
-        false,
+        multi_tenant,
     )
 }
 
@@ -31,9 +32,33 @@ fn local_fs_repo(tempdir: &TempDir) -> DatasetRepositoryLocalFs {
 #[tokio::test]
 async fn test_create_dataset() {
     let tempdir = tempfile::tempdir().unwrap();
-    let repo = local_fs_repo(&tempdir);
+    let repo = local_fs_repo(&tempdir, false);
 
-    test_dataset_repository_shared::test_create_dataset(&repo).await;
+    test_dataset_repository_shared::test_create_dataset(&repo, None).await;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_create_dataset_multi_tenant() {
+    let tempdir = tempfile::tempdir().unwrap();
+    let repo = local_fs_repo(&tempdir, true);
+
+    test_dataset_repository_shared::test_create_dataset(
+        &repo,
+        Some(AccountName::new_unchecked(TEST_ACCOUNT_NAME)),
+    )
+    .await;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_create_dataset_same_name_multiple_tenants() {
+    let tempdir = tempfile::tempdir().unwrap();
+    let repo = local_fs_repo(&tempdir, true);
+
+    test_dataset_repository_shared::test_create_dataset_same_name_multiple_tenants(&repo).await;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -41,9 +66,23 @@ async fn test_create_dataset() {
 #[tokio::test]
 async fn test_create_dataset_from_snapshot() {
     let tempdir = tempfile::tempdir().unwrap();
-    let repo = local_fs_repo(&tempdir);
+    let repo = local_fs_repo(&tempdir, false);
 
-    test_dataset_repository_shared::test_create_dataset_from_snapshot(&repo).await;
+    test_dataset_repository_shared::test_create_dataset_from_snapshot(&repo, None).await;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_create_dataset_from_snapshot_multi_tenant() {
+    let tempdir = tempfile::tempdir().unwrap();
+    let repo = local_fs_repo(&tempdir, true);
+
+    test_dataset_repository_shared::test_create_dataset_from_snapshot(
+        &repo,
+        Some(AccountName::new_unchecked(TEST_ACCOUNT_NAME)),
+    )
+    .await;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -51,20 +90,77 @@ async fn test_create_dataset_from_snapshot() {
 #[tokio::test]
 async fn test_rename_dataset() {
     let tempdir = tempfile::tempdir().unwrap();
-    let repo = local_fs_repo(&tempdir);
+    let repo = local_fs_repo(&tempdir, false);
 
-    test_dataset_repository_shared::test_rename_dataset(&repo).await;
+    test_dataset_repository_shared::test_rename_dataset(&repo, None).await;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(containerized)]
+#[tokio::test]
+async fn test_rename_dataset_multi_tenant() {
+    let tempdir = tempfile::tempdir().unwrap();
+    let repo = local_fs_repo(&tempdir, true);
+
+    test_dataset_repository_shared::test_rename_dataset(
+        &repo,
+        Some(AccountName::new_unchecked(TEST_ACCOUNT_NAME)),
+    )
+    .await;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_rename_dataset_same_name_multiple_tenants() {
+    let tempdir = tempfile::tempdir().unwrap();
+    let repo = local_fs_repo(&tempdir, true);
+
+    test_dataset_repository_shared::test_rename_dataset_same_name_multiple_tenants(&repo).await;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
 #[tokio::test]
 async fn test_delete_dataset() {
     let tempdir = tempfile::tempdir().unwrap();
-    let repo = local_fs_repo(&tempdir);
+    let repo = local_fs_repo(&tempdir, false);
 
-    test_dataset_repository_shared::test_delete_dataset(&repo).await;
+    test_dataset_repository_shared::test_delete_dataset(&repo, None).await;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_delete_dataset_multi_tenant() {
+    let tempdir = tempfile::tempdir().unwrap();
+    let repo = local_fs_repo(&tempdir, true);
+
+    test_dataset_repository_shared::test_delete_dataset(
+        &repo,
+        Some(AccountName::new_unchecked(TEST_ACCOUNT_NAME)),
+    )
+    .await;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_iterate_datasets() {
+    let tempdir = tempfile::tempdir().unwrap();
+    let repo = local_fs_repo(&tempdir, false);
+
+    test_dataset_repository_shared::test_iterate_datasets(&repo).await;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_iterate_datasets_multi_tenant() {
+    let tempdir = tempfile::tempdir().unwrap();
+    let repo = local_fs_repo(&tempdir, true);
+
+    test_dataset_repository_shared::test_iterate_datasets_multi_tenant(&repo).await;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
