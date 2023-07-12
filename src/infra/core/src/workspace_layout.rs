@@ -62,8 +62,11 @@ impl WorkspaceLayout {
         std::fs::create_dir(&ws.run_info_dir).int_err()?;
         std::fs::write(&ws.version_path, Self::VERSION.to_string()).int_err()?;
 
+        // Only save the workspace configuration if it is different from default
         let ws_config = WorkspaceConfig::new(multi_tenant);
-        ws_config.save_to(&ws.config_path).int_err()?;
+        if ws_config != WorkspaceConfig::default() {
+            ws_config.save_to(&ws.config_path).int_err()?;
+        }
 
         Ok(ws)
     }
@@ -122,7 +125,7 @@ impl std::fmt::Display for WorkspaceVersion {
 
 const WORKSPACE_CONFIG_VERSION: i32 = 1;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub struct WorkspaceConfig {
     pub multi_tenant: bool,
 }
