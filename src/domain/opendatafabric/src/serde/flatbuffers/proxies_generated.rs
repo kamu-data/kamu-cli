@@ -8107,6 +8107,7 @@ impl<'a> flatbuffers::Follow<'a> for TransformInput<'a> {
 impl<'a> TransformInput<'a> {
     pub const VT_ID: flatbuffers::VOffsetT = 4;
     pub const VT_NAME: flatbuffers::VOffsetT = 6;
+    pub const VT_DATASET_REF: flatbuffers::VOffsetT = 8;
 
     #[inline]
     pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
@@ -8123,6 +8124,9 @@ impl<'a> TransformInput<'a> {
         }
         if let Some(x) = args.id {
             builder.add_id(x);
+        }
+        if let Some(x) = args.dataset_ref {
+            builder.add_dataset_ref(x);
         }
         builder.finish()
     }
@@ -8150,6 +8154,16 @@ impl<'a> TransformInput<'a> {
                 .get::<flatbuffers::ForwardsUOffset<&str>>(TransformInput::VT_NAME, None)
         }
     }
+    #[inline]
+    pub fn dataset_ref(&self) -> Option<&'a str> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<flatbuffers::ForwardsUOffset<&str>>(TransformInput::VT_DATASET_REF, None)
+        }
+    }
 }
 
 impl flatbuffers::Verifiable for TransformInput<'_> {
@@ -8166,6 +8180,11 @@ impl flatbuffers::Verifiable for TransformInput<'_> {
                 false,
             )?
             .visit_field::<flatbuffers::ForwardsUOffset<&str>>("name", Self::VT_NAME, false)?
+            .visit_field::<flatbuffers::ForwardsUOffset<&str>>(
+                "dataset_ref",
+                Self::VT_DATASET_REF,
+                false,
+            )?
             .finish();
         Ok(())
     }
@@ -8173,6 +8192,7 @@ impl flatbuffers::Verifiable for TransformInput<'_> {
 pub struct TransformInputArgs<'a> {
     pub id: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u8>>>,
     pub name: Option<flatbuffers::WIPOffset<&'a str>>,
+    pub dataset_ref: Option<flatbuffers::WIPOffset<&'a str>>,
 }
 impl<'a> Default for TransformInputArgs<'a> {
     #[inline]
@@ -8180,6 +8200,7 @@ impl<'a> Default for TransformInputArgs<'a> {
         TransformInputArgs {
             id: None,
             name: None,
+            dataset_ref: None,
         }
     }
 }
@@ -8198,6 +8219,13 @@ impl<'a: 'b, 'b> TransformInputBuilder<'a, 'b> {
     pub fn add_name(&mut self, name: flatbuffers::WIPOffset<&'b str>) {
         self.fbb_
             .push_slot_always::<flatbuffers::WIPOffset<_>>(TransformInput::VT_NAME, name);
+    }
+    #[inline]
+    pub fn add_dataset_ref(&mut self, dataset_ref: flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
+            TransformInput::VT_DATASET_REF,
+            dataset_ref,
+        );
     }
     #[inline]
     pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>) -> TransformInputBuilder<'a, 'b> {
@@ -8219,6 +8247,7 @@ impl core::fmt::Debug for TransformInput<'_> {
         let mut ds = f.debug_struct("TransformInput");
         ds.field("id", &self.id());
         ds.field("name", &self.name());
+        ds.field("dataset_ref", &self.dataset_ref());
         ds.finish()
     }
 }

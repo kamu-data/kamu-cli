@@ -15,7 +15,7 @@ use opendatafabric::*;
 use super::{common, CLIError, Command};
 
 pub struct DeleteCommand {
-    local_repo: Arc<dyn DatasetRepository>,
+    dataset_repo: Arc<dyn DatasetRepository>,
     dataset_refs: Vec<DatasetRef>,
     all: bool,
     recursive: bool,
@@ -24,7 +24,7 @@ pub struct DeleteCommand {
 
 impl DeleteCommand {
     pub fn new<I>(
-        local_repo: Arc<dyn DatasetRepository>,
+        dataset_repo: Arc<dyn DatasetRepository>,
         dataset_refs: I,
         all: bool,
         recursive: bool,
@@ -34,7 +34,7 @@ impl DeleteCommand {
         I: IntoIterator<Item = DatasetRef>,
     {
         Self {
-            local_repo,
+            dataset_repo,
             dataset_refs: dataset_refs.into_iter().collect(),
             all,
             recursive,
@@ -61,7 +61,7 @@ impl Command for DeleteCommand {
         // Check references exist
         // TODO: PERF: Create a batch version of `resolve_dataset_ref`
         for dataset_ref in &self.dataset_refs {
-            match self.local_repo.resolve_dataset_ref(dataset_ref).await {
+            match self.dataset_repo.resolve_dataset_ref(dataset_ref).await {
                 Ok(_) => Ok(()),
                 Err(GetDatasetError::NotFound(e)) => Err(CLIError::usage_error_from(e)),
                 Err(GetDatasetError::Internal(e)) => Err(e.into()),
@@ -88,7 +88,7 @@ impl Command for DeleteCommand {
         }
 
         for dataset_ref in &dataset_refs {
-            match self.local_repo.delete_dataset(dataset_ref).await {
+            match self.dataset_repo.delete_dataset(dataset_ref).await {
                 Ok(_) => Ok(()),
                 Err(DeleteDatasetError::DanglingReference(e)) => Err(CLIError::failure(e)),
                 Err(e) => Err(CLIError::critical(e)),

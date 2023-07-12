@@ -17,7 +17,6 @@ use kamu::utils::smart_transfer_protocol::SmartTransferProtocolClient;
 use kamu::*;
 
 use crate::cli_commands;
-use crate::commands::Command;
 use crate::error::*;
 use crate::explore::TraceServer;
 use crate::output::*;
@@ -46,15 +45,20 @@ pub async fn run(
     let workspace_svc = WorkspaceService::new(Arc::new(workspace_layout.clone()));
     let workspace_version = workspace_svc.workspace_version()?;
 
+    let account_svc = AccountService::new();
+    let current_account = account_svc.current_account_indication(&matches);
+
     prepare_run_dir(&workspace_layout.run_info_dir);
 
     // Configure application
     let (guards, catalog, output_config) = {
-        let mut catalog_builder = configure_catalog(&workspace_layout);
+        let mut catalog_builder =
+            configure_catalog(&workspace_layout, workspace_svc.is_multi_tenant_workspace());
         catalog_builder.add_value(workspace_layout.clone());
 
         let output_config = configure_output_format(&matches, &workspace_svc);
         catalog_builder.add_value(output_config.clone());
+        catalog_builder.add_value(current_account.as_current_account_subject());
 
         let guards = configure_logging(&output_config, &workspace_layout);
         tracing::info!(
@@ -76,14 +80,19 @@ pub async fn run(
         catalog.get_one::<GcService>()?.evict_cache()?;
     }
 
-    let mut command: Box<dyn Command> = cli_commands::get_command(&catalog, matches)?;
-
-    let result = if command.needs_workspace() && !workspace_svc.is_in_workspace() {
-        Err(CLIError::usage_error_from(NotInWorkspace))
-    } else if command.needs_workspace() && workspace_svc.is_upgrade_needed()? {
-        Err(CLIError::usage_error_from(WorkspaceUpgradeRequired))
-    } else {
-        command.run().await
+    let result = match cli_commands::get_command(&catalog, matches) {
+        Ok(mut command) => {
+            if command.needs_workspace() && !workspace_svc.is_in_workspace() {
+                Err(CLIError::usage_error_from(NotInWorkspace))
+            } else if command.needs_workspace() && workspace_svc.is_upgrade_needed()? {
+                Err(CLIError::usage_error_from(WorkspaceUpgradeRequired))
+            } else if current_account.is_explicit() && !workspace_svc.is_multi_tenant_workspace() {
+                Err(CLIError::usage_error_from(NotInMultiTenantWorkspace))
+            } else {
+                command.run().await
+            }
+        }
+        Err(e) => Err(e),
     };
 
     match &result {
@@ -119,16 +128,22 @@ pub async fn run(
 /////////////////////////////////////////////////////////////////////////////////////////
 
 // Public only for tests
-pub fn configure_catalog(workspace_layout: &WorkspaceLayout) -> CatalogBuilder {
+pub fn configure_catalog(
+    workspace_layout: &WorkspaceLayout,
+    multi_tenant_workspace: bool,
+) -> CatalogBuilder {
     let mut b = CatalogBuilder::new();
 
     b.add::<ConfigService>();
     b.add::<ContainerRuntime>();
     b.add::<GcService>();
     b.add::<WorkspaceService>();
+    b.add::<AccountService>();
 
     b.add_builder(
-        builder_for::<DatasetRepositoryLocalFs>().with_root(workspace_layout.datasets_dir.clone()),
+        builder_for::<DatasetRepositoryLocalFs>()
+            .with_root(workspace_layout.datasets_dir.clone())
+            .with_multi_tenant(multi_tenant_workspace),
     );
     b.bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>();
 

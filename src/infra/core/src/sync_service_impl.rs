@@ -25,7 +25,7 @@ use crate::utils::smart_transfer_protocol::ObjectTransferOptions;
 
 pub struct SyncServiceImpl {
     remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
-    local_repo: Arc<dyn DatasetRepository>,
+    dataset_repo: Arc<dyn DatasetRepository>,
     dataset_factory: Arc<dyn DatasetFactory>,
     smart_transfer_protocol: Arc<dyn SmartTransferProtocolClient>,
     ipfs_client: Arc<IpfsClient>,
@@ -37,14 +37,14 @@ pub struct SyncServiceImpl {
 impl SyncServiceImpl {
     pub fn new(
         remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
-        local_repo: Arc<dyn DatasetRepository>,
+        dataset_repo: Arc<dyn DatasetRepository>,
         dataset_factory: Arc<dyn DatasetFactory>,
         smart_transfer_protocol: Arc<dyn SmartTransferProtocolClient>,
         ipfs_client: Arc<IpfsClient>,
     ) -> Self {
         Self {
             remote_repo_reg,
-            local_repo,
+            dataset_repo,
             dataset_factory,
             smart_transfer_protocol,
             ipfs_client,
@@ -79,9 +79,8 @@ impl SyncServiceImpl {
         &self,
         dataset_ref: &DatasetRefAny,
     ) -> Result<Arc<dyn Dataset>, SyncError> {
-        // TODO: Support local multi-tenancy
-        let dataset = match dataset_ref.as_local_single_tenant_ref() {
-            Ok(local_ref) => self.local_repo.get_dataset(&local_ref).await?,
+        let dataset = match dataset_ref.as_local_ref(|_| !self.dataset_repo.is_multi_tenant()) {
+            Ok(local_ref) => self.dataset_repo.get_dataset(&local_ref).await?,
             Err(remote_ref) => {
                 let url = self.resolve_remote_dataset_url(&remote_ref).await?;
                 self.dataset_factory.get_dataset(&url, false).await?
@@ -104,13 +103,12 @@ impl SyncServiceImpl {
         dataset_ref: &DatasetRefAny,
         create_if_not_exists: bool,
     ) -> Result<(Option<Arc<dyn Dataset>>, Option<DatasetFactoryFn>), SyncError> {
-        // TODO: Support local multi-tenancy
-        match dataset_ref.as_local_single_tenant_ref() {
-            Ok(local_ref) => match self.local_repo.get_dataset(&local_ref).await {
+        match dataset_ref.as_local_ref(|_| !self.dataset_repo.is_multi_tenant()) {
+            Ok(local_ref) => match self.dataset_repo.get_dataset(&local_ref).await {
                 Ok(dataset) => Ok((Some(dataset), None)),
                 Err(GetDatasetError::NotFound(_)) if create_if_not_exists => {
                     let alias = local_ref.alias().unwrap().clone();
-                    let repo = self.local_repo.clone();
+                    let repo = self.dataset_repo.clone();
                     Ok((
                         None,
                         Some(Box::new(move |seed_block| {
@@ -151,8 +149,9 @@ impl SyncServiceImpl {
         opts: SyncOptions,
         listener: Arc<dyn SyncListener>,
     ) -> Result<SyncResult, SyncError> {
-        // TODO: Support local multi-tenancy
-        let src_is_local = src_ref.as_local_single_tenant_ref().is_ok();
+        let src_is_local = src_ref
+            .as_local_ref(|_| !self.dataset_repo.is_multi_tenant())
+            .is_ok();
 
         let src_dataset = self.get_dataset_reader(src_ref).await?;
         let (dst_dataset, dst_factory) = self
@@ -273,7 +272,7 @@ impl SyncServiceImpl {
         tracing::info!(key_name = %key.name, key_id = %key.id, "Resolved the key to use for IPNS publishing");
 
         // Resolve and compare heads
-        let src_dataset = self.local_repo.get_dataset(src).await?;
+        let src_dataset = self.dataset_repo.get_dataset(src).await?;
         let src_head = src_dataset
             .as_metadata_chain()
             .get_ref(&BlockRef::Head)
@@ -437,7 +436,7 @@ impl SyncServiceImpl {
     }
 
     async fn add_to_ipfs(&self, src: &DatasetRef) -> Result<String, SyncError> {
-        let source_url = self.local_repo.get_dataset_url(src).await.int_err()?;
+        let source_url = self.dataset_repo.get_dataset_url(src).await.int_err()?;
         let source_path = source_url.to_file_path().unwrap();
 
         let cid = self
@@ -478,8 +477,7 @@ impl SyncServiceImpl {
                 .into())
             }
             (_, DatasetRefAny::Url(dst_url)) if dst_url.scheme() == "ipns" => {
-                // TODO: Support local multi-tenancy
-                match src.as_local_single_tenant_ref() {
+                match src.as_local_ref(|_| !self.dataset_repo.is_multi_tenant()) {
                     Ok(src) => match dst_url.path() {
                         "" | "/" => self.sync_to_ipfs(&src, dst_url, opts).await,
                         _ => Err(UnsupportedProtocolError {

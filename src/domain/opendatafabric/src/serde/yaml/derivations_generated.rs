@@ -1141,6 +1141,7 @@ pub struct TransformSqlDef {
 pub struct TransformInputDef {
     pub id: Option<DatasetID>,
     pub name: DatasetName,
+    pub dataset_ref: Option<DatasetRefAny>,
 }
 
 implement_serde_as!(TransformInput, TransformInputDef, "TransformInputDef");

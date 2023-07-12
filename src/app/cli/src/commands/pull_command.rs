@@ -24,7 +24,7 @@ use crate::output::OutputConfig;
 
 pub struct PullCommand {
     pull_svc: Arc<dyn PullService>,
-    local_repo: Arc<dyn DatasetRepository>,
+    dataset_repo: Arc<dyn DatasetRepository>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
     output_config: Arc<OutputConfig>,
     refs: Vec<DatasetRefAny>,
@@ -40,7 +40,7 @@ pub struct PullCommand {
 impl PullCommand {
     pub fn new<I, SS>(
         pull_svc: Arc<dyn PullService>,
-        local_repo: Arc<dyn DatasetRepository>,
+        dataset_repo: Arc<dyn DatasetRepository>,
         remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
         output_config: Arc<OutputConfig>,
         refs: I,
@@ -58,7 +58,7 @@ impl PullCommand {
     {
         Self {
             pull_svc,
-            local_repo,
+            dataset_repo,
             remote_alias_reg,
             output_config,
             refs: refs.into_iter().map(|s| s.clone()).collect(),
@@ -102,14 +102,18 @@ impl PullCommand {
         &self,
         listener: Option<Arc<dyn PullMultiListener>>,
     ) -> Result<Vec<PullResponse>, CLIError> {
-        let dataset_ref = self.refs[0].as_local_single_tenant_ref().map_err(|_| {
-            CLIError::usage_error("When using --fetch reference should point to a local dataset")
-        })?;
+        let dataset_ref = self.refs[0]
+            .as_local_ref(|_| !self.dataset_repo.is_multi_tenant())
+            .map_err(|_| {
+                CLIError::usage_error(
+                    "When using --fetch reference should point to a local dataset",
+                )
+            })?;
 
-        let dataset_handle = self.local_repo.resolve_dataset_ref(&dataset_ref).await?;
+        let dataset_handle = self.dataset_repo.resolve_dataset_ref(&dataset_ref).await?;
 
         let summary = self
-            .local_repo
+            .dataset_repo
             .get_dataset(&dataset_handle.as_local_ref())
             .await?
             .get_summary(GetSummaryOpts::default())
@@ -206,7 +210,8 @@ impl PullCommand {
     }
 
     async fn pull_with_progress(&self) -> Result<Vec<PullResponse>, CLIError> {
-        let pull_progress = PrettyPullProgress::new(self.fetch_uncacheable);
+        let pull_progress =
+            PrettyPullProgress::new(self.fetch_uncacheable, self.dataset_repo.is_multi_tenant());
         let listener = Arc::new(pull_progress.clone());
         self.pull(Some(listener)).await
     }
@@ -334,13 +339,15 @@ impl Command for PullCommand {
 struct PrettyPullProgress {
     multi_progress: Arc<indicatif::MultiProgress>,
     fetch_uncacheable: bool,
+    multi_tenant_workspace: bool,
 }
 
 impl PrettyPullProgress {
-    fn new(fetch_uncacheable: bool) -> Self {
+    fn new(fetch_uncacheable: bool, multi_tenant_workspace: bool) -> Self {
         Self {
             multi_progress: Arc::new(indicatif::MultiProgress::new()),
             fetch_uncacheable,
+            multi_tenant_workspace,
         }
     }
 }
@@ -388,7 +395,8 @@ impl SyncMultiListener for PrettyPullProgress {
         dst: &DatasetRefAny,
     ) -> Option<Arc<dyn SyncListener>> {
         Some(Arc::new(PrettySyncProgress::new(
-            dst.as_local_ref(|_| true).expect("Expected local ref"),
+            dst.as_local_ref(|_| !self.multi_tenant_workspace)
+                .expect("Expected local ref"),
             src.as_remote_ref(|_| true).expect("Expected remote ref"),
             self.multi_progress.clone(),
         )))

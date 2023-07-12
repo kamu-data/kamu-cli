@@ -31,12 +31,12 @@ impl Search {
         page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<SearchResultConnection> {
-        let local_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
+        let dataset_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
 
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_RESULTS_PER_PAGE);
 
-        let mut datasets: Vec<_> = local_repo
+        let mut datasets: Vec<_> = dataset_repo
             .get_all_datasets()
             .filter_ok(|hdl| hdl.alias.dataset_name.contains(&query))
             .try_collect()

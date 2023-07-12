@@ -230,10 +230,12 @@ impl DatasetHelper {
 async fn test_transform_common(transform: Transform) {
     let tempdir = tempfile::tempdir().unwrap();
 
-    let workspace_layout = Arc::new(WorkspaceLayout::create(tempdir.path()).unwrap());
+    let workspace_layout = Arc::new(WorkspaceLayout::create(tempdir.path(), false).unwrap());
 
-    let local_repo = Arc::new(DatasetRepositoryLocalFs::new(
+    let dataset_repo = Arc::new(DatasetRepositoryLocalFs::new(
         workspace_layout.datasets_dir.clone(),
+        Arc::new(CurrentAccountSubject::new_test()),
+        false,
     ));
     let engine_provisioner = Arc::new(EngineProvisionerLocal::new(
         EngineProvisionerLocalConfig::default(),
@@ -242,7 +244,7 @@ async fn test_transform_common(transform: Transform) {
     ));
 
     let ingest_svc = IngestServiceImpl::new(
-        local_repo.clone(),
+        dataset_repo.clone(),
         engine_provisioner.clone(),
         Arc::new(ContainerRuntime::default()),
         workspace_layout.run_info_dir.clone(),
@@ -250,7 +252,7 @@ async fn test_transform_common(transform: Transform) {
     );
 
     let transform_svc = TransformServiceImpl::new(
-        local_repo.clone(),
+        dataset_repo.clone(),
         engine_provisioner.clone(),
         workspace_layout.run_info_dir.clone(),
     );
@@ -295,8 +297,8 @@ async fn test_transform_common(transform: Transform) {
 
     let root_alias = DatasetAlias::new(None, root_snapshot.name.clone());
 
-    local_repo
-        .create_dataset_from_snapshot(root_snapshot)
+    dataset_repo
+        .create_dataset_from_snapshot(None, root_snapshot)
         .await
         .unwrap();
 
@@ -321,8 +323,8 @@ async fn test_transform_common(transform: Transform) {
 
     let deriv_alias = DatasetAlias::new(None, deriv_snapshot.name.clone());
 
-    let dataset = local_repo
-        .create_dataset_from_snapshot(deriv_snapshot)
+    let dataset = dataset_repo
+        .create_dataset_from_snapshot(None, deriv_snapshot)
         .await
         .unwrap()
         .dataset;

@@ -34,20 +34,23 @@ struct RepoFixture {
 
 async fn setup_repo() -> RepoFixture {
     let tmp_dir = tempfile::tempdir().unwrap();
-    let workspace_layout = WorkspaceLayout::create(tmp_dir.path()).unwrap();
+    let workspace_layout = WorkspaceLayout::create(tmp_dir.path(), false).unwrap();
 
     let catalog = dill::CatalogBuilder::new()
         .add_builder(
             builder_for::<DatasetRepositoryLocalFs>()
-                .with_root(workspace_layout.datasets_dir.clone()),
+                .with_root(workspace_layout.datasets_dir.clone())
+                .with_multi_tenant(false),
         )
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+        .add_value(CurrentAccountSubject::new_test())
         .build();
 
-    let local_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
+    let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
 
-    let created_dataset = local_repo
+    let created_dataset = dataset_repo
         .create_dataset_from_snapshot(
+            None,
             MetadataFactory::dataset_snapshot()
                 .name("foo")
                 .kind(DatasetKind::Root)

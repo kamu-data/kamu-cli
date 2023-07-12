@@ -20,7 +20,7 @@ use super::{CLIError, Command};
 use crate::OutputConfig;
 
 pub struct LineageCommand {
-    local_repo: Arc<dyn DatasetRepository>,
+    dataset_repo: Arc<dyn DatasetRepository>,
     provenance_svc: Arc<dyn ProvenanceService>,
     workspace_layout: Arc<WorkspaceLayout>,
     dataset_refs: Vec<DatasetRef>,
@@ -31,7 +31,7 @@ pub struct LineageCommand {
 
 impl LineageCommand {
     pub fn new<I>(
-        local_repo: Arc<dyn DatasetRepository>,
+        dataset_repo: Arc<dyn DatasetRepository>,
         provenance_svc: Arc<dyn ProvenanceService>,
         workspace_layout: Arc<WorkspaceLayout>,
         dataset_refs: I,
@@ -43,7 +43,7 @@ impl LineageCommand {
         I: IntoIterator<Item = DatasetRef>,
     {
         Self {
-            local_repo,
+            dataset_repo,
             provenance_svc,
             workspace_layout,
             dataset_refs: dataset_refs.into_iter().collect(),
@@ -87,10 +87,10 @@ impl Command for LineageCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
         use futures::{StreamExt, TryStreamExt};
         let mut dataset_handles: Vec<_> = if self.dataset_refs.is_empty() {
-            self.local_repo.get_all_datasets().try_collect().await?
+            self.dataset_repo.get_all_datasets().try_collect().await?
         } else {
             futures::stream::iter(&self.dataset_refs)
-                .then(|r| self.local_repo.resolve_dataset_ref(r))
+                .then(|r| self.dataset_repo.resolve_dataset_ref(r))
                 .try_collect()
                 .await
                 .map_err(|e| CLIError::failure(e))?
@@ -135,22 +135,22 @@ impl LineageVisitor for ShellVisitor {
 
     fn enter(&mut self, dataset: &NodeInfo<'_>) -> bool {
         let fmt = match &dataset {
-            &NodeInfo::Local { name, kind, .. } => match kind {
+            &NodeInfo::Local { alias, kind, .. } => match kind {
                 DatasetKind::Root => format!(
                     "{}{}",
-                    console::style(name).bold(),
+                    console::style(alias).bold(),
                     console::style(": Root").dim(),
                 ),
                 DatasetKind::Derivative => format!(
                     "{}{}",
-                    console::style(name).bold(),
+                    console::style(alias).bold(),
                     console::style(": Derivative").dim(),
                 ),
             },
-            &NodeInfo::Remote { name, .. } => {
+            &NodeInfo::Remote { alias, .. } => {
                 format!(
                     "{}{}",
-                    console::style(name).dim(),
+                    console::style(alias).dim(),
                     console::style(": N/A").dim(),
                 )
             }
@@ -212,7 +212,7 @@ impl LineageVisitor for ShellVisitor {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 struct CsvVisitor {
-    visited: HashSet<DatasetName>,
+    visited: HashSet<DatasetAlias>,
 }
 
 impl CsvVisitor {
@@ -229,18 +229,18 @@ impl LineageVisitor for CsvVisitor {
     }
 
     fn enter(&mut self, dataset: &NodeInfo<'_>) -> bool {
-        if !self.visited.insert(dataset.name().clone()) {
+        if !self.visited.insert(dataset.alias().clone()) {
             return false;
         }
 
         match dataset {
             &NodeInfo::Local { dependencies, .. } => {
                 for dep in dependencies {
-                    println!("\"{}\",\"true\",\"{}\"", dataset.name(), dep.name);
+                    println!("\"{}\",\"true\",\"{}\"", dataset.alias(), dep.name);
                 }
             }
             &NodeInfo::Remote { .. } => {
-                println!("\"{}\",\"false\",\"\"", dataset.name());
+                println!("\"{}\",\"false\",\"\"", dataset.alias());
             }
         }
 

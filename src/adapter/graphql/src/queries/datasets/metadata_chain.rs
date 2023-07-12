@@ -43,8 +43,8 @@ impl MetadataChain {
 
     #[graphql(skip)]
     async fn get_dataset(&self, ctx: &Context<'_>) -> Result<std::sync::Arc<dyn domain::Dataset>> {
-        let local_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
-        let dataset = local_repo
+        let dataset_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
+        let dataset = dataset_repo
             .get_dataset(&self.dataset_handle.as_local_ref())
             .await
             .int_err()?;

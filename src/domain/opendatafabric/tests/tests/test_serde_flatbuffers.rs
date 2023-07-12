@@ -97,10 +97,12 @@ fn get_test_events() -> [(MetadataEvent, &'static str); 6] {
                     TransformInput {
                         id: Some(DatasetID::from_pub_key_ed25519(b"input1")),
                         name: DatasetName::try_from("input1").unwrap(),
+                        dataset_ref: None,
                     },
                     TransformInput {
                         id: Some(DatasetID::from_pub_key_ed25519(b"input2")),
                         name: DatasetName::try_from("input2").unwrap(),
+                        dataset_ref: None,
                     },
                 ],
                 transform: Transform::Sql(TransformSql {

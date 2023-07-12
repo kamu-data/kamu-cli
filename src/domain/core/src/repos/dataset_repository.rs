@@ -42,12 +42,16 @@ impl CreateDatasetResult {
 
 #[async_trait]
 pub trait DatasetRepository: DatasetRegistry + Sync + Send {
+    fn is_multi_tenant(&self) -> bool;
+
     async fn resolve_dataset_ref(
         &self,
         dataset_ref: &DatasetRef,
     ) -> Result<DatasetHandle, GetDatasetError>;
 
     fn get_all_datasets<'s>(&'s self) -> DatasetHandleStream<'s>;
+
+    fn get_account_datasets<'s>(&'s self, account_name: AccountName) -> DatasetHandleStream<'s>;
 
     async fn get_dataset(
         &self,
@@ -63,7 +67,7 @@ pub trait DatasetRepository: DatasetRegistry + Sync + Send {
     async fn rename_dataset(
         &self,
         dataset_ref: &DatasetRef,
-        new_alias: &DatasetAlias,
+        new_name: &DatasetName,
     ) -> Result<(), RenameDatasetError>;
 
     async fn delete_dataset(&self, dataset_ref: &DatasetRef) -> Result<(), DeleteDatasetError>;
@@ -97,11 +101,13 @@ pub trait DatasetRepositoryExt: DatasetRepository {
 
     async fn create_dataset_from_snapshot(
         &self,
+        account_name: Option<AccountName>,
         mut snapshot: DatasetSnapshot,
     ) -> Result<CreateDatasetResult, CreateDatasetFromSnapshotError>;
 
     async fn create_datasets_from_snapshots(
         &self,
+        account_name: Option<AccountName>,
         snapshots: Vec<DatasetSnapshot>,
     ) -> Vec<(
         DatasetName,
@@ -141,6 +147,7 @@ where
 
     async fn create_dataset_from_snapshot(
         &self,
+        account_name: Option<AccountName>,
         mut snapshot: DatasetSnapshot,
     ) -> Result<CreateDatasetResult, CreateDatasetFromSnapshotError> {
         // Validate / resolve events
@@ -196,7 +203,7 @@ where
 
         let create_result = self
             .create_dataset(
-                &DatasetAlias::new(None, snapshot.name),
+                &DatasetAlias::new(account_name, snapshot.name),
                 MetadataBlockTyped {
                     system_time,
                     prev_block_hash: None,
@@ -253,6 +260,7 @@ where
 
     async fn create_datasets_from_snapshots(
         &self,
+        account_name: Option<AccountName>,
         snapshots: Vec<DatasetSnapshot>,
     ) -> Vec<(
         DatasetName,
@@ -263,7 +271,9 @@ where
         let mut ret = Vec::new();
         for snapshot in snapshots_ordered {
             let name = snapshot.name.clone();
-            let res = self.create_dataset_from_snapshot(snapshot).await;
+            let res = self
+                .create_dataset_from_snapshot(account_name.clone(), snapshot)
+                .await;
             ret.push((name, res));
         }
         ret
@@ -295,16 +305,28 @@ where
                 Err(GetDatasetError::Internal(e)) => Err(e.into()),
             }?;
         } else {
-            // TODO: Input should be a multitenant alias
-            let input_alias = DatasetAlias::new(None, input.name.clone());
+            // When ID is not specified we try resolving it by name or a reference
 
-            // When ID is not specified we try resolving it by name
-            let hdl = match repo.resolve_dataset_ref(&input_alias.as_local_ref()).await {
+            // When reference is available, it dominates
+            let input_local_ref = if let Some(dataset_ref) = &input.dataset_ref {
+                match dataset_ref.as_local_ref(|_| !repo.is_multi_tenant()) {
+                    Ok(local_ref) => local_ref,
+                    Err(_) => {
+                        unimplemented!("Deriving from remote dataset is not supported yet");
+                    }
+                }
+            } else {
+                // Derive reference purely from a name assuming a default account
+                let input_alias = DatasetAlias::new(None, input.name.clone());
+                input_alias.as_local_ref()
+            };
+
+            let hdl = match repo.resolve_dataset_ref(&input_local_ref).await {
                 Ok(hdl) => Ok(hdl),
                 Err(GetDatasetError::NotFound(_)) => Err(
                     CreateDatasetFromSnapshotError::MissingInputs(MissingInputsError {
                         dataset_ref: dataset_name.into(),
-                        missing_inputs: vec![input_alias.into_local_ref()],
+                        missing_inputs: vec![input_local_ref],
                     }),
                 ),
                 Err(GetDatasetError::Internal(e)) => Err(e.into()),
@@ -462,6 +484,7 @@ pub enum CreateDatasetFromSnapshotError {
     InvalidSnapshot(#[from] InvalidSnapshotError),
     #[error(transparent)]
     MissingInputs(#[from] MissingInputsError),
+
     #[error(transparent)]
     NameCollision(#[from] NameCollisionError),
     #[error(transparent)]
@@ -480,6 +503,7 @@ pub enum RenameDatasetError {
     NotFound(#[from] DatasetNotFoundError),
     #[error(transparent)]
     NameCollision(#[from] NameCollisionError),
+
     #[error(transparent)]
     Internal(
         #[from]
@@ -505,6 +529,7 @@ pub enum DeleteDatasetError {
     NotFound(#[from] DatasetNotFoundError),
     #[error(transparent)]
     DanglingReference(#[from] DanglingReferenceError),
+
     #[error(transparent)]
     Internal(
         #[from]

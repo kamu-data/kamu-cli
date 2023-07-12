@@ -24,7 +24,7 @@ use super::{CLIError, Command};
 use crate::output::OutputConfig;
 
 pub struct LogCommand {
-    local_repo: Arc<dyn DatasetRepository>,
+    dataset_repo: Arc<dyn DatasetRepository>,
     dataset_ref: DatasetRef,
     outout_format: Option<String>,
     filter: Option<String>,
@@ -34,7 +34,7 @@ pub struct LogCommand {
 
 impl LogCommand {
     pub fn new(
-        local_repo: Arc<dyn DatasetRepository>,
+        dataset_repo: Arc<dyn DatasetRepository>,
         dataset_ref: DatasetRef,
         outout_format: Option<&str>,
         filter: Option<&str>,
@@ -42,7 +42,7 @@ impl LogCommand {
         output_config: Arc<OutputConfig>,
     ) -> Self {
         Self {
-            local_repo,
+            dataset_repo,
             dataset_ref,
             outout_format: outout_format.map(|s| s.to_owned()),
             filter: filter.map(|s| s.to_owned()),
@@ -79,7 +79,7 @@ impl LogCommand {
 impl Command for LogCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
         let id_to_alias_lookup: BTreeMap<_, _> = self
-            .local_repo
+            .dataset_repo
             .get_all_datasets()
             .map_ok(|h| (h.id, h.alias))
             .try_collect()
@@ -97,12 +97,12 @@ impl Command for LogCommand {
         };
 
         let dataset_handle = self
-            .local_repo
+            .dataset_repo
             .resolve_dataset_ref(&self.dataset_ref)
             .await?;
 
         let dataset = self
-            .local_repo
+            .dataset_repo
             .get_dataset(&dataset_handle.as_local_ref())
             .await?;
 

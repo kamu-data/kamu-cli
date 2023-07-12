@@ -24,14 +24,14 @@ impl Datasets {
 
     /// Returns dataset by its ID
     async fn by_id(&self, ctx: &Context<'_>, dataset_id: DatasetID) -> Result<Option<Dataset>> {
-        let local_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
-        let hdl = local_repo
+        let dataset_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
+        let hdl = dataset_repo
             .try_resolve_dataset_ref(&dataset_id.as_local_ref())
             .await?;
         Ok(hdl.map(|h| Dataset::new(Account::mock(), h)))
     }
 
-    // TODO: Multitenancy
+    // TODO: Multi-tenancy
     /// Returns dataset by its owner and name
     #[allow(unused_variables)]
     async fn by_owner_and_name(
@@ -42,17 +42,17 @@ impl Datasets {
     ) -> Result<Option<Dataset>> {
         let account = Account::mock();
 
-        // Not multitenant yet
+        // Not multi-tenant yet
         let dataset_alias = odf::DatasetAlias::new(None, dataset_name.into());
 
-        let local_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
-        let hdl = local_repo
+        let dataset_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
+        let hdl = dataset_repo
             .try_resolve_dataset_ref(&dataset_alias.into_local_ref())
             .await?;
         Ok(hdl.map(|h| Dataset::new(Account::mock(), h)))
     }
 
-    // TODO: Multitenancy
+    // TODO: Multi-tenancy
     #[graphql(skip)]
     async fn by_account_impl(
         &self,
@@ -61,12 +61,12 @@ impl Datasets {
         page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<DatasetConnection> {
-        let local_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
+        let dataset_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
 
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_PER_PAGE);
 
-        let mut all_datasets: Vec<_> = local_repo.get_all_datasets().try_collect().await?;
+        let mut all_datasets: Vec<_> = dataset_repo.get_all_datasets().try_collect().await?;
         let total_count = all_datasets.len();
         all_datasets.sort_by(|a, b| a.alias.cmp(&b.alias));
 
@@ -173,8 +173,8 @@ impl Datasets {
             .await
     }
 
-    // TODO: Multitenancy
-    // TODO: Multitenant resolution for derivative dataset inputs (should it only
+    // TODO: Multi-tenancy
+    // TODO: Multi-tenant resolution for derivative dataset inputs (should it only
     // work by ID?)
     #[allow(unused_variables)]
     #[graphql(skip)]
@@ -184,16 +184,19 @@ impl Datasets {
         account_id: AccountID,
         snapshot: odf::DatasetSnapshot,
     ) -> Result<CreateDatasetFromSnapshotResult> {
-        let local_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
+        let dataset_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
 
-        let result = match local_repo.create_dataset_from_snapshot(snapshot).await {
+        let result = match dataset_repo
+            .create_dataset_from_snapshot(None, snapshot)
+            .await
+        {
             Ok(result) => {
                 let dataset = Dataset::from_ref(ctx, &result.dataset_handle.as_local_ref()).await?;
                 CreateDatasetFromSnapshotResult::Success(CreateDatasetResultSuccess { dataset })
             }
             Err(domain::CreateDatasetFromSnapshotError::NameCollision(e)) => {
                 CreateDatasetFromSnapshotResult::NameCollision(CreateDatasetResultNameCollision {
-                    // TODO: Multitenancy
+                    account_name: e.alias.account_name.map(|a| a.into()),
                     dataset_name: e.alias.dataset_name.into(),
                 })
             }
@@ -262,6 +265,7 @@ impl CreateDatasetResultSuccess {
 #[derive(SimpleObject, Debug, Clone)]
 #[graphql(complex)]
 pub struct CreateDatasetResultNameCollision {
+    pub account_name: Option<AccountName>,
     pub dataset_name: DatasetName,
 }
 

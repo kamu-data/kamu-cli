@@ -19,7 +19,11 @@ use url::Url;
 fn test_dataset_refs() {
     assert_eq!(
         DatasetRefAny::from_str("dataset").unwrap(),
-        DatasetRefAny::Alias(None, None, DatasetName::new_unchecked("dataset"))
+        DatasetRefAny::LocalAlias(None, DatasetName::new_unchecked("dataset"))
+    );
+    assert_eq!(
+        DatasetRefAny::from_str("mystery/dataset").unwrap(),
+        DatasetRefAny::AmbiguousAlias(Arc::from("mystery"), DatasetName::new_unchecked("dataset"))
     );
     assert_eq!(
         DatasetRefAny::from_str("repo/dataset")

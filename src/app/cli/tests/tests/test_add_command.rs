@@ -72,12 +72,12 @@ async fn test_add_recursive() {
     .await
     .unwrap();
 
-    let local_repo = kamu
+    let dataset_repo = kamu
         .catalog()
         .get_one::<dyn domain::DatasetRepository>()
         .unwrap();
 
-    let mut datasets: Vec<_> = local_repo
+    let mut datasets: Vec<_> = dataset_repo
         .get_all_datasets()
         .map_ok(|h| h.alias.to_string())
         .try_collect()

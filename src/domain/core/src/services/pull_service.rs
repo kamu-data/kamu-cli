@@ -67,6 +67,26 @@ pub struct PullRequest {
     pub ingest_from: Option<FetchStep>,
 }
 
+impl PullRequest {
+    pub fn from_any_ref(dataset_ref: &DatasetRefAny, is_repo: impl Fn(&RepoName) -> bool) -> Self {
+        // Single-tenant workspace => treat all repo-like references as repos.
+        // Multi-tenant workspace => treat all repo-like references as accounts, use
+        // repo:// for repos
+        match dataset_ref.as_local_ref(is_repo) {
+            Ok(local_ref) => Self {
+                local_ref: Some(local_ref),
+                remote_ref: None,
+                ingest_from: None,
+            },
+            Err(remote_ref) => Self {
+                local_ref: None,
+                remote_ref: Some(remote_ref),
+                ingest_from: None,
+            },
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct PullResponse {
     /// Parameters passed into the call. Empty for datasets that were pulled as
@@ -264,6 +284,7 @@ pub enum SetWatermarkError {
         #[backtrace]
         DatasetNotFoundError,
     ),
+
     #[error("Attempting to set watermark on a remote dataset")]
     IsRemote,
     #[error(transparent)]

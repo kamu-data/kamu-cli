@@ -92,7 +92,12 @@ pub fn cli() -> Command {
             Arg::new("trace")
                 .long("trace")
                 .action(ArgAction::SetTrue)
-                .help("Record and visualize the command execution as perfetto.dev trace")
+                .help("Record and visualize the command execution as perfetto.dev trace"),
+            Arg::new("account")
+                .long("account")
+                .short('a')
+                .action(ArgAction::Set)
+                .hide(true)
         ])
         .after_help(indoc::indoc!(
             r#"
@@ -332,6 +337,11 @@ pub fn cli() -> Command {
                             .action(ArgAction::SetTrue)
                             .hide(true)
                             .help("List image names instead of pulling"),
+                        Arg::new("multi-tenant")
+                            .long("multi-tenant")
+                            .action(ArgAction::SetTrue)
+                            .hide(true)
+                            .help("Initialize a workspace for multiple tenants")
                     ])
                     .after_help(indoc::indoc!(
                         r#"
@@ -434,11 +444,21 @@ pub fn cli() -> Command {
                     Command::new("list")
                         .visible_alias("ls")
                         .about("List all datasets in the workspace")
-                        .args([Arg::new("wide")
-                            .long("wide")
-                            .short('w')
-                            .action(ArgAction::Count)
-                            .help("Show more details (repeat for more)")])
+                        .args([
+                            Arg::new("wide")
+                                .long("wide")
+                                .short('w')
+                                .action(ArgAction::Count)
+                                .help("Show more details (repeat for more)"),
+                            Arg::new("target-account")
+                                .long("target-account")
+                                .action(ArgAction::Set)
+                                .hide(true),
+                            Arg::new("all-accounts")
+                                .long("all-accounts")
+                                .action(ArgAction::SetTrue)
+                                .hide(true)
+                        ])
                         .after_help(indoc::indoc!(
                             r#"
                             ### Examples ###

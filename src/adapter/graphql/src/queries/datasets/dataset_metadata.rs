@@ -29,8 +29,8 @@ impl DatasetMetadata {
 
     #[graphql(skip)]
     async fn get_dataset(&self, ctx: &Context<'_>) -> Result<std::sync::Arc<dyn domain::Dataset>> {
-        let local_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
-        let dataset = local_repo
+        let dataset_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
+        let dataset = dataset_repo
             .get_dataset(&self.dataset_handle.as_local_ref())
             .await
             .int_err()?;
@@ -93,7 +93,7 @@ impl DatasetMetadata {
 
     /// Current upstream dependencies of a dataset
     async fn current_upstream_dependencies(&self, ctx: &Context<'_>) -> Result<Vec<Dataset>> {
-        let local_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
+        let dataset_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
 
         let dataset = self.get_dataset(ctx).await?;
         let summary = dataset
@@ -106,7 +106,7 @@ impl DatasetMetadata {
             let dataset_id = input.id.unwrap().clone();
             dependencies.push(Dataset::new(
                 Account::mock(),
-                local_repo
+                dataset_repo
                     .resolve_dataset_ref(&dataset_id.as_local_ref())
                     .await
                     .int_err()?,
@@ -118,9 +118,9 @@ impl DatasetMetadata {
     // TODO: Convert to collection
     /// Current downstream dependencies of a dataset
     async fn current_downstream_dependencies(&self, ctx: &Context<'_>) -> Result<Vec<Dataset>> {
-        let local_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
+        let dataset_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
 
-        let downstream: Vec<_> = local_repo
+        let downstream: Vec<_> = dataset_repo
             .get_downstream_dependencies(&self.dataset_handle.as_local_ref())
             .map_ok(|hdl| Dataset::new(Account::mock(), hdl))
             .try_collect()

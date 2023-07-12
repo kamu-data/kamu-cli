@@ -10,25 +10,29 @@
 use opendatafabric::*;
 
 use crate::commands::*;
-use crate::services::WorkspaceService;
+use crate::services::{AccountService, WorkspaceService};
 use crate::CommandInterpretationFailed;
 
 pub fn get_command(
     catalog: &dill::Catalog,
-    matches: clap::ArgMatches,
+    arg_matches: clap::ArgMatches,
 ) -> Result<Box<dyn Command>, CLIError> {
-    let command: Box<dyn Command> = match matches.subcommand() {
-        Some(("add", submatches)) => Box::new(AddCommand::new(
-            catalog.get_one()?,
-            catalog.get_one()?,
-            submatches
-                .get_many("manifest")
-                .unwrap_or_default()
-                .map(String::as_str),
-            submatches.get_flag("recursive"),
-            submatches.get_flag("replace"),
-            submatches.get_flag("stdin"),
-        )),
+    let command: Box<dyn Command> = match arg_matches.subcommand() {
+        Some(("add", submatches)) => {
+            let account_service = catalog.get_one::<AccountService>()?;
+            Box::new(AddCommand::new(
+                catalog.get_one()?,
+                catalog.get_one()?,
+                account_service.current_account_indication(&arg_matches),
+                submatches
+                    .get_many("manifest")
+                    .unwrap_or_default()
+                    .map(String::as_str),
+                submatches.get_flag("recursive"),
+                submatches.get_flag("replace"),
+                submatches.get_flag("stdin"),
+            ))
+        }
         Some(("complete", submatches)) => {
             let workspace_svc = catalog.get_one::<WorkspaceService>()?;
             let in_workspace =
@@ -85,10 +89,13 @@ pub fn get_command(
         },
         Some(("delete", submatches)) => Box::new(DeleteCommand::new(
             catalog.get_one()?,
-            submatches
-                .get_many("dataset")
-                .unwrap() // required
-                .map(|r: &DatasetRef| r.clone()),
+            validate_many_dataset_refs(
+                catalog,
+                submatches
+                    .get_many("dataset")
+                    .unwrap() // required
+                    .map(|r: &DatasetRef| r.clone()),
+            )?,
             submatches.get_flag("all"),
             submatches.get_flag("recursive"),
             submatches.get_flag("yes"),
@@ -102,7 +109,10 @@ pub fn get_command(
                     submatches.get_flag("list-only"),
                 ))
             } else {
-                Box::new(InitCommand::new(catalog.get_one()?))
+                Box::new(InitCommand::new(
+                    catalog.get_one()?,
+                    submatches.get_flag("multi-tenant"),
+                ))
             }
         }
         Some(("inspect", submatches)) => match submatches.subcommand() {
@@ -110,41 +120,58 @@ pub fn get_command(
                 catalog.get_one()?,
                 catalog.get_one()?,
                 catalog.get_one()?,
-                lin_matches
-                    .get_many("dataset")
-                    .unwrap() // required
-                    .map(|r: &DatasetRef| r.clone()),
+                validate_many_dataset_refs(
+                    catalog,
+                    lin_matches
+                        .get_many("dataset")
+                        .unwrap() // required
+                        .map(|r: &DatasetRef| r.clone()),
+                )?,
                 lin_matches.get_flag("browse"),
                 lin_matches.get_one("output-format").map(String::as_str),
                 catalog.get_one()?,
             )),
             Some(("query", query_matches)) => Box::new(InspectQueryCommand::new(
                 catalog.get_one()?,
-                query_matches
-                    .get_one::<DatasetRef>("dataset")
-                    .unwrap()
-                    .clone(),
+                validate_dataset_ref(
+                    catalog,
+                    query_matches
+                        .get_one::<DatasetRef>("dataset")
+                        .unwrap()
+                        .clone(),
+                )?,
                 catalog.get_one()?,
             )),
             Some(("schema", schema_matches)) => Box::new(InspectSchemaCommand::new(
                 catalog.get_one()?,
-                schema_matches
-                    .get_one::<DatasetRef>("dataset")
-                    .unwrap()
-                    .clone(),
+                validate_dataset_ref(
+                    catalog,
+                    schema_matches
+                        .get_one::<DatasetRef>("dataset")
+                        .unwrap()
+                        .clone(),
+                )?,
                 schema_matches.get_one("output-format").map(String::as_str),
             )),
             _ => return Err(CommandInterpretationFailed.into()),
         },
-        Some(("list", submatches)) => Box::new(ListCommand::new(
-            catalog.get_one()?,
-            catalog.get_one()?,
-            catalog.get_one()?,
-            submatches.get_count("wide"),
-        )),
+        Some(("list", submatches)) => {
+            let account_service = catalog.get_one::<AccountService>()?;
+            Box::new(ListCommand::new(
+                catalog.get_one()?,
+                catalog.get_one()?,
+                account_service.current_account_indication(&arg_matches),
+                account_service.related_account_indication(submatches),
+                catalog.get_one()?,
+                submatches.get_count("wide"),
+            ))
+        }
         Some(("log", submatches)) => Box::new(LogCommand::new(
             catalog.get_one()?,
-            submatches.get_one::<DatasetRef>("dataset").unwrap().clone(),
+            validate_dataset_ref(
+                catalog,
+                submatches.get_one::<DatasetRef>("dataset").unwrap().clone(),
+            )?,
             submatches.get_one("output-format").map(String::as_str),
             submatches.get_one("filter").map(String::as_str),
             *(submatches.get_one("limit").unwrap()),
@@ -178,6 +205,7 @@ pub fn get_command(
                 Box::new(SetWatermarkCommand::new(
                     catalog.get_one()?,
                     catalog.get_one()?,
+                    catalog.get_one()?,
                     datasets,
                     submatches.get_flag("all"),
                     submatches.get_flag("recursive"),
@@ -205,6 +233,7 @@ pub fn get_command(
         }
         Some(("push", push_matches)) => Box::new(PushCommand::new(
             catalog.get_one()?,
+            catalog.get_one()?,
             push_matches
                 .get_many("dataset")
                 .unwrap_or_default()
@@ -220,10 +249,13 @@ pub fn get_command(
         )),
         Some(("rename", rename_matches)) => Box::new(RenameCommand::new(
             catalog.get_one()?,
-            rename_matches
-                .get_one::<DatasetRef>("dataset")
-                .unwrap()
-                .clone(),
+            validate_dataset_ref(
+                catalog,
+                rename_matches
+                    .get_one::<DatasetRef>("dataset")
+                    .unwrap()
+                    .clone(),
+            )?,
             rename_matches.get_one("name").map(String::as_str).unwrap(),
         )),
         Some(("repo", repo_matches)) => match repo_matches.subcommand() {
@@ -288,7 +320,10 @@ pub fn get_command(
         Some(("reset", submatches)) => Box::new(ResetCommand::new(
             catalog.get_one()?,
             catalog.get_one()?,
-            submatches.get_one::<DatasetRef>("dataset").unwrap().clone(),
+            validate_dataset_ref(
+                catalog,
+                submatches.get_one::<DatasetRef>("dataset").unwrap().clone(),
+            )?,
             submatches.get_one::<Multihash>("hash").unwrap().clone(),
             submatches.get_flag("yes"),
         )),
@@ -371,7 +406,10 @@ pub fn get_command(
         },
         Some(("tail", submatches)) => Box::new(TailCommand::new(
             catalog.get_one()?,
-            submatches.get_one::<DatasetRef>("dataset").unwrap().clone(),
+            validate_dataset_ref(
+                catalog,
+                submatches.get_one::<DatasetRef>("dataset").unwrap().clone(),
+            )?,
             *(submatches.get_one("num-records").unwrap()),
             catalog.get_one()?,
         )),
@@ -385,10 +423,14 @@ pub fn get_command(
             catalog.get_one()?,
             catalog.get_one()?,
             catalog.get_one()?,
-            submatches
-                .get_many("dataset")
-                .unwrap() // required
-                .map(|r: &DatasetRef| r.clone()),
+            validate_many_dataset_refs(
+                catalog,
+                submatches
+                    .get_many("dataset")
+                    .unwrap() // required
+                    .map(|r: &DatasetRef| r.clone()),
+            )?
+            .into_iter(),
             submatches.get_flag("recursive"),
             submatches.get_flag("integrity"),
         )),
@@ -396,4 +438,35 @@ pub fn get_command(
     };
 
     Ok(command)
+}
+
+fn validate_dataset_ref(
+    catalog: &dill::Catalog,
+    dataset_ref: DatasetRef,
+) -> Result<DatasetRef, CLIError> {
+    if let DatasetRef::Alias(ref alias) = dataset_ref {
+        let workspace_svc = catalog.get_one::<WorkspaceService>()?;
+        if !workspace_svc.is_multi_tenant_workspace() && alias.is_multi_tenant() {
+            return Err(MultiTenantRefUnexpectedError {
+                dataset_ref: dataset_ref.clone(),
+            }
+            .into());
+        }
+    }
+    return Ok(dataset_ref);
+}
+
+fn validate_many_dataset_refs<I>(
+    catalog: &dill::Catalog,
+    dataset_refs: I,
+) -> Result<Vec<DatasetRef>, CLIError>
+where
+    I: IntoIterator<Item = DatasetRef>,
+{
+    let mut result_refs = Vec::new();
+    for dataset_ref in dataset_refs.into_iter() {
+        result_refs.push(validate_dataset_ref(catalog, dataset_ref)?);
+    }
+
+    return Ok(result_refs);
 }

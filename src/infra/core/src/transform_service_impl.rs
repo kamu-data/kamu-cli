@@ -18,7 +18,7 @@ use kamu_core::*;
 use opendatafabric::*;
 
 pub struct TransformServiceImpl {
-    local_repo: Arc<dyn DatasetRepository>,
+    dataset_repo: Arc<dyn DatasetRepository>,
     engine_provisioner: Arc<dyn EngineProvisioner>,
     run_info_dir: PathBuf,
 }
@@ -26,12 +26,12 @@ pub struct TransformServiceImpl {
 #[component(pub)]
 impl TransformServiceImpl {
     pub fn new(
-        local_repo: Arc<dyn DatasetRepository>,
+        dataset_repo: Arc<dyn DatasetRepository>,
         engine_provisioner: Arc<dyn EngineProvisioner>,
         run_info_dir: PathBuf,
     ) -> Self {
         Self {
-            local_repo,
+            dataset_repo,
             engine_provisioner,
             run_info_dir,
         }
@@ -264,7 +264,7 @@ impl TransformServiceImpl {
         system_time: DateTime<Utc>,
     ) -> Result<Option<TransformOperation>, InternalError> {
         let dataset = self
-            .local_repo
+            .dataset_repo
             .get_dataset(&dataset_handle.as_local_ref())
             .await
             .int_err()?;
@@ -368,11 +368,6 @@ impl TransformServiceImpl {
         let out_data_path = self.run_info_dir.join(super::repos::get_staging_name());
         let new_checkpoint_path = self.run_info_dir.join(super::repos::get_staging_name());
 
-        assert!(
-            !dataset_handle.alias.is_multitenant(),
-            "Multitenancy is not supported yet"
-        );
-
         Ok(Some(TransformOperation {
             dataset_handle: dataset_handle.clone(),
             input_slices,
@@ -393,7 +388,7 @@ impl TransformServiceImpl {
     }
 
     async fn is_never_pulled(&self, dataset_ref: &DatasetRef) -> Result<bool, InternalError> {
-        let dataset = self.local_repo.get_dataset(dataset_ref).await.int_err()?;
+        let dataset = self.dataset_repo.get_dataset(dataset_ref).await.int_err()?;
         Ok(dataset
             .as_metadata_chain()
             .iter_blocks()
@@ -412,12 +407,12 @@ impl TransformServiceImpl {
         output_chain: &dyn MetadataChain,
     ) -> Result<InputSlice, InternalError> {
         let input_handle = self
-            .local_repo
+            .dataset_repo
             .resolve_dataset_ref(&dataset_id.as_local_ref())
             .await
             .int_err()?;
         let input_dataset = self
-            .local_repo
+            .dataset_repo
             .get_dataset(&input_handle.as_local_ref())
             .await
             .int_err()?;
@@ -505,12 +500,12 @@ impl TransformServiceImpl {
         vocab_hint: Option<DatasetVocabulary>,
     ) -> Result<ExecuteQueryInput, InternalError> {
         let input_handle = self
-            .local_repo
+            .dataset_repo
             .resolve_dataset_ref(&slice.dataset_id.as_local_ref())
             .await
             .int_err()?;
         let input_dataset = self
-            .local_repo
+            .dataset_repo
             .get_dataset(&input_handle.as_local_ref())
             .await
             .int_err()?;
@@ -611,7 +606,7 @@ impl TransformServiceImpl {
         &self,
         dataset_ref: &DatasetRef,
     ) -> Result<DatasetVocabulary, InternalError> {
-        let dataset = self.local_repo.get_dataset(dataset_ref).await.int_err()?;
+        let dataset = self.dataset_repo.get_dataset(dataset_ref).await.int_err()?;
         Ok(dataset
             .as_metadata_chain()
             .iter_blocks()
@@ -632,7 +627,7 @@ impl TransformServiceImpl {
         block_range: (Option<Multihash>, Option<Multihash>),
     ) -> Result<Vec<VerificationStep>, VerificationError> {
         let dataset = self
-            .local_repo
+            .dataset_repo
             .get_dataset(&dataset_handle.as_local_ref())
             .await?;
         let metadata_chain = dataset.as_metadata_chain();
@@ -743,11 +738,6 @@ impl TransformServiceImpl {
                 .try_collect()
                 .await?;
 
-            assert!(
-                !dataset_handle.alias.is_multitenant(),
-                "Multitenancy is not supported yet"
-            );
-
             let prev_checkpoint_path = if let Some(cp) = block_t.event.input_checkpoint.as_ref() {
                 Some(
                     kamu_data_utils::data::local_url::into_local_path(
@@ -803,13 +793,13 @@ impl TransformServiceImpl {
         maybe_listener: Option<Arc<dyn TransformListener>>,
     ) -> Result<TransformResult, TransformError> {
         let listener = maybe_listener.unwrap_or_else(|| Arc::new(NullTransformListener));
-        let dataset_handle = self.local_repo.resolve_dataset_ref(&dataset_ref).await?;
+        let dataset_handle = self.dataset_repo.resolve_dataset_ref(&dataset_ref).await?;
 
         // TODO: There might be more operations to do
         // TODO: Inject time source
         if let Some(operation) = self.get_next_operation(&dataset_handle, Utc::now()).await? {
             let dataset = self
-                .local_repo
+                .dataset_repo
                 .get_dataset(&dataset_handle.as_local_ref())
                 .await?;
             let meta_chain = dataset.as_metadata_chain();
@@ -870,7 +860,7 @@ impl TransformService for TransformServiceImpl {
         let mut futures = Vec::new();
 
         for dataset_ref in &dataset_refs {
-            let f = match self.local_repo.resolve_dataset_ref(dataset_ref).await {
+            let f = match self.dataset_repo.resolve_dataset_ref(dataset_ref).await {
                 Ok(hdl) => {
                     let maybe_listener = multi_listener.begin_transform(&hdl);
                     self.transform_impl(hdl.into(), maybe_listener)
@@ -894,7 +884,7 @@ impl TransformService for TransformServiceImpl {
     ) -> Result<VerificationResult, VerificationError> {
         let listener = maybe_listener.unwrap_or(Arc::new(NullVerificationListener {}));
 
-        let dataset_handle = self.local_repo.resolve_dataset_ref(dataset_ref).await?;
+        let dataset_handle = self.dataset_repo.resolve_dataset_ref(dataset_ref).await?;
 
         let verification_plan = self
             .get_verification_plan(&dataset_handle, block_range)

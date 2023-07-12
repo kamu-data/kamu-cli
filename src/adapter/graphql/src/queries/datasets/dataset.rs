@@ -33,11 +33,11 @@ impl Dataset {
 
     #[graphql(skip)]
     pub async fn from_ref(ctx: &Context<'_>, dataset_ref: &odf::DatasetRef) -> Result<Dataset> {
-        let local_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
+        let dataset_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
 
         // TODO: Should we resolve reference at this point or allow unresolved and fail
         // later?
-        let hdl = local_repo
+        let hdl = dataset_repo
             .resolve_dataset_ref(dataset_ref)
             .await
             .int_err()?;
@@ -46,8 +46,8 @@ impl Dataset {
 
     #[graphql(skip)]
     async fn get_dataset(&self, ctx: &Context<'_>) -> Result<std::sync::Arc<dyn domain::Dataset>> {
-        let local_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
-        let dataset = local_repo
+        let dataset_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
+        let dataset = dataset_repo
             .get_dataset(&self.dataset_handle.as_local_ref())
             .await
             .int_err()?;

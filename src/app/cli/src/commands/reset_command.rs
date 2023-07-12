@@ -15,7 +15,7 @@ use opendatafabric::*;
 use super::{common, CLIError, Command};
 
 pub struct ResetCommand {
-    local_repo: Arc<dyn DatasetRepository>,
+    dataset_repo: Arc<dyn DatasetRepository>,
     reset_svc: Arc<dyn ResetService>,
     dataset_ref: DatasetRef,
     block_hash: Multihash,
@@ -24,14 +24,14 @@ pub struct ResetCommand {
 
 impl ResetCommand {
     pub fn new(
-        local_repo: Arc<dyn DatasetRepository>,
+        dataset_repo: Arc<dyn DatasetRepository>,
         reset_svc: Arc<dyn ResetService>,
         dataset_ref: DatasetRef,
         block_hash: Multihash,
         no_confirmation: bool,
     ) -> Self {
         Self {
-            local_repo,
+            dataset_repo,
             reset_svc,
             dataset_ref,
             block_hash,
@@ -44,7 +44,7 @@ impl ResetCommand {
 impl Command for ResetCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
         let dataset_handle = self
-            .local_repo
+            .dataset_repo
             .resolve_dataset_ref(&self.dataset_ref)
             .await?;
 

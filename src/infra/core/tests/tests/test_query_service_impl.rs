@@ -120,8 +120,12 @@ async fn create_test_dataset(catalog: &dill::Catalog, tempdir: &Path) -> Dataset
 /////////////////////////////////////////////////////////////////////////////////////////
 
 async fn create_catalog_with_local_workspace(tempdir: &Path) -> dill::Catalog {
-    let workspace_layout = Arc::new(WorkspaceLayout::create(tempdir).unwrap());
-    let dataset_repo = DatasetRepositoryLocalFs::new(workspace_layout.datasets_dir.clone());
+    let workspace_layout = Arc::new(WorkspaceLayout::create(tempdir, false).unwrap());
+    let dataset_repo = DatasetRepositoryLocalFs::new(
+        workspace_layout.datasets_dir.clone(),
+        Arc::new(CurrentAccountSubject::new_test()),
+        false,
+    );
 
     dill::CatalogBuilder::new()
         .add_value(dataset_repo)
@@ -140,7 +144,10 @@ async fn create_catalog_with_local_workspace(tempdir: &Path) -> dill::Catalog {
 async fn create_catalog_with_s3_workspace(s3: &S3) -> dill::Catalog {
     let (endpoint, bucket, key_prefix) = S3Context::split_url(&s3.url);
     let s3_context = S3Context::from_items(endpoint.clone(), bucket, key_prefix).await;
-    let dataset_repo = DatasetRepositoryS3::new(s3_context.clone());
+    let dataset_repo = DatasetRepositoryS3::new(
+        s3_context.clone(),
+        Arc::new(CurrentAccountSubject::new_test()),
+    );
 
     let s3_credentials = s3_context.credentials().await;
 

@@ -144,10 +144,79 @@ fn serde_dataset_snapshot_derivative() {
                 TransformInput {
                     id: None,
                     name: DatasetName::try_from("com.naturalearthdata.10m.admin0").unwrap(),
+                    dataset_ref: None,
                 },
                 TransformInput {
                     id: None,
                     name: DatasetName::try_from("com.naturalearthdata.50m.admin0").unwrap(),
+                    dataset_ref: None,
+                },
+            ],
+            transform: Transform::Sql(TransformSql {
+                engine: "spark".to_owned(),
+                version: None,
+                query: Some("SOME_SQL".to_owned()),
+                queries: None,
+                temporal_tables: None,
+            }),
+        })],
+    };
+
+    let actual = YamlDatasetSnapshotDeserializer
+        .read_manifest(data.as_bytes())
+        .unwrap();
+
+    assert_eq!(expected, actual);
+
+    let data2 = YamlDatasetSnapshotSerializer
+        .write_manifest(&actual)
+        .unwrap();
+
+    assert_eq!(data, std::str::from_utf8(&data2).unwrap());
+}
+
+#[test]
+fn serde_dataset_snapshot_derivative_with_multi_tenant_ref() {
+    let data = indoc!(
+        r#"
+        kind: DatasetSnapshot
+        version: 1
+        content:
+          name: com.naturalearthdata.admin0
+          kind: derivative
+          metadata:
+          - kind: setTransform
+            inputs:
+            - name: com.naturalearthdata.10m.admin0
+              datasetRef: kamu/com.naturalearthdata.10m.admin0
+            - name: com.naturalearthdata.50m.admin0
+              datasetRef: remote-repo/kamu/com.naturalearthdata.50m.admin0
+            transform:
+              kind: sql
+              engine: spark
+              query: SOME_SQL
+        "#
+    );
+
+    let expected = DatasetSnapshot {
+        name: DatasetName::try_from("com.naturalearthdata.admin0").unwrap(),
+        kind: DatasetKind::Derivative,
+        metadata: vec![MetadataEvent::SetTransform(SetTransform {
+            inputs: vec![
+                TransformInput {
+                    id: None,
+                    name: DatasetName::try_from("com.naturalearthdata.10m.admin0").unwrap(),
+                    dataset_ref: Some(
+                        DatasetRefAny::try_from("kamu/com.naturalearthdata.10m.admin0").unwrap(),
+                    ),
+                },
+                TransformInput {
+                    id: None,
+                    name: DatasetName::try_from("com.naturalearthdata.50m.admin0").unwrap(),
+                    dataset_ref: Some(
+                        DatasetRefAny::try_from("remote-repo/kamu/com.naturalearthdata.50m.admin0")
+                            .unwrap(),
+                    ),
                 },
             ],
             transform: Transform::Sql(TransformSql {

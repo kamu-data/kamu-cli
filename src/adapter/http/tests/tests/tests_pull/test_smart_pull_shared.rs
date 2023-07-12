@@ -27,6 +27,7 @@ pub async fn test_smart_pull_new_dataset<T: ServerSideHarness>(server_harness: T
     let server_repo = server_harness.dataset_repository();
     server_repo
         .create_dataset_from_snapshot(
+            None,
             MetadataFactory::dataset_snapshot()
                 .name("foo")
                 .kind(DatasetKind::Root)
@@ -76,6 +77,7 @@ pub async fn test_smart_pull_existing_up_to_date_dataset<T: ServerSideHarness>(s
     let server_repo = server_harness.dataset_repository();
     server_repo
         .create_dataset_from_snapshot(
+            None,
             MetadataFactory::dataset_snapshot()
                 .name("foo")
                 .kind(DatasetKind::Root)
@@ -124,6 +126,7 @@ pub async fn test_smart_pull_existing_evolved_dataset<T: ServerSideHarness>(serv
     let server_repo = server_harness.dataset_repository();
     let create_result = server_repo
         .create_dataset_from_snapshot(
+            None,
             MetadataFactory::dataset_snapshot()
                 .name("foo")
                 .kind(DatasetKind::Root)
@@ -199,6 +202,7 @@ pub async fn test_smart_pull_existing_advanced_dataset_fails<T: ServerSideHarnes
     let server_repo = server_harness.dataset_repository();
     server_repo
         .create_dataset_from_snapshot(
+            None,
             MetadataFactory::dataset_snapshot()
                 .name("foo")
                 .kind(DatasetKind::Root)
@@ -261,6 +265,7 @@ pub async fn test_smart_pull_aborted_read_of_new_reread_succeeds<T: ServerSideHa
     let server_repo = server_harness.dataset_repository();
     server_repo
         .create_dataset_from_snapshot(
+            None,
             MetadataFactory::dataset_snapshot()
                 .name("foo")
                 .kind(DatasetKind::Root)
@@ -323,6 +328,7 @@ pub async fn test_smart_pull_aborted_read_of_existing_evolved_dataset_reread_suc
     let server_repo = server_harness.dataset_repository();
     let create_result = server_repo
         .create_dataset_from_snapshot(
+            None,
             MetadataFactory::dataset_snapshot()
                 .name("foo")
                 .kind(DatasetKind::Root)

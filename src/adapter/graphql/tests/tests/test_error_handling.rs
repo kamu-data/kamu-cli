@@ -56,10 +56,14 @@ async fn test_internal_error() {
 
     // Note: Not creating a workspace to cause an error
     let workspace_layout = Arc::new(WorkspaceLayout::new(tempdir.path()));
-    let local_repo = DatasetRepositoryLocalFs::new(workspace_layout.datasets_dir.clone());
+    let dataset_repo = DatasetRepositoryLocalFs::new(
+        workspace_layout.datasets_dir.clone(),
+        Arc::new(CurrentAccountSubject::new_test()),
+        false,
+    );
 
     let cat = dill::CatalogBuilder::new()
-        .add_value(local_repo)
+        .add_value(dataset_repo)
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
         .build();
 

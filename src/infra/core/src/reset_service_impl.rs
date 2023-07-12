@@ -14,13 +14,13 @@ use kamu_core::*;
 use opendatafabric::*;
 
 pub struct ResetServiceImpl {
-    local_repo: Arc<dyn DatasetRepository>,
+    dataset_repo: Arc<dyn DatasetRepository>,
 }
 
 #[component(pub)]
 impl ResetServiceImpl {
-    pub fn new(local_repo: Arc<dyn DatasetRepository>) -> Self {
-        Self { local_repo }
+    pub fn new(dataset_repo: Arc<dyn DatasetRepository>) -> Self {
+        Self { dataset_repo }
     }
 }
 
@@ -32,7 +32,7 @@ impl ResetService for ResetServiceImpl {
         block_hash: &Multihash,
     ) -> Result<(), ResetError> {
         let dataset = self
-            .local_repo
+            .dataset_repo
             .get_dataset(&dataset_handle.as_local_ref())
             .await?;
 

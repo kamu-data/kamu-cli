@@ -19,13 +19,13 @@ use opendatafabric::*;
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct ProvenanceServiceImpl {
-    local_repo: Arc<dyn DatasetRepository>,
+    dataset_repo: Arc<dyn DatasetRepository>,
 }
 
 #[component(pub)]
 impl ProvenanceServiceImpl {
-    pub fn new(local_repo: Arc<dyn DatasetRepository>) -> Self {
-        Self { local_repo }
+    pub fn new(dataset_repo: Arc<dyn DatasetRepository>) -> Self {
+        Self { dataset_repo }
     }
 
     #[async_recursion::async_recursion]
@@ -35,7 +35,7 @@ impl ProvenanceServiceImpl {
         visitor: &mut dyn LineageVisitor,
     ) -> Result<(), GetLineageError> {
         if let Some(dataset) = self
-            .local_repo
+            .dataset_repo
             .try_get_dataset(&dataset_handle.as_local_ref())
             .await?
         {
@@ -51,7 +51,7 @@ impl ProvenanceServiceImpl {
                 let input_id = input.id.as_ref().unwrap();
 
                 let handle = self
-                    .local_repo
+                    .dataset_repo
                     .resolve_dataset_ref(&input_id.as_local_ref())
                     .await?;
 
@@ -61,14 +61,9 @@ impl ProvenanceServiceImpl {
                 })
             }
 
-            assert!(
-                !dataset_handle.alias.is_multitenant(),
-                "Multitenancy is not supported yet"
-            );
-
             let dataset_info = NodeInfo::Local {
                 id: summary.id.clone(),
-                name: dataset_handle.alias.dataset_name.clone(),
+                alias: dataset_handle.alias.clone(),
                 kind: summary.kind,
                 dependencies: &resolved_inputs,
             };
@@ -85,7 +80,7 @@ impl ProvenanceServiceImpl {
             // Remote dataset
             let dataset_info = NodeInfo::Remote {
                 id: dataset_handle.id.clone(),
-                name: dataset_handle.alias.dataset_name.clone(),
+                alias: dataset_handle.alias.clone(),
             };
 
             visitor.enter(&dataset_info);
@@ -103,7 +98,7 @@ impl ProvenanceService for ProvenanceServiceImpl {
         visitor: &mut dyn LineageVisitor,
         _options: LineageOptions,
     ) -> Result<(), GetLineageError> {
-        let hdl = self.local_repo.resolve_dataset_ref(dataset_ref).await?;
+        let hdl = self.dataset_repo.resolve_dataset_ref(dataset_ref).await?;
         self.visit_upstream_dependencies_rec(&hdl, visitor).await
     }
 }
@@ -153,16 +148,16 @@ impl<W: Write + Send, S: DotStyle + Send> LineageVisitor for DotVisitor<W, S> {
         }
 
         match dataset {
-            NodeInfo::Local { name, kind, .. } => match kind {
+            NodeInfo::Local { alias, kind, .. } => match kind {
                 DatasetKind::Root => {
-                    writeln!(self.writer, "\"{}\" [{}];", name, S::root_style())
+                    writeln!(self.writer, "\"{}\" [{}];", alias, S::root_style())
                 }
                 DatasetKind::Derivative => {
-                    writeln!(self.writer, "\"{}\" [{}];", name, S::derivative_style())
+                    writeln!(self.writer, "\"{}\" [{}];", alias, S::derivative_style())
                 }
             },
-            NodeInfo::Remote { name, .. } => {
-                writeln!(self.writer, "\"{}\" [{}];", name, S::remote_style())
+            NodeInfo::Remote { alias, .. } => {
+                writeln!(self.writer, "\"{}\" [{}];", alias, S::remote_style())
             }
         }
         .unwrap();
@@ -173,7 +168,7 @@ impl<W: Write + Send, S: DotStyle + Send> LineageVisitor for DotVisitor<W, S> {
                     self.writer,
                     "\"{}\" -> \"{}\";",
                     dep.handle.alias,
-                    dataset.name()
+                    dataset.alias()
                 )
                 .unwrap();
             }

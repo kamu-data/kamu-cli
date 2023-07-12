@@ -27,8 +27,8 @@ impl DatasetData {
 
     /// Total number of records in this dataset
     async fn num_records_total(&self, ctx: &Context<'_>) -> Result<u64> {
-        let local_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
-        let dataset = local_repo
+        let dataset_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
+        let dataset = dataset_repo
             .get_dataset(&self.dataset_handle.as_local_ref())
             .await
             .int_err()?;
@@ -42,8 +42,8 @@ impl DatasetData {
     /// An estimated size of data on disk not accounting for replication or
     /// caching
     async fn estimated_size(&self, ctx: &Context<'_>) -> Result<u64> {
-        let local_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
-        let dataset = local_repo
+        let dataset_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
+        let dataset = dataset_repo
             .get_dataset(&self.dataset_handle.as_local_ref())
             .await
             .int_err()?;

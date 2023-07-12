@@ -102,23 +102,25 @@ impl ChainWith2BlocksTestCase {
 
 struct ResetTestHarness {
     _temp_dir: TempDir,
-    local_repo: Arc<DatasetRepositoryLocalFs>,
+    dataset_repo: Arc<DatasetRepositoryLocalFs>,
     reset_svc: ResetServiceImpl,
 }
 
 impl ResetTestHarness {
     fn new() -> Self {
         let temp_dir = tempfile::tempdir().unwrap();
-        let workspace_layout = Arc::new(WorkspaceLayout::create(temp_dir.path()).unwrap());
-        let local_repo = Arc::new(DatasetRepositoryLocalFs::new(
+        let workspace_layout = Arc::new(WorkspaceLayout::create(temp_dir.path(), false).unwrap());
+        let dataset_repo = Arc::new(DatasetRepositoryLocalFs::new(
             workspace_layout.datasets_dir.clone(),
+            Arc::new(CurrentAccountSubject::new_test()),
+            false,
         ));
 
-        let reset_svc = ResetServiceImpl::new(local_repo.clone());
+        let reset_svc = ResetServiceImpl::new(dataset_repo.clone());
 
         Self {
             _temp_dir: temp_dir,
-            local_repo,
+            dataset_repo,
             reset_svc,
         }
     }
@@ -134,7 +136,7 @@ impl ResetTestHarness {
         .build_typed();
 
         let create_result = self
-            .local_repo
+            .dataset_repo
             .create_dataset(&DatasetAlias::new(None, dataset_name.clone()), seed_block)
             .await
             .unwrap();
@@ -172,7 +174,7 @@ impl ResetTestHarness {
     }
 
     async fn resolve_dataset(&self, dataset_handle: &DatasetHandle) -> Arc<dyn Dataset> {
-        self.local_repo
+        self.dataset_repo
             .get_dataset(&dataset_handle.as_local_ref())
             .await
             .unwrap()

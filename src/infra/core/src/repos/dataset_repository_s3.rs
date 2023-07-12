@@ -25,19 +25,23 @@ use crate::utils::s3_context::S3Context;
 #[component(pub)]
 pub struct DatasetRepositoryS3 {
     s3_context: S3Context,
+    current_account_subject: Arc<CurrentAccountSubject>,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 impl DatasetRepositoryS3 {
-    pub fn new(s3_context: S3Context) -> Self {
-        Self { s3_context }
+    pub fn new(s3_context: S3Context, current_account_subject: Arc<CurrentAccountSubject>) -> Self {
+        Self {
+            s3_context,
+            current_account_subject,
+        }
     }
 
     fn get_s3_bucket_path(&self, dataset_alias: &DatasetAlias) -> Url {
         assert!(
-            !dataset_alias.is_multitenant(),
-            "Multitenancy is not yet supported by S3 repo"
+            !dataset_alias.is_multi_tenant(),
+            "Multi-tenancy is not yet supported by S3 repo"
         );
 
         let context_url = self.s3_context.make_url();
@@ -51,8 +55,8 @@ impl DatasetRepositoryS3 {
         dataset_alias: &DatasetAlias,
     ) -> Result<impl Dataset, InternalError> {
         assert!(
-            !dataset_alias.is_multitenant(),
-            "Multitenancy is not yet supported by S3 repo"
+            !dataset_alias.is_multi_tenant(),
+            "Multi-tenancy is not yet supported by S3 repo"
         );
         let dataset_url = self.get_s3_bucket_path(dataset_alias);
         DatasetFactoryImpl::get_s3(dataset_url).await
@@ -63,8 +67,8 @@ impl DatasetRepositoryS3 {
         dataset_alias: &DatasetAlias,
     ) -> Result<(), InternalError> {
         assert!(
-            !dataset_alias.is_multitenant(),
-            "Multitenancy is not yet supported by S3 repo"
+            !dataset_alias.is_multi_tenant(),
+            "Multi-tenancy is not yet supported by S3 repo"
         );
         let dataset_key_prefix = self.s3_context.get_key(&dataset_alias.dataset_name);
         self.s3_context.recursive_delete(dataset_key_prefix).await
@@ -76,8 +80,8 @@ impl DatasetRepositoryS3 {
         new_alias: &DatasetAlias,
     ) -> Result<(), MoveBucketItemsOnRenameError> {
         assert!(
-            !new_alias.is_multitenant(),
-            "Multitenancy is not yet supported by S3 repo"
+            !new_alias.is_multi_tenant(),
+            "Multi-tenancy is not yet supported by S3 repo"
         );
 
         let new_key_prefix = self.s3_context.get_key(&new_alias.dataset_name);
@@ -104,16 +108,6 @@ impl DatasetRepositoryS3 {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-impl Clone for DatasetRepositoryS3 {
-    fn clone(&self) -> Self {
-        Self {
-            s3_context: self.s3_context.clone(),
-        }
-    }
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
 #[async_trait]
 impl DatasetRegistry for DatasetRepositoryS3 {
     async fn get_dataset_url(&self, _dataset_ref: &DatasetRef) -> Result<Url, GetDatasetUrlError> {
@@ -125,6 +119,11 @@ impl DatasetRegistry for DatasetRepositoryS3 {
 
 #[async_trait]
 impl DatasetRepository for DatasetRepositoryS3 {
+    fn is_multi_tenant(&self) -> bool {
+        // TODO
+        false
+    }
+
     async fn resolve_dataset_ref(
         &self,
         dataset_ref: &DatasetRef,
@@ -133,8 +132,8 @@ impl DatasetRepository for DatasetRepositoryS3 {
             DatasetRef::Handle(h) => Ok(h.clone()),
             DatasetRef::Alias(alias) => {
                 assert!(
-                    !alias.is_multitenant(),
-                    "Multitenancy is not yet supported by S3 repo"
+                    !alias.is_multi_tenant(),
+                    "Multi-tenancy is not yet supported by S3 repo"
                 );
 
                 if self
@@ -183,6 +182,14 @@ impl DatasetRepository for DatasetRepositoryS3 {
                 yield hdl;
             }
         })
+    }
+
+    fn get_account_datasets<'s>(&'s self, account_name: AccountName) -> DatasetHandleStream<'s> {
+        if account_name == self.current_account_subject.account_name {
+            self.get_all_datasets()
+        } else {
+            panic!("Single-tenant dataset repository queried by non-default account");
+        }
     }
 
     async fn get_dataset(
@@ -235,12 +242,13 @@ impl DatasetRepository for DatasetRepositoryS3 {
     async fn rename_dataset(
         &self,
         dataset_ref: &DatasetRef,
-        new_alias: &DatasetAlias,
+        new_name: &DatasetName,
     ) -> Result<(), RenameDatasetError> {
         let old_alias = self.resolve_dataset_ref(dataset_ref).await?.alias;
+        let new_alias = DatasetAlias::new(old_alias.account_name.clone(), new_name.clone());
 
         match self
-            .move_bucket_items_on_dataset_rename(&old_alias, new_alias)
+            .move_bucket_items_on_dataset_rename(&old_alias, &new_alias)
             .await
         {
             Ok(_) => Ok(()),

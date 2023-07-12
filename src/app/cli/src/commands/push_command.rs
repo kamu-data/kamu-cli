@@ -22,6 +22,7 @@ use crate::output::OutputConfig;
 
 pub struct PushCommand {
     push_svc: Arc<dyn PushService>,
+    dataset_repo: Arc<dyn DatasetRepository>,
     refs: Vec<DatasetRefAny>,
     all: bool,
     recursive: bool,
@@ -34,6 +35,7 @@ pub struct PushCommand {
 impl PushCommand {
     pub fn new<I>(
         push_svc: Arc<dyn PushService>,
+        dataset_repo: Arc<dyn DatasetRepository>,
         refs: I,
         all: bool,
         recursive: bool,
@@ -47,6 +49,7 @@ impl PushCommand {
     {
         Self {
             push_svc,
+            dataset_repo,
             refs: refs.collect(),
             all,
             recursive,
@@ -62,9 +65,13 @@ impl PushCommand {
         listener: Option<Arc<dyn SyncMultiListener>>,
     ) -> Result<Vec<PushResponse>, CLIError> {
         if let Some(remote_ref) = &self.to {
-            let local_ref = self.refs[0].as_local_single_tenant_ref().map_err(|_| {
-                CLIError::usage_error("When using --to reference should point to a local dataset")
-            })?;
+            let local_ref = self.refs[0]
+                .as_local_ref(|_| !self.dataset_repo.is_multi_tenant())
+                .map_err(|_| {
+                    CLIError::usage_error(
+                        "When using --to reference should point to a local dataset",
+                    )
+                })?;
 
             Ok(self
                 .push_svc
@@ -107,7 +114,7 @@ impl PushCommand {
     }
 
     async fn push_with_progress(&self) -> Result<Vec<PushResponse>, CLIError> {
-        let progress = PrettyPushProgress::new();
+        let progress = PrettyPushProgress::new(self.dataset_repo.is_multi_tenant());
         let listener = Arc::new(progress.clone());
         self.do_push(Some(listener.clone())).await
     }
@@ -190,12 +197,14 @@ impl Command for PushCommand {
 #[derive(Clone)]
 struct PrettyPushProgress {
     pub multi_progress: Arc<indicatif::MultiProgress>,
+    pub multi_tenant_workspace: bool,
 }
 
 impl PrettyPushProgress {
-    fn new() -> Self {
+    fn new(multi_tenant_workspace: bool) -> Self {
         Self {
             multi_progress: Arc::new(indicatif::MultiProgress::new()),
+            multi_tenant_workspace,
         }
     }
 }
@@ -207,7 +216,8 @@ impl SyncMultiListener for PrettyPushProgress {
         dst: &DatasetRefAny,
     ) -> Option<Arc<dyn SyncListener>> {
         Some(Arc::new(PrettySyncProgress::new(
-            src.as_local_ref(|_| true).expect("Expected local ref"),
+            src.as_local_ref(|_| !self.multi_tenant_workspace)
+                .expect("Expected local ref"),
             dst.as_remote_ref(|_| true).expect("Expected remote ref"),
             self.multi_progress.clone(),
         )))

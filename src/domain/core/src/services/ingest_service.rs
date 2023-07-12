@@ -165,6 +165,7 @@ pub enum IngestError {
         #[backtrace]
         DatasetNotFoundError,
     ),
+
     #[error("Source is unreachable at {path}")]
     Unreachable {
         path: String,

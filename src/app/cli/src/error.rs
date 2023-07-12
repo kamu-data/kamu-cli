@@ -139,6 +139,12 @@ impl From<CommandInterpretationFailed> for CLIError {
     }
 }
 
+impl From<MultiTenantRefUnexpectedError> for CLIError {
+    fn from(e: MultiTenantRefUnexpectedError) -> Self {
+        Self::usage_error_from(e)
+    }
+}
+
 /////////////////////////////////////////////////////////////////////////////////////////
 // TODO: Replace with traits that distinguish critical and non-critical errors
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -234,6 +240,16 @@ pub struct AlreadyInWorkspace;
 #[derive(Debug, Error)]
 #[error("Directory is not a kamu workspace")]
 pub struct NotInWorkspace;
+
+#[derive(Debug, Error)]
+#[error("Directory is not a multi-tenant kamu workspace")]
+pub struct NotInMultiTenantWorkspace;
+
+#[derive(Error, Clone, PartialEq, Eq, Debug)]
+#[error("Multi-tenant reference is unexpected in single-tenant workspace: {dataset_ref}")]
+pub struct MultiTenantRefUnexpectedError {
+    pub dataset_ref: opendatafabric::DatasetRef,
+}
 
 #[derive(Debug, Error)]
 #[error("Command interpretation failed")]

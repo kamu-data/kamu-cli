@@ -16,11 +16,15 @@ use crate::AlreadyInWorkspace;
 
 pub struct InitCommand {
     workspace_layout: Arc<WorkspaceLayout>,
+    multi_tenant: bool,
 }
 
 impl InitCommand {
-    pub fn new<'a>(workspace_layout: Arc<WorkspaceLayout>) -> Self {
-        Self { workspace_layout }
+    pub fn new<'a>(workspace_layout: Arc<WorkspaceLayout>, multi_tenant: bool) -> Self {
+        Self {
+            workspace_layout,
+            multi_tenant,
+        }
     }
 }
 
@@ -35,13 +39,19 @@ impl Command for InitCommand {
             return Err(CLIError::usage_error_from(AlreadyInWorkspace));
         }
 
-        WorkspaceLayout::create(&self.workspace_layout.root_dir)?;
+        WorkspaceLayout::create(&self.workspace_layout.root_dir, self.multi_tenant)?;
+
+        // TODO, write a workspace config
 
         eprintln!(
             "{}",
-            console::style("Initialized an empty workspace")
-                .green()
-                .bold()
+            console::style(if self.multi_tenant {
+                "Initialized an empty multi-tenant workspace"
+            } else {
+                "Initialized an empty workspace"
+            })
+            .green()
+            .bold()
         );
         Ok(())
     }

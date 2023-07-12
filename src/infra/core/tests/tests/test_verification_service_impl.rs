@@ -25,19 +25,22 @@ async fn test_verify_data_consistency() {
     let tempdir = tempfile::tempdir().unwrap();
 
     let dataset_alias = DatasetAlias::new(None, DatasetName::new_unchecked("bar"));
-    let workspace_layout = Arc::new(WorkspaceLayout::create(tempdir.path()).unwrap());
+    let workspace_layout = Arc::new(WorkspaceLayout::create(tempdir.path(), false).unwrap());
 
-    let local_repo = Arc::new(DatasetRepositoryLocalFs::new(
+    let dataset_repo = Arc::new(DatasetRepositoryLocalFs::new(
         workspace_layout.datasets_dir.clone(),
+        Arc::new(CurrentAccountSubject::new_test()),
+        false,
     ));
 
     let verification_svc = Arc::new(VerificationServiceImpl::new(
-        local_repo.clone(),
+        dataset_repo.clone(),
         Arc::new(TestTransformService::new(Arc::new(Mutex::new(Vec::new())))),
     ));
 
-    local_repo
+    dataset_repo
         .create_dataset_from_snapshot(
+            None,
             MetadataFactory::dataset_snapshot()
                 .name("foo")
                 .kind(DatasetKind::Root)
@@ -47,8 +50,9 @@ async fn test_verify_data_consistency() {
         .await
         .unwrap();
 
-    local_repo
+    dataset_repo
         .create_dataset_from_snapshot(
+            None,
             MetadataFactory::dataset_snapshot()
                 .name(&dataset_alias.dataset_name)
                 .kind(DatasetKind::Derivative)
@@ -91,7 +95,7 @@ async fn test_verify_data_consistency() {
         kamu_data_utils::data::hash::get_file_physical_hash(&data_path).unwrap();
 
     // Commit data
-    let dataset = local_repo
+    let dataset = dataset_repo
         .get_dataset(&dataset_alias.as_local_ref())
         .await
         .unwrap();

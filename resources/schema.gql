@@ -109,6 +109,7 @@ type CreateDatasetResultMissingInputs implements CreateDatasetFromSnapshotResult
 }
 
 type CreateDatasetResultNameCollision implements CreateDatasetResult & CreateDatasetFromSnapshotResult {
+	accountName: AccountName
 	datasetName: DatasetName!
 	message: String!
 }
@@ -308,6 +309,8 @@ type DatasetMetadata {
 }
 
 scalar DatasetName
+
+scalar DatasetRefAny
 
 type Datasets {
 	"""
@@ -888,6 +891,7 @@ union Transform = TransformSql
 type TransformInput {
 	id: DatasetID
 	name: DatasetName!
+	datasetRef: DatasetRefAny
 	dataset: Dataset!
 }
 
