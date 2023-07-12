@@ -68,3 +68,59 @@ fn serde_dataset_summary() {
     assert_eq!(expected.content, actual.content);
     assert_eq!(serde_yaml::to_string(&actual).unwrap(), data);
 }
+
+#[test]
+fn serde_dataset_summary_with_refs() {
+    let data = indoc!(
+        "
+    kind: DatasetSummary
+    version: 1
+    content:
+      id: did:odf:z4k88e8rX1oHBg1rS4kJb3KKj7xxBQRcCxRChnDA8KsXywfSBdh
+      kind: root
+      lastBlockHash: zW1mJtUjH235JZ4BBpJBousTNHaDXer4r4QzSdsqTfKENrr
+      dependencies:
+      - name: foo
+        datasetRef: me/foo
+      - name: bar
+        datasetRef: remote-repo/her/bar
+      lastPulled: 2020-01-01T12:00:00Z
+      numRecords: 100
+      dataSize: 1024
+      checkpointsSize: 64\n"
+    );
+
+    let actual: Manifest<DatasetSummary> = serde_yaml::from_str(data).unwrap();
+
+    let expected = Manifest {
+        kind: "DatasetSummary".to_owned(),
+        version: 1,
+        content: DatasetSummary {
+            id: DatasetID::from_pub_key_ed25519(b"boop"),
+            kind: DatasetKind::Root,
+            last_block_hash: Multihash::from_multibase_str(
+                "zW1mJtUjH235JZ4BBpJBousTNHaDXer4r4QzSdsqTfKENrr",
+            )
+            .unwrap(),
+            dependencies: vec![
+                TransformInput {
+                    id: None,
+                    name: DatasetName::try_from("foo").unwrap(),
+                    dataset_ref: Some(DatasetRefAny::try_from("me/foo").unwrap()),
+                },
+                TransformInput {
+                    id: None,
+                    name: DatasetName::try_from("bar").unwrap(),
+                    dataset_ref: Some(DatasetRefAny::try_from("remote-repo/her/bar").unwrap()),
+                },
+            ],
+            last_pulled: Some(Utc.with_ymd_and_hms(2020, 1, 1, 12, 0, 0).unwrap()),
+            num_records: 100,
+            data_size: 1024,
+            checkpoints_size: 64,
+        },
+    };
+
+    assert_eq!(expected.content, actual.content);
+    assert_eq!(serde_yaml::to_string(&actual).unwrap(), data);
+}
