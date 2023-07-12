@@ -50,6 +50,15 @@ impl MetadataFactory {
         SetTransformBuilder::new(inputs.into_iter())
     }
 
+    pub fn set_transform_aliases<A, I>(inputs: I) -> SetTransformBuilder
+    where
+        I: IntoIterator<Item = A>,
+        A: TryInto<DatasetAlias>,
+        <A as TryInto<DatasetAlias>>::Error: std::fmt::Debug,
+    {
+        SetTransformBuilder::from_aliases(inputs.into_iter())
+    }
+
     pub fn set_transform_names_and_refs<N, R, I>(inputs: I) -> SetTransformBuilder
     where
         I: IntoIterator<Item = (N, R)>,
@@ -258,6 +267,29 @@ impl SetTransformBuilder {
                         id: None,
                         name: s.try_into().unwrap(),
                         dataset_ref: None,
+                    })
+                    .collect(),
+                transform: TransformSqlBuilder::new().build(),
+            },
+        }
+    }
+
+    fn from_aliases<A, I>(inputs: I) -> Self
+    where
+        I: Iterator<Item = A>,
+        A: TryInto<DatasetAlias>,
+        <A as TryInto<DatasetAlias>>::Error: std::fmt::Debug,
+    {
+        Self {
+            v: SetTransform {
+                inputs: inputs
+                    .map(|a| {
+                        let alias: DatasetAlias = a.try_into().unwrap();
+                        TransformInput {
+                            id: None,
+                            name: alias.dataset_name.to_owned(),
+                            dataset_ref: Some(alias.as_any_ref()),
+                        }
                     })
                     .collect(),
                 transform: TransformSqlBuilder::new().build(),
