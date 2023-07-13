@@ -21,19 +21,13 @@ use crate::utils::s3_context::S3Context;
 #[component(pub)]
 pub struct ObjectStoreBuilderS3 {
     s3_context: S3Context,
-    credentials: aws_sdk_s3::config::Credentials,
     allow_http: bool,
 }
 
 impl ObjectStoreBuilderS3 {
-    pub fn new(
-        s3_context: S3Context,
-        credentials: aws_sdk_s3::config::Credentials,
-        allow_http: bool,
-    ) -> Self {
+    pub fn new(s3_context: S3Context, allow_http: bool) -> Self {
         Self {
             s3_context,
-            credentials,
             allow_http,
         }
     }
@@ -62,18 +56,11 @@ impl ObjectStoreBuilder for ObjectStoreBuilderS3 {
         let endpoint = self.s3_context.endpoint.clone().unwrap();
         let region = self.s3_context.region().unwrap();
 
-        let mut s3_builder = AmazonS3Builder::new()
+        let s3_builder = AmazonS3Builder::from_env()
             .with_endpoint(endpoint)
             .with_region(region)
-            .with_access_key_id(self.credentials.access_key_id())
-            .with_secret_access_key(self.credentials.secret_access_key())
             .with_bucket_name(self.s3_context.bucket.clone())
             .with_allow_http(self.allow_http);
-
-        s3_builder = match self.credentials.session_token() {
-            Some(session_token) => s3_builder.with_token(session_token),
-            None => s3_builder,
-        };
 
         let object_store = s3_builder
             .build()

@@ -149,8 +149,6 @@ async fn create_catalog_with_s3_workspace(s3: &S3) -> dill::Catalog {
         Arc::new(CurrentAccountSubject::new_test()),
     );
 
-    let s3_credentials = s3_context.credentials().await;
-
     dill::CatalogBuilder::new()
         .add_value(dataset_repo)
         .bind::<dyn DatasetRepository, DatasetRepositoryS3>()
@@ -160,7 +158,7 @@ async fn create_catalog_with_s3_workspace(s3: &S3) -> dill::Catalog {
         .bind::<dyn ObjectStoreRegistry, ObjectStoreRegistryImpl>()
         .add_value(ObjectStoreBuilderLocalFs::new())
         .bind::<dyn ObjectStoreBuilder, ObjectStoreBuilderLocalFs>()
-        .add_value(ObjectStoreBuilderS3::new(s3_context, s3_credentials, true))
+        .add_value(ObjectStoreBuilderS3::new(s3_context, true))
         .bind::<dyn ObjectStoreBuilder, ObjectStoreBuilderS3>()
         .build()
 }
