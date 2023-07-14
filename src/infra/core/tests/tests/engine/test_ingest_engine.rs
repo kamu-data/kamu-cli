@@ -193,7 +193,8 @@ impl IngestTestHarness {
 
         let engine_provisioner = Arc::new(EngineProvisionerLocal::new(
             EngineProvisionerLocalConfig::default(),
-            workspace_layout.clone(),
+            workspace_layout.root_dir.clone(),
+            workspace_layout.run_info_dir.clone(),
             ContainerRuntime::default(),
         ));
 

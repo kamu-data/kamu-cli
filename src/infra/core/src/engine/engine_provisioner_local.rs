@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::collections::HashSet;
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -42,7 +43,8 @@ struct State {
 impl EngineProvisionerLocal {
     pub fn new(
         config: EngineProvisionerLocalConfig,
-        workspace_layout: Arc<WorkspaceLayout>,
+        root_dir: PathBuf,
+        run_info_dir: PathBuf,
         container_runtime: ContainerRuntime,
     ) -> Self {
         let engine_config = ODFEngineConfig {
@@ -54,25 +56,29 @@ impl EngineProvisionerLocal {
             spark_ingest_engine: Arc::new(SparkEngine::new(
                 container_runtime.clone(),
                 &config.spark_image,
-                workspace_layout.clone(),
+                root_dir.clone(),
+                run_info_dir.clone(),
             )),
             spark_engine: Arc::new(ODFEngine::new(
                 container_runtime.clone(),
                 engine_config.clone(),
                 &config.spark_image,
-                workspace_layout.clone(),
+                root_dir.clone(),
+                run_info_dir.clone(),
             )),
             flink_engine: Arc::new(ODFEngine::new(
                 container_runtime.clone(),
                 engine_config.clone(),
                 &config.flink_image,
-                workspace_layout.clone(),
+                root_dir.clone(),
+                run_info_dir.clone(),
             )),
             datafusion_engine: Arc::new(ODFEngine::new(
                 container_runtime.clone(),
                 engine_config.clone(),
                 &config.datafusion_image,
-                workspace_layout.clone(),
+                root_dir.clone(),
+                run_info_dir.clone(),
             )),
             container_runtime,
             state: Mutex::new(State {

@@ -23,8 +23,7 @@ use url::Url;
 /// This type is meant to be passed directly into DataFusion.
 pub struct ObjectStoreRegistryImpl {
     builders: DashMap<String, Arc<dyn ObjectStoreBuilder>>,
-    // Debug experiment: disable caching, re-create object store each time
-    // object_stores: DashMap<String, Arc<dyn ObjectStore>>,
+    object_stores: DashMap<String, Arc<dyn ObjectStore>>,
 }
 
 #[dill::component(pub)]
@@ -38,8 +37,7 @@ impl ObjectStoreRegistryImpl {
 
         Self {
             builders,
-            // Debug experiment: disable caching, re-create object store each time
-            // object_stores: DashMap::new(),
+            object_stores: DashMap::new(),
         }
     }
 
@@ -76,14 +74,12 @@ impl datafusion::datasource::object_store::ObjectStoreRegistry for ObjectStoreRe
     fn get_store(&self, url: &Url) -> datafusion::error::Result<Arc<dyn ObjectStore>> {
         let s = Self::get_url_key(url);
 
-        // Debug experiment: disable caching, re-create object store each time
-        /*
         // Try get existing store
         let store = self.object_stores.get(&s).map(|o| o.value().clone());
 
         if let Some(store) = store {
             return Ok(store);
-        } */
+        }
 
         // Try building
         let builder = self.builders.get(&s).map(|o| o.value().clone());
@@ -92,8 +88,7 @@ impl datafusion::datasource::object_store::ObjectStoreRegistry for ObjectStoreRe
                 .build_object_store()
                 .map_err(|e| DataFusionError::External(e.into()))?;
 
-            // Debug experiment: disable caching, re-create object store each time
-            // self.object_stores.insert(s, store.clone());
+            self.object_stores.insert(s, store.clone());
             return Ok(store);
         }
 

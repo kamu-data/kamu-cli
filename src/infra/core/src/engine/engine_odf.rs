@@ -9,7 +9,6 @@
 
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
-use std::sync::Arc;
 
 use container_runtime::*;
 use kamu_core::*;
@@ -19,13 +18,13 @@ use opendatafabric as odf;
 
 use super::engine_container::{EngineContainer, LogsConfig};
 use super::ODFEngineConfig;
-use crate::WorkspaceLayout;
 
 pub struct ODFEngine {
     container_runtime: ContainerRuntime,
     engine_config: ODFEngineConfig,
     image: String,
-    workspace_layout: Arc<WorkspaceLayout>,
+    root_dir: PathBuf,
+    run_info_dir: PathBuf,
 }
 
 impl ODFEngine {
@@ -33,13 +32,15 @@ impl ODFEngine {
         container_runtime: ContainerRuntime,
         engine_config: ODFEngineConfig,
         image: &str,
-        workspace_layout: Arc<WorkspaceLayout>,
+        root_dir: PathBuf,
+        run_info_dir: PathBuf,
     ) -> Self {
         Self {
             container_runtime,
             engine_config,
             image: image.to_owned(),
-            workspace_layout,
+            root_dir,
+            run_info_dir,
         }
     }
 
@@ -102,10 +103,8 @@ impl ODFEngine {
 
     fn to_container_path(&self, host_path: &Path) -> PathBuf {
         assert!(host_path.is_absolute());
-        assert!(self.workspace_layout.root_dir.is_absolute());
-        let rel = host_path
-            .strip_prefix(&self.workspace_layout.root_dir)
-            .unwrap();
+        assert!(self.root_dir.is_absolute());
+        let rel = host_path.strip_prefix(&self.root_dir).unwrap();
         let joined = self.workspace_dir_in_container().join(rel);
         let unix_path = joined.to_str().unwrap().replace("\\", "/");
         PathBuf::from(unix_path)
@@ -143,14 +142,11 @@ impl Engine for ODFEngine {
         let engine_container = EngineContainer::new(
             self.container_runtime.clone(),
             self.engine_config.clone(),
-            LogsConfig::new(&self.workspace_layout.run_info_dir),
+            LogsConfig::new(&self.run_info_dir),
             &self.image,
             // TODO: Avoid giving access to the entire workspace data
             // TODO: Use read-only permissions where possible
-            vec![(
-                self.workspace_layout.root_dir.clone(),
-                self.workspace_dir_in_container(),
-            )],
+            vec![(self.root_dir.clone(), self.workspace_dir_in_container())],
         )
         .await?;
 

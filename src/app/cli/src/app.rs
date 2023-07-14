@@ -205,7 +205,11 @@ pub fn configure_catalog(
     b.add_value(ObjectStoreBuilderLocalFs::new());
     b.bind::<dyn ObjectStoreBuilder, ObjectStoreBuilderLocalFs>();
 
-    b.add::<EngineProvisionerLocal>();
+    b.add_builder(
+        builder_for::<EngineProvisionerLocal>()
+            .with_root_dir(workspace_layout.root_dir.clone())
+            .with_run_info_dir(workspace_layout.run_info_dir.clone()),
+    );
     b.bind::<dyn EngineProvisioner, EngineProvisionerLocal>();
 
     b.add::<kamu_adapter_http::SmartTransferProtocolClientWs>();

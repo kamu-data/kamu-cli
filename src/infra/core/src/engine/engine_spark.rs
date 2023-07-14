@@ -10,7 +10,6 @@
 use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
-use std::sync::Arc;
 
 use container_runtime::*;
 use kamu_core::entities::engine::IngestRequest;
@@ -20,12 +19,11 @@ use opendatafabric::serde::yaml::YamlEngineProtocol;
 use opendatafabric::serde::EngineProtocolDeserializer;
 use opendatafabric::*;
 
-use crate::*;
-
 pub struct SparkEngine {
     container_runtime: ContainerRuntime,
     image: String,
-    workspace_layout: Arc<WorkspaceLayout>,
+    root_dir: PathBuf,
+    run_info_dir: PathBuf,
 }
 
 struct RunInfo {
@@ -63,12 +61,14 @@ impl SparkEngine {
     pub fn new(
         container_runtime: ContainerRuntime,
         image: &str,
-        workspace_layout: Arc<WorkspaceLayout>,
+        root_dir: PathBuf,
+        run_info_dir: PathBuf,
     ) -> Self {
         Self {
             container_runtime,
             image: image.to_owned(),
-            workspace_layout,
+            root_dir,
+            run_info_dir,
         }
     }
 
@@ -82,8 +82,8 @@ impl SparkEngine {
 
     fn to_container_path(&self, path: &Path) -> PathBuf {
         assert!(path.is_absolute());
-        assert!(self.workspace_layout.root_dir.is_absolute());
-        let rel = path.strip_prefix(&self.workspace_layout.root_dir).unwrap();
+        assert!(self.root_dir.is_absolute());
+        let rel = path.strip_prefix(&self.root_dir).unwrap();
         let joined = self.workspace_dir_in_container().join(rel);
         let unix_path = joined.to_str().unwrap().replace("\\", "/");
         PathBuf::from(unix_path)
@@ -114,10 +114,7 @@ impl SparkEngine {
                 (&run_info.in_out_dir, self.in_out_dir_in_container()),
                 // TODO: Avoid giving access to the entire workspace data
                 // TODO: Use read-only permissions where possible
-                (
-                    &self.workspace_layout.root_dir,
-                    self.workspace_dir_in_container(),
-                ),
+                (&self.root_dir, self.workspace_dir_in_container()),
             ])
             .user("root")
             .shell_cmd(
@@ -148,7 +145,7 @@ impl SparkEngine {
                         .volumes([
                             (&run_info.in_out_dir, self.in_out_dir_in_container()),
                             (
-                                &self.workspace_layout.root_dir,
+                                &self.root_dir,
                                 self.workspace_dir_in_container(),
                             ),
                         ])
@@ -200,7 +197,7 @@ impl IngestEngine for SparkEngine {
         &self,
         request: IngestRequest,
     ) -> Result<ExecuteQueryResponseSuccess, EngineError> {
-        let run_info = RunInfo::new(&self.workspace_layout.run_info_dir, "ingest");
+        let run_info = RunInfo::new(&self.run_info_dir, "ingest");
 
         // Remove data_dir if it exists but empty as it will confuse Spark
         let _ = std::fs::remove_dir(&request.data_dir);
