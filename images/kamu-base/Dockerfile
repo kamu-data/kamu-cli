@@ -8,10 +8,11 @@ RUN apt update && \
     apt -y install curl wget gnupg unzip jq && \
     . /etc/os-release && \
     echo "deb https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/xUbuntu_${VERSION_ID}/ /" \
-        | tee /etc/apt/sources.list.d/devel:kubic:libcontainers:stable.list && \
+    | tee /etc/apt/sources.list.d/devel:kubic:libcontainers:stable.list && \
     curl -L "https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/xUbuntu_${VERSION_ID}/Release.key" \
-        | apt-key add - && \
+    | apt-key add - && \
     apt update && \
+    apt install ca-certificates && \
     apt -y install podman fuse-overlayfs && \
     rm -rf /var/lib/apt/lists/*
 
