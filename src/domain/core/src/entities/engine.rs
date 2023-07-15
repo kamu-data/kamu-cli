@@ -33,10 +33,7 @@ pub trait Engine: Send + Sync {
 // from Spark into Kamu
 #[async_trait::async_trait]
 pub trait IngestEngine: Send + Sync {
-    async fn ingest(
-        &self,
-        request: IngestRequestRaw,
-    ) -> Result<ExecuteQueryResponseSuccess, EngineError>;
+    async fn ingest(&self, request: IngestRequest) -> Result<IngestResponse, EngineError>;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -78,6 +75,8 @@ pub struct IngestRequestRaw {
 /// locations before passing it to the engine.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IngestRequest {
+    /// Randomly assigned value that identifies this specific engine operation
+    pub operation_id: String,
     /// Identifies the output dataset
     pub dataset_handle: DatasetHandle,
     /// Polling source, if defined
@@ -96,6 +95,20 @@ pub struct IngestRequest {
     pub prev_watermark: Option<DateTime<Utc>>,
     /// Previous source state, if any
     pub prev_source_state: Option<SourceState>,
+    /// Host path to raw data to read
+    pub input_data_path: PathBuf,
+}
+
+#[derive(Debug)]
+pub struct IngestResponse {
+    /// Data slice produced by the transaction, if any
+    pub data_interval: Option<OffsetInterval>,
+    /// Watermark advanced by the transaction, if any
+    pub output_watermark: Option<DateTime<Utc>>,
+    /// New checkpoint written by the engine, if any
+    pub out_checkpoint: Option<OwnedFile>,
+    /// Data produced by the operation, if any
+    pub out_data: Option<OwnedFile>,
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -110,6 +123,8 @@ pub struct IngestRequest {
 /// locations before passing it to the engine.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TransformRequest {
+    /// Randomly assigned value that identifies this specific engine operation
+    pub operation_id: String,
     /// Identifies the output dataset
     pub dataset_handle: DatasetHandle,
     /// Transformation that will be applied to produce new data
@@ -153,7 +168,7 @@ pub struct TransformResponse {
     /// Watermark advanced by the transaction, if any
     pub output_watermark: Option<DateTime<Utc>>,
     /// New checkpoint written by the engine, if any
-    pub new_checkpoint: Option<OwnedFile>,
+    pub out_checkpoint: Option<OwnedFile>,
     /// Data produced by the operation, if any
     pub out_data: Option<OwnedFile>,
 }
@@ -340,6 +355,16 @@ fn normalize_logs(log_files: Vec<PathBuf>) -> Vec<PathBuf> {
             Ok(m) => m.len() > 0,
             Err(_) => true,
         })
-        .map(|p| pathdiff::diff_paths(&p, &cwd).unwrap_or(p))
+        .map(|p| {
+            if let Some(relpath) = pathdiff::diff_paths(&p, &cwd) {
+                if relpath.as_os_str().len() < p.as_os_str().len() {
+                    relpath
+                } else {
+                    p
+                }
+            } else {
+                p
+            }
+        })
         .collect()
 }

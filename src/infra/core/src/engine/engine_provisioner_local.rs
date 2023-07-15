@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::collections::HashSet;
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -42,40 +43,44 @@ struct State {
 impl EngineProvisionerLocal {
     pub fn new(
         config: EngineProvisionerLocalConfig,
-        workspace_layout: Arc<WorkspaceLayout>,
         container_runtime: ContainerRuntime,
         dataset_repo: Arc<dyn DatasetRepository>,
+        run_info_dir: PathBuf,
     ) -> Self {
         let engine_config = ODFEngineConfig {
             start_timeout: config.start_timeout,
             shutdown_timeout: config.shutdown_timeout,
         };
 
+        // TODO: Eliminate
+        let run_info_dir: Arc<std::path::Path> = Arc::from(run_info_dir.as_path());
+
         Self {
             spark_ingest_engine: Arc::new(SparkEngine::new(
                 container_runtime.clone(),
                 &config.spark_image,
-                workspace_layout.clone(),
+                run_info_dir.clone(),
+                dataset_repo.clone(),
             )),
             spark_engine: Arc::new(ODFEngine::new(
                 container_runtime.clone(),
                 engine_config.clone(),
                 &config.spark_image,
-                workspace_layout.clone(),
+                run_info_dir.clone(),
                 dataset_repo.clone(),
             )),
             flink_engine: Arc::new(ODFEngine::new(
                 container_runtime.clone(),
                 engine_config.clone(),
                 &config.flink_image,
-                workspace_layout.clone(),
+                run_info_dir.clone(),
                 dataset_repo.clone(),
             )),
             datafusion_engine: Arc::new(ODFEngine::new(
                 container_runtime.clone(),
                 engine_config.clone(),
                 &config.datafusion_image,
-                workspace_layout.clone(),
+                run_info_dir.clone(),
                 dataset_repo.clone(),
             )),
             container_runtime,

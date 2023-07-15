@@ -14,18 +14,17 @@ use std::sync::Arc;
 use container_runtime::*;
 use kamu_core::*;
 use odf::engine::{EngineGrpcClient, ExecuteQueryError};
-use odf::{ExecuteQueryInput, ExecuteQueryRequest, Multihash};
+use odf::{ExecuteQueryInput, ExecuteQueryRequest, ExecuteQueryResponseSuccess, Multihash};
 use opendatafabric as odf;
 
 use super::engine_container::{EngineContainer, LogsConfig};
 use super::ODFEngineConfig;
-use crate::WorkspaceLayout;
 
 pub struct ODFEngine {
     container_runtime: ContainerRuntime,
     engine_config: ODFEngineConfig,
     image: String,
-    workspace_layout: Arc<WorkspaceLayout>,
+    run_info_dir: Arc<Path>,
     dataset_repo: Arc<dyn DatasetRepository>,
 }
 
@@ -34,14 +33,14 @@ impl ODFEngine {
         container_runtime: ContainerRuntime,
         engine_config: ODFEngineConfig,
         image: &str,
-        workspace_layout: Arc<WorkspaceLayout>,
+        run_info_dir: Arc<Path>,
         dataset_repo: Arc<dyn DatasetRepository>,
     ) -> Self {
         Self {
             container_runtime,
             engine_config,
             image: image.to_owned(),
-            workspace_layout,
+            run_info_dir,
             dataset_repo,
         }
     }
@@ -99,38 +98,32 @@ impl ODFEngine {
         })
     }
 
-    fn workspace_dir_in_container(&self) -> PathBuf {
-        PathBuf::from("/opt/engine/workspace")
-    }
-
-    fn to_container_path(&self, host_path: &Path) -> PathBuf {
-        assert!(host_path.is_absolute());
-        assert!(self.workspace_layout.root_dir.is_absolute());
-        let rel = host_path
-            .strip_prefix(&self.workspace_layout.root_dir)
-            .unwrap();
-        let joined = self.workspace_dir_in_container().join(rel);
-        let unix_path = joined.to_str().unwrap().replace("\\", "/");
-        PathBuf::from(unix_path)
-    }
-
-    async fn map_object_to_container_path(
+    async fn materialize_object(
         &self,
         repo: &dyn ObjectRepository,
         hash: &Multihash,
+        container_in_dir: &Path,
+        volumes: &mut Vec<VolumeSpec>,
     ) -> Result<PathBuf, InternalError> {
         let url = repo.get_internal_url(hash).await;
         let host_path = kamu_data_utils::data::local_url::into_local_path(url).int_err()?;
-        Ok(self.to_container_path(&host_path))
+        let container_path = container_in_dir.join(hash.to_string());
+        volumes.push((host_path, container_path.clone(), VolumeAccess::ReadOnly).into());
+        Ok(container_path)
     }
 
-    async fn maybe_map_object_to_container_path(
+    async fn maybe_materialize_object(
         &self,
         repo: &dyn ObjectRepository,
         hash: Option<&Multihash>,
+        container_in_dir: &Path,
+        volumes: &mut Vec<VolumeSpec>,
     ) -> Result<Option<PathBuf>, InternalError> {
         if let Some(hash) = hash {
-            Ok(Some(self.map_object_to_container_path(repo, hash).await?))
+            Ok(Some(
+                self.materialize_object(repo, hash, container_in_dir, volumes)
+                    .await?,
+            ))
         } else {
             Ok(None)
         }
@@ -139,9 +132,20 @@ impl ODFEngine {
     async fn materialize_request(
         &self,
         request: TransformRequest,
-        out_data_path: &Path,
-        new_checkpoint_path: &Path,
-    ) -> Result<ExecuteQueryRequest, InternalError> {
+        operation_dir: &Path,
+    ) -> Result<MaterializedEngineRequest, InternalError> {
+        let host_out_dir = operation_dir.join("out");
+        let host_out_data_path = host_out_dir.join("data");
+        let host_out_checkpoint_path = host_out_dir.join("checkpoint");
+        std::fs::create_dir(&host_out_dir).int_err()?;
+
+        let container_in_dir = PathBuf::from("/opt/engine/in");
+        let container_out_dir = PathBuf::from("/opt/engine/out");
+        let container_out_data_path = PathBuf::from("/opt/engine/out/data");
+        let container_out_checkpoint_path = PathBuf::from("/opt/engine/out/checkpoint");
+
+        let mut volumes = vec![(host_out_dir, container_out_dir, VolumeAccess::ReadWrite).into()];
+
         let dataset = self
             .dataset_repo
             .get_dataset(&request.dataset_handle.as_local_ref())
@@ -149,9 +153,11 @@ impl ODFEngine {
             .int_err()?;
 
         let prev_checkpoint_path = self
-            .maybe_map_object_to_container_path(
+            .maybe_materialize_object(
                 dataset.as_checkpoint_repo(),
                 request.prev_checkpoint.as_ref(),
+                &container_in_dir,
+                &mut volumes,
             )
             .await?;
 
@@ -163,13 +169,36 @@ impl ODFEngine {
                 .await
                 .int_err()?;
 
+            let mut schema_file = None;
             let mut data_paths = Vec::new();
             for hash in input.data_slices {
-                data_paths.push(
-                    self.map_object_to_container_path(input_dataset.as_data_repo(), &hash)
-                        .await?,
-                );
+                let container_path = self
+                    .materialize_object(
+                        input_dataset.as_data_repo(),
+                        &hash,
+                        &container_in_dir,
+                        &mut volumes,
+                    )
+                    .await?;
+
+                if hash == input.schema_slice {
+                    schema_file = Some(container_path.clone());
+                }
+
+                data_paths.push(container_path);
             }
+
+            let schema_file = if let Some(schema_file) = schema_file {
+                schema_file
+            } else {
+                self.materialize_object(
+                    input_dataset.as_data_repo(),
+                    &input.schema_slice,
+                    &container_in_dir,
+                    &mut volumes,
+                )
+                .await?
+            };
 
             inputs.push(ExecuteQueryInput {
                 dataset_id: input.dataset_handle.id,
@@ -177,9 +206,7 @@ impl ODFEngine {
                 vocab: input.vocab,
                 data_interval: input.data_interval,
                 data_paths,
-                schema_file: self
-                    .map_object_to_container_path(input_dataset.as_data_repo(), &input.schema_slice)
-                    .await?,
+                schema_file,
                 explicit_watermarks: input.explicit_watermarks,
             })
         }
@@ -193,57 +220,33 @@ impl ODFEngine {
             transform: request.transform,
             inputs,
             prev_checkpoint_path,
-            new_checkpoint_path: self.to_container_path(new_checkpoint_path),
-            out_data_path: self.to_container_path(out_data_path),
+            new_checkpoint_path: container_out_checkpoint_path,
+            out_data_path: container_out_data_path,
         };
 
-        Ok(engine_request)
+        Ok(MaterializedEngineRequest {
+            engine_request,
+            out_data_path: host_out_data_path,
+            out_checkpoint_path: host_out_checkpoint_path,
+            volumes,
+        })
     }
-}
 
-#[async_trait::async_trait]
-impl Engine for ODFEngine {
-    async fn transform(&self, request: TransformRequest) -> Result<TransformResponse, EngineError> {
-        let out_data_path = self
-            .workspace_layout
-            .run_info_dir
-            .join(crate::repos::get_staging_name());
-
-        let new_checkpoint_path = self
-            .workspace_layout
-            .run_info_dir
-            .join(crate::repos::get_staging_name());
-
-        let engine_request = self
-            .materialize_request(request, &out_data_path, &new_checkpoint_path)
-            .await
-            .map_err(|e| EngineError::internal(e, Vec::new()))?;
-
-        let engine_container = EngineContainer::new(
-            self.container_runtime.clone(),
-            self.engine_config.clone(),
-            LogsConfig::new(&self.workspace_layout.run_info_dir),
-            &self.image,
-            // TODO: Avoid giving access to the entire workspace data
-            // TODO: Use read-only permissions where possible
-            vec![(
-                self.workspace_layout.root_dir.clone(),
-                self.workspace_dir_in_container(),
-            )],
-        )
-        .await?;
-
-        let mut engine_client = engine_container.connect_client().await?;
-
-        let res = self
-            .execute_query(&engine_container, &mut engine_client, engine_request)
-            .await;
-
-        engine_container.terminate().await?;
-
-        let engine_response = res?;
-
-        let out_data = if engine_response.data_interval.is_some() {
+    async fn materialize_response(
+        &self,
+        engine_response: ExecuteQueryResponseSuccess,
+        next_offset: i64,
+        out_data_path: PathBuf,
+        out_checkpoint_path: PathBuf,
+    ) -> Result<TransformResponse, EngineError> {
+        let out_data = if let Some(data_interval) = &engine_response.data_interval {
+            if data_interval.end < data_interval.start || data_interval.start != next_offset {
+                return Err(EngineError::contract_error(
+                    "Engine returned an output slice with invalid data inverval",
+                    Vec::new(),
+                )
+                .into());
+            }
             if !out_data_path.exists() {
                 return Err(EngineError::contract_error(
                     "Engine did not write a response data file",
@@ -270,15 +273,15 @@ impl Engine for ODFEngine {
             None
         };
 
-        let new_checkpoint = if new_checkpoint_path.exists() {
-            if new_checkpoint_path.is_symlink() || !new_checkpoint_path.is_file() {
+        let out_checkpoint = if out_checkpoint_path.exists() {
+            if out_checkpoint_path.is_symlink() || !out_checkpoint_path.is_file() {
                 return Err(EngineError::contract_error(
                     "Engine wrote checkpoint not as a plain file",
                     Vec::new(),
                 )
                 .into());
             }
-            Some(OwnedFile::new(new_checkpoint_path).into())
+            Some(OwnedFile::new(out_checkpoint_path).into())
         } else {
             None
         };
@@ -286,8 +289,65 @@ impl Engine for ODFEngine {
         Ok(TransformResponse {
             data_interval: engine_response.data_interval,
             output_watermark: engine_response.output_watermark,
-            new_checkpoint,
+            out_checkpoint,
             out_data,
         })
     }
+}
+
+#[async_trait::async_trait]
+impl Engine for ODFEngine {
+    async fn transform(&self, request: TransformRequest) -> Result<TransformResponse, EngineError> {
+        let operation_id = request.operation_id.clone();
+        let operation_dir = self
+            .run_info_dir
+            .join(format!("transform-{}", &request.operation_id));
+        let logs_dir = operation_dir.join("logs");
+        std::fs::create_dir(&operation_dir).map_err(|e| EngineError::internal(e, Vec::new()))?;
+        std::fs::create_dir(&logs_dir).map_err(|e| EngineError::internal(e, Vec::new()))?;
+
+        let next_offset = request.next_offset;
+
+        let materialized_request = self
+            .materialize_request(request, &operation_dir)
+            .await
+            .map_err(|e| EngineError::internal(e, Vec::new()))?;
+
+        let engine_container = EngineContainer::new(
+            self.container_runtime.clone(),
+            self.engine_config.clone(),
+            LogsConfig::new(&logs_dir),
+            &self.image,
+            materialized_request.volumes,
+            &operation_id,
+        )
+        .await?;
+
+        let mut engine_client = engine_container.connect_client().await?;
+
+        let engine_response = self
+            .execute_query(
+                &engine_container,
+                &mut engine_client,
+                materialized_request.engine_request,
+            )
+            .await;
+
+        engine_container.terminate().await?;
+
+        self.materialize_response(
+            engine_response?,
+            next_offset,
+            materialized_request.out_data_path,
+            materialized_request.out_checkpoint_path,
+        )
+        .await
+    }
+}
+
+struct MaterializedEngineRequest {
+    engine_request: ExecuteQueryRequest,
+    out_data_path: PathBuf,
+    out_checkpoint_path: PathBuf,
+    volumes: Vec<VolumeSpec>,
 }

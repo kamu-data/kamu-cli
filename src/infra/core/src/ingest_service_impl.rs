@@ -231,16 +231,33 @@ impl IngestServiceImpl {
         }
 
         Ok(IngestRequest {
+            operation_id: self.next_operation_id(),
             dataset_handle,
             polling_source,
             system_time: Utc::now(),
-            event_time: None,
+            event_time: None, // TODO: Will be filled out by IngestTask
+            input_data_path: PathBuf::new(), // TODO: Will be filled out by IngestTask,
             next_offset: next_offset.unwrap_or_default(),
             vocab: vocab.unwrap_or_default(),
             prev_checkpoint: prev_checkpoint.unwrap_or_default(),
             prev_watermark: prev_watermark.unwrap_or_default(),
             prev_source_state: prev_source_state.clone().unwrap_or_default(),
         })
+    }
+
+    fn next_operation_id(&self) -> String {
+        use rand::distributions::Alphanumeric;
+        use rand::Rng;
+
+        let mut name = String::with_capacity(16);
+        name.extend(
+            rand::thread_rng()
+                .sample_iter(&Alphanumeric)
+                .take(10)
+                .map(char::from),
+        );
+
+        name
     }
 }
 

@@ -34,7 +34,7 @@ impl TransformServiceImpl {
     }
 
     // Note: Can be called from multiple threads
-    #[tracing::instrument(level = "info", skip_all)]
+    #[tracing::instrument(level = "info", skip_all, fields(operation_id = %request.operation_id))]
     async fn do_transform<CommitFn, Fut>(
         engine_provisioner: Arc<dyn EngineProvisioner>,
         request: TransformRequest,
@@ -102,7 +102,7 @@ impl TransformServiceImpl {
                 output_watermark: response.output_watermark,
             },
             response.out_data,
-            response.new_checkpoint,
+            response.out_checkpoint,
         )
         .await
     }
@@ -193,6 +193,7 @@ impl TransformServiceImpl {
             .int_err()?;
 
         Ok(Some(TransformRequest {
+            operation_id: self.next_operation_id(),
             dataset_handle: dataset_handle.clone(),
             transform: source.transform,
             system_time,
@@ -201,6 +202,21 @@ impl TransformServiceImpl {
             inputs,
             prev_checkpoint,
         }))
+    }
+
+    fn next_operation_id(&self) -> String {
+        use rand::distributions::Alphanumeric;
+        use rand::Rng;
+
+        let mut name = String::with_capacity(16);
+        name.extend(
+            rand::thread_rng()
+                .sample_iter(&Alphanumeric)
+                .take(10)
+                .map(char::from),
+        );
+
+        name
     }
 
     async fn is_never_pulled(&self, dataset_ref: &DatasetRef) -> Result<bool, InternalError> {
@@ -557,6 +573,7 @@ impl TransformServiceImpl {
 
             let step = VerificationStep {
                 request: TransformRequest {
+                    operation_id: self.next_operation_id(),
                     dataset_handle: dataset_handle.clone(),
                     transform: source.transform.clone(),
                     system_time: block.system_time,

@@ -26,11 +26,10 @@ pub struct IngestTask {
     listener: Arc<dyn IngestListener>,
 
     prev_source_state: Option<PollingSourceState>,
-    dataset_data_dir: PathBuf,
 
     fetch_service: FetchService,
     prep_service: PrepService,
-    read_service: ReadService,
+    engine_provisioner: Arc<dyn EngineProvisioner>,
     cache_dir: PathBuf,
 }
 
@@ -58,20 +57,6 @@ impl IngestTask {
             }
         }
 
-        // TODO: This seems dirty
-        let some_random_hash: Multihash = Multihash::from_digest_sha3_256(b"");
-        let dataset_data_dir = PathBuf::from(
-            kamu_data_utils::data::local_url::into_local_path(
-                dataset
-                    .as_data_repo()
-                    .get_internal_url(&some_random_hash)
-                    .await,
-            )
-            .int_err()?
-            .parent()
-            .unwrap(),
-        );
-
         Ok(Self {
             dataset,
             options,
@@ -81,10 +66,9 @@ impl IngestTask {
                 .prev_source_state
                 .as_ref()
                 .and_then(|ss| PollingSourceState::try_from_source_state(&ss)),
-            dataset_data_dir,
             fetch_service: FetchService::new(container_runtime, &run_info_dir),
             prep_service: PrepService::new(),
-            read_service: ReadService::new(engine_provisioner),
+            engine_provisioner,
             cache_dir: cache_dir.clone(),
             request,
         })
@@ -93,7 +77,10 @@ impl IngestTask {
     #[tracing::instrument(
         level = "info",
         skip_all,
-        fields(dataset_handle = %self.request.dataset_handle),
+        fields(
+            operation_id = %self.request.operation_id,
+            dataset_handle = %self.request.dataset_handle,
+        ),
     )]
     pub async fn ingest(&mut self) -> Result<IngestResult, IngestError> {
         tracing::info!(
@@ -173,7 +160,7 @@ impl IngestTask {
                     .on_stage_progress(IngestStage::Commit, 0, TotalSteps::Exact(1));
 
                 let commit_res = self
-                    .maybe_commit(savepoint.source_state.as_ref(), &read_result, &prev_head)
+                    .maybe_commit(savepoint.source_state.as_ref(), read_result, &prev_head)
                     .await?;
 
                 // Clean up intermediate files
@@ -191,6 +178,7 @@ impl IngestTask {
                     }),
                     CommitStepResult::Updated(commit) => {
                         // Advance the task state for the next run
+                        self.request.system_time = Utc::now();
                         self.request.prev_checkpoint =
                             commit.new_event.output_checkpoint.map(|c| c.physical_hash);
                         self.request.prev_watermark = commit.new_event.output_watermark;
@@ -325,6 +313,7 @@ impl IngestTask {
             let fetch_result = self
                 .fetch_service
                 .fetch(
+                    &self.request.operation_id,
                     fetch_step,
                     prev_source_state,
                     &target_path,
@@ -393,82 +382,47 @@ impl IngestTask {
         &mut self,
         prep_result: &PrepStepResult,
         source_event_time: Option<DateTime<Utc>>,
-    ) -> Result<ReadStepResult, IngestError> {
-        let system_time = Utc::now(); // TODO: Inject
+    ) -> Result<IngestResponse, IngestError> {
+        let input_data_path = self.cache_dir.join(&prep_result.data_cache_key);
 
-        let src_data_path = self.cache_dir.join(&prep_result.data_cache_key);
-
-        let out_data_cache_key = self.get_random_cache_key("read-");
-        let out_data_path = self.cache_dir.join(&out_data_cache_key);
-
-        let out_checkpoint_cache_key = self.get_random_cache_key("read-cpt-");
-        let out_checkpoint_path = self.cache_dir.join(&out_checkpoint_cache_key);
-
-        let prev_checkpoint_path = if let Some(cp) = &self.request.prev_checkpoint {
-            Some(
-                kamu_data_utils::data::local_url::into_local_path(
-                    self.dataset
-                        .as_checkpoint_repo()
-                        .get_internal_url(&cp)
-                        .await,
-                )
-                .int_err()?,
-            )
+        // Terminate early for zero-sized files
+        // TODO: Should we still call an engine if only to propagate source_event_time
+        // to it?
+        if input_data_path.metadata().int_err()?.len() == 0 {
+            Ok(IngestResponse {
+                data_interval: None,
+                output_watermark: self.request.prev_watermark,
+                out_checkpoint: None,
+                out_data: None,
+            })
         } else {
-            None
-        };
+            let engine = self
+                .engine_provisioner
+                .provision_ingest_engine(self.listener.clone().get_engine_provisioning_listener())
+                .await?;
 
-        let engine_response = self
-            .read_service
-            .read(
-                &self.request.dataset_handle,
-                &self.dataset_data_dir,
-                self.request.polling_source.as_ref().unwrap(),
-                &src_data_path,
-                self.request.prev_watermark.clone(),
-                prev_checkpoint_path.as_ref().map(|cp| cp.as_path()),
-                &self.request.vocab,
-                system_time.clone(),
-                source_event_time,
-                self.request.next_offset,
-                &out_data_path,
-                &out_checkpoint_path,
-                self.listener.clone(),
-            )
-            .await?;
+            let response = engine
+                .ingest(IngestRequest {
+                    event_time: source_event_time,
+                    input_data_path,
+                    ..self.request.clone()
+                })
+                .await?;
 
-        Ok(ReadStepResult {
-            system_time,
-            engine_response,
-            out_checkpoint_cache_key,
-            out_data_cache_key,
-        })
+            Ok(response)
+        }
     }
 
     #[tracing::instrument(level = "info", name = "commit", skip_all)]
     async fn maybe_commit(
         &mut self,
         source_state: Option<&PollingSourceState>,
-        read_result: &ReadStepResult,
+        read_result: IngestResponse,
         prev_hash: &Multihash,
     ) -> Result<CommitStepResult, IngestError> {
-        let data_interval = read_result.engine_response.data_interval.clone();
-        let output_watermark = read_result.engine_response.output_watermark;
+        let data_interval = read_result.data_interval.clone();
+        let output_watermark = read_result.output_watermark;
         let source_state = source_state.map(|v| v.to_source_state());
-
-        let new_data = if data_interval.is_some() {
-            Some(OwnedFile::new(
-                self.cache_dir.join(&read_result.out_data_cache_key),
-            ))
-        } else {
-            None
-        };
-        let new_checkpoint_path = self.cache_dir.join(&read_result.out_checkpoint_cache_key);
-        let new_checkpoint = if new_checkpoint_path.exists() {
-            Some(OwnedFile::new(new_checkpoint_path))
-        } else {
-            None
-        };
 
         match self
             .dataset
@@ -479,11 +433,11 @@ impl IngestTask {
                     output_watermark,
                     source_state,
                 },
-                new_data,
-                new_checkpoint,
+                read_result.out_data,
+                read_result.out_checkpoint,
                 CommitOpts {
                     block_ref: &BlockRef::Head,
-                    system_time: Some(read_result.system_time),
+                    system_time: Some(self.request.system_time),
                     prev_block_hash: Some(Some(&prev_hash)),
                     check_object_refs: false,
                 },
@@ -523,13 +477,6 @@ enum FetchStepResult {
 
 struct PrepStepResult {
     data_cache_key: String,
-}
-
-struct ReadStepResult {
-    system_time: DateTime<Utc>,
-    engine_response: ExecuteQueryResponseSuccess,
-    out_checkpoint_cache_key: String,
-    out_data_cache_key: String,
 }
 
 enum CommitStepResult {

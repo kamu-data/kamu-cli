@@ -46,7 +46,9 @@ async fn test_fetch_url_file() {
 
     // No file to fetch
     assert_matches!(
-        fetch_svc.fetch(&fetch_step, None, &target_path, None).await,
+        fetch_svc
+            .fetch("1", &fetch_step, None, &target_path, None)
+            .await,
         Err(IngestError::NotFound { .. })
     );
     assert!(!target_path.exists());
@@ -66,7 +68,7 @@ async fn test_fetch_url_file() {
 
     // Normal fetch
     let res = fetch_svc
-        .fetch(&fetch_step, None, &target_path, None)
+        .fetch("1", &fetch_step, None, &target_path, None)
         .await
         .unwrap();
     assert_matches!(res, FetchResult::Updated(_));
@@ -80,6 +82,7 @@ async fn test_fetch_url_file() {
     // No modifications
     let res2 = fetch_svc
         .fetch(
+            "1",
             &fetch_step,
             update.source_state.as_ref(),
             &target_path,
@@ -93,6 +96,7 @@ async fn test_fetch_url_file() {
     filetime::set_file_mtime(&src_path, filetime::FileTime::from_unix_time(0, 0)).unwrap();
     let res3 = fetch_svc
         .fetch(
+            "1",
             &fetch_step,
             update.source_state.as_ref(),
             &target_path,
@@ -126,7 +130,9 @@ async fn test_fetch_url_http_unreachable() {
     );
 
     assert_matches!(
-        fetch_svc.fetch(&fetch_step, None, &target_path, None).await,
+        fetch_svc
+            .fetch("1", &fetch_step, None, &target_path, None)
+            .await,
         Err(IngestError::Unreachable { .. })
     );
     assert!(!target_path.exists());
@@ -154,7 +160,9 @@ async fn test_fetch_url_http_not_found() {
     );
 
     assert_matches!(
-        fetch_svc.fetch(&fetch_step, None, &target_path, None).await,
+        fetch_svc
+            .fetch("1", &fetch_step, None, &target_path, None)
+            .await,
         Err(IngestError::NotFound { .. })
     );
     assert!(!target_path.exists());
@@ -197,7 +205,7 @@ async fn test_fetch_url_http_ok() {
     let listener = Arc::new(TestListener::new());
 
     let res = fetch_svc
-        .fetch(&fetch_step, None, &target_path, Some(listener.clone()))
+        .fetch("1", &fetch_step, None, &target_path, Some(listener.clone()))
         .await
         .unwrap();
 
@@ -220,6 +228,7 @@ async fn test_fetch_url_http_ok() {
 
     let res_repeat = fetch_svc
         .fetch(
+            "1",
             &fetch_step,
             update.source_state.as_ref(),
             &target_path,
@@ -234,6 +243,7 @@ async fn test_fetch_url_http_ok() {
     filetime::set_file_mtime(&src_path, filetime::FileTime::from_unix_time(0, 0)).unwrap();
     let res_touch = fetch_svc
         .fetch(
+            "1",
             &fetch_step,
             update.source_state.as_ref(),
             &target_path,
@@ -249,6 +259,7 @@ async fn test_fetch_url_http_ok() {
     assert_matches!(
         fetch_svc
             .fetch(
+                "1",
                 &fetch_step,
                 update.source_state.as_ref(),
                 &target_path,
@@ -302,7 +313,7 @@ async fn test_fetch_url_http_env_interpolation() {
 
     assert_matches!(
         fetch_svc
-            .fetch(&fetch_step, None, &target_path, Some(listener.clone()))
+            .fetch("1", &fetch_step, None, &target_path, Some(listener.clone()))
             .await,
         Err(_)
     );
@@ -310,7 +321,7 @@ async fn test_fetch_url_http_env_interpolation() {
     std::env::set_var("KAMU_TEST", "data.csv");
 
     let res = fetch_svc
-        .fetch(&fetch_step, None, &target_path, Some(listener.clone()))
+        .fetch("1", &fetch_step, None, &target_path, Some(listener.clone()))
         .await
         .unwrap();
 
@@ -368,7 +379,7 @@ async fn test_fetch_url_ftp_ok() {
     let listener = Arc::new(TestListener::new());
 
     let res = fetch_svc
-        .fetch(&fetch_step, None, &target_path, Some(listener.clone()))
+        .fetch("1", &fetch_step, None, &target_path, Some(listener.clone()))
         .await
         .unwrap();
 
@@ -418,7 +429,9 @@ async fn test_fetch_files_glob() {
 
     // No file to fetch
     assert_matches!(
-        fetch_svc.fetch(&fetch_step, None, &target_path, None).await,
+        fetch_svc
+            .fetch("1", &fetch_step, None, &target_path, None)
+            .await,
         Err(IngestError::NotFound { .. })
     );
     assert!(!target_path.exists());
@@ -438,7 +451,7 @@ async fn test_fetch_files_glob() {
 
     // Normal fetch
     let res = fetch_svc
-        .fetch(&fetch_step, None, &target_path, None)
+        .fetch("1", &fetch_step, None, &target_path, None)
         .await
         .unwrap();
     assert_matches!(res, FetchResult::Updated(_));
@@ -459,6 +472,7 @@ async fn test_fetch_files_glob() {
     // No modifications
     let res2 = fetch_svc
         .fetch(
+            "1",
             &fetch_step,
             update.source_state.as_ref(),
             &target_path,
@@ -472,6 +486,7 @@ async fn test_fetch_files_glob() {
     filetime::set_file_mtime(&src_path_1, filetime::FileTime::from_unix_time(0, 0)).unwrap();
     let res3 = fetch_svc
         .fetch(
+            "1",
             &fetch_step,
             update.source_state.as_ref(),
             &target_path,
@@ -499,6 +514,7 @@ async fn test_fetch_files_glob() {
 
     let res4 = fetch_svc
         .fetch(
+            "1",
             &fetch_step,
             update.source_state.as_ref(),
             &target_path,
@@ -535,6 +551,7 @@ async fn test_fetch_files_glob() {
 
     let res5 = fetch_svc
         .fetch(
+            "1",
             &fetch_step,
             update.source_state.as_ref(),
             &target_path,
@@ -560,6 +577,7 @@ async fn test_fetch_files_glob() {
 
     let res6 = fetch_svc
         .fetch(
+            "1",
             &fetch_step,
             update5.source_state.as_ref(),
             &target_path,
@@ -622,7 +640,7 @@ async fn test_fetch_container_ok() {
     let listener = Arc::new(TestListener::new());
 
     let res = fetch_svc
-        .fetch(&fetch_step, None, &target_path, Some(listener.clone()))
+        .fetch("1", &fetch_step, None, &target_path, Some(listener.clone()))
         .await
         .unwrap();
 

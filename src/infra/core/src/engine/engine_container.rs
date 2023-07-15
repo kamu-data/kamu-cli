@@ -35,15 +35,16 @@ impl EngineContainer {
         engine_config: ODFEngineConfig,
         logs_config: LogsConfig,
         image: &str,
-        volume_map: Vec<(PathBuf, PathBuf)>,
+        volumes: Vec<VolumeSpec>,
+        operation_id: &str,
     ) -> Result<Self, EngineError> {
         let stdout_file = std::fs::File::create(&logs_config.stdout_path)?;
         let stderr_file = std::fs::File::create(&logs_config.stderr_path)?;
 
         let container = container_runtime
             .run_attached(image)
-            .container_name(format!("kamu-engine-{}", logs_config.run_id))
-            .volumes(volume_map)
+            .container_name(format!("kamu-engine-{}", operation_id))
+            .volumes(volumes)
             .expose_port(Self::ADAPTER_PORT)
             .stdout(stdout_file)
             .stderr(stderr_file)
@@ -96,7 +97,6 @@ impl std::ops::Deref for EngineContainer {
 ///////////////////////////////////////////////////////////////////////////////
 
 pub(crate) struct LogsConfig {
-    run_id: String,
     logs_dir: PathBuf,
     stdout_path: PathBuf,
     stderr_path: PathBuf,
@@ -104,21 +104,10 @@ pub(crate) struct LogsConfig {
 
 impl LogsConfig {
     pub fn new(logs_dir: &Path) -> Self {
-        use rand::Rng;
-        let run_id: String = rand::thread_rng()
-            .sample_iter(&rand::distributions::Alphanumeric)
-            .take(10)
-            .map(char::from)
-            .collect();
-
-        let stdout_path = logs_dir.join(format!("engine-{}.stdout.txt", &run_id));
-        let stderr_path = logs_dir.join(format!("engine-{}.stderr.txt", &run_id));
-
         Self {
-            run_id,
-            logs_dir: logs_dir.to_owned(),
-            stdout_path,
-            stderr_path,
+            stdout_path: logs_dir.join("engine.stdout.txt"),
+            stderr_path: logs_dir.join("engine.stderr.txt"),
+            logs_dir: logs_dir.to_path_buf(),
         }
     }
 
@@ -171,6 +160,6 @@ impl LogsConfig {
     }
 
     fn demuxed_filename(&self, process: &str, stream: &str) -> String {
-        format!("engine-{}-{}.{}.txt", &self.run_id, process, stream)
+        format!("engine-{}.{}.txt", process, stream)
     }
 }

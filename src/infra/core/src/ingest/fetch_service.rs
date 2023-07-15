@@ -47,6 +47,7 @@ impl FetchService {
 
     pub async fn fetch(
         &self,
+        operation_id: &str,
         fetch_step: &FetchStep,
         prev_source_state: Option<&PollingSourceState>,
         target_path: &Path,
@@ -88,8 +89,14 @@ impl FetchService {
                 }
             }
             FetchStep::Container(fetch) => {
-                self.fetch_container(fetch, prev_source_state, target_path, listener)
-                    .await
+                self.fetch_container(
+                    operation_id,
+                    fetch,
+                    prev_source_state,
+                    target_path,
+                    listener,
+                )
+                .await
             }
             FetchStep::FilesGlob(fglob) => {
                 Self::fetch_files_glob(fglob, prev_source_state, target_path, listener.as_ref())
@@ -159,13 +166,12 @@ impl FetchService {
     // TODO: Allow containers to output watermarks
     async fn fetch_container(
         &self,
+        operation_id: &str,
         fetch: &FetchStepContainer,
         prev_source_state: Option<&PollingSourceState>,
         target_path: &Path,
         listener: Arc<dyn FetchProgressListener>,
     ) -> Result<FetchResult, IngestError> {
-        use rand::Rng;
-
         // Pull image
         let pull_image_listener = listener
             .clone()
@@ -182,18 +188,12 @@ impl FetchService {
         });
 
         // Setup logging
-        let run_id: String = rand::thread_rng()
-            .sample_iter(&rand::distributions::Alphanumeric)
-            .take(10)
-            .map(char::from)
-            .collect();
-
-        let out_dir = self.container_log_dir.join(format!("fetch-{}", &run_id));
+        let out_dir = self
+            .container_log_dir
+            .join(format!("fetch-{}", operation_id));
         std::fs::create_dir_all(&out_dir).int_err()?;
 
-        let stderr_path = self
-            .container_log_dir
-            .join(format!("fetch-{}.err.txt", run_id));
+        let stderr_path = self.container_log_dir.join("fetch.err.txt");
 
         let mut target_file = tokio::fs::File::create(target_path).await.int_err()?;
         let stderr_file = std::fs::File::create(&stderr_path).int_err()?;
@@ -213,7 +213,7 @@ impl FetchService {
         let mut container_builder = self
             .container_runtime
             .run_attached(&fetch.image)
-            .container_name(format!("kamu-fetch-{}", run_id))
+            .container_name(format!("kamu-fetch-{}", operation_id))
             .args(fetch.args.clone().unwrap_or_default())
             .environment_vars([
                 ("ODF_ETAG", prev_etag),

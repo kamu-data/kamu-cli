@@ -470,7 +470,15 @@ async fn test_get_verification_plan_one_to_one() {
         deriv_chain.get_block(&deriv_head_t6).await.unwrap()
     );
 
-    assert_eq!(&plan[0].request, &deriv_req_t2);
-    assert_eq!(&plan[1].request, &deriv_req_t4);
-    assert_eq!(&plan[2].request, &deriv_req_t6);
+    assert_requests_eqivalent(&plan[0].request, deriv_req_t2);
+    assert_requests_eqivalent(&plan[1].request, deriv_req_t4);
+    assert_requests_eqivalent(&plan[2].request, deriv_req_t6);
+}
+
+fn assert_requests_eqivalent(lhs: &TransformRequest, mut rhs: TransformRequest) {
+    // Operation IDs are randomly generated, so ignoring them for this check
+    rhs.operation_id = lhs.operation_id.clone();
+
+    assert_eq!(lhs.inputs, rhs.inputs);
+    assert_eq!(*lhs, rhs);
 }
