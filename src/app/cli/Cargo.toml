@@ -13,6 +13,9 @@ include = { workspace = true }
 edition = { workspace = true }
 publish = { workspace = true }
 
+# Disabling examples discovery as we need them very rarely but they significantly slow down build times
+autoexamples = false 
+
 
 [lib]
 doctest = false
