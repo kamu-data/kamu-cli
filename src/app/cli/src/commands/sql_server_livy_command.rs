@@ -14,13 +14,12 @@ use std::time::Duration;
 use console::style as s;
 use container_runtime::ContainerRuntime;
 use internal_error::*;
-use kamu::*;
 
 use super::common::PullImageProgress;
 use super::{CLIError, Command};
 use crate::explore::LivyServerImpl;
 use crate::output::*;
-use crate::JupyterConfig;
+use crate::{JupyterConfig, WorkspaceLayout};
 
 pub struct SqlServerLivyCommand {
     workspace_layout: Arc<WorkspaceLayout>,

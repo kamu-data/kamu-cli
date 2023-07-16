@@ -220,7 +220,7 @@ async fn create_graph_in_repository(
 // dir and syncing it into the main workspace. TODO: Add simpler way to import
 // remote dataset
 async fn create_graph_remote(
-    ws: Arc<WorkspaceLayout>,
+    dataset_repo: Arc<dyn DatasetRepository>,
     reg: Arc<RemoteRepositoryRegistryImpl>,
     datasets: Vec<(DatasetAlias, Vec<DatasetAlias>)>,
     to_import: Vec<DatasetAlias>,
@@ -238,11 +238,7 @@ async fn create_graph_remote(
 
     let sync_service = SyncServiceImpl::new(
         reg.clone(),
-        Arc::new(DatasetRepositoryLocalFs::new(
-            ws.datasets_dir.clone(),
-            Arc::new(CurrentAccountSubject::new_test()),
-            false,
-        )),
+        dataset_repo,
         Arc::new(DatasetFactoryImpl::new(IpfsGateway::default())),
         Arc::new(DummySmartTransferProtocolClient::new()),
         Arc::new(kamu::utils::ipfs_wrapper::IpfsClient::default()),
@@ -430,7 +426,7 @@ async fn test_pull_batching_complex_with_remote() {
     // C --------/   /
     // D -----------/
     create_graph_remote(
-        harness.workspace_layout.clone(),
+        harness.dataset_repo.clone(),
         harness.remote_repo_reg.clone(),
         vec![
             (n!("a"), names![]),
@@ -887,7 +883,6 @@ async fn test_set_watermark() {
 
 struct PullTestHarness {
     calls: Arc<Mutex<Vec<PullBatch>>>,
-    workspace_layout: Arc<WorkspaceLayout>,
     dataset_repo: Arc<DatasetRepositoryLocalFs>,
     remote_repo_reg: Arc<RemoteRepositoryRegistryImpl>,
     remote_alias_reg: Arc<RemoteAliasesRegistryImpl>,
@@ -897,16 +892,17 @@ struct PullTestHarness {
 impl PullTestHarness {
     fn new(tmp_path: &Path, multi_tenant: bool) -> Self {
         let calls = Arc::new(Mutex::new(Vec::new()));
-        let workspace_layout = Arc::new(WorkspaceLayout::create(tmp_path, multi_tenant).unwrap());
         let current_account_config = Arc::new(CurrentAccountSubject::new_test());
-        let dataset_repo = Arc::new(DatasetRepositoryLocalFs::new(
-            workspace_layout.datasets_dir.clone(),
-            current_account_config.clone(),
-            multi_tenant,
-        ));
-        let remote_repo_reg = Arc::new(RemoteRepositoryRegistryImpl::new(
-            workspace_layout.repos_dir.clone(),
-        ));
+        let dataset_repo = Arc::new(
+            DatasetRepositoryLocalFs::create(
+                tmp_path.join("datasets"),
+                current_account_config.clone(),
+                multi_tenant,
+            )
+            .unwrap(),
+        );
+        let remote_repo_reg =
+            Arc::new(RemoteRepositoryRegistryImpl::create(tmp_path.join("repos")).unwrap());
         let remote_alias_reg = Arc::new(RemoteAliasesRegistryImpl::new(dataset_repo.clone()));
         let ingest_svc = Arc::new(TestIngestService::new(calls.clone()));
         let transform_svc = Arc::new(TestTransformService::new(calls.clone()));
@@ -922,7 +918,6 @@ impl PullTestHarness {
 
         Self {
             calls,
-            workspace_layout,
             dataset_repo,
             remote_repo_reg,
             remote_alias_reg,

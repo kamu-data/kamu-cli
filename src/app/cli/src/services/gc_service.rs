@@ -11,7 +11,8 @@ use std::sync::Arc;
 
 use chrono::{DateTime, Duration, Utc};
 use kamu::domain::*;
-use kamu::WorkspaceLayout;
+
+use crate::WorkspaceLayout;
 
 pub struct GcService {
     workspace_layout: Arc<WorkspaceLayout>,

@@ -19,12 +19,12 @@ use super::test_dataset_repository_shared;
 /////////////////////////////////////////////////////////////////////////////////////////
 
 fn local_fs_repo(tempdir: &TempDir, multi_tenant: bool) -> DatasetRepositoryLocalFs {
-    let workspace_layout = WorkspaceLayout::create(tempdir.path(), false).unwrap();
-    DatasetRepositoryLocalFs::new(
-        workspace_layout.datasets_dir.clone(),
+    DatasetRepositoryLocalFs::create(
+        tempdir.path().join("datasets"),
         Arc::new(CurrentAccountSubject::new_test()),
         multi_tenant,
     )
+    .unwrap()
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

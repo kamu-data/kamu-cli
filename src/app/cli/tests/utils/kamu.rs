@@ -15,7 +15,7 @@ use std::sync::Arc;
 use kamu::domain::*;
 use kamu::testing::ParquetReaderHelper;
 use kamu::*;
-use kamu_cli::{CLIError, CurrentAccountIndication};
+use kamu_cli::*;
 use opendatafabric::serde::yaml::*;
 use opendatafabric::*;
 use thiserror::Error;
@@ -119,8 +119,6 @@ impl Kamu {
     where
         S: Into<String>,
     {
-        use kamu_cli::{CompleteCommand, ConfigService};
-
         let cli = kamu_cli::cli();
         let dataset_repo = Arc::new(DatasetRepositoryLocalFs::new(
             self.workspace_layout.datasets_dir.clone(),

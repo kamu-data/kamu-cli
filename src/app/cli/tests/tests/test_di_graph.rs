@@ -9,8 +9,8 @@
 
 use dill::*;
 use kamu::domain::CurrentAccountSubject;
-use kamu::WorkspaceLayout;
 use kamu_cli;
+use kamu_cli::WorkspaceLayout;
 
 #[test_log::test(tokio::test)]
 async fn test_di_graph_validates() {

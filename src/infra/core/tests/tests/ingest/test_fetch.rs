@@ -16,7 +16,6 @@ use container_runtime::ContainerRuntime;
 use indoc::indoc;
 use kamu::domain::*;
 use kamu::ingest::*;
-use kamu::*;
 use opendatafabric::*;
 use url::Url;
 
@@ -27,7 +26,6 @@ use url::Url;
 #[tokio::test]
 async fn test_fetch_url_file() {
     let tempdir = tempfile::tempdir().unwrap();
-    let workspace_layout = Arc::new(WorkspaceLayout::new(tempdir.path()));
 
     let src_path = tempdir.path().join("data.csv");
     let target_path = tempdir.path().join("fetched.bin");
@@ -41,7 +39,7 @@ async fn test_fetch_url_file() {
 
     let fetch_svc = FetchService::new(
         Arc::new(ContainerRuntime::default()),
-        &workspace_layout.run_info_dir,
+        tempdir.path().join("run"),
     );
 
     // No file to fetch
@@ -114,7 +112,6 @@ async fn test_fetch_url_file() {
 #[tokio::test]
 async fn test_fetch_url_http_unreachable() {
     let tempdir = tempfile::tempdir().unwrap();
-    let workspace_layout = Arc::new(WorkspaceLayout::new(tempdir.path()));
     let target_path = tempdir.path().join("fetched.bin");
 
     let fetch_step = FetchStep::Url(FetchStepUrl {
@@ -126,7 +123,7 @@ async fn test_fetch_url_http_unreachable() {
 
     let fetch_svc = FetchService::new(
         Arc::new(ContainerRuntime::default()),
-        &workspace_layout.run_info_dir,
+        tempdir.path().join("run"),
     );
 
     assert_matches!(
@@ -142,7 +139,6 @@ async fn test_fetch_url_http_unreachable() {
 #[tokio::test]
 async fn test_fetch_url_http_not_found() {
     let tempdir = tempfile::tempdir().unwrap();
-    let workspace_layout = Arc::new(WorkspaceLayout::new(tempdir.path()));
     let target_path = tempdir.path().join("fetched.bin");
 
     let http_server = crate::utils::HttpServer::new(&tempdir.path().join("srv")).await;
@@ -156,7 +152,7 @@ async fn test_fetch_url_http_not_found() {
 
     let fetch_svc = FetchService::new(
         Arc::new(ContainerRuntime::default()),
-        &workspace_layout.run_info_dir,
+        tempdir.path().join("run"),
     );
 
     assert_matches!(
@@ -172,7 +168,6 @@ async fn test_fetch_url_http_not_found() {
 #[tokio::test]
 async fn test_fetch_url_http_ok() {
     let tempdir = tempfile::tempdir().unwrap();
-    let workspace_layout = Arc::new(WorkspaceLayout::new(tempdir.path()));
     let server_dir = tempdir.path().join("srv");
     std::fs::create_dir(&server_dir).unwrap();
 
@@ -200,7 +195,7 @@ async fn test_fetch_url_http_ok() {
 
     let fetch_svc = FetchService::new(
         Arc::new(ContainerRuntime::default()),
-        &workspace_layout.run_info_dir,
+        tempdir.path().join("run"),
     );
     let listener = Arc::new(TestListener::new());
 
@@ -276,7 +271,6 @@ async fn test_fetch_url_http_ok() {
 #[test_log::test(tokio::test)]
 async fn test_fetch_url_http_env_interpolation() {
     let tempdir = tempfile::tempdir().unwrap();
-    let workspace_layout = Arc::new(WorkspaceLayout::new(tempdir.path()));
     let server_dir = tempdir.path().join("srv");
     std::fs::create_dir(&server_dir).unwrap();
 
@@ -307,7 +301,7 @@ async fn test_fetch_url_http_env_interpolation() {
 
     let fetch_svc = FetchService::new(
         Arc::new(ContainerRuntime::default()),
-        &workspace_layout.run_info_dir,
+        tempdir.path().join("run"),
     );
     let listener = Arc::new(TestListener::new());
 
@@ -346,7 +340,6 @@ async fn test_fetch_url_http_env_interpolation() {
 #[tokio::test]
 async fn test_fetch_url_ftp_ok() {
     let tempdir = tempfile::tempdir().unwrap();
-    let workspace_layout = Arc::new(WorkspaceLayout::new(tempdir.path()));
     let server_dir = tempdir.path().join("srv");
     std::fs::create_dir(&server_dir).unwrap();
 
@@ -374,7 +367,7 @@ async fn test_fetch_url_ftp_ok() {
 
     let fetch_svc = FetchService::new(
         Arc::new(ContainerRuntime::default()),
-        &workspace_layout.run_info_dir,
+        tempdir.path().join("run"),
     );
     let listener = Arc::new(TestListener::new());
 
@@ -402,7 +395,6 @@ async fn test_fetch_url_ftp_ok() {
 #[tokio::test]
 async fn test_fetch_files_glob() {
     let tempdir = tempfile::tempdir().unwrap();
-    let workspace_layout = Arc::new(WorkspaceLayout::new(tempdir.path()));
 
     let src_path_1 = tempdir.path().join("data-2020-10-01.csv");
     let target_path = tempdir.path().join("fetched.bin");
@@ -424,7 +416,7 @@ async fn test_fetch_files_glob() {
 
     let fetch_svc = FetchService::new(
         Arc::new(ContainerRuntime::default()),
-        &workspace_layout.run_info_dir,
+        tempdir.path().join("run"),
     );
 
     // No file to fetch
@@ -610,8 +602,6 @@ async fn test_fetch_files_glob() {
 #[test_log::test(tokio::test)]
 async fn test_fetch_container_ok() {
     let tempdir = tempfile::tempdir().unwrap();
-    let workspace_layout = Arc::new(WorkspaceLayout::new(tempdir.path()));
-
     let target_path = tempdir.path().join("fetched.bin");
 
     let content = indoc!(
@@ -635,7 +625,7 @@ async fn test_fetch_container_ok() {
 
     let fetch_svc = FetchService::new(
         Arc::new(ContainerRuntime::default()),
-        &workspace_layout.run_info_dir,
+        tempdir.path().join("run"),
     );
     let listener = Arc::new(TestListener::new());
 

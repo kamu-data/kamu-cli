@@ -9,10 +9,8 @@
 
 use std::sync::Arc;
 
-use kamu::*;
-
 use super::{CLIError, Command};
-use crate::AlreadyInWorkspace;
+use crate::{AlreadyInWorkspace, WorkspaceLayout};
 
 pub struct InitCommand {
     workspace_layout: Arc<WorkspaceLayout>,

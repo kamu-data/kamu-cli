@@ -76,8 +76,14 @@ async fn append_random_data(
     .new_head
 }
 
-fn assert_in_sync(dataset_layout_1: DatasetLayout, dataset_layout_2: DatasetLayout) {
-    DatasetTestHelper::assert_datasets_in_sync(&dataset_layout_1, &dataset_layout_2);
+async fn assert_in_sync(
+    dataset_repo: &DatasetRepositoryLocalFs,
+    lhs: impl Into<DatasetRef>,
+    rhs: impl Into<DatasetRef>,
+) {
+    let lhs_layout = dataset_repo.get_dataset_layout(&lhs.into()).await.unwrap();
+    let rhs_layout = dataset_repo.get_dataset_layout(&rhs.into()).await.unwrap();
+    DatasetTestHelper::assert_datasets_in_sync(&lhs_layout, &rhs_layout);
 }
 
 async fn create_random_file(path: &Path) -> usize {
@@ -102,15 +108,16 @@ async fn do_test_sync(
 
     let (ipfs_gateway, ipfs_client) = ipfs.unwrap_or_default();
 
-    let workspace_layout = Arc::new(WorkspaceLayout::create(tmp_workspace_dir, false).unwrap());
-    let dataset_repo = Arc::new(DatasetRepositoryLocalFs::new(
-        workspace_layout.datasets_dir.clone(),
-        Arc::new(CurrentAccountSubject::new_test()),
-        false,
-    ));
-    let remote_repo_reg = Arc::new(RemoteRepositoryRegistryImpl::new(
-        workspace_layout.repos_dir.clone(),
-    ));
+    let dataset_repo = Arc::new(
+        DatasetRepositoryLocalFs::create(
+            tmp_workspace_dir.join("datasets"),
+            Arc::new(CurrentAccountSubject::new_test()),
+            false,
+        )
+        .unwrap(),
+    );
+    let remote_repo_reg =
+        Arc::new(RemoteRepositoryRegistryImpl::create(tmp_workspace_dir.join("repos")).unwrap());
     let dataset_factory = Arc::new(DatasetFactoryImpl::new(ipfs_gateway));
 
     let sync_svc = SyncServiceImpl::new(
@@ -188,10 +195,7 @@ async fn do_test_sync(
         }) if new_head == b1
     );
 
-    assert_in_sync(
-        DatasetLayout::new(workspace_layout.root_dir.join("datasets/foo")),
-        DatasetLayout::new(workspace_layout.root_dir.join("datasets/bar")),
-    );
+    assert_in_sync(&dataset_repo, &dataset_alias, &dataset_alias_2).await;
 
     // Subsequent sync ////////////////////////////////////////////////////////
     let _b2 = append_random_data(dataset_repo.as_ref(), &dataset_alias).await;
@@ -222,10 +226,8 @@ async fn do_test_sync(
         }) if old_head.as_ref() == Some(&b1) && new_head == b3
     );
 
-    assert_in_sync(
-        DatasetLayout::new(workspace_layout.root_dir.join("datasets/foo")),
-        DatasetLayout::new(workspace_layout.root_dir.join("datasets/bar")),
-    );
+    assert_in_sync(&dataset_repo, &dataset_alias, &dataset_alias_2).await;
+
     // Up to date /////////////////////////////////////////////////////////////
     assert_matches!(
         sync_svc
@@ -251,10 +253,7 @@ async fn do_test_sync(
         Ok(SyncResult::UpToDate)
     );
 
-    assert_in_sync(
-        DatasetLayout::new(workspace_layout.root_dir.join("datasets/foo")),
-        DatasetLayout::new(workspace_layout.root_dir.join("datasets/bar")),
-    );
+    assert_in_sync(&dataset_repo, &dataset_alias, &dataset_alias_2).await;
 
     // Datasets out-of-sync on push //////////////////////////////////////////////
 

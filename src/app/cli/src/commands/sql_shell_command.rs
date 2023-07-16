@@ -19,6 +19,7 @@ use super::common::PullImageProgress;
 use super::{CLIError, Command};
 use crate::explore::SqlShellImpl;
 use crate::output::*;
+use crate::WorkspaceLayout;
 
 pub struct SqlShellCommand {
     query_svc: Arc<dyn QueryService>,

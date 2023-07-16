@@ -14,7 +14,7 @@ use std::path::Path;
 use kamu::domain::*;
 use kamu::testing::{MetadataFactory, ParquetWriterHelper};
 use kamu::*;
-use kamu_cli::{CLIError, WorkspaceService, WorkspaceUpgradeRequired};
+use kamu_cli::*;
 use opendatafabric::serde::yaml::Manifest;
 use opendatafabric::*;
 

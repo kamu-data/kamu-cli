@@ -34,12 +34,13 @@ struct RepoFixture {
 
 async fn setup_repo() -> RepoFixture {
     let tmp_dir = tempfile::tempdir().unwrap();
-    let workspace_layout = WorkspaceLayout::create(tmp_dir.path(), false).unwrap();
+    let datasets_dir = tmp_dir.path().join("datasets");
+    std::fs::create_dir(&datasets_dir).unwrap();
 
     let catalog = dill::CatalogBuilder::new()
         .add_builder(
             builder_for::<DatasetRepositoryLocalFs>()
-                .with_root(workspace_layout.datasets_dir.clone())
+                .with_root(datasets_dir)
                 .with_multi_tenant(false),
         )
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()

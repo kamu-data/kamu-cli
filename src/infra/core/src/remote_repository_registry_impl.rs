@@ -30,6 +30,12 @@ impl RemoteRepositoryRegistryImpl {
     pub fn new(repos_dir: PathBuf) -> Self {
         Self { repos_dir }
     }
+
+    pub fn create(repos_dir: impl Into<PathBuf>) -> Result<Self, std::io::Error> {
+        let repos_dir = repos_dir.into();
+        std::fs::create_dir_all(&repos_dir)?;
+        Ok(Self::new(repos_dir))
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////

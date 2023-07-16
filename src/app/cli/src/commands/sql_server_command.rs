@@ -20,6 +20,7 @@ use super::common::PullImageProgress;
 use super::{CLIError, Command};
 use crate::explore::SqlShellImpl;
 use crate::output::*;
+use crate::WorkspaceLayout;
 
 pub struct SqlServerCommand {
     workspace_layout: Arc<WorkspaceLayout>,

@@ -13,11 +13,11 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use kamu::domain::*;
-use kamu::{DotStyle, DotVisitor, WorkspaceLayout};
+use kamu::{DotStyle, DotVisitor};
 use opendatafabric::*;
 
 use super::{CLIError, Command};
-use crate::OutputConfig;
+use crate::{OutputConfig, WorkspaceLayout};
 
 pub struct LineageCommand {
     dataset_repo: Arc<dyn DatasetRepository>,

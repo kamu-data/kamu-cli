@@ -38,7 +38,6 @@ mod search_service_impl;
 mod sync_service_impl;
 mod transform_service_impl;
 mod verification_service_impl;
-mod workspace_layout;
 
 pub use dataset_config::*;
 pub use dataset_layout::*;
@@ -57,4 +56,3 @@ pub use search_service_impl::*;
 pub use sync_service_impl::*;
 pub use transform_service_impl::*;
 pub use verification_service_impl::*;
-pub use workspace_layout::*;

@@ -14,7 +14,6 @@ use container_runtime::{ContainerRuntimeType, NetworkNamespaceType};
 use dill::*;
 use duration_string::DurationString;
 use kamu::utils::docker_images;
-use kamu::WorkspaceLayout;
 use merge::Merge;
 use opendatafabric::serde::yaml::Manifest;
 use serde::{Deserialize, Serialize};
@@ -22,7 +21,7 @@ use serde_with::skip_serializing_none;
 use url::Url;
 
 use crate::error::CLIError;
-use crate::NotInWorkspace;
+use crate::{NotInWorkspace, WorkspaceLayout};
 
 ////////////////////////////////////////////////////////////////////////////////////////
 

@@ -20,12 +20,12 @@ use opendatafabric::*;
 #[test_log::test(tokio::test)]
 async fn metadata_chain_append_event() {
     let tempdir = tempfile::tempdir().unwrap();
-    let workspace_layout = Arc::new(WorkspaceLayout::create(tempdir.path(), false).unwrap());
-    let dataset_repo = DatasetRepositoryLocalFs::new(
-        workspace_layout.datasets_dir.clone(),
+    let dataset_repo = DatasetRepositoryLocalFs::create(
+        tempdir.path().join("datasets"),
         Arc::new(CurrentAccountSubject::new_test()),
         false,
-    );
+    )
+    .unwrap();
 
     let cat = dill::CatalogBuilder::new()
         .add_value(dataset_repo)

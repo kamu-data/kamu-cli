@@ -54,10 +54,9 @@ async fn test_malformed_argument() {
 async fn test_internal_error() {
     let tempdir = tempfile::tempdir().unwrap();
 
-    // Note: Not creating a workspace to cause an error
-    let workspace_layout = Arc::new(WorkspaceLayout::new(tempdir.path()));
+    // Note: Not creating a repo to cause an error
     let dataset_repo = DatasetRepositoryLocalFs::new(
-        workspace_layout.datasets_dir.clone(),
+        tempdir.path().join("datasets"),
         Arc::new(CurrentAccountSubject::new_test()),
         false,
     );

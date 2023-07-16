@@ -14,7 +14,7 @@ use std::sync::Arc;
 
 use dill::builder_for;
 use kamu::domain::{CurrentAccountSubject, DatasetRepository, InternalError, ResultIntoInternal};
-use kamu::{DatasetLayout, DatasetRepositoryLocalFs, WorkspaceLayout};
+use kamu::{DatasetLayout, DatasetRepositoryLocalFs};
 use tempfile::TempDir;
 use url::Url;
 
@@ -32,12 +32,13 @@ pub struct ServerSideLocalFsHarness {
 impl ServerSideLocalFsHarness {
     pub async fn new() -> Self {
         let tempdir = tempfile::tempdir().unwrap();
-        let workspace_layout = WorkspaceLayout::create(tempdir.path(), false).unwrap();
+        let datasets_dir = tempdir.path().join("datasets");
+        std::fs::create_dir(&datasets_dir).unwrap();
 
         let catalog = dill::CatalogBuilder::new()
             .add_builder(
                 builder_for::<DatasetRepositoryLocalFs>()
-                    .with_root(workspace_layout.datasets_dir.clone())
+                    .with_root(datasets_dir)
                     .with_multi_tenant(false),
             )
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()

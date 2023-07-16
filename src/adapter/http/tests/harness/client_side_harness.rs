@@ -32,7 +32,14 @@ pub struct ClientSideHarness {
 impl ClientSideHarness {
     pub fn new() -> Self {
         let tempdir = tempfile::tempdir().unwrap();
-        let workspace_layout = WorkspaceLayout::create(tempdir.path(), false).unwrap();
+        let datasets_dir = tempdir.path().join("datasets");
+        std::fs::create_dir(&datasets_dir).unwrap();
+        let repos_dir = tempdir.path().join("repos");
+        std::fs::create_dir(&repos_dir).unwrap();
+        let run_info_dir = tempdir.path().join("run");
+        std::fs::create_dir(&run_info_dir).unwrap();
+        let cache_dir = tempdir.path().join("cache");
+        std::fs::create_dir(&cache_dir).unwrap();
 
         let mut b = dill::CatalogBuilder::new();
 
@@ -40,16 +47,13 @@ impl ClientSideHarness {
 
         b.add_builder(
             builder_for::<DatasetRepositoryLocalFs>()
-                .with_root(workspace_layout.datasets_dir.clone())
+                .with_root(datasets_dir)
                 .with_multi_tenant(false),
         )
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>();
 
-        b.add_builder(
-            builder_for::<RemoteRepositoryRegistryImpl>()
-                .with_repos_dir(workspace_layout.repos_dir.clone()),
-        )
-        .bind::<dyn RemoteRepositoryRegistry, RemoteRepositoryRegistryImpl>();
+        b.add_builder(builder_for::<RemoteRepositoryRegistryImpl>().with_repos_dir(repos_dir))
+            .bind::<dyn RemoteRepositoryRegistry, RemoteRepositoryRegistryImpl>();
 
         b.add::<RemoteAliasesRegistryImpl>()
             .bind::<dyn RemoteAliasesRegistry, RemoteAliasesRegistryImpl>();
@@ -59,8 +63,8 @@ impl ClientSideHarness {
 
         b.add_builder(
             builder_for::<IngestServiceImpl>()
-                .with_run_info_dir(workspace_layout.run_info_dir.clone())
-                .with_cache_dir(workspace_layout.cache_dir.clone()),
+                .with_run_info_dir(run_info_dir)
+                .with_cache_dir(cache_dir),
         )
         .bind::<dyn IngestService, IngestServiceImpl>();
 
@@ -82,10 +86,9 @@ impl ClientSideHarness {
         b.add::<PushServiceImpl>()
             .bind::<dyn PushService, PushServiceImpl>();
 
-        b.add_value(workspace_layout.clone())
-            .add_value(ContainerRuntime::default())
-            .add_value(kamu::utils::ipfs_wrapper::IpfsClient::default())
-            .add_value(IpfsGateway::default());
+        b.add_value(ContainerRuntime::default());
+        b.add_value(kamu::utils::ipfs_wrapper::IpfsClient::default());
+        b.add_value(IpfsGateway::default());
 
         let catalog = b.build();
 

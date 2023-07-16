@@ -20,6 +20,9 @@ impl DatasetTestHelper {
         dataset_1_layout: &DatasetLayout,
         dataset_2_layout: &DatasetLayout,
     ) {
+        assert!(dataset_1_layout.blocks_dir.exists());
+        assert!(dataset_2_layout.blocks_dir.exists());
+
         assert_eq!(
             DatasetTestHelper::list_files(&dataset_1_layout.blocks_dir),
             DatasetTestHelper::list_files(&dataset_2_layout.blocks_dir)

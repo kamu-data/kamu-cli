@@ -35,28 +35,30 @@ impl DatasetRepositoryLocalFs {
         current_account_subject: Arc<CurrentAccountSubject>,
         multi_tenant: bool,
     ) -> Self {
-        Self::from(root, current_account_subject, multi_tenant)
-    }
-
-    pub fn from(
-        root: impl Into<PathBuf>,
-        current_account_subject: Arc<CurrentAccountSubject>,
-        multi_tenant: bool,
-    ) -> Self {
         Self {
             storage_strategy: if multi_tenant {
                 Box::new(DatasetMultiTenantStorageStrategy::new(
-                    root.into(),
+                    root,
                     current_account_subject,
                 ))
             } else {
                 Box::new(DatasetSingleTenantStorageStrategy::new(
-                    root.into(),
+                    root,
                     current_account_subject,
                 ))
             },
             thrash_lock: tokio::sync::Mutex::new(()),
         }
+    }
+
+    pub fn create(
+        root: impl Into<PathBuf>,
+        current_account_subject: Arc<CurrentAccountSubject>,
+        multi_tenant: bool,
+    ) -> Result<Self, std::io::Error> {
+        let root = root.into();
+        std::fs::create_dir_all(&root)?;
+        Ok(Self::new(root, current_account_subject, multi_tenant))
     }
 
     // TODO: Make dataset factory (and thus the hashing algo) configurable
@@ -66,6 +68,18 @@ impl DatasetRepositoryLocalFs {
     ) -> Result<impl Dataset, InternalError> {
         let layout = DatasetLayout::new(self.storage_strategy.get_dataset_path(&dataset_handle));
         Ok(DatasetFactoryImpl::get_local_fs(layout))
+    }
+
+    // TODO: Used only for testing, but should be removed it in future to discourage
+    // file-based access
+    pub async fn get_dataset_layout(
+        &self,
+        dataset_ref: &DatasetRef,
+    ) -> Result<DatasetLayout, GetDatasetError> {
+        let dataset_handle = self.resolve_dataset_ref(dataset_ref).await?;
+        Ok(DatasetLayout::new(
+            self.storage_strategy.get_dataset_path(&dataset_handle),
+        ))
     }
 }
 

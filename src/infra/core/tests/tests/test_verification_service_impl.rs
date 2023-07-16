@@ -25,13 +25,15 @@ async fn test_verify_data_consistency() {
     let tempdir = tempfile::tempdir().unwrap();
 
     let dataset_alias = DatasetAlias::new(None, DatasetName::new_unchecked("bar"));
-    let workspace_layout = Arc::new(WorkspaceLayout::create(tempdir.path(), false).unwrap());
 
-    let dataset_repo = Arc::new(DatasetRepositoryLocalFs::new(
-        workspace_layout.datasets_dir.clone(),
-        Arc::new(CurrentAccountSubject::new_test()),
-        false,
-    ));
+    let dataset_repo = Arc::new(
+        DatasetRepositoryLocalFs::create(
+            tempdir.path().join("datasets"),
+            Arc::new(CurrentAccountSubject::new_test()),
+            false,
+        )
+        .unwrap(),
+    );
 
     let verification_svc = Arc::new(VerificationServiceImpl::new(
         dataset_repo.clone(),

@@ -10,9 +10,11 @@
 mod account_service;
 mod config_service;
 mod gc_service;
+mod workspace_layout;
 mod workspace_service;
 
 pub use account_service::*;
 pub use config_service::*;
 pub use gc_service::*;
+pub use workspace_layout::*;
 pub use workspace_service::*;

@@ -24,14 +24,14 @@ use opendatafabric::*;
 
 struct DatasetHelper {
     dataset: Arc<dyn Dataset>,
-    run_info_dir: PathBuf,
+    tempdir: PathBuf,
 }
 
 impl DatasetHelper {
-    fn new(dataset: Arc<dyn Dataset>, run_info_dir: PathBuf) -> Self {
+    fn new(dataset: Arc<dyn Dataset>, tempdir: impl Into<PathBuf>) -> Self {
         Self {
             dataset,
-            run_info_dir,
+            tempdir: tempdir.into(),
         }
     }
 
@@ -123,7 +123,7 @@ impl DatasetHelper {
             (false, record_batch)
         };
 
-        let tmp_path: std::path::PathBuf = self.run_info_dir.join(".tmpdata");
+        let tmp_path: std::path::PathBuf = self.tempdir.join(".tmpdata");
         let mut arrow_writer = ArrowWriter::try_new(
             std::fs::File::create(&tmp_path).unwrap(),
             record_batch.schema(),
@@ -229,27 +229,32 @@ impl DatasetHelper {
 
 async fn test_transform_common(transform: Transform) {
     let tempdir = tempfile::tempdir().unwrap();
+    let run_info_dir = tempdir.path().join("run");
+    let cache_dir = tempdir.path().join("cache");
+    std::fs::create_dir(&run_info_dir).unwrap();
+    std::fs::create_dir(&cache_dir).unwrap();
 
-    let workspace_layout = Arc::new(WorkspaceLayout::create(tempdir.path(), false).unwrap());
-
-    let dataset_repo = Arc::new(DatasetRepositoryLocalFs::new(
-        workspace_layout.datasets_dir.clone(),
-        Arc::new(CurrentAccountSubject::new_test()),
-        false,
-    ));
+    let dataset_repo = Arc::new(
+        DatasetRepositoryLocalFs::create(
+            tempdir.path().join("datasets"),
+            Arc::new(CurrentAccountSubject::new_test()),
+            false,
+        )
+        .unwrap(),
+    );
     let engine_provisioner = Arc::new(EngineProvisionerLocal::new(
         EngineProvisionerLocalConfig::default(),
         ContainerRuntime::default(),
         dataset_repo.clone(),
-        workspace_layout.run_info_dir.clone(),
+        run_info_dir.clone(),
     ));
 
     let ingest_svc = IngestServiceImpl::new(
         dataset_repo.clone(),
         engine_provisioner.clone(),
         Arc::new(ContainerRuntime::default()),
-        workspace_layout.run_info_dir.clone(),
-        workspace_layout.cache_dir.clone(),
+        run_info_dir,
+        cache_dir,
     );
 
     let transform_svc = TransformServiceImpl::new(dataset_repo.clone(), engine_provisioner.clone());
@@ -326,7 +331,7 @@ async fn test_transform_common(transform: Transform) {
         .unwrap()
         .dataset;
 
-    let deriv_helper = DatasetHelper::new(dataset, workspace_layout.run_info_dir.clone());
+    let deriv_helper = DatasetHelper::new(dataset, tempdir.path());
 
     let block_hash = match transform_svc
         .transform(&deriv_alias.as_local_ref(), None)

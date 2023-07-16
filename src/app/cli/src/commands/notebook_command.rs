@@ -14,13 +14,12 @@ use std::time::Duration;
 use console::style as s;
 use container_runtime::ContainerRuntime;
 use internal_error::*;
-use kamu::*;
 
 use super::common::PullImageProgress;
 use super::{CLIError, Command};
 use crate::explore::NotebookServerImpl;
 use crate::output::OutputConfig;
-use crate::JupyterConfig;
+use crate::{JupyterConfig, WorkspaceLayout};
 
 pub struct NotebookCommand {
     workspace_layout: Arc<WorkspaceLayout>,

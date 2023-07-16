@@ -17,6 +17,8 @@ use container_runtime::*;
 use internal_error::*;
 use kamu::*;
 
+use crate::WorkspaceLayout;
+
 pub struct SqlShellImpl {
     container_runtime: Arc<ContainerRuntime>,
     image: String,

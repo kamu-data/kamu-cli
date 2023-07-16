@@ -176,7 +176,6 @@ async fn test_ingest_parquet_with_engine() {
 
 struct IngestTestHarness {
     temp_dir: TempDir,
-    _workspace_layout: Arc<WorkspaceLayout>,
     dataset_repo: Arc<DatasetRepositoryLocalFs>,
     ingest_svc: Arc<IngestServiceImpl>,
 }
@@ -184,31 +183,37 @@ struct IngestTestHarness {
 impl IngestTestHarness {
     fn new() -> Self {
         let temp_dir = tempfile::tempdir().unwrap();
-        let workspace_layout = Arc::new(WorkspaceLayout::create(temp_dir.path(), false).unwrap());
-        let dataset_repo = Arc::new(DatasetRepositoryLocalFs::new(
-            workspace_layout.datasets_dir.clone(),
-            Arc::new(CurrentAccountSubject::new_test()),
-            false,
-        ));
+        let run_info_dir = temp_dir.path().join("run");
+        let cache_dir = temp_dir.path().join("cache");
+        std::fs::create_dir(&run_info_dir).unwrap();
+        std::fs::create_dir(&cache_dir).unwrap();
+
+        let dataset_repo = Arc::new(
+            DatasetRepositoryLocalFs::create(
+                temp_dir.path().join("datasets"),
+                Arc::new(CurrentAccountSubject::new_test()),
+                false,
+            )
+            .unwrap(),
+        );
 
         let engine_provisioner = Arc::new(EngineProvisionerLocal::new(
             EngineProvisionerLocalConfig::default(),
             ContainerRuntime::default(),
             dataset_repo.clone(),
-            workspace_layout.run_info_dir.clone(),
+            run_info_dir.clone(),
         ));
 
         let ingest_svc = Arc::new(IngestServiceImpl::new(
             dataset_repo.clone(),
             engine_provisioner,
             Arc::new(ContainerRuntime::default()),
-            workspace_layout.run_info_dir.clone(),
-            workspace_layout.cache_dir.clone(),
+            run_info_dir,
+            cache_dir,
         ));
 
         Self {
             temp_dir,
-            _workspace_layout: workspace_layout,
             dataset_repo,
             ingest_svc,
         }

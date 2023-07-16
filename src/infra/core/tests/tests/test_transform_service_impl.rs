@@ -105,12 +105,14 @@ async fn append_data_block(
 #[test_log::test(tokio::test)]
 async fn test_get_next_operation() {
     let tempdir = tempfile::tempdir().unwrap();
-    let workspace_layout = Arc::new(WorkspaceLayout::create(tempdir.path(), false).unwrap());
-    let dataset_repo = Arc::new(DatasetRepositoryLocalFs::new(
-        workspace_layout.datasets_dir.clone(),
-        Arc::new(CurrentAccountSubject::new_test()),
-        false,
-    ));
+    let dataset_repo = Arc::new(
+        DatasetRepositoryLocalFs::create(
+            tempdir.path().join("datasets"),
+            Arc::new(CurrentAccountSubject::new_test()),
+            false,
+        )
+        .unwrap(),
+    );
     let transform_svc =
         TransformServiceImpl::new(dataset_repo.clone(), Arc::new(EngineProvisionerNull));
 
@@ -164,12 +166,14 @@ async fn test_get_next_operation() {
 #[test_log::test(tokio::test)]
 async fn test_get_verification_plan_one_to_one() {
     let tempdir = tempfile::tempdir().unwrap();
-    let workspace_layout = Arc::new(WorkspaceLayout::create(tempdir.path(), false).unwrap());
-    let dataset_repo = Arc::new(DatasetRepositoryLocalFs::new(
-        workspace_layout.datasets_dir.clone(),
-        Arc::new(CurrentAccountSubject::new_test()),
-        false,
-    ));
+    let dataset_repo = Arc::new(
+        DatasetRepositoryLocalFs::create(
+            tempdir.path().join("datasets"),
+            Arc::new(CurrentAccountSubject::new_test()),
+            false,
+        )
+        .unwrap(),
+    );
     let transform_svc =
         TransformServiceImpl::new(dataset_repo.clone(), Arc::new(EngineProvisionerNull));
 
