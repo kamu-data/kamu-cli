@@ -43,7 +43,7 @@ impl FtpServer {
             .container_name_prefix("kamu-test-ftp-")
             .expose_port(21)
             .map_port_range((47400, 47470), (47400, 47470))
-            .volume(server_dir, "/home/vsftpd")
+            .volume((server_dir, "/home/vsftpd"))
             .environment_vars([
                 ("FTP_USER", "foo"),
                 ("FTP_PASS", "bar"),
