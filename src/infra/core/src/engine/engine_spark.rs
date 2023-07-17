@@ -12,12 +12,19 @@ use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::Arc;
 
+use ::serde::{Deserialize, Serialize};
+use ::serde_with::skip_serializing_none;
+use chrono::{DateTime, Utc};
 use container_runtime::*;
 use kamu_core::*;
 use opendatafabric::engine::ExecuteQueryError;
-use opendatafabric::serde::yaml::YamlEngineProtocol;
+use opendatafabric::serde::yaml::{YamlEngineProtocol, *};
 use opendatafabric::serde::EngineProtocolDeserializer;
 use opendatafabric::*;
+
+use crate::EngineIoStrategyLocalVolume;
+
+///////////////////////////////////////////////////////////////////////////////
 
 pub struct SparkEngine {
     container_runtime: ContainerRuntime,
@@ -25,6 +32,8 @@ pub struct SparkEngine {
     run_info_dir: Arc<Path>,
     dataset_repo: Arc<dyn DatasetRepository>,
 }
+
+///////////////////////////////////////////////////////////////////////////////
 
 struct RunInfo {
     in_out_dir: PathBuf,
@@ -45,6 +54,8 @@ impl RunInfo {
         vec![self.stdout_path.clone(), self.stderr_path.clone()]
     }
 }
+
+///////////////////////////////////////////////////////////////////////////////
 
 impl SparkEngine {
     pub fn new(
@@ -165,68 +176,6 @@ impl SparkEngine {
         })
     }
 
-    async fn materialize_response(
-        &self,
-        engine_response: ExecuteQueryResponseSuccess,
-        next_offset: i64,
-        out_data_path: PathBuf,
-        out_checkpoint_path: PathBuf,
-    ) -> Result<IngestResponse, EngineError> {
-        let out_data = if let Some(data_interval) = &engine_response.data_interval {
-            if data_interval.end < data_interval.start || data_interval.start != next_offset {
-                return Err(EngineError::contract_error(
-                    "Engine returned an output slice with invalid data inverval",
-                    Vec::new(),
-                )
-                .into());
-            }
-            if !out_data_path.exists() {
-                return Err(EngineError::contract_error(
-                    "Engine did not write a response data file",
-                    Vec::new(),
-                )
-                .into());
-            }
-            if out_data_path.is_symlink() || !out_data_path.is_file() {
-                return Err(EngineError::contract_error(
-                    "Engine wrote data not as a plain file",
-                    Vec::new(),
-                )
-                .into());
-            }
-            Some(OwnedFile::new(out_data_path).into())
-        } else {
-            if out_data_path.exists() {
-                return Err(EngineError::contract_error(
-                    "Engine wrote data file while the ouput slice is empty",
-                    Vec::new(),
-                )
-                .into());
-            }
-            None
-        };
-
-        let out_checkpoint = if out_checkpoint_path.exists() {
-            if out_checkpoint_path.is_symlink() || !out_checkpoint_path.is_file() {
-                return Err(EngineError::contract_error(
-                    "Engine wrote checkpoint not as a plain file",
-                    Vec::new(),
-                )
-                .into());
-            }
-            Some(OwnedFile::new(out_checkpoint_path).into())
-        } else {
-            None
-        };
-
-        Ok(IngestResponse {
-            data_interval: engine_response.data_interval,
-            output_watermark: engine_response.output_watermark,
-            out_checkpoint,
-            out_data,
-        })
-    }
-
     async fn ingest_impl(
         &self,
         run_info: RunInfo,
@@ -316,6 +265,8 @@ impl SparkEngine {
     }
 }
 
+///////////////////////////////////////////////////////////////////////////////
+
 #[async_trait::async_trait]
 impl IngestEngine for SparkEngine {
     async fn ingest(&self, request: IngestRequest) -> Result<IngestResponse, EngineError> {
@@ -343,7 +294,7 @@ impl IngestEngine for SparkEngine {
             )
             .await?;
 
-        let response = self
+        let response = EngineIoStrategyLocalVolume::new(self.dataset_repo.clone())
             .materialize_response(
                 engine_response,
                 next_offset,
@@ -352,13 +303,48 @@ impl IngestEngine for SparkEngine {
             )
             .await?;
 
-        Ok(response)
+        Ok(IngestResponse {
+            data_interval: response.data_interval,
+            output_watermark: response.output_watermark,
+            out_checkpoint: response.out_checkpoint,
+            out_data: response.out_data,
+        })
     }
 }
+
+///////////////////////////////////////////////////////////////////////////////
 
 struct MaterializedEngineRequest {
     engine_request: IngestRequestRaw,
     out_data_path: PathBuf,
     out_checkpoint_path: PathBuf,
     volumes: Vec<VolumeSpec>,
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+// Has to be in sync with kamu-engine-spark repo
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct IngestRequestRaw {
+    #[serde(rename = "datasetID")]
+    pub dataset_id: DatasetID,
+    pub dataset_name: DatasetName,
+    pub input_data_path: PathBuf,
+    pub output_data_path: PathBuf,
+    #[serde(with = "datetime_rfc3339")]
+    pub system_time: DateTime<Utc>,
+    #[serde(default, with = "datetime_rfc3339_opt")]
+    pub event_time: Option<DateTime<Utc>>,
+    pub offset: i64,
+    #[serde(with = "SetPollingSourceDef")]
+    pub source: SetPollingSource,
+    #[serde(with = "DatasetVocabularyDef")]
+    pub dataset_vocab: DatasetVocabulary,
+    pub prev_checkpoint_path: Option<PathBuf>,
+    pub new_checkpoint_path: PathBuf,
+    #[serde(default, with = "datetime_rfc3339_opt")]
+    pub prev_watermark: Option<DateTime<Utc>>,
+    pub data_dir: PathBuf,
 }
