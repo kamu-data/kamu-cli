@@ -36,15 +36,15 @@ test-fast:
 
 .PHONY: release-patch
 release-patch:
-	cargo run -p kamu-repo-tools --bin release --patch
+	cargo run -p kamu-repo-tools --bin release -- --patch
 
 .PHONY: release-minor
 release-minor:
-	cargo run -p kamu-repo-tools --bin release --minor
+	cargo run -p kamu-repo-tools --bin release -- --minor
 
 .PHONY: release-major
 release-major:
-	cargo run -p kamu-repo-tools --bin release --major
+	cargo run -p kamu-repo-tools --bin release -- --major
 
 
 ###############################################################################
