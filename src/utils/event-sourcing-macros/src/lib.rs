@@ -36,7 +36,12 @@ pub fn derive_aggregate(tokens: proc_macro::TokenStream) -> proc_macro::TokenStr
         panic_generic()
     };
 
-    let Some(syn::PathArguments::AngleBracketed(mut generic_args)) = aggretage_type.path.segments.pop().map(|s| s.into_value().arguments) else {
+    let Some(syn::PathArguments::AngleBracketed(mut generic_args)) = aggretage_type
+        .path
+        .segments
+        .pop()
+        .map(|s| s.into_value().arguments)
+    else {
         panic_generic()
     };
 
@@ -44,10 +49,14 @@ pub fn derive_aggregate(tokens: proc_macro::TokenStream) -> proc_macro::TokenStr
         panic_generic()
     }
 
-    let Some(syn::GenericArgument::Type(store_type)) = generic_args.args.pop().map(|p| p.into_value()) else {
+    let Some(syn::GenericArgument::Type(store_type)) =
+        generic_args.args.pop().map(|p| p.into_value())
+    else {
         panic_generic()
     };
-    let Some(syn::GenericArgument::Type(proj_type)) = generic_args.args.pop().map(|p| p.into_value()) else {
+    let Some(syn::GenericArgument::Type(proj_type)) =
+        generic_args.args.pop().map(|p| p.into_value())
+    else {
         panic_generic()
     };
 
