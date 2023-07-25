@@ -86,8 +86,8 @@ codegen-engine-tonic:
 	protoc \
 		-I $(ODF_CRATE_DIR)/schemas \
 		$(ODF_CRATE_DIR)/schemas/engine.proto \
-		--prost_out=opendatafabric/src/engine/grpc_generated \
-		--tonic_out=opendatafabric/src/engine/grpc_generated \
+		--prost_out=$(ODF_CRATE_DIR)/src/engine/grpc_generated \
+		--tonic_out=$(ODF_CRATE_DIR)/src/engine/grpc_generated \
 		--tonic_opt=compile_well_known_types
 
 	$(RUSTFMT) $(ODF_CRATE_DIR)/src/engine/grpc_generated/engine.rs

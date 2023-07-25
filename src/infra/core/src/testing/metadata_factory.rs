@@ -232,9 +232,17 @@ impl SetPollingSourceBuilder {
         }))
     }
 
-    pub fn read(mut self, read_step: ReadStep) -> Self {
+    pub fn read(mut self, read_step: impl Into<ReadStep>) -> Self {
         self.v = SetPollingSource {
-            read: read_step,
+            read: read_step.into(),
+            ..self.v
+        };
+        self
+    }
+
+    pub fn merge(mut self, merge_strategy: impl Into<MergeStrategy>) -> Self {
+        self.v = SetPollingSource {
+            merge: merge_strategy.into(),
             ..self.v
         };
         self

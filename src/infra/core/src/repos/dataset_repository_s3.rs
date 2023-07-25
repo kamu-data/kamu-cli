@@ -162,8 +162,19 @@ impl DatasetRepository for DatasetRepositoryS3 {
                     }))
                 }
             }
-            DatasetRef::ID(_) => {
-                unimplemented!("Querying S3 bucket not supported yet");
+            DatasetRef::ID(id) => {
+                // TODO: this is really really slow and expensive!
+                use futures::StreamExt;
+                let mut datasets = self.get_all_datasets();
+                while let Some(hdl) = datasets.next().await {
+                    let hdl = hdl?;
+                    if hdl.id == *id {
+                        return Ok(hdl);
+                    }
+                }
+                Err(GetDatasetError::NotFound(DatasetNotFoundError {
+                    dataset_ref: dataset_ref.clone(),
+                }))
             }
         }
     }

@@ -7,18 +7,19 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::Arc;
 
 use container_runtime::*;
 use kamu_core::*;
 use odf::engine::{EngineGrpcClient, ExecuteQueryError};
+use odf::{ExecuteQueryResponseSuccess, Multihash};
 use opendatafabric as odf;
 
 use super::engine_container::{EngineContainer, LogsConfig};
+use super::engine_io_strategy::*;
 use super::ODFEngineConfig;
-use crate::EngineIoStrategyLocalVolume;
 
 pub struct ODFEngine {
     container_runtime: ContainerRuntime,
@@ -42,6 +43,37 @@ impl ODFEngine {
             image: image.to_owned(),
             run_info_dir,
             dataset_repo,
+        }
+    }
+
+    // TODO: Currently we are always proxying remote inputs, but in future we should
+    // have a capabilities mechanism for engines to declare that they can work
+    // with some remote storages directly without us needing to proxy data.
+    async fn get_io_strategy(
+        &self,
+        request: &TransformRequest,
+    ) -> Result<Arc<dyn EngineIoStrategy>, InternalError> {
+        let dataset = self
+            .dataset_repo
+            .get_dataset(&request.dataset_handle.as_local_ref())
+            .await
+            .int_err()?;
+
+        // TODO: This seems dirty
+        let some_random_hash = Multihash::from_digest_sha3_256(b"");
+        let data_url = dataset
+            .as_data_repo()
+            .get_internal_url(&some_random_hash)
+            .await;
+
+        if data_url.scheme() == "file" {
+            Ok(Arc::new(EngineIoStrategyLocalVolume::new(
+                self.dataset_repo.clone(),
+            )))
+        } else {
+            Ok(Arc::new(EngineIoStrategyRemoteProxy::new(
+                self.dataset_repo.clone(),
+            )))
         }
     }
 
@@ -97,26 +129,85 @@ impl ODFEngine {
             }
         })
     }
+
+    pub async fn materialize_response(
+        &self,
+        engine_response: ExecuteQueryResponseSuccess,
+        out_data_path: PathBuf,
+        out_checkpoint_path: PathBuf,
+    ) -> Result<TransformResponse, EngineError> {
+        let out_data = if engine_response.data_interval.is_some() {
+            if !out_data_path.exists() {
+                return Err(EngineError::contract_error(
+                    "Engine did not write a response data file",
+                    Vec::new(),
+                )
+                .into());
+            }
+            if out_data_path.is_symlink() || !out_data_path.is_file() {
+                return Err(EngineError::contract_error(
+                    "Engine wrote data not as a plain file",
+                    Vec::new(),
+                )
+                .into());
+            }
+            Some(OwnedFile::new(out_data_path).into())
+        } else {
+            if out_data_path.exists() {
+                return Err(EngineError::contract_error(
+                    "Engine wrote data file while the ouput slice is empty",
+                    Vec::new(),
+                )
+                .into());
+            }
+            None
+        };
+
+        let out_checkpoint = if out_checkpoint_path.exists() {
+            if out_checkpoint_path.is_symlink() || !out_checkpoint_path.is_file() {
+                return Err(EngineError::contract_error(
+                    "Engine wrote checkpoint not as a plain file",
+                    Vec::new(),
+                )
+                .into());
+            }
+            Some(OwnedFile::new(out_checkpoint_path).into())
+        } else {
+            None
+        };
+
+        Ok(TransformResponse {
+            data_interval: engine_response.data_interval,
+            output_watermark: engine_response.output_watermark,
+            out_checkpoint,
+            out_data,
+        })
+    }
 }
 
 #[async_trait::async_trait]
 impl Engine for ODFEngine {
     async fn transform(&self, request: TransformRequest) -> Result<TransformResponse, EngineError> {
+        let dataset = self
+            .dataset_repo
+            .get_dataset(&request.dataset_handle.as_local_ref())
+            .await
+            .int_err()?;
+
         let operation_id = request.operation_id.clone();
         let operation_dir = self
             .run_info_dir
             .join(format!("transform-{}", &request.operation_id));
         let logs_dir = operation_dir.join("logs");
-        std::fs::create_dir(&operation_dir).map_err(|e| EngineError::internal(e, Vec::new()))?;
-        std::fs::create_dir(&logs_dir).map_err(|e| EngineError::internal(e, Vec::new()))?;
+        std::fs::create_dir(&operation_dir).int_err()?;
+        std::fs::create_dir(&logs_dir).int_err()?;
 
-        let next_offset = request.next_offset;
+        let io_strategy = self.get_io_strategy(&request).await.int_err()?;
 
-        let io_strategy = EngineIoStrategyLocalVolume::new(self.dataset_repo.clone());
         let materialized_request = io_strategy
-            .materialize_request(request, &operation_dir)
+            .materialize_request(dataset.as_ref(), request, &operation_dir)
             .await
-            .map_err(|e| EngineError::internal(e, Vec::new()))?;
+            .int_err()?;
 
         let engine_container = EngineContainer::new(
             self.container_runtime.clone(),
@@ -140,13 +231,11 @@ impl Engine for ODFEngine {
 
         engine_container.terminate().await?;
 
-        io_strategy
-            .materialize_response(
-                engine_response?,
-                next_offset,
-                materialized_request.out_data_path,
-                materialized_request.out_checkpoint_path,
-            )
-            .await
+        self.materialize_response(
+            engine_response?,
+            materialized_request.out_data_path,
+            materialized_request.out_checkpoint_path,
+        )
+        .await
     }
 }

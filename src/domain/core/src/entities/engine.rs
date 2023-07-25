@@ -317,6 +317,15 @@ impl From<std::io::Error> for EngineError {
     }
 }
 
+impl From<InternalError> for EngineError {
+    fn from(e: InternalError) -> Self {
+        Self::InternalError(InternalEngineError {
+            source: e,
+            log_files: Vec::new(),
+        })
+    }
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 
 fn normalize_logs(log_files: Vec<PathBuf>) -> Vec<PathBuf> {

@@ -33,7 +33,7 @@ thiserror = { version = "1", default-features = false }
 tokio = { version = "1", default-features = false }
 tokio-stream = { version = "0.1", default-features = false }
 tracing = { version = "0.1", default-features = false }
-url = { version = "2", default-features = false }
+url = { version = "2", default-features = false, features = ["serde"] }
 
 # TODO: Avoid this dependency or depend on sub-crates
 datafusion = { version = "27", default-features = false }

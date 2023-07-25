@@ -22,7 +22,7 @@ use opendatafabric::serde::yaml::{YamlEngineProtocol, *};
 use opendatafabric::serde::EngineProtocolDeserializer;
 use opendatafabric::*;
 
-use crate::EngineIoStrategyLocalVolume;
+use crate::ObjectRepositoryLocalFS;
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -74,15 +74,32 @@ impl SparkEngine {
 
     async fn materialize_request(
         &self,
+        dataset: &dyn Dataset,
         request: IngestRequest,
         operation_dir: &Path,
     ) -> Result<MaterializedEngineRequest, InternalError> {
-        let dataset = self
-            .dataset_repo
-            .get_dataset(&request.dataset_handle.as_local_ref())
-            .await
-            .int_err()?;
+        // TODO: This seems dirty
+        let some_random_hash: Multihash = Multihash::from_digest_sha3_256(b"");
+        let data_url = dataset
+            .as_data_repo()
+            .get_internal_url(&some_random_hash)
+            .await;
 
+        if data_url.scheme() == "file" {
+            self.materialize_request_local(dataset, request, operation_dir)
+                .await
+        } else {
+            self.materialize_request_remote(dataset, request, operation_dir)
+                .await
+        }
+    }
+
+    async fn materialize_request_local(
+        &self,
+        dataset: &dyn Dataset,
+        request: IngestRequest,
+        operation_dir: &Path,
+    ) -> Result<MaterializedEngineRequest, InternalError> {
         let host_in_out_dir = operation_dir.join("in-out");
         std::fs::create_dir(&host_in_out_dir).int_err()?;
 
@@ -176,6 +193,137 @@ impl SparkEngine {
         })
     }
 
+    async fn materialize_request_remote(
+        &self,
+        dataset: &dyn Dataset,
+        request: IngestRequest,
+        operation_dir: &Path,
+    ) -> Result<MaterializedEngineRequest, InternalError> {
+        use futures::StreamExt;
+
+        // Download ALL data files
+        // TODO: This is awful, slow, and expensive, but will be removed once ingest can
+        // work directly over S3
+        let host_in_data_dir = operation_dir.join("in").join("data");
+        std::fs::create_dir_all(&host_in_data_dir).int_err()?;
+        let in_data_repo =
+            ObjectRepositoryLocalFS::<sha3::Sha3_256, 0x16>::new(host_in_data_dir.clone());
+
+        let data_repo = dataset.as_data_repo();
+        let mut blocks = dataset
+            .as_metadata_chain()
+            .iter_blocks()
+            .filter_data_stream_blocks();
+
+        while let Some(block) = blocks.next().await {
+            let (_, block) = block.int_err()?;
+            if let Some(data_slice) = block.event.output_data {
+                let src_url = data_repo.get_internal_url(&data_slice.physical_hash).await;
+
+                tracing::info!(
+                    %src_url,
+                    size = %data_slice.size,
+                    "Downloading remote data file locally",
+                );
+
+                let stream = data_repo
+                    .get_stream(&data_slice.physical_hash)
+                    .await
+                    .int_err()?;
+
+                in_data_repo
+                    .insert_stream(
+                        stream,
+                        InsertOpts {
+                            precomputed_hash: Some(&data_slice.physical_hash),
+                            expected_hash: Some(&data_slice.physical_hash),
+                            size_hint: Some(data_slice.size as usize),
+                        },
+                    )
+                    .await
+                    .int_err()?;
+            }
+        }
+
+        let host_in_out_dir = operation_dir.join("in-out");
+        std::fs::create_dir(&host_in_out_dir).int_err()?;
+
+        let host_out_dir = operation_dir.join("out");
+        let host_out_data_path = host_out_dir.join("data");
+        let host_out_checkpoint_path = host_out_dir.join("checkpoint");
+        std::fs::create_dir(&host_out_dir).int_err()?;
+
+        let container_out_dir = PathBuf::from("/opt/engine/out");
+        let container_inout_dir = PathBuf::from("/opt/engine/in-out");
+        let container_in_raw_data_path = PathBuf::from("/opt/engine/in/raw-data");
+        let container_in_prev_data_path = PathBuf::from("/opt/engine/in/prev-data");
+        let container_out_data_path = PathBuf::from("/opt/engine/out/data");
+        let container_out_checkpoint_path = PathBuf::from("/opt/engine/out/checkpoint");
+
+        let mut volumes = vec![
+            (host_out_dir, container_out_dir, VolumeAccess::ReadWrite).into(),
+            (
+                host_in_out_dir,
+                container_inout_dir,
+                VolumeAccess::ReadWrite,
+            )
+                .into(),
+            (
+                request.input_data_path,
+                &container_in_raw_data_path,
+                VolumeAccess::ReadOnly,
+            )
+                .into(),
+        ];
+
+        // Don't mount existing data directory if it's empty as it will confuse Spark
+        if request.next_offset != 0 {
+            volumes.push(
+                (
+                    host_in_data_dir,
+                    &container_in_prev_data_path,
+                    VolumeAccess::ReadOnly,
+                )
+                    .into(),
+            );
+        }
+
+        assert!(request.prev_checkpoint.is_none());
+
+        Ok(MaterializedEngineRequest {
+            engine_request: IngestRequestRaw {
+                dataset_id: request.dataset_handle.id,
+                dataset_name: request.dataset_handle.alias.dataset_name,
+                input_data_path: container_in_raw_data_path,
+                output_data_path: container_out_data_path,
+                system_time: request.system_time,
+                event_time: request.event_time,
+                offset: request.next_offset,
+                // TODO: We are stripping out the "fetch step because URL can contain templating
+                // that will fail to parse in the engine.
+                // In future engine should only receive the query part of the request.
+                source: SetPollingSource {
+                    fetch: FetchStep::Url(FetchStepUrl {
+                        url: "http://localhost/".to_owned(),
+                        event_time: None,
+                        cache: None,
+                        headers: None,
+                    }),
+                    ..request.polling_source.unwrap()
+                },
+                dataset_vocab: request.vocab,
+                // TODO: Not passing any checkpoint currently as Spark ingest doesn't use them
+                prev_checkpoint_path: None,
+                new_checkpoint_path: container_out_checkpoint_path,
+                prev_watermark: request.prev_watermark,
+                data_dir: container_in_prev_data_path,
+            },
+            out_data_path: host_out_data_path,
+            out_checkpoint_path: host_out_checkpoint_path,
+            volumes,
+        })
+    }
+
     async fn ingest_impl(
         &self,
         run_info: RunInfo,
@@ -188,8 +336,7 @@ impl SparkEngine {
         {
             tracing::info!(?request, path = ?request_path, "Writing request");
             let file = File::create(&request_path)?;
-            serde_yaml::to_writer(file, &request)
-                .map_err(|e| EngineError::internal(e, Vec::new()))?;
+            serde_yaml::to_writer(file, &request).int_err()?;
         }
 
         let stdout_file = std::fs::File::create(&run_info.stdout_path)?;
@@ -227,7 +374,7 @@ impl SparkEngine {
                         .stderr(Stdio::null())
                         .status()
                         .await
-                        .map_err(|e| EngineError::internal(e, Vec::new()))?;
+                        .int_err()?;
                 }
             }
         }
@@ -263,6 +410,60 @@ impl SparkEngine {
             ))
         }
     }
+
+    pub async fn materialize_response(
+        &self,
+        engine_response: ExecuteQueryResponseSuccess,
+        out_data_path: PathBuf,
+        out_checkpoint_path: PathBuf,
+    ) -> Result<IngestResponse, EngineError> {
+        let out_data = if engine_response.data_interval.is_some() {
+            if !out_data_path.exists() {
+                return Err(EngineError::contract_error(
+                    "Engine did not write a response data file",
+                    Vec::new(),
+                )
+                .into());
+            }
+            if out_data_path.is_symlink() || !out_data_path.is_file() {
+                return Err(EngineError::contract_error(
+                    "Engine wrote data not as a plain file",
+                    Vec::new(),
+                )
+                .into());
+            }
+            Some(OwnedFile::new(out_data_path).into())
+        } else {
+            if out_data_path.exists() {
+                return Err(EngineError::contract_error(
+                    "Engine wrote data file while the ouput slice is empty",
+                    Vec::new(),
+                )
+                .into());
+            }
+            None
+        };
+
+        let out_checkpoint = if out_checkpoint_path.exists() {
+            if out_checkpoint_path.is_symlink() || !out_checkpoint_path.is_file() {
+                return Err(EngineError::contract_error(
+                    "Engine wrote checkpoint not as a plain file",
+                    Vec::new(),
+                )
+                .into());
+            }
+            Some(OwnedFile::new(out_checkpoint_path).into())
+        } else {
+            None
+        };
+
+        Ok(IngestResponse {
+            data_interval: engine_response.data_interval,
+            output_watermark: engine_response.output_watermark,
+            out_checkpoint,
+            out_data,
+        })
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -274,15 +475,19 @@ impl IngestEngine for SparkEngine {
             .run_info_dir
             .join(format!("ingest-{}", &request.operation_id));
         let logs_dir = operation_dir.join("logs");
-        std::fs::create_dir(&operation_dir).map_err(|e| EngineError::internal(e, Vec::new()))?;
-        std::fs::create_dir(&logs_dir).map_err(|e| EngineError::internal(e, Vec::new()))?;
+        std::fs::create_dir(&operation_dir).int_err()?;
+        std::fs::create_dir(&logs_dir).int_err()?;
 
-        let next_offset = request.next_offset;
+        let dataset = self
+            .dataset_repo
+            .get_dataset(&request.dataset_handle.as_local_ref())
+            .await
+            .int_err()?;
 
         let materialized_request = self
-            .materialize_request(request, &operation_dir)
+            .materialize_request(dataset.as_ref(), request, &operation_dir)
             .await
-            .map_err(|e| EngineError::internal(e, Vec::new()))?;
+            .int_err()?;
 
         let run_info = RunInfo::new(operation_dir.join("in-out"), &logs_dir);
 
@@ -294,21 +499,12 @@ impl IngestEngine for SparkEngine {
             )
             .await?;
 
-        let response = EngineIoStrategyLocalVolume::new(self.dataset_repo.clone())
-            .materialize_response(
-                engine_response,
-                next_offset,
-                materialized_request.out_data_path,
-                materialized_request.out_checkpoint_path,
-            )
-            .await?;
-
-        Ok(IngestResponse {
-            data_interval: response.data_interval,
-            output_watermark: response.output_watermark,
-            out_checkpoint: response.out_checkpoint,
-            out_data: response.out_data,
-        })
+        self.materialize_response(
+            engine_response,
+            materialized_request.out_data_path,
+            materialized_request.out_checkpoint_path,
+        )
+        .await
     }
 }
 

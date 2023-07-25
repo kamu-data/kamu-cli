@@ -479,7 +479,7 @@ async fn test_transform_with_engine_flink() {
     .await
 }
 
-#[test_group::group(containerized)]
+#[test_group::group(containerized, engine)]
 #[test_log::test(tokio::test)]
 async fn test_transform_with_engine_datafusion() {
     test_transform_common(

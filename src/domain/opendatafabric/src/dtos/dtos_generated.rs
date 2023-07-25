@@ -15,6 +15,7 @@
 use std::path::PathBuf;
 
 use chrono::{DateTime, Utc};
+use enum_variants::*;
 
 use crate::formats::Multihash;
 use crate::identity::{DatasetID, DatasetName, DatasetRefAny};
@@ -63,11 +64,15 @@ pub enum Attachments {
     Embedded(AttachmentsEmbedded),
 }
 
+impl_enum_with_variants!(Attachments);
+
 /// For attachments that are specified inline and are embedded in the metadata.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct AttachmentsEmbedded {
     pub items: Vec<AttachmentEmbedded>,
 }
+
+impl_enum_variant!(Attachments::Embedded(AttachmentsEmbedded));
 
 ////////////////////////////////////////////////////////////////////////////////
 // BlockInterval
@@ -185,6 +190,8 @@ pub enum EventTimeSource {
     FromPath(EventTimeSourceFromPath),
 }
 
+impl_enum_with_variants!(EventTimeSource);
+
 /// Extracts event time from the path component of the source.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct EventTimeSourceFromPath {
@@ -193,6 +200,8 @@ pub struct EventTimeSourceFromPath {
     /// Format of the expected timestamp in java.text.SimpleDateFormat form.
     pub timestamp_format: Option<String>,
 }
+
+impl_enum_variant!(EventTimeSource::FromPath(EventTimeSourceFromPath));
 
 ////////////////////////////////////////////////////////////////////////////////
 // ExecuteQuery
@@ -282,6 +291,8 @@ pub enum ExecuteQueryResponse {
     InternalError(ExecuteQueryResponseInternalError),
 }
 
+impl_enum_with_variants!(ExecuteQueryResponse);
+
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct ExecuteQueryResponseSuccess {
     /// Data slice produced by the transaction (if any)
@@ -290,11 +301,17 @@ pub struct ExecuteQueryResponseSuccess {
     pub output_watermark: Option<DateTime<Utc>>,
 }
 
+impl_enum_variant!(ExecuteQueryResponse::Success(ExecuteQueryResponseSuccess));
+
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct ExecuteQueryResponseInvalidQuery {
     /// Explanation of an error
     pub message: String,
 }
+
+impl_enum_variant!(ExecuteQueryResponse::InvalidQuery(
+    ExecuteQueryResponseInvalidQuery
+));
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct ExecuteQueryResponseInternalError {
@@ -303,6 +320,10 @@ pub struct ExecuteQueryResponseInternalError {
     /// Details of an error (e.g. a backtrace)
     pub backtrace: Option<String>,
 }
+
+impl_enum_variant!(ExecuteQueryResponse::InternalError(
+    ExecuteQueryResponseInternalError
+));
 
 ////////////////////////////////////////////////////////////////////////////////
 // FetchStep
@@ -316,6 +337,8 @@ pub enum FetchStep {
     Container(FetchStepContainer),
 }
 
+impl_enum_with_variants!(FetchStep);
+
 /// Pulls data from one of the supported sources by its URL.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct FetchStepUrl {
@@ -328,6 +351,8 @@ pub struct FetchStepUrl {
     /// Headers to pass during the request (e.g. HTTP Authorization)
     pub headers: Option<Vec<RequestHeader>>,
 }
+
+impl_enum_variant!(FetchStep::Url(FetchStepUrl));
 
 /// Uses glob operator to match files on the local file system.
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -344,6 +369,8 @@ pub struct FetchStepFilesGlob {
     pub order: Option<SourceOrdering>,
 }
 
+impl_enum_variant!(FetchStep::FilesGlob(FetchStepFilesGlob));
+
 /// Runs the specified OCI container to fetch data from an arbitrary source.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct FetchStepContainer {
@@ -358,6 +385,8 @@ pub struct FetchStepContainer {
     /// Environment variables to propagate into or set in the container.
     pub env: Option<Vec<EnvVar>>,
 }
+
+impl_enum_variant!(FetchStep::Container(FetchStepContainer));
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum SourceOrdering {
@@ -393,6 +422,8 @@ pub enum MergeStrategy {
     Snapshot(MergeStrategySnapshot),
 }
 
+impl_enum_with_variants!(MergeStrategy);
+
 /// Ledger merge strategy.
 ///
 /// This strategy should be used for data sources containing append-only event
@@ -413,6 +444,8 @@ pub struct MergeStrategyLedger {
     /// lifetime
     pub primary_key: Vec<String>,
 }
+
+impl_enum_variant!(MergeStrategy::Ledger(MergeStrategyLedger));
 
 /// Snapshot merge strategy.
 ///
@@ -469,6 +502,8 @@ pub struct MergeStrategySnapshot {
     pub obsv_removed: Option<String>,
 }
 
+impl_enum_variant!(MergeStrategy::Snapshot(MergeStrategySnapshot));
+
 ////////////////////////////////////////////////////////////////////////////////
 // MetadataBlock
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#metadatablock-schema
@@ -507,6 +542,28 @@ pub enum MetadataEvent {
     SetLicense(SetLicense),
 }
 
+impl_enum_with_variants!(MetadataEvent);
+
+impl_enum_variant!(MetadataEvent::AddData(AddData));
+
+impl_enum_variant!(MetadataEvent::ExecuteQuery(ExecuteQuery));
+
+impl_enum_variant!(MetadataEvent::Seed(Seed));
+
+impl_enum_variant!(MetadataEvent::SetPollingSource(SetPollingSource));
+
+impl_enum_variant!(MetadataEvent::SetTransform(SetTransform));
+
+impl_enum_variant!(MetadataEvent::SetVocab(SetVocab));
+
+impl_enum_variant!(MetadataEvent::SetWatermark(SetWatermark));
+
+impl_enum_variant!(MetadataEvent::SetAttachments(SetAttachments));
+
+impl_enum_variant!(MetadataEvent::SetInfo(SetInfo));
+
+impl_enum_variant!(MetadataEvent::SetLicense(SetLicense));
+
 ////////////////////////////////////////////////////////////////////////////////
 // OffsetInterval
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#offsetinterval-schema
@@ -532,6 +589,8 @@ pub enum PrepStep {
     Pipe(PrepStepPipe),
 }
 
+impl_enum_with_variants!(PrepStep);
+
 /// Pulls data from one of the supported sources by its URL.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct PrepStepDecompress {
@@ -542,12 +601,16 @@ pub struct PrepStepDecompress {
     pub sub_path: Option<String>,
 }
 
+impl_enum_variant!(PrepStep::Decompress(PrepStepDecompress));
+
 /// Executes external command to process the data using piped input/output.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct PrepStepPipe {
     /// Command to execute and its arguments.
     pub command: Vec<String>,
 }
+
+impl_enum_variant!(PrepStep::Pipe(PrepStepPipe));
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum CompressionFormat {
@@ -568,6 +631,8 @@ pub enum ReadStep {
     EsriShapefile(ReadStepEsriShapefile),
     Parquet(ReadStepParquet),
 }
+
+impl_enum_with_variants!(ReadStep);
 
 /// Reader for comma-separated files.
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -623,6 +688,8 @@ pub struct ReadStepCsv {
     pub multi_line: Option<bool>,
 }
 
+impl_enum_variant!(ReadStep::Csv(ReadStepCsv));
+
 /// Reader for files containing concatenation of multiple JSON records with the
 /// same schema.
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -642,6 +709,8 @@ pub struct ReadStepJsonLines {
     pub timestamp_format: Option<String>,
 }
 
+impl_enum_variant!(ReadStep::JsonLines(ReadStepJsonLines));
+
 /// Reader for GeoJSON files.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct ReadStepGeoJson {
@@ -649,6 +718,8 @@ pub struct ReadStepGeoJson {
     /// appropriate data types.
     pub schema: Option<Vec<String>>,
 }
+
+impl_enum_variant!(ReadStep::GeoJson(ReadStepGeoJson));
 
 /// Reader for ESRI Shapefile format.
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -661,6 +732,8 @@ pub struct ReadStepEsriShapefile {
     pub sub_path: Option<String>,
 }
 
+impl_enum_variant!(ReadStep::EsriShapefile(ReadStepEsriShapefile));
+
 /// Reader for Apache Parquet format.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct ReadStepParquet {
@@ -668,6 +741,8 @@ pub struct ReadStepParquet {
     /// appropriate data types.
     pub schema: Option<Vec<String>>,
 }
+
+impl_enum_variant!(ReadStep::Parquet(ReadStepParquet));
 
 ////////////////////////////////////////////////////////////////////////////////
 // RequestHeader
@@ -815,6 +890,8 @@ pub enum SourceCaching {
     Forever,
 }
 
+impl_enum_with_variants!(SourceCaching);
+
 ////////////////////////////////////////////////////////////////////////////////
 // SourceState
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#sourcestate-schema
@@ -873,6 +950,8 @@ pub enum Transform {
     Sql(TransformSql),
 }
 
+impl_enum_with_variants!(Transform);
+
 /// Transform using one of the SQL dialects.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct TransformSql {
@@ -890,6 +969,8 @@ pub struct TransformSql {
     /// streams.
     pub temporal_tables: Option<Vec<TemporalTable>>,
 }
+
+impl_enum_variant!(Transform::Sql(TransformSql));
 
 ////////////////////////////////////////////////////////////////////////////////
 // TransformInput

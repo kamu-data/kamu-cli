@@ -7,5 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod test_ingest_engine;
-mod test_transform_engine;
+mod test_engine_ingest;
+mod test_engine_io;
+mod test_engine_transform;

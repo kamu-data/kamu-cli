@@ -8119,14 +8119,14 @@ impl<'a> TransformInput<'a> {
         args: &'args TransformInputArgs<'args>,
     ) -> flatbuffers::WIPOffset<TransformInput<'bldr>> {
         let mut builder = TransformInputBuilder::new(_fbb);
+        if let Some(x) = args.dataset_ref {
+            builder.add_dataset_ref(x);
+        }
         if let Some(x) = args.name {
             builder.add_name(x);
         }
         if let Some(x) = args.id {
             builder.add_id(x);
-        }
-        if let Some(x) = args.dataset_ref {
-            builder.add_dataset_ref(x);
         }
         builder.finish()
     }

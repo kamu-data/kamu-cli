@@ -12,6 +12,3 @@ pub use enum_variants::*;
 
 mod metadata_block_types;
 pub use metadata_block_types::*;
-
-mod metadata_event_variants;
-pub use metadata_event_variants::*;
