@@ -15,7 +15,15 @@ use opendatafabric::*;
 
 use crate::utils::HttpFileServer;
 
-#[tokio::test]
+#[test_log::test(tokio::test)]
+async fn test_protocol() {
+    let base_url = url::Url::parse("http://localhost:1234").unwrap();
+    let repo = ObjectRepositoryHttp::new(reqwest::Client::new(), base_url);
+
+    assert_matches!(repo.protocol(), ObjectRepositoryProtocol::Http);
+}
+
+#[test_log::test(tokio::test)]
 async fn test_read_only() {
     let tmp_repo_dir = tempfile::tempdir().unwrap();
     let http_server = HttpFileServer::new(tmp_repo_dir.path());
@@ -29,7 +37,7 @@ async fn test_read_only() {
     );
 }
 
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn test_bytes() {
     let tmp_repo_dir = tempfile::tempdir().unwrap();
     let http_server = HttpFileServer::new(tmp_repo_dir.path());
@@ -61,7 +69,7 @@ async fn test_bytes() {
     assert_eq!(&repo.get_bytes(&hash_bar).await.unwrap()[..], b"bar");
 }
 
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn test_stream() {
     let tmp_repo_dir = tempfile::tempdir().unwrap();
     let http_server = HttpFileServer::new(tmp_repo_dir.path());

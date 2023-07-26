@@ -112,6 +112,12 @@ where
     D: Send + Sync,
     D: digest::Digest,
 {
+    fn protocol(&self) -> ObjectRepositoryProtocol {
+        ObjectRepositoryProtocol::LocalFs {
+            base_dir: self.root.clone(),
+        }
+    }
+
     async fn contains(&self, hash: &Multihash) -> Result<bool, ContainsError> {
         let path = self.get_path(hash);
 

@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use async_trait::async_trait;
 use bytes::Bytes;
@@ -27,6 +27,9 @@ type AsyncReadObj = dyn AsyncRead + Send + Unpin;
 /// Represents a content-addressable storage
 #[async_trait]
 pub trait ObjectRepository: Send + Sync {
+    /// Returns the protocol implemented by this repository
+    fn protocol(&self) -> ObjectRepositoryProtocol;
+
     async fn contains(&self, hash: &Multihash) -> Result<bool, ContainsError>;
 
     async fn get_size(&self, hash: &Multihash) -> Result<u64, GetError>;
@@ -89,6 +92,17 @@ pub trait ObjectRepository: Send + Sync {
     ) -> Result<InsertResult, InsertError>;
 
     async fn delete(&self, hash: &Multihash) -> Result<(), DeleteError>;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+/// Describes the protocol implemented by an [ObjectRepository]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ObjectRepositoryProtocol {
+    Memory,
+    LocalFs { base_dir: PathBuf },
+    Http,
+    S3,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

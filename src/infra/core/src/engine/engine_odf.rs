@@ -14,7 +14,7 @@ use std::sync::Arc;
 use container_runtime::*;
 use kamu_core::*;
 use odf::engine::{EngineGrpcClient, ExecuteQueryError};
-use odf::{ExecuteQueryResponseSuccess, Multihash};
+use odf::ExecuteQueryResponseSuccess;
 use opendatafabric as odf;
 
 use super::engine_container::{EngineContainer, LogsConfig};
@@ -59,21 +59,15 @@ impl ODFEngine {
             .await
             .int_err()?;
 
-        // TODO: This seems dirty
-        let some_random_hash = Multihash::from_digest_sha3_256(b"");
-        let data_url = dataset
-            .as_data_repo()
-            .get_internal_url(&some_random_hash)
-            .await;
-
-        if data_url.scheme() == "file" {
-            Ok(Arc::new(EngineIoStrategyLocalVolume::new(
+        match dataset.as_data_repo().protocol() {
+            ObjectRepositoryProtocol::LocalFs { .. } => Ok(Arc::new(
+                EngineIoStrategyLocalVolume::new(self.dataset_repo.clone()),
+            )),
+            ObjectRepositoryProtocol::Memory
+            | ObjectRepositoryProtocol::Http
+            | ObjectRepositoryProtocol::S3 => Ok(Arc::new(EngineIoStrategyRemoteProxy::new(
                 self.dataset_repo.clone(),
-            )))
-        } else {
-            Ok(Arc::new(EngineIoStrategyRemoteProxy::new(
-                self.dataset_repo.clone(),
-            )))
+            ))),
         }
     }
 

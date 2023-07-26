@@ -78,19 +78,17 @@ impl SparkEngine {
         request: IngestRequest,
         operation_dir: &Path,
     ) -> Result<MaterializedEngineRequest, InternalError> {
-        // TODO: This seems dirty
-        let some_random_hash: Multihash = Multihash::from_digest_sha3_256(b"");
-        let data_url = dataset
-            .as_data_repo()
-            .get_internal_url(&some_random_hash)
-            .await;
-
-        if data_url.scheme() == "file" {
-            self.materialize_request_local(dataset, request, operation_dir)
-                .await
-        } else {
-            self.materialize_request_remote(dataset, request, operation_dir)
-                .await
+        match dataset.as_data_repo().protocol() {
+            ObjectRepositoryProtocol::LocalFs { .. } => {
+                self.materialize_request_local(dataset, request, operation_dir)
+                    .await
+            }
+            ObjectRepositoryProtocol::Memory
+            | ObjectRepositoryProtocol::Http
+            | ObjectRepositoryProtocol::S3 => {
+                self.materialize_request_remote(dataset, request, operation_dir)
+                    .await
+            }
         }
     }
 
@@ -131,19 +129,10 @@ impl SparkEngine {
                 .into(),
         ];
 
-        // Get existing data directory
-        // TODO: This seems dirty
-        let some_random_hash: Multihash = Multihash::from_digest_sha3_256(b"");
-        let dataset_data_dir = kamu_data_utils::data::local_url::into_local_path(
-            dataset
-                .as_data_repo()
-                .get_internal_url(&some_random_hash)
-                .await,
-        )
-        .int_err()?
-        .parent()
-        .unwrap()
-        .to_path_buf();
+        let dataset_data_dir = match dataset.as_data_repo().protocol() {
+            ObjectRepositoryProtocol::LocalFs { base_dir } => base_dir,
+            _ => unreachable!(),
+        };
 
         // Don't mount existing data directory if it's empty as it will confuse Spark
         if request.next_offset != 0 {

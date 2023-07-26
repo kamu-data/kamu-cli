@@ -57,6 +57,10 @@ where
     D: Send + Sync,
     D: digest::Digest,
 {
+    fn protocol(&self) -> ObjectRepositoryProtocol {
+        ObjectRepositoryProtocol::S3
+    }
+
     async fn contains(&self, hash: &Multihash) -> Result<bool, ContainsError> {
         let key = self.get_key(hash);
 

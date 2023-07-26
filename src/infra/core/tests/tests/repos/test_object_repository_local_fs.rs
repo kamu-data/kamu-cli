@@ -18,6 +18,16 @@ use super::test_object_repository_shared;
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
+async fn test_protocol() {
+    let tmp_repo_dir = tempfile::tempdir().unwrap();
+    let repo = ObjectRepositoryLocalFS::<sha3::Sha3_256, 0x16>::new(tmp_repo_dir.path());
+    assert_matches!(
+        repo.protocol(),
+        ObjectRepositoryProtocol::LocalFs { base_dir } if base_dir.as_path() == tmp_repo_dir.path(),
+    );
+}
+
+#[tokio::test]
 async fn test_insert_bytes() {
     let tmp_repo_dir = tempfile::tempdir().unwrap();
     let repo = ObjectRepositoryLocalFS::<sha3::Sha3_256, 0x16>::new(tmp_repo_dir.path());

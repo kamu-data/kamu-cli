@@ -46,6 +46,10 @@ impl ObjectRepositoryHttp {
 
 #[async_trait]
 impl ObjectRepository for ObjectRepositoryHttp {
+    fn protocol(&self) -> ObjectRepositoryProtocol {
+        ObjectRepositoryProtocol::Http
+    }
+
     async fn contains(&self, hash: &Multihash) -> Result<bool, ContainsError> {
         let url = self.base_url.join(&hash.to_multibase_string()).int_err()?;
 

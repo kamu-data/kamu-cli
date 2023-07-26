@@ -55,6 +55,16 @@ async fn run_s3_server() -> S3 {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(containerized)]
+#[test_log::test(tokio::test)]
+async fn test_protocol() {
+    let s3 = run_s3_server().await;
+    std::env::set_var("AWS_SECRET_ACCESS_KEY", "BAD_KEY");
+    let repo = ObjectRepositoryS3::<sha3::Sha3_256, 0x16>::new(S3Context::from_url(&s3.url).await);
+
+    assert_matches!(repo.protocol(), ObjectRepositoryProtocol::S3);
+}
+
+#[test_group::group(containerized)]
 #[ignore = "We do not yet handle unauthorized errors correctly"]
 #[test_log::test(tokio::test)]
 async fn test_unauthorized() {

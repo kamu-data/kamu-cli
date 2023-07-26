@@ -42,6 +42,10 @@ impl ObjectRepositoryInMemory {
 
 #[async_trait]
 impl ObjectRepository for ObjectRepositoryInMemory {
+    fn protocol(&self) -> ObjectRepositoryProtocol {
+        ObjectRepositoryProtocol::Memory
+    }
+
     async fn contains(&self, hash: &Multihash) -> Result<bool, ContainsError> {
         let blocks_by_hash = self.blocks_by_hash.lock().unwrap();
         Ok(blocks_by_hash.contains_key(hash))
