@@ -17,4 +17,5 @@ mod test_object_repository_in_memory;
 mod test_object_repository_local_fs;
 mod test_object_repository_s3;
 mod test_object_repository_shared;
+mod test_object_store_s3;
 mod test_reference_repository_impl;
