@@ -233,31 +233,14 @@ async fn test_engine_io_local_file_mount() {
 #[test_group::group(containerized, engine)]
 #[test_log::test(tokio::test)]
 async fn test_engine_io_s3_to_local_file_mount_proxy() {
-    let access_key = "AKIAIOSFODNN7EXAMPLE";
-    let secret_key = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY";
-    std::env::set_var("AWS_ACCESS_KEY_ID", access_key);
-    std::env::set_var("AWS_SECRET_ACCESS_KEY", secret_key);
-
+    let s3 = LocalS3Server::new().await;
     let tmp_workspace_dir = tempfile::tempdir().unwrap();
     let run_info_dir = tmp_workspace_dir.path().join("run");
     let cache_dir = tmp_workspace_dir.path().join("cache");
     std::fs::create_dir(&run_info_dir).unwrap();
     std::fs::create_dir(&cache_dir).unwrap();
 
-    let tmp_repo_dir = tempfile::tempdir().unwrap();
-    let bucket = "test-bucket";
-    std::fs::create_dir(tmp_repo_dir.path().join(bucket)).unwrap();
-
-    let minio = MinioServer::new(tmp_repo_dir.path(), access_key, secret_key).await;
-
-    let s3_context = kamu::utils::s3_context::S3Context::from_url(
-        &url::Url::parse(&format!(
-            "s3+http://{}:{}/{}",
-            minio.address, minio.host_port, bucket
-        ))
-        .unwrap(),
-    )
-    .await;
+    let s3_context = kamu::utils::s3_context::S3Context::from_url(&s3.url).await;
 
     let dataset_repo = Arc::new(DatasetRepositoryS3::new(
         s3_context,

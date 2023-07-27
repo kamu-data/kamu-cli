@@ -11,8 +11,11 @@ use std::path::Path;
 use std::time::Duration;
 
 use container_runtime::{ContainerProcess, ContainerRuntime};
+use url::Url;
 
 use crate::utils::docker_images;
+
+/////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct MinioServer {
     pub container_name: String,
@@ -79,6 +82,43 @@ impl MinioServer {
             host_port,
             access_key: access_key.to_owned(),
             secret_key: secret_key.to_owned(),
+        }
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct LocalS3Server {
+    pub tmp_dir: tempfile::TempDir,
+    pub minio: MinioServer,
+    pub bucket: String,
+    pub url: Url,
+}
+
+impl LocalS3Server {
+    pub async fn new() -> Self {
+        let access_key = "AKIAIOSFODNN7EXAMPLE";
+        let secret_key = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY";
+        std::env::set_var("AWS_ACCESS_KEY_ID", access_key);
+        std::env::set_var("AWS_SECRET_ACCESS_KEY", secret_key);
+
+        let tmp_dir = tempfile::tempdir().unwrap();
+        let bucket = "test-bucket".to_string();
+        std::fs::create_dir(tmp_dir.path().join(&bucket)).unwrap();
+
+        let minio = MinioServer::new(tmp_dir.path(), access_key, secret_key).await;
+
+        let url = Url::parse(&format!(
+            "s3+http://{}:{}/{}",
+            minio.address, minio.host_port, bucket
+        ))
+        .unwrap();
+
+        Self {
+            tmp_dir,
+            minio,
+            bucket,
+            url,
         }
     }
 }

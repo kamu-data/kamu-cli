@@ -100,24 +100,8 @@ async fn test_search_local_fs() {
 #[test_group::group(containerized)]
 #[test_log::test(tokio::test)]
 async fn test_search_s3() {
-    let access_key = "AKIAIOSFODNN7EXAMPLE";
-    let secret_key = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY";
-    std::env::set_var("AWS_ACCESS_KEY_ID", access_key);
-    std::env::set_var("AWS_SECRET_ACCESS_KEY", secret_key);
-
+    let s3 = LocalS3Server::new().await;
     let tmp_workspace_dir = tempfile::tempdir().unwrap();
-    let tmp_repo_dir = tempfile::tempdir().unwrap();
-    let bucket = "test-bucket";
-    std::fs::create_dir(tmp_repo_dir.path().join(bucket)).unwrap();
 
-    let minio = MinioServer::new(tmp_repo_dir.path(), access_key, secret_key).await;
-
-    use std::str::FromStr;
-    let repo_url = Url::from_str(&format!(
-        "s3+http://{}:{}/{}",
-        minio.address, minio.host_port, bucket
-    ))
-    .unwrap();
-
-    do_test_search(tmp_workspace_dir.path(), repo_url).await;
+    do_test_search(tmp_workspace_dir.path(), s3.url).await;
 }

@@ -10,54 +10,17 @@
 use std::assert_matches::assert_matches;
 
 use kamu::domain::*;
-use kamu::testing::MinioServer;
+use kamu::testing::LocalS3Server;
 use kamu::utils::s3_context::S3Context;
 use kamu::*;
 use opendatafabric::*;
-use url::Url;
 
 use super::test_object_repository_shared;
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-#[allow(dead_code)]
-struct S3 {
-    tmp_dir: tempfile::TempDir,
-    minio: MinioServer,
-    url: Url,
-}
-
-async fn run_s3_server() -> S3 {
-    let access_key = "AKIAIOSFODNN7EXAMPLE";
-    let secret_key = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY";
-    std::env::set_var("AWS_ACCESS_KEY_ID", access_key);
-    std::env::set_var("AWS_SECRET_ACCESS_KEY", secret_key);
-
-    let tmp_dir = tempfile::tempdir().unwrap();
-    let bucket = "test-bucket";
-    std::fs::create_dir(tmp_dir.path().join(bucket)).unwrap();
-
-    let minio = MinioServer::new(tmp_dir.path(), access_key, secret_key).await;
-
-    let url = Url::parse(&format!(
-        "s3+http://{}:{}/{}",
-        minio.address, minio.host_port, bucket
-    ))
-    .unwrap();
-
-    S3 {
-        tmp_dir,
-        minio,
-        url,
-    }
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(containerized)]
 #[test_log::test(tokio::test)]
 async fn test_protocol() {
-    let s3 = run_s3_server().await;
+    let s3 = LocalS3Server::new().await;
     std::env::set_var("AWS_SECRET_ACCESS_KEY", "BAD_KEY");
     let repo = ObjectRepositoryS3::<sha3::Sha3_256, 0x16>::new(S3Context::from_url(&s3.url).await);
 
@@ -68,7 +31,7 @@ async fn test_protocol() {
 #[ignore = "We do not yet handle unauthorized errors correctly"]
 #[test_log::test(tokio::test)]
 async fn test_unauthorized() {
-    let s3 = run_s3_server().await;
+    let s3 = LocalS3Server::new().await;
     std::env::set_var("AWS_SECRET_ACCESS_KEY", "BAD_KEY");
     let repo = ObjectRepositoryS3::<sha3::Sha3_256, 0x16>::new(S3Context::from_url(&s3.url).await);
 
@@ -81,7 +44,7 @@ async fn test_unauthorized() {
 #[test_group::group(containerized)]
 #[test_log::test(tokio::test)]
 async fn test_insert_bytes() {
-    let s3 = run_s3_server().await;
+    let s3 = LocalS3Server::new().await;
     let repo = ObjectRepositoryS3::<sha3::Sha3_256, 0x16>::new(S3Context::from_url(&s3.url).await);
     test_object_repository_shared::test_insert_bytes(&repo).await;
 }
@@ -89,7 +52,7 @@ async fn test_insert_bytes() {
 #[test_group::group(containerized)]
 #[test_log::test(tokio::test)]
 async fn test_insert_bytes_long() {
-    let s3 = run_s3_server().await;
+    let s3 = LocalS3Server::new().await;
     let repo = ObjectRepositoryS3::<sha3::Sha3_256, 0x16>::new(S3Context::from_url(&s3.url).await);
 
     use rand::RngCore;
@@ -112,7 +75,7 @@ async fn test_insert_bytes_long() {
 #[test_group::group(containerized)]
 #[test_log::test(tokio::test)]
 async fn test_insert_stream() {
-    let s3 = run_s3_server().await;
+    let s3 = LocalS3Server::new().await;
     let repo = ObjectRepositoryS3::<sha3::Sha3_256, 0x16>::new(S3Context::from_url(&s3.url).await);
 
     let hash_foobar = Multihash::from_digest_sha3_256(b"foobar");
@@ -149,7 +112,7 @@ async fn test_insert_stream() {
 #[test_group::group(containerized)]
 #[test_log::test(tokio::test)]
 async fn test_insert_stream_long() {
-    let s3 = run_s3_server().await;
+    let s3 = LocalS3Server::new().await;
     let repo = ObjectRepositoryS3::<sha3::Sha3_256, 0x16>::new(S3Context::from_url(&s3.url).await);
 
     use rand::RngCore;
@@ -183,7 +146,7 @@ async fn test_insert_stream_long() {
 #[test_group::group(containerized)]
 #[test_log::test(tokio::test)]
 async fn test_delete() {
-    let s3 = run_s3_server().await;
+    let s3 = LocalS3Server::new().await;
     let repo = ObjectRepositoryS3::<sha3::Sha3_256, 0x16>::new(S3Context::from_url(&s3.url).await);
     test_object_repository_shared::test_delete(&repo).await;
 }
@@ -191,7 +154,7 @@ async fn test_delete() {
 #[test_group::group(containerized)]
 #[test_log::test(tokio::test)]
 async fn test_insert_precomputed() {
-    let s3 = run_s3_server().await;
+    let s3 = LocalS3Server::new().await;
     let repo = ObjectRepositoryS3::<sha3::Sha3_256, 0x16>::new(S3Context::from_url(&s3.url).await);
     test_object_repository_shared::test_insert_precomputed(&repo).await;
 }
@@ -199,9 +162,7 @@ async fn test_insert_precomputed() {
 #[test_group::group(containerized)]
 #[test_log::test(tokio::test)]
 async fn test_insert_expect() {
-    let s3 = run_s3_server().await;
+    let s3 = LocalS3Server::new().await;
     let repo = ObjectRepositoryS3::<sha3::Sha3_256, 0x16>::new(S3Context::from_url(&s3.url).await);
     test_object_repository_shared::test_insert_expect(&repo).await;
 }
-
-/////////////////////////////////////////////////////////////////////////////////////////

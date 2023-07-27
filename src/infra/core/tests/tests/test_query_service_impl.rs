@@ -14,50 +14,12 @@ use datafusion::arrow::array::*;
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use datafusion::arrow::record_batch::RecordBatch;
 use kamu::domain::*;
-use kamu::testing::{MetadataFactory, MinioServer, ParquetWriterHelper};
+use kamu::testing::{LocalS3Server, MetadataFactory, ParquetWriterHelper};
 use kamu::utils::s3_context::S3Context;
 use kamu::*;
 use kamu_data_utils::data::format::JsonArrayWriter;
 use opendatafabric::*;
-use reqwest::Url;
 use tempfile::TempDir;
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-#[allow(dead_code)]
-struct S3 {
-    tmp_dir: tempfile::TempDir,
-    minio: MinioServer,
-    url: Url,
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-async fn run_s3_server() -> S3 {
-    let access_key = "AKIAIOSFODNN7EXAMPLE";
-    let secret_key = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY";
-    std::env::set_var("AWS_ACCESS_KEY_ID", access_key);
-    std::env::set_var("AWS_SECRET_ACCESS_KEY", secret_key);
-    std::env::set_var("AWS_DEFAULT_REGION", "us-east-1");
-
-    let tmp_dir = tempfile::tempdir().unwrap();
-    let bucket = "test-bucket";
-    std::fs::create_dir(tmp_dir.path().join(bucket)).unwrap();
-
-    let minio = MinioServer::new(tmp_dir.path(), access_key, secret_key).await;
-
-    let url = Url::parse(&format!(
-        "s3+http://{}:{}/{}",
-        minio.address, minio.host_port, bucket
-    ))
-    .unwrap();
-
-    S3 {
-        tmp_dir,
-        minio,
-        url,
-    }
-}
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -143,7 +105,7 @@ async fn create_catalog_with_local_workspace(tempdir: &Path) -> dill::Catalog {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-async fn create_catalog_with_s3_workspace(s3: &S3) -> dill::Catalog {
+async fn create_catalog_with_s3_workspace(s3: &LocalS3Server) -> dill::Catalog {
     let (endpoint, bucket, key_prefix) = S3Context::split_url(&s3.url);
     let s3_context = S3Context::from_items(endpoint.clone(), bucket, key_prefix).await;
     let dataset_repo = DatasetRepositoryS3::new(
@@ -212,7 +174,7 @@ async fn test_dataset_schema_local_fs() {
 #[test_group::group(containerized)]
 #[test_log::test(tokio::test)]
 async fn test_dataset_schema_s3() {
-    let s3 = run_s3_server().await;
+    let s3 = LocalS3Server::new().await;
     let catalog = create_catalog_with_s3_workspace(&s3).await;
     test_dataset_schema_common(catalog, &s3.tmp_dir).await;
 }
@@ -249,7 +211,7 @@ async fn test_dataset_tail_local_fs() {
 #[test_group::group(containerized)]
 #[test_log::test(tokio::test)]
 async fn test_dataset_tail_s3() {
-    let s3 = run_s3_server().await;
+    let s3 = LocalS3Server::new().await;
     let catalog = create_catalog_with_s3_workspace(&s3).await;
     test_dataset_tail_common(catalog, &s3.tmp_dir).await;
 }
