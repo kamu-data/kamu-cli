@@ -5,7 +5,17 @@ EXAMPLES_URL=s3://datasets.kamu.dev/example/
 
 set -e
 
+# Install kamu if its missing (KAMU_VERSION env var has to be set)
+if ! command -v kamu &> /dev/null
+then
+    echo "Installing kamu-cli"
+    curl -s "https://get.kamu.dev" | sh
+else
+    echo "Using pre-installed kamu-cli"
+    kamu --version
+fi
 
+# Init workspace
 kamu init || true
 
 # External datasets first

@@ -18,6 +18,7 @@ image-push:
 
 .PHONY: workspace
 workspace:
+	KAMU_VERSION=$(KAMU_VERSION) \
 	mkdir -p workspace && \
 	cd workspace/ && \
 	../init-workspace.sh

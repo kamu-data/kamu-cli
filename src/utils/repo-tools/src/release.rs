@@ -59,11 +59,6 @@ fn main() {
     update_crates(&new_version);
 
     update_license(&Path::new("LICENSE.txt"), &current_version, &new_version);
-
-    update_workflow(
-        &Path::new(".github/workflows/release-images.yaml"),
-        &new_version,
-    );
 }
 
 fn get_current_version() -> Version {
@@ -129,20 +124,6 @@ fn update_license_text<'t>(
         text
     }
     .to_string()
-}
-
-fn update_workflow(workflow_path: &Path, new_version: &Version) {
-    eprintln!("Updating version in workflow: {}", workflow_path.display());
-    let text = std::fs::read_to_string(workflow_path).expect("Could not read the workflow");
-    let new_text = update_workflow_text(&text, new_version);
-    assert_ne!(text, new_text);
-    std::fs::write(workflow_path, new_text).expect("Failed to write to workflow");
-}
-
-fn update_workflow_text(text: &str, new_version: &Version) -> String {
-    let re = regex::Regex::new(r#"(KAMU_VERSION: )"(\d+\.\d+\.\d+)""#).unwrap();
-    re.replace(text, |c: &Captures| format!("{}\"{}\"", &c[1], new_version))
-        .to_string()
 }
 
 fn add_years(d: &NaiveDate, years: i32) -> NaiveDate {
