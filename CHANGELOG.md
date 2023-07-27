@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.134.0] - 2023-07-27
+### Changed
+- New engine I/O strategies allow ingest/transform to run over datasets in remote storage (e.g. S3) even when engine does not support remote inputs
+- Improved credental reuse in S3-based dataset repository
+- Simplified S3 tests
+
 ## [0.133.0] - 2023-07-17
 ### Changed
 - Lots of internal improvements in how data is being passed to engines
