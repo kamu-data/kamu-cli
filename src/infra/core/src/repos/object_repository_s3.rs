@@ -131,7 +131,7 @@ where
         let context_url = Url::parse(
             format!(
                 "s3://{}/{}",
-                self.s3_context.bucket, self.s3_context.root_folder_key
+                self.s3_context.bucket, self.s3_context.key_prefix
             )
             .as_str(),
         )

@@ -28,7 +28,7 @@ pub struct S3Context {
     pub client: Client,
     pub endpoint: Option<String>,
     pub bucket: String,
-    pub root_folder_key: String,
+    pub key_prefix: String,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -40,12 +40,7 @@ pub type AsyncReadObj = dyn AsyncRead + Send + Unpin;
 impl S3Context {
     const MAX_LISTED_OBJECTS: i32 = 1000;
 
-    pub fn new<S1, S2, S3>(
-        client: Client,
-        endpoint: Option<S1>,
-        bucket: S2,
-        root_folder_key: S3,
-    ) -> Self
+    pub fn new<S1, S2, S3>(client: Client, endpoint: Option<S1>, bucket: S2, key_prefix: S3) -> Self
     where
         S1: Into<String>,
         S2: Into<String>,
@@ -55,15 +50,27 @@ impl S3Context {
             client,
             endpoint: endpoint.map(|e| e.into()),
             bucket: bucket.into(),
-            root_folder_key: root_folder_key.into(),
+            key_prefix: key_prefix.into(),
         }
     }
 
-    pub async fn from_items(
-        endpoint: Option<String>,
-        bucket: String,
-        root_folder_key: String,
-    ) -> Self {
+    /// Creates a context for a sub-key while reusing the S3 client and its
+    /// credential cache
+    pub fn sub_context(&self, sub_key: &str) -> Self {
+        let mut key_prefix = self.get_key(sub_key);
+        if !key_prefix.ends_with('/') {
+            key_prefix.push('/');
+        }
+        Self {
+            client: self.client.clone(),
+            endpoint: self.endpoint.clone(),
+            bucket: self.bucket.clone(),
+            key_prefix,
+        }
+    }
+
+    #[tracing::instrument(level = "info", name = "init_s3_context")]
+    pub async fn from_items(endpoint: Option<String>, bucket: String, key_prefix: String) -> Self {
         // Note: Falling back to `unspecified` region as SDK errors out when the region
         // not set even if using custom endpoint
         let region_provider = aws_config::meta::region::RegionProviderChain::default_provider()
@@ -81,19 +88,19 @@ impl S3Context {
         // TODO: PERF: Client construction is expensive and should only be done once
         let client = Client::from_conf(s3_config);
 
-        Self::new(client, endpoint, bucket, root_folder_key)
+        Self::new(client, endpoint, bucket, key_prefix)
     }
 
     pub async fn from_url(url: &Url) -> Self {
-        let (endpoint, bucket, root_folder_key) = Self::split_url(url);
+        let (endpoint, bucket, key_prefix) = Self::split_url(url);
 
         assert!(
-            root_folder_key.is_empty() || root_folder_key.ends_with('/'),
+            key_prefix.is_empty() || key_prefix.ends_with('/'),
             "Base URL does not contain a trailing slash: {}",
             url
         );
 
-        Self::from_items(endpoint, bucket, root_folder_key).await
+        Self::from_items(endpoint, bucket, key_prefix).await
     }
 
     pub fn split_url(url: &Url) -> (Option<String>, String, String) {
@@ -123,21 +130,21 @@ impl S3Context {
                 _ => panic!("Unsupported S3 url format: {}", url),
             };
 
-        let (bucket, root_folder_key) = match path.trim_start_matches('/').split_once('/') {
+        let (bucket, key_prefix) = match path.trim_start_matches('/').split_once('/') {
             Some((b, p)) => (b.to_owned(), p.to_owned()),
             None => (path.trim_start_matches('/').to_owned(), String::new()),
         };
 
-        (endpoint, bucket, root_folder_key)
+        (endpoint, bucket, key_prefix)
     }
 
     pub fn make_url(&self) -> Url {
         let context_url_str = match &self.endpoint {
             Some(endpoint) => {
-                format!("s3+{}/{}/{}", endpoint, self.bucket, self.root_folder_key)
+                format!("s3+{}/{}/{}", endpoint, self.bucket, self.key_prefix)
             }
             None => {
-                format!("s3://{}/{}", self.bucket, self.root_folder_key)
+                format!("s3://{}/{}", self.bucket, self.key_prefix)
             }
         };
         Url::parse(context_url_str.as_str()).unwrap()
@@ -156,11 +163,11 @@ impl S3Context {
         self.client.conf().region().map(|r| r.as_ref())
     }
 
-    pub fn get_key(&self, key: &str) -> String {
-        if self.root_folder_key.is_empty() {
-            String::from(key)
+    pub fn get_key(&self, sub_key: &str) -> String {
+        if self.key_prefix.is_empty() {
+            String::from(sub_key)
         } else {
-            format!("{}{}", self.root_folder_key, key)
+            format!("{}{}", self.key_prefix, sub_key)
         }
     }
 

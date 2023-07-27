@@ -38,18 +38,6 @@ impl DatasetRepositoryS3 {
         }
     }
 
-    fn get_s3_bucket_path(&self, dataset_alias: &DatasetAlias) -> Url {
-        assert!(
-            !dataset_alias.is_multi_tenant(),
-            "Multi-tenancy is not yet supported by S3 repo"
-        );
-
-        let context_url = self.s3_context.make_url();
-        context_url
-            .join(format!("{}/", &dataset_alias.dataset_name).as_str())
-            .unwrap()
-    }
-
     async fn get_dataset_impl(
         &self,
         dataset_alias: &DatasetAlias,
@@ -58,8 +46,12 @@ impl DatasetRepositoryS3 {
             !dataset_alias.is_multi_tenant(),
             "Multi-tenancy is not yet supported by S3 repo"
         );
-        let dataset_url = self.get_s3_bucket_path(dataset_alias);
-        DatasetFactoryImpl::get_s3(dataset_url).await
+
+        let s3_context = self
+            .s3_context
+            .sub_context(&format!("{}/", &dataset_alias.dataset_name));
+
+        DatasetFactoryImpl::get_s3_from_context(s3_context).await
     }
 
     async fn delete_dataset_s3_objects(
@@ -218,8 +210,7 @@ impl DatasetRepository for DatasetRepositoryS3 {
         seed_block: MetadataBlockTyped<Seed>,
     ) -> Result<CreateDatasetResult, CreateDatasetError> {
         let dataset_id = seed_block.event.dataset_id.clone();
-        let dataset_url = self.get_s3_bucket_path(dataset_alias);
-        let dataset = DatasetFactoryImpl::get_s3(dataset_url).await?;
+        let dataset = self.get_dataset_impl(dataset_alias).await?;
 
         // There are three possiblities at this point:
         // - Dataset did not exist before - continue normally

@@ -71,12 +71,24 @@ impl DatasetFactoryImpl {
         ))
     }
 
-    pub async fn get_s3(base_url: Url) -> Result<impl Dataset, InternalError> {
+    /// Creates new dataset proxy for an S3 URL
+    ///
+    /// WARNING: This function will create a new [S3Context] that will do
+    /// credental resolution from scratch which can be very expensive. If you
+    /// already have an established [S3Context] use [get_s3_with_context]
+    /// function instead.
+    pub async fn get_s3_from_url(base_url: Url) -> Result<impl Dataset, InternalError> {
+        // TODO: We should ensure optimal credential reuse. Perhaps in future we should
+        // create a cache of S3Contexts keyed by an endpoint.
         let s3_context = S3Context::from_url(&base_url).await;
+        Self::get_s3_from_context(s3_context).await
+    }
+
+    pub async fn get_s3_from_context(s3_context: S3Context) -> Result<impl Dataset, InternalError> {
         let client = s3_context.client;
         let endpoint = s3_context.endpoint;
         let bucket = s3_context.bucket;
-        let key_prefix = s3_context.root_folder_key;
+        let key_prefix = s3_context.key_prefix;
 
         Ok(DatasetImpl::new(
             MetadataChainImpl::new(
@@ -236,7 +248,7 @@ impl DatasetFactory for DatasetFactoryImpl {
                 Ok(Arc::new(ds))
             }
             "s3" | "s3+http" | "s3+https" => {
-                let ds = Self::get_s3(url.clone()).await?;
+                let ds = Self::get_s3_from_url(url.clone()).await?;
                 Ok(Arc::new(ds))
             }
             _ => Err(UnsupportedProtocolError {
