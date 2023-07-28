@@ -26,6 +26,9 @@ jobs:
         with:
           command: fmt
           args: --check
+      - name: license headers
+        run: |
+          cargo test -p kamu-repo-tools -- license_header
 
   lint_deps:
     name: Lint / Dependencies
