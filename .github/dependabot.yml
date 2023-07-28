@@ -13,7 +13,8 @@ updates:
       interval: daily
     groups:
       all:
-        - "*"
+        patterns:
+          - "*"
     ignore:
       # For now we use dependabot to notify us only about major library updates
       - dependency-name: "*"
