@@ -392,6 +392,10 @@ pub fn get_command(
                 )),
                 _ => return Err(CommandInterpretationFailed.into()),
             },
+            Some(("info", info_matches)) => Box::new(SystemInfoCommand::new(
+                catalog.get_one()?,
+                info_matches.get_one("output-format").map(String::as_str),
+            )),
             Some(("ipfs", ipfs_matches)) => match ipfs_matches.subcommand() {
                 Some(("add", add_matches)) => Box::new(SystemIpfsAddCommand::new(
                     catalog.get_one()?,
@@ -433,6 +437,10 @@ pub fn get_command(
             .into_iter(),
             submatches.get_flag("recursive"),
             submatches.get_flag("integrity"),
+        )),
+        Some(("version", submatches)) => Box::new(VersionCommand::new(
+            catalog.get_one()?,
+            submatches.get_one("output-format").map(String::as_str),
         )),
         _ => return Err(CommandInterpretationFailed.into()),
     };

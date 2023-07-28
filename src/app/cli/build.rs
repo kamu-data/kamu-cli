@@ -7,10 +7,16 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod test_add_command;
-mod test_complete_command;
-mod test_di_graph;
-mod test_new_dataset_command;
-mod test_pull_command;
-mod test_system_info_command;
-mod test_workspace_svc;
+use std::error::Error;
+
+use vergen::EmitBuilder;
+
+fn main() -> Result<(), Box<dyn Error>> {
+    EmitBuilder::builder()
+        .all_build()
+        .all_git()
+        .all_rustc()
+        .all_cargo()
+        .emit()?;
+    Ok(())
+}

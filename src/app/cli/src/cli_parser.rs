@@ -1094,6 +1094,15 @@ pub fn cli() -> Command {
                                     kamu system api-server gql-schema
                                 "#
                             )),
+                        Command::new("info")
+                            .about("Summary of the system information")
+                            .args([
+                                Arg::new("output-format")
+                                    .long("output-format")
+                                    .short('o')
+                                    .value_name("FMT")
+                                    .value_parser(["shell", "json", "yaml"]),
+                            ]),
                         Command::new("ipfs")
                             .about("IPFS helpers")
                             .subcommand_required(true)
@@ -1207,6 +1216,15 @@ pub fn cli() -> Command {
                             kamu verify --integrity com.example.deriv
                         "#
                     )),
+                Command::new("version")
+                    .about("Outputs build information")
+                    .args([
+                        Arg::new("output-format")
+                            .long("output-format")
+                            .short('o')
+                            .value_name("FMT")
+                            .value_parser(["shell", "json", "yaml"]),
+                    ]),
             ],
         )
 }

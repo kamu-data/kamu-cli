@@ -243,6 +243,8 @@ kamu_installed_version() {
     if ! check_cmd "$_bin"; then
         version=""
     else
+        # TODO: As of 2023-07-28 the `--version` flag is considered deprecated.
+        # We should switch to `version` command after a grace period of ~6 months.
         version=$($_bin --version)
         version=$(echo $version | sed 's/^kamu //')
     fi

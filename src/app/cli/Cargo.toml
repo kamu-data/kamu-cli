@@ -15,6 +15,7 @@ publish = { workspace = true }
 
 # Disabling examples discovery as we need them very rarely but they significantly slow down build times
 autoexamples = false 
+build = "build.rs"
 
 
 [lib]
@@ -117,3 +118,7 @@ env_logger = "0.10"
 rand = "0.8"
 test-group = { version = "1" }
 test-log = { version = "0.2", features = ["trace"] }
+
+
+[build-dependencies]
+vergen = { version = "8.0.0", features = ["build", "cargo", "git", "gitcl", "rustc"] }
