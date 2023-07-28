@@ -6,7 +6,8 @@ updates:
       interval: daily
     groups:
       all:
-        - "*"
+        patterns:
+          - "*"
   - package-ecosystem: cargo
     directory: /
     schedule:
