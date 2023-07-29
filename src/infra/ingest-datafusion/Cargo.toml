@@ -1,0 +1,60 @@
+[package]
+name = "kamu-ingest-datafusion"
+description = "Ingest implementation using Apache DataFusion"
+version = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+authors = { workspace = true }
+readme = { workspace = true }
+license-file = { workspace = true }
+keywords = { workspace = true }
+include = { workspace = true }
+edition = { workspace = true }
+publish = { workspace = true }
+
+
+[lib]
+doctest = false
+
+
+[dependencies]
+internal-error = { workspace = true }
+opendatafabric = { workspace = true } 
+
+datafusion = "28"
+digest = "0.10"
+object_store = { version = "0.6", features = ["aws"] }
+sha3 = "0.10"
+
+# Utils
+async-trait = "0.1"
+chrono = { version = "0.4", features = ["serde"] }
+thiserror = "1"
+tokio = { version = "1", default-features = false, features=["fs", "process"] }
+tracing = "0.1"
+url = { version = "2", features = ["serde"] }
+
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["async_tokio"] }
+env_logger = "0.10"
+pretty_assertions = "1"
+rand = "0.8"
+test-log = { version = "0.2", features = ["trace"] }
+tempfile = "3"
+tokio = { version = "1", default-features = false, features=["rt", "macros"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+
+[[bench]]
+name = "cdc_project"
+harness = false
+
+[[bench]]
+name = "ledger"
+harness = false
+
+[[bench]]
+name = "snapshot"
+harness = false
+

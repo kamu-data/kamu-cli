@@ -7,13 +7,19 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use super::SourceState;
-use crate::DatasetVocabulary;
+use crate::*;
 
 impl DatasetVocabulary {
     pub const DEFAULT_SYSTEM_TIME_COLUMN_NAME: &str = "system_time";
     pub const DEFAULT_EVENT_TIME_COLUMN_NAME: &str = "event_time";
     pub const DEFAULT_OFFSET_COLUMN_NAME: &str = "offset";
+}
+
+impl MergeStrategySnapshot {
+    pub const DEFAULT_OBSV_COLUMN_NAME: &str = "observed";
+    pub const DEFAULT_OBSV_ADDED: &str = "I";
+    pub const DEFAULT_OBSV_CHANGED: &str = "U";
+    pub const DEFAULT_OBSV_REMOVED: &str = "D";
 }
 
 impl SourceState {

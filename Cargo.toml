@@ -15,6 +15,7 @@ members = [
     "src/domain/task-system",
     # Infra
     "src/infra/core",
+    "src/infra/ingest-datafusion",
     "src/infra/task-system-inmem",
     # Adapters
     "src/adapter/graphql",
@@ -40,6 +41,7 @@ kamu-core = { version = "0.139.0", path = "src/domain/core", default-features = 
 kamu-task-system = { version = "0.139.0", path = "src/domain/task-system", default-features = false }
 # Infra
 kamu = { version = "0.139.0", path = "src/infra/core", default-features = false }
+kamu-ingest-datafusion = { version = "0.139.0", path = "src/infra/ingest-datafusion", default-features = false }
 kamu-task-system-inmem = { version = "0.139.0", path = "src/infra/task-system-inmem", default-features = false }
 # Adapters
 kamu-adapter-graphql = { version = "0.139.0", path = "src/adapter/graphql", default-features = false }
