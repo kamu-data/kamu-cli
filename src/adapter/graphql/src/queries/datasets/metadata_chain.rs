@@ -199,7 +199,7 @@ impl MetadataChain {
 ////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Interface, Debug, Clone)]
-#[graphql(field(name = "message", type = "String"))]
+#[graphql(field(name = "message", ty = "String"))]
 pub enum CommitResult {
     Success(CommitResultSuccess),
     Malformed(MetadataManifestMalformed),

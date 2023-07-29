@@ -82,6 +82,7 @@ async fn test_ingest_csv_with_engine() {
     assert_eq!(
         parquet_reader
             .get_row_iter()
+            .map(|r| r.unwrap())
             .map(IngestTestHarness::row_mapper)
             .sorted()
             .collect::<Vec<_>>(),
@@ -161,6 +162,7 @@ async fn test_ingest_parquet_with_engine() {
     assert_eq!(
         parquet_reader
             .get_row_iter()
+            .map(|r| r.unwrap())
             .map(IngestTestHarness::row_mapper)
             .sorted()
             .collect::<Vec<_>>(),

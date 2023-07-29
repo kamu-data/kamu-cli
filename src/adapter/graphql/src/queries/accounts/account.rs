@@ -15,8 +15,8 @@ use crate::prelude::*;
 
 #[derive(Interface, Debug, Clone, PartialEq, Eq)]
 #[graphql(
-    field(name = "id", method = "id", type = "&AccountID"),
-    field(name = "name", type = "&str")
+    field(name = "id", method = "id", ty = "&AccountID"),
+    field(name = "name", ty = "&str")
 )]
 pub enum Account {
     User(User),

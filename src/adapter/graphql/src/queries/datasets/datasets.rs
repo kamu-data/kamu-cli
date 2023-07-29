@@ -226,14 +226,14 @@ impl Datasets {
 ///////////////////////////////////////////////////////////////////////////////
 
 #[derive(Interface, Debug, Clone)]
-#[graphql(field(name = "message", type = "String"))]
+#[graphql(field(name = "message", ty = "String"))]
 pub enum CreateDatasetResult {
     Success(CreateDatasetResultSuccess),
     NameCollision(CreateDatasetResultNameCollision),
 }
 
 #[derive(Interface, Debug, Clone)]
-#[graphql(field(name = "message", type = "String"))]
+#[graphql(field(name = "message", ty = "String"))]
 pub enum CreateDatasetFromSnapshotResult {
     Success(CreateDatasetResultSuccess),
     NameCollision(CreateDatasetResultNameCollision),

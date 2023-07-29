@@ -360,6 +360,7 @@ async fn test_transform_common(transform: Transform) {
     assert_eq!(
         parquet_reader
             .get_row_iter()
+            .map(|r| r.unwrap())
             .map(|r| {
                 (
                     r.get_long(0).unwrap().clone(),
@@ -411,6 +412,7 @@ async fn test_transform_common(transform: Transform) {
     assert_eq!(
         parquet_reader
             .get_row_iter()
+            .map(|r| r.unwrap())
             .map(|r| {
                 (
                     r.get_long(0).unwrap().clone(),
