@@ -96,6 +96,7 @@ impl MetadataChainMut {
 #[graphql(field(name = "message", ty = "String"))]
 pub enum CommitResult {
     Success(CommitResultSuccess),
+    NoChanges(NoChanges),
     Malformed(MetadataManifestMalformed),
     UnsupportedVersion(MetadataManifestUnsupportedVersion),
     AppendError(CommitResultAppendError),
@@ -112,8 +113,20 @@ pub struct CommitResultSuccess {
 
 #[ComplexObject]
 impl CommitResultSuccess {
-    async fn message(&self) -> String {
+    pub async fn message(&self) -> String {
         format!("Success")
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone)]
+pub struct NoChanges;
+
+#[Object]
+impl NoChanges {
+    pub async fn message(&self) -> String {
+        format!("No changes")
     }
 }
 

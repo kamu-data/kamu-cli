@@ -76,11 +76,11 @@ interface CommitResult {
 	message: String!
 }
 
-type CommitResultAppendError implements CommitResult {
+type CommitResultAppendError implements CommitResult & UpdateReadmeResult {
 	message: String!
 }
 
-type CommitResultSuccess implements CommitResult {
+type CommitResultSuccess implements CommitResult & UpdateReadmeResult {
 	oldHead: Multihash
 	newHead: Multihash!
 	message: String!
@@ -313,6 +313,10 @@ type DatasetMetadataMut {
 	Access to the mutable metadata chain of the dataset
 	"""
 	chain: MetadataChainMut!
+	"""
+	Updates or clears the dataset readme
+	"""
+	updateReadme(content: String): UpdateReadmeResult!
 }
 
 type DatasetMut {
@@ -559,6 +563,10 @@ type Mutation {
 	and process data.
 	"""
 	tasks: TasksMut!
+}
+
+type NoChanges implements CommitResult & UpdateReadmeResult {
+	message: String!
 }
 
 type OffsetInterval {
@@ -940,6 +948,10 @@ type TransformSql {
 	version: String
 	queries: [SqlQueryStep!]!
 	temporalTables: [TemporalTable!]
+}
+
+interface UpdateReadmeResult {
+	message: String!
 }
 
 type User implements Account {
