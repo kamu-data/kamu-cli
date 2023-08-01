@@ -88,7 +88,11 @@ impl ServerSideHarness for ServerSideS3Harness {
 
 async fn s3_repo(s3: &LocalS3Server) -> DatasetRepositoryS3 {
     let s3_context = S3Context::from_url(&s3.url).await;
-    DatasetRepositoryS3::new(s3_context, Arc::new(CurrentAccountSubject::new_test()))
+    DatasetRepositoryS3::new(
+        s3_context,
+        Arc::new(CurrentAccountSubject::new_test()),
+        false,
+    )
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

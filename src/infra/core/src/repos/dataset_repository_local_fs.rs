@@ -88,8 +88,8 @@ impl DatasetRepositoryLocalFs {
 #[async_trait]
 impl DatasetRegistry for DatasetRepositoryLocalFs {
     async fn get_dataset_url(&self, dataset_ref: &DatasetRef) -> Result<Url, GetDatasetUrlError> {
-        let handle = self.resolve_dataset_ref(dataset_ref).await?;
-        let dataset_path = self.storage_strategy.get_dataset_path(&handle);
+        let dataset_handle = self.resolve_dataset_ref(dataset_ref).await?;
+        let dataset_path = self.storage_strategy.get_dataset_path(&dataset_handle);
         Ok(Url::from_directory_path(dataset_path).unwrap())
     }
 }
@@ -152,8 +152,8 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
         &self,
         dataset_ref: &DatasetRef,
     ) -> Result<Arc<dyn Dataset>, GetDatasetError> {
-        let handle = self.resolve_dataset_ref(dataset_ref).await?;
-        let dataset = self.get_dataset_impl(&handle)?;
+        let dataset_handle = self.resolve_dataset_ref(dataset_ref).await?;
+        let dataset = self.get_dataset_impl(&dataset_handle)?;
         Ok(Arc::new(dataset))
     }
 

@@ -111,6 +111,7 @@ async fn create_catalog_with_s3_workspace(s3: &LocalS3Server) -> dill::Catalog {
     let dataset_repo = DatasetRepositoryS3::new(
         s3_context.clone(),
         Arc::new(CurrentAccountSubject::new_test()),
+        false,
     );
 
     dill::CatalogBuilder::new()
