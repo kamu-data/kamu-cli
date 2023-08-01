@@ -11,12 +11,12 @@ use serde::Deserialize;
 
 use crate::prelude::*;
 
-pub(crate) struct Auth;
+pub(crate) struct AuthMut;
 
 // TODO: We should somehow separate auth method implementations from this
 // pure-API crate
 #[Object]
-impl Auth {
+impl AuthMut {
     // TODO: PERF: Cache client instance?
     #[graphql(skip)]
     fn get_client(&self) -> Result<reqwest::Client, reqwest::Error> {

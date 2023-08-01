@@ -69,12 +69,25 @@ pub struct Mutation;
 
 #[Object]
 impl Mutation {
-    async fn auth(&self) -> Auth {
-        Auth
+    /// Authentication and authorization-related functionality group
+    async fn auth(&self) -> AuthMut {
+        AuthMut
     }
 
-    async fn tasks(&self) -> TasksMutations {
-        TasksMutations
+    /// Dataset-related functionality group.
+    ///
+    /// Datasets are historical streams of events recorded under a cetrain
+    /// schema.
+    async fn datasets(&self) -> DatasetsMut {
+        DatasetsMut
+    }
+
+    /// Tasks-related functionality group.
+    ///
+    /// Tasks are units of work scheduled and executed by the system to query
+    /// and process data.
+    async fn tasks(&self) -> TasksMut {
+        TasksMut
     }
 }
 

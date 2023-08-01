@@ -14,13 +14,13 @@ use crate::queries::Task;
 
 ///////////////////////////////////////////////////////////////////////////////
 
-pub struct TasksMutations;
+pub struct TasksMut;
 
 ///////////////////////////////////////////////////////////////////////////////
 
 // TODO: Error handling
 #[Object]
-impl TasksMutations {
+impl TasksMut {
     /// Requests cancellation of the specified task
     async fn cancel_task(&self, ctx: &Context<'_>, task_id: TaskID) -> Result<Task> {
         let task_sched = from_catalog::<dyn ts::TaskScheduler>(ctx).unwrap();
