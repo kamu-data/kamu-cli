@@ -39,7 +39,7 @@ thiserror = "1"
 tokio = { version = "1", default-features = false, features = [] }
 tokio-stream = "0.1"
 tokio-util = { version = "0.7", default-features = false, features = ["codec", "compat", "io"] }
-tokio-tungstenite = "0.19"
+tokio-tungstenite = "0.20"
 tower = "0.4"
 tracing = "0.1"
 url = { version = "2", features = ["serde"] }
