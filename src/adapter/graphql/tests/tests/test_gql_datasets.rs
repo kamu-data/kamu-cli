@@ -135,7 +135,7 @@ async fn dataset_create_empty() {
     let res = schema
         .execute(indoc::indoc!(
             r#"
-            {
+            mutation {
                 datasets {
                     createEmpty (accountId: "kamu", datasetKind: ROOT, datasetName: "foo") {
                         ... on CreateDatasetResultSuccess {
@@ -196,7 +196,7 @@ async fn dataset_create_from_snapshot() {
     let res = schema
         .execute(indoc!(
             r#"
-            {
+            mutation {
                 datasets {
                     createFromSnapshot (accountId: "kamu", snapshot: "<content>", snapshotFormat: YAML) {
                         ... on CreateDatasetResultSuccess {
@@ -246,7 +246,7 @@ async fn dataset_create_from_snapshot_malformed() {
     let res = schema
         .execute(indoc!(
             r#"
-            {
+            mutation {
                 datasets {
                     createFromSnapshot (accountId: "kamu", snapshot: "version: 1", snapshotFormat: YAML) {
                         ... on MetadataManifestMalformed {

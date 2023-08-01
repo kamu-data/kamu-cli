@@ -58,9 +58,9 @@ async fn metadata_chain_append_event() {
         .execute(
             indoc!(
                 r#"
-                {
+                mutation {
                     datasets {
-                        byOwnerAndName (accountName: "kamu", datasetName: "foo") {
+                        byId (datasetId: "<id>") {
                             metadata {
                                 chain {
                                     commitEvent (
@@ -78,6 +78,7 @@ async fn metadata_chain_append_event() {
                 }
                 "#
             )
+            .replace("<id>", &create_result.dataset_handle.id.to_string())
             .replace("<content>", &event_yaml.escape_default().to_string()),
         )
         .await;
@@ -86,7 +87,7 @@ async fn metadata_chain_append_event() {
         res.data,
         value!({
             "datasets": {
-                "byOwnerAndName": {
+                "byId": {
                     "metadata": {
                         "chain": {
                             "commitEvent": {

@@ -51,7 +51,7 @@ type AttachmentsEmbedded {
 	items: [AttachmentEmbedded!]!
 }
 
-type Auth {
+type AuthMut {
 	githubLogin(code: String!): LoginResponse!
 	accountInfo(accessToken: String!): AccountInfo!
 }
@@ -308,6 +308,20 @@ type DatasetMetadata {
 	currentVocab: SetVocab
 }
 
+type DatasetMetadataMut {
+	"""
+	Access to the mutable metadata chain of the dataset
+	"""
+	chain: MetadataChainMut!
+}
+
+type DatasetMut {
+	"""
+	Access to the mutable metadata of the dataset
+	"""
+	metadata: DatasetMetadataMut!
+}
+
 scalar DatasetName
 
 scalar DatasetRefAny
@@ -329,6 +343,13 @@ type Datasets {
 	Returns datasets belonging to the specified account
 	"""
 	byAccountName(accountName: AccountName!, page: Int, perPage: Int): DatasetConnection!
+}
+
+type DatasetsMut {
+	"""
+	Returns a mutable dataset by its ID
+	"""
+	byId(datasetId: DatasetID!): DatasetMut
 	"""
 	Creates a new empty dataset
 	"""
@@ -494,6 +515,9 @@ type MetadataChain {
 	Iterates all metadata blocks in the reverse chronological order
 	"""
 	blocks(page: Int, perPage: Int): MetadataBlockConnection!
+}
+
+type MetadataChainMut {
 	"""
 	Commits new event to the metadata chain
 	"""
@@ -517,8 +541,24 @@ type MetadataManifestUnsupportedVersion implements CommitResult & CreateDatasetF
 scalar Multihash
 
 type Mutation {
-	auth: Auth!
-	tasks: TasksMutations!
+	"""
+	Authentication and authorization-related functionality group
+	"""
+	auth: AuthMut!
+	"""
+	Dataset-related functionality group.
+	
+	Datasets are historical streams of events recorded under a cetrain
+	schema.
+	"""
+	datasets: DatasetsMut!
+	"""
+	Tasks-related functionality group.
+	
+	Tasks are units of work scheduled and executed by the system to query
+	and process data.
+	"""
+	tasks: TasksMut!
 }
 
 type OffsetInterval {
@@ -864,7 +904,7 @@ type Tasks {
 	listTasksByDataset(datasetId: DatasetID!, page: Int, perPage: Int): TaskConnection!
 }
 
-type TasksMutations {
+type TasksMut {
 	"""
 	Requests cancellation of the specified task
 	"""
