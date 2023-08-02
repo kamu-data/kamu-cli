@@ -17,50 +17,57 @@ use crate::*;
 
 ///////////////////////////////////////////////////////////////////////////////
 
-pub struct ReaderCsv {}
+pub struct ReaderParquet {}
 
 ///////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl Reader for ReaderCsv {
+impl Reader for ReaderParquet {
     async fn read(
         &self,
         ctx: &SessionContext,
         path: &Path,
         conf: &ReadStep,
     ) -> Result<DataFrame, ReadError> {
-        let ReadStep::Csv(conf) = conf else {
+        let ReadStep::Parquet(conf) = conf else {
             unreachable!()
         };
 
-        let schema = match &conf.schema {
-            Some(s) => Some(
-                kamu_data_utils::schema::parse::parse_ddl_to_arrow_schema(ctx, s)
-                    .await
-                    .int_err()?,
-            ),
-            None => None,
-        };
-
-        let options = CsvReadOptions {
-            has_header: conf.header.unwrap_or(false),
-            delimiter: b',',
-            schema: schema.as_ref(),
-            schema_infer_max_records: 1000,
+        let options = ParquetReadOptions {
             file_extension: path.extension().and_then(|s| s.to_str()).unwrap_or(""),
             table_partition_cols: Vec::new(),
-            // TODO: PERF: Reader support compression, thus we could detect decompress step and
-            // optimize the ingest plan to avoid writing uncompressed data to disc or having to
-            // re-compress it.
-            file_compression_type:
-                datafusion::datasource::file_format::file_type::FileCompressionType::UNCOMPRESSED,
-            infinite: false,
+            parquet_pruning: None,
+            skip_metadata: None,
         };
 
         let df = ctx
-            .read_csv(path.to_str().unwrap(), options)
+            .read_parquet(path.to_str().unwrap(), options)
             .await
             .int_err()?;
+
+        let df = if let Some(schema) = &conf.schema {
+            let schema =
+                kamu_data_utils::schema::parse::parse_ddl_to_datafusion_schema(ctx, schema)
+                    .await
+                    .int_err()?;
+
+            tracing::debug!(
+                orig_schema = ?df.schema(),
+                target_schema = ?schema,
+                "Performing read coercion of the parquet data",
+            );
+
+            df.select(
+                schema
+                    .fields()
+                    .iter()
+                    .map(|f| cast(col(f.name()), f.data_type().clone()).alias(f.name()))
+                    .collect(),
+            )
+            .int_err()?
+        } else {
+            df
+        };
 
         Ok(df)
     }

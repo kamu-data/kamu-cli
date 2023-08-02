@@ -47,6 +47,6 @@ pub fn get_reader_for(conf: &ReadStep) -> Arc<dyn Reader> {
         ReadStep::JsonLines(_) => todo!(),
         ReadStep::GeoJson(_) => todo!(),
         ReadStep::EsriShapefile(_) => todo!(),
-        ReadStep::Parquet(_) => todo!(),
+        ReadStep::Parquet(_) => Arc::new(ReaderParquet {}),
     }
 }

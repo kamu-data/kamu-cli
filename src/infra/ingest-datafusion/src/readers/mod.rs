@@ -8,5 +8,7 @@
 // by the Apache License, Version 2.0.
 
 mod csv;
+mod parquet;
 
 pub use csv::*;
+pub use parquet::*;
