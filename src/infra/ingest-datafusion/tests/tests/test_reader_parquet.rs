@@ -11,10 +11,11 @@ use std::path::Path;
 use std::sync::Arc;
 
 use chrono::DateTime;
-use datafusion::prelude::*;
-use kamu_data_utils::testing::*;
+use indoc::indoc;
 use kamu_ingest_datafusion::*;
 use opendatafabric::*;
+
+use super::test_reader_common;
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -89,46 +90,34 @@ fn write_test_data(path: impl AsRef<Path>) {
 
 #[test_log::test(tokio::test)]
 async fn test_read_parquet() {
-    let temp_dir = tempfile::tempdir().unwrap();
-    let ctx = SessionContext::new();
-
-    let path = temp_dir.path().join("data.parquet");
-    write_test_data(&path);
-
-    let reader = ReaderParquet {};
-    let df = reader
-        .read(
-            &ctx,
-            &path,
-            &ReadStep::Parquet(ReadStepParquet { schema: None }),
-        )
-        .await
-        .unwrap();
-
-    assert_schema_eq(
-        df.schema(),
-        r#"
-message arrow_schema {
-  REQUIRED INT64 offset;
-  REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
-  REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
-  REQUIRED BYTE_ARRAY city (STRING);
-  REQUIRED INT64 population;
-}
-        "#,
-    );
-
-    assert_data_eq(
-        df,
-        r#"
-+--------+----------------------+----------------------+-----------+------------+
-| offset | system_time          | event_time           | city      | population |
-+--------+----------------------+----------------------+-----------+------------+
-| 0      | 2023-02-01T00:00:00Z | 2023-01-01T00:00:00Z | vancouver | 675000     |
-| 1      | 2023-02-01T00:00:00Z | 2023-01-01T00:00:00Z | seattle   | 733000     |
-| 2      | 2023-02-01T00:00:00Z | 2023-01-01T00:00:00Z | kyiv      | 2884000    |
-+--------+----------------------+----------------------+-----------+------------+
-        "#,
+    test_reader_common::test_reader_success(
+        ReaderParquet {},
+        ReadStepParquet { schema: None },
+        |path| async {
+            write_test_data(path);
+        },
+        indoc!(
+            r#"
+            message arrow_schema {
+              REQUIRED INT64 offset;
+              REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
+              REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
+              REQUIRED BYTE_ARRAY city (STRING);
+              REQUIRED INT64 population;
+            }
+            "#
+        ),
+        indoc!(
+            r#"
+            +--------+----------------------+----------------------+-----------+------------+
+            | offset | system_time          | event_time           | city      | population |
+            +--------+----------------------+----------------------+-----------+------------+
+            | 0      | 2023-02-01T00:00:00Z | 2023-01-01T00:00:00Z | vancouver | 675000     |
+            | 1      | 2023-02-01T00:00:00Z | 2023-01-01T00:00:00Z | seattle   | 733000     |
+            | 2      | 2023-02-01T00:00:00Z | 2023-01-01T00:00:00Z | kyiv      | 2884000    |
+            +--------+----------------------+----------------------+-----------+------------+
+            "#
+        ),
     )
     .await;
 }
@@ -137,50 +126,38 @@ message arrow_schema {
 
 #[test_log::test(tokio::test)]
 async fn test_read_parquet_schema_coercion() {
-    let temp_dir = tempfile::tempdir().unwrap();
-    let ctx = SessionContext::new();
-
-    let path = temp_dir.path().join("data.parquet");
-    write_test_data(&path);
-
-    let reader = ReaderParquet {};
-    let df = reader
-        .read(
-            &ctx,
-            &path,
-            &ReadStep::Parquet(ReadStepParquet {
-                schema: Some(vec![
-                    "event_time string".to_string(),
-                    "city string".to_string(),
-                    "population int".to_string(),
-                ]),
-            }),
-        )
-        .await
-        .unwrap();
-
-    assert_schema_eq(
-        df.schema(),
-        r#"
-message arrow_schema {
-  REQUIRED BYTE_ARRAY event_time (STRING);
-  REQUIRED BYTE_ARRAY city (STRING);
-  REQUIRED INT32 population;
-}
-        "#,
-    );
-
-    assert_data_eq(
-        df,
-        r#"
-+----------------------+-----------+------------+
-| event_time           | city      | population |
-+----------------------+-----------+------------+
-| 2023-01-01T00:00:00Z | vancouver | 675000     |
-| 2023-01-01T00:00:00Z | seattle   | 733000     |
-| 2023-01-01T00:00:00Z | kyiv      | 2884000    |
-+----------------------+-----------+------------+
-        "#,
+    test_reader_common::test_reader_success(
+        ReaderParquet {},
+        ReadStepParquet {
+            schema: Some(vec![
+                "event_time string".to_string(),
+                "city string".to_string(),
+                "population int".to_string(),
+            ]),
+        },
+        |path| async {
+            write_test_data(path);
+        },
+        indoc!(
+            r#"
+            message arrow_schema {
+              REQUIRED BYTE_ARRAY event_time (STRING);
+              REQUIRED BYTE_ARRAY city (STRING);
+              REQUIRED INT32 population;
+            }
+            "#
+        ),
+        indoc!(
+            r#"
+            +----------------------+-----------+------------+
+            | event_time           | city      | population |
+            +----------------------+-----------+------------+
+            | 2023-01-01T00:00:00Z | vancouver | 675000     |
+            | 2023-01-01T00:00:00Z | seattle   | 733000     |
+            | 2023-01-01T00:00:00Z | kyiv      | 2884000    |
+            +----------------------+-----------+------------+
+            "#
+        ),
     )
     .await;
 }

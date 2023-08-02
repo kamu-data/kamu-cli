@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use std::path::Path;
-use std::sync::Arc;
 
 use datafusion::prelude::*;
 use internal_error::InternalError;
@@ -34,19 +33,4 @@ pub trait Reader: Send + Sync {
 pub enum ReadError {
     #[error(transparent)]
     Internal(#[from] InternalError),
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-// TODO: Replace with DI
-pub fn get_reader_for(conf: &ReadStep) -> Arc<dyn Reader> {
-    use crate::readers::*;
-
-    match conf {
-        ReadStep::Csv(_) => Arc::new(ReaderCsv {}),
-        ReadStep::JsonLines(_) => todo!(),
-        ReadStep::GeoJson(_) => todo!(),
-        ReadStep::EsriShapefile(_) => todo!(),
-        ReadStep::Parquet(_) => Arc::new(ReaderParquet {}),
-    }
 }

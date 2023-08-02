@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 use datafusion::error::DataFusionError;
@@ -15,6 +16,7 @@ use datafusion::prelude::*;
 use internal_error::*;
 use kamu_core::OwnedFile;
 use kamu_data_utils::data::dataframe_ext::*;
+use kamu_ingest_datafusion::*;
 use opendatafabric::*;
 
 use crate::domain::{IngestError, IngestRequest, IngestResponse};
@@ -39,6 +41,17 @@ pub struct ReadServiceDatafusion {
 impl ReadServiceDatafusion {
     pub fn new(run_info_dir: PathBuf) -> Self {
         Self { run_info_dir }
+    }
+
+    // TODO: Replace with DI
+    fn get_reader_for(conf: &ReadStep) -> Arc<dyn Reader> {
+        match conf {
+            ReadStep::Csv(_) => Arc::new(ReaderCsv {}),
+            ReadStep::JsonLines(_) => Arc::new(ReaderJsonLines {}),
+            ReadStep::GeoJson(_) => todo!(),
+            ReadStep::EsriShapefile(_) => todo!(),
+            ReadStep::Parquet(_) => Arc::new(ReaderParquet {}),
+        }
     }
 
     async fn with_system_columns(
@@ -150,7 +163,7 @@ impl ReadService for ReadServiceDatafusion {
 
         let ctx = SessionContext::new();
 
-        let reader = kamu_ingest_datafusion::get_reader_for(&source.read);
+        let reader = Self::get_reader_for(&source.read);
         let df = reader
             .read(&ctx, &in_data_path, &source.read)
             .await

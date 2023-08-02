@@ -40,6 +40,7 @@ url = { version = "2", features = ["serde"] }
 kamu-data-utils = { workspace = true, features = ["testing"] }
 criterion = { version = "0.5", features = ["async_tokio"] }
 env_logger = "0.10"
+indoc = "2"
 pretty_assertions = "1"
 rand = "0.8"
 test-log = { version = "0.2", features = ["trace"] }

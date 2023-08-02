@@ -7,69 +7,53 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use datafusion::prelude::*;
-use kamu_data_utils::testing::*;
+use indoc::indoc;
 use kamu_ingest_datafusion::*;
 use opendatafabric::*;
+
+use super::test_reader_common;
 
 ///////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_read_csv_with_schema() {
-    let temp_dir = tempfile::tempdir().unwrap();
-    let ctx = SessionContext::new();
-
-    let path = temp_dir.path().join("data.csv");
-    std::fs::write(
-        &path,
-        r#"
-city,population
-A,1000
-B,2000
-C,3000
-        "#
-        .trim(),
-    )
-    .unwrap();
-
-    let reader = ReaderCsv {};
-    let df = reader
-        .read(
-            &ctx,
-            &path,
-            &ReadStep::Csv(ReadStepCsv {
-                header: Some(true),
-                schema: Some(vec![
-                    "city string not null".to_string(),
-                    "population int not null".to_string(),
-                ]),
-                ..Default::default()
-            }),
-        )
-        .await
-        .unwrap();
-
-    assert_schema_eq(
-        df.schema(),
-        r#"
-message arrow_schema {
-  REQUIRED BYTE_ARRAY city (STRING);
-  REQUIRED INT32 population;
-}
-        "#,
-    );
-
-    assert_data_eq(
-        df,
-        r#"
-+------+------------+
-| city | population |
-+------+------------+
-| A    | 1000       |
-| B    | 2000       |
-| C    | 3000       |
-+------+------------+
-        "#,
+    test_reader_common::test_reader_success_textual(
+        ReaderCsv {},
+        ReadStepCsv {
+            header: Some(true),
+            schema: Some(vec![
+                "city string not null".to_string(),
+                "population int not null".to_string(),
+            ]),
+            ..Default::default()
+        },
+        indoc!(
+            r#"
+            city,population
+            A,1000
+            B,2000
+            C,3000
+            "#
+        ),
+        indoc!(
+            r#"
+            message arrow_schema {
+              REQUIRED BYTE_ARRAY city (STRING);
+              REQUIRED INT32 population;
+            }
+            "#
+        ),
+        indoc!(
+            r#"
+            +------+------------+
+            | city | population |
+            +------+------------+
+            | A    | 1000       |
+            | B    | 2000       |
+            | C    | 3000       |
+            +------+------------+
+            "#
+        ),
     )
     .await;
 }
@@ -78,56 +62,39 @@ message arrow_schema {
 
 #[test_log::test(tokio::test)]
 async fn test_read_csv_infer_schema() {
-    let temp_dir = tempfile::tempdir().unwrap();
-    let ctx = SessionContext::new();
-
-    let path = temp_dir.path().join("data.csv");
-    std::fs::write(
-        &path,
-        r#"
-city,population
-A,1000
-B,2000
-C,3000
-        "#
-        .trim(),
-    )
-    .unwrap();
-
-    let reader = ReaderCsv {};
-    let df = reader
-        .read(
-            &ctx,
-            &path,
-            &ReadStep::Csv(ReadStepCsv {
-                header: Some(true),
-                ..Default::default()
-            }),
-        )
-        .await
-        .unwrap();
-
-    assert_schema_eq(
-        df.schema(),
-        r#"
-message arrow_schema {
-  OPTIONAL BYTE_ARRAY city (STRING);
-  OPTIONAL INT64 population;
-}
-        "#,
-    );
-
-    assert_data_eq(
-        df,
-        r#"
-+------+------------+
-| city | population |
-+------+------------+
-| A    | 1000       |
-| B    | 2000       |
-| C    | 3000       |
-+------+------------+
-        "#,
+    test_reader_common::test_reader_success_textual(
+        ReaderCsv {},
+        ReadStepCsv {
+            header: Some(true),
+            ..Default::default()
+        },
+        indoc!(
+            r#"
+            city,population
+            A,1000
+            B,2000
+            C,3000
+            "#
+        ),
+        indoc!(
+            r#"
+            message arrow_schema {
+              OPTIONAL BYTE_ARRAY city (STRING);
+              OPTIONAL INT64 population;
+            }
+            "#
+        ),
+        indoc!(
+            r#"
+            +------+------------+
+            | city | population |
+            +------+------------+
+            | A    | 1000       |
+            | B    | 2000       |
+            | C    | 3000       |
+            +------+------------+
+            "#
+        ),
     )
     .await;
 }

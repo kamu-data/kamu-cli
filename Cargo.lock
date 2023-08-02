@@ -3251,6 +3251,7 @@ dependencies = [
  "datafusion",
  "digest 0.10.7",
  "env_logger",
+ "indoc",
  "internal-error",
  "kamu-data-utils",
  "object_store",
