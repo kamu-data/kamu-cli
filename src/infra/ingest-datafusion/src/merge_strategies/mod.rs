@@ -7,17 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use datafusion::prelude::DataFrame;
+mod append;
+mod ledger;
+mod snapshot;
 
-use super::*;
-
-/// Append merge strategy.
-///
-/// See [opendatafabric::MergeStrategy] for details.
-pub struct MergeStrategyAppend;
-
-impl MergeStrategy for MergeStrategyAppend {
-    fn merge(&self, _prev: DataFrame, new: DataFrame) -> Result<DataFrame, MergeError> {
-        Ok(new)
-    }
-}
+pub use append::*;
+pub use ledger::*;
+pub use snapshot::*;

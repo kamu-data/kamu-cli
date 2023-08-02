@@ -17,6 +17,11 @@ publish = { workspace = true }
 doctest = false
 
 
+[features]
+default = []
+testing = ["dep:pretty_assertions"]
+
+
 [dependencies]
 opendatafabric = { workspace = true }
 
@@ -24,8 +29,10 @@ arrow-digest = { version = "45", default-features = false }
 datafusion = { version = "30", default-features = false }
 tracing = { version = "0.1", default-features = false }
 
+async-trait = "0.1"
 digest = "0.10"
 sha3 = "0.10"
 thiserror = { version = "=1.0.44", default-features = false }  # TODO: Pinned until rustc upgrade
 url = "2"
 
+pretty_assertions = { optional = true, version = "1" }

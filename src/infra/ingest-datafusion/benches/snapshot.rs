@@ -147,7 +147,8 @@ async fn setup(
 async fn merge_snapshot(prev_path: &str, new_path: &str, expected_rows: usize) {
     use kamu_ingest_datafusion::*;
 
-    let ctx = SessionContext::new();
+    let ctx = SessionContext::with_config(SessionConfig::new());
+
     ctx.register_parquet("prev", prev_path, ParquetReadOptions::default())
         .await
         .unwrap();

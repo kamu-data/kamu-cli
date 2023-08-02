@@ -9,3 +9,6 @@
 
 pub mod data;
 pub mod schema;
+
+#[cfg(feature = "testing")]
+pub mod testing;

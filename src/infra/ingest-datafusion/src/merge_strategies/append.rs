@@ -7,7 +7,17 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod test_merge_strategy_append;
-mod test_merge_strategy_ledger;
-mod test_merge_strategy_snapshot;
-mod test_reader_csv;
+use datafusion::prelude::DataFrame;
+
+use crate::*;
+
+/// Append merge strategy.
+///
+/// See [opendatafabric::MergeStrategy] for details.
+pub struct MergeStrategyAppend;
+
+impl MergeStrategy for MergeStrategyAppend {
+    fn merge(&self, _prev: DataFrame, new: DataFrame) -> Result<DataFrame, MergeError> {
+        Ok(new)
+    }
+}

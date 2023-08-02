@@ -13,7 +13,7 @@ use datafusion::arrow::array;
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::prelude::*;
-use kamu_ingest_datafusion::dataframe_ext::*;
+use kamu_data_utils::data::dataframe_ext::*;
 use kamu_ingest_datafusion::*;
 
 use crate::utils::*;

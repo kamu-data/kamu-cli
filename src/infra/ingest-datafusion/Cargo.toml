@@ -19,7 +19,8 @@ doctest = false
 
 [dependencies]
 internal-error = { workspace = true }
-opendatafabric = { workspace = true } 
+opendatafabric = { workspace = true }
+kamu-data-utils = { workspace = true }
 
 datafusion = "28"
 digest = "0.10"
@@ -36,6 +37,7 @@ url = { version = "2", features = ["serde"] }
 
 
 [dev-dependencies]
+kamu-data-utils = { workspace = true, features = ["testing"] }
 criterion = { version = "0.5", features = ["async_tokio"] }
 env_logger = "0.10"
 pretty_assertions = "1"

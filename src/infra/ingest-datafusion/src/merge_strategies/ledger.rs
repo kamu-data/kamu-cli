@@ -10,7 +10,7 @@
 use datafusion::prelude::*;
 use internal_error::*;
 
-use super::*;
+use crate::*;
 
 /// Ledger merge strategy.
 ///

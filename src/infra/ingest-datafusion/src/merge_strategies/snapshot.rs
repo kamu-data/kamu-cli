@@ -12,10 +12,10 @@ use datafusion::logical_expr::Operator;
 use datafusion::prelude::*;
 use datafusion::sql::TableReference;
 use internal_error::*;
+use kamu_data_utils::data::dataframe_ext::*;
 use opendatafabric as odf;
 
-use super::*;
-use crate::dataframe_ext::*;
+use crate::*;
 
 /// Snapshot merge strategy.
 ///
