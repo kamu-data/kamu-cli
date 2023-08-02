@@ -11,7 +11,10 @@ use std::str::FromStr;
 
 use kamu::domain::*;
 use kamu::testing::{DatasetTestHelper, MetadataFactory};
+use kamu::DatasetLayout;
 use opendatafabric::*;
+use tokio::fs::File;
+use tokio::io::AsyncWriteExt;
 
 use crate::harness::{
     await_client_server_flow,
@@ -24,13 +27,11 @@ use crate::harness::{
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_smart_push_new_dataset<T: ServerSideHarness>(server_harness: T) {
-    let server_dataset_layout = server_harness.dataset_layout("foo");
-
     let client_harness = ClientSideHarness::new();
     let client_dataset_layout = client_harness.dataset_layout("foo");
     let client_repo = client_harness.dataset_repository();
 
-    client_repo
+    let create_result = client_repo
         .create_dataset_from_snapshot(
             None,
             MetadataFactory::dataset_snapshot()
@@ -41,6 +42,8 @@ pub async fn test_smart_push_new_dataset<T: ServerSideHarness>(server_harness: T
         )
         .await
         .unwrap();
+
+    let server_dataset_layout = server_harness.dataset_layout(&create_result.dataset_handle);
 
     let dataset_ref = DatasetRef::from_str("foo").unwrap();
 
@@ -74,13 +77,11 @@ pub async fn test_smart_push_new_dataset<T: ServerSideHarness>(server_harness: T
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_smart_push_existing_up_to_date_dataset<T: ServerSideHarness>(server_harness: T) {
-    let server_dataset_layout = server_harness.dataset_layout("foo");
-
     let client_harness = ClientSideHarness::new();
     let client_dataset_layout = client_harness.dataset_layout("foo");
     let client_repo = client_harness.dataset_repository();
 
-    client_repo
+    let create_result = client_repo
         .create_dataset_from_snapshot(
             None,
             MetadataFactory::dataset_snapshot()
@@ -92,6 +93,8 @@ pub async fn test_smart_push_existing_up_to_date_dataset<T: ServerSideHarness>(s
         .await
         .unwrap();
 
+    let server_dataset_layout = server_harness.dataset_layout(&create_result.dataset_handle);
+
     let dataset_ref: DatasetRef = DatasetRef::from_str("foo").unwrap();
 
     commit_add_data_event(client_repo.as_ref(), &dataset_ref, &client_dataset_layout).await;
@@ -102,6 +105,9 @@ pub async fn test_smart_push_existing_up_to_date_dataset<T: ServerSideHarness>(s
         &server_dataset_layout.root_dir,
     )
     .unwrap();
+
+    // Note: local FS repo does not have "info/alias" file unlike S3 repo
+    write_dataset_alias(&server_dataset_layout, &create_result.dataset_handle.alias).await;
 
     let foo_odf_url = server_harness.dataset_url("foo");
     let foo_dataset_ref = DatasetRefRemote::from(&foo_odf_url);
@@ -123,8 +129,6 @@ pub async fn test_smart_push_existing_up_to_date_dataset<T: ServerSideHarness>(s
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_smart_push_existing_evolved_dataset<T: ServerSideHarness>(server_harness: T) {
-    let server_dataset_layout = server_harness.dataset_layout("foo");
-
     let client_harness = ClientSideHarness::new();
     let client_dataset_layout = client_harness.dataset_layout("foo");
     let client_repo = client_harness.dataset_repository();
@@ -141,12 +145,17 @@ pub async fn test_smart_push_existing_evolved_dataset<T: ServerSideHarness>(serv
         .await
         .unwrap();
 
+    let server_dataset_layout = server_harness.dataset_layout(&create_result.dataset_handle);
+
     // Hard folder synchronization
     copy_folder_recursively(
         &client_dataset_layout.root_dir,
         &server_dataset_layout.root_dir,
     )
     .unwrap();
+
+    // Note: local FS repo does not have "info/alias" file unlike S3 repo
+    write_dataset_alias(&server_dataset_layout, &create_result.dataset_handle.alias).await;
 
     // Extend client-side dataset with new nodes
     let dataset_ref = DatasetRef::from_str("foo").unwrap();
@@ -197,14 +206,13 @@ pub async fn test_smart_push_existing_evolved_dataset<T: ServerSideHarness>(serv
 pub async fn test_smart_push_existing_dataset_fails_as_server_advanced<T: ServerSideHarness>(
     server_harness: T,
 ) {
-    let server_dataset_layout = server_harness.dataset_layout("foo");
     let server_repo = server_harness.dataset_repository();
 
     let client_harness = ClientSideHarness::new();
     let client_dataset_layout = client_harness.dataset_layout("foo");
     let client_repo = client_harness.dataset_repository();
 
-    client_repo
+    let create_result = client_repo
         .create_dataset_from_snapshot(
             None,
             MetadataFactory::dataset_snapshot()
@@ -216,12 +224,17 @@ pub async fn test_smart_push_existing_dataset_fails_as_server_advanced<T: Server
         .await
         .unwrap();
 
+    let server_dataset_layout = server_harness.dataset_layout(&create_result.dataset_handle);
+
     // Hard folder synchronization
     copy_folder_recursively(
         &client_dataset_layout.root_dir,
         &server_dataset_layout.root_dir,
     )
     .unwrap();
+
+    // Note: local FS repo does not have "info/alias" file unlike S3 repo
+    write_dataset_alias(&server_dataset_layout, &create_result.dataset_handle.alias).await;
 
     let dataset_ref = DatasetRef::from_str("foo").unwrap();
 
@@ -262,13 +275,11 @@ pub async fn test_smart_push_existing_dataset_fails_as_server_advanced<T: Server
 pub async fn test_smart_push_aborted_write_of_new_rewrite_succeeds<T: ServerSideHarness>(
     server_harness: T,
 ) {
-    let server_dataset_layout = server_harness.dataset_layout("foo");
-
     let client_harness = ClientSideHarness::new();
     let client_dataset_layout = client_harness.dataset_layout("foo");
     let client_repo = client_harness.dataset_repository();
 
-    client_repo
+    let create_result = client_repo
         .create_dataset_from_snapshot(
             None,
             MetadataFactory::dataset_snapshot()
@@ -279,6 +290,8 @@ pub async fn test_smart_push_aborted_write_of_new_rewrite_succeeds<T: ServerSide
         )
         .await
         .unwrap();
+
+    let server_dataset_layout = server_harness.dataset_layout(&create_result.dataset_handle);
 
     let dataset_ref = DatasetRef::from_str("foo").unwrap();
 
@@ -293,6 +306,9 @@ pub async fn test_smart_push_aborted_write_of_new_rewrite_succeeds<T: ServerSide
         &server_dataset_layout.data_dir,
     )
     .unwrap();
+
+    // Note: local FS repo does not have "info/alias" file unlike S3 repo
+    write_dataset_alias(&server_dataset_layout, &create_result.dataset_handle.alias).await;
 
     let foo_odf_url = server_harness.dataset_url("foo");
     let foo_dataset_ref = DatasetRefRemote::from(&foo_odf_url);
@@ -323,8 +339,6 @@ pub async fn test_smart_push_aborted_write_of_new_rewrite_succeeds<T: ServerSide
 pub async fn test_smart_push_aborted_write_of_updated_rewrite_succeeds<T: ServerSideHarness>(
     server_harness: T,
 ) {
-    let server_dataset_layout = server_harness.dataset_layout("foo");
-
     let client_harness = ClientSideHarness::new();
     let client_dataset_layout = client_harness.dataset_layout("foo");
     let client_repo = client_harness.dataset_repository();
@@ -341,12 +355,17 @@ pub async fn test_smart_push_aborted_write_of_updated_rewrite_succeeds<T: Server
         .await
         .unwrap();
 
+    let server_dataset_layout = server_harness.dataset_layout(&create_result.dataset_handle);
+
     // Hard folder synchronization
     copy_folder_recursively(
         &client_dataset_layout.root_dir,
         &server_dataset_layout.root_dir,
     )
     .unwrap();
+
+    // Note: local FS repo does not have "info/alias" file unlike S3 repo
+    write_dataset_alias(&server_dataset_layout, &create_result.dataset_handle.alias).await;
 
     // Extend client-side dataset with new nodes
     let dataset_ref = DatasetRef::from_str("foo").unwrap();
@@ -399,6 +418,21 @@ pub async fn test_smart_push_aborted_write_of_updated_rewrite_succeeds<T: Server
     };
 
     await_client_server_flow!(api_server_handle, client_handle)
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+async fn write_dataset_alias(dataset_layout: &DatasetLayout, alias: &DatasetAlias) {
+    if !dataset_layout.info_dir.is_dir() {
+        std::fs::create_dir_all(dataset_layout.info_dir.clone()).unwrap();
+    }
+
+    let alias_path = dataset_layout.info_dir.join("alias");
+    let mut alias_file = File::create(alias_path).await.unwrap();
+    alias_file
+        .write_all(alias.to_string().as_bytes())
+        .await
+        .unwrap();
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

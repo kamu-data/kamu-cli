@@ -324,7 +324,7 @@ impl SparkEngine {
 
         {
             tracing::info!(?request, path = ?request_path, "Writing request");
-            let file = File::create(&request_path)?;
+            let file: File = File::create(&request_path)?;
             serde_yaml::to_writer(file, &request).int_err()?;
         }
 

@@ -16,6 +16,7 @@ use kamu::domain::{CurrentAccountSubject, DatasetRepository, InternalError, Resu
 use kamu::testing::LocalS3Server;
 use kamu::utils::s3_context::S3Context;
 use kamu::{DatasetLayout, DatasetRepositoryS3};
+use opendatafabric::DatasetHandle;
 use url::Url;
 
 use super::{ServerSideHarness, TestAPIServer};
@@ -71,10 +72,10 @@ impl ServerSideHarness for ServerSideS3Harness {
             .unwrap()
     }
 
-    fn dataset_layout(&self, dataset_name: &str) -> DatasetLayout {
+    fn dataset_layout(&self, dataset_handle: &DatasetHandle) -> DatasetLayout {
         DatasetLayout::new(
             self.internal_bucket_folder_path()
-                .join(dataset_name)
+                .join(dataset_handle.id.cid.to_string())
                 .as_path(),
         )
     }

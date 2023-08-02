@@ -15,6 +15,7 @@ use std::sync::Arc;
 use dill::builder_for;
 use kamu::domain::{CurrentAccountSubject, DatasetRepository, InternalError, ResultIntoInternal};
 use kamu::{DatasetLayout, DatasetRepositoryLocalFs};
+use opendatafabric::DatasetHandle;
 use tempfile::TempDir;
 use url::Url;
 
@@ -79,10 +80,10 @@ impl ServerSideHarness for ServerSideLocalFsHarness {
             .unwrap()
     }
 
-    fn dataset_layout(&self, dataset_name: &str) -> DatasetLayout {
+    fn dataset_layout(&self, dataset_handle: &DatasetHandle) -> DatasetLayout {
         DatasetLayout::new(
             self.internal_datasets_folder_path()
-                .join(dataset_name)
+                .join(dataset_handle.alias.dataset_name.clone())
                 .as_path(),
         )
     }
