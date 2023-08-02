@@ -30,6 +30,7 @@ pub struct IngestTask {
     fetch_service: FetchService,
     prep_service: PrepService,
     engine_provisioner: Arc<dyn EngineProvisioner>,
+    run_info_dir: PathBuf,
     cache_dir: PathBuf,
 }
 
@@ -42,8 +43,8 @@ impl IngestTask {
         listener: Arc<dyn IngestListener>,
         engine_provisioner: Arc<dyn EngineProvisioner>,
         container_runtime: Arc<ContainerRuntime>,
-        run_info_dir: &PathBuf,
-        cache_dir: &PathBuf,
+        run_info_dir: &Path,
+        cache_dir: &Path,
     ) -> Result<Self, InternalError> {
         if let Some(polling_source) = &request.polling_source {
             if fetch_override.is_some() {
@@ -69,7 +70,8 @@ impl IngestTask {
             fetch_service: FetchService::new(container_runtime, &run_info_dir),
             prep_service: PrepService::new(),
             engine_provisioner,
-            cache_dir: cache_dir.clone(),
+            run_info_dir: run_info_dir.to_owned(),
+            cache_dir: cache_dir.to_owned(),
             request,
         })
     }
@@ -389,28 +391,30 @@ impl IngestTask {
         // TODO: Should we still call an engine if only to propagate source_event_time
         // to it?
         if input_data_path.metadata().int_err()?.len() == 0 {
-            Ok(IngestResponse {
+            return Ok(IngestResponse {
                 data_interval: None,
                 output_watermark: self.request.prev_watermark,
                 out_checkpoint: None,
                 out_data: None,
-            })
-        } else {
-            let engine = self
-                .engine_provisioner
-                .provision_ingest_engine(self.listener.clone().get_engine_provisioning_listener())
-                .await?;
-
-            let response = engine
-                .ingest(IngestRequest {
-                    event_time: source_event_time,
-                    input_data_path,
-                    ..self.request.clone()
-                })
-                .await?;
-
-            Ok(response)
+            });
         }
+
+        let request = IngestRequest {
+            event_time: source_event_time,
+            input_data_path,
+            ..self.request.clone()
+        };
+
+        let read_svc: Box<dyn ReadService> =
+            if std::env::var("KAMU_INGEST_IMPL") == Ok("datafusion".to_string()) {
+                Box::new(ReadServiceDatafusion::new(self.run_info_dir.clone()))
+            } else {
+                Box::new(ReadServiceSpark::new(
+                    self.engine_provisioner.clone(),
+                    self.listener.clone(),
+                ))
+            };
+        read_svc.read(request).await
     }
 
     #[tracing::instrument(level = "info", name = "commit", skip_all)]

@@ -3000,6 +3000,7 @@ dependencies = [
  "itertools 0.11.0",
  "kamu-core",
  "kamu-data-utils",
+ "kamu-ingest-datafusion",
  "libc",
  "mockall",
  "object_store",
@@ -3229,9 +3230,11 @@ name = "kamu-data-utils"
 version = "0.139.0"
 dependencies = [
  "arrow-digest",
+ "async-trait",
  "datafusion",
  "digest",
  "opendatafabric",
+ "pretty_assertions",
  "sha3",
  "thiserror",
  "tracing",
@@ -3249,6 +3252,7 @@ dependencies = [
  "digest 0.10.7",
  "env_logger",
  "internal-error",
+ "kamu-data-utils",
  "object_store",
  "opendatafabric",
  "pretty_assertions",

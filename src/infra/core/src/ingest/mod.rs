@@ -7,14 +7,16 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod ingest_task;
-pub use ingest_task::*;
-
 mod fetch_service;
-pub use fetch_service::*;
-
-mod prep_service;
-pub use prep_service::*;
-
+mod ingest_task;
 mod polling_source_state;
+mod prep_service;
+mod read_service_datafusion;
+mod read_service_spark;
+
+pub use fetch_service::*;
+pub use ingest_task::*;
 pub use polling_source_state::*;
+pub use prep_service::*;
+pub use read_service_datafusion::*;
+pub use read_service_spark::*;

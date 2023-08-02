@@ -30,6 +30,7 @@ container-runtime = { workspace = true }
 kamu-data-utils = { workspace = true }
 opendatafabric = { workspace = true }
 kamu-core = { workspace = true }
+kamu-ingest-datafusion = { workspace = true }
 
 # Serialization
 flatbuffers = "23"
