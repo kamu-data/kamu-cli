@@ -18,6 +18,13 @@ pub fn write_schema_parquet(output: &mut dyn Write, schema: &Type) -> Result<(),
     Ok(())
 }
 
+/// Same as [write_schema_parquet] bu outputs into a String
+pub fn format_schema_parquet(schema: &Type) -> String {
+    let mut buf = Vec::new();
+    crate::schema::format::write_schema_parquet(&mut buf, &schema).unwrap();
+    String::from_utf8(buf).unwrap()
+}
+
 /// Similar to [write_schema_parquet], but uses JSON format that does not
 /// require a custom parser
 pub fn write_schema_parquet_json(

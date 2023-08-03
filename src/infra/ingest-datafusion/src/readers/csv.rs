@@ -29,17 +29,10 @@ impl Reader for ReaderCsv {
         path: &Path,
         conf: &ReadStep,
     ) -> Result<DataFrame, ReadError> {
+        let schema = self.output_schema(ctx, conf).await?;
+
         let ReadStep::Csv(conf) = conf else {
             unreachable!()
-        };
-
-        let schema = match &conf.schema {
-            Some(s) => Some(
-                kamu_data_utils::schema::parse::parse_ddl_to_arrow_schema(ctx, s)
-                    .await
-                    .int_err()?,
-            ),
-            None => None,
         };
 
         let options = CsvReadOptions {

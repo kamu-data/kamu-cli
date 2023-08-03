@@ -160,20 +160,20 @@ async fn test_read_json_ld_format_timestamp() {
         indoc!(
             r#"
             message arrow_schema {
-              REQUIRED INT64 event_time (TIMESTAMP(NANOS,false));
+              REQUIRED INT64 event_time (TIMESTAMP(NANOS,true));
             }
             "#
         ),
         indoc!(
             r#"
-            +---------------------+
-            | event_time          |
-            +---------------------+
-            | 2022-09-25T01:02:03 |
-            | 2022-09-25T01:02:03 |
-            | 2022-09-25T01:02:03 |
-            | 2022-09-25T02:02:03 |
-            +---------------------+
+            +----------------------+
+            | event_time           |
+            +----------------------+
+            | 2022-09-25T01:02:03Z |
+            | 2022-09-25T01:02:03Z |
+            | 2022-09-25T01:02:03Z |
+            | 2022-09-25T02:02:03Z |
+            +----------------------+
             "#
         ),
     )

@@ -37,7 +37,7 @@ url = { version = "2", features = ["serde"] }
 
 
 [dev-dependencies]
-kamu-data-utils = { workspace = true, features = ["testing"] }
+kamu-data-utils = { workspace = true }
 criterion = { version = "0.5", features = ["async_tokio"] }
 env_logger = "0.10"
 indoc = "2"

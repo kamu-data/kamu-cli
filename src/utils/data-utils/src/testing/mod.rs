@@ -13,9 +13,7 @@ use pretty_assertions::assert_eq;
 
 pub fn assert_schema_eq(schema: &DFSchema, expected: &str) {
     let parquet_schema = crate::schema::convert::dataframe_schema_to_parquet_schema(schema);
-    let mut buf = Vec::new();
-    crate::schema::format::write_schema_parquet(&mut buf, &parquet_schema).unwrap();
-    let actual = std::str::from_utf8(&buf).unwrap();
+    let actual = crate::schema::format::format_schema_parquet(&parquet_schema);
     assert_eq!(expected.trim(), actual.trim())
 }
 

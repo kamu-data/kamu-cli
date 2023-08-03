@@ -29,7 +29,9 @@ impl Reader for ReaderParquet {
         path: &Path,
         conf: &ReadStep,
     ) -> Result<DataFrame, ReadError> {
-        let ReadStep::Parquet(conf) = conf else {
+        let schema = self.output_schema(ctx, conf).await?;
+
+        let ReadStep::Parquet(_) = conf else {
             unreachable!()
         };
 
@@ -45,12 +47,7 @@ impl Reader for ReaderParquet {
             .await
             .int_err()?;
 
-        let df = if let Some(schema) = &conf.schema {
-            let schema =
-                kamu_data_utils::schema::parse::parse_ddl_to_datafusion_schema(ctx, schema)
-                    .await
-                    .int_err()?;
-
+        let df = if let Some(schema) = schema {
             tracing::debug!(
                 orig_schema = ?df.schema(),
                 target_schema = ?schema,

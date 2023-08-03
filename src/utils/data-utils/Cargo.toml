@@ -17,11 +17,6 @@ publish = { workspace = true }
 doctest = false
 
 
-[features]
-default = []
-testing = ["dep:pretty_assertions"]
-
-
 [dependencies]
 opendatafabric = { workspace = true }
 
@@ -31,8 +26,15 @@ tracing = { version = "0.1", default-features = false }
 
 async-trait = "0.1"
 digest = "0.10"
+pretty_assertions = { version = "1" }
 sha3 = "0.10"
 thiserror = { version = "=1.0.44", default-features = false }  # TODO: Pinned until rustc upgrade
 url = "2"
 
-pretty_assertions = { optional = true, version = "1" }
+
+
+[dev-dependencies]
+env_logger = "0.10"
+test-log = { version = "0.2", features = ["trace"] }
+tokio = { version = "1", default-features = false, features=["rt", "macros"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
