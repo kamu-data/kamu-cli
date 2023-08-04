@@ -88,8 +88,8 @@ impl DatasetRepositoryLocalFs {
 #[async_trait]
 impl DatasetRegistry for DatasetRepositoryLocalFs {
     async fn get_dataset_url(&self, dataset_ref: &DatasetRef) -> Result<Url, GetDatasetUrlError> {
-        let handle = self.resolve_dataset_ref(dataset_ref).await?;
-        let dataset_path = self.storage_strategy.get_dataset_path(&handle);
+        let dataset_handle = self.resolve_dataset_ref(dataset_ref).await?;
+        let dataset_path = self.storage_strategy.get_dataset_path(&dataset_handle);
         Ok(Url::from_directory_path(dataset_path).unwrap())
     }
 }
@@ -144,16 +144,16 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
         self.storage_strategy.get_all_datasets()
     }
 
-    fn get_account_datasets<'s>(&'s self, account_name: AccountName) -> DatasetHandleStream<'s> {
-        self.storage_strategy.get_account_datasets(account_name)
+    fn get_datasets_by_owner<'s>(&'s self, account_name: AccountName) -> DatasetHandleStream<'s> {
+        self.storage_strategy.get_datasets_by_owner(account_name)
     }
 
     async fn get_dataset(
         &self,
         dataset_ref: &DatasetRef,
     ) -> Result<Arc<dyn Dataset>, GetDatasetError> {
-        let handle = self.resolve_dataset_ref(dataset_ref).await?;
-        let dataset = self.get_dataset_impl(&handle)?;
+        let dataset_handle = self.resolve_dataset_ref(dataset_ref).await?;
+        let dataset = self.get_dataset_impl(&dataset_handle)?;
         Ok(Arc::new(dataset))
     }
 
@@ -236,9 +236,6 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
             .await
         {
             Ok(head) => head,
-            Err(AppendError::RefCASFailed(_)) => {
-                unreachable!("The duplication protection should have triggered by now");
-            }
             Err(err) => return Err(err.int_err().into()),
         };
 
@@ -345,7 +342,7 @@ trait DatasetStorageStrategy: Sync + Send {
 
     fn get_all_datasets<'s>(&'s self) -> DatasetHandleStream<'s>;
 
-    fn get_account_datasets<'s>(&'s self, account_name: AccountName) -> DatasetHandleStream<'s>;
+    fn get_datasets_by_owner<'s>(&'s self, account_name: AccountName) -> DatasetHandleStream<'s>;
 
     async fn resolve_dataset_alias(
         &self,
@@ -468,7 +465,7 @@ impl DatasetStorageStrategy for DatasetSingleTenantStorageStrategy {
         })
     }
 
-    fn get_account_datasets<'s>(&'s self, account_name: AccountName) -> DatasetHandleStream<'s> {
+    fn get_datasets_by_owner<'s>(&'s self, account_name: AccountName) -> DatasetHandleStream<'s> {
         if account_name == self.current_account_subject.account_name {
             self.get_all_datasets()
         } else {
@@ -698,7 +695,7 @@ impl DatasetStorageStrategy for DatasetMultiTenantStorageStrategy {
         })
     }
 
-    fn get_account_datasets<'s>(&'s self, account_name: AccountName) -> DatasetHandleStream<'s> {
+    fn get_datasets_by_owner<'s>(&'s self, account_name: AccountName) -> DatasetHandleStream<'s> {
         Box::pin(async_stream::try_stream! {
             let account_dir_path = self.root.join(account_name.clone());
             if !account_dir_path.is_dir() {

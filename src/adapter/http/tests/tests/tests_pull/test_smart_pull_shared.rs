@@ -25,7 +25,7 @@ use crate::harness::{
 
 pub async fn test_smart_pull_new_dataset<T: ServerSideHarness>(server_harness: T) {
     let server_repo = server_harness.dataset_repository();
-    server_repo
+    let create_result = server_repo
         .create_dataset_from_snapshot(
             None,
             MetadataFactory::dataset_snapshot()
@@ -37,7 +37,7 @@ pub async fn test_smart_pull_new_dataset<T: ServerSideHarness>(server_harness: T
         .await
         .unwrap();
 
-    let server_dataset_layout = server_harness.dataset_layout("foo");
+    let server_dataset_layout = server_harness.dataset_layout(&create_result.dataset_handle);
 
     let dataset_ref = DatasetRef::from_str("foo").unwrap();
 
@@ -75,7 +75,7 @@ pub async fn test_smart_pull_new_dataset<T: ServerSideHarness>(server_harness: T
 
 pub async fn test_smart_pull_existing_up_to_date_dataset<T: ServerSideHarness>(server_harness: T) {
     let server_repo = server_harness.dataset_repository();
-    server_repo
+    let create_result = server_repo
         .create_dataset_from_snapshot(
             None,
             MetadataFactory::dataset_snapshot()
@@ -87,7 +87,7 @@ pub async fn test_smart_pull_existing_up_to_date_dataset<T: ServerSideHarness>(s
         .await
         .unwrap();
 
-    let server_dataset_layout = server_harness.dataset_layout("foo");
+    let server_dataset_layout = server_harness.dataset_layout(&create_result.dataset_handle);
 
     let dataset_ref = DatasetRef::from_str("foo").unwrap();
 
@@ -136,7 +136,7 @@ pub async fn test_smart_pull_existing_evolved_dataset<T: ServerSideHarness>(serv
         .await
         .unwrap();
 
-    let server_dataset_layout = server_harness.dataset_layout("foo");
+    let server_dataset_layout = server_harness.dataset_layout(&create_result.dataset_handle);
 
     let client_harness = ClientSideHarness::new();
     let client_dataset_layout = client_harness.dataset_layout("foo");
@@ -200,7 +200,7 @@ pub async fn test_smart_pull_existing_advanced_dataset_fails<T: ServerSideHarnes
     server_harness: T,
 ) {
     let server_repo = server_harness.dataset_repository();
-    server_repo
+    let create_result = server_repo
         .create_dataset_from_snapshot(
             None,
             MetadataFactory::dataset_snapshot()
@@ -212,7 +212,7 @@ pub async fn test_smart_pull_existing_advanced_dataset_fails<T: ServerSideHarnes
         .await
         .unwrap();
 
-    let server_dataset_layout = server_harness.dataset_layout("foo");
+    let server_dataset_layout = server_harness.dataset_layout(&create_result.dataset_handle);
 
     let client_harness = ClientSideHarness::new();
     let client_dataset_layout = client_harness.dataset_layout("foo");
@@ -263,7 +263,7 @@ pub async fn test_smart_pull_aborted_read_of_new_reread_succeeds<T: ServerSideHa
     server_harness: T,
 ) {
     let server_repo = server_harness.dataset_repository();
-    server_repo
+    let create_result = server_repo
         .create_dataset_from_snapshot(
             None,
             MetadataFactory::dataset_snapshot()
@@ -275,7 +275,7 @@ pub async fn test_smart_pull_aborted_read_of_new_reread_succeeds<T: ServerSideHa
         .await
         .unwrap();
 
-    let server_dataset_layout = server_harness.dataset_layout("foo");
+    let server_dataset_layout = server_harness.dataset_layout(&create_result.dataset_handle);
 
     let dataset_ref = DatasetRef::from_str("foo").unwrap();
 
@@ -338,7 +338,7 @@ pub async fn test_smart_pull_aborted_read_of_existing_evolved_dataset_reread_suc
         .await
         .unwrap();
 
-    let server_dataset_layout = server_harness.dataset_layout("foo");
+    let server_dataset_layout = server_harness.dataset_layout(&create_result.dataset_handle);
 
     let client_harness = ClientSideHarness::new();
     let client_dataset_layout = client_harness.dataset_layout("foo");

@@ -51,7 +51,7 @@ pub trait DatasetRepository: DatasetRegistry + Sync + Send {
 
     fn get_all_datasets<'s>(&'s self) -> DatasetHandleStream<'s>;
 
-    fn get_account_datasets<'s>(&'s self, account_name: AccountName) -> DatasetHandleStream<'s>;
+    fn get_datasets_by_owner<'s>(&'s self, account_name: AccountName) -> DatasetHandleStream<'s>;
 
     async fn get_dataset(
         &self,

@@ -14,7 +14,6 @@ use dill::*;
 use futures::TryStreamExt;
 use kamu_core::*;
 use opendatafabric::*;
-use thiserror::Error;
 use url::Url;
 
 use super::{get_downstream_dependencies_impl, DatasetFactoryImpl};
@@ -26,75 +25,100 @@ use crate::utils::s3_context::S3Context;
 pub struct DatasetRepositoryS3 {
     s3_context: S3Context,
     current_account_subject: Arc<CurrentAccountSubject>,
+    multi_tenant: bool,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 impl DatasetRepositoryS3 {
-    pub fn new(s3_context: S3Context, current_account_subject: Arc<CurrentAccountSubject>) -> Self {
+    pub fn new(
+        s3_context: S3Context,
+        current_account_subject: Arc<CurrentAccountSubject>,
+        multi_tenant: bool,
+    ) -> Self {
         Self {
             s3_context,
             current_account_subject,
+            multi_tenant,
         }
     }
 
     async fn get_dataset_impl(
         &self,
-        dataset_alias: &DatasetAlias,
+        dataset_id: &DatasetID,
     ) -> Result<impl Dataset, InternalError> {
-        assert!(
-            !dataset_alias.is_multi_tenant(),
-            "Multi-tenancy is not yet supported by S3 repo"
-        );
-
         let s3_context = self
             .s3_context
-            .sub_context(&format!("{}/", &dataset_alias.dataset_name));
+            .sub_context(&format!("{}/", &dataset_id.cid.to_string()));
 
         DatasetFactoryImpl::get_s3_from_context(s3_context).await
     }
 
-    async fn delete_dataset_s3_objects(
-        &self,
-        dataset_alias: &DatasetAlias,
-    ) -> Result<(), InternalError> {
-        assert!(
-            !dataset_alias.is_multi_tenant(),
-            "Multi-tenancy is not yet supported by S3 repo"
-        );
-        let dataset_key_prefix = self.s3_context.get_key(&dataset_alias.dataset_name);
+    async fn delete_dataset_s3_objects(&self, dataset_id: &DatasetID) -> Result<(), InternalError> {
+        let dataset_key_prefix = self.s3_context.get_key(&dataset_id.cid.to_string());
         self.s3_context.recursive_delete(dataset_key_prefix).await
     }
 
-    async fn move_bucket_items_on_dataset_rename(
+    async fn resolve_dataset_alias(
         &self,
-        old_alias: &DatasetAlias,
-        new_alias: &DatasetAlias,
-    ) -> Result<(), MoveBucketItemsOnRenameError> {
-        assert!(
-            !new_alias.is_multi_tenant(),
-            "Multi-tenancy is not yet supported by S3 repo"
-        );
+        dataset: &dyn Dataset,
+    ) -> Result<DatasetAlias, InternalError> {
+        let bytes = dataset.as_info_repo().get("alias").await.int_err()?;
+        let dataset_alias_str = std::str::from_utf8(&bytes[..]).int_err()?.trim();
+        let dataset_alias = DatasetAlias::try_from(dataset_alias_str).int_err()?;
+        Ok(dataset_alias)
+    }
 
-        let new_key_prefix = self.s3_context.get_key(&new_alias.dataset_name);
-        if self
-            .s3_context
-            .bucket_path_exists(new_key_prefix.as_str())
-            .await?
-        {
-            return Err(MoveBucketItemsOnRenameError::NameCollision(
-                NameCollisionError {
-                    alias: new_alias.clone(),
-                },
-            ));
-        }
-
-        let old_key_prefix = self.s3_context.get_key(&old_alias.dataset_name);
-        self.s3_context
-            .recursive_move(old_key_prefix, new_key_prefix)
-            .await?;
+    async fn save_dataset_alias(
+        &self,
+        dataset: &dyn Dataset,
+        dataset_alias: DatasetAlias,
+    ) -> Result<(), InternalError> {
+        dataset
+            .as_info_repo()
+            .set("alias", dataset_alias.to_string().as_bytes())
+            .await
+            .int_err()?;
 
         Ok(())
+    }
+
+    fn stream_datasets_if<'s>(
+        &'s self,
+        alias_filter: impl Fn(&DatasetAlias) -> bool + Send + 's,
+    ) -> DatasetHandleStream<'s> {
+        Box::pin(async_stream::try_stream! {
+            let folders_common_prefixes = self.s3_context.bucket_list_folders().await?;
+            for prefix in folders_common_prefixes {
+                let mut prefix = prefix.prefix.unwrap();
+                while prefix.ends_with('/') {
+                    prefix.pop();
+                }
+
+                if let Ok(id) = DatasetID::try_from(format!("did:odf:{}", prefix)) {
+                    let dataset = self.get_dataset_impl(&id).await?;
+                    let dataset_alias = self.resolve_dataset_alias(&dataset).await?;
+                    if alias_filter(&dataset_alias) {
+                        let hdl = DatasetHandle::new(id, dataset_alias);
+                        yield hdl;
+                    }
+
+                }
+            }
+        })
+    }
+
+    fn normalize_alias(&self, alias: &DatasetAlias) -> DatasetAlias {
+        if alias.is_multi_tenant() {
+            alias.clone()
+        } else if self.is_multi_tenant() {
+            DatasetAlias::new(
+                Some(self.current_account_subject.account_name.clone()),
+                alias.dataset_name.clone(),
+            )
+        } else {
+            DatasetAlias::new(None, alias.dataset_name.clone())
+        }
     }
 }
 
@@ -112,8 +136,7 @@ impl DatasetRegistry for DatasetRepositoryS3 {
 #[async_trait]
 impl DatasetRepository for DatasetRepositoryS3 {
     fn is_multi_tenant(&self) -> bool {
-        // TODO
-        false
+        self.multi_tenant
     }
 
     async fn resolve_dataset_ref(
@@ -123,44 +146,13 @@ impl DatasetRepository for DatasetRepositoryS3 {
         match dataset_ref {
             DatasetRef::Handle(h) => Ok(h.clone()),
             DatasetRef::Alias(alias) => {
-                assert!(
-                    !alias.is_multi_tenant(),
-                    "Multi-tenancy is not yet supported by S3 repo"
-                );
-
-                if self
-                    .s3_context
-                    .bucket_path_exists(&alias.dataset_name)
-                    .await?
-                {
-                    let dataset = self.get_dataset_impl(alias).await?;
-                    let summary = dataset
-                        .get_summary(GetSummaryOpts::default())
-                        .await
-                        .map_err(|e| {
-                            if let GetSummaryError::EmptyDataset = e {
-                                GetDatasetError::NotFound(DatasetNotFoundError {
-                                    dataset_ref: dataset_ref.clone(),
-                                })
-                            } else {
-                                GetDatasetError::Internal(e.int_err())
-                            }
-                        })?;
-
-                    Ok(DatasetHandle::new(summary.id, alias.clone()))
-                } else {
-                    Err(GetDatasetError::NotFound(DatasetNotFoundError {
-                        dataset_ref: dataset_ref.clone(),
-                    }))
-                }
-            }
-            DatasetRef::ID(id) => {
                 // TODO: this is really really slow and expensive!
+                let normalized_alias = self.normalize_alias(alias);
                 use futures::StreamExt;
                 let mut datasets = self.get_all_datasets();
                 while let Some(hdl) = datasets.next().await {
                     let hdl = hdl?;
-                    if hdl.id == *id {
+                    if hdl.alias == normalized_alias {
                         return Ok(hdl);
                     }
                 }
@@ -168,39 +160,48 @@ impl DatasetRepository for DatasetRepositoryS3 {
                     dataset_ref: dataset_ref.clone(),
                 }))
             }
+            DatasetRef::ID(id) => {
+                if self
+                    .s3_context
+                    .bucket_path_exists(&id.cid.to_string())
+                    .await?
+                {
+                    let dataset = self.get_dataset_impl(id).await?;
+                    let dataset_alias = self.resolve_dataset_alias(&dataset).await?;
+                    Ok(DatasetHandle::new(id.clone(), dataset_alias))
+                } else {
+                    Err(GetDatasetError::NotFound(DatasetNotFoundError {
+                        dataset_ref: dataset_ref.clone(),
+                    }))
+                }
+            }
         }
     }
 
     fn get_all_datasets<'s>(&'s self) -> DatasetHandleStream<'s> {
-        Box::pin(async_stream::try_stream! {
-            let folders_common_prefixes = self.s3_context.bucket_list_folders().await?;
-            for prefix in folders_common_prefixes {
-                let mut prefix = prefix.prefix.unwrap();
-                while prefix.ends_with('/') {
-                    prefix.pop();
-                }
-
-                let name = DatasetAlias::new(None, DatasetName::try_from(prefix).int_err()?);
-                let hdl = self.resolve_dataset_ref(&name.into()).await.int_err()?;
-                yield hdl;
-            }
-        })
+        self.stream_datasets_if(|_| true)
     }
 
-    fn get_account_datasets<'s>(&'s self, account_name: AccountName) -> DatasetHandleStream<'s> {
-        if account_name == self.current_account_subject.account_name {
-            self.get_all_datasets()
-        } else {
+    fn get_datasets_by_owner<'s>(&'s self, account_name: AccountName) -> DatasetHandleStream<'s> {
+        if !self.is_multi_tenant() && account_name != self.current_account_subject.account_name {
             panic!("Single-tenant dataset repository queried by non-default account");
         }
+
+        self.stream_datasets_if(move |dataset_alias| {
+            if let Some(dataset_account_name) = &dataset_alias.account_name {
+                dataset_account_name == &account_name
+            } else {
+                true
+            }
+        })
     }
 
     async fn get_dataset(
         &self,
         dataset_ref: &DatasetRef,
     ) -> Result<Arc<dyn Dataset>, GetDatasetError> {
-        let handle = self.resolve_dataset_ref(dataset_ref).await?;
-        let dataset = self.get_dataset_impl(&handle.alias).await?;
+        let dataset_handle = self.resolve_dataset_ref(dataset_ref).await?;
+        let dataset = self.get_dataset_impl(&dataset_handle.id).await?;
         Ok(Arc::new(dataset))
     }
 
@@ -209,8 +210,54 @@ impl DatasetRepository for DatasetRepositoryS3 {
         dataset_alias: &DatasetAlias,
         seed_block: MetadataBlockTyped<Seed>,
     ) -> Result<CreateDatasetResult, CreateDatasetError> {
+        // Check if a dataset with the same alias can be resolved succesfully
+        let maybe_existing_dataset_handle = match self
+            .resolve_dataset_ref(&dataset_alias.as_local_ref())
+            .await
+        {
+            Ok(existing_handle) => Ok(Some(existing_handle)),
+            Err(GetDatasetError::NotFound(_)) => Ok(None),
+            Err(GetDatasetError::Internal(e)) => Err(e),
+        }?;
+
+        // If so, there are 2 possibilities:
+        // - Dataset was partially created before (no head yet) and was not GC'd - so we
+        //   assume ownership
+        // - Dataset existed before (has valid head) - we should error out with name
+        //   collision
+        if let Some(existing_dataset_handle) = maybe_existing_dataset_handle {
+            let existing_dataset = self
+                .get_dataset(&existing_dataset_handle.as_local_ref())
+                .await
+                .int_err()?;
+
+            match existing_dataset
+                .as_metadata_chain()
+                .get_ref(&BlockRef::Head)
+                .await
+            {
+                // Existing head
+                Ok(_) => {
+                    return Err(CreateDatasetError::NameCollision(NameCollisionError {
+                        alias: dataset_alias.clone(),
+                    }));
+                }
+
+                // No head, so continue creating
+                Err(GetRefError::NotFound(_)) => {}
+
+                // Errors...
+                Err(GetRefError::Access(e)) => {
+                    return Err(CreateDatasetError::Internal(e.int_err()))
+                }
+                Err(GetRefError::Internal(e)) => return Err(CreateDatasetError::Internal(e)),
+            }
+        }
+
+        // It's okay to create a new dataset by this point
+
         let dataset_id = seed_block.event.dataset_id.clone();
-        let dataset = self.get_dataset_impl(dataset_alias).await?;
+        let dataset = self.get_dataset_impl(&dataset_id).await?;
 
         // There are three possiblities at this point:
         // - Dataset did not exist before - continue normally
@@ -220,22 +267,35 @@ impl DatasetRepository for DatasetRepositoryS3 {
         //   collision
         let head = match dataset
             .as_metadata_chain()
-            .append(seed_block.into(), AppendOpts::default())
+            .append(
+                seed_block.into(),
+                AppendOpts {
+                    // We are using head ref CAS to detect previous existence of a dataset
+                    // as atomically as possible
+                    check_ref_is: Some(None),
+                    ..AppendOpts::default()
+                },
+            )
             .await
         {
-            Ok(hash) => Ok(hash),
-            Err(AppendError::RefCASFailed(_)) => {
-                // We are using head ref CAS to detect previous existence of a dataset
-                // as atomically as possible
-                Err(CreateDatasetError::NameCollision(NameCollisionError {
-                    alias: dataset_alias.clone(),
-                }))
-            }
-            Err(err) => Err(err.int_err().into()),
-        }?;
+            Ok(head) => head,
+            Err(err) => return Err(err.int_err().into()),
+        };
+
+        let normalized_alias = self.normalize_alias(&dataset_alias);
+        self.save_dataset_alias(&dataset, normalized_alias).await?;
+
+        let dataset_handle = DatasetHandle::new(dataset_id, dataset_alias.clone());
+
+        tracing::info!(
+            id = %dataset_handle.id,
+            alias = %dataset_handle.alias,
+            %head,
+            "Created new dataset",
+        );
 
         Ok(CreateDatasetResult {
-            dataset_handle: DatasetHandle::new(dataset_id, dataset_alias.clone()),
+            dataset_handle,
             dataset: Arc::new(dataset),
             head,
         })
@@ -246,19 +306,28 @@ impl DatasetRepository for DatasetRepositoryS3 {
         dataset_ref: &DatasetRef,
         new_name: &DatasetName,
     ) -> Result<(), RenameDatasetError> {
-        let old_alias = self.resolve_dataset_ref(dataset_ref).await?.alias;
-        let new_alias = DatasetAlias::new(old_alias.account_name.clone(), new_name.clone());
+        let dataset_handle = self.resolve_dataset_ref(dataset_ref).await?;
+        let dataset = self.get_dataset_impl(&dataset_handle.id).await?;
 
-        match self
-            .move_bucket_items_on_dataset_rename(&old_alias, &new_alias)
-            .await
-        {
-            Ok(_) => Ok(()),
-            Err(MoveBucketItemsOnRenameError::NameCollision(e)) => {
-                Err(RenameDatasetError::NameCollision(e))
-            }
-            Err(MoveBucketItemsOnRenameError::Internal(e)) => Err(RenameDatasetError::Internal(e)),
-        }
+        let new_alias =
+            DatasetAlias::new(dataset_handle.alias.account_name.clone(), new_name.clone());
+
+        // Check against possible name collisions
+        match self.resolve_dataset_ref(&new_alias.as_local_ref()).await {
+            Ok(_) => Err(RenameDatasetError::NameCollision(NameCollisionError {
+                alias: DatasetAlias::new(
+                    dataset_handle.alias.account_name.clone(),
+                    new_name.clone(),
+                ),
+            })),
+            Err(GetDatasetError::Internal(e)) => Err(RenameDatasetError::Internal(e)),
+            Err(GetDatasetError::NotFound(_)) => Ok(()),
+        }?;
+
+        // It's safe to rename dataset
+        self.save_dataset_alias(&dataset, new_alias).await?;
+
+        Ok(())
     }
 
     async fn delete_dataset(&self, dataset_ref: &DatasetRef) -> Result<(), DeleteDatasetError> {
@@ -280,7 +349,7 @@ impl DatasetRepository for DatasetRepositoryS3 {
             .into());
         }
 
-        match self.delete_dataset_s3_objects(&dataset_handle.alias).await {
+        match self.delete_dataset_s3_objects(&dataset_handle.id).await {
             Ok(_) => Ok(()),
             Err(e) => Err(DeleteDatasetError::Internal(e)),
         }
@@ -295,18 +364,3 @@ impl DatasetRepository for DatasetRepositoryS3 {
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
-// MoveBucketItemsOnRenameError
-/////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Error, Debug)]
-enum MoveBucketItemsOnRenameError {
-    #[error(transparent)]
-    NameCollision(#[from] NameCollisionError),
-
-    #[error(transparent)]
-    Internal(
-        #[from]
-        #[backtrace]
-        InternalError,
-    ),
-}

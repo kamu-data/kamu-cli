@@ -410,7 +410,7 @@ pub async fn test_iterate_datasets(repo: &dyn DatasetRepository) {
     // Default account
     check_expected_datasets(
         vec![alias_bar, alias_foo],
-        repo.get_account_datasets(AccountName::new_unchecked(TEST_ACCOUNT_NAME)),
+        repo.get_datasets_by_owner(AccountName::new_unchecked(TEST_ACCOUNT_NAME)),
     )
     .await;
 }
@@ -475,13 +475,13 @@ pub async fn test_iterate_datasets_multi_tenant(repo: &dyn DatasetRepository) {
 
     check_expected_datasets(
         vec![alias_my_baz, alias_my_foo],
-        repo.get_account_datasets(account_my),
+        repo.get_datasets_by_owner(account_my),
     )
     .await;
 
     check_expected_datasets(
         vec![alias_her_bar, alias_her_foo],
-        repo.get_account_datasets(account_her),
+        repo.get_datasets_by_owner(account_her),
     )
     .await;
 }

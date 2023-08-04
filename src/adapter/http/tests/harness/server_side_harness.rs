@@ -13,6 +13,7 @@ use std::sync::Arc;
 
 use kamu::domain::{DatasetRepository, InternalError};
 use kamu::DatasetLayout;
+use opendatafabric::DatasetHandle;
 use reqwest::Url;
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -21,7 +22,7 @@ use reqwest::Url;
 pub trait ServerSideHarness {
     fn dataset_repository(&self) -> Arc<dyn DatasetRepository>;
 
-    fn dataset_layout(&self, dataset_name: &str) -> DatasetLayout;
+    fn dataset_layout(&self, dataset_handle: &DatasetHandle) -> DatasetLayout;
 
     fn dataset_url(&self, dataset_name: &str) -> Url;
 
