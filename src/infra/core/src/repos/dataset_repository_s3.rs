@@ -205,7 +205,6 @@ impl DatasetRepository for DatasetRepositoryS3 {
         Ok(Arc::new(dataset))
     }
 
-    // TODO: name collision check
     async fn create_dataset(
         &self,
         dataset_alias: &DatasetAlias,
@@ -302,7 +301,6 @@ impl DatasetRepository for DatasetRepositoryS3 {
         })
     }
 
-    // TODO: name collision check
     async fn rename_dataset(
         &self,
         dataset_ref: &DatasetRef,
