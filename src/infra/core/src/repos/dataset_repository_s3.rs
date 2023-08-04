@@ -63,14 +63,10 @@ impl DatasetRepositoryS3 {
         &self,
         dataset: &dyn Dataset,
     ) -> Result<DatasetAlias, InternalError> {
-        match dataset.as_info_repo().get("alias").await {
-            Ok(bytes) => {
-                let dataset_alias_str = std::str::from_utf8(&bytes[..]).int_err()?.trim();
-                let dataset_alias = DatasetAlias::try_from(dataset_alias_str).int_err()?;
-                Ok(dataset_alias)
-            }
-            Err(e) => Err(e.int_err()),
-        }
+        let bytes = dataset.as_info_repo().get("alias").await.int_err()?;
+        let dataset_alias_str = std::str::from_utf8(&bytes[..]).int_err()?.trim();
+        let dataset_alias = DatasetAlias::try_from(dataset_alias_str).int_err()?;
+        Ok(dataset_alias)
     }
 
     async fn save_dataset_alias(
@@ -186,7 +182,7 @@ impl DatasetRepository for DatasetRepositoryS3 {
         self.stream_datasets_if(|_| true)
     }
 
-    fn get_account_datasets<'s>(&'s self, account_name: AccountName) -> DatasetHandleStream<'s> {
+    fn get_datasets_by_owner<'s>(&'s self, account_name: AccountName) -> DatasetHandleStream<'s> {
         if !self.is_multi_tenant() && account_name != self.current_account_subject.account_name {
             panic!("Single-tenant dataset repository queried by non-default account");
         }
@@ -284,9 +280,6 @@ impl DatasetRepository for DatasetRepositoryS3 {
             .await
         {
             Ok(head) => head,
-            Err(AppendError::RefCASFailed(_)) => {
-                unreachable!("The duplication protection should have triggered by now");
-            }
             Err(err) => return Err(err.int_err().into()),
         };
 

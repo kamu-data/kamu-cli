@@ -184,12 +184,12 @@ impl ListCommand {
             match &self.related_account.target_account {
                 TargetAccountSelection::Current => self
                     .dataset_repo
-                    .get_account_datasets(self.current_account.account_name.clone()),
+                    .get_datasets_by_owner(self.current_account.account_name.clone()),
                 TargetAccountSelection::Specific {
                     account_name: user_name,
                 } => self
                     .dataset_repo
-                    .get_account_datasets(AccountName::from_str(user_name.as_str()).unwrap()),
+                    .get_datasets_by_owner(AccountName::from_str(user_name.as_str()).unwrap()),
                 TargetAccountSelection::AllUsers => self.dataset_repo.get_all_datasets(),
             }
         } else {
