@@ -16,11 +16,11 @@ use kamu::domain::*;
 use kamu::utils::smart_transfer_protocol::SmartTransferProtocolClient;
 use kamu::*;
 
-use crate::cli_commands;
 use crate::error::*;
 use crate::explore::TraceServer;
 use crate::output::*;
 use crate::services::*;
+use crate::{cli_commands, cli_oso, CLIOsoDatasetAuthorizer};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -48,6 +48,8 @@ pub async fn run(
     let account_svc = AccountService::new();
     let current_account = account_svc.current_account_indication(&matches);
 
+    let oso = cli_oso().int_err()?;
+
     prepare_run_dir(&workspace_layout.run_info_dir);
 
     // Configure application
@@ -59,6 +61,8 @@ pub async fn run(
         let output_config = configure_output_format(&matches, &workspace_svc);
         catalog_builder.add_value(output_config.clone());
         catalog_builder.add_value(current_account.as_current_account_subject());
+
+        catalog_builder.add_value(oso);
 
         let guards = configure_logging(&output_config, &workspace_layout);
         tracing::info!(
@@ -219,6 +223,9 @@ pub fn configure_catalog(
 
     b.add::<kamu_task_system_inmem::TaskSystemEventStoreInMemory>();
     b.bind::<dyn kamu_task_system_inmem::domain::TaskSystemEventStore, kamu_task_system_inmem::TaskSystemEventStoreInMemory>();
+
+    b.add::<CLIOsoDatasetAuthorizer>();
+    b.bind::<dyn domain::authorization::DatasetActionAuthorizer, CLIOsoDatasetAuthorizer>();
 
     b
 }

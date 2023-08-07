@@ -32,6 +32,7 @@ pub struct DataQueryResultError {
 #[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DataQueryResultErrorKind {
     InvalidSql,
+    Unauthorized,
     InternalError,
 }
 
@@ -65,6 +66,13 @@ impl DataQueryResult {
         })
     }
 
+    pub fn unauthorized(error_message: String) -> DataQueryResult {
+        DataQueryResult::Error(DataQueryResultError {
+            error_message,
+            error_kind: DataQueryResultErrorKind::Unauthorized,
+        })
+    }
+
     pub fn internal(error_message: String) -> DataQueryResult {
         DataQueryResult::Error(DataQueryResultError {
             error_message,
@@ -79,6 +87,7 @@ impl From<QueryError> for DataQueryResult {
             QueryError::DatasetNotFound(e) => DataQueryResult::invalid_sql(e.to_string()),
             QueryError::DataFusionError(e) => e.into(),
             QueryError::DatasetSchemaNotAvailable(_) => unreachable!(),
+            QueryError::Access(e) => DataQueryResult::unauthorized(e.to_string()),
             QueryError::Internal(e) => DataQueryResult::internal(e.to_string()),
         }
     }

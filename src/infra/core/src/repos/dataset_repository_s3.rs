@@ -12,6 +12,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use dill::*;
 use futures::TryStreamExt;
+use kamu_core::authorization::{DatasetAction, DatasetActionAuthorizer};
 use kamu_core::*;
 use opendatafabric::*;
 use url::Url;
@@ -25,6 +26,7 @@ use crate::utils::s3_context::S3Context;
 pub struct DatasetRepositoryS3 {
     s3_context: S3Context,
     current_account_subject: Arc<CurrentAccountSubject>,
+    dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
     multi_tenant: bool,
 }
 
@@ -34,11 +36,13 @@ impl DatasetRepositoryS3 {
     pub fn new(
         s3_context: S3Context,
         current_account_subject: Arc<CurrentAccountSubject>,
+        dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
         multi_tenant: bool,
     ) -> Self {
         Self {
             s3_context,
             current_account_subject,
+            dataset_action_authorizer,
             multi_tenant,
         }
     }
@@ -307,6 +311,15 @@ impl DatasetRepository for DatasetRepositoryS3 {
         new_name: &DatasetName,
     ) -> Result<(), RenameDatasetError> {
         let dataset_handle = self.resolve_dataset_ref(dataset_ref).await?;
+
+        self.dataset_action_authorizer
+            .check_action_allowed(
+                &dataset_handle,
+                &self.current_account_subject.account_name,
+                DatasetAction::Write,
+            )
+            .await?;
+
         let dataset = self.get_dataset_impl(&dataset_handle.id).await?;
 
         let new_alias =

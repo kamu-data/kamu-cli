@@ -18,6 +18,7 @@ use opendatafabric::*;
 use thiserror::Error;
 use tokio_stream::Stream;
 
+use crate::authorization::DatasetActionUnauthorizedError;
 use crate::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -503,7 +504,12 @@ pub enum RenameDatasetError {
     NotFound(#[from] DatasetNotFoundError),
     #[error(transparent)]
     NameCollision(#[from] NameCollisionError),
-
+    #[error(transparent)]
+    Access(
+        #[from]
+        #[backtrace]
+        AccessError,
+    ),
     #[error(transparent)]
     Internal(
         #[from]
@@ -517,6 +523,15 @@ impl From<GetDatasetError> for RenameDatasetError {
         match v {
             GetDatasetError::NotFound(e) => Self::NotFound(e),
             GetDatasetError::Internal(e) => Self::Internal(e),
+        }
+    }
+}
+
+impl From<DatasetActionUnauthorizedError> for RenameDatasetError {
+    fn from(v: DatasetActionUnauthorizedError) -> Self {
+        match v {
+            DatasetActionUnauthorizedError::Access(e) => Self::Access(e),
+            DatasetActionUnauthorizedError::Internal(e) => Self::Internal(e),
         }
     }
 }

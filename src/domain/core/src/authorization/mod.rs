@@ -7,18 +7,5 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-#![feature(provide_any)]
-#![feature(error_generic_member_access)]
-
-// Re-exports
-pub use internal_error::*;
-
-pub mod authorization;
-pub mod entities;
-pub mod repos;
-pub mod services;
-pub mod utils;
-
-pub use entities::{SetRefError, *};
-pub use repos::*;
-pub use services::*;
+pub mod dataset_action_authorizer;
+pub use dataset_action_authorizer::*;

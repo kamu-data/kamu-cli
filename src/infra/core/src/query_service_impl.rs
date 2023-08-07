@@ -20,6 +20,7 @@ use datafusion::parquet::schema::types::Type;
 use datafusion::prelude::*;
 use dill::*;
 use futures::stream::{self, StreamExt, TryStreamExt};
+use kamu_core::authorization::{DatasetAction, DatasetActionAuthorizer};
 use kamu_core::*;
 use opendatafabric::*;
 
@@ -30,6 +31,8 @@ use crate::utils::docker_images;
 pub struct QueryServiceImpl {
     dataset_repo: Arc<dyn DatasetRepository>,
     object_store_registry: Arc<dyn ObjectStoreRegistry>,
+    current_account_subject: Arc<CurrentAccountSubject>,
+    dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
 }
 
 #[component(pub)]
@@ -37,10 +40,14 @@ impl QueryServiceImpl {
     pub fn new(
         dataset_repo: Arc<dyn DatasetRepository>,
         object_store_registry: Arc<dyn ObjectStoreRegistry>,
+        current_account_subject: Arc<CurrentAccountSubject>,
+        dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
     ) -> Self {
         Self {
             dataset_repo,
             object_store_registry,
+            current_account_subject,
+            dataset_action_authorizer,
         }
     }
 
@@ -74,6 +81,15 @@ impl QueryServiceImpl {
         dataset_ref: &DatasetRef,
     ) -> Result<Option<Type>, QueryError> {
         let dataset_handle = self.dataset_repo.resolve_dataset_ref(dataset_ref).await?;
+
+        self.dataset_action_authorizer
+            .check_action_allowed(
+                &dataset_handle,
+                &self.current_account_subject.account_name,
+                DatasetAction::Read,
+            )
+            .await?;
+
         let dataset = self
             .dataset_repo
             .get_dataset(&dataset_handle.as_local_ref())
@@ -135,6 +151,7 @@ impl QueryService for QueryServiceImpl {
         limit: u64,
     ) -> Result<DataFrame, QueryError> {
         let dataset_handle = self.dataset_repo.resolve_dataset_ref(dataset_ref).await?;
+
         let dataset = self
             .dataset_repo
             .get_dataset(&dataset_handle.as_local_ref())

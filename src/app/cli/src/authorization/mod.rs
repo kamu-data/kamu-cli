@@ -7,18 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-#![feature(provide_any)]
-#![feature(error_generic_member_access)]
+pub mod dataset_resource;
+pub use dataset_resource::*;
 
-// Re-exports
-pub use internal_error::*;
+pub mod user_actor;
+pub use user_actor::*;
 
-pub mod authorization;
-pub mod entities;
-pub mod repos;
-pub mod services;
-pub mod utils;
+pub mod cli_oso_loader;
+pub use cli_oso_loader::*;
 
-pub use entities::{SetRefError, *};
-pub use repos::*;
-pub use services::*;
+pub mod cli_oso_dataset_authorizer;
+pub use cli_oso_dataset_authorizer::*;

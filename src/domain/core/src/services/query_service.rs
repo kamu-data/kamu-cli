@@ -13,6 +13,7 @@ use datafusion::prelude::DataFrame;
 use opendatafabric::DatasetRef;
 use thiserror::Error;
 
+use crate::authorization::DatasetActionUnauthorizedError;
 use crate::*;
 
 // TODO: Support different engines and query dialects
@@ -107,6 +108,12 @@ pub enum QueryError {
         DataFusionError,
     ),
     #[error(transparent)]
+    Access(
+        #[from]
+        #[backtrace]
+        AccessError,
+    ),
+    #[error(transparent)]
     Internal(
         #[from]
         #[backtrace]
@@ -132,3 +139,16 @@ impl From<GetDatasetError> for QueryError {
         }
     }
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+impl From<DatasetActionUnauthorizedError> for QueryError {
+    fn from(v: DatasetActionUnauthorizedError) -> Self {
+        match v {
+            DatasetActionUnauthorizedError::Access(e) => Self::Access(e),
+            DatasetActionUnauthorizedError::Internal(e) => Self::Internal(e),
+        }
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////

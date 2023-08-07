@@ -12,6 +12,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use dill::*;
+use domain::authorization::{DatasetAction, DatasetActionAuthorizer};
 use futures::TryStreamExt;
 use kamu_core::*;
 use opendatafabric::*;
@@ -23,6 +24,8 @@ use crate::*;
 
 pub struct DatasetRepositoryLocalFs {
     storage_strategy: Box<dyn DatasetStorageStrategy>,
+    current_account_subject: Arc<CurrentAccountSubject>,
+    dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
     thrash_lock: tokio::sync::Mutex<()>,
 }
 
@@ -33,20 +36,23 @@ impl DatasetRepositoryLocalFs {
     pub fn new(
         root: PathBuf,
         current_account_subject: Arc<CurrentAccountSubject>,
+        dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
         multi_tenant: bool,
     ) -> Self {
         Self {
             storage_strategy: if multi_tenant {
                 Box::new(DatasetMultiTenantStorageStrategy::new(
                     root,
-                    current_account_subject,
+                    current_account_subject.clone(),
                 ))
             } else {
                 Box::new(DatasetSingleTenantStorageStrategy::new(
                     root,
-                    current_account_subject,
+                    current_account_subject.clone(),
                 ))
             },
+            current_account_subject,
+            dataset_action_authorizer,
             thrash_lock: tokio::sync::Mutex::new(()),
         }
     }
@@ -54,11 +60,17 @@ impl DatasetRepositoryLocalFs {
     pub fn create(
         root: impl Into<PathBuf>,
         current_account_subject: Arc<CurrentAccountSubject>,
+        dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
         multi_tenant: bool,
     ) -> Result<Self, std::io::Error> {
         let root = root.into();
         std::fs::create_dir_all(&root)?;
-        Ok(Self::new(root, current_account_subject, multi_tenant))
+        Ok(Self::new(
+            root,
+            current_account_subject,
+            dataset_action_authorizer,
+            multi_tenant,
+        ))
     }
 
     // TODO: Make dataset factory (and thus the hashing algo) configurable
@@ -263,6 +275,14 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
         new_name: &DatasetName,
     ) -> Result<(), RenameDatasetError> {
         let dataset_handle = self.resolve_dataset_ref(dataset_ref).await?;
+
+        self.dataset_action_authorizer
+            .check_action_allowed(
+                &dataset_handle,
+                &self.current_account_subject.account_name,
+                DatasetAction::Write,
+            )
+            .await?;
 
         let new_alias =
             DatasetAlias::new(dataset_handle.alias.account_name.clone(), new_name.clone());
@@ -743,7 +763,10 @@ impl DatasetStorageStrategy for DatasetMultiTenantStorageStrategy {
                     .await?;
 
                 if dataset_name == dataset_alias.dataset_name {
-                    return Ok(DatasetHandle::new(dataset_id, dataset_alias.to_owned()));
+                    return Ok(DatasetHandle::new(
+                        dataset_id,
+                        DatasetAlias::new(Some(effective_account_name.clone()), dataset_name),
+                    ));
                 }
             }
         }
