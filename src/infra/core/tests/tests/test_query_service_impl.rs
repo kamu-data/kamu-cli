@@ -103,7 +103,7 @@ async fn create_catalog_with_local_workspace(tempdir: &Path) -> dill::Catalog {
         .bind::<dyn ObjectStoreBuilder, ObjectStoreBuilderLocalFs>()
         .add_value(CurrentAccountSubject::new_test())
         .add::<authorization::AlwaysHappyDatasetActionAuthorizer>()
-        .bind::<dyn authorization::DatasetActionAuthorizer, authorization::AlwaysHappyDatasetActionAuthorizer>()        
+        .bind::<dyn authorization::DatasetActionAuthorizer, authorization::AlwaysHappyDatasetActionAuthorizer>()
         .build()
 }
 
@@ -132,7 +132,7 @@ async fn create_catalog_with_s3_workspace(s3: &LocalS3Server) -> dill::Catalog {
         .bind::<dyn ObjectStoreBuilder, ObjectStoreBuilderS3>()
         .add_value(CurrentAccountSubject::new_test())
         .add::<authorization::AlwaysHappyDatasetActionAuthorizer>()
-        .bind::<dyn authorization::DatasetActionAuthorizer, authorization::AlwaysHappyDatasetActionAuthorizer>() 
+        .bind::<dyn authorization::DatasetActionAuthorizer, authorization::AlwaysHappyDatasetActionAuthorizer>()
         .build()
 }
 

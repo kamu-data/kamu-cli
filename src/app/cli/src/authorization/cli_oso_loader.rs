@@ -26,15 +26,15 @@ pub fn cli_oso() -> Result<Oso, OsoError> {
         resource DatasetResource {
             permissions = ["read", "write"];
         }
-        
+
         has_permission(actor: UserActor, "read", dataset: DatasetResource) if
             dataset.allows_public_read or actor.name in dataset.authorized_readers;
-        
+
         has_permission(actor: UserActor, "write", dataset: DatasetResource) if
             dataset.created_by == actor.name or actor.name in dataset.authorized_editors;
-        
+
         allow(actor: UserActor, action: String, dataset: DatasetResource) if
-            has_permission(actor, action, dataset);    
+            has_permission(actor, action, dataset);
     "#,
     ) {
         println!("{}", e);

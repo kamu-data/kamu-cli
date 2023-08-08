@@ -51,7 +51,7 @@ impl ServerSideLocalFsHarness {
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
             .add_value(CurrentAccountSubject::new_test())
             .add::<authorization::AlwaysHappyDatasetActionAuthorizer>()
-            .bind::<dyn authorization::DatasetActionAuthorizer, authorization::AlwaysHappyDatasetActionAuthorizer>()            
+            .bind::<dyn authorization::DatasetActionAuthorizer, authorization::AlwaysHappyDatasetActionAuthorizer>()
             .build();
 
         let api_server = TestAPIServer::new(
