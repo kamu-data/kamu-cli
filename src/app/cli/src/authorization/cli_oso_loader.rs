@@ -19,7 +19,8 @@ pub fn cli_oso() -> Result<Oso, OsoError> {
     oso.register_class(DatasetResource::get_polar_class())?;
     oso.register_class(UserActor::get_polar_class())?;
 
-    if let Err(e) = oso.load_str(r#"
+    if let Err(e) = oso.load_str(
+        r#"
         actor UserActor {}
 
         resource DatasetResource {
@@ -34,13 +35,13 @@ pub fn cli_oso() -> Result<Oso, OsoError> {
         
         allow(actor: UserActor, action: String, dataset: DatasetResource) if
             has_permission(actor, action, dataset);    
-    "#) {
-            println!("{}", e);
-            return Err(e);
-        }
+    "#,
+    ) {
+        println!("{}", e);
+        return Err(e);
+    }
 
     Ok(oso)
 }
-    
 
 ///////////////////////////////////////////////////////////////////////////////

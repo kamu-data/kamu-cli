@@ -13,7 +13,13 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use dill::builder_for;
-use kamu::domain::{authorization, CurrentAccountSubject, DatasetRepository, InternalError, ResultIntoInternal};
+use kamu::domain::{
+    authorization,
+    CurrentAccountSubject,
+    DatasetRepository,
+    InternalError,
+    ResultIntoInternal,
+};
 use kamu::{DatasetLayout, DatasetRepositoryLocalFs};
 use opendatafabric::DatasetHandle;
 use tempfile::TempDir;
