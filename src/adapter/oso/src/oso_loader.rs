@@ -29,7 +29,7 @@ pub fn load_oso() -> Result<Oso, OsoError> {
         }
 
         has_permission(actor: UserActor, "read", dataset: DatasetResource) if
-            dataset.allows_public_read or actor.name in dataset.authorized_readers;
+            dataset.allows_public_read or dataset.created_by == actor.name or actor.name in dataset.authorized_readers;
 
         has_permission(actor: UserActor, "write", dataset: DatasetResource) if
             dataset.created_by == actor.name or actor.name in dataset.authorized_editors;

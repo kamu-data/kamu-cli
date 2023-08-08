@@ -2981,10 +2981,16 @@ version = "0.137.0"
 dependencies = [
  "async-trait",
  "dill",
+ "env_logger",
  "kamu-core",
  "opendatafabric",
  "oso",
  "oso-derive",
+ "test-group",
+ "test-log",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]

@@ -26,3 +26,11 @@ dill = "0.6"
 # Authorization
 oso = "0.27"
 oso-derive = "0.27"
+
+[dev-dependencies]
+env_logger = "0.10"
+test-group = { version = "1" }
+test-log = { version = "0.2", features = ["trace"] }
+tokio = { version = "1", default-features = false, features = [] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
