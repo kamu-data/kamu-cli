@@ -19,9 +19,9 @@ use super::test_reader_common;
 ///////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_read_json_ld_with_schema() {
+async fn test_read_ndjson_with_schema() {
     test_reader_common::test_reader_success_textual(
-        ReaderJsonLines {},
+        ReaderNdJson {},
         ReadStepJsonLines {
             schema: Some(vec![
                 "city string not null".to_string(),
@@ -62,9 +62,9 @@ async fn test_read_json_ld_with_schema() {
 ///////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_read_json_ld_infer_schema() {
+async fn test_read_ndjson_infer_schema() {
     test_reader_common::test_reader_success_textual(
-        ReaderJsonLines {},
+        ReaderNdJson {},
         ReadStepJsonLines {
             ..Default::default()
         },
@@ -101,9 +101,9 @@ async fn test_read_json_ld_infer_schema() {
 ///////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_read_json_ld_format_date() {
+async fn test_read_ndjson_format_date() {
     test_reader_common::test_reader_success_textual(
-        ReaderJsonLines {},
+        ReaderNdJson {},
         ReadStepJsonLines {
             schema: Some(vec!["date date not null".to_string()]),
             ..Default::default()
@@ -136,7 +136,7 @@ async fn test_read_json_ld_format_date() {
 ///////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_read_json_ld_format_timestamp() {
+async fn test_read_ndjson_format_timestamp() {
     // Test below not stating a correct behavior but simply attempt to capture how
     // DataFusion behaves currently.
     //
@@ -144,7 +144,7 @@ async fn test_read_json_ld_format_timestamp() {
     // - naive date-times are treated as UTC
     // - different timezones are normalized to UTC with TZ information getting lost
     test_reader_common::test_reader_success_textual(
-        ReaderJsonLines {},
+        ReaderNdJson {},
         ReadStepJsonLines {
             schema: Some(vec!["event_time timestamp not null".to_string()]),
             ..Default::default()
@@ -183,7 +183,7 @@ async fn test_read_json_ld_format_timestamp() {
 ///////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_read_json_ld_format_timestamp_parse_failed() {
+async fn test_read_ndjson_format_timestamp_parse_failed() {
     // Test below not stating a correct behavior but simply attempt to capture how
     // DataFusion behaves currently.
     //
@@ -191,7 +191,7 @@ async fn test_read_json_ld_format_timestamp_parse_failed() {
     // - naive date-times are treated as UTC
     // - different timezones are normalized to UTC with TZ information getting lost
     test_reader_common::test_reader_textual(
-        ReaderJsonLines {},
+        ReaderNdJson {},
         ReadStepJsonLines {
             schema: Some(vec!["event_time timestamp not null".to_string()]),
             ..Default::default()

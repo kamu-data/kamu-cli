@@ -8,9 +8,9 @@
 // by the Apache License, Version 2.0.
 
 mod csv;
-mod json;
+mod ndjson;
 mod parquet;
 
 pub use csv::*;
-pub use json::*;
+pub use ndjson::*;
 pub use parquet::*;

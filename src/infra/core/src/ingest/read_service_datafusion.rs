@@ -47,7 +47,7 @@ impl ReadServiceDatafusion {
     fn get_reader_for(conf: &ReadStep) -> Arc<dyn Reader> {
         match conf {
             ReadStep::Csv(_) => Arc::new(ReaderCsv {}),
-            ReadStep::JsonLines(_) => Arc::new(ReaderJsonLines {}),
+            ReadStep::JsonLines(_) => Arc::new(ReaderNdJson {}),
             ReadStep::GeoJson(_) => todo!(),
             ReadStep::EsriShapefile(_) => todo!(),
             ReadStep::Parquet(_) => Arc::new(ReaderParquet {}),

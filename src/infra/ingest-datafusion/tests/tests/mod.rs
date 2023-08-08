@@ -12,5 +12,5 @@ mod test_merge_strategy_ledger;
 mod test_merge_strategy_snapshot;
 mod test_reader_common;
 mod test_reader_csv;
-mod test_reader_json;
+mod test_reader_ndjson;
 mod test_reader_parquet;

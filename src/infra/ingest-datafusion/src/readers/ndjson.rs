@@ -18,12 +18,12 @@ use crate::*;
 
 ///////////////////////////////////////////////////////////////////////////////
 
-pub struct ReaderJsonLines {}
+pub struct ReaderNdJson {}
 
 ///////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl Reader for ReaderJsonLines {
+impl Reader for ReaderNdJson {
     async fn read(
         &self,
         ctx: &SessionContext,
