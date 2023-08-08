@@ -194,6 +194,7 @@ impl IngestTestHarness {
             DatasetRepositoryLocalFs::create(
                 temp_dir.path().join("datasets"),
                 Arc::new(CurrentAccountSubject::new_test()),
+                Arc::new(authorization::AlwaysHappyDatasetActionAuthorizer::new()),
                 false,
             )
             .unwrap(),

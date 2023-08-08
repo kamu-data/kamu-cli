@@ -45,6 +45,9 @@ impl ClientSideHarness {
 
         b.add_value(CurrentAccountSubject::new_test());
 
+        b.add::<authorization::AlwaysHappyDatasetActionAuthorizer>()
+        .bind::<dyn authorization::DatasetActionAuthorizer, authorization::AlwaysHappyDatasetActionAuthorizer>();
+
         b.add_builder(
             builder_for::<DatasetRepositoryLocalFs>()
                 .with_root(datasets_dir)

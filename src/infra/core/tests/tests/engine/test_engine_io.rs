@@ -211,6 +211,7 @@ async fn test_engine_io_local_file_mount() {
         DatasetRepositoryLocalFs::create(
             tempdir.path().join("datasets"),
             Arc::new(CurrentAccountSubject::new_test()),
+            Arc::new(authorization::AlwaysHappyDatasetActionAuthorizer::new()),
             false,
         )
         .unwrap(),
@@ -245,6 +246,7 @@ async fn test_engine_io_s3_to_local_file_mount_proxy() {
     let dataset_repo = Arc::new(DatasetRepositoryS3::new(
         s3_context,
         Arc::new(CurrentAccountSubject::new_test()),
+        Arc::new(authorization::AlwaysHappyDatasetActionAuthorizer::new()),
         false,
     ));
 

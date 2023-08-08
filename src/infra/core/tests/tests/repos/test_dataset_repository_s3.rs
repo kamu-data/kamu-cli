@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use kamu::domain::{CurrentAccountSubject, TEST_ACCOUNT_NAME};
+use kamu::domain::{authorization, CurrentAccountSubject, TEST_ACCOUNT_NAME};
 use kamu::testing::LocalS3Server;
 use kamu::utils::s3_context::S3Context;
 use kamu::DatasetRepositoryS3;
@@ -24,6 +24,7 @@ async fn s3_repo(s3: &LocalS3Server, multi_tenant: bool) -> DatasetRepositoryS3 
     DatasetRepositoryS3::new(
         s3_context,
         Arc::new(CurrentAccountSubject::new_test()),
+        Arc::new(authorization::AlwaysHappyDatasetActionAuthorizer::new()),
         multi_tenant,
     )
 }

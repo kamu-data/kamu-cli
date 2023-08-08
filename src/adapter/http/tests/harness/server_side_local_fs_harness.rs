@@ -13,7 +13,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use dill::builder_for;
-use kamu::domain::{CurrentAccountSubject, DatasetRepository, InternalError, ResultIntoInternal};
+use kamu::domain::{authorization, CurrentAccountSubject, DatasetRepository, InternalError, ResultIntoInternal};
 use kamu::{DatasetLayout, DatasetRepositoryLocalFs};
 use opendatafabric::DatasetHandle;
 use tempfile::TempDir;
@@ -44,6 +44,8 @@ impl ServerSideLocalFsHarness {
             )
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
             .add_value(CurrentAccountSubject::new_test())
+            .add::<authorization::AlwaysHappyDatasetActionAuthorizer>()
+            .bind::<dyn authorization::DatasetActionAuthorizer, authorization::AlwaysHappyDatasetActionAuthorizer>()            
             .build();
 
         let api_server = TestAPIServer::new(

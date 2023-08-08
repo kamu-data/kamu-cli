@@ -67,6 +67,7 @@ impl Kamu {
         let dataset_repo = DatasetRepositoryLocalFs::new(
             self.workspace_layout.datasets_dir.clone(),
             Arc::new(self.current_account.as_current_account_subject()),
+            Arc::new(domain::authorization::AlwaysHappyDatasetActionAuthorizer::new()),
             false,
         );
 
@@ -123,6 +124,7 @@ impl Kamu {
         let dataset_repo = Arc::new(DatasetRepositoryLocalFs::new(
             self.workspace_layout.datasets_dir.clone(),
             Arc::new(CurrentAccountSubject::new_test()),
+            Arc::new(domain::authorization::AlwaysHappyDatasetActionAuthorizer::new()),
             false,
         ));
         let config_service = Arc::new(ConfigService::new(&self.workspace_layout));

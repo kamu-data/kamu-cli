@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use dill::component;
 use internal_error::InternalError;
 use opendatafabric::{AccountName, DatasetHandle, DatasetRef};
 use thiserror::Error;
@@ -58,6 +59,32 @@ pub struct DatasetActionNotEnoughPermissionsError {
     pub account_name: AccountName,
     pub action: DatasetAction,
     pub dataset_ref: DatasetRef,
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+#[component(pub)]
+pub struct AlwaysHappyDatasetActionAuthorizer {}
+
+impl AlwaysHappyDatasetActionAuthorizer {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+#[async_trait::async_trait]
+impl DatasetActionAuthorizer for AlwaysHappyDatasetActionAuthorizer {
+    #[must_use]
+    #[allow(clippy::type_complexity, clippy::type_repetition_in_bounds)]
+    async fn check_action_allowed(
+        &self,
+        _dataset_handle: &DatasetHandle,
+        _account_name: &AccountName,
+        _action: DatasetAction,
+    ) -> Result<(), DatasetActionUnauthorizedError> {
+        // Ignore rules
+        Ok(())
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////

@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use domain::{CurrentAccountSubject, TEST_ACCOUNT_NAME};
+use domain::{authorization, CurrentAccountSubject, TEST_ACCOUNT_NAME};
 use kamu::*;
 use opendatafabric::AccountName;
 use tempfile::TempDir;
@@ -22,6 +22,7 @@ fn local_fs_repo(tempdir: &TempDir, multi_tenant: bool) -> DatasetRepositoryLoca
     DatasetRepositoryLocalFs::create(
         tempdir.path().join("datasets"),
         Arc::new(CurrentAccountSubject::new_test()),
+        Arc::new(authorization::AlwaysHappyDatasetActionAuthorizer::new()),
         multi_tenant,
     )
     .unwrap()

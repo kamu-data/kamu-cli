@@ -238,6 +238,7 @@ async fn test_transform_common(transform: Transform) {
         DatasetRepositoryLocalFs::create(
             tempdir.path().join("datasets"),
             Arc::new(CurrentAccountSubject::new_test()),
+            Arc::new(authorization::AlwaysHappyDatasetActionAuthorizer::new()),
             false,
         )
         .unwrap(),

@@ -12,7 +12,7 @@ use std::sync::Arc;
 use dill::component;
 use internal_error::ErrorIntoInternal;
 use kamu::domain::authorization::*;
-use kamu::domain::AccessError;
+use kamu::domain::{AccessError, CurrentAccountSubject};
 use opendatafabric::{AccountName, DatasetHandle};
 use oso::Oso;
 
@@ -23,13 +23,17 @@ use crate::{DatasetResource, UserActor};
 #[component(pub)]
 pub struct CLIOsoDatasetAuthorizer {
     oso: Arc<Oso>,
+    current_account_subject: Arc<CurrentAccountSubject>,
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 impl CLIOsoDatasetAuthorizer {
-    pub fn new(oso: Arc<Oso>) -> Self {
-        Self { oso }
+    pub fn new(oso: Arc<Oso>, current_account_subject: Arc<CurrentAccountSubject>) -> Self {
+        Self {
+            oso,
+            current_account_subject,
+        }
     }
 
     fn actor(&self, account_name: &AccountName) -> UserActor {
@@ -42,7 +46,7 @@ impl CLIOsoDatasetAuthorizer {
             .account_name
             .as_ref()
             .map(|a| a.as_str())
-            .unwrap_or("kamu");
+            .unwrap_or(self.current_account_subject.account_name.as_str());
 
         // Let's treat all CLI datasets as public
         // CLI does not require explicit read/write permissions

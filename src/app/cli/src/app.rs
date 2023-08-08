@@ -48,8 +48,6 @@ pub async fn run(
     let account_svc = AccountService::new();
     let current_account = account_svc.current_account_indication(&matches);
 
-    let oso = cli_oso().int_err()?;
-
     prepare_run_dir(&workspace_layout.run_info_dir);
 
     // Configure application
@@ -61,8 +59,6 @@ pub async fn run(
         let output_config = configure_output_format(&matches, &workspace_svc);
         catalog_builder.add_value(output_config.clone());
         catalog_builder.add_value(current_account.as_current_account_subject());
-
-        catalog_builder.add_value(oso);
 
         let guards = configure_logging(&output_config, &workspace_layout);
         tracing::info!(
@@ -137,6 +133,8 @@ pub fn configure_catalog(
     multi_tenant_workspace: bool,
 ) -> CatalogBuilder {
     let mut b = CatalogBuilder::new();
+
+    b.add_value(cli_oso().unwrap());
 
     b.add::<ConfigService>();
     b.add::<ContainerRuntime>();

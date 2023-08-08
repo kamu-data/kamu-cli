@@ -23,6 +23,7 @@ async fn metadata_chain_append_event() {
     let dataset_repo = DatasetRepositoryLocalFs::create(
         tempdir.path().join("datasets"),
         Arc::new(CurrentAccountSubject::new_test()),
+        Arc::new(authorization::AlwaysHappyDatasetActionAuthorizer::new()),
         false,
     )
     .unwrap();
@@ -107,6 +108,7 @@ async fn metadata_update_readme_new() {
     let dataset_repo = DatasetRepositoryLocalFs::create(
         tempdir.path().join("datasets"),
         Arc::new(CurrentAccountSubject::new_test()),
+        Arc::new(authorization::AlwaysHappyDatasetActionAuthorizer::new()),
         false,
     )
     .unwrap();

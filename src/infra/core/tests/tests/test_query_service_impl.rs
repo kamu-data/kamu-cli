@@ -87,6 +87,7 @@ async fn create_catalog_with_local_workspace(tempdir: &Path) -> dill::Catalog {
     let dataset_repo = DatasetRepositoryLocalFs::create(
         tempdir.join("datasets"),
         Arc::new(CurrentAccountSubject::new_test()),
+        Arc::new(authorization::AlwaysHappyDatasetActionAuthorizer::new()),
         false,
     )
     .unwrap();
@@ -100,6 +101,9 @@ async fn create_catalog_with_local_workspace(tempdir: &Path) -> dill::Catalog {
         .bind::<dyn ObjectStoreRegistry, ObjectStoreRegistryImpl>()
         .add_value(ObjectStoreBuilderLocalFs::new())
         .bind::<dyn ObjectStoreBuilder, ObjectStoreBuilderLocalFs>()
+        .add_value(CurrentAccountSubject::new_test())
+        .add::<authorization::AlwaysHappyDatasetActionAuthorizer>()
+        .bind::<dyn authorization::DatasetActionAuthorizer, authorization::AlwaysHappyDatasetActionAuthorizer>()        
         .build()
 }
 
@@ -111,6 +115,7 @@ async fn create_catalog_with_s3_workspace(s3: &LocalS3Server) -> dill::Catalog {
     let dataset_repo = DatasetRepositoryS3::new(
         s3_context.clone(),
         Arc::new(CurrentAccountSubject::new_test()),
+        Arc::new(authorization::AlwaysHappyDatasetActionAuthorizer::new()),
         false,
     );
 
@@ -125,6 +130,9 @@ async fn create_catalog_with_s3_workspace(s3: &LocalS3Server) -> dill::Catalog {
         .bind::<dyn ObjectStoreBuilder, ObjectStoreBuilderLocalFs>()
         .add_value(ObjectStoreBuilderS3::new(s3_context, true))
         .bind::<dyn ObjectStoreBuilder, ObjectStoreBuilderS3>()
+        .add_value(CurrentAccountSubject::new_test())
+        .add::<authorization::AlwaysHappyDatasetActionAuthorizer>()
+        .bind::<dyn authorization::DatasetActionAuthorizer, authorization::AlwaysHappyDatasetActionAuthorizer>() 
         .build()
 }
 

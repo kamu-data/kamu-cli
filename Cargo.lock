@@ -3061,6 +3061,7 @@ dependencies = [
  "chrono",
  "container-runtime",
  "datafusion",
+ "dill",
  "futures",
  "internal-error",
  "object_store",

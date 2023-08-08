@@ -29,6 +29,7 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
         DatasetRepositoryLocalFs::create(
             tmp_workspace_dir.join("datasets"),
             Arc::new(CurrentAccountSubject::new_test()),
+            Arc::new(authorization::AlwaysHappyDatasetActionAuthorizer::new()),
             false,
         )
         .unwrap(),

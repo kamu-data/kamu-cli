@@ -21,15 +21,12 @@ use opendatafabric::*;
 /////////////////////////////////////////////////////////////////////////////////////////
 
 async fn create_catalog_with_local_workspace(tempdir: &Path) -> dill::Catalog {
-    let dataset_repo = DatasetRepositoryLocalFs::create(
-        tempdir.join("datasets"),
-        Arc::new(CurrentAccountSubject::new_test()),
-        false,
-    )
-    .unwrap();
-
     dill::CatalogBuilder::new()
-        .add_value(dataset_repo)
+        .add_builder(
+            dill::builder_for::<DatasetRepositoryLocalFs>()
+                .with_root(tempdir.join("datasets"))
+                .with_multi_tenant(false)
+        )
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
         .add::<QueryServiceImpl>()
         .bind::<dyn QueryService, QueryServiceImpl>()
@@ -37,6 +34,9 @@ async fn create_catalog_with_local_workspace(tempdir: &Path) -> dill::Catalog {
         .bind::<dyn ObjectStoreRegistry, ObjectStoreRegistryImpl>()
         .add_value(ObjectStoreBuilderLocalFs::new())
         .bind::<dyn ObjectStoreBuilder, ObjectStoreBuilderLocalFs>()
+        .add_value(CurrentAccountSubject::new_test())
+        .add::<authorization::AlwaysHappyDatasetActionAuthorizer>()
+        .bind::<dyn authorization::DatasetActionAuthorizer, authorization::AlwaysHappyDatasetActionAuthorizer>()
         .build()
 }
 
