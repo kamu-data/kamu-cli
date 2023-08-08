@@ -10,25 +10,25 @@
 use std::sync::Arc;
 
 use dill::component;
-use internal_error::ErrorIntoInternal;
-use kamu::domain::authorization::*;
-use kamu::domain::{AccessError, CurrentAccountSubject};
+use kamu_core::authorization::*;
+use kamu_core::{AccessError, CurrentAccountSubject, ErrorIntoInternal};
 use opendatafabric::{AccountName, DatasetHandle};
 use oso::Oso;
 
-use crate::{DatasetResource, UserActor};
+use crate::dataset_resource::*;
+use crate::user_actor::*;
 
 ///////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
-pub struct CLIOsoDatasetAuthorizer {
+pub struct OsoDatasetAuthorizer {
     oso: Arc<Oso>,
     current_account_subject: Arc<CurrentAccountSubject>,
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-impl CLIOsoDatasetAuthorizer {
+impl OsoDatasetAuthorizer {
     pub fn new(oso: Arc<Oso>, current_account_subject: Arc<CurrentAccountSubject>) -> Self {
         Self {
             oso,
@@ -48,8 +48,8 @@ impl CLIOsoDatasetAuthorizer {
             .map(|a| a.as_str())
             .unwrap_or(self.current_account_subject.account_name.as_str());
 
-        // Let's treat all CLI datasets as public
-        // CLI does not require explicit read/write permissions
+        // TODO: for now let's treat all datasets as public
+        // TODO: explicit read/write permissions
         DatasetResource::new(creator, true)
     }
 }
@@ -57,7 +57,7 @@ impl CLIOsoDatasetAuthorizer {
 ///////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl DatasetActionAuthorizer for CLIOsoDatasetAuthorizer {
+impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
     async fn check_action_allowed(
         &self,
         dataset_handle: &DatasetHandle,

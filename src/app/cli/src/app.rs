@@ -16,11 +16,11 @@ use kamu::domain::*;
 use kamu::utils::smart_transfer_protocol::SmartTransferProtocolClient;
 use kamu::*;
 
+use crate::cli_commands;
 use crate::error::*;
 use crate::explore::TraceServer;
 use crate::output::*;
 use crate::services::*;
-use crate::{cli_commands, cli_oso, CLIOsoDatasetAuthorizer};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -134,7 +134,7 @@ pub fn configure_catalog(
 ) -> CatalogBuilder {
     let mut b = CatalogBuilder::new();
 
-    b.add_value(cli_oso().unwrap());
+    b.add_value(kamu_adapter_oso::load_oso().unwrap());
 
     b.add::<ConfigService>();
     b.add::<ContainerRuntime>();
@@ -222,8 +222,8 @@ pub fn configure_catalog(
     b.add::<kamu_task_system_inmem::TaskSystemEventStoreInMemory>();
     b.bind::<dyn kamu_task_system_inmem::domain::TaskSystemEventStore, kamu_task_system_inmem::TaskSystemEventStoreInMemory>();
 
-    b.add::<CLIOsoDatasetAuthorizer>();
-    b.bind::<dyn domain::authorization::DatasetActionAuthorizer, CLIOsoDatasetAuthorizer>();
+    b.add::<kamu_adapter_oso::OsoDatasetAuthorizer>();
+    b.bind::<dyn domain::authorization::DatasetActionAuthorizer, kamu_adapter_oso::OsoDatasetAuthorizer>();
 
     b
 }

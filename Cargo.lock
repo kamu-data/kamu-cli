@@ -2975,6 +2975,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "kamu-adapter-oso"
+version = "0.137.0"
+dependencies = [
+ "async-trait",
+ "dill",
+ "kamu-core",
+ "opendatafabric",
+ "oso",
+ "oso-derive",
+]
+
+[[package]]
 name = "kamu-cli"
 version = "0.137.0"
 dependencies = [
@@ -3008,6 +3020,7 @@ dependencies = [
  "kamu",
  "kamu-adapter-graphql",
  "kamu-adapter-http",
+ "kamu-adapter-oso",
  "kamu-data-utils",
  "kamu-task-system-inmem",
  "libc",
@@ -3017,8 +3030,6 @@ dependencies = [
  "minus",
  "num-format",
  "opendatafabric",
- "oso",
- "oso-derive",
  "prettytable-rs",
  "rand 0.8.5",
  "read_input",

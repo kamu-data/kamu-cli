@@ -9,11 +9,12 @@
 
 use oso::{Oso, OsoError, PolarClass};
 
-use crate::{DatasetResource, UserActor};
+use crate::dataset_resource::*;
+use crate::user_actor::*;
 
 ///////////////////////////////////////////////////////////////////////////////
 
-pub fn cli_oso() -> Result<Oso, OsoError> {
+pub fn load_oso() -> Result<Oso, OsoError> {
     let mut oso = Oso::new();
 
     oso.register_class(DatasetResource::get_polar_class())?;

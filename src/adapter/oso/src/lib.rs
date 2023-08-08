@@ -7,14 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-pub mod dataset_resource;
-pub use dataset_resource::*;
+mod dataset_resource;
+mod user_actor;
 
-pub mod user_actor;
-pub use user_actor::*;
+pub mod oso_loader;
+pub use oso_loader::load_oso;
 
-pub mod cli_oso_loader;
-pub use cli_oso_loader::*;
-
-pub mod cli_oso_dataset_authorizer;
-pub use cli_oso_dataset_authorizer::*;
+pub mod oso_dataset_authorizer;
+pub use oso_dataset_authorizer::OsoDatasetAuthorizer;

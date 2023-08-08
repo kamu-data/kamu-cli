@@ -39,6 +39,7 @@ kamu = { workspace = true }
 kamu-task-system-inmem = { workspace = true }
 kamu-adapter-graphql = { workspace = true }
 kamu-adapter-http = { workspace = true }
+kamu-adapter-oso = { workspace = true }
 
 # CLI
 chrono-humanize = "0.2"  # Human readable durations
@@ -52,10 +53,6 @@ num-format = "0.4"  # Human-readable number formatting
 prettytable-rs = "0.10"  # ASCII table formatting
 read_input = "0.8"  # Basic user input
 webbrowser = "0.8"  # For opening URLs in default system browser
-
-# Authorization
-oso = "0.27"
-oso-derive = "0.27"
 
 # API / GraphQL
 http = "0.2"

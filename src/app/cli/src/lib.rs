@@ -36,6 +36,3 @@ pub use output::*;
 
 pub mod services;
 pub use services::*;
-
-pub mod authorization;
-pub use authorization::*;

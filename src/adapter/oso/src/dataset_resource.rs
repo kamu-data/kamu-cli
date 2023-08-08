@@ -37,10 +37,12 @@ impl DatasetResource {
         }
     }
 
+    #[allow(dead_code)]
     pub fn authorize_reader(&mut self, reader: &str) {
         self.authorized_readers.insert(reader.to_string());
     }
 
+    #[allow(dead_code)]
     pub fn authorize_editor(&mut self, editor: &str) {
         self.authorized_editors.insert(editor.to_string());
     }
