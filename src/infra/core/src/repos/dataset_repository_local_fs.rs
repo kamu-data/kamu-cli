@@ -276,14 +276,6 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
     ) -> Result<(), RenameDatasetError> {
         let dataset_handle = self.resolve_dataset_ref(dataset_ref).await?;
 
-        self.dataset_action_authorizer
-            .check_action_allowed(
-                &dataset_handle,
-                &self.current_account_subject.account_name,
-                DatasetAction::Write,
-            )
-            .await?;
-
         let new_alias =
             DatasetAlias::new(dataset_handle.alias.account_name.clone(), new_name.clone());
         match self
@@ -300,6 +292,14 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
             Err(ResolveDatasetError::Internal(e)) => Err(RenameDatasetError::Internal(e)),
             Err(ResolveDatasetError::NotFound(_)) => Ok(()),
         }?;
+
+        self.dataset_action_authorizer
+            .check_action_allowed(
+                &dataset_handle,
+                &self.current_account_subject.account_name,
+                DatasetAction::Write,
+            )
+            .await?;
 
         self.storage_strategy
             .handle_dataset_renamed(&dataset_handle, new_name)

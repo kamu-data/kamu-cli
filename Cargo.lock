@@ -2874,6 +2874,7 @@ dependencies = [
  "kamu-core",
  "kamu-data-utils",
  "libc",
+ "mockall",
  "object_store",
  "opendatafabric",
  "pin-project",

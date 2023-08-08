@@ -312,14 +312,6 @@ impl DatasetRepository for DatasetRepositoryS3 {
     ) -> Result<(), RenameDatasetError> {
         let dataset_handle = self.resolve_dataset_ref(dataset_ref).await?;
 
-        self.dataset_action_authorizer
-            .check_action_allowed(
-                &dataset_handle,
-                &self.current_account_subject.account_name,
-                DatasetAction::Write,
-            )
-            .await?;
-
         let dataset = self.get_dataset_impl(&dataset_handle.id).await?;
 
         let new_alias =
@@ -336,6 +328,14 @@ impl DatasetRepository for DatasetRepositoryS3 {
             Err(GetDatasetError::Internal(e)) => Err(RenameDatasetError::Internal(e)),
             Err(GetDatasetError::NotFound(_)) => Ok(()),
         }?;
+
+        self.dataset_action_authorizer
+            .check_action_allowed(
+                &dataset_handle,
+                &self.current_account_subject.account_name,
+                DatasetAction::Write,
+            )
+            .await?;
 
         // It's safe to rename dataset
         self.save_dataset_alias(&dataset, new_alias).await?;
