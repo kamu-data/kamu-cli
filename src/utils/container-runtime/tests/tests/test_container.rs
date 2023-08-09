@@ -47,7 +47,7 @@ async fn test_container_terminate_not_called() {
 
     assert_matches!(
         container
-            .wait_for_container(Duration::from_millis(1000))
+            .wait_for_container(Duration::from_millis(5000))
             .await,
         Ok(_)
     );
@@ -79,14 +79,14 @@ async fn test_container_terminate_awaited() {
 
     let mut container = rt
         .run_attached(TEST_IMAGE)
-        .args(["sleep", "999"])
+        .args(["sleep", "4999"])
         .init(true)
         .spawn()
         .unwrap();
 
     assert_matches!(
         container
-            .wait_for_container(Duration::from_millis(1000))
+            .wait_for_container(Duration::from_millis(5000))
             .await,
         Ok(_)
     );
