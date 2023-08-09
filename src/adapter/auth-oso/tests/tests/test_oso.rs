@@ -145,7 +145,7 @@ async fn test_having_explicit_write_permission_in_private_dataset() {
     );
 
     assert_allowed!(write_result);
-    assert_forbidden!(read_result);
+    assert_allowed!(read_result);
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

@@ -7,11 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::HashSet;
+use std::collections::HashMap;
 
 use oso::PolarClass;
 
 ///////////////////////////////////////////////////////////////////////////////
+
+const ROLE_READER: &'static str = "Reader";
+const ROLE_EDITOR: &'static str = "Editor";
 
 #[derive(PolarClass, Debug, Clone)]
 pub struct DatasetResource {
@@ -20,9 +23,7 @@ pub struct DatasetResource {
     #[polar(attribute)]
     pub allows_public_read: bool,
     #[polar(attribute)]
-    pub authorized_readers: HashSet<String>,
-    #[polar(attribute)]
-    pub authorized_editors: HashSet<String>,
+    pub authorized_users: HashMap<String, &'static str>,
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -32,19 +33,20 @@ impl DatasetResource {
         Self {
             created_by: created_by.to_string(),
             allows_public_read,
-            authorized_readers: HashSet::new(),
-            authorized_editors: HashSet::new(),
+            authorized_users: HashMap::new(),
         }
     }
 
     #[allow(dead_code)]
     pub fn authorize_reader(&mut self, reader: &str) {
-        self.authorized_readers.insert(reader.to_string());
+        self.authorized_users
+            .insert(reader.to_string(), ROLE_READER);
     }
 
     #[allow(dead_code)]
     pub fn authorize_editor(&mut self, editor: &str) {
-        self.authorized_editors.insert(editor.to_string());
+        self.authorized_users
+            .insert(editor.to_string(), ROLE_EDITOR);
     }
 }
 
@@ -54,11 +56,10 @@ impl std::fmt::Display for DatasetResource {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "Dataset(created_by='{}', allows_public_read={}, num_readers={}, num_editors={})",
+            "Dataset(created_by='{}', allows_public_read={}, num_authorizations={})",
             &self.created_by,
             self.allows_public_read,
-            self.authorized_readers.len(),
-            self.authorized_editors.len()
+            self.authorized_users.len(),
         )
     }
 }
