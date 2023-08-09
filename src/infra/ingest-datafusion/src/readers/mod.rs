@@ -11,8 +11,10 @@ mod csv;
 mod geojson;
 mod ndjson;
 mod parquet;
+mod shapefile;
 
 pub use csv::*;
 pub use geojson::*;
 pub use ndjson::*;
 pub use parquet::*;
+pub use shapefile::*;

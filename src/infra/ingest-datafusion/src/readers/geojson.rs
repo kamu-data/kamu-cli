@@ -88,9 +88,6 @@ impl Reader for ReaderGeoJson {
             table_partition_cols: Vec::new(),
             schema: schema.as_ref(),
             schema_infer_max_records: 1000,
-            // TODO: PERF: Reader support compression, thus we could detect decompress step and
-            // optimize the ingest plan to avoid writing uncompressed data to disc or having to
-            // re-compress it.
             file_compression_type: FileCompressionType::UNCOMPRESSED,
             infinite: false,
         };
