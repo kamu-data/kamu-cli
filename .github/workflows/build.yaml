@@ -6,6 +6,7 @@ on:
       - "examples/**"
       - "images/**"
       - "**.md"
+      - "**.ipynb"
   # manual trigger
   workflow_dispatch: {}
 env:
