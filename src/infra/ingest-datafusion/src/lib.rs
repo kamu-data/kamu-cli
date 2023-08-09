@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+#![feature(file_create_new)]
+
 mod merge_strategies;
 mod merge_strategy;
 mod reader;
