@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use kamu::domain::{authorization, CurrentAccountSubject, TEST_ACCOUNT_NAME};
+use kamu::domain::{auth, CurrentAccountSubject, TEST_ACCOUNT_NAME};
 use kamu::testing::LocalS3Server;
 use kamu::utils::s3_context::S3Context;
 use kamu::DatasetRepositoryS3;
@@ -22,7 +22,7 @@ use crate::mock_dataset_action_authorizer;
 
 async fn s3_repo(
     s3: &LocalS3Server,
-    dataset_action_authorizer: Arc<dyn authorization::DatasetActionAuthorizer>,
+    dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
     multi_tenant: bool,
 ) -> DatasetRepositoryS3 {
     let s3_context = S3Context::from_url(&s3.url).await;
@@ -42,7 +42,7 @@ async fn test_create_dataset() {
     let s3 = LocalS3Server::new().await;
     let repo = s3_repo(
         &s3,
-        Arc::new(authorization::AlwaysHappyDatasetActionAuthorizer::new()),
+        Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new()),
         false,
     )
     .await;
@@ -58,7 +58,7 @@ async fn test_create_dataset_multi_tenant() {
     let s3 = LocalS3Server::new().await;
     let repo = s3_repo(
         &s3,
-        Arc::new(authorization::AlwaysHappyDatasetActionAuthorizer::new()),
+        Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new()),
         true,
     )
     .await;
@@ -78,7 +78,7 @@ async fn test_create_dataset_same_name_multiple_tenants() {
     let s3 = LocalS3Server::new().await;
     let repo = s3_repo(
         &s3,
-        Arc::new(authorization::AlwaysHappyDatasetActionAuthorizer::new()),
+        Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new()),
         true,
     )
     .await;
@@ -95,7 +95,7 @@ async fn test_create_dataset_from_snapshot() {
     let s3 = LocalS3Server::new().await;
     let repo = s3_repo(
         &s3,
-        Arc::new(authorization::AlwaysHappyDatasetActionAuthorizer::new()),
+        Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new()),
         false,
     )
     .await;
@@ -111,7 +111,7 @@ async fn test_create_dataset_from_snapshot_multi_tenant() {
     let s3 = LocalS3Server::new().await;
     let repo = s3_repo(
         &s3,
-        Arc::new(authorization::AlwaysHappyDatasetActionAuthorizer::new()),
+        Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new()),
         true,
     )
     .await;
@@ -199,7 +199,7 @@ async fn test_delete_dataset() {
     let s3 = LocalS3Server::new().await;
     let repo = s3_repo(
         &s3,
-        Arc::new(authorization::AlwaysHappyDatasetActionAuthorizer::new()),
+        Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new()),
         false,
     )
     .await;
@@ -215,7 +215,7 @@ async fn test_delete_dataset_multi_tenant() {
     let s3 = LocalS3Server::new().await;
     let repo = s3_repo(
         &s3,
-        Arc::new(authorization::AlwaysHappyDatasetActionAuthorizer::new()),
+        Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new()),
         true,
     )
     .await;
@@ -235,7 +235,7 @@ async fn test_iterate_datasets() {
     let s3 = LocalS3Server::new().await;
     let repo = s3_repo(
         &s3,
-        Arc::new(authorization::AlwaysHappyDatasetActionAuthorizer::new()),
+        Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new()),
         false,
     )
     .await;
@@ -251,7 +251,7 @@ async fn test_iterate_datasets_multi_tenant() {
     let s3 = LocalS3Server::new().await;
     let repo = s3_repo(
         &s3,
-        Arc::new(authorization::AlwaysHappyDatasetActionAuthorizer::new()),
+        Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new()),
         true,
     )
     .await;

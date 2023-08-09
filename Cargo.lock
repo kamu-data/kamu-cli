@@ -2908,6 +2908,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "kamu-adapter-auth-oso"
+version = "0.136.0"
+dependencies = [
+ "async-trait",
+ "dill",
+ "env_logger",
+ "kamu-core",
+ "opendatafabric",
+ "oso",
+ "oso-derive",
+ "test-group",
+ "test-log",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "kamu-adapter-graphql"
 version = "0.137.0"
 dependencies = [
@@ -3025,9 +3043,9 @@ dependencies = [
  "internal-error",
  "itertools 0.11.0",
  "kamu",
+ "kamu-adapter-auth-oso",
  "kamu-adapter-graphql",
  "kamu-adapter-http",
- "kamu-adapter-oso",
  "kamu-data-utils",
  "kamu-task-system-inmem",
  "libc",

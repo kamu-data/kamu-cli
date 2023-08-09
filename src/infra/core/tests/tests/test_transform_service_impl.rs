@@ -109,7 +109,7 @@ async fn test_get_next_operation() {
         DatasetRepositoryLocalFs::create(
             tempdir.path().join("datasets"),
             Arc::new(CurrentAccountSubject::new_test()),
-            Arc::new(authorization::AlwaysHappyDatasetActionAuthorizer::new()),
+            Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new()),
             false,
         )
         .unwrap(),
@@ -171,7 +171,7 @@ async fn test_get_verification_plan_one_to_one() {
         DatasetRepositoryLocalFs::create(
             tempdir.path().join("datasets"),
             Arc::new(CurrentAccountSubject::new_test()),
-            Arc::new(authorization::AlwaysHappyDatasetActionAuthorizer::new()),
+            Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new()),
             false,
         )
         .unwrap(),

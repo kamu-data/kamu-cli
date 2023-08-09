@@ -1,5 +1,5 @@
 [package]
-name = "kamu-adapter-oso"
+name = "kamu-adapter-auth-oso"
 description = "Authorization adapter for Kamu domain based on OSO library"
 version = { workspace = true }
 homepage = { workspace = true }

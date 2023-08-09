@@ -18,7 +18,7 @@ use opendatafabric::*;
 use thiserror::Error;
 use tokio_stream::Stream;
 
-use crate::authorization::DatasetActionUnauthorizedError;
+use crate::auth::DatasetActionUnauthorizedError;
 use crate::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////

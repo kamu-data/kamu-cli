@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use domain::{authorization, CurrentAccountSubject, TEST_ACCOUNT_NAME};
+use domain::{auth, CurrentAccountSubject, TEST_ACCOUNT_NAME};
 use kamu::*;
 use opendatafabric::AccountName;
 use tempfile::TempDir;
@@ -21,7 +21,7 @@ use crate::mock_dataset_action_authorizer;
 
 fn local_fs_repo(
     tempdir: &TempDir,
-    dataset_action_authorizer: Arc<dyn authorization::DatasetActionAuthorizer>,
+    dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
     multi_tenant: bool,
 ) -> DatasetRepositoryLocalFs {
     DatasetRepositoryLocalFs::create(
@@ -40,7 +40,7 @@ async fn test_create_dataset() {
     let tempdir = tempfile::tempdir().unwrap();
     let repo = local_fs_repo(
         &tempdir,
-        Arc::new(authorization::AlwaysHappyDatasetActionAuthorizer::new()),
+        Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new()),
         false,
     );
 
@@ -54,7 +54,7 @@ async fn test_create_dataset_multi_tenant() {
     let tempdir = tempfile::tempdir().unwrap();
     let repo = local_fs_repo(
         &tempdir,
-        Arc::new(authorization::AlwaysHappyDatasetActionAuthorizer::new()),
+        Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new()),
         true,
     );
 
@@ -72,7 +72,7 @@ async fn test_create_dataset_same_name_multiple_tenants() {
     let tempdir = tempfile::tempdir().unwrap();
     let repo = local_fs_repo(
         &tempdir,
-        Arc::new(authorization::AlwaysHappyDatasetActionAuthorizer::new()),
+        Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new()),
         true,
     );
 
@@ -86,7 +86,7 @@ async fn test_create_dataset_from_snapshot() {
     let tempdir = tempfile::tempdir().unwrap();
     let repo = local_fs_repo(
         &tempdir,
-        Arc::new(authorization::AlwaysHappyDatasetActionAuthorizer::new()),
+        Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new()),
         false,
     );
 
@@ -100,7 +100,7 @@ async fn test_create_dataset_from_snapshot_multi_tenant() {
     let tempdir = tempfile::tempdir().unwrap();
     let repo = local_fs_repo(
         &tempdir,
-        Arc::new(authorization::AlwaysHappyDatasetActionAuthorizer::new()),
+        Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new()),
         true,
     );
 
@@ -178,7 +178,7 @@ async fn test_delete_dataset() {
     let tempdir = tempfile::tempdir().unwrap();
     let repo = local_fs_repo(
         &tempdir,
-        Arc::new(authorization::AlwaysHappyDatasetActionAuthorizer::new()),
+        Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new()),
         false,
     );
 
@@ -192,7 +192,7 @@ async fn test_delete_dataset_multi_tenant() {
     let tempdir = tempfile::tempdir().unwrap();
     let repo = local_fs_repo(
         &tempdir,
-        Arc::new(authorization::AlwaysHappyDatasetActionAuthorizer::new()),
+        Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new()),
         true,
     );
 
@@ -210,7 +210,7 @@ async fn test_iterate_datasets() {
     let tempdir = tempfile::tempdir().unwrap();
     let repo = local_fs_repo(
         &tempdir,
-        Arc::new(authorization::AlwaysHappyDatasetActionAuthorizer::new()),
+        Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new()),
         false,
     );
 
@@ -224,7 +224,7 @@ async fn test_iterate_datasets_multi_tenant() {
     let tempdir = tempfile::tempdir().unwrap();
     let repo = local_fs_repo(
         &tempdir,
-        Arc::new(authorization::AlwaysHappyDatasetActionAuthorizer::new()),
+        Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new()),
         true,
     );
 

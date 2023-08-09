@@ -74,8 +74,6 @@ impl AlwaysHappyDatasetActionAuthorizer {
 
 #[async_trait::async_trait]
 impl DatasetActionAuthorizer for AlwaysHappyDatasetActionAuthorizer {
-    #[must_use]
-    #[allow(clippy::type_complexity, clippy::type_repetition_in_bounds)]
     async fn check_action_allowed(
         &self,
         _dataset_handle: &DatasetHandle,

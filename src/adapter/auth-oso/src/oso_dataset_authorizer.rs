@@ -10,7 +10,7 @@
 use std::sync::Arc;
 
 use dill::component;
-use kamu_core::authorization::*;
+use kamu_core::auth::*;
 use kamu_core::{AccessError, CurrentAccountSubject, ErrorIntoInternal};
 use opendatafabric::{AccountName, DatasetHandle};
 use oso::Oso;
@@ -20,7 +20,6 @@ use crate::user_actor::*;
 
 ///////////////////////////////////////////////////////////////////////////////
 
-#[component(pub)]
 pub struct OsoDatasetAuthorizer {
     oso: Arc<Oso>,
     current_account_subject: Arc<CurrentAccountSubject>,
@@ -28,6 +27,7 @@ pub struct OsoDatasetAuthorizer {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+#[component(pub)]
 impl OsoDatasetAuthorizer {
     pub fn new(oso: Arc<Oso>, current_account_subject: Arc<CurrentAccountSubject>) -> Self {
         Self {

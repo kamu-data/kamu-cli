@@ -7,10 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_adapter_oso::dataset_resource::DatasetResource;
-use kamu_adapter_oso::load_oso;
-use kamu_adapter_oso::user_actor::UserActor;
-use kamu_core::authorization::DatasetAction;
+use kamu_adapter_auth_oso::dataset_resource::DatasetResource;
+use kamu_adapter_auth_oso::load_oso;
+use kamu_adapter_auth_oso::user_actor::UserActor;
+use kamu_core::auth::DatasetAction;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 

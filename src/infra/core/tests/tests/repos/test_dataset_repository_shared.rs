@@ -353,12 +353,7 @@ pub async fn test_rename_dataset_unauthroized(
         .rename_dataset(&alias_foo.as_local_ref(), &alias_bar.dataset_name)
         .await;
 
-    assert!(result.is_err());
-    match result.err().unwrap() {
-        RenameDatasetError::Access(_) => {}
-        _ => panic!("Expected access error"),
-    }
-
+    assert_matches!(result, Err(RenameDatasetError::Access(_)));
     assert!(repo.get_dataset(&alias_foo.as_local_ref()).await.is_ok());
     assert!(repo.get_dataset(&alias_bar.as_local_ref()).await.is_err());
 }

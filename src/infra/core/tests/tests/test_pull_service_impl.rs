@@ -897,7 +897,7 @@ impl PullTestHarness {
             DatasetRepositoryLocalFs::create(
                 tmp_path.join("datasets"),
                 current_account_config.clone(),
-                Arc::new(authorization::AlwaysHappyDatasetActionAuthorizer::new()),
+                Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new()),
                 multi_tenant,
             )
             .unwrap(),

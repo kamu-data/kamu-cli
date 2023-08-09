@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use core::panic;
+use std::assert_matches::assert_matches;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -106,7 +106,7 @@ async fn create_catalog_with_local_workspace(
         .bind::<dyn ObjectStoreBuilder, ObjectStoreBuilderLocalFs>()
         .add_value(CurrentAccountSubject::new_test())
         .add_value(dataset_action_authorizer)
-        .bind::<dyn authorization::DatasetActionAuthorizer, MockDatasetActionAuthorizer>()
+        .bind::<dyn auth::DatasetActionAuthorizer, MockDatasetActionAuthorizer>()
         .build()
 }
 
@@ -136,7 +136,7 @@ async fn create_catalog_with_s3_workspace(
         .bind::<dyn ObjectStoreBuilder, ObjectStoreBuilderS3>()
         .add_value(CurrentAccountSubject::new_test())
         .add_value(dataset_action_authorizer)
-        .bind::<dyn authorization::DatasetActionAuthorizer, MockDatasetActionAuthorizer>()
+        .bind::<dyn auth::DatasetActionAuthorizer, MockDatasetActionAuthorizer>()
         .build()
 }
 
@@ -208,11 +208,7 @@ async fn test_dataset_schema_unauthorized_common(catalog: dill::Catalog, tempdir
 
     let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
     let result = query_svc.get_schema(&dataset_ref).await;
-    assert!(result.is_err());
-    match result.err().unwrap() {
-        QueryError::Access(_) => {}
-        _ => panic!("Expected access error"),
-    }
+    assert_matches!(result, Err(QueryError::Access(_)));
 }
 
 #[test_log::test(tokio::test)]
@@ -289,11 +285,7 @@ async fn test_dataset_tail_unauthorized_common(catalog: dill::Catalog, tempdir: 
 
     let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
     let result = query_svc.tail(&dataset_ref, 1).await;
-    assert!(result.is_err());
-    match result.err().unwrap() {
-        QueryError::Access(_) => {}
-        _ => panic!("Expected access error"),
-    }
+    assert_matches!(result, Err(QueryError::Access(_)));
 }
 
 #[test_log::test(tokio::test)]

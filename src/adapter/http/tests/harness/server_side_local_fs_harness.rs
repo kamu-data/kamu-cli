@@ -14,7 +14,7 @@ use std::sync::Arc;
 
 use dill::builder_for;
 use kamu::domain::{
-    authorization,
+    auth,
     CurrentAccountSubject,
     DatasetRepository,
     InternalError,
@@ -50,8 +50,8 @@ impl ServerSideLocalFsHarness {
             )
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
             .add_value(CurrentAccountSubject::new_test())
-            .add::<authorization::AlwaysHappyDatasetActionAuthorizer>()
-            .bind::<dyn authorization::DatasetActionAuthorizer, authorization::AlwaysHappyDatasetActionAuthorizer>()
+            .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
+            .bind::<dyn auth::DatasetActionAuthorizer, auth::AlwaysHappyDatasetActionAuthorizer>()
             .build();
 
         let api_server = TestAPIServer::new(

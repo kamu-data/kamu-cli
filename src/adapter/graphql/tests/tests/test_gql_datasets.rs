@@ -24,7 +24,7 @@ async fn dataset_by_id_does_not_exist() {
     let dataset_repo = DatasetRepositoryLocalFs::create(
         tempdir.path().join("datasets"),
         Arc::new(CurrentAccountSubject::new_test()),
-        Arc::new(authorization::AlwaysHappyDatasetActionAuthorizer::new()),
+        Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new()),
         false,
     )
     .unwrap();
@@ -65,7 +65,7 @@ async fn dataset_by_id() {
     let dataset_repo = DatasetRepositoryLocalFs::create(
         tempdir.path().join("datasets"),
         Arc::new(CurrentAccountSubject::new_test()),
-        Arc::new(authorization::AlwaysHappyDatasetActionAuthorizer::new()),
+        Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new()),
         false,
     )
     .unwrap();
@@ -124,7 +124,7 @@ async fn dataset_create_empty() {
     let dataset_repo = DatasetRepositoryLocalFs::create(
         tempdir.path().join("datasets"),
         Arc::new(CurrentAccountSubject::new_test()),
-        Arc::new(authorization::AlwaysHappyDatasetActionAuthorizer::new()),
+        Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new()),
         false,
     )
     .unwrap();
@@ -173,7 +173,7 @@ async fn dataset_create_from_snapshot() {
     let dataset_repo = DatasetRepositoryLocalFs::create(
         tempdir.path().join("datasets"),
         Arc::new(CurrentAccountSubject::new_test()),
-        Arc::new(authorization::AlwaysHappyDatasetActionAuthorizer::new()),
+        Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new()),
         false,
     )
     .unwrap();
@@ -237,7 +237,7 @@ async fn dataset_create_from_snapshot_malformed() {
     let dataset_repo = DatasetRepositoryLocalFs::create(
         tempdir.path().join("datasets"),
         Arc::new(CurrentAccountSubject::new_test()),
-        Arc::new(authorization::AlwaysHappyDatasetActionAuthorizer::new()),
+        Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new()),
         false,
     )
     .unwrap();

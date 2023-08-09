@@ -134,7 +134,7 @@ pub fn configure_catalog(
 ) -> CatalogBuilder {
     let mut b = CatalogBuilder::new();
 
-    b.add_value(kamu_adapter_oso::load_oso().unwrap());
+    b.add_value(kamu_adapter_auth_oso::load_oso().unwrap());
 
     b.add::<ConfigService>();
     b.add::<ContainerRuntime>();
@@ -222,8 +222,8 @@ pub fn configure_catalog(
     b.add::<kamu_task_system_inmem::TaskSystemEventStoreInMemory>();
     b.bind::<dyn kamu_task_system_inmem::domain::TaskSystemEventStore, kamu_task_system_inmem::TaskSystemEventStoreInMemory>();
 
-    b.add::<kamu_adapter_oso::OsoDatasetAuthorizer>();
-    b.bind::<dyn domain::authorization::DatasetActionAuthorizer, kamu_adapter_oso::OsoDatasetAuthorizer>();
+    b.add::<kamu_adapter_auth_oso::OsoDatasetAuthorizer>();
+    b.bind::<dyn domain::auth::DatasetActionAuthorizer, kamu_adapter_auth_oso::OsoDatasetAuthorizer>();
 
     b
 }

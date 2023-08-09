@@ -30,7 +30,7 @@ async fn test_verify_data_consistency() {
         DatasetRepositoryLocalFs::create(
             tempdir.path().join("datasets"),
             Arc::new(CurrentAccountSubject::new_test()),
-            Arc::new(authorization::AlwaysHappyDatasetActionAuthorizer::new()),
+            Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new()),
             false,
         )
         .unwrap(),

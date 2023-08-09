@@ -20,7 +20,7 @@ use datafusion::parquet::schema::types::Type;
 use datafusion::prelude::*;
 use dill::*;
 use futures::stream::{self, StreamExt, TryStreamExt};
-use kamu_core::authorization::{DatasetAction, DatasetActionAuthorizer};
+use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer};
 use kamu_core::*;
 use opendatafabric::*;
 

@@ -38,7 +38,6 @@ pub fn load_oso() -> Result<Oso, OsoError> {
             has_permission(actor, action, dataset);
     "#,
     ) {
-        println!("{}", e);
         return Err(e);
     }
 

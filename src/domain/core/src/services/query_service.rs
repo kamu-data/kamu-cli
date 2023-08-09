@@ -13,7 +13,7 @@ use datafusion::prelude::DataFrame;
 use opendatafabric::DatasetRef;
 use thiserror::Error;
 
-use crate::authorization::DatasetActionUnauthorizedError;
+use crate::auth::DatasetActionUnauthorizedError;
 use crate::*;
 
 // TODO: Support different engines and query dialects

@@ -12,7 +12,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use dill::*;
-use domain::authorization::{DatasetAction, DatasetActionAuthorizer};
+use domain::auth::{DatasetAction, DatasetActionAuthorizer};
 use futures::TryStreamExt;
 use kamu_core::*;
 use opendatafabric::*;

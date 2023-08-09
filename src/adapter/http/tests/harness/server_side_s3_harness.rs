@@ -13,7 +13,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use kamu::domain::{
-    authorization,
+    auth,
     CurrentAccountSubject,
     DatasetRepository,
     InternalError,
@@ -98,7 +98,7 @@ async fn s3_repo(s3: &LocalS3Server) -> DatasetRepositoryS3 {
     DatasetRepositoryS3::new(
         s3_context,
         Arc::new(CurrentAccountSubject::new_test()),
-        Arc::new(authorization::AlwaysHappyDatasetActionAuthorizer::new()),
+        Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new()),
         false,
     )
 }
