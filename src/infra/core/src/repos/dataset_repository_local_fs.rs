@@ -328,6 +328,14 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
             .into());
         }
 
+        self.dataset_action_authorizer
+            .check_action_allowed(
+                &dataset_handle,
+                &self.current_account_subject.account_name,
+                DatasetAction::Write,
+            )
+            .await?;
+
         // // Update repo info
         // let mut repo_info = self.read_repo_info().await?;
         // let index = repo_info

@@ -231,6 +231,22 @@ async fn test_delete_dataset_multi_tenant() {
 
 #[test_group::group(containerized)]
 #[tokio::test]
+async fn test_delete_unauthorized() {
+    let s3 = LocalS3Server::new().await;
+    let repo = s3_repo(
+        &s3,
+        Arc::new(mock_dataset_action_authorizer::denying_mock()),
+        true,
+    )
+    .await;
+
+    test_dataset_repository_shared::test_delete_dataset_unauthroized(&repo, None).await;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(containerized)]
+#[tokio::test]
 async fn test_iterate_datasets() {
     let s3 = LocalS3Server::new().await;
     let repo = s3_repo(

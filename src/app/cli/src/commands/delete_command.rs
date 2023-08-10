@@ -91,6 +91,7 @@ impl Command for DeleteCommand {
             match self.dataset_repo.delete_dataset(dataset_ref).await {
                 Ok(_) => Ok(()),
                 Err(DeleteDatasetError::DanglingReference(e)) => Err(CLIError::failure(e)),
+                Err(DeleteDatasetError::Access(e)) => Err(CLIError::failure(e)),
                 Err(e) => Err(CLIError::critical(e)),
             }?
         }

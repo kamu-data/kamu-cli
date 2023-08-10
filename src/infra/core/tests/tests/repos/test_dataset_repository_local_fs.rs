@@ -206,6 +206,20 @@ async fn test_delete_dataset_multi_tenant() {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
+async fn test_delete_unauthorized() {
+    let tempdir = tempfile::tempdir().unwrap();
+    let repo = local_fs_repo(
+        &tempdir,
+        Arc::new(mock_dataset_action_authorizer::denying_mock()),
+        true,
+    );
+
+    test_dataset_repository_shared::test_delete_dataset_unauthroized(&repo, None).await;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
 async fn test_iterate_datasets() {
     let tempdir = tempfile::tempdir().unwrap();
     let repo = local_fs_repo(

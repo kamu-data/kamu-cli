@@ -410,6 +410,32 @@ pub async fn test_delete_dataset(repo: &dyn DatasetRepository, account_name: Opt
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+pub async fn test_delete_dataset_unauthroized(
+    repo: &dyn DatasetRepository,
+    account_name: Option<AccountName>,
+) {
+    let alias_foo = DatasetAlias::new(account_name.clone(), DatasetName::new_unchecked("foo"));
+
+    let snapshot = MetadataFactory::dataset_snapshot()
+        .name("foo")
+        .kind(DatasetKind::Root)
+        .push_event(MetadataFactory::set_polling_source().build())
+        .build();
+
+    repo.create_dataset_from_snapshot(account_name, snapshot)
+        .await
+        .unwrap();
+
+    assert_matches!(
+        repo.delete_dataset(&alias_foo.as_local_ref()).await,
+        Err(DeleteDatasetError::Access(_))
+    );
+
+    assert!(repo.get_dataset(&alias_foo.as_local_ref()).await.is_ok());
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
 pub async fn test_iterate_datasets(repo: &dyn DatasetRepository) {
     let alias_foo = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
     let alias_bar = DatasetAlias::new(None, DatasetName::new_unchecked("bar"));

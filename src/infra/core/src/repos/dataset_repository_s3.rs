@@ -362,6 +362,14 @@ impl DatasetRepository for DatasetRepositoryS3 {
             .into());
         }
 
+        self.dataset_action_authorizer
+            .check_action_allowed(
+                &dataset_handle,
+                &self.current_account_subject.account_name,
+                DatasetAction::Write,
+            )
+            .await?;
+
         match self.delete_dataset_s3_objects(&dataset_handle.id).await {
             Ok(_) => Ok(()),
             Err(e) => Err(DeleteDatasetError::Internal(e)),
