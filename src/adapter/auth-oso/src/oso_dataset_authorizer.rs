@@ -17,6 +17,7 @@ use oso::Oso;
 
 use crate::dataset_resource::*;
 use crate::user_actor::*;
+use crate::KamuAuthOso;
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -29,9 +30,12 @@ pub struct OsoDatasetAuthorizer {
 
 #[component(pub)]
 impl OsoDatasetAuthorizer {
-    pub fn new(oso: Arc<Oso>, current_account_subject: Arc<CurrentAccountSubject>) -> Self {
+    pub fn new(
+        kamu_auth_oso: Arc<KamuAuthOso>,
+        current_account_subject: Arc<CurrentAccountSubject>,
+    ) -> Self {
         Self {
-            oso,
+            oso: kamu_auth_oso.oso.clone(),
             current_account_subject,
         }
     }

@@ -8,8 +8,8 @@
 // by the Apache License, Version 2.0.
 
 use kamu_adapter_auth_oso::dataset_resource::DatasetResource;
-use kamu_adapter_auth_oso::load_oso;
 use kamu_adapter_auth_oso::user_actor::UserActor;
+use kamu_adapter_auth_oso::KamuAuthOso;
 use kamu_core::auth::DatasetAction;
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -33,7 +33,7 @@ async fn test_owner_can_read_and_write() {
     let user_actor = UserActor::new("foo");
     let dataset_resource = DatasetResource::new("foo", false);
 
-    let oso = load_oso().unwrap();
+    let oso = KamuAuthOso::new().oso;
 
     let write_result = oso.is_allowed(
         user_actor.clone(),
@@ -57,7 +57,7 @@ async fn test_unrelated_can_read_public() {
     let user_actor = UserActor::new("foo");
     let dataset_resource = DatasetResource::new("bar", true);
 
-    let oso = load_oso().unwrap();
+    let oso = KamuAuthOso::new().oso;
 
     let write_result = oso.is_allowed(
         user_actor.clone(),
@@ -81,7 +81,7 @@ async fn test_unrelated_cannot_read_private() {
     let user_actor = UserActor::new("foo");
     let dataset_resource = DatasetResource::new("bar", false);
 
-    let oso = load_oso().unwrap();
+    let oso = KamuAuthOso::new().oso;
 
     let write_result = oso.is_allowed(
         user_actor.clone(),
@@ -106,7 +106,7 @@ async fn test_having_explicit_read_permission_in_private_dataset() {
     let mut dataset_resource = DatasetResource::new("bar", false);
     dataset_resource.authorize_reader("foo");
 
-    let oso = load_oso().unwrap();
+    let oso = KamuAuthOso::new().oso;
 
     let write_result = oso.is_allowed(
         user_actor.clone(),
@@ -131,7 +131,7 @@ async fn test_having_explicit_write_permission_in_private_dataset() {
     let mut dataset_resource = DatasetResource::new("bar", false);
     dataset_resource.authorize_editor("foo");
 
-    let oso = load_oso().unwrap();
+    let oso = KamuAuthOso::new().oso;
 
     let write_result = oso.is_allowed(
         user_actor.clone(),
