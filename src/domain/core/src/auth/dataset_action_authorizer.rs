@@ -21,7 +21,6 @@ pub trait DatasetActionAuthorizer: Sync + Send {
     async fn check_action_allowed(
         &self,
         dataset_handle: &DatasetHandle,
-        account_name: &AccountName,
         action: DatasetAction,
     ) -> Result<(), DatasetActionUnauthorizedError>;
 }
@@ -77,7 +76,6 @@ impl DatasetActionAuthorizer for AlwaysHappyDatasetActionAuthorizer {
     async fn check_action_allowed(
         &self,
         _dataset_handle: &DatasetHandle,
-        _account_name: &AccountName,
         _action: DatasetAction,
     ) -> Result<(), DatasetActionUnauthorizedError> {
         // Ignore rules

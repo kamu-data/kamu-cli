@@ -31,7 +31,6 @@ use crate::utils::docker_images;
 pub struct QueryServiceImpl {
     dataset_repo: Arc<dyn DatasetRepository>,
     object_store_registry: Arc<dyn ObjectStoreRegistry>,
-    current_account_subject: Arc<CurrentAccountSubject>,
     dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
 }
 
@@ -40,13 +39,11 @@ impl QueryServiceImpl {
     pub fn new(
         dataset_repo: Arc<dyn DatasetRepository>,
         object_store_registry: Arc<dyn ObjectStoreRegistry>,
-        current_account_subject: Arc<CurrentAccountSubject>,
         dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
     ) -> Self {
         Self {
             dataset_repo,
             object_store_registry,
-            current_account_subject,
             dataset_action_authorizer,
         }
     }
@@ -83,11 +80,7 @@ impl QueryServiceImpl {
         let dataset_handle = self.dataset_repo.resolve_dataset_ref(dataset_ref).await?;
 
         self.dataset_action_authorizer
-            .check_action_allowed(
-                &dataset_handle,
-                &self.current_account_subject.account_name,
-                DatasetAction::Read,
-            )
+            .check_action_allowed(&dataset_handle, DatasetAction::Read)
             .await?;
 
         let dataset = self

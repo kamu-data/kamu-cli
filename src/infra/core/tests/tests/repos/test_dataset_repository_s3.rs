@@ -183,7 +183,9 @@ async fn test_rename_unauthorized() {
     let s3 = LocalS3Server::new().await;
     let repo = s3_repo(
         &s3,
-        Arc::new(mock_dataset_action_authorizer::denying_mock()),
+        Arc::new(mock_dataset_action_authorizer::denying_mock(
+            TEST_ACCOUNT_NAME,
+        )),
         true,
     )
     .await;
@@ -235,7 +237,9 @@ async fn test_delete_unauthorized() {
     let s3 = LocalS3Server::new().await;
     let repo = s3_repo(
         &s3,
-        Arc::new(mock_dataset_action_authorizer::denying_mock()),
+        Arc::new(mock_dataset_action_authorizer::denying_mock(
+            TEST_ACCOUNT_NAME,
+        )),
         true,
     )
     .await;

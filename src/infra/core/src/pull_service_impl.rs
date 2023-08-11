@@ -611,11 +611,7 @@ impl PullService for PullServiceImpl {
 
         let dataset_handle = self.dataset_repo.resolve_dataset_ref(dataset_ref).await?;
         self.dataset_action_authorizer
-            .check_action_allowed(
-                &dataset_handle,
-                &self.current_account_subject.account_name,
-                auth::DatasetAction::Write,
-            )
+            .check_action_allowed(&dataset_handle, auth::DatasetAction::Write)
             .await?;
 
         let dataset = self.dataset_repo.get_dataset(dataset_ref).await?;

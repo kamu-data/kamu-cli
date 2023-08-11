@@ -25,7 +25,6 @@ mockall::mock! {
         async fn check_action_allowed(
             &self,
             dataset_handle: &DatasetHandle,
-            account_name: &AccountName,
             action: DatasetAction,
         ) -> Result<(), DatasetActionUnauthorizedError>;
     }
@@ -38,7 +37,7 @@ pub fn expecting_write_mock(times: usize) -> MockDatasetActionAuthorizer {
     mock_dataset_action_authorizer
         .expect_check_action_allowed()
         .times(times)
-        .returning(|_, _, action| match action {
+        .returning(|_, action| match action {
             DatasetAction::Write => Ok(()),
             _ => panic!("Expected Write action"),
         });
@@ -52,7 +51,7 @@ pub fn expecting_read_mock(times: usize) -> MockDatasetActionAuthorizer {
     mock_dataset_action_authorizer
         .expect_check_action_allowed()
         .times(times)
-        .returning(|_, _, action| match action {
+        .returning(|_, action| match action {
             DatasetAction::Read => Ok(()),
             _ => panic!("Expected Read action"),
         });
@@ -61,15 +60,16 @@ pub fn expecting_read_mock(times: usize) -> MockDatasetActionAuthorizer {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn denying_mock() -> MockDatasetActionAuthorizer {
+pub fn denying_mock(current_account_name: &str) -> MockDatasetActionAuthorizer {
+    let account_name = AccountName::new_unchecked(current_account_name);
     let mut mock_dataset_action_authorizer = MockDatasetActionAuthorizer::new();
     mock_dataset_action_authorizer
         .expect_check_action_allowed()
-        .return_once(|dataset_handle, account_name, action| {
+        .return_once(|dataset_handle, action| {
             Err(DatasetActionUnauthorizedError::Access(
                 AccessError::Forbidden(
                     DatasetActionNotEnoughPermissionsError {
-                        account_name: account_name.clone(),
+                        account_name,
                         action,
                         dataset_ref: dataset_handle.as_local_ref(),
                     }

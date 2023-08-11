@@ -869,7 +869,9 @@ async fn test_set_watermark_unauthorized() {
     let tmp_dir = tempfile::tempdir().unwrap();
     let harness = PullTestHarness::new_with_authorizer(
         tmp_dir.path(),
-        Arc::new(mock_dataset_action_authorizer::denying_mock()),
+        Arc::new(mock_dataset_action_authorizer::denying_mock(
+            TEST_ACCOUNT_NAME,
+        )),
         true,
     );
 

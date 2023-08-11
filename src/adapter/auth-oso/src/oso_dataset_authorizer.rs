@@ -65,10 +65,9 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
     async fn check_action_allowed(
         &self,
         dataset_handle: &DatasetHandle,
-        account_name: &AccountName,
         action: DatasetAction,
     ) -> Result<(), DatasetActionUnauthorizedError> {
-        let actor = self.actor(&account_name);
+        let actor = self.actor(&self.current_account_subject.account_name);
         let dataset_resource = self.dataset_resource(dataset_handle);
 
         match self
@@ -82,7 +81,7 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
                     Err(DatasetActionUnauthorizedError::Access(
                         AccessError::Forbidden(
                             DatasetActionNotEnoughPermissionsError {
-                                account_name: account_name.clone(),
+                                account_name: self.current_account_subject.account_name.clone(),
                                 action,
                                 dataset_ref: dataset_handle.as_local_ref(),
                             }

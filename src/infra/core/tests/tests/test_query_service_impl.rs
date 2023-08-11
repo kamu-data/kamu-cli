@@ -217,7 +217,7 @@ async fn test_dataset_schema_unauthorized_local_fs() {
     let tempdir = tempfile::tempdir().unwrap();
     let catalog = create_catalog_with_local_workspace(
         tempdir.path(),
-        mock_dataset_action_authorizer::denying_mock(),
+        mock_dataset_action_authorizer::denying_mock(TEST_ACCOUNT_NAME),
     )
     .await;
     test_dataset_schema_unauthorized_common(catalog, &tempdir).await;
@@ -227,8 +227,11 @@ async fn test_dataset_schema_unauthorized_local_fs() {
 #[test_log::test(tokio::test)]
 async fn test_dataset_schema_unauthorized_s3() {
     let s3 = LocalS3Server::new().await;
-    let catalog =
-        create_catalog_with_s3_workspace(&s3, mock_dataset_action_authorizer::denying_mock()).await;
+    let catalog = create_catalog_with_s3_workspace(
+        &s3,
+        mock_dataset_action_authorizer::denying_mock(TEST_ACCOUNT_NAME),
+    )
+    .await;
     test_dataset_schema_unauthorized_common(catalog, &s3.tmp_dir).await;
 }
 
@@ -294,7 +297,7 @@ async fn test_dataset_tail_unauhtorized_local_fs() {
     let tempdir = tempfile::tempdir().unwrap();
     let catalog = create_catalog_with_local_workspace(
         tempdir.path(),
-        mock_dataset_action_authorizer::denying_mock(),
+        mock_dataset_action_authorizer::denying_mock(TEST_ACCOUNT_NAME),
     )
     .await;
     test_dataset_tail_unauthorized_common(catalog, &tempdir).await;
@@ -304,8 +307,11 @@ async fn test_dataset_tail_unauhtorized_local_fs() {
 #[test_log::test(tokio::test)]
 async fn test_dataset_tail_unauthroized_s3() {
     let s3 = LocalS3Server::new().await;
-    let catalog =
-        create_catalog_with_s3_workspace(&s3, mock_dataset_action_authorizer::denying_mock()).await;
+    let catalog = create_catalog_with_s3_workspace(
+        &s3,
+        mock_dataset_action_authorizer::denying_mock(TEST_ACCOUNT_NAME),
+    )
+    .await;
     test_dataset_tail_unauthorized_common(catalog, &s3.tmp_dir).await;
 }
 

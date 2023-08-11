@@ -24,7 +24,6 @@ use crate::*;
 
 pub struct DatasetRepositoryLocalFs {
     storage_strategy: Box<dyn DatasetStorageStrategy>,
-    current_account_subject: Arc<CurrentAccountSubject>,
     dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
     thrash_lock: tokio::sync::Mutex<()>,
 }
@@ -43,15 +42,14 @@ impl DatasetRepositoryLocalFs {
             storage_strategy: if multi_tenant {
                 Box::new(DatasetMultiTenantStorageStrategy::new(
                     root,
-                    current_account_subject.clone(),
+                    current_account_subject,
                 ))
             } else {
                 Box::new(DatasetSingleTenantStorageStrategy::new(
                     root,
-                    current_account_subject.clone(),
+                    current_account_subject,
                 ))
             },
-            current_account_subject,
             dataset_action_authorizer,
             thrash_lock: tokio::sync::Mutex::new(()),
         }
@@ -294,11 +292,7 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
         }?;
 
         self.dataset_action_authorizer
-            .check_action_allowed(
-                &dataset_handle,
-                &self.current_account_subject.account_name,
-                DatasetAction::Write,
-            )
+            .check_action_allowed(&dataset_handle, DatasetAction::Write)
             .await?;
 
         self.storage_strategy
@@ -329,11 +323,7 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
         }
 
         self.dataset_action_authorizer
-            .check_action_allowed(
-                &dataset_handle,
-                &self.current_account_subject.account_name,
-                DatasetAction::Write,
-            )
+            .check_action_allowed(&dataset_handle, DatasetAction::Write)
             .await?;
 
         // // Update repo info

@@ -330,11 +330,7 @@ impl DatasetRepository for DatasetRepositoryS3 {
         }?;
 
         self.dataset_action_authorizer
-            .check_action_allowed(
-                &dataset_handle,
-                &self.current_account_subject.account_name,
-                DatasetAction::Write,
-            )
+            .check_action_allowed(&dataset_handle, DatasetAction::Write)
             .await?;
 
         // It's safe to rename dataset
@@ -363,11 +359,7 @@ impl DatasetRepository for DatasetRepositoryS3 {
         }
 
         self.dataset_action_authorizer
-            .check_action_allowed(
-                &dataset_handle,
-                &self.current_account_subject.account_name,
-                DatasetAction::Write,
-            )
+            .check_action_allowed(&dataset_handle, DatasetAction::Write)
             .await?;
 
         match self.delete_dataset_s3_objects(&dataset_handle.id).await {

@@ -164,7 +164,9 @@ async fn test_rename_unauthorized() {
     let tempdir = tempfile::tempdir().unwrap();
     let repo = local_fs_repo(
         &tempdir,
-        Arc::new(mock_dataset_action_authorizer::denying_mock()),
+        Arc::new(mock_dataset_action_authorizer::denying_mock(
+            TEST_ACCOUNT_NAME,
+        )),
         true,
     );
 
@@ -210,7 +212,9 @@ async fn test_delete_unauthorized() {
     let tempdir = tempfile::tempdir().unwrap();
     let repo = local_fs_repo(
         &tempdir,
-        Arc::new(mock_dataset_action_authorizer::denying_mock()),
+        Arc::new(mock_dataset_action_authorizer::denying_mock(
+            TEST_ACCOUNT_NAME,
+        )),
         true,
     );
 

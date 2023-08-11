@@ -15,28 +15,26 @@ use kamu::DatasetRepositoryLocalFs;
 use kamu_adapter_auth_oso::{KamuAuthOso, OsoDatasetAuthorizer};
 use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer, DatasetActionUnauthorizedError};
 use kamu_core::{AccessError, CurrentAccountSubject, DatasetRepository};
-use opendatafabric::{AccountName, DatasetAlias, DatasetHandle, DatasetKind};
+use opendatafabric::{DatasetAlias, DatasetHandle, DatasetKind};
 use tempfile::TempDir;
 
 ///////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_owner_can_read_and_write() {
-    let harness = DatasetAuthorizerHarness::new();
+    let harness = DatasetAuthorizerHarness::new("john");
     let dataset_handle = harness
         .create_dataset(&DatasetAlias::try_from("john/foo").unwrap())
         .await;
 
-    let john_account = AccountName::try_from("john").unwrap();
-
     let read_result = harness
         .dataset_authorizer
-        .check_action_allowed(&dataset_handle, &john_account, DatasetAction::Read)
+        .check_action_allowed(&dataset_handle, DatasetAction::Read)
         .await;
 
     let write_result = harness
         .dataset_authorizer
-        .check_action_allowed(&dataset_handle, &john_account, DatasetAction::Write)
+        .check_action_allowed(&dataset_handle, DatasetAction::Write)
         .await;
 
     assert_matches!(read_result, Ok(()));
@@ -47,21 +45,19 @@ async fn test_owner_can_read_and_write() {
 
 #[test_log::test(tokio::test)]
 async fn test_guest_can_read_but_not_write() {
-    let harness = DatasetAuthorizerHarness::new();
+    let harness = DatasetAuthorizerHarness::new("kate");
     let dataset_handle = harness
         .create_dataset(&DatasetAlias::try_from("john/foo").unwrap())
         .await;
 
-    let kate_account = AccountName::try_from("kate").unwrap();
-
     let read_result = harness
         .dataset_authorizer
-        .check_action_allowed(&dataset_handle, &kate_account, DatasetAction::Read)
+        .check_action_allowed(&dataset_handle, DatasetAction::Read)
         .await;
 
     let write_result = harness
         .dataset_authorizer
-        .check_action_allowed(&dataset_handle, &kate_account, DatasetAction::Write)
+        .check_action_allowed(&dataset_handle, DatasetAction::Write)
         .await;
 
     assert_matches!(read_result, Ok(()));
@@ -83,12 +79,12 @@ pub struct DatasetAuthorizerHarness {
 }
 
 impl DatasetAuthorizerHarness {
-    pub fn new() -> Self {
+    pub fn new(current_account_name: &str) -> Self {
         let tempdir = tempfile::tempdir().unwrap();
         let datasets_dir = tempdir.path().join("datasets");
         std::fs::create_dir(&datasets_dir).unwrap();
 
-        let current_account_subject = Arc::new(CurrentAccountSubject::new_test());
+        let current_account_subject = Arc::new(CurrentAccountSubject::new(current_account_name));
 
         let dataset_authorizer = Arc::new(OsoDatasetAuthorizer::new(
             Arc::new(KamuAuthOso::new()),
