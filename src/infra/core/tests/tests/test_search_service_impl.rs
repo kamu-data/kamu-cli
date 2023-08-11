@@ -25,11 +25,13 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
     let repo_name = RepoName::new_unchecked("repo");
     let dataset_remote_alias = DatasetAliasRemote::try_from("repo/bar").unwrap();
 
+    let dataset_action_authorizer = Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new());
+
     let dataset_repo = Arc::new(
         DatasetRepositoryLocalFs::create(
             tmp_workspace_dir.join("datasets"),
             Arc::new(CurrentAccountSubject::new_test()),
-            Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new()),
+            dataset_action_authorizer.clone(),
             false,
         )
         .unwrap(),
@@ -39,6 +41,7 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
     let sync_svc = SyncServiceImpl::new(
         remote_repo_reg.clone(),
         dataset_repo.clone(),
+        dataset_action_authorizer.clone(),
         Arc::new(DatasetFactoryImpl::new(IpfsGateway::default())),
         Arc::new(DummySmartTransferProtocolClient::new()),
         Arc::new(kamu::utils::ipfs_wrapper::IpfsClient::default()),

@@ -18,6 +18,7 @@ use opendatafabric::*;
 
 pub struct TransformServiceImpl {
     dataset_repo: Arc<dyn DatasetRepository>,
+    dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
     engine_provisioner: Arc<dyn EngineProvisioner>,
 }
 
@@ -25,10 +26,12 @@ pub struct TransformServiceImpl {
 impl TransformServiceImpl {
     pub fn new(
         dataset_repo: Arc<dyn DatasetRepository>,
+        dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
         engine_provisioner: Arc<dyn EngineProvisioner>,
     ) -> Self {
         Self {
             dataset_repo,
+            dataset_action_authorizer,
             engine_provisioner,
         }
     }
@@ -606,6 +609,10 @@ impl TransformServiceImpl {
     ) -> Result<TransformResult, TransformError> {
         let listener = maybe_listener.unwrap_or_else(|| Arc::new(NullTransformListener));
         let dataset_handle = self.dataset_repo.resolve_dataset_ref(&dataset_ref).await?;
+
+        self.dataset_action_authorizer
+            .check_action_allowed(&dataset_handle, auth::DatasetAction::Write)
+            .await?;
 
         // TODO: There might be more operations to do
         // TODO: Inject time source

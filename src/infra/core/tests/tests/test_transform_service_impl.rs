@@ -105,17 +105,21 @@ async fn append_data_block(
 #[test_log::test(tokio::test)]
 async fn test_get_next_operation() {
     let tempdir = tempfile::tempdir().unwrap();
+    let dataset_action_authorizer = Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new());
     let dataset_repo = Arc::new(
         DatasetRepositoryLocalFs::create(
             tempdir.path().join("datasets"),
             Arc::new(CurrentAccountSubject::new_test()),
-            Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new()),
+            dataset_action_authorizer.clone(),
             false,
         )
         .unwrap(),
     );
-    let transform_svc =
-        TransformServiceImpl::new(dataset_repo.clone(), Arc::new(EngineProvisionerNull));
+    let transform_svc = TransformServiceImpl::new(
+        dataset_repo.clone(),
+        dataset_action_authorizer.clone(),
+        Arc::new(EngineProvisionerNull),
+    );
 
     let foo = new_root(dataset_repo.as_ref(), "foo").await;
     let foo_seed = dataset_repo
@@ -167,17 +171,21 @@ async fn test_get_next_operation() {
 #[test_log::test(tokio::test)]
 async fn test_get_verification_plan_one_to_one() {
     let tempdir = tempfile::tempdir().unwrap();
+    let dataset_action_authorizer = Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new());
     let dataset_repo = Arc::new(
         DatasetRepositoryLocalFs::create(
             tempdir.path().join("datasets"),
             Arc::new(CurrentAccountSubject::new_test()),
-            Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new()),
+            dataset_action_authorizer.clone(),
             false,
         )
         .unwrap(),
     );
-    let transform_svc =
-        TransformServiceImpl::new(dataset_repo.clone(), Arc::new(EngineProvisionerNull));
+    let transform_svc = TransformServiceImpl::new(
+        dataset_repo.clone(),
+        dataset_action_authorizer.clone(),
+        Arc::new(EngineProvisionerNull),
+    );
 
     // Create root dataset
     let t0 = Utc.with_ymd_and_hms(2020, 1, 1, 11, 0, 0).unwrap();

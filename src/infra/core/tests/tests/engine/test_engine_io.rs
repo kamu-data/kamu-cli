@@ -31,15 +31,22 @@ async fn test_engine_io_common(
         run_info_dir.to_path_buf(),
     ));
 
+    let dataset_action_authorizer = Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new());
+
     let ingest_svc = IngestServiceImpl::new(
         dataset_repo.clone(),
+        dataset_action_authorizer.clone(),
         engine_provisioner.clone(),
         Arc::new(ContainerRuntime::default()),
         run_info_dir.to_path_buf(),
         cache_dir.to_path_buf(),
     );
 
-    let transform_svc = TransformServiceImpl::new(dataset_repo.clone(), engine_provisioner.clone());
+    let transform_svc = TransformServiceImpl::new(
+        dataset_repo.clone(),
+        dataset_action_authorizer.clone(),
+        engine_provisioner.clone(),
+    );
 
     ///////////////////////////////////////////////////////////////////////////
     // Root setup

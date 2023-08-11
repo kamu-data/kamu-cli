@@ -209,6 +209,7 @@ impl IngestTestHarness {
 
         let ingest_svc = Arc::new(IngestServiceImpl::new(
             dataset_repo.clone(),
+            Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new()),
             engine_provisioner,
             Arc::new(ContainerRuntime::default()),
             run_info_dir,

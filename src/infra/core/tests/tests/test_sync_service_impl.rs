@@ -108,11 +108,13 @@ async fn do_test_sync(
 
     let (ipfs_gateway, ipfs_client) = ipfs.unwrap_or_default();
 
+    let dataset_action_authorizer = Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new());
+
     let dataset_repo = Arc::new(
         DatasetRepositoryLocalFs::create(
             tmp_workspace_dir.join("datasets"),
             Arc::new(CurrentAccountSubject::new_test()),
-            Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new()),
+            dataset_action_authorizer.clone(),
             false,
         )
         .unwrap(),
@@ -124,6 +126,7 @@ async fn do_test_sync(
     let sync_svc = SyncServiceImpl::new(
         remote_repo_reg.clone(),
         dataset_repo.clone(),
+        dataset_action_authorizer.clone(),
         dataset_factory,
         Arc::new(DummySmartTransferProtocolClient::new()),
         Arc::new(ipfs_client),

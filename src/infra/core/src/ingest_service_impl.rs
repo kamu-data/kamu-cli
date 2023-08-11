@@ -20,6 +20,7 @@ use super::ingest::*;
 
 pub struct IngestServiceImpl {
     dataset_repo: Arc<dyn DatasetRepository>,
+    dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
     engine_provisioner: Arc<dyn EngineProvisioner>,
     container_runtime: Arc<ContainerRuntime>,
     run_info_dir: PathBuf,
@@ -30,6 +31,7 @@ pub struct IngestServiceImpl {
 impl IngestServiceImpl {
     pub fn new(
         dataset_repo: Arc<dyn DatasetRepository>,
+        dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
         engine_provisioner: Arc<dyn EngineProvisioner>,
         container_runtime: Arc<ContainerRuntime>,
         run_info_dir: PathBuf,
@@ -37,6 +39,7 @@ impl IngestServiceImpl {
     ) -> Self {
         Self {
             dataset_repo,
+            dataset_action_authorizer,
             engine_provisioner,
             container_runtime,
             run_info_dir,
@@ -101,6 +104,10 @@ impl IngestServiceImpl {
         get_listener: impl FnOnce(&DatasetHandle) -> Option<Arc<dyn IngestListener>>,
     ) -> Result<IngestResult, IngestError> {
         let dataset_handle = self.dataset_repo.resolve_dataset_ref(&dataset_ref).await?;
+
+        self.dataset_action_authorizer
+            .check_action_allowed(&dataset_handle, auth::DatasetAction::Write)
+            .await?;
 
         let dataset = self
             .dataset_repo

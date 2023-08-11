@@ -122,6 +122,12 @@ pub enum TransformError {
         CommitError,
     ),
     #[error(transparent)]
+    Access(
+        #[from]
+        #[backtrace]
+        AccessError,
+    ),
+    #[error(transparent)]
     Internal(
         #[from]
         #[backtrace]
@@ -134,6 +140,15 @@ impl From<GetDatasetError> for TransformError {
         match v {
             GetDatasetError::NotFound(e) => Self::DatasetNotFound(e),
             GetDatasetError::Internal(e) => Self::Internal(e),
+        }
+    }
+}
+
+impl From<auth::DatasetActionUnauthorizedError> for TransformError {
+    fn from(v: auth::DatasetActionUnauthorizedError) -> Self {
+        match v {
+            auth::DatasetActionUnauthorizedError::Access(e) => Self::Access(e),
+            auth::DatasetActionUnauthorizedError::Internal(e) => Self::Internal(e),
         }
     }
 }
