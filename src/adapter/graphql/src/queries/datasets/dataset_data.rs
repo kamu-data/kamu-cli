@@ -60,6 +60,7 @@ impl DatasetData {
     async fn tail(
         &self,
         ctx: &Context<'_>,
+        skip: Option<u64>,
         limit: Option<u64>,
         data_format: Option<DataBatchFormat>,
         schema_format: Option<DataSchemaFormat>,
@@ -71,7 +72,11 @@ impl DatasetData {
 
         let query_svc = from_catalog::<dyn domain::QueryService>(ctx).unwrap();
         let df = match query_svc
-            .tail(&self.dataset_handle.as_local_ref(), limit)
+            .tail(
+                &self.dataset_handle.as_local_ref(),
+                skip.unwrap_or(0),
+                limit,
+            )
             .await
         {
             Ok(r) => r,

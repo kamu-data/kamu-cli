@@ -18,7 +18,8 @@ use crate::output::*;
 pub struct TailCommand {
     query_svc: Arc<dyn QueryService>,
     dataset_ref: DatasetRef,
-    num_records: u64,
+    skip: u64,
+    limit: u64,
     output_cfg: Arc<OutputConfig>,
 }
 
@@ -26,13 +27,15 @@ impl TailCommand {
     pub fn new(
         query_svc: Arc<dyn QueryService>,
         dataset_ref: DatasetRef,
-        num_records: u64,
+        skip: u64,
+        limit: u64,
         output_cfg: Arc<OutputConfig>,
     ) -> Self {
         Self {
             query_svc,
             dataset_ref,
-            num_records,
+            skip,
+            limit,
             output_cfg,
         }
     }
@@ -43,7 +46,7 @@ impl Command for TailCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
         let df = self
             .query_svc
-            .tail(&self.dataset_ref, self.num_records)
+            .tail(&self.dataset_ref, self.skip, self.limit)
             .await
             .map_err(|e| CLIError::failure(e))?;
 

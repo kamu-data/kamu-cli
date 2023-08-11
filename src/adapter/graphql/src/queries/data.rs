@@ -27,6 +27,7 @@ impl DataQueries {
         query_dialect: QueryDialect,
         data_format: Option<DataBatchFormat>,
         schema_format: Option<DataSchemaFormat>,
+        skip: Option<u64>,
         limit: Option<u64>,
     ) -> Result<DataQueryResult> {
         // TODO: Default to JsonSoA format once implemented
@@ -48,7 +49,8 @@ impl DataQueries {
             }
             _ => unimplemented!(),
         }
-        .limit(0, Some(limit as usize))
+        // TODO: Sanity limits
+        .limit(skip.unwrap_or(0) as usize, Some(limit as usize))
         .int_err()?;
 
         let schema = DataSchema::from_data_frame_schema(df.schema(), schema_format)?;

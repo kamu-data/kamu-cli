@@ -187,7 +187,7 @@ async fn test_dataset_tail_common(catalog: dill::Catalog, tempdir: &TempDir) {
     let dataset_ref = DatasetRef::from(dataset_alias);
 
     let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
-    let df = query_svc.tail(&dataset_ref, 1).await.unwrap();
+    let df = query_svc.tail(&dataset_ref, 1, 1).await.unwrap();
     let record_batches = df.collect().await.unwrap();
 
     let mut buf = Vec::new();
@@ -198,7 +198,7 @@ async fn test_dataset_tail_common(catalog: dill::Catalog, tempdir: &TempDir) {
     let data_content = String::from_utf8(buf).unwrap();
     let data_json = serde_json::from_str::<serde_json::Value>(data_content.as_str()).unwrap();
 
-    assert_eq!(data_json, serde_json::json!([{"blah":"c","offset":2}]));
+    assert_eq!(data_json, serde_json::json!([{"blah": "b", "offset": 1}]));
 }
 
 #[test_log::test(tokio::test)]

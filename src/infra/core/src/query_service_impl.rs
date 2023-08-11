@@ -131,7 +131,8 @@ impl QueryService for QueryServiceImpl {
     async fn tail(
         &self,
         dataset_ref: &DatasetRef,
-        num_records: u64,
+        skip: u64,
+        limit: u64,
     ) -> Result<DataFrame, QueryError> {
         let dataset_handle = self.dataset_repo.resolve_dataset_ref(dataset_ref).await?;
         let dataset = self
@@ -154,7 +155,7 @@ impl QueryService for QueryServiceImpl {
             .session_context(QueryOptions {
                 datasets: vec![DatasetQueryOptions {
                     dataset_ref: dataset_handle.as_local_ref(),
-                    limit: Some(num_records),
+                    last_records_to_consider: Some(skip + limit),
                 }],
             })
             .map_err(|e| {
@@ -218,18 +219,21 @@ impl QueryService for QueryServiceImpl {
             fields = fields.join(", "),
             dataset = dataset_handle.alias,
             offset_col = vocab.offset_column.to_owned(),
-            num_records = num_records
+            num_records = skip + limit
         );
 
         tracing::debug!(query = %query, "QueryService::tail: Executing SQL query");
 
-        match ctx.sql(&query).await {
+        let df = match ctx.sql(&query).await {
             Ok(res) => Ok(res),
             Err(e) => {
                 tracing::error!(error = ?e, "QueryService::tail: SQL query failed");
                 Err(QueryError::DataFusionError(e))
             }
-        }
+        }?;
+
+        let df = df.limit(skip as usize, None)?;
+        Ok(df)
     }
 
     #[tracing::instrument(level = "info", skip_all, fields(statement))]
@@ -334,9 +338,11 @@ impl KamuSchema {
             .await
             .unwrap();
 
-        let limit = self.options_for(dataset_handle).and_then(|o| o.limit);
+        let last_records_to_consider = self
+            .options_for(dataset_handle)
+            .and_then(|o| o.last_records_to_consider);
         let file_hashes = self
-            .collect_data_file_hashes(dataset.as_ref(), limit)
+            .collect_data_file_hashes(dataset.as_ref(), last_records_to_consider)
             .await?;
 
         if file_hashes.is_empty() {
@@ -378,7 +384,7 @@ impl KamuSchema {
     async fn collect_data_file_hashes(
         &self,
         dataset: &dyn Dataset,
-        limit: Option<u64>,
+        last_records_to_consider: Option<u64>,
     ) -> Result<Vec<Multihash>, InternalError> {
         let mut files = Vec::new();
         let mut num_records = 0;
@@ -394,7 +400,9 @@ impl KamuSchema {
 
             num_records += slice.interval.end - slice.interval.start + 1;
 
-            if limit.is_some() && limit.unwrap() <= num_records as u64 {
+            if last_records_to_consider.is_some()
+                && last_records_to_consider.unwrap() <= num_records as u64
+            {
                 break;
             }
         }
@@ -502,9 +510,11 @@ impl SchemaProvider for KamuSchema {
             .await
             .unwrap();
 
-        let limit = self.options_for(&dataset_handle).and_then(|o| o.limit);
+        let last_records_to_consider = self
+            .options_for(&dataset_handle)
+            .and_then(|o| o.last_records_to_consider);
         let files = self
-            .collect_data_file_hashes(dataset.as_ref(), limit)
+            .collect_data_file_hashes(dataset.as_ref(), last_records_to_consider)
             .await
             .unwrap();
 

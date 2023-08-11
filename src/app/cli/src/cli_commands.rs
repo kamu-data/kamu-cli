@@ -414,6 +414,7 @@ pub fn get_command(
                 catalog,
                 submatches.get_one::<DatasetRef>("dataset").unwrap().clone(),
             )?,
+            *(submatches.get_one("skip-records").unwrap()),
             *(submatches.get_one("num-records").unwrap()),
             catalog.get_one()?,
         )),

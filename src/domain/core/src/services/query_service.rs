@@ -24,7 +24,8 @@ pub trait QueryService: Send + Sync {
     async fn tail(
         &self,
         dataset_ref: &DatasetRef,
-        num_records: u64,
+        skip: u64,
+        limit: u64,
     ) -> Result<DataFrame, QueryError>;
 
     async fn sql_statement(
@@ -51,9 +52,12 @@ pub struct QueryOptions {
 #[derive(Debug, Clone)]
 pub struct DatasetQueryOptions {
     pub dataset_ref: DatasetRef,
-    /// Number of records that output requires (starting from latest entries)
-    /// Setting this value allows to limit the number of part files examined.
-    pub limit: Option<u64>,
+    /// Number of records that will be considered for this dataset (starting
+    /// from latest entries) Setting this value allows engine to limit the
+    /// number of part files examined, e.g. if limit is 100 and last data part
+    /// file contains 150 records - only this file will be considered for the
+    /// query and the rest of data will be completely ignored.
+    pub last_records_to_consider: Option<u64>,
 }
 
 ///////////////////////////////////////////////////////////////////////////////

@@ -156,7 +156,7 @@ async fn test_dataset_tail_local_fs() {
                     byOwnerAndName(accountName: "kamu", datasetName: "foo") {
                         name
                         data {
-                            tail(limit: 1, schemaFormat: PARQUET_JSON, dataFormat: JSON) {
+                            tail(skip: 1, limit: 1, schemaFormat: PARQUET_JSON, dataFormat: JSON) {
                                 ... on DataQueryResultSuccess {
                                     data { content }
                                 }
@@ -173,7 +173,7 @@ async fn test_dataset_tail_local_fs() {
     let json = serde_json::from_str::<serde_json::Value>(&json).unwrap();
     let data = &json["datasets"]["byOwnerAndName"]["data"]["tail"]["data"]["content"];
     let data = serde_json::from_str::<serde_json::Value>(data.as_str().unwrap()).unwrap();
-    assert_eq!(data, serde_json::json!([{"blah":"c","offset":2}]));
+    assert_eq!(data, serde_json::json!([{"blah": "b", "offset": 1}]));
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -194,7 +194,7 @@ async fn test_dataset_tail_empty_local_fs() {
                     byOwnerAndName(accountName: "kamu", datasetName: "foo") {
                         name
                         data {
-                            tail(limit: 0, schemaFormat: PARQUET_JSON, dataFormat: JSON) {
+                            tail(skip: 10, schemaFormat: PARQUET_JSON, dataFormat: JSON) {
                                 ... on DataQueryResultSuccess {
                                     data { content }
                                 }

@@ -136,7 +136,7 @@ type DataQueries {
 	"""
 	Executes a specified query and returns its result
 	"""
-	query(query: String!, queryDialect: QueryDialect!, dataFormat: DataBatchFormat, schemaFormat: DataSchemaFormat, limit: Int): DataQueryResult!
+	query(query: String!, queryDialect: QueryDialect!, dataFormat: DataBatchFormat, schemaFormat: DataSchemaFormat, skip: Int, limit: Int): DataQueryResult!
 	"""
 	Lists engines known to the system and recommended for use
 	"""
@@ -246,7 +246,7 @@ type DatasetData {
 	This is equivalent to the SQL query: `SELECT * FROM dataset ORDER BY
 	event_time DESC LIMIT N`
 	"""
-	tail(limit: Int, dataFormat: DataBatchFormat, schemaFormat: DataSchemaFormat): DataQueryResult!
+	tail(skip: Int, limit: Int, dataFormat: DataBatchFormat, schemaFormat: DataSchemaFormat): DataQueryResult!
 }
 
 type DatasetEdge {
