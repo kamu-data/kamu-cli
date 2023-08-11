@@ -118,7 +118,7 @@ async fn test_rename_dataset() {
     let tempdir = tempfile::tempdir().unwrap();
     let repo = local_fs_repo(
         &tempdir,
-        Arc::new(mock_dataset_action_authorizer::expecting_write_mock()),
+        Arc::new(mock_dataset_action_authorizer::expecting_write_mock(1)),
         false,
     );
 
@@ -132,7 +132,7 @@ async fn test_rename_dataset_multi_tenant() {
     let tempdir = tempfile::tempdir().unwrap();
     let repo = local_fs_repo(
         &tempdir,
-        Arc::new(mock_dataset_action_authorizer::expecting_write_mock()),
+        Arc::new(mock_dataset_action_authorizer::expecting_write_mock(1)),
         true,
     );
 
@@ -150,7 +150,7 @@ async fn test_rename_dataset_same_name_multiple_tenants() {
     let tempdir = tempfile::tempdir().unwrap();
     let repo = local_fs_repo(
         &tempdir,
-        Arc::new(mock_dataset_action_authorizer::expecting_write_mock()),
+        Arc::new(mock_dataset_action_authorizer::expecting_write_mock(1)),
         true,
     );
 

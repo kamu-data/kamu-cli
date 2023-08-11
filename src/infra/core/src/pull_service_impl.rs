@@ -24,6 +24,7 @@ pub struct PullServiceImpl {
     transform_svc: Arc<dyn TransformService>,
     sync_svc: Arc<dyn SyncService>,
     current_account_subject: Arc<CurrentAccountSubject>,
+    dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
 }
 
 #[component(pub)]
@@ -35,6 +36,7 @@ impl PullServiceImpl {
         transform_svc: Arc<dyn TransformService>,
         sync_svc: Arc<dyn SyncService>,
         current_account_subject: Arc<CurrentAccountSubject>,
+        dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
     ) -> Self {
         Self {
             dataset_repo,
@@ -43,6 +45,7 @@ impl PullServiceImpl {
             transform_svc,
             sync_svc,
             current_account_subject,
+            dataset_action_authorizer,
         }
     }
 
@@ -605,6 +608,15 @@ impl PullService for PullServiceImpl {
         if !aliases.is_empty(RemoteAliasKind::Pull) {
             return Err(SetWatermarkError::IsRemote);
         }
+
+        let dataset_handle = self.dataset_repo.resolve_dataset_ref(dataset_ref).await?;
+        self.dataset_action_authorizer
+            .check_action_allowed(
+                &dataset_handle,
+                &self.current_account_subject.account_name,
+                auth::DatasetAction::Write,
+            )
+            .await?;
 
         let dataset = self.dataset_repo.get_dataset(dataset_ref).await?;
         let chain = dataset.as_metadata_chain();

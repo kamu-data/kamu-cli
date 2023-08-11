@@ -13,6 +13,7 @@ use chrono::{DateTime, Utc};
 use opendatafabric::*;
 use thiserror::Error;
 
+use crate::auth::DatasetActionUnauthorizedError;
 use crate::*;
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -287,6 +288,14 @@ pub enum SetWatermarkError {
 
     #[error("Attempting to set watermark on a remote dataset")]
     IsRemote,
+
+    #[error(transparent)]
+    Access(
+        #[from]
+        #[backtrace]
+        AccessError,
+    ),
+
     #[error(transparent)]
     Internal(
         #[from]
@@ -294,8 +303,6 @@ pub enum SetWatermarkError {
         InternalError,
     ),
 }
-
-///////////////////////////////////////////////////////////////////////////////
 
 impl From<GetDatasetError> for SetWatermarkError {
     fn from(v: GetDatasetError) -> Self {
@@ -305,3 +312,14 @@ impl From<GetDatasetError> for SetWatermarkError {
         }
     }
 }
+
+impl From<DatasetActionUnauthorizedError> for SetWatermarkError {
+    fn from(v: DatasetActionUnauthorizedError) -> Self {
+        match v {
+            DatasetActionUnauthorizedError::Access(e) => Self::Access(e),
+            DatasetActionUnauthorizedError::Internal(e) => Self::Internal(e),
+        }
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////

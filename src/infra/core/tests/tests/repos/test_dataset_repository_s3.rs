@@ -131,7 +131,7 @@ async fn test_rename_dataset() {
     let s3 = LocalS3Server::new().await;
     let repo = s3_repo(
         &s3,
-        Arc::new(mock_dataset_action_authorizer::expecting_write_mock()),
+        Arc::new(mock_dataset_action_authorizer::expecting_write_mock(1)),
         false,
     )
     .await;
@@ -147,7 +147,7 @@ async fn test_rename_dataset_multi_tenant() {
     let s3 = LocalS3Server::new().await;
     let repo = s3_repo(
         &s3,
-        Arc::new(mock_dataset_action_authorizer::expecting_write_mock()),
+        Arc::new(mock_dataset_action_authorizer::expecting_write_mock(1)),
         true,
     )
     .await;
@@ -167,7 +167,7 @@ async fn test_rename_dataset_same_name_multiple_tenants() {
     let s3 = LocalS3Server::new().await;
     let repo = s3_repo(
         &s3,
-        Arc::new(mock_dataset_action_authorizer::expecting_write_mock()),
+        Arc::new(mock_dataset_action_authorizer::expecting_write_mock(1)),
         true,
     )
     .await;

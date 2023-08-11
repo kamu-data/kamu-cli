@@ -33,11 +33,12 @@ mockall::mock! {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn expecting_write_mock() -> MockDatasetActionAuthorizer {
+pub fn expecting_write_mock(times: usize) -> MockDatasetActionAuthorizer {
     let mut mock_dataset_action_authorizer = MockDatasetActionAuthorizer::new();
     mock_dataset_action_authorizer
         .expect_check_action_allowed()
-        .return_once(|_, _, action| match action {
+        .times(times)
+        .returning(|_, _, action| match action {
             DatasetAction::Write => Ok(()),
             _ => panic!("Expected Write action"),
         });
@@ -46,11 +47,12 @@ pub fn expecting_write_mock() -> MockDatasetActionAuthorizer {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn expecting_read_mock() -> MockDatasetActionAuthorizer {
+pub fn expecting_read_mock(times: usize) -> MockDatasetActionAuthorizer {
     let mut mock_dataset_action_authorizer = MockDatasetActionAuthorizer::new();
     mock_dataset_action_authorizer
         .expect_check_action_allowed()
-        .return_once(|_, _, action| match action {
+        .times(times)
+        .returning(|_, _, action| match action {
             DatasetAction::Read => Ok(()),
             _ => panic!("Expected Read action"),
         });

@@ -18,6 +18,7 @@ use kamu::testing::*;
 use kamu::*;
 use opendatafabric::*;
 
+use crate::mock_dataset_action_authorizer;
 use crate::utils::DummySmartTransferProtocolClient;
 
 macro_rules! n {
@@ -803,32 +804,16 @@ async fn test_sync_from_url_only_multi_tenant_case() {
 #[tokio::test]
 async fn test_set_watermark() {
     let tmp_dir = tempfile::tempdir().unwrap();
-    let harness = PullTestHarness::new(tmp_dir.path(), false);
+    let harness = PullTestHarness::new_with_authorizer(
+        tmp_dir.path(),
+        Arc::new(mock_dataset_action_authorizer::expecting_write_mock(4)),
+        false,
+    );
 
     let dataset_alias = n!("foo");
+    harness.create_dataset(&dataset_alias).await;
 
-    harness
-        .dataset_repo
-        .create_dataset_from_snapshot(
-            None,
-            MetadataFactory::dataset_snapshot()
-                .name(&dataset_alias.dataset_name)
-                .build(),
-        )
-        .await
-        .unwrap();
-
-    let num_blocks = || async {
-        let ds = harness
-            .dataset_repo
-            .get_dataset(&dataset_alias.as_local_ref())
-            .await
-            .unwrap();
-
-        use futures::StreamExt;
-        ds.as_metadata_chain().iter_blocks().count().await
-    };
-    assert_eq!(num_blocks().await, 1);
+    assert_eq!(harness.num_blocks(&dataset_alias).await, 1);
 
     assert!(matches!(
         harness
@@ -840,7 +825,7 @@ async fn test_set_watermark() {
             .await,
         Ok(PullResult::Updated { .. })
     ));
-    assert_eq!(num_blocks().await, 2);
+    assert_eq!(harness.num_blocks(&dataset_alias).await, 2);
 
     assert!(matches!(
         harness
@@ -852,7 +837,7 @@ async fn test_set_watermark() {
             .await,
         Ok(PullResult::Updated { .. })
     ));
-    assert_eq!(num_blocks().await, 3);
+    assert_eq!(harness.num_blocks(&dataset_alias).await, 3);
 
     assert!(matches!(
         harness
@@ -864,7 +849,7 @@ async fn test_set_watermark() {
             .await,
         Ok(PullResult::UpToDate)
     ));
-    assert_eq!(num_blocks().await, 3);
+    assert_eq!(harness.num_blocks(&dataset_alias).await, 3);
 
     assert!(matches!(
         harness
@@ -876,7 +861,33 @@ async fn test_set_watermark() {
             .await,
         Ok(PullResult::UpToDate)
     ));
-    assert_eq!(num_blocks().await, 3);
+    assert_eq!(harness.num_blocks(&dataset_alias).await, 3);
+}
+
+#[tokio::test]
+async fn test_set_watermark_unauthorized() {
+    let tmp_dir = tempfile::tempdir().unwrap();
+    let harness = PullTestHarness::new_with_authorizer(
+        tmp_dir.path(),
+        Arc::new(mock_dataset_action_authorizer::denying_mock()),
+        true,
+    );
+
+    let dataset_alias = n!("foo");
+    harness.create_dataset(&dataset_alias).await;
+
+    assert!(matches!(
+        harness
+            .pull_svc
+            .set_watermark(
+                &dataset_alias.as_local_ref(),
+                Utc.with_ymd_and_hms(2000, 1, 2, 0, 0, 0).unwrap()
+            )
+            .await,
+        Err(SetWatermarkError::Access(AccessError::Forbidden(_)))
+    ));
+
+    assert_eq!(harness.num_blocks(&dataset_alias).await, 1);
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -891,6 +902,18 @@ struct PullTestHarness {
 
 impl PullTestHarness {
     fn new(tmp_path: &Path, multi_tenant: bool) -> Self {
+        Self::new_with_authorizer(
+            tmp_path,
+            Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new()),
+            multi_tenant,
+        )
+    }
+
+    fn new_with_authorizer(
+        tmp_path: &Path,
+        dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
+        multi_tenant: bool,
+    ) -> Self {
         let calls = Arc::new(Mutex::new(Vec::new()));
         let current_account_config = Arc::new(CurrentAccountSubject::new_test());
         let dataset_repo = Arc::new(
@@ -908,6 +931,7 @@ impl PullTestHarness {
         let ingest_svc = Arc::new(TestIngestService::new(calls.clone()));
         let transform_svc = Arc::new(TestTransformService::new(calls.clone()));
         let sync_svc = Arc::new(TestSyncService::new(calls.clone(), dataset_repo.clone()));
+
         let pull_svc = PullServiceImpl::new(
             dataset_repo.clone(),
             remote_alias_reg.clone(),
@@ -915,6 +939,7 @@ impl PullTestHarness {
             transform_svc,
             sync_svc,
             current_account_config,
+            dataset_action_authorizer,
         );
 
         Self {
@@ -924,6 +949,29 @@ impl PullTestHarness {
             remote_alias_reg,
             pull_svc,
         }
+    }
+
+    async fn create_dataset(&self, dataset_alias: &DatasetAlias) {
+        self.dataset_repo
+            .create_dataset_from_snapshot(
+                None,
+                MetadataFactory::dataset_snapshot()
+                    .name(&dataset_alias.dataset_name)
+                    .build(),
+            )
+            .await
+            .unwrap();
+    }
+
+    async fn num_blocks(&self, dataset_alias: &DatasetAlias) -> usize {
+        let ds = self
+            .dataset_repo
+            .get_dataset(&dataset_alias.as_local_ref())
+            .await
+            .unwrap();
+
+        use futures::StreamExt;
+        ds.as_metadata_chain().iter_blocks().count().await
     }
 
     fn collect_calls(&self) -> Vec<PullBatch> {
