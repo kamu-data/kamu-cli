@@ -79,24 +79,15 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
                 if r {
                     Ok(())
                 } else {
-                    let permission_error = DatasetActionNotEnoughPermissionsError {
-                        account_name: account_name.clone(),
-                        action,
-                        dataset_ref: dataset_handle.as_local_ref(),
-                    };
-                    if action == DatasetAction::Write {
-                        // Try with Read permissions to improve error messages
-                        if let Ok(()) = self
-                            .check_action_allowed(dataset_handle, account_name, DatasetAction::Read)
-                            .await
-                        {
-                            return Err(DatasetActionUnauthorizedError::Access(
-                                AccessError::ReadOnly(Some(permission_error.into())),
-                            ));
-                        }
-                    }
                     Err(DatasetActionUnauthorizedError::Access(
-                        AccessError::Forbidden(permission_error.into()),
+                        AccessError::Forbidden(
+                            DatasetActionNotEnoughPermissionsError {
+                                account_name: account_name.clone(),
+                                action,
+                                dataset_ref: dataset_handle.as_local_ref(),
+                            }
+                            .into(),
+                        ),
                     ))
                 }
             }

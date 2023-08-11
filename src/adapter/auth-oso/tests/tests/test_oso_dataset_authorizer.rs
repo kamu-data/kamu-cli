@@ -68,7 +68,7 @@ async fn test_guest_can_read_but_not_write() {
     assert_matches!(
         write_result,
         Err(DatasetActionUnauthorizedError::Access(
-            AccessError::ReadOnly(_)
+            AccessError::Forbidden(_)
         ))
     );
 }
