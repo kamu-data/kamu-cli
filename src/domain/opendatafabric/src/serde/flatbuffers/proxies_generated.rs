@@ -208,16 +208,17 @@ pub const ENUM_MIN_EVENT_TIME_SOURCE: u8 = 0;
     since = "2.0.0",
     note = "Use associated constants instead. This will no longer be generated in 2021."
 )]
-pub const ENUM_MAX_EVENT_TIME_SOURCE: u8 = 2;
+pub const ENUM_MAX_EVENT_TIME_SOURCE: u8 = 3;
 #[deprecated(
     since = "2.0.0",
     note = "Use associated constants instead. This will no longer be generated in 2021."
 )]
 #[allow(non_camel_case_types)]
-pub const ENUM_VALUES_EVENT_TIME_SOURCE: [EventTimeSource; 3] = [
+pub const ENUM_VALUES_EVENT_TIME_SOURCE: [EventTimeSource; 4] = [
     EventTimeSource::NONE,
     EventTimeSource::EventTimeSourceFromMetadata,
     EventTimeSource::EventTimeSourceFromPath,
+    EventTimeSource::EventTimeSourceFromSystemTime,
 ];
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
@@ -228,13 +229,15 @@ impl EventTimeSource {
     pub const NONE: Self = Self(0);
     pub const EventTimeSourceFromMetadata: Self = Self(1);
     pub const EventTimeSourceFromPath: Self = Self(2);
+    pub const EventTimeSourceFromSystemTime: Self = Self(3);
 
     pub const ENUM_MIN: u8 = 0;
-    pub const ENUM_MAX: u8 = 2;
+    pub const ENUM_MAX: u8 = 3;
     pub const ENUM_VALUES: &'static [Self] = &[
         Self::NONE,
         Self::EventTimeSourceFromMetadata,
         Self::EventTimeSourceFromPath,
+        Self::EventTimeSourceFromSystemTime,
     ];
     /// Returns the variant's name or "" if unknown.
     pub fn variant_name(self) -> Option<&'static str> {
@@ -242,6 +245,7 @@ impl EventTimeSource {
             Self::NONE => Some("NONE"),
             Self::EventTimeSourceFromMetadata => Some("EventTimeSourceFromMetadata"),
             Self::EventTimeSourceFromPath => Some("EventTimeSourceFromPath"),
+            Self::EventTimeSourceFromSystemTime => Some("EventTimeSourceFromSystemTime"),
             _ => None,
         }
     }
@@ -3543,6 +3547,85 @@ impl core::fmt::Debug for EventTimeSourceFromPath<'_> {
         ds.finish()
     }
 }
+pub enum EventTimeSourceFromSystemTimeOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+pub struct EventTimeSourceFromSystemTime<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for EventTimeSourceFromSystemTime<'a> {
+    type Inner = EventTimeSourceFromSystemTime<'a>;
+    #[inline]
+    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table::new(buf, loc),
+        }
+    }
+}
+
+impl<'a> EventTimeSourceFromSystemTime<'a> {
+    #[inline]
+    pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        EventTimeSourceFromSystemTime { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
+        _args: &'args EventTimeSourceFromSystemTimeArgs,
+    ) -> flatbuffers::WIPOffset<EventTimeSourceFromSystemTime<'bldr>> {
+        let mut builder = EventTimeSourceFromSystemTimeBuilder::new(_fbb);
+        builder.finish()
+    }
+}
+
+impl flatbuffers::Verifiable for EventTimeSourceFromSystemTime<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        v.visit_table(pos)?.finish();
+        Ok(())
+    }
+}
+pub struct EventTimeSourceFromSystemTimeArgs {}
+impl<'a> Default for EventTimeSourceFromSystemTimeArgs {
+    #[inline]
+    fn default() -> Self {
+        EventTimeSourceFromSystemTimeArgs {}
+    }
+}
+
+pub struct EventTimeSourceFromSystemTimeBuilder<'a: 'b, 'b> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b> EventTimeSourceFromSystemTimeBuilder<'a, 'b> {
+    #[inline]
+    pub fn new(
+        _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+    ) -> EventTimeSourceFromSystemTimeBuilder<'a, 'b> {
+        let start = _fbb.start_table();
+        EventTimeSourceFromSystemTimeBuilder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<EventTimeSourceFromSystemTime<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl core::fmt::Debug for EventTimeSourceFromSystemTime<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut ds = f.debug_struct("EventTimeSourceFromSystemTime");
+        ds.finish()
+    }
+}
 pub enum SourceCachingForeverOffset {}
 #[derive(Copy, Clone, PartialEq)]
 
@@ -4042,6 +4125,23 @@ impl<'a> FetchStepUrl<'a> {
 
     #[inline]
     #[allow(non_snake_case)]
+    pub fn event_time_as_event_time_source_from_system_time(
+        &self,
+    ) -> Option<EventTimeSourceFromSystemTime<'a>> {
+        if self.event_time_type() == EventTimeSource::EventTimeSourceFromSystemTime {
+            self.event_time().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { EventTimeSourceFromSystemTime::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
     pub fn cache_as_source_caching_forever(&self) -> Option<SourceCachingForever<'a>> {
         if self.cache_type() == SourceCaching::SourceCachingForever {
             self.cache().map(|t| {
@@ -4069,6 +4169,7 @@ impl flatbuffers::Verifiable for FetchStepUrl<'_> {
         match key {
           EventTimeSource::EventTimeSourceFromMetadata => v.verify_union_variant::<flatbuffers::ForwardsUOffset<EventTimeSourceFromMetadata>>("EventTimeSource::EventTimeSourceFromMetadata", pos),
           EventTimeSource::EventTimeSourceFromPath => v.verify_union_variant::<flatbuffers::ForwardsUOffset<EventTimeSourceFromPath>>("EventTimeSource::EventTimeSourceFromPath", pos),
+          EventTimeSource::EventTimeSourceFromSystemTime => v.verify_union_variant::<flatbuffers::ForwardsUOffset<EventTimeSourceFromSystemTime>>("EventTimeSource::EventTimeSourceFromSystemTime", pos),
           _ => Ok(()),
         }
      })?
@@ -4191,6 +4292,16 @@ impl core::fmt::Debug for FetchStepUrl<'_> {
             }
             EventTimeSource::EventTimeSourceFromPath => {
                 if let Some(x) = self.event_time_as_event_time_source_from_path() {
+                    ds.field("event_time", &x)
+                } else {
+                    ds.field(
+                        "event_time",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            EventTimeSource::EventTimeSourceFromSystemTime => {
+                if let Some(x) = self.event_time_as_event_time_source_from_system_time() {
                     ds.field("event_time", &x)
                 } else {
                     ds.field(
@@ -4382,6 +4493,23 @@ impl<'a> FetchStepFilesGlob<'a> {
 
     #[inline]
     #[allow(non_snake_case)]
+    pub fn event_time_as_event_time_source_from_system_time(
+        &self,
+    ) -> Option<EventTimeSourceFromSystemTime<'a>> {
+        if self.event_time_type() == EventTimeSource::EventTimeSourceFromSystemTime {
+            self.event_time().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { EventTimeSourceFromSystemTime::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
     pub fn cache_as_source_caching_forever(&self) -> Option<SourceCachingForever<'a>> {
         if self.cache_type() == SourceCaching::SourceCachingForever {
             self.cache().map(|t| {
@@ -4409,6 +4537,7 @@ impl flatbuffers::Verifiable for FetchStepFilesGlob<'_> {
         match key {
           EventTimeSource::EventTimeSourceFromMetadata => v.verify_union_variant::<flatbuffers::ForwardsUOffset<EventTimeSourceFromMetadata>>("EventTimeSource::EventTimeSourceFromMetadata", pos),
           EventTimeSource::EventTimeSourceFromPath => v.verify_union_variant::<flatbuffers::ForwardsUOffset<EventTimeSourceFromPath>>("EventTimeSource::EventTimeSourceFromPath", pos),
+          EventTimeSource::EventTimeSourceFromSystemTime => v.verify_union_variant::<flatbuffers::ForwardsUOffset<EventTimeSourceFromSystemTime>>("EventTimeSource::EventTimeSourceFromSystemTime", pos),
           _ => Ok(()),
         }
      })?
@@ -4526,6 +4655,16 @@ impl core::fmt::Debug for FetchStepFilesGlob<'_> {
             }
             EventTimeSource::EventTimeSourceFromPath => {
                 if let Some(x) = self.event_time_as_event_time_source_from_path() {
+                    ds.field("event_time", &x)
+                } else {
+                    ds.field(
+                        "event_time",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            EventTimeSource::EventTimeSourceFromSystemTime => {
+                if let Some(x) = self.event_time_as_event_time_source_from_system_time() {
                     ds.field("event_time", &x)
                 } else {
                     ds.field(

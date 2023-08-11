@@ -386,6 +386,10 @@ impl<'fb> FlatbuffersEnumSerializable<'fb, fb::EventTimeSource> for odf::EventTi
                 fb::EventTimeSource::EventTimeSourceFromPath,
                 v.serialize(fb).as_union_value(),
             ),
+            odf::EventTimeSource::FromSystemTime => (
+                fb::EventTimeSource::EventTimeSourceFromSystemTime,
+                empty_table(fb).as_union_value(),
+            ),
         }
     }
 }
@@ -398,6 +402,9 @@ impl<'fb> FlatbuffersEnumDeserializable<'fb, fb::EventTimeSource> for odf::Event
                 odf::EventTimeSource::FromPath(odf::EventTimeSourceFromPath::deserialize(unsafe {
                     fb::EventTimeSourceFromPath::init_from_table(table)
                 }))
+            }
+            fb::EventTimeSource::EventTimeSourceFromSystemTime => {
+                odf::EventTimeSource::FromSystemTime
             }
             _ => panic!("Invalid enum value: {}", t.0),
         }

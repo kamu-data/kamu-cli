@@ -156,9 +156,13 @@ table EventTimeSourceFromPath {
   timestamp_format: string;
 }
 
+table EventTimeSourceFromSystemTime {
+}
+
 union EventTimeSource {
   EventTimeSourceFromMetadata,
   EventTimeSourceFromPath,
+  EventTimeSourceFromSystemTime,
 }
 
 ////////////////////////////////////////////////////////////////////////////////

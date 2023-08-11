@@ -266,6 +266,8 @@ pub enum EventTimeSourceDef {
     FromMetadata,
     #[serde(rename_all = "camelCase")]
     FromPath(#[serde_as(as = "EventTimeSourceFromPathDef")] EventTimeSourceFromPath),
+    #[serde(rename_all = "camelCase")]
+    FromSystemTime,
 }
 
 implement_serde_as!(EventTimeSource, EventTimeSourceDef, "EventTimeSourceDef");

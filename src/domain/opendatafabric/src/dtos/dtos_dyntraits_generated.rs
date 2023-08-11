@@ -346,6 +346,7 @@ impl Into<dtos::EnvVar> for &dyn EnvVar {
 pub enum EventTimeSource<'a> {
     FromMetadata,
     FromPath(&'a dyn EventTimeSourceFromPath),
+    FromSystemTime,
 }
 
 impl<'a> From<&'a dtos::EventTimeSource> for EventTimeSource<'a> {
@@ -353,6 +354,7 @@ impl<'a> From<&'a dtos::EventTimeSource> for EventTimeSource<'a> {
         match other {
             dtos::EventTimeSource::FromMetadata => EventTimeSource::FromMetadata,
             dtos::EventTimeSource::FromPath(v) => EventTimeSource::FromPath(v),
+            dtos::EventTimeSource::FromSystemTime => EventTimeSource::FromSystemTime,
         }
     }
 }
@@ -362,6 +364,7 @@ impl Into<dtos::EventTimeSource> for EventTimeSource<'_> {
         match self {
             EventTimeSource::FromMetadata => dtos::EventTimeSource::FromMetadata,
             EventTimeSource::FromPath(v) => dtos::EventTimeSource::FromPath(v.into()),
+            EventTimeSource::FromSystemTime => dtos::EventTimeSource::FromSystemTime,
         }
     }
 }

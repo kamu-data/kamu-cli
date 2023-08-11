@@ -188,6 +188,7 @@ pub struct EnvVar {
 pub enum EventTimeSource {
     FromMetadata,
     FromPath(EventTimeSourceFromPath),
+    FromSystemTime,
 }
 
 impl_enum_with_variants!(EventTimeSource);

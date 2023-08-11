@@ -262,6 +262,7 @@ impl From<odf::EnvVar> for EnvVar {
 pub enum EventTimeSource {
     FromMetadata(EventTimeSourceFromMetadata),
     FromPath(EventTimeSourceFromPath),
+    FromSystemTime(EventTimeSourceFromSystemTime),
 }
 
 impl From<odf::EventTimeSource> for EventTimeSource {
@@ -271,6 +272,9 @@ impl From<odf::EventTimeSource> for EventTimeSource {
                 Self::FromMetadata(EventTimeSourceFromMetadata { _dummy: None })
             }
             odf::EventTimeSource::FromPath(v) => Self::FromPath(v.into()),
+            odf::EventTimeSource::FromSystemTime => {
+                Self::FromSystemTime(EventTimeSourceFromSystemTime { _dummy: None })
+            }
         }
     }
 }
@@ -293,6 +297,11 @@ impl From<odf::EventTimeSourceFromPath> for EventTimeSourceFromPath {
             timestamp_format: v.timestamp_format.map(Into::into),
         }
     }
+}
+
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
+pub struct EventTimeSourceFromSystemTime {
+    pub _dummy: Option<String>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
