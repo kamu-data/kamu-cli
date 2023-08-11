@@ -10,7 +10,6 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use chrono::Utc;
 use container_runtime::ContainerRuntime;
 use dill::*;
 use kamu_core::*;
@@ -25,6 +24,7 @@ pub struct IngestServiceImpl {
     container_runtime: Arc<ContainerRuntime>,
     run_info_dir: PathBuf,
     cache_dir: PathBuf,
+    time_source: Arc<dyn SystemTimeSource>,
 }
 
 #[component(pub)]
@@ -36,6 +36,7 @@ impl IngestServiceImpl {
         container_runtime: Arc<ContainerRuntime>,
         run_info_dir: PathBuf,
         cache_dir: PathBuf,
+        time_source: Arc<dyn SystemTimeSource>,
     ) -> Self {
         Self {
             dataset_repo,
@@ -44,6 +45,7 @@ impl IngestServiceImpl {
             container_runtime,
             run_info_dir,
             cache_dir,
+            time_source,
         }
     }
 
@@ -241,7 +243,7 @@ impl IngestServiceImpl {
             operation_id: self.next_operation_id(),
             dataset_handle,
             polling_source,
-            system_time: Utc::now(),
+            system_time: self.time_source.now(),
             event_time: None, // TODO: Will be filled out by IngestTask
             input_data_path: PathBuf::new(), // TODO: Will be filled out by IngestTask,
             next_offset: next_offset.unwrap_or_default(),
