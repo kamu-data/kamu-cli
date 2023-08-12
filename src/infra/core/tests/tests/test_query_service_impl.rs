@@ -287,7 +287,7 @@ async fn test_dataset_tail_unauthorized_common(catalog: dill::Catalog, tempdir: 
     let dataset_ref = DatasetRef::from(dataset_alias);
 
     let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
-    let result = query_svc.tail(&dataset_ref, 1).await;
+    let result = query_svc.tail(&dataset_ref, 1, 1).await;
     assert_matches!(result, Err(QueryError::Access(_)));
 }
 
