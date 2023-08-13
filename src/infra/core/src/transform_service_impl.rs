@@ -15,6 +15,7 @@ use dill::*;
 use futures::{StreamExt, TryFutureExt, TryStreamExt};
 use kamu_core::*;
 use opendatafabric::*;
+use thiserror::Error;
 
 pub struct TransformServiceImpl {
     dataset_repo: Arc<dyn DatasetRepository>,
@@ -116,7 +117,7 @@ impl TransformServiceImpl {
         &self,
         dataset_handle: &DatasetHandle,
         system_time: DateTime<Utc>,
-    ) -> Result<Option<TransformRequest>, InternalError> {
+    ) -> Result<Option<TransformRequest>, GetNextOperationError> {
         let dataset = self
             .dataset_repo
             .get_dataset(&dataset_handle.as_local_ref())
@@ -165,7 +166,10 @@ impl TransformServiceImpl {
             .then(|input| self.get_transform_input(input, output_chain))
             .try_collect()
             .await
-            .int_err()?;
+            .map_err(|e| match e {
+                TransformInputError::Access(e) => GetNextOperationError::Access(e),
+                TransformInputError::Internal(e) => GetNextOperationError::Internal(e),
+            })?;
 
         // Nothing to do?
         if inputs
@@ -240,7 +244,7 @@ impl TransformServiceImpl {
         &self,
         transform_input: &TransformInput,
         output_chain: &dyn MetadataChain,
-    ) -> Result<TransformRequestInput, InternalError> {
+    ) -> Result<TransformRequestInput, TransformInputError> {
         let dataset_id = transform_input.id.as_ref().unwrap();
         let dataset_handle = self
             .dataset_repo
@@ -339,12 +343,17 @@ impl TransformServiceImpl {
         alias: String,
         blocks_hint: Option<Vec<(Multihash, MetadataBlock)>>,
         vocab_hint: Option<DatasetVocabulary>,
-    ) -> Result<TransformRequestInput, InternalError> {
+    ) -> Result<TransformRequestInput, TransformInputError> {
         let dataset_handle = self
             .dataset_repo
             .resolve_dataset_ref(&input_slice.dataset_id.as_local_ref())
             .await
             .int_err()?;
+
+        self.dataset_action_authorizer
+            .check_action_allowed(&dataset_handle, auth::DatasetAction::Read)
+            .await?;
+
         let dataset = self
             .dataset_repo
             .get_dataset(&dataset_handle.as_local_ref())
@@ -572,7 +581,11 @@ impl TransformServiceImpl {
                     )
                 })
                 .try_collect()
-                .await?;
+                .await
+                .map_err(|e| match e {
+                    TransformInputError::Access(e) => VerificationError::Access(e),
+                    TransformInputError::Internal(e) => VerificationError::Internal(e),
+                })?;
 
             let step = VerificationStep {
                 request: TransformRequest {
@@ -616,7 +629,14 @@ impl TransformServiceImpl {
 
         // TODO: There might be more operations to do
         // TODO: Inject time source
-        if let Some(operation) = self.get_next_operation(&dataset_handle, Utc::now()).await? {
+        let next_operation = self
+            .get_next_operation(&dataset_handle, Utc::now())
+            .await
+            .map_err(|e| match e {
+                GetNextOperationError::Access(e) => TransformError::Access(e),
+                GetNextOperationError::Internal(e) => TransformError::Internal(e),
+            })?;
+        if let Some(operation) = next_operation {
             let dataset = self
                 .dataset_repo
                 .get_dataset(&dataset_handle.as_local_ref())
@@ -837,3 +857,50 @@ pub struct VerificationStep {
     pub expected_block: MetadataBlock,
     pub expected_hash: Multihash,
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Error)]
+pub enum GetNextOperationError {
+    #[error(transparent)]
+    Access(
+        #[from]
+        #[backtrace]
+        AccessError,
+    ),
+    #[error(transparent)]
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Error)]
+enum TransformInputError {
+    #[error(transparent)]
+    Access(
+        #[from]
+        #[backtrace]
+        AccessError,
+    ),
+    #[error(transparent)]
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
+}
+
+impl From<auth::DatasetActionUnauthorizedError> for TransformInputError {
+    fn from(v: auth::DatasetActionUnauthorizedError) -> Self {
+        match v {
+            auth::DatasetActionUnauthorizedError::Access(e) => Self::Access(e),
+            auth::DatasetActionUnauthorizedError::Internal(e) => Self::Internal(e),
+        }
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////

@@ -16,7 +16,7 @@ use kamu::DatasetRepositoryS3;
 use opendatafabric::AccountName;
 
 use super::test_dataset_repository_shared;
-use crate::mock_dataset_action_authorizer;
+use crate::MockDatasetActionAuthorizer;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -131,7 +131,7 @@ async fn test_rename_dataset() {
     let s3 = LocalS3Server::new().await;
     let repo = s3_repo(
         &s3,
-        Arc::new(mock_dataset_action_authorizer::expecting_write_mock(1)),
+        Arc::new(MockDatasetActionAuthorizer::new().expect_check_write_a_dataset(1)),
         false,
     )
     .await;
@@ -147,7 +147,7 @@ async fn test_rename_dataset_multi_tenant() {
     let s3 = LocalS3Server::new().await;
     let repo = s3_repo(
         &s3,
-        Arc::new(mock_dataset_action_authorizer::expecting_write_mock(1)),
+        Arc::new(MockDatasetActionAuthorizer::new().expect_check_write_a_dataset(1)),
         true,
     )
     .await;
@@ -167,7 +167,7 @@ async fn test_rename_dataset_same_name_multiple_tenants() {
     let s3 = LocalS3Server::new().await;
     let repo = s3_repo(
         &s3,
-        Arc::new(mock_dataset_action_authorizer::expecting_write_mock(1)),
+        Arc::new(MockDatasetActionAuthorizer::new().expect_check_write_a_dataset(1)),
         true,
     )
     .await;
@@ -181,14 +181,7 @@ async fn test_rename_dataset_same_name_multiple_tenants() {
 #[tokio::test]
 async fn test_rename_unauthorized() {
     let s3 = LocalS3Server::new().await;
-    let repo = s3_repo(
-        &s3,
-        Arc::new(mock_dataset_action_authorizer::denying_mock(
-            TEST_ACCOUNT_NAME,
-        )),
-        true,
-    )
-    .await;
+    let repo = s3_repo(&s3, Arc::new(MockDatasetActionAuthorizer::denying()), true).await;
 
     test_dataset_repository_shared::test_rename_dataset_unauthroized(&repo, None).await;
 }
@@ -235,14 +228,7 @@ async fn test_delete_dataset_multi_tenant() {
 #[tokio::test]
 async fn test_delete_unauthorized() {
     let s3 = LocalS3Server::new().await;
-    let repo = s3_repo(
-        &s3,
-        Arc::new(mock_dataset_action_authorizer::denying_mock(
-            TEST_ACCOUNT_NAME,
-        )),
-        true,
-    )
-    .await;
+    let repo = s3_repo(&s3, Arc::new(MockDatasetActionAuthorizer::denying()), true).await;
 
     test_dataset_repository_shared::test_delete_dataset_unauthroized(&repo, None).await;
 }

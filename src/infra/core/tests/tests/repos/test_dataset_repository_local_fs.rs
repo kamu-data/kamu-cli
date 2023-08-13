@@ -15,7 +15,7 @@ use opendatafabric::AccountName;
 use tempfile::TempDir;
 
 use super::test_dataset_repository_shared;
-use crate::mock_dataset_action_authorizer;
+use crate::MockDatasetActionAuthorizer;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -118,7 +118,7 @@ async fn test_rename_dataset() {
     let tempdir = tempfile::tempdir().unwrap();
     let repo = local_fs_repo(
         &tempdir,
-        Arc::new(mock_dataset_action_authorizer::expecting_write_mock(1)),
+        Arc::new(MockDatasetActionAuthorizer::new().expect_check_write_a_dataset(1)),
         false,
     );
 
@@ -132,7 +132,7 @@ async fn test_rename_dataset_multi_tenant() {
     let tempdir = tempfile::tempdir().unwrap();
     let repo = local_fs_repo(
         &tempdir,
-        Arc::new(mock_dataset_action_authorizer::expecting_write_mock(1)),
+        Arc::new(MockDatasetActionAuthorizer::new().expect_check_write_a_dataset(1)),
         true,
     );
 
@@ -150,7 +150,7 @@ async fn test_rename_dataset_same_name_multiple_tenants() {
     let tempdir = tempfile::tempdir().unwrap();
     let repo = local_fs_repo(
         &tempdir,
-        Arc::new(mock_dataset_action_authorizer::expecting_write_mock(1)),
+        Arc::new(MockDatasetActionAuthorizer::new().expect_check_write_a_dataset(1)),
         true,
     );
 
@@ -164,9 +164,7 @@ async fn test_rename_unauthorized() {
     let tempdir = tempfile::tempdir().unwrap();
     let repo = local_fs_repo(
         &tempdir,
-        Arc::new(mock_dataset_action_authorizer::denying_mock(
-            TEST_ACCOUNT_NAME,
-        )),
+        Arc::new(MockDatasetActionAuthorizer::denying()),
         true,
     );
 
@@ -212,9 +210,7 @@ async fn test_delete_unauthorized() {
     let tempdir = tempfile::tempdir().unwrap();
     let repo = local_fs_repo(
         &tempdir,
-        Arc::new(mock_dataset_action_authorizer::denying_mock(
-            TEST_ACCOUNT_NAME,
-        )),
+        Arc::new(MockDatasetActionAuthorizer::denying()),
         true,
     );
 

@@ -18,7 +18,7 @@ use kamu::testing::*;
 use kamu::*;
 use opendatafabric::*;
 
-use crate::mock_dataset_action_authorizer;
+use crate::mock_dataset_action_authorizer::MockDatasetActionAuthorizer;
 use crate::utils::DummySmartTransferProtocolClient;
 
 macro_rules! n {
@@ -807,7 +807,12 @@ async fn test_set_watermark() {
     let tmp_dir = tempfile::tempdir().unwrap();
     let harness = PullTestHarness::new_with_authorizer(
         tmp_dir.path(),
-        Arc::new(mock_dataset_action_authorizer::expecting_write_mock(4)),
+        Arc::new(
+            MockDatasetActionAuthorizer::new().expect_check_write_dataset(
+                DatasetAlias::new(None, DatasetName::new_unchecked("foo")),
+                4,
+            ),
+        ),
         false,
     );
 
@@ -870,9 +875,7 @@ async fn test_set_watermark_unauthorized() {
     let tmp_dir = tempfile::tempdir().unwrap();
     let harness = PullTestHarness::new_with_authorizer(
         tmp_dir.path(),
-        Arc::new(mock_dataset_action_authorizer::denying_mock(
-            TEST_ACCOUNT_NAME,
-        )),
+        Arc::new(MockDatasetActionAuthorizer::denying()),
         true,
     );
 

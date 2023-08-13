@@ -210,6 +210,12 @@ pub enum VerificationError {
         TransformError,
     ),
     #[error(transparent)]
+    Access(
+        #[from]
+        #[backtrace]
+        AccessError,
+    ),
+    #[error(transparent)]
     Internal(
         #[from]
         #[backtrace]

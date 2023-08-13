@@ -22,7 +22,6 @@ use kamu_data_utils::data::format::JsonArrayWriter;
 use opendatafabric::*;
 use tempfile::TempDir;
 
-use crate::utils::mock_dataset_action_authorizer;
 use crate::MockDatasetActionAuthorizer;
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -182,7 +181,7 @@ async fn test_dataset_schema_local_fs() {
     let tempdir = tempfile::tempdir().unwrap();
     let catalog = create_catalog_with_local_workspace(
         tempdir.path(),
-        mock_dataset_action_authorizer::expecting_read_mock(1),
+        MockDatasetActionAuthorizer::new().expect_check_read_a_dataset(1),
     )
     .await;
     test_dataset_schema_common(catalog, &tempdir).await;
@@ -194,7 +193,7 @@ async fn test_dataset_schema_s3() {
     let s3 = LocalS3Server::new().await;
     let catalog = create_catalog_with_s3_workspace(
         &s3,
-        mock_dataset_action_authorizer::expecting_read_mock(1),
+        MockDatasetActionAuthorizer::new().expect_check_read_a_dataset(1),
     )
     .await;
     test_dataset_schema_common(catalog, &s3.tmp_dir).await;
@@ -215,11 +214,9 @@ async fn test_dataset_schema_unauthorized_common(catalog: dill::Catalog, tempdir
 #[cfg_attr(not(unix), ignore)] // TODO: DataFusion crashes on windows
 async fn test_dataset_schema_unauthorized_local_fs() {
     let tempdir = tempfile::tempdir().unwrap();
-    let catalog = create_catalog_with_local_workspace(
-        tempdir.path(),
-        mock_dataset_action_authorizer::denying_mock(TEST_ACCOUNT_NAME),
-    )
-    .await;
+    let catalog =
+        create_catalog_with_local_workspace(tempdir.path(), MockDatasetActionAuthorizer::denying())
+            .await;
     test_dataset_schema_unauthorized_common(catalog, &tempdir).await;
 }
 
@@ -227,11 +224,8 @@ async fn test_dataset_schema_unauthorized_local_fs() {
 #[test_log::test(tokio::test)]
 async fn test_dataset_schema_unauthorized_s3() {
     let s3 = LocalS3Server::new().await;
-    let catalog = create_catalog_with_s3_workspace(
-        &s3,
-        mock_dataset_action_authorizer::denying_mock(TEST_ACCOUNT_NAME),
-    )
-    .await;
+    let catalog =
+        create_catalog_with_s3_workspace(&s3, MockDatasetActionAuthorizer::denying()).await;
     test_dataset_schema_unauthorized_common(catalog, &s3.tmp_dir).await;
 }
 
@@ -262,7 +256,7 @@ async fn test_dataset_tail_local_fs() {
     let tempdir = tempfile::tempdir().unwrap();
     let catalog = create_catalog_with_local_workspace(
         tempdir.path(),
-        mock_dataset_action_authorizer::expecting_read_mock(1),
+        MockDatasetActionAuthorizer::new().expect_check_read_a_dataset(1),
     )
     .await;
     test_dataset_tail_common(catalog, &tempdir).await;
@@ -274,7 +268,7 @@ async fn test_dataset_tail_s3() {
     let s3 = LocalS3Server::new().await;
     let catalog = create_catalog_with_s3_workspace(
         &s3,
-        mock_dataset_action_authorizer::expecting_read_mock(1),
+        MockDatasetActionAuthorizer::new().expect_check_read_a_dataset(1),
     )
     .await;
     test_dataset_tail_common(catalog, &s3.tmp_dir).await;
@@ -295,11 +289,9 @@ async fn test_dataset_tail_unauthorized_common(catalog: dill::Catalog, tempdir: 
 #[cfg_attr(not(unix), ignore)] // TODO: DataFusion crashes on windows
 async fn test_dataset_tail_unauhtorized_local_fs() {
     let tempdir = tempfile::tempdir().unwrap();
-    let catalog = create_catalog_with_local_workspace(
-        tempdir.path(),
-        mock_dataset_action_authorizer::denying_mock(TEST_ACCOUNT_NAME),
-    )
-    .await;
+    let catalog =
+        create_catalog_with_local_workspace(tempdir.path(), MockDatasetActionAuthorizer::denying())
+            .await;
     test_dataset_tail_unauthorized_common(catalog, &tempdir).await;
 }
 
@@ -307,11 +299,8 @@ async fn test_dataset_tail_unauhtorized_local_fs() {
 #[test_log::test(tokio::test)]
 async fn test_dataset_tail_unauthroized_s3() {
     let s3 = LocalS3Server::new().await;
-    let catalog = create_catalog_with_s3_workspace(
-        &s3,
-        mock_dataset_action_authorizer::denying_mock(TEST_ACCOUNT_NAME),
-    )
-    .await;
+    let catalog =
+        create_catalog_with_s3_workspace(&s3, MockDatasetActionAuthorizer::denying()).await;
     test_dataset_tail_unauthorized_common(catalog, &s3.tmp_dir).await;
 }
 
