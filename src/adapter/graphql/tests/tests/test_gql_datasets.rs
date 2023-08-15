@@ -358,6 +358,100 @@ async fn dataset_rename_name_collision() {
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_log::test(tokio::test)]
+async fn dataset_delete_success() {
+    let harness = GraphQLDatasetsHarness::new();
+
+    let foo_result = harness
+        .create_root_dataset(DatasetName::new_unchecked("foo"))
+        .await;
+
+    let schema = harness.schema();
+    let res = schema
+        .execute(
+            indoc!(
+                r#"
+            mutation {
+                datasets {
+                    byId (datasetId: "<id>") {
+                        delete {
+                            __typename
+                        }
+                    }
+                }
+            }
+            "#
+            )
+            .replace("<id>", &foo_result.dataset_handle.id.to_string()),
+        )
+        .await;
+    assert!(res.is_ok(), "{:?}", res);
+    assert_eq!(
+        res.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "delete": {
+                        "__typename": "DeleteResultSuccess",
+                    }
+                }
+            }
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn dataset_delete_dangling_ref() {
+    let harness = GraphQLDatasetsHarness::new();
+
+    let foo_result = harness
+        .create_root_dataset(DatasetName::new_unchecked("foo"))
+        .await;
+    let _bar_result = harness
+        .create_derived_dataset(
+            DatasetName::new_unchecked("bar"),
+            &foo_result.dataset_handle,
+        )
+        .await;
+
+    let schema = harness.schema();
+    let res = schema
+        .execute(
+            indoc!(
+                r#"
+            mutation {
+                datasets {
+                    byId (datasetId: "<id>") {
+                        delete {
+                            __typename
+                        }
+                    }
+                }
+            }
+            "#
+            )
+            .replace("<id>", &foo_result.dataset_handle.id.to_string()),
+        )
+        .await;
+    assert!(res.is_ok(), "{:?}", res);
+    assert_eq!(
+        res.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "delete": {
+                        "__typename": "DeleteResultDanglingReference",
+                    }
+                }
+            }
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+
 struct GraphQLDatasetsHarness {
     _tempdir: tempfile::TempDir,
     catalog: dill::Catalog,
@@ -393,6 +487,28 @@ impl GraphQLDatasetsHarness {
                     .name(name)
                     .kind(DatasetKind::Root)
                     .push_event(MetadataFactory::set_polling_source().build())
+                    .build(),
+            )
+            .await
+            .unwrap()
+    }
+
+    pub async fn create_derived_dataset(
+        &self,
+        name: DatasetName,
+        input_dataset: &DatasetHandle,
+    ) -> CreateDatasetResult {
+        let dataset_repo = self.catalog.get_one::<dyn DatasetRepository>().unwrap();
+        dataset_repo
+            .create_dataset_from_snapshot(
+                None,
+                MetadataFactory::dataset_snapshot()
+                    .name(name)
+                    .kind(DatasetKind::Derivative)
+                    .push_event(
+                        MetadataFactory::set_transform_aliases(vec![input_dataset.alias.clone()])
+                            .build(),
+                    )
                     .build(),
             )
             .await

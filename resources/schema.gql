@@ -330,9 +330,15 @@ type DatasetMut {
 	Rename the dataset
 	"""
 	rename(newName: DatasetName!): RenameResult!
+	"""
+	Delete the dataset
+	"""
+	delete: DeleteResult!
 }
 
 scalar DatasetName
+
+scalar DatasetRef
 
 scalar DatasetRefAny
 
@@ -376,6 +382,21 @@ Implement the DateTime<Utc> scalar
 The input/output is a string in RFC3339 format.
 """
 scalar DateTime
+
+interface DeleteResult {
+	message: String!
+}
+
+type DeleteResultDanglingReference implements DeleteResult {
+	notDeletedDataset: DatasetAlias!
+	danglingChildRefs: [DatasetRef!]!
+	message: String!
+}
+
+type DeleteResultSuccess implements DeleteResult {
+	deletedDataset: DatasetAlias!
+	message: String!
+}
 
 """
 Describes

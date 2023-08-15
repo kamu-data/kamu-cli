@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use domain::RenameDatasetError;
+use domain::{DeleteDatasetError, RenameDatasetError};
 use kamu_core::{self as domain};
 use opendatafabric as odf;
 
@@ -44,6 +44,7 @@ impl DatasetMut {
                 preserved_name: new_name.into(),
             }));
         }
+
         let dataset_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
         match dataset_repo
             .rename_dataset(&self.dataset_handle.as_local_ref(), &new_name)
@@ -61,6 +62,32 @@ impl DatasetMut {
             // "Not found" should not be reachable, since we've just resolved the dataset by ID
             Err(RenameDatasetError::NotFound(e)) => Err(e.int_err().into()),
             Err(RenameDatasetError::Internal(e)) => Err(e.into()),
+        }
+    }
+
+    /// Delete the dataset
+    async fn delete(&self, ctx: &Context<'_>) -> Result<DeleteResult> {
+        let dataset_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
+        match dataset_repo
+            .delete_dataset(&self.dataset_handle.as_local_ref())
+            .await
+        {
+            Ok(_) => Ok(DeleteResult::Success(DeleteResultSuccess {
+                deleted_dataset: self.dataset_handle.alias.clone().into(),
+            })),
+            Err(DeleteDatasetError::DanglingReference(e)) => Ok(DeleteResult::DanglingReference(
+                DeleteResultDanglingReference {
+                    not_deleted_dataset: self.dataset_handle.alias.clone().into(),
+                    dangling_child_refs: e
+                        .children
+                        .iter()
+                        .map(|child_dataset| child_dataset.as_local_ref().into())
+                        .collect(),
+                },
+            )),
+            // "Not found" should not be reachable, since we've just resolved the dataset by ID
+            Err(DeleteDatasetError::NotFound(e)) => Err(e.int_err().into()),
+            Err(DeleteDatasetError::Internal(e)) => Err(e.into()),
         }
     }
 }
@@ -111,6 +138,45 @@ pub struct RenameResultNameCollision {
 impl RenameResultNameCollision {
     async fn message(&self) -> String {
         format!("Dataset '{}' already exists", self.alias)
+    }
+}
+////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Interface, Debug, Clone)]
+#[graphql(field(name = "message", ty = "String"))]
+pub enum DeleteResult {
+    Success(DeleteResultSuccess),
+    DanglingReference(DeleteResultDanglingReference),
+}
+
+#[derive(SimpleObject, Debug, Clone)]
+#[graphql(complex)]
+pub struct DeleteResultSuccess {
+    pub deleted_dataset: DatasetAlias,
+}
+
+#[ComplexObject]
+impl DeleteResultSuccess {
+    async fn message(&self) -> String {
+        format!("Success")
+    }
+}
+
+#[derive(SimpleObject, Debug, Clone)]
+#[graphql(complex)]
+pub struct DeleteResultDanglingReference {
+    pub not_deleted_dataset: DatasetAlias,
+    pub dangling_child_refs: Vec<DatasetRef>,
+}
+
+#[ComplexObject]
+impl DeleteResultDanglingReference {
+    async fn message(&self) -> String {
+        format!(
+            "Dataset '{}' has {} danging references",
+            self.not_deleted_dataset,
+            self.dangling_child_refs.len()
+        )
     }
 }
 
