@@ -13,28 +13,19 @@ use async_graphql::*;
 use indoc::indoc;
 use kamu::testing::MetadataFactory;
 use kamu::*;
+use kamu_adapter_graphql::{Mutation, Query};
 use kamu_core::*;
 use opendatafabric::serde::yaml::YamlDatasetSnapshotSerializer;
 use opendatafabric::serde::DatasetSnapshotSerializer;
 use opendatafabric::*;
 
+////////////////////////////////////////////////////////////////////////////////////////
+
 #[test_log::test(tokio::test)]
 async fn dataset_by_id_does_not_exist() {
-    let tempdir = tempfile::tempdir().unwrap();
-    let dataset_repo = DatasetRepositoryLocalFs::create(
-        tempdir.path().join("datasets"),
-        Arc::new(CurrentAccountSubject::new_test()),
-        Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new()),
-        false,
-    )
-    .unwrap();
+    let harness = GraphQLDatasetsHarness::new();
 
-    let cat = dill::CatalogBuilder::new()
-        .add_value(dataset_repo)
-        .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-        .build();
-
-    let schema = kamu_adapter_graphql::schema(cat);
+    let schema = harness.schema();
     let res = schema
         .execute(indoc!(
             r#"
@@ -59,36 +50,17 @@ async fn dataset_by_id_does_not_exist() {
     );
 }
 
+////////////////////////////////////////////////////////////////////////////////////////
+
 #[test_log::test(tokio::test)]
 async fn dataset_by_id() {
-    let tempdir = tempfile::tempdir().unwrap();
-    let dataset_repo = DatasetRepositoryLocalFs::create(
-        tempdir.path().join("datasets"),
-        Arc::new(CurrentAccountSubject::new_test()),
-        Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new()),
-        false,
-    )
-    .unwrap();
+    let harness = GraphQLDatasetsHarness::new();
 
-    let cat = dill::CatalogBuilder::new()
-        .add_value(dataset_repo)
-        .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-        .build();
+    let foo_result = harness
+        .create_root_dataset(DatasetName::new_unchecked("foo"))
+        .await;
 
-    let dataset_repo = cat.get_one::<dyn DatasetRepository>().unwrap();
-    let create_result = dataset_repo
-        .create_dataset_from_snapshot(
-            None,
-            MetadataFactory::dataset_snapshot()
-                .name("foo")
-                .kind(DatasetKind::Root)
-                .push_event(MetadataFactory::set_polling_source().build())
-                .build(),
-        )
-        .await
-        .unwrap();
-
-    let schema = kamu_adapter_graphql::schema(cat);
+    let schema = harness.schema();
     let res = schema
         .execute(
             indoc!(
@@ -102,7 +74,7 @@ async fn dataset_by_id() {
                 }
                 "#
             )
-            .replace("<id>", &create_result.dataset_handle.id.to_string()),
+            .replace("<id>", &foo_result.dataset_handle.id.to_string()),
         )
         .await;
     assert!(res.is_ok(), "{:?}", res);
@@ -118,23 +90,13 @@ async fn dataset_by_id() {
     );
 }
 
+////////////////////////////////////////////////////////////////////////////////////////
+
 #[test_log::test(tokio::test)]
 async fn dataset_create_empty() {
-    let tempdir = tempfile::tempdir().unwrap();
-    let dataset_repo = DatasetRepositoryLocalFs::create(
-        tempdir.path().join("datasets"),
-        Arc::new(CurrentAccountSubject::new_test()),
-        Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new()),
-        false,
-    )
-    .unwrap();
+    let harness = GraphQLDatasetsHarness::new();
 
-    let cat = dill::CatalogBuilder::new()
-        .add_value(dataset_repo)
-        .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-        .build();
-
-    let schema = kamu_adapter_graphql::schema(cat);
+    let schema = harness.schema();
     let res = schema
         .execute(indoc::indoc!(
             r#"
@@ -167,21 +129,11 @@ async fn dataset_create_empty() {
     );
 }
 
+////////////////////////////////////////////////////////////////////////////////////////
+
 #[test_log::test(tokio::test)]
 async fn dataset_create_from_snapshot() {
-    let tempdir = tempfile::tempdir().unwrap();
-    let dataset_repo = DatasetRepositoryLocalFs::create(
-        tempdir.path().join("datasets"),
-        Arc::new(CurrentAccountSubject::new_test()),
-        Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new()),
-        false,
-    )
-    .unwrap();
-
-    let cat = dill::CatalogBuilder::new()
-        .add_value(dataset_repo)
-        .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-        .build();
+    let harness = GraphQLDatasetsHarness::new();
 
     let snapshot = MetadataFactory::dataset_snapshot()
         .name("foo")
@@ -196,7 +148,7 @@ async fn dataset_create_from_snapshot() {
     )
     .to_string();
 
-    let schema = kamu_adapter_graphql::schema(cat);
+    let schema = harness.schema();
     let res = schema
         .execute(indoc!(
             r#"
@@ -231,23 +183,13 @@ async fn dataset_create_from_snapshot() {
     );
 }
 
+////////////////////////////////////////////////////////////////////////////////////////
+
 #[test_log::test(tokio::test)]
 async fn dataset_create_from_snapshot_malformed() {
-    let tempdir = tempfile::tempdir().unwrap();
-    let dataset_repo = DatasetRepositoryLocalFs::create(
-        tempdir.path().join("datasets"),
-        Arc::new(CurrentAccountSubject::new_test()),
-        Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new()),
-        false,
-    )
-    .unwrap();
+    let harness = GraphQLDatasetsHarness::new();
 
-    let cat = dill::CatalogBuilder::new()
-        .add_value(dataset_repo)
-        .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-        .build();
-
-    let schema = kamu_adapter_graphql::schema(cat);
+    let schema = harness.schema();
     let res = schema
         .execute(indoc!(
             r#"
@@ -275,3 +217,342 @@ async fn dataset_create_from_snapshot_malformed() {
         })
     );
 }
+
+////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn dataset_rename_success() {
+    let harness = GraphQLDatasetsHarness::new();
+
+    let foo_result = harness
+        .create_root_dataset(DatasetName::new_unchecked("foo"))
+        .await;
+
+    let schema = harness.schema();
+    let res = schema
+        .execute(
+            indoc!(
+                r#"
+            mutation {
+                datasets {
+                    byId (datasetId: "<id>") {
+                        rename(newName: "<newName>") {
+                            __typename
+                            message
+                            ... on RenameResultSuccess {
+                                oldName
+                                newName
+                            }
+                        }
+                    }
+                }
+            }
+            "#
+            )
+            .replace("<id>", &foo_result.dataset_handle.id.to_string())
+            .replace("<newName>", "bar"),
+        )
+        .await;
+    assert!(res.is_ok(), "{:?}", res);
+    assert_eq!(
+        res.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "rename": {
+                        "__typename": "RenameResultSuccess",
+                        "message": "Success",
+                        "oldName": "foo",
+                        "newName": "bar"
+                    }
+                }
+            }
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn dataset_rename_no_changes() {
+    let harness = GraphQLDatasetsHarness::new();
+
+    let foo_result = harness
+        .create_root_dataset(DatasetName::new_unchecked("foo"))
+        .await;
+
+    let schema = harness.schema();
+    let res = schema
+        .execute(
+            indoc!(
+                r#"
+            mutation {
+                datasets {
+                    byId (datasetId: "<id>") {
+                        rename(newName: "<newName>") {
+                            __typename
+                            message
+                            ... on RenameResultNoChanges {
+                                preservedName
+                            }
+                        }
+                    }
+                }
+            }
+            "#
+            )
+            .replace("<id>", &foo_result.dataset_handle.id.to_string())
+            .replace("<newName>", "foo"),
+        )
+        .await;
+    assert!(res.is_ok(), "{:?}", res);
+    assert_eq!(
+        res.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "rename": {
+                        "__typename": "RenameResultNoChanges",
+                        "message": "No changes",
+                        "preservedName": "foo"
+                    }
+                }
+            }
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn dataset_rename_name_collision() {
+    let harness = GraphQLDatasetsHarness::new();
+
+    let foo_result = harness
+        .create_root_dataset(DatasetName::new_unchecked("foo"))
+        .await;
+    let _bar_result = harness
+        .create_root_dataset(DatasetName::new_unchecked("bar"))
+        .await;
+
+    let schema = harness.schema();
+    let res = schema
+        .execute(
+            indoc!(
+                r#"
+            mutation {
+                datasets {
+                    byId (datasetId: "<id>") {
+                        rename(newName: "<newName>") {
+                            __typename
+                            message
+                            ... on RenameResultNameCollision {
+                                collidingAlias
+                            }
+                        }
+                    }
+                }
+            }
+            "#
+            )
+            .replace("<id>", &foo_result.dataset_handle.id.to_string())
+            .replace("<newName>", "bar"),
+        )
+        .await;
+    assert!(res.is_ok(), "{:?}", res);
+    assert_eq!(
+        res.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "rename": {
+                        "__typename": "RenameResultNameCollision",
+                        "message": "Dataset 'bar' already exists",
+                        "collidingAlias": "bar"
+                    }
+                }
+            }
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn dataset_delete_success() {
+    let harness = GraphQLDatasetsHarness::new();
+
+    let foo_result = harness
+        .create_root_dataset(DatasetName::new_unchecked("foo"))
+        .await;
+
+    let schema = harness.schema();
+    let res = schema
+        .execute(
+            indoc!(
+                r#"
+            mutation {
+                datasets {
+                    byId (datasetId: "<id>") {
+                        delete {
+                            __typename
+                            message
+                            ... on DeleteResultSuccess {
+                                deletedDataset
+                            }
+                        }
+                    }
+                }
+            }
+            "#
+            )
+            .replace("<id>", &foo_result.dataset_handle.id.to_string()),
+        )
+        .await;
+    assert!(res.is_ok(), "{:?}", res);
+    assert_eq!(
+        res.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "delete": {
+                        "__typename": "DeleteResultSuccess",
+                        "message": "Success",
+                        "deletedDataset": "foo"
+                    }
+                }
+            }
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn dataset_delete_dangling_ref() {
+    let harness = GraphQLDatasetsHarness::new();
+
+    let foo_result = harness
+        .create_root_dataset(DatasetName::new_unchecked("foo"))
+        .await;
+    let _bar_result = harness
+        .create_derived_dataset(
+            DatasetName::new_unchecked("bar"),
+            &foo_result.dataset_handle,
+        )
+        .await;
+
+    let schema = harness.schema();
+    let res = schema
+        .execute(
+            indoc!(
+                r#"
+            mutation {
+                datasets {
+                    byId (datasetId: "<id>") {
+                        delete {
+                            __typename
+                            message
+                            ... on DeleteResultDanglingReference {
+                                notDeletedDataset
+                                danglingChildRefs
+                            }
+                        }
+                    }
+                }
+            }
+            "#
+            )
+            .replace("<id>", &foo_result.dataset_handle.id.to_string()),
+        )
+        .await;
+    assert!(res.is_ok(), "{:?}", res);
+    assert_eq!(
+        res.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "delete": {
+                        "__typename": "DeleteResultDanglingReference",
+                        "message": "Dataset 'foo' has 1 dangling reference(s)",
+                        "notDeletedDataset": "foo",
+                        "danglingChildRefs": ["bar"]
+                    }
+                }
+            }
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+
+struct GraphQLDatasetsHarness {
+    _tempdir: tempfile::TempDir,
+    catalog: dill::Catalog,
+}
+
+impl GraphQLDatasetsHarness {
+    pub fn new() -> Self {
+        let tempdir = tempfile::tempdir().unwrap();
+        let dataset_repo = DatasetRepositoryLocalFs::create(
+            tempdir.path().join("datasets"),
+            Arc::new(CurrentAccountSubject::new_test()),
+            Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new()),
+            false,
+        )
+        .unwrap();
+
+        let cat = dill::CatalogBuilder::new()
+            .add_value(dataset_repo)
+            .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+            .build();
+
+        Self {
+            _tempdir: tempdir,
+            catalog: cat,
+        }
+    }
+
+    pub async fn create_root_dataset(&self, name: DatasetName) -> CreateDatasetResult {
+        let dataset_repo = self.catalog.get_one::<dyn DatasetRepository>().unwrap();
+        dataset_repo
+            .create_dataset_from_snapshot(
+                None,
+                MetadataFactory::dataset_snapshot()
+                    .name(name)
+                    .kind(DatasetKind::Root)
+                    .push_event(MetadataFactory::set_polling_source().build())
+                    .build(),
+            )
+            .await
+            .unwrap()
+    }
+
+    pub async fn create_derived_dataset(
+        &self,
+        name: DatasetName,
+        input_dataset: &DatasetHandle,
+    ) -> CreateDatasetResult {
+        let dataset_repo = self.catalog.get_one::<dyn DatasetRepository>().unwrap();
+        dataset_repo
+            .create_dataset_from_snapshot(
+                None,
+                MetadataFactory::dataset_snapshot()
+                    .name(name)
+                    .kind(DatasetKind::Derivative)
+                    .push_event(
+                        MetadataFactory::set_transform_aliases(vec![input_dataset.alias.clone()])
+                            .build(),
+                    )
+                    .build(),
+            )
+            .await
+            .unwrap()
+    }
+
+    pub fn schema(&self) -> Schema<Query, Mutation, EmptySubscription> {
+        kamu_adapter_graphql::schema(self.catalog.clone())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
