@@ -53,7 +53,7 @@ where
     ctx.read_batch(batch).unwrap()
 }
 
-fn make_input_empty(ctx: &SessionContext) -> DataFrame {
+fn make_output_empty(ctx: &SessionContext) -> DataFrame {
     make_input::<[_; 0], &str>(&ctx, [])
 }
 
@@ -64,7 +64,6 @@ async fn test_ledger_to_empty() {
     let ctx = SessionContext::new();
     let strat = MergeStrategyLedger::new(vec!["year".to_string(), "city".to_string()]);
 
-    let prev = make_input_empty(&ctx);
     let new = make_input(
         &ctx,
         [
@@ -74,7 +73,7 @@ async fn test_ledger_to_empty() {
         ],
     );
 
-    let actual = strat.merge(prev, new).unwrap();
+    let actual = strat.merge(None, new).unwrap();
     let expected = make_input(
         &ctx,
         [
@@ -103,7 +102,7 @@ async fn test_ledger_unseen() {
     );
     let new = make_input(&ctx, [(2020, "odessa", 4)]);
 
-    let actual = strat.merge(prev, new).unwrap();
+    let actual = strat.merge(Some(prev), new).unwrap();
     let expected = make_input(&ctx, [(2020, "odessa", 4)]);
     assert_dfs_equivalent(expected, actual).await;
 }
@@ -125,8 +124,8 @@ async fn test_ledger_seen_tail_ordered() {
     );
     let new = make_input(&ctx, [(2020, "seattle", 2), (2020, "kyiv", 3)]);
 
-    let actual = strat.merge(prev, new).unwrap();
-    let expected = make_input_empty(&ctx);
+    let actual = strat.merge(Some(prev), new).unwrap();
+    let expected = make_output_empty(&ctx);
     assert_dfs_equivalent(expected, actual).await;
 }
 
@@ -147,8 +146,8 @@ async fn test_ledger_seen_tail_unordered() {
     );
     let new = make_input(&ctx, [(2020, "kyiv", 3), (2020, "seattle", 2)]);
 
-    let actual = strat.merge(prev, new).unwrap();
-    let expected = make_input_empty(&ctx);
+    let actual = strat.merge(Some(prev), new).unwrap();
+    let expected = make_output_empty(&ctx);
     assert_dfs_equivalent(expected, actual).await;
 }
 
@@ -169,8 +168,8 @@ async fn test_ledger_seen_middle() {
     );
     let new = make_input(&ctx, [(2020, "seattle", 2)]);
 
-    let actual = strat.merge(prev, new).unwrap();
-    let expected = make_input_empty(&ctx);
+    let actual = strat.merge(Some(prev), new).unwrap();
+    let expected = make_output_empty(&ctx);
     assert_dfs_equivalent(expected, actual).await;
 }
 
@@ -183,17 +182,17 @@ async fn test_ledger_respects_pk() {
     let prev = make_input(&ctx, [(2020, "vancouver", 1), (2020, "seattle", 2)]);
     let new = make_input(&ctx, [(2020, "kiev", 3)]);
     let actual = MergeStrategyLedger::new(vec!["year".to_string()])
-        .merge(prev, new)
+        .merge(Some(prev), new)
         .unwrap();
-    let expected = make_input_empty(&ctx);
+    let expected = make_output_empty(&ctx);
     assert_dfs_equivalent(expected, actual).await;
 
     let prev = make_input(&ctx, [(2020, "vancouver", 1), (2020, "seattle", 2)]);
     let new = make_input(&ctx, [(2020, "seattle", 3)]);
     let actual = MergeStrategyLedger::new(vec!["year".to_string(), "city".to_string()])
-        .merge(prev, new)
+        .merge(Some(prev), new)
         .unwrap();
-    let expected = make_input_empty(&ctx);
+    let expected = make_output_empty(&ctx);
     assert_dfs_equivalent(expected, actual).await;
 
     let prev = make_input(&ctx, [(2020, "vancouver", 1), (2020, "seattle", 2)]);
@@ -203,7 +202,7 @@ async fn test_ledger_respects_pk() {
         "city".to_string(),
         "population".to_string(),
     ])
-    .merge(prev, new)
+    .merge(Some(prev), new)
     .unwrap();
     let expected = make_input(&ctx, [(2020, "seattle", 3)]);
     assert_dfs_equivalent(expected, actual).await;
@@ -211,7 +210,7 @@ async fn test_ledger_respects_pk() {
     let prev = make_input(&ctx, [(2020, "vancouver", 1), (2020, "seattle", 2)]);
     let new = make_input(&ctx, [(2021, "seattle", 3)]);
     let actual = MergeStrategyLedger::new(vec!["year".to_string(), "city".to_string()])
-        .merge(prev, new)
+        .merge(Some(prev), new)
         .unwrap();
     let expected = make_input(&ctx, [(2021, "seattle", 3)]);
     assert_dfs_equivalent(expected, actual).await;

@@ -17,7 +17,7 @@ use crate::*;
 pub struct MergeStrategyAppend;
 
 impl MergeStrategy for MergeStrategyAppend {
-    fn merge(&self, _prev: DataFrame, new: DataFrame) -> Result<DataFrame, MergeError> {
+    fn merge(&self, _prev: Option<DataFrame>, new: DataFrame) -> Result<DataFrame, MergeError> {
         Ok(new)
     }
 }

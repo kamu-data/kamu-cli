@@ -7,19 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-#![feature(provide_any)]
-#![feature(error_generic_member_access)]
+mod merge_strategy;
+mod reader;
 
-// Re-exports
-pub use internal_error::*;
-
-pub mod auth;
-pub mod entities;
-pub mod repos;
-pub mod services;
-pub mod utils;
-
-pub use entities::{SetRefError, *};
-pub use repos::*;
-pub use services::*;
-pub use utils::time_source::*;
+pub use merge_strategy::*;
+pub use reader::*;

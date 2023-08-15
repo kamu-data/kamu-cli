@@ -26,6 +26,16 @@ impl ParquetReaderHelper {
         Self::new(SerializedFileReader::new(std::fs::File::open(&path).unwrap()).unwrap())
     }
 
+    pub fn get_schema(&self) -> &datafusion::parquet::schema::types::Type {
+        self.reader
+            .metadata()
+            .file_metadata()
+            .schema_descr()
+            .root_schema()
+    }
+
+    /// Deprecated: use [Self::get_schema] in combination with
+    /// [kamu_data_utils::testing::assert_parquet_schema_eq]
     pub fn get_column_names(&self) -> Vec<String> {
         self.reader
             .metadata()
@@ -37,6 +47,8 @@ impl ParquetReaderHelper {
             .collect()
     }
 
+    /// Deprecated: use [Self::get_batches] in combination with
+    /// [kamu_data_utils::testing::assert_data_batches_eq]
     pub fn get_row_iter(&self) -> RowIter {
         self.reader.get_row_iter(None).unwrap()
     }

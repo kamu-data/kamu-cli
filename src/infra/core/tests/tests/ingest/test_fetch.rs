@@ -45,7 +45,7 @@ async fn test_fetch_url_file() {
     // No file to fetch
     assert_matches!(
         fetch_svc
-            .fetch("1", &fetch_step, None, &target_path, None)
+            .fetch("1", &fetch_step, None, &target_path, &Utc::now(), None)
             .await,
         Err(IngestError::NotFound { .. })
     );
@@ -66,7 +66,7 @@ async fn test_fetch_url_file() {
 
     // Normal fetch
     let res = fetch_svc
-        .fetch("1", &fetch_step, None, &target_path, None)
+        .fetch("1", &fetch_step, None, &target_path, &Utc::now(), None)
         .await
         .unwrap();
     assert_matches!(res, FetchResult::Updated(_));
@@ -84,6 +84,7 @@ async fn test_fetch_url_file() {
             &fetch_step,
             update.source_state.as_ref(),
             &target_path,
+            &Utc::now(),
             None,
         )
         .await
@@ -98,6 +99,7 @@ async fn test_fetch_url_file() {
             &fetch_step,
             update.source_state.as_ref(),
             &target_path,
+            &Utc::now(),
             None,
         )
         .await
@@ -128,7 +130,7 @@ async fn test_fetch_url_http_unreachable() {
 
     assert_matches!(
         fetch_svc
-            .fetch("1", &fetch_step, None, &target_path, None)
+            .fetch("1", &fetch_step, None, &target_path, &Utc::now(), None)
             .await,
         Err(IngestError::Unreachable { .. })
     );
@@ -157,7 +159,7 @@ async fn test_fetch_url_http_not_found() {
 
     assert_matches!(
         fetch_svc
-            .fetch("1", &fetch_step, None, &target_path, None)
+            .fetch("1", &fetch_step, None, &target_path, &Utc::now(), None)
             .await,
         Err(IngestError::NotFound { .. })
     );
@@ -200,7 +202,14 @@ async fn test_fetch_url_http_ok() {
     let listener = Arc::new(TestListener::new());
 
     let res = fetch_svc
-        .fetch("1", &fetch_step, None, &target_path, Some(listener.clone()))
+        .fetch(
+            "1",
+            &fetch_step,
+            None,
+            &target_path,
+            &Utc::now(),
+            Some(listener.clone()),
+        )
         .await
         .unwrap();
 
@@ -227,6 +236,7 @@ async fn test_fetch_url_http_ok() {
             &fetch_step,
             update.source_state.as_ref(),
             &target_path,
+            &Utc::now(),
             None,
         )
         .await
@@ -242,6 +252,7 @@ async fn test_fetch_url_http_ok() {
             &fetch_step,
             update.source_state.as_ref(),
             &target_path,
+            &Utc::now(),
             None,
         )
         .await
@@ -258,6 +269,7 @@ async fn test_fetch_url_http_ok() {
                 &fetch_step,
                 update.source_state.as_ref(),
                 &target_path,
+                &Utc::now(),
                 None
             )
             .await,
@@ -307,7 +319,14 @@ async fn test_fetch_url_http_env_interpolation() {
 
     assert_matches!(
         fetch_svc
-            .fetch("1", &fetch_step, None, &target_path, Some(listener.clone()))
+            .fetch(
+                "1",
+                &fetch_step,
+                None,
+                &target_path,
+                &Utc::now(),
+                Some(listener.clone())
+            )
             .await,
         Err(_)
     );
@@ -315,7 +334,14 @@ async fn test_fetch_url_http_env_interpolation() {
     std::env::set_var("KAMU_TEST", "data.csv");
 
     let res = fetch_svc
-        .fetch("1", &fetch_step, None, &target_path, Some(listener.clone()))
+        .fetch(
+            "1",
+            &fetch_step,
+            None,
+            &target_path,
+            &Utc::now(),
+            Some(listener.clone()),
+        )
         .await
         .unwrap();
 
@@ -372,7 +398,14 @@ async fn test_fetch_url_ftp_ok() {
     let listener = Arc::new(TestListener::new());
 
     let res = fetch_svc
-        .fetch("1", &fetch_step, None, &target_path, Some(listener.clone()))
+        .fetch(
+            "1",
+            &fetch_step,
+            None,
+            &target_path,
+            &Utc::now(),
+            Some(listener.clone()),
+        )
         .await
         .unwrap();
 
@@ -422,7 +455,7 @@ async fn test_fetch_files_glob() {
     // No file to fetch
     assert_matches!(
         fetch_svc
-            .fetch("1", &fetch_step, None, &target_path, None)
+            .fetch("1", &fetch_step, None, &target_path, &Utc::now(), None)
             .await,
         Err(IngestError::NotFound { .. })
     );
@@ -443,7 +476,7 @@ async fn test_fetch_files_glob() {
 
     // Normal fetch
     let res = fetch_svc
-        .fetch("1", &fetch_step, None, &target_path, None)
+        .fetch("1", &fetch_step, None, &target_path, &Utc::now(), None)
         .await
         .unwrap();
     assert_matches!(res, FetchResult::Updated(_));
@@ -468,6 +501,7 @@ async fn test_fetch_files_glob() {
             &fetch_step,
             update.source_state.as_ref(),
             &target_path,
+            &Utc::now(),
             None,
         )
         .await
@@ -482,6 +516,7 @@ async fn test_fetch_files_glob() {
             &fetch_step,
             update.source_state.as_ref(),
             &target_path,
+            &Utc::now(),
             None,
         )
         .await
@@ -510,6 +545,7 @@ async fn test_fetch_files_glob() {
             &fetch_step,
             update.source_state.as_ref(),
             &target_path,
+            &Utc::now(),
             None,
         )
         .await
@@ -547,6 +583,7 @@ async fn test_fetch_files_glob() {
             &fetch_step,
             update.source_state.as_ref(),
             &target_path,
+            &Utc::now(),
             None,
         )
         .await
@@ -573,6 +610,7 @@ async fn test_fetch_files_glob() {
             &fetch_step,
             update5.source_state.as_ref(),
             &target_path,
+            &Utc::now(),
             None,
         )
         .await
@@ -630,7 +668,14 @@ async fn test_fetch_container_ok() {
     let listener = Arc::new(TestListener::new());
 
     let res = fetch_svc
-        .fetch("1", &fetch_step, None, &target_path, Some(listener.clone()))
+        .fetch(
+            "1",
+            &fetch_step,
+            None,
+            &target_path,
+            &Utc::now(),
+            Some(listener.clone()),
+        )
         .await
         .unwrap();
 

@@ -319,6 +319,7 @@ impl IngestTask {
                     fetch_step,
                     prev_source_state,
                     &target_path,
+                    &self.request.system_time,
                     Some(Arc::new(FetchProgressListenerBridge {
                         listener: self.listener.clone(),
                     })),
@@ -405,15 +406,28 @@ impl IngestTask {
             ..self.request.clone()
         };
 
-        let read_svc: Box<dyn ReadService> =
-            if std::env::var("KAMU_INGEST_IMPL") == Ok("datafusion".to_string()) {
-                Box::new(ReadServiceDatafusion::new(self.run_info_dir.clone()))
-            } else {
-                Box::new(ReadServiceSpark::new(
-                    self.engine_provisioner.clone(),
-                    self.listener.clone(),
-                ))
-            };
+        // TODO: Temporarily we continue to default to Spark ingest, but use new engine
+        // if preprocessing query specifies datafusion
+        let engine = self
+            .request
+            .polling_source
+            .as_ref()
+            .unwrap()
+            .preprocess
+            .as_ref()
+            .map(|Transform::Sql(t)| t.engine.as_str());
+
+        let read_svc: Box<dyn ReadService> = if engine == Some("datafusion") {
+            Box::new(ReadServiceDatafusion::new(
+                self.dataset.clone(),
+                self.run_info_dir.clone(),
+            ))
+        } else {
+            Box::new(ReadServiceSpark::new(
+                self.engine_provisioner.clone(),
+                self.listener.clone(),
+            ))
+        };
         read_svc.read(request).await
     }
 

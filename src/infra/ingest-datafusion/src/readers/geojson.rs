@@ -12,6 +12,7 @@ use std::path::{Path, PathBuf};
 use datafusion::datasource::file_format::file_type::FileCompressionType;
 use datafusion::prelude::*;
 use internal_error::*;
+use kamu_core::ingest::ReadError;
 use opendatafabric::*;
 
 use crate::*;
@@ -34,6 +35,14 @@ impl ReaderGeoJson {
 
 #[async_trait::async_trait]
 impl Reader for ReaderGeoJson {
+    async fn output_schema(
+        &self,
+        ctx: &SessionContext,
+        conf: &ReadStep,
+    ) -> Result<Option<datafusion::arrow::datatypes::Schema>, ReadError> {
+        super::output_schema_common(ctx, conf).await
+    }
+
     async fn read(
         &self,
         ctx: &SessionContext,

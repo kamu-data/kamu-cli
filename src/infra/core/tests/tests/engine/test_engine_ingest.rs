@@ -8,16 +8,13 @@
 // by the Apache License, Version 2.0.
 
 use std::assert_matches::assert_matches;
+use std::path::PathBuf;
 use std::sync::Arc;
 
+use chrono::{TimeZone, Utc};
 use container_runtime::ContainerRuntime;
-use datafusion::arrow::array::{Array, Int32Array, StringArray};
-use datafusion::arrow::datatypes::{DataType, Field, Schema};
-use datafusion::arrow::record_batch::RecordBatch;
-use datafusion::parquet::arrow::ArrowWriter;
-use datafusion::parquet::basic::{Compression, GzipLevel};
-use datafusion::parquet::file::properties::WriterProperties;
 use datafusion::parquet::record::RowAccessor;
+use datafusion::prelude::*;
 use futures::StreamExt;
 use indoc::indoc;
 use itertools::Itertools;
@@ -31,8 +28,8 @@ use crate::mock_dataset_action_authorizer;
 
 #[test_group::group(containerized, engine)]
 #[test_log::test(tokio::test)]
-async fn test_ingest_csv_with_engine() {
-    let harness = IngestTestHarness::new(DatasetName::new_unchecked("foo.bar"));
+async fn test_ingest_csv_with_engine_spark() {
+    let harness = IngestTestHarness::new();
 
     let src_path = harness.temp_dir.path().join("data.csv");
     std::fs::write(
@@ -64,13 +61,33 @@ async fn test_ingest_csv_with_engine() {
                     ),
                     ..ReadStepCsv::default()
                 }))
+                .preprocess(TransformSql {
+                    engine: "spark".to_string(),
+                    version: None,
+                    query: Some(
+                        indoc::indoc!(
+                            r#"
+                            select
+                                city,
+                                population * 10 as population
+                            from input
+                            "#
+                        )
+                        .to_string(),
+                    ),
+                    queries: None,
+                    temporal_tables: None,
+                })
                 .build(),
         )
         .build();
 
-    harness.ingest_snapshot(dataset_snapshot).await;
+    let dataset_name = dataset_snapshot.name.clone();
 
-    let parquet_reader = harness.read_datafile().await;
+    harness.create_dataset(dataset_snapshot).await;
+    harness.ingest(&dataset_name).await;
+
+    let parquet_reader = harness.read_datafile(&dataset_name).await;
 
     assert_eq!(
         parquet_reader.get_column_names(),
@@ -85,86 +102,208 @@ async fn test_ingest_csv_with_engine() {
             .sorted()
             .collect::<Vec<_>>(),
         [
-            (0, "A".to_owned(), 1000),
-            (1, "B".to_owned(), 2000),
-            (2, "C".to_owned(), 3000)
+            (0, "A".to_owned(), 10000),
+            (1, "B".to_owned(), 20000),
+            (2, "C".to_owned(), 30000)
         ]
     );
 }
 
 #[test_group::group(containerized, engine)]
 #[test_log::test(tokio::test)]
-async fn test_ingest_parquet_with_engine() {
-    let harness = IngestTestHarness::new(DatasetName::new_unchecked("foo.bar"));
-
-    let src_path = harness.temp_dir.path().join("data.parquet");
-
-    // Write data
-    let schema = Arc::new(Schema::new(vec![
-        Field::new("city", DataType::Utf8, false),
-        Field::new("population", DataType::Int32, false),
-    ]));
-    let cities: Arc<dyn Array> = Arc::new(StringArray::from(vec!["D", "E", "F"]));
-    let populations: Arc<dyn Array> = Arc::new(Int32Array::from(vec![4000, 5000, 6000]));
-    let record_batch = RecordBatch::try_new(
-        Arc::clone(&schema),
-        vec![Arc::clone(&cities), Arc::clone(&populations)],
-    )
-    .unwrap();
-
-    let arrow_writer_props = WriterProperties::builder()
-        .set_compression(Compression::GZIP(GzipLevel::default()))
-        .build();
-
-    let mut arrow_writer = ArrowWriter::try_new(
-        std::fs::File::create(&src_path).unwrap(),
-        record_batch.schema(),
-        Some(arrow_writer_props),
-    )
-    .unwrap();
-
-    arrow_writer.write(&record_batch).unwrap();
-    arrow_writer.close().unwrap();
+async fn test_ingest_csv_with_engine_datafusion() {
+    let harness = IngestTestHarness::new();
 
     let dataset_snapshot = MetadataFactory::dataset_snapshot()
         .name("foo.bar")
         .kind(DatasetKind::Root)
         .push_event(
             MetadataFactory::set_polling_source()
-                .fetch_file(&src_path)
-                .read(ReadStep::Parquet(ReadStepParquet {
+                .fetch(FetchStep::Url(FetchStepUrl {
+                    url: url::Url::from_file_path(&src_path)
+                        .unwrap()
+                        .as_str()
+                        .to_owned(),
+                    event_time: Some(EventTimeSource::FromSystemTime),
+                    cache: None,
+                    headers: None,
+                }))
+                .read(ReadStep::Csv(ReadStepCsv {
+                    header: Some(true),
                     schema: Some(
-                        ["city STRING", "population INT"]
+                        ["city STRING", "population BIGINT"]
                             .iter()
                             .map(|s| s.to_string())
                             .collect(),
                     ),
+                    ..ReadStepCsv::default()
                 }))
+                .preprocess(TransformSql {
+                    engine: "datafusion".to_string(),
+                    version: None,
+                    query: None,
+                    queries: Some(vec![
+                        SqlQueryStep {
+                            alias: Some("step1".to_string()),
+                            query: indoc::indoc!(
+                                r#"
+                            select
+                                city,
+                                population * 10 as population
+                            from input
+                            "#
+                            )
+                            .to_string(),
+                        },
+                        SqlQueryStep {
+                            alias: None,
+                            query: indoc::indoc!(
+                                r#"
+                            select
+                                city,
+                                population + 1 as population
+                            from step1
+                            "#
+                            )
+                            .to_string(),
+                        },
+                    ]),
+                    temporal_tables: None,
+                })
+                .merge(MergeStrategySnapshot {
+                    primary_key: vec!["city".to_string()],
+                    compare_columns: None,
+                    observation_column: None,
+                    obsv_added: None,
+                    obsv_changed: None,
+                    obsv_removed: None,
+                })
                 .build(),
         )
         .build();
 
-    harness.ingest_snapshot(dataset_snapshot).await;
+    let dataset_name = dataset_snapshot.name.clone();
 
-    let parquet_reader = harness.read_datafile().await;
+    harness.create_dataset(dataset_snapshot).await;
 
-    assert_eq!(
-        parquet_reader.get_column_names(),
-        ["offset", "system_time", "event_time", "city", "population"]
+    // Round 1
+    std::fs::write(
+        &src_path,
+        indoc!(
+            "
+            city,population
+            A,1000
+            B,2000
+            C,3000
+            "
+        ),
+    )
+    .unwrap();
+
+    harness.ingest(&dataset_name).await;
+
+    let df = harness.get_last_data(&dataset_name).await;
+    kamu_data_utils::testing::assert_schema_eq(
+        df.schema(),
+        indoc!(
+            r#"
+            message arrow_schema {
+              REQUIRED INT64 offset;
+              REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
+              REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
+              REQUIRED BYTE_ARRAY observed (STRING);
+              OPTIONAL BYTE_ARRAY city (STRING);
+              OPTIONAL INT64 population;
+            }
+            "#
+        ),
     );
 
+    kamu_data_utils::testing::assert_data_eq(
+        df,
+        indoc!(
+            r#"
+            +--------+----------------------+----------------------+----------+------+------------+
+            | offset | system_time          | event_time           | observed | city | population |
+            +--------+----------------------+----------------------+----------+------+------------+
+            | 0      | 2050-01-01T12:00:00Z | 2050-01-01T12:00:00Z | I        | A    | 10001      |
+            | 1      | 2050-01-01T12:00:00Z | 2050-01-01T12:00:00Z | I        | B    | 20001      |
+            | 2      | 2050-01-01T12:00:00Z | 2050-01-01T12:00:00Z | I        | C    | 30001      |
+            +--------+----------------------+----------------------+----------+------+------------+
+            "#
+        ),
+    )
+    .await;
+
     assert_eq!(
-        parquet_reader
-            .get_row_iter()
-            .map(|r| r.unwrap())
-            .map(IngestTestHarness::row_mapper)
-            .sorted()
-            .collect::<Vec<_>>(),
-        [
-            (0, "D".to_owned(), 4000),
-            (1, "E".to_owned(), 5000),
-            (2, "F".to_owned(), 6000)
-        ]
+        harness
+            .get_last_data_block(&dataset_name)
+            .await
+            .event
+            .output_watermark
+            .map(|dt| dt.to_rfc3339()),
+        Some("2050-01-01T12:00:00+00:00".to_string())
+    );
+
+    // Round 2
+    std::fs::write(
+        &src_path,
+        indoc!(
+            "
+            city,population
+            A,1000
+            B,2000
+            C,4000
+            "
+        ),
+    )
+    .unwrap();
+
+    harness
+        .time_source
+        .set(Utc.with_ymd_and_hms(2050, 2, 1, 12, 0, 0).unwrap());
+
+    harness.ingest(&dataset_name).await;
+
+    let df = harness.get_last_data(&dataset_name).await;
+    kamu_data_utils::testing::assert_schema_eq(
+        df.schema(),
+        indoc!(
+            r#"
+            message arrow_schema {
+              REQUIRED INT64 offset;
+              REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
+              REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
+              REQUIRED BYTE_ARRAY observed (STRING);
+              OPTIONAL BYTE_ARRAY city (STRING);
+              OPTIONAL INT64 population;
+            }
+            "#
+        ),
+    );
+
+    kamu_data_utils::testing::assert_data_eq(
+        df,
+        indoc!(
+            r#"
+            +--------+----------------------+----------------------+----------+------+------------+
+            | offset | system_time          | event_time           | observed | city | population |
+            +--------+----------------------+----------------------+----------+------+------------+
+            | 3      | 2050-02-01T12:00:00Z | 2050-02-01T12:00:00Z | U        | C    | 40001      |
+            +--------+----------------------+----------------------+----------+------+------------+
+            "#
+        ),
+    )
+    .await;
+
+    assert_eq!(
+        harness
+            .get_last_data_block(&dataset_name)
+            .await
+            .event
+            .output_watermark
+            .map(|dt| dt.to_rfc3339()),
+        Some("2050-02-01T12:00:00+00:00".to_string())
     );
 }
 
@@ -174,11 +313,12 @@ struct IngestTestHarness {
     temp_dir: TempDir,
     dataset_repo: Arc<DatasetRepositoryLocalFs>,
     ingest_svc: Arc<IngestServiceImpl>,
-    dataset_name: DatasetName,
+    time_source: Arc<MockSystemTimeSource>,
+    ctx: SessionContext,
 }
 
 impl IngestTestHarness {
-    fn new(dataset_name: DatasetName) -> Self {
+    fn new() -> Self {
         let temp_dir = tempfile::tempdir().unwrap();
         let run_info_dir = temp_dir.path().join("run");
         let cache_dir = temp_dir.path().join("cache");
@@ -207,6 +347,10 @@ impl IngestTestHarness {
             run_info_dir.clone(),
         ));
 
+        let time_source = Arc::new(MockSystemTimeSource::new(
+            Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap(),
+        ));
+
         let ingest_svc = Arc::new(IngestServiceImpl::new(
             dataset_repo.clone(),
             dataset_action_authorizer,
@@ -214,22 +358,26 @@ impl IngestTestHarness {
             Arc::new(ContainerRuntime::default()),
             run_info_dir,
             cache_dir,
+            time_source.clone(),
         ));
 
         Self {
             temp_dir,
             dataset_repo,
             ingest_svc,
-            dataset_name,
+            time_source,
+            ctx: SessionContext::with_config(SessionConfig::new().with_target_partitions(1)),
         }
     }
 
-    async fn ingest_snapshot(&self, dataset_snapshot: DatasetSnapshot) {
+    async fn create_dataset(&self, dataset_snapshot: DatasetSnapshot) {
         self.dataset_repo
             .create_dataset_from_snapshot(None, dataset_snapshot)
             .await
             .unwrap();
+    }
 
+    async fn ingest(&self, dataset_name: &DatasetName) {
         let res = self
             .ingest_svc
             .ingest(
@@ -241,35 +389,70 @@ impl IngestTestHarness {
         assert_matches!(res, Ok(IngestResult::Updated { .. }));
     }
 
-    async fn read_datafile(&self) -> ParquetReaderHelper {
-        let dataset_ref = self.dataset_name.as_local_ref();
-        let dataset = self.dataset_repo.get_dataset(&dataset_ref).await.unwrap();
-
-        let (_, block) = dataset
-            .as_metadata_chain()
-            .iter_blocks()
-            .filter_data_stream_blocks()
-            .next()
+    async fn get_last_data_block(&self) -> MetadataBlockTyped<AddData> {
+        let dataset = self
+            .dataset_repo
+            .get_dataset(&dataset_name.as_local_ref())
             .await
-            .unwrap()
             .unwrap();
 
-        let part_file = kamu_data_utils::data::local_url::into_local_path(
+        let mut stream = dataset.as_metadata_chain().iter_blocks();
+        while let Some(v) = stream.next().await {
+            let (_, b) = v.unwrap();
+            if let Some(b) = b.into_typed::<AddData>() {
+                return b;
+            }
+        }
+
+        unreachable!()
+    }
+
+    async fn get_last_data_file(&self, dataset_name: &DatasetName) -> PathBuf {
+        let dataset = self
+            .dataset_repo
+            .get_dataset(&dataset_name.as_local_ref())
+            .await
+            .unwrap();
+
+        let block = self.get_last_data_block(dataset_name).await;
+
+        kamu_data_utils::data::local_url::into_local_path(
             dataset
                 .as_data_repo()
                 .get_internal_url(&block.event.output_data.unwrap().physical_hash)
                 .await,
         )
-        .unwrap();
+        .unwrap()
+    }
 
+    async fn read_datafile(&self, dataset_name: &DatasetName) -> ParquetReaderHelper {
+        let part_file = self.get_last_data_file(dataset_name).await;
         ParquetReaderHelper::open(&part_file)
     }
 
+    /// Deprecated: use [kamu_data_utils::testing::assert_data_eq]
     fn row_mapper(r: datafusion::parquet::record::Row) -> (i64, String, i32) {
         (
             r.get_long(0).unwrap().clone(),
             r.get_string(3).unwrap().clone(),
             r.get_int(4).unwrap(),
         )
+    }
+
+    async fn get_last_data(&self, dataset_name: &DatasetName) -> DataFrame {
+        let part_file = self.get_last_data_file(dataset_name).await;
+        self.ctx
+            .read_parquet(
+                part_file.to_string_lossy().as_ref(),
+                ParquetReadOptions {
+                    file_extension: part_file
+                        .extension()
+                        .and_then(|s| s.to_str())
+                        .unwrap_or_default(),
+                    ..Default::default()
+                },
+            )
+            .await
+            .unwrap()
     }
 }

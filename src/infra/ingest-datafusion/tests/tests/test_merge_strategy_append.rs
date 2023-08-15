@@ -54,10 +54,9 @@ where
 #[test_log::test(tokio::test)]
 async fn test_append_to_empty() {
     let ctx = SessionContext::new();
-    let prev = make_input::<[_; 0], String>(&ctx, []);
     let new = make_input(&ctx, [("vancouver", 1), ("seattle", 2), ("kyiv", 3)]);
 
-    let actual = MergeStrategyAppend.merge(prev, new).unwrap();
+    let actual = MergeStrategyAppend.merge(None, new).unwrap();
     let expected = make_input(&ctx, [("vancouver", 1), ("seattle", 2), ("kyiv", 3)]);
     assert_dfs_equivalent(expected, actual).await;
 }
@@ -70,7 +69,7 @@ async fn test_append_to_some() {
     let prev = make_input(&ctx, [("vancouver", 1), ("seattle", 2), ("kyiv", 3)]);
     let new = make_input(&ctx, [("vancouver", 1), ("odessa", 4)]);
 
-    let actual = MergeStrategyAppend.merge(prev, new).unwrap();
+    let actual = MergeStrategyAppend.merge(Some(prev), new).unwrap();
     let expected = make_input(&ctx, [("vancouver", 1), ("odessa", 4)]);
     assert_dfs_equivalent(expected, actual).await;
 }

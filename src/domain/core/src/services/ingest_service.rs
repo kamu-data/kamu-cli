@@ -14,6 +14,7 @@ use container_runtime::ImagePullError;
 use opendatafabric::*;
 use thiserror::Error;
 
+use super::ingest;
 use crate::*;
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -242,6 +243,22 @@ impl From<GetDatasetError> for IngestError {
         match v {
             GetDatasetError::NotFound(e) => Self::DatasetNotFound(e),
             GetDatasetError::Internal(e) => Self::Internal(e),
+        }
+    }
+}
+
+impl From<ingest::ReadError> for IngestError {
+    fn from(v: ingest::ReadError) -> Self {
+        match v {
+            ingest::ReadError::Internal(err) => Self::Internal(err),
+        }
+    }
+}
+
+impl From<ingest::MergeError> for IngestError {
+    fn from(v: ingest::MergeError) -> Self {
+        match v {
+            ingest::MergeError::Internal(err) => Self::Internal(err),
         }
     }
 }

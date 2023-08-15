@@ -207,10 +207,20 @@ impl MergeStrategySnapshot {
 }
 
 impl MergeStrategy for MergeStrategySnapshot {
-    fn merge(&self, prev: DataFrame, new: DataFrame) -> Result<DataFrame, MergeError> {
+    fn merge(&self, prev: Option<DataFrame>, new: DataFrame) -> Result<DataFrame, MergeError> {
+        if prev.is_none() {
+            let df = new
+                .with_column(&self.obsv_column, lit(&self.obsv_added))
+                .int_err()?
+                .columns_to_front(&[&self.obsv_column])
+                .int_err()?;
+
+            return Ok(df);
+        }
+
         // Project existing CDC ledger into a state
         let proj = self
-            .project(prev)?
+            .project(prev.unwrap())?
             .without_columns(&[&self.obsv_column, &self.order_column])
             .int_err()?;
 

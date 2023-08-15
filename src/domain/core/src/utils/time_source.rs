@@ -38,6 +38,10 @@ impl MockSystemTimeSource {
     pub fn new(t: DateTime<Utc>) -> Self {
         Self { t: Mutex::new(t) }
     }
+
+    pub fn set(&self, t: DateTime<Utc>) {
+        *self.t.lock().unwrap() = t;
+    }
 }
 
 impl SystemTimeSource for MockSystemTimeSource {

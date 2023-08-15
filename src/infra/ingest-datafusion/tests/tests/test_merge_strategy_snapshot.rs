@@ -233,10 +233,9 @@ async fn test_snapshot_to_empty() {
     let ctx = SessionContext::new();
     let strat = get_strat();
 
-    let prev = make_ledger::<[_; 0], &str, &str>(&ctx, "prev", []).await;
     let new = make_input(&ctx, "new", [("vancouver", 1), ("seattle", 2)]).await;
 
-    let actual = strat.merge(prev, new).unwrap();
+    let actual = strat.merge(None, new).unwrap();
     let expected = make_output(
         &ctx,
         "expected",
@@ -256,7 +255,7 @@ async fn test_snapshot_no_changes_ordered() {
     let prev = make_ledger(&ctx, "prev", [("I", "vancouver", 1), ("I", "seattle", 2)]).await;
     let new = make_input(&ctx, "new", [("vancouver", 1), ("seattle", 2)]).await;
 
-    let actual = strat.merge(prev, new).unwrap();
+    let actual = strat.merge(Some(prev), new).unwrap();
     let expected = make_output_empty(&ctx, "expected").await;
     assert_dfs_equivalent(expected, actual).await;
 }
@@ -271,7 +270,7 @@ async fn test_snapshot_no_changes_unordered() {
     let prev = make_ledger(&ctx, "prev", [("I", "vancouver", 1), ("I", "seattle", 2)]).await;
     let new = make_input(&ctx, "new", [("seattle", 2), ("vancouver", 1)]).await;
 
-    let actual = strat.merge(prev, new).unwrap();
+    let actual = strat.merge(Some(prev), new).unwrap();
     let expected = make_output_empty(&ctx, "expected").await;
     assert_dfs_equivalent(expected, actual).await;
 }
@@ -291,7 +290,7 @@ async fn test_snapshot_mix_of_changes() {
     .await;
     let new = make_input(&ctx, "new", [("seattle", 2), ("kyiv", 4), ("odessa", 5)]).await;
 
-    let actual = strat.merge(prev, new).unwrap();
+    let actual = strat.merge(Some(prev), new).unwrap();
     let expected = make_output(
         &ctx,
         "expected",

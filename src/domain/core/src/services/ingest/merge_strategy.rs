@@ -20,7 +20,9 @@ use internal_error::InternalError;
 /// Merge strategies define how to combine the newly-ingested data with the
 /// existing one.
 pub trait MergeStrategy {
-    fn merge(&self, prev: DataFrame, new: DataFrame) -> Result<DataFrame, MergeError>;
+    /// Reduces newly seen data `new` to a minimal update to previously
+    /// ledgerized data `prev`.
+    fn merge(&self, prev: Option<DataFrame>, new: DataFrame) -> Result<DataFrame, MergeError>;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

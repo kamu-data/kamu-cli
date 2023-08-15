@@ -11,6 +11,7 @@
 pub use container_runtime::{NullPullImageListener, PullImageListener};
 
 pub mod engine_provisioner;
+pub mod ingest;
 pub mod ingest_service;
 pub mod provenance_service;
 pub mod pull_service;

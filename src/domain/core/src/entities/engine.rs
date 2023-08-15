@@ -61,6 +61,8 @@ pub struct IngestRequest {
     pub next_offset: i64,
     /// Output dataset's vocabulary
     pub vocab: DatasetVocabulary,
+    /// List of *all* previous data files (needed for merge step)
+    pub prev_data_slices: Vec<Multihash>,
     /// Previous checkpoint, if any
     pub prev_checkpoint: Option<Multihash>,
     /// Previous watermark, if any
@@ -178,6 +180,16 @@ pub struct InvalidQueryError {
     pub message: String,
     pub log_files: Vec<PathBuf>,
     pub backtrace: Backtrace,
+}
+
+impl InvalidQueryError {
+    pub fn new(message: impl Into<String>, log_files: Vec<PathBuf>) -> Self {
+        Self {
+            message: message.into(),
+            log_files,
+            backtrace: Backtrace::capture(),
+        }
+    }
 }
 
 impl std::fmt::Display for InvalidQueryError {

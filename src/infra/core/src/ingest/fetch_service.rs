@@ -51,6 +51,7 @@ impl FetchService {
         fetch_step: &FetchStep,
         prev_source_state: Option<&PollingSourceState>,
         target_path: &Path,
+        system_time: &DateTime<Utc>,
         maybe_listener: Option<Arc<dyn FetchProgressListener>>,
     ) -> Result<FetchResult, IngestError> {
         let listener = maybe_listener.unwrap_or_else(|| Arc::new(NullFetchProgressListener));
@@ -68,6 +69,7 @@ impl FetchService {
                             furl.event_time.as_ref(),
                             prev_source_state,
                             target_path,
+                            system_time,
                             listener.as_ref(),
                         )
                         .await
@@ -79,11 +81,14 @@ impl FetchService {
                             furl.event_time.as_ref(),
                             prev_source_state,
                             target_path,
+                            system_time,
                             listener.as_ref(),
                         )
                         .await
                     }
-                    "ftp" | "ftps" => Self::fetch_ftp(url, target_path, listener).await,
+                    "ftp" | "ftps" => {
+                        Self::fetch_ftp(url, target_path, system_time, listener).await
+                    }
                     // TODO: Replace with proper error type
                     scheme => unimplemented!("Unsupported scheme: {}", scheme),
                 }
@@ -99,8 +104,14 @@ impl FetchService {
                 .await
             }
             FetchStep::FilesGlob(fglob) => {
-                Self::fetch_files_glob(fglob, prev_source_state, target_path, listener.as_ref())
-                    .await
+                Self::fetch_files_glob(
+                    fglob,
+                    prev_source_state,
+                    target_path,
+                    system_time,
+                    listener.as_ref(),
+                )
+                .await
             }
         }
     }
@@ -336,6 +347,7 @@ impl FetchService {
         fglob: &FetchStepFilesGlob,
         prev_source_state: Option<&PollingSourceState>,
         target_path: &Path,
+        system_time: &DateTime<Utc>,
         listener: &dyn FetchProgressListener,
     ) -> Result<FetchResult, IngestError> {
         match &fglob.order {
@@ -346,19 +358,6 @@ impl FetchService {
                 ord
             ),
         }
-
-        let event_time_source = match &fglob.event_time {
-            None => None,
-            Some(EventTimeSource::FromPath(fp)) => Some(fp),
-            Some(src) => {
-                return Err(EventTimeSourceError::incompatible(format!(
-                    "Files glob source only supports deriving event time from file path, found: \
-                     {:?}",
-                    src
-                ))
-                .into());
-            }
-        };
 
         let last_filename = match prev_source_state {
             Some(PollingSourceState::ETag(etag)) => Some(etag),
@@ -401,13 +400,24 @@ impl FetchService {
         }
 
         let (first_filename, first_path) = matched_files.pop().unwrap();
-        let fetch_res = Self::fetch_file(&first_path, None, None, target_path, listener).await?;
-        assert_matches!(fetch_res, FetchResult::Updated(_));
 
-        let source_event_time = match event_time_source {
-            None => None,
-            Some(src) => Some(Self::extract_event_time(&first_filename, &src)?),
+        let source_event_time = match &fglob.event_time {
+            None | Some(EventTimeSource::FromSystemTime) => Some(system_time.clone()),
+            Some(EventTimeSource::FromPath(src)) => {
+                Some(Self::extract_event_time_from_path(&first_filename, &src)?)
+            }
+            Some(EventTimeSource::FromMetadata) => {
+                return Err(EventTimeSourceError::incompatible(
+                    "Files glob source does not support extracting event time fromMetadata, you \
+                     should use fromPath instead",
+                )
+                .into());
+            }
         };
+
+        let fetch_res =
+            Self::fetch_file(&first_path, None, None, target_path, system_time, listener).await?;
+        assert_matches!(fetch_res, FetchResult::Updated(_));
 
         Ok(FetchResult::Updated(FetchResultUpdated {
             source_state: Some(PollingSourceState::ETag(first_filename)),
@@ -425,23 +435,10 @@ impl FetchService {
         event_time_source: Option<&EventTimeSource>,
         prev_source_state: Option<&PollingSourceState>,
         target_path: &Path,
+        system_time: &DateTime<Utc>,
         listener: &dyn FetchProgressListener,
     ) -> Result<FetchResult, IngestError> {
         tracing::info!(?path, "Ingesting file");
-
-        match event_time_source {
-            None | Some(EventTimeSource::FromMetadata) => (),
-            Some(src) => {
-                return Err(EventTimeSourceError::incompatible(format!(
-                    concat!(
-                        "File source only supports deriving event time from metadata ",
-                        "(file modification time), found: {:?}"
-                    ),
-                    src
-                ))
-                .into());
-            }
-        };
 
         let meta = tokio::fs::metadata(path)
             .await
@@ -463,6 +460,17 @@ impl FetchService {
                 return Ok(FetchResult::UpToDate);
             }
         }
+
+        let source_event_time = match event_time_source {
+            None | Some(EventTimeSource::FromMetadata) => Some(mod_time),
+            Some(EventTimeSource::FromSystemTime) => Some(system_time.clone()),
+            Some(EventTimeSource::FromPath(_)) => {
+                return Err(EventTimeSourceError::incompatible(
+                    "File source does not supports fromPath event time source",
+                )
+                .into());
+            }
+        };
 
         let mut fetched_bytes = 0;
         let total_bytes = TotalBytes::Exact(meta.len());
@@ -489,7 +497,7 @@ impl FetchService {
 
         Ok(FetchResult::Updated(FetchResultUpdated {
             source_state: Some(PollingSourceState::LastModified(mod_time)),
-            source_event_time: Some(mod_time),
+            source_event_time,
             has_more: false,
         }))
     }
@@ -505,25 +513,12 @@ impl FetchService {
         event_time_source: Option<&EventTimeSource>,
         prev_source_state: Option<&PollingSourceState>,
         target_path: &Path,
+        system_time: &DateTime<Utc>,
         listener: &dyn FetchProgressListener,
     ) -> Result<FetchResult, IngestError> {
         use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
         use reqwest::StatusCode;
         use tokio::io::AsyncWriteExt;
-
-        match event_time_source {
-            None | Some(EventTimeSource::FromMetadata) => (),
-            Some(src) => {
-                return Err(EventTimeSourceError::incompatible(format!(
-                    concat!(
-                        "Url source only supports deriving event time from metadata ",
-                        "(last modified time), found: {:?}",
-                    ),
-                    src
-                ))
-                .into());
-            }
-        };
 
         let client = reqwest::Client::builder()
             .connect_timeout(Self::HTTP_CONNECT_TIMEOUT)
@@ -580,14 +575,14 @@ impl FetchService {
             }
         }
 
-        let mut source_event_time = None;
+        let mut last_modified_time = None;
         let source_state = if let Some(etag) = response.headers().get(reqwest::header::ETAG) {
             Some(PollingSourceState::ETag(
                 etag.to_str().int_err()?.to_string(),
             ))
         } else if let Some(last_modified) = response.headers().get(reqwest::header::LAST_MODIFIED) {
             let last_modified = Self::parse_http_date_time(last_modified.to_str().int_err()?);
-            source_event_time = Some(last_modified.clone());
+            last_modified_time = Some(last_modified.clone());
             Some(PollingSourceState::LastModified(last_modified))
         } else {
             None
@@ -614,6 +609,17 @@ impl FetchService {
         // Important: Ensures file is closed immediately when dropped
         file.flush().await.int_err()?;
 
+        let source_event_time = match event_time_source {
+            None | Some(EventTimeSource::FromMetadata) => last_modified_time,
+            Some(EventTimeSource::FromSystemTime) => Some(system_time.clone()),
+            Some(EventTimeSource::FromPath(_)) => {
+                return Err(EventTimeSourceError::incompatible(
+                    "Url source does not support fromPath event time source",
+                )
+                .into());
+            }
+        };
+
         Ok(FetchResult::Updated(FetchResultUpdated {
             source_state,
             source_event_time,
@@ -625,6 +631,7 @@ impl FetchService {
     async fn fetch_ftp(
         url: Url,
         target_path: &Path,
+        system_time: &DateTime<Utc>,
         listener: Arc<dyn FetchProgressListener>,
     ) -> Result<FetchResult, IngestError> {
         cfg_if::cfg_if! {
@@ -634,6 +641,7 @@ impl FetchService {
                         Self::fetch_ftp_impl(
                             url,
                             &target_path,
+                            system_time,
                             listener.as_ref(),
                         )
                     })
@@ -652,6 +660,7 @@ impl FetchService {
     fn fetch_ftp_impl(
         url: Url,
         target_path: &Path,
+        system_time: &DateTime<Utc>,
         listener: &dyn FetchProgressListener,
     ) -> Result<FetchResult, IngestError> {
         use std::io::prelude::*;
@@ -711,7 +720,7 @@ impl FetchService {
 
         Ok(FetchResult::Updated(FetchResultUpdated {
             source_state: None,
-            source_event_time: None,
+            source_event_time: Some(system_time.clone()),
             has_more: false,
         }))
     }
@@ -722,7 +731,7 @@ impl FetchService {
             .into()
     }
 
-    fn extract_event_time(
+    fn extract_event_time_from_path(
         filename: &str,
         src: &EventTimeSourceFromPath,
     ) -> Result<DateTime<Utc>, IngestError> {
@@ -835,8 +844,10 @@ enum EventTimeSourceError {
 }
 
 impl EventTimeSourceError {
-    fn incompatible(message: String) -> EventTimeSourceError {
-        EventTimeSourceError::Incompatible(EventTimeSourceIncompatibleError { message })
+    fn incompatible(message: impl Into<String>) -> EventTimeSourceError {
+        EventTimeSourceError::Incompatible(EventTimeSourceIncompatibleError {
+            message: message.into(),
+        })
     }
 
     fn bad_pattern(pattern: &str, error: chrono::ParseError) -> EventTimeSourceError {

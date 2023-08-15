@@ -240,6 +240,14 @@ impl SetPollingSourceBuilder {
         self
     }
 
+    pub fn preprocess(mut self, preprocess_step: impl Into<Transform>) -> Self {
+        self.v = SetPollingSource {
+            preprocess: Some(preprocess_step.into()),
+            ..self.v
+        };
+        self
+    }
+
     pub fn merge(mut self, merge_strategy: impl Into<MergeStrategy>) -> Self {
         self.v = SetPollingSource {
             merge: merge_strategy.into(),

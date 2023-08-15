@@ -18,3 +18,22 @@ pub use geojson::*;
 pub use ndjson::*;
 pub use parquet::*;
 pub use shapefile::*;
+
+pub(crate) async fn output_schema_common(
+    ctx: &datafusion::prelude::SessionContext,
+    conf: &opendatafabric::ReadStep,
+) -> Result<Option<datafusion::arrow::datatypes::Schema>, kamu_core::ingest::ReadError> {
+    use internal_error::*;
+
+    let Some(ddl_parts) = conf.schema() else {
+        return Ok(None);
+    };
+
+    let ddl = ddl_parts.join(", ");
+
+    let schema = kamu_data_utils::schema::parse::parse_ddl_to_arrow_schema(ctx, &ddl, true)
+        .await
+        .int_err()?;
+
+    Ok(Some(schema))
+}

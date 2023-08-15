@@ -11,6 +11,7 @@ use std::path::Path;
 
 use datafusion::prelude::*;
 use internal_error::*;
+use kamu_core::ingest::ReadError;
 use opendatafabric::*;
 
 use crate::*;
@@ -23,6 +24,14 @@ pub struct ReaderCsv {}
 
 #[async_trait::async_trait]
 impl Reader for ReaderCsv {
+    async fn output_schema(
+        &self,
+        ctx: &SessionContext,
+        conf: &ReadStep,
+    ) -> Result<Option<datafusion::arrow::datatypes::Schema>, ReadError> {
+        super::output_schema_common(ctx, conf).await
+    }
+
     async fn read(
         &self,
         ctx: &SessionContext,

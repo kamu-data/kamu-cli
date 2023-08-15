@@ -172,9 +172,10 @@ impl IngestServiceImpl {
         dataset_handle: DatasetHandle,
         dataset: Arc<dyn Dataset>,
     ) -> Result<IngestRequest, InternalError> {
-        // TODO: PERF: This is expensive and could be cached
+        // TODO: PERF: Full metadata scan below - this is expensive and should be cached
         let mut polling_source = None;
         let mut prev_source_state = None;
+        let mut prev_data_slices = Vec::new();
         let mut prev_checkpoint = None;
         let mut prev_watermark = None;
         let mut vocab = None;
@@ -186,8 +187,10 @@ impl IngestServiceImpl {
             while let Some((_, block)) = block_stream.try_next().await.int_err()? {
                 match block.event {
                     MetadataEvent::AddData(add_data) => {
-                        if next_offset.is_none() {
-                            if let Some(output_data) = &add_data.output_data {
+                        if let Some(output_data) = &add_data.output_data {
+                            prev_data_slices.push(output_data.physical_hash.clone());
+
+                            if next_offset.is_none() {
                                 next_offset = Some(output_data.interval.end + 1);
                             }
                         }
@@ -227,15 +230,6 @@ impl IngestServiceImpl {
                     | MetadataEvent::SetLicense(_)
                     | MetadataEvent::SetTransform(_) => (),
                 }
-
-                if next_offset.is_some()
-                    && polling_source.is_some()
-                    && vocab.is_some()
-                    && prev_checkpoint.is_some()
-                    && prev_watermark.is_some()
-                {
-                    break;
-                }
             }
         }
 
@@ -245,7 +239,8 @@ impl IngestServiceImpl {
             polling_source,
             system_time: self.time_source.now(),
             event_time: None, // TODO: Will be filled out by IngestTask
-            input_data_path: PathBuf::new(), // TODO: Will be filled out by IngestTask,
+            input_data_path: PathBuf::new(), // TODO: Will be filled out by IngestTask
+            prev_data_slices,
             next_offset: next_offset.unwrap_or_default(),
             vocab: vocab.unwrap_or_default(),
             prev_checkpoint: prev_checkpoint.unwrap_or_default(),

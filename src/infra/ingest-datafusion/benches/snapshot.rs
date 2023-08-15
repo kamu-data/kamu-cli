@@ -171,7 +171,7 @@ async fn merge_snapshot(prev_path: &str, new_path: &str, expected_rows: usize) {
             obsv_removed: None,
         },
     )
-    .merge(prev, new)
+    .merge(Some(prev), new)
     .unwrap();
 
     let res = res.cache().await.unwrap();

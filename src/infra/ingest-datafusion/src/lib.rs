@@ -9,12 +9,9 @@
 
 #![feature(file_create_new)]
 
-mod merge_strategies;
-mod merge_strategy;
-mod reader;
-mod readers;
+pub mod merge_strategies;
+pub mod readers;
 
+pub use kamu_core::ingest::*;
 pub use merge_strategies::*;
-pub use merge_strategy::*;
-pub use reader::*;
 pub use readers::*;

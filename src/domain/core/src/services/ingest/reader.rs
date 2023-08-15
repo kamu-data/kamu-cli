@@ -11,7 +11,7 @@ use std::path::Path;
 
 use datafusion::arrow::datatypes::Schema;
 use datafusion::prelude::*;
-use internal_error::{InternalError, *};
+use internal_error::*;
 use opendatafabric::ReadStep;
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -26,19 +26,7 @@ pub trait Reader: Send + Sync {
         &self,
         ctx: &SessionContext,
         conf: &ReadStep,
-    ) -> Result<Option<Schema>, ReadError> {
-        let Some(ddl_parts) = conf.schema() else {
-            return Ok(None);
-        };
-
-        let ddl = ddl_parts.join(", ");
-
-        let schema = kamu_data_utils::schema::parse::parse_ddl_to_arrow_schema(ctx, &ddl, true)
-            .await
-            .int_err()?;
-
-        Ok(Some(schema))
-    }
+    ) -> Result<Option<Schema>, ReadError>;
 
     /// Returns a [DataFrame] that is ready to read the data.
     ///

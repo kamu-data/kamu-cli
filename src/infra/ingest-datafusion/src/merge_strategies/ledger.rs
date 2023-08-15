@@ -38,10 +38,14 @@ impl MergeStrategy for MergeStrategyLedger {
     // - expecting input to contain new events and a subset of prev events
     //   - dedupe against entire prev
     //   - seen events should be a tail of the prev (less work to dedupe)
-    fn merge(&self, prev: DataFrame, new: DataFrame) -> Result<DataFrame, MergeError> {
+    fn merge(&self, prev: Option<DataFrame>, new: DataFrame) -> Result<DataFrame, MergeError> {
+        if prev.is_none() {
+            return Ok(new);
+        }
+
         let cols: Vec<_> = self.primary_key.iter().map(|s| s.as_str()).collect();
         let res = new
-            .join(prev, JoinType::LeftAnti, &cols, &cols, None)
+            .join(prev.unwrap(), JoinType::LeftAnti, &cols, &cols, None)
             .int_err()?;
         Ok(res)
     }

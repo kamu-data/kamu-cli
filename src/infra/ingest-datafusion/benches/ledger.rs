@@ -155,7 +155,7 @@ async fn merge(prev_path: &str, new_path: &str, expected_rows: usize) {
     let new = ctx.table("new").await.unwrap();
 
     let res = MergeStrategyLedger::new(vec!["pk1".to_string(), "pk2".to_string()])
-        .merge(prev, new)
+        .merge(Some(prev), new)
         .unwrap();
 
     let res = res.cache().await.unwrap();
