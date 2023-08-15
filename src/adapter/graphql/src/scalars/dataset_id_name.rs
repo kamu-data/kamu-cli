@@ -169,3 +169,111 @@ impl ScalarType for DatasetRefAny {
         Value::String(self.0.to_string())
     }
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////
+// DatasetRef
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DatasetRef(odf::DatasetRef);
+
+impl From<odf::DatasetRef> for DatasetRef {
+    fn from(value: odf::DatasetRef) -> Self {
+        DatasetRef(value)
+    }
+}
+
+impl Into<odf::DatasetRef> for DatasetRef {
+    fn into(self) -> odf::DatasetRef {
+        self.0
+    }
+}
+
+impl Into<String> for DatasetRef {
+    fn into(self) -> String {
+        self.0.to_string()
+    }
+}
+
+impl Deref for DatasetRef {
+    type Target = odf::DatasetRef;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl std::fmt::Display for DatasetRef {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+#[Scalar]
+impl ScalarType for DatasetRef {
+    fn parse(value: Value) -> InputValueResult<Self> {
+        if let Value::String(value) = &value {
+            let val = odf::DatasetRef::try_from(value.as_str())?;
+            Ok(val.into())
+        } else {
+            Err(InputValueError::expected_type(value))
+        }
+    }
+
+    fn to_value(&self) -> Value {
+        Value::String(self.0.to_string())
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+// DatasetAlias
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DatasetAlias(odf::DatasetAlias);
+
+impl From<odf::DatasetAlias> for DatasetAlias {
+    fn from(value: odf::DatasetAlias) -> Self {
+        DatasetAlias(value)
+    }
+}
+
+impl Into<odf::DatasetAlias> for DatasetAlias {
+    fn into(self) -> odf::DatasetAlias {
+        self.0
+    }
+}
+
+impl Into<String> for DatasetAlias {
+    fn into(self) -> String {
+        self.0.to_string()
+    }
+}
+
+impl Deref for DatasetAlias {
+    type Target = odf::DatasetAlias;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl std::fmt::Display for DatasetAlias {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+#[Scalar]
+impl ScalarType for DatasetAlias {
+    fn parse(value: Value) -> InputValueResult<Self> {
+        if let Value::String(value) = &value {
+            let val = odf::DatasetAlias::try_from(value.as_str())?;
+            Ok(val.into())
+        } else {
+            Err(InputValueError::expected_type(value))
+        }
+    }
+
+    fn to_value(&self) -> Value {
+        Value::String(self.0.to_string())
+    }
+}

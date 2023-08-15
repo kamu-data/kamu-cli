@@ -215,6 +215,8 @@ type Dataset {
 	lastUpdatedAt: DateTime!
 }
 
+scalar DatasetAlias
+
 type DatasetConnection {
 	"""
 	A shorthand for `edges { node { ... } }`
@@ -324,6 +326,10 @@ type DatasetMut {
 	Access to the mutable metadata of the dataset
 	"""
 	metadata: DatasetMetadataMut!
+	"""
+	Rename the dataset
+	"""
+	rename(newName: DatasetName!): RenameResult!
 }
 
 scalar DatasetName
@@ -703,6 +709,25 @@ type ReadStepJsonLines {
 
 type ReadStepParquet {
 	schema: [String!]
+}
+
+interface RenameResult {
+	message: String!
+}
+
+type RenameResultNameCollision implements RenameResult {
+	alias: DatasetAlias!
+}
+
+type RenameResultNoChanges implements RenameResult {
+	preservedName: DatasetName!
+	message: String!
+}
+
+type RenameResultSuccess implements RenameResult {
+	oldName: DatasetName!
+	newName: DatasetName!
+	message: String!
 }
 
 type RequestHeader {
