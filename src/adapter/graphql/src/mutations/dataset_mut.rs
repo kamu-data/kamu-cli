@@ -56,7 +56,7 @@ impl DatasetMut {
             })),
             Err(RenameDatasetError::NameCollision(e)) => {
                 Ok(RenameResult::NameCollision(RenameResultNameCollision {
-                    alias: e.alias.into(),
+                    colliding_alias: e.alias.into(),
                 }))
             }
             // "Not found" should not be reachable, since we've just resolved the dataset by ID
@@ -130,16 +130,18 @@ impl RenameResultNoChanges {
 }
 
 #[derive(SimpleObject, Debug, Clone)]
+#[graphql(complex)]
 pub struct RenameResultNameCollision {
-    pub alias: DatasetAlias,
+    pub colliding_alias: DatasetAlias,
 }
 
 #[ComplexObject]
 impl RenameResultNameCollision {
     async fn message(&self) -> String {
-        format!("Dataset '{}' already exists", self.alias)
+        format!("Dataset '{}' already exists", self.colliding_alias)
     }
 }
+
 ////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Interface, Debug, Clone)]
@@ -173,7 +175,7 @@ pub struct DeleteResultDanglingReference {
 impl DeleteResultDanglingReference {
     async fn message(&self) -> String {
         format!(
-            "Dataset '{}' has {} danging references",
+            "Dataset '{}' has {} dangling reference(s)",
             self.not_deleted_dataset,
             self.dangling_child_refs.len()
         )

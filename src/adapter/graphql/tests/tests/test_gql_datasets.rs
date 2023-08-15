@@ -238,6 +238,11 @@ async fn dataset_rename_success() {
                     byId (datasetId: "<id>") {
                         rename(newName: "<newName>") {
                             __typename
+                            message
+                            ... on RenameResultSuccess {
+                                oldName
+                                newName
+                            }
                         }
                     }
                 }
@@ -256,6 +261,9 @@ async fn dataset_rename_success() {
                 "byId": {
                     "rename": {
                         "__typename": "RenameResultSuccess",
+                        "message": "Success",
+                        "oldName": "foo",
+                        "newName": "bar"
                     }
                 }
             }
@@ -283,6 +291,10 @@ async fn dataset_rename_no_changes() {
                     byId (datasetId: "<id>") {
                         rename(newName: "<newName>") {
                             __typename
+                            message
+                            ... on RenameResultNoChanges {
+                                preservedName
+                            }
                         }
                     }
                 }
@@ -301,6 +313,8 @@ async fn dataset_rename_no_changes() {
                 "byId": {
                     "rename": {
                         "__typename": "RenameResultNoChanges",
+                        "message": "No changes",
+                        "preservedName": "foo"
                     }
                 }
             }
@@ -331,6 +345,10 @@ async fn dataset_rename_name_collision() {
                     byId (datasetId: "<id>") {
                         rename(newName: "<newName>") {
                             __typename
+                            message
+                            ... on RenameResultNameCollision {
+                                collidingAlias
+                            }
                         }
                     }
                 }
@@ -349,6 +367,8 @@ async fn dataset_rename_name_collision() {
                 "byId": {
                     "rename": {
                         "__typename": "RenameResultNameCollision",
+                        "message": "Dataset 'bar' already exists",
+                        "collidingAlias": "bar"
                     }
                 }
             }
@@ -376,6 +396,10 @@ async fn dataset_delete_success() {
                     byId (datasetId: "<id>") {
                         delete {
                             __typename
+                            message
+                            ... on DeleteResultSuccess {
+                                deletedDataset
+                            }                            
                         }
                     }
                 }
@@ -393,6 +417,8 @@ async fn dataset_delete_success() {
                 "byId": {
                     "delete": {
                         "__typename": "DeleteResultSuccess",
+                        "message": "Success",
+                        "deletedDataset": "foo"
                     }
                 }
             }
@@ -426,6 +452,11 @@ async fn dataset_delete_dangling_ref() {
                     byId (datasetId: "<id>") {
                         delete {
                             __typename
+                            message
+                            ... on DeleteResultDanglingReference {
+                                notDeletedDataset
+                                danglingChildRefs
+                            }
                         }
                     }
                 }
@@ -443,6 +474,9 @@ async fn dataset_delete_dangling_ref() {
                 "byId": {
                     "delete": {
                         "__typename": "DeleteResultDanglingReference",
+                        "message": "Dataset 'foo' has 1 dangling reference(s)",
+                        "notDeletedDataset": "foo",
+                        "danglingChildRefs": ["bar"]
                     }
                 }
             }

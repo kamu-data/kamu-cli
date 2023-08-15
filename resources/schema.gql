@@ -737,7 +737,8 @@ interface RenameResult {
 }
 
 type RenameResultNameCollision implements RenameResult {
-	alias: DatasetAlias!
+	collidingAlias: DatasetAlias!
+	message: String!
 }
 
 type RenameResultNoChanges implements RenameResult {
