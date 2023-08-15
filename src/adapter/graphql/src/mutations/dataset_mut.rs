@@ -61,6 +61,7 @@ impl DatasetMut {
             }
             // "Not found" should not be reachable, since we've just resolved the dataset by ID
             Err(RenameDatasetError::NotFound(e)) => Err(e.int_err().into()),
+            Err(RenameDatasetError::Access(e)) => Err(e.int_err().into()),
             Err(RenameDatasetError::Internal(e)) => Err(e.into()),
         }
     }
@@ -87,6 +88,7 @@ impl DatasetMut {
             )),
             // "Not found" should not be reachable, since we've just resolved the dataset by ID
             Err(DeleteDatasetError::NotFound(e)) => Err(e.int_err().into()),
+            Err(DeleteDatasetError::Access(e)) => Err(e.int_err().into()),
             Err(DeleteDatasetError::Internal(e)) => Err(e.into()),
         }
     }
