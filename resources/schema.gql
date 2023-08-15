@@ -215,6 +215,8 @@ type Dataset {
 	lastUpdatedAt: DateTime!
 }
 
+scalar DatasetAlias
+
 type DatasetConnection {
 	"""
 	A shorthand for `edges { node { ... } }`
@@ -324,9 +326,19 @@ type DatasetMut {
 	Access to the mutable metadata of the dataset
 	"""
 	metadata: DatasetMetadataMut!
+	"""
+	Rename the dataset
+	"""
+	rename(newName: DatasetName!): RenameResult!
+	"""
+	Delete the dataset
+	"""
+	delete: DeleteResult!
 }
 
 scalar DatasetName
+
+scalar DatasetRef
 
 scalar DatasetRefAny
 
@@ -370,6 +382,21 @@ Implement the DateTime<Utc> scalar
 The input/output is a string in RFC3339 format.
 """
 scalar DateTime
+
+interface DeleteResult {
+	message: String!
+}
+
+type DeleteResultDanglingReference implements DeleteResult {
+	notDeletedDataset: DatasetAlias!
+	danglingChildRefs: [DatasetRef!]!
+	message: String!
+}
+
+type DeleteResultSuccess implements DeleteResult {
+	deletedDataset: DatasetAlias!
+	message: String!
+}
 
 """
 Describes
@@ -703,6 +730,26 @@ type ReadStepJsonLines {
 
 type ReadStepParquet {
 	schema: [String!]
+}
+
+interface RenameResult {
+	message: String!
+}
+
+type RenameResultNameCollision implements RenameResult {
+	collidingAlias: DatasetAlias!
+	message: String!
+}
+
+type RenameResultNoChanges implements RenameResult {
+	preservedName: DatasetName!
+	message: String!
+}
+
+type RenameResultSuccess implements RenameResult {
+	oldName: DatasetName!
+	newName: DatasetName!
+	message: String!
 }
 
 type RequestHeader {
