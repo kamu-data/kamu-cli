@@ -399,7 +399,7 @@ async fn dataset_delete_success() {
                             message
                             ... on DeleteResultSuccess {
                                 deletedDataset
-                            }                            
+                            }
                         }
                     }
                 }
