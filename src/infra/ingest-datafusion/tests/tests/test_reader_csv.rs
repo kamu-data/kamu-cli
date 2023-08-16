@@ -61,11 +61,53 @@ async fn test_read_csv_with_schema() {
 ///////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_read_csv_infer_schema() {
+async fn test_read_csv_no_schema_no_infer() {
     test_reader_common::test_reader_success_textual(
         ReaderCsv {},
         ReadStepCsv {
             header: Some(true),
+            ..Default::default()
+        },
+        indoc!(
+            r#"
+            city,population
+            A,1000
+            B,2000
+            C,3000
+            "#
+        ),
+        indoc!(
+            r#"
+            message arrow_schema {
+              OPTIONAL BYTE_ARRAY city (STRING);
+              OPTIONAL BYTE_ARRAY population (STRING);
+            }
+            "#
+        ),
+        indoc!(
+            r#"
+            +------+------------+
+            | city | population |
+            +------+------------+
+            | A    | 1000       |
+            | B    | 2000       |
+            | C    | 3000       |
+            +------+------------+
+            "#
+        ),
+    )
+    .await;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_read_csv_no_schema_infer() {
+    test_reader_common::test_reader_success_textual(
+        ReaderCsv {},
+        ReadStepCsv {
+            header: Some(true),
+            infer_schema: Some(true),
             ..Default::default()
         },
         indoc!(
@@ -91,6 +133,48 @@ async fn test_read_csv_infer_schema() {
             +------+------------+
             | A    | 1000       |
             | B    | 2000       |
+            | C    | 3000       |
+            +------+------------+
+            "#
+        ),
+    )
+    .await;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_read_csv_null_values() {
+    test_reader_common::test_reader_success_textual(
+        ReaderCsv {},
+        ReadStepCsv {
+            header: Some(true),
+            infer_schema: Some(true),
+            ..Default::default()
+        },
+        indoc!(
+            r#"
+            city,population
+            A,1000
+            B,
+            C,3000
+            "#
+        ),
+        indoc!(
+            r#"
+            message arrow_schema {
+              OPTIONAL BYTE_ARRAY city (STRING);
+              OPTIONAL INT64 population;
+            }
+            "#
+        ),
+        indoc!(
+            r#"
+            +------+------------+
+            | city | population |
+            +------+------------+
+            | A    | 1000       |
+            | B    |            |
             | C    | 3000       |
             +------+------------+
             "#

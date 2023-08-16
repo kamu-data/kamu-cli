@@ -41,9 +41,34 @@ impl Reader for ReaderNdJson {
     ) -> Result<DataFrame, ReadError> {
         let schema = self.output_schema(ctx, conf).await?;
 
-        let ReadStep::JsonLines(_) = conf else {
-            unreachable!()
+        let conf = match conf.clone() {
+            ReadStep::JsonLines(v) => ReadStepNdJson {
+                schema: v.schema,
+                date_format: v.date_format,
+                encoding: v.encoding,
+                primitives_as_string: v.primitives_as_string,
+                timestamp_format: v.timestamp_format,
+            },
+            ReadStep::NdJson(v) => v,
+            _ => unreachable!(),
         };
+
+        match conf.encoding.as_ref().map(|s| s.as_str()) {
+            None | Some("utf8") => Ok(()),
+            Some(v) => Err(format!("Unsupported NdJson.encoding: {}", v).int_err()),
+        }?;
+        match conf.primitives_as_string {
+            None | Some(false) => Ok(()),
+            Some(v) => Err(format!("Unsupported NdJson.primitivesAsString: {}", v).int_err()),
+        }?;
+        match conf.date_format.as_ref().map(|s| s.as_str()) {
+            None | Some("rfc3339") => Ok(()),
+            Some(v) => Err(format!("Unsupported NdJson.dateFormat: {}", v).int_err()),
+        }?;
+        match conf.timestamp_format.as_ref().map(|s| s.as_str()) {
+            None | Some("rfc3339") => Ok(()),
+            Some(v) => Err(format!("Unsupported NdJson.timestampFormat: {}", v).int_err()),
+        }?;
 
         let options = NdJsonReadOptions {
             file_extension: path.extension().and_then(|s| s.to_str()).unwrap_or(""),

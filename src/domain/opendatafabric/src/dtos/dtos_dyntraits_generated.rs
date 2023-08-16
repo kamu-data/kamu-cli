@@ -1161,6 +1161,7 @@ pub enum ReadStep<'a> {
     GeoJson(&'a dyn ReadStepGeoJson),
     EsriShapefile(&'a dyn ReadStepEsriShapefile),
     Parquet(&'a dyn ReadStepParquet),
+    NdJson(&'a dyn ReadStepNdJson),
 }
 
 impl<'a> From<&'a dtos::ReadStep> for ReadStep<'a> {
@@ -1171,6 +1172,7 @@ impl<'a> From<&'a dtos::ReadStep> for ReadStep<'a> {
             dtos::ReadStep::GeoJson(v) => ReadStep::GeoJson(v),
             dtos::ReadStep::EsriShapefile(v) => ReadStep::EsriShapefile(v),
             dtos::ReadStep::Parquet(v) => ReadStep::Parquet(v),
+            dtos::ReadStep::NdJson(v) => ReadStep::NdJson(v),
         }
     }
 }
@@ -1183,6 +1185,7 @@ impl Into<dtos::ReadStep> for ReadStep<'_> {
             ReadStep::GeoJson(v) => dtos::ReadStep::GeoJson(v.into()),
             ReadStep::EsriShapefile(v) => dtos::ReadStep::EsriShapefile(v.into()),
             ReadStep::Parquet(v) => dtos::ReadStep::Parquet(v.into()),
+            ReadStep::NdJson(v) => dtos::ReadStep::NdJson(v.into()),
         }
     }
 }
@@ -1229,6 +1232,14 @@ pub trait ReadStepEsriShapefile {
 
 pub trait ReadStepParquet {
     fn schema(&self) -> Option<Box<dyn Iterator<Item = &str> + '_>>;
+}
+
+pub trait ReadStepNdJson {
+    fn schema(&self) -> Option<Box<dyn Iterator<Item = &str> + '_>>;
+    fn date_format(&self) -> Option<&str>;
+    fn encoding(&self) -> Option<&str>;
+    fn primitives_as_string(&self) -> Option<bool>;
+    fn timestamp_format(&self) -> Option<&str>;
 }
 
 impl ReadStepCsv for dtos::ReadStepCsv {
@@ -1361,6 +1372,30 @@ impl ReadStepParquet for dtos::ReadStepParquet {
     }
 }
 
+impl ReadStepNdJson for dtos::ReadStepNdJson {
+    fn schema(&self) -> Option<Box<dyn Iterator<Item = &str> + '_>> {
+        self.schema
+            .as_ref()
+            .map(|v| -> Box<dyn Iterator<Item = &str> + '_> {
+                Box::new(v.iter().map(|i| -> &str { i.as_ref() }))
+            })
+    }
+    fn date_format(&self) -> Option<&str> {
+        self.date_format.as_ref().map(|v| -> &str { v.as_ref() })
+    }
+    fn encoding(&self) -> Option<&str> {
+        self.encoding.as_ref().map(|v| -> &str { v.as_ref() })
+    }
+    fn primitives_as_string(&self) -> Option<bool> {
+        self.primitives_as_string.as_ref().map(|v| -> bool { *v })
+    }
+    fn timestamp_format(&self) -> Option<&str> {
+        self.timestamp_format
+            .as_ref()
+            .map(|v| -> &str { v.as_ref() })
+    }
+}
+
 impl Into<dtos::ReadStepCsv> for &dyn ReadStepCsv {
     fn into(self) -> dtos::ReadStepCsv {
         dtos::ReadStepCsv {
@@ -1421,6 +1456,18 @@ impl Into<dtos::ReadStepParquet> for &dyn ReadStepParquet {
     fn into(self) -> dtos::ReadStepParquet {
         dtos::ReadStepParquet {
             schema: self.schema().map(|v| v.map(|i| i.to_owned()).collect()),
+        }
+    }
+}
+
+impl Into<dtos::ReadStepNdJson> for &dyn ReadStepNdJson {
+    fn into(self) -> dtos::ReadStepNdJson {
+        dtos::ReadStepNdJson {
+            schema: self.schema().map(|v| v.map(|i| i.to_owned()).collect()),
+            date_format: self.date_format().map(|v| v.to_owned()),
+            encoding: self.encoding().map(|v| v.to_owned()),
+            primitives_as_string: self.primitives_as_string().map(|v| v),
+            timestamp_format: self.timestamp_format().map(|v| v.to_owned()),
         }
     }
 }

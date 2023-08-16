@@ -631,6 +631,7 @@ pub enum ReadStep {
     GeoJson(ReadStepGeoJson),
     EsriShapefile(ReadStepEsriShapefile),
     Parquet(ReadStepParquet),
+    NdJson(ReadStepNdJson),
 }
 
 impl_enum_with_variants!(ReadStep);
@@ -681,9 +682,12 @@ pub struct ReadStepCsv {
     pub positive_inf: Option<String>,
     /// Sets the string representation of a negative infinity value.
     pub negative_inf: Option<String>,
-    /// Sets the string that indicates a date format.
+    /// Sets the string that indicates a date format. The `rfc3339` is the only
+    /// required format, the other format strings are implementation-specific.
     pub date_format: Option<String>,
-    /// Sets the string that indicates a timestamp format.
+    /// Sets the string that indicates a timestamp format. The `rfc3339` is the
+    /// only required format, the other format strings are
+    /// implementation-specific.
     pub timestamp_format: Option<String>,
     /// Parse one record, which may span multiple lines.
     pub multi_line: Option<bool>,
@@ -698,7 +702,8 @@ pub struct ReadStepJsonLines {
     /// A DDL-formatted schema. Schema can be used to coerce values into more
     /// appropriate data types.
     pub schema: Option<Vec<String>>,
-    /// Sets the string that indicates a date format.
+    /// Sets the string that indicates a date format. The `rfc3339` is the only
+    /// required format, the other format strings are implementation-specific.
     pub date_format: Option<String>,
     /// Allows to forcibly set one of standard basic or extended encoding.
     pub encoding: Option<String>,
@@ -706,7 +711,9 @@ pub struct ReadStepJsonLines {
     pub multi_line: Option<bool>,
     /// Infers all primitive values as a string type.
     pub primitives_as_string: Option<bool>,
-    /// Sets the string that indicates a timestamp format.
+    /// Sets the string that indicates a timestamp format. The `rfc3339` is the
+    /// only required format, the other format strings are
+    /// implementation-specific.
     pub timestamp_format: Option<String>,
 }
 
@@ -728,8 +735,8 @@ pub struct ReadStepEsriShapefile {
     /// A DDL-formatted schema. Schema can be used to coerce values into more
     /// appropriate data types.
     pub schema: Option<Vec<String>>,
-    /// Path to a data file within a multi-file archive. Can contain glob
-    /// patterns.
+    /// If the ZIP archive contains multiple shapefiles use this field to
+    /// specify a sub-path to the desired `.shp` file.
     pub sub_path: Option<String>,
 }
 
@@ -744,6 +751,28 @@ pub struct ReadStepParquet {
 }
 
 impl_enum_variant!(ReadStep::Parquet(ReadStepParquet));
+
+/// Reader for files containing multiple newline-delimited JSON objects with the
+/// same schema.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct ReadStepNdJson {
+    /// A DDL-formatted schema. Schema can be used to coerce values into more
+    /// appropriate data types.
+    pub schema: Option<Vec<String>>,
+    /// Sets the string that indicates a date format. The `rfc3339` is the only
+    /// required format, the other format strings are implementation-specific.
+    pub date_format: Option<String>,
+    /// Allows to forcibly set one of standard basic or extended encoding.
+    pub encoding: Option<String>,
+    /// Infers all primitive values as a string type.
+    pub primitives_as_string: Option<bool>,
+    /// Sets the string that indicates a timestamp format. The `rfc3339` is the
+    /// only required format, the other format strings are
+    /// implementation-specific.
+    pub timestamp_format: Option<String>,
+}
+
+impl_enum_variant!(ReadStep::NdJson(ReadStepNdJson));
 
 ////////////////////////////////////////////////////////////////////////////////
 // RequestHeader

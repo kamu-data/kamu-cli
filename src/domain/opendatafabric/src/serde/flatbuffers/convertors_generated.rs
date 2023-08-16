@@ -1434,6 +1434,10 @@ impl<'fb> FlatbuffersEnumSerializable<'fb, fb::ReadStep> for odf::ReadStep {
                 fb::ReadStep::ReadStepParquet,
                 v.serialize(fb).as_union_value(),
             ),
+            odf::ReadStep::NdJson(v) => (
+                fb::ReadStep::ReadStepNdJson,
+                v.serialize(fb).as_union_value(),
+            ),
         }
     }
 }
@@ -1464,6 +1468,11 @@ impl<'fb> FlatbuffersEnumDeserializable<'fb, fb::ReadStep> for odf::ReadStep {
             fb::ReadStep::ReadStepParquet => {
                 odf::ReadStep::Parquet(odf::ReadStepParquet::deserialize(unsafe {
                     fb::ReadStepParquet::init_from_table(table)
+                }))
+            }
+            fb::ReadStep::ReadStepNdJson => {
+                odf::ReadStep::NdJson(odf::ReadStepNdJson::deserialize(unsafe {
+                    fb::ReadStepNdJson::init_from_table(table)
                 }))
             }
             _ => panic!("Invalid enum value: {}", t.0),
@@ -1654,6 +1663,42 @@ impl<'fb> FlatbuffersDeserializable<fb::ReadStepParquet<'fb>> for odf::ReadStepP
             schema: proxy
                 .schema()
                 .map(|v| v.iter().map(|i| i.to_owned()).collect()),
+        }
+    }
+}
+
+impl<'fb> FlatbuffersSerializable<'fb> for odf::ReadStepNdJson {
+    type OffsetT = WIPOffset<fb::ReadStepNdJson<'fb>>;
+
+    fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
+        let schema_offset = self.schema.as_ref().map(|v| {
+            let offsets: Vec<_> = v.iter().map(|i| fb.create_string(&i)).collect();
+            fb.create_vector(&offsets)
+        });
+        let date_format_offset = self.date_format.as_ref().map(|v| fb.create_string(&v));
+        let encoding_offset = self.encoding.as_ref().map(|v| fb.create_string(&v));
+        let timestamp_format_offset = self.timestamp_format.as_ref().map(|v| fb.create_string(&v));
+        let mut builder = fb::ReadStepNdJsonBuilder::new(fb);
+        schema_offset.map(|off| builder.add_schema(off));
+        date_format_offset.map(|off| builder.add_date_format(off));
+        encoding_offset.map(|off| builder.add_encoding(off));
+        self.primitives_as_string
+            .map(|v| builder.add_primitives_as_string(v));
+        timestamp_format_offset.map(|off| builder.add_timestamp_format(off));
+        builder.finish()
+    }
+}
+
+impl<'fb> FlatbuffersDeserializable<fb::ReadStepNdJson<'fb>> for odf::ReadStepNdJson {
+    fn deserialize(proxy: fb::ReadStepNdJson<'fb>) -> Self {
+        odf::ReadStepNdJson {
+            schema: proxy
+                .schema()
+                .map(|v| v.iter().map(|i| i.to_owned()).collect()),
+            date_format: proxy.date_format().map(|v| v.to_owned()),
+            encoding: proxy.encoding().map(|v| v.to_owned()),
+            primitives_as_string: proxy.primitives_as_string().map(|v| v),
+            timestamp_format: proxy.timestamp_format().map(|v| v.to_owned()),
         }
     }
 }

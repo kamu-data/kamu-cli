@@ -307,12 +307,21 @@ table ReadStepParquet {
   schema: [string];
 }
 
+table ReadStepNdJson {
+  schema: [string];
+  date_format: string;
+  encoding: string;
+  primitives_as_string: bool = null;
+  timestamp_format: string;
+}
+
 union ReadStep {
   ReadStepCsv,
   ReadStepJsonLines,
   ReadStepGeoJson,
   ReadStepEsriShapefile,
   ReadStepParquet,
+  ReadStepNdJson,
 }
 
 ////////////////////////////////////////////////////////////////////////////////

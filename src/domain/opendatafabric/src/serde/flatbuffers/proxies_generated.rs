@@ -789,19 +789,20 @@ pub const ENUM_MIN_READ_STEP: u8 = 0;
     since = "2.0.0",
     note = "Use associated constants instead. This will no longer be generated in 2021."
 )]
-pub const ENUM_MAX_READ_STEP: u8 = 5;
+pub const ENUM_MAX_READ_STEP: u8 = 6;
 #[deprecated(
     since = "2.0.0",
     note = "Use associated constants instead. This will no longer be generated in 2021."
 )]
 #[allow(non_camel_case_types)]
-pub const ENUM_VALUES_READ_STEP: [ReadStep; 6] = [
+pub const ENUM_VALUES_READ_STEP: [ReadStep; 7] = [
     ReadStep::NONE,
     ReadStep::ReadStepCsv,
     ReadStep::ReadStepJsonLines,
     ReadStep::ReadStepGeoJson,
     ReadStep::ReadStepEsriShapefile,
     ReadStep::ReadStepParquet,
+    ReadStep::ReadStepNdJson,
 ];
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
@@ -815,9 +816,10 @@ impl ReadStep {
     pub const ReadStepGeoJson: Self = Self(3);
     pub const ReadStepEsriShapefile: Self = Self(4);
     pub const ReadStepParquet: Self = Self(5);
+    pub const ReadStepNdJson: Self = Self(6);
 
     pub const ENUM_MIN: u8 = 0;
-    pub const ENUM_MAX: u8 = 5;
+    pub const ENUM_MAX: u8 = 6;
     pub const ENUM_VALUES: &'static [Self] = &[
         Self::NONE,
         Self::ReadStepCsv,
@@ -825,6 +827,7 @@ impl ReadStep {
         Self::ReadStepGeoJson,
         Self::ReadStepEsriShapefile,
         Self::ReadStepParquet,
+        Self::ReadStepNdJson,
     ];
     /// Returns the variant's name or "" if unknown.
     pub fn variant_name(self) -> Option<&'static str> {
@@ -835,6 +838,7 @@ impl ReadStep {
             Self::ReadStepGeoJson => Some("ReadStepGeoJson"),
             Self::ReadStepEsriShapefile => Some("ReadStepEsriShapefile"),
             Self::ReadStepParquet => Some("ReadStepParquet"),
+            Self::ReadStepNdJson => Some("ReadStepNdJson"),
             _ => None,
         }
     }
@@ -6373,6 +6377,233 @@ impl core::fmt::Debug for ReadStepParquet<'_> {
         ds.finish()
     }
 }
+pub enum ReadStepNdJsonOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+pub struct ReadStepNdJson<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for ReadStepNdJson<'a> {
+    type Inner = ReadStepNdJson<'a>;
+    #[inline]
+    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table::new(buf, loc),
+        }
+    }
+}
+
+impl<'a> ReadStepNdJson<'a> {
+    pub const VT_SCHEMA: flatbuffers::VOffsetT = 4;
+    pub const VT_DATE_FORMAT: flatbuffers::VOffsetT = 6;
+    pub const VT_ENCODING: flatbuffers::VOffsetT = 8;
+    pub const VT_PRIMITIVES_AS_STRING: flatbuffers::VOffsetT = 10;
+    pub const VT_TIMESTAMP_FORMAT: flatbuffers::VOffsetT = 12;
+
+    #[inline]
+    pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        ReadStepNdJson { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
+        args: &'args ReadStepNdJsonArgs<'args>,
+    ) -> flatbuffers::WIPOffset<ReadStepNdJson<'bldr>> {
+        let mut builder = ReadStepNdJsonBuilder::new(_fbb);
+        if let Some(x) = args.timestamp_format {
+            builder.add_timestamp_format(x);
+        }
+        if let Some(x) = args.encoding {
+            builder.add_encoding(x);
+        }
+        if let Some(x) = args.date_format {
+            builder.add_date_format(x);
+        }
+        if let Some(x) = args.schema {
+            builder.add_schema(x);
+        }
+        if let Some(x) = args.primitives_as_string {
+            builder.add_primitives_as_string(x);
+        }
+        builder.finish()
+    }
+
+    #[inline]
+    pub fn schema(&self) -> Option<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<&'a str>>> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab.get::<flatbuffers::ForwardsUOffset<
+                flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<&'a str>>,
+            >>(ReadStepNdJson::VT_SCHEMA, None)
+        }
+    }
+    #[inline]
+    pub fn date_format(&self) -> Option<&'a str> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<flatbuffers::ForwardsUOffset<&str>>(ReadStepNdJson::VT_DATE_FORMAT, None)
+        }
+    }
+    #[inline]
+    pub fn encoding(&self) -> Option<&'a str> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<flatbuffers::ForwardsUOffset<&str>>(ReadStepNdJson::VT_ENCODING, None)
+        }
+    }
+    #[inline]
+    pub fn primitives_as_string(&self) -> Option<bool> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<bool>(ReadStepNdJson::VT_PRIMITIVES_AS_STRING, None)
+        }
+    }
+    #[inline]
+    pub fn timestamp_format(&self) -> Option<&'a str> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab.get::<flatbuffers::ForwardsUOffset<&str>>(
+                ReadStepNdJson::VT_TIMESTAMP_FORMAT,
+                None,
+            )
+        }
+    }
+}
+
+impl flatbuffers::Verifiable for ReadStepNdJson<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        v.visit_table(pos)?
+            .visit_field::<flatbuffers::ForwardsUOffset<
+                flatbuffers::Vector<'_, flatbuffers::ForwardsUOffset<&'_ str>>,
+            >>("schema", Self::VT_SCHEMA, false)?
+            .visit_field::<flatbuffers::ForwardsUOffset<&str>>(
+                "date_format",
+                Self::VT_DATE_FORMAT,
+                false,
+            )?
+            .visit_field::<flatbuffers::ForwardsUOffset<&str>>(
+                "encoding",
+                Self::VT_ENCODING,
+                false,
+            )?
+            .visit_field::<bool>("primitives_as_string", Self::VT_PRIMITIVES_AS_STRING, false)?
+            .visit_field::<flatbuffers::ForwardsUOffset<&str>>(
+                "timestamp_format",
+                Self::VT_TIMESTAMP_FORMAT,
+                false,
+            )?
+            .finish();
+        Ok(())
+    }
+}
+pub struct ReadStepNdJsonArgs<'a> {
+    pub schema: Option<
+        flatbuffers::WIPOffset<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<&'a str>>>,
+    >,
+    pub date_format: Option<flatbuffers::WIPOffset<&'a str>>,
+    pub encoding: Option<flatbuffers::WIPOffset<&'a str>>,
+    pub primitives_as_string: Option<bool>,
+    pub timestamp_format: Option<flatbuffers::WIPOffset<&'a str>>,
+}
+impl<'a> Default for ReadStepNdJsonArgs<'a> {
+    #[inline]
+    fn default() -> Self {
+        ReadStepNdJsonArgs {
+            schema: None,
+            date_format: None,
+            encoding: None,
+            primitives_as_string: None,
+            timestamp_format: None,
+        }
+    }
+}
+
+pub struct ReadStepNdJsonBuilder<'a: 'b, 'b> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b> ReadStepNdJsonBuilder<'a, 'b> {
+    #[inline]
+    pub fn add_schema(
+        &mut self,
+        schema: flatbuffers::WIPOffset<
+            flatbuffers::Vector<'b, flatbuffers::ForwardsUOffset<&'b str>>,
+        >,
+    ) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<_>>(ReadStepNdJson::VT_SCHEMA, schema);
+    }
+    #[inline]
+    pub fn add_date_format(&mut self, date_format: flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
+            ReadStepNdJson::VT_DATE_FORMAT,
+            date_format,
+        );
+    }
+    #[inline]
+    pub fn add_encoding(&mut self, encoding: flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<_>>(ReadStepNdJson::VT_ENCODING, encoding);
+    }
+    #[inline]
+    pub fn add_primitives_as_string(&mut self, primitives_as_string: bool) {
+        self.fbb_.push_slot_always::<bool>(
+            ReadStepNdJson::VT_PRIMITIVES_AS_STRING,
+            primitives_as_string,
+        );
+    }
+    #[inline]
+    pub fn add_timestamp_format(&mut self, timestamp_format: flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
+            ReadStepNdJson::VT_TIMESTAMP_FORMAT,
+            timestamp_format,
+        );
+    }
+    #[inline]
+    pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>) -> ReadStepNdJsonBuilder<'a, 'b> {
+        let start = _fbb.start_table();
+        ReadStepNdJsonBuilder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<ReadStepNdJson<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl core::fmt::Debug for ReadStepNdJson<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut ds = f.debug_struct("ReadStepNdJson");
+        ds.field("schema", &self.schema());
+        ds.field("date_format", &self.date_format());
+        ds.field("encoding", &self.encoding());
+        ds.field("primitives_as_string", &self.primitives_as_string());
+        ds.field("timestamp_format", &self.timestamp_format());
+        ds.finish()
+    }
+}
 pub enum SqlQueryStepOffset {}
 #[derive(Copy, Clone, PartialEq)]
 
@@ -7848,6 +8079,21 @@ impl<'a> SetPollingSource<'a> {
 
     #[inline]
     #[allow(non_snake_case)]
+    pub fn read_as_read_step_nd_json(&self) -> Option<ReadStepNdJson<'a>> {
+        if self.read_type() == ReadStep::ReadStepNdJson {
+            self.read().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { ReadStepNdJson::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
     pub fn preprocess_as_transform_sql(&self) -> Option<TransformSql<'a>> {
         if self.preprocess_type() == Transform::TransformSql {
             self.preprocess().map(|t| {
@@ -7931,6 +8177,7 @@ impl flatbuffers::Verifiable for SetPollingSource<'_> {
           ReadStep::ReadStepGeoJson => v.verify_union_variant::<flatbuffers::ForwardsUOffset<ReadStepGeoJson>>("ReadStep::ReadStepGeoJson", pos),
           ReadStep::ReadStepEsriShapefile => v.verify_union_variant::<flatbuffers::ForwardsUOffset<ReadStepEsriShapefile>>("ReadStep::ReadStepEsriShapefile", pos),
           ReadStep::ReadStepParquet => v.verify_union_variant::<flatbuffers::ForwardsUOffset<ReadStepParquet>>("ReadStep::ReadStepParquet", pos),
+          ReadStep::ReadStepNdJson => v.verify_union_variant::<flatbuffers::ForwardsUOffset<ReadStepNdJson>>("ReadStep::ReadStepNdJson", pos),
           _ => Ok(()),
         }
      })?
@@ -8155,6 +8402,16 @@ impl core::fmt::Debug for SetPollingSource<'_> {
             }
             ReadStep::ReadStepParquet => {
                 if let Some(x) = self.read_as_read_step_parquet() {
+                    ds.field("read", &x)
+                } else {
+                    ds.field(
+                        "read",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            ReadStep::ReadStepNdJson => {
+                if let Some(x) = self.read_as_read_step_nd_json() {
                     ds.field("read", &x)
                 } else {
                     ds.field(

@@ -772,6 +772,8 @@ pub enum ReadStepDef {
     EsriShapefile(#[serde_as(as = "ReadStepEsriShapefileDef")] ReadStepEsriShapefile),
     #[serde(rename_all = "camelCase")]
     Parquet(#[serde_as(as = "ReadStepParquetDef")] ReadStepParquet),
+    #[serde(rename_all = "camelCase")]
+    NdJson(#[serde_as(as = "ReadStepNdJsonDef")] ReadStepNdJson),
 }
 
 implement_serde_as!(ReadStep, ReadStepDef, "ReadStepDef");
@@ -781,6 +783,7 @@ implement_serde_as!(
     ReadStepJsonLinesDef,
     "ReadStepJsonLinesDef"
 );
+implement_serde_as!(ReadStepNdJson, ReadStepNdJsonDef, "ReadStepNdJsonDef");
 implement_serde_as!(ReadStepGeoJson, ReadStepGeoJsonDef, "ReadStepGeoJsonDef");
 implement_serde_as!(
     ReadStepEsriShapefile,
@@ -856,6 +859,19 @@ pub struct ReadStepEsriShapefileDef {
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct ReadStepParquetDef {
     pub schema: Option<Vec<String>>,
+}
+
+#[serde_as]
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "ReadStepNdJson")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct ReadStepNdJsonDef {
+    pub schema: Option<Vec<String>>,
+    pub date_format: Option<String>,
+    pub encoding: Option<String>,
+    pub primitives_as_string: Option<bool>,
+    pub timestamp_format: Option<String>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////

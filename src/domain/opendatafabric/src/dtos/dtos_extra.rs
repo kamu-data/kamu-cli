@@ -170,6 +170,7 @@ impl ReadStep {
         match self {
             ReadStep::Csv(v) => v.schema.as_ref(),
             ReadStep::JsonLines(v) => v.schema.as_ref(),
+            ReadStep::NdJson(v) => v.schema.as_ref(),
             ReadStep::GeoJson(v) => v.schema.as_ref(),
             ReadStep::EsriShapefile(v) => v.schema.as_ref(),
             ReadStep::Parquet(v) => v.schema.as_ref(),

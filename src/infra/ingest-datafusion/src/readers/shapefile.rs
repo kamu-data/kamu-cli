@@ -30,6 +30,7 @@ impl ReaderEsriShapefile {
         }
     }
 
+    // TODO: PERF: Consider subPath argumemnt to skip extracting unrelated data
     fn extract_zip_to_temp_dir(&self, path: &Path) -> Result<PathBuf, InternalError> {
         let extracted_path = self.temp_dir.join("shapefile");
         std::fs::create_dir(&extracted_path).int_err()?;
@@ -38,15 +39,41 @@ impl ReaderEsriShapefile {
         Ok(extracted_path)
     }
 
-    fn locate_shp_file(&self, dir: &Path) -> Result<PathBuf, InternalError> {
-        for entry in std::fs::read_dir(dir).int_err()? {
-            let entry = entry.int_err()?;
-            let path = entry.path();
-            if path.extension().map(|s| s == "shp").unwrap_or(false) {
-                return Ok(path);
+    fn locate_shp_file(&self, dir: &Path, subpath: Option<&str>) -> Result<PathBuf, InternalError> {
+        if let Some(subpath) = subpath {
+            let path = dir.join(subpath);
+            if !path.is_file() {
+                let possible_entries: Vec<_> = walkdir::WalkDir::new(dir)
+                    .into_iter()
+                    .filter_map(|e| e.ok())
+                    .filter_map(|e| {
+                        e.path()
+                            .strip_prefix(dir)
+                            .ok()
+                            .map(|p| p.to_string_lossy().into_owned())
+                    })
+                    .take(20)
+                    .collect();
+                Err(format!(
+                    "Shapefile archive does not contain a '{}' sub-path. Some possible entries \
+                     are:\n  - {}",
+                    subpath,
+                    possible_entries.join("\n  - ")
+                )
+                .int_err())
+            } else {
+                Ok(path)
             }
+        } else {
+            for entry in std::fs::read_dir(dir).int_err()? {
+                let entry = entry.int_err()?;
+                let path = entry.path();
+                if path.extension().map(|s| s == "shp").unwrap_or(false) {
+                    return Ok(path);
+                }
+            }
+            Err("Archive does not contain a *.shp file".int_err())
         }
-        return Err("Archive does not contain a *.shp file".int_err());
     }
 
     fn shp_record_to_json(
@@ -122,14 +149,15 @@ impl Reader for ReaderEsriShapefile {
 
         let schema = self.output_schema(ctx, conf).await?;
 
-        let ReadStep::EsriShapefile(_) = conf else {
+        let ReadStep::EsriShapefile(conf) = conf else {
             unreachable!()
         };
 
         // TODO: PERF: This is a temporary, highly inefficient implementation that
         // decodes Shapefile into NdJson which DataFusion can read natively
         let extracted_path = self.extract_zip_to_temp_dir(path)?;
-        let shp_path = self.locate_shp_file(&extracted_path)?;
+        let shp_path =
+            self.locate_shp_file(&extracted_path, conf.sub_path.as_ref().map(|s| s.as_str()))?;
 
         let temp_path = self.temp_dir.join("temp.json");
         let mut file = std::fs::File::create_new(&temp_path).int_err()?;

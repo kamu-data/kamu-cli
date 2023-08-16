@@ -824,6 +824,7 @@ pub enum ReadStep {
     GeoJson(ReadStepGeoJson),
     EsriShapefile(ReadStepEsriShapefile),
     Parquet(ReadStepParquet),
+    NdJson(ReadStepNdJson),
 }
 
 impl From<odf::ReadStep> for ReadStep {
@@ -834,6 +835,7 @@ impl From<odf::ReadStep> for ReadStep {
             odf::ReadStep::GeoJson(v) => Self::GeoJson(v.into()),
             odf::ReadStep::EsriShapefile(v) => Self::EsriShapefile(v.into()),
             odf::ReadStep::Parquet(v) => Self::Parquet(v.into()),
+            odf::ReadStep::NdJson(v) => Self::NdJson(v.into()),
         }
     }
 }
@@ -947,6 +949,27 @@ impl From<odf::ReadStepParquet> for ReadStepParquet {
     fn from(v: odf::ReadStepParquet) -> Self {
         Self {
             schema: v.schema.map(|v| v.into_iter().map(Into::into).collect()),
+        }
+    }
+}
+
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
+pub struct ReadStepNdJson {
+    pub schema: Option<Vec<String>>,
+    pub date_format: Option<String>,
+    pub encoding: Option<String>,
+    pub primitives_as_string: Option<bool>,
+    pub timestamp_format: Option<String>,
+}
+
+impl From<odf::ReadStepNdJson> for ReadStepNdJson {
+    fn from(v: odf::ReadStepNdJson) -> Self {
+        Self {
+            schema: v.schema.map(|v| v.into_iter().map(Into::into).collect()),
+            date_format: v.date_format.map(Into::into),
+            encoding: v.encoding.map(Into::into),
+            primitives_as_string: v.primitives_as_string.map(Into::into),
+            timestamp_format: v.timestamp_format.map(Into::into),
         }
     }
 }

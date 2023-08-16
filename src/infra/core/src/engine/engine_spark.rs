@@ -323,6 +323,26 @@ impl SparkEngine {
         let response_path = run_info.in_out_dir.join("response.yaml");
 
         {
+            // TODO: Spark ingest does not support `NdJson` type so we translate it into
+            // deprecated `JsonLines`
+            let request = match request.source.read {
+                ReadStep::NdJson(v) => IngestRequestRaw {
+                    source: SetPollingSource {
+                        read: ReadStep::JsonLines(ReadStepJsonLines {
+                            schema: v.schema,
+                            date_format: v.date_format,
+                            encoding: v.encoding,
+                            multi_line: None,
+                            primitives_as_string: v.primitives_as_string,
+                            timestamp_format: v.timestamp_format,
+                        }),
+                        ..request.source
+                    },
+                    ..request
+                },
+                _ => request,
+            };
+
             tracing::info!(?request, path = ?request_path, "Writing request");
             let file = File::create(&request_path)?;
             serde_yaml::to_writer(file, &request).int_err()?;

@@ -51,6 +51,7 @@ impl ReadServiceDatafusion {
     fn get_reader_for(conf: &odf::ReadStep, operation_dir: &Path) -> Arc<dyn Reader> {
         match conf {
             odf::ReadStep::Csv(_) => Arc::new(ReaderCsv {}),
+            odf::ReadStep::NdJson(_) => Arc::new(ReaderNdJson {}),
             odf::ReadStep::JsonLines(_) => Arc::new(ReaderNdJson {}),
             odf::ReadStep::GeoJson(_) => Arc::new(ReaderGeoJson::new(operation_dir.to_path_buf())),
             odf::ReadStep::EsriShapefile(_) => {

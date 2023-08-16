@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::assert_matches::assert_matches;
+
 use datafusion::arrow::array::StringArray;
 use datafusion::prelude::{col, lit};
 use indoc::indoc;
@@ -78,6 +80,92 @@ async fn test_read_shapefile_with_schema() {
             +-----+---------+------------------+
             "#
         ),
+    )
+    .await;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_read_shapefile_infer_schema() {
+    let temp_dir: tempfile::TempDir = tempfile::tempdir().unwrap();
+
+    test_reader_common::test_reader(
+        ReaderEsriShapefile::new(temp_dir.path()),
+        ReadStepEsriShapefile {
+            schema: None,
+            sub_path: None,
+        },
+        |path| async {
+            std::fs::copy("tests/data/ukraine.zip", path).unwrap();
+        },
+        |res| async {
+            let df = res.unwrap();
+            kamu_data_utils::testing::assert_schema_eq(
+                df.schema(),
+                indoc!(
+                    r#"
+                    message arrow_schema {
+                    OPTIONAL DOUBLE ccn_1;
+                    OPTIONAL BYTE_ARRAY engtype_1 (STRING);
+                    OPTIONAL BYTE_ARRAY geometry (STRING);
+                    OPTIONAL BYTE_ARRAY hasc_1 (STRING);
+                    OPTIONAL DOUBLE id_0;
+                    OPTIONAL DOUBLE id_1;
+                    OPTIONAL BYTE_ARRAY iso (STRING);
+                    OPTIONAL BYTE_ARRAY name_0 (STRING);
+                    OPTIONAL BYTE_ARRAY name_1 (STRING);
+                    OPTIONAL BYTE_ARRAY type_1 (STRING);
+                    OPTIONAL BYTE_ARRAY varname_1 (STRING);
+                    }
+                    "#
+                )
+            );
+        }
+    )
+    .await;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_read_shapefile_with_subpath_exists() {
+    let temp_dir: tempfile::TempDir = tempfile::tempdir().unwrap();
+
+    test_reader_common::test_reader(
+        ReaderEsriShapefile::new(temp_dir.path()),
+        ReadStepEsriShapefile {
+            schema: None,
+            sub_path: Some("gg870xt4706.shp".to_string()),
+        },
+        |path| async {
+            std::fs::copy("tests/data/ukraine.zip", path).unwrap();
+        },
+        |res| async move {
+            assert_matches!(res, Ok(_));
+        }
+    )
+    .await;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_read_shapefile_with_subpath_missing() {
+    let temp_dir: tempfile::TempDir = tempfile::tempdir().unwrap();
+
+    test_reader_common::test_reader(
+        ReaderEsriShapefile::new(temp_dir.path()),
+        ReadStepEsriShapefile {
+            schema: None,
+            sub_path: Some("invalid.shp".to_string()),
+        },
+        |path| async {
+            std::fs::copy("tests/data/ukraine.zip", path).unwrap();
+        },
+        |res| async move {
+            assert_matches!(res, Err(_));
+        }
     )
     .await;
 }
