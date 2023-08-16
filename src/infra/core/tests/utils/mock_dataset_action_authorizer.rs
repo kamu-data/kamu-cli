@@ -87,10 +87,16 @@ impl MockDatasetActionAuthorizer {
     where
         P: Predicate<DatasetHandle> + Sync + Send + 'static,
     {
-        self.expect_check_action_allowed()
-            .with(dataset_handle_predicate, eq(action))
-            .times(times)
-            .returning(|_, _| Ok(()));
+        if times > 0 {
+            self.expect_check_action_allowed()
+                .with(dataset_handle_predicate, eq(action))
+                .times(times)
+                .returning(|_, _| Ok(()));
+        } else {
+            self.expect_check_action_allowed()
+                .with(dataset_handle_predicate, eq(action))
+                .never();
+        }
 
         self
     }

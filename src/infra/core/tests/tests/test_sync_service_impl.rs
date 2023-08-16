@@ -19,7 +19,10 @@ use kamu::*;
 use opendatafabric::*;
 use url::Url;
 
+use crate::mock_dataset_action_authorizer;
 use crate::utils::{DummySmartTransferProtocolClient, HttpFileServer, IpfsDaemon};
+
+/////////////////////////////////////////////////////////////////////////////////////////
 
 async fn append_random_data(
     dataset_repo: &dyn DatasetRepository,
@@ -76,6 +79,8 @@ async fn append_random_data(
     .new_head
 }
 
+/////////////////////////////////////////////////////////////////////////////////////////
+
 async fn assert_in_sync(
     dataset_repo: &DatasetRepositoryLocalFs,
     lhs: impl Into<DatasetRef>,
@@ -86,6 +91,8 @@ async fn assert_in_sync(
     DatasetTestHelper::assert_datasets_in_sync(&lhs_layout, &rhs_layout);
 }
 
+/////////////////////////////////////////////////////////////////////////////////////////
+
 async fn create_random_file(path: &Path) -> usize {
     use rand::RngCore;
 
@@ -95,6 +102,31 @@ async fn create_random_file(path: &Path) -> usize {
     std::fs::write(path, data).unwrap();
     data.len()
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+struct AuthorizationExpectations {
+    pub d1_reads: usize,
+    pub d1_writes: usize,
+    pub d2_reads: usize,
+    pub d2_writes: usize,
+}
+
+fn construct_authorizer(
+    authorization_expectations: AuthorizationExpectations,
+    d1_alias: &DatasetAlias,
+    d2_alias: &DatasetAlias,
+) -> Arc<dyn auth::DatasetActionAuthorizer> {
+    let authorizer = mock_dataset_action_authorizer::MockDatasetActionAuthorizer::new()
+        .expect_check_read_dataset(d1_alias.clone(), authorization_expectations.d1_reads)
+        .expect_check_read_dataset(d2_alias.clone(), authorization_expectations.d2_reads)
+        .expect_check_write_dataset(d1_alias.clone(), authorization_expectations.d1_writes)
+        .expect_check_write_dataset(d2_alias.clone(), authorization_expectations.d2_writes);
+
+    Arc::new(authorizer)
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
 
 async fn do_test_sync(
     tmp_workspace_dir: &Path,
@@ -108,7 +140,16 @@ async fn do_test_sync(
 
     let (ipfs_gateway, ipfs_client) = ipfs.unwrap_or_default();
 
-    let dataset_action_authorizer = Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new());
+    let dataset_action_authorizer = construct_authorizer(
+        AuthorizationExpectations {
+            d1_reads: 7,
+            d2_reads: 2,
+            d1_writes: 1,
+            d2_writes: 4,
+        },
+        &dataset_alias,
+        &dataset_alias_2,
+    );
 
     let dataset_repo = Arc::new(
         DatasetRepositoryLocalFs::create(
@@ -352,6 +393,8 @@ async fn do_test_sync(
     );
 }
 
+/////////////////////////////////////////////////////////////////////////////////////////
+
 #[test_log::test(tokio::test)]
 async fn test_sync_to_from_local_fs() {
     let tmp_workspace_dir = tempfile::tempdir().unwrap();
@@ -367,6 +410,8 @@ async fn test_sync_to_from_local_fs() {
     .await;
 }
 
+/////////////////////////////////////////////////////////////////////////////////////////
+
 #[test_group::group(containerized)]
 #[test_log::test(tokio::test)]
 async fn test_sync_to_from_s3() {
@@ -381,6 +426,8 @@ async fn test_sync_to_from_s3() {
     )
     .await;
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_sync_from_http() {
@@ -401,6 +448,8 @@ async fn test_sync_from_http() {
     )
     .await;
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(containerized)]
 #[test_log::test(tokio::test)]
@@ -426,3 +475,5 @@ async fn test_sync_to_from_ipfs() {
     )
     .await;
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////

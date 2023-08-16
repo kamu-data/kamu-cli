@@ -290,6 +290,11 @@ impl SyncServiceImpl {
 
         tracing::info!(key_name = %key.name, key_id = %key.id, "Resolved the key to use for IPNS publishing");
 
+        let src_dataset_handle = self.dataset_repo.resolve_dataset_ref(src).await?;
+        self.dataset_action_authorizer
+            .check_action_allowed(&src_dataset_handle, auth::DatasetAction::Read)
+            .await?;
+
         // Resolve and compare heads
         let src_dataset = self.dataset_repo.get_dataset(src).await?;
         let src_head = src_dataset
