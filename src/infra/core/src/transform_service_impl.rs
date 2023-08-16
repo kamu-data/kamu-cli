@@ -732,6 +732,11 @@ impl TransformService for TransformServiceImpl {
         let listener = maybe_listener.unwrap_or(Arc::new(NullVerificationListener {}));
 
         let dataset_handle = self.dataset_repo.resolve_dataset_ref(dataset_ref).await?;
+
+        // Note: output dataset read permissions are already checked in
+        // VerificationService. But permissions for input datasets have to be
+        // checked here
+
         let dataset = self
             .dataset_repo
             .get_dataset(&dataset_handle.as_local_ref())

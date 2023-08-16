@@ -256,6 +256,15 @@ impl From<IterBlocksError> for VerificationError {
     }
 }
 
+impl From<auth::DatasetActionUnauthorizedError> for VerificationError {
+    fn from(v: auth::DatasetActionUnauthorizedError) -> Self {
+        match v {
+            auth::DatasetActionUnauthorizedError::Access(e) => Self::Access(e),
+            auth::DatasetActionUnauthorizedError::Internal(e) => Self::Internal(e),
+        }
+    }
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 
 #[derive(Clone, Debug, Eq, PartialEq)]
