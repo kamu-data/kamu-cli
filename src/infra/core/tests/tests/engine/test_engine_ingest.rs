@@ -29,6 +29,7 @@ use tempfile::TempDir;
 
 use crate::mock_dataset_action_authorizer;
 
+#[test_group::group(containerized, engine)]
 #[test_log::test(tokio::test)]
 async fn test_ingest_csv_with_engine() {
     let harness = IngestTestHarness::new(DatasetName::new_unchecked("foo.bar"));
@@ -91,6 +92,7 @@ async fn test_ingest_csv_with_engine() {
     );
 }
 
+#[test_group::group(containerized, engine)]
 #[test_log::test(tokio::test)]
 async fn test_ingest_parquet_with_engine() {
     let harness = IngestTestHarness::new(DatasetName::new_unchecked("foo.bar"));
