@@ -27,10 +27,11 @@ use kamu::*;
 use opendatafabric::*;
 use tempfile::TempDir;
 
-#[test_group::group(containerized, engine)]
+use crate::mock_dataset_action_authorizer;
+
 #[test_log::test(tokio::test)]
 async fn test_ingest_csv_with_engine() {
-    let harness = IngestTestHarness::new();
+    let harness = IngestTestHarness::new(DatasetName::new_unchecked("foo.bar"));
 
     let src_path = harness.temp_dir.path().join("data.csv");
     std::fs::write(
@@ -66,13 +67,9 @@ async fn test_ingest_csv_with_engine() {
         )
         .build();
 
-    let dataset_name = dataset_snapshot.name.clone();
+    harness.ingest_snapshot(dataset_snapshot).await;
 
-    harness
-        .ingest_snapshot(dataset_snapshot, &dataset_name)
-        .await;
-
-    let parquet_reader = harness.read_datafile(&dataset_name).await;
+    let parquet_reader = harness.read_datafile().await;
 
     assert_eq!(
         parquet_reader.get_column_names(),
@@ -94,10 +91,9 @@ async fn test_ingest_csv_with_engine() {
     );
 }
 
-#[test_group::group(containerized, engine)]
 #[test_log::test(tokio::test)]
 async fn test_ingest_parquet_with_engine() {
-    let harness = IngestTestHarness::new();
+    let harness = IngestTestHarness::new(DatasetName::new_unchecked("foo.bar"));
 
     let src_path = harness.temp_dir.path().join("data.parquet");
 
@@ -146,13 +142,9 @@ async fn test_ingest_parquet_with_engine() {
         )
         .build();
 
-    let dataset_name = dataset_snapshot.name.clone();
+    harness.ingest_snapshot(dataset_snapshot).await;
 
-    harness
-        .ingest_snapshot(dataset_snapshot, &dataset_name)
-        .await;
-
-    let parquet_reader = harness.read_datafile(&dataset_name).await;
+    let parquet_reader = harness.read_datafile().await;
 
     assert_eq!(
         parquet_reader.get_column_names(),
@@ -180,21 +172,27 @@ struct IngestTestHarness {
     temp_dir: TempDir,
     dataset_repo: Arc<DatasetRepositoryLocalFs>,
     ingest_svc: Arc<IngestServiceImpl>,
+    dataset_name: DatasetName,
 }
 
 impl IngestTestHarness {
-    fn new() -> Self {
+    fn new(dataset_name: DatasetName) -> Self {
         let temp_dir = tempfile::tempdir().unwrap();
         let run_info_dir = temp_dir.path().join("run");
         let cache_dir = temp_dir.path().join("cache");
         std::fs::create_dir(&run_info_dir).unwrap();
         std::fs::create_dir(&cache_dir).unwrap();
 
+        let dataset_action_authorizer = Arc::new(
+            mock_dataset_action_authorizer::MockDatasetActionAuthorizer::new()
+                .expect_check_write_dataset(DatasetAlias::new(None, dataset_name.clone()), 1),
+        );
+
         let dataset_repo = Arc::new(
             DatasetRepositoryLocalFs::create(
                 temp_dir.path().join("datasets"),
                 Arc::new(CurrentAccountSubject::new_test()),
-                Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new()),
+                dataset_action_authorizer.clone(),
                 false,
             )
             .unwrap(),
@@ -209,7 +207,7 @@ impl IngestTestHarness {
 
         let ingest_svc = Arc::new(IngestServiceImpl::new(
             dataset_repo.clone(),
-            Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new()),
+            dataset_action_authorizer,
             engine_provisioner,
             Arc::new(ContainerRuntime::default()),
             run_info_dir,
@@ -220,10 +218,11 @@ impl IngestTestHarness {
             temp_dir,
             dataset_repo,
             ingest_svc,
+            dataset_name,
         }
     }
 
-    async fn ingest_snapshot(&self, dataset_snapshot: DatasetSnapshot, dataset_name: &DatasetName) {
+    async fn ingest_snapshot(&self, dataset_snapshot: DatasetSnapshot) {
         self.dataset_repo
             .create_dataset_from_snapshot(None, dataset_snapshot)
             .await
@@ -232,7 +231,7 @@ impl IngestTestHarness {
         let res = self
             .ingest_svc
             .ingest(
-                &DatasetAlias::new(None, dataset_name.clone()).as_local_ref(),
+                &DatasetAlias::new(None, self.dataset_name.clone()).as_local_ref(),
                 IngestOptions::default(),
                 None,
             )
@@ -240,8 +239,8 @@ impl IngestTestHarness {
         assert_matches!(res, Ok(IngestResult::Updated { .. }));
     }
 
-    async fn read_datafile(&self, dataset_name: &DatasetName) -> ParquetReaderHelper {
-        let dataset_ref = dataset_name.as_local_ref();
+    async fn read_datafile(&self) -> ParquetReaderHelper {
+        let dataset_ref = self.dataset_name.as_local_ref();
         let dataset = self.dataset_repo.get_dataset(&dataset_ref).await.unwrap();
 
         let (_, block) = dataset
