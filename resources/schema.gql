@@ -425,7 +425,7 @@ type EnvVar {
 	value: String
 }
 
-union EventTimeSource = EventTimeSourceFromMetadata | EventTimeSourceFromPath
+union EventTimeSource = EventTimeSourceFromMetadata | EventTimeSourceFromPath | EventTimeSourceFromSystemTime
 
 type EventTimeSourceFromMetadata {
 	dummy: String
@@ -434,6 +434,10 @@ type EventTimeSourceFromMetadata {
 type EventTimeSourceFromPath {
 	pattern: String!
 	timestampFormat: String
+}
+
+type EventTimeSourceFromSystemTime {
+	dummy: String
 }
 
 type ExecuteQuery {
@@ -687,7 +691,7 @@ enum QueryDialect {
 	SQL_DATA_FUSION
 }
 
-union ReadStep = ReadStepCsv | ReadStepJsonLines | ReadStepGeoJson | ReadStepEsriShapefile | ReadStepParquet
+union ReadStep = ReadStepCsv | ReadStepJsonLines | ReadStepGeoJson | ReadStepEsriShapefile | ReadStepParquet | ReadStepNdJson
 
 type ReadStepCsv {
 	schema: [String!]
@@ -725,6 +729,14 @@ type ReadStepJsonLines {
 	dateFormat: String
 	encoding: String
 	multiLine: Boolean
+	primitivesAsString: Boolean
+	timestampFormat: String
+}
+
+type ReadStepNdJson {
+	schema: [String!]
+	dateFormat: String
+	encoding: String
 	primitivesAsString: Boolean
 	timestampFormat: String
 }

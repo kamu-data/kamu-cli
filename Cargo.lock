@@ -3279,7 +3279,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-ingest-datafusion"
-version = "0.137.0"
+version = "0.139.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -3289,7 +3289,7 @@ dependencies = [
  "env_logger",
  "geo-types",
  "geojson",
- "indoc",
+ "indoc 2.0.3",
  "internal-error",
  "kamu-core",
  "kamu-data-utils",
@@ -4370,6 +4370,22 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "38f6d39893cca0701371e3c27294f09797214b86f1fb951b89ade8ec04e2abab"
 dependencies = [
  "plotters-backend",
+]
+
+[[package]]
+name = "polar-core"
+version = "0.27.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9d1b77e852bec994296c8a1dddc231ab3f112bfa0a0399fc8a7fd8bddfb46b4e"
+dependencies = [
+ "indoc 1.0.9",
+ "js-sys",
+ "lalrpop",
+ "lalrpop-util",
+ "serde",
+ "serde_derive",
+ "strum_macros 0.24.3",
+ "wasm-bindgen",
 ]
 
 [[package]]

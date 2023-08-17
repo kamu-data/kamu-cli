@@ -19,6 +19,8 @@ use kamu::domain::{
     DatasetRepository,
     InternalError,
     ResultIntoInternal,
+    SystemTimeSource,
+    SystemTimeSourceDefault,
 };
 use kamu::{DatasetLayout, DatasetRepositoryLocalFs};
 use opendatafabric::DatasetHandle;
@@ -43,6 +45,8 @@ impl ServerSideLocalFsHarness {
         std::fs::create_dir(&datasets_dir).unwrap();
 
         let catalog = dill::CatalogBuilder::new()
+            .add::<SystemTimeSourceDefault>()
+            .bind::<dyn SystemTimeSource, SystemTimeSourceDefault>()
             .add_builder(
                 builder_for::<DatasetRepositoryLocalFs>()
                     .with_root(datasets_dir)

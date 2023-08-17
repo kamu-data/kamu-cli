@@ -24,8 +24,6 @@ use kamu::*;
 use opendatafabric::*;
 use tempfile::TempDir;
 
-use crate::mock_dataset_action_authorizer;
-
 #[test_group::group(containerized, engine)]
 #[test_log::test(tokio::test)]
 async fn test_ingest_csv_with_engine_spark() {
@@ -113,6 +111,8 @@ async fn test_ingest_csv_with_engine_spark() {
 #[test_log::test(tokio::test)]
 async fn test_ingest_csv_with_engine_datafusion_cdc() {
     let harness = IngestTestHarness::new();
+
+    let src_path = harness.temp_dir.path().join("data.csv");
 
     let dataset_snapshot = MetadataFactory::dataset_snapshot()
         .name("foo.bar")
@@ -471,10 +471,8 @@ impl IngestTestHarness {
         std::fs::create_dir(&run_info_dir).unwrap();
         std::fs::create_dir(&cache_dir).unwrap();
 
-        let dataset_action_authorizer = Arc::new(
-            mock_dataset_action_authorizer::MockDatasetActionAuthorizer::new()
-                .expect_check_write_dataset(DatasetAlias::new(None, dataset_name.clone()), 1),
-        );
+        let dataset_action_authorizer =
+            Arc::new(kamu_core::auth::AlwaysHappyDatasetActionAuthorizer::new());
 
         let dataset_repo = Arc::new(
             DatasetRepositoryLocalFs::create(
@@ -527,7 +525,7 @@ impl IngestTestHarness {
         let res = self
             .ingest_svc
             .ingest(
-                &DatasetAlias::new(None, self.dataset_name.clone()).as_local_ref(),
+                &DatasetAlias::new(None, dataset_name.clone()).as_local_ref(),
                 IngestOptions::default(),
                 None,
             )
@@ -535,7 +533,7 @@ impl IngestTestHarness {
         assert_matches!(res, Ok(IngestResult::Updated { .. }));
     }
 
-    async fn get_last_data_block(&self) -> MetadataBlockTyped<AddData> {
+    async fn get_last_data_block(&self, dataset_name: &DatasetName) -> MetadataBlockTyped<AddData> {
         let dataset = self
             .dataset_repo
             .get_dataset(&dataset_name.as_local_ref())

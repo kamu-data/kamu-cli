@@ -48,6 +48,9 @@ impl ClientSideHarness {
         b.add::<auth::AlwaysHappyDatasetActionAuthorizer>()
             .bind::<dyn auth::DatasetActionAuthorizer, auth::AlwaysHappyDatasetActionAuthorizer>();
 
+        b.add::<SystemTimeSourceDefault>();
+        b.bind::<dyn SystemTimeSource, SystemTimeSourceDefault>();
+
         b.add_builder(
             builder_for::<DatasetRepositoryLocalFs>()
                 .with_root(datasets_dir)

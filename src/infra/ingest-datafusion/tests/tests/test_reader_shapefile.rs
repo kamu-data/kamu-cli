@@ -106,17 +106,17 @@ async fn test_read_shapefile_infer_schema() {
                 indoc!(
                     r#"
                     message arrow_schema {
-                    OPTIONAL DOUBLE ccn_1;
-                    OPTIONAL BYTE_ARRAY engtype_1 (STRING);
-                    OPTIONAL BYTE_ARRAY geometry (STRING);
-                    OPTIONAL BYTE_ARRAY hasc_1 (STRING);
-                    OPTIONAL DOUBLE id_0;
-                    OPTIONAL DOUBLE id_1;
-                    OPTIONAL BYTE_ARRAY iso (STRING);
-                    OPTIONAL BYTE_ARRAY name_0 (STRING);
-                    OPTIONAL BYTE_ARRAY name_1 (STRING);
-                    OPTIONAL BYTE_ARRAY type_1 (STRING);
-                    OPTIONAL BYTE_ARRAY varname_1 (STRING);
+                      OPTIONAL DOUBLE ccn_1;
+                      OPTIONAL BYTE_ARRAY engtype_1 (STRING);
+                      OPTIONAL BYTE_ARRAY geometry (STRING);
+                      OPTIONAL BYTE_ARRAY hasc_1 (STRING);
+                      OPTIONAL DOUBLE id_0;
+                      OPTIONAL DOUBLE id_1;
+                      OPTIONAL BYTE_ARRAY iso (STRING);
+                      OPTIONAL BYTE_ARRAY name_0 (STRING);
+                      OPTIONAL BYTE_ARRAY name_1 (STRING);
+                      OPTIONAL BYTE_ARRAY type_1 (STRING);
+                      OPTIONAL BYTE_ARRAY varname_1 (STRING);
                     }
                     "#
                 )
