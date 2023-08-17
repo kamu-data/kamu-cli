@@ -21,6 +21,7 @@ use crate::{OutputConfig, WritePager};
 
 pub struct InspectQueryCommand {
     dataset_repo: Arc<dyn DatasetRepository>,
+    dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
     dataset_ref: DatasetRef,
     output_config: Arc<OutputConfig>,
 }
@@ -28,11 +29,13 @@ pub struct InspectQueryCommand {
 impl InspectQueryCommand {
     pub fn new(
         dataset_repo: Arc<dyn DatasetRepository>,
+        dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
         dataset_ref: DatasetRef,
         output_config: Arc<OutputConfig>,
     ) -> Self {
         Self {
             dataset_repo,
+            dataset_action_authorizer,
             dataset_ref,
             output_config,
         }
@@ -177,6 +180,14 @@ impl Command for InspectQueryCommand {
             .dataset_repo
             .resolve_dataset_ref(&self.dataset_ref)
             .await?;
+
+        self.dataset_action_authorizer
+            .check_action_allowed(&dataset_handle, auth::DatasetAction::Read)
+            .await
+            .map_err(|e| match e {
+                auth::DatasetActionUnauthorizedError::Access(e) => CLIError::failure(e),
+                auth::DatasetActionUnauthorizedError::Internal(e) => CLIError::critical(e),
+            })?;
 
         if self.output_config.is_tty && self.output_config.verbosity_level == 0 {
             let mut pager = minus::Pager::new();

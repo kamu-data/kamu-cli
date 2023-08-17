@@ -133,6 +133,7 @@ pub fn get_command(
             )),
             Some(("query", query_matches)) => Box::new(InspectQueryCommand::new(
                 catalog.get_one()?,
+                catalog.get_one()?,
                 validate_dataset_ref(
                     catalog,
                     query_matches
