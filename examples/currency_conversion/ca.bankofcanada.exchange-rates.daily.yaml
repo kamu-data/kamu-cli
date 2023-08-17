@@ -51,12 +51,12 @@ content:
           - date
       preprocess:
         kind: sql
-        engine: spark
+        engine: datafusion
         query: |
           SELECT 
             date,
-            "USD" as currency_base,
-            "CAD" as currency_target,
+            'USD' as currency_base,
+            'CAD' as currency_target,
             FXUSDCAD as rate
           FROM input
     - kind: setVocab
