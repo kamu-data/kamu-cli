@@ -12,7 +12,13 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
 
-use kamu::domain::{CurrentAccountSubject, DatasetRepository, InternalError, ResultIntoInternal};
+use kamu::domain::{
+    auth,
+    CurrentAccountSubject,
+    DatasetRepository,
+    InternalError,
+    ResultIntoInternal,
+};
 use kamu::testing::LocalS3Server;
 use kamu::utils::s3_context::S3Context;
 use kamu::{DatasetLayout, DatasetRepositoryS3};
@@ -92,6 +98,7 @@ async fn s3_repo(s3: &LocalS3Server) -> DatasetRepositoryS3 {
     DatasetRepositoryS3::new(
         s3_context,
         Arc::new(CurrentAccountSubject::new_test()),
+        Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new()),
         false,
     )
 }

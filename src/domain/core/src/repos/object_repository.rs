@@ -275,7 +275,7 @@ pub enum DeleteError {
 
 #[derive(Error, Debug)]
 pub enum AccessError {
-    #[error("Respository is read-only")]
+    #[error("Resource is read-only")]
     ReadOnly(#[source] Option<BoxedError>),
     #[error("Unauthorized")]
     Unauthorized(#[source] BoxedError),

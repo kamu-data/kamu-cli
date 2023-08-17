@@ -220,6 +220,10 @@ pub fn configure_catalog(
     b.add::<kamu_task_system_inmem::TaskSystemEventStoreInMemory>();
     b.bind::<dyn kamu_task_system_inmem::domain::TaskSystemEventStore, kamu_task_system_inmem::TaskSystemEventStoreInMemory>();
 
+    b.add::<kamu_adapter_auth_oso::KamuAuthOso>();
+    b.add::<kamu_adapter_auth_oso::OsoDatasetAuthorizer>();
+    b.bind::<dyn domain::auth::DatasetActionAuthorizer, kamu_adapter_auth_oso::OsoDatasetAuthorizer>();
+
     b
 }
 

@@ -13,6 +13,7 @@
 // Re-exports
 pub use internal_error::*;
 
+pub mod auth;
 pub mod entities;
 pub mod repos;
 pub mod services;

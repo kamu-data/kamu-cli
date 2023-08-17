@@ -45,6 +45,8 @@ async fn setup_repo() -> RepoFixture {
         )
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
         .add_value(CurrentAccountSubject::new_test())
+        .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
+        .bind::<dyn auth::DatasetActionAuthorizer, auth::AlwaysHappyDatasetActionAuthorizer>()
         .build();
 
     let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();

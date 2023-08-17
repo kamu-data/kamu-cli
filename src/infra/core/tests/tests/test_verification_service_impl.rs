@@ -19,6 +19,7 @@ use kamu::*;
 use opendatafabric::*;
 
 use super::test_pull_service_impl::TestTransformService;
+use crate::mock_dataset_action_authorizer;
 
 #[tokio::test]
 async fn test_verify_data_consistency() {
@@ -26,10 +27,16 @@ async fn test_verify_data_consistency() {
 
     let dataset_alias = DatasetAlias::new(None, DatasetName::new_unchecked("bar"));
 
+    let dataset_authorizer = Arc::new(
+        mock_dataset_action_authorizer::MockDatasetActionAuthorizer::new()
+            .expect_check_read_dataset(dataset_alias.clone(), 3),
+    );
+
     let dataset_repo = Arc::new(
         DatasetRepositoryLocalFs::create(
             tempdir.path().join("datasets"),
             Arc::new(CurrentAccountSubject::new_test()),
+            dataset_authorizer.clone(),
             false,
         )
         .unwrap(),
@@ -37,6 +44,7 @@ async fn test_verify_data_consistency() {
 
     let verification_svc = Arc::new(VerificationServiceImpl::new(
         dataset_repo.clone(),
+        dataset_authorizer.clone(),
         Arc::new(TestTransformService::new(Arc::new(Mutex::new(Vec::new())))),
     ));
 

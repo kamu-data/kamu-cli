@@ -497,6 +497,7 @@ impl GraphQLDatasetsHarness {
         let dataset_repo = DatasetRepositoryLocalFs::create(
             tempdir.path().join("datasets"),
             Arc::new(CurrentAccountSubject::new_test()),
+            Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new()),
             false,
         )
         .unwrap();

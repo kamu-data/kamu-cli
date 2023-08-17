@@ -18,6 +18,7 @@ use opendatafabric::*;
 use thiserror::Error;
 use tokio_stream::Stream;
 
+use crate::auth::DatasetActionUnauthorizedError;
 use crate::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -495,6 +496,16 @@ pub enum CreateDatasetFromSnapshotError {
     ),
 }
 
+impl From<CreateDatasetError> for CreateDatasetFromSnapshotError {
+    fn from(v: CreateDatasetError) -> Self {
+        match v {
+            CreateDatasetError::EmptyDataset => unreachable!(),
+            CreateDatasetError::NameCollision(e) => Self::NameCollision(e),
+            CreateDatasetError::Internal(e) => Self::Internal(e),
+        }
+    }
+}
+
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
@@ -503,7 +514,12 @@ pub enum RenameDatasetError {
     NotFound(#[from] DatasetNotFoundError),
     #[error(transparent)]
     NameCollision(#[from] NameCollisionError),
-
+    #[error(transparent)]
+    Access(
+        #[from]
+        #[backtrace]
+        AccessError,
+    ),
     #[error(transparent)]
     Internal(
         #[from]
@@ -521,6 +537,15 @@ impl From<GetDatasetError> for RenameDatasetError {
     }
 }
 
+impl From<DatasetActionUnauthorizedError> for RenameDatasetError {
+    fn from(v: DatasetActionUnauthorizedError) -> Self {
+        match v {
+            DatasetActionUnauthorizedError::Access(e) => Self::Access(e),
+            DatasetActionUnauthorizedError::Internal(e) => Self::Internal(e),
+        }
+    }
+}
+
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
@@ -529,7 +554,12 @@ pub enum DeleteDatasetError {
     NotFound(#[from] DatasetNotFoundError),
     #[error(transparent)]
     DanglingReference(#[from] DanglingReferenceError),
-
+    #[error(transparent)]
+    Access(
+        #[from]
+        #[backtrace]
+        AccessError,
+    ),
     #[error(transparent)]
     Internal(
         #[from]
@@ -538,14 +568,13 @@ pub enum DeleteDatasetError {
     ),
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////
-
-impl From<CreateDatasetError> for CreateDatasetFromSnapshotError {
-    fn from(v: CreateDatasetError) -> Self {
+impl From<DatasetActionUnauthorizedError> for DeleteDatasetError {
+    fn from(v: DatasetActionUnauthorizedError) -> Self {
         match v {
-            CreateDatasetError::EmptyDataset => unreachable!(),
-            CreateDatasetError::NameCollision(e) => Self::NameCollision(e),
-            CreateDatasetError::Internal(e) => Self::Internal(e),
+            DatasetActionUnauthorizedError::Access(e) => Self::Access(e),
+            DatasetActionUnauthorizedError::Internal(e) => Self::Internal(e),
         }
     }
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////

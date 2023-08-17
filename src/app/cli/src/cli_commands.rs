@@ -133,6 +133,7 @@ pub fn get_command(
             )),
             Some(("query", query_matches)) => Box::new(InspectQueryCommand::new(
                 catalog.get_one()?,
+                catalog.get_one()?,
                 validate_dataset_ref(
                     catalog,
                     query_matches
@@ -167,6 +168,7 @@ pub fn get_command(
             ))
         }
         Some(("log", submatches)) => Box::new(LogCommand::new(
+            catalog.get_one()?,
             catalog.get_one()?,
             validate_dataset_ref(
                 catalog,

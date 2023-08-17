@@ -12,6 +12,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use dill::*;
 use futures::TryStreamExt;
+use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer};
 use kamu_core::*;
 use opendatafabric::*;
 use url::Url;
@@ -25,6 +26,7 @@ use crate::utils::s3_context::S3Context;
 pub struct DatasetRepositoryS3 {
     s3_context: S3Context,
     current_account_subject: Arc<CurrentAccountSubject>,
+    dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
     multi_tenant: bool,
 }
 
@@ -34,11 +36,13 @@ impl DatasetRepositoryS3 {
     pub fn new(
         s3_context: S3Context,
         current_account_subject: Arc<CurrentAccountSubject>,
+        dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
         multi_tenant: bool,
     ) -> Self {
         Self {
             s3_context,
             current_account_subject,
+            dataset_action_authorizer,
             multi_tenant,
         }
     }
@@ -307,6 +311,7 @@ impl DatasetRepository for DatasetRepositoryS3 {
         new_name: &DatasetName,
     ) -> Result<(), RenameDatasetError> {
         let dataset_handle = self.resolve_dataset_ref(dataset_ref).await?;
+
         let dataset = self.get_dataset_impl(&dataset_handle.id).await?;
 
         let new_alias =
@@ -323,6 +328,10 @@ impl DatasetRepository for DatasetRepositoryS3 {
             Err(GetDatasetError::Internal(e)) => Err(RenameDatasetError::Internal(e)),
             Err(GetDatasetError::NotFound(_)) => Ok(()),
         }?;
+
+        self.dataset_action_authorizer
+            .check_action_allowed(&dataset_handle, DatasetAction::Write)
+            .await?;
 
         // It's safe to rename dataset
         self.save_dataset_alias(&dataset, new_alias).await?;
@@ -348,6 +357,10 @@ impl DatasetRepository for DatasetRepositoryS3 {
             }
             .into());
         }
+
+        self.dataset_action_authorizer
+            .check_action_allowed(&dataset_handle, DatasetAction::Write)
+            .await?;
 
         match self.delete_dataset_s3_objects(&dataset_handle.id).await {
             Ok(_) => Ok(()),

@@ -39,6 +39,7 @@ kamu = { workspace = true }
 kamu-task-system-inmem = { workspace = true }
 kamu-adapter-graphql = { workspace = true }
 kamu-adapter-http = { workspace = true }
+kamu-adapter-auth-oso = { workspace = true }
 
 # CLI
 chrono-humanize = "0.2"  # Human readable durations

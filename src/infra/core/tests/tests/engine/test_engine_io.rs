@@ -31,15 +31,22 @@ async fn test_engine_io_common(
         run_info_dir.to_path_buf(),
     ));
 
+    let dataset_action_authorizer = Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new());
+
     let ingest_svc = IngestServiceImpl::new(
         dataset_repo.clone(),
+        dataset_action_authorizer.clone(),
         engine_provisioner.clone(),
         Arc::new(ContainerRuntime::default()),
         run_info_dir.to_path_buf(),
         cache_dir.to_path_buf(),
     );
 
-    let transform_svc = TransformServiceImpl::new(dataset_repo.clone(), engine_provisioner.clone());
+    let transform_svc = TransformServiceImpl::new(
+        dataset_repo.clone(),
+        dataset_action_authorizer.clone(),
+        engine_provisioner.clone(),
+    );
 
     ///////////////////////////////////////////////////////////////////////////
     // Root setup
@@ -211,6 +218,7 @@ async fn test_engine_io_local_file_mount() {
         DatasetRepositoryLocalFs::create(
             tempdir.path().join("datasets"),
             Arc::new(CurrentAccountSubject::new_test()),
+            Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new()),
             false,
         )
         .unwrap(),
@@ -245,6 +253,7 @@ async fn test_engine_io_s3_to_local_file_mount_proxy() {
     let dataset_repo = Arc::new(DatasetRepositoryS3::new(
         s3_context,
         Arc::new(CurrentAccountSubject::new_test()),
+        Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new()),
         false,
     ));
 

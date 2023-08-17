@@ -58,6 +58,7 @@ async fn test_internal_error() {
     let dataset_repo = DatasetRepositoryLocalFs::new(
         tempdir.path().join("datasets"),
         Arc::new(CurrentAccountSubject::new_test()),
+        Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new()),
         false,
     );
 

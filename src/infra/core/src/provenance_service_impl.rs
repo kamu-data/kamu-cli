@@ -20,12 +20,19 @@ use opendatafabric::*;
 
 pub struct ProvenanceServiceImpl {
     dataset_repo: Arc<dyn DatasetRepository>,
+    dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
 }
 
 #[component(pub)]
 impl ProvenanceServiceImpl {
-    pub fn new(dataset_repo: Arc<dyn DatasetRepository>) -> Self {
-        Self { dataset_repo }
+    pub fn new(
+        dataset_repo: Arc<dyn DatasetRepository>,
+        dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
+    ) -> Self {
+        Self {
+            dataset_repo,
+            dataset_action_authorizer,
+        }
     }
 
     #[async_recursion::async_recursion]
@@ -34,6 +41,10 @@ impl ProvenanceServiceImpl {
         dataset_handle: &DatasetHandle,
         visitor: &mut dyn LineageVisitor,
     ) -> Result<(), GetLineageError> {
+        self.dataset_action_authorizer
+            .check_action_allowed(&dataset_handle, auth::DatasetAction::Read)
+            .await?;
+
         if let Some(dataset) = self
             .dataset_repo
             .try_get_dataset(&dataset_handle.as_local_ref())

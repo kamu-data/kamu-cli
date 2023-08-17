@@ -69,6 +69,15 @@ impl From<GetDatasetError> for ResetError {
     }
 }
 
+impl From<auth::DatasetActionUnauthorizedError> for ResetError {
+    fn from(v: auth::DatasetActionUnauthorizedError) -> Self {
+        match v {
+            auth::DatasetActionUnauthorizedError::Access(e) => Self::Access(e),
+            auth::DatasetActionUnauthorizedError::Internal(e) => Self::Internal(e),
+        }
+    }
+}
+
 impl From<SetRefError> for ResetError {
     fn from(v: SetRefError) -> Self {
         match v {

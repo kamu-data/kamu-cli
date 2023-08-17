@@ -16,6 +16,8 @@ use kamu::*;
 use opendatafabric::*;
 use tempfile::TempDir;
 
+use crate::mock_dataset_action_authorizer;
+
 #[test_log::test(tokio::test)]
 async fn test_reset_dataset_with_2revisions_drop_last() {
     let harness = ResetTestHarness::new();
@@ -109,16 +111,22 @@ struct ResetTestHarness {
 impl ResetTestHarness {
     fn new() -> Self {
         let tempdir = tempfile::tempdir().unwrap();
+        let dataset_authorizer = Arc::new(
+            mock_dataset_action_authorizer::MockDatasetActionAuthorizer::new()
+                .expect_check_write_a_dataset(1),
+        );
+
         let dataset_repo = Arc::new(
             DatasetRepositoryLocalFs::create(
                 tempdir.path().join("datasets"),
                 Arc::new(CurrentAccountSubject::new_test()),
+                dataset_authorizer.clone(),
                 false,
             )
             .unwrap(),
         );
 
-        let reset_svc = ResetServiceImpl::new(dataset_repo.clone());
+        let reset_svc = ResetServiceImpl::new(dataset_repo.clone(), dataset_authorizer.clone());
 
         Self {
             _temp_dir: tempdir,

@@ -172,48 +172,63 @@ pub enum IngestError {
         #[source]
         source: Option<BoxedError>,
     },
+
     #[error("Source not found at {path}")]
     NotFound {
         path: String,
         #[source]
         source: Option<BoxedError>,
     },
+
     #[error(transparent)]
     ImagePull(
         #[from]
         #[backtrace]
         ImagePullError,
     ),
+
     #[error(transparent)]
     ParameterNotFound(
         #[from]
         #[backtrace]
         IngestParameterNotFound,
     ),
+
     #[error(transparent)]
     ProcessError(
         #[from]
         #[backtrace]
         ProcessError,
     ),
+
     #[error("Engine provisioning error")]
     EngineProvisioningError(
         #[from]
         #[backtrace]
         EngineProvisioningError,
     ),
+
     #[error("Engine error")]
     EngineError(
         #[from]
         #[backtrace]
         EngineError,
     ),
+
     #[error("Pipe command error: {command:?} {source}")]
     PipeError {
         command: Vec<String>,
         source: BoxedError,
         backtrace: Backtrace,
     },
+
+    #[error(transparent)]
+    Access(
+        #[from]
+        #[backtrace]
+        AccessError,
+    ),
+
     #[error(transparent)]
     Internal(
         #[from]
@@ -227,6 +242,15 @@ impl From<GetDatasetError> for IngestError {
         match v {
             GetDatasetError::NotFound(e) => Self::DatasetNotFound(e),
             GetDatasetError::Internal(e) => Self::Internal(e),
+        }
+    }
+}
+
+impl From<auth::DatasetActionUnauthorizedError> for IngestError {
+    fn from(v: auth::DatasetActionUnauthorizedError) -> Self {
+        match v {
+            auth::DatasetActionUnauthorizedError::Access(e) => Self::Access(e),
+            auth::DatasetActionUnauthorizedError::Internal(e) => Self::Internal(e),
         }
     }
 }

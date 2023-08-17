@@ -210,6 +210,12 @@ pub enum VerificationError {
         TransformError,
     ),
     #[error(transparent)]
+    Access(
+        #[from]
+        #[backtrace]
+        AccessError,
+    ),
+    #[error(transparent)]
     Internal(
         #[from]
         #[backtrace]
@@ -246,6 +252,15 @@ impl From<IterBlocksError> for VerificationError {
             IterBlocksError::InvalidInterval(e) => VerificationError::InvalidInterval(e),
             IterBlocksError::Access(e) => VerificationError::Internal(e.int_err()),
             IterBlocksError::Internal(e) => VerificationError::Internal(e),
+        }
+    }
+}
+
+impl From<auth::DatasetActionUnauthorizedError> for VerificationError {
+    fn from(v: auth::DatasetActionUnauthorizedError) -> Self {
+        match v {
+            auth::DatasetActionUnauthorizedError::Access(e) => Self::Access(e),
+            auth::DatasetActionUnauthorizedError::Internal(e) => Self::Internal(e),
         }
     }
 }

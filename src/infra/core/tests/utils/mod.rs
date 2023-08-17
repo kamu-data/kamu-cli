@@ -23,3 +23,8 @@ pub use ipfs_daemon::*;
 
 mod dummy_smart_transfer_protocol_client;
 pub use dummy_smart_transfer_protocol_client::*;
+
+pub mod mock_dataset_action_authorizer;
+pub use mock_dataset_action_authorizer::*;
+
+pub mod mock_engine_provisioner;

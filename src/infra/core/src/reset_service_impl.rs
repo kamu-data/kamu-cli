@@ -15,12 +15,19 @@ use opendatafabric::*;
 
 pub struct ResetServiceImpl {
     dataset_repo: Arc<dyn DatasetRepository>,
+    dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
 }
 
 #[component(pub)]
 impl ResetServiceImpl {
-    pub fn new(dataset_repo: Arc<dyn DatasetRepository>) -> Self {
-        Self { dataset_repo }
+    pub fn new(
+        dataset_repo: Arc<dyn DatasetRepository>,
+        dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
+    ) -> Self {
+        Self {
+            dataset_repo,
+            dataset_action_authorizer,
+        }
     }
 }
 
@@ -31,6 +38,10 @@ impl ResetService for ResetServiceImpl {
         dataset_handle: &DatasetHandle,
         block_hash: &Multihash,
     ) -> Result<(), ResetError> {
+        self.dataset_action_authorizer
+            .check_action_allowed(&dataset_handle, auth::DatasetAction::Write)
+            .await?;
+
         let dataset = self
             .dataset_repo
             .get_dataset(&dataset_handle.as_local_ref())

@@ -12,6 +12,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use dill::*;
+use domain::auth::{DatasetAction, DatasetActionAuthorizer};
 use futures::TryStreamExt;
 use kamu_core::*;
 use opendatafabric::*;
@@ -23,6 +24,7 @@ use crate::*;
 
 pub struct DatasetRepositoryLocalFs {
     storage_strategy: Box<dyn DatasetStorageStrategy>,
+    dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
     thrash_lock: tokio::sync::Mutex<()>,
 }
 
@@ -33,6 +35,7 @@ impl DatasetRepositoryLocalFs {
     pub fn new(
         root: PathBuf,
         current_account_subject: Arc<CurrentAccountSubject>,
+        dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
         multi_tenant: bool,
     ) -> Self {
         Self {
@@ -47,6 +50,7 @@ impl DatasetRepositoryLocalFs {
                     current_account_subject,
                 ))
             },
+            dataset_action_authorizer,
             thrash_lock: tokio::sync::Mutex::new(()),
         }
     }
@@ -54,11 +58,17 @@ impl DatasetRepositoryLocalFs {
     pub fn create(
         root: impl Into<PathBuf>,
         current_account_subject: Arc<CurrentAccountSubject>,
+        dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
         multi_tenant: bool,
     ) -> Result<Self, std::io::Error> {
         let root = root.into();
         std::fs::create_dir_all(&root)?;
-        Ok(Self::new(root, current_account_subject, multi_tenant))
+        Ok(Self::new(
+            root,
+            current_account_subject,
+            dataset_action_authorizer,
+            multi_tenant,
+        ))
     }
 
     // TODO: Make dataset factory (and thus the hashing algo) configurable
@@ -281,6 +291,10 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
             Err(ResolveDatasetError::NotFound(_)) => Ok(()),
         }?;
 
+        self.dataset_action_authorizer
+            .check_action_allowed(&dataset_handle, DatasetAction::Write)
+            .await?;
+
         self.storage_strategy
             .handle_dataset_renamed(&dataset_handle, new_name)
             .await?;
@@ -307,6 +321,10 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
             }
             .into());
         }
+
+        self.dataset_action_authorizer
+            .check_action_allowed(&dataset_handle, DatasetAction::Write)
+            .await?;
 
         // // Update repo info
         // let mut repo_info = self.read_repo_info().await?;
@@ -743,7 +761,10 @@ impl DatasetStorageStrategy for DatasetMultiTenantStorageStrategy {
                     .await?;
 
                 if dataset_name == dataset_alias.dataset_name {
-                    return Ok(DatasetHandle::new(dataset_id, dataset_alias.to_owned()));
+                    return Ok(DatasetHandle::new(
+                        dataset_id,
+                        DatasetAlias::new(Some(effective_account_name.clone()), dataset_name),
+                    ));
                 }
             }
         }
