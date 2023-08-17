@@ -140,6 +140,9 @@ pub fn configure_catalog(
     b.add::<WorkspaceService>();
     b.add::<AccountService>();
 
+    b.add::<SystemTimeSourceDefault>();
+    b.bind::<dyn SystemTimeSource, SystemTimeSourceDefault>();
+
     b.add_builder(
         builder_for::<DatasetRepositoryLocalFs>()
             .with_root(workspace_layout.datasets_dir.clone())

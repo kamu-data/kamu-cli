@@ -20,9 +20,10 @@ pub trait SystemTimeSource: Send + Sync {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct DefaultSystemTimeSource;
+#[dill::component]
+pub struct SystemTimeSourceDefault;
 
-impl SystemTimeSource for DefaultSystemTimeSource {
+impl SystemTimeSource for SystemTimeSourceDefault {
     fn now(&self) -> DateTime<Utc> {
         Utc::now()
     }
@@ -30,11 +31,11 @@ impl SystemTimeSource for DefaultSystemTimeSource {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct MockSystemTimeSource {
+pub struct SystemTimeSourceMock {
     t: Mutex<DateTime<Utc>>,
 }
 
-impl MockSystemTimeSource {
+impl SystemTimeSourceMock {
     pub fn new(t: DateTime<Utc>) -> Self {
         Self { t: Mutex::new(t) }
     }
@@ -44,7 +45,7 @@ impl MockSystemTimeSource {
     }
 }
 
-impl SystemTimeSource for MockSystemTimeSource {
+impl SystemTimeSource for SystemTimeSourceMock {
     fn now(&self) -> DateTime<Utc> {
         (*self.t.lock().unwrap()).clone()
     }

@@ -40,7 +40,7 @@ async fn test_engine_io_common(
         Arc::new(ContainerRuntime::default()),
         run_info_dir.to_path_buf(),
         cache_dir.to_path_buf(),
-        Arc::new(DefaultSystemTimeSource),
+        Arc::new(SystemTimeSourceDefault),
     );
 
     let transform_svc = TransformServiceImpl::new(

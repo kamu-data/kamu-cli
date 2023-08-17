@@ -11,7 +11,6 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use chrono::{DateTime, TimeZone, Utc};
-use datafusion::error::DataFusionError;
 use datafusion::prelude::*;
 use internal_error::*;
 use kamu_core::{Dataset, EngineError, InvalidQueryError, OwnedFile};
@@ -78,17 +77,71 @@ impl ReadServiceDatafusion {
         }
     }
 
+    // TODO: This function currently ensures that all timestamps in the ouput are
+    // represeted as `Timestamp(Millis, "UTC")` for compatibility with other engines
+    // (e.g. Flink does not support event time with nanosecond precision).
+    fn normalize_raw_result(&self, df: DataFrame) -> Result<DataFrame, EngineError> {
+        use datafusion::arrow::datatypes::{DataType, TimeUnit};
+
+        let utc_tz: Arc<str> = Arc::from("UTC");
+        let mut select: Vec<Expr> = Vec::new();
+        let mut noop = true;
+
+        for field in df.schema().fields() {
+            let expr = match field.data_type() {
+                DataType::Timestamp(TimeUnit::Millisecond, Some(tz)) if tz.as_ref() == "UTC" => {
+                    col(field.unqualified_column())
+                }
+                DataType::Timestamp(_, _) => {
+                    noop = false;
+                    cast(
+                        col(field.unqualified_column()),
+                        DataType::Timestamp(TimeUnit::Millisecond, Some(utc_tz.clone())),
+                    )
+                    .alias(field.name())
+                }
+                _ => col(field.unqualified_column()),
+            };
+            select.push(expr);
+        }
+
+        if noop {
+            Ok(df)
+        } else {
+            let df = df.select(select).int_err()?;
+            tracing::info!(schema = ?df.schema(), "Schema after timestamp normalization");
+            Ok(df)
+        }
+    }
+
     async fn with_system_columns(
+        &self,
         df: DataFrame,
         vocab: &odf::DatasetVocabularyResolved<'_>,
         system_time: DateTime<Utc>,
         source_event_time: Option<DateTime<Utc>>,
         start_offset: i64,
-    ) -> Result<DataFrame, DataFusionError> {
+    ) -> Result<DataFrame, EngineError> {
         use datafusion::arrow::datatypes::DataType;
         use datafusion::logical_expr as expr;
         use datafusion::logical_expr::expr::WindowFunction;
         use datafusion::scalar::ScalarValue;
+
+        let system_columns = [&vocab.offset_column, &vocab.system_time_column];
+        for system_column in system_columns {
+            if df.schema().has_column_with_unqualified_name(system_column) {
+                return Err(InvalidQueryError::new(
+                    format!(
+                        "Transformed data contains a column that conflicts with the system column \
+                         name, you should either rename the data column or configure the dataset \
+                         vocabulary to use a different name: {}",
+                        system_column
+                    ),
+                    Vec::new(),
+                )
+                .into());
+            }
+        }
 
         // Collect non-system column names for later
         let mut raw_columns_wo_event_time: Vec<_> = df
@@ -102,41 +155,96 @@ impl ReadServiceDatafusion {
         // Offset
         // TODO: For some reason this adds two collumns: the expected "offset", but also
         // "ROW_NUMBER()" for now we simply filter out the latter.
-        let df = df.with_column(
-            &vocab.offset_column,
-            Expr::WindowFunction(WindowFunction {
-                fun: expr::WindowFunction::BuiltInWindowFunction(
-                    expr::BuiltInWindowFunction::RowNumber,
-                ),
-                args: vec![],
-                partition_by: vec![],
-                order_by: vec![],
-                window_frame: expr::WindowFrame::new(false),
-            }),
-        )?;
+        let df = df
+            .with_column(
+                &vocab.offset_column,
+                Expr::WindowFunction(WindowFunction {
+                    fun: expr::WindowFunction::BuiltInWindowFunction(
+                        expr::BuiltInWindowFunction::RowNumber,
+                    ),
+                    args: vec![],
+                    partition_by: vec![],
+                    order_by: vec![],
+                    window_frame: expr::WindowFrame::new(false),
+                }),
+            )
+            .int_err()?;
 
-        let df = df.with_column(
-            &vocab.offset_column,
-            cast(
-                col(&vocab.offset_column as &str) + lit(start_offset - 1),
-                DataType::Int64,
-            ),
-        )?;
+        let df = df
+            .with_column(
+                &vocab.offset_column,
+                cast(
+                    col(&vocab.offset_column as &str) + lit(start_offset - 1),
+                    DataType::Int64,
+                ),
+            )
+            .int_err()?;
 
         // System time
-        let df = df.with_column(
-            &vocab.system_time_column,
-            Expr::Literal(ScalarValue::TimestampMillisecond(
-                Some(system_time.timestamp_millis()),
-                Some("UTC".into()),
-            )),
-        )?;
+        let df = df
+            .with_column(
+                &vocab.system_time_column,
+                Expr::Literal(ScalarValue::TimestampMillisecond(
+                    Some(system_time.timestamp_millis()),
+                    Some("UTC".into()),
+                )),
+            )
+            .int_err()?;
 
-        // Event time (only if raw data doesn't already have this column)
-        let df = if !df
+        // Event time - validate or add from source event time if data doesn't contain
+        // this colum
+        let event_time_col = df
             .schema()
-            .has_column_with_unqualified_name(&vocab.event_time_column)
-        {
+            .fields()
+            .iter()
+            .find(|f| f.name().as_str() == vocab.event_time_column);
+
+        let df = if let Some(event_time_col) = event_time_col {
+            match event_time_col.data_type() {
+                DataType::Date32 | DataType::Date64 => {}
+                DataType::Timestamp(_, None) => {
+                    return Err(InvalidQueryError::new(
+                        format!(
+                            "Event time column '{}' should be adjusted to UTC, but local/naive \
+                             timestamp found",
+                            vocab.event_time_column
+                        ),
+                        Vec::new(),
+                    )
+                    .into());
+                }
+                DataType::Timestamp(_, Some(tz)) => match tz as &str {
+                    "+00:00" | "UTC" => {}
+                    tz => {
+                        // TODO: Is this restriction necessary?
+                        // Datafusion has very sane (metadata-only) approach to storing timezones.
+                        // The fear currently is about compatibility with engines like Spark/Flink
+                        // that might interpret it incorrectly. This has to be tested further.
+                        return Err(InvalidQueryError::new(
+                            format!(
+                                "Event time column '{}' should be adjusted to UTC, but found: {}",
+                                vocab.event_time_column, tz
+                            ),
+                            Vec::new(),
+                        )
+                        .into());
+                    }
+                },
+                typ => {
+                    return Err(InvalidQueryError::new(
+                        format!(
+                            "Event time column '{}' should be either Date or Timestamp, but \
+                             found: {}",
+                            vocab.event_time_column, typ
+                        ),
+                        Vec::new(),
+                    )
+                    .into());
+                }
+            }
+
+            df
+        } else {
             df.with_column(
                 &vocab.event_time_column,
                 if let Some(event_time) = source_event_time {
@@ -147,9 +255,8 @@ impl ReadServiceDatafusion {
                 } else {
                     col(vocab.system_time_column.as_ref())
                 },
-            )?
-        } else {
-            df
+            )
+            .int_err()?
         };
 
         // Reorder columns for nice looks
@@ -161,7 +268,7 @@ impl ReadServiceDatafusion {
         full_columns.append(&mut raw_columns_wo_event_time);
         let full_columns_str: Vec<_> = full_columns.iter().map(String::as_str).collect();
 
-        let df = df.select_columns(&full_columns_str)?;
+        let df = df.select_columns(&full_columns_str).int_err()?;
         Ok(df)
     }
 
@@ -208,8 +315,7 @@ impl ReadServiceDatafusion {
         vocab: &odf::DatasetVocabularyResolved<'_>,
     ) -> Result<IngestResponse, IngestError> {
         use datafusion::arrow::array::{Int64Array, TimestampMillisecondArray};
-        //use datafusion::parquet::file::reader::{FileReader, SerializedFileReader};
-        //use datafusion::parquet::file::statistics::Statistics;
+        use datafusion::arrow::datatypes::{DataType, TimeUnit};
 
         // Write parquet
         df.write_parquet_single_file(&path, None).await.int_err()?;
@@ -248,7 +354,10 @@ impl ReadServiceDatafusion {
                 vec![
                     min(col(vocab.offset_column.as_ref())),
                     max(col(vocab.offset_column.as_ref())),
-                    max(col(vocab.event_time_column.as_ref())),
+                    max(cast(
+                        col(vocab.event_time_column.as_ref()),
+                        DataType::Timestamp(TimeUnit::Millisecond, Some(Arc::from("UTC"))),
+                    )),
                 ],
             )
             .int_err()?;
@@ -289,48 +398,6 @@ impl ReadServiceDatafusion {
             out_checkpoint: None,
             out_data: Some(OwnedFile::new(path)),
         })
-
-        /*
-        let reader = SerializedFileReader::new(std::fs::File::open(&path).int_err()?).int_err()?;
-        let metadata = reader.metadata();
-        let num_rows: i64 = reader.metadata().file_metadata().num_rows();
-
-        // Print metadata for debugging
-        let metadata_str = {
-            let mut metadata_buf = Vec::new();
-            datafusion::parquet::schema::printer::print_parquet_metadata(
-                &mut metadata_buf,
-                metadata,
-            );
-            String::from_utf8(metadata_buf).unwrap()
-        };
-        tracing::info!(
-            metadata = %metadata_str,
-            num_rows,
-            "Wrote data to parquet file"
-        );
-
-        if num_rows == 0 {
-            std::fs::remove_file(&path).int_err()?;
-            Ok(IngestResponse {
-                data_interval: None,
-                output_watermark: None,
-                out_checkpoint: None,
-                out_data: None,
-            })
-        } else {
-            let mut offset_min = i64::MAX;
-            let mut offset_max = i64::MIN;
-            for rg in metadata.row_groups() {
-                let offset_stats = match rg.column(0).statistics() {
-                    Some(Statistics::Int64(s)) => Ok(s),
-                    s => Err(format!("Expected i64 offset statistics but got: {:?}", s).int_err()),
-                }?;
-
-                offset_min = offset_min.min(*offset_stats.min());
-                offset_max = offset_max.min(*offset_stats.max());
-            }
-        }*/
     }
 }
 
@@ -383,6 +450,9 @@ impl ReadService for ReadServiceDatafusion {
             df
         };
 
+        // Normalize timestamps
+        let df = self.normalize_raw_result(df)?;
+
         // Merge step
         let df = {
             // Prepare previous data
@@ -427,15 +497,15 @@ impl ReadService for ReadServiceDatafusion {
         };
 
         // Prepare and write output
-        let df = Self::with_system_columns(
-            df,
-            &vocab,
-            request.system_time,
-            request.event_time,
-            request.next_offset,
-        )
-        .await
-        .int_err()?;
+        let df = self
+            .with_system_columns(
+                df,
+                &vocab,
+                request.system_time,
+                request.event_time,
+                request.next_offset,
+            )
+            .await?;
 
         tracing::info!(schema = ?df.schema(), "Final output schema");
 

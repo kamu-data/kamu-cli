@@ -259,7 +259,7 @@ async fn test_transform_common(transform: Transform) {
         Arc::new(ContainerRuntime::default()),
         run_info_dir,
         cache_dir,
-        Arc::new(DefaultSystemTimeSource),
+        Arc::new(SystemTimeSourceDefault),
     );
 
     let transform_svc = TransformServiceImpl::new(
