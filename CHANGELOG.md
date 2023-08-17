@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.139.0] - 2023-08-17
+### Added
+- Prototyped authorization checks for CLI functionality based on OSO-framework:
+   - for now the assumption is that all datasets are public
+   - public datasets can be read by anyone, but written only by owner
+   - authorization checks (Read, Write) integrated into every known CLI command or underlying service
+
 ## [0.138.0] - 2023-08-15
 ### Added
 - GQL API now supports renaming and deleting datasets
