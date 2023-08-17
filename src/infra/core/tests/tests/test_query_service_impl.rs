@@ -12,7 +12,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use datafusion::arrow::array::*;
-use datafusion::arrow::datatypes::{DataType, Field, Schema};
+use datafusion::arrow::datatypes::{DataType, Field, Int64Type, Schema};
 use datafusion::arrow::record_batch::RecordBatch;
 use kamu::domain::*;
 use kamu::testing::{LocalS3Server, MetadataFactory, ParquetWriterHelper};
@@ -256,7 +256,8 @@ async fn test_dataset_tail_local_fs() {
     let tempdir = tempfile::tempdir().unwrap();
     let catalog = create_catalog_with_local_workspace(
         tempdir.path(),
-        MockDatasetActionAuthorizer::new().expect_check_read_a_dataset(1),
+        // schema check + data check
+        MockDatasetActionAuthorizer::new().expect_check_read_a_dataset(2),
     )
     .await;
     test_dataset_tail_common(catalog, &tempdir).await;
@@ -268,7 +269,8 @@ async fn test_dataset_tail_s3() {
     let s3 = LocalS3Server::new().await;
     let catalog = create_catalog_with_s3_workspace(
         &s3,
-        MockDatasetActionAuthorizer::new().expect_check_read_a_dataset(1),
+        // schema check + data check
+        MockDatasetActionAuthorizer::new().expect_check_read_a_dataset(2),
     )
     .await;
     test_dataset_tail_common(catalog, &s3.tmp_dir).await;
@@ -302,6 +304,97 @@ async fn test_dataset_tail_unauthroized_s3() {
     let catalog =
         create_catalog_with_s3_workspace(&s3, MockDatasetActionAuthorizer::denying()).await;
     test_dataset_tail_unauthorized_common(catalog, &s3.tmp_dir).await;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+async fn test_dataset_sql_authorized_common(catalog: dill::Catalog, tempdir: &TempDir) {
+    let dataset_alias = create_test_dataset(&catalog, tempdir.path()).await;
+
+    let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
+    let statement = format!(
+        "SELECT COUNT(*) AS num_records FROM {}",
+        dataset_alias.to_string()
+    );
+    let result = query_svc
+        .sql_statement(statement.as_str(), QueryOptions::default())
+        .await;
+
+    assert_matches!(result, Ok(_));
+
+    let data_frame = result.unwrap();
+    let batches = data_frame.collect().await.unwrap();
+    assert_eq!(1, batches.len());
+    let last_batch = batches.last().unwrap();
+
+    assert_eq!(1, last_batch.num_rows());
+    assert_eq!(1, last_batch.num_columns());
+    assert_eq!(
+        &[3],
+        last_batch.column(0).as_primitive::<Int64Type>().values()
+    )
+}
+
+#[test_log::test(tokio::test)]
+#[cfg_attr(not(unix), ignore)] // TODO: DataFusion crashes on windows
+async fn test_dataset_sql_authorized_local_fs() {
+    let tempdir = tempfile::tempdir().unwrap();
+    let catalog = create_catalog_with_local_workspace(
+        tempdir.path(),
+        MockDatasetActionAuthorizer::new().expect_check_read_a_dataset(1),
+    )
+    .await;
+    test_dataset_sql_authorized_common(catalog, &tempdir).await;
+}
+
+#[test_group::group(containerized)]
+#[test_log::test(tokio::test)]
+async fn test_dataset_sql_authorized_s3() {
+    let s3 = LocalS3Server::new().await;
+    let catalog = create_catalog_with_s3_workspace(
+        &s3,
+        MockDatasetActionAuthorizer::new().expect_check_read_a_dataset(1),
+    )
+    .await;
+    test_dataset_sql_authorized_common(catalog, &s3.tmp_dir).await;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+async fn test_dataset_sql_unauthorized_common(catalog: dill::Catalog, tempdir: &TempDir) {
+    let dataset_alias = create_test_dataset(&catalog, tempdir.path()).await;
+
+    let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
+    let statement = format!("SELECT COUNT(*) FROM {}", dataset_alias.to_string());
+    let result = query_svc
+        .sql_statement(statement.as_str(), QueryOptions::default())
+        .await;
+
+    assert_matches!(
+        result,
+        Err(QueryError::DataFusionError(
+            datafusion::common::DataFusionError::Plan(s)
+        ))  if s.eq("table 'kamu.kamu.foo' not found")
+    );
+}
+
+#[test_log::test(tokio::test)]
+#[cfg_attr(not(unix), ignore)] // TODO: DataFusion crashes on windows
+async fn test_dataset_sql_unauthorized_local_fs() {
+    let tempdir = tempfile::tempdir().unwrap();
+    let catalog =
+        create_catalog_with_local_workspace(tempdir.path(), MockDatasetActionAuthorizer::denying())
+            .await;
+    test_dataset_sql_unauthorized_common(catalog, &tempdir).await;
+}
+
+#[test_group::group(containerized)]
+#[test_log::test(tokio::test)]
+async fn test_dataset_sql_unauthroized_s3() {
+    let s3 = LocalS3Server::new().await;
+    let catalog =
+        create_catalog_with_s3_workspace(&s3, MockDatasetActionAuthorizer::denying()).await;
+    test_dataset_sql_unauthorized_common(catalog, &s3.tmp_dir).await;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

@@ -65,6 +65,7 @@ impl QueryServiceImpl {
             Arc::new(KamuCatalog::new(Arc::new(KamuSchema::new(
                 session_context.clone(),
                 self.dataset_repo.clone(),
+                self.dataset_action_authorizer.clone(),
                 options,
             )))),
         );
@@ -325,6 +326,7 @@ impl CatalogProvider for KamuCatalog {
 struct KamuSchema {
     session_context: SessionContext,
     dataset_repo: Arc<dyn DatasetRepository>,
+    dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
     options: QueryOptions,
 }
 
@@ -332,11 +334,13 @@ impl KamuSchema {
     fn new(
         session_context: SessionContext,
         dataset_repo: Arc<dyn DatasetRepository>,
+        dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
         options: QueryOptions,
     ) -> Self {
         Self {
             session_context,
             dataset_repo,
+            dataset_action_authorizer,
             options,
         }
     }
@@ -440,8 +444,15 @@ impl KamuSchema {
             let mut dataset_handles = self.dataset_repo.get_all_datasets();
 
             while let Some(hdl) = dataset_handles.try_next().await.unwrap() {
-                if self.has_data(&hdl).await.unwrap() {
-                    res.push(hdl.alias.to_string())
+                if self
+                    .dataset_action_authorizer
+                    .check_action_allowed(&hdl, auth::DatasetAction::Read)
+                    .await
+                    .is_ok()
+                {
+                    if self.has_data(&hdl).await.unwrap() {
+                        res.push(hdl.alias.to_string())
+                    }
                 }
             }
 
@@ -461,11 +472,20 @@ impl KamuSchema {
             Err(_) => return false,
         };
 
-        self.dataset_repo
+        let maybe_dataset_handle = self
+            .dataset_repo
             .try_resolve_dataset_ref(&dataset_name.into())
             .await
-            .unwrap()
-            .is_some()
+            .unwrap();
+
+        if let Some(dh) = maybe_dataset_handle.as_ref() {
+            self.dataset_action_authorizer
+                .check_action_allowed(dh, auth::DatasetAction::Read)
+                .await
+                .is_ok()
+        } else {
+            false
+        }
     }
 }
 
@@ -513,6 +533,15 @@ impl SchemaProvider for KamuSchema {
             Ok(hdl) => hdl,
             Err(_) => return None,
         };
+
+        match self
+            .dataset_action_authorizer
+            .check_action_allowed(&dataset_handle, auth::DatasetAction::Read)
+            .await
+        {
+            Ok(_) => {}
+            Err(_) => return None,
+        }
 
         let dataset = self
             .dataset_repo
