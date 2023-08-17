@@ -25,6 +25,7 @@ use crate::output::OutputConfig;
 
 pub struct LogCommand {
     dataset_repo: Arc<dyn DatasetRepository>,
+    dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
     dataset_ref: DatasetRef,
     outout_format: Option<String>,
     filter: Option<String>,
@@ -35,6 +36,7 @@ pub struct LogCommand {
 impl LogCommand {
     pub fn new(
         dataset_repo: Arc<dyn DatasetRepository>,
+        dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
         dataset_ref: DatasetRef,
         outout_format: Option<&str>,
         filter: Option<&str>,
@@ -43,6 +45,7 @@ impl LogCommand {
     ) -> Self {
         Self {
             dataset_repo,
+            dataset_action_authorizer,
             dataset_ref,
             outout_format: outout_format.map(|s| s.to_owned()),
             filter: filter.map(|s| s.to_owned()),
@@ -100,6 +103,14 @@ impl Command for LogCommand {
             .dataset_repo
             .resolve_dataset_ref(&self.dataset_ref)
             .await?;
+
+        self.dataset_action_authorizer
+            .check_action_allowed(&dataset_handle, auth::DatasetAction::Read)
+            .await
+            .map_err(|e| match e {
+                auth::DatasetActionUnauthorizedError::Access(e) => CLIError::failure(e),
+                auth::DatasetActionUnauthorizedError::Internal(e) => CLIError::critical(e),
+            })?;
 
         let dataset = self
             .dataset_repo

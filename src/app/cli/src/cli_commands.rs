@@ -168,6 +168,7 @@ pub fn get_command(
         }
         Some(("log", submatches)) => Box::new(LogCommand::new(
             catalog.get_one()?,
+            catalog.get_one()?,
             validate_dataset_ref(
                 catalog,
                 submatches.get_one::<DatasetRef>("dataset").unwrap().clone(),
