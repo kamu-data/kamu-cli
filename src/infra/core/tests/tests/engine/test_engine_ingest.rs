@@ -24,9 +24,11 @@ use kamu::*;
 use opendatafabric::*;
 use tempfile::TempDir;
 
+/////////////////////////////////////////////////////////////////////////////////////////
+
 #[test_group::group(containerized, engine, ingest, spark)]
 #[test_log::test(tokio::test)]
-async fn test_ingest_csv_with_engine_spark() {
+async fn test_ingest_legacy_spark() {
     let harness = IngestTestHarness::new();
 
     let src_path = harness.temp_dir.path().join("data.csv");
@@ -51,12 +53,10 @@ async fn test_ingest_csv_with_engine_spark() {
                 .fetch_file(&src_path)
                 .read(ReadStep::Csv(ReadStepCsv {
                     header: Some(true),
-                    schema: Some(
-                        ["city STRING", "population INT"]
-                            .iter()
-                            .map(|s| s.to_string())
-                            .collect(),
-                    ),
+                    schema: Some(vec![
+                        "city STRING".to_string(),
+                        "population INT".to_string(),
+                    ]),
                     ..ReadStepCsv::default()
                 }))
                 .preprocess(TransformSql {
@@ -83,7 +83,7 @@ async fn test_ingest_csv_with_engine_spark() {
     let dataset_name = dataset_snapshot.name.clone();
 
     harness.create_dataset(dataset_snapshot).await;
-    harness.ingest(&dataset_name).await;
+    harness.ingest(&dataset_name).await.unwrap();
 
     let parquet_reader = harness.read_datafile(&dataset_name).await;
 
@@ -107,9 +107,11 @@ async fn test_ingest_csv_with_engine_spark() {
     );
 }
 
+/////////////////////////////////////////////////////////////////////////////////////////
+
 #[test_group::group(containerized, engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
-async fn test_ingest_csv_with_engine_datafusion_cdc() {
+async fn test_ingest_datafusion_snapshot() {
     let harness = IngestTestHarness::new();
 
     let src_path = harness.temp_dir.path().join("data.csv");
@@ -130,12 +132,10 @@ async fn test_ingest_csv_with_engine_datafusion_cdc() {
                 }))
                 .read(ReadStep::Csv(ReadStepCsv {
                     header: Some(true),
-                    schema: Some(
-                        ["city STRING", "population BIGINT"]
-                            .iter()
-                            .map(|s| s.to_string())
-                            .collect(),
-                    ),
+                    schema: Some(vec![
+                        "city STRING".to_string(),
+                        "population BIGINT".to_string(),
+                    ]),
                     ..ReadStepCsv::default()
                 }))
                 .preprocess(TransformSql {
@@ -147,11 +147,11 @@ async fn test_ingest_csv_with_engine_datafusion_cdc() {
                             alias: Some("step1".to_string()),
                             query: indoc::indoc!(
                                 r#"
-                            select
-                                city,
-                                population * 10 as population
-                            from input
-                            "#
+                                select
+                                    city,
+                                    population * 10 as population
+                                from input
+                                "#
                             )
                             .to_string(),
                         },
@@ -159,11 +159,11 @@ async fn test_ingest_csv_with_engine_datafusion_cdc() {
                             alias: None,
                             query: indoc::indoc!(
                                 r#"
-                            select
-                                city,
-                                population + 1 as population
-                            from step1
-                            "#
+                                select
+                                    city,
+                                    population + 1 as population
+                                from step1
+                                "#
                             )
                             .to_string(),
                         },
@@ -200,7 +200,7 @@ async fn test_ingest_csv_with_engine_datafusion_cdc() {
     )
     .unwrap();
 
-    harness.ingest(&dataset_name).await;
+    harness.ingest(&dataset_name).await.unwrap();
 
     let df = harness.get_last_data(&dataset_name).await;
     kamu_data_utils::testing::assert_schema_eq(
@@ -263,7 +263,7 @@ async fn test_ingest_csv_with_engine_datafusion_cdc() {
         .time_source
         .set(Utc.with_ymd_and_hms(2050, 2, 1, 12, 0, 0).unwrap());
 
-    harness.ingest(&dataset_name).await;
+    harness.ingest(&dataset_name).await.unwrap();
 
     let df = harness.get_last_data(&dataset_name).await;
     kamu_data_utils::testing::assert_data_eq(
@@ -291,9 +291,11 @@ async fn test_ingest_csv_with_engine_datafusion_cdc() {
     );
 }
 
+/////////////////////////////////////////////////////////////////////////////////////////
+
 #[test_group::group(containerized, engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
-async fn test_ingest_csv_with_engine_datafusion_ledger() {
+async fn test_ingest_datafusion_ledger() {
     let harness = IngestTestHarness::new();
     let src_path = harness.temp_dir.path().join("data.csv");
 
@@ -324,16 +326,7 @@ async fn test_ingest_csv_with_engine_datafusion_ledger() {
                 .preprocess(TransformSql {
                     engine: "datafusion".to_string(),
                     version: None,
-                    query: Some(
-                        indoc::indoc!(
-                            r#"
-                            select
-                                *
-                            from input
-                            "#
-                        )
-                        .to_string(),
-                    ),
+                    query: Some("select * from input".to_string()),
                     queries: None,
                     temporal_tables: None,
                 })
@@ -367,7 +360,7 @@ async fn test_ingest_csv_with_engine_datafusion_ledger() {
     )
     .unwrap();
 
-    harness.ingest(&dataset_name).await;
+    harness.ingest(&dataset_name).await.unwrap();
 
     let df = harness.get_last_data(&dataset_name).await;
     kamu_data_utils::testing::assert_schema_eq(
@@ -425,7 +418,7 @@ async fn test_ingest_csv_with_engine_datafusion_ledger() {
     )
     .unwrap();
 
-    harness.ingest(&dataset_name).await;
+    harness.ingest(&dataset_name).await.unwrap();
 
     let df = harness.get_last_data(&dataset_name).await;
     kamu_data_utils::testing::assert_data_eq(
@@ -450,6 +443,190 @@ async fn test_ingest_csv_with_engine_datafusion_ledger() {
             .output_watermark
             .map(|dt| dt.to_rfc3339()),
         Some("2021-01-01T00:00:00+00:00".to_string())
+    );
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(containerized, engine, ingest, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_ingest_datafusion_event_time_as_date() {
+    let harness = IngestTestHarness::new();
+    let src_path = harness.temp_dir.path().join("data.csv");
+
+    let dataset_snapshot = MetadataFactory::dataset_snapshot()
+        .name("foo.bar")
+        .kind(DatasetKind::Root)
+        .push_event(
+            MetadataFactory::set_polling_source()
+                .fetch(FetchStep::Url(FetchStepUrl {
+                    url: url::Url::from_file_path(&src_path)
+                        .unwrap()
+                        .as_str()
+                        .to_owned(),
+                    event_time: Some(EventTimeSource::FromSystemTime),
+                    cache: None,
+                    headers: None,
+                }))
+                .read(ReadStep::Csv(ReadStepCsv {
+                    header: Some(true),
+                    schema: Some(
+                        ["date DATE", "city STRING", "population BIGINT"]
+                            .iter()
+                            .map(|s| s.to_string())
+                            .collect(),
+                    ),
+                    ..ReadStepCsv::default()
+                }))
+                .preprocess(TransformSql {
+                    engine: "datafusion".to_string(),
+                    version: None,
+                    query: Some("select * from input".to_string()),
+                    queries: None,
+                    temporal_tables: None,
+                })
+                .merge(MergeStrategyLedger {
+                    primary_key: vec!["date".to_string(), "city".to_string()],
+                })
+                .build(),
+        )
+        .push_event(SetVocab {
+            system_time_column: None,
+            event_time_column: Some("date".to_string()),
+            offset_column: None,
+        })
+        .build();
+
+    let dataset_name = dataset_snapshot.name.clone();
+
+    harness.create_dataset(dataset_snapshot).await;
+
+    std::fs::write(
+        &src_path,
+        indoc!(
+            "
+            date,city,population
+            2020-01-01,A,1000
+            2020-01-01,B,2000
+            2020-01-01,C,3000
+            "
+        ),
+    )
+    .unwrap();
+
+    harness.ingest(&dataset_name).await.unwrap();
+
+    let df = harness.get_last_data(&dataset_name).await;
+    kamu_data_utils::testing::assert_schema_eq(
+        df.schema(),
+        indoc!(
+            r#"
+            message arrow_schema {
+              REQUIRED INT64 offset;
+              REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
+              OPTIONAL INT32 date (DATE);
+              OPTIONAL BYTE_ARRAY city (STRING);
+              OPTIONAL INT64 population;
+            }
+            "#
+        ),
+    );
+
+    kamu_data_utils::testing::assert_data_eq(
+        df,
+        indoc!(
+            r#"
+            +--------+----------------------+------------+------+------------+
+            | offset | system_time          | date       | city | population |
+            +--------+----------------------+------------+------+------------+
+            | 0      | 2050-01-01T12:00:00Z | 2020-01-01 | A    | 1000       |
+            | 1      | 2050-01-01T12:00:00Z | 2020-01-01 | B    | 2000       |
+            | 2      | 2050-01-01T12:00:00Z | 2020-01-01 | C    | 3000       |
+            +--------+----------------------+------------+------+------------+
+            "#
+        ),
+    )
+    .await;
+
+    assert_eq!(
+        harness
+            .get_last_data_block(&dataset_name)
+            .await
+            .event
+            .output_watermark
+            .map(|dt| dt.to_rfc3339()),
+        Some("2020-01-01T00:00:00+00:00".to_string())
+    );
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(containerized, engine, ingest, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_ingest_datafusion_event_time_of_invalid_type() {
+    let harness = IngestTestHarness::new();
+    let src_path = harness.temp_dir.path().join("data.csv");
+
+    let dataset_snapshot = MetadataFactory::dataset_snapshot()
+        .name("foo.bar")
+        .kind(DatasetKind::Root)
+        .push_event(
+            MetadataFactory::set_polling_source()
+                .fetch(FetchStep::Url(FetchStepUrl {
+                    url: url::Url::from_file_path(&src_path)
+                        .unwrap()
+                        .as_str()
+                        .to_owned(),
+                    event_time: Some(EventTimeSource::FromSystemTime),
+                    cache: None,
+                    headers: None,
+                }))
+                .read(ReadStep::Csv(ReadStepCsv {
+                    header: Some(true),
+                    schema: Some(vec![
+                        "date STRING".to_string(),
+                        "city STRING".to_string(),
+                        "population BIGINT".to_string(),
+                    ]),
+                    ..ReadStepCsv::default()
+                }))
+                .preprocess(TransformSql {
+                    engine: "datafusion".to_string(),
+                    version: None,
+                    query: Some("select * from input".to_string()),
+                    queries: None,
+                    temporal_tables: None,
+                })
+                .build(),
+        )
+        .push_event(SetVocab {
+            system_time_column: None,
+            event_time_column: Some("date".to_string()),
+            offset_column: None,
+        })
+        .build();
+
+    let dataset_name = dataset_snapshot.name.clone();
+
+    harness.create_dataset(dataset_snapshot).await;
+
+    std::fs::write(
+        &src_path,
+        indoc!(
+            "
+            date,city,population
+            2020-01-01,A,1000
+            2020-01-01,B,2000
+            2020-01-01,C,3000
+            "
+        ),
+    )
+    .unwrap();
+
+    let res = harness.ingest(&dataset_name).await;
+    assert_matches!(
+        res,
+        Err(IngestError::EngineError(EngineError::InvalidQuery(_)))
     );
 }
 
@@ -524,16 +701,14 @@ impl IngestTestHarness {
             .unwrap();
     }
 
-    async fn ingest(&self, dataset_name: &DatasetName) {
-        let res = self
-            .ingest_svc
+    async fn ingest(&self, dataset_name: &DatasetName) -> Result<IngestResult, IngestError> {
+        self.ingest_svc
             .ingest(
                 &DatasetAlias::new(None, dataset_name.clone()).as_local_ref(),
                 IngestOptions::default(),
                 None,
             )
-            .await;
-        assert_matches!(res, Ok(IngestResult::Updated { .. }));
+            .await
     }
 
     async fn get_last_data_block(&self, dataset_name: &DatasetName) -> MetadataBlockTyped<AddData> {

@@ -73,7 +73,9 @@ impl ReadServiceDatafusion {
             odf::ReadStep::Csv(_) => Arc::new(ReaderCsv {}),
             odf::ReadStep::NdJson(_) => Arc::new(ReaderNdJson {}),
             odf::ReadStep::JsonLines(_) => Arc::new(ReaderNdJson {}),
-            odf::ReadStep::GeoJson(_) => Arc::new(ReaderGeoJson::new(operation_dir.join("reader.tmp"))),
+            odf::ReadStep::GeoJson(_) => {
+                Arc::new(ReaderGeoJson::new(operation_dir.join("reader.tmp")))
+            }
             odf::ReadStep::EsriShapefile(_) => {
                 Arc::new(ReaderEsriShapefile::new(operation_dir.join("reader.tmp")))
             }
@@ -369,8 +371,12 @@ impl ReadServiceDatafusion {
         df: DataFrame,
         vocab: &odf::DatasetVocabularyResolved<'_>,
     ) -> Result<IngestResponse, IngestError> {
-        use datafusion::arrow::array::{Int64Array, TimestampMillisecondArray};
-        use datafusion::arrow::datatypes::{DataType, TimeUnit};
+        use datafusion::arrow::array::{
+            Date32Array,
+            Date64Array,
+            Int64Array,
+            TimestampMillisecondArray,
+        };
 
         // Write parquet
         df.write_parquet_single_file(&path, None).await.int_err()?;
@@ -402,17 +408,14 @@ impl ReadServiceDatafusion {
         }
 
         // Calculate watermark as max(event_time)
-        // TODO: Add support for more watermark strategies
         let stats = df
             .aggregate(
                 vec![],
                 vec![
                     min(col(vocab.offset_column.as_ref())),
                     max(col(vocab.offset_column.as_ref())),
-                    max(cast(
-                        col(vocab.event_time_column.as_ref()),
-                        DataType::Timestamp(TimeUnit::Millisecond, Some(Arc::from("UTC"))),
-                    )),
+                    // TODO: Add support for more watermark strategies
+                    max(col(vocab.event_time_column.as_ref())),
                 ],
             )
             .int_err()?;
@@ -435,14 +438,28 @@ impl ReadServiceDatafusion {
             .unwrap()
             .value(0);
 
-        let event_time_max_millis = batches[0]
-            .column(2)
-            .as_any()
-            .downcast_ref::<TimestampMillisecondArray>()
-            .unwrap()
-            .value(0);
-
-        let event_time_max = Utc.timestamp_millis_opt(event_time_max_millis).unwrap();
+        // Event time is either Date or Timestamp(Millisecond, UTC)
+        let event_time_arr = batches[0].column(2).as_any();
+        let event_time_max = if let Some(event_time_arr) =
+            event_time_arr.downcast_ref::<TimestampMillisecondArray>()
+        {
+            let event_time_max_millis = event_time_arr.value(0);
+            Utc.timestamp_millis_opt(event_time_max_millis).unwrap()
+        } else if let Some(event_time_arr) = event_time_arr.downcast_ref::<Date64Array>() {
+            let naive_datetime = event_time_arr.value_as_datetime(0).unwrap();
+            DateTime::from_utc(naive_datetime, Utc)
+        } else if let Some(event_time_arr) = event_time_arr.downcast_ref::<Date32Array>() {
+            let naive_datetime = event_time_arr.value_as_datetime(0).unwrap();
+            DateTime::from_utc(naive_datetime, Utc)
+        } else {
+            return Err(format!(
+                "Expected event time column to be Date64 or Timestamp(Millisecond, UTC), but got \
+                 {}",
+                batches[0].schema().field(2)
+            )
+            .int_err()
+            .into());
+        };
 
         Ok(IngestResponse {
             data_interval: Some(odf::OffsetInterval {
