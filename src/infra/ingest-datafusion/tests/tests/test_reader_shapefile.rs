@@ -24,7 +24,7 @@ async fn test_read_shapefile_with_schema() {
     let temp_dir: tempfile::TempDir = tempfile::tempdir().unwrap();
 
     test_reader_common::test_reader_success(
-        ReaderEsriShapefile::new(temp_dir.path()),
+        ReaderEsriShapefile::new(temp_dir.path().join("reader-tmp")),
         ReadStepEsriShapefile {
             schema: Some(vec![
                 "iso string not null".to_string(),
@@ -91,7 +91,7 @@ async fn test_read_shapefile_infer_schema() {
     let temp_dir: tempfile::TempDir = tempfile::tempdir().unwrap();
 
     test_reader_common::test_reader(
-        ReaderEsriShapefile::new(temp_dir.path()),
+        ReaderEsriShapefile::new(temp_dir.path().join("reader-tmp")),
         ReadStepEsriShapefile {
             schema: None,
             sub_path: None,
@@ -133,7 +133,7 @@ async fn test_read_shapefile_with_subpath_exists() {
     let temp_dir: tempfile::TempDir = tempfile::tempdir().unwrap();
 
     test_reader_common::test_reader(
-        ReaderEsriShapefile::new(temp_dir.path()),
+        ReaderEsriShapefile::new(temp_dir.path().join("reader-tmp")),
         ReadStepEsriShapefile {
             schema: None,
             sub_path: Some("gg870xt4706.shp".to_string()),
@@ -155,7 +155,7 @@ async fn test_read_shapefile_with_subpath_missing() {
     let temp_dir: tempfile::TempDir = tempfile::tempdir().unwrap();
 
     test_reader_common::test_reader(
-        ReaderEsriShapefile::new(temp_dir.path()),
+        ReaderEsriShapefile::new(temp_dir.path().join("reader-tmp")),
         ReadStepEsriShapefile {
             schema: None,
             sub_path: Some("invalid.shp".to_string()),
@@ -177,7 +177,7 @@ async fn test_read_shapefile_geom() {
     let temp_dir: tempfile::TempDir = tempfile::tempdir().unwrap();
 
     test_reader_common::test_reader(
-        ReaderEsriShapefile::new(temp_dir.path()),
+        ReaderEsriShapefile::new(temp_dir.path().join("reader-tmp")),
         ReadStepEsriShapefile {
             schema: Some(vec![
                 "geometry string not null".to_string(),

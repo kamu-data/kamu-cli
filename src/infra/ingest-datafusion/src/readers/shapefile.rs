@@ -20,23 +20,25 @@ use crate::*;
 ///////////////////////////////////////////////////////////////////////////////
 
 pub struct ReaderEsriShapefile {
-    temp_dir: PathBuf,
+    temp_path: PathBuf,
 }
 
 impl ReaderEsriShapefile {
-    pub fn new(temp_dir: impl Into<PathBuf>) -> Self {
+    // TODO: This is an ugly API that leaves it to the caller to clean up our temp
+    // file mess. Ideally we should not produce any temp files at all and stream in
+    // all data.
+    pub fn new(temp_path: impl Into<PathBuf>) -> Self {
         Self {
-            temp_dir: temp_dir.into(),
+            temp_path: temp_path.into(),
         }
     }
 
     // TODO: PERF: Consider subPath argumemnt to skip extracting unrelated data
     fn extract_zip_to_temp_dir(&self, path: &Path) -> Result<PathBuf, InternalError> {
-        let extracted_path = self.temp_dir.join("shapefile");
-        std::fs::create_dir(&extracted_path).int_err()?;
+        std::fs::create_dir(&self.temp_path).int_err()?;
         let mut archive = zip::ZipArchive::new(std::fs::File::open(path).int_err()?).int_err()?;
-        archive.extract(&extracted_path).int_err()?;
-        Ok(extracted_path)
+        archive.extract(&self.temp_path).int_err()?;
+        Ok(self.temp_path.clone())
     }
 
     fn locate_shp_file(&self, dir: &Path, subpath: Option<&str>) -> Result<PathBuf, InternalError> {
@@ -159,8 +161,8 @@ impl Reader for ReaderEsriShapefile {
         let shp_path =
             self.locate_shp_file(&extracted_path, conf.sub_path.as_ref().map(|s| s.as_str()))?;
 
-        let temp_path = self.temp_dir.join("temp.json");
-        let mut file = std::fs::File::create_new(&temp_path).int_err()?;
+        let temp_json_path = extracted_path.join("__temp.json");
+        let mut file = std::fs::File::create_new(&temp_json_path).int_err()?;
 
         let mut reader = shapefile::Reader::from_path(&shp_path).int_err()?;
         for rec in reader.iter_shapes_and_records() {
@@ -192,7 +194,7 @@ impl Reader for ReaderEsriShapefile {
         file.flush().int_err()?;
 
         let options = NdJsonReadOptions {
-            file_extension: temp_path.extension().and_then(|s| s.to_str()).unwrap_or(""),
+            file_extension: "json",
             table_partition_cols: Vec::new(),
             schema: schema.as_ref(),
             schema_infer_max_records: 1000,
@@ -201,7 +203,7 @@ impl Reader for ReaderEsriShapefile {
         };
 
         let df = ctx
-            .read_json(temp_path.to_str().unwrap(), options)
+            .read_json(temp_json_path.to_str().unwrap(), options)
             .await
             .int_err()?;
 

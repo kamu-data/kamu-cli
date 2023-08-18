@@ -73,9 +73,9 @@ impl ReadServiceDatafusion {
             odf::ReadStep::Csv(_) => Arc::new(ReaderCsv {}),
             odf::ReadStep::NdJson(_) => Arc::new(ReaderNdJson {}),
             odf::ReadStep::JsonLines(_) => Arc::new(ReaderNdJson {}),
-            odf::ReadStep::GeoJson(_) => Arc::new(ReaderGeoJson::new(operation_dir.to_path_buf())),
+            odf::ReadStep::GeoJson(_) => Arc::new(ReaderGeoJson::new(operation_dir.join("reader.tmp"))),
             odf::ReadStep::EsriShapefile(_) => {
-                Arc::new(ReaderEsriShapefile::new(operation_dir.to_path_buf()))
+                Arc::new(ReaderEsriShapefile::new(operation_dir.join("reader.tmp")))
             }
             odf::ReadStep::Parquet(_) => Arc::new(ReaderParquet {}),
         }

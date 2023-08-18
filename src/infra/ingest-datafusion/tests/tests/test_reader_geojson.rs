@@ -20,7 +20,7 @@ async fn test_read_geojson_with_schema() {
     let temp_dir: tempfile::TempDir = tempfile::tempdir().unwrap();
 
     test_reader_common::test_reader_success_textual(
-        ReaderGeoJson::new(temp_dir.path()),
+        ReaderGeoJson::new(temp_dir.path().join("reader-tmp")),
         ReadStepGeoJson {
             schema: Some(vec![
                 "id int not null".to_string(),
@@ -68,7 +68,7 @@ async fn test_read_geojson_infer_schema() {
     let temp_dir: tempfile::TempDir = tempfile::tempdir().unwrap();
 
     test_reader_common::test_reader_success_textual(
-        ReaderGeoJson::new(temp_dir.path()),
+        ReaderGeoJson::new(temp_dir.path().join("reader-tmp")),
         ReadStepGeoJson {
             schema: None,
         },

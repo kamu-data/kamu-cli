@@ -20,13 +20,16 @@ use crate::*;
 ///////////////////////////////////////////////////////////////////////////////
 
 pub struct ReaderGeoJson {
-    temp_dir: PathBuf,
+    temp_path: PathBuf,
 }
 
 impl ReaderGeoJson {
-    pub fn new(temp_dir: impl Into<PathBuf>) -> Self {
+    // TODO: This is an ugly API that leaves it to the caller to clean up our temp
+    // file mess. Ideally we should not produce any temp files at all and stream in
+    // all data.
+    pub fn new(temp_path: impl Into<PathBuf>) -> Self {
         Self {
-            temp_dir: temp_dir.into(),
+            temp_path: temp_path.into(),
         }
     }
 }
@@ -74,8 +77,7 @@ impl Reader for ReaderGeoJson {
             _ => Err("Object doesn't look like a FeatureCollection".int_err()),
         }?;
 
-        let temp_path = self.temp_dir.join("temp.json");
-        let mut file = std::fs::File::create_new(&temp_path).int_err()?;
+        let mut file = std::fs::File::create_new(&self.temp_path).int_err()?;
 
         for feature in features {
             let mut record = feature["properties"]
@@ -93,7 +95,11 @@ impl Reader for ReaderGeoJson {
         file.flush().int_err()?;
 
         let options = NdJsonReadOptions {
-            file_extension: temp_path.extension().and_then(|s| s.to_str()).unwrap_or(""),
+            file_extension: self
+                .temp_path
+                .extension()
+                .and_then(|s| s.to_str())
+                .unwrap_or(""),
             table_partition_cols: Vec::new(),
             schema: schema.as_ref(),
             schema_infer_max_records: 1000,
@@ -102,7 +108,7 @@ impl Reader for ReaderGeoJson {
         };
 
         let df = ctx
-            .read_json(temp_path.to_str().unwrap(), options)
+            .read_json(self.temp_path.to_str().unwrap(), options)
             .await
             .int_err()?;
 
