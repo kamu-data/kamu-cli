@@ -27,7 +27,7 @@ test:
 # Run all tests excluding the heavy engines
 .PHONY: test-fast
 test-fast:
-	RUST_LOG_SPAN_EVENTS=new,close RUST_LOG=debug cargo nextest run -E '!test(::engine::)'
+	RUST_LOG_SPAN_EVENTS=new,close RUST_LOG=debug cargo nextest run -E 'not (test(::spark::) | test(::flink::))'
 
 
 ###############################################################################

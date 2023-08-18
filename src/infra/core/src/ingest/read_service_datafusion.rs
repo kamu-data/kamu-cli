@@ -13,7 +13,7 @@ use std::sync::Arc;
 use chrono::{DateTime, TimeZone, Utc};
 use datafusion::prelude::*;
 use internal_error::*;
-use kamu_core::{Dataset, EngineError, InvalidQueryError, OwnedFile};
+use kamu_core::{Dataset, EngineError, InvalidQueryError, ObjectStoreRegistry, OwnedFile};
 use kamu_data_utils::data::dataframe_ext::*;
 use kamu_ingest_datafusion::*;
 use opendatafabric as odf;
@@ -34,16 +34,37 @@ pub trait ReadService: Send + Sync {
 }
 
 pub struct ReadServiceDatafusion {
+    object_store_registry: Arc<dyn ObjectStoreRegistry>,
     dataset: Arc<dyn Dataset>,
     run_info_dir: PathBuf,
 }
 
 impl ReadServiceDatafusion {
-    pub fn new(dataset: Arc<dyn Dataset>, run_info_dir: PathBuf) -> Self {
+    pub fn new(
+        object_store_registry: Arc<dyn ObjectStoreRegistry>,
+        dataset: Arc<dyn Dataset>,
+        run_info_dir: PathBuf,
+    ) -> Self {
         Self {
+            object_store_registry,
             dataset,
             run_info_dir,
         }
+    }
+
+    fn new_session_context(&self) -> SessionContext {
+        use datafusion::execution::runtime_env::{RuntimeConfig, RuntimeEnv};
+
+        let config = SessionConfig::new().with_default_catalog_and_schema("kamu", "kamu");
+
+        let runtime_config = RuntimeConfig {
+            object_store_registry: self.object_store_registry.clone().as_datafusion_registry(),
+            ..RuntimeConfig::default()
+        };
+
+        let runtime = Arc::new(RuntimeEnv::new(runtime_config).unwrap());
+
+        SessionContext::with_config_rt(config, runtime)
     }
 
     // TODO: Replace with DI
@@ -75,6 +96,40 @@ impl ReadServiceDatafusion {
                 cfg.clone(),
             )),
         }
+    }
+
+    async fn get_all_previous_data(
+        &self,
+        ctx: &SessionContext,
+        prev_data_slices: &Vec<odf::Multihash>,
+    ) -> Result<Option<DataFrame>, InternalError> {
+        if prev_data_slices.is_empty() {
+            return Ok(None);
+        }
+
+        let data_repo = self.dataset.as_data_repo();
+
+        use futures::StreamExt;
+        let prev_data_paths: Vec<_> = futures::stream::iter(prev_data_slices.iter().rev())
+            .then(|hash| data_repo.get_internal_url(hash))
+            .map(|url| url.to_string())
+            .collect()
+            .await;
+
+        let df = ctx
+            .read_parquet(
+                prev_data_paths,
+                ParquetReadOptions {
+                    file_extension: "",
+                    table_partition_cols: Vec::new(),
+                    parquet_pruning: None,
+                    skip_metadata: None,
+                },
+            )
+            .await
+            .int_err()?;
+
+        Ok(Some(df))
     }
 
     // TODO: This function currently ensures that all timestamps in the ouput are
@@ -418,7 +473,7 @@ impl ReadService for ReadServiceDatafusion {
         let vocab = request.vocab.into_resolved();
         let source = request.polling_source.unwrap();
 
-        let ctx = SessionContext::new();
+        let ctx = self.new_session_context();
 
         // Read step
         let df = {
@@ -455,43 +510,14 @@ impl ReadService for ReadServiceDatafusion {
 
         // Merge step
         let df = {
-            // Prepare previous data
-            let prev = if request.prev_data_slices.is_empty() {
-                None
-            } else {
-                // TODO: PERF: We could benefit from ingest checkpointing here
-                let data_repo = self.dataset.as_data_repo();
-
-                // Assuming slices are in reverse chronological order and we flip it to make the
-                // datafusion's job of sorting by offset (as needed by snapshot strategy) easier
-                use futures::{StreamExt, TryStreamExt};
-                let prev_data_paths: Vec<_> =
-                    futures::stream::iter(request.prev_data_slices.iter().rev())
-                        .then(|hash| data_repo.get_internal_url(hash))
-                        .map(|url| kamu_data_utils::data::local_url::into_local_path(url))
-                        .map_ok(|path| path.to_string_lossy().into_owned())
-                        .try_collect()
-                        .await
-                        .int_err()?;
-
-                let df = ctx
-                    .read_parquet(
-                        prev_data_paths,
-                        ParquetReadOptions {
-                            file_extension: "",
-                            table_partition_cols: Vec::new(),
-                            parquet_pruning: None,
-                            skip_metadata: None,
-                        },
-                    )
-                    .await
-                    .int_err()?;
-
-                Some(df)
-            };
+            // TODO: PERF: We could benefit from ingest checkpointing here
+            let prev = self
+                .get_all_previous_data(&ctx, &request.prev_data_slices)
+                .await?;
 
             let merge_strategy = self.get_merge_strategy(&source.merge, &vocab);
             let df = merge_strategy.merge(prev, df)?;
+
             tracing::info!(schema = ?df.schema(), "Merge step output schema");
             df
         };

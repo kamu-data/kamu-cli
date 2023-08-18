@@ -24,7 +24,7 @@ use kamu::*;
 use opendatafabric::*;
 use tempfile::TempDir;
 
-#[test_group::group(containerized, engine)]
+#[test_group::group(containerized, engine, ingest, spark)]
 #[test_log::test(tokio::test)]
 async fn test_ingest_csv_with_engine_spark() {
     let harness = IngestTestHarness::new();
@@ -107,7 +107,7 @@ async fn test_ingest_csv_with_engine_spark() {
     );
 }
 
-#[test_group::group(containerized, engine)]
+#[test_group::group(containerized, engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_ingest_csv_with_engine_datafusion_cdc() {
     let harness = IngestTestHarness::new();
@@ -291,7 +291,7 @@ async fn test_ingest_csv_with_engine_datafusion_cdc() {
     );
 }
 
-#[test_group::group(containerized, engine)]
+#[test_group::group(containerized, engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_ingest_csv_with_engine_datafusion_ledger() {
     let harness = IngestTestHarness::new();
@@ -499,6 +499,9 @@ impl IngestTestHarness {
             dataset_repo.clone(),
             dataset_action_authorizer,
             engine_provisioner,
+            Arc::new(ObjectStoreRegistryImpl::new(vec![Arc::new(
+                ObjectStoreBuilderLocalFs::new(),
+            )])),
             Arc::new(ContainerRuntime::default()),
             run_info_dir,
             cache_dir,

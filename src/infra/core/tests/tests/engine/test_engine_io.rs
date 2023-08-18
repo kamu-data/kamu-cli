@@ -19,6 +19,7 @@ use kamu::*;
 use opendatafabric::*;
 
 async fn test_engine_io_common(
+    object_stores: Vec<Arc<dyn ObjectStoreBuilder>>,
     dataset_repo: Arc<dyn DatasetRepository>,
     run_info_dir: &Path,
     cache_dir: &Path,
@@ -37,6 +38,7 @@ async fn test_engine_io_common(
         dataset_repo.clone(),
         dataset_action_authorizer.clone(),
         engine_provisioner.clone(),
+        Arc::new(ObjectStoreRegistryImpl::new(object_stores)),
         Arc::new(ContainerRuntime::default()),
         run_info_dir.to_path_buf(),
         cache_dir.to_path_buf(),
@@ -80,6 +82,14 @@ async fn test_engine_io_common(
                         "population INT".to_string(),
                     ]),
                     ..ReadStepCsv::default()
+                })
+                // TODO: Temporary no-op to make ingest use experimental DataFusion engine
+                .preprocess(TransformSql {
+                    engine: "datafusion".to_string(),
+                    query: Some("select * from input".to_string()),
+                    version: None,
+                    queries: None,
+                    temporal_tables: None,
                 })
                 .merge(MergeStrategySnapshot {
                     primary_key: vec!["city".to_string()],
@@ -206,7 +216,7 @@ async fn test_engine_io_common(
     assert_matches!(verify_result, Ok(VerificationResult::Valid));
 }
 
-#[test_group::group(containerized, engine)]
+#[test_group::group(containerized, engine, transform, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_engine_io_local_file_mount() {
     let tempdir = tempfile::tempdir().unwrap();
@@ -226,6 +236,7 @@ async fn test_engine_io_local_file_mount() {
     );
 
     test_engine_io_common(
+        vec![Arc::new(ObjectStoreBuilderLocalFs::new())],
         dataset_repo,
         &run_info_dir,
         &cache_dir,
@@ -239,7 +250,7 @@ async fn test_engine_io_local_file_mount() {
     .await
 }
 
-#[test_group::group(containerized, engine)]
+#[test_group::group(containerized, engine, transform, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_engine_io_s3_to_local_file_mount_proxy() {
     let s3 = LocalS3Server::new().await;
@@ -252,13 +263,19 @@ async fn test_engine_io_s3_to_local_file_mount_proxy() {
     let s3_context = kamu::utils::s3_context::S3Context::from_url(&s3.url).await;
 
     let dataset_repo = Arc::new(DatasetRepositoryS3::new(
-        s3_context,
+        s3_context.clone(),
         Arc::new(CurrentAccountSubject::new_test()),
         Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new()),
         false,
     ));
 
     test_engine_io_common(
+        vec![
+            Arc::new(ObjectStoreBuilderLocalFs::new()),
+            // Note that DataFusion ingest will use S3 object store directly, but transform engine
+            // will use the IO proxying
+            Arc::new(ObjectStoreBuilderS3::new(s3_context, true)),
+        ],
         dataset_repo,
         &run_info_dir,
         &cache_dir,

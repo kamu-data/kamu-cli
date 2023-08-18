@@ -17,7 +17,7 @@ use url::Url;
 
 use crate::utils::Kamu;
 
-#[test_group::group(containerized, engine)]
+#[test_group::group(containerized, engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_pull_ingest_from_file() {
     let kamu = Kamu::new_workspace_tmp().await;
@@ -43,7 +43,17 @@ async fn test_pull_ingest_from_file() {
                 ]),
                 ..ReadStepCsv::default()
             }),
-            preprocess: None,
+            // TODO: Temporary to force ingest to use new DataFusion engine
+            preprocess: Some(
+                TransformSql {
+                    engine: "datafusion".to_string(),
+                    query: Some("select * from input".to_string()),
+                    version: None,
+                    queries: None,
+                    temporal_tables: None,
+                }
+                .into(),
+            ),
             merge: MergeStrategy::Ledger(MergeStrategyLedger {
                 primary_key: vec!["event_time".to_owned(), "city".to_owned()],
             }),

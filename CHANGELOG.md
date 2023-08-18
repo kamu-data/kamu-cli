@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+### Added
+- **Experimental:** Data ingest using `DataFusion` engine
+  - It's an engirely new implementation of data readers and merge strategies
+  - It's often over **100x faster** than the `Spark`-based ingest as it has near-instant startup time (even avoids container overhead)
+  - New merge strategies can work directly over S3 without downloading all data locally
+  - It supports all existing data formats (Parquet, CSV, NdJson, GeoJson, Shapefile)
+    - Some advanced CSV / Json reader options are not yet implemented, most notably `timestampFormat`
+  - `Spark` is still used by default for compatibility. To start using `DataFusion` declare (a potentially no-op) `preprocess` step in your root dataset manifest ([see example](examples/currency_conversion/ca.bankofcanada.exchange-rates.daily.yaml))
+  - `Spark`-based ingest will be remove in future versions with `DataFusion` becoming the default, however we are planning to support `Spark` and all other engines in the `preprocess` step, while `DataFusion` will still be handling the initial reading of data and merging of results
+
 ## [0.139.0] - 2023-08-17
 ### Added
 - Prototyped authorization checks for CLI functionality based on OSO-framework:

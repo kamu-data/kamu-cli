@@ -256,6 +256,9 @@ async fn test_transform_common(transform: Transform) {
         dataset_repo.clone(),
         dataset_action_authorizer.clone(),
         engine_provisioner.clone(),
+        Arc::new(ObjectStoreRegistryImpl::new(vec![Arc::new(
+            ObjectStoreBuilderLocalFs::new(),
+        )])),
         Arc::new(ContainerRuntime::default()),
         run_info_dir,
         cache_dir,
@@ -302,6 +305,14 @@ async fn test_transform_common(transform: Transform) {
                     ),
                     ..ReadStepCsv::default()
                 }))
+                // TODO: Temporary no-op to make ingest use experimental DataFusion engine
+                .preprocess(TransformSql {
+                    engine: "datafusion".to_string(),
+                    query: Some("select * from input".to_string()),
+                    version: None,
+                    queries: None,
+                    temporal_tables: None,
+                })
                 .build(),
         )
         .build();
@@ -466,7 +477,7 @@ async fn test_transform_common(transform: Transform) {
     );
 }
 
-#[test_group::group(containerized, engine)]
+#[test_group::group(containerized, engine, transform, spark)]
 #[test_log::test(tokio::test)]
 async fn test_transform_with_engine_spark() {
     test_transform_common(
@@ -478,7 +489,7 @@ async fn test_transform_with_engine_spark() {
     .await
 }
 
-#[test_group::group(containerized, engine)]
+#[test_group::group(containerized, engine, transform, flink)]
 #[test_log::test(tokio::test)]
 async fn test_transform_with_engine_flink() {
     test_transform_common(
@@ -490,7 +501,7 @@ async fn test_transform_with_engine_flink() {
     .await
 }
 
-#[test_group::group(containerized, engine)]
+#[test_group::group(containerized, engine, transform, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_transform_with_engine_datafusion() {
     test_transform_common(

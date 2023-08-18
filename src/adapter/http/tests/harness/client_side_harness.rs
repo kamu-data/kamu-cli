@@ -67,6 +67,9 @@ impl ClientSideHarness {
         b.add_value(EngineProvisionerNull)
             .bind::<dyn EngineProvisioner, EngineProvisionerNull>();
 
+        b.add::<ObjectStoreRegistryImpl>()
+            .bind::<dyn ObjectStoreRegistry, ObjectStoreRegistryImpl>();
+
         b.add_builder(
             builder_for::<IngestServiceImpl>()
                 .with_run_info_dir(run_info_dir)

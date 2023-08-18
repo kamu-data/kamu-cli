@@ -30,6 +30,7 @@ pub struct IngestTask {
     fetch_service: FetchService,
     prep_service: PrepService,
     engine_provisioner: Arc<dyn EngineProvisioner>,
+    object_store_registry: Arc<dyn ObjectStoreRegistry>,
     run_info_dir: PathBuf,
     cache_dir: PathBuf,
 }
@@ -42,6 +43,7 @@ impl IngestTask {
         fetch_override: Option<FetchStep>,
         listener: Arc<dyn IngestListener>,
         engine_provisioner: Arc<dyn EngineProvisioner>,
+        object_store_registry: Arc<dyn ObjectStoreRegistry>,
         container_runtime: Arc<ContainerRuntime>,
         run_info_dir: &Path,
         cache_dir: &Path,
@@ -70,6 +72,7 @@ impl IngestTask {
             fetch_service: FetchService::new(container_runtime, &run_info_dir),
             prep_service: PrepService::new(),
             engine_provisioner,
+            object_store_registry,
             run_info_dir: run_info_dir.to_owned(),
             cache_dir: cache_dir.to_owned(),
             request,
@@ -419,6 +422,7 @@ impl IngestTask {
 
         let read_svc: Box<dyn ReadService> = if engine == Some("datafusion") {
             Box::new(ReadServiceDatafusion::new(
+                self.object_store_registry.clone(),
                 self.dataset.clone(),
                 self.run_info_dir.clone(),
             ))

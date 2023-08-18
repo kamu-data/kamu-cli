@@ -19,7 +19,7 @@ use internal_error::InternalError;
 /// to provide it as a log of changes between current and the previous export.
 /// Merge strategies define how to combine the newly-ingested data with the
 /// existing one.
-pub trait MergeStrategy {
+pub trait MergeStrategy: Send + Sync {
     /// Reduces newly seen data `new` to a minimal update to previously
     /// ledgerized data `prev`.
     fn merge(&self, prev: Option<DataFrame>, new: DataFrame) -> Result<DataFrame, MergeError>;
