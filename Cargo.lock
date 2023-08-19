@@ -3289,6 +3289,7 @@ dependencies = [
  "env_logger",
  "geo-types",
  "geojson",
+ "glob",
  "indoc 2.0.3",
  "internal-error",
  "kamu-core",

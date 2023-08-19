@@ -41,40 +41,77 @@ impl ReaderEsriShapefile {
         Ok(self.temp_path.clone())
     }
 
-    fn locate_shp_file(&self, dir: &Path, subpath: Option<&str>) -> Result<PathBuf, InternalError> {
+    fn locate_shp_file(&self, dir: &Path, subpath: Option<&str>) -> Result<PathBuf, ReadError> {
+        let is_shp_file = |p: &Path| -> bool { p.extension().map(|s| s == "shp").unwrap_or(false) };
+
+        let list_shp_files = || -> Vec<PathBuf> {
+            walkdir::WalkDir::new(dir)
+                .into_iter()
+                .filter_map(|e| e.ok())
+                .filter(|e| is_shp_file(e.path()))
+                .map(|e| e.into_path())
+                .collect()
+        };
+
+        let to_relative_paths = |paths: Vec<PathBuf>| -> Vec<String> {
+            paths
+                .into_iter()
+                .filter_map(|p| {
+                    p.strip_prefix(dir)
+                        .ok()
+                        .map(|p| p.to_string_lossy().into_owned())
+                })
+                .collect()
+        };
+
         if let Some(subpath) = subpath {
             let path = dir.join(subpath);
-            if !path.is_file() {
-                let possible_entries: Vec<_> = walkdir::WalkDir::new(dir)
-                    .into_iter()
-                    .filter_map(|e| e.ok())
-                    .filter_map(|e| {
-                        e.path()
-                            .strip_prefix(dir)
-                            .ok()
-                            .map(|p| p.to_string_lossy().into_owned())
-                    })
-                    .take(20)
-                    .collect();
-                Err(format!(
-                    "Shapefile archive does not contain a '{}' sub-path. Some possible entries \
-                     are:\n  - {}",
-                    subpath,
-                    possible_entries.join("\n  - ")
-                )
-                .int_err())
-            } else {
+
+            // Try exact match
+            if path.is_file() {
                 Ok(path)
-            }
-        } else {
-            for entry in std::fs::read_dir(dir).int_err()? {
-                let entry = entry.int_err()?;
-                let path = entry.path();
-                if path.extension().map(|s| s == "shp").unwrap_or(false) {
-                    return Ok(path);
+            } else {
+                // Try globbed match
+                let matches: Vec<_> = glob::glob(path.to_str().unwrap())
+                    .int_err()?
+                    .filter_map(|e| e.ok())
+                    .filter(|p| is_shp_file(&p))
+                    .collect();
+
+                if matches.len() == 1 {
+                    Ok(matches.into_iter().next().unwrap())
+                } else if matches.is_empty() {
+                    Err(MalformedError::new(format!(
+                        "Archive does not contain any .shp files under '{}' sub-path. Possible \
+                         entries are:\n  - {}",
+                        subpath,
+                        to_relative_paths(list_shp_files()).join("\n  - ")
+                    ))
+                    .into())
+                } else {
+                    Err(MalformedError::new(format!(
+                        "Archive contains multiple .shp files matching sub-path '{}':\n  - {}",
+                        subpath,
+                        to_relative_paths(matches).join("\n  - ")
+                    ))
+                    .into())
                 }
             }
-            Err("Archive does not contain a *.shp file".int_err())
+        } else {
+            let shp_files = list_shp_files();
+
+            if shp_files.len() == 1 {
+                Ok(shp_files.into_iter().next().unwrap())
+            } else if shp_files.len() > 1 {
+                Err(MalformedError::new(format!(
+                    "Archive contains multiple .shp files. Specify `subPath` argument to select \
+                     one of:\n  - {}",
+                    to_relative_paths(shp_files).join("\n  - ")
+                ))
+                .into())
+            } else {
+                Err(MalformedError::new("Archive does not contain any .shp files").into())
+            }
         }
     }
 
