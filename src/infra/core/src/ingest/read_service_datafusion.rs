@@ -11,6 +11,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use chrono::{DateTime, TimeZone, Utc};
+use datafusion::parquet::file::properties::WriterProperties;
 use datafusion::prelude::*;
 use internal_error::*;
 use kamu_core::{Dataset, EngineError, InvalidQueryError, ObjectStoreRegistry, OwnedFile};
@@ -364,6 +365,20 @@ impl ReadServiceDatafusion {
         Ok(())
     }
 
+    // TODO: Externalize configuration
+    fn get_write_properties(&self, vocab: &odf::DatasetVocabularyResolved<'_>) -> WriterProperties {
+        // TODO: `offset` column is sorted integers so we could use delta encoding, but
+        // Flink does not support it.
+        // See: https://github.com/kamu-data/kamu-engine-flink/issues/3
+        WriterProperties::builder()
+            .set_writer_version(datafusion::parquet::file::properties::WriterVersion::PARQUET_2_0)
+            .set_created_by("kamu ingest datafusion".to_string())
+            .set_compression(datafusion::parquet::basic::Compression::SNAPPY)
+            // system_time value will be the same for all rows in a batch
+            .set_column_dictionary_enabled(vocab.system_time_column.as_ref().into(), true)
+            .build()
+    }
+
     async fn write_output(
         &self,
         path: PathBuf,
@@ -379,7 +394,9 @@ impl ReadServiceDatafusion {
         };
 
         // Write parquet
-        df.write_parquet_single_file(&path, None).await.int_err()?;
+        df.write_parquet_single_file(&path, Some(self.get_write_properties(vocab)))
+            .await
+            .int_err()?;
 
         // Read file back (metadata-only query) to get offsets and watermark
         let df = ctx

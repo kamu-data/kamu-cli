@@ -158,6 +158,7 @@ impl IngestParameterNotFound {
     }
 }
 
+// TODO: Revisit error granularity
 #[derive(Debug, Error)]
 pub enum IngestError {
     #[error(transparent)]
@@ -202,6 +203,20 @@ pub enum IngestError {
         ProcessError,
     ),
 
+    #[error("Pipe command error: {command:?} {source}")]
+    PipeError {
+        command: Vec<String>,
+        source: BoxedError,
+        backtrace: Backtrace,
+    },
+
+    #[error(transparent)]
+    ReadError(
+        #[from]
+        #[backtrace]
+        ingest::ReadError,
+    ),
+
     #[error("Engine provisioning error")]
     EngineProvisioningError(
         #[from]
@@ -216,12 +231,12 @@ pub enum IngestError {
         EngineError,
     ),
 
-    #[error("Pipe command error: {command:?} {source}")]
-    PipeError {
-        command: Vec<String>,
-        source: BoxedError,
-        backtrace: Backtrace,
-    },
+    #[error(transparent)]
+    MergeError(
+        #[from]
+        #[backtrace]
+        ingest::MergeError,
+    ),
 
     #[error(transparent)]
     Access(
@@ -243,22 +258,6 @@ impl From<GetDatasetError> for IngestError {
         match v {
             GetDatasetError::NotFound(e) => Self::DatasetNotFound(e),
             GetDatasetError::Internal(e) => Self::Internal(e),
-        }
-    }
-}
-
-impl From<ingest::ReadError> for IngestError {
-    fn from(v: ingest::ReadError) -> Self {
-        match v {
-            ingest::ReadError::Internal(err) => Self::Internal(err),
-        }
-    }
-}
-
-impl From<ingest::MergeError> for IngestError {
-    fn from(v: ingest::MergeError) -> Self {
-        match v {
-            ingest::MergeError::Internal(err) => Self::Internal(err),
         }
     }
 }

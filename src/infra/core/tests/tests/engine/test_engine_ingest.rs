@@ -632,6 +632,108 @@ async fn test_ingest_datafusion_event_time_of_invalid_type() {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_group::group(containerized, engine, ingest, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_ingest_datafusion_parquet_encoding() {
+    use ::datafusion::parquet::basic::{Compression, Encoding, PageType};
+    use ::datafusion::parquet::file::reader::FileReader;
+
+    let harness = IngestTestHarness::new();
+    let src_path = harness.temp_dir.path().join("data.csv");
+
+    let dataset_snapshot = MetadataFactory::dataset_snapshot()
+        .name("foo.bar")
+        .kind(DatasetKind::Root)
+        .push_event(
+            MetadataFactory::set_polling_source()
+                .fetch(FetchStep::Url(FetchStepUrl {
+                    url: url::Url::from_file_path(&src_path)
+                        .unwrap()
+                        .as_str()
+                        .to_owned(),
+                    event_time: Some(EventTimeSource::FromSystemTime),
+                    cache: None,
+                    headers: None,
+                }))
+                .read(ReadStep::Csv(ReadStepCsv {
+                    header: Some(true),
+                    schema: Some(vec![
+                        "date TIMESTAMP".to_string(),
+                        "city STRING".to_string(),
+                        "population BIGINT".to_string(),
+                    ]),
+                    ..ReadStepCsv::default()
+                }))
+                .preprocess(TransformSql {
+                    engine: "datafusion".to_string(),
+                    version: None,
+                    query: Some("select * from input".to_string()),
+                    queries: None,
+                    temporal_tables: None,
+                })
+                .build(),
+        )
+        .push_event(SetVocab {
+            system_time_column: None,
+            event_time_column: Some("date".to_string()),
+            offset_column: None,
+        })
+        .build();
+
+    let dataset_name = dataset_snapshot.name.clone();
+
+    harness.create_dataset(dataset_snapshot).await;
+
+    std::fs::write(
+        &src_path,
+        indoc!(
+            "
+            date,city,population
+            2020-01-01,A,1000
+            2020-01-01,B,2000
+            2020-01-01,C,3000
+            "
+        ),
+    )
+    .unwrap();
+
+    harness.ingest(&dataset_name).await.unwrap();
+    let parquet = harness.read_datafile(&dataset_name).await;
+    let meta = parquet.reader.metadata();
+
+    let assert_data_encoding = |col, enc| {
+        let data_page = parquet
+            .reader
+            .get_row_group(0)
+            .unwrap()
+            .get_column_page_reader(col)
+            .unwrap()
+            .map(|p| p.unwrap())
+            .filter(|p| p.page_type() == PageType::DATA_PAGE_V2)
+            .next()
+            .unwrap();
+
+        assert_eq!(data_page.encoding(), enc);
+    };
+
+    assert_eq!(meta.num_row_groups(), 1);
+
+    let offset_col = meta.row_group(0).column(0);
+    assert_eq!(offset_col.column_path().string(), "offset");
+    assert_eq!(offset_col.compression(), Compression::SNAPPY);
+
+    // TODO: Validate the encoding
+    // See: https://github.com/kamu-data/kamu-engine-flink/issues/3
+    // assert_data_encoding(0, Encoding::DELTA_BINARY_PACKED);
+
+    let system_time_col = meta.row_group(0).column(1);
+    assert_eq!(system_time_col.column_path().string(), "system_time");
+    assert_eq!(system_time_col.compression(), Compression::SNAPPY);
+    assert_data_encoding(1, Encoding::RLE_DICTIONARY);
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
 struct IngestTestHarness {
     temp_dir: TempDir,
     dataset_repo: Arc<DatasetRepositoryLocalFs>,

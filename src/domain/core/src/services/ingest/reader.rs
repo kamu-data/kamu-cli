@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::backtrace::Backtrace;
 use std::path::Path;
 
 use datafusion::arrow::datatypes::Schema;
@@ -47,5 +48,23 @@ pub trait Reader: Send + Sync {
 #[derive(thiserror::Error, Debug)]
 pub enum ReadError {
     #[error(transparent)]
+    Malformed(#[from] MalformedError),
+    #[error(transparent)]
     Internal(#[from] InternalError),
+}
+
+#[derive(thiserror::Error, Debug)]
+#[error("{message}")]
+pub struct MalformedError {
+    message: String,
+    backtrace: Backtrace,
+}
+
+impl MalformedError {
+    pub fn new(message: impl Into<String>) -> Self {
+        Self {
+            message: message.into(),
+            backtrace: Backtrace::capture(),
+        }
+    }
 }
