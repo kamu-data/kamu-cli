@@ -27,6 +27,7 @@ struct HttpRoot;
 #[serde(rename_all = "camelCase")]
 struct WebUIConfig {
     api_server_gql_url: String,
+    login_enabled: bool,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -54,6 +55,7 @@ impl WebUIServer {
         let gql_schema = kamu_adapter_graphql::schema(catalog);
         let web_ui_config = WebUIConfig {
             api_server_gql_url: format!("http://{}/graphql", bound_addr.local_addr()),
+            login_enabled: false,
         };
 
         let app = axum::Router::new()
