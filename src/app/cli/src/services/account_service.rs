@@ -16,6 +16,7 @@ use opendatafabric::AccountName;
 
 pub struct AccountService {
     pub default_account_name: String,
+    pub default_user_name: String,
 }
 
 #[component(pub)]
@@ -23,18 +24,28 @@ impl AccountService {
     pub fn new() -> Self {
         Self {
             default_account_name: whoami::username(),
+            default_user_name: whoami::realname(),
         }
     }
 
     pub fn current_account_indication(&self, arg_matches: &ArgMatches) -> CurrentAccountIndication {
-        let (current_account, specified_explicitly) =
-            if let Some(account) = arg_matches.get_one::<String>("account") {
-                (account, true)
-            } else {
-                (&self.default_account_name, false)
-            };
+        let (current_account, user_name, specified_explicitly) = if let Some(account) =
+            arg_matches.get_one::<String>("account")
+        {
+            (
+                account,
+                if account.eq(&self.default_account_name) {
+                    &self.default_user_name
+                } else {
+                    &account // Use account as user name, when there is no data
+                },
+                true,
+            )
+        } else {
+            (&self.default_account_name, &self.default_user_name, false)
+        };
 
-        CurrentAccountIndication::new(current_account, specified_explicitly)
+        CurrentAccountIndication::new(current_account, user_name, specified_explicitly)
     }
 
     pub fn related_account_indication(&self, sub_matches: &ArgMatches) -> RelatedAccountIndication {
@@ -82,16 +93,19 @@ pub enum TargetAccountSelection {
 #[derive(Debug, Clone)]
 pub struct CurrentAccountIndication {
     pub account_name: AccountName,
+    pub user_name: String,
     pub specified_explicitly: bool,
 }
 
 impl CurrentAccountIndication {
-    pub fn new<S>(account_name: S, specified_explicitly: bool) -> Self
+    pub fn new<A, U>(account_name: A, user_name: U, specified_explicitly: bool) -> Self
     where
-        S: Into<String>,
+        A: Into<String>,
+        U: Into<String>,
     {
         Self {
             account_name: AccountName::try_from(account_name.into()).unwrap(),
+            user_name: user_name.into(),
             specified_explicitly,
         }
     }
@@ -101,7 +115,7 @@ impl CurrentAccountIndication {
     }
 
     pub fn as_current_account_subject(&self) -> CurrentAccountSubject {
-        CurrentAccountSubject::new(self.account_name.clone())
+        CurrentAccountSubject::new(&self.account_name, &self.user_name)
     }
 }
 

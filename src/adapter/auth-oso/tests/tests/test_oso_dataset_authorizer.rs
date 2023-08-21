@@ -84,7 +84,10 @@ impl DatasetAuthorizerHarness {
         let datasets_dir = tempdir.path().join("datasets");
         std::fs::create_dir(&datasets_dir).unwrap();
 
-        let current_account_subject = Arc::new(CurrentAccountSubject::new(current_account_name));
+        let current_account_subject = Arc::new(CurrentAccountSubject::new(
+            current_account_name,
+            current_account_name,
+        ));
 
         let dataset_authorizer = Arc::new(OsoDatasetAuthorizer::new(
             Arc::new(KamuAuthOso::new()),

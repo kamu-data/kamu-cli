@@ -32,7 +32,7 @@ impl Kamu {
     pub fn new<P: Into<PathBuf>>(workspace_path: P) -> Self {
         let workspace_path = workspace_path.into();
         let workspace_layout = WorkspaceLayout::new(workspace_path.join(".kamu"));
-        let current_account = CurrentAccountIndication::new("kamu", false);
+        let current_account = CurrentAccountIndication::new("kamu", "kamu", false);
         Self {
             workspace_layout,
             current_account,

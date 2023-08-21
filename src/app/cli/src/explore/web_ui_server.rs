@@ -12,6 +12,7 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use axum::http::Uri;
 use axum::response::{IntoResponse, Response};
 use dill::Catalog;
+use kamu::domain::CurrentAccountSubject;
 use rust_embed::RustEmbed;
 use serde::Serialize;
 
@@ -27,7 +28,24 @@ struct HttpRoot;
 #[serde(rename_all = "camelCase")]
 struct WebUIConfig {
     api_server_gql_url: String,
-    login_enabled: bool,
+    logged_user: Option<WebUIULoggedUser>,
+    feature_flags: WebUIFeatureFlags,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct WebUIULoggedUser {
+    login: String,
+    name: String,
+    email: Option<String>,
+    avatar_url: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct WebUIFeatureFlags {
+    enable_login: bool,
+    enable_logout: bool,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -52,10 +70,21 @@ impl WebUIServer {
             panic!("error binding to {}: {}", addr, e);
         });
 
+        let current_account_subject = catalog.get_one::<CurrentAccountSubject>().unwrap();
+
         let gql_schema = kamu_adapter_graphql::schema(catalog);
         let web_ui_config = WebUIConfig {
             api_server_gql_url: format!("http://{}/graphql", bound_addr.local_addr()),
-            login_enabled: false,
+            logged_user: Some(WebUIULoggedUser {
+                login: current_account_subject.account_name.to_string(),
+                name: current_account_subject.user_name.clone(),
+                email: None,
+                avatar_url: None,
+            }),
+            feature_flags: WebUIFeatureFlags {
+                enable_login: false,
+                enable_logout: false,
+            },
         };
 
         let app = axum::Router::new()

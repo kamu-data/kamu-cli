@@ -17,19 +17,22 @@ pub const TEST_ACCOUNT_NAME: &str = "kamu";
 
 pub struct CurrentAccountSubject {
     pub account_name: AccountName,
+    pub user_name: String,
 }
 
 impl CurrentAccountSubject {
     pub fn new_test() -> Self {
-        CurrentAccountSubject::new(TEST_ACCOUNT_NAME)
+        CurrentAccountSubject::new(TEST_ACCOUNT_NAME, TEST_ACCOUNT_NAME)
     }
 
-    pub fn new<S>(account_name: S) -> Self
+    pub fn new<A, U>(account_name: A, user_name: U) -> Self
     where
-        S: Into<String>,
+        A: Into<String>,
+        U: Into<String>,
     {
         Self {
             account_name: AccountName::try_from(account_name.into()).unwrap(),
+            user_name: user_name.into(),
         }
     }
 }
