@@ -371,7 +371,7 @@ impl ReadServiceDatafusion {
         // Flink does not support it.
         // See: https://github.com/kamu-data/kamu-engine-flink/issues/3
         WriterProperties::builder()
-            .set_writer_version(datafusion::parquet::file::properties::WriterVersion::PARQUET_2_0)
+            .set_writer_version(datafusion::parquet::file::properties::WriterVersion::PARQUET_1_0)
             .set_created_by("kamu ingest datafusion".to_string())
             .set_compression(datafusion::parquet::basic::Compression::SNAPPY)
             // system_time value will be the same for all rows in a batch
@@ -569,6 +569,15 @@ impl ReadService for ReadServiceDatafusion {
 
         tracing::info!(schema = ?df.schema(), "Final output schema");
 
-        self.write_output(out_data_path, &ctx, df, &vocab).await
+        let mut response = self.write_output(out_data_path, &ctx, df, &vocab).await?;
+
+        // Don't unpdate watermark unless it progressed
+        response.output_watermark = match (response.output_watermark, request.prev_watermark) {
+            (Some(new), Some(old)) if new < old => Some(old),
+            (None, old) => old,
+            (new, _) => new,
+        };
+
+        Ok(response)
     }
 }

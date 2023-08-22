@@ -151,7 +151,7 @@ impl IngestServiceImpl {
         let mut combined_result = None;
 
         loop {
-            match task.ingest().await {
+            match task.ingest(Self::next_operation_id()).await {
                 Ok(res) => {
                     combined_result = Some(Self::merge_results(combined_result, res));
 
@@ -238,7 +238,7 @@ impl IngestServiceImpl {
         }
 
         Ok(IngestRequest {
-            operation_id: self.next_operation_id(),
+            operation_id: "".to_string(), // TODO: Will be filled out by IngestTask
             dataset_handle,
             polling_source,
             system_time: self.time_source.now(),
@@ -253,7 +253,7 @@ impl IngestServiceImpl {
         })
     }
 
-    fn next_operation_id(&self) -> String {
+    fn next_operation_id() -> String {
         use rand::distributions::Alphanumeric;
         use rand::Rng;
 

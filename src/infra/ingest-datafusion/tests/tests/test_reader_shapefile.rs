@@ -209,7 +209,7 @@ async fn test_read_shapefile_geom() {
                 .value(0);
 
             let mut geojson: serde_json::Value = serde_json::from_str(geom).unwrap();
-            geojson["geometry"]["coordinates"][0][0]
+            geojson["coordinates"][0][0]
                 .as_array_mut()
                 .unwrap()
                 .truncate(2);
@@ -217,12 +217,8 @@ async fn test_read_shapefile_geom() {
             assert_eq!(
                 geojson, 
                 serde_json::json!({
-                    "type": "Feature",
-                    "properties": {}, 
-                    "geometry": {
-                        "type": "MultiPolygon",
-                        "coordinates": [[[[30.466304779052763, 50.58700942993181], [30.466583251953324, 50.58112716674821]]]], 
-                    },
+                    "type": "MultiPolygon",
+                    "coordinates": [[[[30.466304779052763, 50.58700942993181], [30.466583251953324, 50.58112716674821]]]],
                 })
             );
         },

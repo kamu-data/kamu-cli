@@ -83,11 +83,13 @@ impl IngestTask {
         level = "info",
         skip_all,
         fields(
-            operation_id = %self.request.operation_id,
+            operation_id = %operation_id,
             dataset_handle = %self.request.dataset_handle,
         ),
     )]
-    pub async fn ingest(&mut self) -> Result<IngestResult, IngestError> {
+    pub async fn ingest(&mut self, operation_id: String) -> Result<IngestResult, IngestError> {
+        self.request.operation_id = operation_id;
+
         tracing::info!(
             request = ?self.request,
             options = ?self.options,

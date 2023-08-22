@@ -206,22 +206,16 @@ impl Reader for ReaderEsriShapefile {
             let (shape, record) = rec.int_err()?;
 
             let geometry: geo_types::Geometry = shape.try_into().int_err()?;
-            let feature = geojson::Feature {
+            let geometry = geojson::Geometry {
+                value: geojson::Value::from(&geometry),
                 bbox: None,
-                geometry: Some(geojson::Geometry {
-                    value: geojson::Value::from(&geometry),
-                    bbox: None,
-                    foreign_members: None,
-                }),
-                id: None,
-                properties: None,
                 foreign_members: None,
             };
 
             let mut json = self.shp_record_to_json(record);
             json.insert(
                 "geometry".to_string(),
-                JsonValue::String(feature.to_string()),
+                JsonValue::String(geometry.to_string()),
             );
 
             serde_json::to_writer(&mut file, &json).int_err()?;

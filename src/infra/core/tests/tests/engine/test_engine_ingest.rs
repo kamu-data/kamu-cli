@@ -444,6 +444,45 @@ async fn test_ingest_datafusion_ledger() {
             .map(|dt| dt.to_rfc3339()),
         Some("2021-01-01T00:00:00+00:00".to_string())
     );
+
+    // Round 3
+    std::fs::write(
+        &src_path,
+        indoc!(
+            "
+            date,city,population
+            2020-01-01,D,4000
+            "
+        ),
+    )
+    .unwrap();
+
+    harness.ingest(&dataset_name).await.unwrap();
+
+    let df = harness.get_last_data(&dataset_name).await;
+    kamu_data_utils::testing::assert_data_eq(
+        df,
+        indoc!(
+            r#"
+            +--------+----------------------+----------------------+------+------------+
+            | offset | system_time          | date                 | city | population |
+            +--------+----------------------+----------------------+------+------------+
+            | 4      | 2050-01-01T12:00:00Z | 2020-01-01T00:00:00Z | D    | 4000       |
+            +--------+----------------------+----------------------+------+------------+
+            "#
+        ),
+    )
+    .await;
+
+    assert_eq!(
+        harness
+            .get_last_data_block(&dataset_name)
+            .await
+            .event
+            .output_watermark
+            .map(|dt| dt.to_rfc3339()),
+        Some("2021-01-01T00:00:00+00:00".to_string())
+    );
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
