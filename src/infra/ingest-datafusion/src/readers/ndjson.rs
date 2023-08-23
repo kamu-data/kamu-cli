@@ -46,7 +46,6 @@ impl Reader for ReaderNdJson {
                 schema: v.schema,
                 date_format: v.date_format,
                 encoding: v.encoding,
-                primitives_as_string: v.primitives_as_string,
                 timestamp_format: v.timestamp_format,
             },
             ReadStep::NdJson(v) => v,
@@ -56,10 +55,6 @@ impl Reader for ReaderNdJson {
         match conf.encoding.as_ref().map(|s| s.as_str()) {
             None | Some("utf8") => Ok(()),
             Some(v) => Err(format!("Unsupported NdJson.encoding: {}", v).int_err()),
-        }?;
-        match conf.primitives_as_string {
-            None | Some(false) => Ok(()),
-            Some(v) => Err(format!("Unsupported NdJson.primitivesAsString: {}", v).int_err()),
         }?;
         match conf.date_format.as_ref().map(|s| s.as_str()) {
             None | Some("rfc3339") => Ok(()),

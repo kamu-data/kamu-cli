@@ -19,11 +19,11 @@ use crate::*;
 
 ///////////////////////////////////////////////////////////////////////////////
 
-pub struct ReaderGeoJson {
+pub struct ReaderNdGeoJson {
     temp_path: PathBuf,
 }
 
-impl ReaderGeoJson {
+impl ReaderNdGeoJson {
     // TODO: This is an ugly API that leaves it to the caller to clean up our temp
     // file mess. Ideally we should not produce any temp files at all and stream in
     // all data.
@@ -37,7 +37,7 @@ impl ReaderGeoJson {
 ///////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl Reader for ReaderGeoJson {
+impl Reader for ReaderNdGeoJson {
     async fn output_schema(
         &self,
         ctx: &SessionContext,
@@ -52,57 +52,61 @@ impl Reader for ReaderGeoJson {
         path: &Path,
         conf: &ReadStep,
     ) -> Result<DataFrame, ReadError> {
-        use std::io::Write;
+        use std::io::prelude::*;
 
         use serde_json::Value as JsonValue;
 
         let schema = self.output_schema(ctx, conf).await?;
 
-        let ReadStep::GeoJson(_) = conf else {
+        let ReadStep::NdGeoJson(_) = conf else {
             unreachable!()
         };
 
         // TODO: PERF: This is a temporary, highly inefficient implementation that
-        // re-encodes GeoJson into NdJson which DataFusion can read natively
-        let mut feature_col: serde_json::Map<String, JsonValue> =
-            serde_json::from_reader(std::fs::File::open(path).int_err()?).int_err()?;
-
-        if feature_col["type"].as_str() != Some("FeatureCollection") {
-            return Err(format!(
-                "Expected FeatureCollection type but got {} instead",
-                feature_col["type"]
-            )
-            .int_err()
-            .into());
-        }
-
-        let features = match feature_col.remove("features") {
-            Some(JsonValue::Array(v)) => Ok(v),
-            _ => Err("Invalid geojson".int_err()),
-        }?;
-
+        // re-encodes NdGeoJson into NdJson which DataFusion can read natively
         let mut out_file = std::fs::File::create_new(&self.temp_path).int_err()?;
 
-        for feature in features {
-            let JsonValue::Object(mut feature) = feature else {
-                return Err("Invalid geojson".int_err().into());
-            };
+        let in_file = std::fs::File::open(path).int_err()?;
+        let mut reader = std::io::BufReader::new(in_file);
+        let mut buffer = String::new();
 
-            let mut record = match feature.remove("properties") {
-                Some(JsonValue::Object(v)) => Ok(v),
-                _ => Err("Invalid geojson".int_err()),
-            }?;
+        loop {
+            if reader.read_line(&mut buffer).int_err()? == 0 {
+                break;
+            }
+            let line = buffer.trim();
 
-            let geometry = match feature.remove("geometry") {
-                Some(JsonValue::Object(v)) => Ok(v),
-                _ => Err("Invalid geojson".int_err()),
-            }?;
+            if !line.is_empty() {
+                let mut feature: serde_json::Map<String, JsonValue> =
+                    serde_json::from_str(line).int_err()?;
 
-            let geom_str = serde_json::to_string(&geometry).int_err()?;
-            record.insert("geometry".to_string(), JsonValue::String(geom_str));
+                if feature["type"].as_str() != Some("Feature") {
+                    return Err(format!(
+                        "Expected Feature type but got {} instead",
+                        feature["type"]
+                    )
+                    .int_err()
+                    .into());
+                }
 
-            serde_json::to_writer(&mut out_file, &record).int_err()?;
-            writeln!(&mut out_file).int_err()?;
+                let mut record = match feature.remove("properties") {
+                    Some(JsonValue::Object(v)) => Ok(v),
+                    _ => Err("Invalid geojson".int_err()),
+                }?;
+
+                let geometry = match feature.remove("geometry") {
+                    Some(JsonValue::Object(v)) => Ok(v),
+                    _ => Err("Invalid geojson".int_err()),
+                }?;
+
+                let geom_str = serde_json::to_string(&geometry).int_err()?;
+                record.insert("geometry".to_string(), JsonValue::String(geom_str));
+
+                serde_json::to_writer(&mut out_file, &record).int_err()?;
+                writeln!(&mut out_file).int_err()?;
+            }
+
+            buffer.clear();
         }
 
         out_file.flush().int_err()?;

@@ -9,12 +9,14 @@
 
 mod csv;
 mod geojson;
+mod ndgeojson;
 mod ndjson;
 mod parquet;
 mod shapefile;
 
 pub use csv::*;
 pub use geojson::*;
+pub use ndgeojson::*;
 pub use ndjson::*;
 pub use parquet::*;
 pub use shapefile::*;

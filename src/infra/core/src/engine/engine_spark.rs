@@ -333,7 +333,7 @@ impl SparkEngine {
                             date_format: v.date_format,
                             encoding: v.encoding,
                             multi_line: None,
-                            primitives_as_string: v.primitives_as_string,
+                            primitives_as_string: None,
                             timestamp_format: v.timestamp_format,
                         }),
                         ..request.source

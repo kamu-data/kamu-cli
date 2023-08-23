@@ -311,8 +311,11 @@ table ReadStepNdJson {
   schema: [string];
   date_format: string;
   encoding: string;
-  primitives_as_string: bool = null;
   timestamp_format: string;
+}
+
+table ReadStepNdGeoJson {
+  schema: [string];
 }
 
 union ReadStep {
@@ -322,6 +325,7 @@ union ReadStep {
   ReadStepEsriShapefile,
   ReadStepParquet,
   ReadStepNdJson,
+  ReadStepNdGeoJson,
 }
 
 ////////////////////////////////////////////////////////////////////////////////

@@ -172,6 +172,7 @@ impl ReadStep {
             ReadStep::JsonLines(v) => v.schema.as_ref(),
             ReadStep::NdJson(v) => v.schema.as_ref(),
             ReadStep::GeoJson(v) => v.schema.as_ref(),
+            ReadStep::NdGeoJson(v) => v.schema.as_ref(),
             ReadStep::EsriShapefile(v) => v.schema.as_ref(),
             ReadStep::Parquet(v) => v.schema.as_ref(),
         }
@@ -235,7 +236,6 @@ impl Default for ReadStepNdJson {
             schema: None,
             date_format: None,
             encoding: None,
-            primitives_as_string: None,
             timestamp_format: None,
         }
     }

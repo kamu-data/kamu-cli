@@ -632,6 +632,7 @@ pub enum ReadStep {
     EsriShapefile(ReadStepEsriShapefile),
     Parquet(ReadStepParquet),
     NdJson(ReadStepNdJson),
+    NdGeoJson(ReadStepNdGeoJson),
 }
 
 impl_enum_with_variants!(ReadStep);
@@ -719,7 +720,10 @@ pub struct ReadStepJsonLines {
 
 impl_enum_variant!(ReadStep::JsonLines(ReadStepJsonLines));
 
-/// Reader for GeoJSON files.
+/// Reader for GeoJSON files. It expects one `FeatureCollection` object in the
+/// root and will create a record per each `Feature` inside it extracting the
+/// properties into individual columns and leaving the feature geometry in its
+/// own column.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct ReadStepGeoJson {
     /// A DDL-formatted schema. Schema can be used to coerce values into more
@@ -736,7 +740,8 @@ pub struct ReadStepEsriShapefile {
     /// appropriate data types.
     pub schema: Option<Vec<String>>,
     /// If the ZIP archive contains multiple shapefiles use this field to
-    /// specify a sub-path to the desired `.shp` file.
+    /// specify a sub-path to the desired `.shp` file. Can contain glob patterns
+    /// to act as a filter.
     pub sub_path: Option<String>,
 }
 
@@ -762,10 +767,8 @@ pub struct ReadStepNdJson {
     /// Sets the string that indicates a date format. The `rfc3339` is the only
     /// required format, the other format strings are implementation-specific.
     pub date_format: Option<String>,
-    /// Allows to forcibly set one of standard basic or extended encoding.
+    /// Allows to forcibly set one of standard basic or extended encodings.
     pub encoding: Option<String>,
-    /// Infers all primitive values as a string type.
-    pub primitives_as_string: Option<bool>,
     /// Sets the string that indicates a timestamp format. The `rfc3339` is the
     /// only required format, the other format strings are
     /// implementation-specific.
@@ -773,6 +776,18 @@ pub struct ReadStepNdJson {
 }
 
 impl_enum_variant!(ReadStep::NdJson(ReadStepNdJson));
+
+/// Reader for Newline-delimited GeoJSON files. It is similar to `GeoJson`
+/// format but instead of `FeatureCollection` object in the root it expects
+/// every individual feature object to appear on its own line.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct ReadStepNdGeoJson {
+    /// A DDL-formatted schema. Schema can be used to coerce values into more
+    /// appropriate data types.
+    pub schema: Option<Vec<String>>,
+}
+
+impl_enum_variant!(ReadStep::NdGeoJson(ReadStepNdGeoJson));
 
 ////////////////////////////////////////////////////////////////////////////////
 // RequestHeader
