@@ -49,7 +49,7 @@ impl Search {
             .into_iter()
             .skip(page * per_page)
             .take(per_page)
-            .map(|hdl| SearchResult::Dataset(Dataset::new(Account::mock(), hdl)))
+            .map(|hdl| SearchResult::Dataset(Dataset::new(Account::fake(), hdl)))
             .collect();
 
         Ok(SearchResultConnection::new(

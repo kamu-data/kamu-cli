@@ -41,7 +41,7 @@ impl Dataset {
             .resolve_dataset_ref(dataset_ref)
             .await
             .int_err()?;
-        Ok(Dataset::new(Account::mock(), hdl))
+        Ok(Dataset::new(Account::fake(), hdl))
     }
 
     #[graphql(skip)]

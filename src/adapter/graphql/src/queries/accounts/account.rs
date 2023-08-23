@@ -16,7 +16,7 @@ use crate::prelude::*;
 #[derive(Interface, Debug, Clone, PartialEq, Eq)]
 #[graphql(
     field(name = "id", method = "id", ty = "&AccountID"),
-    field(name = "name", ty = "&str")
+    field(name = "name", ty = "&AccountName")
 )]
 pub enum Account {
     User(User),
@@ -24,16 +24,18 @@ pub enum Account {
 }
 
 impl Account {
-    // TODO: MOCK
-    pub(crate) fn mock() -> Self {
+    // TODO: FAKE
+    pub(crate) fn fake() -> Self {
         Self::User(User::new(
-            AccountID::from("1"),
+            AccountID::from(FAKE_USER_ID),
             odf::AccountName::new_unchecked("kamu").into(),
         ))
     }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+
+pub const FAKE_USER_ID: &str = "12345";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct User {
@@ -57,7 +59,7 @@ impl User {
     }
 
     /// Symbolic account name
-    async fn name(&self) -> &str {
+    async fn name(&self) -> &AccountName {
         &self.account_name
     }
 }
@@ -87,7 +89,7 @@ impl Organization {
     }
 
     /// Symbolic account name
-    async fn name(&self) -> &str {
+    async fn name(&self) -> &AccountName {
         &self.account_name
     }
 }

@@ -75,7 +75,7 @@ impl MetadataChain {
     ) -> Result<Option<MetadataBlockExtended>> {
         let dataset = self.get_dataset(ctx).await?;
         let block = dataset.as_metadata_chain().try_get_block(&hash).await?;
-        Ok(block.map(|b| MetadataBlockExtended::new(hash, b, Account::mock())))
+        Ok(block.map(|b| MetadataBlockExtended::new(hash, b, Account::fake())))
     }
 
     /// Returns a metadata block corresponding to the specified hash and encoded
@@ -132,7 +132,7 @@ impl MetadataChain {
             .into_iter()
             .skip(page * per_page)
             .take(per_page)
-            .map(|(hash, block)| MetadataBlockExtended::new(hash, block, Account::mock()))
+            .map(|(hash, block)| MetadataBlockExtended::new(hash, block, Account::fake()))
             .collect();
 
         Ok(MetadataBlockConnection::new(

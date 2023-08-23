@@ -6,7 +6,7 @@ type AccessToken {
 
 interface Account {
 	id: AccountID!
-	name: String!
+	name: AccountName!
 }
 
 scalar AccountID
@@ -614,7 +614,7 @@ type Organization implements Account {
 	"""
 	Symbolic account name
 	"""
-	name: String!
+	name: AccountName!
 }
 
 type PageBasedInfo {
@@ -1033,7 +1033,7 @@ type User implements Account {
 	"""
 	Symbolic account name
 	"""
-	name: String!
+	name: AccountName!
 }
 
 schema {

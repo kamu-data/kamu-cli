@@ -105,7 +105,7 @@ impl DatasetMetadata {
         for input in summary.dependencies.into_iter() {
             let dataset_id = input.id.unwrap().clone();
             dependencies.push(Dataset::new(
-                Account::mock(),
+                Account::fake(),
                 dataset_repo
                     .resolve_dataset_ref(&dataset_id.as_local_ref())
                     .await
@@ -122,7 +122,7 @@ impl DatasetMetadata {
 
         let downstream: Vec<_> = dataset_repo
             .get_downstream_dependencies(&self.dataset_handle.as_local_ref())
-            .map_ok(|hdl| Dataset::new(Account::mock(), hdl))
+            .map_ok(|hdl| Dataset::new(Account::fake(), hdl))
             .try_collect()
             .await?;
 

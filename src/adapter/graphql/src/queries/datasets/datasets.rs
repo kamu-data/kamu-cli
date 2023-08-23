@@ -28,7 +28,7 @@ impl Datasets {
         let hdl = dataset_repo
             .try_resolve_dataset_ref(&dataset_id.as_local_ref())
             .await?;
-        Ok(hdl.map(|h| Dataset::new(Account::mock(), h)))
+        Ok(hdl.map(|h| Dataset::new(Account::fake(), h)))
     }
 
     // TODO: Multi-tenancy
@@ -40,7 +40,7 @@ impl Datasets {
         account_name: AccountName,
         dataset_name: DatasetName,
     ) -> Result<Option<Dataset>> {
-        let account = Account::mock();
+        let account = Account::fake();
 
         // Not multi-tenant yet
         let dataset_alias = odf::DatasetAlias::new(None, dataset_name.into());
@@ -49,10 +49,9 @@ impl Datasets {
         let hdl = dataset_repo
             .try_resolve_dataset_ref(&dataset_alias.into_local_ref())
             .await?;
-        Ok(hdl.map(|h| Dataset::new(Account::mock(), h)))
+        Ok(hdl.map(|h| Dataset::new(Account::fake(), h)))
     }
 
-    // TODO: Multi-tenancy
     #[graphql(skip)]
     async fn by_account_impl(
         &self,
@@ -66,7 +65,12 @@ impl Datasets {
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_PER_PAGE);
 
-        let mut all_datasets: Vec<_> = dataset_repo.get_all_datasets().try_collect().await?;
+        let account_name = account.name(ctx).await?;
+
+        let mut all_datasets: Vec<_> = dataset_repo
+            .get_datasets_by_owner(account_name.to_owned().into())
+            .try_collect()
+            .await?;
         let total_count = all_datasets.len();
         all_datasets.sort_by(|a, b| a.alias.cmp(&b.alias));
 
@@ -89,8 +93,7 @@ impl Datasets {
         page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<DatasetConnection> {
-        let account = Account::mock();
-        self.by_account_impl(ctx, account, page, per_page).await
+        panic!("Resolving accounts by ID is not supported yet");
     }
 
     /// Returns datasets belonging to the specified account
@@ -102,7 +105,7 @@ impl Datasets {
         page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<DatasetConnection> {
-        let account = Account::mock();
+        let account = Account::User(User::new(AccountID::from(FAKE_USER_ID), account_name));
         self.by_account_impl(ctx, account, page, per_page).await
     }
 }
