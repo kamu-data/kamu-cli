@@ -31,15 +31,21 @@ impl MergeStrategyLedger {
 
 impl MergeStrategy for MergeStrategyLedger {
     // TODO: Ideas to add more comparison modes such as:
-    // - expecting input to conain a full superset of prev
+    // - input must be a full superset of prev
     //   - otherwise - raise error
     //   - otherwise - emit retractions
-    // - expecting input to contain only new events
-    // - expecting input to contain new events and a subset of prev events
+    // - input will only contain new events
+    // - input will contain new events and a subset of prev events
     //   - dedupe against entire prev
     //   - seen events should be a tail of the prev (less work to dedupe)
+    // - input can contain duplicates
     fn merge(&self, prev: Option<DataFrame>, new: DataFrame) -> Result<DataFrame, MergeError> {
         if prev.is_none() {
+            // Validate PK columns exist
+            new.clone()
+                .select(self.primary_key.iter().map(|c| col(c)).collect())
+                .int_err()?;
+
             return Ok(new);
         }
 

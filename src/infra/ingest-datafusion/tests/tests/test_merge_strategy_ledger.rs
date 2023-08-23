@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
 use datafusion::arrow::array;
@@ -214,6 +215,30 @@ async fn test_ledger_respects_pk() {
         .unwrap();
     let expected = make_input(&ctx, [(2021, "seattle", 3)]);
     assert_dfs_equivalent(expected, actual).await;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_ledger_invalid_pk() {
+    let ctx = SessionContext::new();
+    let strat = MergeStrategyLedger::new(vec![
+        "year".to_string(),
+        "city".to_string(),
+        "foo".to_string(),
+    ]);
+
+    let new = make_input(
+        &ctx,
+        [
+            (2020, "vancouver", 1),
+            (2020, "seattle", 2),
+            (2020, "kyiv", 3),
+        ],
+    );
+
+    let res = strat.merge(None, new);
+    assert_matches!(res, Err(MergeError::Internal(_)));
 }
 
 ///////////////////////////////////////////////////////////////////////////////

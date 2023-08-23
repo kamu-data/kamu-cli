@@ -209,6 +209,11 @@ impl MergeStrategySnapshot {
 impl MergeStrategy for MergeStrategySnapshot {
     fn merge(&self, prev: Option<DataFrame>, new: DataFrame) -> Result<DataFrame, MergeError> {
         if prev.is_none() {
+            // Validate PK columns exist
+            new.clone()
+                .select(self.primary_key.iter().map(|c| col(c)).collect())
+                .int_err()?;
+
             let df = new
                 .with_column(&self.obsv_column, lit(&self.obsv_added))
                 .int_err()?

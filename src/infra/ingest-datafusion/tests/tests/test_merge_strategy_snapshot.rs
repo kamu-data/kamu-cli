@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
 use datafusion::arrow::array;
@@ -301,6 +302,29 @@ async fn test_snapshot_mix_of_changes() {
     actual.clone().show().await.unwrap();
 
     assert_dfs_equivalent(expected, actual).await;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_snapshot_invalid_pk() {
+    let ctx = SessionContext::new();
+    let strat = MergeStrategySnapshot::new(
+        "offset".to_string(),
+        opendatafabric::MergeStrategySnapshot {
+            primary_key: vec!["city".to_string(), "foo".to_string()],
+            compare_columns: None,
+            observation_column: None,
+            obsv_added: None,
+            obsv_changed: None,
+            obsv_removed: None,
+        },
+    );
+
+    let new = make_input(&ctx, "new", [("vancouver", 1), ("seattle", 2)]).await;
+
+    let res = strat.merge(None, new);
+    assert_matches!(res, Err(MergeError::Internal(_)));
 }
 
 ///////////////////////////////////////////////////////////////////////////////
