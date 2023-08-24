@@ -137,7 +137,7 @@ impl PullServiceImpl {
                 ) => DatasetAlias::new(alias.account_name.clone(), alias.dataset_name.clone()),
                 Some(DatasetRefRemote::Url(url)) => DatasetAlias::new(
                     if self.dataset_repo.is_multi_tenant() {
-                        Some(self.current_account_subject.account_name.clone())
+                        Some(self.current_account_subject.account.login.clone())
                     } else {
                         None
                     },
@@ -272,7 +272,7 @@ impl PullServiceImpl {
         use tokio_stream::StreamExt;
         let mut datasets = self
             .dataset_repo
-            .get_datasets_by_owner(self.current_account_subject.account_name.clone());
+            .get_datasets_by_owner(self.current_account_subject.account.login.clone());
         while let Some(dataset_handle) = datasets.next().await {
             let dataset_handle = dataset_handle?;
 

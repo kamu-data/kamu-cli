@@ -50,7 +50,7 @@ impl OsoDatasetAuthorizer {
             .account_name
             .as_ref()
             .map(|a| a.as_str())
-            .unwrap_or(self.current_account_subject.account_name.as_str());
+            .unwrap_or(self.current_account_subject.account.login.as_str());
 
         // TODO: for now let's treat all datasets as public
         // TODO: explicit read/write permissions
@@ -67,7 +67,7 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
         dataset_handle: &DatasetHandle,
         action: DatasetAction,
     ) -> Result<(), DatasetActionUnauthorizedError> {
-        let actor = self.actor(&self.current_account_subject.account_name);
+        let actor = self.actor(&self.current_account_subject.account.login);
         let dataset_resource = self.dataset_resource(dataset_handle);
 
         match self
@@ -81,7 +81,7 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
                     Err(DatasetActionUnauthorizedError::Access(
                         AccessError::Forbidden(
                             DatasetActionNotEnoughPermissionsError {
-                                account_name: self.current_account_subject.account_name.clone(),
+                                account_name: self.current_account_subject.account.login.clone(),
                                 action,
                                 dataset_ref: dataset_handle.as_local_ref(),
                             }

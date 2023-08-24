@@ -9,6 +9,7 @@
 
 use clap::ArgMatches;
 use dill::component;
+use kamu::domain::auth::AccountInfo;
 use kamu::domain::CurrentAccountSubject;
 use opendatafabric::AccountName;
 
@@ -115,7 +116,11 @@ impl CurrentAccountIndication {
     }
 
     pub fn as_current_account_subject(&self) -> CurrentAccountSubject {
-        CurrentAccountSubject::new(&self.account_name, &self.user_name)
+        CurrentAccountSubject::new(AccountInfo {
+            login: AccountName::from(self.account_name.clone()),
+            name: self.user_name.clone(),
+            avatar_url: None,
+        })
     }
 }
 

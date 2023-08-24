@@ -34,7 +34,7 @@ pub struct PasswordLoginCredentials {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AccountInfo {
     pub login: AccountName,
     pub name: String,

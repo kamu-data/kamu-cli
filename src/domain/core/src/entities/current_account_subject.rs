@@ -9,6 +9,8 @@
 
 use opendatafabric::AccountName;
 
+use crate::auth;
+
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub const TEST_ACCOUNT_NAME: &str = "kamu";
@@ -16,24 +18,20 @@ pub const TEST_ACCOUNT_NAME: &str = "kamu";
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct CurrentAccountSubject {
-    pub account_name: AccountName,
-    pub user_name: String,
+    pub account: auth::AccountInfo,
 }
 
 impl CurrentAccountSubject {
     pub fn new_test() -> Self {
-        CurrentAccountSubject::new(TEST_ACCOUNT_NAME, TEST_ACCOUNT_NAME)
+        CurrentAccountSubject::new(auth::AccountInfo {
+            name: TEST_ACCOUNT_NAME.to_string(),
+            login: AccountName::new_unchecked(TEST_ACCOUNT_NAME),
+            avatar_url: None,
+        })
     }
 
-    pub fn new<A, U>(account_name: A, user_name: U) -> Self
-    where
-        A: Into<String>,
-        U: Into<String>,
-    {
-        Self {
-            account_name: AccountName::try_from(account_name.into()).unwrap(),
-            user_name: user_name.into(),
-        }
+    pub fn new(account: auth::AccountInfo) -> Self {
+        Self { account }
     }
 }
 
