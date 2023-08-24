@@ -631,6 +631,7 @@ pub enum ReadStep {
     GeoJson(ReadStepGeoJson),
     EsriShapefile(ReadStepEsriShapefile),
     Parquet(ReadStepParquet),
+    Json(ReadStepJson),
     NdJson(ReadStepNdJson),
     NdGeoJson(ReadStepNdGeoJson),
 }
@@ -756,6 +757,29 @@ pub struct ReadStepParquet {
 }
 
 impl_enum_variant!(ReadStep::Parquet(ReadStepParquet));
+
+/// Reader for JSON files that contain an array of objects within them.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct ReadStepJson {
+    /// Path in the form of `a.b.c` to a sub-element of the root JSON object
+    /// that is an array or objects. If not specified it is assumed that the
+    /// root element is an array.
+    pub sub_path: Option<String>,
+    /// A DDL-formatted schema. Schema can be used to coerce values into more
+    /// appropriate data types.
+    pub schema: Option<Vec<String>>,
+    /// Sets the string that indicates a date format. The `rfc3339` is the only
+    /// required format, the other format strings are implementation-specific.
+    pub date_format: Option<String>,
+    /// Allows to forcibly set one of standard basic or extended encodings.
+    pub encoding: Option<String>,
+    /// Sets the string that indicates a timestamp format. The `rfc3339` is the
+    /// only required format, the other format strings are
+    /// implementation-specific.
+    pub timestamp_format: Option<String>,
+}
+
+impl_enum_variant!(ReadStep::Json(ReadStepJson));
 
 /// Reader for files containing multiple newline-delimited JSON objects with the
 /// same schema.

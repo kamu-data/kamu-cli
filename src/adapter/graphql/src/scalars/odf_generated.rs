@@ -824,6 +824,7 @@ pub enum ReadStep {
     GeoJson(ReadStepGeoJson),
     EsriShapefile(ReadStepEsriShapefile),
     Parquet(ReadStepParquet),
+    Json(ReadStepJson),
     NdJson(ReadStepNdJson),
     NdGeoJson(ReadStepNdGeoJson),
 }
@@ -836,6 +837,7 @@ impl From<odf::ReadStep> for ReadStep {
             odf::ReadStep::GeoJson(v) => Self::GeoJson(v.into()),
             odf::ReadStep::EsriShapefile(v) => Self::EsriShapefile(v.into()),
             odf::ReadStep::Parquet(v) => Self::Parquet(v.into()),
+            odf::ReadStep::Json(v) => Self::Json(v.into()),
             odf::ReadStep::NdJson(v) => Self::NdJson(v.into()),
             odf::ReadStep::NdGeoJson(v) => Self::NdGeoJson(v.into()),
         }
@@ -951,6 +953,27 @@ impl From<odf::ReadStepParquet> for ReadStepParquet {
     fn from(v: odf::ReadStepParquet) -> Self {
         Self {
             schema: v.schema.map(|v| v.into_iter().map(Into::into).collect()),
+        }
+    }
+}
+
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
+pub struct ReadStepJson {
+    pub sub_path: Option<String>,
+    pub schema: Option<Vec<String>>,
+    pub date_format: Option<String>,
+    pub encoding: Option<String>,
+    pub timestamp_format: Option<String>,
+}
+
+impl From<odf::ReadStepJson> for ReadStepJson {
+    fn from(v: odf::ReadStepJson) -> Self {
+        Self {
+            sub_path: v.sub_path.map(Into::into),
+            schema: v.schema.map(|v| v.into_iter().map(Into::into).collect()),
+            date_format: v.date_format.map(Into::into),
+            encoding: v.encoding.map(Into::into),
+            timestamp_format: v.timestamp_format.map(Into::into),
         }
     }
 }

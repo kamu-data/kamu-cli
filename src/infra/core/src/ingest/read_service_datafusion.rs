@@ -70,19 +70,15 @@ impl ReadServiceDatafusion {
 
     // TODO: Replace with DI
     fn get_reader_for(conf: &odf::ReadStep, operation_dir: &Path) -> Arc<dyn Reader> {
+        let temp_path = operation_dir.join("reader.tmp");
         match conf {
             odf::ReadStep::Csv(_) => Arc::new(ReaderCsv {}),
+            odf::ReadStep::Json(_) => Arc::new(ReaderJson::new(temp_path)),
             odf::ReadStep::NdJson(_) => Arc::new(ReaderNdJson {}),
             odf::ReadStep::JsonLines(_) => Arc::new(ReaderNdJson {}),
-            odf::ReadStep::GeoJson(_) => {
-                Arc::new(ReaderGeoJson::new(operation_dir.join("reader.tmp")))
-            }
-            odf::ReadStep::NdGeoJson(_) => {
-                Arc::new(ReaderNdGeoJson::new(operation_dir.join("reader.tmp")))
-            }
-            odf::ReadStep::EsriShapefile(_) => {
-                Arc::new(ReaderEsriShapefile::new(operation_dir.join("reader.tmp")))
-            }
+            odf::ReadStep::GeoJson(_) => Arc::new(ReaderGeoJson::new(temp_path)),
+            odf::ReadStep::NdGeoJson(_) => Arc::new(ReaderNdGeoJson::new(temp_path)),
+            odf::ReadStep::EsriShapefile(_) => Arc::new(ReaderEsriShapefile::new(temp_path)),
             odf::ReadStep::Parquet(_) => Arc::new(ReaderParquet {}),
         }
     }

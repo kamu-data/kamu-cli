@@ -169,6 +169,7 @@ impl ReadStep {
     pub fn schema(&self) -> Option<&Vec<String>> {
         match self {
             ReadStep::Csv(v) => v.schema.as_ref(),
+            ReadStep::Json(v) => v.schema.as_ref(),
             ReadStep::JsonLines(v) => v.schema.as_ref(),
             ReadStep::NdJson(v) => v.schema.as_ref(),
             ReadStep::GeoJson(v) => v.schema.as_ref(),
@@ -221,6 +222,22 @@ impl Default for ReadStepJsonLines {
             encoding: None,
             multi_line: None,
             primitives_as_string: None,
+            timestamp_format: None,
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// ReadStepJson
+////////////////////////////////////////////////////////////////////////////////
+
+impl Default for ReadStepJson {
+    fn default() -> Self {
+        Self {
+            sub_path: None,
+            schema: None,
+            date_format: None,
+            encoding: None,
             timestamp_format: None,
         }
     }

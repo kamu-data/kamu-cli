@@ -307,6 +307,14 @@ table ReadStepParquet {
   schema: [string];
 }
 
+table ReadStepJson {
+  sub_path: string;
+  schema: [string];
+  date_format: string;
+  encoding: string;
+  timestamp_format: string;
+}
+
 table ReadStepNdJson {
   schema: [string];
   date_format: string;
@@ -324,6 +332,7 @@ union ReadStep {
   ReadStepGeoJson,
   ReadStepEsriShapefile,
   ReadStepParquet,
+  ReadStepJson,
   ReadStepNdJson,
   ReadStepNdGeoJson,
 }

@@ -9,6 +9,7 @@
 
 mod csv;
 mod geojson;
+mod json;
 mod ndgeojson;
 mod ndjson;
 mod parquet;
@@ -16,6 +17,7 @@ mod shapefile;
 
 pub use csv::*;
 pub use geojson::*;
+pub use json::*;
 pub use ndgeojson::*;
 pub use ndjson::*;
 pub use parquet::*;
