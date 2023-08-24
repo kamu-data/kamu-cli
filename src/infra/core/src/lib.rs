@@ -17,6 +17,7 @@
 // Re-exports
 pub use kamu_core as domain;
 
+mod auth;
 mod engine;
 pub mod ingest;
 mod repos;
@@ -39,6 +40,7 @@ mod sync_service_impl;
 mod transform_service_impl;
 mod verification_service_impl;
 
+pub use auth::*;
 pub use dataset_config::*;
 pub use dataset_layout::*;
 pub use engine::*;

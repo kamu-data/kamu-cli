@@ -6,11 +6,9 @@ interface Account {
 scalar AccountID
 
 type AccountInfo {
-	login: String!
+	login: AccountName!
 	name: String!
-	email: String
 	avatarUrl: String
-	gravatarId: String
 }
 
 scalar AccountName

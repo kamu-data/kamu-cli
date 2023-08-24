@@ -7,14 +7,5 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod authentication_common;
-pub use authentication_common::*;
-
-mod authentication_provider;
-pub use authentication_provider::*;
-
-mod authentication_service;
-pub use authentication_service::*;
-
-mod dataset_action_authorizer;
-pub use dataset_action_authorizer::*;
+mod authentication_service_impl;
+pub use authentication_service_impl::*;

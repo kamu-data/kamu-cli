@@ -71,7 +71,7 @@ pub struct Mutation;
 impl Mutation {
     /// Authentication and authorization-related functionality group
     async fn auth(&self) -> AuthMut {
-        AuthMut::new()
+        AuthMut
     }
 
     /// Dataset-related functionality group.

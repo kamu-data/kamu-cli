@@ -11,36 +11,61 @@ use crate::prelude::*;
 
 ///////////////////////////////////////////////////////////////////////////////
 
-pub(crate) struct AuthMut {
-    github_oauth: kamu_adapter_oauth::OAuthGithub,
-}
+pub(crate) struct AuthMut;
 
 #[Object]
 impl AuthMut {
-    #[graphql(skip)]
-    pub fn new() -> Self {
-        Self {
-            github_oauth: kamu_adapter_oauth::OAuthGithub::new(),
-        }
-    }
+    async fn password_login(
+        &self,
+        ctx: &Context<'_>,
+        login: String,
+        password: String,
+    ) -> Result<LoginResponse> {
+        let authentication_service =
+            from_catalog::<dyn kamu_core::auth::AuthenticationService>(ctx).unwrap();
 
-    async fn password_login(&self, login: String, password: String) -> Result<LoginResponse> {
-        tracing::info!(%login, %password, "Password login"); // TODO: don't log password
-        unimplemented!("Password login not supported yet");
-    }
+        let credentials = kamu_core::auth::PasswordLoginCredentials { login, password };
 
-    async fn github_login(&self, code: String) -> Result<LoginResponse> {
-        // TODO: output token will be wrapped with our own JWT
-        match self.github_oauth.login(code).await {
-            Ok(github_login_response) => Ok(github_login_response.into()),
+        let login_result = authentication_service
+            .login(
+                kamu_core::auth::LOGIN_METHOD_PASSWORD,
+                serde_json::to_string::<kamu_core::auth::PasswordLoginCredentials>(&credentials)
+                    .int_err()?,
+            )
+            .await;
+
+        match login_result {
+            Ok(login_response) => Ok(login_response.into()),
             Err(e) => Err(e.into()),
         }
     }
 
-    async fn account_info(&self, access_token: String) -> Result<AccountInfo> {
-        // TODO: access token will be our own JWT, so deciding whether it is for Github
-        // would not be done here
-        match self.github_oauth.account_info(access_token).await {
+    async fn github_login(&self, ctx: &Context<'_>, code: String) -> Result<LoginResponse> {
+        let authentication_service =
+            from_catalog::<dyn kamu_core::auth::AuthenticationService>(ctx).unwrap();
+
+        let credentials = kamu_core::auth::GithubLoginCredentials { code };
+
+        let login_result = authentication_service
+            .login(
+                kamu_core::auth::LOGIN_METHOD_GITHUB,
+                serde_json::to_string::<kamu_core::auth::GithubLoginCredentials>(&credentials)
+                    .int_err()?,
+            )
+            .await;
+
+        match login_result {
+            Ok(login_response) => Ok(login_response.into()),
+            Err(e) => Err(e.into()),
+        }
+    }
+
+    async fn account_info(&self, ctx: &Context<'_>, access_token: String) -> Result<AccountInfo> {
+        let authentication_service =
+            from_catalog::<dyn kamu_core::auth::AuthenticationService>(ctx).unwrap();
+
+        let get_account_info_result = authentication_service.get_account_info(access_token).await;
+        match get_account_info_result {
             Ok(github_account_info) => Ok(github_account_info.into()),
             Err(e) => Err(e.into()),
         }
@@ -49,17 +74,28 @@ impl AuthMut {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-impl From<kamu_adapter_oauth::GithubError> for GqlError {
-    fn from(value: kamu_adapter_oauth::GithubError) -> Self {
+impl From<kamu_core::auth::LoginError> for GqlError {
+    fn from(value: kamu_core::auth::LoginError) -> Self {
         match value {
-            kamu_adapter_oauth::GithubError::GithubResponse(github_response_error) => {
-                GqlError::Gql(
-                    Error::new("Failed to process auth response").extend_with(|_, e| {
-                        e.set("github_response", github_response_error.github_response)
-                    }),
-                )
-            }
-            kamu_adapter_oauth::GithubError::Internal(e) => GqlError::Internal(e),
+            kamu_core::auth::LoginError::UnknownMethod(e) => GqlError::Internal(e.int_err()),
+            kamu_core::auth::LoginError::InvalidCredentials(e) => GqlError::Internal(e.int_err()),
+            kamu_core::auth::LoginError::RejectedCredentials(e) => GqlError::Gql(
+                Error::new("Rejected credentials")
+                    .extend_with(|_, eev| eev.set("reason", e.to_string())),
+            ),
+            kamu_core::auth::LoginError::Internal(e) => GqlError::Internal(e),
+        }
+    }
+}
+
+impl From<kamu_core::auth::GetAccountInfoError> for GqlError {
+    fn from(value: kamu_core::auth::GetAccountInfoError) -> Self {
+        match value {
+            kamu_core::auth::GetAccountInfoError::AccessToken(e) => GqlError::Gql(
+                Error::new("Access token error")
+                    .extend_with(|_, eev| eev.set("token_error", e.to_string())),
+            ),
+            kamu_core::auth::GetAccountInfoError::Internal(e) => GqlError::Internal(e),
         }
     }
 }
@@ -72,10 +108,10 @@ pub(crate) struct LoginResponse {
     account_info: AccountInfo,
 }
 
-impl From<kamu_adapter_oauth::GithubLoginResponse> for LoginResponse {
-    fn from(value: kamu_adapter_oauth::GithubLoginResponse) -> Self {
+impl From<kamu_core::auth::LoginResponse> for LoginResponse {
+    fn from(value: kamu_core::auth::LoginResponse) -> Self {
         Self {
-            access_token: value.token.access_token.into(),
+            access_token: value.access_token.into(),
             account_info: value.account_info.into(),
         }
     }
@@ -83,24 +119,19 @@ impl From<kamu_adapter_oauth::GithubLoginResponse> for LoginResponse {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-// TODO: reduce the structure to avoid Github specifics
 #[derive(SimpleObject, Debug, Clone)]
 pub(crate) struct AccountInfo {
-    login: String,
+    login: AccountName,
     name: String,
-    email: Option<String>,
     avatar_url: Option<String>,
-    gravatar_id: Option<String>,
 }
 
-impl From<kamu_adapter_oauth::GithubAccountInfo> for AccountInfo {
-    fn from(value: kamu_adapter_oauth::GithubAccountInfo) -> Self {
+impl From<kamu_core::auth::AccountInfo> for AccountInfo {
+    fn from(value: kamu_core::auth::AccountInfo) -> Self {
         Self {
-            login: value.login,
+            login: AccountName::from(value.login),
             name: value.name,
-            email: value.email,
             avatar_url: value.avatar_url,
-            gravatar_id: value.gravatar_id,
         }
     }
 }
