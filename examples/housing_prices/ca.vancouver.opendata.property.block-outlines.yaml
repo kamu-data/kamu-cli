@@ -8,10 +8,6 @@ content:
       fetch:
         kind: url
         url: https://opendata.vancouver.ca/explore/dataset/block-outlines/download/?format=geojson&timezone=America/Los_Angeles&lang=en
-      # Transforms the single object GeoJson with "FeatureCollection" at the root
-      # into file with one "Feature" object per line
-      # as expected by Apache Sedona.
-      # In future this will not be required.
       prepare:
       - kind: pipe
         # Dataset contains some malformed geometry :(
@@ -20,7 +16,12 @@ content:
         - '-c'
         - '.features[] | select(.geometry != null) | .'
       read:
-        kind: geoJson
+        kind: ndGeoJson
+      preprocess:
+        # TODO: Remove after datafusion ingest is stabilized
+        kind: sql
+        engine: datafusion
+        query: select * from input
       merge:
         # TODO
         kind: append

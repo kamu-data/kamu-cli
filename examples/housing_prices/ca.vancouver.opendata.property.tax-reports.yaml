@@ -42,10 +42,46 @@ content:
           - BIG_IMPROVEMENT_YEAR STRING
           - TAX_LEVY STRING
           - NEIGHBOURHOOD_CODE STRING
-          - REPORT_YEAR DATE
+          - REPORT_YEAR STRING
+      preprocess:
+        # TODO: Remove after datafusion ingest is stabilized
+        kind: sql
+        engine: datafusion
+        query: |
+          select
+            pid,
+            legal_type,
+            folio,
+            land_coordinate,
+            zoning_district,
+            zoning_classification,
+            lot,
+            plan,
+            block,
+            district_lot,
+            from_civic_number,
+            to_civic_number,
+            street_name,
+            property_postal_code,
+            narrative_legal_line1,
+            narrative_legal_line2,
+            narrative_legal_line3,
+            narrative_legal_line4,
+            narrative_legal_line5,
+            current_land_value,
+            current_improvement_value,
+            tax_assessment_year,
+            previous_land_value,
+            previous_improvement_value,
+            year_built,
+            big_improvement_year,
+            tax_levy,
+            neighbourhood_code,
+            cast(concat(report_year, '-01-01') as date) as report_year
+          from input
       merge:
         kind: ledger
         primaryKey:
-          - PID
+          - pid
     - kind: setVocab
-      eventTimeColumn: REPORT_YEAR
+      eventTimeColumn: report_year
