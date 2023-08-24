@@ -49,7 +49,7 @@ impl Reader for ReaderCsv {
         };
 
         if let Some(v) = conf.separator.as_ref() {
-            if v.as_bytes().len() > 0 {
+            if v.as_bytes().len() > 1 {
                 return Err("Csv.separator supports only single-character ascii values"
                     .int_err()
                     .into());

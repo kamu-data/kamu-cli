@@ -32,40 +32,14 @@ impl ReaderGeoJson {
             temp_path: temp_path.into(),
         }
     }
-}
 
-///////////////////////////////////////////////////////////////////////////////
-
-#[async_trait::async_trait]
-impl Reader for ReaderGeoJson {
-    async fn output_schema(
-        &self,
-        ctx: &SessionContext,
-        conf: &ReadStep,
-    ) -> Result<Option<datafusion::arrow::datatypes::Schema>, ReadError> {
-        super::output_schema_common(ctx, conf).await
-    }
-
-    async fn read(
-        &self,
-        ctx: &SessionContext,
-        path: &Path,
-        conf: &ReadStep,
-    ) -> Result<DataFrame, ReadError> {
+    fn convert_to_ndjson_blocking(in_path: &Path, out_path: &Path) -> Result<(), ReadError> {
         use std::io::Write;
 
         use serde_json::Value as JsonValue;
 
-        let schema = self.output_schema(ctx, conf).await?;
-
-        let ReadStep::GeoJson(_) = conf else {
-            unreachable!()
-        };
-
-        // TODO: PERF: This is a temporary, highly inefficient implementation that
-        // re-encodes GeoJson into NdJson which DataFusion can read natively
         let mut feature_col: serde_json::Map<String, JsonValue> =
-            serde_json::from_reader(std::fs::File::open(path).int_err()?).int_err()?;
+            serde_json::from_reader(std::fs::File::open(in_path).int_err()?).int_err()?;
 
         if feature_col["type"].as_str() != Some("FeatureCollection") {
             return Err(format!(
@@ -81,7 +55,7 @@ impl Reader for ReaderGeoJson {
             _ => Err("Invalid geojson".int_err()),
         }?;
 
-        let mut out_file = std::fs::File::create_new(&self.temp_path).int_err()?;
+        let mut out_file = std::fs::File::create_new(out_path).int_err()?;
 
         for feature in features {
             let JsonValue::Object(mut feature) = feature else {
@@ -106,7 +80,41 @@ impl Reader for ReaderGeoJson {
         }
 
         out_file.flush().int_err()?;
-        drop(out_file);
+        Ok(())
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+#[async_trait::async_trait]
+impl Reader for ReaderGeoJson {
+    async fn output_schema(
+        &self,
+        ctx: &SessionContext,
+        conf: &ReadStep,
+    ) -> Result<Option<datafusion::arrow::datatypes::Schema>, ReadError> {
+        super::output_schema_common(ctx, conf).await
+    }
+
+    async fn read(
+        &self,
+        ctx: &SessionContext,
+        path: &Path,
+        conf: &ReadStep,
+    ) -> Result<DataFrame, ReadError> {
+        let schema = self.output_schema(ctx, conf).await?;
+
+        let ReadStep::GeoJson(_) = conf else {
+            unreachable!()
+        };
+
+        // TODO: PERF: This is a temporary, highly inefficient implementation that
+        // re-encodes GeoJson into NdJson which DataFusion can read natively
+        let in_path = path.to_path_buf();
+        let out_path = self.temp_path.clone();
+        tokio::task::spawn_blocking(move || Self::convert_to_ndjson_blocking(&in_path, &out_path))
+            .await
+            .int_err()??;
 
         let options = NdJsonReadOptions {
             file_extension: self

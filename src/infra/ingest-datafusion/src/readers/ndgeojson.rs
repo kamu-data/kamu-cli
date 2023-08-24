@@ -32,41 +32,15 @@ impl ReaderNdGeoJson {
             temp_path: temp_path.into(),
         }
     }
-}
 
-///////////////////////////////////////////////////////////////////////////////
-
-#[async_trait::async_trait]
-impl Reader for ReaderNdGeoJson {
-    async fn output_schema(
-        &self,
-        ctx: &SessionContext,
-        conf: &ReadStep,
-    ) -> Result<Option<datafusion::arrow::datatypes::Schema>, ReadError> {
-        super::output_schema_common(ctx, conf).await
-    }
-
-    async fn read(
-        &self,
-        ctx: &SessionContext,
-        path: &Path,
-        conf: &ReadStep,
-    ) -> Result<DataFrame, ReadError> {
+    fn convert_to_ndjson_blocking(in_path: &Path, out_path: &Path) -> Result<(), ReadError> {
         use std::io::prelude::*;
 
         use serde_json::Value as JsonValue;
 
-        let schema = self.output_schema(ctx, conf).await?;
+        let in_file = std::fs::File::open(in_path).int_err()?;
+        let mut out_file = std::fs::File::create_new(out_path).int_err()?;
 
-        let ReadStep::NdGeoJson(_) = conf else {
-            unreachable!()
-        };
-
-        // TODO: PERF: This is a temporary, highly inefficient implementation that
-        // re-encodes NdGeoJson into NdJson which DataFusion can read natively
-        let mut out_file = std::fs::File::create_new(&self.temp_path).int_err()?;
-
-        let in_file = std::fs::File::open(path).int_err()?;
         let mut reader = std::io::BufReader::new(in_file);
         let mut buffer = String::new();
 
@@ -110,7 +84,41 @@ impl Reader for ReaderNdGeoJson {
         }
 
         out_file.flush().int_err()?;
-        drop(out_file);
+        Ok(())
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+#[async_trait::async_trait]
+impl Reader for ReaderNdGeoJson {
+    async fn output_schema(
+        &self,
+        ctx: &SessionContext,
+        conf: &ReadStep,
+    ) -> Result<Option<datafusion::arrow::datatypes::Schema>, ReadError> {
+        super::output_schema_common(ctx, conf).await
+    }
+
+    async fn read(
+        &self,
+        ctx: &SessionContext,
+        path: &Path,
+        conf: &ReadStep,
+    ) -> Result<DataFrame, ReadError> {
+        let schema = self.output_schema(ctx, conf).await?;
+
+        let ReadStep::NdGeoJson(_) = conf else {
+            unreachable!()
+        };
+
+        // TODO: PERF: This is a temporary, highly inefficient implementation that
+        // re-encodes NdGeoJson into NdJson which DataFusion can read natively
+        let in_path = path.to_path_buf();
+        let out_path = self.temp_path.clone();
+        tokio::task::spawn_blocking(move || Self::convert_to_ndjson_blocking(&in_path, &out_path))
+            .await
+            .int_err()??;
 
         let options = NdJsonReadOptions {
             file_extension: self

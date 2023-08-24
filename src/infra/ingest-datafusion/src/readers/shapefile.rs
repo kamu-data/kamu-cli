@@ -33,15 +33,56 @@ impl ReaderEsriShapefile {
         }
     }
 
-    // TODO: PERF: Consider subPath argumemnt to skip extracting unrelated data
-    fn extract_zip_to_temp_dir(&self, path: &Path) -> Result<PathBuf, InternalError> {
-        std::fs::create_dir(&self.temp_path).int_err()?;
-        let mut archive = zip::ZipArchive::new(std::fs::File::open(path).int_err()?).int_err()?;
-        archive.extract(&self.temp_path).int_err()?;
-        Ok(self.temp_path.clone())
+    fn convert_to_ndjson_blocking(
+        in_path: &Path,
+        tmp_path: &Path,
+        conf: ReadStepEsriShapefile,
+    ) -> Result<PathBuf, ReadError> {
+        use std::io::Write;
+
+        use serde_json::Value as JsonValue;
+
+        Self::extract_zip(in_path, tmp_path)?;
+        let shp_path = Self::locate_shp_file(tmp_path, conf.sub_path.as_ref().map(|s| s.as_str()))?;
+
+        let temp_json_path = tmp_path.join("__temp.json");
+        let mut file = std::fs::File::create_new(&temp_json_path).int_err()?;
+
+        let mut reader = shapefile::Reader::from_path(&shp_path).int_err()?;
+        for rec in reader.iter_shapes_and_records() {
+            let (shape, record) = rec.int_err()?;
+
+            let geometry: geo_types::Geometry = shape.try_into().int_err()?;
+            let geometry = geojson::Geometry {
+                value: geojson::Value::from(&geometry),
+                bbox: None,
+                foreign_members: None,
+            };
+
+            let mut json = Self::shp_record_to_json(record);
+            json.insert(
+                "geometry".to_string(),
+                JsonValue::String(geometry.to_string()),
+            );
+
+            serde_json::to_writer(&mut file, &json).int_err()?;
+            writeln!(&mut file).int_err()?;
+        }
+
+        file.flush().int_err()?;
+        Ok(temp_json_path)
     }
 
-    fn locate_shp_file(&self, dir: &Path, subpath: Option<&str>) -> Result<PathBuf, ReadError> {
+    // TODO: PERF: Consider subPath argumemnt to skip extracting unrelated data
+    fn extract_zip(in_path: &Path, out_path: &Path) -> Result<(), InternalError> {
+        std::fs::create_dir(out_path).int_err()?;
+        let mut archive =
+            zip::ZipArchive::new(std::fs::File::open(in_path).int_err()?).int_err()?;
+        archive.extract(out_path).int_err()?;
+        Ok(())
+    }
+
+    fn locate_shp_file(dir: &Path, subpath: Option<&str>) -> Result<PathBuf, ReadError> {
         let is_shp_file = |p: &Path| -> bool { p.extension().map(|s| s == "shp").unwrap_or(false) };
 
         let list_shp_files = || -> Vec<PathBuf> {
@@ -116,7 +157,6 @@ impl ReaderEsriShapefile {
     }
 
     fn shp_record_to_json(
-        &self,
         record: shapefile::dbase::Record,
     ) -> serde_json::Map<String, serde_json::Value> {
         use serde_json::Value as JsonValue;
@@ -182,47 +222,22 @@ impl Reader for ReaderEsriShapefile {
         path: &Path,
         conf: &ReadStep,
     ) -> Result<DataFrame, ReadError> {
-        use std::io::Write;
-
-        use serde_json::Value as JsonValue;
-
         let schema = self.output_schema(ctx, conf).await?;
 
-        let ReadStep::EsriShapefile(conf) = conf else {
+        let ReadStep::EsriShapefile(conf) = conf.clone() else {
             unreachable!()
         };
 
         // TODO: PERF: This is a temporary, highly inefficient implementation that
         // decodes Shapefile into NdJson which DataFusion can read natively
-        let extracted_path = self.extract_zip_to_temp_dir(path)?;
-        let shp_path =
-            self.locate_shp_file(&extracted_path, conf.sub_path.as_ref().map(|s| s.as_str()))?;
+        let in_path = path.to_path_buf();
+        let out_path = self.temp_path.clone();
 
-        let temp_json_path = extracted_path.join("__temp.json");
-        let mut file = std::fs::File::create_new(&temp_json_path).int_err()?;
-
-        let mut reader = shapefile::Reader::from_path(&shp_path).int_err()?;
-        for rec in reader.iter_shapes_and_records() {
-            let (shape, record) = rec.int_err()?;
-
-            let geometry: geo_types::Geometry = shape.try_into().int_err()?;
-            let geometry = geojson::Geometry {
-                value: geojson::Value::from(&geometry),
-                bbox: None,
-                foreign_members: None,
-            };
-
-            let mut json = self.shp_record_to_json(record);
-            json.insert(
-                "geometry".to_string(),
-                JsonValue::String(geometry.to_string()),
-            );
-
-            serde_json::to_writer(&mut file, &json).int_err()?;
-            writeln!(&mut file).int_err()?;
-        }
-
-        file.flush().int_err()?;
+        let temp_json_path = tokio::task::spawn_blocking(move || {
+            Self::convert_to_ndjson_blocking(&in_path, &out_path, conf)
+        })
+        .await
+        .int_err()??;
 
         let options = NdJsonReadOptions {
             file_extension: "json",
