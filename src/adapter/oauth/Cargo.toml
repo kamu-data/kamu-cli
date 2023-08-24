@@ -1,0 +1,39 @@
+[package]
+name = "kamu-adapter-oauth"
+description = "OAuth authentication adapter"
+version = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+authors = { workspace = true }
+readme = { workspace = true }
+license-file = { workspace = true }
+keywords = { workspace = true }
+include = { workspace = true }
+edition = { workspace = true }
+publish = { workspace = true }
+
+
+[lib]
+doctest = false
+
+[dependencies]
+opendatafabric = { workspace = true }
+kamu-core = { workspace = true }
+
+async-trait = "0.1"
+dill = "0.6"
+reqwest = { version = "0.11", default-features = false, features = ["rustls-tls", "json"] }  # TODO: Remove from this crate (needed by GitHub auth)
+serde = "1"
+serde_json = "1"
+thiserror = "1"
+
+[dev-dependencies]
+kamu = { workspace = true }
+
+env_logger = "0.10"
+tempfile = "3"
+test-group = { version = "1" }
+test-log = { version = "0.2", features = ["trace"] }
+tokio = { version = "1", default-features = false, features = [] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }

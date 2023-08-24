@@ -7,113 +7,84 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use serde::Deserialize;
-
 use crate::prelude::*;
 
-pub(crate) struct AuthMut;
+///////////////////////////////////////////////////////////////////////////////
 
-// TODO: We should somehow separate auth method implementations from this
-// pure-API crate
+pub(crate) struct AuthMut {
+    github_oauth: kamu_adapter_oauth::OAuthGithub,
+}
+
 #[Object]
 impl AuthMut {
-    // TODO: PERF: Cache client instance?
     #[graphql(skip)]
-    fn get_client(&self) -> Result<reqwest::Client, reqwest::Error> {
-        reqwest::Client::builder()
-            .user_agent(concat!(
-                env!("CARGO_PKG_NAME"),
-                "/",
-                env!("CARGO_PKG_VERSION"),
-            ))
-            .build()
+    pub fn new() -> Self {
+        Self {
+            github_oauth: kamu_adapter_oauth::OAuthGithub::new(),
+        }
+    }
+
+    async fn password_login(&self, login: String, password: String) -> Result<LoginResponse> {
+        tracing::info!(%login, %password, "Password login"); // TODO: don't log password
+        unimplemented!("Password login not supported yet");
     }
 
     async fn github_login(&self, code: String) -> Result<LoginResponse> {
-        let client_id = std::env::var("KAMU_AUTH_GITHUB_CLIENT_ID")
-            .expect("KAMU_AUTH_GITHUB_CLIENT_ID env var is not set");
-        let client_secret = std::env::var("KAMU_AUTH_GITHUB_CLIENT_SECRET")
-            .expect("KAMU_AUTH_GITHUB_CLIENT_SECRET env var is not set");
-
-        let params = [
-            ("client_id", client_id),
-            ("client_secret", client_secret),
-            ("code", code),
-        ];
-
-        let client = self.get_client().int_err()?;
-
-        let body = client
-            .post("https://github.com/login/oauth/access_token")
-            .header(reqwest::header::ACCEPT, "application/json")
-            .form(&params)
-            .send()
-            .await
-            .int_err()?
-            .error_for_status()
-            .int_err()?
-            .text()
-            .await
-            .int_err()?;
-
-        let token = serde_json::from_str::<AccessToken>(&body).map_err(|_| {
-            Error::new("Failed to process auth response")
-                .extend_with(|_, e| e.set("github_response", body))
-        })?;
-
-        let account_info = client
-            .get("https://api.github.com/user")
-            .bearer_auth(&token.access_token)
-            .header(reqwest::header::ACCEPT, "application/vnd.github.v3+json")
-            .send()
-            .await
-            .int_err()?
-            .error_for_status()
-            .int_err()?
-            .json::<AccountInfo>()
-            .await
-            .int_err()?;
-
-        Ok(LoginResponse {
-            token,
-            account_info,
-        })
+        // TODO: output token will be wrapped with our own JWT
+        match self.github_oauth.login(code).await {
+            Ok(github_login_response) => Ok(github_login_response.into()),
+            Err(e) => Err(e.into()),
+        }
     }
 
     async fn account_info(&self, access_token: String) -> Result<AccountInfo> {
-        let client = self.get_client().int_err()?;
-
-        let account_info = client
-            .get("https://api.github.com/user")
-            .bearer_auth(access_token)
-            .header(reqwest::header::ACCEPT, "application/vnd.github.v3+json")
-            .send()
-            .await
-            .int_err()?
-            .error_for_status()
-            .int_err()?
-            .json::<AccountInfo>()
-            .await
-            .int_err()?;
-
-        Ok(account_info)
+        // TODO: access token will be our own JWT, so deciding whether it is for Github
+        // would not be done here
+        match self.github_oauth.account_info(access_token).await {
+            Ok(github_account_info) => Ok(github_account_info.into()),
+            Err(e) => Err(e.into()),
+        }
     }
 }
 
-#[derive(SimpleObject, Debug, Clone, Deserialize)]
+///////////////////////////////////////////////////////////////////////////////
+
+impl From<kamu_adapter_oauth::GithubError> for GqlError {
+    fn from(value: kamu_adapter_oauth::GithubError) -> Self {
+        match value {
+            kamu_adapter_oauth::GithubError::GithubResponse(github_response_error) => {
+                GqlError::Gql(
+                    Error::new("Failed to process auth response").extend_with(|_, e| {
+                        e.set("github_response", github_response_error.github_response)
+                    }),
+                )
+            }
+            kamu_adapter_oauth::GithubError::Internal(e) => GqlError::Internal(e),
+        }
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject, Debug, Clone)]
 pub(crate) struct LoginResponse {
-    token: AccessToken,
+    access_token: String,
     account_info: AccountInfo,
 }
 
-#[derive(SimpleObject, Debug, Clone, Deserialize)]
-pub(crate) struct AccessToken {
-    access_token: String,
-    scope: String,
-    token_type: String,
+impl From<kamu_adapter_oauth::GithubLoginResponse> for LoginResponse {
+    fn from(value: kamu_adapter_oauth::GithubLoginResponse) -> Self {
+        Self {
+            access_token: value.token.access_token.into(),
+            account_info: value.account_info.into(),
+        }
+    }
 }
 
-#[derive(SimpleObject, Debug, Clone, Deserialize)]
+///////////////////////////////////////////////////////////////////////////////
+
+// TODO: reduce the structure to avoid Github specifics
+#[derive(SimpleObject, Debug, Clone)]
 pub(crate) struct AccountInfo {
     login: String,
     name: String,
@@ -121,3 +92,17 @@ pub(crate) struct AccountInfo {
     avatar_url: Option<String>,
     gravatar_id: Option<String>,
 }
+
+impl From<kamu_adapter_oauth::GithubAccountInfo> for AccountInfo {
+    fn from(value: kamu_adapter_oauth::GithubAccountInfo) -> Self {
+        Self {
+            login: value.login,
+            name: value.name,
+            email: value.email,
+            avatar_url: value.avatar_url,
+            gravatar_id: value.gravatar_id,
+        }
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////

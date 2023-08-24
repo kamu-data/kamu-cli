@@ -1,9 +1,3 @@
-type AccessToken {
-	accessToken: String!
-	scope: String!
-	tokenType: String!
-}
-
 interface Account {
 	id: AccountID!
 	name: AccountName!
@@ -52,6 +46,7 @@ type AttachmentsEmbedded {
 }
 
 type AuthMut {
+	passwordLogin(login: String!, password: String!): LoginResponse!
 	githubLogin(code: String!): LoginResponse!
 	accountInfo(accessToken: String!): AccountInfo!
 }
@@ -481,7 +476,7 @@ type InputSlice {
 
 
 type LoginResponse {
-	token: AccessToken!
+	accessToken: String!
 	accountInfo: AccountInfo!
 }
 

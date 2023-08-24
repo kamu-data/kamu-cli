@@ -3111,13 +3111,12 @@ dependencies = [
  "indoc 2.0.3",
  "internal-error",
  "kamu",
+ "kamu-adapter-oauth",
  "kamu-core",
  "kamu-data-utils",
  "kamu-task-system",
  "mockall",
  "opendatafabric",
- "reqwest",
- "serde",
  "serde_json",
  "tempfile",
  "test-group",
@@ -3167,6 +3166,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "kamu-adapter-oauth"
+version = "0.142.1"
+dependencies = [
+ "async-trait",
+ "dill",
+ "env_logger",
+ "kamu",
+ "kamu-core",
+ "opendatafabric",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "test-group",
+ "test-log",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "kamu-cli"
 version = "0.142.1"
 dependencies = [
@@ -3201,6 +3222,7 @@ dependencies = [
  "kamu-adapter-auth-oso",
  "kamu-adapter-graphql",
  "kamu-adapter-http",
+ "kamu-adapter-oauth",
  "kamu-data-utils",
  "kamu-task-system-inmem",
  "libc",

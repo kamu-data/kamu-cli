@@ -23,6 +23,8 @@ opendatafabric = { workspace = true }
 kamu-data-utils = { workspace = true }
 kamu-core = { workspace = true }
 kamu-task-system = { workspace = true }
+# TODO: don't use this adapter directly
+kamu-adapter-oauth = { workspace = true }
 
 async-graphql = { version = "6", features = ["chrono", "url", "apollo_tracing"] }
 async-trait = { version = "0.1", default-features = false }
@@ -31,9 +33,6 @@ datafusion = "30"  # TODO: Currently needed for type conversions but ideally sho
 dill = "0.6"
 futures = "0.3"
 indoc = "2"
-reqwest = { version = "0.11", default-features = false, features = ["rustls-tls", "json"] }  # TODO: Remove from this crate (needed by GitHub auth)
-serde = "1"
-serde_json = "1"
 tracing = "0.1"
 
 
@@ -43,6 +42,7 @@ kamu = { workspace = true }
 
 env_logger = "0.10"
 mockall = "0.11"
+serde_json = "1"
 test-group = { version = "1" }
 tempfile = "3"
 tokio = { version = "1", default-features = false, features = [] }
