@@ -21,6 +21,12 @@ use crate::*;
 
 pub struct ReaderNdJson {}
 
+impl ReaderNdJson {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]

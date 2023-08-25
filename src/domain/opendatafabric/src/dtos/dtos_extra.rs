@@ -55,6 +55,12 @@ pub struct DatasetVocabularyResolved<'a> {
 
 pub type DatasetVocabularyResolvedOwned = DatasetVocabularyResolved<'static>;
 
+impl Default for DatasetVocabularyResolvedOwned {
+    fn default() -> Self {
+        Self::from(DatasetVocabulary::default())
+    }
+}
+
 impl<'a> From<&'a DatasetVocabulary> for DatasetVocabularyResolved<'a> {
     fn from(value: &'a DatasetVocabulary) -> Self {
         Self {
@@ -104,6 +110,13 @@ impl From<DatasetVocabulary> for DatasetVocabularyResolvedOwned {
                 .map(Cow::Owned)
                 .unwrap_or(Cow::Borrowed(DatasetVocabulary::DEFAULT_OFFSET_COLUMN_NAME)),
         }
+    }
+}
+
+impl From<SetVocab> for DatasetVocabularyResolvedOwned {
+    fn from(value: SetVocab) -> Self {
+        let vocab: DatasetVocabulary = value.into();
+        Self::from(vocab)
     }
 }
 

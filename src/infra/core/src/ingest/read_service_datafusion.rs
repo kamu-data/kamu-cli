@@ -375,7 +375,6 @@ impl ReadServiceDatafusion {
         // See: https://github.com/kamu-data/kamu-engine-flink/issues/3
         WriterProperties::builder()
             .set_writer_version(datafusion::parquet::file::properties::WriterVersion::PARQUET_1_0)
-            .set_created_by("kamu ingest datafusion".to_string())
             .set_compression(datafusion::parquet::basic::Compression::SNAPPY)
             // system_time value will be the same for all rows in a batch
             .set_column_dictionary_enabled(vocab.system_time_column.as_ref().into(), true)
@@ -585,7 +584,7 @@ impl ReadService for ReadServiceDatafusion {
 
         let mut response = self.write_output(out_data_path, &ctx, df, &vocab).await?;
 
-        // Don't unpdate watermark unless it progressed
+        // Ensure watermark is monotonically non-decreasing
         response.output_watermark = match (response.output_watermark, request.prev_watermark) {
             (Some(new), Some(old)) if new < old => Some(old),
             (None, old) => old,

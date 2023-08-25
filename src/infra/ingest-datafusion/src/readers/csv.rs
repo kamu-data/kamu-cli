@@ -22,6 +22,10 @@ pub struct ReaderCsv {}
 
 impl ReaderCsv {
     const DEFAULT_INFER_SCHEMA_ROWS: usize = 1000;
+
+    pub fn new() -> Self {
+        Self {}
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////

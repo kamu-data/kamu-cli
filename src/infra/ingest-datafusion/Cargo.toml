@@ -39,6 +39,7 @@ zip = { version = "0.6", default-features = false, features = ["deflate", "bzip2
 # Utils
 async-trait = "0.1"
 chrono = { version = "0.4", features = ["serde"] }
+futures = "0.3"
 thiserror = "1"
 tokio = { version = "1", default-features = false, features=["fs", "process"] }
 tracing = "0.1"
@@ -46,7 +47,7 @@ url = { version = "2", features = ["serde"] }
 
 
 [dev-dependencies]
-kamu-data-utils = { workspace = true }
+kamu = { workspace = true }
 criterion = { version = "0.5", features = ["async_tokio"] }
 env_logger = "0.10"
 indoc = "2"

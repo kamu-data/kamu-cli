@@ -20,6 +20,12 @@ use crate::*;
 
 pub struct ReaderParquet {}
 
+impl ReaderParquet {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]

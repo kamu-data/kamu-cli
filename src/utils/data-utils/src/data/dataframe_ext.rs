@@ -78,7 +78,13 @@ impl DataFrameExt for DataFrame {
             "write_parquet produced more than one file"
         );
 
-        let tmp_path = path.with_extension("tmp");
+        let tmp_path = path.with_extension(format!(
+            "{}tmp",
+            path.extension()
+                .unwrap_or_default()
+                .to_str()
+                .unwrap_or_default()
+        ));
         std::fs::rename(path.join("part-0.parquet"), &tmp_path)?;
         std::fs::remove_dir(path)?;
         std::fs::rename(tmp_path, path)?;

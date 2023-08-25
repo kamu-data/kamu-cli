@@ -17,6 +17,7 @@ use crate::formats::*;
 
 /// Same as [MetadataBlock] struct but holds a specific variant of the
 /// [MetadataEvent]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MetadataBlockTyped<T> {
     /// System time when this block was written.
     pub system_time: DateTime<Utc>,
