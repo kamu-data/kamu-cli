@@ -247,12 +247,6 @@ impl MergeStrategy for MergeStrategySnapshot {
             .select(cdc_select)
             .int_err()?;
 
-        tracing::info!(
-            schema = ?res.schema(),
-            logical_plan = ?res.logical_plan(),
-            "Performing merge",
-        );
-
         Ok(res)
     }
 }

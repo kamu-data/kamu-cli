@@ -339,7 +339,7 @@ impl ReadServiceDatafusion {
 
         let name = step.alias.as_ref().unwrap();
 
-        tracing::info!(
+        tracing::debug!(
             %name,
             query = %step.query,
             "Creating view for a query",
@@ -348,7 +348,11 @@ impl ReadServiceDatafusion {
         let logical_plan = match ctx.state().create_logical_plan(&step.query).await {
             Ok(plan) => plan,
             Err(error) => {
-                tracing::debug!(?error, query = %step.query, "Error when setting up query");
+                tracing::error!(
+                    error = &error as &dyn std::error::Error,
+                    query = %step.query,
+                    "Error when setting up query"
+                );
                 return Err(InvalidQueryError::new(error.to_string(), Vec::new()).into());
             }
         };
@@ -514,7 +518,7 @@ impl ReadService for ReadServiceDatafusion {
             reader.read(&ctx, &in_data_path, &source.read).await?
         };
 
-        tracing::info!(schema = ?df.schema(), "Read step output schema");
+        tracing::debug!(schema = ?df.schema(), "Read step output schema");
 
         // Preprocess step
         let df = if let Some(preprocess) = source.preprocess.clone() {
@@ -532,7 +536,13 @@ impl ReadService for ReadServiceDatafusion {
 
             // Get result's execution plan
             let df = ctx.table("output").await.int_err()?;
-            tracing::info!(schema = ?df.schema(), "Preprocess step output schema");
+
+            tracing::debug!(
+                schema = ?df.schema(),
+                logical_plan = ?df.logical_plan(),
+                "Performing preprocess step",
+            );
+
             df
         } else {
             df
@@ -551,7 +561,12 @@ impl ReadService for ReadServiceDatafusion {
             let merge_strategy = self.get_merge_strategy(&source.merge, &vocab);
             let df = merge_strategy.merge(prev, df)?;
 
-            tracing::info!(schema = ?df.schema(), "Merge step output schema");
+            tracing::debug!(
+                schema = ?df.schema(),
+                logical_plan = ?df.logical_plan(),
+                "Performing merge step",
+            );
+
             df
         };
 
