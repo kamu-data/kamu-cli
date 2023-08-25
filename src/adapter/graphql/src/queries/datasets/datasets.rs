@@ -28,10 +28,9 @@ impl Datasets {
         let hdl = dataset_repo
             .try_resolve_dataset_ref(&dataset_id.as_local_ref())
             .await?;
-        Ok(hdl.map(|h| Dataset::new(Account::fake(), h)))
+        Ok(hdl.map(|h| Dataset::new(Account::from_alias(&h.alias), h)))
     }
 
-    // TODO: Multi-tenancy
     /// Returns dataset by its owner and name
     #[allow(unused_variables)]
     async fn by_owner_and_name(
@@ -40,16 +39,15 @@ impl Datasets {
         account_name: AccountName,
         dataset_name: DatasetName,
     ) -> Result<Option<Dataset>> {
-        let account = Account::fake();
+        let account = Account::from_account_name(&account_name);
 
-        // Not multi-tenant yet
-        let dataset_alias = odf::DatasetAlias::new(None, dataset_name.into());
+        let dataset_alias = odf::DatasetAlias::new(Some(account_name.into()), dataset_name.into());
 
         let dataset_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
         let hdl = dataset_repo
             .try_resolve_dataset_ref(&dataset_alias.into_local_ref())
             .await?;
-        Ok(hdl.map(|h| Dataset::new(Account::fake(), h)))
+        Ok(hdl.map(|h| Dataset::new(account, h)))
     }
 
     #[graphql(skip)]
@@ -105,7 +103,7 @@ impl Datasets {
         page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<DatasetConnection> {
-        let account = Account::User(User::new(AccountID::from(FAKE_USER_ID), account_name));
+        let account = Account::from_account_name(&account_name);
         self.by_account_impl(ctx, account, page, per_page).await
     }
 }

@@ -420,7 +420,6 @@ impl DatasetSingleTenantStorageStrategy {
     }
 
     fn dataset_name<'a>(&self, dataset_alias: &'a DatasetAlias) -> &'a DatasetName {
-        assert!(!dataset_alias.is_multi_tenant());
         &dataset_alias.dataset_name
     }
 
@@ -484,7 +483,7 @@ impl DatasetStorageStrategy for DatasetSingleTenantStorageStrategy {
     }
 
     fn get_datasets_by_owner<'s>(&'s self, account_name: AccountName) -> DatasetHandleStream<'s> {
-        if account_name == self.current_account_subject.account.login {
+        if account_name.eq(&self.current_account_subject.account.login) {
             self.get_all_datasets()
         } else {
             panic!("Single-tenant dataset repository queried by non-default account");
@@ -496,7 +495,12 @@ impl DatasetStorageStrategy for DatasetSingleTenantStorageStrategy {
         dataset_alias: &DatasetAlias,
     ) -> Result<DatasetHandle, ResolveDatasetError> {
         assert!(
-            !dataset_alias.is_multi_tenant(),
+            !dataset_alias.is_multi_tenant()
+                || dataset_alias
+                    .account_name
+                    .as_ref()
+                    .unwrap()
+                    .eq(&self.current_account_subject.account.login),
             "Multi-tenant refs shouldn't have reached down to here with earlier validations"
         );
 

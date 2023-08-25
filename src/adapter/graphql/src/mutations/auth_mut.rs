@@ -51,8 +51,14 @@ impl AuthMut {
 impl From<kamu_core::auth::LoginError> for GqlError {
     fn from(value: kamu_core::auth::LoginError) -> Self {
         match value {
-            kamu_core::auth::LoginError::UnknownMethod(e) => GqlError::Internal(e.int_err()),
-            kamu_core::auth::LoginError::InvalidCredentials(e) => GqlError::Internal(e.int_err()),
+            kamu_core::auth::LoginError::UnknownMethod(e) => GqlError::Gql(
+                Error::new("Unknown login method")
+                    .extend_with(|_, eev| eev.set("method", e.to_string())),
+            ),
+            kamu_core::auth::LoginError::InvalidCredentials(e) => GqlError::Gql(
+                Error::new("Invalid credentials")
+                    .extend_with(|_, eev| eev.set("reason", e.to_string())),
+            ),
             kamu_core::auth::LoginError::RejectedCredentials(e) => GqlError::Gql(
                 Error::new("Rejected credentials")
                     .extend_with(|_, eev| eev.set("reason", e.to_string())),

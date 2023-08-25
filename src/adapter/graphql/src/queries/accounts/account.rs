@@ -31,6 +31,25 @@ impl Account {
             odf::AccountName::new_unchecked("kamu").into(),
         ))
     }
+
+    pub(crate) fn from_account_name(name: &odf::AccountName) -> Self {
+        Self::User(User::new(
+            AccountID::from(FAKE_USER_ID),
+            name.clone().into(),
+        ))
+    }
+
+    pub(crate) fn from_alias(alias: &odf::DatasetAlias) -> Self {
+        if alias.is_multi_tenant() {
+            Self::User(User::new(
+                AccountID::from(FAKE_USER_ID),
+                alias.account_name.as_ref().unwrap().clone().into(),
+            ))
+        } else {
+            // TODO: resolve to current user
+            Self::fake()
+        }
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////

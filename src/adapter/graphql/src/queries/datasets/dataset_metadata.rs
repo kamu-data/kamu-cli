@@ -104,12 +104,13 @@ impl DatasetMetadata {
         let mut dependencies: Vec<_> = Vec::new();
         for input in summary.dependencies.into_iter() {
             let dataset_id = input.id.unwrap().clone();
+            let dataset_handle = dataset_repo
+                .resolve_dataset_ref(&dataset_id.as_local_ref())
+                .await
+                .int_err()?;
             dependencies.push(Dataset::new(
-                Account::fake(),
-                dataset_repo
-                    .resolve_dataset_ref(&dataset_id.as_local_ref())
-                    .await
-                    .int_err()?,
+                Account::from_alias(&dataset_handle.alias),
+                dataset_handle,
             ));
         }
         Ok(dependencies)
@@ -122,7 +123,7 @@ impl DatasetMetadata {
 
         let downstream: Vec<_> = dataset_repo
             .get_downstream_dependencies(&self.dataset_handle.as_local_ref())
-            .map_ok(|hdl| Dataset::new(Account::fake(), hdl))
+            .map_ok(|hdl| Dataset::new(Account::from_alias(&hdl.alias), hdl))
             .try_collect()
             .await?;
 

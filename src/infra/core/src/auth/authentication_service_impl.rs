@@ -17,6 +17,8 @@ use internal_error::{ErrorIntoInternal, InternalError};
 use jsonwebtoken::errors::ErrorKind;
 use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
 use kamu_core::auth::*;
+use rand::distributions::Alphanumeric;
+use rand::{thread_rng, Rng};
 use serde::{Deserialize, Serialize};
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -34,10 +36,14 @@ pub struct AuthenticationServiceImpl {
 #[component(pub)]
 impl AuthenticationServiceImpl {
     pub fn new(authentication_providers: Vec<Arc<dyn AuthenticationProvider>>) -> Self {
+        let kamu_jwt_secret = match std::env::var("KAMU_JWT_SECRET") {
+            Ok(jwt_secret) => jwt_secret,
+            Err(_) => Self::random_jwt_secret(),
+        };
+
         let mut service = Self {
             authentication_providers_by_method: HashMap::new(),
-            kamu_jwt_secret: std::env::var("KAMU_JWT_SECRET")
-                .expect("KAMU_JWT_SECRET env var is not set"),
+            kamu_jwt_secret,
         };
 
         for authentication_provider in authentication_providers {
@@ -56,6 +62,14 @@ impl AuthenticationServiceImpl {
         }
 
         service
+    }
+
+    fn random_jwt_secret() -> String {
+        thread_rng()
+            .sample_iter(&Alphanumeric)
+            .take(64)
+            .map(char::from)
+            .collect()
     }
 
     fn resolve_authentication_provider(

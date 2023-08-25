@@ -16,6 +16,8 @@ use kamu::domain;
 use rust_embed::RustEmbed;
 use serde::Serialize;
 
+use crate::{PasswordLoginCredentials, LOGIN_METHOD_PASSWORD};
+
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(RustEmbed)]
@@ -28,9 +30,15 @@ struct HttpRoot;
 #[serde(rename_all = "camelCase")]
 struct WebUIConfig {
     api_server_gql_url: String,
-    // TODO: pass login & password instead
-    logged_user: Option<domain::auth::AccountInfo>,
+    login_instructions: Option<WebUILoginInstructions>,
     feature_flags: WebUIFeatureFlags,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct WebUILoginInstructions {
+    login_method: String,
+    login_credentials_json: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -63,11 +71,21 @@ impl WebUIServer {
         });
 
         let current_account_subject = catalog.get_one::<domain::CurrentAccountSubject>().unwrap();
+        let login_credentials = PasswordLoginCredentials {
+            login: current_account_subject.account.login.to_string(),
+            password: current_account_subject.account.login.to_string(),
+        };
 
         let gql_schema = kamu_adapter_graphql::schema(catalog);
         let web_ui_config = WebUIConfig {
             api_server_gql_url: format!("http://{}/graphql", bound_addr.local_addr()),
-            logged_user: Some(current_account_subject.account.clone()),
+            login_instructions: Some(WebUILoginInstructions {
+                login_method: LOGIN_METHOD_PASSWORD.to_string(),
+                login_credentials_json: serde_json::to_string::<PasswordLoginCredentials>(
+                    &login_credentials,
+                )
+                .unwrap(),
+            }),
             feature_flags: WebUIFeatureFlags {
                 enable_login: false,
                 enable_logout: false,

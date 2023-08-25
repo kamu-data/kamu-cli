@@ -18,23 +18,22 @@ const LOGIN_METHOD_GITHUB: &str = "oauth_github";
 
 ///////////////////////////////////////////////////////////////////////////////
 
-pub struct OAuthGithub {
-    client_id: String,
-    client_secret: String,
-}
+pub struct OAuthGithub;
 
 #[component(pub)]
 impl OAuthGithub {
     pub fn new() -> Self {
-        let client_id = std::env::var("KAMU_AUTH_GITHUB_CLIENT_ID")
-            .expect("KAMU_AUTH_GITHUB_CLIENT_ID env var is not set");
-        let client_secret = std::env::var("KAMU_AUTH_GITHUB_CLIENT_SECRET")
-            .expect("KAMU_AUTH_GITHUB_CLIENT_SECRET env var is not set");
+        Self {}
+    }
 
-        Self {
-            client_id,
-            client_secret,
-        }
+    fn get_client_id() -> String {
+        std::env::var("KAMU_AUTH_GITHUB_CLIENT_ID")
+            .expect("KAMU_AUTH_GITHUB_CLIENT_ID env var is not set")
+    }
+
+    fn get_client_secret() -> String {
+        std::env::var("KAMU_AUTH_GITHUB_CLIENT_SECRET")
+            .expect("KAMU_AUTH_GITHUB_CLIENT_SECRET env var is not set")
     }
 
     fn get_client(&self) -> Result<reqwest::Client, reqwest::Error> {
@@ -52,8 +51,8 @@ impl OAuthGithub {
         code: String,
     ) -> Result<GithubLoginResponse, kamu_core::auth::ProviderLoginError> {
         let params = [
-            ("client_id", self.client_id.clone()),
-            ("client_secret", self.client_secret.clone()),
+            ("client_id", OAuthGithub::get_client_id()),
+            ("client_secret", OAuthGithub::get_client_secret()),
             ("code", code),
         ];
 

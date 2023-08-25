@@ -21,7 +21,7 @@ use crate::UsersConfig;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-const LOGIN_METHOD_PASSWORD: &str = "password";
+pub const LOGIN_METHOD_PASSWORD: &str = "password";
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -34,9 +34,10 @@ impl AccountService {
     pub fn new(users_config: Arc<UsersConfig>) -> Self {
         let mut predefined_accounts: HashMap<String, auth::AccountInfo> = HashMap::new();
         for predefined_account in &users_config.predefined {
-            predefined_accounts
-                .insert(predefined_account.name.clone(), predefined_account.clone())
-                .unwrap();
+            predefined_accounts.insert(
+                predefined_account.login.to_string(),
+                predefined_account.clone(),
+            );
         }
 
         Self {
@@ -231,8 +232,8 @@ impl CurrentAccountIndication {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, Deserialize)]
-struct PasswordLoginCredentials {
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PasswordLoginCredentials {
     pub login: String,
     pub password: String,
 }
