@@ -14,27 +14,8 @@ use thiserror::Error;
 
 ///////////////////////////////////////////////////////////////////////////////
 
-pub const LOGIN_METHOD_GITHUB: &str = "oauth_github";
-pub const LOGIN_METHOD_PASSWORD: &str = "password";
-
-///////////////////////////////////////////////////////////////////////////////
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GithubLoginCredentials {
-    pub code: String,
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PasswordLoginCredentials {
-    pub login: String,
-    pub password: String,
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct AccountInfo {
     pub login: AccountName,
     pub name: String,

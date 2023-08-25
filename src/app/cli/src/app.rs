@@ -45,8 +45,7 @@ pub async fn run(
     let workspace_svc = WorkspaceService::new(Arc::new(workspace_layout.clone()));
     let workspace_version = workspace_svc.workspace_version()?;
 
-    let account_svc = AccountService::new();
-    let current_account = account_svc.current_account_indication(&matches);
+    let current_account = AccountService::current_account_indication(&matches);
 
     prepare_run_dir(&workspace_layout.run_info_dir);
 
@@ -138,7 +137,9 @@ pub fn configure_catalog(
     b.add::<ContainerRuntime>();
     b.add::<GcService>();
     b.add::<WorkspaceService>();
+
     b.add::<AccountService>();
+    b.bind::<dyn auth::AuthenticationProvider, AccountService>();
 
     b.add::<SystemTimeSourceDefault>();
     b.bind::<dyn SystemTimeSource, SystemTimeSourceDefault>();
@@ -225,7 +226,6 @@ pub fn configure_catalog(
 
     b.add::<kamu_adapter_oauth::OAuthGithub>();
     b.bind::<dyn domain::auth::AuthenticationProvider, kamu_adapter_oauth::OAuthGithub>();
-    // TODO: local login-passwords
 
     b.add::<AuthenticationServiceImpl>();
     b.bind::<dyn domain::auth::AuthenticationService, AuthenticationServiceImpl>();
@@ -316,6 +316,8 @@ pub fn register_config_in_catalog(config: &CLIConfig, catalog: &mut CatalogBuild
         pre_resolve_dnslink: ipfs_conf.pre_resolve_dnslink.unwrap(),
     });
     catalog.add_value(kamu::utils::ipfs_wrapper::IpfsClient::default());
+
+    catalog.add_value(config.users.clone().unwrap());
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

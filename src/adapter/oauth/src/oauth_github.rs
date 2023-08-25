@@ -14,6 +14,10 @@ use serde::{Deserialize, Serialize};
 
 ///////////////////////////////////////////////////////////////////////////////
 
+const LOGIN_METHOD_GITHUB: &str = "oauth_github";
+
+///////////////////////////////////////////////////////////////////////////////
+
 pub struct OAuthGithub {
     client_id: String,
     client_secret: String,
@@ -121,7 +125,7 @@ impl OAuthGithub {
 #[async_trait::async_trait]
 impl kamu_core::auth::AuthenticationProvider for OAuthGithub {
     fn login_method(&self) -> &'static str {
-        kamu_core::auth::LOGIN_METHOD_GITHUB
+        LOGIN_METHOD_GITHUB
     }
 
     async fn login(
@@ -129,14 +133,13 @@ impl kamu_core::auth::AuthenticationProvider for OAuthGithub {
         login_credentials_json: String,
     ) -> Result<kamu_core::auth::ProviderLoginResponse, kamu_core::auth::ProviderLoginError> {
         // Decode credentials
-        let github_login_credentials = serde_json::from_str::<
-            kamu_core::auth::GithubLoginCredentials,
-        >(login_credentials_json.as_str())
-        .map_err(|e| {
-            kamu_core::auth::ProviderLoginError::InvalidCredentials(
-                kamu_core::auth::InvalidCredentialsError::new(Box::new(e)),
-            )
-        })?;
+        let github_login_credentials =
+            serde_json::from_str::<GithubLoginCredentials>(login_credentials_json.as_str())
+                .map_err(|e| {
+                    kamu_core::auth::ProviderLoginError::InvalidCredentials(
+                        kamu_core::auth::InvalidCredentialsError::new(Box::new(e)),
+                    )
+                })?;
 
         // Access GitHub OAuth Api
         let github_login_response = self
@@ -174,6 +177,11 @@ impl kamu_core::auth::AuthenticationProvider for OAuthGithub {
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct GithubLoginCredentials {
+    pub code: String,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct GithubProviderCredentials {
