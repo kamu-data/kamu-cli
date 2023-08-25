@@ -18,7 +18,7 @@ use super::{AccountInfo, InvalidCredentialsError, RejectedCredentialsError};
 pub trait AuthenticationService: Sync + Send {
     async fn login(
         &self,
-        login_method: &'static str,
+        login_method: &str,
         login_credentials_json: String,
     ) -> Result<LoginResponse, LoginError>;
 

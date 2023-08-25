@@ -44,8 +44,7 @@ type AttachmentsEmbedded {
 }
 
 type AuthMut {
-	passwordLogin(login: String!, password: String!): LoginResponse!
-	githubLogin(code: String!): LoginResponse!
+	login(loginMethod: String!, loginCredentialsJson: String!): LoginResponse!
 	accountInfo(accessToken: String!): AccountInfo!
 }
 

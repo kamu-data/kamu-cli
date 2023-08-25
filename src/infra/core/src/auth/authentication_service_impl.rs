@@ -73,7 +73,7 @@ impl AuthenticationServiceImpl {
     fn make_access_token(
         &self,
         subject: String,
-        login_method: &'static str,
+        login_method: &str,
         provider_credentials_json: String,
     ) -> Result<String, InternalError> {
         let claims = KamuAccessTokenClaims {
@@ -122,7 +122,7 @@ impl AuthenticationServiceImpl {
 impl AuthenticationService for AuthenticationServiceImpl {
     async fn login(
         &self,
-        login_method: &'static str,
+        login_method: &str,
         login_credentials_json: String,
     ) -> Result<LoginResponse, LoginError> {
         let provider = self.resolve_authentication_provider(login_method)?;

@@ -15,43 +15,17 @@ pub(crate) struct AuthMut;
 
 #[Object]
 impl AuthMut {
-    async fn password_login(
+    async fn login(
         &self,
         ctx: &Context<'_>,
-        login: String,
-        password: String,
+        login_method: String,
+        login_credentials_json: String,
     ) -> Result<LoginResponse> {
         let authentication_service =
             from_catalog::<dyn kamu_core::auth::AuthenticationService>(ctx).unwrap();
 
-        let credentials = kamu_core::auth::PasswordLoginCredentials { login, password };
-
         let login_result = authentication_service
-            .login(
-                kamu_core::auth::LOGIN_METHOD_PASSWORD,
-                serde_json::to_string::<kamu_core::auth::PasswordLoginCredentials>(&credentials)
-                    .int_err()?,
-            )
-            .await;
-
-        match login_result {
-            Ok(login_response) => Ok(login_response.into()),
-            Err(e) => Err(e.into()),
-        }
-    }
-
-    async fn github_login(&self, ctx: &Context<'_>, code: String) -> Result<LoginResponse> {
-        let authentication_service =
-            from_catalog::<dyn kamu_core::auth::AuthenticationService>(ctx).unwrap();
-
-        let credentials = kamu_core::auth::GithubLoginCredentials { code };
-
-        let login_result = authentication_service
-            .login(
-                kamu_core::auth::LOGIN_METHOD_GITHUB,
-                serde_json::to_string::<kamu_core::auth::GithubLoginCredentials>(&credentials)
-                    .int_err()?,
-            )
+            .login(login_method.as_str(), login_credentials_json)
             .await;
 
         match login_result {
