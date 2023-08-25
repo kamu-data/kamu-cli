@@ -9,7 +9,7 @@ content:
       fetch:
         kind: url
         url: "https://www.alphavantage.co/query\
-          ?function=TIME_SERIES_DAILY_ADJUSTED\
+          ?function=TIME_SERIES_DAILY\
           &symbol=SPY\
           &outputsize=full\
           &datatype=csv\
@@ -19,26 +19,24 @@ content:
         header: true
         schema:
           - timestamp TIMESTAMP
-          - open FLOAT
-          - high FLOAT
-          - low FLOAT
-          - close FLOAT
-          - adjusted_close FLOAT
-          - volume FLOAT
-          - dividend_amount FLOAT
-          - split_coefficient FLOAT
+          - open DOUBLE
+          - high DOUBLE
+          - low DOUBLE
+          - close DOUBLE
+          - volume DOUBLE
       preprocess:
         kind: sql
-        engine: spark
+        engine: datafusion
         query: |
           select
             timestamp as event_time,
-            "spy" as from_symbol,
-            "usd" as to_symbol,
+            'spy' as from_symbol,
+            'usd' as to_symbol,
             open,
             high,
             low,
-            close
+            close,
+            volume
           from input
       merge:
         kind: ledger

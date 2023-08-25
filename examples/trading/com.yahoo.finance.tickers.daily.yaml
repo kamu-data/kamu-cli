@@ -12,27 +12,27 @@ content:
         kind: csv
         header: true
         schema:
-          - "`Date` TIMESTAMP"
-          - "`Symbol` STRING"
-          - "`Adj Close` DOUBLE"
-          - "`Close` DOUBLE"
-          - "`High` DOUBLE"
-          - "`Low` DOUBLE"
-          - "`Open` DOUBLE"
-          - "`Volume` DOUBLE"
+          - Date TIMESTAMP
+          - Symbol STRING
+          - AdjClose DOUBLE
+          - Close DOUBLE
+          - High DOUBLE
+          - Low DOUBLE
+          - Open DOUBLE
+          - Volume DOUBLE
       preprocess:
         kind: sql
-        engine: spark
+        engine: datafusion
         query: |
           SELECT
-            `Date` as event_time,
-            `Symbol` as symbol,
-            `Adj Close` as close_adj,
-            `Close` as close,
-            `High` as high,
-            `Low` as low,
-            `Open` as open,
-            `Volume` as volume
+            Date as event_time,
+            Symbol as symbol,
+            AdjClose as close_adj,
+            Close as close,
+            High as high,
+            Low as low,
+            Open as open,
+            Volume as volume
           FROM input
       merge:
         kind: ledger

@@ -12,11 +12,19 @@ content:
         kind: csv
         header: true
         schema:
-        - "event_time TIMESTAMP"
-        - "shipment_id BIGINT"
-        - "order_id BIGINT"
-        - "quantity BIGINT"
+          - event_time TIMESTAMP
+          - shipment_id BIGINT
+          - order_id BIGINT
+          - quantity BIGINT
+      # TODO: This no-op step serves makes kamu-cli use the experimental
+      # DataFusion ingest implementation instead of Spark. This should be
+      # removed once DataFusion ingest becomes the default.
+      preprocess:
+        kind: sql
+        engine: datafusion
+        query: |
+          select * from input
       merge:
         kind: ledger
         primaryKey:
-        - shipment_id
+          - shipment_id

@@ -25,7 +25,7 @@ content:
         kind: sql
         engine: datafusion
         query: |
-          SELECT * FROM input
+          select * from input
       merge:
         kind: ledger
         primaryKey:

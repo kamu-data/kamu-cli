@@ -12,19 +12,23 @@ content:
         kind: sql
         engine: flink
         queries:
+          # This is a Stream-to-Stream join that matches orders and shipments on order_id, 
+          # restricting the shipment.event_time to a time interval [order.event_time, order.event_time + 2 DAYS).
+          # Note that the cast of s.event_time is necessary to tell Flink to no longer treat it as `rowtime`.
           - alias: order_shipments
             query: |
               SELECT
                 o.event_time as order_time,
                 o.order_id,
                 o.quantity as order_quantity,
-                CAST(s.event_time as TIMESTAMP) as shipped_time,
+                CAST(s.event_time as TIMESTAMP(3)) as shipped_time,
                 COALESCE(s.quantity, 0) as shipped_quantity
               FROM `com.acme.orders` as o
               LEFT JOIN `com.acme.shipments` as s
               ON
                 o.order_id = s.order_id
                 AND s.event_time BETWEEN o.event_time AND o.event_time + INTERVAL '2' DAY
+          # This is a windowed aggregation that computes the total quantity of shipped product
           - alias: order_shipments_agg
             query: |
               SELECT
@@ -37,6 +41,7 @@ content:
                 sum(shipped_quantity) as shipped_quantity_total
               FROM order_shipments
               GROUP BY TUMBLE(order_time, INTERVAL '1' DAY), order_id
+          # Return only records for orders that were not fully fulfilled
           - alias: com.acme.shipments.overdue
             query: |
               SELECT *

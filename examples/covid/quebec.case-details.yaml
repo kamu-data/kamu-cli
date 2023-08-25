@@ -16,8 +16,6 @@ content:
       read:
         kind: csv
         header: true
-        #inferSchema: false
-        #enforceSchema: true
         timestampFormat: "yyyy/MM/dd HH:mm:ssx"
         schema:
           - ObjectId BIGINT

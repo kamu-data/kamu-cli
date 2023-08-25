@@ -20,16 +20,18 @@ content:
       # Pre-processing query that shapes the data (optional)
       preprocess:
         kind: sql
-        engine: spark
+        engine: datafusion
+        # Note use of row_number() below is very unfortunate and is due to the data source
+        # not providing us any viable primary key to deduplicate records on
         query: |
-          SELECT
-            CAST(UNIX_TIMESTAMP(Reported_Date, "yyyy-MM-dd") as TIMESTAMP) as reported_date,
-            Classification_Reported as classification,
-            ROW_NUMBER() OVER (ORDER BY (Reported_Date, HA)) as id,
-            ha,
-            sex,
-            age_group
-          FROM input
+          select
+            to_timestamp("Reported_Date") as reported_date,
+            "Classification_Reported" as classification,
+            cast(row_number() over (order by "Reported_Date") as bigint) as id,
+            "HA" as ha,
+            "Sex" as sex,
+            "Age_Group" as age_group
+          from input
       # How to combine newly-ingested data with data that is already in the dataset
       merge:
         kind: ledger

@@ -17,57 +17,33 @@ content:
           &startblock=0\
           &endblock=99999999\
           &apikey=${{ env.ETHERSCAN_API_KEY }}"
-      prepare:
-        - kind: pipe
-          command:
-            - "jq"
-            - "-c"
-            - ".result[]"
       read:
-        kind: jsonLines
-        schema:
-          - blockNumber STRING
-          - timeStamp STRING
-          - hash STRING
-          - nonce STRING
-          - blockHash STRING
-          - transactionIndex STRING
-          - from STRING
-          - to STRING
-          - value STRING
-          - gas STRING
-          - gasPrice STRING
-          - isError STRING
-          - txreceipt_status STRING
-          - input STRING
-          - contractAddress STRING
-          - cumulativeGasUsed STRING
-          - gasUsed STRING
-          - confirmations STRING
+        kind: json
+        subPath: result
       preprocess:
         kind: sql
-        engine: spark
+        engine: datafusion
         query: |
           SELECT
-            cast(cast(timeStamp as bigint) as timestamp) as block_time,
-            cast(blockNumber as bigint) as block_number,
-            blockHash as block_hash,
+            to_timestamp_seconds(cast("timeStamp" as bigint)) as block_time,
+            "blockNumber" as block_number,
+            "blockHash" as block_hash,
             'eth' as symbol,
-            hash as transaction_hash,
-            transactionIndex as transaction_index,
-            nonce,
-            from,
-            to,
-            value,
-            input,
-            isError,
-            txreceipt_status,
-            contractAddress as contract_address,
-            gas,
-            gasPrice as gas_price,
-            gasUsed as gas_used,
-            cumulativeGasUsed as cumulative_gas_used,
-            confirmations
+            "hash" as transaction_hash,
+            "transactionIndex" as transaction_index,
+            "nonce",
+            "from",
+            "to",
+            "value",
+            "input",
+            "isError",
+            "txreceipt_status",
+            "contractAddress" as contract_address,
+            "gas",
+            "gasPrice" as gas_price,
+            "gasUsed" as gas_used,
+            "cumulativeGasUsed" as cumulative_gas_used,
+            "confirmations"
           FROM input
       merge:
         kind: ledger

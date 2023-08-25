@@ -17,56 +17,32 @@ content:
           &startblock=0\
           &endblock=99999999\
           &apikey=${{ env.ETHERSCAN_API_KEY }}"
-      prepare:
-        - kind: pipe
-          command:
-            - "jq"
-            - "-c"
-            - ".result[]"
       read:
-        kind: jsonLines
-        schema:
-          - blockNumber STRING
-          - timeStamp STRING
-          - hash STRING
-          - nonce STRING
-          - blockHash STRING
-          - from STRING
-          - contractAddress STRING
-          - to STRING
-          - value STRING
-          - tokenName STRING
-          - tokenSymbol STRING
-          - tokenDecimal STRING
-          - transactionIndex STRING
-          - gas STRING
-          - gasPrice STRING
-          - gasUsed STRING
-          - cumulativeGasUsed STRING
-          - confirmations STRING
+        kind: json
+        subPath: result
       preprocess:
         kind: sql
-        engine: spark
+        engine: datafusion
         query: |
           SELECT
-            cast(cast(timeStamp as bigint) as timestamp) as block_time,
-            cast(blockNumber as bigint) as block_number,
-            blockHash as block_hash,
-            hash as transaction_hash,
-            transactionIndex as transaction_index,
-            nonce,
-            from,
-            to,
-            value,
-            contractAddress as contract_address,
-            tokenName as token_name,
-            tokenSymbol as token_symbol,
-            tokenDecimal as token_decimal,
-            gas,
-            gasPrice as gas_price,
-            gasUsed as gas_used,
-            cumulativeGasUsed as cumulative_gas_used,
-            confirmations
+            to_timestamp_seconds(cast("timeStamp" as bigint)) as block_time,
+            cast("blockNumber" as bigint) as block_number,
+            "blockHash" as block_hash,
+            "hash" as transaction_hash,
+            "transactionIndex" as transaction_index,
+            "nonce",
+            "from",
+            "to",
+            "value",
+            "contractAddress" as contract_address,
+            "tokenName" as token_name,
+            "tokenSymbol" as token_symbol,
+            "tokenDecimal" as token_decimal,
+            "gas",
+            "gasPrice" as gas_price,
+            "gasUsed" as gas_used,
+            "cumulativeGasUsed" as cumulative_gas_used,
+            "confirmations"
           FROM input
       merge:
         kind: ledger

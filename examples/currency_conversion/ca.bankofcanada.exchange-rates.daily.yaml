@@ -53,11 +53,11 @@ content:
         kind: sql
         engine: datafusion
         query: |
-          SELECT 
+          select
             date,
             'USD' as currency_base,
             'CAD' as currency_target,
             FXUSDCAD as rate
-          FROM input
+          from input
     - kind: setVocab
       eventTimeColumn: date
