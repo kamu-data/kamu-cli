@@ -11,7 +11,7 @@ use std::convert::{AsRef, TryFrom};
 use std::sync::Arc;
 use std::{cmp, fmt, ops};
 
-use ed25519_dalek::Keypair;
+use ed25519_dalek::SigningKey;
 
 use super::grammar::Grammar;
 use super::{DatasetRef, DatasetRefAny, DatasetRefRemote};
@@ -207,12 +207,12 @@ impl DatasetID {
         Self { cid }
     }
 
-    pub fn from_new_keypair_ed25519() -> (Keypair, Self) {
+    pub fn from_new_keypair_ed25519() -> (SigningKey, Self) {
         use rand::rngs::OsRng;
 
         let mut csprng = OsRng {};
-        let keypair: Keypair = Keypair::generate(&mut csprng);
-        let pub_key = keypair.public.to_bytes();
+        let keypair = SigningKey::generate(&mut csprng);
+        let pub_key = keypair.verifying_key().to_bytes();
         let id = Self::from_pub_key_ed25519(&pub_key);
         (keypair, id)
     }

@@ -20,12 +20,12 @@ doctest = false
 [dependencies]
 opendatafabric = { workspace = true }
 
-arrow-digest = { version = "43", default-features = false }
-datafusion = { version = "28", default-features = false }
+arrow-digest = { version = "45", default-features = false }
+datafusion = { version = "30", default-features = false }
 tracing = { version = "0.1", default-features = false }
 
 digest = "0.10"
 sha3 = "0.10"
-thiserror = "1"
+thiserror = { version = "=1.0.44", default-features = false }  # TODO: Pinned until rustc upgrade
 url = "2"
 

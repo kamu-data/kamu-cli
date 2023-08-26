@@ -30,14 +30,14 @@ dill = "0.6"
 futures = { version = "0.3", default-features = false }
 pathdiff = { version = "0.2", default-features = false }
 pin-project = { version = "1", default-features = false }
-thiserror = { version = "1", default-features = false }
+thiserror = { version = "=1.0.44", default-features = false }  # TODO: Pinned until rustc upgrade
 tokio = { version = "1", default-features = false }
 tokio-stream = { version = "0.1", default-features = false }
 tracing = { version = "0.1", default-features = false }
 url = { version = "2", default-features = false, features = ["serde"] }
 
 # TODO: Avoid this dependency or depend on sub-crates
-datafusion = { version = "28", default-features = false }
+datafusion = { version = "30", default-features = false }
 object_store = { version = "0.6", default-features = false }
 
 # TODO: Make serde optional

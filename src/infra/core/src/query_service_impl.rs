@@ -573,10 +573,14 @@ impl SchemaProvider for KamuSchema {
             .read_parquet(
                 file_urls,
                 ParquetReadOptions {
+                    schema: None,
+                    // TODO: PERF: potential speedup if we specify `offset`?
+                    file_sort_order: Vec::new(),
                     file_extension: "",
                     table_partition_cols: Vec::new(),
                     parquet_pruning: None,
                     skip_metadata: None,
+                    insert_mode: datafusion::datasource::listing::ListingTableInsertMode::Error,
                 },
             )
             .await
