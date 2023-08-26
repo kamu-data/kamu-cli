@@ -9,7 +9,6 @@
 
 use std::path::{Path, PathBuf};
 
-use datafusion::datasource::file_format::file_type::FileCompressionType;
 use datafusion::prelude::*;
 use internal_error::*;
 use kamu_core::ingest::ReadError;
@@ -36,7 +35,7 @@ impl ReaderEsriShapefile {
     fn convert_to_ndjson_blocking(
         in_path: &Path,
         tmp_path: &Path,
-        conf: ReadStepEsriShapefile,
+        conf: &ReadStepEsriShapefile,
     ) -> Result<PathBuf, ReadError> {
         use std::io::Write;
 
@@ -222,37 +221,29 @@ impl Reader for ReaderEsriShapefile {
         path: &Path,
         conf: &ReadStep,
     ) -> Result<DataFrame, ReadError> {
-        let schema = self.output_schema(ctx, conf).await?;
-
         let ReadStep::EsriShapefile(conf) = conf.clone() else {
             unreachable!()
         };
 
         // TODO: PERF: This is a temporary, highly inefficient implementation that
         // decodes Shapefile into NdJson which DataFusion can read natively
+        let schema = conf.schema.clone();
         let in_path = path.to_path_buf();
         let out_path = self.temp_path.clone();
 
         let temp_json_path = tokio::task::spawn_blocking(move || {
-            Self::convert_to_ndjson_blocking(&in_path, &out_path, conf)
+            Self::convert_to_ndjson_blocking(&in_path, &out_path, &conf)
         })
         .await
         .int_err()??;
 
-        let options = NdJsonReadOptions {
-            file_extension: "json",
-            table_partition_cols: Vec::new(),
-            schema: schema.as_ref(),
-            schema_infer_max_records: 1000,
-            file_compression_type: FileCompressionType::UNCOMPRESSED,
-            infinite: false,
-        };
+        let conf = ReadStep::NdJson(ReadStepNdJson {
+            schema,
+            date_format: None,
+            encoding: None,
+            timestamp_format: None,
+        });
 
-        let df = ctx
-            .read_json(temp_json_path.to_str().unwrap(), options)
-            .await
-            .int_err()?;
-
-        Ok(df)
+        ReaderNdJson::new().read(ctx, &temp_json_path, &conf).await
     }
 }

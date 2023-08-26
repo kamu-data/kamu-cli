@@ -9,3 +9,4 @@
 
 mod test_fetch;
 mod test_prep;
+mod test_writer;

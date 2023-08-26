@@ -60,6 +60,7 @@ fn make_output_empty(ctx: &SessionContext) -> DataFrame {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+#[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_ledger_to_empty() {
     let ctx = SessionContext::new();
@@ -88,6 +89,7 @@ async fn test_ledger_to_empty() {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+#[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_ledger_unseen() {
     let ctx = SessionContext::new();
@@ -110,6 +112,7 @@ async fn test_ledger_unseen() {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+#[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_ledger_seen_tail_ordered() {
     let ctx = SessionContext::new();
@@ -132,6 +135,7 @@ async fn test_ledger_seen_tail_ordered() {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+#[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_ledger_seen_tail_unordered() {
     let ctx = SessionContext::new();
@@ -154,6 +158,7 @@ async fn test_ledger_seen_tail_unordered() {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+#[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_ledger_seen_middle() {
     let ctx = SessionContext::new();
@@ -176,6 +181,7 @@ async fn test_ledger_seen_middle() {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+#[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_ledger_respects_pk() {
     let ctx = SessionContext::new();
@@ -219,6 +225,7 @@ async fn test_ledger_respects_pk() {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+#[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_ledger_invalid_pk() {
     let ctx = SessionContext::new();

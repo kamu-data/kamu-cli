@@ -15,6 +15,7 @@ use super::test_reader_common;
 
 ///////////////////////////////////////////////////////////////////////////////
 
+#[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_read_csv_with_schema() {
     test_reader_common::test_reader_success_textual(
@@ -60,6 +61,7 @@ async fn test_read_csv_with_schema() {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+#[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_read_csv_no_schema_no_infer() {
     test_reader_common::test_reader_success_textual(
@@ -101,6 +103,7 @@ async fn test_read_csv_no_schema_no_infer() {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+#[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_read_csv_no_schema_infer() {
     test_reader_common::test_reader_success_textual(
@@ -143,6 +146,7 @@ async fn test_read_csv_no_schema_infer() {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+#[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_read_csv_null_values() {
     test_reader_common::test_reader_success_textual(

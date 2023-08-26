@@ -51,35 +51,19 @@ impl Reader for ReaderParquet {
         };
 
         let options = ParquetReadOptions {
+            schema: schema.as_ref(),
             file_extension: path.extension().and_then(|s| s.to_str()).unwrap_or(""),
             table_partition_cols: Vec::new(),
             parquet_pruning: None,
             skip_metadata: None,
+            file_sort_order: Vec::new(),
+            insert_mode: datafusion::datasource::listing::ListingTableInsertMode::Error,
         };
 
         let df = ctx
             .read_parquet(path.to_str().unwrap(), options)
             .await
             .int_err()?;
-
-        let df = if let Some(schema) = schema {
-            tracing::debug!(
-                orig_schema = ?df.schema(),
-                target_schema = ?schema,
-                "Performing read coercion of the parquet data",
-            );
-
-            df.select(
-                schema
-                    .fields()
-                    .iter()
-                    .map(|f| cast(col(f.name()), f.data_type().clone()).alias(f.name()))
-                    .collect(),
-            )
-            .int_err()?
-        } else {
-            df
-        };
 
         Ok(df)
     }

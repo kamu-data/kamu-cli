@@ -18,4 +18,3 @@ mod test_reader_ndgeojson;
 mod test_reader_ndjson;
 mod test_reader_parquet;
 mod test_reader_shapefile;
-mod test_writer;

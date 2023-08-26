@@ -15,6 +15,7 @@ use super::test_reader_common;
 
 ///////////////////////////////////////////////////////////////////////////////
 
+#[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_read_json_object() {
     let temp_dir: tempfile::TempDir = tempfile::tempdir().unwrap();
@@ -67,6 +68,7 @@ async fn test_read_json_object() {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+#[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_read_json_array() {
     let temp_dir: tempfile::TempDir = tempfile::tempdir().unwrap();

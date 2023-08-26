@@ -23,7 +23,7 @@ opendatafabric = { workspace = true }
 kamu-core = { workspace = true }
 kamu-data-utils = { workspace = true }
 
-datafusion = "28"
+datafusion = "30"
 digest = "0.10"
 geo-types = { version = "0.7", default-features = false, features = [] }
 geojson ={ version = "0.24", default-features = false, features = ["geo-types"] }
@@ -47,12 +47,12 @@ url = { version = "2", features = ["serde"] }
 
 
 [dev-dependencies]
-kamu = { workspace = true }
 criterion = { version = "0.5", features = ["async_tokio"] }
 env_logger = "0.10"
 indoc = "2"
 pretty_assertions = "1"
 rand = "0.8"
+test-group = { version = "1" }
 test-log = { version = "0.2", features = ["trace"] }
 tempfile = "3"
 tokio = { version = "1", default-features = false, features=["rt", "macros"] }

@@ -19,12 +19,8 @@ where
     Self: Sized,
 {
     fn columns_to_front(self, front_cols: &[&str]) -> Result<Self>;
+
     fn without_columns(self, cols: &[&str]) -> Result<Self>;
-    async fn write_parquet_single_file(
-        self,
-        path: &Path,
-        writer_properties: Option<WriterProperties>,
-    ) -> Result<()>;
 }
 
 #[async_trait::async_trait]
@@ -56,25 +52,54 @@ impl DataFrameExt for DataFrame {
 
         self.select(columns)
     }
+}
 
+#[async_trait::async_trait]
+pub trait SessionContextExt
+where
+    Self: Sized,
+{
     async fn write_parquet_single_file(
-        self,
+        &self,
+        df: DataFrame,
+        path: &Path,
+        writer_properties: Option<WriterProperties>,
+    ) -> Result<()>;
+}
+
+#[async_trait::async_trait]
+impl SessionContextExt for SessionContext {
+    async fn write_parquet_single_file(
+        &self,
+        df: DataFrame,
         path: &Path,
         writer_properties: Option<WriterProperties>,
     ) -> Result<()> {
         tracing::info!(?path, "Writing result to parquet");
 
         // Reprartition to only produce a single file
-        let df = self.repartition(Partitioning::RoundRobinBatch(1))?;
+        let df = df.repartition(Partitioning::RoundRobinBatch(1))?;
 
-        // Produces a directory of "part-X.parquet" files
-        df.write_parquet(path.as_os_str().to_str().unwrap(), writer_properties)
+        // Produces a directory of "<random>-[0..9].parquet" files
+        let plan = df.create_physical_plan().await?;
+
+        // TODO: FIXME: As noted in https://github.com/apache/arrow-datafusion/issues/7423
+        // we are using an older API that support properties and have to pre-create empy
+        // directory due to what is likely a bug in ListingTableUrl
+        std::fs::create_dir(path)?;
+        self.write_parquet(plan, path.as_os_str().to_str().unwrap(), writer_properties)
             .await?;
 
+        let mut read_dir = path.read_dir().unwrap();
+
+        let first_file = read_dir
+            .next()
+            .expect("write_parquet did not write any files")
+            .unwrap();
+
         // Ensure only produced one file
-        assert_eq!(
-            1,
-            path.read_dir().unwrap().into_iter().count(),
+        assert!(
+            read_dir.next().is_none(),
             "write_parquet produced more than one file"
         );
 
@@ -85,7 +110,7 @@ impl DataFrameExt for DataFrame {
                 .to_str()
                 .unwrap_or_default()
         ));
-        std::fs::rename(path.join("part-0.parquet"), &tmp_path)?;
+        std::fs::rename(first_file.path(), &tmp_path)?;
         std::fs::remove_dir(path)?;
         std::fs::rename(tmp_path, path)?;
         Ok(())

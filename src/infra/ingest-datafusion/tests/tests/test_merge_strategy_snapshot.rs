@@ -169,6 +169,7 @@ where
 // MergeStrategySnapshot::project
 ///////////////////////////////////////////////////////////////////////////////
 
+#[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_snapshot_project_empty() {
     test_snapshot_project::<[_; 0], &str, &str, [_; 0], &str>([], []).await;
@@ -176,6 +177,7 @@ async fn test_snapshot_project_empty() {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+#[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_snapshot_project_add() {
     test_snapshot_project(
@@ -187,6 +189,7 @@ async fn test_snapshot_project_add() {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+#[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_snapshot_project_add_remove() {
     test_snapshot_project::<_, _, _, [_; 0], &str>(
@@ -198,6 +201,7 @@ async fn test_snapshot_project_add_remove() {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+#[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_snapshot_project_update() {
     test_snapshot_project(
@@ -209,6 +213,7 @@ async fn test_snapshot_project_update() {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+#[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_snapshot_project_mixed() {
     test_snapshot_project(
@@ -229,6 +234,7 @@ async fn test_snapshot_project_mixed() {
 // MergeStrategySnapshot::merge
 ///////////////////////////////////////////////////////////////////////////////
 
+#[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_snapshot_to_empty() {
     let ctx = SessionContext::new();
@@ -248,6 +254,7 @@ async fn test_snapshot_to_empty() {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+#[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_snapshot_no_changes_ordered() {
     let ctx = SessionContext::new();
@@ -263,6 +270,7 @@ async fn test_snapshot_no_changes_ordered() {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+#[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_snapshot_no_changes_unordered() {
     let ctx = SessionContext::new();
@@ -278,6 +286,7 @@ async fn test_snapshot_no_changes_unordered() {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+#[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_snapshot_mix_of_changes() {
     let ctx = SessionContext::new();
@@ -306,6 +315,7 @@ async fn test_snapshot_mix_of_changes() {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+#[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_snapshot_invalid_pk() {
     let ctx = SessionContext::new();

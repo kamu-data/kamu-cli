@@ -10,7 +10,7 @@
 use std::assert_matches::assert_matches;
 
 use datafusion::arrow::array::StringArray;
-use datafusion::prelude::{col, lit};
+use datafusion::prelude::*;
 use indoc::indoc;
 use kamu_ingest_datafusion::*;
 use opendatafabric::*;
@@ -19,6 +19,7 @@ use super::test_reader_common;
 
 ///////////////////////////////////////////////////////////////////////////////
 
+#[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_read_shapefile_with_schema() {
     let temp_dir: tempfile::TempDir = tempfile::tempdir().unwrap();
@@ -86,6 +87,7 @@ async fn test_read_shapefile_with_schema() {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+#[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_read_shapefile_infer_schema() {
     let temp_dir: tempfile::TempDir = tempfile::tempdir().unwrap();
@@ -128,6 +130,7 @@ async fn test_read_shapefile_infer_schema() {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+#[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_read_shapefile_with_subpath_exists() {
     let temp_dir: tempfile::TempDir = tempfile::tempdir().unwrap();
@@ -150,6 +153,7 @@ async fn test_read_shapefile_with_subpath_exists() {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+#[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_read_shapefile_with_subpath_missing() {
     let temp_dir: tempfile::TempDir = tempfile::tempdir().unwrap();
@@ -172,6 +176,7 @@ async fn test_read_shapefile_with_subpath_missing() {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+#[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_read_shapefile_geom() {
     let temp_dir: tempfile::TempDir = tempfile::tempdir().unwrap();
@@ -193,7 +198,7 @@ async fn test_read_shapefile_geom() {
                 .unwrap()
                 .filter(col("name_1").eq(lit("Kiev City")))
                 .unwrap()
-                .repartition(datafusion::prelude::Partitioning::RoundRobinBatch(1))
+                .repartition(Partitioning::RoundRobinBatch(1))
                 .unwrap();
             
             let batches = df.collect().await.unwrap();

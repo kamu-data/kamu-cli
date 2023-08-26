@@ -9,7 +9,6 @@
 
 use std::path::{Path, PathBuf};
 
-use datafusion::datasource::file_format::file_type::FileCompressionType;
 use datafusion::prelude::*;
 use internal_error::*;
 use kamu_core::ingest::ReadError;
@@ -102,9 +101,7 @@ impl Reader for ReaderGeoJson {
         path: &Path,
         conf: &ReadStep,
     ) -> Result<DataFrame, ReadError> {
-        let schema = self.output_schema(ctx, conf).await?;
-
-        let ReadStep::GeoJson(_) = conf else {
+        let ReadStep::GeoJson(conf) = conf else {
             unreachable!()
         };
 
@@ -116,24 +113,13 @@ impl Reader for ReaderGeoJson {
             .await
             .int_err()??;
 
-        let options = NdJsonReadOptions {
-            file_extension: self
-                .temp_path
-                .extension()
-                .and_then(|s| s.to_str())
-                .unwrap_or(""),
-            table_partition_cols: Vec::new(),
-            schema: schema.as_ref(),
-            schema_infer_max_records: 1000,
-            file_compression_type: FileCompressionType::UNCOMPRESSED,
-            infinite: false,
-        };
+        let conf = ReadStep::NdJson(ReadStepNdJson {
+            schema: conf.schema.clone(),
+            date_format: None,
+            encoding: None,
+            timestamp_format: None,
+        });
 
-        let df = ctx
-            .read_json(self.temp_path.to_str().unwrap(), options)
-            .await
-            .int_err()?;
-
-        Ok(df)
+        ReaderNdJson::new().read(ctx, &self.temp_path, &conf).await
     }
 }

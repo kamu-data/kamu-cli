@@ -52,24 +52,42 @@ impl Reader for ReaderCsv {
             unreachable!()
         };
 
-        if let Some(v) = conf.separator.as_ref() {
-            if v.as_bytes().len() > 1 {
-                return Err("Csv.separator supports only single-character ascii values"
-                    .int_err()
-                    .into());
+        let delimiter = match &conf.separator {
+            Some(v) => {
+                if v.as_bytes().len() > 1 {
+                    return Err("Csv.separator supports only single-character ascii values"
+                        .int_err()
+                        .into());
+                }
+                v.as_bytes()[0]
             }
-        }
+            None => b',',
+        };
+        let quote = match &conf.quote {
+            Some(v) => {
+                if v.as_bytes().len() > 1 {
+                    return Err("Csv.quote supports only single-character ascii values"
+                        .int_err()
+                        .into());
+                }
+                v.as_bytes()[0]
+            }
+            None => b'"',
+        };
+        let escape = match &conf.escape {
+            Some(v) => {
+                if v.as_bytes().len() > 1 {
+                    return Err("Csv.escape supports only single-character ascii values"
+                        .int_err()
+                        .into());
+                }
+                Some(v.as_bytes()[0])
+            }
+            None => None,
+        };
         match conf.encoding.as_ref().map(|s| s.as_str()) {
             None | Some("utf8") => Ok(()),
             Some(v) => Err(format!("Unsupported Csv.encoding: {}", v).int_err()),
-        }?;
-        match conf.quote.as_ref().map(|s| s.as_str()) {
-            None | Some("\"") => Ok(()),
-            Some(v) => Err(format!("Unsupported Csv.quote: {}", v).int_err()),
-        }?;
-        match conf.escape.as_ref().map(|s| s.as_str()) {
-            None | Some("\\") => Ok(()),
-            Some(v) => Err(format!("Unsupported Csv.escape: {}", v).int_err()),
         }?;
         match conf.comment.as_ref().map(|s| s.as_str()) {
             None => Ok(()),
@@ -121,25 +139,24 @@ impl Reader for ReaderCsv {
         }?;
 
         let options = CsvReadOptions {
-            has_header: conf.header.unwrap_or(false),
-            delimiter: conf
-                .separator
-                .as_ref()
-                .map(|s| s.as_bytes()[0])
-                .unwrap_or(b','),
             schema: schema.as_ref(),
+            delimiter,
+            has_header: conf.header.unwrap_or(false),
             schema_infer_max_records: if conf.infer_schema.unwrap_or(false) {
                 Self::DEFAULT_INFER_SCHEMA_ROWS
             } else {
                 0
             },
             file_extension: path.extension().and_then(|s| s.to_str()).unwrap_or(""),
+            quote,
+            escape,
             table_partition_cols: Vec::new(),
             // TODO: PERF: Reader support compression, thus we could detect decompress step and
             // optimize the ingest plan to avoid writing uncompressed data to disc or having to
             // re-compress it.
-            file_compression_type:
-                datafusion::datasource::file_format::file_type::FileCompressionType::UNCOMPRESSED,
+            file_compression_type: datafusion::common::FileCompressionType::UNCOMPRESSED,
+            file_sort_order: Vec::new(),
+            insert_mode: datafusion::datasource::listing::ListingTableInsertMode::Error,
             infinite: false,
         };
 

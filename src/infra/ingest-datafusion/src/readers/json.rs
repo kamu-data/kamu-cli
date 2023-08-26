@@ -127,6 +127,6 @@ impl Reader for ReaderJson {
             timestamp_format: conf.timestamp_format.clone(),
         });
 
-        ReaderNdJson {}.read(ctx, &self.temp_path, &conf).await
+        ReaderNdJson::new().read(ctx, &self.temp_path, &conf).await
     }
 }

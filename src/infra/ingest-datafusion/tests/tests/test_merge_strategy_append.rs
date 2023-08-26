@@ -51,6 +51,7 @@ where
 
 ///////////////////////////////////////////////////////////////////////////////
 
+#[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_append_to_empty() {
     let ctx = SessionContext::new();
@@ -63,6 +64,7 @@ async fn test_append_to_empty() {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+#[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_append_to_some() {
     let ctx = SessionContext::new();

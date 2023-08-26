@@ -7,14 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-// reuse across calls
-// system column conflict
-// normalize timestamp
-// watermarks
-// no-op commit
-// source state
-// panic on deriv
-
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -29,8 +21,25 @@ use kamu_ingest_datafusion::*;
 use odf::{AsTypedBlock, DatasetAlias};
 use opendatafabric as odf;
 
+///////////////////////////////////////////////////////////////
+// TODO: This test belongs in kamu-ingest-datafusion crate.
+// We currently cannot move it there as it needs DatasetRepositoryLocalFs to
+// function. We should move it there once we further decompose the kamu core
+// crate.
+///////////////////////////////////////////////////////////////
+
+// TODO:
+// reuse across calls
+// system column conflict
+// normalize timestamp
+// watermarks
+// no-op commit
+// source state
+// panic on deriv
+
+#[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
-async fn test_writer_happy_path() {
+async fn test_data_writer_happy_path() {
     let mut harness = Harness::new(
         MetadataFactory::set_polling_source()
             .merge(odf::MergeStrategySnapshot {

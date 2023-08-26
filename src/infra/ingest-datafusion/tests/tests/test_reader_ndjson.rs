@@ -18,6 +18,7 @@ use super::test_reader_common;
 
 ///////////////////////////////////////////////////////////////////////////////
 
+#[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_read_ndjson_with_schema() {
     test_reader_common::test_reader_success_textual(
@@ -61,6 +62,7 @@ async fn test_read_ndjson_with_schema() {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+#[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_read_ndjson_infer_schema() {
     test_reader_common::test_reader_success_textual(
@@ -100,6 +102,7 @@ async fn test_read_ndjson_infer_schema() {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+#[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_read_ndjson_format_date() {
     test_reader_common::test_reader_success_textual(
@@ -135,6 +138,7 @@ async fn test_read_ndjson_format_date() {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+#[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_read_ndjson_format_timestamp() {
     // Test below not stating a correct behavior but simply attempt to capture how
@@ -182,6 +186,7 @@ async fn test_read_ndjson_format_timestamp() {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+#[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_read_ndjson_format_timestamp_parse_failed() {
     // Test below not stating a correct behavior but simply attempt to capture how
@@ -205,7 +210,7 @@ async fn test_read_ndjson_format_timestamp_parse_failed() {
             assert_matches!(
                 res.unwrap().collect().await,
                 Err(DataFusionError::ArrowError(
-                    datafusion::arrow::error::ArrowError::JsonError(_)
+                    ::datafusion::arrow::error::ArrowError::JsonError(_)
                 ))
             );
         },

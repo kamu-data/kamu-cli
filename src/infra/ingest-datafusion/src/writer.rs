@@ -16,7 +16,7 @@ use datafusion::prelude::*;
 use internal_error::*;
 use kamu_core::ingest::*;
 use kamu_core::*;
-use kamu_data_utils::data::dataframe_ext::DataFrameExt;
+use kamu_data_utils::data::dataframe_ext::*;
 use odf::AsTypedBlock;
 use opendatafabric as odf;
 
@@ -131,10 +131,15 @@ impl DataWriterDataFusion {
             .read_parquet(
                 prev_data_paths,
                 ParquetReadOptions {
+                    // TODO: Specify schema
+                    schema: None,
                     file_extension: "",
+                    // TODO: PERF: Possibly speed up by specifying `offset`
+                    file_sort_order: Vec::new(),
                     table_partition_cols: Vec::new(),
                     parquet_pruning: None,
                     skip_metadata: None,
+                    insert_mode: datafusion::datasource::listing::ListingTableInsertMode::Error,
                 },
             )
             .await
@@ -285,7 +290,8 @@ impl DataWriterDataFusion {
 
     #[tracing::instrument(level = "debug", skip_all, fields(?path))]
     async fn write_output(&self, path: PathBuf, df: DataFrame) -> Result<OwnedFile, InternalError> {
-        df.write_parquet_single_file(&path, Some(self.get_write_properties()))
+        self.ctx
+            .write_parquet_single_file(df, &path, Some(self.get_write_properties()))
             .await
             .int_err()?;
 
@@ -312,10 +318,13 @@ impl DataWriterDataFusion {
             .read_parquet(
                 path.to_str().unwrap(),
                 ParquetReadOptions {
+                    schema: None,
+                    file_sort_order: Vec::new(),
                     file_extension: path.extension().unwrap_or_default().to_str().unwrap(),
                     table_partition_cols: Vec::new(),
                     parquet_pruning: None,
                     skip_metadata: None,
+                    insert_mode: datafusion::datasource::listing::ListingTableInsertMode::Error,
                 },
             )
             .await

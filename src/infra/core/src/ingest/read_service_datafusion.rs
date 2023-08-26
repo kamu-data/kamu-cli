@@ -122,10 +122,13 @@ impl ReadServiceDatafusion {
             .read_parquet(
                 prev_data_paths,
                 ParquetReadOptions {
+                    schema: None,
                     file_extension: "",
+                    file_sort_order: Vec::new(),
                     table_partition_cols: Vec::new(),
                     parquet_pruning: None,
                     skip_metadata: None,
+                    insert_mode: datafusion::datasource::listing::ListingTableInsertMode::Error,
                 },
             )
             .await
@@ -396,7 +399,7 @@ impl ReadServiceDatafusion {
         };
 
         // Write parquet
-        df.write_parquet_single_file(&path, Some(self.get_write_properties(vocab)))
+        ctx.write_parquet_single_file(df, &path, Some(self.get_write_properties(vocab)))
             .await
             .int_err()?;
 
@@ -405,10 +408,13 @@ impl ReadServiceDatafusion {
             .read_parquet(
                 path.to_str().unwrap(),
                 ParquetReadOptions {
+                    schema: None,
                     file_extension: path.extension().unwrap_or_default().to_str().unwrap(),
+                    file_sort_order: Vec::new(),
                     table_partition_cols: Vec::new(),
                     parquet_pruning: None,
                     skip_metadata: None,
+                    insert_mode: datafusion::datasource::listing::ListingTableInsertMode::Error,
                 },
             )
             .await
