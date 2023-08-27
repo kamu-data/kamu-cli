@@ -308,8 +308,6 @@ async fn test_snapshot_mix_of_changes() {
     )
     .await;
 
-    actual.clone().show().await.unwrap();
-
     assert_dfs_equivalent(expected, actual).await;
 }
 

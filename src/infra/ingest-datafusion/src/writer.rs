@@ -35,6 +35,7 @@ pub struct DataWriterDataFusion {
     next_offset: i64,
     prev_checkpoint: Option<odf::Multihash>,
     prev_watermark: Option<DateTime<Utc>>,
+    prev_source_state: Option<odf::SourceState>,
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -56,6 +57,7 @@ impl DataWriterDataFusion {
         next_offset: i64,
         prev_checkpoint: Option<odf::Multihash>,
         prev_watermark: Option<DateTime<Utc>>,
+        prev_source_state: Option<odf::SourceState>,
     ) -> Self {
         Self {
             dataset,
@@ -68,6 +70,7 @@ impl DataWriterDataFusion {
             next_offset,
             prev_checkpoint,
             prev_watermark,
+            prev_source_state,
         }
     }
 
@@ -462,16 +465,20 @@ impl DataWriter for DataWriterDataFusion {
                 data_file.as_path(),
                 self.prev_watermark.clone(),
                 self.prev_checkpoint.clone(),
-                opts.source_state,
+                opts.source_state.clone(),
             )
             .await?;
 
-        let data_file = if add_data.output_data.is_none() {
-            // Deletes empty output file
-            None
-        } else {
-            Some(data_file)
-        };
+        // Do we have anything to commit?
+        if add_data.output_data.is_none()
+            && add_data.output_watermark == self.prev_watermark
+            && opts.source_state == self.prev_source_state
+        {
+            return Err(WriteDataError::EmptyCommit(EmptyCommitError {}));
+        }
+
+        // Empty file will be cleaned up here
+        let data_file = add_data.output_data.as_ref().map(|_| data_file);
 
         // Commit data
         let commit_result = self
@@ -512,7 +519,9 @@ impl DataWriter for DataWriterDataFusion {
             .output_checkpoint
             .as_ref()
             .map(|c| c.physical_hash.clone());
+
         self.prev_watermark = new_block.event.output_watermark;
+        self.prev_source_state = new_block.event.source_state.clone();
 
         Ok(WriteDataResult {
             old_head: commit_result.old_head.unwrap(),
@@ -522,6 +531,8 @@ impl DataWriter for DataWriterDataFusion {
     }
 }
 
+///////////////////////////////////////////////////////////////////////////////
+// Builder
 ///////////////////////////////////////////////////////////////////////////////
 
 pub struct DataWriterDataFusionBuilder {
@@ -536,6 +547,7 @@ pub struct DataWriterDataFusionBuilder {
     next_offset: Option<i64>,
     prev_checkpoint: Option<Option<odf::Multihash>>,
     prev_watermark: Option<Option<DateTime<Utc>>>,
+    prev_source_state: Option<Option<odf::SourceState>>,
 }
 
 impl DataWriterDataFusionBuilder {
@@ -551,6 +563,7 @@ impl DataWriterDataFusionBuilder {
             next_offset: None,
             prev_checkpoint: None,
             prev_watermark: None,
+            prev_source_state: None,
         }
     }
 
@@ -567,6 +580,7 @@ impl DataWriterDataFusionBuilder {
         next_offset: i64,
         prev_checkpoint: Option<odf::Multihash>,
         prev_watermark: Option<DateTime<Utc>>,
+        prev_source_state: Option<odf::SourceState>,
         prev_data_slices: Vec<odf::Multihash>,
         vocab: impl Into<odf::DatasetVocabularyResolvedOwned>,
     ) -> Self {
@@ -577,6 +591,7 @@ impl DataWriterDataFusionBuilder {
             next_offset: Some(next_offset),
             prev_checkpoint: Some(prev_checkpoint),
             prev_watermark: Some(prev_watermark),
+            prev_source_state: Some(prev_source_state),
             prev_data_slices: Some(prev_data_slices),
             vocab: Some(vocab.into()),
             ..self
@@ -606,6 +621,7 @@ impl DataWriterDataFusionBuilder {
             this.next_offset.unwrap(),
             this.prev_checkpoint.unwrap(),
             this.prev_watermark.unwrap(),
+            this.prev_source_state.unwrap(),
         ))
     }
 
@@ -623,6 +639,7 @@ impl DataWriterDataFusionBuilder {
         let mut prev_data_slices = Vec::new();
         let mut prev_checkpoint = None;
         let mut prev_watermark = None;
+        let mut prev_source_state = None;
         let mut vocab = None;
         let mut next_offset = None;
 
@@ -649,6 +666,10 @@ impl DataWriterDataFusionBuilder {
                         }
                         if prev_watermark.is_none() {
                             prev_watermark = Some(add_data.output_watermark);
+                        }
+                        // TODO: Consider multiple sources situation
+                        if prev_source_state.is_none() {
+                            prev_source_state = Some(add_data.source_state);
                         }
                     }
                     odf::MetadataEvent::SetWatermark(set_wm) => {
@@ -685,6 +706,7 @@ impl DataWriterDataFusionBuilder {
             prev_data_slices: Some(prev_data_slices),
             prev_checkpoint: Some(prev_checkpoint.unwrap_or_default()),
             prev_watermark: Some(prev_watermark.unwrap_or_default()),
+            prev_source_state: Some(prev_source_state.unwrap_or_default()),
             vocab: Some(vocab.unwrap_or_default()),
             next_offset,
             ..self

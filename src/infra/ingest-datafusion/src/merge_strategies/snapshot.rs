@@ -7,8 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use datafusion::common::DFSchema;
-use datafusion::logical_expr::Operator;
+use datafusion::common::{DFSchema, OwnedTableReference};
+use datafusion::logical_expr::{LogicalPlanBuilder, Operator};
 use datafusion::prelude::*;
 use datafusion::sql::TableReference;
 use internal_error::*;
@@ -56,37 +56,42 @@ impl MergeStrategySnapshot {
     }
 
     /// Projects the CDC ledger into a state snapshot.
-    pub fn project(&self, ledger: DataFrame) -> Result<DataFrame, MergeError> {
-        // TODO: Re-assess implementation
-        //
-        // CDC projection requires retrieving last records per primary key.
-        //
-        // In Spark it would look something like:
-        //
-        //   select x, last(y) from table group by x
-        //
-        // But in DataFusion last_value() aggregate function panics:
-        //
-        //   select x, last_value(y) from table group by x
-        //
-        // The postgres-like DISTINCT ON returns "not implemented":
-        //
-        //   select distinct on (x) x, y from table order by date desc
-        //
-        // Self-join did not complete on 1M row table:
-        //
-        //   select a.* from table a
-        //   left join table b on a.x = b.x and a.date < b.date
-        //   where b.x is null
-        //
-        // The window function approach below works, but might be sub-optimal:
-        //
-        //   select * from (
-        //     select
-        //       *,
-        //       row_number() over (partition by x order by date desc) as rank
-        //     from table
-        //   ) where rank = 1
+    ///
+    /// Implementation is mostly equivalent to this example (using
+    /// datafusion-cli):
+    ///
+    ///   create or replace table ledger (
+    ///       offset bigint not null,
+    ///       obsv string not null,
+    ///       city string not null,
+    ///       population int not null
+    ///   ) as values
+    ///   (0, '+', 'a', 1000),
+    ///   (1, '+', 'b', 2000),
+    ///   (2, '+', 'c', 3000),
+    ///   (3, 'u', 'b', 2500),
+    ///   (4, 'u', 'a', 1500),
+    ///   (5, '-', 'a', 1500);
+    ///
+    ///   select * from (
+    ///      select
+    ///          *,
+    ///          row_number() over (
+    ///              partition by city
+    ///              order by offset desc) as __row_num
+    ///       from ledger
+    ///   ) where __row_num = 1 and obsv != '-';
+    ///
+    /// Which should output:
+    ///
+    ///   +--------+------+------+------------+-----------+
+    ///   | offset | obsv | city | population | __row_num |
+    ///   +--------+------+------+------------+-----------+
+    ///   | 2      | +    | c    | 3000       | 1         |
+    ///   | 3      | u    | b    | 2500       | 1         |
+    ///   +--------+------+------+------------+-----------+
+    pub fn project(&self, ledger: DataFrame) -> Result<DataFrame, InternalError> {
+        // TODO: PERF: Re-assess implementation as it may be sub-optimal
         //
 
         let rank_col = "__rank";
@@ -105,28 +110,16 @@ impl MergeStrategySnapshot {
             )
             .alias(rank_col)])
             .int_err()?
-            .filter(col(rank_col).eq(lit(1)))
+            .filter(
+                col(rank_col)
+                    .eq(lit(1))
+                    .and(col(&self.obsv_column).not_eq(lit(&self.obsv_removed))),
+            )
             .int_err()?
             .without_columns(&[rank_col])
-            .int_err()?
-            .filter(col(&self.obsv_column).not_eq(lit(&self.obsv_removed)))
             .int_err()?;
 
         Ok(state)
-    }
-
-    /// Returns table name ususe to disambiguate fields
-    fn get_table_qualifier(
-        &self,
-        df: &DataFrame,
-    ) -> Result<TableReference<'static>, InternalError> {
-        Ok(df
-            .schema()
-            .field_with_unqualified_name(self.primary_key.first().unwrap())
-            .int_err()?
-            .qualifier()
-            .unwrap()
-            .clone())
     }
 
     /// Returns filter like:
@@ -204,6 +197,69 @@ impl MergeStrategySnapshot {
 
         Ok(select)
     }
+
+    /// Performs Change Data Capture diff between old and new state.
+    ///
+    /// It is mostly equivalent to this query (using datafusion-cli):
+    ///
+    ///   select
+    ///     case
+    ///       when old.city is null then '+'
+    ///       when new.city is null then '-'
+    ///       else 'u'
+    ///     end as obsv,
+    ///     coalesce(old.city, new.city) as city,
+    ///     coalesce(old.population, new.population) as population
+    ///   from old
+    ///   full join new
+    ///   on old.city = new.city
+    ///   where old.population is distinct from new.population;
+    fn cdc_diff(&self, old: DataFrame, new: DataFrame) -> Result<DataFrame, InternalError> {
+        let a_old: OwnedTableReference = "old".into();
+        let a_new: OwnedTableReference = "new".into();
+
+        let (session_state, old) = old.into_parts();
+        let (_, new) = new.into_parts();
+
+        let old = LogicalPlanBuilder::from(old)
+            .alias(a_old.clone())
+            .int_err()?;
+        let new = LogicalPlanBuilder::from(new)
+            .alias(a_new.clone())
+            .int_err()?;
+
+        // TODO: Schema evolution
+        // Filters out values that didn't change
+        let filter = self.get_cdc_filter(new.schema().as_ref(), a_old.clone(), a_new.clone())?;
+
+        let select: Vec<Expr> = self.get_cdc_select(new.schema(), a_old.clone(), a_new.clone())?;
+
+        let plan = old
+            .join(
+                new.build().int_err()?,
+                JoinType::Full,
+                (
+                    self.primary_key
+                        .iter()
+                        .map(|s| Column::new(Some(a_old.clone()), s))
+                        .collect(),
+                    self.primary_key
+                        .iter()
+                        .map(|s| Column::new(Some(a_new.clone()), s))
+                        .collect(),
+                ),
+                None,
+            )
+            .int_err()?
+            .filter(filter)
+            .int_err()?
+            .project(select)
+            .int_err()?
+            .build()
+            .int_err()?;
+
+        Ok(DataFrame::new(session_state, plan))
+    }
 }
 
 impl MergeStrategy for MergeStrategySnapshot {
@@ -229,23 +285,8 @@ impl MergeStrategy for MergeStrategySnapshot {
             .without_columns(&[&self.obsv_column, &self.order_column])
             .int_err()?;
 
-        let new_qual = self.get_table_qualifier(&new)?;
-        let proj_qual = self.get_table_qualifier(&proj)?;
-
-        let pk: Vec<_> = self.primary_key.iter().map(|s| s.as_str()).collect();
-        let cdc_filter = self.get_cdc_filter(new.schema(), proj_qual.clone(), new_qual.clone())?;
-        let cdc_select = self.get_cdc_select(new.schema(), proj_qual.clone(), new_qual.clone())?;
-
-        // Diff old and new states by performing full join and detecting changes
-        let res = proj
-            .join(new, JoinType::Full, &pk, &pk, None)
-            .int_err()?
-            // TODO: PERF: This condition ideally should be in join filter, but at the time of
-            // writing it was producing incorrect results
-            .filter(cdc_filter)
-            .int_err()?
-            .select(cdc_select)
-            .int_err()?;
+        // Diff state with new data
+        let res = self.cdc_diff(proj, new).int_err()?;
 
         Ok(res)
     }

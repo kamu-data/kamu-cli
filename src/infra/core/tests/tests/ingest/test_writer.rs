@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::assert_matches::assert_matches;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -27,15 +28,6 @@ use opendatafabric as odf;
 // function. We should move it there once we further decompose the kamu core
 // crate.
 ///////////////////////////////////////////////////////////////
-
-// TODO:
-// reuse across calls
-// system column conflict
-// normalize timestamp
-// watermarks
-// no-op commit
-// source state
-// panic on deriv
 
 #[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
@@ -165,6 +157,191 @@ async fn test_data_writer_happy_path() {
         res.new_block.event.output_watermark.as_ref(),
         Some(&harness.source_event_time)
     );
+
+    // Round 3 (nothing to commit)
+    let prev_watermark = res.new_block.event.output_watermark.unwrap();
+    harness.set_system_time(Utc.with_ymd_and_hms(2010, 1, 3, 12, 0, 0).unwrap());
+    harness.set_source_event_time(Utc.with_ymd_and_hms(2000, 1, 3, 12, 0, 0).unwrap());
+
+    let res = harness
+        .write(
+            indoc!(
+                r#"
+                city,population
+                A,1000
+                B,2000
+                C,3000
+                D,4000
+                "#
+            ),
+            "city STRING, population BIGINT",
+        )
+        .await;
+
+    assert_matches!(res, Err(WriteDataError::EmptyCommit(_)));
+
+    // Round 4 (nothing but source state changed)
+    let source_state = odf::SourceState {
+        kind: "odf/etag".to_string(),
+        source: "odf/poll".to_string(),
+        value: "123".to_string(),
+    };
+
+    harness.set_system_time(Utc.with_ymd_and_hms(2010, 1, 4, 12, 0, 0).unwrap());
+    harness.set_source_event_time(Utc.with_ymd_and_hms(2000, 1, 4, 12, 0, 0).unwrap());
+
+    let res = harness
+        .write_opts(
+            indoc!(
+                r#"
+                city,population
+                A,1000
+                B,2000
+                C,3000
+                D,4000
+                "#
+            ),
+            "city STRING, population BIGINT",
+            Some(source_state.clone()),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(res.new_block.event.output_data, None);
+    // Watermark is carried
+    assert_eq!(res.new_block.event.output_watermark, Some(prev_watermark));
+    // Source state updated
+    assert_eq!(res.new_block.event.source_state, Some(source_state));
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, ingest, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_data_writer_normalizes_timestamps_to_utc_millis() {
+    let mut harness = Harness::new(
+        MetadataFactory::set_polling_source()
+            .merge(odf::MergeStrategyLedger {
+                primary_key: vec!["event_time".to_string(), "city".to_string()],
+            })
+            .build(),
+    )
+    .await;
+
+    harness
+        .write(
+            indoc!(
+                r#"
+                event_time,city,population
+                2000-01-01,A,1000
+                2000-01-01,B,2000
+                2000-01-01,C,3000
+                "#
+            ),
+            "event_time TIMESTAMP, city STRING, population BIGINT",
+        )
+        .await
+        .unwrap();
+
+    let df = harness.get_last_data().await;
+
+    assert_schema_eq(
+        df.schema(),
+        indoc!(
+            r#"
+            message arrow_schema {
+              REQUIRED INT64 offset;
+              REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
+              OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
+              OPTIONAL BYTE_ARRAY city (STRING);
+              OPTIONAL INT64 population;
+            }
+            "#
+        ),
+    );
+
+    assert_data_eq(
+        df,
+        indoc!(
+            r#"
+            +--------+----------------------+----------------------+------+------------+
+            | offset | system_time          | event_time           | city | population |
+            +--------+----------------------+----------------------+------+------------+
+            | 0      | 2010-01-01T12:00:00Z | 2000-01-01T00:00:00Z | A    | 1000       |
+            | 1      | 2010-01-01T12:00:00Z | 2000-01-01T00:00:00Z | B    | 2000       |
+            | 2      | 2010-01-01T12:00:00Z | 2000-01-01T00:00:00Z | C    | 3000       |
+            +--------+----------------------+----------------------+------+------------+
+            "#
+        ),
+    )
+    .await;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, ingest, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_data_writer_optimal_parquet_encoding() {
+    use ::datafusion::parquet::basic::{Compression, Encoding, PageType};
+    use ::datafusion::parquet::file::reader::FileReader;
+
+    let mut harness = Harness::new(
+        MetadataFactory::set_polling_source()
+            .merge(odf::MergeStrategyLedger {
+                primary_key: vec!["event_time".to_string(), "city".to_string()],
+            })
+            .build(),
+    )
+    .await;
+
+    harness
+        .write(
+            indoc!(
+                r#"
+                event_time,city,population
+                2020-01-01,A,1000
+                2020-01-01,B,2000
+                2020-01-01,C,3000
+                "#
+            ),
+            "event_time TIMESTAMP, city STRING, population BIGINT",
+        )
+        .await
+        .unwrap();
+
+    let parquet = kamu::testing::ParquetReaderHelper::open(&harness.get_last_data_file().await);
+    let meta = parquet.reader.metadata();
+
+    // TODO: Migrate to Parquet v2 and DATA_PAGE_V2
+    let assert_data_encoding = |col, enc| {
+        let data_page = parquet
+            .reader
+            .get_row_group(0)
+            .unwrap()
+            .get_column_page_reader(col)
+            .unwrap()
+            .map(|p| p.unwrap())
+            .filter(|p| p.page_type() == PageType::DATA_PAGE)
+            .next()
+            .unwrap();
+
+        assert_eq!(data_page.encoding(), enc);
+    };
+
+    assert_eq!(meta.num_row_groups(), 1);
+
+    let offset_col = meta.row_group(0).column(0);
+    assert_eq!(offset_col.column_path().string(), "offset");
+    assert_eq!(offset_col.compression(), Compression::SNAPPY);
+
+    // TODO: Validate the encoding
+    // See: https://github.com/kamu-data/kamu-engine-flink/issues/3
+    // assert_data_encoding(0, Encoding::DELTA_BINARY_PACKED);
+
+    let system_time_col = meta.row_group(0).column(1);
+    assert_eq!(system_time_col.column_path().string(), "system_time");
+    assert_eq!(system_time_col.compression(), Compression::SNAPPY);
+    assert_data_encoding(1, Encoding::RLE_DICTIONARY);
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -243,7 +420,12 @@ impl Harness {
         self.source_event_time = t;
     }
 
-    async fn write(&mut self, data: &str, schema: &str) -> Result<WriteDataResult, WriteDataError> {
+    async fn write_opts(
+        &mut self,
+        data: &str,
+        schema: &str,
+        source_state: Option<odf::SourceState>,
+    ) -> Result<WriteDataResult, WriteDataError> {
         let data_path = self.temp_dir.path().join("data.bin");
         std::fs::write(&data_path, data).unwrap();
 
@@ -266,11 +448,15 @@ impl Harness {
                 WriteDataOpts {
                     system_time: self.system_time.clone(),
                     source_event_time: self.source_event_time.clone(),
-                    source_state: None,
+                    source_state,
                     data_staging_path: self.temp_dir.path().join("write.tmp"),
                 },
             )
             .await
+    }
+
+    async fn write(&mut self, data: &str, schema: &str) -> Result<WriteDataResult, WriteDataError> {
+        self.write_opts(data, schema, None).await
     }
 
     async fn get_last_data_block(&self) -> odf::MetadataBlockTyped<odf::AddData> {

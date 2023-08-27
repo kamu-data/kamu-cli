@@ -61,6 +61,9 @@ pub struct WriteDataResult {
 #[derive(Debug, thiserror::Error)]
 pub enum WriteDataError {
     #[error(transparent)]
+    EmptyCommit(#[from] EmptyCommitError),
+
+    #[error(transparent)]
     MergeError(#[from] MergeError),
 
     #[error(transparent)]
@@ -69,3 +72,7 @@ pub enum WriteDataError {
     #[error(transparent)]
     Internal(#[from] InternalError),
 }
+
+#[derive(Debug, thiserror::Error)]
+#[error("Nothing to commit")]
+pub struct EmptyCommitError {}
