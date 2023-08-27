@@ -41,3 +41,20 @@ pub(crate) async fn output_schema_common(
 
     Ok(Some(schema))
 }
+
+macro_rules! unsupported {
+    ($($arg:tt)*) => {{
+        let res = ::kamu_core::ingest::UnsupportedError::new(format!($($arg)*));
+        res
+    }}
+}
+
+macro_rules! bad_input {
+    ($($arg:tt)*) => {{
+        let res = ::kamu_core::ingest::BadInputError::new(format!($($arg)*));
+        res
+    }}
+}
+
+pub(crate) use unsupported;
+pub(crate) use bad_input;

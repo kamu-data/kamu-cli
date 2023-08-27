@@ -11,8 +11,6 @@ content:
         image: "ghcr.io/kamu-data/fetch-net.rocketpool.reth.mint-burn:0.1.1"
         env:
           - name: ETH_NODE_PROVIDER_URL
-          - name: STRIDE
-            value: "10000"
       read:
         kind: ndJson
       preprocess:

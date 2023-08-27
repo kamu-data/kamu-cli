@@ -41,34 +41,33 @@ impl ReaderGeoJson {
             serde_json::from_reader(std::fs::File::open(in_path).int_err()?).int_err()?;
 
         if feature_col["type"].as_str() != Some("FeatureCollection") {
-            return Err(format!(
+            return Err(bad_input!(
                 "Expected FeatureCollection type but got {} instead",
                 feature_col["type"]
             )
-            .int_err()
             .into());
         }
 
         let features = match feature_col.remove("features") {
             Some(JsonValue::Array(v)) => Ok(v),
-            _ => Err("Invalid geojson".int_err()),
+            _ => Err(bad_input!("Invalid geojson")),
         }?;
 
         let mut out_file = std::fs::File::create_new(out_path).int_err()?;
 
         for feature in features {
             let JsonValue::Object(mut feature) = feature else {
-                return Err("Invalid geojson".int_err().into());
+                return Err(bad_input!("Invalid geojson").into());
             };
 
             let mut record = match feature.remove("properties") {
                 Some(JsonValue::Object(v)) => Ok(v),
-                _ => Err("Invalid geojson".int_err()),
+                _ => Err(bad_input!("Invalid geojson")),
             }?;
 
             let geometry = match feature.remove("geometry") {
                 Some(JsonValue::Object(v)) => Ok(v),
-                _ => Err("Invalid geojson".int_err()),
+                _ => Err(bad_input!("Invalid geojson")),
             }?;
 
             let geom_str = serde_json::to_string(&geometry).int_err()?;

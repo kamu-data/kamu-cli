@@ -121,19 +121,19 @@ impl ReaderEsriShapefile {
                 if matches.len() == 1 {
                     Ok(matches.into_iter().next().unwrap())
                 } else if matches.is_empty() {
-                    Err(MalformedError::new(format!(
+                    Err(bad_input!(
                         "Archive does not contain any .shp files under '{}' sub-path. Possible \
                          entries are:\n  - {}",
                         subpath,
                         to_relative_paths(list_shp_files()).join("\n  - ")
-                    ))
+                    )
                     .into())
                 } else {
-                    Err(MalformedError::new(format!(
+                    Err(bad_input!(
                         "Archive contains multiple .shp files matching sub-path '{}':\n  - {}",
                         subpath,
                         to_relative_paths(matches).join("\n  - ")
-                    ))
+                    )
                     .into())
                 }
             }
@@ -143,14 +143,14 @@ impl ReaderEsriShapefile {
             if shp_files.len() == 1 {
                 Ok(shp_files.into_iter().next().unwrap())
             } else if shp_files.len() > 1 {
-                Err(MalformedError::new(format!(
+                Err(bad_input!(
                     "Archive contains multiple .shp files. Specify `subPath` argument to select \
                      one of:\n  - {}",
                     to_relative_paths(shp_files).join("\n  - ")
-                ))
+                )
                 .into())
             } else {
-                Err(MalformedError::new("Archive does not contain any .shp files").into())
+                Err(BadInputError::new("Archive does not contain any .shp files").into())
             }
         }
     }

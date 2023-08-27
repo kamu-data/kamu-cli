@@ -64,78 +64,88 @@ impl Reader for ReaderCsv {
             None => b',',
         };
         let quote = match &conf.quote {
+            None => Ok(b'"'),
             Some(v) => {
                 if v.as_bytes().len() > 1 {
-                    return Err("Csv.quote supports only single-character ascii values"
-                        .int_err()
-                        .into());
+                    Err(unsupported!(
+                        "Csv.quote supports only single-character ascii values, got: {}",
+                        v
+                    ))
+                } else {
+                    Ok(v.as_bytes()[0])
                 }
-                v.as_bytes()[0]
             }
-            None => b'"',
-        };
+        }?;
         let escape = match &conf.escape {
+            None => Ok(None),
             Some(v) => {
                 if v.as_bytes().len() > 1 {
-                    return Err("Csv.escape supports only single-character ascii values"
-                        .int_err()
-                        .into());
+                    Err(unsupported!(
+                        "Csv.escape supports only single-character ascii values, got: {}",
+                        v
+                    ))
+                } else {
+                    Ok(Some(v.as_bytes()[0]))
                 }
-                Some(v.as_bytes()[0])
             }
-            None => None,
-        };
+        }?;
         match conf.encoding.as_ref().map(|s| s.as_str()) {
             None | Some("utf8") => Ok(()),
-            Some(v) => Err(format!("Unsupported Csv.encoding: {}", v).int_err()),
+            Some(v) => Err(unsupported!("Unsupported Csv.encoding: {}", v)),
         }?;
         match conf.comment.as_ref().map(|s| s.as_str()) {
             None => Ok(()),
-            Some(v) => Err(format!("Unsupported Csv.comment: {}", v).int_err()),
+            Some(v) => Err(unsupported!("Unsupported Csv.comment: {}", v)),
         }?;
         match conf.enforce_schema {
             None | Some(true) => Ok(()),
-            Some(v) => Err(format!("Unsupported Csv.enforceSchema: {}", v).int_err()),
+            Some(v) => Err(unsupported!("Unsupported Csv.enforceSchema: {}", v)),
         }?;
         match conf.ignore_leading_white_space {
             None | Some(false) => Ok(()),
-            Some(v) => Err(format!("Unsupported Csv.ignoreLeadingWhiteSpace: {}", v).int_err()),
+            Some(v) => Err(unsupported!(
+                "Unsupported Csv.ignoreLeadingWhiteSpace: {}",
+                v
+            )),
         }?;
         match conf.ignore_trailing_white_space {
             None | Some(false) => Ok(()),
-            Some(v) => Err(format!("Unsupported Csv.ignoreTrailingWhiteSpace: {}", v).int_err()),
+            Some(v) => Err(unsupported!(
+                "Unsupported Csv.ignoreTrailingWhiteSpace: {}",
+                v
+            )),
         }?;
         match conf.null_value.as_ref().map(|s| s.as_str()) {
             None | Some("") => Ok(()),
-            Some(v) => Err(format!("Unsupported Csv.nullValue: {}", v).int_err()),
+            Some(v) => Err(unsupported!("Unsupported Csv.nullValue: {}", v)),
         }?;
         match conf.empty_value.as_ref().map(|s| s.as_str()) {
             None => Ok(()),
-            Some(v) => Err(format!("Unsupported Csv.emptyValue: {}", v).int_err()),
+            Some(v) => Err(unsupported!("Unsupported Csv.emptyValue: {}", v)),
         }?;
         match conf.nan_value.as_ref().map(|s| s.as_str()) {
             None => Ok(()),
-            Some(v) => Err(format!("Unsupported Csv.nanValue: {}", v).int_err()),
+            Some(v) => Err(unsupported!("Unsupported Csv.nanValue: {}", v)),
         }?;
         match conf.positive_inf.as_ref().map(|s| s.as_str()) {
             None => Ok(()),
-            Some(v) => Err(format!("Unsupported Csv.positiveInf: {}", v).int_err()),
+            Some(v) => Err(unsupported!("Unsupported Csv.positiveInf: {}", v)),
         }?;
         match conf.negative_inf.as_ref().map(|s| s.as_str()) {
             None => Ok(()),
-            Some(v) => Err(format!("Unsupported Csv.negativeInf: {}", v).int_err()),
+            Some(v) => Err(unsupported!("Unsupported Csv.negativeInf: {}", v)),
         }?;
         match conf.date_format.as_ref().map(|s| s.as_str()) {
             None | Some("rfc3339") => Ok(()),
-            Some(v) => Err(format!("Unsupported Csv.dateFormat: {}", v).int_err()),
+            Some(v) => Err(unsupported!("Unsupported Csv.dateFormat: {}", v)),
         }?;
         match conf.timestamp_format.as_ref().map(|s| s.as_str()) {
             None | Some("rfc3339") => Ok(()),
-            Some(v) => Err(format!("Unsupported Csv.timestampFormat: {}", v).int_err()),
+            Some(v) => Err(unsupported!("Unsupported Csv.timestampFormat: {}", v)),
         }?;
         match conf.multi_line {
             None | Some(false) => Ok(()),
-            Some(v) => Err(format!("Unsupported Csv.multiLine: {}", v).int_err()),
+            Some(v) => Err(unsupported!("Unsupported Csv.multiLine: {}", v)),
         }?;
 
         let options = CsvReadOptions {

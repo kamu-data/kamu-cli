@@ -52,9 +52,7 @@ impl ReaderJson {
                 sub_value = &sub_value[key];
 
                 if sub_value.is_null() {
-                    return Err(format!("Sub-path not found: {}", path.join("."))
-                        .int_err()
-                        .into());
+                    return Err(bad_input!("Sub-path not found: {}", path.join(".")).into());
                 }
             }
         }
@@ -64,9 +62,7 @@ impl ReaderJson {
 
         let Some(array) = sub_value.as_array() else {
             return Err(
-                format!("Sub-path does not specify an array: {}", path.join("."))
-                    .int_err()
-                    .into(),
+                bad_input!("Sub-path does not specify an array: {}", path.join(".")).into(),
             );
         };
 

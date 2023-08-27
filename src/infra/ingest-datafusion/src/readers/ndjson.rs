@@ -59,15 +59,15 @@ impl Reader for ReaderNdJson {
 
         match conf.encoding.as_ref().map(|s| s.as_str()) {
             None | Some("utf8") => Ok(()),
-            Some(v) => Err(format!("Unsupported NdJson.encoding: {}", v).int_err()),
+            Some(v) => Err(unsupported!("Unsupported NdJson.encoding: {}", v)),
         }?;
         match conf.date_format.as_ref().map(|s| s.as_str()) {
             None | Some("rfc3339") => Ok(()),
-            Some(v) => Err(format!("Unsupported NdJson.dateFormat: {}", v).int_err()),
+            Some(v) => Err(unsupported!("Unsupported NdJson.dateFormat: {}", v)),
         }?;
         match conf.timestamp_format.as_ref().map(|s| s.as_str()) {
             None | Some("rfc3339") => Ok(()),
-            Some(v) => Err(format!("Unsupported NdJson.timestampFormat: {}", v).int_err()),
+            Some(v) => Err(unsupported!("Unsupported NdJson.timestampFormat: {}", v)),
         }?;
 
         let options = NdJsonReadOptions {

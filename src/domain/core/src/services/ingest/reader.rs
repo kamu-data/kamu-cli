@@ -48,19 +48,41 @@ pub trait Reader: Send + Sync {
 #[derive(thiserror::Error, Debug)]
 pub enum ReadError {
     #[error(transparent)]
-    Malformed(#[from] MalformedError),
+    BadInput(#[from] BadInputError),
+    #[error(transparent)]
+    Unsupported(#[from] UnsupportedError),
     #[error(transparent)]
     Internal(#[from] InternalError),
 }
 
+///////////////////////////////////////////////////////////////////////////////
+
 #[derive(thiserror::Error, Debug)]
 #[error("{message}")]
-pub struct MalformedError {
+pub struct BadInputError {
     message: String,
     backtrace: Backtrace,
 }
 
-impl MalformedError {
+impl BadInputError {
+    pub fn new(message: impl Into<String>) -> Self {
+        Self {
+            message: message.into(),
+            backtrace: Backtrace::capture(),
+        }
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+#[derive(thiserror::Error, Debug)]
+#[error("{message}")]
+pub struct UnsupportedError {
+    message: String,
+    backtrace: Backtrace,
+}
+
+impl UnsupportedError {
     pub fn new(message: impl Into<String>) -> Self {
         Self {
             message: message.into(),

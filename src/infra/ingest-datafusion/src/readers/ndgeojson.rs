@@ -54,22 +54,21 @@ impl ReaderNdGeoJson {
                     serde_json::from_str(line).int_err()?;
 
                 if feature["type"].as_str() != Some("Feature") {
-                    return Err(format!(
+                    return Err(bad_input!(
                         "Expected Feature type but got {} instead",
                         feature["type"]
                     )
-                    .int_err()
                     .into());
                 }
 
                 let mut record = match feature.remove("properties") {
                     Some(JsonValue::Object(v)) => Ok(v),
-                    _ => Err("Invalid geojson".int_err()),
+                    _ => Err(bad_input!("Invalid geojson")),
                 }?;
 
                 let geometry = match feature.remove("geometry") {
                     Some(JsonValue::Object(v)) => Ok(v),
-                    _ => Err("Invalid geojson".int_err()),
+                    _ => Err(bad_input!("Invalid geojson")),
                 }?;
 
                 let geom_str = serde_json::to_string(&geometry).int_err()?;
