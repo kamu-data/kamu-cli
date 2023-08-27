@@ -325,6 +325,8 @@ impl SparkEngine {
         {
             // TODO: Spark ingest does not support `NdJson` type so we translate it into
             // deprecated `JsonLines`
+            // TODO: Spark ingest did not distinguish `NdGeoJson` type so we translate it
+            // into `GeoJson`
             let request = match request.source.read {
                 ReadStep::NdJson(v) => IngestRequestRaw {
                     source: SetPollingSource {
@@ -336,6 +338,13 @@ impl SparkEngine {
                             primitives_as_string: None,
                             timestamp_format: v.timestamp_format,
                         }),
+                        ..request.source
+                    },
+                    ..request
+                },
+                ReadStep::NdGeoJson(v) => IngestRequestRaw {
+                    source: SetPollingSource {
+                        read: ReadStep::GeoJson(ReadStepGeoJson { schema: v.schema }),
                         ..request.source
                     },
                     ..request
