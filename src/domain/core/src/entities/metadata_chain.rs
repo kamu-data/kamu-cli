@@ -11,7 +11,7 @@ use std::fmt::Display;
 
 use async_trait::async_trait;
 use internal_error::*;
-use opendatafabric::{MetadataBlock, MetadataEvent, Multihash};
+use opendatafabric::{MetadataBlock, MetadataBlockTyped, MetadataEvent, Multihash, VariantOf};
 use thiserror::Error;
 
 use super::metadata_stream::DynMetadataStream;
@@ -104,6 +104,34 @@ pub trait MetadataChainExt: MetadataChain {
             Err(GetBlockError::NotFound(_)) => Ok(None),
             Err(e) => Err(e.int_err()),
         }
+    }
+
+    /// Same as [Self::last_of_type_ref] defaulting to the head reference
+    async fn last_of_type<E: VariantOf<MetadataEvent>>(
+        &self,
+    ) -> Result<Option<(Multihash, MetadataBlockTyped<E>)>, IterBlocksError> {
+        self.last_of_type_ref(&BlockRef::Head).await
+    }
+
+    /// Finds the last block (chonologically) carrying an instance of the
+    /// specified event type
+    async fn last_of_type_ref<E: VariantOf<MetadataEvent>>(
+        &self,
+        r: &BlockRef,
+    ) -> Result<Option<(Multihash, MetadataBlockTyped<E>)>, IterBlocksError> {
+        use futures::StreamExt;
+        use opendatafabric::AsTypedBlock;
+
+        let mut stream = self.iter_blocks_ref(r);
+        // TODO: PERF: Implement faster traversal of typed blocks
+        while let Some(r) = stream.next().await {
+            let (h, b) = r?;
+            if let Some(b) = b.into_typed::<E>() {
+                return Ok(Some((h, b)));
+            }
+        }
+
+        Ok(None)
     }
 
     /// Convenience function to iterate blocks starting with the `head`

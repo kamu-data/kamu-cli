@@ -30,8 +30,6 @@ pub struct IngestTask {
     fetch_service: FetchService,
     prep_service: PrepService,
     engine_provisioner: Arc<dyn EngineProvisioner>,
-    object_store_registry: Arc<dyn ObjectStoreRegistry>,
-    run_info_dir: PathBuf,
     cache_dir: PathBuf,
 }
 
@@ -43,20 +41,17 @@ impl IngestTask {
         fetch_override: Option<FetchStep>,
         listener: Arc<dyn IngestListener>,
         engine_provisioner: Arc<dyn EngineProvisioner>,
-        object_store_registry: Arc<dyn ObjectStoreRegistry>,
         container_runtime: Arc<ContainerRuntime>,
         run_info_dir: &Path,
         cache_dir: &Path,
     ) -> Result<Self, InternalError> {
-        if let Some(polling_source) = &request.polling_source {
-            if fetch_override.is_some() {
-                if let FetchStep::FilesGlob(_) = &polling_source.fetch {
-                    return Err(concat!(
-                        "Fetch override use is not supported for glob sources, ",
-                        "as globs maintain strict ordering and state"
-                    )
-                    .int_err());
-                }
+        if fetch_override.is_some() {
+            if let FetchStep::FilesGlob(_) = &request.polling_source.fetch {
+                return Err(concat!(
+                    "Fetch override use is not supported for glob sources, ",
+                    "as globs maintain strict ordering and state"
+                )
+                .int_err());
             }
         }
 
@@ -69,24 +64,14 @@ impl IngestTask {
                 .prev_source_state
                 .as_ref()
                 .and_then(|ss| PollingSourceState::try_from_source_state(&ss)),
-            fetch_service: FetchService::new(container_runtime, &run_info_dir),
+            fetch_service: FetchService::new(container_runtime, run_info_dir),
             prep_service: PrepService::new(),
             engine_provisioner,
-            object_store_registry,
-            run_info_dir: run_info_dir.to_owned(),
             cache_dir: cache_dir.to_owned(),
             request,
         })
     }
 
-    #[tracing::instrument(
-        level = "info",
-        skip_all,
-        fields(
-            operation_id = %operation_id,
-            dataset_handle = %self.request.dataset_handle,
-        ),
-    )]
     pub async fn ingest(&mut self, operation_id: String) -> Result<IngestResult, IngestError> {
         self.request.operation_id = operation_id;
 
@@ -114,13 +99,6 @@ impl IngestTask {
     }
 
     pub async fn ingest_inner(&mut self) -> Result<IngestResult, IngestError> {
-        if self.request.polling_source.is_none() {
-            return Ok(IngestResult::UpToDate {
-                no_polling_source: true,
-                uncacheable: false,
-            });
-        }
-
         let prev_head = self
             .dataset
             .as_metadata_chain()
@@ -300,7 +278,7 @@ impl IngestTask {
             (fetch_override, None)
         } else {
             (
-                &self.request.polling_source.as_ref().unwrap().fetch,
+                &self.request.polling_source.fetch,
                 self.prev_source_state.as_ref(),
             )
         };
@@ -328,9 +306,9 @@ impl IngestTask {
                     prev_source_state,
                     &target_path,
                     &self.request.system_time,
-                    Some(Arc::new(FetchProgressListenerBridge {
-                        listener: self.listener.clone(),
-                    })),
+                    Some(Arc::new(FetchProgressListenerBridge::new(
+                        self.listener.clone(),
+                    ))),
                 )
                 .await?;
 
@@ -365,8 +343,6 @@ impl IngestTask {
         let prep_steps = self
             .request
             .polling_source
-            .as_ref()
-            .unwrap()
             .prepare
             .as_ref()
             .unwrap_or(&null_steps);
@@ -400,44 +376,28 @@ impl IngestTask {
         // TODO: Should we still call an engine if only to propagate source_event_time
         // to it?
         if input_data_path.metadata().int_err()?.len() == 0 {
-            return Ok(IngestResponse {
+            Ok(IngestResponse {
                 data_interval: None,
                 output_watermark: self.request.prev_watermark,
                 out_checkpoint: None,
                 out_data: None,
-            });
-        }
-
-        let request = IngestRequest {
-            event_time: source_event_time,
-            input_data_path,
-            ..self.request.clone()
-        };
-
-        // TODO: Temporarily we continue to default to Spark ingest, but use new engine
-        // if preprocessing query specifies datafusion
-        let engine = self
-            .request
-            .polling_source
-            .as_ref()
-            .unwrap()
-            .preprocess
-            .as_ref()
-            .map(|Transform::Sql(t)| t.engine.as_str());
-
-        let read_svc: Box<dyn ReadService> = if engine == Some("datafusion") {
-            Box::new(ReadServiceDatafusion::new(
-                self.object_store_registry.clone(),
-                self.dataset.clone(),
-                self.run_info_dir.clone(),
-            ))
+            })
         } else {
-            Box::new(ReadServiceSpark::new(
-                self.engine_provisioner.clone(),
-                self.listener.clone(),
-            ))
-        };
-        read_svc.read(request).await
+            let engine = self
+                .engine_provisioner
+                .provision_ingest_engine(self.listener.clone().get_engine_provisioning_listener())
+                .await?;
+
+            let response = engine
+                .ingest(IngestRequest {
+                    event_time: source_event_time,
+                    input_data_path,
+                    ..self.request.clone()
+                })
+                .await?;
+
+            Ok(response)
+        }
     }
 
     #[tracing::instrument(level = "info", name = "commit", skip_all)]
@@ -497,13 +457,13 @@ impl IngestTask {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-enum FetchStepResult {
+pub(crate) enum FetchStepResult {
     UpToDate,
     Updated(FetchSavepoint),
 }
 
-struct PrepStepResult {
-    data_cache_key: String,
+pub(crate) struct PrepStepResult {
+    pub data_cache_key: String,
 }
 
 enum CommitStepResult {
@@ -518,8 +478,14 @@ struct CommitStepResultUpdated {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-struct FetchProgressListenerBridge {
+pub(crate) struct FetchProgressListenerBridge {
     listener: Arc<dyn IngestListener>,
+}
+
+impl FetchProgressListenerBridge {
+    pub(crate) fn new(listener: Arc<dyn IngestListener>) -> Self {
+        Self { listener }
+    }
 }
 
 impl FetchProgressListener for FetchProgressListenerBridge {

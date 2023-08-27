@@ -69,6 +69,58 @@ impl DataWriterDataFusion {
         }
     }
 
+    pub fn last_offset(&self) -> Option<i64> {
+        self.meta.last_offset
+    }
+
+    pub fn last_source_state(&self) -> Option<&odf::SourceState> {
+        self.meta.last_source_state.as_ref()
+    }
+
+    pub fn vocab(&self) -> &odf::DatasetVocabularyResolvedOwned {
+        &self.meta.vocab
+    }
+
+    fn validate_input(&self, df: &DataFrame) -> Result<(), InternalError> {
+        use datafusion::arrow::datatypes::DataType;
+
+        for system_column in [
+            &self.meta.vocab.offset_column,
+            &self.meta.vocab.system_time_column,
+        ] {
+            if df.schema().has_column_with_unqualified_name(system_column) {
+                return Err(format!(
+                    "Transformed data contains a column that conflicts with the system column \
+                     name, you should either rename the data column or configure the dataset \
+                     vocabulary to use a different name: {}",
+                    system_column
+                )
+                .int_err());
+            }
+        }
+
+        let event_time_col = df
+            .schema()
+            .fields()
+            .iter()
+            .find(|f| f.name().as_str() == self.meta.vocab.event_time_column);
+
+        if let Some(event_time_col) = event_time_col {
+            match event_time_col.data_type() {
+                DataType::Date32 | DataType::Date64 | DataType::Timestamp(_, _) => {}
+                typ => {
+                    return Err(format!(
+                        "Event time column '{}' should be either Date or Timestamp, but found: {}",
+                        self.meta.vocab.event_time_column, typ
+                    )
+                    .int_err());
+                }
+            }
+        }
+
+        Ok(())
+    }
+
     // TODO: This function currently ensures that all timestamps in the ouput are
     // represeted as `Timestamp(Millis, "UTC")` for compatibility with other engines
     // (e.g. Flink does not support event time with nanosecond precision).
@@ -144,46 +196,6 @@ impl DataWriterDataFusion {
             .int_err()?;
 
         Ok(Some(df))
-    }
-
-    fn validate_input(&self, df: &DataFrame) -> Result<(), InternalError> {
-        use datafusion::arrow::datatypes::DataType;
-
-        for system_column in [
-            &self.meta.vocab.offset_column,
-            &self.meta.vocab.system_time_column,
-        ] {
-            if df.schema().has_column_with_unqualified_name(system_column) {
-                return Err(format!(
-                    "Transformed data contains a column that conflicts with the system column \
-                     name, you should either rename the data column or configure the dataset \
-                     vocabulary to use a different name: {}",
-                    system_column
-                )
-                .int_err());
-            }
-        }
-
-        let event_time_col = df
-            .schema()
-            .fields()
-            .iter()
-            .find(|f| f.name().as_str() == self.meta.vocab.event_time_column);
-
-        if let Some(event_time_col) = event_time_col {
-            match event_time_col.data_type() {
-                DataType::Date32 | DataType::Date64 | DataType::Timestamp(_, _) => {}
-                typ => {
-                    return Err(format!(
-                        "Event time column '{}' should be either Date or Timestamp, but found: {}",
-                        self.meta.vocab.event_time_column, typ
-                    )
-                    .int_err());
-                }
-            }
-        }
-
-        Ok(())
     }
 
     async fn with_system_columns(
@@ -567,7 +579,7 @@ impl DataWriterDataFusionBuilder {
     // TODO: PERF: Full metadata scan below - this is expensive and should be
     // improved using skip lists and caching
     /// Scans metadata chain to populate the needed metadata
-    async fn with_metadata_state_scanned(self) -> Result<Self, InternalError> {
+    pub async fn with_metadata_state_scanned(self) -> Result<Self, InternalError> {
         let head = self
             .dataset
             .as_metadata_chain()

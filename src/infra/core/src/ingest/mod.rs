@@ -11,12 +11,8 @@ mod fetch_service;
 mod ingest_task;
 mod polling_source_state;
 mod prep_service;
-mod read_service_datafusion;
-mod read_service_spark;
 
 pub use fetch_service::*;
 pub use ingest_task::*;
 pub use polling_source_state::*;
 pub use prep_service::*;
-pub use read_service_datafusion::*;
-pub use read_service_spark::*;

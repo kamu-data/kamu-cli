@@ -167,7 +167,7 @@ impl SparkEngine {
                         cache: None,
                         headers: None,
                     }),
-                    ..request.polling_source.unwrap()
+                    ..request.polling_source
                 },
                 dataset_vocab: request.vocab,
                 // TODO: Not passing any checkpoint currently as Spark ingest doesn't use them
@@ -298,7 +298,7 @@ impl SparkEngine {
                         cache: None,
                         headers: None,
                     }),
-                    ..request.polling_source.unwrap()
+                    ..request.polling_source
                 },
                 dataset_vocab: request.vocab,
                 // TODO: Not passing any checkpoint currently as Spark ingest doesn't use them

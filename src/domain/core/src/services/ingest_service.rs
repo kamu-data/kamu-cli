@@ -239,6 +239,13 @@ pub enum IngestError {
     ),
 
     #[error(transparent)]
+    CommitError(
+        #[from]
+        #[backtrace]
+        CommitError,
+    ),
+
+    #[error(transparent)]
     Access(
         #[from]
         #[backtrace]

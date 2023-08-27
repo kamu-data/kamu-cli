@@ -51,8 +51,8 @@ pub struct IngestRequest {
     pub operation_id: String,
     /// Identifies the output dataset
     pub dataset_handle: DatasetHandle,
-    /// Polling source, if defined
-    pub polling_source: Option<SetPollingSource>,
+    /// Polling source
+    pub polling_source: SetPollingSource,
     /// System time to use for new records
     pub system_time: DateTime<Utc>,
     /// Event time extracted from source's metadata
