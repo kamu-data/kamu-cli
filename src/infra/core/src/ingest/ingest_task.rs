@@ -191,6 +191,9 @@ impl IngestTask {
                         self.request.prev_watermark = commit.new_event.output_watermark;
                         if let Some(output_data) = commit.new_event.output_data {
                             self.request.next_offset = output_data.interval.end + 1;
+                            self.request
+                                .prev_data_slices
+                                .push(output_data.physical_hash);
                         }
                         self.prev_source_state = savepoint.source_state;
                         self.request.prev_source_state = self
