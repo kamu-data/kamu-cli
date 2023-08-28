@@ -84,8 +84,8 @@ async fn create_test_dataset(catalog: &dill::Catalog, tempdir: &Path) {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_group::group(engine, datafusion)]
 #[test_log::test(tokio::test)]
-#[cfg_attr(not(unix), ignore)] // TODO: DataFusion crashes on windows
 async fn test_dataset_schema_local_fs() {
     let tempdir = tempfile::tempdir().unwrap();
     let catalog = create_catalog_with_local_workspace(tempdir.path()).await;
@@ -140,8 +140,8 @@ async fn test_dataset_schema_local_fs() {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_group::group(engine, datafusion)]
 #[test_log::test(tokio::test)]
-#[cfg_attr(not(unix), ignore)] // TODO: DataFusion crashes on windows
 async fn test_dataset_tail_local_fs() {
     let tempdir = tempfile::tempdir().unwrap();
     let catalog = create_catalog_with_local_workspace(tempdir.path()).await;
@@ -178,8 +178,8 @@ async fn test_dataset_tail_local_fs() {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_group::group(engine, datafusion)]
 #[test_log::test(tokio::test)]
-#[cfg_attr(not(unix), ignore)] // TODO: DataFusion crashes on windows
 async fn test_dataset_tail_empty_local_fs() {
     let tempdir = tempfile::tempdir().unwrap();
     let catalog = create_catalog_with_local_workspace(tempdir.path()).await;

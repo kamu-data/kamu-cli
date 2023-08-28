@@ -3121,6 +3121,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tempfile",
+ "test-group",
  "test-log",
  "tokio",
  "tracing",

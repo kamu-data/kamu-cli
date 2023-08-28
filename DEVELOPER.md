@@ -9,6 +9,7 @@
   - [Dependency Injection](#dependency-injection)
   - [Async](#async)
   - [Error Handling](#error-handling)
+  - [Test Groups](#test-groups)
 - [Typical Workflow](#typical-workflow)
   - [Feature Branches](#feature-branches)
   - [Release Procedure](#release-procedure)
@@ -191,6 +192,18 @@ With these ideas in mind:
 - We heavily use `thiserror` library to define errors per function and generate error type conversions
 - We use our own `internal-error` crate to concisely box unexpected errors into `InternalError` type
 
+### Test Groups
+We use the homegrown [`test-group`](https://crates.io/crates/test-group) crate to organize tests in groups. The complete set of groups is:
+- `containerized` - for tests that spawn Docker/Podman containers
+- `engine` - for tests that involve any data engine or data framework (query, ingest, or transfrom paths), subsequently grouped by:
+  - `datafusion` - tests that use Apache DataFusion
+  - `spark` - tests that use Apache Spark
+  - `flink` - tests that use Apache Flink
+- `ingest` - tests that test data ingestion path
+- `transfrom` - tests that test data transformation path
+- `query` - tests that test data query path
+- `flaky` - special group for tests that sometimes fail and need to be retried (use very sparingly and create tickets)
+- `setup` - special group for tests that initialize the environment (e.g. pull container images) - this group is run by CI before executing the rest of the tests
 
 ## Typical Workflow
 

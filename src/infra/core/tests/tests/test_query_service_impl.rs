@@ -175,8 +175,8 @@ async fn test_dataset_schema_common(catalog: dill::Catalog, tempdir: &TempDir) {
     );
 }
 
+#[test_group::group(engine, datafusion)]
 #[test_log::test(tokio::test)]
-#[cfg_attr(not(unix), ignore)] // TODO: DataFusion crashes on windows
 async fn test_dataset_schema_local_fs() {
     let tempdir = tempfile::tempdir().unwrap();
     let catalog = create_catalog_with_local_workspace(
@@ -187,7 +187,7 @@ async fn test_dataset_schema_local_fs() {
     test_dataset_schema_common(catalog, &tempdir).await;
 }
 
-#[test_group::group(containerized)]
+#[test_group::group(containerized, engine, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_dataset_schema_s3() {
     let s3 = LocalS3Server::new().await;
@@ -210,8 +210,8 @@ async fn test_dataset_schema_unauthorized_common(catalog: dill::Catalog, tempdir
     assert_matches!(result, Err(QueryError::Access(_)));
 }
 
+#[test_group::group(engine, datafusion)]
 #[test_log::test(tokio::test)]
-#[cfg_attr(not(unix), ignore)] // TODO: DataFusion crashes on windows
 async fn test_dataset_schema_unauthorized_local_fs() {
     let tempdir = tempfile::tempdir().unwrap();
     let catalog =
@@ -220,7 +220,7 @@ async fn test_dataset_schema_unauthorized_local_fs() {
     test_dataset_schema_unauthorized_common(catalog, &tempdir).await;
 }
 
-#[test_group::group(containerized)]
+#[test_group::group(containerized, engine, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_dataset_schema_unauthorized_s3() {
     let s3 = LocalS3Server::new().await;
@@ -250,8 +250,8 @@ async fn test_dataset_tail_common(catalog: dill::Catalog, tempdir: &TempDir) {
     assert_eq!(data_json, serde_json::json!([{"blah": "b", "offset": 1}]));
 }
 
+#[test_group::group(engine, datafusion)]
 #[test_log::test(tokio::test)]
-#[cfg_attr(not(unix), ignore)] // TODO: DataFusion crashes on windows
 async fn test_dataset_tail_local_fs() {
     let tempdir = tempfile::tempdir().unwrap();
     let catalog = create_catalog_with_local_workspace(
@@ -263,7 +263,7 @@ async fn test_dataset_tail_local_fs() {
     test_dataset_tail_common(catalog, &tempdir).await;
 }
 
-#[test_group::group(containerized)]
+#[test_group::group(containerized, engine, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_dataset_tail_s3() {
     let s3 = LocalS3Server::new().await;
@@ -287,8 +287,8 @@ async fn test_dataset_tail_unauthorized_common(catalog: dill::Catalog, tempdir: 
     assert_matches!(result, Err(QueryError::Access(_)));
 }
 
+#[test_group::group(engine, datafusion)]
 #[test_log::test(tokio::test)]
-#[cfg_attr(not(unix), ignore)] // TODO: DataFusion crashes on windows
 async fn test_dataset_tail_unauhtorized_local_fs() {
     let tempdir = tempfile::tempdir().unwrap();
     let catalog =
@@ -297,7 +297,7 @@ async fn test_dataset_tail_unauhtorized_local_fs() {
     test_dataset_tail_unauthorized_common(catalog, &tempdir).await;
 }
 
-#[test_group::group(containerized)]
+#[test_group::group(containerized, engine, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_dataset_tail_unauthroized_s3() {
     let s3 = LocalS3Server::new().await;
@@ -335,8 +335,8 @@ async fn test_dataset_sql_authorized_common(catalog: dill::Catalog, tempdir: &Te
     )
 }
 
+#[test_group::group(engine, datafusion)]
 #[test_log::test(tokio::test)]
-#[cfg_attr(not(unix), ignore)] // TODO: DataFusion crashes on windows
 async fn test_dataset_sql_authorized_local_fs() {
     let tempdir = tempfile::tempdir().unwrap();
     let catalog = create_catalog_with_local_workspace(
@@ -347,7 +347,7 @@ async fn test_dataset_sql_authorized_local_fs() {
     test_dataset_sql_authorized_common(catalog, &tempdir).await;
 }
 
-#[test_group::group(containerized)]
+#[test_group::group(containerized, engine, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_dataset_sql_authorized_s3() {
     let s3 = LocalS3Server::new().await;
@@ -378,8 +378,8 @@ async fn test_dataset_sql_unauthorized_common(catalog: dill::Catalog, tempdir: &
     );
 }
 
+#[test_group::group(engine, datafusion)]
 #[test_log::test(tokio::test)]
-#[cfg_attr(not(unix), ignore)] // TODO: DataFusion crashes on windows
 async fn test_dataset_sql_unauthorized_local_fs() {
     let tempdir = tempfile::tempdir().unwrap();
     let catalog =
@@ -388,7 +388,7 @@ async fn test_dataset_sql_unauthorized_local_fs() {
     test_dataset_sql_unauthorized_common(catalog, &tempdir).await;
 }
 
-#[test_group::group(containerized)]
+#[test_group::group(containerized, engine, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_dataset_sql_unauthroized_s3() {
     let s3 = LocalS3Server::new().await;

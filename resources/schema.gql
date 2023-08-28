@@ -691,7 +691,7 @@ enum QueryDialect {
 	SQL_DATA_FUSION
 }
 
-union ReadStep = ReadStepCsv | ReadStepJsonLines | ReadStepGeoJson | ReadStepEsriShapefile | ReadStepParquet | ReadStepNdJson
+union ReadStep = ReadStepCsv | ReadStepJsonLines | ReadStepGeoJson | ReadStepEsriShapefile | ReadStepParquet | ReadStepJson | ReadStepNdJson | ReadStepNdGeoJson
 
 type ReadStepCsv {
 	schema: [String!]
@@ -724,6 +724,14 @@ type ReadStepGeoJson {
 	schema: [String!]
 }
 
+type ReadStepJson {
+	subPath: String
+	schema: [String!]
+	dateFormat: String
+	encoding: String
+	timestampFormat: String
+}
+
 type ReadStepJsonLines {
 	schema: [String!]
 	dateFormat: String
@@ -733,11 +741,14 @@ type ReadStepJsonLines {
 	timestampFormat: String
 }
 
+type ReadStepNdGeoJson {
+	schema: [String!]
+}
+
 type ReadStepNdJson {
 	schema: [String!]
 	dateFormat: String
 	encoding: String
-	primitivesAsString: Boolean
 	timestampFormat: String
 }
 

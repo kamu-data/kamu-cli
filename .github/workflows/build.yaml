@@ -95,7 +95,9 @@ jobs:
     runs-on: windows-latest
     env:
       CARGO_FLAGS: --profile ci
-      NEXTEST_FLAGS: --cargo-profile ci -E '!test(::containerized::)'
+      # TODO: FIXME: DataFusion tests are temporarily disabled
+      # See: https://github.com/kamu-data/kamu-cli/issues/226
+      NEXTEST_FLAGS: --cargo-profile ci -E 'not (test(::containerized::) | test(::datafusion::))'
     steps:
       - uses: actions/checkout@v3
       - uses: actions-rs/toolchain@v1
