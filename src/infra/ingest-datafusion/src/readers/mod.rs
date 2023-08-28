@@ -56,5 +56,4 @@ macro_rules! bad_input {
     }}
 }
 
-pub(crate) use unsupported;
-pub(crate) use bad_input;
+pub(crate) use {bad_input, unsupported};

@@ -637,6 +637,7 @@ impl FetchService {
         cfg_if::cfg_if! {
             if #[cfg(feature = "ftp")] {
                 let target_path = target_path.to_owned();
+                let system_time = system_time.clone();
                 tokio::task::spawn_blocking(move || {
                         Self::fetch_ftp_impl(
                             url,
@@ -660,7 +661,7 @@ impl FetchService {
     fn fetch_ftp_impl(
         url: Url,
         target_path: &Path,
-        system_time: &DateTime<Utc>,
+        system_time: DateTime<Utc>,
         listener: &dyn FetchProgressListener,
     ) -> Result<FetchResult, IngestError> {
         use std::io::prelude::*;
@@ -720,7 +721,7 @@ impl FetchService {
 
         Ok(FetchResult::Updated(FetchResultUpdated {
             source_state: None,
-            source_event_time: Some(system_time.clone()),
+            source_event_time: Some(system_time),
             has_more: false,
         }))
     }

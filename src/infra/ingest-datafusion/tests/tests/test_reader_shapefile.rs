@@ -121,9 +121,9 @@ async fn test_read_shapefile_infer_schema() {
                       OPTIONAL BYTE_ARRAY varname_1 (STRING);
                     }
                     "#
-                )
+                ),
             );
-        }
+        },
     )
     .await;
 }
@@ -146,7 +146,7 @@ async fn test_read_shapefile_with_subpath_exists() {
         },
         |res| async move {
             assert_matches!(res, Ok(_));
-        }
+        },
     )
     .await;
 }
@@ -169,7 +169,7 @@ async fn test_read_shapefile_with_subpath_missing() {
         },
         |res| async move {
             assert_matches!(res, Err(_));
-        }
+        },
     )
     .await;
 }
@@ -200,7 +200,7 @@ async fn test_read_shapefile_geom() {
                 .unwrap()
                 .repartition(Partitioning::RoundRobinBatch(1))
                 .unwrap();
-            
+
             let batches = df.collect().await.unwrap();
             let batch = &batches[0];
             assert_eq!(batch.num_columns(), 2);
@@ -220,7 +220,7 @@ async fn test_read_shapefile_geom() {
                 .truncate(2);
 
             assert_eq!(
-                geojson, 
+                geojson,
                 serde_json::json!({
                     "type": "MultiPolygon",
                     "coordinates": [[[[30.466304779052763, 50.58700942993181], [30.466583251953324, 50.58112716674821]]]],
