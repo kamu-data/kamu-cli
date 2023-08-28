@@ -18,18 +18,24 @@ pub fn get_command(
     arg_matches: clap::ArgMatches,
 ) -> Result<Box<dyn Command>, CLIError> {
     let command: Box<dyn Command> = match arg_matches.subcommand() {
-        Some(("add", submatches)) => Box::new(AddCommand::new(
-            catalog.get_one()?,
-            catalog.get_one()?,
-            AccountService::current_account_indication(&arg_matches),
-            submatches
-                .get_many("manifest")
-                .unwrap_or_default()
-                .map(String::as_str),
-            submatches.get_flag("recursive"),
-            submatches.get_flag("replace"),
-            submatches.get_flag("stdin"),
-        )),
+        Some(("add", submatches)) => {
+            let workspace_svc = catalog.get_one::<WorkspaceService>()?;
+            Box::new(AddCommand::new(
+                catalog.get_one()?,
+                catalog.get_one()?,
+                AccountService::current_account_indication(
+                    &arg_matches,
+                    workspace_svc.is_multi_tenant_workspace(),
+                ),
+                submatches
+                    .get_many("manifest")
+                    .unwrap_or_default()
+                    .map(String::as_str),
+                submatches.get_flag("recursive"),
+                submatches.get_flag("replace"),
+                submatches.get_flag("stdin"),
+            ))
+        }
         Some(("complete", submatches)) => {
             let workspace_svc = catalog.get_one::<WorkspaceService>()?;
             let in_workspace =
@@ -153,14 +159,20 @@ pub fn get_command(
             )),
             _ => return Err(CommandInterpretationFailed.into()),
         },
-        Some(("list", submatches)) => Box::new(ListCommand::new(
-            catalog.get_one()?,
-            catalog.get_one()?,
-            AccountService::current_account_indication(&arg_matches),
-            AccountService::related_account_indication(submatches),
-            catalog.get_one()?,
-            submatches.get_count("wide"),
-        )),
+        Some(("list", submatches)) => {
+            let workspace_svc = catalog.get_one::<WorkspaceService>()?;
+            Box::new(ListCommand::new(
+                catalog.get_one()?,
+                catalog.get_one()?,
+                AccountService::current_account_indication(
+                    &arg_matches,
+                    workspace_svc.is_multi_tenant_workspace(),
+                ),
+                AccountService::related_account_indication(submatches),
+                catalog.get_one()?,
+                submatches.get_count("wide"),
+            ))
+        }
         Some(("log", submatches)) => Box::new(LogCommand::new(
             catalog.get_one()?,
             catalog.get_one()?,

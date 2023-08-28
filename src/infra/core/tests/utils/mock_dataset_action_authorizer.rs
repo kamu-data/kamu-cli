@@ -14,7 +14,7 @@ use kamu_core::auth::{
     DatasetActionNotEnoughPermissionsError,
     DatasetActionUnauthorizedError,
 };
-use kamu_core::{AccessError, TEST_ACCOUNT_NAME};
+use kamu_core::{AccessError, DEFAULT_ACCOUNT_NAME};
 use mockall::predicate::{always, eq, function};
 use mockall::Predicate;
 use opendatafabric::{AccountName, DatasetAlias, DatasetHandle};
@@ -35,7 +35,7 @@ mockall::mock! {
 
 impl MockDatasetActionAuthorizer {
     pub fn denying() -> Self {
-        let account_name = AccountName::new_unchecked(TEST_ACCOUNT_NAME);
+        let account_name = AccountName::new_unchecked(DEFAULT_ACCOUNT_NAME);
         let mut mock_dataset_action_authorizer = MockDatasetActionAuthorizer::new();
         mock_dataset_action_authorizer
             .expect_check_action_allowed()

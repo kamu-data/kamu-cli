@@ -13,7 +13,7 @@ use crate::auth;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub const TEST_ACCOUNT_NAME: &str = "kamu";
+pub const DEFAULT_ACCOUNT_NAME: &str = "kamu";
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -24,8 +24,8 @@ pub struct CurrentAccountSubject {
 impl CurrentAccountSubject {
     pub fn new_test() -> Self {
         CurrentAccountSubject::new(auth::AccountInfo {
-            name: TEST_ACCOUNT_NAME.to_string(),
-            login: AccountName::new_unchecked(TEST_ACCOUNT_NAME),
+            name: DEFAULT_ACCOUNT_NAME.to_string(),
+            login: AccountName::new_unchecked(DEFAULT_ACCOUNT_NAME),
             avatar_url: None,
         })
     }

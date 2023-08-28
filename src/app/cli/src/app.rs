@@ -45,7 +45,10 @@ pub async fn run(
     let workspace_svc = WorkspaceService::new(Arc::new(workspace_layout.clone()));
     let workspace_version = workspace_svc.workspace_version()?;
 
-    let current_account = AccountService::current_account_indication(&matches);
+    let current_account = AccountService::current_account_indication(
+        &matches,
+        workspace_svc.is_multi_tenant_workspace(),
+    );
 
     prepare_run_dir(&workspace_layout.run_info_dir);
 

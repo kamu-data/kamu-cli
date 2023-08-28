@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use kamu::domain::{auth, CurrentAccountSubject, TEST_ACCOUNT_NAME};
+use kamu::domain::{auth, CurrentAccountSubject, DEFAULT_ACCOUNT_NAME};
 use kamu::testing::LocalS3Server;
 use kamu::utils::s3_context::S3Context;
 use kamu::DatasetRepositoryS3;
@@ -65,7 +65,7 @@ async fn test_create_dataset_multi_tenant() {
 
     test_dataset_repository_shared::test_create_dataset(
         &repo,
-        Some(AccountName::new_unchecked(TEST_ACCOUNT_NAME)),
+        Some(AccountName::new_unchecked(DEFAULT_ACCOUNT_NAME)),
     )
     .await;
 }
@@ -118,7 +118,7 @@ async fn test_create_dataset_from_snapshot_multi_tenant() {
 
     test_dataset_repository_shared::test_create_dataset_from_snapshot(
         &repo,
-        Some(AccountName::new_unchecked(TEST_ACCOUNT_NAME)),
+        Some(AccountName::new_unchecked(DEFAULT_ACCOUNT_NAME)),
     )
     .await;
 }
@@ -154,7 +154,7 @@ async fn test_rename_dataset_multi_tenant() {
 
     test_dataset_repository_shared::test_rename_dataset(
         &repo,
-        Some(AccountName::new_unchecked(TEST_ACCOUNT_NAME)),
+        Some(AccountName::new_unchecked(DEFAULT_ACCOUNT_NAME)),
     )
     .await;
 }
@@ -217,7 +217,7 @@ async fn test_delete_dataset_multi_tenant() {
 
     test_dataset_repository_shared::test_delete_dataset(
         &repo,
-        Some(AccountName::new_unchecked(TEST_ACCOUNT_NAME)),
+        Some(AccountName::new_unchecked(DEFAULT_ACCOUNT_NAME)),
     )
     .await;
 }

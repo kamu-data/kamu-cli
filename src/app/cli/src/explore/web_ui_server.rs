@@ -44,7 +44,7 @@ struct WebUILoginInstructions {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct WebUIFeatureFlags {
-    enable_login: bool,
+    login_methods: Vec<String>,
     enable_logout: bool,
 }
 
@@ -87,7 +87,7 @@ impl WebUIServer {
                 .unwrap(),
             }),
             feature_flags: WebUIFeatureFlags {
-                enable_login: false,
+                login_methods: vec![], // no methods => user won't be able to login via UI features
                 enable_logout: false,
             },
         };

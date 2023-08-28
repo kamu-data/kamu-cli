@@ -13,7 +13,7 @@ use std::sync::Arc;
 use clap::ArgMatches;
 use dill::component;
 use internal_error::{InternalError, ResultIntoInternal};
-use kamu::domain::{auth, CurrentAccountSubject};
+use kamu::domain::{auth, CurrentAccountSubject, DEFAULT_ACCOUNT_NAME};
 use opendatafabric::AccountName;
 use serde::{Deserialize, Serialize};
 
@@ -45,17 +45,29 @@ impl AccountService {
         }
     }
 
-    fn default_account_name() -> String {
-        whoami::username()
+    fn default_account_name(multitenant_workspace: bool) -> String {
+        if multitenant_workspace {
+            whoami::username()
+        } else {
+            String::from(DEFAULT_ACCOUNT_NAME)
+        }
     }
 
-    fn default_user_name() -> String {
-        whoami::realname()
+    fn default_user_name(multitenant_workspace: bool) -> String {
+        if multitenant_workspace {
+            whoami::realname()
+        } else {
+            String::from(DEFAULT_ACCOUNT_NAME)
+        }
     }
 
-    pub fn current_account_indication(arg_matches: &ArgMatches) -> CurrentAccountIndication {
-        let default_account_name: String = AccountService::default_account_name();
-        let default_user_name: String = AccountService::default_user_name();
+    pub fn current_account_indication(
+        arg_matches: &ArgMatches,
+        multitenant_workspace: bool,
+    ) -> CurrentAccountIndication {
+        let default_account_name: String =
+            AccountService::default_account_name(multitenant_workspace);
+        let default_user_name: String = AccountService::default_user_name(multitenant_workspace);
 
         let (current_account, user_name, specified_explicitly) =
             if let Some(account) = arg_matches.get_one::<String>("account") {
