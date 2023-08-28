@@ -10,6 +10,7 @@
 use std::backtrace::Backtrace;
 use std::sync::Arc;
 
+use chrono::{DateTime, Utc};
 use container_runtime::ImagePullError;
 use opendatafabric::*;
 use thiserror::Error;
@@ -107,12 +108,13 @@ pub enum IngestStage {
     Commit,
 }
 
+#[allow(unused_variables)]
 pub trait IngestListener: Send + Sync {
     fn begin(&self) {}
-    fn on_stage_progress(&self, _stage: IngestStage, _progress: u64, _out_of: TotalSteps) {}
-
-    fn success(&self, _result: &IngestResult) {}
-    fn error(&self, _error: &IngestError) {}
+    fn on_cache_hit(&self, created_at: &DateTime<Utc>) {}
+    fn on_stage_progress(&self, stage: IngestStage, _progress: u64, _out_of: TotalSteps) {}
+    fn success(&self, result: &IngestResult) {}
+    fn error(&self, error: &IngestError) {}
 
     fn get_pull_image_listener(self: Arc<Self>) -> Option<Arc<dyn PullImageListener>> {
         None

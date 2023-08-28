@@ -9,7 +9,7 @@
 
 use chrono::{DateTime, SecondsFormat, Utc};
 use kamu_core::{InternalError, ResultIntoInternal};
-use opendatafabric::serde::yaml::{datetime_rfc3339_opt, SourceStateDef};
+use opendatafabric::serde::yaml::{datetime_rfc3339, datetime_rfc3339_opt, SourceStateDef};
 use opendatafabric::SourceState;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_with::skip_serializing_none;
@@ -93,12 +93,14 @@ impl PollingSourceState {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/// Used to cache the fetch results te resume without re-downloading data
+/// Used to cache the fetch results to resume without re-downloading data
 /// in case of errors in further ingestion steps.
 #[skip_serializing_none]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct FetchSavepoint {
+    #[serde(with = "datetime_rfc3339")]
+    pub created_at: DateTime<Utc>,
     #[serde(default, with = "PollingSourceState")]
     pub source_state: Option<PollingSourceState>,
     #[serde(default, with = "datetime_rfc3339_opt")]

@@ -36,7 +36,7 @@ pub struct WorkspaceLayout {
 }
 
 impl WorkspaceLayout {
-    pub const VERSION: WorkspaceVersion = WorkspaceVersion::V2_DatasetConfig;
+    pub const VERSION: WorkspaceVersion = WorkspaceVersion::V3_SavepointCreatedAt;
 
     pub fn new(root: impl Into<PathBuf>) -> Self {
         let root_dir = root.into();
@@ -82,6 +82,8 @@ pub enum WorkspaceVersion {
     V0_Initial,
     V1_WorkspaceCacheDir,
     V2_DatasetConfig,
+    // Added a `createdAt` field to fetch savepoints
+    V3_SavepointCreatedAt,
     Unknown(u32),
 }
 
@@ -98,6 +100,7 @@ impl From<u32> for WorkspaceVersion {
             0 => WorkspaceVersion::V0_Initial,
             1 => WorkspaceVersion::V1_WorkspaceCacheDir,
             2 => WorkspaceVersion::V2_DatasetConfig,
+            3 => WorkspaceVersion::V3_SavepointCreatedAt,
             _ => WorkspaceVersion::Unknown(value),
         }
     }
@@ -109,6 +112,7 @@ impl Into<u32> for WorkspaceVersion {
             Self::V0_Initial => 0,
             Self::V1_WorkspaceCacheDir => 1,
             Self::V2_DatasetConfig => 2,
+            Self::V3_SavepointCreatedAt => 3,
             Self::Unknown(value) => value,
         }
     }

@@ -11,6 +11,7 @@ use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+use chrono::{DateTime, Utc};
 use kamu::domain::*;
 use opendatafabric::*;
 use url::Url;
@@ -511,6 +512,23 @@ impl PrettyIngestProgress {
 }
 
 impl IngestListener for PrettyIngestProgress {
+    fn on_cache_hit(&self, created_at: &DateTime<Utc>) {
+        let mut state = self.state.lock().unwrap();
+
+        state
+            .curr_progress
+            .finish_with_message(Self::spinner_message(
+                &self.dataset_handle,
+                IngestStage::Fetch as u32,
+                console::style(format!(
+                    "Using cached data from {} (use kamu system gc to clear cache)",
+                    chrono_humanize::HumanTime::from(*created_at - Utc::now())
+                ))
+                .yellow(),
+            ));
+        state.curr_progress = self.multi_progress.add(Self::new_spinner(""));
+    }
+
     fn on_stage_progress(&self, stage: IngestStage, n: u64, out_of: TotalSteps) {
         let mut state = self.state.lock().unwrap();
         state.stage = stage;

@@ -288,6 +288,9 @@ impl IngestTask {
 
         if let Some(savepoint) = savepoint {
             tracing::info!(?savepoint_path, "Resuming from savepoint");
+
+            self.listener.on_cache_hit(&savepoint.created_at);
+
             Ok(FetchStepResult::Updated(savepoint))
         } else {
             // Just in case user deleted it manually
@@ -316,7 +319,8 @@ impl IngestTask {
                 FetchResult::UpToDate => Ok(FetchStepResult::UpToDate),
                 FetchResult::Updated(upd) => {
                     let savepoint = FetchSavepoint {
-                        // If fetch source was overridden we don't want to put its
+                        created_at: self.request.system_time.clone(),
+                        // If fetch source was overridden, we don't want to put its
                         // source state into the metadata.
                         source_state: if self.fetch_override.is_none() {
                             upd.source_state

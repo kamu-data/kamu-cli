@@ -340,6 +340,9 @@ impl IngestServiceImpl {
 
         if let Some(savepoint) = savepoint {
             tracing::info!(?savepoint_path, "Resuming from savepoint");
+
+            args.listener.on_cache_hit(&savepoint.created_at);
+
             Ok(FetchStepResult::Updated(savepoint))
         } else {
             // Just in case user deleted it manually
@@ -370,6 +373,7 @@ impl IngestServiceImpl {
                 FetchResult::UpToDate => Ok(FetchStepResult::UpToDate),
                 FetchResult::Updated(upd) => {
                     let savepoint = FetchSavepoint {
+                        created_at: args.system_time.clone(),
                         // If fetch source was overridden we don't want to put its
                         // source state into the metadata.
                         source_state: if args.fetch_override.is_none() {
