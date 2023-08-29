@@ -31,11 +31,11 @@ impl SystemTimeSource for SystemTimeSourceDefault {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct SystemTimeSourceMock {
+pub struct SystemTimeSourceStub {
     t: Mutex<DateTime<Utc>>,
 }
 
-impl SystemTimeSourceMock {
+impl SystemTimeSourceStub {
     pub fn new(t: DateTime<Utc>) -> Self {
         Self { t: Mutex::new(t) }
     }
@@ -45,7 +45,7 @@ impl SystemTimeSourceMock {
     }
 }
 
-impl SystemTimeSource for SystemTimeSourceMock {
+impl SystemTimeSource for SystemTimeSourceStub {
     fn now(&self) -> DateTime<Utc> {
         (*self.t.lock().unwrap()).clone()
     }

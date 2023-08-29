@@ -15,6 +15,7 @@ use chrono::{TimeZone, Utc};
 use container_runtime::ContainerRuntime;
 use datafusion::parquet::record::RowAccessor;
 use datafusion::prelude::*;
+use domain::auth::DatasetActionAuthorizer;
 use futures::StreamExt;
 use indoc::indoc;
 use itertools::Itertools;
@@ -109,7 +110,7 @@ async fn test_ingest_legacy_spark() {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(containerized, engine, ingest, datafusion)]
+#[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_ingest_datafusion_snapshot() {
     let harness = IngestTestHarness::new();
@@ -321,7 +322,7 @@ async fn test_ingest_datafusion_snapshot() {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(containerized, engine, ingest, datafusion)]
+#[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_ingest_datafusion_ledger() {
     let harness = IngestTestHarness::new();
@@ -550,7 +551,7 @@ async fn test_ingest_datafusion_ledger() {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(containerized, engine, ingest, datafusion)]
+#[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_ingest_datafusion_empty_data() {
     let harness = IngestTestHarness::new();
@@ -610,7 +611,7 @@ async fn test_ingest_datafusion_empty_data() {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(containerized, engine, ingest, datafusion)]
+#[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_ingest_datafusion_event_time_as_date() {
     let harness = IngestTestHarness::new();
@@ -723,7 +724,7 @@ async fn test_ingest_datafusion_event_time_as_date() {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(containerized, engine, ingest, datafusion)]
+#[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_ingest_datafusion_event_time_of_invalid_type() {
     let harness = IngestTestHarness::new();
@@ -794,7 +795,7 @@ async fn test_ingest_datafusion_event_time_of_invalid_type() {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(containerized, engine, ingest, datafusion)]
+#[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_ingest_datafusion_bad_column_names_preserve() {
     let harness = IngestTestHarness::new();
@@ -891,7 +892,7 @@ async fn test_ingest_datafusion_bad_column_names_preserve() {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(containerized, engine, ingest, datafusion)]
+#[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_ingest_datafusion_bad_column_names_rename() {
     let harness = IngestTestHarness::new();
@@ -987,24 +988,79 @@ async fn test_ingest_datafusion_bad_column_names_rename() {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_group::group(engine, ingest, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_ingest_checks_auth() {
+    let harness = IngestTestHarness::new_with_authorizer(Arc::new(
+        crate::mock_dataset_action_authorizer::MockDatasetActionAuthorizer::new()
+            .expect_check_write_dataset(
+                DatasetAlias::new(None, DatasetName::new_unchecked("foo.bar")),
+                1,
+            ),
+    ));
+    let src_path = harness.temp_dir.path().join("data.json");
+
+    let dataset_snapshot = MetadataFactory::dataset_snapshot()
+        .name("foo.bar")
+        .kind(DatasetKind::Root)
+        .push_event(
+            MetadataFactory::set_polling_source()
+                .fetch_file(&src_path)
+                .read(ReadStepNdJson {
+                    schema: Some(vec![
+                        "event_time TIMESTAMP".to_string(),
+                        "city STRING".to_string(),
+                        "population BIGINT".to_string(),
+                    ]),
+                    ..ReadStepNdJson::default()
+                })
+                .preprocess(TransformSql {
+                    engine: "datafusion".to_string(),
+                    version: None,
+                    query: Some("select * from input".to_string()),
+                    queries: None,
+                    temporal_tables: None,
+                })
+                .build(),
+        )
+        .build();
+
+    let dataset_name = dataset_snapshot.name.clone();
+
+    harness.create_dataset(dataset_snapshot).await;
+
+    std::fs::write(
+        &src_path,
+        r#"{"event_time": "2020-01-01T12:00:00", "city": "A", "population": 1000}"#,
+    )
+    .unwrap();
+
+    harness.ingest(&dataset_name).await.unwrap();
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
 struct IngestTestHarness {
     temp_dir: TempDir,
     dataset_repo: Arc<DatasetRepositoryLocalFs>,
     ingest_svc: Arc<IngestServiceImpl>,
-    time_source: Arc<SystemTimeSourceMock>,
+    time_source: Arc<SystemTimeSourceStub>,
     ctx: SessionContext,
 }
 
 impl IngestTestHarness {
     fn new() -> Self {
+        Self::new_with_authorizer(Arc::new(
+            kamu_core::auth::AlwaysHappyDatasetActionAuthorizer::new(),
+        ))
+    }
+
+    fn new_with_authorizer(dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>) -> Self {
         let temp_dir = tempfile::tempdir().unwrap();
         let run_info_dir = temp_dir.path().join("run");
         let cache_dir = temp_dir.path().join("cache");
         std::fs::create_dir(&run_info_dir).unwrap();
         std::fs::create_dir(&cache_dir).unwrap();
-
-        let dataset_action_authorizer =
-            Arc::new(kamu_core::auth::AlwaysHappyDatasetActionAuthorizer::new());
 
         let dataset_repo = Arc::new(
             DatasetRepositoryLocalFs::create(
@@ -1023,7 +1079,7 @@ impl IngestTestHarness {
             run_info_dir.clone(),
         ));
 
-        let time_source = Arc::new(SystemTimeSourceMock::new(
+        let time_source = Arc::new(SystemTimeSourceStub::new(
             Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap(),
         ));
 
