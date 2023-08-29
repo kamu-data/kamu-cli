@@ -24,9 +24,12 @@ use crate::CommitError;
 /// to commit data into a dataset in bitemporal ledger form.
 #[async_trait::async_trait]
 pub trait DataWriter {
+    // TODO: Avoid using Option<> and create empty DataFrame instead.
+    // This would require us always knowing what the schema of data is (e.g. before
+    // the first ingest run).
     async fn write(
         &mut self,
-        new_data: DataFrame,
+        new_data: Option<DataFrame>,
         opts: WriteDataOpts,
     ) -> Result<WriteDataResult, WriteDataError>;
 }

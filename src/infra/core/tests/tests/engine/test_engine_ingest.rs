@@ -512,7 +512,7 @@ async fn test_ingest_datafusion_ledger() {
         Some("2021-01-01T00:00:00+00:00".to_string())
     );
 
-    // Round 4 (no-op, only updates source state)
+    // Round 4 (duplicate data, commit only updates the source state)
     std::fs::write(
         &src_path,
         indoc!(
@@ -532,6 +532,79 @@ async fn test_ingest_datafusion_ledger() {
         event.output_watermark.map(|dt| dt.to_rfc3339()),
         Some("2021-01-01T00:00:00+00:00".to_string())
     );
+    assert!(event.source_state.is_some());
+
+    // Round 5 (empty data, commit only updates the source state)
+    std::fs::write(&src_path, "").unwrap();
+
+    harness.ingest(&dataset_name).await.unwrap();
+    let event = harness.get_last_data_block(&dataset_name).await.event;
+
+    assert_eq!(event.output_data, None);
+    assert_eq!(
+        event.output_watermark.map(|dt| dt.to_rfc3339()),
+        Some("2021-01-01T00:00:00+00:00".to_string())
+    );
+    assert!(event.source_state.is_some());
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(containerized, engine, ingest, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_ingest_datafusion_empty_data() {
+    let harness = IngestTestHarness::new();
+    let src_path = harness.temp_dir.path().join("data.csv");
+
+    let dataset_snapshot = MetadataFactory::dataset_snapshot()
+        .name("foo.bar")
+        .kind(DatasetKind::Root)
+        .push_event(
+            MetadataFactory::set_polling_source()
+                .fetch(FetchStep::Url(FetchStepUrl {
+                    url: url::Url::from_file_path(&src_path)
+                        .unwrap()
+                        .as_str()
+                        .to_owned(),
+                    event_time: Some(EventTimeSource::FromSystemTime),
+                    cache: None,
+                    headers: None,
+                }))
+                .read(ReadStep::Csv(ReadStepCsv {
+                    header: Some(false),
+                    schema: None,
+                    ..ReadStepCsv::default()
+                }))
+                .preprocess(TransformSql {
+                    engine: "datafusion".to_string(),
+                    version: None,
+                    query: Some("select date, city, population from input".to_string()),
+                    queries: None,
+                    temporal_tables: None,
+                })
+                .merge(MergeStrategyLedger {
+                    primary_key: vec!["date".to_string(), "city".to_string()],
+                })
+                .build(),
+        )
+        .push_event(SetVocab {
+            system_time_column: None,
+            event_time_column: Some("date".to_string()),
+            offset_column: None,
+        })
+        .build();
+
+    let dataset_name = dataset_snapshot.name.clone();
+
+    harness.create_dataset(dataset_snapshot).await;
+
+    std::fs::write(&src_path, "").unwrap();
+    harness.ingest(&dataset_name).await.unwrap();
+
+    // Should only containe source state
+    let event = harness.get_last_data_block(&dataset_name).await.event;
+    assert_eq!(event.output_data, None);
+    assert_eq!(event.output_watermark, None);
     assert!(event.source_state.is_some());
 }
 

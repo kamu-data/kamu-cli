@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.141.0] - 2023-08-28
+### Fixed
+- `datafusion` ingest will not crash on empty inputs when schema inference is enabled
+### Added
+- Added a warning when fetch cache is used to resume ingest: `Using cached data from X minutes ago (use kamu system gc to clear cache)`
+
 ## [0.140.0] - 2023-08-27
 ### Added
 - **Experimental:** Data ingest using `DataFusion` engine

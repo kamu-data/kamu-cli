@@ -426,21 +426,27 @@ impl Harness {
         schema: &str,
         source_state: Option<odf::SourceState>,
     ) -> Result<WriteDataResult, WriteDataError> {
-        let data_path = self.temp_dir.path().join("data.bin");
-        std::fs::write(&data_path, data).unwrap();
+        let df = if data.len() == 0 {
+            None
+        } else {
+            let data_path = self.temp_dir.path().join("data.bin");
+            std::fs::write(&data_path, data).unwrap();
 
-        let df = ReaderCsv::new()
-            .read(
-                &self.ctx,
-                &data_path,
-                &odf::ReadStep::Csv(odf::ReadStepCsv {
-                    header: Some(true),
-                    schema: Some(schema.split(',').map(|s| s.to_string()).collect()),
-                    ..Default::default()
-                }),
-            )
-            .await
-            .unwrap();
+            let df = ReaderCsv::new()
+                .read(
+                    &self.ctx,
+                    &data_path,
+                    &odf::ReadStep::Csv(odf::ReadStepCsv {
+                        header: Some(true),
+                        schema: Some(schema.split(',').map(|s| s.to_string()).collect()),
+                        ..Default::default()
+                    }),
+                )
+                .await
+                .unwrap();
+
+            Some(df)
+        };
 
         self.writer
             .write(

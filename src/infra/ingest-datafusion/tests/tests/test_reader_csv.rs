@@ -148,6 +148,50 @@ async fn test_read_csv_no_schema_infer() {
 
 #[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
+async fn test_read_csv_no_header() {
+    test_reader_common::test_reader_success_textual(
+        ReaderCsv {},
+        ReadStepCsv {
+            schema: Some(vec![
+                "city STRING".to_string(),
+                "population BIGINT".to_string(),
+            ]),
+            ..Default::default()
+        },
+        indoc!(
+            r#"
+            A,1000
+            B,2000
+            C,3000
+            "#
+        ),
+        indoc!(
+            r#"
+            message arrow_schema {
+              OPTIONAL BYTE_ARRAY city (STRING);
+              OPTIONAL INT64 population;
+            }
+            "#
+        ),
+        indoc!(
+            r#"
+            +------+------------+
+            | city | population |
+            +------+------------+
+            | A    | 1000       |
+            | B    | 2000       |
+            | C    | 3000       |
+            +------+------------+
+            "#
+        ),
+    )
+    .await;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, ingest, datafusion)]
+#[test_log::test(tokio::test)]
 async fn test_read_csv_null_values() {
     test_reader_common::test_reader_success_textual(
         ReaderCsv {},

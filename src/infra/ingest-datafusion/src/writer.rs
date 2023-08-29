@@ -434,50 +434,67 @@ impl DataWriterDataFusion {
 impl DataWriter for DataWriterDataFusion {
     async fn write(
         &mut self,
-        new_data: DataFrame,
+        new_data: Option<DataFrame>,
         opts: WriteDataOpts,
     ) -> Result<WriteDataResult, WriteDataError> {
-        self.validate_input(&new_data)?;
+        let (add_data, data_file) = if let Some(new_data) = new_data {
+            self.validate_input(&new_data)?;
 
-        // Normalize timestamps
-        let df = self.normalize_raw_result(new_data)?;
+            // Normalize timestamps
+            let df = self.normalize_raw_result(new_data)?;
 
-        // Merge step
-        // TODO: PERF: We could likely benefit from checkpointing here
-        let prev = self.get_all_previous_data(&self.meta.data_slices).await?;
+            // Merge step
+            // TODO: PERF: We could likely benefit from checkpointing here
+            let prev = self.get_all_previous_data(&self.meta.data_slices).await?;
 
-        let df = self.merge_strategy.merge(prev, df)?;
+            let df = self.merge_strategy.merge(prev, df)?;
 
-        tracing::debug!(
-            schema = ?df.schema(),
-            logical_plan = ?df.logical_plan(),
-            "Performing merge step",
-        );
+            tracing::debug!(
+                schema = ?df.schema(),
+                logical_plan = ?df.logical_plan(),
+                "Performing merge step",
+            );
 
-        // Add system columns
-        let df = self
-            .with_system_columns(
-                df,
-                opts.system_time,
-                opts.source_event_time,
-                self.meta.last_offset.map(|e| e + 1).unwrap_or(0),
-            )
-            .await?;
+            // Add system columns
+            let df = self
+                .with_system_columns(
+                    df,
+                    opts.system_time,
+                    opts.source_event_time,
+                    self.meta.last_offset.map(|e| e + 1).unwrap_or(0),
+                )
+                .await?;
 
-        tracing::info!(schema = ?df.schema(), "Final output schema");
+            tracing::info!(schema = ?df.schema(), "Final output schema");
 
-        // Write output
-        let data_file = self.write_output(opts.data_staging_path, df).await?;
+            // Write output
+            let data_file = self.write_output(opts.data_staging_path, df).await?;
 
-        // Prepare commit info
-        let add_data = self
-            .compute_offset_and_watermark(
-                data_file.as_path(),
-                self.meta.last_watermark.clone(),
-                self.meta.last_checkpoint.clone(),
-                opts.source_state.clone(),
-            )
-            .await?;
+            // Prepare commit info
+            let add_data = self
+                .compute_offset_and_watermark(
+                    data_file.as_path(),
+                    self.meta.last_watermark.clone(),
+                    self.meta.last_checkpoint.clone(),
+                    opts.source_state.clone(),
+                )
+                .await?;
+
+            // Empty file will be cleaned up here
+            let data_file = add_data.output_data.as_ref().map(|_| data_file);
+
+            (add_data, data_file)
+        } else {
+            // TODO: Should watermark be advanced by the source event time?
+            let add_data = AddDataParams {
+                input_checkpoint: self.meta.last_checkpoint.clone(),
+                output_data: None,
+                output_watermark: self.meta.last_watermark.clone(),
+                source_state: opts.source_state.clone(),
+            };
+
+            (add_data, None)
+        };
 
         // Do we have anything to commit?
         if add_data.output_data.is_none()
@@ -486,9 +503,6 @@ impl DataWriter for DataWriterDataFusion {
         {
             return Err(WriteDataError::EmptyCommit(EmptyCommitError {}));
         }
-
-        // Empty file will be cleaned up here
-        let data_file = add_data.output_data.as_ref().map(|_| data_file);
 
         // Commit data
         let commit_result = self

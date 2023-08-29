@@ -256,17 +256,24 @@ impl IngestServiceImpl {
 
         args.listener
             .on_stage_progress(IngestStage::Prepare, 0, TotalSteps::Exact(1));
+
         let prepare_result = self.prepare(&args, &savepoint).await?;
 
         args.listener
             .on_stage_progress(IngestStage::Read, 0, TotalSteps::Exact(1));
+
         let df = self.read(&args, &prepare_result).await?;
 
         args.listener
             .on_stage_progress(IngestStage::Preprocess, 0, TotalSteps::Exact(1));
-        let df = self.preprocess(&args, df).await?;
 
-        self.validate_new_data(&df, args.data_writer.vocab())?;
+        let df = if let Some(df) = df {
+            let df = self.preprocess(&args, df).await?;
+            self.validate_new_data(&df, args.data_writer.vocab())?;
+            Some(df)
+        } else {
+            None
+        };
 
         args.listener
             .on_stage_progress(IngestStage::Merge, 0, TotalSteps::Exact(1));
@@ -487,8 +494,12 @@ impl IngestServiceImpl {
         &self,
         args: &IngestIterationArgs<'_>,
         prep_result: &PrepStepResult,
-    ) -> Result<DataFrame, IngestError> {
+    ) -> Result<Option<DataFrame>, IngestError> {
         let input_data_path = self.cache_dir.join(&prep_result.data_cache_key);
+
+        if input_data_path.metadata().int_err()?.len() == 0 {
+            return Ok(None);
+        }
 
         let reader = Self::get_reader_for(&args.polling_source.read, &args.operation_dir);
 
@@ -496,7 +507,7 @@ impl IngestServiceImpl {
             .read(&args.ctx, &input_data_path, &args.polling_source.read)
             .await?;
 
-        Ok(df)
+        Ok(Some(df))
     }
 
     // TODO: Replace with DI
