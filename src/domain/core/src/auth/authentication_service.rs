@@ -41,10 +41,10 @@ pub struct LoginResponse {
 #[derive(Debug, Error)]
 pub enum LoginError {
     #[error(transparent)]
-    UnknownMethod(
+    UnsupportedMethod(
         #[from]
         #[backtrace]
-        UnknownLoginMethodError,
+        UnsupportedLoginMethodError,
     ),
 
     #[error(transparent)]
@@ -70,8 +70,8 @@ pub enum LoginError {
 }
 
 #[derive(Debug, Error)]
-#[error("Unknown login method {method}")]
-pub struct UnknownLoginMethodError {
+#[error("Unsupported login method '{method}'")]
+pub struct UnsupportedLoginMethodError {
     pub method: String,
 }
 

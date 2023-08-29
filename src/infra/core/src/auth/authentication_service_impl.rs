@@ -75,10 +75,10 @@ impl AuthenticationServiceImpl {
     fn resolve_authentication_provider(
         &self,
         login_method: &str,
-    ) -> Result<Arc<dyn AuthenticationProvider>, UnknownLoginMethodError> {
+    ) -> Result<Arc<dyn AuthenticationProvider>, UnsupportedLoginMethodError> {
         match self.authentication_providers_by_method.get(login_method) {
             Some(provider) => Ok(provider.clone()),
-            None => Err(UnknownLoginMethodError {
+            None => Err(UnsupportedLoginMethodError {
                 method: login_method.into(),
             }),
         }
