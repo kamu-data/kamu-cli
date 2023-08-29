@@ -13,6 +13,7 @@ use opendatafabric as odf;
 use crate::mutations::DatasetMut;
 use crate::prelude::*;
 use crate::queries::Dataset;
+use crate::LoggedInGuard;
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -32,6 +33,7 @@ impl DatasetsMut {
     }
 
     /// Creates a new empty dataset
+    #[graphql(guard = "LoggedInGuard::new()")]
     async fn create_empty(
         &self,
         ctx: &Context<'_>,
@@ -63,6 +65,7 @@ impl DatasetsMut {
     }
 
     /// Creates a new dataset from provided DatasetSnapshot manifest
+    #[graphql(guard = "LoggedInGuard::new()")]
     async fn create_from_snapshot(
         &self,
         ctx: &Context<'_>,

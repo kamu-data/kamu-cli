@@ -91,6 +91,22 @@ impl Mutation {
     }
 }
 
+#[derive(Clone, Debug)]
+pub struct AccessToken {
+    pub token: String,
+}
+
+impl AccessToken {
+    pub fn new<S>(token: S) -> Self
+    where
+        S: Into<String>,
+    {
+        Self {
+            token: token.into(),
+        }
+    }
+}
+
 pub type Schema = async_graphql::Schema<Query, Mutation, EmptySubscription>;
 pub type SchemaBuilder = async_graphql::SchemaBuilder<Query, Mutation, EmptySubscription>;
 

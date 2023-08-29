@@ -13,6 +13,7 @@ use async_graphql::*;
 use indoc::indoc;
 use kamu::testing::MetadataFactory;
 use kamu::*;
+use kamu_adapter_graphql::AccessToken;
 use kamu_core::*;
 use opendatafabric::serde::yaml::YamlMetadataEventSerializer;
 use opendatafabric::*;
@@ -31,6 +32,8 @@ async fn metadata_chain_append_event() {
     let cat = dill::CatalogBuilder::new()
         .add_value(dataset_repo)
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+        .add_value(kamu::testing::MockAuthenticationService::built_in())
+        .bind::<dyn auth::AuthenticationService, kamu::testing::MockAuthenticationService>()
         .build();
 
     let dataset_repo = cat.get_one::<dyn DatasetRepository>().unwrap();
@@ -54,11 +57,19 @@ async fn metadata_chain_append_event() {
     )
     .to_string();
 
+    let authentication_svc = cat.get_one::<dyn auth::AuthenticationService>().unwrap();
+    let access_token = authentication_svc
+        .login("test", String::from("<dummy>"))
+        .await
+        .unwrap()
+        .access_token;
+
     let schema = kamu_adapter_graphql::schema(cat);
     let res = schema
         .execute(
-            indoc!(
-                r#"
+            async_graphql::Request::new(
+                indoc!(
+                    r#"
                 mutation {
                     datasets {
                         byId (datasetId: "<id>") {
@@ -78,9 +89,11 @@ async fn metadata_chain_append_event() {
                     }
                 }
                 "#
+                )
+                .replace("<id>", &create_result.dataset_handle.id.to_string())
+                .replace("<content>", &event_yaml.escape_default().to_string()),
             )
-            .replace("<id>", &create_result.dataset_handle.id.to_string())
-            .replace("<content>", &event_yaml.escape_default().to_string()),
+            .data(AccessToken::new(access_token)),
         )
         .await;
     assert!(res.is_ok(), "{:?}", res);
@@ -116,6 +129,8 @@ async fn metadata_update_readme_new() {
     let cat = dill::CatalogBuilder::new()
         .add_value(dataset_repo)
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+        .add_value(kamu::testing::MockAuthenticationService::built_in())
+        .bind::<dyn auth::AuthenticationService, kamu::testing::MockAuthenticationService>()
         .build();
 
     let dataset_repo = cat.get_one::<dyn DatasetRepository>().unwrap();
@@ -132,6 +147,13 @@ async fn metadata_update_readme_new() {
 
     let dataset = create_result.dataset.clone();
 
+    let authentication_svc = cat.get_one::<dyn auth::AuthenticationService>().unwrap();
+    let access_token = authentication_svc
+        .login("test", String::from("<dummy>"))
+        .await
+        .unwrap()
+        .access_token;
+
     let schema = kamu_adapter_graphql::schema(cat);
 
     /////////////////////////////////////
@@ -140,8 +162,9 @@ async fn metadata_update_readme_new() {
 
     let res = schema
         .execute(
-            indoc!(
-                r#"
+            async_graphql::Request::new(
+                indoc!(
+                    r#"
                 mutation {
                     datasets {
                         byId (datasetId: "<id>") {
@@ -154,8 +177,10 @@ async fn metadata_update_readme_new() {
                     }
                 }
                 "#
+                )
+                .replace("<id>", &create_result.dataset_handle.id.to_string()),
             )
-            .replace("<id>", &create_result.dataset_handle.id.to_string()),
+            .data(AccessToken::new(access_token.clone())),
         )
         .await;
 
@@ -198,8 +223,9 @@ async fn metadata_update_readme_new() {
 
     let res = schema
         .execute(
-            indoc!(
-                r#"
+            async_graphql::Request::new(
+                indoc!(
+                    r#"
                 mutation {
                     datasets {
                         byId (datasetId: "<id>") {
@@ -212,8 +238,10 @@ async fn metadata_update_readme_new() {
                     }
                 }
                 "#
+                )
+                .replace("<id>", &create_result.dataset_handle.id.to_string()),
             )
-            .replace("<id>", &create_result.dataset_handle.id.to_string()),
+            .data(AccessToken::new(access_token.clone())),
         )
         .await;
 
@@ -233,8 +261,9 @@ async fn metadata_update_readme_new() {
 
     let res = schema
         .execute(
-            indoc!(
-                r#"
+            async_graphql::Request::new(
+                indoc!(
+                    r#"
                 mutation {
                     datasets {
                         byId (datasetId: "<id>") {
@@ -247,8 +276,10 @@ async fn metadata_update_readme_new() {
                     }
                 }
                 "#
+                )
+                .replace("<id>", &create_result.dataset_handle.id.to_string()),
             )
-            .replace("<id>", &create_result.dataset_handle.id.to_string()),
+            .data(AccessToken::new(access_token.clone())),
         )
         .await;
 
@@ -283,8 +314,9 @@ async fn metadata_update_readme_new() {
 
     let res = schema
         .execute(
-            indoc!(
-                r#"
+            async_graphql::Request::new(
+                indoc!(
+                    r#"
                 mutation {
                     datasets {
                         byId (datasetId: "<id>") {
@@ -297,8 +329,10 @@ async fn metadata_update_readme_new() {
                     }
                 }
                 "#
+                )
+                .replace("<id>", &create_result.dataset_handle.id.to_string()),
             )
-            .replace("<id>", &create_result.dataset_handle.id.to_string()),
+            .data(AccessToken::new(access_token)),
         )
         .await;
 

@@ -11,6 +11,7 @@ use kamu_task_system as ts;
 
 use crate::prelude::*;
 use crate::queries::Task;
+use crate::LoggedInGuard;
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -22,6 +23,7 @@ pub struct TasksMut;
 #[Object]
 impl TasksMut {
     /// Requests cancellation of the specified task
+    #[graphql(guard = "LoggedInGuard::new()")]
     async fn cancel_task(&self, ctx: &Context<'_>, task_id: TaskID) -> Result<Task> {
         let task_sched = from_catalog::<dyn ts::TaskScheduler>(ctx).unwrap();
         let task_state = task_sched.cancel_task(task_id.into()).await.int_err()?;
@@ -30,6 +32,7 @@ impl TasksMut {
 
     /// Schedules a task to update the specified dataset by performing polling
     /// ingest or a derivative transformation
+    #[graphql(guard = "LoggedInGuard::new()")]
     async fn create_update_dataset_task(
         &self,
         ctx: &Context<'_>,
@@ -47,6 +50,7 @@ impl TasksMut {
 
     /// Schedules a task to update the specified dataset by performing polling
     /// ingest or a derivative transformation
+    #[graphql(guard = "LoggedInGuard::new()")]
     async fn create_probe_task(
         &self,
         ctx: &Context<'_>,

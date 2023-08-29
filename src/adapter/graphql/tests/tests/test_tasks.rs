@@ -9,6 +9,8 @@
 
 use async_graphql::*;
 use chrono::Utc;
+use kamu_adapter_graphql::AccessToken;
+use kamu_core::auth;
 use kamu_task_system::*;
 use opendatafabric::DatasetID;
 
@@ -223,20 +225,33 @@ async fn test_task_create_update_dataset() {
     let cat = dill::CatalogBuilder::new()
         .add_value(task_sched_mock)
         .bind::<dyn TaskScheduler, MockTaskScheduler>()
+        .add_value(kamu::testing::MockAuthenticationService::built_in())
+        .bind::<dyn auth::AuthenticationService, kamu::testing::MockAuthenticationService>()
         .build();
 
+    let authentication_svc = cat.get_one::<dyn auth::AuthenticationService>().unwrap();
+    let access_token = authentication_svc
+        .login("test", String::from("<dummy>"))
+        .await
+        .unwrap()
+        .access_token;
+
     let schema = kamu_adapter_graphql::schema(cat);
+
     let res = schema
-        .execute(format!(
-            r#"mutation {{
-                tasks {{
-                    createUpdateDatasetTask (datasetId: "{}") {{
-                        taskId
+        .execute(
+            async_graphql::Request::new(format!(
+                r#"mutation {{
+                    tasks {{
+                        createUpdateDatasetTask (datasetId: "{}") {{
+                            taskId
+                        }}
                     }}
-                }}
-            }}"#,
-            dataset_id,
-        ))
+                }}"#,
+                dataset_id,
+            ))
+            .data(AccessToken::new(access_token)),
+        )
         .await;
     assert!(res.is_ok(), "{:?}", res);
     assert_eq!(
@@ -281,20 +296,32 @@ async fn test_task_create_probe() {
     let cat = dill::CatalogBuilder::new()
         .add_value(task_sched_mock)
         .bind::<dyn TaskScheduler, MockTaskScheduler>()
+        .add_value(kamu::testing::MockAuthenticationService::built_in())
+        .bind::<dyn auth::AuthenticationService, kamu::testing::MockAuthenticationService>()
         .build();
+
+    let authentication_svc = cat.get_one::<dyn auth::AuthenticationService>().unwrap();
+    let access_token = authentication_svc
+        .login("test", String::from("<dummy>"))
+        .await
+        .unwrap()
+        .access_token;
 
     let schema = kamu_adapter_graphql::schema(cat);
     let res = schema
-        .execute(format!(
-            r#"mutation {{
-                tasks {{
-                    createProbeTask (datasetId: "{}", busyTimeMs: 500, endWithOutcome: FAILED) {{
-                        taskId
+        .execute(
+            async_graphql::Request::new(format!(
+                r#"mutation {{
+                    tasks {{
+                        createProbeTask (datasetId: "{}", busyTimeMs: 500, endWithOutcome: FAILED) {{
+                            taskId
+                        }}
                     }}
-                }}
-            }}"#,
-            dataset_id,
-        ))
+                }}"#,
+                dataset_id,
+            ))
+            .data(AccessToken::new(access_token)),
+        )
         .await;
     assert!(res.is_ok(), "{:?}", res);
     assert_eq!(

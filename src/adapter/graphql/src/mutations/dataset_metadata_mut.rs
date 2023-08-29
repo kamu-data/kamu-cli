@@ -14,6 +14,7 @@ use opendatafabric::{AsTypedBlock, VariantOf};
 use super::{CommitResultAppendError, CommitResultSuccess, NoChanges};
 use crate::mutations::MetadataChainMut;
 use crate::prelude::*;
+use crate::LoggedInGuard;
 
 pub struct DatasetMetadataMut {
     dataset_handle: odf::DatasetHandle,
@@ -58,6 +59,8 @@ impl DatasetMetadataMut {
     }
 
     /// Updates or clears the dataset readme
+    #[graphql(guard = "LoggedInGuard::new()")]
+    // TODO: guard should include permission check
     async fn update_readme(
         &self,
         ctx: &Context<'_>,
@@ -154,3 +157,5 @@ pub enum UpdateReadmeResult {
     NoChanges(NoChanges),
     AppendError(CommitResultAppendError),
 }
+
+////////////////////////////////////////////////////////////////////////////////////////

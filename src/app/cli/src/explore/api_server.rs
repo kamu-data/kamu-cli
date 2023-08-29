@@ -100,9 +100,19 @@ async fn root() -> impl axum::response::IntoResponse {
 
 async fn graphql_handler(
     schema: axum::extract::Extension<kamu_adapter_graphql::Schema>,
+    maybe_access_token_header: Option<
+        axum::TypedHeader<axum::headers::Authorization<axum::headers::authorization::Bearer>>,
+    >,
     req: async_graphql_axum::GraphQLRequest,
 ) -> async_graphql_axum::GraphQLResponse {
-    schema.execute(req.into_inner()).await.into()
+    let req_inner = if let Some(th) = maybe_access_token_header {
+        req.into_inner()
+            .data(kamu_adapter_graphql::AccessToken::new(th.token()))
+    } else {
+        req.into_inner()
+    };
+
+    schema.execute(req_inner).await.into()
 }
 
 async fn graphql_playground() -> impl axum::response::IntoResponse {

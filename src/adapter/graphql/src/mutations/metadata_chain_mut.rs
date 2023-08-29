@@ -11,6 +11,7 @@ use kamu_core::{self as domain};
 use opendatafabric as odf;
 
 use crate::prelude::*;
+use crate::LoggedInGuard;
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
@@ -39,6 +40,8 @@ impl MetadataChainMut {
 
     /// Commits new event to the metadata chain
     #[tracing::instrument(level = "info", skip_all)]
+    // TODO: guard should include permission check
+    #[graphql(guard = "LoggedInGuard::new()")]
     async fn commit_event(
         &self,
         ctx: &Context<'_>,
@@ -136,3 +139,5 @@ impl NoChanges {
 pub struct CommitResultAppendError {
     pub message: String,
 }
+
+////////////////////////////////////////////////////////////////////////////////////////
