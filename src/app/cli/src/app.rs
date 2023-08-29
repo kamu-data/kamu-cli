@@ -72,7 +72,11 @@ pub async fn run(
         );
 
         let config = load_config(&workspace_layout);
-        register_config_in_catalog(&config, &mut catalog_builder);
+        register_config_in_catalog(
+            &config,
+            &mut catalog_builder,
+            workspace_svc.is_multi_tenant_workspace(),
+        );
 
         (guards, catalog_builder.build(), output_config)
     };
@@ -227,8 +231,11 @@ pub fn configure_catalog(
     b.add::<kamu_task_system_inmem::TaskSystemEventStoreInMemory>();
     b.bind::<dyn kamu_task_system_inmem::domain::TaskSystemEventStore, kamu_task_system_inmem::TaskSystemEventStoreInMemory>();
 
-    b.add::<kamu_adapter_oauth::OAuthGithub>();
-    b.bind::<dyn domain::auth::AuthenticationProvider, kamu_adapter_oauth::OAuthGithub>();
+    // No Github login possible for single-tenant workspace
+    if multi_tenant_workspace {
+        b.add::<kamu_adapter_oauth::OAuthGithub>();
+        b.bind::<dyn domain::auth::AuthenticationProvider, kamu_adapter_oauth::OAuthGithub>();
+    }
 
     b.add::<AuthenticationServiceImpl>();
     b.bind::<dyn domain::auth::AuthenticationService, AuthenticationServiceImpl>();
@@ -253,18 +260,22 @@ fn load_config(workspace_layout: &WorkspaceLayout) -> CLIConfig {
 }
 
 // Public only for tests
-pub fn register_config_in_catalog(config: &CLIConfig, catalog: &mut CatalogBuilder) {
+pub fn register_config_in_catalog(
+    config: &CLIConfig,
+    catalog_builder: &mut CatalogBuilder,
+    multi_tenant_workspace: bool,
+) {
     let network_ns = config.engine.as_ref().unwrap().network_ns.unwrap();
 
     // Registrer JupyterConfig used by some commands
-    catalog.add_value(config.frontend.as_ref().unwrap().jupyter.clone().unwrap());
+    catalog_builder.add_value(config.frontend.as_ref().unwrap().jupyter.clone().unwrap());
 
-    catalog.add_value(ContainerRuntimeConfig {
+    catalog_builder.add_value(ContainerRuntimeConfig {
         runtime: config.engine.as_ref().unwrap().runtime.unwrap(),
         network_ns,
     });
 
-    catalog.add_value(EngineProvisionerLocalConfig {
+    catalog_builder.add_value(EngineProvisionerLocalConfig {
         max_concurrency: config.engine.as_ref().unwrap().max_concurrency,
         start_timeout: config
             .engine
@@ -314,13 +325,23 @@ pub fn register_config_in_catalog(config: &CLIConfig, catalog: &mut CatalogBuild
 
     let ipfs_conf = config.protocol.as_ref().unwrap().ipfs.as_ref().unwrap();
 
-    catalog.add_value(IpfsGateway {
+    catalog_builder.add_value(IpfsGateway {
         url: ipfs_conf.http_gateway.clone().unwrap(),
         pre_resolve_dnslink: ipfs_conf.pre_resolve_dnslink.unwrap(),
     });
-    catalog.add_value(kamu::utils::ipfs_wrapper::IpfsClient::default());
+    catalog_builder.add_value(kamu::utils::ipfs_wrapper::IpfsClient::default());
 
-    catalog.add_value(config.users.clone().unwrap());
+    if multi_tenant_workspace {
+        catalog_builder.add_value(config.users.clone().unwrap());
+    } else {
+        if let Some(users) = &config.users {
+            if users.predefined.len() > 0 {
+                panic!("There cannot be predefined users in a single-tenant workspace");
+            }
+        }
+
+        catalog_builder.add_value(UsersConfig::single_tenant());
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

@@ -13,10 +13,11 @@ use std::path::{Path, PathBuf};
 use container_runtime::{ContainerRuntimeType, NetworkNamespaceType};
 use dill::*;
 use duration_string::DurationString;
-use kamu::domain::auth;
+use kamu::domain::{auth, DEFAULT_ACCOUNT_NAME, DEFAULT_AVATAR_URL};
 use kamu::utils::docker_images;
 use merge::Merge;
 use opendatafabric::serde::yaml::Manifest;
+use opendatafabric::AccountName;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 use url::Url;
@@ -324,17 +325,27 @@ impl Default for JupyterConfig {
 pub struct UsersConfig {
     #[merge(strategy = merge::vec::append)]
     pub predefined: Vec<auth::AccountInfo>,
+    pub allow_login_unknown: Option<bool>,
 }
 
 impl UsersConfig {
     pub fn new() -> Self {
-        Self {
-            predefined: Vec::new(),
-        }
+        Self::default()
     }
 
     fn sample() -> Self {
-        Self { ..Self::default() }
+        Self::default()
+    }
+
+    pub fn single_tenant() -> Self {
+        Self {
+            predefined: vec![auth::AccountInfo {
+                login: AccountName::new_unchecked(DEFAULT_ACCOUNT_NAME),
+                name: String::from(DEFAULT_ACCOUNT_NAME),
+                avatar_url: Some(String::from(DEFAULT_AVATAR_URL)),
+            }],
+            allow_login_unknown: Some(false),
+        }
     }
 }
 
@@ -342,6 +353,7 @@ impl Default for UsersConfig {
     fn default() -> Self {
         Self {
             predefined: Vec::new(),
+            allow_login_unknown: Some(true),
         }
     }
 }
