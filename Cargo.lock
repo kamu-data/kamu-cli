@@ -1980,9 +1980,9 @@ dependencies = [
 
 [[package]]
 name = "dill"
-version = "0.6.1"
+version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "13ecc60c899801b6268c4b0789a5f6a6e230665ab632ba4f0691ddf1c9946533"
+checksum = "c6cbaf217293b62a5f16340435108461ee85ffe1027a8362739bc627335c60ac"
 dependencies = [
  "dill-impl",
  "multimap",
@@ -1991,9 +1991,9 @@ dependencies = [
 
 [[package]]
 name = "dill-impl"
-version = "0.6.1"
+version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "45e4c74c299e72a87399ea685ac4c1220f001cfb655f56e81c0824bc63b8cc01"
+checksum = "ffcda37b765cf4a9dd545cfd720a09a32aa5d0546d1e02c1629289c3d2f9cce8"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3012,7 +3012,7 @@ version = "8.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6971da4d9c3aa03c3d8f3ff0f4155b534aad021292003895a469716b2a230378"
 dependencies = [
- "base64 0.21.2",
+ "base64 0.21.3",
  "pem",
  "ring",
  "serde",
@@ -5261,7 +5261,7 @@ dependencies = [
  "num-bigint",
  "num-traits",
  "thiserror",
- "time 0.3.27",
+ "time 0.3.28",
 ]
 
 [[package]]
