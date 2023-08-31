@@ -60,7 +60,7 @@ pub async fn run(
 
         let output_config = configure_output_format(&matches, &workspace_svc);
         catalog_builder.add_value(output_config.clone());
-        catalog_builder.add_value(current_account.as_current_account_subject());
+        catalog_builder.add_value(current_account.to_current_account_subject());
 
         let guards = configure_logging(&output_config, &workspace_layout);
         tracing::info!(

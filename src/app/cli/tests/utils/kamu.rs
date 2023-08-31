@@ -66,7 +66,7 @@ impl Kamu {
     pub async fn get_last_data_slice(&self, dataset_name: &DatasetName) -> ParquetReaderHelper {
         let dataset_repo = DatasetRepositoryLocalFs::new(
             self.workspace_layout.datasets_dir.clone(),
-            Arc::new(self.current_account.as_current_account_subject()),
+            Arc::new(self.current_account.to_current_account_subject()),
             Arc::new(domain::auth::AlwaysHappyDatasetActionAuthorizer::new()),
             false,
         );
@@ -164,7 +164,7 @@ impl Kamu {
     pub fn catalog(&self) -> dill::Catalog {
         let mut builder = kamu_cli::configure_catalog(&self.workspace_layout, false);
         builder.add_value(self.workspace_layout.clone());
-        builder.add_value(self.current_account.as_current_account_subject());
+        builder.add_value(self.current_account.to_current_account_subject());
         builder.build()
     }
 }

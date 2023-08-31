@@ -11,12 +11,13 @@ use core::panic;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use chrono::{Duration, Utc};
+use chrono::Duration;
 use dill::component;
 use internal_error::{ErrorIntoInternal, InternalError};
 use jsonwebtoken::errors::ErrorKind;
 use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
 use kamu_core::auth::*;
+use kamu_core::SystemTimeSource;
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
 use serde::{Deserialize, Serialize};
@@ -29,29 +30,30 @@ const KAMU_JWT_ALGORITHM: Algorithm = Algorithm::HS384;
 ///////////////////////////////////////////////////////////////////////////////
 
 pub struct AuthenticationServiceImpl {
-    kamu_jwt_secret: String,
+    time_source: Arc<dyn SystemTimeSource>,
+    encoding_key: EncodingKey,
+    decoding_key: DecodingKey,
     authentication_providers_by_method: HashMap<&'static str, Arc<dyn AuthenticationProvider>>,
 }
 
 #[component(pub)]
 impl AuthenticationServiceImpl {
-    pub fn new(authentication_providers: Vec<Arc<dyn AuthenticationProvider>>) -> Self {
+    pub fn new(
+        authentication_providers: Vec<Arc<dyn AuthenticationProvider>>,
+        time_source: Arc<dyn SystemTimeSource>,
+    ) -> Self {
         let kamu_jwt_secret = match std::env::var("KAMU_JWT_SECRET") {
             Ok(jwt_secret) => jwt_secret,
             Err(_) => Self::random_jwt_secret(),
         };
 
-        let mut service = Self {
-            authentication_providers_by_method: HashMap::new(),
-            kamu_jwt_secret,
-        };
+        let mut authentication_providers_by_method = HashMap::new();
 
         for authentication_provider in authentication_providers {
             let login_method = authentication_provider.login_method();
 
-            let insert_result = service
-                .authentication_providers_by_method
-                .insert(login_method, authentication_provider);
+            let insert_result =
+                authentication_providers_by_method.insert(login_method, authentication_provider);
 
             if let Some(_) = insert_result {
                 panic!(
@@ -61,7 +63,12 @@ impl AuthenticationServiceImpl {
             }
         }
 
-        service
+        Self {
+            time_source,
+            encoding_key: EncodingKey::from_secret(kamu_jwt_secret.as_bytes()),
+            decoding_key: DecodingKey::from_secret(kamu_jwt_secret.as_bytes()),
+            authentication_providers_by_method,
+        }
     }
 
     fn random_jwt_secret() -> String {
@@ -90,9 +97,10 @@ impl AuthenticationServiceImpl {
         login_method: &str,
         provider_credentials_json: String,
     ) -> Result<String, InternalError> {
+        let current_time = self.time_source.now();
         let claims = KamuAccessTokenClaims {
-            iat: Utc::now().timestamp() as usize,
-            exp: (Utc::now() + Duration::days(1)).timestamp() as usize,
+            iat: current_time.timestamp() as usize,
+            exp: (current_time + Duration::days(1)).timestamp() as usize,
             iss: String::from(KAMU_JWT_ISSUER),
             sub: subject,
             access_credentials: KamuAccessCredentials {
@@ -104,7 +112,7 @@ impl AuthenticationServiceImpl {
         encode(
             &Header::new(KAMU_JWT_ALGORITHM),
             &claims,
-            &EncodingKey::from_secret(self.kamu_jwt_secret.as_bytes()),
+            &self.encoding_key,
         )
         .map_err(|e| e.int_err())
     }
@@ -116,15 +124,12 @@ impl AuthenticationServiceImpl {
         let mut validation = Validation::new(KAMU_JWT_ALGORITHM);
         validation.set_issuer(vec![KAMU_JWT_ISSUER].as_slice());
 
-        let token_data = decode::<KamuAccessTokenClaims>(
-            &access_token,
-            &DecodingKey::from_secret(self.kamu_jwt_secret.as_bytes()),
-            &validation,
-        )
-        .map_err(|e| match *e.kind() {
-            ErrorKind::ExpiredSignature => AccessTokenError::Expired,
-            _ => AccessTokenError::Invalid(Box::new(e)),
-        })?;
+        let token_data =
+            decode::<KamuAccessTokenClaims>(&access_token, &self.decoding_key, &validation)
+                .map_err(|e| match *e.kind() {
+                    ErrorKind::ExpiredSignature => AccessTokenError::Expired,
+                    _ => AccessTokenError::Invalid(Box::new(e)),
+                })?;
 
         Ok(token_data.claims.access_credentials)
     }

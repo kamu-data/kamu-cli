@@ -46,6 +46,7 @@ pub struct CLIConfig {
     #[merge(strategy = merge_recursive)]
     pub frontend: Option<FrontendConfig>,
     /// Users configuration
+    #[merge(strategy = merge_recursive)]
     pub users: Option<UsersConfig>,
 }
 
