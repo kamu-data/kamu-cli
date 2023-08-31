@@ -15,9 +15,12 @@ use kamu_core::*;
 
 #[test_log::test(tokio::test)]
 async fn test_malformed_argument() {
-    let schema = kamu_adapter_graphql::schema(dill::CatalogBuilder::new().build());
-    let res = schema
-        .execute(indoc!(
+    let schema = kamu_adapter_graphql::schema();
+    let res = kamu_adapter_graphql::execute_query(
+        schema,
+        dill::CatalogBuilder::new().build(),
+        None,
+        indoc!(
             r#"
             {
                 datasets {
@@ -27,8 +30,9 @@ async fn test_malformed_argument() {
                 }
             }
             "#
-        ))
-        .await;
+        ),
+    )
+    .await;
 
     let mut json_resp = serde_json::to_value(res).unwrap();
 
@@ -67,9 +71,8 @@ async fn test_internal_error() {
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
         .build();
 
-    let schema = kamu_adapter_graphql::schema(cat);
-    let res = schema
-        .execute(indoc!(
+    let schema = kamu_adapter_graphql::schema();
+    let res = kamu_adapter_graphql::execute_query(schema, cat, None, indoc!(
             r#"
             {
                 datasets {
@@ -106,10 +109,8 @@ async fn test_internal_error() {
 #[should_panic]
 async fn test_handler_panics() {
     // Not expecting panic to be trapped - that's the job of an HTTP server
-    let schema = kamu_adapter_graphql::schema(dill::CatalogBuilder::new().build());
-
-    schema
-        .execute(indoc!(
+    let schema = kamu_adapter_graphql::schema();
+    kamu_adapter_graphql::execute_query(schema, dill::CatalogBuilder::new().build(), None, indoc!(
             r#"
             {
                 datasets {

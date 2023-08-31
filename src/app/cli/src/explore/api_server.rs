@@ -34,7 +34,7 @@ impl APIServer {
 
         let task_executor = catalog.get_one().unwrap();
 
-        let gql_schema = kamu_adapter_graphql::schema(catalog.clone());
+        let gql_schema = kamu_adapter_graphql::schema();
 
         let app = axum::Router::new()
             .route("/", axum::routing::get(root))
@@ -100,19 +100,18 @@ async fn root() -> impl axum::response::IntoResponse {
 
 async fn graphql_handler(
     schema: axum::extract::Extension<kamu_adapter_graphql::Schema>,
+    catalog: axum::extract::Extension<dill::Catalog>,
     maybe_access_token_header: Option<
         axum::TypedHeader<axum::headers::Authorization<axum::headers::authorization::Bearer>>,
     >,
     req: async_graphql_axum::GraphQLRequest,
 ) -> async_graphql_axum::GraphQLResponse {
-    let req_inner = if let Some(th) = maybe_access_token_header {
-        req.into_inner()
-            .data(kamu_adapter_graphql::AccessToken::new(th.token()))
-    } else {
-        req.into_inner()
-    };
+    let maybe_access_token =
+        maybe_access_token_header.map(|th| kamu_adapter_graphql::AccessToken::new(th.token()));
 
-    schema.execute(req_inner).await.into()
+    kamu_adapter_graphql::execute_query(schema.0, catalog.0, maybe_access_token, req.into_inner())
+        .await
+        .into()
 }
 
 async fn graphql_playground() -> impl axum::response::IntoResponse {

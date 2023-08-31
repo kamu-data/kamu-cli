@@ -111,14 +111,34 @@ pub type Schema = async_graphql::Schema<Query, Mutation, EmptySubscription>;
 pub type SchemaBuilder = async_graphql::SchemaBuilder<Query, Mutation, EmptySubscription>;
 
 /// Returns schema builder without any extensions
-pub fn schema_builder(catalog: dill::Catalog) -> SchemaBuilder {
-    Schema::build(Query, Mutation, EmptySubscription).data(catalog)
+pub fn schema_builder() -> SchemaBuilder {
+    Schema::build(Query, Mutation, EmptySubscription)
 }
 
 /// Returns schema preconfigured with default extensions
-pub fn schema(catalog: dill::Catalog) -> Schema {
-    schema_builder(catalog)
+pub fn schema() -> Schema {
+    schema_builder()
         .extension(Tracing)
         .extension(extensions::ApolloTracing)
         .finish()
+}
+
+/// Executes GraphQL query
+pub async fn execute_query(
+    schema: Schema,
+    catalog: dill::Catalog,
+    maybe_access_token: Option<AccessToken>,
+    req: impl Into<Request>,
+) -> async_graphql::Response {
+    let req = req.into();
+
+    let req = if let Some(access_token) = maybe_access_token {
+        req.data(access_token)
+    } else {
+        req
+    };
+
+    let req = req.data(catalog);
+
+    schema.execute(req).await
 }

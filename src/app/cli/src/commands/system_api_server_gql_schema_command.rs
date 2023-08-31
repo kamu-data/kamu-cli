@@ -7,22 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use dill::Catalog;
-
 use super::{CLIError, Command};
 
-pub struct APIServerGqlSchemaCommand {
-    catalog: Catalog,
-}
+pub struct APIServerGqlSchemaCommand {}
 
 impl APIServerGqlSchemaCommand {
-    pub fn new(catalog: Catalog) -> Self {
-        Self { catalog }
-    }
-
     pub fn get_schema(&self) -> String {
-        // TODO: Cloning catalog is too expensive currently
-        let gql_schema = kamu_adapter_graphql::schema(self.catalog.clone());
+        let gql_schema = kamu_adapter_graphql::schema();
         gql_schema.sdl()
     }
 }

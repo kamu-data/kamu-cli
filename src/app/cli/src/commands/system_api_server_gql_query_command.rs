@@ -30,9 +30,15 @@ impl APIServerGqlQueryCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for APIServerGqlQueryCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
-        // TODO: Cloning catalog is too expensive currently
-        let gql_schema = kamu_adapter_graphql::schema(self.catalog.clone());
-        let response = gql_schema.execute(&self.query).await;
+        // Access token?
+        let gql_schema = kamu_adapter_graphql::schema();
+        let response = kamu_adapter_graphql::execute_query(
+            gql_schema,
+            self.catalog.clone(),
+            None,
+            &self.query,
+        )
+        .await;
 
         let data = if self.full {
             serde_json::to_string_pretty(&response).unwrap()

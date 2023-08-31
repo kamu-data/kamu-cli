@@ -44,10 +44,12 @@ async fn query() {
         .await
         .unwrap();
 
-    let schema = kamu_adapter_graphql::schema(cat);
-    let res = schema
-        .execute(
-            "
+    let schema = kamu_adapter_graphql::schema();
+    let res = kamu_adapter_graphql::execute_query(
+        schema.clone(),
+        cat.clone(),
+        None,
+        "
         {
             search {
               query(query: \"bar\") {
@@ -67,8 +69,8 @@ async fn query() {
             }
           }
         ",
-        )
-        .await;
+    )
+    .await;
     assert!(res.is_ok());
     assert_eq!(
         res.data,
@@ -87,9 +89,11 @@ async fn query() {
         })
     );
 
-    let res = schema
-        .execute(
-            "
+    let res = kamu_adapter_graphql::execute_query(
+        schema,
+        cat,
+        None,
+        "
         {
             search {
               query(query: \"foo\") {
@@ -109,8 +113,8 @@ async fn query() {
             }
           }
         ",
-        )
-        .await;
+    )
+    .await;
     assert!(res.is_ok());
     assert_eq!(
         res.data,

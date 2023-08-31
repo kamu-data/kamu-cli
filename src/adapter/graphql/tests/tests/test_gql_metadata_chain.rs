@@ -64,12 +64,13 @@ async fn metadata_chain_append_event() {
         .unwrap()
         .access_token;
 
-    let schema = kamu_adapter_graphql::schema(cat);
-    let res = schema
-        .execute(
-            async_graphql::Request::new(
-                indoc!(
-                    r#"
+    let schema = kamu_adapter_graphql::schema();
+    let res = kamu_adapter_graphql::execute_query(
+        schema,
+        cat,
+        Some(AccessToken::new(access_token)),
+        indoc!(
+            r#"
                 mutation {
                     datasets {
                         byId (datasetId: "<id>") {
@@ -89,13 +90,11 @@ async fn metadata_chain_append_event() {
                     }
                 }
                 "#
-                )
-                .replace("<id>", &create_result.dataset_handle.id.to_string())
-                .replace("<content>", &event_yaml.escape_default().to_string()),
-            )
-            .data(AccessToken::new(access_token)),
         )
-        .await;
+        .replace("<id>", &create_result.dataset_handle.id.to_string())
+        .replace("<content>", &event_yaml.escape_default().to_string()),
+    )
+    .await;
     assert!(res.is_ok(), "{:?}", res);
     assert_eq!(
         res.data,
@@ -154,35 +153,34 @@ async fn metadata_update_readme_new() {
         .unwrap()
         .access_token;
 
-    let schema = kamu_adapter_graphql::schema(cat);
+    let schema = kamu_adapter_graphql::schema();
 
     /////////////////////////////////////
     // Add new readme
     /////////////////////////////////////
 
-    let res = schema
-        .execute(
-            async_graphql::Request::new(
-                indoc!(
-                    r#"
-                mutation {
-                    datasets {
-                        byId (datasetId: "<id>") {
-                            metadata {
-                                updateReadme(content: "new readme") {
-                                    __typename
-                                }
+    let res = kamu_adapter_graphql::execute_query(
+        schema.clone(),
+        cat.clone(),
+        Some(AccessToken::new(access_token.clone())),
+        indoc!(
+            r#"
+            mutation {
+                datasets {
+                    byId (datasetId: "<id>") {
+                        metadata {
+                            updateReadme(content: "new readme") {
+                                __typename
                             }
                         }
                     }
                 }
-                "#
-                )
-                .replace("<id>", &create_result.dataset_handle.id.to_string()),
-            )
-            .data(AccessToken::new(access_token.clone())),
+            }
+            "#
         )
-        .await;
+        .replace("<id>", &create_result.dataset_handle.id.to_string()),
+    )
+    .await;
 
     let assert_result = |res: async_graphql::Response, expected: &str| {
         assert!(res.is_ok(), "{:?}", res);
@@ -221,11 +219,12 @@ async fn metadata_update_readme_new() {
     // Removes readme
     /////////////////////////////////////
 
-    let res = schema
-        .execute(
-            async_graphql::Request::new(
-                indoc!(
-                    r#"
+    let res = kamu_adapter_graphql::execute_query(
+        schema.clone(),
+        cat.clone(),
+        Some(AccessToken::new(access_token.clone())),
+        indoc!(
+            r#"
                 mutation {
                     datasets {
                         byId (datasetId: "<id>") {
@@ -238,12 +237,10 @@ async fn metadata_update_readme_new() {
                     }
                 }
                 "#
-                )
-                .replace("<id>", &create_result.dataset_handle.id.to_string()),
-            )
-            .data(AccessToken::new(access_token.clone())),
         )
-        .await;
+        .replace("<id>", &create_result.dataset_handle.id.to_string()),
+    )
+    .await;
 
     assert_result(res, "CommitResultSuccess");
 
@@ -259,11 +256,12 @@ async fn metadata_update_readme_new() {
     // Detects no-op changes
     /////////////////////////////////////
 
-    let res = schema
-        .execute(
-            async_graphql::Request::new(
-                indoc!(
-                    r#"
+    let res = kamu_adapter_graphql::execute_query(
+        schema.clone(),
+        cat.clone(),
+        Some(AccessToken::new(access_token.clone())),
+        indoc!(
+            r#"
                 mutation {
                     datasets {
                         byId (datasetId: "<id>") {
@@ -276,12 +274,10 @@ async fn metadata_update_readme_new() {
                     }
                 }
                 "#
-                )
-                .replace("<id>", &create_result.dataset_handle.id.to_string()),
-            )
-            .data(AccessToken::new(access_token.clone())),
         )
-        .await;
+        .replace("<id>", &create_result.dataset_handle.id.to_string()),
+    )
+    .await;
 
     assert_result(res, "NoChanges");
 
@@ -312,29 +308,28 @@ async fn metadata_update_readme_new() {
         .await
         .unwrap();
 
-    let res = schema
-        .execute(
-            async_graphql::Request::new(
-                indoc!(
-                    r#"
-                mutation {
-                    datasets {
-                        byId (datasetId: "<id>") {
-                            metadata {
-                                updateReadme(content: "new readme") {
-                                    __typename
-                                }
+    let res = kamu_adapter_graphql::execute_query(
+        schema,
+        cat,
+        Some(AccessToken::new(access_token)),
+        indoc!(
+            r#"
+            mutation {
+                datasets {
+                    byId (datasetId: "<id>") {
+                        metadata {
+                            updateReadme(content: "new readme") {
+                                __typename
                             }
                         }
                     }
                 }
-                "#
-                )
-                .replace("<id>", &create_result.dataset_handle.id.to_string()),
-            )
-            .data(AccessToken::new(access_token)),
+            }
+            "#
         )
-        .await;
+        .replace("<id>", &create_result.dataset_handle.id.to_string()),
+    )
+    .await;
 
     assert_result(res, "CommitResultSuccess");
 

@@ -395,9 +395,7 @@ pub fn get_command(
                     query_matches.get_one("query").map(String::as_str).unwrap(),
                     query_matches.get_flag("full"),
                 )),
-                Some(("gql-schema", _)) => Box::new(APIServerGqlSchemaCommand::new(
-                    catalog.clone(), // TODO: Currently very expensive
-                )),
+                Some(("gql-schema", _)) => Box::new(APIServerGqlSchemaCommand {}),
                 _ => return Err(CommandInterpretationFailed.into()),
             },
             Some(("info", info_matches)) => Box::new(SystemInfoCommand::new(

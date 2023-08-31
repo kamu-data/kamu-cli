@@ -91,9 +91,12 @@ async fn test_dataset_schema_local_fs() {
     let catalog = create_catalog_with_local_workspace(tempdir.path()).await;
     create_test_dataset(&catalog, tempdir.path()).await;
 
-    let schema = kamu_adapter_graphql::schema(catalog);
-    let res = schema
-        .execute(indoc::indoc!(
+    let schema = kamu_adapter_graphql::schema();
+    let res = kamu_adapter_graphql::execute_query(
+        schema,
+        catalog,
+        None,
+        indoc::indoc!(
             r#"
             {
                 datasets {
@@ -110,8 +113,9 @@ async fn test_dataset_schema_local_fs() {
                 }
             }
             "#
-        ))
-        .await;
+        ),
+    )
+    .await;
     assert!(res.is_ok(), "{:?}", res);
     let json = serde_json::to_string(&res.data).unwrap();
     let json = serde_json::from_str::<serde_json::Value>(&json).unwrap();
@@ -147,9 +151,12 @@ async fn test_dataset_tail_local_fs() {
     let catalog = create_catalog_with_local_workspace(tempdir.path()).await;
     create_test_dataset(&catalog, tempdir.path()).await;
 
-    let schema = kamu_adapter_graphql::schema(catalog);
-    let res = schema
-        .execute(indoc::indoc!(
+    let schema = kamu_adapter_graphql::schema();
+    let res = kamu_adapter_graphql::execute_query(
+        schema,
+        catalog,
+        None,
+        indoc::indoc!(
             r#"
             {
                 datasets {
@@ -166,8 +173,9 @@ async fn test_dataset_tail_local_fs() {
                 }
             }
             "#
-        ))
-        .await;
+        ),
+    )
+    .await;
     assert!(res.is_ok(), "{:?}", res);
     let json = serde_json::to_string(&res.data).unwrap();
     let json = serde_json::from_str::<serde_json::Value>(&json).unwrap();
@@ -185,9 +193,12 @@ async fn test_dataset_tail_empty_local_fs() {
     let catalog = create_catalog_with_local_workspace(tempdir.path()).await;
     create_test_dataset(&catalog, tempdir.path()).await;
 
-    let schema = kamu_adapter_graphql::schema(catalog);
-    let res = schema
-        .execute(indoc::indoc!(
+    let schema = kamu_adapter_graphql::schema();
+    let res = kamu_adapter_graphql::execute_query(
+        schema,
+        catalog,
+        None,
+        indoc::indoc!(
             r#"
             {
                 datasets {
@@ -204,8 +215,9 @@ async fn test_dataset_tail_empty_local_fs() {
                 }
             }
             "#
-        ))
-        .await;
+        ),
+    )
+    .await;
     assert!(res.is_ok(), "{:?}", res);
     let json = serde_json::to_string(&res.data).unwrap();
     let json = serde_json::from_str::<serde_json::Value>(&json).unwrap();

@@ -41,18 +41,20 @@ async fn test_task_get_non_existing() {
         .bind::<dyn TaskScheduler, MockTaskScheduler>()
         .build();
 
-    let schema = kamu_adapter_graphql::schema(cat);
-    let res = schema
-        .execute(
-            r#"{
+    let schema = kamu_adapter_graphql::schema();
+    let res = kamu_adapter_graphql::execute_query(
+        schema,
+        cat,
+        None,
+        r#"{
                 tasks {
                     getTask (taskId: "123") {
                         taskId
                     }
                 }
             }"#,
-        )
-        .await;
+    )
+    .await;
     assert!(res.is_ok(), "{:?}", res);
     assert_eq!(
         res.data,
@@ -91,9 +93,12 @@ async fn test_task_get_existing() {
         .bind::<dyn TaskScheduler, MockTaskScheduler>()
         .build();
 
-    let schema = kamu_adapter_graphql::schema(cat);
-    let res = schema
-        .execute(format!(
+    let schema = kamu_adapter_graphql::schema();
+    let res = kamu_adapter_graphql::execute_query(
+        schema,
+        cat,
+        None,
+        format!(
             r#"{{
                 tasks {{
                     getTask (taskId: "{}") {{
@@ -105,8 +110,9 @@ async fn test_task_get_existing() {
                 }}
             }}"#,
             expected_task.task_id,
-        ))
-        .await;
+        ),
+    )
+    .await;
     assert!(res.is_ok(), "{:?}", res);
     assert_eq!(
         res.data,
@@ -151,9 +157,12 @@ async fn test_task_list_by_dataset() {
         .bind::<dyn TaskScheduler, MockTaskScheduler>()
         .build();
 
-    let schema = kamu_adapter_graphql::schema(cat);
-    let res = schema
-        .execute(format!(
+    let schema = kamu_adapter_graphql::schema();
+    let res = kamu_adapter_graphql::execute_query(
+        schema,
+        cat,
+        None,
+        format!(
             r#"{{
                 tasks {{
                     listTasksByDataset (datasetId: "{}") {{
@@ -172,8 +181,9 @@ async fn test_task_list_by_dataset() {
                 }}
             }}"#,
             dataset_id,
-        ))
-        .await;
+        ),
+    )
+    .await;
     assert!(res.is_ok(), "{:?}", res);
     assert_eq!(
         res.data,
@@ -236,23 +246,26 @@ async fn test_task_create_update_dataset() {
         .unwrap()
         .access_token;
 
-    let schema = kamu_adapter_graphql::schema(cat);
+    let schema = kamu_adapter_graphql::schema();
 
-    let res = schema
-        .execute(
-            async_graphql::Request::new(format!(
-                r#"mutation {{
-                    tasks {{
-                        createUpdateDatasetTask (datasetId: "{}") {{
-                            taskId
-                        }}
+    let res = kamu_adapter_graphql::execute_query(
+        schema,
+        cat,
+        Some(AccessToken::new(access_token)),
+        format!(
+            r#"
+            mutation {{
+                tasks {{
+                    createUpdateDatasetTask (datasetId: "{}") {{
+                        taskId
                     }}
-                }}"#,
-                dataset_id,
-            ))
-            .data(AccessToken::new(access_token)),
-        )
-        .await;
+                }}
+            }}
+            "#,
+            dataset_id,
+        ),
+    )
+    .await;
     assert!(res.is_ok(), "{:?}", res);
     assert_eq!(
         res.data,
@@ -307,10 +320,11 @@ async fn test_task_create_probe() {
         .unwrap()
         .access_token;
 
-    let schema = kamu_adapter_graphql::schema(cat);
-    let res = schema
-        .execute(
-            async_graphql::Request::new(format!(
+    let schema = kamu_adapter_graphql::schema();
+    let res = kamu_adapter_graphql::execute_query(
+        schema,
+        cat,
+        Some(AccessToken::new(access_token)),format!(
                 r#"mutation {{
                     tasks {{
                         createProbeTask (datasetId: "{}", busyTimeMs: 500, endWithOutcome: FAILED) {{
@@ -320,8 +334,6 @@ async fn test_task_create_probe() {
                 }}"#,
                 dataset_id,
             ))
-            .data(AccessToken::new(access_token)),
-        )
         .await;
     assert!(res.is_ok(), "{:?}", res);
     assert_eq!(

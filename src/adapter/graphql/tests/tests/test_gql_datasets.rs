@@ -13,7 +13,7 @@ use async_graphql::*;
 use indoc::indoc;
 use kamu::testing::MetadataFactory;
 use kamu::*;
-use kamu_adapter_graphql::{AccessToken, Mutation, Query};
+use kamu_adapter_graphql::AccessToken;
 use kamu_core::*;
 use opendatafabric::serde::yaml::YamlDatasetSnapshotSerializer;
 use opendatafabric::serde::DatasetSnapshotSerializer;
@@ -24,10 +24,7 @@ use opendatafabric::*;
 #[test_log::test(tokio::test)]
 async fn dataset_by_id_does_not_exist() {
     let harness = GraphQLDatasetsHarness::new();
-
-    let schema = harness.schema();
-    let res = schema
-        .execute(indoc!(
+    let res = harness.execute_anonymous_query(indoc!(
             r#"
             {
                 datasets {
@@ -60,9 +57,8 @@ async fn dataset_by_id() {
         .create_root_dataset(DatasetName::new_unchecked("foo"))
         .await;
 
-    let schema = harness.schema();
-    let res = schema
-        .execute(
+    let res = harness
+        .execute_anonymous_query(
             indoc!(
                 r#"
                 {
@@ -96,26 +92,22 @@ async fn dataset_by_id() {
 async fn dataset_create_empty() {
     let harness = GraphQLDatasetsHarness::new();
 
-    let schema = harness.schema();
-    let res = schema
-        .execute(
-            async_graphql::Request::new(indoc::indoc!(
-                r#"
-                mutation {
-                    datasets {
-                        createEmpty (accountId: "kamu", datasetKind: ROOT, datasetName: "foo") {
-                            ... on CreateDatasetResultSuccess {
-                                dataset {
-                                    name
-                                }
+    let res = harness
+        .execute_query(indoc::indoc!(
+            r#"
+            mutation {
+                datasets {
+                    createEmpty (accountId: "kamu", datasetKind: ROOT, datasetName: "foo") {
+                        ... on CreateDatasetResultSuccess {
+                            dataset {
+                                name
                             }
                         }
                     }
                 }
-                "#
-            ))
-            .data(AccessToken::new(harness.access_token().await)),
-        )
+            }
+            "#
+        ))
         .await;
     assert!(res.is_ok(), "{:?}", res);
     assert_eq!(
@@ -151,9 +143,7 @@ async fn dataset_create_from_snapshot() {
     )
     .to_string();
 
-    let schema = harness.schema();
-    let res = schema
-        .execute(async_graphql::Request::new(indoc!(
+    let res = harness.execute_query(indoc!(
             r#"
             mutation {
                 datasets {
@@ -169,7 +159,6 @@ async fn dataset_create_from_snapshot() {
             }
             "#
         ).replace("<content>", &snapshot_yaml.escape_default().to_string()))
-        .data(AccessToken::new(harness.access_token().await)))
         .await;
     assert!(res.is_ok(), "{:?}", res);
     assert_eq!(
@@ -193,9 +182,7 @@ async fn dataset_create_from_snapshot() {
 async fn dataset_create_from_snapshot_malformed() {
     let harness = GraphQLDatasetsHarness::new();
 
-    let schema = harness.schema();
-    let res = schema
-        .execute(async_graphql::Request::new(indoc!(
+    let res = harness.execute_query(indoc!(
             r#"
             mutation {
                 datasets {
@@ -207,7 +194,7 @@ async fn dataset_create_from_snapshot_malformed() {
                 }
             }
             "#
-        )).data(AccessToken::new(harness.access_token().await)))
+        ))
         .await;
     assert!(res.is_ok(), "{:?}", res);
     assert_eq!(
@@ -232,32 +219,28 @@ async fn dataset_rename_success() {
         .create_root_dataset(DatasetName::new_unchecked("foo"))
         .await;
 
-    let schema = harness.schema();
-    let res = schema
-        .execute(
-            async_graphql::Request::new(
-                indoc!(
-                    r#"
-                    mutation {
-                        datasets {
-                            byId (datasetId: "<id>") {
-                                rename(newName: "<newName>") {
-                                    __typename
-                                    message
-                                    ... on RenameResultSuccess {
-                                        oldName
-                                        newName
-                                    }
+    let res = harness
+        .execute_query(
+            indoc!(
+                r#"
+                mutation {
+                    datasets {
+                        byId (datasetId: "<id>") {
+                            rename(newName: "<newName>") {
+                                __typename
+                                message
+                                ... on RenameResultSuccess {
+                                    oldName
+                                    newName
                                 }
                             }
                         }
                     }
-                    "#
-                )
-                .replace("<id>", &foo_result.dataset_handle.id.to_string())
-                .replace("<newName>", "bar"),
+                }
+                "#
             )
-            .data(AccessToken::new(harness.access_token().await)),
+            .replace("<id>", &foo_result.dataset_handle.id.to_string())
+            .replace("<newName>", "bar"),
         )
         .await;
     assert!(res.is_ok(), "{:?}", res);
@@ -288,31 +271,27 @@ async fn dataset_rename_no_changes() {
         .create_root_dataset(DatasetName::new_unchecked("foo"))
         .await;
 
-    let schema = harness.schema();
-    let res = schema
-        .execute(
-            async_graphql::Request::new(
-                indoc!(
-                    r#"
-                    mutation {
-                        datasets {
-                            byId (datasetId: "<id>") {
-                                rename(newName: "<newName>") {
-                                    __typename
-                                    message
-                                    ... on RenameResultNoChanges {
-                                        preservedName
-                                    }
+    let res = harness
+        .execute_query(
+            indoc!(
+                r#"
+                mutation {
+                    datasets {
+                        byId (datasetId: "<id>") {
+                            rename(newName: "<newName>") {
+                                __typename
+                                message
+                                ... on RenameResultNoChanges {
+                                    preservedName
                                 }
                             }
                         }
                     }
-                    "#
-                )
-                .replace("<id>", &foo_result.dataset_handle.id.to_string())
-                .replace("<newName>", "foo"),
+                }
+                "#
             )
-            .data(AccessToken::new(harness.access_token().await)),
+            .replace("<id>", &foo_result.dataset_handle.id.to_string())
+            .replace("<newName>", "foo"),
         )
         .await;
     assert!(res.is_ok(), "{:?}", res);
@@ -345,31 +324,27 @@ async fn dataset_rename_name_collision() {
         .create_root_dataset(DatasetName::new_unchecked("bar"))
         .await;
 
-    let schema = harness.schema();
-    let res = schema
-        .execute(
-            async_graphql::Request::new(
-                indoc!(
-                    r#"
-                    mutation {
-                        datasets {
-                            byId (datasetId: "<id>") {
-                                rename(newName: "<newName>") {
-                                    __typename
-                                    message
-                                    ... on RenameResultNameCollision {
-                                        collidingAlias
-                                    }
+    let res = harness
+        .execute_query(
+            indoc!(
+                r#"
+                mutation {
+                    datasets {
+                        byId (datasetId: "<id>") {
+                            rename(newName: "<newName>") {
+                                __typename
+                                message
+                                ... on RenameResultNameCollision {
+                                    collidingAlias
                                 }
                             }
                         }
                     }
-                    "#
-                )
-                .replace("<id>", &foo_result.dataset_handle.id.to_string())
-                .replace("<newName>", "bar"),
+                }
+                "#
             )
-            .data(AccessToken::new(harness.access_token().await)),
+            .replace("<id>", &foo_result.dataset_handle.id.to_string())
+            .replace("<newName>", "bar"),
         )
         .await;
     assert!(res.is_ok(), "{:?}", res);
@@ -399,30 +374,26 @@ async fn dataset_delete_success() {
         .create_root_dataset(DatasetName::new_unchecked("foo"))
         .await;
 
-    let schema = harness.schema();
-    let res = schema
-        .execute(
-            async_graphql::Request::new(
-                indoc!(
-                    r#"
-                    mutation {
-                        datasets {
-                            byId (datasetId: "<id>") {
-                                delete {
-                                    __typename
-                                    message
-                                    ... on DeleteResultSuccess {
-                                        deletedDataset
-                                    }
+    let res = harness
+        .execute_query(
+            indoc!(
+                r#"
+                mutation {
+                    datasets {
+                        byId (datasetId: "<id>") {
+                            delete {
+                                __typename
+                                message
+                                ... on DeleteResultSuccess {
+                                    deletedDataset
                                 }
                             }
                         }
                     }
-                    "#
-                )
-                .replace("<id>", &foo_result.dataset_handle.id.to_string()),
+                }
+                "#
             )
-            .data(AccessToken::new(harness.access_token().await)),
+            .replace("<id>", &foo_result.dataset_handle.id.to_string()),
         )
         .await;
     assert!(res.is_ok(), "{:?}", res);
@@ -458,31 +429,27 @@ async fn dataset_delete_dangling_ref() {
         )
         .await;
 
-    let schema = harness.schema();
-    let res = schema
-        .execute(
-            async_graphql::Request::new(
-                indoc!(
-                    r#"
-                    mutation {
-                        datasets {
-                            byId (datasetId: "<id>") {
-                                delete {
-                                    __typename
-                                    message
-                                    ... on DeleteResultDanglingReference {
-                                        notDeletedDataset
-                                        danglingChildRefs
-                                    }
+    let res = harness
+        .execute_query(
+            indoc!(
+                r#"
+                mutation {
+                    datasets {
+                        byId (datasetId: "<id>") {
+                            delete {
+                                __typename
+                                message
+                                ... on DeleteResultDanglingReference {
+                                    notDeletedDataset
+                                    danglingChildRefs
                                 }
                             }
                         }
                     }
-                    "#
-                )
-                .replace("<id>", &foo_result.dataset_handle.id.to_string()),
+                }
+                "#
             )
-            .data(AccessToken::new(harness.access_token().await)),
+            .replace("<id>", &foo_result.dataset_handle.id.to_string()),
         )
         .await;
     assert!(res.is_ok(), "{:?}", res);
@@ -572,8 +539,30 @@ impl GraphQLDatasetsHarness {
             .unwrap()
     }
 
-    pub fn schema(&self) -> Schema<Query, Mutation, EmptySubscription> {
-        kamu_adapter_graphql::schema(self.catalog.clone())
+    pub async fn execute_anonymous_query(
+        &self,
+        query: impl Into<async_graphql::Request>,
+    ) -> async_graphql::Response {
+        kamu_adapter_graphql::execute_query(
+            kamu_adapter_graphql::schema(),
+            self.catalog.clone(),
+            None,
+            query,
+        )
+        .await
+    }
+
+    pub async fn execute_query(
+        &self,
+        query: impl Into<async_graphql::Request>,
+    ) -> async_graphql::Response {
+        kamu_adapter_graphql::execute_query(
+            kamu_adapter_graphql::schema(),
+            self.catalog.clone(),
+            Some(AccessToken::new(self.access_token().await)),
+            query,
+        )
+        .await
     }
 
     pub async fn access_token(&self) -> String {

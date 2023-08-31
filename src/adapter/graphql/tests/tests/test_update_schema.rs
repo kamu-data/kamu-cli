@@ -14,8 +14,6 @@ async fn update_graphql_schema() {
     let mut schema_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     schema_path.push("../../../resources/schema.gql");
 
-    let cat = dill::CatalogBuilder::new().build();
-
-    let schema = kamu_adapter_graphql::schema(cat);
+    let schema = kamu_adapter_graphql::schema();
     std::fs::write(&schema_path, schema.sdl()).unwrap();
 }

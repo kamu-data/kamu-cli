@@ -77,7 +77,8 @@ impl WebUIServer {
             password: current_account_subject.account_name.to_string(),
         };
 
-        let gql_schema = kamu_adapter_graphql::schema(catalog);
+        let gql_schema = kamu_adapter_graphql::schema();
+
         let web_ui_config = WebUIConfig {
             api_server_gql_url: format!("http://{}/graphql", bound_addr.local_addr()),
             login_instructions: Some(WebUILoginInstructions {
@@ -113,6 +114,7 @@ impl WebUIServer {
                             .allow_methods(vec![http::Method::GET, http::Method::POST])
                             .allow_headers(tower_http::cors::Any),
                     )
+                    .layer(axum::extract::Extension(catalog))
                     .layer(axum::extract::Extension(gql_schema))
                     .layer(axum::extract::Extension(web_ui_config)),
             );
