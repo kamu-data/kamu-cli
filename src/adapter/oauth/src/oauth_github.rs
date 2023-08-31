@@ -190,8 +190,8 @@ struct GithubProviderCredentials {
 impl From<GithubAccountInfo> for kamu_core::auth::AccountInfo {
     fn from(value: GithubAccountInfo) -> Self {
         Self {
-            login: AccountName::try_from(&value.login).unwrap(),
-            name: value.name,
+            account_name: AccountName::try_from(&value.login).unwrap(),
+            display_name: value.name,
             avatar_url: value.avatar_url,
         }
     }

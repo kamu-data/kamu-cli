@@ -90,8 +90,8 @@ impl DatasetAuthorizerHarness {
         std::fs::create_dir(&datasets_dir).unwrap();
 
         let current_account_subject = Arc::new(CurrentAccountSubject::new(AccountInfo {
-            login: AccountName::new_unchecked(current_account_name),
-            name: current_account_name.to_string(),
+            account_name: AccountName::new_unchecked(current_account_name),
+            display_name: current_account_name.to_string(),
             avatar_url: None,
         }));
 

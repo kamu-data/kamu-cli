@@ -156,7 +156,7 @@ impl AuthenticationService for AuthenticationServiceImpl {
 
         Ok(LoginResponse {
             access_token: self.make_access_token(
-                provider_response.account_info.login.to_string(),
+                provider_response.account_info.account_name.to_string(),
                 login_method,
                 provider_response.provider_credentials_json,
             )?,

@@ -98,16 +98,16 @@ impl From<kamu_core::auth::LoginResponse> for LoginResponse {
 
 #[derive(SimpleObject, Debug, Clone)]
 pub(crate) struct AccountInfo {
-    login: AccountName,
-    name: String,
+    account_name: AccountName,
+    display_name: AccountDisplayName,
     avatar_url: Option<String>,
 }
 
 impl From<kamu_core::auth::AccountInfo> for AccountInfo {
     fn from(value: kamu_core::auth::AccountInfo) -> Self {
         Self {
-            login: AccountName::from(value.login),
-            name: value.name,
+            account_name: AccountName::from(value.account_name),
+            display_name: AccountDisplayName::from(value.display_name),
             avatar_url: value.avatar_url,
         }
     }

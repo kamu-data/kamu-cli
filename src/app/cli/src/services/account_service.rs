@@ -36,7 +36,7 @@ impl AccountService {
         let mut predefined_accounts: HashMap<String, auth::AccountInfo> = HashMap::new();
         for predefined_account in &users_config.predefined {
             predefined_accounts.insert(
-                predefined_account.login.to_string(),
+                predefined_account.account_name.to_string(),
                 predefined_account.clone(),
             );
         }
@@ -107,10 +107,10 @@ impl AccountService {
 
     fn get_account_info_impl(
         &self,
-        login: &String,
+        account_name: &String,
     ) -> Result<auth::AccountInfo, auth::RejectedCredentialsError> {
         // The account might be predefined in the configuration
-        match self.predefined_accounts.get(login) {
+        match self.predefined_accounts.get(account_name) {
             // Use the predefined record
             Some(account_info) => Ok(account_info.clone()),
 
@@ -119,8 +119,8 @@ impl AccountService {
                 // without avatar and with the name identical to login
                 if self.allow_login_unknown {
                     Ok(auth::AccountInfo {
-                        login: AccountName::new_unchecked(login),
-                        name: login.clone(),
+                        account_name: AccountName::new_unchecked(account_name),
+                        display_name: account_name.clone(),
                         avatar_url: None,
                     })
                 } else {
@@ -172,7 +172,7 @@ impl auth::AuthenticationProvider for AccountService {
 
         // Store login as provider credentials
         let provider_credentials = PasswordProviderCredentials {
-            account_name: account_info.login.clone(),
+            account_name: account_info.account_name.clone(),
         };
 
         Ok(auth::ProviderLoginResponse {
@@ -253,8 +253,8 @@ impl CurrentAccountIndication {
 
     pub fn to_current_account_subject(&self) -> CurrentAccountSubject {
         CurrentAccountSubject::new(auth::AccountInfo {
-            login: AccountName::from(self.account_name.clone()),
-            name: self.user_name.clone(),
+            account_name: AccountName::from(self.account_name.clone()),
+            display_name: self.user_name.clone(),
             avatar_url: None,
         })
     }

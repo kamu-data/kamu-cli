@@ -25,8 +25,8 @@ pub struct CurrentAccountSubject {
 impl CurrentAccountSubject {
     pub fn new_test() -> Self {
         CurrentAccountSubject::new(auth::AccountInfo {
-            name: DEFAULT_ACCOUNT_NAME.to_string(),
-            login: AccountName::new_unchecked(DEFAULT_ACCOUNT_NAME),
+            display_name: DEFAULT_ACCOUNT_NAME.to_string(),
+            account_name: AccountName::new_unchecked(DEFAULT_ACCOUNT_NAME),
             avatar_url: None,
         })
     }

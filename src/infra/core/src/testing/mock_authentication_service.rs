@@ -62,8 +62,8 @@ impl MockAuthenticationService {
 
     fn make_dummy_account_info() -> AccountInfo {
         AccountInfo {
-            login: AccountName::new_unchecked(DEFAULT_ACCOUNT_NAME),
-            name: DEFAULT_ACCOUNT_NAME.to_string(),
+            account_name: AccountName::new_unchecked(DEFAULT_ACCOUNT_NAME),
+            display_name: DEFAULT_ACCOUNT_NAME.to_string(),
             avatar_url: Some(DEFAULT_AVATAR_URL.to_string()),
         }
     }

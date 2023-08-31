@@ -3,11 +3,13 @@ interface Account {
 	name: AccountName!
 }
 
+scalar AccountDisplayName
+
 scalar AccountID
 
 type AccountInfo {
-	login: AccountName!
-	name: String!
+	accountName: AccountName!
+	displayName: AccountDisplayName!
 	avatarUrl: String
 }
 

@@ -341,8 +341,8 @@ impl UsersConfig {
     pub fn single_tenant() -> Self {
         Self {
             predefined: vec![auth::AccountInfo {
-                login: AccountName::new_unchecked(DEFAULT_ACCOUNT_NAME),
-                name: String::from(DEFAULT_ACCOUNT_NAME),
+                account_name: AccountName::new_unchecked(DEFAULT_ACCOUNT_NAME),
+                display_name: String::from(DEFAULT_ACCOUNT_NAME),
                 avatar_url: Some(String::from(DEFAULT_AVATAR_URL)),
             }],
             allow_login_unknown: Some(false),

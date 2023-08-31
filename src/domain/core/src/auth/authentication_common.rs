@@ -14,11 +14,16 @@ use thiserror::Error;
 
 ///////////////////////////////////////////////////////////////////////////////
 
+// TODO: have some length restrictions (0 < .. < limit)
+pub type AccountDisplayName = String;
+
+///////////////////////////////////////////////////////////////////////////////
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct AccountInfo {
-    pub login: AccountName,
-    pub name: String,
+    pub account_name: AccountName,
+    pub display_name: AccountDisplayName,
     pub avatar_url: Option<String>,
 }
 

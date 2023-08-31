@@ -100,3 +100,47 @@ impl ScalarType for AccountName {
         Value::String(self.0.to_string())
     }
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////
+// AccountDisplayName
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct AccountDisplayName(kamu_core::auth::AccountDisplayName);
+
+impl From<kamu_core::auth::AccountDisplayName> for AccountDisplayName {
+    fn from(value: kamu_core::auth::AccountDisplayName) -> Self {
+        Self(value)
+    }
+}
+
+impl Into<kamu_core::auth::AccountDisplayName> for AccountDisplayName {
+    fn into(self) -> kamu_core::auth::AccountDisplayName {
+        self.0
+    }
+}
+
+impl Deref for AccountDisplayName {
+    type Target = kamu_core::auth::AccountDisplayName;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+#[Scalar]
+impl ScalarType for AccountDisplayName {
+    fn parse(value: Value) -> InputValueResult<Self> {
+        if let Value::String(value) = &value {
+            let val = kamu_core::auth::AccountDisplayName::from(value.as_str());
+            Ok(val.into())
+        } else {
+            Err(InputValueError::expected_type(value))
+        }
+    }
+
+    fn to_value(&self) -> Value {
+        Value::String(self.0.to_string())
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////

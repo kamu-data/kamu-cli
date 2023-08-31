@@ -117,7 +117,7 @@ impl DatasetRepositoryS3 {
             alias.clone()
         } else if self.is_multi_tenant() {
             DatasetAlias::new(
-                Some(self.current_account_subject.account.login.clone()),
+                Some(self.current_account_subject.account.account_name.clone()),
                 alias.dataset_name.clone(),
             )
         } else {
@@ -187,7 +187,9 @@ impl DatasetRepository for DatasetRepositoryS3 {
     }
 
     fn get_datasets_by_owner<'s>(&'s self, account_name: AccountName) -> DatasetHandleStream<'s> {
-        if !self.is_multi_tenant() && account_name != self.current_account_subject.account.login {
+        if !self.is_multi_tenant()
+            && account_name != self.current_account_subject.account.account_name
+        {
             panic!("Single-tenant dataset repository queried by non-default account");
         }
 
