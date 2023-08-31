@@ -464,7 +464,7 @@ pub async fn test_iterate_datasets(repo: &dyn DatasetRepository) {
     // Default account
     check_expected_datasets(
         vec![alias_bar, alias_foo],
-        repo.get_datasets_by_owner(AccountName::new_unchecked(DEFAULT_ACCOUNT_NAME)),
+        repo.get_datasets_by_owner(AccountName::new_unchecked(auth::DEFAULT_ACCOUNT_NAME)),
     )
     .await;
 }

@@ -9,30 +9,21 @@
 
 use opendatafabric::AccountName;
 
-use crate::auth;
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-pub const DEFAULT_ACCOUNT_NAME: &str = "kamu";
-pub const DEFAULT_AVATAR_URL: &str = "https://avatars.githubusercontent.com/u/50896974?s=200&v=4";
+use crate::auth::DEFAULT_ACCOUNT_NAME;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct CurrentAccountSubject {
-    pub account: auth::AccountInfo,
+    pub account_name: AccountName,
 }
 
 impl CurrentAccountSubject {
     pub fn new_test() -> Self {
-        CurrentAccountSubject::new(auth::AccountInfo {
-            display_name: DEFAULT_ACCOUNT_NAME.to_string(),
-            account_name: AccountName::new_unchecked(DEFAULT_ACCOUNT_NAME),
-            avatar_url: None,
-        })
+        CurrentAccountSubject::new(AccountName::new_unchecked(DEFAULT_ACCOUNT_NAME))
     }
 
-    pub fn new(account: auth::AccountInfo) -> Self {
-        Self { account }
+    pub fn new(account_name: AccountName) -> Self {
+        Self { account_name }
     }
 }
 

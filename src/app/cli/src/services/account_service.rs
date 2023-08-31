@@ -13,7 +13,7 @@ use std::sync::Arc;
 use clap::ArgMatches;
 use dill::component;
 use internal_error::{InternalError, ResultIntoInternal};
-use kamu::domain::{auth, CurrentAccountSubject, DEFAULT_ACCOUNT_NAME};
+use kamu::domain::{auth, CurrentAccountSubject};
 use opendatafabric::AccountName;
 use serde::{Deserialize, Serialize};
 
@@ -51,7 +51,7 @@ impl AccountService {
         if multitenant_workspace {
             whoami::username()
         } else {
-            String::from(DEFAULT_ACCOUNT_NAME)
+            String::from(auth::DEFAULT_ACCOUNT_NAME)
         }
     }
 
@@ -59,7 +59,7 @@ impl AccountService {
         if multitenant_workspace {
             whoami::realname()
         } else {
-            String::from(DEFAULT_ACCOUNT_NAME)
+            String::from(auth::DEFAULT_ACCOUNT_NAME)
         }
     }
 
@@ -252,11 +252,7 @@ impl CurrentAccountIndication {
     }
 
     pub fn to_current_account_subject(&self) -> CurrentAccountSubject {
-        CurrentAccountSubject::new(auth::AccountInfo {
-            account_name: AccountName::from(self.account_name.clone()),
-            display_name: self.user_name.clone(),
-            avatar_url: None,
-        })
+        CurrentAccountSubject::new(AccountName::from(self.account_name.clone()))
     }
 }
 

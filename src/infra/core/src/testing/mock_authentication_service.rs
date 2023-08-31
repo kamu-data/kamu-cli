@@ -13,8 +13,9 @@ use kamu_core::auth::{
     GetAccountInfoError,
     LoginError,
     LoginResponse,
+    DEFAULT_ACCOUNT_NAME,
+    DEFAULT_AVATAR_URL,
 };
-use kamu_core::{DEFAULT_ACCOUNT_NAME, DEFAULT_AVATAR_URL};
 use mockall::predicate::{always, eq};
 use opendatafabric::AccountName;
 

@@ -72,8 +72,9 @@ impl WebUIServer {
 
         let current_account_subject = catalog.get_one::<domain::CurrentAccountSubject>().unwrap();
         let login_credentials = PasswordLoginCredentials {
-            login: current_account_subject.account.account_name.to_string(),
-            password: current_account_subject.account.account_name.to_string(),
+            login: current_account_subject.account_name.to_string(),
+            // Note: note a mistake, use identical login and password, equal to account name
+            password: current_account_subject.account_name.to_string(),
         };
 
         let gql_schema = kamu_adapter_graphql::schema(catalog);

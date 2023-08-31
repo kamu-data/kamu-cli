@@ -13,12 +13,7 @@ use std::sync::Arc;
 use kamu::testing::MetadataFactory;
 use kamu::DatasetRepositoryLocalFs;
 use kamu_adapter_auth_oso::{KamuAuthOso, OsoDatasetAuthorizer};
-use kamu_core::auth::{
-    AccountInfo,
-    DatasetAction,
-    DatasetActionAuthorizer,
-    DatasetActionUnauthorizedError,
-};
+use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer, DatasetActionUnauthorizedError};
 use kamu_core::{AccessError, CurrentAccountSubject, DatasetRepository};
 use opendatafabric::{AccountName, DatasetAlias, DatasetHandle, DatasetKind};
 use tempfile::TempDir;
@@ -89,11 +84,9 @@ impl DatasetAuthorizerHarness {
         let datasets_dir = tempdir.path().join("datasets");
         std::fs::create_dir(&datasets_dir).unwrap();
 
-        let current_account_subject = Arc::new(CurrentAccountSubject::new(AccountInfo {
-            account_name: AccountName::new_unchecked(current_account_name),
-            display_name: current_account_name.to_string(),
-            avatar_url: None,
-        }));
+        let current_account_subject = Arc::new(CurrentAccountSubject::new(
+            AccountName::new_unchecked(current_account_name),
+        ));
 
         let dataset_authorizer = Arc::new(OsoDatasetAuthorizer::new(
             Arc::new(KamuAuthOso::new()),
