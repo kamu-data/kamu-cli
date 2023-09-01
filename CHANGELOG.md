@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.142.0] - 2023-09-01
 ### Fixed
 - Ignoring the downloads cache when `--fetch-uncacheable` flag is used
+- Restored pre-sorting of events by `event_time` within one data slice in DataFusion-baesd ingest
 
 ## [0.141.0] - 2023-08-28
 ### Fixed

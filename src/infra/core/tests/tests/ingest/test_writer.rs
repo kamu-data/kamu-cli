@@ -218,6 +218,76 @@ async fn test_data_writer_happy_path() {
 
 #[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
+async fn test_data_writer_orders_by_event_time() {
+    let mut harness = Harness::new(
+        MetadataFactory::set_polling_source()
+            .merge(odf::MergeStrategy::Append)
+            .build(),
+    )
+    .await;
+
+    let res = harness
+        .write(
+            indoc!(
+                r#"
+                event_time,city,population
+                2021-01-01,A,1000
+                2023-01-01,B,2000
+                2022-01-01,C,3000
+                "#
+            ),
+            "event_time DATE, city STRING, population BIGINT",
+        )
+        .await
+        .unwrap();
+
+    let df = harness.get_last_data().await;
+
+    assert_schema_eq(
+        df.schema(),
+        indoc!(
+            r#"
+            message arrow_schema {
+              REQUIRED INT64 offset;
+              REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
+              OPTIONAL INT32 event_time (DATE);
+              OPTIONAL BYTE_ARRAY city (STRING);
+              OPTIONAL INT64 population;
+            }
+            "#
+        ),
+    );
+
+    assert_data_eq(
+        df,
+        indoc!(
+            r#"
+            +--------+----------------------+------------+------+------------+
+            | offset | system_time          | event_time | city | population |
+            +--------+----------------------+------------+------+------------+
+            | 0      | 2010-01-01T12:00:00Z | 2021-01-01 | A    | 1000       |
+            | 1      | 2010-01-01T12:00:00Z | 2022-01-01 | C    | 3000       |
+            | 2      | 2010-01-01T12:00:00Z | 2023-01-01 | B    | 2000       |
+            +--------+----------------------+------------+------+------------+
+            "#
+        ),
+    )
+    .await;
+
+    assert_eq!(
+        res.new_block
+            .event
+            .output_watermark
+            .as_ref()
+            .map(|dt| dt.to_rfc3339()),
+        Some("2023-01-01T00:00:00+00:00".to_string())
+    );
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, ingest, datafusion)]
+#[test_log::test(tokio::test)]
 async fn test_data_writer_normalizes_timestamps_to_utc_millis() {
     let mut harness = Harness::new(
         MetadataFactory::set_polling_source()

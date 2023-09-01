@@ -219,6 +219,38 @@ impl DataWriterDataFusion {
             .filter(|n| n.as_str() != self.meta.vocab.event_time_column)
             .collect();
 
+        // System time
+        let df = df
+            .with_column(
+                &self.meta.vocab.system_time_column,
+                Expr::Literal(ScalarValue::TimestampMillisecond(
+                    Some(system_time.timestamp_millis()),
+                    Some("UTC".into()),
+                )),
+            )
+            .int_err()?;
+
+        // Event time: Add from source event time if missing in data
+        let df = if df
+            .schema()
+            .has_column_with_unqualified_name(&self.meta.vocab.event_time_column)
+        {
+            // Events within one chunk must be sorted by event_time
+            df.sort(vec![
+                col(self.meta.vocab.event_time_column.as_ref()).sort(true, false)
+            ])
+            .int_err()?
+        } else {
+            df.with_column(
+                &self.meta.vocab.event_time_column,
+                Expr::Literal(ScalarValue::TimestampMillisecond(
+                    Some(fallback_event_time.timestamp_millis()),
+                    Some("UTC".into()),
+                )),
+            )
+            .int_err()?
+        };
+
         // Offset
         // TODO: For some reason this adds two collumns: the expected "offset", but also
         // "ROW_NUMBER()" for now we simply filter out the latter.
@@ -246,34 +278,6 @@ impl DataWriterDataFusion {
                 ),
             )
             .int_err()?;
-
-        // System time
-        let df = df
-            .with_column(
-                &self.meta.vocab.system_time_column,
-                Expr::Literal(ScalarValue::TimestampMillisecond(
-                    Some(system_time.timestamp_millis()),
-                    Some("UTC".into()),
-                )),
-            )
-            .int_err()?;
-
-        // Event time: Add from source event time if missing in data
-        let df = if df
-            .schema()
-            .has_column_with_unqualified_name(&self.meta.vocab.event_time_column)
-        {
-            df
-        } else {
-            df.with_column(
-                &self.meta.vocab.event_time_column,
-                Expr::Literal(ScalarValue::TimestampMillisecond(
-                    Some(fallback_event_time.timestamp_millis()),
-                    Some("UTC".into()),
-                )),
-            )
-            .int_err()?
-        };
 
         // Reorder columns for nice looks
         let mut full_columns = vec![
