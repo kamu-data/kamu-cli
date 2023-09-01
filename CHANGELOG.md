@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Ignoring the downloads cache when `--fetch-uncacheable` flag is used
 - Restored pre-sorting of events by `event_time` within one data slice in DataFusion-baesd ingest
 - Performance degradation in local file copying due to async
+- Race condition in Zip decompress step that caused file truncation
 
 ## [0.141.0] - 2023-08-28
 ### Fixed

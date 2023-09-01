@@ -37,12 +37,14 @@ impl PrepService {
 
         for step in prep_steps.iter() {
             stream = match step {
-                PrepStep::Pipe(ref p) => Box::new(
+                PrepStep::Pipe(p) => Box::new(
                     PipeStream::new(&p.command, stream)
                         .map_err(|e| IngestError::pipe(p.command.clone(), e))?,
                 ),
-                PrepStep::Decompress(ref dc) => match dc.format {
-                    CompressionFormat::Zip => Box::new(DecompressZipStream::new(stream).int_err()?),
+                PrepStep::Decompress(dc) => match dc.format {
+                    CompressionFormat::Zip => {
+                        Box::new(DecompressZipStream::new(stream, dc.sub_path.clone()).int_err()?)
+                    }
                     CompressionFormat::Gzip => Box::new(DecompressGzipStream::new(stream)),
                 },
             };
@@ -188,7 +190,7 @@ struct DecompressZipStream {
 }
 
 impl DecompressZipStream {
-    fn new(mut input: Box<dyn Stream>) -> Result<Self, IOError> {
+    fn new(mut input: Box<dyn Stream>, sub_path: Option<String>) -> Result<Self, IOError> {
         let (mut producer, consumer) = ringbuf::HeapRb::<u8>::new(BUFFER_SIZE).split();
 
         let (tx, rx) = std::sync::mpsc::sync_channel(1);
@@ -201,9 +203,17 @@ impl DecompressZipStream {
             .spawn(move || {
                 if let Some(seekable) = input.as_seekable_read() {
                     let mut archive = zip::read::ZipArchive::new(seekable).int_err()?;
-                    let mut file = archive.by_index(0).int_err()?;
+
+                    let mut file = if let Some(sub_path) = sub_path {
+                        archive.by_name(&sub_path).int_err()?
+                    } else {
+                        archive.by_index(0).int_err()?
+                    };
 
                     loop {
+                        while producer.is_full() {
+                            std::thread::sleep(std::time::Duration::ZERO);
+                        }
                         let read = producer.read_from(&mut file, None).unwrap();
                         tx.send(read).unwrap();
                         if read == 0 {
