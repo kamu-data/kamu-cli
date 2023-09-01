@@ -436,11 +436,23 @@ impl DataWriterDataFusion {
 
 #[async_trait::async_trait]
 impl DataWriter for DataWriterDataFusion {
+    #[tracing::instrument(level = "info", skip_all)]
     async fn write(
         &mut self,
         new_data: Option<DataFrame>,
         opts: WriteDataOpts,
     ) -> Result<WriteDataResult, WriteDataError> {
+        let staged = self.stage(new_data, opts).await?;
+        let commit = self.commit(staged).await?;
+        Ok(commit)
+    }
+
+    #[tracing::instrument(level = "info", skip_all)]
+    async fn stage(
+        &self,
+        new_data: Option<DataFrame>,
+        opts: WriteDataOpts,
+    ) -> Result<StageDataResult, StageDataError> {
         let (add_data, data_file) = if let Some(new_data) = new_data {
             self.validate_input(&new_data)?;
 
@@ -505,19 +517,27 @@ impl DataWriter for DataWriterDataFusion {
             && add_data.output_watermark == self.meta.last_watermark
             && opts.source_state == self.meta.last_source_state
         {
-            return Err(WriteDataError::EmptyCommit(EmptyCommitError {}));
+            Err(EmptyCommitError {}.into())
+        } else {
+            Ok(StageDataResult {
+                system_time: opts.system_time,
+                add_data,
+                data_file,
+            })
         }
+    }
 
-        // Commit data
+    #[tracing::instrument(level = "info", skip_all)]
+    async fn commit(&mut self, staged: StageDataResult) -> Result<WriteDataResult, CommitError> {
         let commit_result = self
             .dataset
             .commit_add_data(
-                add_data,
-                data_file,
+                staged.add_data,
+                staged.data_file,
                 None,
                 CommitOpts {
                     block_ref: &self.block_ref,
-                    system_time: Some(opts.system_time),
+                    system_time: Some(staged.system_time),
                     prev_block_hash: Some(Some(&self.meta.head)),
                     check_object_refs: false,
                 },

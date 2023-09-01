@@ -15,7 +15,7 @@ use internal_error::*;
 use opendatafabric as odf;
 
 use super::MergeError;
-use crate::CommitError;
+use crate::{AddDataParams, CommitError, OwnedFile};
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -32,6 +32,16 @@ pub trait DataWriter {
         new_data: Option<DataFrame>,
         opts: WriteDataOpts,
     ) -> Result<WriteDataResult, WriteDataError>;
+
+    /// Prepares all data for commit without actually committing
+    async fn stage(
+        &self,
+        new_data: Option<DataFrame>,
+        opts: WriteDataOpts,
+    ) -> Result<StageDataResult, StageDataError>;
+
+    /// Commit previously staged data and advance writer state
+    async fn commit(&mut self, staged: StageDataResult) -> Result<WriteDataResult, CommitError>;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -61,6 +71,15 @@ pub struct WriteDataResult {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+#[derive(Debug)]
+pub struct StageDataResult {
+    pub system_time: DateTime<Utc>,
+    pub add_data: AddDataParams,
+    pub data_file: Option<OwnedFile>,
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 #[derive(Debug, thiserror::Error)]
 pub enum WriteDataError {
     #[error(transparent)]
@@ -75,6 +94,32 @@ pub enum WriteDataError {
     #[error(transparent)]
     Internal(#[from] InternalError),
 }
+
+impl From<StageDataError> for WriteDataError {
+    fn from(value: StageDataError) -> Self {
+        match value {
+            StageDataError::EmptyCommit(v) => WriteDataError::EmptyCommit(v),
+            StageDataError::MergeError(v) => WriteDataError::MergeError(v),
+            StageDataError::Internal(v) => WriteDataError::Internal(v),
+        }
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, thiserror::Error)]
+pub enum StageDataError {
+    #[error(transparent)]
+    EmptyCommit(#[from] EmptyCommitError),
+
+    #[error(transparent)]
+    MergeError(#[from] MergeError),
+
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+
+///////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, thiserror::Error)]
 #[error("Nothing to commit")]

@@ -16,14 +16,9 @@ use datafusion::common::SchemaError;
 use datafusion::error::DataFusionError;
 use datafusion::prelude::{DataFrame, SessionContext};
 use dill::*;
+use kamu_core::ingest::*;
 use kamu_core::*;
-use kamu_ingest_datafusion::{
-    DataWriter,
-    DataWriterDataFusion,
-    Reader,
-    WriteDataError,
-    WriteDataOpts,
-};
+use kamu_ingest_datafusion::DataWriterDataFusion;
 use opendatafabric::serde::yaml::Manifest;
 use opendatafabric::*;
 
@@ -264,9 +259,6 @@ impl IngestServiceImpl {
 
         let df = self.read(&args, &prepare_result).await?;
 
-        args.listener
-            .on_stage_progress(IngestStage::Preprocess, 0, TotalSteps::Exact(1));
-
         let df = if let Some(df) = df {
             let df = self.preprocess(&args, df).await?;
             self.validate_new_data(&df, args.data_writer.vocab())?;
@@ -275,20 +267,15 @@ impl IngestServiceImpl {
             None
         };
 
-        args.listener
-            .on_stage_progress(IngestStage::Merge, 0, TotalSteps::Exact(1));
-        args.listener
-            .on_stage_progress(IngestStage::Commit, 0, TotalSteps::Exact(1));
-
         let source_state = savepoint.source_state.map(|ss| ss.to_source_state());
 
         let out_dir = args.operation_dir.join("out");
         let data_staging_path = out_dir.join("data");
         std::fs::create_dir(&out_dir).int_err()?;
 
-        let res = args
+        let stage_result = args
             .data_writer
-            .write(
+            .stage(
                 df,
                 WriteDataOpts {
                     system_time: args.system_time.clone(),
@@ -309,21 +296,27 @@ impl IngestServiceImpl {
             std::fs::remove_file(self.cache_dir.join(prepare_result.data_cache_key)).int_err()?;
         }
 
-        match res {
-            Ok(res) => Ok(IngestResult::Updated {
-                old_head: res.old_head,
-                new_head: res.new_head,
-                num_blocks: 1,
-                has_more: savepoint.has_more,
-                uncacheable,
-            }),
-            Err(WriteDataError::EmptyCommit(_)) => Ok(IngestResult::UpToDate {
+        match stage_result {
+            Ok(staged) => {
+                args.listener
+                    .on_stage_progress(IngestStage::Commit, 0, TotalSteps::Exact(1));
+
+                let res = args.data_writer.commit(staged).await?;
+
+                Ok(IngestResult::Updated {
+                    old_head: res.old_head,
+                    new_head: res.new_head,
+                    num_blocks: 1,
+                    has_more: savepoint.has_more,
+                    uncacheable,
+                })
+            }
+            Err(StageDataError::EmptyCommit(_)) => Ok(IngestResult::UpToDate {
                 no_polling_source: false,
                 uncacheable,
             }),
-            Err(WriteDataError::MergeError(e)) => Err(e.into()),
-            Err(WriteDataError::CommitError(e)) => Err(e.into()),
-            Err(WriteDataError::Internal(e)) => Err(e.into()),
+            Err(StageDataError::MergeError(e)) => Err(e.into()),
+            Err(StageDataError::Internal(e)) => Err(e.into()),
         }
     }
 
@@ -473,8 +466,7 @@ impl IngestServiceImpl {
         args: &IngestIterationArgs<'_>,
         fetch_result: &FetchSavepoint,
     ) -> Result<PrepStepResult, IngestError> {
-        let null_steps: Vec<_> = Vec::new();
-        let prep_steps = args.polling_source.prepare.as_ref().unwrap_or(&null_steps);
+        let prep_steps = args.polling_source.prepare.clone().unwrap_or_default();
 
         if prep_steps.is_empty() {
             Ok(PrepStepResult {
@@ -486,8 +478,20 @@ impl IngestServiceImpl {
             let data_cache_key = self.get_random_cache_key("prepare-");
             let target_path = self.cache_dir.join(&data_cache_key);
 
-            let prep_service = PrepService::new();
-            prep_service.prepare(prep_steps, &src_path, &target_path)?;
+            tracing::debug!(
+                ?src_path,
+                ?target_path,
+                ?prep_steps,
+                "Executing prepare step",
+            );
+
+            // TODO: Make async
+            tokio::task::spawn_blocking(move || {
+                let prep_service = PrepService::new();
+                prep_service.prepare(&prep_steps, &src_path, &target_path)
+            })
+            .await
+            .int_err()??;
 
             Ok(PrepStepResult { data_cache_key })
         }

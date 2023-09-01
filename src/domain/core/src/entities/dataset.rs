@@ -170,6 +170,7 @@ pub enum CommitError {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 /// Replicates [AddData] event prior to hashing of data and checkpoint
+#[derive(Debug, Clone)]
 pub struct AddDataParams {
     pub input_checkpoint: Option<Multihash>,
     pub output_data: Option<OffsetInterval>,
@@ -180,6 +181,7 @@ pub struct AddDataParams {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 /// Replicates [ExecuteQuery] event prior to hashing of data and checkpoint
+#[derive(Debug, Clone)]
 pub struct ExecuteQueryParams {
     pub input_slices: Vec<InputSlice>,
     pub input_checkpoint: Option<Multihash>,
