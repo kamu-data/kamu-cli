@@ -230,3 +230,55 @@ async fn test_read_csv_null_values() {
     )
     .await;
 }
+
+///////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, ingest, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_read_tsv_null_values() {
+    test_reader_common::test_reader_success_textual(
+        ReaderCsv {},
+        ReadStepCsv {
+            header: Some(false),
+            separator: Some("\t".to_string()),
+            schema: Some(vec![
+                "a INT".to_string(),
+                "b INT".to_string(),
+                "c INT".to_string(),
+                "d INT".to_string(),
+            ]),
+            ..Default::default()
+        },
+        indoc!(
+            "
+            1\t2\t3\t4
+            1\t\t\t4
+            1\t2\t\t
+            \t\t3\t4
+            "
+        ),
+        indoc!(
+            r#"
+            message arrow_schema {
+              OPTIONAL INT32 a;
+              OPTIONAL INT32 b;
+              OPTIONAL INT32 c;
+              OPTIONAL INT32 d;
+            }
+            "#
+        ),
+        indoc!(
+            r#"
+            +---+---+---+---+
+            | a | b | c | d |
+            +---+---+---+---+
+            | 1 | 2 | 3 | 4 |
+            | 1 |   |   | 4 |
+            | 1 | 2 |   |   |
+            |   |   | 3 | 4 |
+            +---+---+---+---+
+            "#
+        ),
+    )
+    .await;
+}

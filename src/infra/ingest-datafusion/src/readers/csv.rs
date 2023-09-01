@@ -53,7 +53,7 @@ impl Reader for ReaderCsv {
         };
 
         let delimiter = match &conf.separator {
-            Some(v) => {
+            Some(v) if v.len() > 0 => {
                 if v.as_bytes().len() > 1 {
                     return Err("Csv.separator supports only single-character ascii values"
                         .int_err()
@@ -61,11 +61,10 @@ impl Reader for ReaderCsv {
                 }
                 v.as_bytes()[0]
             }
-            None => b',',
+            _ => b',',
         };
         let quote = match &conf.quote {
-            None => Ok(b'"'),
-            Some(v) => {
+            Some(v) if v.len() > 0 => {
                 if v.as_bytes().len() > 1 {
                     Err(unsupported!(
                         "Csv.quote supports only single-character ascii values, got: {}",
@@ -75,10 +74,10 @@ impl Reader for ReaderCsv {
                     Ok(v.as_bytes()[0])
                 }
             }
+            _ => Ok(b'"'),
         }?;
         let escape = match &conf.escape {
-            None => Ok(None),
-            Some(v) => {
+            Some(v) if v.len() > 0 => {
                 if v.as_bytes().len() > 1 {
                     Err(unsupported!(
                         "Csv.escape supports only single-character ascii values, got: {}",
@@ -88,6 +87,7 @@ impl Reader for ReaderCsv {
                     Ok(Some(v.as_bytes()[0]))
                 }
             }
+            _ => Ok(None),
         }?;
         match conf.encoding.as_ref().map(|s| s.as_str()) {
             None | Some("utf8") => Ok(()),
