@@ -346,55 +346,59 @@ impl IngestServiceImpl {
         let savepoint = self.read_fetch_savepoint(&savepoint_path)?;
 
         if let Some(savepoint) = savepoint {
-            tracing::info!(?savepoint_path, "Resuming from savepoint");
-
-            args.listener.on_cache_hit(&savepoint.created_at);
-
-            Ok(FetchStepResult::Updated(savepoint))
-        } else {
-            // Just in case user deleted it manually
-            if !self.cache_dir.exists() {
-                std::fs::create_dir(&self.cache_dir).int_err()?;
+            if prev_source_state.is_none() && args.options.fetch_uncacheable {
+                tracing::info!(
+                    ?savepoint_path,
+                    "Ingoring savepoint due to --fetch-uncacheable"
+                );
+            } else {
+                tracing::info!(?savepoint_path, "Resuming from savepoint");
+                args.listener.on_cache_hit(&savepoint.created_at);
+                return Ok(FetchStepResult::Updated(savepoint));
             }
+        }
 
-            let data_cache_key = self.get_random_cache_key("fetch-");
-            let target_path = self.cache_dir.join(&data_cache_key);
+        // Just in case user deleted it manually
+        if !self.cache_dir.exists() {
+            std::fs::create_dir(&self.cache_dir).int_err()?;
+        }
 
-            let fetch_service =
-                FetchService::new(self.container_runtime.clone(), &self.run_info_dir);
+        let data_cache_key = self.get_random_cache_key("fetch-");
+        let target_path = self.cache_dir.join(&data_cache_key);
 
-            let fetch_result = fetch_service
-                .fetch(
-                    &args.operation_id,
-                    fetch_step,
-                    prev_source_state.as_ref(),
-                    &target_path,
-                    &args.system_time,
-                    Some(Arc::new(FetchProgressListenerBridge::new(
-                        args.listener.clone(),
-                    ))),
-                )
-                .await?;
+        let fetch_service = FetchService::new(self.container_runtime.clone(), &self.run_info_dir);
 
-            match fetch_result {
-                FetchResult::UpToDate => Ok(FetchStepResult::UpToDate),
-                FetchResult::Updated(upd) => {
-                    let savepoint = FetchSavepoint {
-                        created_at: args.system_time.clone(),
-                        // If fetch source was overridden we don't want to put its
-                        // source state into the metadata.
-                        source_state: if args.fetch_override.is_none() {
-                            upd.source_state
-                        } else {
-                            None
-                        },
-                        source_event_time: upd.source_event_time,
-                        data_cache_key,
-                        has_more: upd.has_more,
-                    };
-                    self.write_fetch_savepoint(&savepoint_path, &savepoint)?;
-                    Ok(FetchStepResult::Updated(savepoint))
-                }
+        let fetch_result = fetch_service
+            .fetch(
+                &args.operation_id,
+                fetch_step,
+                prev_source_state.as_ref(),
+                &target_path,
+                &args.system_time,
+                Some(Arc::new(FetchProgressListenerBridge::new(
+                    args.listener.clone(),
+                ))),
+            )
+            .await?;
+
+        match fetch_result {
+            FetchResult::UpToDate => Ok(FetchStepResult::UpToDate),
+            FetchResult::Updated(upd) => {
+                let savepoint = FetchSavepoint {
+                    created_at: args.system_time.clone(),
+                    // If fetch source was overridden we don't want to put its
+                    // source state into the metadata.
+                    source_state: if args.fetch_override.is_none() {
+                        upd.source_state
+                    } else {
+                        None
+                    },
+                    source_event_time: upd.source_event_time,
+                    data_cache_key,
+                    has_more: upd.has_more,
+                };
+                self.write_fetch_savepoint(&savepoint_path, &savepoint)?;
+                Ok(FetchStepResult::Updated(savepoint))
             }
         }
     }
