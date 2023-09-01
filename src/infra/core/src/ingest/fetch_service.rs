@@ -70,7 +70,7 @@ impl FetchService {
                             prev_source_state,
                             target_path,
                             system_time,
-                            listener.as_ref(),
+                            &listener,
                         )
                         .await
                     }
@@ -82,12 +82,12 @@ impl FetchService {
                             prev_source_state,
                             target_path,
                             system_time,
-                            listener.as_ref(),
+                            &listener,
                         )
                         .await
                     }
                     "ftp" | "ftps" => {
-                        Self::fetch_ftp(url, target_path, system_time, listener).await
+                        Self::fetch_ftp(url, target_path, system_time, &listener).await
                     }
                     // TODO: Replace with proper error type
                     scheme => unimplemented!("Unsupported scheme: {}", scheme),
@@ -99,7 +99,7 @@ impl FetchService {
                     fetch,
                     prev_source_state,
                     target_path,
-                    listener,
+                    &listener,
                 )
                 .await
             }
@@ -109,7 +109,7 @@ impl FetchService {
                     prev_source_state,
                     target_path,
                     system_time,
-                    listener.as_ref(),
+                    &listener,
                 )
                 .await
             }
@@ -181,7 +181,7 @@ impl FetchService {
         fetch: &FetchStepContainer,
         prev_source_state: Option<&PollingSourceState>,
         target_path: &Path,
-        listener: Arc<dyn FetchProgressListener>,
+        listener: &Arc<dyn FetchProgressListener>,
     ) -> Result<FetchResult, IngestError> {
         // Pull image
         let pull_image_listener = listener
@@ -263,6 +263,8 @@ impl FetchService {
 
         // Handle output in a task
         let mut stdout = container.take_stdout().unwrap();
+        let listener = listener.clone();
+
         let output_task = tokio::spawn(async move {
             use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
@@ -348,7 +350,7 @@ impl FetchService {
         prev_source_state: Option<&PollingSourceState>,
         target_path: &Path,
         system_time: &DateTime<Utc>,
-        listener: &dyn FetchProgressListener,
+        listener: &Arc<dyn FetchProgressListener>,
     ) -> Result<FetchResult, IngestError> {
         match &fglob.order {
             None => (),
@@ -436,7 +438,7 @@ impl FetchService {
         prev_source_state: Option<&PollingSourceState>,
         target_path: &Path,
         system_time: &DateTime<Utc>,
-        listener: &dyn FetchProgressListener,
+        listener: &Arc<dyn FetchProgressListener>,
     ) -> Result<FetchResult, IngestError> {
         tracing::info!(?path, "Ingesting file");
 
@@ -472,28 +474,37 @@ impl FetchService {
             }
         };
 
-        let mut fetched_bytes = 0;
         let total_bytes = TotalBytes::Exact(meta.len());
-        let mut source = tokio::fs::File::open(path).await.int_err()?;
-        let mut target = tokio::fs::File::create(target_path).await.int_err()?;
+        let mut source = std::fs::File::open(path).int_err()?;
+        let mut target = std::fs::File::create(target_path).int_err()?;
+        let listener = listener.clone();
 
-        let mut buf = [0u8; 1024];
-        loop {
-            use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        tokio::task::spawn_blocking(move || -> Result<(), std::io::Error> {
+            use std::io::{Read, Write};
 
-            let read = source.read(&mut buf).await.int_err()?;
-            if read == 0 {
-                break;
+            let mut buf = [0u8; 1024];
+            let mut fetched_bytes = 0;
+
+            loop {
+                let read = source.read(&mut buf)?;
+                if read == 0 {
+                    break;
+                }
+
+                target.write_all(&buf[..read])?;
+
+                fetched_bytes += read as u64;
+                listener.on_progress(&FetchProgress {
+                    fetched_bytes,
+                    total_bytes,
+                });
             }
 
-            target.write_all(&buf[..read]).await.int_err()?;
-
-            fetched_bytes += read as u64;
-            listener.on_progress(&FetchProgress {
-                fetched_bytes,
-                total_bytes,
-            });
-        }
+            Ok(())
+        })
+        .await
+        .int_err()?
+        .int_err()?;
 
         Ok(FetchResult::Updated(FetchResultUpdated {
             source_state: Some(PollingSourceState::LastModified(mod_time)),
@@ -514,7 +525,7 @@ impl FetchService {
         prev_source_state: Option<&PollingSourceState>,
         target_path: &Path,
         system_time: &DateTime<Utc>,
-        listener: &dyn FetchProgressListener,
+        listener: &Arc<dyn FetchProgressListener>,
     ) -> Result<FetchResult, IngestError> {
         use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
         use reqwest::StatusCode;
@@ -632,7 +643,7 @@ impl FetchService {
         url: Url,
         target_path: &Path,
         system_time: &DateTime<Utc>,
-        listener: Arc<dyn FetchProgressListener>,
+        listener: &Arc<dyn FetchProgressListener>,
     ) -> Result<FetchResult, IngestError> {
         cfg_if::cfg_if! {
             if #[cfg(feature = "ftp")] {
