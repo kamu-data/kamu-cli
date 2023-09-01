@@ -649,6 +649,7 @@ impl FetchService {
             if #[cfg(feature = "ftp")] {
                 let target_path = target_path.to_owned();
                 let system_time = system_time.clone();
+                let listener = listener.clone();
                 tokio::task::spawn_blocking(move || {
                         Self::fetch_ftp_impl(
                             url,
