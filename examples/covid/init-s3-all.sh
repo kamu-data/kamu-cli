@@ -1,12 +1,12 @@
 #!/bin/sh
-# Downloads cached root and derivative datasets from S3 repository (for faster experimetation and testing)
+# Downloads cached root and derivative datasets from S3 repository for faster experimetation and testing
 set -e
 
-./init-s3.sh
+S3_BASE_URL="https://s3.us-west-2.amazonaws.com/datasets.kamu.dev/odf/v1/examples/"
 
-kamu pull "https://s3.us-west-2.amazonaws.com/datasets.kamu.dev/alberta.case-details.hm"
-kamu pull "https://s3.us-west-2.amazonaws.com/datasets.kamu.dev/british-columbia.case-details.hm"
-kamu pull "https://s3.us-west-2.amazonaws.com/datasets.kamu.dev/canada.case-details"
-kamu pull "https://s3.us-west-2.amazonaws.com/datasets.kamu.dev/canada.daily-cases"
-kamu pull "https://s3.us-west-2.amazonaws.com/datasets.kamu.dev/ontario.case-details.hm"
-kamu pull "https://s3.us-west-2.amazonaws.com/datasets.kamu.dev/quebec.case-details.hm"
+kamu init || true
+
+kamu pull "${S3_BASE_URL}alberta.case-details"
+kamu pull "${S3_BASE_URL}british-columbia.case-details"
+kamu pull "${S3_BASE_URL}ontario.case-details"
+kamu pull "${S3_BASE_URL}quebec.case-details"

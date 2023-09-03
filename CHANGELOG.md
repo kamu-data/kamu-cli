@@ -4,9 +4,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [0.142.1] - 2023-09-02
 ### Fixed
 - `RecordsFormat` Utf8 issue when truncating strings
+### Changed
+- Updated `kamu-base:latest-with-data` image to use new DF-ingest-based datasets
 
 ## [0.142.0] - 2023-09-01
 ### Fixed

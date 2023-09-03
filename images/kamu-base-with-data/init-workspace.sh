@@ -1,7 +1,7 @@
 #!/bin/sh
 
-EXTERNAL_URL=s3://datasets.kamu.dev/
-EXAMPLES_URL=s3://datasets.kamu.dev/example/
+EXTERNAL_URL="s3://datasets.kamu.dev/odf/v1/contrib/"
+EXAMPLES_URL="s3://datasets.kamu.dev/odf/v1/example/"
 
 set -e
 
