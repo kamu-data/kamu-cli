@@ -133,7 +133,7 @@ impl RecordsFormat {
                             .downcast_ref::<fn(DateTime<Utc>) -> String>()
                             .unwrap();
                         let value = t_array.value_as_datetime(row).unwrap();
-                        let value = DateTime::from_utc(value, Utc);
+                        let value = DateTime::from_naive_utc_and_offset(value, Utc);
                         t_value_fmt(value)
                     }
                     _ => unimplemented!(),
@@ -152,9 +152,12 @@ impl RecordsFormat {
             .and_then(|cf| cf.max_len)
             .or_else(|| self.default_column_format.max_len)
         {
+            // Quick bytes check
             if value.len() > max_len {
-                value.truncate(max_len);
-                value.push_str("...");
+                if let Some((byte_index, _)) = value.char_indices().nth(max_len) {
+                    value.truncate(byte_index);
+                    value.push_str("...");
+                }
             }
         }
 

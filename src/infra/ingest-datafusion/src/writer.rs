@@ -399,10 +399,10 @@ impl DataWriterDataFusion {
             Utc.timestamp_millis_opt(event_time_max_millis).unwrap()
         } else if let Some(event_time_arr) = event_time_arr.downcast_ref::<Date64Array>() {
             let naive_datetime = event_time_arr.value_as_datetime(0).unwrap();
-            DateTime::from_utc(naive_datetime, Utc)
+            DateTime::from_naive_utc_and_offset(naive_datetime, Utc)
         } else if let Some(event_time_arr) = event_time_arr.downcast_ref::<Date32Array>() {
             let naive_datetime = event_time_arr.value_as_datetime(0).unwrap();
-            DateTime::from_utc(naive_datetime, Utc)
+            DateTime::from_naive_utc_and_offset(naive_datetime, Utc)
         } else {
             return Err(format!(
                 "Expected event time column to be Date64 or Timestamp(Millisecond, UTC), but got \
