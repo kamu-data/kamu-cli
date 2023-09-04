@@ -15,15 +15,19 @@ use crate::auth::DEFAULT_ACCOUNT_NAME;
 
 pub struct CurrentAccountSubject {
     pub account_name: AccountName,
+    pub anonymous: bool,
 }
 
 impl CurrentAccountSubject {
     pub fn new_test() -> Self {
-        CurrentAccountSubject::new(AccountName::new_unchecked(DEFAULT_ACCOUNT_NAME))
+        CurrentAccountSubject::new(AccountName::new_unchecked(DEFAULT_ACCOUNT_NAME), false)
     }
 
-    pub fn new(account_name: AccountName) -> Self {
-        Self { account_name }
+    pub fn new(account_name: AccountName, anonymous: bool) -> Self {
+        Self {
+            account_name,
+            anonymous,
+        }
     }
 }
 

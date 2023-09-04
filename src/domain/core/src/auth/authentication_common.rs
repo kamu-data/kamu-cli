@@ -20,6 +20,8 @@ pub type AccountDisplayName = String;
 pub const DEFAULT_ACCOUNT_NAME: &str = "kamu";
 pub const DEFAULT_AVATAR_URL: &str = "https://avatars.githubusercontent.com/u/50896974?s=200&v=4";
 
+pub const ANONYMOUS_ACCOUNT_NAME: &str = "kamu.anonymous";
+
 ///////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -165,6 +165,13 @@ impl auth::AuthenticationProvider for AccountService {
             ));
         }
 
+        // Do not allow logging via system reserved names
+        if password_login_credentials.login == auth::ANONYMOUS_ACCOUNT_NAME {
+            return Err(auth::ProviderLoginError::RejectedCredentials(
+                auth::RejectedCredentialsError::new("Invalid login or password".into()),
+            ));
+        }
+
         // The account might be predefined in the configuration
         let account_info = self
             .get_account_info_impl(&password_login_credentials.login)
@@ -252,7 +259,10 @@ impl CurrentAccountIndication {
     }
 
     pub fn to_current_account_subject(&self) -> CurrentAccountSubject {
-        CurrentAccountSubject::new(AccountName::from(self.account_name.clone()))
+        CurrentAccountSubject::new(
+            AccountName::from(self.account_name.clone()),
+            self.account_name == auth::ANONYMOUS_ACCOUNT_NAME,
+        )
     }
 }
 

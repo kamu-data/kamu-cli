@@ -3136,6 +3136,7 @@ dependencies = [
  "tempfile",
  "test-group",
  "test-log",
+ "thiserror",
  "tokio",
  "tracing",
  "tracing-subscriber",

@@ -21,17 +21,17 @@ use opendatafabric::*;
 #[test_log::test(tokio::test)]
 async fn metadata_chain_append_event() {
     let tempdir = tempfile::tempdir().unwrap();
-    let dataset_repo = DatasetRepositoryLocalFs::create(
-        tempdir.path().join("datasets"),
-        Arc::new(CurrentAccountSubject::new_test()),
-        Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new()),
-        false,
-    )
-    .unwrap();
 
     let cat = dill::CatalogBuilder::new()
-        .add_value(dataset_repo)
+        .add_builder(
+            dill::builder_for::<DatasetRepositoryLocalFs>()
+                .with_root(tempdir.path().join("datasets"))
+                .with_current_account_subject(Arc::new(CurrentAccountSubject::new_test()))
+                .with_multi_tenant(false),
+        )
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+        .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
+        .bind::<dyn auth::DatasetActionAuthorizer, auth::AlwaysHappyDatasetActionAuthorizer>()
         .add_value(kamu::testing::MockAuthenticationService::built_in())
         .bind::<dyn auth::AuthenticationService, kamu::testing::MockAuthenticationService>()
         .build();
@@ -117,17 +117,17 @@ async fn metadata_chain_append_event() {
 #[test_log::test(tokio::test)]
 async fn metadata_update_readme_new() {
     let tempdir = tempfile::tempdir().unwrap();
-    let dataset_repo = DatasetRepositoryLocalFs::create(
-        tempdir.path().join("datasets"),
-        Arc::new(CurrentAccountSubject::new_test()),
-        Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new()),
-        false,
-    )
-    .unwrap();
 
     let cat = dill::CatalogBuilder::new()
-        .add_value(dataset_repo)
+        .add_builder(
+            dill::builder_for::<DatasetRepositoryLocalFs>()
+                .with_root(tempdir.path().join("datasets"))
+                .with_current_account_subject(Arc::new(CurrentAccountSubject::new_test()))
+                .with_multi_tenant(false),
+        )
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+        .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
+        .bind::<dyn auth::DatasetActionAuthorizer, auth::AlwaysHappyDatasetActionAuthorizer>()
         .add_value(kamu::testing::MockAuthenticationService::built_in())
         .bind::<dyn auth::AuthenticationService, kamu::testing::MockAuthenticationService>()
         .build();

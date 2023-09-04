@@ -25,6 +25,7 @@ async fn create_catalog_with_local_workspace(tempdir: &Path) -> dill::Catalog {
         .add_builder(
             dill::builder_for::<DatasetRepositoryLocalFs>()
                 .with_root(tempdir.join("datasets"))
+                .with_current_account_subject(Arc::new(CurrentAccountSubject::new_test()))
                 .with_multi_tenant(false),
         )
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
@@ -34,7 +35,6 @@ async fn create_catalog_with_local_workspace(tempdir: &Path) -> dill::Catalog {
         .bind::<dyn ObjectStoreRegistry, ObjectStoreRegistryImpl>()
         .add_value(ObjectStoreBuilderLocalFs::new())
         .bind::<dyn ObjectStoreBuilder, ObjectStoreBuilderLocalFs>()
-        .add_value(CurrentAccountSubject::new_test())
         .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
         .bind::<dyn auth::DatasetActionAuthorizer, auth::AlwaysHappyDatasetActionAuthorizer>()
         .build()

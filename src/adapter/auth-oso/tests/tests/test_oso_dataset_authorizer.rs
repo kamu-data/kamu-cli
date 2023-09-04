@@ -86,6 +86,7 @@ impl DatasetAuthorizerHarness {
 
         let current_account_subject = Arc::new(CurrentAccountSubject::new(
             AccountName::new_unchecked(current_account_name),
+            false,
         ));
 
         let dataset_authorizer = Arc::new(OsoDatasetAuthorizer::new(

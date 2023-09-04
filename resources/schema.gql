@@ -210,6 +210,11 @@ type Dataset {
 	lastUpdatedAt: DateTime!
 }
 
+type DatasetAccessError implements CommitResult & UpdateReadmeResult & RenameResult & DeleteResult {
+	datasetAlias: DatasetAlias!
+	message: String!
+}
+
 scalar DatasetAlias
 
 type DatasetConnection {
