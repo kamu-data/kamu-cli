@@ -53,14 +53,12 @@ pub async fn run(
     prepare_run_dir(&workspace_layout.run_info_dir);
 
     // Configure application
-    let (guards, catalog, output_config) = {
-        let mut catalog_builder =
-            configure_catalog(&workspace_layout, workspace_svc.is_multi_tenant_workspace());
-        catalog_builder.add_value(workspace_layout.clone());
+    let (guards, base_catalog, cli_catalog, output_config) = {
+        let mut base_catalog_builder =
+            configure_base_catalog(&workspace_layout, workspace_svc.is_multi_tenant_workspace());
 
         let output_config = configure_output_format(&matches, &workspace_svc);
-        catalog_builder.add_value(output_config.clone());
-        catalog_builder.add_value(current_account.to_current_account_subject());
+        base_catalog_builder.add_value(output_config.clone());
 
         let guards = configure_logging(&output_config, &workspace_layout);
         tracing::info!(
@@ -74,19 +72,26 @@ pub async fn run(
         let config = load_config(&workspace_layout);
         register_config_in_catalog(
             &config,
-            &mut catalog_builder,
+            &mut base_catalog_builder,
             workspace_svc.is_multi_tenant_workspace(),
         );
 
-        (guards, catalog_builder.build(), output_config)
+        let base_catalog = base_catalog_builder.build();
+
+        let cli_catalog = configure_cli_catalog(&base_catalog)
+            .add_value(workspace_layout.clone())
+            .add_value(current_account.to_current_account_subject())
+            .build();
+
+        (guards, base_catalog, cli_catalog, output_config)
     };
 
     // Evict cache
     if workspace_svc.is_in_workspace() && !workspace_svc.is_upgrade_needed()? {
-        catalog.get_one::<GcService>()?.evict_cache()?;
+        cli_catalog.get_one::<GcService>()?.evict_cache()?;
     }
 
-    let result = match cli_commands::get_command(&catalog, matches) {
+    let result = match cli_commands::get_command(&base_catalog, &cli_catalog, matches) {
         Ok(mut command) => {
             if command.needs_workspace() && !workspace_svc.is_in_workspace() {
                 Err(CLIError::usage_error_from(NotInWorkspace))
@@ -134,19 +139,13 @@ pub async fn run(
 /////////////////////////////////////////////////////////////////////////////////////////
 
 // Public only for tests
-pub fn configure_catalog(
+pub fn configure_base_catalog(
     workspace_layout: &WorkspaceLayout,
     multi_tenant_workspace: bool,
 ) -> CatalogBuilder {
     let mut b = CatalogBuilder::new();
 
-    b.add::<ConfigService>();
     b.add::<ContainerRuntime>();
-    b.add::<GcService>();
-    b.add::<WorkspaceService>();
-
-    b.add::<AccountService>();
-    b.bind::<dyn auth::AuthenticationProvider, AccountService>();
 
     b.add::<SystemTimeSourceDefault>();
     b.bind::<dyn SystemTimeSource, SystemTimeSourceDefault>();
@@ -237,12 +236,26 @@ pub fn configure_catalog(
         b.bind::<dyn domain::auth::AuthenticationProvider, kamu_adapter_oauth::OAuthGithub>();
     }
 
+    b.add::<AccountService>();
+    b.bind::<dyn auth::AuthenticationProvider, AccountService>();
+
     b.add::<AuthenticationServiceImpl>();
     b.bind::<dyn domain::auth::AuthenticationService, AuthenticationServiceImpl>();
 
     b.add::<kamu_adapter_auth_oso::KamuAuthOso>();
     b.add::<kamu_adapter_auth_oso::OsoDatasetAuthorizer>();
     b.bind::<dyn domain::auth::DatasetActionAuthorizer, kamu_adapter_auth_oso::OsoDatasetAuthorizer>();
+
+    b
+}
+
+// Public only for tests
+pub fn configure_cli_catalog(base_catalog: &Catalog) -> CatalogBuilder {
+    let mut b = CatalogBuilder::new_chained(base_catalog);
+
+    b.add::<ConfigService>();
+    b.add::<GcService>();
+    b.add::<WorkspaceService>();
 
     b
 }

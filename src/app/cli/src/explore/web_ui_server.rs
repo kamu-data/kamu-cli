@@ -12,7 +12,7 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use axum::http::Uri;
 use axum::response::{IntoResponse, Response};
 use dill::Catalog;
-use kamu::domain;
+use opendatafabric::AccountName;
 use rust_embed::RustEmbed;
 use serde::Serialize;
 
@@ -60,7 +60,12 @@ pub struct WebUIServer {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 impl WebUIServer {
-    pub fn new(catalog: Catalog, address: Option<IpAddr>, port: Option<u16>) -> Self {
+    pub fn new(
+        base_catalog: Catalog,
+        current_account_name: AccountName,
+        address: Option<IpAddr>,
+        port: Option<u16>,
+    ) -> Self {
         let addr = SocketAddr::from((
             address.unwrap_or(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1))),
             port.unwrap_or(0),
@@ -70,11 +75,10 @@ impl WebUIServer {
             panic!("error binding to {}: {}", addr, e);
         });
 
-        let current_account_subject = catalog.get_one::<domain::CurrentAccountSubject>().unwrap();
         let login_credentials = PasswordLoginCredentials {
-            login: current_account_subject.account_name.to_string(),
+            login: current_account_name.to_string(),
             // Note: note a mistake, use identical login and password, equal to account name
-            password: current_account_subject.account_name.to_string(),
+            password: current_account_name.to_string(),
         };
 
         let gql_schema = kamu_adapter_graphql::schema();
@@ -114,7 +118,7 @@ impl WebUIServer {
                             .allow_methods(vec![http::Method::GET, http::Method::POST])
                             .allow_headers(tower_http::cors::Any),
                     )
-                    .layer(axum::extract::Extension(catalog))
+                    .layer(axum::extract::Extension(base_catalog))
                     .layer(axum::extract::Extension(gql_schema))
                     .layer(axum::extract::Extension(web_ui_config)),
             );
@@ -164,9 +168,23 @@ async fn runtime_config_handler(
 
 async fn graphql_handler(
     schema: axum::extract::Extension<kamu_adapter_graphql::Schema>,
+    base_catalog: axum::extract::Extension<dill::Catalog>,
+    maybe_access_token_header: Option<
+        axum::TypedHeader<axum::headers::Authorization<axum::headers::authorization::Bearer>>,
+    >,
     req: async_graphql_axum::GraphQLRequest,
 ) -> async_graphql_axum::GraphQLResponse {
-    schema.execute(req.into_inner()).await.into()
+    let maybe_access_token =
+        maybe_access_token_header.map(|th| kamu_adapter_graphql::AccessToken::new(th.token()));
+
+    kamu_adapter_graphql::execute_query(
+        schema.0,
+        base_catalog.0,
+        maybe_access_token,
+        req.into_inner(),
+    )
+    .await
+    .into()
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

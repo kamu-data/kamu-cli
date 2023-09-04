@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use kamu_core::{auth, CurrentAccountSubject};
+
 use crate::extensions::*;
 use crate::mutations::*;
 use crate::prelude::*;
@@ -126,19 +128,40 @@ pub fn schema() -> Schema {
 /// Executes GraphQL query
 pub async fn execute_query(
     schema: Schema,
-    catalog: dill::Catalog,
+    base_catalog: dill::Catalog,
     maybe_access_token: Option<AccessToken>,
     req: impl Into<Request>,
 ) -> async_graphql::Response {
-    let req = req.into();
+    let graphql_request = req.into();
 
-    let req = if let Some(access_token) = maybe_access_token {
-        req.data(access_token)
+    let graphql_request = if let Some(access_token) = maybe_access_token {
+        let authentication_service = base_catalog
+            .get_one::<dyn auth::AuthenticationService>()
+            .unwrap();
+
+        let current_account_info = match authentication_service
+            .get_account_info(access_token.token)
+            .await
+        {
+            Ok(account_info) => account_info,
+            Err(e) => {
+                return async_graphql::Response::from_errors(vec![async_graphql::ServerError::new(
+                    e.to_string(),
+                    None,
+                )])
+            }
+        };
+
+        let graphql_catalog = dill::CatalogBuilder::new_chained(&base_catalog)
+            .add_value(CurrentAccountSubject::new(
+                current_account_info.account_name,
+            ))
+            .build();
+
+        graphql_request.data(graphql_catalog)
     } else {
-        req
+        graphql_request.data(base_catalog)
     };
 
-    let req = req.data(catalog);
-
-    schema.execute(req).await
+    schema.execute(graphql_request).await
 }

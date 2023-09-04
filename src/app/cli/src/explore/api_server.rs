@@ -29,10 +29,10 @@ pub struct APIServer {
 }
 
 impl APIServer {
-    pub fn new(catalog: Catalog, address: Option<IpAddr>, port: Option<u16>) -> Self {
+    pub fn new(base_catalog: Catalog, address: Option<IpAddr>, port: Option<u16>) -> Self {
         use axum::extract::{Extension, Path};
 
-        let task_executor = catalog.get_one().unwrap();
+        let task_executor = base_catalog.get_one().unwrap();
 
         let gql_schema = kamu_adapter_graphql::schema();
 
@@ -44,11 +44,11 @@ impl APIServer {
             )
             .nest(
                 "/:dataset_name",
-                kamu_adapter_http::smart_transfer_protocol_routes()
-                    .layer(kamu_adapter_http::DatasetResolverLayer::new(
-                        |Path(p): Path<DatasetByName>| p.dataset_name.as_local_ref(),
-                    ))
-                    .layer(Extension(catalog)),
+                kamu_adapter_http::smart_transfer_protocol_routes().layer(
+                    kamu_adapter_http::DatasetResolverLayer::new(|Path(p): Path<DatasetByName>| {
+                        p.dataset_name.as_local_ref()
+                    }),
+                ),
             )
             .layer(
                 tower::ServiceBuilder::new()
@@ -59,6 +59,7 @@ impl APIServer {
                             .allow_methods(vec![http::Method::GET, http::Method::POST])
                             .allow_headers(tower_http::cors::Any),
                     )
+                    .layer(Extension(base_catalog))
                     .layer(Extension(gql_schema)),
             );
 
@@ -100,7 +101,7 @@ async fn root() -> impl axum::response::IntoResponse {
 
 async fn graphql_handler(
     schema: axum::extract::Extension<kamu_adapter_graphql::Schema>,
-    catalog: axum::extract::Extension<dill::Catalog>,
+    base_catalog: axum::extract::Extension<dill::Catalog>,
     maybe_access_token_header: Option<
         axum::TypedHeader<axum::headers::Authorization<axum::headers::authorization::Bearer>>,
     >,
@@ -109,9 +110,14 @@ async fn graphql_handler(
     let maybe_access_token =
         maybe_access_token_header.map(|th| kamu_adapter_graphql::AccessToken::new(th.token()));
 
-    kamu_adapter_graphql::execute_query(schema.0, catalog.0, maybe_access_token, req.into_inner())
-        .await
-        .into()
+    kamu_adapter_graphql::execute_query(
+        schema.0,
+        base_catalog.0,
+        maybe_access_token,
+        req.into_inner(),
+    )
+    .await
+    .into()
 }
 
 async fn graphql_playground() -> impl axum::response::IntoResponse {

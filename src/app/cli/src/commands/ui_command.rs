@@ -16,12 +16,14 @@ use std::sync::Arc;
 
 use console::style as s;
 use dill::Catalog;
+use opendatafabric::AccountName;
 
 use super::{CLIError, Command};
 use crate::OutputConfig;
 
 pub struct UICommand {
-    catalog: Catalog,
+    base_catalog: Catalog,
+    current_account_name: AccountName,
     output_config: Arc<OutputConfig>,
     address: Option<IpAddr>,
     port: Option<u16>,
@@ -29,13 +31,15 @@ pub struct UICommand {
 
 impl UICommand {
     pub fn new(
-        catalog: Catalog,
+        base_catalog: Catalog,
+        current_account_name: AccountName,
         output_config: Arc<OutputConfig>,
         address: Option<IpAddr>,
         port: Option<u16>,
     ) -> Self {
         Self {
-            catalog,
+            base_catalog,
+            current_account_name,
             output_config,
             address,
             port,
@@ -47,9 +51,12 @@ impl UICommand {
 #[async_trait::async_trait(?Send)]
 impl Command for UICommand {
     async fn run(&mut self) -> Result<(), CLIError> {
-        // TODO: Cloning catalog is too expensive currently
-        let web_server =
-            crate::explore::WebUIServer::new(self.catalog.clone(), self.address, self.port);
+        let web_server = crate::explore::WebUIServer::new(
+            self.base_catalog.clone(),
+            self.current_account_name.clone(),
+            self.address,
+            self.port,
+        );
 
         let web_server_url = format!("http://{}", web_server.local_addr());
         tracing::info!("HTTP server is listening on: {}", web_server_url);

@@ -8,9 +8,9 @@
 // by the Apache License, Version 2.0.
 
 use async_graphql::{Context, Guard, Result};
+use kamu_core::CurrentAccountSubject;
 
 use crate::prelude::from_catalog;
-use crate::utils::extract_access_token;
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
@@ -25,18 +25,9 @@ impl LoggedInGuard {
 #[async_trait::async_trait]
 impl Guard for LoggedInGuard {
     async fn check(&self, ctx: &Context<'_>) -> Result<()> {
-        let maybe_access_token = extract_access_token(ctx);
-        if let Some(access_token) = maybe_access_token {
-            let authentication_service =
-                from_catalog::<dyn kamu_core::auth::AuthenticationService>(ctx).unwrap();
-
-            match authentication_service
-                .get_account_info(access_token.token)
-                .await
-            {
-                Ok(_) => Ok(()),
-                Err(e) => Err(async_graphql::Error::new(e.to_string())),
-            }
+        let maybe_current_account_subject = from_catalog::<CurrentAccountSubject>(ctx).ok();
+        if let Some(_) = maybe_current_account_subject {
+            Ok(())
         } else {
             Err(async_graphql::Error::new("Anonymous access forbidden"))
         }
