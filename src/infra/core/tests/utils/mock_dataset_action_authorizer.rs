@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashSet;
+
 use kamu_core::auth::{
     self,
     DatasetAction,
@@ -30,6 +32,8 @@ mockall::mock! {
             dataset_handle: &DatasetHandle,
             action: DatasetAction,
         ) -> Result<(), DatasetActionUnauthorizedError>;
+
+        async fn get_allowed_actions(&self, dataset_handle: &DatasetHandle) -> HashSet<DatasetAction>;
     }
 }
 

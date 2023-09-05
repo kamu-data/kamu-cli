@@ -7,8 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashSet;
+use std::str::FromStr;
+
 use dill::component;
-use internal_error::InternalError;
+use internal_error::{ErrorIntoInternal, InternalError};
 use opendatafabric::{AccountName, DatasetHandle, DatasetRef};
 use thiserror::Error;
 
@@ -23,14 +26,30 @@ pub trait DatasetActionAuthorizer: Sync + Send {
         dataset_handle: &DatasetHandle,
         action: DatasetAction,
     ) -> Result<(), DatasetActionUnauthorizedError>;
+
+    async fn get_allowed_actions(&self, dataset_handle: &DatasetHandle) -> HashSet<DatasetAction>;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 pub enum DatasetAction {
     Read,
     Write,
+}
+
+impl FromStr for DatasetAction {
+    type Err = InternalError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s == "read" {
+            Ok(DatasetAction::Read)
+        } else if s == "write" {
+            Ok(DatasetAction::Write)
+        } else {
+            Err(format!("Invalid DatasetAction: {}", s).int_err())
+        }
+    }
 }
 
 impl std::fmt::Display for DatasetAction {
@@ -80,6 +99,10 @@ impl DatasetActionAuthorizer for AlwaysHappyDatasetActionAuthorizer {
     ) -> Result<(), DatasetActionUnauthorizedError> {
         // Ignore rules
         Ok(())
+    }
+
+    async fn get_allowed_actions(&self, _dataset_handle: &DatasetHandle) -> HashSet<DatasetAction> {
+        HashSet::from([DatasetAction::Read, DatasetAction::Write])
     }
 }
 

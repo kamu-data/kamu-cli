@@ -208,6 +208,10 @@ type Dataset {
 	Creation time of the most recent metadata block in the chain
 	"""
 	lastUpdatedAt: DateTime!
+	"""
+	Permissions of the current user
+	"""
+	permissions: DatasetPermissions!
 }
 
 type DatasetAccessError implements CommitResult & UpdateReadmeResult & RenameResult & DeleteResult {
@@ -337,6 +341,13 @@ type DatasetMut {
 }
 
 scalar DatasetName
+
+type DatasetPermissions {
+	canView: Boolean!
+	canDelete: Boolean!
+	canRename: Boolean!
+	canCommit: Boolean!
+}
 
 scalar DatasetRef
 

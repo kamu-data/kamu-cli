@@ -119,4 +119,32 @@ impl Dataset {
             .expect("Dataset without blocks");
         Ok(head.system_time)
     }
+
+    /// Permissions of the current user
+    async fn permissions(&self, ctx: &Context<'_>) -> Result<DatasetPermissions> {
+        use kamu_core::auth;
+        let dataset_action_authorizer =
+            from_catalog::<dyn auth::DatasetActionAuthorizer>(ctx).unwrap();
+
+        let allowed_actions = dataset_action_authorizer
+            .get_allowed_actions(&self.dataset_handle)
+            .await;
+        let can_read = allowed_actions.contains(&auth::DatasetAction::Read);
+        let can_write = allowed_actions.contains(&auth::DatasetAction::Write);
+
+        Ok(DatasetPermissions {
+            can_view: can_read,
+            can_delete: can_write,
+            can_rename: can_write,
+            can_commit: can_write,
+        })
+    }
+}
+
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
+pub struct DatasetPermissions {
+    can_view: bool,
+    can_delete: bool,
+    can_rename: bool,
+    can_commit: bool,
 }

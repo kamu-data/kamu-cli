@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashSet;
+use std::str::FromStr;
 use std::sync::Arc;
 
 use dill::component;
@@ -92,6 +94,24 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
             }
             Err(e) => Err(DatasetActionUnauthorizedError::Internal(e.int_err())),
         }
+    }
+
+    async fn get_allowed_actions(&self, dataset_handle: &DatasetHandle) -> HashSet<DatasetAction> {
+        let actor = self.actor(&self.current_account_subject.account_name);
+        let dataset_resource = self.dataset_resource(dataset_handle);
+
+        let allowed_action_names: HashSet<String> = self
+            .oso
+            .get_allowed_actions(actor, dataset_resource)
+            .unwrap();
+
+        let mut allowed_actions = HashSet::new();
+        for action_name in allowed_action_names {
+            let action = DatasetAction::from_str(action_name.as_str()).unwrap();
+            allowed_actions.insert(action);
+        }
+
+        allowed_actions
     }
 }
 
