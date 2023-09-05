@@ -97,7 +97,7 @@ async fn dataset_create_empty() {
             r#"
             mutation {
                 datasets {
-                    createEmpty (accountId: "kamu", datasetKind: ROOT, datasetName: "foo") {
+                    createEmpty (datasetKind: ROOT, datasetName: "foo") {
                         ... on CreateDatasetResultSuccess {
                             dataset {
                                 name
@@ -143,22 +143,26 @@ async fn dataset_create_from_snapshot() {
     )
     .to_string();
 
-    let res = harness.execute_query(indoc!(
-            r#"
-            mutation {
-                datasets {
-                    createFromSnapshot (accountId: "kamu", snapshot: "<content>", snapshotFormat: YAML) {
-                        ... on CreateDatasetResultSuccess {
-                            dataset {
-                                name
-                                kind
+    let res = harness
+        .execute_query(
+            indoc!(
+                r#"
+                mutation {
+                    datasets {
+                        createFromSnapshot (snapshot: "<content>", snapshotFormat: YAML) {
+                            ... on CreateDatasetResultSuccess {
+                                dataset {
+                                    name
+                                    kind
+                                }
                             }
                         }
                     }
                 }
-            }
-            "#
-        ).replace("<content>", &snapshot_yaml.escape_default().to_string()))
+                "#
+            )
+            .replace("<content>", &snapshot_yaml.escape_default().to_string()),
+        )
         .await;
     assert!(res.is_ok(), "{:?}", res);
     assert_eq!(
@@ -182,11 +186,12 @@ async fn dataset_create_from_snapshot() {
 async fn dataset_create_from_snapshot_malformed() {
     let harness = GraphQLDatasetsHarness::new();
 
-    let res = harness.execute_query(indoc!(
+    let res = harness
+        .execute_query(indoc!(
             r#"
             mutation {
                 datasets {
-                    createFromSnapshot (accountId: "kamu", snapshot: "version: 1", snapshotFormat: YAML) {
+                    createFromSnapshot(snapshot: "version: 1", snapshotFormat: YAML) {
                         ... on MetadataManifestMalformed {
                             __typename
                         }

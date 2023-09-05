@@ -369,11 +369,11 @@ type DatasetsMut {
 	"""
 	Creates a new empty dataset
 	"""
-	createEmpty(accountId: AccountID!, datasetKind: DatasetKind!, datasetName: DatasetName!): CreateDatasetResult!
+	createEmpty(datasetKind: DatasetKind!, datasetName: DatasetName!): CreateDatasetResult!
 	"""
 	Creates a new dataset from provided DatasetSnapshot manifest
 	"""
-	createFromSnapshot(accountId: AccountID!, snapshot: String!, snapshotFormat: MetadataManifestFormat!): CreateDatasetFromSnapshotResult!
+	createFromSnapshot(snapshot: String!, snapshotFormat: MetadataManifestFormat!): CreateDatasetFromSnapshotResult!
 }
 
 """
