@@ -11,33 +11,33 @@ content:
         # Image src: https://github.com/kamu-data/kamu-contrib/tree/ee8b5943f5696c0868adbd8eb1682028ad4e54c2/com.cryptocompare
         image: "ghcr.io/kamu-data/fetch-com.cryptocompare.ohlcv.eth-usd:0.1.0"
       read:
-        kind: jsonLines
+        kind: ndJson
         schema:
-          - time TIMESTAMP
-          - high FLOAT
-          - low FLOAT
-          - open FLOAT
-          - close FLOAT
-          - volumefrom FLOAT
-          - volumeto FLOAT
-          - conversionType STRING
-          - conversionSymbol STRING
+          - time BIGINT
+          - high DOUBLE
+          - low DOUBLE
+          - open DOUBLE
+          - volumefrom DOUBLE
+          - volumeto DOUBLE
+          - close DOUBLE
+          - '"conversionType" STRING'
+          - '"conversionSymbol" STRING'
       preprocess:
         kind: sql
-        engine: spark
+        engine: datafusion
         query: |
           select
-            time as event_time,
-            "eth" as from_symbol,
-            "usd" as to_symbol,
+            to_timestamp_seconds(time) as event_time,
+            'eth' as from_symbol,
+            'usd' as to_symbol,
             high,
             low,
             open,
             close,
             volumefrom,
             volumeto,
-            conversionType,
-            conversionSymbol
+            "conversionType" as conversion_type,
+            "conversionSymbol" as conversion_symbol
           from input
       merge:
         kind: ledger
@@ -50,7 +50,7 @@ content:
         kind: embedded
         items:
           - path: README.md
-            content: |2
+            content: |
               # ETH to USD Prices from CryptoCompare
               This dataset pulls best available granularity data within CryptoCompare's free API tier.
     - kind: setLicense

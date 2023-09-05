@@ -8,6 +8,7 @@ content:
     - kind: setPollingSource
       fetch:
         kind: container
+        # Image src: https://github.com/kamu-data/kamu-contrib/tree/7f368e88e75d1d4eab95ca9c8697eafd80b3f283/net.rocketpool
         image: "ghcr.io/kamu-data/fetch-net.rocketpool.reth.mint-burn:0.1.1"
         env:
           - name: ETH_NODE_PROVIDER_URL

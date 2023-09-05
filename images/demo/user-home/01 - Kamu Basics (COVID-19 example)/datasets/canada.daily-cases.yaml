@@ -10,7 +10,7 @@ content:
       transform:
         kind: sql
         engine: flink
-        query: >
+        query: |
           SELECT
             TUMBLE_START(`reported_date`, INTERVAL '1' DAY) as `reported_date`,
             `province`,

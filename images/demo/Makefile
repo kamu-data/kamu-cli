@@ -1,6 +1,6 @@
 IMAGE_REPO = ghcr.io/kamu-data
 KAMU_VERSION = $(shell cargo metadata --format-version 1 | jq -r '.packages[] | select( .name == "kamu") | .version')
-DEMO_VERSION = 0.8.0
+DEMO_VERSION = 0.9.0
 
 #########################################################################################
 

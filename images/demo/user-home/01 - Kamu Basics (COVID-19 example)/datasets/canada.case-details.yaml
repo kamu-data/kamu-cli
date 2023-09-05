@@ -14,7 +14,7 @@ content:
       transform:
         kind: sql
         engine: spark
-        query: >
+        query: |
           SELECT
             "BC" as province,
             id,

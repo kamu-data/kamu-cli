@@ -8,23 +8,34 @@ content:
     - kind: setPollingSource
       fetch:
         kind: container
+        # Image src: https://github.com/kamu-data/kamu-contrib/tree/ee8b5943f5696c0868adbd8eb1682028ad4e54c2/com.cryptocompare
         image: "ghcr.io/kamu-data/fetch-com.cryptocompare.ohlcv.eth-usd:0.1.0"
       read:
         kind: ndJson
+        schema:
+          - time BIGINT
+          - high DOUBLE
+          - low DOUBLE
+          - open DOUBLE
+          - volumefrom DOUBLE
+          - volumeto DOUBLE
+          - close DOUBLE
+          - '"conversionType" STRING'
+          - '"conversionSymbol" STRING'
       preprocess:
         kind: sql
         engine: datafusion
         query: |
           select
-            to_timestamp_seconds("time") as event_time,
+            to_timestamp_seconds(time) as event_time,
             'eth' as from_symbol,
             'usd' as to_symbol,
-            "high",
-            "low",
-            "open",
-            "close",
-            "volumefrom",
-            "volumeto",
+            high,
+            low,
+            open,
+            close,
+            volumefrom,
+            volumeto,
             "conversionType" as conversion_type,
             "conversionSymbol" as conversion_symbol
           from input
