@@ -71,6 +71,11 @@ impl Dataset {
         &self.account
     }
 
+    /// Returns dataset alias (user + name)
+    async fn alias(&self) -> DatasetAlias {
+        self.dataset_handle.alias.clone().into()
+    }
+
     /// Returns the kind of a dataset (Root or Derivative)
     async fn kind(&self, ctx: &Context<'_>) -> Result<DatasetKind> {
         let dataset = self.get_dataset(ctx).await?;

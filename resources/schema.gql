@@ -189,6 +189,10 @@ type Dataset {
 	"""
 	owner: Account!
 	"""
+	Returns dataset alias (user + name)
+	"""
+	alias: DatasetAlias!
+	"""
 	Returns the kind of a dataset (Root or Derivative)
 	"""
 	kind: DatasetKind!
