@@ -155,7 +155,7 @@ impl EngineIoStrategy for EngineIoStrategyLocalVolume {
 
             inputs.push(ExecuteQueryInput {
                 dataset_id: input.dataset_handle.id,
-                dataset_name: input.dataset_handle.alias.dataset_name,
+                dataset_name: DatasetName::new_unchecked(&input.alias),
                 vocab: input.vocab,
                 data_interval: input.data_interval,
                 data_paths,
@@ -330,7 +330,7 @@ impl EngineIoStrategy for EngineIoStrategyRemoteProxy {
 
             inputs.push(ExecuteQueryInput {
                 dataset_id: input.dataset_handle.id,
-                dataset_name: input.dataset_handle.alias.dataset_name,
+                dataset_name: DatasetName::new_unchecked(&input.alias),
                 vocab: input.vocab,
                 data_interval: input.data_interval,
                 data_paths,
