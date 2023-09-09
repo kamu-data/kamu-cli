@@ -12,7 +12,7 @@ pub const FLINK: &str = "ghcr.io/kamu-data/engine-flink:0.15.1-flink_1.16.0-scal
 pub const DATAFUSION: &str = "ghcr.io/kamu-data/engine-datafusion:0.4.0";
 
 pub const LIVY: &str = SPARK;
-pub const JUPYTER: &str = "ghcr.io/kamu-data/jupyter:0.5.0";
+pub const JUPYTER: &str = "ghcr.io/kamu-data/jupyter:0.5.1";
 
 // Test Images
 pub const HTTPD: &str = "docker.io/httpd:2.4";

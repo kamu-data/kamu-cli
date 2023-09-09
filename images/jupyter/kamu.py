@@ -1,3 +1,4 @@
+import re
 from IPython.core import magic_arguments
 from IPython.core.magic import line_magic, cell_magic, line_cell_magic, Magics, magics_class
 
@@ -8,15 +9,34 @@ spark.sparkContext._jvm.org.datasyslab.geosparksql.utils.GeoSparkSQLRegistrator.
 
 
 SPARK_IMPORT_DATASET_CODE = """
-hadoop = sc._jvm.org.apache.hadoop
-fs = hadoop.fs.FileSystem.get(hadoop.conf.Configuration())
+import os
 
-path = hadoop.fs.Path("{dataset_id}")
-if not fs.exists(path):
-    raise Exception("Dataset {dataset_id} does not exist")
+def resolve_dataset_ref(dataset_ref):
+    if "/" not in dataset_ref:
+        # Single-tenant
+        data_path = os.path.join(dataset_ref, "data")
+        if os.path.exists(data_path):
+            return data_path
+    else:
+        # Multi-tenant
+        # Assuming layout <account_name>/<dataset_id>/info/alias
+        account_path, dataset_alias = dataset_ref.split("/", 1)
+        if os.path.isdir(account_path):
+            for dataset_id in os.listdir(account_path):
+                alias_path = os.path.join(account_path, dataset_id, "info", "alias")
+                if not os.path.exists(alias_path):
+                    continue
+                with open(alias_path) as f:
+                    alias = f.read().strip()
+                if alias != dataset_alias:
+                    continue
+                return os.path.join(account_path, dataset_id, "data")
 
-{alias} = spark.read.parquet(str(path) + "/data/*")
-{alias}.createOrReplaceTempView("`{dataset_id}`")
+    raise Exception("Dataset {ref} does not exist")
+
+data_path = resolve_dataset_ref("{ref}")
+{alias} = spark.read.parquet(os.path.join(data_path, "*"))
+{alias}.createOrReplaceTempView("`{ref}`")
 {alias}.createOrReplaceTempView("{alias}")
 """
 
@@ -38,19 +58,22 @@ class KamuMagics(Magics):
 
     @line_magic
     @magic_arguments.magic_arguments()
-    @magic_arguments.argument('dataset_id',
+    @magic_arguments.argument('dataset_ref',
         nargs=1,
-        help='ID of the dataset to load'
+        help='Dataset to load'
     )
     @magic_arguments.argument('--alias',
         help='Also registers the dataset under provided alias'
     )
     def import_dataset(self, line):
         args = magic_arguments.parse_argstring(self.import_dataset, line)
+        dataset_ref = args.dataset_ref[0]
         if not args.alias:
-            args.alias = '_df'
+            args.alias = re.sub(r"[\.\-/]", "_", dataset_ref)
         code = SPARK_IMPORT_DATASET_CODE.format(
-            dataset_id=args.dataset_id[0], alias=args.alias)
+            ref=dataset_ref,
+            alias=args.alias,
+        )
         self.shell.run_cell_magic('spark', '', code)
 
 
