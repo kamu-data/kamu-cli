@@ -97,10 +97,10 @@ impl ListCommand {
         if self.detail_level > 0 {
             cols.push(ColumnFormat::new().with_style_spec("l")); // id
         }
-        cols.push(ColumnFormat::new().with_style_spec("l")); // name
         if show_owners {
-            cols.push(ColumnFormat::new().with_style_spec("c")); // owner
+            cols.push(ColumnFormat::new().with_style_spec("l")); // owner
         }
+        cols.push(ColumnFormat::new().with_style_spec("l")); // name
         cols.push(ColumnFormat::new().with_style_spec("c")); // kind
         if self.detail_level > 0 {
             cols.push(ColumnFormat::new().with_style_spec("l")); // head
@@ -151,10 +151,10 @@ impl ListCommand {
         if self.detail_level > 0 {
             fields.push(Field::new("ID", DataType::Utf8, false));
         }
-        fields.push(Field::new("Name", DataType::Utf8, false));
         if show_owners {
             fields.push(Field::new("Owner", DataType::Utf8, false));
         }
+        fields.push(Field::new("Name", DataType::Utf8, false));
         fields.push(Field::new("Kind", DataType::Utf8, false));
         if self.detail_level > 0 {
             fields.push(Field::new("Head", DataType::Utf8, false));
@@ -286,10 +286,10 @@ impl Command for ListCommand {
         if self.detail_level > 0 {
             columns.push(Arc::new(StringArray::from(id)));
         }
-        columns.push(Arc::new(StringArray::from(name)));
         if show_owners {
             columns.push(Arc::new(StringArray::from(owner)));
         }
+        columns.push(Arc::new(StringArray::from(name)));
         columns.push(Arc::new(StringArray::from(kind)));
         if self.detail_level > 0 {
             columns.push(Arc::new(StringArray::from(head)));
