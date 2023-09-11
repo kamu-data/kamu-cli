@@ -17,7 +17,7 @@ jobs:
           - x86_64-unknown-linux-gnu
           - x86_64-unknown-linux-musl
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: actions-rs/toolchain@v1 # Uses rust-toolchain file
         with:
           target: ${{ matrix.target }}
@@ -51,7 +51,7 @@ jobs:
         target:
           - x86_64-apple-darwin
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: actions-rs/toolchain@v1 # Uses rust-toolchain file
       - name: Fetch web UI artifacts # TODO: Add target without UI
         run: |
@@ -80,7 +80,7 @@ jobs:
         target:
           - x86_64-pc-windows-msvc
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: actions-rs/toolchain@v1 # Uses rust-toolchain file
       - name: Build
         run: >-
