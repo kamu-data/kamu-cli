@@ -218,11 +218,6 @@ type Dataset {
 	permissions: DatasetPermissions!
 }
 
-type DatasetAccessError implements CommitResult & UpdateReadmeResult & RenameResult & DeleteResult {
-	datasetAlias: DatasetAlias!
-	message: String!
-}
-
 scalar DatasetAlias
 
 type DatasetConnection {

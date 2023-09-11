@@ -62,11 +62,10 @@ impl DatasetMut {
                     colliding_alias: e.alias.into(),
                 }))
             }
-            Err(RenameDatasetError::Access(_)) => {
-                Ok(RenameResult::AccessError(DatasetAccessError {
-                    dataset_alias: self.dataset_handle.alias.to_owned().into(),
-                }))
-            }
+            Err(RenameDatasetError::Access(_)) => Err(GqlError::Gql(
+                Error::new("Dataset access error")
+                    .extend_with(|_, eev| eev.set("alias", self.dataset_handle.alias.to_string())),
+            )),
             // "Not found" should not be reachable, since we've just resolved the dataset by ID
             Err(RenameDatasetError::NotFound(e)) => Err(e.int_err().into()),
             Err(RenameDatasetError::Internal(e)) => Err(e.into()),
@@ -95,11 +94,10 @@ impl DatasetMut {
                         .collect(),
                 },
             )),
-            Err(DeleteDatasetError::Access(_)) => {
-                Ok(DeleteResult::AccessError(DatasetAccessError {
-                    dataset_alias: self.dataset_handle.alias.to_owned().into(),
-                }))
-            }
+            Err(DeleteDatasetError::Access(_)) => Err(GqlError::Gql(
+                Error::new("Dataset access error")
+                    .extend_with(|_, eev| eev.set("alias", self.dataset_handle.alias.to_string())),
+            )),
             // "Not found" should not be reachable, since we've just resolved the dataset by ID
             Err(DeleteDatasetError::NotFound(e)) => Err(e.int_err().into()),
             Err(DeleteDatasetError::Internal(e)) => Err(e.into()),
@@ -115,7 +113,6 @@ pub enum RenameResult {
     Success(RenameResultSuccess),
     NoChanges(RenameResultNoChanges),
     NameCollision(RenameResultNameCollision),
-    AccessError(DatasetAccessError),
 }
 
 #[derive(SimpleObject, Debug, Clone)]
@@ -165,7 +162,6 @@ impl RenameResultNameCollision {
 pub enum DeleteResult {
     Success(DeleteResultSuccess),
     DanglingReference(DeleteResultDanglingReference),
-    AccessError(DatasetAccessError),
 }
 
 #[derive(SimpleObject, Debug, Clone)]
@@ -195,24 +191,6 @@ impl DeleteResultDanglingReference {
             "Dataset '{}' has {} dangling reference(s)",
             self.not_deleted_dataset,
             self.dangling_child_refs.len()
-        )
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(SimpleObject, Debug, Clone)]
-#[graphql(complex)]
-pub struct DatasetAccessError {
-    pub dataset_alias: DatasetAlias,
-}
-
-#[ComplexObject]
-impl DatasetAccessError {
-    pub async fn message(&self) -> String {
-        format!(
-            "User operation on dataset '{}' is unauthorized",
-            self.dataset_alias
         )
     }
 }

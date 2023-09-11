@@ -10,7 +10,6 @@
 use kamu_core::{self as domain};
 use opendatafabric as odf;
 
-use super::DatasetAccessError;
 use crate::prelude::*;
 use crate::utils::{check_dataset_write_access, CheckDatasetAccessError};
 use crate::LoggedInGuard;
@@ -54,9 +53,11 @@ impl MetadataChainMut {
             Ok(_) => {}
             Err(e) => match e {
                 CheckDatasetAccessError::Access(_) => {
-                    return Ok(CommitResult::AccessError(DatasetAccessError {
-                        dataset_alias: self.dataset_handle.alias.clone().into(),
-                    }));
+                    return Err(GqlError::Gql(
+                        Error::new("Dataset access error").extend_with(|_, eev| {
+                            eev.set("alias", self.dataset_handle.alias.to_string())
+                        }),
+                    ))
                 }
                 CheckDatasetAccessError::Internal(e) => return Err(e.into()),
             },
@@ -117,7 +118,6 @@ pub enum CommitResult {
     Malformed(MetadataManifestMalformed),
     UnsupportedVersion(MetadataManifestUnsupportedVersion),
     AppendError(CommitResultAppendError),
-    AccessError(DatasetAccessError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
