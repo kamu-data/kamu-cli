@@ -19,11 +19,11 @@ type Accounts {
 	"""
 	Returns account by its ID
 	"""
-	byId(accountId: AccountID!): Account
+	byId(accountId: AccountID!): AccountInfo
 	"""
 	Returns account by its name
 	"""
-	byName(name: String!): Account
+	byName(name: AccountName!): AccountInfo
 }
 
 type AddData {

@@ -18,6 +18,7 @@ use jsonwebtoken::errors::ErrorKind;
 use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
 use kamu_core::auth::*;
 use kamu_core::SystemTimeSource;
+use opendatafabric::AccountName;
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
 use serde::{Deserialize, Serialize};
@@ -34,6 +35,7 @@ pub struct AuthenticationServiceImpl {
     encoding_key: EncodingKey,
     decoding_key: DecodingKey,
     authentication_providers_by_method: HashMap<&'static str, Arc<dyn AuthenticationProvider>>,
+    authentication_providers: Vec<Arc<dyn AuthenticationProvider>>,
 }
 
 #[component(pub)]
@@ -49,11 +51,11 @@ impl AuthenticationServiceImpl {
 
         let mut authentication_providers_by_method = HashMap::new();
 
-        for authentication_provider in authentication_providers {
+        for authentication_provider in &authentication_providers {
             let login_method = authentication_provider.login_method();
 
-            let insert_result =
-                authentication_providers_by_method.insert(login_method, authentication_provider);
+            let insert_result = authentication_providers_by_method
+                .insert(login_method, authentication_provider.clone());
 
             if let Some(_) = insert_result {
                 panic!(
@@ -68,6 +70,7 @@ impl AuthenticationServiceImpl {
             encoding_key: EncodingKey::from_secret(kamu_jwt_secret.as_bytes()),
             decoding_key: DecodingKey::from_secret(kamu_jwt_secret.as_bytes()),
             authentication_providers_by_method,
+            authentication_providers,
         }
     }
 
@@ -180,6 +183,20 @@ impl AuthenticationService for AuthenticationServiceImpl {
             .get_account_info(decoded_access_token.provider_credentials_json)
             .await
             .map_err(|e| GetAccountInfoError::Internal(e.int_err()))
+    }
+
+    async fn find_account_info_by_name<'a>(
+        &'a self,
+        account_name: &'a AccountName,
+    ) -> Result<Option<AccountInfo>, InternalError> {
+        for provider in self.authentication_providers.iter() {
+            let maybe_account_info = provider.find_account_info_by_name(&account_name).await?;
+            if maybe_account_info.is_some() {
+                return Ok(maybe_account_info);
+            }
+        }
+
+        Ok(None)
     }
 }
 

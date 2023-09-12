@@ -76,7 +76,11 @@ impl MetadataChain {
         let dataset = self.get_dataset(ctx).await?;
         let block = dataset.as_metadata_chain().try_get_block(&hash).await?;
         Ok(block.map(|b| {
-            MetadataBlockExtended::new(hash, b, Account::from_alias(&self.dataset_handle.alias))
+            MetadataBlockExtended::new(
+                hash,
+                b,
+                Account::from_dataset_alias(ctx, &self.dataset_handle.alias),
+            )
         }))
     }
 
@@ -138,7 +142,7 @@ impl MetadataChain {
                 MetadataBlockExtended::new(
                     hash,
                     block,
-                    Account::from_alias(&self.dataset_handle.alias),
+                    Account::from_dataset_alias(ctx, &self.dataset_handle.alias),
                 )
             })
             .collect();

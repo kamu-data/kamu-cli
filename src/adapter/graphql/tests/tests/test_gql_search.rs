@@ -7,8 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::sync::Arc;
-
 use async_graphql::*;
 use kamu::testing::MetadataFactory;
 use kamu::*;
@@ -18,16 +16,16 @@ use opendatafabric::*;
 #[tokio::test]
 async fn query() {
     let tempdir = tempfile::tempdir().unwrap();
-    let dataset_repo = DatasetRepositoryLocalFs::create(
-        tempdir.path().join("datasets"),
-        Arc::new(CurrentAccountSubject::new_test()),
-        Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new()),
-        false,
-    )
-    .unwrap();
 
     let cat = dill::CatalogBuilder::new()
-        .add_value(dataset_repo)
+        .add_value(CurrentAccountSubject::new_test())
+        .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
+        .bind::<dyn auth::DatasetActionAuthorizer, auth::AlwaysHappyDatasetActionAuthorizer>()
+        .add_builder(
+            dill::builder_for::<DatasetRepositoryLocalFs>()
+                .with_root(tempdir.path().join("datasets"))
+                .with_multi_tenant(false),
+        )
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
         .build();
 

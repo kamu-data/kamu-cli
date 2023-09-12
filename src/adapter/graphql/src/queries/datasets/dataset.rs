@@ -41,7 +41,10 @@ impl Dataset {
             .resolve_dataset_ref(dataset_ref)
             .await
             .int_err()?;
-        Ok(Dataset::new(Account::from_alias(&hdl.alias), hdl))
+        Ok(Dataset::new(
+            Account::from_dataset_alias(ctx, &hdl.alias),
+            hdl,
+        ))
     }
 
     #[graphql(skip)]

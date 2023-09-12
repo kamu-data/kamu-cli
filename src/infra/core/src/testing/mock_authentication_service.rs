@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use internal_error::InternalError;
 use kamu_core::auth::{
     AccountInfo,
     AuthenticationService,
@@ -35,6 +36,8 @@ mockall::mock! {
             &self,
             access_token: String,
         ) -> Result<AccountInfo, GetAccountInfoError>;
+
+        async fn find_account_info_by_name<'a>(&'a self, account_name: &'a AccountName) -> Result<Option<AccountInfo>, InternalError>;
     }
 }
 

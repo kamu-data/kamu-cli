@@ -34,7 +34,6 @@ impl DatasetMut {
 
     /// Rename the dataset
     #[graphql(guard = "LoggedInGuard::new()")]
-    // TODO: guard should include permission check
     async fn rename(&self, ctx: &Context<'_>, new_name: DatasetName) -> Result<RenameResult> {
         if self
             .dataset_handle
@@ -74,7 +73,6 @@ impl DatasetMut {
 
     /// Delete the dataset
     #[graphql(guard = "LoggedInGuard::new()")]
-    // TODO: guard should include permission check
     async fn delete(&self, ctx: &Context<'_>) -> Result<DeleteResult> {
         let dataset_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
         match dataset_repo

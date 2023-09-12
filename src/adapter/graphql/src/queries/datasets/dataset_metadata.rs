@@ -109,7 +109,7 @@ impl DatasetMetadata {
                 .await
                 .int_err()?;
             dependencies.push(Dataset::new(
-                Account::from_alias(&dataset_handle.alias),
+                Account::from_dataset_alias(ctx, &dataset_handle.alias),
                 dataset_handle,
             ));
         }
@@ -123,7 +123,7 @@ impl DatasetMetadata {
 
         let downstream: Vec<_> = dataset_repo
             .get_downstream_dependencies(&self.dataset_handle.as_local_ref())
-            .map_ok(|hdl| Dataset::new(Account::from_alias(&hdl.alias), hdl))
+            .map_ok(|hdl| Dataset::new(Account::from_dataset_alias(ctx, &hdl.alias), hdl))
             .try_collect()
             .await?;
 

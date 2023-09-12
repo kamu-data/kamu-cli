@@ -28,7 +28,7 @@ impl Datasets {
         let hdl = dataset_repo
             .try_resolve_dataset_ref(&dataset_id.as_local_ref())
             .await?;
-        Ok(hdl.map(|h| Dataset::new(Account::from_alias(&h.alias), h)))
+        Ok(hdl.map(|h| Dataset::new(Account::from_dataset_alias(ctx, &h.alias), h)))
     }
 
     /// Returns dataset by its owner and name

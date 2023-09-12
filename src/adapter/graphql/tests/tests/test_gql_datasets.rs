@@ -23,7 +23,7 @@ use opendatafabric::*;
 #[test_log::test(tokio::test)]
 async fn dataset_by_id_does_not_exist() {
     let harness = GraphQLDatasetsHarness::new();
-    let res = harness.execute_anonymous_query(indoc!(
+    let res = harness.execute_query(indoc!(
             r#"
             {
                 datasets {
@@ -57,7 +57,7 @@ async fn dataset_by_id() {
         .await;
 
     let res = harness
-        .execute_anonymous_query(
+        .execute_query(
             indoc!(
                 r#"
                 {
@@ -541,15 +541,6 @@ impl GraphQLDatasetsHarness {
             )
             .await
             .unwrap()
-    }
-
-    pub async fn execute_anonymous_query(
-        &self,
-        query: impl Into<async_graphql::Request>,
-    ) -> async_graphql::Response {
-        kamu_adapter_graphql::schema()
-            .execute(query.into().data(self.catalog.clone()))
-            .await
     }
 
     pub async fn execute_query(

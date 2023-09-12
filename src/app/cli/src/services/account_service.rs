@@ -13,7 +13,8 @@ use std::sync::Arc;
 use clap::ArgMatches;
 use dill::component;
 use internal_error::{InternalError, ResultIntoInternal};
-use kamu::domain::{auth, CurrentAccountSubject};
+use kamu::domain::auth::{self, AccountInfo};
+use kamu::domain::CurrentAccountSubject;
 use opendatafabric::AccountName;
 use serde::{Deserialize, Serialize};
 
@@ -103,6 +104,13 @@ impl AccountService {
             };
 
         RelatedAccountIndication::new(target_account)
+    }
+
+    fn find_account_info_impl(&self, account_name: &String) -> Option<auth::AccountInfo> {
+        // The account might be predefined in the configuration
+        self.predefined_accounts
+            .get(account_name)
+            .map(|an| an.clone())
     }
 
     fn get_account_info_impl(
@@ -205,6 +213,13 @@ impl auth::AuthenticationProvider for AccountService {
             .int_err()?;
 
         Ok(account_info)
+    }
+
+    async fn find_account_info_by_name<'a>(
+        &'a self,
+        account_name: &'a AccountName,
+    ) -> Result<Option<AccountInfo>, InternalError> {
+        Ok(self.find_account_info_impl(&account_name.into()))
     }
 }
 

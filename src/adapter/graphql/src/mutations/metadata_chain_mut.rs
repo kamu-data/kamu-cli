@@ -41,7 +41,6 @@ impl MetadataChainMut {
 
     /// Commits new event to the metadata chain
     #[tracing::instrument(level = "info", skip_all)]
-    // TODO: guard should include permission check
     #[graphql(guard = "LoggedInGuard::new()")]
     async fn commit_event(
         &self,

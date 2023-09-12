@@ -230,14 +230,14 @@ pub fn configure_base_catalog(
     b.add::<kamu_task_system_inmem::TaskSystemEventStoreInMemory>();
     b.bind::<dyn kamu_task_system_inmem::domain::TaskSystemEventStore, kamu_task_system_inmem::TaskSystemEventStoreInMemory>();
 
+    b.add::<AccountService>();
+    b.bind::<dyn auth::AuthenticationProvider, AccountService>();
+
     // No Github login possible for single-tenant workspace
     if multi_tenant_workspace {
         b.add::<kamu_adapter_oauth::OAuthGithub>();
         b.bind::<dyn domain::auth::AuthenticationProvider, kamu_adapter_oauth::OAuthGithub>();
     }
-
-    b.add::<AccountService>();
-    b.bind::<dyn auth::AuthenticationProvider, AccountService>();
 
     b.add::<AuthenticationServiceImpl>();
     b.bind::<dyn domain::auth::AuthenticationService, AuthenticationServiceImpl>();

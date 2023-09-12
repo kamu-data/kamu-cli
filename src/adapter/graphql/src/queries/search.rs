@@ -49,7 +49,12 @@ impl Search {
             .into_iter()
             .skip(page * per_page)
             .take(per_page)
-            .map(|hdl| SearchResult::Dataset(Dataset::new(Account::from_alias(&hdl.alias), hdl)))
+            .map(|hdl| {
+                SearchResult::Dataset(Dataset::new(
+                    Account::from_dataset_alias(ctx, &hdl.alias),
+                    hdl,
+                ))
+            })
             .collect();
 
         Ok(SearchResultConnection::new(

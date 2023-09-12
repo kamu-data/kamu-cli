@@ -61,7 +61,6 @@ impl DatasetMetadataMut {
 
     /// Updates or clears the dataset readme
     #[graphql(guard = "LoggedInGuard::new()")]
-    // TODO: guard should include permission check
     async fn update_readme(
         &self,
         ctx: &Context<'_>,

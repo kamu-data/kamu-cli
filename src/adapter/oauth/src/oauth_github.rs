@@ -8,7 +8,8 @@
 // by the Apache License, Version 2.0.
 
 use dill::component;
-use kamu_core::{InternalError, ResultIntoInternal};
+use kamu_core::auth::AccountInfo;
+use kamu_core::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use opendatafabric::AccountName;
 use serde::{Deserialize, Serialize};
 
@@ -96,7 +97,7 @@ impl OAuthGithub {
         })
     }
 
-    async fn github_account_info_impl(
+    async fn github_own_account_info_impl(
         &self,
         access_token: String,
     ) -> Result<GithubAccountInfo, InternalError> {
@@ -116,6 +117,29 @@ impl OAuthGithub {
             .int_err()?;
 
         Ok(account_info)
+    }
+
+    async fn github_find_account_info_by_login(
+        &self,
+        login: &String,
+    ) -> Result<Option<GithubAccountInfo>, InternalError> {
+        let client = self.get_client().int_err()?;
+
+        let response = client
+            .get(format!("https://api.github.com/users/{}", login))
+            .header(reqwest::header::ACCEPT, "application/vnd.github.v3+json")
+            .send()
+            .await
+            .int_err()?;
+
+        if response.status().is_client_error() {
+            Ok(None)
+        } else if response.status().is_server_error() {
+            Err(response.error_for_status().unwrap_err().int_err())
+        } else {
+            let account_info = response.json::<GithubAccountInfo>().await.int_err()?;
+            Ok(Some(account_info))
+        }
     }
 }
 
@@ -167,11 +191,22 @@ impl kamu_core::auth::AuthenticationProvider for OAuthGithub {
                 .int_err()?;
 
         let account_info = self
-            .github_account_info_impl(provider_credentials.access_token)
+            .github_own_account_info_impl(provider_credentials.access_token)
             .await
             .int_err()?;
 
         Ok(account_info.into())
+    }
+
+    async fn find_account_info_by_name<'a>(
+        &'a self,
+        account_name: &'a AccountName,
+    ) -> Result<Option<AccountInfo>, InternalError> {
+        let github_login = account_name.to_string();
+        let maybe_account_info = self
+            .github_find_account_info_by_login(&github_login)
+            .await?;
+        Ok(maybe_account_info.map(|github_ai| github_ai.into()))
     }
 }
 
@@ -191,7 +226,7 @@ impl From<GithubAccountInfo> for kamu_core::auth::AccountInfo {
     fn from(value: GithubAccountInfo) -> Self {
         Self {
             account_name: AccountName::try_from(&value.login).unwrap(),
-            display_name: value.name,
+            display_name: value.name.or_else(|| Some(value.login)).unwrap(),
             avatar_url: value.avatar_url,
         }
     }
@@ -216,7 +251,7 @@ pub struct GithubAccessToken {
 #[derive(Debug, Clone, Deserialize)]
 struct GithubAccountInfo {
     pub login: String,
-    pub name: String,
+    pub name: Option<String>,
     pub email: Option<String>,
     pub avatar_url: Option<String>,
     pub gravatar_id: Option<String>,

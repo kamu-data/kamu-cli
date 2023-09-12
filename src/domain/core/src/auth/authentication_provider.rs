@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::InternalError;
+use opendatafabric::AccountName;
 use thiserror::Error;
 
 use super::{AccountInfo, InvalidCredentialsError, RejectedCredentialsError};
@@ -27,6 +28,11 @@ pub trait AuthenticationProvider: Sync + Send {
         &self,
         provider_credentials_json: String,
     ) -> Result<AccountInfo, InternalError>;
+
+    async fn find_account_info_by_name<'a>(
+        &'a self,
+        account_name: &'a AccountName,
+    ) -> Result<Option<AccountInfo>, InternalError>;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
