@@ -13,7 +13,6 @@ use async_graphql::*;
 use indoc::indoc;
 use kamu::testing::MetadataFactory;
 use kamu::*;
-use kamu_adapter_graphql::AccessToken;
 use kamu_core::*;
 use opendatafabric::serde::yaml::YamlDatasetSnapshotSerializer;
 use opendatafabric::serde::DatasetSnapshotSerializer;
@@ -548,38 +547,22 @@ impl GraphQLDatasetsHarness {
         &self,
         query: impl Into<async_graphql::Request>,
     ) -> async_graphql::Response {
-        kamu_adapter_graphql::execute_query(
-            kamu_adapter_graphql::schema(),
-            self.catalog.clone(),
-            None,
-            query,
-        )
-        .await
+        kamu_adapter_graphql::schema()
+            .execute(query.into().data(self.catalog.clone()))
+            .await
     }
 
     pub async fn execute_query(
         &self,
         query: impl Into<async_graphql::Request>,
     ) -> async_graphql::Response {
-        kamu_adapter_graphql::execute_query(
-            kamu_adapter_graphql::schema(),
-            self.catalog.clone(),
-            Some(AccessToken::new(self.access_token().await)),
-            query,
-        )
-        .await
-    }
+        let patched_catalog = dill::CatalogBuilder::new_chained(&self.catalog)
+            .add_value(CurrentAccountSubject::new_test())
+            .build();
 
-    pub async fn access_token(&self) -> String {
-        let authentication_svc = self
-            .catalog
-            .get_one::<dyn auth::AuthenticationService>()
-            .unwrap();
-        let login_response = authentication_svc
-            .login("test", String::from("<dummy>"))
+        kamu_adapter_graphql::schema()
+            .execute(query.into().data(patched_catalog))
             .await
-            .unwrap();
-        login_response.access_token
     }
 }
 

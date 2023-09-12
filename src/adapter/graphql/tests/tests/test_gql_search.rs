@@ -45,32 +45,33 @@ async fn query() {
         .unwrap();
 
     let schema = kamu_adapter_graphql::schema();
-    let res = kamu_adapter_graphql::execute_query(
-        schema.clone(),
-        cat.clone(),
-        None,
-        "
-        {
-            search {
-              query(query: \"bar\") {
-                nodes {
-                  __typename
-                  ... on Dataset {
-                    name
+    let res = schema
+        .execute(
+            async_graphql::Request::new(
+                "
+                {
+                    search {
+                      query(query: \"bar\") {
+                        nodes {
+                          __typename
+                          ... on Dataset {
+                            name
+                          }
+                        }
+                        totalCount
+                        pageInfo {
+                          totalPages
+                          hasNextPage
+                          hasPreviousPage
+                        }
+                      }
+                    }
                   }
-                }
-                totalCount
-                pageInfo {
-                  totalPages
-                  hasNextPage
-                  hasPreviousPage
-                }
-              }
-            }
-          }
-        ",
-    )
-    .await;
+                ",
+            )
+            .data(cat.clone()),
+        )
+        .await;
     assert!(res.is_ok());
     assert_eq!(
         res.data,
@@ -89,32 +90,33 @@ async fn query() {
         })
     );
 
-    let res = kamu_adapter_graphql::execute_query(
-        schema,
-        cat,
-        None,
-        "
-        {
-            search {
-              query(query: \"foo\") {
-                nodes {
-                  __typename
-                  ... on Dataset {
-                    name
+    let res = schema
+        .execute(
+            async_graphql::Request::new(
+                "
+                {
+                    search {
+                      query(query: \"foo\") {
+                        nodes {
+                          __typename
+                          ... on Dataset {
+                            name
+                          }
+                        }
+                        totalCount
+                        pageInfo {
+                          totalPages
+                          hasNextPage
+                          hasPreviousPage
+                        }
+                      }
+                    }
                   }
-                }
-                totalCount
-                pageInfo {
-                  totalPages
-                  hasNextPage
-                  hasPreviousPage
-                }
-              }
-            }
-          }
-        ",
-    )
-    .await;
+                ",
+            )
+            .data(cat),
+        )
+        .await;
     assert!(res.is_ok());
     assert_eq!(
         res.data,

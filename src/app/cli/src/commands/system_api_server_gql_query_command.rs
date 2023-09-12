@@ -32,13 +32,9 @@ impl Command for APIServerGqlQueryCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
         // TODO: Access token? Not every GraphQL can run unauthorized
         let gql_schema = kamu_adapter_graphql::schema();
-        let response = kamu_adapter_graphql::execute_query(
-            gql_schema,
-            self.base_catalog.clone(),
-            None,
-            &self.query,
-        )
-        .await;
+        let response = gql_schema
+            .execute(async_graphql::Request::new(&self.query).data(self.base_catalog.clone()))
+            .await;
 
         let data = if self.full {
             serde_json::to_string_pretty(&response).unwrap()

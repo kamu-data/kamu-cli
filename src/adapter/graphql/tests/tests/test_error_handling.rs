@@ -16,23 +16,22 @@ use kamu_core::*;
 #[test_log::test(tokio::test)]
 async fn test_malformed_argument() {
     let schema = kamu_adapter_graphql::schema();
-    let res = kamu_adapter_graphql::execute_query(
-        schema,
-        dill::CatalogBuilder::new().build(),
-        None,
-        indoc!(
-            r#"
-            {
-                datasets {
-                    byAccountName (accountName: "????") {
-                        nodes { id }
+    let res = schema
+        .execute(
+            async_graphql::Request::new(indoc!(
+                r#"
+                {
+                    datasets {
+                        byAccountName (accountName: "????") {
+                            nodes { id }
+                        }
                     }
                 }
-            }
-            "#
-        ),
-    )
-    .await;
+                "#
+            ))
+            .data(dill::CatalogBuilder::new().build()),
+        )
+        .await;
 
     let mut json_resp = serde_json::to_value(res).unwrap();
 
@@ -72,7 +71,7 @@ async fn test_internal_error() {
         .build();
 
     let schema = kamu_adapter_graphql::schema();
-    let res = kamu_adapter_graphql::execute_query(schema, cat, None, indoc!(
+    let res = schema.execute(async_graphql::Request::new(indoc!(
             r#"
             {
                 datasets {
@@ -82,7 +81,7 @@ async fn test_internal_error() {
                 }
             }
             "#
-        ))
+        )).data(cat))
         .await;
 
     let mut json_resp = serde_json::to_value(res).unwrap();
@@ -110,7 +109,7 @@ async fn test_internal_error() {
 async fn test_handler_panics() {
     // Not expecting panic to be trapped - that's the job of an HTTP server
     let schema = kamu_adapter_graphql::schema();
-    kamu_adapter_graphql::execute_query(schema, dill::CatalogBuilder::new().build(), None, indoc!(
+    schema.execute(async_graphql::Request::new(indoc!(
             r#"
             {
                 datasets {
@@ -120,6 +119,6 @@ async fn test_handler_panics() {
                 }
             }
             "#
-        ))
+        )).data(dill::CatalogBuilder::new().build()))
         .await;
 }

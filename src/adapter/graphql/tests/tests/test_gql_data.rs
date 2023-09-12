@@ -92,30 +92,29 @@ async fn test_dataset_schema_local_fs() {
     create_test_dataset(&catalog, tempdir.path()).await;
 
     let schema = kamu_adapter_graphql::schema();
-    let res = kamu_adapter_graphql::execute_query(
-        schema,
-        catalog,
-        None,
-        indoc::indoc!(
-            r#"
-            {
-                datasets {
-                    byOwnerAndName(accountName: "kamu", datasetName: "foo") {
-                        name
-                        data {
-                            tail(limit: 1, schemaFormat: PARQUET_JSON, dataFormat: JSON) {
-                                ... on DataQueryResultSuccess {
-                                    schema { content }
+    let res = schema
+        .execute(
+            async_graphql::Request::new(indoc::indoc!(
+                r#"
+                {
+                    datasets {
+                        byOwnerAndName(accountName: "kamu", datasetName: "foo") {
+                            name
+                            data {
+                                tail(limit: 1, schemaFormat: PARQUET_JSON, dataFormat: JSON) {
+                                    ... on DataQueryResultSuccess {
+                                        schema { content }
+                                    }
                                 }
                             }
                         }
                     }
                 }
-            }
-            "#
-        ),
-    )
-    .await;
+                "#
+            ))
+            .data(catalog),
+        )
+        .await;
     assert!(res.is_ok(), "{:?}", res);
     let json = serde_json::to_string(&res.data).unwrap();
     let json = serde_json::from_str::<serde_json::Value>(&json).unwrap();
@@ -152,30 +151,29 @@ async fn test_dataset_tail_local_fs() {
     create_test_dataset(&catalog, tempdir.path()).await;
 
     let schema = kamu_adapter_graphql::schema();
-    let res = kamu_adapter_graphql::execute_query(
-        schema,
-        catalog,
-        None,
-        indoc::indoc!(
-            r#"
-            {
-                datasets {
-                    byOwnerAndName(accountName: "kamu", datasetName: "foo") {
-                        name
-                        data {
-                            tail(skip: 1, limit: 1, schemaFormat: PARQUET_JSON, dataFormat: JSON) {
-                                ... on DataQueryResultSuccess {
-                                    data { content }
+    let res = schema
+        .execute(
+            async_graphql::Request::new(indoc::indoc!(
+                r#"
+                {
+                    datasets {
+                        byOwnerAndName(accountName: "kamu", datasetName: "foo") {
+                            name
+                            data {
+                                tail(skip: 1, limit: 1, schemaFormat: PARQUET_JSON, dataFormat: JSON) {
+                                    ... on DataQueryResultSuccess {
+                                        data { content }
+                                    }
                                 }
                             }
                         }
                     }
                 }
-            }
-            "#
-        ),
-    )
-    .await;
+                "#
+            ))
+            .data(catalog),
+        )
+        .await;
     assert!(res.is_ok(), "{:?}", res);
     let json = serde_json::to_string(&res.data).unwrap();
     let json = serde_json::from_str::<serde_json::Value>(&json).unwrap();
@@ -194,30 +192,29 @@ async fn test_dataset_tail_empty_local_fs() {
     create_test_dataset(&catalog, tempdir.path()).await;
 
     let schema = kamu_adapter_graphql::schema();
-    let res = kamu_adapter_graphql::execute_query(
-        schema,
-        catalog,
-        None,
-        indoc::indoc!(
-            r#"
-            {
-                datasets {
-                    byOwnerAndName(accountName: "kamu", datasetName: "foo") {
-                        name
-                        data {
-                            tail(skip: 10, schemaFormat: PARQUET_JSON, dataFormat: JSON) {
-                                ... on DataQueryResultSuccess {
-                                    data { content }
+    let res = schema
+        .execute(
+            async_graphql::Request::new(indoc::indoc!(
+                r#"
+                {
+                    datasets {
+                        byOwnerAndName(accountName: "kamu", datasetName: "foo") {
+                            name
+                            data {
+                                tail(skip: 10, schemaFormat: PARQUET_JSON, dataFormat: JSON) {
+                                    ... on DataQueryResultSuccess {
+                                        data { content }
+                                    }
                                 }
                             }
                         }
                     }
                 }
-            }
-            "#
-        ),
-    )
-    .await;
+                "#
+            ))
+            .data(catalog),
+        )
+        .await;
     assert!(res.is_ok(), "{:?}", res);
     let json = serde_json::to_string(&res.data).unwrap();
     let json = serde_json::from_str::<serde_json::Value>(&json).unwrap();

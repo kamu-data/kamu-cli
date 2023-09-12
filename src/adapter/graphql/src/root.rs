@@ -7,9 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_core::auth::GetAccountInfoError;
-use kamu_core::{auth, CurrentAccountSubject};
-
 use crate::extensions::*;
 use crate::mutations::*;
 use crate::prelude::*;
@@ -94,22 +91,6 @@ impl Mutation {
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct AccessToken {
-    pub token: String,
-}
-
-impl AccessToken {
-    pub fn new<S>(token: S) -> Self
-    where
-        S: Into<String>,
-    {
-        Self {
-            token: token.into(),
-        }
-    }
-}
-
 pub type Schema = async_graphql::Schema<Query, Mutation, EmptySubscription>;
 pub type SchemaBuilder = async_graphql::SchemaBuilder<Query, Mutation, EmptySubscription>;
 
@@ -124,60 +105,4 @@ pub fn schema() -> Schema {
         .extension(Tracing)
         .extension(extensions::ApolloTracing)
         .finish()
-}
-
-/// Executes GraphQL query
-pub async fn execute_query(
-    schema: Schema,
-    base_catalog: dill::Catalog,
-    maybe_access_token: Option<AccessToken>,
-    req: impl Into<Request>,
-) -> async_graphql::Response {
-    let graphql_request = req.into();
-
-    let current_account_subject =
-        match current_account_subject(&base_catalog, maybe_access_token).await {
-            Ok(current_account_subject) => current_account_subject,
-            Err(response) => return response,
-        };
-
-    let graphql_catalog = dill::CatalogBuilder::new_chained(&base_catalog)
-        .add_value(current_account_subject)
-        .build();
-
-    let graphql_request = graphql_request.data(graphql_catalog);
-
-    schema.execute(graphql_request).await
-}
-
-async fn current_account_subject(
-    base_catalog: &dill::Catalog,
-    maybe_access_token: Option<AccessToken>,
-) -> Result<CurrentAccountSubject, Response> {
-    if let Some(access_token) = maybe_access_token {
-        let authentication_service = base_catalog
-            .get_one::<dyn auth::AuthenticationService>()
-            .unwrap();
-
-        match authentication_service
-            .get_account_info(access_token.token)
-            .await
-        {
-            Ok(account_info) => Ok(CurrentAccountSubject::new(account_info.account_name, false)),
-            Err(GetAccountInfoError::AccessToken(_)) => Ok(CurrentAccountSubject::new(
-                opendatafabric::AccountName::new_unchecked(auth::ANONYMOUS_ACCOUNT_NAME),
-                true,
-            )),
-            Err(e) => {
-                return Err(async_graphql::Response::from_errors(vec![
-                    async_graphql::ServerError::new(e.to_string(), None),
-                ]))
-            }
-        }
-    } else {
-        Ok(CurrentAccountSubject::new(
-            opendatafabric::AccountName::new_unchecked(auth::ANONYMOUS_ACCOUNT_NAME),
-            true,
-        ))
-    }
 }

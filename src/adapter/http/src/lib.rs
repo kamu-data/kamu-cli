@@ -13,8 +13,11 @@
 mod http_server_dataset_router;
 pub use http_server_dataset_router::*;
 
-mod http_server_middleware;
-pub use http_server_middleware::*;
+mod access_token;
+pub use access_token::*;
+
+mod middleware;
+pub use middleware::*;
 
 mod simple_protocol;
 mod smart_protocol;
