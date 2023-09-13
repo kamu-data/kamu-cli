@@ -13,11 +13,11 @@ use std::path::{Path, PathBuf};
 use container_runtime::{ContainerRuntimeType, NetworkNamespaceType};
 use dill::*;
 use duration_string::DurationString;
-use kamu::domain::auth;
+use kamu::domain::auth::{self, AccountType};
 use kamu::utils::docker_images;
 use merge::Merge;
 use opendatafabric::serde::yaml::Manifest;
-use opendatafabric::AccountName;
+use opendatafabric::{AccountName, FAKE_ACCOUNT_ID};
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 use url::Url;
@@ -341,7 +341,9 @@ impl UsersConfig {
     pub fn single_tenant() -> Self {
         Self {
             predefined: vec![auth::AccountInfo {
+                account_id: FAKE_ACCOUNT_ID.to_string(),
                 account_name: AccountName::new_unchecked(auth::DEFAULT_ACCOUNT_NAME),
+                account_type: AccountType::User,
                 display_name: String::from(auth::DEFAULT_ACCOUNT_NAME),
                 avatar_url: Some(String::from(auth::DEFAULT_AVATAR_URL)),
             }],

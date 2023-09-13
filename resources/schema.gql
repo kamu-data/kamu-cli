@@ -1,351 +1,387 @@
-interface Account {
-	id: AccountID!
-	name: AccountName!
+type Account {
+    """
+    Unique and stable identitfier of this account
+    """
+    id: AccountID!
+    """
+    Symbolic account name
+    """
+    accountName: AccountName!
+    """
+    Account name to display
+    """
+    displayName: AccountDisplayName!
+    """
+    Account type
+    """
+    accountType: AccountType!
+    avatarUrl: String
 }
 
 scalar AccountDisplayName
 
 scalar AccountID
 
-type AccountInfo {
-	accountName: AccountName!
-	displayName: AccountDisplayName!
-	avatarUrl: String
-}
-
 scalar AccountName
 
+type AccountRef {
+    """
+    Unique and stable identitfier of this account
+    """
+    id: AccountID!
+    """
+    Symbolic account name
+    """
+    accountName: AccountName!
+}
+
+enum AccountType {
+    USER
+    ORGANIZATION
+}
+
 type Accounts {
-	"""
-	Returns account by its ID
-	"""
-	byId(accountId: AccountID!): AccountInfo
-	"""
-	Returns account by its name
-	"""
-	byName(name: AccountName!): AccountInfo
+    """
+    Returns account by its ID
+    """
+    byId(accountId: AccountID!): Account
+    """
+    Returns account by its name
+    """
+    byName(name: AccountName!): Account
 }
 
 type AddData {
-	inputCheckpoint: Multihash
-	outputData: DataSlice
-	outputCheckpoint: Checkpoint
-	outputWatermark: DateTime
-	sourceState: SourceState
+    inputCheckpoint: Multihash
+    outputData: DataSlice
+    outputCheckpoint: Checkpoint
+    outputWatermark: DateTime
+    sourceState: SourceState
 }
 
 type AttachmentEmbedded {
-	path: String!
-	content: String!
+    path: String!
+    content: String!
 }
 
 union Attachments = AttachmentsEmbedded
 
 type AttachmentsEmbedded {
-	items: [AttachmentEmbedded!]!
+    items: [AttachmentEmbedded!]!
 }
 
 type AuthMut {
-	login(loginMethod: String!, loginCredentialsJson: String!): LoginResponse!
-	accountInfo(accessToken: String!): AccountInfo!
+    login(loginMethod: String!, loginCredentialsJson: String!): LoginResponse!
+    accountDetails(accessToken: String!): Account!
 }
 
 type BlockInterval {
-	start: Multihash!
-	end: Multihash!
+    start: Multihash!
+    end: Multihash!
 }
 
 type BlockRef {
-	name: String!
-	blockHash: Multihash!
+    name: String!
+    blockHash: Multihash!
 }
 
-
 type Checkpoint {
-	physicalHash: Multihash!
-	size: Int!
+    physicalHash: Multihash!
+    size: Int!
 }
 
 interface CommitResult {
-	message: String!
+    message: String!
 }
 
 type CommitResultAppendError implements CommitResult & UpdateReadmeResult {
-	message: String!
+    message: String!
 }
 
 type CommitResultSuccess implements CommitResult & UpdateReadmeResult {
-	oldHead: Multihash
-	newHead: Multihash!
-	message: String!
+    oldHead: Multihash
+    newHead: Multihash!
+    message: String!
 }
 
 enum CompressionFormat {
-	GZIP
-	ZIP
+    GZIP
+    ZIP
 }
 
 interface CreateDatasetFromSnapshotResult {
-	message: String!
+    message: String!
 }
 
 interface CreateDatasetResult {
-	message: String!
+    message: String!
 }
 
 type CreateDatasetResultInvalidSnapshot implements CreateDatasetFromSnapshotResult {
-	message: String!
+    message: String!
 }
 
 type CreateDatasetResultMissingInputs implements CreateDatasetFromSnapshotResult {
-	missingInputs: [String!]!
-	message: String!
+    missingInputs: [String!]!
+    message: String!
 }
 
 type CreateDatasetResultNameCollision implements CreateDatasetResult & CreateDatasetFromSnapshotResult {
-	accountName: AccountName
-	datasetName: DatasetName!
-	message: String!
+    accountName: AccountName
+    datasetName: DatasetName!
+    message: String!
 }
 
 type CreateDatasetResultSuccess implements CreateDatasetResult & CreateDatasetFromSnapshotResult {
-	dataset: Dataset!
-	message: String!
+    dataset: Dataset!
+    message: String!
 }
 
 type DataBatch {
-	format: DataBatchFormat!
-	content: String!
-	numRecords: Int!
+    format: DataBatchFormat!
+    content: String!
+    numRecords: Int!
 }
 
 enum DataBatchFormat {
-	JSON
-	JSON_LD
-	JSON_SOA
-	CSV
+    JSON
+    JSON_LD
+    JSON_SOA
+    CSV
 }
 
 type DataQueries {
-	"""
-	Executes a specified query and returns its result
-	"""
-	query(query: String!, queryDialect: QueryDialect!, dataFormat: DataBatchFormat, schemaFormat: DataSchemaFormat, skip: Int, limit: Int): DataQueryResult!
-	"""
-	Lists engines known to the system and recommended for use
-	"""
-	knownEngines: [EngineDesc!]!
+    """
+    Executes a specified query and returns its result
+    """
+    query(
+        query: String!
+        queryDialect: QueryDialect!
+        dataFormat: DataBatchFormat
+        schemaFormat: DataSchemaFormat
+        skip: Int
+        limit: Int
+    ): DataQueryResult!
+    """
+    Lists engines known to the system and recommended for use
+    """
+    knownEngines: [EngineDesc!]!
 }
 
 union DataQueryResult = DataQueryResultSuccess | DataQueryResultError
 
 type DataQueryResultError {
-	errorMessage: String!
-	errorKind: DataQueryResultErrorKind!
+    errorMessage: String!
+    errorKind: DataQueryResultErrorKind!
 }
 
 enum DataQueryResultErrorKind {
-	INVALID_SQL
-	UNAUTHORIZED
-	INTERNAL_ERROR
+    INVALID_SQL
+    UNAUTHORIZED
+    INTERNAL_ERROR
 }
 
 type DataQueryResultSuccess {
-	schema: DataSchema
-	data: DataBatch!
-	limit: Int!
+    schema: DataSchema
+    data: DataBatch!
+    limit: Int!
 }
 
 type DataSchema {
-	format: DataSchemaFormat!
-	content: String!
+    format: DataSchemaFormat!
+    content: String!
 }
 
 enum DataSchemaFormat {
-	PARQUET
-	PARQUET_JSON
+    PARQUET
+    PARQUET_JSON
 }
 
 type DataSlice {
-	logicalHash: Multihash!
-	physicalHash: Multihash!
-	interval: OffsetInterval!
-	size: Int!
+    logicalHash: Multihash!
+    physicalHash: Multihash!
+    interval: OffsetInterval!
+    size: Int!
 }
 
 type Dataset {
-	"""
-	Unique identifier of the dataset
-	"""
-	id: DatasetID!
-	"""
-	Symbolic name of the dataset.
-	Name can change over the dataset's lifetime. For unique identifier use
-	`id()`.
-	"""
-	name: DatasetName!
-	"""
-	Returns the user or organization that owns this dataset
-	"""
-	owner: Account!
-	"""
-	Returns dataset alias (user + name)
-	"""
-	alias: DatasetAlias!
-	"""
-	Returns the kind of a dataset (Root or Derivative)
-	"""
-	kind: DatasetKind!
-	"""
-	Access to the data of the dataset
-	"""
-	data: DatasetData!
-	"""
-	Access to the metadata of the dataset
-	"""
-	metadata: DatasetMetadata!
-	"""
-	Creation time of the first metadata block in the chain
-	"""
-	createdAt: DateTime!
-	"""
-	Creation time of the most recent metadata block in the chain
-	"""
-	lastUpdatedAt: DateTime!
-	"""
-	Permissions of the current user
-	"""
-	permissions: DatasetPermissions!
+    """
+    Unique identifier of the dataset
+    """
+    id: DatasetID!
+    """
+    Symbolic name of the dataset.
+    Name can change over the dataset's lifetime. For unique identifier use
+    `id()`.
+    """
+    name: DatasetName!
+    """
+    Returns the user or organization that owns this dataset
+    """
+    ownerRef: AccountRef!
+    """
+    Returns dataset alias (user + name)
+    """
+    alias: DatasetAlias!
+    """
+    Returns the kind of a dataset (Root or Derivative)
+    """
+    kind: DatasetKind!
+    """
+    Access to the data of the dataset
+    """
+    data: DatasetData!
+    """
+    Access to the metadata of the dataset
+    """
+    metadata: DatasetMetadata!
+    """
+    Creation time of the first metadata block in the chain
+    """
+    createdAt: DateTime!
+    """
+    Creation time of the most recent metadata block in the chain
+    """
+    lastUpdatedAt: DateTime!
+    """
+    Permissions of the current user
+    """
+    permissions: DatasetPermissions!
 }
 
 scalar DatasetAlias
 
 type DatasetConnection {
-	"""
-	A shorthand for `edges { node { ... } }`
-	"""
-	nodes: [Dataset!]!
-	"""
-	Approximate number of total nodes
-	"""
-	totalCount: Int!
-	"""
-	Page information
-	"""
-	pageInfo: PageBasedInfo!
-	edges: [DatasetEdge!]!
+    """
+    A shorthand for `edges { node { ... } }`
+    """
+    nodes: [Dataset!]!
+    """
+    Approximate number of total nodes
+    """
+    totalCount: Int!
+    """
+    Page information
+    """
+    pageInfo: PageBasedInfo!
+    edges: [DatasetEdge!]!
 }
 
 type DatasetData {
-	"""
-	Total number of records in this dataset
-	"""
-	numRecordsTotal: Int!
-	"""
-	An estimated size of data on disk not accounting for replication or
-	caching
-	"""
-	estimatedSize: Int!
-	"""
-	Returns the specified number of the latest records in the dataset
-	This is equivalent to the SQL query: `SELECT * FROM dataset ORDER BY
-	event_time DESC LIMIT N`
-	"""
-	tail(skip: Int, limit: Int, dataFormat: DataBatchFormat, schemaFormat: DataSchemaFormat): DataQueryResult!
+    """
+    Total number of records in this dataset
+    """
+    numRecordsTotal: Int!
+    """
+    An estimated size of data on disk not accounting for replication or
+    caching
+    """
+    estimatedSize: Int!
+    """
+    Returns the specified number of the latest records in the dataset
+    This is equivalent to the SQL query: `SELECT * FROM dataset ORDER BY
+    event_time DESC LIMIT N`
+    """
+    tail(
+        skip: Int
+        limit: Int
+        dataFormat: DataBatchFormat
+        schemaFormat: DataSchemaFormat
+    ): DataQueryResult!
 }
 
 type DatasetEdge {
-	node: Dataset!
+    node: Dataset!
 }
 
 scalar DatasetID
 
 enum DatasetKind {
-	ROOT
-	DERIVATIVE
+    ROOT
+    DERIVATIVE
 }
 
 type DatasetMetadata {
-	"""
-	Access to the temporal metadata chain of the dataset
-	"""
-	chain: MetadataChain!
-	"""
-	Last recorded watermark
-	"""
-	currentWatermark: DateTime
-	"""
-	Latest data schema
-	"""
-	currentSchema(format: DataSchemaFormat): DataSchema
-	"""
-	Current upstream dependencies of a dataset
-	"""
-	currentUpstreamDependencies: [Dataset!]!
-	"""
-	Current downstream dependencies of a dataset
-	"""
-	currentDownstreamDependencies: [Dataset!]!
-	"""
-	Current source used by the root dataset
-	"""
-	currentSource: SetPollingSource
-	"""
-	Current transformation used by the derivative dataset
-	"""
-	currentTransform: SetTransform
-	"""
-	Current descriptive information about the dataset
-	"""
-	currentInfo: SetInfo!
-	"""
-	Current readme file as discovered from attachments associated with the
-	dataset
-	"""
-	currentReadme: String
-	"""
-	Current license associated with the dataset
-	"""
-	currentLicense: SetLicense
-	"""
-	Current vocabulary associated with the dataset
-	"""
-	currentVocab: SetVocab
+    """
+    Access to the temporal metadata chain of the dataset
+    """
+    chain: MetadataChain!
+    """
+    Last recorded watermark
+    """
+    currentWatermark: DateTime
+    """
+    Latest data schema
+    """
+    currentSchema(format: DataSchemaFormat): DataSchema
+    """
+    Current upstream dependencies of a dataset
+    """
+    currentUpstreamDependencies: [Dataset!]!
+    """
+    Current downstream dependencies of a dataset
+    """
+    currentDownstreamDependencies: [Dataset!]!
+    """
+    Current source used by the root dataset
+    """
+    currentSource: SetPollingSource
+    """
+    Current transformation used by the derivative dataset
+    """
+    currentTransform: SetTransform
+    """
+    Current descriptive information about the dataset
+    """
+    currentInfo: SetInfo!
+    """
+    Current readme file as discovered from attachments associated with the
+    dataset
+    """
+    currentReadme: String
+    """
+    Current license associated with the dataset
+    """
+    currentLicense: SetLicense
+    """
+    Current vocabulary associated with the dataset
+    """
+    currentVocab: SetVocab
 }
 
 type DatasetMetadataMut {
-	"""
-	Access to the mutable metadata chain of the dataset
-	"""
-	chain: MetadataChainMut!
-	"""
-	Updates or clears the dataset readme
-	"""
-	updateReadme(content: String): UpdateReadmeResult!
+    """
+    Access to the mutable metadata chain of the dataset
+    """
+    chain: MetadataChainMut!
+    """
+    Updates or clears the dataset readme
+    """
+    updateReadme(content: String): UpdateReadmeResult!
 }
 
 type DatasetMut {
-	"""
-	Access to the mutable metadata of the dataset
-	"""
-	metadata: DatasetMetadataMut!
-	"""
-	Rename the dataset
-	"""
-	rename(newName: DatasetName!): RenameResult!
-	"""
-	Delete the dataset
-	"""
-	delete: DeleteResult!
+    """
+    Access to the mutable metadata of the dataset
+    """
+    metadata: DatasetMetadataMut!
+    """
+    Rename the dataset
+    """
+    rename(newName: DatasetName!): RenameResult!
+    """
+    Delete the dataset
+    """
+    delete: DeleteResult!
 }
 
 scalar DatasetName
 
 type DatasetPermissions {
-	canView: Boolean!
-	canDelete: Boolean!
-	canRename: Boolean!
-	canCommit: Boolean!
+    canView: Boolean!
+    canDelete: Boolean!
+    canRename: Boolean!
+    canCommit: Boolean!
 }
 
 scalar DatasetRef
@@ -353,37 +389,54 @@ scalar DatasetRef
 scalar DatasetRefAny
 
 type Datasets {
-	"""
-	Returns dataset by its ID
-	"""
-	byId(datasetId: DatasetID!): Dataset
-	"""
-	Returns dataset by its owner and name
-	"""
-	byOwnerAndName(accountName: AccountName!, datasetName: DatasetName!): Dataset
-	"""
-	Returns datasets belonging to the specified account
-	"""
-	byAccountId(accountId: AccountID!, page: Int, perPage: Int): DatasetConnection!
-	"""
-	Returns datasets belonging to the specified account
-	"""
-	byAccountName(accountName: AccountName!, page: Int, perPage: Int): DatasetConnection!
+    """
+    Returns dataset by its ID
+    """
+    byId(datasetId: DatasetID!): Dataset
+    """
+    Returns dataset by its owner and name
+    """
+    byOwnerAndName(
+        accountName: AccountName!
+        datasetName: DatasetName!
+    ): Dataset
+    """
+    Returns datasets belonging to the specified account
+    """
+    byAccountId(
+        accountId: AccountID!
+        page: Int
+        perPage: Int
+    ): DatasetConnection!
+    """
+    Returns datasets belonging to the specified account
+    """
+    byAccountName(
+        accountName: AccountName!
+        page: Int
+        perPage: Int
+    ): DatasetConnection!
 }
 
 type DatasetsMut {
-	"""
-	Returns a mutable dataset by its ID
-	"""
-	byId(datasetId: DatasetID!): DatasetMut
-	"""
-	Creates a new empty dataset
-	"""
-	createEmpty(datasetKind: DatasetKind!, datasetName: DatasetName!): CreateDatasetResult!
-	"""
-	Creates a new dataset from provided DatasetSnapshot manifest
-	"""
-	createFromSnapshot(snapshot: String!, snapshotFormat: MetadataManifestFormat!): CreateDatasetFromSnapshotResult!
+    """
+    Returns a mutable dataset by its ID
+    """
+    byId(datasetId: DatasetID!): DatasetMut
+    """
+    Creates a new empty dataset
+    """
+    createEmpty(
+        datasetKind: DatasetKind!
+        datasetName: DatasetName!
+    ): CreateDatasetResult!
+    """
+    Creates a new dataset from provided DatasetSnapshot manifest
+    """
+    createFromSnapshot(
+        snapshot: String!
+        snapshotFormat: MetadataManifestFormat!
+    ): CreateDatasetFromSnapshotResult!
 }
 
 """
@@ -394,552 +447,567 @@ The input/output is a string in RFC3339 format.
 scalar DateTime
 
 interface DeleteResult {
-	message: String!
+    message: String!
 }
 
 type DeleteResultDanglingReference implements DeleteResult {
-	notDeletedDataset: DatasetAlias!
-	danglingChildRefs: [DatasetRef!]!
-	message: String!
+    notDeletedDataset: DatasetAlias!
+    danglingChildRefs: [DatasetRef!]!
+    message: String!
 }
 
 type DeleteResultSuccess implements DeleteResult {
-	deletedDataset: DatasetAlias!
-	message: String!
+    deletedDataset: DatasetAlias!
+    message: String!
 }
 
 """
 Describes
 """
 type EngineDesc {
-	"""
-	A short name of the engine, e.g. "Spark", "Flink".
-	Intended for use in UI for quick engine identification and selection.
-	"""
-	name: String!
-	"""
-	Language and dialect this engine is using for queries
-	Indended for configuring code highlighting and completions.
-	"""
-	dialect: QueryDialect!
-	"""
-	OCI image repository and a tag of the latest engine image, e.g.
-	"ghcr.io/kamu-data/engine-datafusion:0.1.2"
-	"""
-	latestImage: String!
+    """
+    A short name of the engine, e.g. "Spark", "Flink".
+    Intended for use in UI for quick engine identification and selection.
+    """
+    name: String!
+    """
+    Language and dialect this engine is using for queries
+    Indended for configuring code highlighting and completions.
+    """
+    dialect: QueryDialect!
+    """
+    OCI image repository and a tag of the latest engine image, e.g.
+    "ghcr.io/kamu-data/engine-datafusion:0.1.2"
+    """
+    latestImage: String!
 }
 
 type EnvVar {
-	name: String!
-	value: String
+    name: String!
+    value: String
 }
 
-union EventTimeSource = EventTimeSourceFromMetadata | EventTimeSourceFromPath | EventTimeSourceFromSystemTime
+union EventTimeSource =
+      EventTimeSourceFromMetadata
+    | EventTimeSourceFromPath
+    | EventTimeSourceFromSystemTime
 
 type EventTimeSourceFromMetadata {
-	dummy: String
+    dummy: String
 }
 
 type EventTimeSourceFromPath {
-	pattern: String!
-	timestampFormat: String
+    pattern: String!
+    timestampFormat: String
 }
 
 type EventTimeSourceFromSystemTime {
-	dummy: String
+    dummy: String
 }
 
 type ExecuteQuery {
-	inputSlices: [InputSlice!]!
-	inputCheckpoint: Multihash
-	outputData: DataSlice
-	outputCheckpoint: Checkpoint
-	outputWatermark: DateTime
+    inputSlices: [InputSlice!]!
+    inputCheckpoint: Multihash
+    outputData: DataSlice
+    outputCheckpoint: Checkpoint
+    outputWatermark: DateTime
 }
 
 union FetchStep = FetchStepUrl | FetchStepFilesGlob | FetchStepContainer
 
 type FetchStepContainer {
-	image: String!
-	command: [String!]
-	args: [String!]
-	env: [EnvVar!]
+    image: String!
+    command: [String!]
+    args: [String!]
+    env: [EnvVar!]
 }
 
 type FetchStepFilesGlob {
-	path: String!
-	eventTime: EventTimeSource
-	cache: SourceCaching
-	order: SourceOrdering
+    path: String!
+    eventTime: EventTimeSource
+    cache: SourceCaching
+    order: SourceOrdering
 }
 
 type FetchStepUrl {
-	url: String!
-	eventTime: EventTimeSource
-	cache: SourceCaching
-	headers: [RequestHeader!]
+    url: String!
+    eventTime: EventTimeSource
+    cache: SourceCaching
+    headers: [RequestHeader!]
 }
-
-
 
 type InputSlice {
-	datasetId: DatasetID!
-	blockInterval: BlockInterval
-	dataInterval: OffsetInterval
+    datasetId: DatasetID!
+    blockInterval: BlockInterval
+    dataInterval: OffsetInterval
 }
-
 
 type LoginResponse {
-	accessToken: String!
-	accountInfo: AccountInfo!
+    accessToken: String!
+    account: Account!
 }
 
-union MergeStrategy = MergeStrategyAppend | MergeStrategyLedger | MergeStrategySnapshot
+union MergeStrategy =
+      MergeStrategyAppend
+    | MergeStrategyLedger
+    | MergeStrategySnapshot
 
 type MergeStrategyAppend {
-	dummy: String
+    dummy: String
 }
 
 type MergeStrategyLedger {
-	primaryKey: [String!]!
+    primaryKey: [String!]!
 }
 
 type MergeStrategySnapshot {
-	primaryKey: [String!]!
-	compareColumns: [String!]
-	observationColumn: String
-	obsvAdded: String
-	obsvChanged: String
-	obsvRemoved: String
+    primaryKey: [String!]!
+    compareColumns: [String!]
+    observationColumn: String
+    obsvAdded: String
+    obsvChanged: String
+    obsvRemoved: String
 }
 
 type MetadataBlockConnection {
-	"""
-	A shorthand for `edges { node { ... } }`
-	"""
-	nodes: [MetadataBlockExtended!]!
-	"""
-	Approximate number of total nodes
-	"""
-	totalCount: Int!
-	"""
-	Page information
-	"""
-	pageInfo: PageBasedInfo!
-	edges: [MetadataBlockEdge!]!
+    """
+    A shorthand for `edges { node { ... } }`
+    """
+    nodes: [MetadataBlockExtended!]!
+    """
+    Approximate number of total nodes
+    """
+    totalCount: Int!
+    """
+    Page information
+    """
+    pageInfo: PageBasedInfo!
+    edges: [MetadataBlockEdge!]!
 }
 
 type MetadataBlockEdge {
-	node: MetadataBlockExtended!
+    node: MetadataBlockExtended!
 }
 
 type MetadataBlockExtended {
-	blockHash: Multihash!
-	prevBlockHash: Multihash
-	systemTime: DateTime!
-	author: Account!
-	event: MetadataEvent!
-	sequenceNumber: Int!
+    blockHash: Multihash!
+    prevBlockHash: Multihash
+    systemTime: DateTime!
+    authorRef: AccountRef!
+    event: MetadataEvent!
+    sequenceNumber: Int!
 }
 
 type MetadataChain {
-	"""
-	Returns all named metadata block references
-	"""
-	refs: [BlockRef!]!
-	"""
-	Returns a metadata block corresponding to the specified hash
-	"""
-	blockByHash(hash: Multihash!): MetadataBlockExtended
-	"""
-	Returns a metadata block corresponding to the specified hash and encoded
-	in desired format
-	"""
-	blockByHashEncoded(hash: Multihash!, format: MetadataManifestFormat!): String
-	"""
-	Iterates all metadata blocks in the reverse chronological order
-	"""
-	blocks(page: Int, perPage: Int): MetadataBlockConnection!
+    """
+    Returns all named metadata block references
+    """
+    refs: [BlockRef!]!
+    """
+    Returns a metadata block corresponding to the specified hash
+    """
+    blockByHash(hash: Multihash!): MetadataBlockExtended
+    """
+    Returns a metadata block corresponding to the specified hash and encoded
+    in desired format
+    """
+    blockByHashEncoded(
+        hash: Multihash!
+        format: MetadataManifestFormat!
+    ): String
+    """
+    Iterates all metadata blocks in the reverse chronological order
+    """
+    blocks(page: Int, perPage: Int): MetadataBlockConnection!
 }
 
 type MetadataChainMut {
-	"""
-	Commits new event to the metadata chain
-	"""
-	commitEvent(event: String!, eventFormat: MetadataManifestFormat!): CommitResult!
+    """
+    Commits new event to the metadata chain
+    """
+    commitEvent(
+        event: String!
+        eventFormat: MetadataManifestFormat!
+    ): CommitResult!
 }
 
-union MetadataEvent = AddData | ExecuteQuery | Seed | SetPollingSource | SetTransform | SetVocab | SetWatermark | SetAttachments | SetInfo | SetLicense
+union MetadataEvent =
+      AddData
+    | ExecuteQuery
+    | Seed
+    | SetPollingSource
+    | SetTransform
+    | SetVocab
+    | SetWatermark
+    | SetAttachments
+    | SetInfo
+    | SetLicense
 
 enum MetadataManifestFormat {
-	YAML
+    YAML
 }
 
 type MetadataManifestMalformed implements CommitResult & CreateDatasetFromSnapshotResult {
-	message: String!
+    message: String!
 }
 
 type MetadataManifestUnsupportedVersion implements CommitResult & CreateDatasetFromSnapshotResult {
-	message: String!
+    message: String!
 }
 
 scalar Multihash
 
 type Mutation {
-	"""
-	Authentication and authorization-related functionality group
-	"""
-	auth: AuthMut!
-	"""
-	Dataset-related functionality group.
-	
-	Datasets are historical streams of events recorded under a cetrain
-	schema.
-	"""
-	datasets: DatasetsMut!
-	"""
-	Tasks-related functionality group.
-	
-	Tasks are units of work scheduled and executed by the system to query
-	and process data.
-	"""
-	tasks: TasksMut!
+    """
+    Authentication and authorization-related functionality group
+    """
+    auth: AuthMut!
+    """
+    Dataset-related functionality group.
+
+    Datasets are historical streams of events recorded under a cetrain
+    schema.
+    """
+    datasets: DatasetsMut!
+    """
+    Tasks-related functionality group.
+
+    Tasks are units of work scheduled and executed by the system to query
+    and process data.
+    """
+    tasks: TasksMut!
 }
 
 type NoChanges implements CommitResult & UpdateReadmeResult {
-	message: String!
+    message: String!
 }
 
 type OffsetInterval {
-	start: Int!
-	end: Int!
-}
-
-type Organization implements Account {
-	"""
-	Unique and stable identitfier of this organization account
-	"""
-	id: AccountID!
-	"""
-	Symbolic account name
-	"""
-	name: AccountName!
+    start: Int!
+    end: Int!
 }
 
 type PageBasedInfo {
-	"""
-	When paginating backwards, are there more items?
-	"""
-	hasPreviousPage: Boolean!
-	"""
-	When paginating forwards, are there more items?
-	"""
-	hasNextPage: Boolean!
-	"""
-	Index of the current page
-	"""
-	currentPage: Int!
-	"""
-	Approximate number of total pages assuming number of nodes per page
-	stays the same
-	"""
-	totalPages: Int
+    """
+    When paginating backwards, are there more items?
+    """
+    hasPreviousPage: Boolean!
+    """
+    When paginating forwards, are there more items?
+    """
+    hasNextPage: Boolean!
+    """
+    Index of the current page
+    """
+    currentPage: Int!
+    """
+    Approximate number of total pages assuming number of nodes per page
+    stays the same
+    """
+    totalPages: Int
 }
 
 union PrepStep = PrepStepDecompress | PrepStepPipe
 
 type PrepStepDecompress {
-	format: CompressionFormat!
-	subPath: String
+    format: CompressionFormat!
+    subPath: String
 }
 
 type PrepStepPipe {
-	command: [String!]!
+    command: [String!]!
 }
 
 type Query {
-	"""
-	Returns the version of the GQL API
-	"""
-	apiVersion: String!
-	"""
-	Dataset-related functionality group.
-	
-	Datasets are historical streams of events recorded under a cetrain
-	schema.
-	"""
-	datasets: Datasets!
-	"""
-	Account-related functionality group.
-	
-	Accounts can be individual users or organizations registered in the
-	system. This groups deals with their identities and permissions.
-	"""
-	accounts: Accounts!
-	"""
-	Task-related functionality group.
-	
-	Tasks are units of scheduling that can perform many functions like
-	ingesting new data, running dataset transformations, answering ad-hoc
-	queries etc.
-	"""
-	tasks: Tasks!
-	"""
-	Search-related functionality group.
-	"""
-	search: Search!
-	"""
-	Querying and data manipulations
-	"""
-	data: DataQueries!
+    """
+    Returns the version of the GQL API
+    """
+    apiVersion: String!
+    """
+    Dataset-related functionality group.
+
+    Datasets are historical streams of events recorded under a cetrain
+    schema.
+    """
+    datasets: Datasets!
+    """
+    Account-related functionality group.
+
+    Accounts can be individual users or organizations registered in the
+    system. This groups deals with their identities and permissions.
+    """
+    accounts: Accounts!
+    """
+    Task-related functionality group.
+
+    Tasks are units of scheduling that can perform many functions like
+    ingesting new data, running dataset transformations, answering ad-hoc
+    queries etc.
+    """
+    tasks: Tasks!
+    """
+    Search-related functionality group.
+    """
+    search: Search!
+    """
+    Querying and data manipulations
+    """
+    data: DataQueries!
 }
 
 enum QueryDialect {
-	SQL_SPARK
-	SQL_FLINK
-	SQL_DATA_FUSION
+    SQL_SPARK
+    SQL_FLINK
+    SQL_DATA_FUSION
 }
 
-union ReadStep = ReadStepCsv | ReadStepJsonLines | ReadStepGeoJson | ReadStepEsriShapefile | ReadStepParquet | ReadStepJson | ReadStepNdJson | ReadStepNdGeoJson
+union ReadStep =
+      ReadStepCsv
+    | ReadStepJsonLines
+    | ReadStepGeoJson
+    | ReadStepEsriShapefile
+    | ReadStepParquet
+    | ReadStepJson
+    | ReadStepNdJson
+    | ReadStepNdGeoJson
 
 type ReadStepCsv {
-	schema: [String!]
-	separator: String
-	encoding: String
-	quote: String
-	escape: String
-	comment: String
-	header: Boolean
-	enforceSchema: Boolean
-	inferSchema: Boolean
-	ignoreLeadingWhiteSpace: Boolean
-	ignoreTrailingWhiteSpace: Boolean
-	nullValue: String
-	emptyValue: String
-	nanValue: String
-	positiveInf: String
-	negativeInf: String
-	dateFormat: String
-	timestampFormat: String
-	multiLine: Boolean
+    schema: [String!]
+    separator: String
+    encoding: String
+    quote: String
+    escape: String
+    comment: String
+    header: Boolean
+    enforceSchema: Boolean
+    inferSchema: Boolean
+    ignoreLeadingWhiteSpace: Boolean
+    ignoreTrailingWhiteSpace: Boolean
+    nullValue: String
+    emptyValue: String
+    nanValue: String
+    positiveInf: String
+    negativeInf: String
+    dateFormat: String
+    timestampFormat: String
+    multiLine: Boolean
 }
 
 type ReadStepEsriShapefile {
-	schema: [String!]
-	subPath: String
+    schema: [String!]
+    subPath: String
 }
 
 type ReadStepGeoJson {
-	schema: [String!]
+    schema: [String!]
 }
 
 type ReadStepJson {
-	subPath: String
-	schema: [String!]
-	dateFormat: String
-	encoding: String
-	timestampFormat: String
+    subPath: String
+    schema: [String!]
+    dateFormat: String
+    encoding: String
+    timestampFormat: String
 }
 
 type ReadStepJsonLines {
-	schema: [String!]
-	dateFormat: String
-	encoding: String
-	multiLine: Boolean
-	primitivesAsString: Boolean
-	timestampFormat: String
+    schema: [String!]
+    dateFormat: String
+    encoding: String
+    multiLine: Boolean
+    primitivesAsString: Boolean
+    timestampFormat: String
 }
 
 type ReadStepNdGeoJson {
-	schema: [String!]
+    schema: [String!]
 }
 
 type ReadStepNdJson {
-	schema: [String!]
-	dateFormat: String
-	encoding: String
-	timestampFormat: String
+    schema: [String!]
+    dateFormat: String
+    encoding: String
+    timestampFormat: String
 }
 
 type ReadStepParquet {
-	schema: [String!]
+    schema: [String!]
 }
 
 interface RenameResult {
-	message: String!
+    message: String!
 }
 
 type RenameResultNameCollision implements RenameResult {
-	collidingAlias: DatasetAlias!
-	message: String!
+    collidingAlias: DatasetAlias!
+    message: String!
 }
 
 type RenameResultNoChanges implements RenameResult {
-	preservedName: DatasetName!
-	message: String!
+    preservedName: DatasetName!
+    message: String!
 }
 
 type RenameResultSuccess implements RenameResult {
-	oldName: DatasetName!
-	newName: DatasetName!
-	message: String!
+    oldName: DatasetName!
+    newName: DatasetName!
+    message: String!
 }
 
 type RequestHeader {
-	name: String!
-	value: String!
+    name: String!
+    value: String!
 }
 
 type Search {
-	"""
-	Perform search across all resources
-	"""
-	query(query: String!, page: Int, perPage: Int): SearchResultConnection!
+    """
+    Perform search across all resources
+    """
+    query(query: String!, page: Int, perPage: Int): SearchResultConnection!
 }
 
 union SearchResult = Dataset
 
 type SearchResultConnection {
-	"""
-	A shorthand for `edges { node { ... } }`
-	"""
-	nodes: [SearchResult!]!
-	"""
-	Approximate number of total nodes
-	"""
-	totalCount: Int!
-	"""
-	Page information
-	"""
-	pageInfo: PageBasedInfo!
-	edges: [SearchResultEdge!]!
+    """
+    A shorthand for `edges { node { ... } }`
+    """
+    nodes: [SearchResult!]!
+    """
+    Approximate number of total nodes
+    """
+    totalCount: Int!
+    """
+    Page information
+    """
+    pageInfo: PageBasedInfo!
+    edges: [SearchResultEdge!]!
 }
 
 type SearchResultEdge {
-	node: SearchResult!
+    node: SearchResult!
 }
 
 type Seed {
-	datasetId: DatasetID!
-	datasetKind: DatasetKind!
+    datasetId: DatasetID!
+    datasetKind: DatasetKind!
 }
 
 type SetAttachments {
-	attachments: Attachments!
+    attachments: Attachments!
 }
 
 type SetInfo {
-	description: String
-	keywords: [String!]
+    description: String
+    keywords: [String!]
 }
 
 type SetLicense {
-	shortName: String!
-	name: String!
-	spdxId: String
-	websiteUrl: String!
+    shortName: String!
+    name: String!
+    spdxId: String
+    websiteUrl: String!
 }
 
 type SetPollingSource {
-	fetch: FetchStep!
-	prepare: [PrepStep!]
-	read: ReadStep!
-	preprocess: Transform
-	merge: MergeStrategy!
+    fetch: FetchStep!
+    prepare: [PrepStep!]
+    read: ReadStep!
+    preprocess: Transform
+    merge: MergeStrategy!
 }
 
 type SetTransform {
-	inputs: [TransformInput!]!
-	transform: Transform!
+    inputs: [TransformInput!]!
+    transform: Transform!
 }
 
 type SetVocab {
-	systemTimeColumn: String
-	eventTimeColumn: String
-	offsetColumn: String
+    systemTimeColumn: String
+    eventTimeColumn: String
+    offsetColumn: String
 }
 
 type SetWatermark {
-	outputWatermark: DateTime!
+    outputWatermark: DateTime!
 }
 
 union SourceCaching = SourceCachingForever
 
 type SourceCachingForever {
-	dummy: String
+    dummy: String
 }
 
 enum SourceOrdering {
-	BY_EVENT_TIME
-	BY_NAME
+    BY_EVENT_TIME
+    BY_NAME
 }
 
 type SourceState {
-	kind: String!
-	source: String!
-	value: String!
+    kind: String!
+    source: String!
+    value: String!
 }
 
 type SqlQueryStep {
-	alias: String
-	query: String!
+    alias: String
+    query: String!
 }
 
-
 type Task {
-	"""
-	Unique and stable identitfier of this task
-	"""
-	taskId: TaskID!
-	"""
-	Life-cycle status of a task
-	"""
-	status: TaskStatus!
-	"""
-	Whether the task was ordered to be cancelled
-	"""
-	cancellationRequested: Boolean!
-	"""
-	Describes a certain final outcome of the task once it reaches the
-	"finished" status
-	"""
-	outcome: TaskOutcome
-	"""
-	Time when task was originally created and placed in a queue
-	"""
-	createdAt: DateTime!
-	"""
-	Time when task transitioned into a running state
-	"""
-	ranAt: DateTime
-	"""
-	Time when cancellation of task was requested
-	"""
-	cancellationRequestedAt: DateTime
-	"""
-	Time when task has reached a final outcome
-	"""
-	finishedAt: DateTime
+    """
+    Unique and stable identitfier of this task
+    """
+    taskId: TaskID!
+    """
+    Life-cycle status of a task
+    """
+    status: TaskStatus!
+    """
+    Whether the task was ordered to be cancelled
+    """
+    cancellationRequested: Boolean!
+    """
+    Describes a certain final outcome of the task once it reaches the
+    "finished" status
+    """
+    outcome: TaskOutcome
+    """
+    Time when task was originally created and placed in a queue
+    """
+    createdAt: DateTime!
+    """
+    Time when task transitioned into a running state
+    """
+    ranAt: DateTime
+    """
+    Time when cancellation of task was requested
+    """
+    cancellationRequestedAt: DateTime
+    """
+    Time when task has reached a final outcome
+    """
+    finishedAt: DateTime
 }
 
 type TaskConnection {
-	"""
-	A shorthand for `edges { node { ... } }`
-	"""
-	nodes: [Task!]!
-	"""
-	Approximate number of total nodes
-	"""
-	totalCount: Int!
-	"""
-	Page information
-	"""
-	pageInfo: PageBasedInfo!
-	edges: [TaskEdge!]!
+    """
+    A shorthand for `edges { node { ... } }`
+    """
+    nodes: [Task!]!
+    """
+    Approximate number of total nodes
+    """
+    totalCount: Int!
+    """
+    Page information
+    """
+    pageInfo: PageBasedInfo!
+    edges: [TaskEdge!]!
 }
 
 type TaskEdge {
-	node: Task!
+    node: Task!
 }
 
 scalar TaskID
@@ -948,104 +1016,101 @@ scalar TaskID
 Describes a certain final outcome of the task
 """
 enum TaskOutcome {
-	"""
-	Task succeeded
-	"""
-	SUCCESS
-	"""
-	Task failed to complete
-	"""
-	FAILED
-	"""
-	Task was cancelled by a user
-	"""
-	CANCELLED
+    """
+    Task succeeded
+    """
+    SUCCESS
+    """
+    Task failed to complete
+    """
+    FAILED
+    """
+    Task was cancelled by a user
+    """
+    CANCELLED
 }
 
 """
 Life-cycle status of a task
 """
 enum TaskStatus {
-	"""
-	Task is waiting for capacity to be allocated to it
-	"""
-	QUEUED
-	"""
-	Task is being executed
-	"""
-	RUNNING
-	"""
-	Task has reached a certain final outcome (see [TaskOutcome])
-	"""
-	FINISHED
+    """
+    Task is waiting for capacity to be allocated to it
+    """
+    QUEUED
+    """
+    Task is being executed
+    """
+    RUNNING
+    """
+    Task has reached a certain final outcome (see [TaskOutcome])
+    """
+    FINISHED
 }
 
 type Tasks {
-	"""
-	Returns current state of a given task
-	"""
-	getTask(taskId: TaskID!): Task
-	"""
-	Returns states of tasks associated with a given dataset ordered by
-	creation time from newest to oldest
-	"""
-	listTasksByDataset(datasetId: DatasetID!, page: Int, perPage: Int): TaskConnection!
+    """
+    Returns current state of a given task
+    """
+    getTask(taskId: TaskID!): Task
+    """
+    Returns states of tasks associated with a given dataset ordered by
+    creation time from newest to oldest
+    """
+    listTasksByDataset(
+        datasetId: DatasetID!
+        page: Int
+        perPage: Int
+    ): TaskConnection!
 }
 
 type TasksMut {
-	"""
-	Requests cancellation of the specified task
-	"""
-	cancelTask(taskId: TaskID!): Task!
-	"""
-	Schedules a task to update the specified dataset by performing polling
-	ingest or a derivative transformation
-	"""
-	createUpdateDatasetTask(datasetId: DatasetID!): Task!
-	"""
-	Schedules a task to update the specified dataset by performing polling
-	ingest or a derivative transformation
-	"""
-	createProbeTask(datasetId: DatasetID, busyTimeMs: Int, endWithOutcome: TaskOutcome): Task!
+    """
+    Requests cancellation of the specified task
+    """
+    cancelTask(taskId: TaskID!): Task!
+    """
+    Schedules a task to update the specified dataset by performing polling
+    ingest or a derivative transformation
+    """
+    createUpdateDatasetTask(datasetId: DatasetID!): Task!
+    """
+    Schedules a task to update the specified dataset by performing polling
+    ingest or a derivative transformation
+    """
+    createProbeTask(
+        datasetId: DatasetID
+        busyTimeMs: Int
+        endWithOutcome: TaskOutcome
+    ): Task!
 }
 
 type TemporalTable {
-	name: String!
-	primaryKey: [String!]!
+    name: String!
+    primaryKey: [String!]!
 }
 
 union Transform = TransformSql
 
 type TransformInput {
-	id: DatasetID
-	name: DatasetName!
-	datasetRef: DatasetRefAny
-	dataset: Dataset!
+    id: DatasetID
+    name: DatasetName!
+    datasetRef: DatasetRefAny
+    dataset: Dataset!
 }
 
 type TransformSql {
-	engine: String!
-	version: String
-	queries: [SqlQueryStep!]!
-	temporalTables: [TemporalTable!]
+    engine: String!
+    version: String
+    queries: [SqlQueryStep!]!
+    temporalTables: [TemporalTable!]
 }
 
 interface UpdateReadmeResult {
-	message: String!
-}
-
-type User implements Account {
-	"""
-	Unique and stable identitfier of this user account
-	"""
-	id: AccountID!
-	"""
-	Symbolic account name
-	"""
-	name: AccountName!
+    message: String!
 }
 
 schema {
-	query: Query
-	mutation: Mutation
+    query: Query
+    mutation: Mutation
 }

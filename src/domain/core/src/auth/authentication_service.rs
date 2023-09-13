@@ -23,7 +23,7 @@ pub trait AuthenticationService: Sync + Send {
         login_credentials_json: String,
     ) -> Result<LoginResponse, LoginError>;
 
-    async fn get_account_info(
+    async fn account_info_by_token(
         &self,
         access_token: String,
     ) -> Result<AccountInfo, GetAccountInfoError>;

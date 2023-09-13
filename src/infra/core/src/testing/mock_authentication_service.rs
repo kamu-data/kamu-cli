@@ -10,6 +10,7 @@
 use internal_error::InternalError;
 use kamu_core::auth::{
     AccountInfo,
+    AccountType,
     AuthenticationService,
     GetAccountInfoError,
     LoginError,
@@ -18,7 +19,7 @@ use kamu_core::auth::{
     DEFAULT_AVATAR_URL,
 };
 use mockall::predicate::{always, eq};
-use opendatafabric::AccountName;
+use opendatafabric::{AccountName, FAKE_ACCOUNT_ID};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -32,7 +33,7 @@ mockall::mock! {
             login_credentials_json: String,
         ) -> Result<LoginResponse, LoginError>;
 
-        async fn get_account_info(
+        async fn account_info_by_token(
             &self,
             access_token: String,
         ) -> Result<AccountInfo, GetAccountInfoError>;
@@ -58,7 +59,7 @@ impl MockAuthenticationService {
                 })
             });
         mock_authentication_service
-            .expect_get_account_info()
+            .expect_account_info_by_token()
             .with(eq(DUMMY_TOKEN.to_string()))
             .returning(|_| Ok(Self::make_dummy_account_info()));
         mock_authentication_service
@@ -66,7 +67,9 @@ impl MockAuthenticationService {
 
     fn make_dummy_account_info() -> AccountInfo {
         AccountInfo {
+            account_id: FAKE_ACCOUNT_ID.to_string(),
             account_name: AccountName::new_unchecked(DEFAULT_ACCOUNT_NAME),
+            account_type: AccountType::User,
             display_name: DEFAULT_ACCOUNT_NAME.to_string(),
             avatar_url: Some(DEFAULT_AVATAR_URL.to_string()),
         }

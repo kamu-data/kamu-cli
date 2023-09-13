@@ -8,9 +8,9 @@
 // by the Apache License, Version 2.0.
 
 use dill::component;
-use kamu_core::auth::AccountInfo;
+use kamu_core::auth::{AccountInfo, AccountType};
 use kamu_core::{ErrorIntoInternal, InternalError, ResultIntoInternal};
-use opendatafabric::AccountName;
+use opendatafabric::{AccountName, FAKE_ACCOUNT_ID};
 use serde::{Deserialize, Serialize};
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -182,7 +182,7 @@ impl kamu_core::auth::AuthenticationProvider for OAuthGithub {
         })
     }
 
-    async fn get_account_info(
+    async fn account_info_by_token(
         &self,
         provider_credentials_json: String,
     ) -> Result<kamu_core::auth::AccountInfo, InternalError> {
@@ -225,7 +225,9 @@ struct GithubProviderCredentials {
 impl From<GithubAccountInfo> for kamu_core::auth::AccountInfo {
     fn from(value: GithubAccountInfo) -> Self {
         Self {
+            account_id: FAKE_ACCOUNT_ID.to_string(),
             account_name: AccountName::try_from(&value.login).unwrap(),
+            account_type: AccountType::User,
             display_name: value.name.or_else(|| Some(value.login)).unwrap(),
             avatar_url: value.avatar_url,
         }

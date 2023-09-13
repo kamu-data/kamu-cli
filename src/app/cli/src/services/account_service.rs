@@ -13,9 +13,9 @@ use std::sync::Arc;
 use clap::ArgMatches;
 use dill::component;
 use internal_error::{InternalError, ResultIntoInternal};
-use kamu::domain::auth::{self, AccountInfo};
+use kamu::domain::auth::{self, AccountInfo, AccountType};
 use kamu::domain::CurrentAccountSubject;
-use opendatafabric::AccountName;
+use opendatafabric::{AccountName, FAKE_ACCOUNT_ID};
 use serde::{Deserialize, Serialize};
 
 use crate::UsersConfig;
@@ -127,7 +127,9 @@ impl AccountService {
                 // without avatar and with the name identical to login
                 if self.allow_login_unknown {
                     Ok(auth::AccountInfo {
+                        account_id: FAKE_ACCOUNT_ID.to_string(),
                         account_name: AccountName::new_unchecked(account_name),
+                        account_type: AccountType::User,
                         display_name: account_name.clone(),
                         avatar_url: None,
                     })
@@ -199,7 +201,7 @@ impl auth::AuthenticationProvider for AccountService {
         })
     }
 
-    async fn get_account_info(
+    async fn account_info_by_token(
         &self,
         provider_credentials_json: String,
     ) -> Result<auth::AccountInfo, InternalError> {

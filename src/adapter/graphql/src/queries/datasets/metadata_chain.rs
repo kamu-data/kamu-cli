@@ -12,7 +12,7 @@ use kamu_core::{self as domain, MetadataChainExt};
 use opendatafabric as odf;
 
 use crate::prelude::*;
-use crate::queries::Account;
+use crate::queries::AccountRef;
 
 ////////////////////////////////////////////////////////////////////////////////////////
 // MetadataRef
@@ -79,7 +79,7 @@ impl MetadataChain {
             MetadataBlockExtended::new(
                 hash,
                 b,
-                Account::from_dataset_alias(ctx, &self.dataset_handle.alias),
+                AccountRef::from_dataset_alias(ctx, &self.dataset_handle.alias),
             )
         }))
     }
@@ -142,7 +142,7 @@ impl MetadataChain {
                 MetadataBlockExtended::new(
                     hash,
                     block,
-                    Account::from_dataset_alias(ctx, &self.dataset_handle.alias),
+                    AccountRef::from_dataset_alias(ctx, &self.dataset_handle.alias),
                 )
             })
             .collect();

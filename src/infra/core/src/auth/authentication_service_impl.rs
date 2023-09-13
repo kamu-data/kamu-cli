@@ -167,7 +167,7 @@ impl AuthenticationService for AuthenticationServiceImpl {
         })
     }
 
-    async fn get_account_info(
+    async fn account_info_by_token(
         &self,
         access_token: String,
     ) -> Result<AccountInfo, GetAccountInfoError> {
@@ -180,7 +180,7 @@ impl AuthenticationService for AuthenticationServiceImpl {
             .map_err(|e| GetAccountInfoError::Internal(e.int_err()))?;
 
         provider
-            .get_account_info(decoded_access_token.provider_credentials_json)
+            .account_info_by_token(decoded_access_token.provider_credentials_json)
             .await
             .map_err(|e| GetAccountInfoError::Internal(e.int_err()))
     }

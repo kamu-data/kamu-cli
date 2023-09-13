@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use crate::prelude::*;
+use crate::queries::Account;
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -34,13 +35,15 @@ impl AuthMut {
         }
     }
 
-    async fn account_info(&self, ctx: &Context<'_>, access_token: String) -> Result<AccountInfo> {
+    async fn account_details(&self, ctx: &Context<'_>, access_token: String) -> Result<Account> {
         let authentication_service =
             from_catalog::<dyn kamu_core::auth::AuthenticationService>(ctx).unwrap();
 
-        let get_account_info_result = authentication_service.get_account_info(access_token).await;
+        let get_account_info_result = authentication_service
+            .account_info_by_token(access_token)
+            .await;
         match get_account_info_result {
-            Ok(github_account_info) => Ok(github_account_info.into()),
+            Ok(ai) => Ok(Account::new(ai)),
             Err(e) => Err(e.into()),
         }
     }
@@ -82,33 +85,14 @@ impl From<kamu_core::auth::GetAccountInfoError> for GqlError {
 #[derive(SimpleObject, Debug, Clone)]
 pub(crate) struct LoginResponse {
     access_token: String,
-    account_info: AccountInfo,
+    account: Account,
 }
 
 impl From<kamu_core::auth::LoginResponse> for LoginResponse {
     fn from(value: kamu_core::auth::LoginResponse) -> Self {
         Self {
             access_token: value.access_token.into(),
-            account_info: value.account_info.into(),
-        }
-    }
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-#[derive(SimpleObject, Debug, Clone)]
-pub(crate) struct AccountInfo {
-    account_name: AccountName,
-    display_name: AccountDisplayName,
-    avatar_url: Option<String>,
-}
-
-impl From<kamu_core::auth::AccountInfo> for AccountInfo {
-    fn from(value: kamu_core::auth::AccountInfo) -> Self {
-        Self {
-            account_name: AccountName::from(value.account_name),
-            display_name: AccountDisplayName::from(value.display_name),
-            avatar_url: value.avatar_url,
+            account: Account::new(value.account_info),
         }
     }
 }

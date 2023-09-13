@@ -57,7 +57,7 @@ impl<Svc> CurrentAccountResolverMiddleware<Svc> {
                 .unwrap();
 
             match authentication_service
-                .get_account_info(access_token.token)
+                .account_info_by_token(access_token.token)
                 .await
             {
                 Ok(account_info) => {

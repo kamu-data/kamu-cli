@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::BoxedError;
-use opendatafabric::AccountName;
+use opendatafabric::{AccountID, AccountName};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -24,12 +24,20 @@ pub const ANONYMOUS_ACCOUNT_NAME: &str = "kamu.anonymous";
 
 ///////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct AccountInfo {
+    pub account_id: AccountID,
     pub account_name: AccountName,
+    pub account_type: AccountType,
     pub display_name: AccountDisplayName,
     pub avatar_url: Option<String>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub enum AccountType {
+    User,
+    Organization,
 }
 
 ///////////////////////////////////////////////////////////////////////////////

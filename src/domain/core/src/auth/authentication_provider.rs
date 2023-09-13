@@ -24,7 +24,7 @@ pub trait AuthenticationProvider: Sync + Send {
         login_credentials_json: String,
     ) -> Result<ProviderLoginResponse, ProviderLoginError>;
 
-    async fn get_account_info(
+    async fn account_info_by_token(
         &self,
         provider_credentials_json: String,
     ) -> Result<AccountInfo, InternalError>;

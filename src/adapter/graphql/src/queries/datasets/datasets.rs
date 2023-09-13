@@ -28,7 +28,7 @@ impl Datasets {
         let hdl = dataset_repo
             .try_resolve_dataset_ref(&dataset_id.as_local_ref())
             .await?;
-        Ok(hdl.map(|h| Dataset::new(Account::from_dataset_alias(ctx, &h.alias), h)))
+        Ok(hdl.map(|h| Dataset::new(AccountRef::from_dataset_alias(ctx, &h.alias), h)))
     }
 
     /// Returns dataset by its owner and name
@@ -39,7 +39,7 @@ impl Datasets {
         account_name: AccountName,
         dataset_name: DatasetName,
     ) -> Result<Option<Dataset>> {
-        let account = Account::from_account_name(&account_name);
+        let account = AccountRef::from_account_name(&account_name);
 
         let dataset_alias = odf::DatasetAlias::new(Some(account_name.into()), dataset_name.into());
 
@@ -54,7 +54,7 @@ impl Datasets {
     async fn by_account_impl(
         &self,
         ctx: &Context<'_>,
-        account: Account,
+        account_ref: AccountRef,
         page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<DatasetConnection> {
@@ -63,7 +63,7 @@ impl Datasets {
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_PER_PAGE);
 
-        let account_name = account.name(ctx).await?;
+        let account_name = account_ref.account_name_internal();
 
         let mut all_datasets: Vec<_> = dataset_repo
             .get_datasets_by_owner(account_name.to_owned().into())
@@ -76,7 +76,7 @@ impl Datasets {
             .into_iter()
             .skip(page * per_page)
             .take(per_page)
-            .map(|hdl| Dataset::new(account.clone(), hdl))
+            .map(|hdl| Dataset::new(account_ref.clone(), hdl))
             .collect();
 
         Ok(DatasetConnection::new(nodes, page, per_page, total_count))
@@ -103,8 +103,8 @@ impl Datasets {
         page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<DatasetConnection> {
-        let account = Account::from_account_name(&account_name);
-        self.by_account_impl(ctx, account, page, per_page).await
+        let account_ref = AccountRef::from_account_name(&account_name);
+        self.by_account_impl(ctx, account_ref, page, per_page).await
     }
 }
 

@@ -7,104 +7,71 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use opendatafabric as odf;
-
 use crate::prelude::*;
 
 ///////////////////////////////////////////////////////////////////////////////
 
-#[derive(Interface, Debug, Clone, PartialEq, Eq)]
-#[graphql(
-    field(name = "id", method = "id", ty = "&AccountID"),
-    field(name = "name", ty = "&AccountName")
-)]
-pub enum Account {
-    User(User),
-    Organization(Organization),
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Account {
+    account_id: AccountID,
+    account_name: AccountName,
+    display_name: AccountDisplayName,
+    account_type: AccountType,
+    avatar_url: Option<String>,
 }
 
+#[derive(Enum, Debug, Copy, Clone, PartialEq, Eq)]
+pub enum AccountType {
+    User,
+    Organization,
+}
+
+#[Object]
 impl Account {
-    pub(crate) fn from_account_name(name: &odf::AccountName) -> Self {
-        Self::User(User::new(
-            AccountID::from(FAKE_USER_ID),
-            name.clone().into(),
-        ))
-    }
-
-    pub(crate) fn from_dataset_alias(ctx: &Context<'_>, alias: &odf::DatasetAlias) -> Self {
-        if alias.is_multi_tenant() {
-            Self::User(User::new(
-                AccountID::from(FAKE_USER_ID),
-                alias.account_name.as_ref().unwrap().clone().into(),
-            ))
-        } else {
-            let current_account_subject =
-                from_catalog::<kamu_core::CurrentAccountSubject>(ctx).unwrap();
-            Self::User(User::new(
-                AccountID::from(FAKE_USER_ID),
-                current_account_subject.account_name.clone().into(),
-            ))
-        }
-    }
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-pub const FAKE_USER_ID: &str = "12345";
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct User {
-    account_id: AccountID,
-    account_name: AccountName,
-}
-
-#[Object]
-impl User {
     #[graphql(skip)]
-    pub fn new(account_id: AccountID, account_name: AccountName) -> Self {
+    pub(crate) fn new(account_info: kamu_core::auth::AccountInfo) -> Self {
+        let account_id = AccountID::from(account_info.account_id);
+        let account_name: AccountName = AccountName::from(account_info.account_name);
+        let display_name: AccountDisplayName = AccountDisplayName::from(account_info.display_name);
+        let account_type: AccountType = match account_info.account_type {
+            kamu_core::auth::AccountType::User => AccountType::User,
+            kamu_core::auth::AccountType::Organization => AccountType::Organization,
+        };
+        let avatar_url = account_info.avatar_url;
+
         Self {
             account_id,
             account_name,
+            display_name,
+            account_type,
+            avatar_url,
         }
     }
 
-    /// Unique and stable identitfier of this user account
-    async fn id(&self) -> &AccountID {
+    /// Unique and stable identitfier of this account
+    pub async fn id(&self) -> &AccountID {
         &self.account_id
     }
 
     /// Symbolic account name
-    async fn name(&self) -> &AccountName {
+    pub async fn account_name(&self) -> &AccountName {
         &self.account_name
+    }
+
+    /// Account name to display
+    pub async fn display_name(&self) -> &AccountDisplayName {
+        &self.display_name
+    }
+
+    /// Account type
+    pub async fn account_type(&self) -> &AccountType {
+        &self.account_type
+    }
+
+    /// Avatar URL
+    pub async fn avatar_url(&self) -> &Option<String> {
+        &self.avatar_url
     }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Organization {
-    account_id: AccountID,
-    account_name: AccountName,
-}
-
-#[Object]
-impl Organization {
-    #[allow(dead_code)]
-    #[graphql(skip)]
-    pub fn new(account_id: AccountID, account_name: AccountName) -> Self {
-        Self {
-            account_id,
-            account_name,
-        }
-    }
-
-    /// Unique and stable identitfier of this organization account
-    async fn id(&self) -> &AccountID {
-        &self.account_id
-    }
-
-    /// Symbolic account name
-    async fn name(&self) -> &AccountName {
-        &self.account_name
-    }
-}
