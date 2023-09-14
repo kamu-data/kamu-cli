@@ -12,7 +12,7 @@ use std::str::FromStr;
 
 use dill::component;
 use internal_error::{ErrorIntoInternal, InternalError};
-use opendatafabric::{AccountName, DatasetHandle, DatasetRef};
+use opendatafabric::{DatasetHandle, DatasetRef};
 use thiserror::Error;
 
 use crate::AccessError;
@@ -72,9 +72,8 @@ pub enum DatasetActionUnauthorizedError {
 }
 
 #[derive(Debug, Error)]
-#[error("User '{account_name}' has no '{action}' permission in dataset '{dataset_ref}'")]
+#[error("User has no '{action}' permission in dataset '{dataset_ref}'")]
 pub struct DatasetActionNotEnoughPermissionsError {
-    pub account_name: AccountName,
     pub action: DatasetAction,
     pub dataset_ref: DatasetRef,
 }

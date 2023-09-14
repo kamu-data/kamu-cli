@@ -52,7 +52,7 @@ impl OsoDatasetAuthorizer {
             .account_name
             .as_ref()
             .map(|a| a.as_str())
-            .unwrap_or(self.current_account_subject.account_name.as_str());
+            .unwrap_or(DEFAULT_ACCOUNT_NAME);
 
         // TODO: for now let's treat all datasets as public
         // TODO: explicit read/write permissions
@@ -83,7 +83,6 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
                     Err(DatasetActionUnauthorizedError::Access(
                         AccessError::Forbidden(
                             DatasetActionNotEnoughPermissionsError {
-                                account_name: self.current_account_subject.account_name.clone(),
                                 action,
                                 dataset_ref: dataset_handle.as_local_ref(),
                             }

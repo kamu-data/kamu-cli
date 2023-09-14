@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use kamu_core::auth::DEFAULT_ACCOUNT_NAME;
 use opendatafabric as odf;
 
 use crate::prelude::*;
@@ -39,9 +40,19 @@ impl AccountRef {
         } else {
             let current_account_subject =
                 from_catalog::<kamu_core::CurrentAccountSubject>(ctx).unwrap();
-            Self {
-                account_id: AccountID::from(odf::FAKE_ACCOUNT_ID),
-                account_name: current_account_subject.account_name.clone().into(),
+
+            if current_account_subject.anonymous {
+                Self {
+                    account_id: AccountID::from(odf::FAKE_ACCOUNT_ID),
+                    account_name: AccountName::from(odf::AccountName::new_unchecked(
+                        DEFAULT_ACCOUNT_NAME,
+                    )),
+                }
+            } else {
+                Self {
+                    account_id: AccountID::from(odf::FAKE_ACCOUNT_ID),
+                    account_name: current_account_subject.account_name.clone().into(),
+                }
             }
         }
     }

@@ -39,7 +39,6 @@ mockall::mock! {
 
 impl MockDatasetActionAuthorizer {
     pub fn denying() -> Self {
-        let account_name = AccountName::new_unchecked(auth::DEFAULT_ACCOUNT_NAME);
         let mut mock_dataset_action_authorizer = MockDatasetActionAuthorizer::new();
         mock_dataset_action_authorizer
             .expect_check_action_allowed()
@@ -47,7 +46,6 @@ impl MockDatasetActionAuthorizer {
                 Err(DatasetActionUnauthorizedError::Access(
                     AccessError::Forbidden(
                         DatasetActionNotEnoughPermissionsError {
-                            account_name,
                             action,
                             dataset_ref: dataset_handle.as_local_ref(),
                         }

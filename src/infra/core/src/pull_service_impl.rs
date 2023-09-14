@@ -137,6 +137,10 @@ impl PullServiceImpl {
                 ) => DatasetAlias::new(alias.account_name.clone(), alias.dataset_name.clone()),
                 Some(DatasetRefRemote::Url(url)) => DatasetAlias::new(
                     if self.dataset_repo.is_multi_tenant() {
+                        assert!(
+                            !self.current_account_subject.anonymous,
+                            "Anonymous account misused, use multi-tenant alias"
+                        );
                         Some(self.current_account_subject.account_name.clone())
                     } else {
                         None
@@ -269,23 +273,26 @@ impl PullServiceImpl {
         }
 
         // No luck - now have to search through aliases (of current user)
-        use tokio_stream::StreamExt;
-        let mut datasets = self
-            .dataset_repo
-            .get_datasets_by_owner(self.current_account_subject.account_name.clone());
-        while let Some(dataset_handle) = datasets.next().await {
-            let dataset_handle = dataset_handle?;
+        if !self.current_account_subject.anonymous {
+            use tokio_stream::StreamExt;
+            let mut datasets = self
+                .dataset_repo
+                .get_datasets_by_owner(self.current_account_subject.account_name.clone());
+            while let Some(dataset_handle) = datasets.next().await {
+                let dataset_handle = dataset_handle?;
 
-            if self
-                .remote_alias_reg
-                .get_remote_aliases(&dataset_handle.as_local_ref())
-                .await
-                .int_err()?
-                .contains(&remote_ref, RemoteAliasKind::Pull)
-            {
-                return Ok(Some(dataset_handle));
+                if self
+                    .remote_alias_reg
+                    .get_remote_aliases(&dataset_handle.as_local_ref())
+                    .await
+                    .int_err()?
+                    .contains(&remote_ref, RemoteAliasKind::Pull)
+                {
+                    return Ok(Some(dataset_handle));
+                }
             }
         }
+
         Ok(None)
     }
 

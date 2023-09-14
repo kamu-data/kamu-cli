@@ -12,7 +12,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use dill::*;
 use futures::TryStreamExt;
-use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer};
+use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer, DEFAULT_ACCOUNT_NAME};
 use kamu_core::*;
 use opendatafabric::*;
 use url::Url;
@@ -116,6 +116,10 @@ impl DatasetRepositoryS3 {
         if alias.is_multi_tenant() {
             alias.clone()
         } else if self.is_multi_tenant() {
+            assert!(
+                !self.current_account_subject.anonymous,
+                "Anonymous account misused, use multi-tenant alias"
+            );
             DatasetAlias::new(
                 Some(self.current_account_subject.account_name.clone()),
                 alias.dataset_name.clone(),
@@ -187,7 +191,7 @@ impl DatasetRepository for DatasetRepositoryS3 {
     }
 
     fn get_datasets_by_owner<'s>(&'s self, account_name: AccountName) -> DatasetHandleStream<'s> {
-        if !self.is_multi_tenant() && account_name != self.current_account_subject.account_name {
+        if !self.is_multi_tenant() && account_name != DEFAULT_ACCOUNT_NAME {
             panic!("Single-tenant dataset repository queried by non-default account");
         }
 

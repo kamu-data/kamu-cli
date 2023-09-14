@@ -12,7 +12,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use dill::*;
-use domain::auth::{DatasetAction, DatasetActionAuthorizer};
+use domain::auth::{DatasetAction, DatasetActionAuthorizer, DEFAULT_ACCOUNT_NAME};
 use futures::TryStreamExt;
 use kamu_core::*;
 use opendatafabric::*;
@@ -45,10 +45,7 @@ impl DatasetRepositoryLocalFs {
                     current_account_subject,
                 ))
             } else {
-                Box::new(DatasetSingleTenantStorageStrategy::new(
-                    root,
-                    current_account_subject,
-                ))
+                Box::new(DatasetSingleTenantStorageStrategy::new(root))
             },
             dataset_action_authorizer,
             thrash_lock: tokio::sync::Mutex::new(()),
@@ -405,18 +402,11 @@ enum ResolveDatasetError {
 
 struct DatasetSingleTenantStorageStrategy {
     root: PathBuf,
-    current_account_subject: Arc<CurrentAccountSubject>,
 }
 
 impl DatasetSingleTenantStorageStrategy {
-    pub fn new(
-        root: impl Into<PathBuf>,
-        current_account_subject: Arc<CurrentAccountSubject>,
-    ) -> Self {
-        Self {
-            root: root.into(),
-            current_account_subject,
-        }
+    pub fn new(root: impl Into<PathBuf>) -> Self {
+        Self { root: root.into() }
     }
 
     fn dataset_name<'a>(&self, dataset_alias: &'a DatasetAlias) -> &'a DatasetName {
@@ -483,10 +473,10 @@ impl DatasetStorageStrategy for DatasetSingleTenantStorageStrategy {
     }
 
     fn get_datasets_by_owner<'s>(&'s self, account_name: AccountName) -> DatasetHandleStream<'s> {
-        if account_name == self.current_account_subject.account_name {
+        if account_name == DEFAULT_ACCOUNT_NAME {
             self.get_all_datasets()
         } else {
-            panic!("Single-tenant dataset repository queried by non-default account");
+            Box::pin(futures::stream::empty())
         }
     }
 
@@ -496,8 +486,7 @@ impl DatasetStorageStrategy for DatasetSingleTenantStorageStrategy {
     ) -> Result<DatasetHandle, ResolveDatasetError> {
         assert!(
             !dataset_alias.is_multi_tenant()
-                || dataset_alias.account_name.as_ref().unwrap()
-                    == &self.current_account_subject.account_name,
+                || dataset_alias.account_name.as_ref().unwrap() == DEFAULT_ACCOUNT_NAME,
             "Multi-tenant refs shouldn't have reached down to here with earlier validations"
         );
 
@@ -592,6 +581,10 @@ impl DatasetMultiTenantStorageStrategy {
         if dataset_alias.is_multi_tenant() {
             dataset_alias.account_name.as_ref().unwrap()
         } else {
+            assert!(
+                !self.current_account_subject.anonymous,
+                "Anonymous account misused, use multi-tenant alias"
+            );
             &self.current_account_subject.account_name
         }
     }
