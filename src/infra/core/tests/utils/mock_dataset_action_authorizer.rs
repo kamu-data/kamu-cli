@@ -19,7 +19,7 @@ use kamu_core::auth::{
 use kamu_core::AccessError;
 use mockall::predicate::{always, eq, function};
 use mockall::Predicate;
-use opendatafabric::{AccountName, DatasetAlias, DatasetHandle};
+use opendatafabric::{DatasetAlias, DatasetHandle};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 

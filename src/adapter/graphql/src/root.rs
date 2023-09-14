@@ -25,6 +25,11 @@ impl Query {
         "0.1".to_string()
     }
 
+    /// Authentication and authorization-related functionality group
+    async fn auth(&self) -> Auth {
+        Auth
+    }
+
     /// Dataset-related functionality group.
     ///
     /// Datasets are historical streams of events recorded under a cetrain

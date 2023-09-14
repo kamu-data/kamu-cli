@@ -17,6 +17,8 @@ use super::{AccountInfo, InvalidCredentialsError, RejectedCredentialsError};
 
 #[async_trait::async_trait]
 pub trait AuthenticationService: Sync + Send {
+    fn supported_login_methods(&self) -> Vec<&'static str>;
+
     async fn login(
         &self,
         login_method: &str,

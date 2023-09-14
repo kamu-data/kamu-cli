@@ -44,7 +44,6 @@ struct WebUILoginInstructions {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct WebUIFeatureFlags {
-    enabled_ui_login_methods: Vec<String>,
     enable_logout: bool,
 }
 
@@ -93,8 +92,7 @@ impl WebUIServer {
                 .unwrap(),
             }),
             feature_flags: WebUIFeatureFlags {
-                // no way to login or logout in UI - only login instructions would matter
-                enabled_ui_login_methods: vec![],
+                // No way to log out, always logging in a predefined user
                 enable_logout: false,
             },
         };

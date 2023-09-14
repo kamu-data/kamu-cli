@@ -73,6 +73,10 @@ type AttachmentsEmbedded {
 	items: [AttachmentEmbedded!]!
 }
 
+type Auth {
+	enabledLoginMethods: [String!]!
+}
+
 type AuthMut {
 	login(loginMethod: String!, loginCredentialsJson: String!): LoginResponse!
 	accountDetails(accessToken: String!): Account!
@@ -679,6 +683,10 @@ type Query {
 	Returns the version of the GQL API
 	"""
 	apiVersion: String!
+	"""
+	Authentication and authorization-related functionality group
+	"""
+	auth: Auth!
 	"""
 	Dataset-related functionality group.
 	

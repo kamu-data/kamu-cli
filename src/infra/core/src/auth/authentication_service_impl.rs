@@ -142,6 +142,13 @@ impl AuthenticationServiceImpl {
 
 #[async_trait::async_trait]
 impl AuthenticationService for AuthenticationServiceImpl {
+    fn supported_login_methods(&self) -> Vec<&'static str> {
+        self.authentication_providers_by_method
+            .keys()
+            .cloned()
+            .collect()
+    }
+
     async fn login(
         &self,
         login_method: &str,
