@@ -18,21 +18,21 @@ fn test_write_schema_parquet_json_group() {
     let f1 = Type::primitive_type_builder("f1", PhysicalType::INT32)
         .with_repetition(Repetition::REQUIRED)
         .with_converted_type(ConvertedType::INT_32)
-        .with_id(0)
+        .with_id(Some(0))
         .build();
     let f2 = Type::primitive_type_builder("f2", PhysicalType::BYTE_ARRAY)
         .with_converted_type(ConvertedType::UTF8)
-        .with_id(1)
+        .with_id(Some(1))
         .build();
     let f3 = Type::primitive_type_builder("f3", PhysicalType::BYTE_ARRAY)
         .with_logical_type(Some(LogicalType::String))
-        .with_id(1)
+        .with_id(Some(1))
         .build();
     let f4 = Type::primitive_type_builder("f4", PhysicalType::FIXED_LEN_BYTE_ARRAY)
         .with_repetition(Repetition::REPEATED)
         .with_converted_type(ConvertedType::INTERVAL)
         .with_length(12)
-        .with_id(2)
+        .with_id(Some(2))
         .build();
     let f5 = Type::primitive_type_builder("f5", PhysicalType::FIXED_LEN_BYTE_ARRAY)
         .with_length(9)
@@ -46,8 +46,8 @@ fn test_write_schema_parquet_json_group() {
     struct_fields.push(Arc::new(f3.unwrap()));
     let field = Type::group_type_builder("field")
         .with_repetition(Repetition::OPTIONAL)
-        .with_fields(&mut struct_fields)
-        .with_id(1)
+        .with_fields(struct_fields)
+        .with_id(Some(1))
         .build()
         .unwrap();
     let mut fields = Vec::new();
@@ -55,8 +55,8 @@ fn test_write_schema_parquet_json_group() {
     fields.push(Arc::new(f4.unwrap()));
     fields.push(Arc::new(f5.unwrap()));
     let message = Type::group_type_builder("schema")
-        .with_fields(&mut fields)
-        .with_id(2)
+        .with_fields(fields)
+        .with_id(Some(2))
         .build()
         .unwrap();
 
