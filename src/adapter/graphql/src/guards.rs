@@ -26,7 +26,7 @@ impl LoggedInGuard {
 impl Guard for LoggedInGuard {
     async fn check(&self, ctx: &Context<'_>) -> Result<()> {
         let current_account_subject = from_catalog::<CurrentAccountSubject>(ctx).unwrap();
-        if current_account_subject.anonymous {
+        if let CurrentAccountSubject::Anonymous(_) = current_account_subject.as_ref() {
             Err(async_graphql::Error::new("Anonymous access forbidden"))
         } else {
             Ok(())

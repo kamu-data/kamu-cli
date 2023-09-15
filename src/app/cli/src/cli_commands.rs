@@ -426,16 +426,24 @@ pub fn get_command(
             *(submatches.get_one("num-records").unwrap()),
             cli_catalog.get_one()?,
         )),
-        Some(("ui", submatches)) => Box::new(UICommand::new(
-            base_catalog.clone(), // TODO: Currently very expensive!
-            cli_catalog
-                .get_one::<CurrentAccountSubject>()?
-                .account_name
-                .clone(),
-            cli_catalog.get_one()?,
-            submatches.get_one("address").map(|a| *a),
-            submatches.get_one("http-port").map(|p| *p),
-        )),
+        Some(("ui", submatches)) => {
+            let current_account_subject = cli_catalog.get_one::<CurrentAccountSubject>()?;
+
+            let current_account_name = match current_account_subject.as_ref() {
+                CurrentAccountSubject::Logged(l) => l.account_name.clone(),
+                CurrentAccountSubject::Anonymous(_) => {
+                    panic!("Cannot launch Web UI with anonymous account")
+                }
+            };
+
+            Box::new(UICommand::new(
+                base_catalog.clone(), // TODO: Currently very expensive!
+                current_account_name,
+                cli_catalog.get_one()?,
+                submatches.get_one("address").map(|a| *a),
+                submatches.get_one("http-port").map(|p| *p),
+            ))
+        }
         Some(("verify", submatches)) => Box::new(VerifyCommand::new(
             cli_catalog.get_one()?,
             cli_catalog.get_one()?,

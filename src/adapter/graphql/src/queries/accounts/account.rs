@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use kamu_core::auth::DEFAULT_ACCOUNT_NAME;
+use kamu_core::CurrentAccountSubject;
 use opendatafabric as odf;
 use tokio::sync::OnceCell;
 
@@ -64,16 +65,15 @@ impl Account {
             let current_account_subject =
                 from_catalog::<kamu_core::CurrentAccountSubject>(ctx).unwrap();
 
-            if current_account_subject.anonymous {
-                Self::new(
+            match current_account_subject.as_ref() {
+                CurrentAccountSubject::Anonymous(_) => Self::new(
                     AccountID::from(odf::FAKE_ACCOUNT_ID),
                     AccountName::from(odf::AccountName::new_unchecked(DEFAULT_ACCOUNT_NAME)),
-                )
-            } else {
-                Self::new(
+                ),
+                CurrentAccountSubject::Logged(l) => Self::new(
                     AccountID::from(odf::FAKE_ACCOUNT_ID),
-                    current_account_subject.account_name.clone().into(),
-                )
+                    l.account_name.clone().into(),
+                ),
             }
         }
     }

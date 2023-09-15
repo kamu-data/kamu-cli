@@ -116,14 +116,14 @@ impl DatasetRepositoryS3 {
         if alias.is_multi_tenant() {
             alias.clone()
         } else if self.is_multi_tenant() {
-            assert!(
-                !self.current_account_subject.anonymous,
-                "Anonymous account misused, use multi-tenant alias"
-            );
-            DatasetAlias::new(
-                Some(self.current_account_subject.account_name.clone()),
-                alias.dataset_name.clone(),
-            )
+            match self.current_account_subject.as_ref() {
+                CurrentAccountSubject::Anonymous(_) => {
+                    panic!("Anonymous account misused, use multi-tenant alias");
+                }
+                CurrentAccountSubject::Logged(l) => {
+                    DatasetAlias::new(Some(l.account_name.clone()), alias.dataset_name.clone())
+                }
+            }
         } else {
             DatasetAlias::new(None, alias.dataset_name.clone())
         }

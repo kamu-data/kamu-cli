@@ -137,11 +137,12 @@ impl PullServiceImpl {
                 ) => DatasetAlias::new(alias.account_name.clone(), alias.dataset_name.clone()),
                 Some(DatasetRefRemote::Url(url)) => DatasetAlias::new(
                     if self.dataset_repo.is_multi_tenant() {
-                        assert!(
-                            !self.current_account_subject.anonymous,
-                            "Anonymous account misused, use multi-tenant alias"
-                        );
-                        Some(self.current_account_subject.account_name.clone())
+                        match self.current_account_subject.as_ref() {
+                            CurrentAccountSubject::Anonymous(_) => {
+                                panic!("Anonymous account misused, use multi-tenant alias");
+                            }
+                            CurrentAccountSubject::Logged(l) => Some(l.account_name.clone()),
+                        }
                     } else {
                         None
                     },
@@ -273,11 +274,11 @@ impl PullServiceImpl {
         }
 
         // No luck - now have to search through aliases (of current user)
-        if !self.current_account_subject.anonymous {
+        if let CurrentAccountSubject::Logged(l) = self.current_account_subject.as_ref() {
             use tokio_stream::StreamExt;
             let mut datasets = self
                 .dataset_repo
-                .get_datasets_by_owner(self.current_account_subject.account_name.clone());
+                .get_datasets_by_owner(l.account_name.clone());
             while let Some(dataset_handle) = datasets.next().await {
                 let dataset_handle = dataset_handle?;
 

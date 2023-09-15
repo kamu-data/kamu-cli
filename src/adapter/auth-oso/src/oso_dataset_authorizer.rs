@@ -14,7 +14,7 @@ use std::sync::Arc;
 use dill::component;
 use kamu_core::auth::*;
 use kamu_core::{AccessError, CurrentAccountSubject, ErrorIntoInternal};
-use opendatafabric::{AccountName, DatasetHandle};
+use opendatafabric::DatasetHandle;
 use oso::Oso;
 
 use crate::dataset_resource::*;
@@ -42,8 +42,11 @@ impl OsoDatasetAuthorizer {
         }
     }
 
-    fn actor(&self, account_name: &AccountName) -> UserActor {
-        UserActor::new(account_name.as_str())
+    fn actor(&self) -> UserActor {
+        match self.current_account_subject.as_ref() {
+            CurrentAccountSubject::Anonymous(_) => UserActor::new("", true),
+            CurrentAccountSubject::Logged(l) => UserActor::new(l.account_name.as_str(), false),
+        }
     }
 
     fn dataset_resource(&self, dataset_handle: &DatasetHandle) -> DatasetResource {
@@ -69,7 +72,7 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
         dataset_handle: &DatasetHandle,
         action: DatasetAction,
     ) -> Result<(), DatasetActionUnauthorizedError> {
-        let actor = self.actor(&self.current_account_subject.account_name);
+        let actor = self.actor();
         let dataset_resource = self.dataset_resource(dataset_handle);
 
         match self
@@ -96,7 +99,7 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
     }
 
     async fn get_allowed_actions(&self, dataset_handle: &DatasetHandle) -> HashSet<DatasetAction> {
-        let actor = self.actor(&self.current_account_subject.account_name);
+        let actor = self.actor();
         let dataset_resource = self.dataset_resource(dataset_handle);
 
         let allowed_action_names: HashSet<String> = self

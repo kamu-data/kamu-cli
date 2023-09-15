@@ -581,11 +581,12 @@ impl DatasetMultiTenantStorageStrategy {
         if dataset_alias.is_multi_tenant() {
             dataset_alias.account_name.as_ref().unwrap()
         } else {
-            assert!(
-                !self.current_account_subject.anonymous,
-                "Anonymous account misused, use multi-tenant alias"
-            );
-            &self.current_account_subject.account_name
+            match self.current_account_subject.as_ref() {
+                CurrentAccountSubject::Anonymous(_) => {
+                    panic!("Anonymous account misused, use multi-tenant alias");
+                }
+                CurrentAccountSubject::Logged(l) => &l.account_name,
+            }
         }
     }
 

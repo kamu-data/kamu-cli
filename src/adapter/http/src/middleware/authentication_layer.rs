@@ -60,13 +60,10 @@ impl<Svc> AuthenticationMiddleware<Svc> {
                 .account_info_by_token(access_token.token)
                 .await
             {
-                Ok(account_info) => {
-                    Ok(CurrentAccountSubject::new(account_info.account_name, false))
+                Ok(account_info) => Ok(CurrentAccountSubject::logged(account_info.account_name)),
+                Err(auth::GetAccountInfoError::AccessToken(_)) => {
+                    Ok(CurrentAccountSubject::anonymous())
                 }
-                Err(auth::GetAccountInfoError::AccessToken(_)) => Ok(CurrentAccountSubject::new(
-                    opendatafabric::AccountName::new_unchecked(auth::ANONYMOUS_ACCOUNT_NAME),
-                    true,
-                )),
                 Err(auth::GetAccountInfoError::Internal(_)) => {
                     return Err(Response::builder()
                         .status(StatusCode::INTERNAL_SERVER_ERROR)
@@ -75,10 +72,7 @@ impl<Svc> AuthenticationMiddleware<Svc> {
                 }
             }
         } else {
-            Ok(CurrentAccountSubject::new(
-                opendatafabric::AccountName::new_unchecked(auth::ANONYMOUS_ACCOUNT_NAME),
-                true,
-            ))
+            Ok(CurrentAccountSubject::anonymous())
         }
     }
 }
