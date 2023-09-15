@@ -757,8 +757,8 @@ impl FetchService {
 
         if let Some(capture) = time_re.captures(&filename) {
             if let Some(group) = capture.get(1) {
-                match Utc.datetime_from_str(group.as_str(), time_fmt) {
-                    Ok(dt) => Ok(dt),
+                match DateTime::parse_from_str(group.as_str(), time_fmt) {
+                    Ok(dt) => Ok(dt.into()),
                     Err(_) => {
                         let date = chrono::NaiveDate::parse_from_str(group.as_str(), time_fmt)
                             .map_err(|e| EventTimeSourceError::bad_pattern(time_fmt, e))?;

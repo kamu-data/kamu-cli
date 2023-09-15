@@ -4,11 +4,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
-### Fixed
-- Failing transform operations in multi-tenant workspaces due to invalid propagation of dataset aliases
+## [0.142.0] - 2023-09-15
 ### Added
 - Support for multi-tenant workspaces in Jupyter Notebook extension
+- Support for GraphQL multi-tenant mode (TODO: describe better)
+### Fixed
+- Failing transform operations in multi-tenant workspaces due to invalid propagation of dataset aliases
 
 ## [0.142.1] - 2023-09-02
 ### Fixed
