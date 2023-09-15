@@ -114,7 +114,7 @@ impl Account {
     }
 
     /// Account name to display
-    pub async fn display_name(&self, ctx: &Context<'_>) -> Result<AccountDisplayName> {
+    async fn display_name(&self, ctx: &Context<'_>) -> Result<AccountDisplayName> {
         let full_account_info = self
             .full_account_info
             .get_or_try_init(|| self.resolve_full_account_info(ctx))
@@ -126,7 +126,7 @@ impl Account {
     }
 
     /// Account type
-    pub async fn account_type(&self, ctx: &Context<'_>) -> Result<AccountType> {
+    async fn account_type(&self, ctx: &Context<'_>) -> Result<AccountType> {
         let full_account_info = self
             .full_account_info
             .get_or_try_init(|| self.resolve_full_account_info(ctx))
@@ -139,7 +139,7 @@ impl Account {
     }
 
     /// Avatar URL
-    pub async fn avatar_url(&self, ctx: &Context<'_>) -> Result<&Option<String>> {
+    async fn avatar_url(&self, ctx: &Context<'_>) -> Result<&Option<String>> {
         let full_account_info = self
             .full_account_info
             .get_or_try_init(|| self.resolve_full_account_info(ctx))
