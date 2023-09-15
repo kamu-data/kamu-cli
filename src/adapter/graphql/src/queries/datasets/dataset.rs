@@ -17,16 +17,16 @@ use crate::queries::*;
 
 #[derive(Debug, Clone)]
 pub struct Dataset {
-    owner_ref: AccountRef,
+    owner: Account,
     dataset_handle: odf::DatasetHandle,
 }
 
 #[Object]
 impl Dataset {
     #[graphql(skip)]
-    pub fn new(owner_ref: AccountRef, dataset_handle: odf::DatasetHandle) -> Self {
+    pub fn new(owner: Account, dataset_handle: odf::DatasetHandle) -> Self {
         Self {
-            owner_ref,
+            owner,
             dataset_handle,
         }
     }
@@ -42,7 +42,7 @@ impl Dataset {
             .await
             .int_err()?;
         Ok(Dataset::new(
-            AccountRef::from_dataset_alias(ctx, &hdl.alias),
+            Account::from_dataset_alias(ctx, &hdl.alias),
             hdl,
         ))
     }
@@ -70,8 +70,8 @@ impl Dataset {
     }
 
     /// Returns the user or organization that owns this dataset
-    async fn owner_ref(&self) -> &AccountRef {
-        &self.owner_ref
+    async fn owner(&self) -> &Account {
+        &self.owner
     }
 
     /// Returns dataset alias (user + name)

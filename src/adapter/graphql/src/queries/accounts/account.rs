@@ -7,17 +7,19 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use kamu_core::auth::DEFAULT_ACCOUNT_NAME;
+use opendatafabric as odf;
+use tokio::sync::OnceCell;
+
 use crate::prelude::*;
 
 ///////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Account {
     account_id: AccountID,
     account_name: AccountName,
-    display_name: AccountDisplayName,
-    account_type: AccountType,
-    avatar_url: Option<String>,
+    full_account_info: OnceCell<kamu_core::auth::AccountInfo>,
 }
 
 #[derive(Enum, Debug, Copy, Clone, PartialEq, Eq)]
@@ -29,48 +31,120 @@ pub enum AccountType {
 #[Object]
 impl Account {
     #[graphql(skip)]
-    pub(crate) fn new(account_info: kamu_core::auth::AccountInfo) -> Self {
-        let account_id = AccountID::from(account_info.account_id);
-        let account_name: AccountName = AccountName::from(account_info.account_name);
-        let display_name: AccountDisplayName = AccountDisplayName::from(account_info.display_name);
-        let account_type: AccountType = match account_info.account_type {
-            kamu_core::auth::AccountType::User => AccountType::User,
-            kamu_core::auth::AccountType::Organization => AccountType::Organization,
-        };
-        let avatar_url = account_info.avatar_url;
-
+    fn new(account_id: AccountID, account_name: AccountName) -> Self {
         Self {
             account_id,
             account_name,
-            display_name,
-            account_type,
-            avatar_url,
+            full_account_info: OnceCell::new(),
         }
     }
 
+    #[graphql(skip)]
+    pub(crate) fn from_account_info(account_info: kamu_core::auth::AccountInfo) -> Self {
+        Self {
+            account_id: AccountID::from(account_info.account_id.clone()),
+            account_name: account_info.account_name.clone().into(),
+            full_account_info: OnceCell::new_with(Some(account_info)),
+        }
+    }
+
+    #[graphql(skip)]
+    pub(crate) fn from_account_name(name: &odf::AccountName) -> Self {
+        Self::new(AccountID::from(odf::FAKE_ACCOUNT_ID), name.clone().into())
+    }
+
+    #[graphql(skip)]
+    pub(crate) fn from_dataset_alias(ctx: &Context<'_>, alias: &odf::DatasetAlias) -> Self {
+        if alias.is_multi_tenant() {
+            Self::new(
+                AccountID::from(odf::FAKE_ACCOUNT_ID),
+                alias.account_name.as_ref().unwrap().clone().into(),
+            )
+        } else {
+            let current_account_subject =
+                from_catalog::<kamu_core::CurrentAccountSubject>(ctx).unwrap();
+
+            if current_account_subject.anonymous {
+                Self::new(
+                    AccountID::from(odf::FAKE_ACCOUNT_ID),
+                    AccountName::from(odf::AccountName::new_unchecked(DEFAULT_ACCOUNT_NAME)),
+                )
+            } else {
+                Self::new(
+                    AccountID::from(odf::FAKE_ACCOUNT_ID),
+                    current_account_subject.account_name.clone().into(),
+                )
+            }
+        }
+    }
+
+    #[graphql(skip)]
+    async fn resolve_full_account_info(
+        &self,
+        ctx: &Context<'_>,
+    ) -> Result<kamu_core::auth::AccountInfo> {
+        let authentication_service =
+            from_catalog::<dyn kamu_core::auth::AuthenticationService>(ctx).unwrap();
+
+        let maybe_account_info = authentication_service
+            .find_account_info_by_name(&self.account_name)
+            .await?;
+
+        maybe_account_info.ok_or_else(|| {
+            GqlError::Gql(
+                Error::new("Account not resolved")
+                    .extend_with(|_, eev| eev.set("name", self.account_name.to_string())),
+            )
+        })
+    }
+
+    #[graphql(skip)]
+    pub(crate) fn account_name_internal(&self) -> &AccountName {
+        &self.account_name
+    }
+
     /// Unique and stable identitfier of this account
-    pub async fn id(&self) -> &AccountID {
+    async fn id(&self) -> &AccountID {
         &self.account_id
     }
 
     /// Symbolic account name
-    pub async fn account_name(&self) -> &AccountName {
+    async fn account_name(&self) -> &AccountName {
         &self.account_name
     }
 
     /// Account name to display
-    pub async fn display_name(&self) -> &AccountDisplayName {
-        &self.display_name
+    pub async fn display_name(&self, ctx: &Context<'_>) -> Result<AccountDisplayName> {
+        let full_account_info = self
+            .full_account_info
+            .get_or_try_init(|| self.resolve_full_account_info(ctx))
+            .await?;
+
+        Ok(AccountDisplayName::from(
+            full_account_info.display_name.clone(),
+        ))
     }
 
     /// Account type
-    pub async fn account_type(&self) -> &AccountType {
-        &self.account_type
+    pub async fn account_type(&self, ctx: &Context<'_>) -> Result<AccountType> {
+        let full_account_info = self
+            .full_account_info
+            .get_or_try_init(|| self.resolve_full_account_info(ctx))
+            .await?;
+
+        Ok(match full_account_info.account_type {
+            kamu_core::auth::AccountType::User => AccountType::User,
+            kamu_core::auth::AccountType::Organization => AccountType::Organization,
+        })
     }
 
     /// Avatar URL
-    pub async fn avatar_url(&self) -> &Option<String> {
-        &self.avatar_url
+    pub async fn avatar_url(&self, ctx: &Context<'_>) -> Result<&Option<String>> {
+        let full_account_info = self
+            .full_account_info
+            .get_or_try_init(|| self.resolve_full_account_info(ctx))
+            .await?;
+        Ok(&full_account_info.avatar_url)
     }
 }
 

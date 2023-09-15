@@ -8,9 +8,7 @@
 // by the Apache License, Version 2.0.
 
 mod account;
-mod account_ref;
 mod accounts;
 
 pub(crate) use account::*;
-pub(crate) use account_ref::*;
 pub(crate) use accounts::*;

@@ -11,7 +11,7 @@ use chrono::{DateTime, Utc};
 use opendatafabric as odf;
 
 use crate::prelude::*;
-use crate::queries::AccountRef;
+use crate::queries::Account;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 // MetadataBlockExtended
@@ -22,7 +22,7 @@ pub struct MetadataBlockExtended {
     pub block_hash: Multihash,
     pub prev_block_hash: Option<Multihash>,
     pub system_time: DateTime<Utc>,
-    pub author_ref: AccountRef,
+    pub author: Account,
     pub event: MetadataEvent,
     pub sequence_number: i32,
 }
@@ -31,14 +31,14 @@ impl MetadataBlockExtended {
     pub fn new<H: Into<Multihash>, B: Into<MetadataBlock>>(
         block_hash: H,
         block: B,
-        author_ref: AccountRef,
+        author: Account,
     ) -> Self {
         let b = block.into();
         Self {
             block_hash: block_hash.into(),
             prev_block_hash: b.prev_block_hash,
             system_time: b.system_time,
-            author_ref,
+            author,
             event: b.event,
             sequence_number: b.sequence_number,
         }

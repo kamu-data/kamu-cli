@@ -43,7 +43,7 @@ impl AuthMut {
             .account_info_by_token(access_token)
             .await;
         match get_account_info_result {
-            Ok(ai) => Ok(Account::new(ai)),
+            Ok(ai) => Ok(Account::from_account_info(ai)),
             Err(e) => Err(e.into()),
         }
     }
@@ -92,7 +92,7 @@ impl From<kamu_core::auth::LoginResponse> for LoginResponse {
     fn from(value: kamu_core::auth::LoginResponse) -> Self {
         Self {
             access_token: value.access_token.into(),
-            account: Account::new(value.account_info),
+            account: Account::from_account_info(value.account_info),
         }
     }
 }

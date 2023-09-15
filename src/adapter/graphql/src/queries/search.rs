@@ -11,7 +11,7 @@ use futures::TryStreamExt;
 use kamu_core::{self as domain, TryStreamExtExt};
 
 use crate::prelude::*;
-use crate::queries::{AccountRef, Dataset};
+use crate::queries::{Account, Dataset};
 
 ///////////////////////////////////////////////////////////////////////////////
 // Search
@@ -51,7 +51,7 @@ impl Search {
             .take(per_page)
             .map(|hdl| {
                 SearchResult::Dataset(Dataset::new(
-                    AccountRef::from_dataset_alias(ctx, &hdl.alias),
+                    Account::from_dataset_alias(ctx, &hdl.alias),
                     hdl,
                 ))
             })

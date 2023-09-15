@@ -27,17 +27,6 @@ scalar AccountID
 
 scalar AccountName
 
-type AccountRef {
-	"""
-	Unique and stable identitfier of this account
-	"""
-	id: AccountID!
-	"""
-	Symbolic account name
-	"""
-	accountName: AccountName!
-}
-
 enum AccountType {
 	USER
 	ORGANIZATION
@@ -219,7 +208,7 @@ type Dataset {
 	"""
 	Returns the user or organization that owns this dataset
 	"""
-	ownerRef: AccountRef!
+	owner: Account!
 	"""
 	Returns dataset alias (user + name)
 	"""
@@ -569,7 +558,7 @@ type MetadataBlockExtended {
 	blockHash: Multihash!
 	prevBlockHash: Multihash
 	systemTime: DateTime!
-	authorRef: AccountRef!
+	author: Account!
 	event: MetadataEvent!
 	sequenceNumber: Int!
 }

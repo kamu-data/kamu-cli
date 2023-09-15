@@ -28,7 +28,7 @@ impl Datasets {
         let hdl = dataset_repo
             .try_resolve_dataset_ref(&dataset_id.as_local_ref())
             .await?;
-        Ok(hdl.map(|h| Dataset::new(AccountRef::from_dataset_alias(ctx, &h.alias), h)))
+        Ok(hdl.map(|h| Dataset::new(Account::from_dataset_alias(ctx, &h.alias), h)))
     }
 
     /// Returns dataset by its owner and name
@@ -39,7 +39,7 @@ impl Datasets {
         account_name: AccountName,
         dataset_name: DatasetName,
     ) -> Result<Option<Dataset>> {
-        let account = AccountRef::from_account_name(&account_name);
+        let account = Account::from_account_name(&account_name);
 
         let dataset_alias = odf::DatasetAlias::new(Some(account_name.into()), dataset_name.into());
 
@@ -54,7 +54,7 @@ impl Datasets {
     async fn by_account_impl(
         &self,
         ctx: &Context<'_>,
-        account_ref: AccountRef,
+        account_ref: Account,
         page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<DatasetConnection> {
@@ -103,7 +103,7 @@ impl Datasets {
         page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<DatasetConnection> {
-        let account_ref = AccountRef::from_account_name(&account_name);
+        let account_ref = Account::from_account_name(&account_name);
         self.by_account_impl(ctx, account_ref, page, per_page).await
     }
 }
