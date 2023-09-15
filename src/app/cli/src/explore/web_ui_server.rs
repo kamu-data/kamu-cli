@@ -119,7 +119,7 @@ impl WebUIServer {
                     .layer(axum::extract::Extension(base_catalog))
                     .layer(axum::extract::Extension(gql_schema))
                     .layer(axum::extract::Extension(web_ui_config))
-                    .layer(kamu_adapter_http::CurrentAccountResolverLayer::new()),
+                    .layer(kamu_adapter_http::AuthenticationLayer::new()),
             );
 
         let server = axum::Server::builder(bound_addr).serve(app.into_make_service());

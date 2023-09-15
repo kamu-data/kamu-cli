@@ -23,30 +23,30 @@ use crate::AccessToken;
 /////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
-pub struct CurrentAccountResolverLayer {}
+pub struct AuthenticationLayer {}
 
-impl CurrentAccountResolverLayer {
+impl AuthenticationLayer {
     pub fn new() -> Self {
         Self {}
     }
 }
 
-impl<Svc> Layer<Svc> for CurrentAccountResolverLayer {
-    type Service = CurrentAccountResolverMiddleware<Svc>;
+impl<Svc> Layer<Svc> for AuthenticationLayer {
+    type Service = AuthenticationMiddleware<Svc>;
 
     fn layer(&self, inner: Svc) -> Self::Service {
-        CurrentAccountResolverMiddleware { inner }
+        AuthenticationMiddleware { inner }
     }
 }
 
 /////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
-pub struct CurrentAccountResolverMiddleware<Svc> {
+pub struct AuthenticationMiddleware<Svc> {
     inner: Svc,
 }
 
-impl<Svc> CurrentAccountResolverMiddleware<Svc> {
+impl<Svc> AuthenticationMiddleware<Svc> {
     async fn current_account_subject(
         base_catalog: &dill::Catalog,
         maybe_access_token: Option<AccessToken>,
@@ -83,7 +83,7 @@ impl<Svc> CurrentAccountResolverMiddleware<Svc> {
     }
 }
 
-impl<Svc> Service<Request<Body>> for CurrentAccountResolverMiddleware<Svc>
+impl<Svc> Service<Request<Body>> for AuthenticationMiddleware<Svc>
 where
     Svc: Service<Request<Body>, Response = Response> + Send + 'static + Clone,
     Svc::Future: Send + 'static,
@@ -128,7 +128,7 @@ where
                 .add_value(current_account_subject)
                 .build();
 
-            request.extensions_mut().insert(derived_catalog.clone());
+            request.extensions_mut().insert(derived_catalog);
 
             inner.call(request).await
         })

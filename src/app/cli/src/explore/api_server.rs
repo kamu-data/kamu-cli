@@ -61,7 +61,7 @@ impl APIServer {
                     )
                     .layer(Extension(base_catalog))
                     .layer(Extension(gql_schema))
-                    .layer(kamu_adapter_http::CurrentAccountResolverLayer::new()),
+                    .layer(kamu_adapter_http::AuthenticationLayer::new()),
             );
 
         let addr = SocketAddr::from((
