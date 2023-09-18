@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::BoxedError;
-use opendatafabric::{AccountID, AccountName};
+use opendatafabric::{AccountID, AccountName, FAKE_ACCOUNT_ID};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -36,6 +36,20 @@ pub struct AccountInfo {
 pub enum AccountType {
     User,
     Organization,
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+impl AccountInfo {
+    pub fn dummy() -> Self {
+        Self {
+            account_id: FAKE_ACCOUNT_ID.to_string(),
+            account_name: AccountName::new_unchecked(DEFAULT_ACCOUNT_NAME),
+            account_type: AccountType::User,
+            display_name: DEFAULT_ACCOUNT_NAME.to_string(),
+            avatar_url: Some(DEFAULT_AVATAR_URL.to_string()),
+        }
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////

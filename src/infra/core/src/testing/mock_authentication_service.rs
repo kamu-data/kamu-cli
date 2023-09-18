@@ -10,16 +10,13 @@
 use internal_error::InternalError;
 use kamu_core::auth::{
     AccountInfo,
-    AccountType,
     AuthenticationService,
     GetAccountInfoError,
     LoginError,
     LoginResponse,
-    DEFAULT_ACCOUNT_NAME,
-    DEFAULT_AVATAR_URL,
 };
 use mockall::predicate::{always, eq};
-use opendatafabric::{AccountName, FAKE_ACCOUNT_ID};
+use opendatafabric::AccountName;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -57,13 +54,13 @@ impl MockAuthenticationService {
             .returning(|_, _| {
                 Ok(LoginResponse {
                     access_token: DUMMY_TOKEN.to_string(),
-                    account_info: Self::make_dummy_account_info(),
+                    account_info: AccountInfo::dummy(),
                 })
             });
         mock_authentication_service
             .expect_account_info_by_token()
             .with(eq(DUMMY_TOKEN.to_string()))
-            .returning(|_| Ok(Self::make_dummy_account_info()));
+            .returning(|_| Ok(AccountInfo::dummy()));
         mock_authentication_service
     }
 
@@ -74,15 +71,5 @@ impl MockAuthenticationService {
             .with(eq(access_token.to_string()))
             .returning(move |_| Ok(expected_account_info.clone()));
         mock_authentication_service
-    }
-
-    fn make_dummy_account_info() -> AccountInfo {
-        AccountInfo {
-            account_id: FAKE_ACCOUNT_ID.to_string(),
-            account_name: AccountName::new_unchecked(DEFAULT_ACCOUNT_NAME),
-            account_type: AccountType::User,
-            display_name: DEFAULT_ACCOUNT_NAME.to_string(),
-            avatar_url: Some(DEFAULT_AVATAR_URL.to_string()),
-        }
     }
 }
