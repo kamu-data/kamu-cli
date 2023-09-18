@@ -67,6 +67,15 @@ impl MockAuthenticationService {
         mock_authentication_service
     }
 
+    pub fn resolving_token(access_token: &str, expected_account_info: AccountInfo) -> Self {
+        let mut mock_authentication_service = MockAuthenticationService::new();
+        mock_authentication_service
+            .expect_account_info_by_token()
+            .with(eq(access_token.to_string()))
+            .returning(move |_| Ok(expected_account_info.clone()));
+        mock_authentication_service
+    }
+
     fn make_dummy_account_info() -> AccountInfo {
         AccountInfo {
             account_id: FAKE_ACCOUNT_ID.to_string(),
