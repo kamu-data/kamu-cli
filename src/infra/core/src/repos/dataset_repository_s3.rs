@@ -192,7 +192,7 @@ impl DatasetRepository for DatasetRepositoryS3 {
 
     fn get_datasets_by_owner<'s>(&'s self, account_name: AccountName) -> DatasetHandleStream<'s> {
         if !self.is_multi_tenant() && account_name != DEFAULT_ACCOUNT_NAME {
-            panic!("Single-tenant dataset repository queried by non-default account");
+            return Box::pin(futures::stream::empty());
         }
 
         self.stream_datasets_if(move |dataset_alias| {
