@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::assert_matches::assert_matches;
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use kamu::testing::MetadataFactory;
@@ -37,8 +38,18 @@ async fn test_owner_can_read_and_write() {
         .check_action_allowed(&dataset_handle, DatasetAction::Write)
         .await;
 
+    let allowed_actions = harness
+        .dataset_authorizer
+        .get_allowed_actions(&dataset_handle)
+        .await;
+
     assert_matches!(read_result, Ok(()));
     assert_matches!(write_result, Ok(()));
+
+    assert_eq!(
+        allowed_actions,
+        HashSet::from([DatasetAction::Read, DatasetAction::Write])
+    );
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -60,6 +71,11 @@ async fn test_guest_can_read_but_not_write() {
         .check_action_allowed(&dataset_handle, DatasetAction::Write)
         .await;
 
+    let allowed_actions = harness
+        .dataset_authorizer
+        .get_allowed_actions(&dataset_handle)
+        .await;
+
     assert_matches!(read_result, Ok(()));
     assert_matches!(
         write_result,
@@ -67,6 +83,8 @@ async fn test_guest_can_read_but_not_write() {
             AccessError::Forbidden(_)
         ))
     );
+
+    assert_eq!(allowed_actions, HashSet::from([DatasetAction::Read]));
 }
 
 ///////////////////////////////////////////////////////////////////////////////
