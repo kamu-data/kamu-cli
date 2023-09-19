@@ -20,9 +20,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    - Implemented previously mocked account resolution API
 ### Fixed
 - Failing transform operations in multi-tenant workspaces due to invalid propagation of dataset aliases
+### Changed
+- Updated WEB UI image to latest release 0.10.0
 - Github OAuth functionality isolated in a separate component `kamu-adapter-oauth`
 - GraphQL: filtering datasets based on logged account
 - Unified and clarified namings in account-related data structures
+
 
 ## [0.142.1] - 2023-09-02
 ### Fixed
