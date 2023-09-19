@@ -788,7 +788,7 @@ async fn test_sync_from_url_only_multi_tenant_case() {
 
     let aliases = harness
         .remote_alias_reg
-        .get_remote_aliases(&mrl!(format!("{}/{}", TEST_ACCOUNT_NAME, "bar")))
+        .get_remote_aliases(&mrl!(format!("{}/{}", auth::DEFAULT_ACCOUNT_NAME, "bar")))
         .await
         .unwrap();
     let pull_aliases: Vec<_> = aliases

@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashSet;
+
 use kamu_core::auth::{
     self,
     DatasetAction,
@@ -14,10 +16,10 @@ use kamu_core::auth::{
     DatasetActionNotEnoughPermissionsError,
     DatasetActionUnauthorizedError,
 };
-use kamu_core::{AccessError, TEST_ACCOUNT_NAME};
+use kamu_core::AccessError;
 use mockall::predicate::{always, eq, function};
 use mockall::Predicate;
-use opendatafabric::{AccountName, DatasetAlias, DatasetHandle};
+use opendatafabric::{DatasetAlias, DatasetHandle};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -30,12 +32,13 @@ mockall::mock! {
             dataset_handle: &DatasetHandle,
             action: DatasetAction,
         ) -> Result<(), DatasetActionUnauthorizedError>;
+
+        async fn get_allowed_actions(&self, dataset_handle: &DatasetHandle) -> HashSet<DatasetAction>;
     }
 }
 
 impl MockDatasetActionAuthorizer {
     pub fn denying() -> Self {
-        let account_name = AccountName::new_unchecked(TEST_ACCOUNT_NAME);
         let mut mock_dataset_action_authorizer = MockDatasetActionAuthorizer::new();
         mock_dataset_action_authorizer
             .expect_check_action_allowed()
@@ -43,7 +46,6 @@ impl MockDatasetActionAuthorizer {
                 Err(DatasetActionUnauthorizedError::Access(
                     AccessError::Forbidden(
                         DatasetActionNotEnoughPermissionsError {
-                            account_name,
                             action,
                             dataset_ref: dataset_handle.as_local_ref(),
                         }

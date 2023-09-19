@@ -12,8 +12,11 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use axum::http::Uri;
 use axum::response::{IntoResponse, Response};
 use dill::Catalog;
+use opendatafabric::AccountName;
 use rust_embed::RustEmbed;
 use serde::Serialize;
+
+use crate::{PasswordLoginCredentials, LOGIN_METHOD_PASSWORD};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -27,6 +30,21 @@ struct HttpRoot;
 #[serde(rename_all = "camelCase")]
 struct WebUIConfig {
     api_server_gql_url: String,
+    login_instructions: Option<WebUILoginInstructions>,
+    feature_flags: WebUIFeatureFlags,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct WebUILoginInstructions {
+    login_method: String,
+    login_credentials_json: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct WebUIFeatureFlags {
+    enable_logout: bool,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -41,7 +59,12 @@ pub struct WebUIServer {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 impl WebUIServer {
-    pub fn new(catalog: Catalog, address: Option<IpAddr>, port: Option<u16>) -> Self {
+    pub fn new(
+        base_catalog: Catalog,
+        current_account_name: AccountName,
+        address: Option<IpAddr>,
+        port: Option<u16>,
+    ) -> Self {
         let addr = SocketAddr::from((
             address.unwrap_or(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1))),
             port.unwrap_or(0),
@@ -51,9 +74,27 @@ impl WebUIServer {
             panic!("error binding to {}: {}", addr, e);
         });
 
-        let gql_schema = kamu_adapter_graphql::schema(catalog);
+        let login_credentials = PasswordLoginCredentials {
+            login: current_account_name.to_string(),
+            // Note: note a mistake, use identical login and password, equal to account name
+            password: current_account_name.to_string(),
+        };
+
+        let gql_schema = kamu_adapter_graphql::schema();
+
         let web_ui_config = WebUIConfig {
             api_server_gql_url: format!("http://{}/graphql", bound_addr.local_addr()),
+            login_instructions: Some(WebUILoginInstructions {
+                login_method: LOGIN_METHOD_PASSWORD.to_string(),
+                login_credentials_json: serde_json::to_string::<PasswordLoginCredentials>(
+                    &login_credentials,
+                )
+                .unwrap(),
+            }),
+            feature_flags: WebUIFeatureFlags {
+                // No way to log out, always logging in a predefined user
+                enable_logout: false,
+            },
         };
 
         let app = axum::Router::new()
@@ -75,8 +116,10 @@ impl WebUIServer {
                             .allow_methods(vec![http::Method::GET, http::Method::POST])
                             .allow_headers(tower_http::cors::Any),
                     )
+                    .layer(axum::extract::Extension(base_catalog))
                     .layer(axum::extract::Extension(gql_schema))
-                    .layer(axum::extract::Extension(web_ui_config)),
+                    .layer(axum::extract::Extension(web_ui_config))
+                    .layer(kamu_adapter_http::AuthenticationLayer::new()),
             );
 
         let server = axum::Server::builder(bound_addr).serve(app.into_make_service());
@@ -124,9 +167,11 @@ async fn runtime_config_handler(
 
 async fn graphql_handler(
     schema: axum::extract::Extension<kamu_adapter_graphql::Schema>,
+    catalog: axum::extract::Extension<dill::Catalog>,
     req: async_graphql_axum::GraphQLRequest,
 ) -> async_graphql_axum::GraphQLResponse {
-    schema.execute(req.into_inner()).await.into()
+    let graphql_request = req.into_inner().data(catalog.0);
+    schema.execute(graphql_request).await.into()
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -136,3 +181,5 @@ async fn graphql_playground_handler() -> impl IntoResponse {
         async_graphql::http::GraphQLPlaygroundConfig::new("/graphql"),
     ))
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////

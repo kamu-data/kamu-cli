@@ -29,12 +29,12 @@ pub struct APIServer {
 }
 
 impl APIServer {
-    pub fn new(catalog: Catalog, address: Option<IpAddr>, port: Option<u16>) -> Self {
+    pub fn new(base_catalog: Catalog, address: Option<IpAddr>, port: Option<u16>) -> Self {
         use axum::extract::{Extension, Path};
 
-        let task_executor = catalog.get_one().unwrap();
+        let task_executor = base_catalog.get_one().unwrap();
 
-        let gql_schema = kamu_adapter_graphql::schema(catalog.clone());
+        let gql_schema = kamu_adapter_graphql::schema();
 
         let app = axum::Router::new()
             .route("/", axum::routing::get(root))
@@ -44,11 +44,11 @@ impl APIServer {
             )
             .nest(
                 "/:dataset_name",
-                kamu_adapter_http::smart_transfer_protocol_routes()
-                    .layer(kamu_adapter_http::DatasetResolverLayer::new(
-                        |Path(p): Path<DatasetByName>| p.dataset_name.as_local_ref(),
-                    ))
-                    .layer(Extension(catalog)),
+                kamu_adapter_http::smart_transfer_protocol_routes().layer(
+                    kamu_adapter_http::DatasetResolverLayer::new(|Path(p): Path<DatasetByName>| {
+                        p.dataset_name.as_local_ref()
+                    }),
+                ),
             )
             .layer(
                 tower::ServiceBuilder::new()
@@ -59,7 +59,9 @@ impl APIServer {
                             .allow_methods(vec![http::Method::GET, http::Method::POST])
                             .allow_headers(tower_http::cors::Any),
                     )
-                    .layer(Extension(gql_schema)),
+                    .layer(Extension(base_catalog))
+                    .layer(Extension(gql_schema))
+                    .layer(kamu_adapter_http::AuthenticationLayer::new()),
             );
 
         let addr = SocketAddr::from((
@@ -100,9 +102,11 @@ async fn root() -> impl axum::response::IntoResponse {
 
 async fn graphql_handler(
     schema: axum::extract::Extension<kamu_adapter_graphql::Schema>,
+    catalog: axum::extract::Extension<dill::Catalog>,
     req: async_graphql_axum::GraphQLRequest,
 ) -> async_graphql_axum::GraphQLResponse {
-    schema.execute(req.into_inner()).await.into()
+    let graphql_request = req.into_inner().data(catalog.0);
+    schema.execute(graphql_request).await.into()
 }
 
 async fn graphql_playground() -> impl axum::response::IntoResponse {

@@ -19,6 +19,9 @@ pub use metadata_factory::*;
 mod minio_server;
 pub use minio_server::*;
 
+mod mock_authentication_service;
+pub use mock_authentication_service::*;
+
 mod parquet_reader_helper;
 pub use parquet_reader_helper::*;
 

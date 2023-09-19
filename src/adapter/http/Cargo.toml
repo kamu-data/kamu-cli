@@ -27,7 +27,7 @@ axum-extra = { version = "0.7", features = ["async-read-body"] }
 async-trait = "0.1"
 bytes = "1"
 chrono = { version = "0.4", features = ["serde"] }
-dill = "0.6"
+dill = "0.7"
 flate2 = "1"                                                           # GZip decoder
 futures = "0.3"
 hyper = "0.14"

@@ -13,9 +13,11 @@ use std::path::{Path, PathBuf};
 use container_runtime::{ContainerRuntimeType, NetworkNamespaceType};
 use dill::*;
 use duration_string::DurationString;
+use kamu::domain::auth::{self, AccountType};
 use kamu::utils::docker_images;
 use merge::Merge;
 use opendatafabric::serde::yaml::Manifest;
+use opendatafabric::{AccountName, FAKE_ACCOUNT_ID};
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 use url::Url;
@@ -43,6 +45,9 @@ pub struct CLIConfig {
     /// Data access and visualization configuration
     #[merge(strategy = merge_recursive)]
     pub frontend: Option<FrontendConfig>,
+    /// Users configuration
+    #[merge(strategy = merge_recursive)]
+    pub users: Option<UsersConfig>,
 }
 
 impl CLIConfig {
@@ -51,6 +56,7 @@ impl CLIConfig {
             engine: None,
             protocol: None,
             frontend: None,
+            users: None,
         }
     }
 
@@ -63,6 +69,7 @@ impl CLIConfig {
             engine: Some(EngineConfig::sample()),
             protocol: Some(ProtocolConfig::sample()),
             frontend: Some(FrontendConfig::sample()),
+            users: Some(UsersConfig::sample()),
         }
     }
 }
@@ -73,6 +80,7 @@ impl Default for CLIConfig {
             engine: Some(EngineConfig::default()),
             protocol: Some(ProtocolConfig::default()),
             frontend: Some(FrontendConfig::default()),
+            users: Some(UsersConfig::default()),
         }
     }
 }
@@ -306,6 +314,49 @@ impl Default for JupyterConfig {
         Self {
             image: Some(Self::IMAGE.to_owned()),
             livy_image: EngineImagesConfig::default().spark,
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+
+#[skip_serializing_none]
+#[derive(Debug, Clone, Merge, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct UsersConfig {
+    #[merge(strategy = merge::vec::append)]
+    pub predefined: Vec<auth::AccountInfo>,
+    pub allow_login_unknown: Option<bool>,
+}
+
+impl UsersConfig {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    fn sample() -> Self {
+        Self::default()
+    }
+
+    pub fn single_tenant() -> Self {
+        Self {
+            predefined: vec![auth::AccountInfo {
+                account_id: FAKE_ACCOUNT_ID.to_string(),
+                account_name: AccountName::new_unchecked(auth::DEFAULT_ACCOUNT_NAME),
+                account_type: AccountType::User,
+                display_name: String::from(auth::DEFAULT_ACCOUNT_NAME),
+                avatar_url: Some(String::from(auth::DEFAULT_AVATAR_URL)),
+            }],
+            allow_login_unknown: Some(false),
+        }
+    }
+}
+
+impl Default for UsersConfig {
+    fn default() -> Self {
+        Self {
+            predefined: Vec::new(),
+            allow_login_unknown: Some(true),
         }
     }
 }

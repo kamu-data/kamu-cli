@@ -464,7 +464,14 @@ pub async fn test_iterate_datasets(repo: &dyn DatasetRepository) {
     // Default account
     check_expected_datasets(
         vec![alias_bar, alias_foo],
-        repo.get_datasets_by_owner(AccountName::new_unchecked(TEST_ACCOUNT_NAME)),
+        repo.get_datasets_by_owner(AccountName::new_unchecked(auth::DEFAULT_ACCOUNT_NAME)),
+    )
+    .await;
+
+    // Random account
+    check_expected_datasets(
+        vec![],
+        repo.get_datasets_by_owner(AccountName::new_unchecked("unknown-account")),
     )
     .await;
 }
@@ -536,6 +543,13 @@ pub async fn test_iterate_datasets_multi_tenant(repo: &dyn DatasetRepository) {
     check_expected_datasets(
         vec![alias_her_bar, alias_her_foo],
         repo.get_datasets_by_owner(account_her),
+    )
+    .await;
+
+    // Random account
+    check_expected_datasets(
+        vec![],
+        repo.get_datasets_by_owner(AccountName::new_unchecked("unknown-account")),
     )
     .await;
 }

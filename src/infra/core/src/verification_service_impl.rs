@@ -19,7 +19,7 @@ use crate::*;
 
 pub struct VerificationServiceImpl {
     dataset_repo: Arc<dyn DatasetRepository>,
-    dataset_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
+    dataset_authorizer: Arc<dyn domain::auth::DatasetActionAuthorizer>,
     transform_service: Arc<dyn TransformService>,
 }
 
@@ -27,7 +27,7 @@ pub struct VerificationServiceImpl {
 impl VerificationServiceImpl {
     pub fn new(
         dataset_repo: Arc<dyn DatasetRepository>,
-        dataset_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
+        dataset_authorizer: Arc<dyn domain::auth::DatasetActionAuthorizer>,
         transform_service: Arc<dyn TransformService>,
     ) -> Self {
         Self {
@@ -264,7 +264,7 @@ impl VerificationService for VerificationServiceImpl {
         let dataset_handle = self.dataset_repo.resolve_dataset_ref(dataset_ref).await?;
 
         self.dataset_authorizer
-            .check_action_allowed(&dataset_handle, auth::DatasetAction::Read)
+            .check_action_allowed(&dataset_handle, domain::auth::DatasetAction::Read)
             .await?;
 
         let dataset = self

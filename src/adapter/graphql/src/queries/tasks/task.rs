@@ -27,23 +27,23 @@ impl Task {
     }
 
     /// Unique and stable identitfier of this task
-    pub async fn task_id(&self) -> TaskID {
+    async fn task_id(&self) -> TaskID {
         self.state.task_id.into()
     }
 
     /// Life-cycle status of a task
-    pub async fn status(&self) -> TaskStatus {
+    async fn status(&self) -> TaskStatus {
         self.state.status.into()
     }
 
     /// Whether the task was ordered to be cancelled
-    pub async fn cancellation_requested(&self) -> bool {
+    async fn cancellation_requested(&self) -> bool {
         self.state.cancellation_requested
     }
 
     /// Describes a certain final outcome of the task once it reaches the
     /// "finished" status
-    pub async fn outcome(&self) -> Option<TaskOutcome> {
+    async fn outcome(&self) -> Option<TaskOutcome> {
         match &self.state.status {
             ts::TaskStatus::Queued | ts::TaskStatus::Running => None,
             ts::TaskStatus::Finished(outcome) => Some((*outcome).into()),
@@ -51,22 +51,22 @@ impl Task {
     }
 
     /// Time when task was originally created and placed in a queue
-    pub async fn created_at(&self) -> DateTime<Utc> {
+    async fn created_at(&self) -> DateTime<Utc> {
         self.state.created_at.clone()
     }
 
     /// Time when task transitioned into a running state
-    pub async fn ran_at(&self) -> Option<DateTime<Utc>> {
+    async fn ran_at(&self) -> Option<DateTime<Utc>> {
         self.state.ran_at.clone()
     }
 
     /// Time when cancellation of task was requested
-    pub async fn cancellation_requested_at(&self) -> Option<DateTime<Utc>> {
+    async fn cancellation_requested_at(&self) -> Option<DateTime<Utc>> {
         self.state.cancellation_requested_at.clone()
     }
 
     /// Time when task has reached a final outcome
-    pub async fn finished_at(&self) -> Option<DateTime<Utc>> {
+    async fn finished_at(&self) -> Option<DateTime<Utc>> {
         self.state.finished_at.clone()
     }
 }

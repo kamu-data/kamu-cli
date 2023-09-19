@@ -15,14 +15,17 @@ use oso::PolarClass;
 pub struct UserActor {
     #[polar(attribute)]
     pub name: String,
+    #[polar(attribute)]
+    pub anonymous: bool,
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 impl UserActor {
-    pub fn new(name: &str) -> Self {
+    pub fn new(name: &str, anonymous: bool) -> Self {
         Self {
             name: name.to_string(),
+            anonymous,
         }
     }
 }
@@ -31,7 +34,11 @@ impl UserActor {
 
 impl std::fmt::Display for UserActor {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "User(name='{}')", &self.name)
+        write!(
+            f,
+            "User(name='{}', anonymous={})",
+            &self.name, self.anonymous
+        )
     }
 }
 

@@ -25,6 +25,11 @@ impl Query {
         "0.1".to_string()
     }
 
+    /// Authentication and authorization-related functionality group
+    async fn auth(&self) -> Auth {
+        Auth
+    }
+
     /// Dataset-related functionality group.
     ///
     /// Datasets are historical streams of events recorded under a cetrain
@@ -95,14 +100,19 @@ pub type Schema = async_graphql::Schema<Query, Mutation, EmptySubscription>;
 pub type SchemaBuilder = async_graphql::SchemaBuilder<Query, Mutation, EmptySubscription>;
 
 /// Returns schema builder without any extensions
-pub fn schema_builder(catalog: dill::Catalog) -> SchemaBuilder {
-    Schema::build(Query, Mutation, EmptySubscription).data(catalog)
+pub fn schema_builder() -> SchemaBuilder {
+    Schema::build(Query, Mutation, EmptySubscription)
 }
 
 /// Returns schema preconfigured with default extensions
-pub fn schema(catalog: dill::Catalog) -> Schema {
-    schema_builder(catalog)
+pub fn schema() -> Schema {
+    schema_builder()
         .extension(Tracing)
         .extension(extensions::ApolloTracing)
         .finish()
+}
+
+/// Returns schema preconfigured schema without tracing extensions
+pub fn schema_quiet() -> Schema {
+    schema_builder().finish()
 }

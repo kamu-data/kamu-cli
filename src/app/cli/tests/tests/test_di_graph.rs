@@ -16,14 +16,21 @@ use kamu_cli::WorkspaceLayout;
 async fn test_di_graph_validates() {
     let tempdir = tempfile::tempdir().unwrap();
     let workspace_layout = WorkspaceLayout::new(tempdir.path());
-    let mut catalog_builder = kamu_cli::configure_catalog(&workspace_layout, false);
-    kamu_cli::register_config_in_catalog(&kamu_cli::CLIConfig::default(), &mut catalog_builder);
-    catalog_builder.add_value(CurrentAccountSubject::new_test());
+    let mut base_catalog_builder = kamu_cli::configure_base_catalog(&workspace_layout, false);
+    kamu_cli::register_config_in_catalog(
+        &kamu_cli::CLIConfig::default(),
+        &mut base_catalog_builder,
+        false,
+    );
+    let base_catalog = base_catalog_builder.build();
+
+    let mut cli_catalog_builder = kamu_cli::configure_cli_catalog(&base_catalog);
+    cli_catalog_builder.add_value(CurrentAccountSubject::new_test());
 
     // TODO: We should ensure this test covers parameters requested by commands and
     // types needed for GQL/HTTP adapter that are currently being constructed
     // manually
-    let validate_result = catalog_builder.validate().ignore::<WorkspaceLayout>();
+    let validate_result = cli_catalog_builder.validate().ignore::<WorkspaceLayout>();
 
     assert!(
         validate_result.is_ok(),

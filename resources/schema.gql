@@ -1,25 +1,36 @@
-type AccessToken {
-	accessToken: String!
-	scope: String!
-	tokenType: String!
+type Account {
+	"""
+	Unique and stable identitfier of this account
+	"""
+	id: AccountID!
+	"""
+	Symbolic account name
+	"""
+	accountName: AccountName!
+	"""
+	Account name to display
+	"""
+	displayName: AccountDisplayName!
+	"""
+	Account type
+	"""
+	accountType: AccountType!
+	"""
+	Avatar URL
+	"""
+	avatarUrl: String
 }
 
-interface Account {
-	id: AccountID!
-	name: String!
-}
+scalar AccountDisplayName
 
 scalar AccountID
 
-type AccountInfo {
-	login: String!
-	name: String!
-	email: String
-	avatarUrl: String
-	gravatarId: String
-}
-
 scalar AccountName
+
+enum AccountType {
+	USER
+	ORGANIZATION
+}
 
 type Accounts {
 	"""
@@ -29,7 +40,7 @@ type Accounts {
 	"""
 	Returns account by its name
 	"""
-	byName(name: String!): Account
+	byName(name: AccountName!): Account
 }
 
 type AddData {
@@ -51,9 +62,13 @@ type AttachmentsEmbedded {
 	items: [AttachmentEmbedded!]!
 }
 
+type Auth {
+	enabledLoginMethods: [String!]!
+}
+
 type AuthMut {
-	githubLogin(code: String!): LoginResponse!
-	accountInfo(accessToken: String!): AccountInfo!
+	login(loginMethod: String!, loginCredentialsJson: String!): LoginResponse!
+	accountDetails(accessToken: String!): Account!
 }
 
 type BlockInterval {
@@ -195,6 +210,10 @@ type Dataset {
 	"""
 	owner: Account!
 	"""
+	Returns dataset alias (user + name)
+	"""
+	alias: DatasetAlias!
+	"""
 	Returns the kind of a dataset (Root or Derivative)
 	"""
 	kind: DatasetKind!
@@ -214,6 +233,10 @@ type Dataset {
 	Creation time of the most recent metadata block in the chain
 	"""
 	lastUpdatedAt: DateTime!
+	"""
+	Permissions of the current user
+	"""
+	permissions: DatasetPermissions!
 }
 
 scalar DatasetAlias
@@ -339,6 +362,13 @@ type DatasetMut {
 
 scalar DatasetName
 
+type DatasetPermissions {
+	canView: Boolean!
+	canDelete: Boolean!
+	canRename: Boolean!
+	canCommit: Boolean!
+}
+
 scalar DatasetRef
 
 scalar DatasetRefAny
@@ -370,11 +400,11 @@ type DatasetsMut {
 	"""
 	Creates a new empty dataset
 	"""
-	createEmpty(accountId: AccountID!, datasetKind: DatasetKind!, datasetName: DatasetName!): CreateDatasetResult!
+	createEmpty(datasetKind: DatasetKind!, datasetName: DatasetName!): CreateDatasetResult!
 	"""
 	Creates a new dataset from provided DatasetSnapshot manifest
 	"""
-	createFromSnapshot(accountId: AccountID!, snapshot: String!, snapshotFormat: MetadataManifestFormat!): CreateDatasetFromSnapshotResult!
+	createFromSnapshot(snapshot: String!, snapshotFormat: MetadataManifestFormat!): CreateDatasetFromSnapshotResult!
 }
 
 """
@@ -481,8 +511,8 @@ type InputSlice {
 
 
 type LoginResponse {
-	token: AccessToken!
-	accountInfo: AccountInfo!
+	accessToken: String!
+	account: Account!
 }
 
 union MergeStrategy = MergeStrategyAppend | MergeStrategyLedger | MergeStrategySnapshot
@@ -606,17 +636,6 @@ type OffsetInterval {
 	end: Int!
 }
 
-type Organization implements Account {
-	"""
-	Unique and stable identitfier of this organization account
-	"""
-	id: AccountID!
-	"""
-	Symbolic account name
-	"""
-	name: String!
-}
-
 type PageBasedInfo {
 	"""
 	When paginating backwards, are there more items?
@@ -653,6 +672,10 @@ type Query {
 	Returns the version of the GQL API
 	"""
 	apiVersion: String!
+	"""
+	Authentication and authorization-related functionality group
+	"""
+	auth: Auth!
 	"""
 	Dataset-related functionality group.
 	
@@ -1023,17 +1046,6 @@ type TransformSql {
 
 interface UpdateReadmeResult {
 	message: String!
-}
-
-type User implements Account {
-	"""
-	Unique and stable identitfier of this user account
-	"""
-	id: AccountID!
-	"""
-	Symbolic account name
-	"""
-	name: String!
 }
 
 schema {

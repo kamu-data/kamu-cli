@@ -25,7 +25,7 @@ kamu-task-system = { workspace = true }
 async-stream = "0.3"
 async-trait = { version = "0.1", default-features = false }
 chrono = { version = "0.4", default-features = false }
-dill = "0.6"
+dill = "0.7"
 futures = "0.3"
 thiserror = { version = "=1.0.44", default-features = false }  # TODO: Pinned until rustc upgrade
 tokio = { version = "1", default-features = false, features=[] }

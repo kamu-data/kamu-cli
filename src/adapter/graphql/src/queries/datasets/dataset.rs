@@ -17,16 +17,16 @@ use crate::queries::*;
 
 #[derive(Debug, Clone)]
 pub struct Dataset {
-    account: Account,
+    owner: Account,
     dataset_handle: odf::DatasetHandle,
 }
 
 #[Object]
 impl Dataset {
     #[graphql(skip)]
-    pub fn new(account: Account, dataset_handle: odf::DatasetHandle) -> Self {
+    pub fn new(owner: Account, dataset_handle: odf::DatasetHandle) -> Self {
         Self {
-            account,
+            owner,
             dataset_handle,
         }
     }
@@ -41,7 +41,10 @@ impl Dataset {
             .resolve_dataset_ref(dataset_ref)
             .await
             .int_err()?;
-        Ok(Dataset::new(Account::mock(), hdl))
+        Ok(Dataset::new(
+            Account::from_dataset_alias(ctx, &hdl.alias),
+            hdl,
+        ))
     }
 
     #[graphql(skip)]
@@ -68,7 +71,12 @@ impl Dataset {
 
     /// Returns the user or organization that owns this dataset
     async fn owner(&self) -> &Account {
-        &self.account
+        &self.owner
+    }
+
+    /// Returns dataset alias (user + name)
+    async fn alias(&self) -> DatasetAlias {
+        self.dataset_handle.alias.clone().into()
     }
 
     /// Returns the kind of a dataset (Root or Derivative)
@@ -119,4 +127,32 @@ impl Dataset {
             .expect("Dataset without blocks");
         Ok(head.system_time)
     }
+
+    /// Permissions of the current user
+    async fn permissions(&self, ctx: &Context<'_>) -> Result<DatasetPermissions> {
+        use kamu_core::auth;
+        let dataset_action_authorizer =
+            from_catalog::<dyn auth::DatasetActionAuthorizer>(ctx).unwrap();
+
+        let allowed_actions = dataset_action_authorizer
+            .get_allowed_actions(&self.dataset_handle)
+            .await;
+        let can_read = allowed_actions.contains(&auth::DatasetAction::Read);
+        let can_write = allowed_actions.contains(&auth::DatasetAction::Write);
+
+        Ok(DatasetPermissions {
+            can_view: can_read,
+            can_delete: can_write,
+            can_rename: can_write,
+            can_commit: can_write,
+        })
+    }
+}
+
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
+pub struct DatasetPermissions {
+    can_view: bool,
+    can_delete: bool,
+    can_rename: bool,
+    can_commit: bool,
 }

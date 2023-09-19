@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::assert_matches::assert_matches;
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use kamu::testing::MetadataFactory;
@@ -15,7 +16,7 @@ use kamu::DatasetRepositoryLocalFs;
 use kamu_adapter_auth_oso::{KamuAuthOso, OsoDatasetAuthorizer};
 use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer, DatasetActionUnauthorizedError};
 use kamu_core::{AccessError, CurrentAccountSubject, DatasetRepository};
-use opendatafabric::{DatasetAlias, DatasetHandle, DatasetKind};
+use opendatafabric::{AccountName, DatasetAlias, DatasetHandle, DatasetKind};
 use tempfile::TempDir;
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -37,8 +38,18 @@ async fn test_owner_can_read_and_write() {
         .check_action_allowed(&dataset_handle, DatasetAction::Write)
         .await;
 
+    let allowed_actions = harness
+        .dataset_authorizer
+        .get_allowed_actions(&dataset_handle)
+        .await;
+
     assert_matches!(read_result, Ok(()));
     assert_matches!(write_result, Ok(()));
+
+    assert_eq!(
+        allowed_actions,
+        HashSet::from([DatasetAction::Read, DatasetAction::Write])
+    );
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -60,6 +71,11 @@ async fn test_guest_can_read_but_not_write() {
         .check_action_allowed(&dataset_handle, DatasetAction::Write)
         .await;
 
+    let allowed_actions = harness
+        .dataset_authorizer
+        .get_allowed_actions(&dataset_handle)
+        .await;
+
     assert_matches!(read_result, Ok(()));
     assert_matches!(
         write_result,
@@ -67,6 +83,8 @@ async fn test_guest_can_read_but_not_write() {
             AccessError::Forbidden(_)
         ))
     );
+
+    assert_eq!(allowed_actions, HashSet::from([DatasetAction::Read]));
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -84,7 +102,9 @@ impl DatasetAuthorizerHarness {
         let datasets_dir = tempdir.path().join("datasets");
         std::fs::create_dir(&datasets_dir).unwrap();
 
-        let current_account_subject = Arc::new(CurrentAccountSubject::new(current_account_name));
+        let current_account_subject = Arc::new(CurrentAccountSubject::logged(
+            AccountName::new_unchecked(current_account_name),
+        ));
 
         let dataset_authorizer = Arc::new(OsoDatasetAuthorizer::new(
             Arc::new(KamuAuthOso::new()),

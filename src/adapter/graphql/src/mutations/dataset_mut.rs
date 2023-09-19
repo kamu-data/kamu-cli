@@ -13,6 +13,7 @@ use opendatafabric as odf;
 
 use super::DatasetMetadataMut;
 use crate::prelude::*;
+use crate::LoggedInGuard;
 
 #[derive(Debug, Clone)]
 pub struct DatasetMut {
@@ -32,6 +33,7 @@ impl DatasetMut {
     }
 
     /// Rename the dataset
+    #[graphql(guard = "LoggedInGuard::new()")]
     async fn rename(&self, ctx: &Context<'_>, new_name: DatasetName) -> Result<RenameResult> {
         if self
             .dataset_handle
@@ -59,14 +61,18 @@ impl DatasetMut {
                     colliding_alias: e.alias.into(),
                 }))
             }
+            Err(RenameDatasetError::Access(_)) => Err(GqlError::Gql(
+                Error::new("Dataset access error")
+                    .extend_with(|_, eev| eev.set("alias", self.dataset_handle.alias.to_string())),
+            )),
             // "Not found" should not be reachable, since we've just resolved the dataset by ID
             Err(RenameDatasetError::NotFound(e)) => Err(e.int_err().into()),
-            Err(RenameDatasetError::Access(e)) => Err(e.int_err().into()),
             Err(RenameDatasetError::Internal(e)) => Err(e.into()),
         }
     }
 
     /// Delete the dataset
+    #[graphql(guard = "LoggedInGuard::new()")]
     async fn delete(&self, ctx: &Context<'_>) -> Result<DeleteResult> {
         let dataset_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
         match dataset_repo
@@ -86,9 +92,12 @@ impl DatasetMut {
                         .collect(),
                 },
             )),
+            Err(DeleteDatasetError::Access(_)) => Err(GqlError::Gql(
+                Error::new("Dataset access error")
+                    .extend_with(|_, eev| eev.set("alias", self.dataset_handle.alias.to_string())),
+            )),
             // "Not found" should not be reachable, since we've just resolved the dataset by ID
             Err(DeleteDatasetError::NotFound(e)) => Err(e.int_err().into()),
-            Err(DeleteDatasetError::Access(e)) => Err(e.int_err().into()),
             Err(DeleteDatasetError::Internal(e)) => Err(e.into()),
         }
     }

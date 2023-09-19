@@ -16,7 +16,7 @@ use kamu_task_system::*;
 pub struct TaskExecutorInMemory {
     task_sched: Arc<dyn TaskScheduler>,
     event_store: Arc<dyn TaskSystemEventStore>,
-    pull_svc: Arc<dyn PullService>,
+    catalog: Catalog,
 }
 
 #[component(pub)]
@@ -25,12 +25,12 @@ impl TaskExecutorInMemory {
     pub fn new(
         task_sched: Arc<dyn TaskScheduler>,
         event_store: Arc<dyn TaskSystemEventStore>,
-        pull_svc: Arc<dyn PullService>,
+        catalog: Catalog,
     ) -> Self {
         Self {
             task_sched,
             event_store,
-            pull_svc,
+            catalog,
         }
     }
 }
@@ -51,10 +51,11 @@ impl TaskExecutor for TaskExecutorInMemory {
                 "Executing task",
             );
 
+            let pull_svc = self.catalog.get_one::<dyn PullService>().int_err()?;
+
             let outcome = match &task.logical_plan {
                 LogicalPlan::UpdateDataset(upd) => {
-                    let res = self
-                        .pull_svc
+                    let res = pull_svc
                         .pull(&upd.dataset_id.as_any_ref(), PullOptions::default(), None)
                         .await;
 

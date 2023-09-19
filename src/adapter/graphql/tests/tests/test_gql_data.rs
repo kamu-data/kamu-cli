@@ -25,6 +25,7 @@ async fn create_catalog_with_local_workspace(tempdir: &Path) -> dill::Catalog {
         .add_builder(
             dill::builder_for::<DatasetRepositoryLocalFs>()
                 .with_root(tempdir.join("datasets"))
+                .with_current_account_subject(Arc::new(CurrentAccountSubject::new_test()))
                 .with_multi_tenant(false),
         )
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
@@ -34,7 +35,6 @@ async fn create_catalog_with_local_workspace(tempdir: &Path) -> dill::Catalog {
         .bind::<dyn ObjectStoreRegistry, ObjectStoreRegistryImpl>()
         .add_value(ObjectStoreBuilderLocalFs::new())
         .bind::<dyn ObjectStoreBuilder, ObjectStoreBuilderLocalFs>()
-        .add_value(CurrentAccountSubject::new_test())
         .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
         .bind::<dyn auth::DatasetActionAuthorizer, auth::AlwaysHappyDatasetActionAuthorizer>()
         .build()
@@ -91,26 +91,29 @@ async fn test_dataset_schema_local_fs() {
     let catalog = create_catalog_with_local_workspace(tempdir.path()).await;
     create_test_dataset(&catalog, tempdir.path()).await;
 
-    let schema = kamu_adapter_graphql::schema(catalog);
+    let schema = kamu_adapter_graphql::schema_quiet();
     let res = schema
-        .execute(indoc::indoc!(
-            r#"
-            {
-                datasets {
-                    byOwnerAndName(accountName: "kamu", datasetName: "foo") {
-                        name
-                        data {
-                            tail(limit: 1, schemaFormat: PARQUET_JSON, dataFormat: JSON) {
-                                ... on DataQueryResultSuccess {
-                                    schema { content }
+        .execute(
+            async_graphql::Request::new(indoc::indoc!(
+                r#"
+                {
+                    datasets {
+                        byOwnerAndName(accountName: "kamu", datasetName: "foo") {
+                            name
+                            data {
+                                tail(limit: 1, schemaFormat: PARQUET_JSON, dataFormat: JSON) {
+                                    ... on DataQueryResultSuccess {
+                                        schema { content }
+                                    }
                                 }
                             }
                         }
                     }
                 }
-            }
-            "#
-        ))
+                "#
+            ))
+            .data(catalog),
+        )
         .await;
     assert!(res.is_ok(), "{:?}", res);
     let json = serde_json::to_string(&res.data).unwrap();
@@ -147,26 +150,29 @@ async fn test_dataset_tail_local_fs() {
     let catalog = create_catalog_with_local_workspace(tempdir.path()).await;
     create_test_dataset(&catalog, tempdir.path()).await;
 
-    let schema = kamu_adapter_graphql::schema(catalog);
+    let schema = kamu_adapter_graphql::schema_quiet();
     let res = schema
-        .execute(indoc::indoc!(
-            r#"
-            {
-                datasets {
-                    byOwnerAndName(accountName: "kamu", datasetName: "foo") {
-                        name
-                        data {
-                            tail(skip: 1, limit: 1, schemaFormat: PARQUET_JSON, dataFormat: JSON) {
-                                ... on DataQueryResultSuccess {
-                                    data { content }
+        .execute(
+            async_graphql::Request::new(indoc::indoc!(
+                r#"
+                {
+                    datasets {
+                        byOwnerAndName(accountName: "kamu", datasetName: "foo") {
+                            name
+                            data {
+                                tail(skip: 1, limit: 1, schemaFormat: PARQUET_JSON, dataFormat: JSON) {
+                                    ... on DataQueryResultSuccess {
+                                        data { content }
+                                    }
                                 }
                             }
                         }
                     }
                 }
-            }
-            "#
-        ))
+                "#
+            ))
+            .data(catalog),
+        )
         .await;
     assert!(res.is_ok(), "{:?}", res);
     let json = serde_json::to_string(&res.data).unwrap();
@@ -185,26 +191,29 @@ async fn test_dataset_tail_empty_local_fs() {
     let catalog = create_catalog_with_local_workspace(tempdir.path()).await;
     create_test_dataset(&catalog, tempdir.path()).await;
 
-    let schema = kamu_adapter_graphql::schema(catalog);
+    let schema = kamu_adapter_graphql::schema_quiet();
     let res = schema
-        .execute(indoc::indoc!(
-            r#"
-            {
-                datasets {
-                    byOwnerAndName(accountName: "kamu", datasetName: "foo") {
-                        name
-                        data {
-                            tail(skip: 10, schemaFormat: PARQUET_JSON, dataFormat: JSON) {
-                                ... on DataQueryResultSuccess {
-                                    data { content }
+        .execute(
+            async_graphql::Request::new(indoc::indoc!(
+                r#"
+                {
+                    datasets {
+                        byOwnerAndName(accountName: "kamu", datasetName: "foo") {
+                            name
+                            data {
+                                tail(skip: 10, schemaFormat: PARQUET_JSON, dataFormat: JSON) {
+                                    ... on DataQueryResultSuccess {
+                                        data { content }
+                                    }
                                 }
                             }
                         }
                     }
                 }
-            }
-            "#
-        ))
+                "#
+            ))
+            .data(catalog),
+        )
         .await;
     assert!(res.is_ok(), "{:?}", res);
     let json = serde_json::to_string(&res.data).unwrap();

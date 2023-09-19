@@ -7,12 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashSet;
+use std::str::FromStr;
 use std::sync::Arc;
 
 use dill::component;
 use kamu_core::auth::*;
 use kamu_core::{AccessError, CurrentAccountSubject, ErrorIntoInternal};
-use opendatafabric::{AccountName, DatasetHandle};
+use opendatafabric::DatasetHandle;
 use oso::Oso;
 
 use crate::dataset_resource::*;
@@ -40,8 +42,11 @@ impl OsoDatasetAuthorizer {
         }
     }
 
-    fn actor(&self, account_name: &AccountName) -> UserActor {
-        UserActor::new(account_name.as_str())
+    fn actor(&self) -> UserActor {
+        match self.current_account_subject.as_ref() {
+            CurrentAccountSubject::Anonymous(_) => UserActor::new("", true),
+            CurrentAccountSubject::Logged(l) => UserActor::new(l.account_name.as_str(), false),
+        }
     }
 
     fn dataset_resource(&self, dataset_handle: &DatasetHandle) -> DatasetResource {
@@ -50,7 +55,7 @@ impl OsoDatasetAuthorizer {
             .account_name
             .as_ref()
             .map(|a| a.as_str())
-            .unwrap_or(self.current_account_subject.account_name.as_str());
+            .unwrap_or(DEFAULT_ACCOUNT_NAME);
 
         // TODO: for now let's treat all datasets as public
         // TODO: explicit read/write permissions
@@ -67,7 +72,7 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
         dataset_handle: &DatasetHandle,
         action: DatasetAction,
     ) -> Result<(), DatasetActionUnauthorizedError> {
-        let actor = self.actor(&self.current_account_subject.account_name);
+        let actor = self.actor();
         let dataset_resource = self.dataset_resource(dataset_handle);
 
         match self
@@ -81,7 +86,6 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
                     Err(DatasetActionUnauthorizedError::Access(
                         AccessError::Forbidden(
                             DatasetActionNotEnoughPermissionsError {
-                                account_name: self.current_account_subject.account_name.clone(),
                                 action,
                                 dataset_ref: dataset_handle.as_local_ref(),
                             }
@@ -92,6 +96,24 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
             }
             Err(e) => Err(DatasetActionUnauthorizedError::Internal(e.int_err())),
         }
+    }
+
+    async fn get_allowed_actions(&self, dataset_handle: &DatasetHandle) -> HashSet<DatasetAction> {
+        let actor = self.actor();
+        let dataset_resource = self.dataset_resource(dataset_handle);
+
+        let allowed_action_names: HashSet<String> = self
+            .oso
+            .get_allowed_actions(actor, dataset_resource)
+            .unwrap();
+
+        let mut allowed_actions = HashSet::new();
+        for action_name in allowed_action_names {
+            let action = DatasetAction::from_str(action_name.as_str()).unwrap();
+            allowed_actions.insert(action);
+        }
+
+        allowed_actions
     }
 }
 

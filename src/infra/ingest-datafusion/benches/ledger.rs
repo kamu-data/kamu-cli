@@ -11,6 +11,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use criterion::{criterion_group, criterion_main, Criterion};
+use datafusion::dataframe::DataFrameWriteOptions;
 use datafusion::prelude::*;
 use rand::{Rng, SeedableRng};
 
@@ -104,7 +105,7 @@ async fn setup(
         .unwrap(),
     )
     .unwrap()
-    .write_parquet(&prev, None)
+    .write_parquet(&prev, DataFrameWriteOptions::default(), None)
     .await
     .unwrap();
 
@@ -130,7 +131,7 @@ async fn setup(
         .unwrap(),
     )
     .unwrap()
-    .write_parquet(&new, None)
+    .write_parquet(&new, DataFrameWriteOptions::default(), None)
     .await
     .unwrap();
 

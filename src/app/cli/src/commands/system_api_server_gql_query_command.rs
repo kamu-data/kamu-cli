@@ -12,15 +12,15 @@ use dill::Catalog;
 use super::{CLIError, Command};
 
 pub struct APIServerGqlQueryCommand {
-    catalog: Catalog,
+    base_catalog: Catalog,
     query: String,
     full: bool,
 }
 
 impl APIServerGqlQueryCommand {
-    pub fn new<S: Into<String>>(catalog: Catalog, query: S, full: bool) -> Self {
+    pub fn new<S: Into<String>>(base_catalog: Catalog, query: S, full: bool) -> Self {
         Self {
-            catalog,
+            base_catalog,
             query: query.into(),
             full,
         }
@@ -30,9 +30,11 @@ impl APIServerGqlQueryCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for APIServerGqlQueryCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
-        // TODO: Cloning catalog is too expensive currently
-        let gql_schema = kamu_adapter_graphql::schema(self.catalog.clone());
-        let response = gql_schema.execute(&self.query).await;
+        // TODO: Access token? Not every GraphQL can run unauthorized
+        let gql_schema = kamu_adapter_graphql::schema();
+        let response = gql_schema
+            .execute(async_graphql::Request::new(&self.query).data(self.base_catalog.clone()))
+            .await;
 
         let data = if self.full {
             serde_json::to_string_pretty(&response).unwrap()

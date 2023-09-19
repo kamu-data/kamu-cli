@@ -30,7 +30,7 @@ macro_rules! assert_forbidden {
 
 #[test_log::test(tokio::test)]
 async fn test_owner_can_read_and_write() {
-    let user_actor = UserActor::new("foo");
+    let user_actor = UserActor::new("foo", false);
     let dataset_resource = DatasetResource::new("foo", false);
 
     let oso = KamuAuthOso::new().oso;
@@ -54,7 +54,7 @@ async fn test_owner_can_read_and_write() {
 
 #[test_log::test(tokio::test)]
 async fn test_unrelated_can_read_public() {
-    let user_actor = UserActor::new("foo");
+    let user_actor = UserActor::new("foo", false);
     let dataset_resource = DatasetResource::new("bar", true);
 
     let oso = KamuAuthOso::new().oso;
@@ -78,7 +78,7 @@ async fn test_unrelated_can_read_public() {
 
 #[test_log::test(tokio::test)]
 async fn test_unrelated_cannot_read_private() {
-    let user_actor = UserActor::new("foo");
+    let user_actor = UserActor::new("foo", false);
     let dataset_resource = DatasetResource::new("bar", false);
 
     let oso = KamuAuthOso::new().oso;
@@ -102,7 +102,7 @@ async fn test_unrelated_cannot_read_private() {
 
 #[test_log::test(tokio::test)]
 async fn test_having_explicit_read_permission_in_private_dataset() {
-    let user_actor = UserActor::new("foo");
+    let user_actor = UserActor::new("foo", false);
     let mut dataset_resource = DatasetResource::new("bar", false);
     dataset_resource.authorize_reader("foo");
 
@@ -127,7 +127,7 @@ async fn test_having_explicit_read_permission_in_private_dataset() {
 
 #[test_log::test(tokio::test)]
 async fn test_having_explicit_write_permission_in_private_dataset() {
-    let user_actor = UserActor::new("foo");
+    let user_actor = UserActor::new("foo", false);
     let mut dataset_resource = DatasetResource::new("bar", false);
     dataset_resource.authorize_editor("foo");
 

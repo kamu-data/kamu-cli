@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use domain::{auth, CurrentAccountSubject, TEST_ACCOUNT_NAME};
+use domain::{auth, CurrentAccountSubject};
 use kamu::*;
 use opendatafabric::AccountName;
 use tempfile::TempDir;
@@ -60,7 +60,7 @@ async fn test_create_dataset_multi_tenant() {
 
     test_dataset_repository_shared::test_create_dataset(
         &repo,
-        Some(AccountName::new_unchecked(TEST_ACCOUNT_NAME)),
+        Some(AccountName::new_unchecked(auth::DEFAULT_ACCOUNT_NAME)),
     )
     .await;
 }
@@ -106,7 +106,7 @@ async fn test_create_dataset_from_snapshot_multi_tenant() {
 
     test_dataset_repository_shared::test_create_dataset_from_snapshot(
         &repo,
-        Some(AccountName::new_unchecked(TEST_ACCOUNT_NAME)),
+        Some(AccountName::new_unchecked(auth::DEFAULT_ACCOUNT_NAME)),
     )
     .await;
 }
@@ -138,7 +138,7 @@ async fn test_rename_dataset_multi_tenant() {
 
     test_dataset_repository_shared::test_rename_dataset(
         &repo,
-        Some(AccountName::new_unchecked(TEST_ACCOUNT_NAME)),
+        Some(AccountName::new_unchecked(auth::DEFAULT_ACCOUNT_NAME)),
     )
     .await;
 }
@@ -198,7 +198,7 @@ async fn test_delete_dataset_multi_tenant() {
 
     test_dataset_repository_shared::test_delete_dataset(
         &repo,
-        Some(AccountName::new_unchecked(TEST_ACCOUNT_NAME)),
+        Some(AccountName::new_unchecked(auth::DEFAULT_ACCOUNT_NAME)),
     )
     .await;
 }

@@ -17,23 +17,30 @@ use kamu_core::*;
 use opendatafabric::serde::yaml::YamlMetadataEventSerializer;
 use opendatafabric::*;
 
+use crate::utils::{authentication_catalogs, expect_anonymous_access_error};
+
+////////////////////////////////////////////////////////////////////////////////////////
+
 #[test_log::test(tokio::test)]
 async fn metadata_chain_append_event() {
     let tempdir = tempfile::tempdir().unwrap();
-    let dataset_repo = DatasetRepositoryLocalFs::create(
-        tempdir.path().join("datasets"),
-        Arc::new(CurrentAccountSubject::new_test()),
-        Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new()),
-        false,
-    )
-    .unwrap();
 
-    let cat = dill::CatalogBuilder::new()
-        .add_value(dataset_repo)
+    let base_catalog = dill::CatalogBuilder::new()
+        .add_builder(
+            dill::builder_for::<DatasetRepositoryLocalFs>()
+                .with_root(tempdir.path().join("datasets"))
+                .with_multi_tenant(false),
+        )
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+        .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
+        .bind::<dyn auth::DatasetActionAuthorizer, auth::AlwaysHappyDatasetActionAuthorizer>()
         .build();
 
-    let dataset_repo = cat.get_one::<dyn DatasetRepository>().unwrap();
+    let (catalog_anonymous, catalog_authorized) = authentication_catalogs(&base_catalog);
+
+    let dataset_repo = catalog_authorized
+        .get_one::<dyn DatasetRepository>()
+        .unwrap();
     let create_result = dataset_repo
         .create_dataset_from_snapshot(
             None,
@@ -54,34 +61,40 @@ async fn metadata_chain_append_event() {
     )
     .to_string();
 
-    let schema = kamu_adapter_graphql::schema(cat);
-    let res = schema
-        .execute(
-            indoc!(
-                r#"
-                mutation {
-                    datasets {
-                        byId (datasetId: "<id>") {
-                            metadata {
-                                chain {
-                                    commitEvent (
-                                        event: "<content>",
-                                        eventFormat: YAML,
-                                    ) {
-                                        ... on CommitResultSuccess {
-                                            oldHead
-                                        }
-                                    }
+    let request_code = indoc!(
+        r#"
+        mutation {
+            datasets {
+                byId (datasetId: "<id>") {
+                    metadata {
+                        chain {
+                            commitEvent (
+                                event: "<content>",
+                                eventFormat: YAML,
+                            ) {
+                                ... on CommitResultSuccess {
+                                    oldHead
                                 }
                             }
                         }
                     }
                 }
-                "#
-            )
-            .replace("<id>", &create_result.dataset_handle.id.to_string())
-            .replace("<content>", &event_yaml.escape_default().to_string()),
-        )
+            }
+        }
+        "#
+    )
+    .replace("<id>", &create_result.dataset_handle.id.to_string())
+    .replace("<content>", &event_yaml.escape_default().to_string());
+
+    let schema = kamu_adapter_graphql::schema_quiet();
+
+    let res = schema
+        .execute(async_graphql::Request::new(request_code.clone()).data(catalog_anonymous))
+        .await;
+    expect_anonymous_access_error(res);
+
+    let res = schema
+        .execute(async_graphql::Request::new(request_code.clone()).data(catalog_authorized))
         .await;
     assert!(res.is_ok(), "{:?}", res);
     assert_eq!(
@@ -102,23 +115,28 @@ async fn metadata_chain_append_event() {
     );
 }
 
+////////////////////////////////////////////////////////////////////////////////////////
+
 #[test_log::test(tokio::test)]
 async fn metadata_update_readme_new() {
     let tempdir = tempfile::tempdir().unwrap();
-    let dataset_repo = DatasetRepositoryLocalFs::create(
-        tempdir.path().join("datasets"),
-        Arc::new(CurrentAccountSubject::new_test()),
-        Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new()),
-        false,
-    )
-    .unwrap();
 
-    let cat = dill::CatalogBuilder::new()
-        .add_value(dataset_repo)
+    let base_catalog = dill::CatalogBuilder::new()
+        .add_builder(
+            dill::builder_for::<DatasetRepositoryLocalFs>()
+                .with_root(tempdir.path().join("datasets"))
+                .with_multi_tenant(false),
+        )
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+        .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
+        .bind::<dyn auth::DatasetActionAuthorizer, auth::AlwaysHappyDatasetActionAuthorizer>()
         .build();
 
-    let dataset_repo = cat.get_one::<dyn DatasetRepository>().unwrap();
+    let (catalog_anonymous, catalog_authorized) = authentication_catalogs(&base_catalog);
+
+    let dataset_repo = catalog_authorized
+        .get_one::<dyn DatasetRepository>()
+        .unwrap();
     let create_result = dataset_repo
         .create_dataset_from_snapshot(
             None,
@@ -132,30 +150,39 @@ async fn metadata_update_readme_new() {
 
     let dataset = create_result.dataset.clone();
 
-    let schema = kamu_adapter_graphql::schema(cat);
+    let schema = kamu_adapter_graphql::schema_quiet();
 
     /////////////////////////////////////
     // Add new readme
     /////////////////////////////////////
 
-    let res = schema
-        .execute(
-            indoc!(
-                r#"
-                mutation {
-                    datasets {
-                        byId (datasetId: "<id>") {
-                            metadata {
-                                updateReadme(content: "new readme") {
-                                    __typename
-                                }
-                            }
+    let new_readme_request_code = indoc!(
+        r#"
+        mutation {
+            datasets {
+                byId (datasetId: "<id>") {
+                    metadata {
+                        updateReadme(content: "new readme") {
+                            __typename
                         }
                     }
                 }
-                "#
-            )
-            .replace("<id>", &create_result.dataset_handle.id.to_string()),
+            }
+        }
+        "#
+    )
+    .replace("<id>", &create_result.dataset_handle.id.to_string());
+
+    let res = schema
+        .execute(
+            async_graphql::Request::new(new_readme_request_code.clone()).data(catalog_anonymous),
+        )
+        .await;
+    expect_anonymous_access_error(res);
+
+    let res = schema
+        .execute(
+            async_graphql::Request::new(new_readme_request_code).data(catalog_authorized.clone()),
         )
         .await;
 
@@ -198,22 +225,25 @@ async fn metadata_update_readme_new() {
 
     let res = schema
         .execute(
-            indoc!(
-                r#"
-                mutation {
-                    datasets {
-                        byId (datasetId: "<id>") {
-                            metadata {
-                                updateReadme(content: null) {
-                                    __typename
+            async_graphql::Request::new(
+                indoc!(
+                    r#"
+                    mutation {
+                        datasets {
+                            byId (datasetId: "<id>") {
+                                metadata {
+                                    updateReadme(content: null) {
+                                        __typename
+                                    }
                                 }
                             }
                         }
                     }
-                }
-                "#
+                    "#
+                )
+                .replace("<id>", &create_result.dataset_handle.id.to_string()),
             )
-            .replace("<id>", &create_result.dataset_handle.id.to_string()),
+            .data(catalog_authorized.clone()),
         )
         .await;
 
@@ -233,22 +263,25 @@ async fn metadata_update_readme_new() {
 
     let res = schema
         .execute(
-            indoc!(
-                r#"
-                mutation {
-                    datasets {
-                        byId (datasetId: "<id>") {
-                            metadata {
-                                updateReadme(content: null) {
-                                    __typename
+            async_graphql::Request::new(
+                indoc!(
+                    r#"
+                    mutation {
+                        datasets {
+                            byId (datasetId: "<id>") {
+                                metadata {
+                                    updateReadme(content: null) {
+                                        __typename
+                                    }
                                 }
                             }
                         }
                     }
-                }
-                "#
+                    "#
+                )
+                .replace("<id>", &create_result.dataset_handle.id.to_string()),
             )
-            .replace("<id>", &create_result.dataset_handle.id.to_string()),
+            .data(catalog_authorized.clone()),
         )
         .await;
 
@@ -283,22 +316,25 @@ async fn metadata_update_readme_new() {
 
     let res = schema
         .execute(
-            indoc!(
-                r#"
-                mutation {
-                    datasets {
-                        byId (datasetId: "<id>") {
-                            metadata {
-                                updateReadme(content: "new readme") {
-                                    __typename
+            async_graphql::Request::new(
+                indoc!(
+                    r#"
+                    mutation {
+                        datasets {
+                            byId (datasetId: "<id>") {
+                                metadata {
+                                    updateReadme(content: "new readme") {
+                                        __typename
+                                    }
                                 }
                             }
                         }
                     }
-                }
-                "#
+                    "#
+                )
+                .replace("<id>", &create_result.dataset_handle.id.to_string()),
             )
-            .replace("<id>", &create_result.dataset_handle.id.to_string()),
+            .data(catalog_authorized),
         )
         .await;
 
@@ -324,6 +360,8 @@ async fn metadata_update_readme_new() {
     .await;
 }
 
+////////////////////////////////////////////////////////////////////////////////////////
+
 async fn assert_attachments_eq(dataset: Arc<dyn Dataset>, expected: SetAttachments) {
     let actual = dataset
         .as_metadata_chain()
@@ -339,3 +377,5 @@ async fn assert_attachments_eq(dataset: Arc<dyn Dataset>, expected: SetAttachmen
 
     assert_eq!(actual, expected);
 }
+
+////////////////////////////////////////////////////////////////////////////////////////

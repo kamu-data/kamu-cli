@@ -23,6 +23,7 @@ internal-error = { workspace = true }
 
 chrono = { version = "0.4", features = ["serde"] }
 indoc = "2"
+futures-core = "0.3"
 thiserror = { version = "=1.0.44", default-features = false }  # TODO: Pinned until rustc upgrade
 
 # Multiformats
@@ -45,5 +46,5 @@ serde_with = "3"
 serde_yaml = "0.9"
 
 # gRPC
-prost = "0.11"
-tonic = "0.9"
+prost = "0.12"
+tonic = "0.10"

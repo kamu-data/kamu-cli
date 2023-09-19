@@ -28,10 +28,9 @@ impl Datasets {
         let hdl = dataset_repo
             .try_resolve_dataset_ref(&dataset_id.as_local_ref())
             .await?;
-        Ok(hdl.map(|h| Dataset::new(Account::mock(), h)))
+        Ok(hdl.map(|h| Dataset::new(Account::from_dataset_alias(ctx, &h.alias), h)))
     }
 
-    // TODO: Multi-tenancy
     /// Returns dataset by its owner and name
     #[allow(unused_variables)]
     async fn by_owner_and_name(
@@ -40,24 +39,22 @@ impl Datasets {
         account_name: AccountName,
         dataset_name: DatasetName,
     ) -> Result<Option<Dataset>> {
-        let account = Account::mock();
+        let account = Account::from_account_name(&account_name);
 
-        // Not multi-tenant yet
-        let dataset_alias = odf::DatasetAlias::new(None, dataset_name.into());
+        let dataset_alias = odf::DatasetAlias::new(Some(account_name.into()), dataset_name.into());
 
         let dataset_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
         let hdl = dataset_repo
             .try_resolve_dataset_ref(&dataset_alias.into_local_ref())
             .await?;
-        Ok(hdl.map(|h| Dataset::new(Account::mock(), h)))
+        Ok(hdl.map(|h| Dataset::new(account, h)))
     }
 
-    // TODO: Multi-tenancy
     #[graphql(skip)]
     async fn by_account_impl(
         &self,
         ctx: &Context<'_>,
-        account: Account,
+        account_ref: Account,
         page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<DatasetConnection> {
@@ -66,7 +63,12 @@ impl Datasets {
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_PER_PAGE);
 
-        let mut all_datasets: Vec<_> = dataset_repo.get_all_datasets().try_collect().await?;
+        let account_name = account_ref.account_name_internal();
+
+        let mut all_datasets: Vec<_> = dataset_repo
+            .get_datasets_by_owner(account_name.to_owned().into())
+            .try_collect()
+            .await?;
         let total_count = all_datasets.len();
         all_datasets.sort_by(|a, b| a.alias.cmp(&b.alias));
 
@@ -74,7 +76,7 @@ impl Datasets {
             .into_iter()
             .skip(page * per_page)
             .take(per_page)
-            .map(|hdl| Dataset::new(account.clone(), hdl))
+            .map(|hdl| Dataset::new(account_ref.clone(), hdl))
             .collect();
 
         Ok(DatasetConnection::new(nodes, page, per_page, total_count))
@@ -89,8 +91,7 @@ impl Datasets {
         page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<DatasetConnection> {
-        let account = Account::mock();
-        self.by_account_impl(ctx, account, page, per_page).await
+        panic!("Resolving accounts by ID is not supported yet");
     }
 
     /// Returns datasets belonging to the specified account
@@ -102,8 +103,8 @@ impl Datasets {
         page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<DatasetConnection> {
-        let account = Account::mock();
-        self.by_account_impl(ctx, account, page, per_page).await
+        let account_ref = Account::from_account_name(&account_name);
+        self.by_account_impl(ctx, account_ref, page, per_page).await
     }
 }
 

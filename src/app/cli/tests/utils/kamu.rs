@@ -32,7 +32,7 @@ impl Kamu {
     pub fn new<P: Into<PathBuf>>(workspace_path: P) -> Self {
         let workspace_path = workspace_path.into();
         let workspace_layout = WorkspaceLayout::new(workspace_path.join(".kamu"));
-        let current_account = CurrentAccountIndication::new("kamu", false);
+        let current_account = CurrentAccountIndication::new("kamu", "kamu", false);
         Self {
             workspace_layout,
             current_account,
@@ -66,7 +66,7 @@ impl Kamu {
     pub async fn get_last_data_slice(&self, dataset_name: &DatasetName) -> ParquetReaderHelper {
         let dataset_repo = DatasetRepositoryLocalFs::new(
             self.workspace_layout.datasets_dir.clone(),
-            Arc::new(self.current_account.as_current_account_subject()),
+            Arc::new(self.current_account.to_current_account_subject()),
             Arc::new(domain::auth::AlwaysHappyDatasetActionAuthorizer::new()),
             false,
         );
@@ -162,10 +162,12 @@ impl Kamu {
     }
 
     pub fn catalog(&self) -> dill::Catalog {
-        let mut builder = kamu_cli::configure_catalog(&self.workspace_layout, false);
-        builder.add_value(self.workspace_layout.clone());
-        builder.add_value(self.current_account.as_current_account_subject());
-        builder.build()
+        let base_catalog = kamu_cli::configure_base_catalog(&self.workspace_layout, false).build();
+
+        let mut cli_catalog_builder = kamu_cli::configure_cli_catalog(&base_catalog);
+        cli_catalog_builder.add_value(self.workspace_layout.clone());
+        cli_catalog_builder.add_value(self.current_account.to_current_account_subject());
+        cli_catalog_builder.build()
     }
 }
 

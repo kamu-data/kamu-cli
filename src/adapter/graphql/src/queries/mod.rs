@@ -8,12 +8,14 @@
 // by the Apache License, Version 2.0.
 
 mod accounts;
+mod auth;
 mod data;
 mod datasets;
 mod search;
 mod tasks;
 
 pub(crate) use accounts::*;
+pub(crate) use auth::*;
 pub(crate) use data::*;
 pub(crate) use datasets::*;
 pub(crate) use search::*;

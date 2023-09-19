@@ -4,11 +4,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
-### Fixed
-- Failing transform operations in multi-tenant workspaces due to invalid propagation of dataset aliases
+## [0.143.0] - 2023-09-19
 ### Added
 - Support for multi-tenant workspaces in Jupyter Notebook extension
+- Support for GraphQL multi-tenant mode:
+   - Added new endpoint for querying engine supported login methods
+   - Added `AuthenticationService` and `AuthenticationProvider` concepts that implement login functionality
+   - CLI authentication provider: login same as password with preconfigured accounts in `.kamucliconfig` files
+   - Login issues and interpets Kamu-specific JWT tokens
+   - GraphQL queries are expected to attach JWT tokens as Bearer authentication header
+   - Modeling anonymous account sessions
+   - Login guards in GraphQL write operations
+   - Simple model for dataset permission queries
+   - Login instructions and feature flags are sent as configuration in `kamu ui` mode
+   - Implemented previously mocked account resolution API
+### Fixed
+- Failing transform operations in multi-tenant workspaces due to invalid propagation of dataset aliases
+### Changed
+- Updated WEB UI image to latest release 0.10.0
+- Github OAuth functionality isolated in a separate component `kamu-adapter-oauth`
+- GraphQL: filtering datasets based on logged account
+- Unified and clarified namings in account-related data structures
+
 
 ## [0.142.1] - 2023-09-02
 ### Fixed

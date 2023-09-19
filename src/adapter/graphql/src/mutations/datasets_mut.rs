@@ -13,6 +13,7 @@ use opendatafabric as odf;
 use crate::mutations::DatasetMut;
 use crate::prelude::*;
 use crate::queries::Dataset;
+use crate::LoggedInGuard;
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -32,17 +33,16 @@ impl DatasetsMut {
     }
 
     /// Creates a new empty dataset
+    #[graphql(guard = "LoggedInGuard::new()")]
     async fn create_empty(
         &self,
         ctx: &Context<'_>,
-        account_id: AccountID,
         dataset_kind: DatasetKind,
         dataset_name: DatasetName,
     ) -> Result<CreateDatasetResult> {
         match self
             .create_from_snapshot_impl(
                 ctx,
-                account_id,
                 odf::DatasetSnapshot {
                     name: dataset_name.into(),
                     kind: dataset_kind.into(),
@@ -63,10 +63,10 @@ impl DatasetsMut {
     }
 
     /// Creates a new dataset from provided DatasetSnapshot manifest
+    #[graphql(guard = "LoggedInGuard::new()")]
     async fn create_from_snapshot(
         &self,
         ctx: &Context<'_>,
-        account_id: AccountID,
         snapshot: String,
         snapshot_format: MetadataManifestFormat,
     ) -> Result<CreateDatasetFromSnapshotResult> {
@@ -94,8 +94,7 @@ impl DatasetsMut {
             }
         };
 
-        self.create_from_snapshot_impl(ctx, account_id, snapshot)
-            .await
+        self.create_from_snapshot_impl(ctx, snapshot).await
     }
 
     // TODO: Multi-tenancy
@@ -106,7 +105,6 @@ impl DatasetsMut {
     async fn create_from_snapshot_impl(
         &self,
         ctx: &Context<'_>,
-        account_id: AccountID,
         snapshot: odf::DatasetSnapshot,
     ) -> Result<CreateDatasetFromSnapshotResult> {
         let dataset_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();

@@ -11,6 +11,9 @@ use std::sync::Arc;
 
 use async_graphql::Context;
 use internal_error::*;
+use kamu_core::AccessError;
+use opendatafabric::DatasetHandle;
+use thiserror::Error;
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -21,6 +24,46 @@ where
 {
     let cat = ctx.data::<dill::Catalog>().unwrap();
     cat.get_one::<T>()
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+pub(crate) async fn check_dataset_write_access(
+    ctx: &Context<'_>,
+    dataset_handle: &DatasetHandle,
+) -> Result<(), CheckDatasetAccessError> {
+    let dataset_action_authorizer =
+        from_catalog::<dyn kamu_core::auth::DatasetActionAuthorizer>(ctx).int_err()?;
+
+    dataset_action_authorizer
+        .check_action_allowed(dataset_handle, kamu_core::auth::DatasetAction::Write)
+        .await?;
+
+    Ok(())
+}
+
+#[derive(Debug, Error)]
+pub(crate) enum CheckDatasetAccessError {
+    #[error(transparent)]
+    Access(AccessError),
+
+    #[error(transparent)]
+    Internal(InternalError),
+}
+
+impl From<InternalError> for CheckDatasetAccessError {
+    fn from(value: InternalError) -> Self {
+        Self::Internal(value)
+    }
+}
+
+impl From<kamu_core::auth::DatasetActionUnauthorizedError> for CheckDatasetAccessError {
+    fn from(v: kamu_core::auth::DatasetActionUnauthorizedError) -> Self {
+        match v {
+            kamu_core::auth::DatasetActionUnauthorizedError::Access(e) => Self::Access(e),
+            kamu_core::auth::DatasetActionUnauthorizedError::Internal(e) => Self::Internal(e),
+        }
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////

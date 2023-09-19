@@ -7,117 +7,94 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use serde::Deserialize;
-
 use crate::prelude::*;
+use crate::queries::Account;
+
+///////////////////////////////////////////////////////////////////////////////
 
 pub(crate) struct AuthMut;
 
-// TODO: We should somehow separate auth method implementations from this
-// pure-API crate
 #[Object]
 impl AuthMut {
-    // TODO: PERF: Cache client instance?
-    #[graphql(skip)]
-    fn get_client(&self) -> Result<reqwest::Client, reqwest::Error> {
-        reqwest::Client::builder()
-            .user_agent(concat!(
-                env!("CARGO_PKG_NAME"),
-                "/",
-                env!("CARGO_PKG_VERSION"),
-            ))
-            .build()
+    async fn login(
+        &self,
+        ctx: &Context<'_>,
+        login_method: String,
+        login_credentials_json: String,
+    ) -> Result<LoginResponse> {
+        let authentication_service =
+            from_catalog::<dyn kamu_core::auth::AuthenticationService>(ctx).unwrap();
+
+        let login_result = authentication_service
+            .login(login_method.as_str(), login_credentials_json)
+            .await;
+
+        match login_result {
+            Ok(login_response) => Ok(login_response.into()),
+            Err(e) => Err(e.into()),
+        }
     }
 
-    async fn github_login(&self, code: String) -> Result<LoginResponse> {
-        let client_id = std::env::var("KAMU_AUTH_GITHUB_CLIENT_ID")
-            .expect("KAMU_AUTH_GITHUB_CLIENT_ID env var is not set");
-        let client_secret = std::env::var("KAMU_AUTH_GITHUB_CLIENT_SECRET")
-            .expect("KAMU_AUTH_GITHUB_CLIENT_SECRET env var is not set");
+    async fn account_details(&self, ctx: &Context<'_>, access_token: String) -> Result<Account> {
+        let authentication_service =
+            from_catalog::<dyn kamu_core::auth::AuthenticationService>(ctx).unwrap();
 
-        let params = [
-            ("client_id", client_id),
-            ("client_secret", client_secret),
-            ("code", code),
-        ];
-
-        let client = self.get_client().int_err()?;
-
-        let body = client
-            .post("https://github.com/login/oauth/access_token")
-            .header(reqwest::header::ACCEPT, "application/json")
-            .form(&params)
-            .send()
-            .await
-            .int_err()?
-            .error_for_status()
-            .int_err()?
-            .text()
-            .await
-            .int_err()?;
-
-        let token = serde_json::from_str::<AccessToken>(&body).map_err(|_| {
-            Error::new("Failed to process auth response")
-                .extend_with(|_, e| e.set("github_response", body))
-        })?;
-
-        let account_info = client
-            .get("https://api.github.com/user")
-            .bearer_auth(&token.access_token)
-            .header(reqwest::header::ACCEPT, "application/vnd.github.v3+json")
-            .send()
-            .await
-            .int_err()?
-            .error_for_status()
-            .int_err()?
-            .json::<AccountInfo>()
-            .await
-            .int_err()?;
-
-        Ok(LoginResponse {
-            token,
-            account_info,
-        })
-    }
-
-    async fn account_info(&self, access_token: String) -> Result<AccountInfo> {
-        let client = self.get_client().int_err()?;
-
-        let account_info = client
-            .get("https://api.github.com/user")
-            .bearer_auth(access_token)
-            .header(reqwest::header::ACCEPT, "application/vnd.github.v3+json")
-            .send()
-            .await
-            .int_err()?
-            .error_for_status()
-            .int_err()?
-            .json::<AccountInfo>()
-            .await
-            .int_err()?;
-
-        Ok(account_info)
+        let get_account_info_result = authentication_service
+            .account_info_by_token(access_token)
+            .await;
+        match get_account_info_result {
+            Ok(ai) => Ok(Account::from_account_info(ai)),
+            Err(e) => Err(e.into()),
+        }
     }
 }
 
-#[derive(SimpleObject, Debug, Clone, Deserialize)]
+///////////////////////////////////////////////////////////////////////////////
+
+impl From<kamu_core::auth::LoginError> for GqlError {
+    fn from(value: kamu_core::auth::LoginError) -> Self {
+        match value {
+            kamu_core::auth::LoginError::UnsupportedMethod(e) => GqlError::Gql(
+                Error::new(e.to_string()).extend_with(|_, eev| eev.set("method", e.to_string())),
+            ),
+            kamu_core::auth::LoginError::InvalidCredentials(e) => GqlError::Gql(
+                Error::new(e.to_string()).extend_with(|_, eev| eev.set("reason", e.to_string())),
+            ),
+            kamu_core::auth::LoginError::RejectedCredentials(e) => GqlError::Gql(
+                Error::new(e.to_string()).extend_with(|_, eev| eev.set("reason", e.to_string())),
+            ),
+            kamu_core::auth::LoginError::Internal(e) => GqlError::Internal(e),
+        }
+    }
+}
+
+impl From<kamu_core::auth::GetAccountInfoError> for GqlError {
+    fn from(value: kamu_core::auth::GetAccountInfoError) -> Self {
+        match value {
+            kamu_core::auth::GetAccountInfoError::AccessToken(e) => GqlError::Gql(
+                Error::new("Access token error")
+                    .extend_with(|_, eev| eev.set("token_error", e.to_string())),
+            ),
+            kamu_core::auth::GetAccountInfoError::Internal(e) => GqlError::Internal(e),
+        }
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject, Debug, Clone)]
 pub(crate) struct LoginResponse {
-    token: AccessToken,
-    account_info: AccountInfo,
-}
-
-#[derive(SimpleObject, Debug, Clone, Deserialize)]
-pub(crate) struct AccessToken {
     access_token: String,
-    scope: String,
-    token_type: String,
+    account: Account,
 }
 
-#[derive(SimpleObject, Debug, Clone, Deserialize)]
-pub(crate) struct AccountInfo {
-    login: String,
-    name: String,
-    email: Option<String>,
-    avatar_url: Option<String>,
-    gravatar_id: Option<String>,
+impl From<kamu_core::auth::LoginResponse> for LoginResponse {
+    fn from(value: kamu_core::auth::LoginResponse) -> Self {
+        Self {
+            access_token: value.access_token.into(),
+            account: Account::from_account_info(value.account_info),
+        }
+    }
 }
+
+///////////////////////////////////////////////////////////////////////////////

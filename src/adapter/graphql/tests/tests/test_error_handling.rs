@@ -15,19 +15,22 @@ use kamu_core::*;
 
 #[test_log::test(tokio::test)]
 async fn test_malformed_argument() {
-    let schema = kamu_adapter_graphql::schema(dill::CatalogBuilder::new().build());
+    let schema = kamu_adapter_graphql::schema_quiet();
     let res = schema
-        .execute(indoc!(
-            r#"
-            {
-                datasets {
-                    byAccountName (accountName: "????") {
-                        nodes { id }
+        .execute(
+            async_graphql::Request::new(indoc!(
+                r#"
+                {
+                    datasets {
+                        byAccountName (accountName: "????") {
+                            nodes { id }
+                        }
                     }
                 }
-            }
-            "#
-        ))
+                "#
+            ))
+            .data(dill::CatalogBuilder::new().build()),
+        )
         .await;
 
     let mut json_resp = serde_json::to_value(res).unwrap();
@@ -67,9 +70,8 @@ async fn test_internal_error() {
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
         .build();
 
-    let schema = kamu_adapter_graphql::schema(cat);
-    let res = schema
-        .execute(indoc!(
+    let schema = kamu_adapter_graphql::schema_quiet();
+    let res = schema.execute(async_graphql::Request::new(indoc!(
             r#"
             {
                 datasets {
@@ -79,7 +81,7 @@ async fn test_internal_error() {
                 }
             }
             "#
-        ))
+        )).data(cat))
         .await;
 
     let mut json_resp = serde_json::to_value(res).unwrap();
@@ -106,10 +108,8 @@ async fn test_internal_error() {
 #[should_panic]
 async fn test_handler_panics() {
     // Not expecting panic to be trapped - that's the job of an HTTP server
-    let schema = kamu_adapter_graphql::schema(dill::CatalogBuilder::new().build());
-
-    schema
-        .execute(indoc!(
+    let schema = kamu_adapter_graphql::schema_quiet();
+    schema.execute(async_graphql::Request::new(indoc!(
             r#"
             {
                 datasets {
@@ -119,6 +119,6 @@ async fn test_handler_panics() {
                 }
             }
             "#
-        ))
+        )).data(dill::CatalogBuilder::new().build()))
         .await;
 }

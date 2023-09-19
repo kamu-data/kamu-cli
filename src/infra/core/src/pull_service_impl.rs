@@ -137,7 +137,12 @@ impl PullServiceImpl {
                 ) => DatasetAlias::new(alias.account_name.clone(), alias.dataset_name.clone()),
                 Some(DatasetRefRemote::Url(url)) => DatasetAlias::new(
                     if self.dataset_repo.is_multi_tenant() {
-                        Some(self.current_account_subject.account_name.clone())
+                        match self.current_account_subject.as_ref() {
+                            CurrentAccountSubject::Anonymous(_) => {
+                                panic!("Anonymous account misused, use multi-tenant alias");
+                            }
+                            CurrentAccountSubject::Logged(l) => Some(l.account_name.clone()),
+                        }
                     } else {
                         None
                     },
@@ -269,23 +274,26 @@ impl PullServiceImpl {
         }
 
         // No luck - now have to search through aliases (of current user)
-        use tokio_stream::StreamExt;
-        let mut datasets = self
-            .dataset_repo
-            .get_datasets_by_owner(self.current_account_subject.account_name.clone());
-        while let Some(dataset_handle) = datasets.next().await {
-            let dataset_handle = dataset_handle?;
+        if let CurrentAccountSubject::Logged(l) = self.current_account_subject.as_ref() {
+            use tokio_stream::StreamExt;
+            let mut datasets = self
+                .dataset_repo
+                .get_datasets_by_owner(l.account_name.clone());
+            while let Some(dataset_handle) = datasets.next().await {
+                let dataset_handle = dataset_handle?;
 
-            if self
-                .remote_alias_reg
-                .get_remote_aliases(&dataset_handle.as_local_ref())
-                .await
-                .int_err()?
-                .contains(&remote_ref, RemoteAliasKind::Pull)
-            {
-                return Ok(Some(dataset_handle));
+                if self
+                    .remote_alias_reg
+                    .get_remote_aliases(&dataset_handle.as_local_ref())
+                    .await
+                    .int_err()?
+                    .contains(&remote_ref, RemoteAliasKind::Pull)
+                {
+                    return Ok(Some(dataset_handle));
+                }
             }
         }
+
         Ok(None)
     }
 
