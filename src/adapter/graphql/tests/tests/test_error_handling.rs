@@ -15,7 +15,7 @@ use kamu_core::*;
 
 #[test_log::test(tokio::test)]
 async fn test_malformed_argument() {
-    let schema = kamu_adapter_graphql::schema();
+    let schema = kamu_adapter_graphql::schema_quiet();
     let res = schema
         .execute(
             async_graphql::Request::new(indoc!(
@@ -70,7 +70,7 @@ async fn test_internal_error() {
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
         .build();
 
-    let schema = kamu_adapter_graphql::schema();
+    let schema = kamu_adapter_graphql::schema_quiet();
     let res = schema.execute(async_graphql::Request::new(indoc!(
             r#"
             {
@@ -108,7 +108,7 @@ async fn test_internal_error() {
 #[should_panic]
 async fn test_handler_panics() {
     // Not expecting panic to be trapped - that's the job of an HTTP server
-    let schema = kamu_adapter_graphql::schema();
+    let schema = kamu_adapter_graphql::schema_quiet();
     schema.execute(async_graphql::Request::new(indoc!(
             r#"
             {

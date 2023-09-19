@@ -9,9 +9,10 @@
 
 use async_graphql::*;
 use chrono::Utc;
-use kamu_core::CurrentAccountSubject;
 use kamu_task_system::*;
 use opendatafabric::DatasetID;
+
+use crate::utils::{authentication_catalogs, expect_anonymous_access_error};
 
 mockall::mock! {
     TaskScheduler {}
@@ -40,7 +41,7 @@ async fn test_task_get_non_existing() {
         .bind::<dyn TaskScheduler, MockTaskScheduler>()
         .build();
 
-    let schema = kamu_adapter_graphql::schema();
+    let schema = kamu_adapter_graphql::schema_quiet();
     let res = schema
         .execute(
             async_graphql::Request::new(
@@ -93,7 +94,7 @@ async fn test_task_get_existing() {
         .bind::<dyn TaskScheduler, MockTaskScheduler>()
         .build();
 
-    let schema = kamu_adapter_graphql::schema();
+    let schema = kamu_adapter_graphql::schema_quiet();
     let res = schema
         .execute(
             async_graphql::Request::new(format!(
@@ -156,7 +157,7 @@ async fn test_task_list_by_dataset() {
         .bind::<dyn TaskScheduler, MockTaskScheduler>()
         .build();
 
-    let schema = kamu_adapter_graphql::schema();
+    let schema = kamu_adapter_graphql::schema_quiet();
     let res = schema
         .execute(
             async_graphql::Request::new(format!(
@@ -230,30 +231,35 @@ async fn test_task_create_update_dataset() {
         .withf(move |logical_plan| *logical_plan == expected_logical_plan)
         .return_once(move |_| Ok(returned_task));
 
-    let cat = dill::CatalogBuilder::new()
+    let base_cat = dill::CatalogBuilder::new()
         .add_value(task_sched_mock)
         .bind::<dyn TaskScheduler, MockTaskScheduler>()
-        .add_value(CurrentAccountSubject::new_test())
         .build();
 
-    let schema = kamu_adapter_graphql::schema();
+    let (cat_anonymous, cat_authorized) = authentication_catalogs(&base_cat);
+
+    let schema = kamu_adapter_graphql::schema_quiet();
+
+    let request_code = format!(
+        r#"
+        mutation {{
+            tasks {{
+                createUpdateDatasetTask (datasetId: "{}") {{
+                    taskId
+                }}
+            }}
+        }}
+        "#,
+        dataset_id,
+    );
 
     let res = schema
-        .execute(
-            async_graphql::Request::new(format!(
-                r#"
-                mutation {{
-                    tasks {{
-                        createUpdateDatasetTask (datasetId: "{}") {{
-                            taskId
-                        }}
-                    }}
-                }}
-                "#,
-                dataset_id,
-            ))
-            .data(cat),
-        )
+        .execute(async_graphql::Request::new(request_code.clone()).data(cat_anonymous))
+        .await;
+    expect_anonymous_access_error(res);
+
+    let res = schema
+        .execute(async_graphql::Request::new(request_code).data(cat_authorized))
         .await;
     assert!(res.is_ok(), "{:?}", res);
     assert_eq!(
@@ -295,24 +301,33 @@ async fn test_task_create_probe() {
         .withf(move |logical_plan| *logical_plan == expected_logical_plan)
         .return_once(move |_| Ok(returned_task));
 
-    let cat = dill::CatalogBuilder::new()
+    let base_cat = dill::CatalogBuilder::new()
         .add_value(task_sched_mock)
         .bind::<dyn TaskScheduler, MockTaskScheduler>()
-        .add_value(CurrentAccountSubject::new_test())
         .build();
 
-    let schema = kamu_adapter_graphql::schema();
-    let res = schema.execute(async_graphql::Request::new(
-            format!(
-                r#"mutation {{
-                    tasks {{
-                        createProbeTask (datasetId: "{}", busyTimeMs: 500, endWithOutcome: FAILED) {{
-                            taskId
-                        }}
+    let (cat_anonymous, cat_authorized) = authentication_catalogs(&base_cat);
+
+    let request_code = format!(
+        r#"mutation {{
+                tasks {{
+                    createProbeTask (datasetId: "{}", busyTimeMs: 500, endWithOutcome: FAILED) {{
+                        taskId
                     }}
-                }}"#,
-                dataset_id,
-    )).data(cat))
+                }}
+            }}"#,
+        dataset_id
+    );
+
+    let schema = kamu_adapter_graphql::schema_quiet();
+
+    let res = schema
+        .execute(async_graphql::Request::new(request_code.clone()).data(cat_anonymous))
+        .await;
+    expect_anonymous_access_error(res);
+
+    let res = schema
+        .execute(async_graphql::Request::new(request_code).data(cat_authorized))
         .await;
     assert!(res.is_ok(), "{:?}", res);
     assert_eq!(

@@ -62,7 +62,7 @@ async fn test_enabled_login_methods() {
         .bind::<dyn kamu_core::auth::AuthenticationService, MockAuthenticationService>()
         .build();
 
-    let schema = kamu_adapter_graphql::schema();
+    let schema = kamu_adapter_graphql::schema_quiet();
     let res = schema
         .execute(
             async_graphql::Request::new(
@@ -98,7 +98,7 @@ async fn test_login() {
         .bind::<dyn kamu_core::auth::AuthenticationService, MockAuthenticationService>()
         .build();
 
-    let schema = kamu_adapter_graphql::schema();
+    let schema = kamu_adapter_graphql::schema_quiet();
     let res = schema.execute(make_login_request().data(cat)).await;
 
     assert!(res.is_ok(), "{:?}", res);
@@ -126,7 +126,7 @@ async fn test_login_bad_method() {
         .bind::<dyn kamu_core::auth::AuthenticationService, MockAuthenticationService>()
         .build();
 
-    let schema = kamu_adapter_graphql::schema();
+    let schema = kamu_adapter_graphql::schema_quiet();
     let res = schema.execute(make_login_request().data(cat)).await;
 
     assert!(res.is_err());
@@ -146,7 +146,7 @@ async fn test_account_details() {
         .bind::<dyn kamu_core::auth::AuthenticationService, MockAuthenticationService>()
         .build();
 
-    let schema = kamu_adapter_graphql::schema();
+    let schema = kamu_adapter_graphql::schema_quiet();
     let res = schema
         .execute(make_account_details_request().data(cat))
         .await;
@@ -173,7 +173,7 @@ async fn test_account_details_expired_token() {
         .bind::<dyn kamu_core::auth::AuthenticationService, MockAuthenticationService>()
         .build();
 
-    let schema = kamu_adapter_graphql::schema();
+    let schema = kamu_adapter_graphql::schema_quiet();
     let res = schema
         .execute(make_account_details_request().data(cat))
         .await;

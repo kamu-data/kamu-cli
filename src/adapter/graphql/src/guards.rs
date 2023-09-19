@@ -14,7 +14,7 @@ use crate::prelude::from_catalog;
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
-pub const ANONYMOUS_ACCESS_FORBIDEDN_MESSAGE: &str = "Anonymous access forbidden";
+pub const ANONYMOUS_ACCESS_FORBIDDEN_MESSAGE: &str = "Anonymous access forbidden";
 
 pub struct LoggedInGuard {}
 
@@ -30,7 +30,7 @@ impl Guard for LoggedInGuard {
         let current_account_subject = from_catalog::<CurrentAccountSubject>(ctx).unwrap();
         if let CurrentAccountSubject::Anonymous(_) = current_account_subject.as_ref() {
             Err(async_graphql::Error::new(
-                ANONYMOUS_ACCESS_FORBIDEDN_MESSAGE,
+                ANONYMOUS_ACCESS_FORBIDDEN_MESSAGE,
             ))
         } else {
             Ok(())

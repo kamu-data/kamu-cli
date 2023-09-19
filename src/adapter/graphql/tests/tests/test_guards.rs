@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use async_graphql::{value, EmptySubscription, Object};
-use kamu_adapter_graphql::{LoggedInGuard, ANONYMOUS_ACCESS_FORBIDEDN_MESSAGE};
+use kamu_adapter_graphql::{LoggedInGuard, ANONYMOUS_ACCESS_FORBIDDEN_MESSAGE};
 use kamu_core::CurrentAccountSubject;
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -99,7 +99,7 @@ async fn logged_in_guard_anonymous() {
     assert_eq!(guarded_query_response.errors.len(), 1);
     assert_eq!(
         guarded_query_response.errors[0].message,
-        ANONYMOUS_ACCESS_FORBIDEDN_MESSAGE
+        ANONYMOUS_ACCESS_FORBIDDEN_MESSAGE
     );
 
     assert!(
@@ -137,7 +137,7 @@ async fn logged_in_guard_anonymous() {
     assert_eq!(guarded_mutation_response.errors.len(), 1);
     assert_eq!(
         guarded_mutation_response.errors[0].message,
-        ANONYMOUS_ACCESS_FORBIDEDN_MESSAGE
+        ANONYMOUS_ACCESS_FORBIDDEN_MESSAGE
     );
 
     assert!(

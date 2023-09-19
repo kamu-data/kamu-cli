@@ -91,7 +91,7 @@ async fn test_dataset_schema_local_fs() {
     let catalog = create_catalog_with_local_workspace(tempdir.path()).await;
     create_test_dataset(&catalog, tempdir.path()).await;
 
-    let schema = kamu_adapter_graphql::schema();
+    let schema = kamu_adapter_graphql::schema_quiet();
     let res = schema
         .execute(
             async_graphql::Request::new(indoc::indoc!(
@@ -150,7 +150,7 @@ async fn test_dataset_tail_local_fs() {
     let catalog = create_catalog_with_local_workspace(tempdir.path()).await;
     create_test_dataset(&catalog, tempdir.path()).await;
 
-    let schema = kamu_adapter_graphql::schema();
+    let schema = kamu_adapter_graphql::schema_quiet();
     let res = schema
         .execute(
             async_graphql::Request::new(indoc::indoc!(
@@ -191,7 +191,7 @@ async fn test_dataset_tail_empty_local_fs() {
     let catalog = create_catalog_with_local_workspace(tempdir.path()).await;
     create_test_dataset(&catalog, tempdir.path()).await;
 
-    let schema = kamu_adapter_graphql::schema();
+    let schema = kamu_adapter_graphql::schema_quiet();
     let res = schema
         .execute(
             async_graphql::Request::new(indoc::indoc!(

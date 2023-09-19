@@ -7,8 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::sync::Arc;
-
 use async_graphql::*;
 use indoc::indoc;
 use kamu::testing::MetadataFactory;
@@ -18,12 +16,14 @@ use opendatafabric::serde::yaml::YamlDatasetSnapshotSerializer;
 use opendatafabric::serde::DatasetSnapshotSerializer;
 use opendatafabric::*;
 
+use crate::utils::{authentication_catalogs, expect_anonymous_access_error};
+
 ////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn dataset_by_id_does_not_exist() {
     let harness = GraphQLDatasetsHarness::new();
-    let res = harness.execute_query(indoc!(
+    let res = harness.execute_anonymous_query(indoc!(
             r#"
             {
                 datasets {
@@ -57,7 +57,7 @@ async fn dataset_by_id() {
         .await;
 
     let res = harness
-        .execute_query(
+        .execute_anonymous_query(
             indoc!(
                 r#"
                 {
@@ -91,23 +91,25 @@ async fn dataset_by_id() {
 async fn dataset_create_empty() {
     let harness = GraphQLDatasetsHarness::new();
 
-    let res = harness
-        .execute_query(indoc::indoc!(
-            r#"
-            mutation {
-                datasets {
-                    createEmpty (datasetKind: ROOT, datasetName: "foo") {
-                        ... on CreateDatasetResultSuccess {
-                            dataset {
-                                name
-                            }
+    let request_code = indoc::indoc!(
+        r#"
+        mutation {
+            datasets {
+                createEmpty (datasetKind: ROOT, datasetName: "foo") {
+                    ... on CreateDatasetResultSuccess {
+                        dataset {
+                            name
                         }
                     }
                 }
             }
-            "#
-        ))
-        .await;
+        }
+        "#
+    );
+
+    expect_anonymous_access_error(harness.execute_anonymous_query(request_code).await);
+
+    let res = harness.execute_authorized_query(request_code).await;
     assert!(res.is_ok(), "{:?}", res);
     assert_eq!(
         res.data,
@@ -142,27 +144,27 @@ async fn dataset_create_from_snapshot() {
     )
     .to_string();
 
-    let res = harness
-        .execute_query(
-            indoc!(
-                r#"
-                mutation {
-                    datasets {
-                        createFromSnapshot (snapshot: "<content>", snapshotFormat: YAML) {
-                            ... on CreateDatasetResultSuccess {
-                                dataset {
-                                    name
-                                    kind
-                                }
-                            }
+    let request_code = indoc!(
+        r#"
+        mutation {
+            datasets {
+                createFromSnapshot (snapshot: "<content>", snapshotFormat: YAML) {
+                    ... on CreateDatasetResultSuccess {
+                        dataset {
+                            name
+                            kind
                         }
                     }
                 }
-                "#
-            )
-            .replace("<content>", &snapshot_yaml.escape_default().to_string()),
-        )
-        .await;
+            }
+        }
+        "#
+    )
+    .replace("<content>", &snapshot_yaml.escape_default().to_string());
+
+    expect_anonymous_access_error(harness.execute_anonymous_query(request_code.clone()).await);
+
+    let res = harness.execute_authorized_query(request_code).await;
     assert!(res.is_ok(), "{:?}", res);
     assert_eq!(
         res.data,
@@ -186,18 +188,18 @@ async fn dataset_create_from_snapshot_malformed() {
     let harness = GraphQLDatasetsHarness::new();
 
     let res = harness
-        .execute_query(indoc!(
+        .execute_authorized_query(indoc!(
             r#"
-            mutation {
-                datasets {
-                    createFromSnapshot(snapshot: "version: 1", snapshotFormat: YAML) {
-                        ... on MetadataManifestMalformed {
-                            __typename
-                        }
+        mutation {
+            datasets {
+                createFromSnapshot(snapshot: "version: 1", snapshotFormat: YAML) {
+                    ... on MetadataManifestMalformed {
+                        __typename
                     }
                 }
             }
-            "#
+        }
+        "#
         ))
         .await;
     assert!(res.is_ok(), "{:?}", res);
@@ -223,30 +225,30 @@ async fn dataset_rename_success() {
         .create_root_dataset(DatasetName::new_unchecked("foo"))
         .await;
 
-    let res = harness
-        .execute_query(
-            indoc!(
-                r#"
-                mutation {
-                    datasets {
-                        byId (datasetId: "<id>") {
-                            rename(newName: "<newName>") {
-                                __typename
-                                message
-                                ... on RenameResultSuccess {
-                                    oldName
-                                    newName
-                                }
-                            }
+    let request_code = indoc!(
+        r#"
+        mutation {
+            datasets {
+                byId (datasetId: "<id>") {
+                    rename(newName: "<newName>") {
+                        __typename
+                        message
+                        ... on RenameResultSuccess {
+                            oldName
+                            newName
                         }
                     }
                 }
-                "#
-            )
-            .replace("<id>", &foo_result.dataset_handle.id.to_string())
-            .replace("<newName>", "bar"),
-        )
-        .await;
+            }
+        }
+        "#
+    )
+    .replace("<id>", &foo_result.dataset_handle.id.to_string())
+    .replace("<newName>", "bar");
+
+    expect_anonymous_access_error(harness.execute_anonymous_query(request_code.clone()).await);
+
+    let res = harness.execute_authorized_query(request_code).await;
     assert!(res.is_ok(), "{:?}", res);
     assert_eq!(
         res.data,
@@ -276,7 +278,7 @@ async fn dataset_rename_no_changes() {
         .await;
 
     let res = harness
-        .execute_query(
+        .execute_authorized_query(
             indoc!(
                 r#"
                 mutation {
@@ -329,7 +331,7 @@ async fn dataset_rename_name_collision() {
         .await;
 
     let res = harness
-        .execute_query(
+        .execute_authorized_query(
             indoc!(
                 r#"
                 mutation {
@@ -378,28 +380,28 @@ async fn dataset_delete_success() {
         .create_root_dataset(DatasetName::new_unchecked("foo"))
         .await;
 
-    let res = harness
-        .execute_query(
-            indoc!(
-                r#"
-                mutation {
-                    datasets {
-                        byId (datasetId: "<id>") {
-                            delete {
-                                __typename
-                                message
-                                ... on DeleteResultSuccess {
-                                    deletedDataset
-                                }
-                            }
+    let request_code = indoc!(
+        r#"
+        mutation {
+            datasets {
+                byId (datasetId: "<id>") {
+                    delete {
+                        __typename
+                        message
+                        ... on DeleteResultSuccess {
+                            deletedDataset
                         }
                     }
                 }
-                "#
-            )
-            .replace("<id>", &foo_result.dataset_handle.id.to_string()),
-        )
-        .await;
+            }
+        }
+        "#
+    )
+    .replace("<id>", &foo_result.dataset_handle.id.to_string());
+
+    expect_anonymous_access_error(harness.execute_anonymous_query(request_code.clone()).await);
+
+    let res = harness.execute_authorized_query(request_code).await;
     assert!(res.is_ok(), "{:?}", res);
     assert_eq!(
         res.data,
@@ -434,7 +436,7 @@ async fn dataset_delete_dangling_ref() {
         .await;
 
     let res = harness
-        .execute_query(
+        .execute_authorized_query(
             indoc!(
                 r#"
                 mutation {
@@ -476,38 +478,94 @@ async fn dataset_delete_dangling_ref() {
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_log::test(tokio::test)]
+async fn dataset_view_permissions() {
+    let harness = GraphQLDatasetsHarness::new();
+
+    let foo_result = harness
+        .create_root_dataset(DatasetName::new_unchecked("foo"))
+        .await;
+
+    let request_code = indoc!(
+        r#"
+        query {
+            datasets {
+                byId (datasetId: "<id>") {
+                    permissions {
+                        canView
+                        canDelete
+                        canRename
+                        canCommit
+                    }
+                }
+            }
+        }
+        "#
+    )
+    .replace("<id>", &foo_result.dataset_handle.id.to_string());
+
+    let res = harness.execute_authorized_query(request_code).await;
+    assert!(res.is_ok(), "{:?}", res);
+    assert_eq!(
+        res.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "permissions": {
+                        "canView": true,
+                        "canDelete": true,
+                        "canRename": true,
+                        "canCommit": true
+                    }
+                }
+            }
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+
 struct GraphQLDatasetsHarness {
     _tempdir: tempfile::TempDir,
-    catalog: dill::Catalog,
+    _base_catalog: dill::Catalog,
+    catalog_authorized: dill::Catalog,
+    catalog_anonymous: dill::Catalog,
 }
 
 impl GraphQLDatasetsHarness {
     pub fn new() -> Self {
         let tempdir = tempfile::tempdir().unwrap();
-        let dataset_repo = DatasetRepositoryLocalFs::create(
-            tempdir.path().join("datasets"),
-            Arc::new(CurrentAccountSubject::new_test()),
-            Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new()),
-            false,
-        )
-        .unwrap();
-        let authentication_svc = kamu::testing::MockAuthenticationService::built_in();
+        let datasets_dir = tempdir.path().join("datasets");
+        std::fs::create_dir(&datasets_dir).unwrap();
 
-        let cat = dill::CatalogBuilder::new()
-            .add_value(dataset_repo)
+        let base_catalog = dill::CatalogBuilder::new()
+            .add_builder(
+                dill::builder_for::<DatasetRepositoryLocalFs>()
+                    .with_root(datasets_dir)
+                    .with_multi_tenant(false),
+            )
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-            .add_value(authentication_svc)
+            .add_value(kamu::testing::MockAuthenticationService::built_in())
             .bind::<dyn auth::AuthenticationService, kamu::testing::MockAuthenticationService>()
+            .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
+            .bind::<dyn auth::DatasetActionAuthorizer, auth::AlwaysHappyDatasetActionAuthorizer>()
             .build();
+
+        let (catalog_anonymous, catalog_authorized) = authentication_catalogs(&base_catalog);
 
         Self {
             _tempdir: tempdir,
-            catalog: cat,
+            _base_catalog: base_catalog,
+            catalog_anonymous,
+            catalog_authorized,
         }
     }
 
     pub async fn create_root_dataset(&self, name: DatasetName) -> CreateDatasetResult {
-        let dataset_repo = self.catalog.get_one::<dyn DatasetRepository>().unwrap();
+        let dataset_repo = self
+            .catalog_authorized
+            .get_one::<dyn DatasetRepository>()
+            .unwrap();
         dataset_repo
             .create_dataset_from_snapshot(
                 None,
@@ -526,7 +584,10 @@ impl GraphQLDatasetsHarness {
         name: DatasetName,
         input_dataset: &DatasetHandle,
     ) -> CreateDatasetResult {
-        let dataset_repo = self.catalog.get_one::<dyn DatasetRepository>().unwrap();
+        let dataset_repo = self
+            .catalog_authorized
+            .get_one::<dyn DatasetRepository>()
+            .unwrap();
         dataset_repo
             .create_dataset_from_snapshot(
                 None,
@@ -543,16 +604,21 @@ impl GraphQLDatasetsHarness {
             .unwrap()
     }
 
-    pub async fn execute_query(
+    pub async fn execute_authorized_query(
         &self,
         query: impl Into<async_graphql::Request>,
     ) -> async_graphql::Response {
-        let patched_catalog = dill::CatalogBuilder::new_chained(&self.catalog)
-            .add_value(CurrentAccountSubject::new_test())
-            .build();
+        kamu_adapter_graphql::schema_quiet()
+            .execute(query.into().data(self.catalog_authorized.clone()))
+            .await
+    }
 
-        kamu_adapter_graphql::schema()
-            .execute(query.into().data(patched_catalog))
+    pub async fn execute_anonymous_query(
+        &self,
+        query: impl Into<async_graphql::Request>,
+    ) -> async_graphql::Response {
+        kamu_adapter_graphql::schema_quiet()
+            .execute(query.into().data(self.catalog_anonymous.clone()))
             .await
     }
 }

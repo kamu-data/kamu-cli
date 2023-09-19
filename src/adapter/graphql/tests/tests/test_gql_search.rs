@@ -42,7 +42,7 @@ async fn query() {
         .await
         .unwrap();
 
-    let schema = kamu_adapter_graphql::schema();
+    let schema = kamu_adapter_graphql::schema_quiet();
     let res = schema
         .execute(
             async_graphql::Request::new(

@@ -111,3 +111,8 @@ pub fn schema() -> Schema {
         .extension(extensions::ApolloTracing)
         .finish()
 }
+
+/// Returns schema preconfigured schema without tracing extensions
+pub fn schema_quiet() -> Schema {
+    schema_builder().finish()
+}
