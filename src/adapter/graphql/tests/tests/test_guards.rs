@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use async_graphql::{EmptySubscription, Object};
+use async_graphql::{value, EmptySubscription, Object};
 use kamu_adapter_graphql::{LoggedInGuard, ANONYMOUS_ACCESS_FORBIDEDN_MESSAGE};
 use kamu_core::CurrentAccountSubject;
 
@@ -34,10 +34,13 @@ async fn logged_in_guard_logged() {
         )
         .await;
 
-    assert_eq!(query_response.errors.len(), 0);
+    assert!(query_response.is_ok(), "{:?}", query_response);
     assert_eq!(
-        query_response.data.to_string(),
-        "{guardedQuery: 1,unguardedQuery: 2}"
+        query_response.data,
+        value!({
+            "guardedQuery": 1,
+            "unguardedQuery": 2,
+        })
     );
 
     let mutation_response = schema
@@ -51,10 +54,13 @@ async fn logged_in_guard_logged() {
         )
         .await;
 
-    assert_eq!(mutation_response.errors.len(), 0);
+    assert!(mutation_response.is_ok(), "{:?}", mutation_response);
     assert_eq!(
-        mutation_response.data.to_string(),
-        "{guardedMutation: 3,unguardedMutation: 4}"
+        mutation_response.data,
+        value!({
+            "guardedMutation": 3,
+            "unguardedMutation": 4,
+        })
     );
 }
 
@@ -80,7 +86,7 @@ async fn logged_in_guard_anonymous() {
         )
         .await;
 
-    let unuarded_query_response = schema
+    let unguarded_query_response = schema
         .execute(
             r#"
             query {
@@ -96,10 +102,16 @@ async fn logged_in_guard_anonymous() {
         ANONYMOUS_ACCESS_FORBIDEDN_MESSAGE
     );
 
-    assert_eq!(unuarded_query_response.errors.len(), 0);
+    assert!(
+        unguarded_query_response.is_ok(),
+        "{:?}",
+        unguarded_query_response
+    );
     assert_eq!(
-        unuarded_query_response.data.to_string(),
-        "{unguardedQuery: 2}"
+        unguarded_query_response.data,
+        value!({
+            "unguardedQuery": 2,
+        })
     );
 
     let guarded_mutation_response = schema
@@ -128,10 +140,16 @@ async fn logged_in_guard_anonymous() {
         ANONYMOUS_ACCESS_FORBIDEDN_MESSAGE
     );
 
-    assert_eq!(unguarded_mutation_response.errors.len(), 0);
+    assert!(
+        unguarded_mutation_response.is_ok(),
+        "{:?}",
+        unguarded_mutation_response
+    );
     assert_eq!(
-        unguarded_mutation_response.data.to_string(),
-        "{unguardedMutation: 4}"
+        unguarded_mutation_response.data,
+        value!({
+            "unguardedMutation": 4,
+        })
     );
 }
 

@@ -9,11 +9,13 @@
 
 use internal_error::InternalError;
 use kamu_core::auth::{
+    AccessTokenError,
     AccountInfo,
     AuthenticationService,
     GetAccountInfoError,
     LoginError,
     LoginResponse,
+    UnsupportedLoginMethodError,
 };
 use mockall::predicate::{always, eq};
 use opendatafabric::AccountName;
@@ -43,14 +45,15 @@ mockall::mock! {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-const DUMMY_TOKEN: &str = "test-dummy-token";
+pub const DUMMY_TOKEN: &str = "test-dummy-token";
+pub const DUMMY_LOGIN_METHOD: &str = "test";
 
 impl MockAuthenticationService {
     pub fn built_in() -> Self {
         let mut mock_authentication_service = MockAuthenticationService::new();
         mock_authentication_service
             .expect_login()
-            .with(eq("test"), always())
+            .with(eq(DUMMY_LOGIN_METHOD), always())
             .returning(|_, _| {
                 Ok(LoginResponse {
                     access_token: DUMMY_TOKEN.to_string(),
@@ -64,6 +67,28 @@ impl MockAuthenticationService {
         mock_authentication_service
     }
 
+    pub fn unsupported_login_method() -> Self {
+        let mut mock_authentication_service = MockAuthenticationService::new();
+        mock_authentication_service
+            .expect_login()
+            .with(eq(DUMMY_LOGIN_METHOD), always())
+            .returning(|_, _| {
+                Err(LoginError::UnsupportedMethod(UnsupportedLoginMethodError {
+                    method: DUMMY_LOGIN_METHOD.to_string(),
+                }))
+            });
+        mock_authentication_service
+    }
+
+    pub fn expired_token() -> Self {
+        let mut mock_authentication_service = MockAuthenticationService::new();
+        mock_authentication_service
+            .expect_account_info_by_token()
+            .with(eq(DUMMY_TOKEN.to_string()))
+            .returning(|_| Err(GetAccountInfoError::AccessToken(AccessTokenError::Expired)));
+        mock_authentication_service
+    }
+
     pub fn resolving_token(access_token: &str, expected_account_info: AccountInfo) -> Self {
         let mut mock_authentication_service = MockAuthenticationService::new();
         mock_authentication_service
@@ -73,3 +98,5 @@ impl MockAuthenticationService {
         mock_authentication_service
     }
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////

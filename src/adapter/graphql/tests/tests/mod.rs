@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod test_auth;
 mod test_error_handling;
 mod test_gql_data;
 mod test_gql_datasets;
