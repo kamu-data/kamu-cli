@@ -18,3 +18,6 @@ pub use authentication_service::*;
 
 mod dataset_action_authorizer;
 pub use dataset_action_authorizer::*;
+
+mod dataset_credentials_resolver;
+pub use dataset_credentials_resolver::*;
