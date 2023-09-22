@@ -9,16 +9,24 @@
 
 use std::sync::Arc;
 
+use kamu::domain::CurrentAccountSubject;
 use url::Url;
 
 use crate::services::{RemoteServerCredentialsService, RemoteServerLoginService};
-use crate::{CLIError, Command, RemoteServerCredentialsScope, DEFAULT_LOGIN_URL};
+use crate::{
+    CLIError,
+    Command,
+    RemoteServerCredentialsScope,
+    RemoteServerLoginError,
+    DEFAULT_LOGIN_URL,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct LoginCommand {
     remote_server_login_service: Arc<RemoteServerLoginService>,
     remote_server_credentials_service: Arc<RemoteServerCredentialsService>,
+    current_account_subject: Arc<CurrentAccountSubject>,
     scope: RemoteServerCredentialsScope,
     server: Option<Url>,
 }
@@ -27,12 +35,14 @@ impl LoginCommand {
     pub fn new(
         remote_server_login_service: Arc<RemoteServerLoginService>,
         remote_server_credentials_service: Arc<RemoteServerCredentialsService>,
+        current_account_subject: Arc<CurrentAccountSubject>,
         scope: RemoteServerCredentialsScope,
         server: Option<Url>,
     ) -> Self {
         Self {
             remote_server_login_service,
             remote_server_credentials_service,
+            current_account_subject,
             scope,
             server,
         }
@@ -42,19 +52,35 @@ impl LoginCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for LoginCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
+        let account_name = match self.current_account_subject.as_ref() {
+            CurrentAccountSubject::Logged(l) => l.account_name.clone(),
+            CurrentAccountSubject::Anonymous(_) => panic!("Anonymous current account unexpected"),
+        };
+
         let server_url = self
             .server
             .as_ref()
             .map(|u| u.clone())
             .unwrap_or_else(|| Url::parse(DEFAULT_LOGIN_URL).unwrap());
 
-        let credentials = self
-            .remote_server_login_service
-            .obtain_login_credentials(&server_url)
-            .await?;
+        let account_credentials = match self.remote_server_login_service.login(&server_url).await {
+            Ok(credentials) => Ok(credentials),
+            Err(e) => match e {
+                RemoteServerLoginError::CredentialsNotObtained => {
+                    Err(CLIError::usage_error(e.to_string()))
+                }
+                RemoteServerLoginError::Internal(e) => Err(CLIError::failure(e)),
+            },
+        }?;
 
-        self.remote_server_credentials_service
-            .save_credentials(self.scope, credentials)?;
+        self.remote_server_credentials_service.save_credentials(
+            self.scope,
+            server_url,
+            account_name,
+            account_credentials,
+        )?;
+
+        eprintln!("{}", console::style("Login Succesful").green().bold());
 
         Ok(())
     }

@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashMap;
+
 use opendatafabric::AccountName;
 use serde::{Deserialize, Serialize};
 use url::Url;
@@ -24,12 +26,37 @@ pub enum RemoteServerCredentialsScope {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RemoteServerCredentials {
     pub server: Url,
-    pub local_account_name: AccountName,
-    pub kind: RemoteServerCredentialsKind,
+    pub account_credentials: HashMap<AccountName, RemoteServerAccountCredentials>,
+}
+
+impl RemoteServerCredentials {
+    pub fn new(server: Url) -> Self {
+        Self {
+            server,
+            account_credentials: HashMap::new(),
+        }
+    }
+
+    pub fn add_account_credentials(
+        &mut self,
+        account_name: AccountName,
+        credentials: RemoteServerAccountCredentials,
+    ) {
+        self.account_credentials.insert(account_name, credentials);
+    }
+
+    pub fn for_account(
+        &self,
+        account_name: &AccountName,
+    ) -> Option<RemoteServerAccountCredentials> {
+        self.account_credentials
+            .get(account_name)
+            .map(|c| c.clone())
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum RemoteServerCredentialsKind {
+pub enum RemoteServerAccountCredentials {
     AccessToken(RemoteServerAccessToken),
     APIKey(RemoteServerAPIKey),
 }

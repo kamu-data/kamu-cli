@@ -15,14 +15,14 @@ use dill::component;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::auth::{DatasetCredentials, ResolveDatasetCredentialsError};
 use opendatafabric::serde::yaml::Manifest;
-use opendatafabric::DatasetAlias;
+use opendatafabric::{AccountName, DatasetAlias};
 use url::Url;
 
 use crate::{
+    RemoteServerAccountCredentials,
     RemoteServerCredentials,
     RemoteServerCredentialsScope,
     WorkspaceLayout,
-    DEFAULT_LOGIN_URL,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////
@@ -51,59 +51,34 @@ impl RemoteServerCredentialsService {
         }
     }
 
-    fn resolve_server_url(server: Option<Url>) -> Url {
-        if let Some(server_url) = server {
-            server_url
-        } else {
-            Url::parse(DEFAULT_LOGIN_URL).unwrap()
-        }
-    }
-
     pub fn find_existing_credentials(
         &self,
-        scope: Option<RemoteServerCredentialsScope>,
-        server: Option<Url>,
-    ) -> Option<RemoteServerCredentials> {
-        let server_url = Self::resolve_server_url(server);
+        scope: RemoteServerCredentialsScope,
+        server_url: &Url,
+        account_name: &AccountName,
+    ) -> Option<RemoteServerAccountCredentials> {
+        let credentials_table_ptr = match scope {
+            RemoteServerCredentialsScope::User => &self.user_credentials,
+            RemoteServerCredentialsScope::Workspace => &self.workspace_credentials,
+        };
 
-        match scope {
-            Some(RemoteServerCredentialsScope::User) => self
-                .user_credentials
-                .lock()
-                .expect("Could not lock credentials table")
-                .get(&server_url)
-                .map(|c| c.clone()),
+        let credentials_table = credentials_table_ptr
+            .lock()
+            .expect("Could not lock credentials table");
 
-            Some(RemoteServerCredentialsScope::Workspace) => self
-                .workspace_credentials
-                .lock()
-                .expect("Could not lock credentials table")
-                .get(&server_url)
-                .map(|c| c.clone()),
-
-            None => {
-                if let Some(credentials) = self
-                    .workspace_credentials
-                    .lock()
-                    .expect("Could not lock credentials table")
-                    .get(&server_url)
-                {
-                    Some(credentials.clone())
-                } else {
-                    self.user_credentials
-                        .lock()
-                        .expect("Could not lock credentials table")
-                        .get(&server_url)
-                        .map(|c| c.clone())
-                }
-            }
+        if let Some(server_credentials) = credentials_table.get(server_url) {
+            server_credentials.for_account(account_name)
+        } else {
+            None
         }
     }
 
     pub fn save_credentials(
         &self,
         scope: RemoteServerCredentialsScope,
-        credentials: RemoteServerCredentials,
+        server_url: Url,
+        account_name: AccountName,
+        account_credentials: RemoteServerAccountCredentials,
     ) -> Result<(), InternalError> {
         let credentials_table_ptr = match scope {
             RemoteServerCredentialsScope::User => &self.user_credentials,
@@ -114,7 +89,16 @@ impl RemoteServerCredentialsService {
             .lock()
             .expect("Could not lock credentials table");
 
-        credentials_table.insert(credentials.server.clone(), credentials);
+        match credentials_table.get_mut(&server_url) {
+            Some(server_credentials) => {
+                server_credentials.add_account_credentials(account_name, account_credentials);
+            }
+            None => {
+                let mut server_credentials = RemoteServerCredentials::new(server_url);
+                server_credentials.add_account_credentials(account_name, account_credentials);
+                credentials_table.insert(server_credentials.server.clone(), server_credentials);
+            }
+        }
 
         self.storage.write_credentials(scope, &credentials_table)
     }
@@ -122,7 +106,8 @@ impl RemoteServerCredentialsService {
     pub fn drop_credentials(
         &self,
         scope: RemoteServerCredentialsScope,
-        server: Option<Url>,
+        server_url: &Url,
+        account_name: &AccountName,
     ) -> Result<(), InternalError> {
         let credentials_table_ptr = match scope {
             RemoteServerCredentialsScope::User => &self.user_credentials,
@@ -133,11 +118,13 @@ impl RemoteServerCredentialsService {
             .lock()
             .expect("Could not lock credentials table");
 
-        let server_url = Self::resolve_server_url(server);
+        if let Some(server_credentials) = credentials_table.get_mut(server_url) {
+            if let Some(_) = server_credentials.account_credentials.remove(account_name) {
+                return self.storage.write_credentials(scope, &credentials_table);
+            }
+        }
 
-        credentials_table.remove(&server_url);
-
-        self.storage.write_credentials(scope, &credentials_table)
+        Ok(())
     }
 }
 
