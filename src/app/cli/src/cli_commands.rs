@@ -9,10 +9,11 @@
 
 use kamu::domain::CurrentAccountSubject;
 use opendatafabric::*;
+use url::Url;
 
 use crate::commands::*;
 use crate::services::{AccountService, WorkspaceService};
-use crate::CommandInterpretationFailed;
+use crate::{CommandInterpretationFailed, RemoteServerCredentialsScope};
 
 pub fn get_command(
     base_catalog: &dill::Catalog,
@@ -186,6 +187,31 @@ pub fn get_command(
             submatches.get_one("filter").map(String::as_str),
             *(submatches.get_one("limit").unwrap()),
             cli_catalog.get_one()?,
+        )),
+        Some(("login", submatches)) => Box::new(LoginCommand::new(
+            cli_catalog.get_one()?,
+            cli_catalog.get_one()?,
+            if submatches.get_flag("g") {
+                RemoteServerCredentialsScope::User
+            } else {
+                RemoteServerCredentialsScope::Workspace
+            },
+            // TODO: improve URL parser
+            submatches
+                .get_one::<String>("server")
+                .map(|s| Url::parse(s).unwrap()),
+        )),
+        Some(("logout", submatches)) => Box::new(LogoutCommand::new(
+            cli_catalog.get_one()?,
+            if submatches.get_flag("g") {
+                RemoteServerCredentialsScope::User
+            } else {
+                RemoteServerCredentialsScope::Workspace
+            },
+            // TODO: improve URL parser
+            submatches
+                .get_one::<String>("server")
+                .map(|s| Url::parse(s).unwrap()),
         )),
         Some(("new", submatches)) => Box::new(NewDatasetCommand::new(
             submatches.get_one::<DatasetName>("name").unwrap().clone(),

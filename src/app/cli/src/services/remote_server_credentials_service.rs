@@ -9,61 +9,46 @@
 
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
 
 use dill::component;
-use internal_error::InternalError;
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::auth::{DatasetCredentials, ResolveDatasetCredentialsError};
+use opendatafabric::serde::yaml::Manifest;
 use opendatafabric::DatasetAlias;
 use url::Url;
 
-use crate::DEFAULT_LOGIN_URL;
-
-////////////////////////////////////////////////////////////////////////////////////////
-
-const KAMU_CREDENTIALS: &str = ".kamucredentials";
+use crate::{
+    RemoteServerCredentials,
+    RemoteServerCredentialsScope,
+    WorkspaceLayout,
+    DEFAULT_LOGIN_URL,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct RemoteServerCredentialsService {
-    user_credentials_path: PathBuf,
-    workspace_credentials_path: PathBuf,
-
-    workspace_credentials: HashMap<Url, RemoteServerCredentials>,
-    user_credentials: HashMap<Url, RemoteServerCredentials>,
+    storage: Arc<dyn RemoteServerCredentialsStorage>,
+    workspace_credentials: Mutex<HashMap<Url, RemoteServerCredentials>>,
+    user_credentials: Mutex<HashMap<Url, RemoteServerCredentials>>,
 }
 
 #[component(pub)]
 impl RemoteServerCredentialsService {
-    pub fn new(workspace_kamu_dir: PathBuf) -> Self {
-        let user_credentials_path = dirs::home_dir()
-            .expect("Cannot determine user home directory")
-            .join(KAMU_CREDENTIALS);
+    pub fn new(storage: Arc<dyn RemoteServerCredentialsStorage>) -> Self {
+        let user_credentials = storage
+            .read_credentials(RemoteServerCredentialsScope::User)
+            .unwrap();
 
-        let user_credentials = Self::read_credentials_file(&user_credentials_path);
-
-        let workspace_credentials_path: PathBuf = workspace_kamu_dir.join(KAMU_CREDENTIALS);
-
-        let workspace_credentials = Self::read_credentials_file(&workspace_credentials_path);
+        let workspace_credentials = storage
+            .read_credentials(RemoteServerCredentialsScope::Workspace)
+            .unwrap();
 
         Self {
-            user_credentials_path,
-            workspace_credentials_path,
-            user_credentials,
-            workspace_credentials,
+            storage,
+            user_credentials: Mutex::new(user_credentials),
+            workspace_credentials: Mutex::new(workspace_credentials),
         }
-    }
-
-    fn read_credentials_file(_path: &PathBuf) -> HashMap<Url, RemoteServerCredentials> {
-        // TODO
-        unimplemented!()
-    }
-
-    fn write_credentials_file(
-        _path: &PathBuf,
-        _credentials: &HashMap<Url, RemoteServerCredentials>,
-    ) -> Result<(), InternalError> {
-        // TODO
-        unimplemented!()
     }
 
     fn resolve_server_url(server: Option<Url>) -> Url {
@@ -82,65 +67,77 @@ impl RemoteServerCredentialsService {
         let server_url = Self::resolve_server_url(server);
 
         match scope {
-            Some(RemoteServerCredentialsScope::User) => {
-                self.user_credentials.get(&server_url).map(|c| c.clone())
-            }
+            Some(RemoteServerCredentialsScope::User) => self
+                .user_credentials
+                .lock()
+                .expect("Could not lock credentials table")
+                .get(&server_url)
+                .map(|c| c.clone()),
 
             Some(RemoteServerCredentialsScope::Workspace) => self
                 .workspace_credentials
+                .lock()
+                .expect("Could not lock credentials table")
                 .get(&server_url)
                 .map(|c| c.clone()),
 
             None => {
-                if let Some(credentials) = self.workspace_credentials.get(&server_url) {
+                if let Some(credentials) = self
+                    .workspace_credentials
+                    .lock()
+                    .expect("Could not lock credentials table")
+                    .get(&server_url)
+                {
                     Some(credentials.clone())
                 } else {
-                    self.user_credentials.get(&server_url).map(|c| c.clone())
+                    self.user_credentials
+                        .lock()
+                        .expect("Could not lock credentials table")
+                        .get(&server_url)
+                        .map(|c| c.clone())
                 }
             }
         }
     }
 
     pub fn save_credentials(
-        &mut self,
+        &self,
         scope: RemoteServerCredentialsScope,
         credentials: RemoteServerCredentials,
     ) -> Result<(), InternalError> {
-        let (credentials_table, target_path) = match scope {
-            RemoteServerCredentialsScope::User => {
-                (&mut self.user_credentials, &self.user_credentials_path)
-            }
-            RemoteServerCredentialsScope::Workspace => (
-                &mut self.workspace_credentials,
-                &self.workspace_credentials_path,
-            ),
+        let credentials_table_ptr = match scope {
+            RemoteServerCredentialsScope::User => &self.user_credentials,
+            RemoteServerCredentialsScope::Workspace => &self.workspace_credentials,
         };
+
+        let mut credentials_table = credentials_table_ptr
+            .lock()
+            .expect("Could not lock credentials table");
 
         credentials_table.insert(credentials.server.clone(), credentials);
 
-        Self::write_credentials_file(target_path, credentials_table)
+        self.storage.write_credentials(scope, &credentials_table)
     }
 
     pub fn drop_credentials(
-        &mut self,
+        &self,
         scope: RemoteServerCredentialsScope,
         server: Option<Url>,
     ) -> Result<(), InternalError> {
-        let (credentials_table, target_path) = match scope {
-            RemoteServerCredentialsScope::User => {
-                (&mut self.user_credentials, &self.user_credentials_path)
-            }
-            RemoteServerCredentialsScope::Workspace => (
-                &mut self.workspace_credentials,
-                &self.workspace_credentials_path,
-            ),
+        let credentials_table_ptr = match scope {
+            RemoteServerCredentialsScope::User => &self.user_credentials,
+            RemoteServerCredentialsScope::Workspace => &self.workspace_credentials,
         };
+
+        let mut credentials_table = credentials_table_ptr
+            .lock()
+            .expect("Could not lock credentials table");
 
         let server_url = Self::resolve_server_url(server);
 
         credentials_table.remove(&server_url);
 
-        Self::write_credentials_file(target_path, credentials_table)
+        self.storage.write_credentials(scope, &credentials_table)
     }
 }
 
@@ -158,18 +155,110 @@ impl kamu::domain::auth::DatasetCredentialsResolver for RemoteServerCredentialsS
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug)]
-pub enum RemoteServerCredentialsScope {
-    Workspace,
-    User,
+pub trait RemoteServerCredentialsStorage: Send + Sync {
+    fn read_credentials(
+        &self,
+        scope: RemoteServerCredentialsScope,
+    ) -> Result<HashMap<Url, RemoteServerCredentials>, InternalError>;
+
+    fn write_credentials(
+        &self,
+        scope: RemoteServerCredentialsScope,
+        credentials: &HashMap<Url, RemoteServerCredentials>,
+    ) -> Result<(), InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone)]
-pub struct RemoteServerCredentials {
-    pub server: Url,
-    pub access_token: String,
+const KAMU_CREDENTIALS: &str = ".kamucredentials";
+const KAMU_CREDENTIALS_VERSION: i32 = 1;
+
+pub struct CLIRemoteServerCredentialsStorage {
+    user_credentials_path: PathBuf,
+    workspace_credentials_path: PathBuf,
+}
+
+#[component(pub)]
+impl CLIRemoteServerCredentialsStorage {
+    pub fn new(workspace_layout: &WorkspaceLayout) -> Self {
+        let user_credentials_path = dirs::home_dir()
+            .expect("Cannot determine user home directory")
+            .join(KAMU_CREDENTIALS);
+
+        let workspace_credentials_path: PathBuf = workspace_layout.root_dir.join(KAMU_CREDENTIALS);
+
+        Self {
+            user_credentials_path,
+            workspace_credentials_path,
+        }
+    }
+
+    fn credentials_path_for_scope(&self, scope: RemoteServerCredentialsScope) -> &PathBuf {
+        match scope {
+            RemoteServerCredentialsScope::User => &self.user_credentials_path,
+            RemoteServerCredentialsScope::Workspace => &self.workspace_credentials_path,
+        }
+    }
+}
+
+impl RemoteServerCredentialsStorage for CLIRemoteServerCredentialsStorage {
+    fn read_credentials(
+        &self,
+        scope: RemoteServerCredentialsScope,
+    ) -> Result<HashMap<Url, RemoteServerCredentials>, InternalError> {
+        let credentials_path = self.credentials_path_for_scope(scope);
+
+        if !credentials_path.exists() {
+            return Ok(HashMap::new());
+        }
+
+        let file = std::fs::OpenOptions::new()
+            .read(true)
+            .open(credentials_path)
+            .int_err()?;
+
+        let manifest: Manifest<Vec<RemoteServerCredentials>> =
+            serde_yaml::from_reader(file).int_err()?;
+
+        assert_eq!(manifest.kind, "RemoteServerCredentials");
+        assert_eq!(manifest.version, KAMU_CREDENTIALS_VERSION);
+
+        let mut res = HashMap::new();
+
+        for credentials in manifest.content {
+            res.insert(credentials.server.clone(), credentials);
+        }
+
+        Ok(res)
+    }
+
+    fn write_credentials(
+        &self,
+        scope: RemoteServerCredentialsScope,
+        credentials: &HashMap<Url, RemoteServerCredentials>,
+    ) -> Result<(), InternalError> {
+        let credentials_path = self.credentials_path_for_scope(scope);
+
+        let file = std::fs::OpenOptions::new()
+            .create(true)
+            .write(true)
+            .truncate(true)
+            .open(credentials_path)
+            .unwrap();
+
+        let mut content: Vec<&RemoteServerCredentials> = Vec::new();
+        for credentials in credentials.values() {
+            content.push(credentials);
+        }
+
+        let manifest = Manifest {
+            kind: "RemoteServerCredentials".to_owned(),
+            version: KAMU_CREDENTIALS_VERSION,
+            content,
+        };
+
+        serde_yaml::to_writer(file, &manifest).int_err()
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////

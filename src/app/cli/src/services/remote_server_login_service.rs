@@ -7,8 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::sync::Arc;
+
 use dill::component;
 use internal_error::InternalError;
+use kamu::domain::CurrentAccountSubject;
 use thiserror::Error;
 use url::Url;
 
@@ -20,12 +23,16 @@ pub const DEFAULT_LOGIN_URL: &str = "http://localhost:4200";
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
-struct RemoteServerLoginService {}
+pub struct RemoteServerLoginService {
+    _current_account_subject: Arc<CurrentAccountSubject>,
+}
 
 #[component(pub)]
 impl RemoteServerLoginService {
-    pub fn new() -> Self {
-        Self {}
+    pub fn new(current_account_subject: Arc<CurrentAccountSubject>) -> Self {
+        Self {
+            _current_account_subject: current_account_subject,
+        }
     }
 
     #[allow(dead_code)]

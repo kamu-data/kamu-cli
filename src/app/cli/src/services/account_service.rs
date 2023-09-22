@@ -14,11 +14,16 @@ use clap::ArgMatches;
 use dill::component;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::auth::{self, AccountInfo, AccountType};
-use kamu::domain::CurrentAccountSubject;
 use opendatafabric::{AccountName, FAKE_ACCOUNT_ID};
 use serde::{Deserialize, Serialize};
 
-use crate::UsersConfig;
+use crate::{
+    CurrentAccountIndication,
+    PasswordLoginCredentials,
+    RelatedAccountIndication,
+    TargetAccountSelection,
+    UsersConfig,
+};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -219,67 +224,6 @@ impl auth::AuthenticationProvider for AccountService {
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug)]
-pub struct RelatedAccountIndication {
-    pub target_account: TargetAccountSelection,
-}
-
-impl RelatedAccountIndication {
-    pub fn new(target_account: TargetAccountSelection) -> Self {
-        Self { target_account }
-    }
-
-    pub fn is_explicit(&self) -> bool {
-        self.target_account != TargetAccountSelection::Current
-    }
-}
-
-#[derive(Debug, Eq, PartialEq)]
-pub enum TargetAccountSelection {
-    Current,
-    Specific { account_name: String },
-    AllUsers,
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Clone)]
-pub struct CurrentAccountIndication {
-    pub account_name: AccountName,
-    pub user_name: String,
-    pub specified_explicitly: bool,
-}
-
-impl CurrentAccountIndication {
-    pub fn new<A, U>(account_name: A, user_name: U, specified_explicitly: bool) -> Self
-    where
-        A: Into<String>,
-        U: Into<String>,
-    {
-        Self {
-            account_name: AccountName::try_from(account_name.into()).unwrap(),
-            user_name: user_name.into(),
-            specified_explicitly,
-        }
-    }
-
-    pub fn is_explicit(&self) -> bool {
-        self.specified_explicitly
-    }
-
-    pub fn to_current_account_subject(&self) -> CurrentAccountSubject {
-        CurrentAccountSubject::logged(AccountName::from(self.account_name.clone()))
-    }
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PasswordLoginCredentials {
-    pub login: String,
-    pub password: String,
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct PasswordProviderCredentials {

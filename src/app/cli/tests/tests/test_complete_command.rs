@@ -15,7 +15,7 @@ use crate::utils::Kamu;
 async fn test_complete_subcommand() {
     let kamu = Kamu::new(".");
     let completions = kamu.complete("kamu l", 1).await.unwrap();
-    assert_eq!(completions, ["list", "log"]);
+    assert_eq!(completions, ["list", "log", "login", "logout"]);
 }
 
 #[test_log::test(tokio::test)]

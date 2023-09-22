@@ -12,7 +12,7 @@ use std::sync::Arc;
 
 use kamu::domain::*;
 
-use super::{WorkspaceConfig, WorkspaceLayout, WorkspaceVersion};
+use crate::{WorkspaceConfig, WorkspaceLayout, WorkspaceVersion};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 

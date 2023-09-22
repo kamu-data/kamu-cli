@@ -16,11 +16,11 @@ use kamu::domain::*;
 use kamu::utils::smart_transfer_protocol::SmartTransferProtocolClient;
 use kamu::*;
 
-use crate::cli_commands;
 use crate::error::*;
 use crate::explore::TraceServer;
 use crate::output::*;
 use crate::services::*;
+use crate::{cli_commands, CLIConfig, ConfigScope, UsersConfig, WorkspaceLayout};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -256,6 +256,11 @@ pub fn configure_cli_catalog(base_catalog: &Catalog) -> CatalogBuilder {
     b.add::<ConfigService>();
     b.add::<GcService>();
     b.add::<WorkspaceService>();
+
+    b.add::<RemoteServerCredentialsService>();
+    b.add::<RemoteServerLoginService>();
+    b.add::<CLIRemoteServerCredentialsStorage>();
+    b.bind::<dyn RemoteServerCredentialsStorage, CLIRemoteServerCredentialsStorage>();
 
     b
 }
