@@ -555,7 +555,7 @@ pub fn cli() -> Command {
                             .long("server")
                             .action(ArgAction::Set)
                             .help("Custom remote server URL (Kamu platform is used by default)")
-                    ]),                                       
+                    ]),
                 Command::new("new")
                     .about("Creates a new dataset manifest from a template")
                     .args([
