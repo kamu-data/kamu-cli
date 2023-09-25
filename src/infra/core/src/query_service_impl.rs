@@ -132,6 +132,11 @@ impl QueryServiceImpl {
 
 #[async_trait::async_trait]
 impl QueryService for QueryServiceImpl {
+    #[tracing::instrument(level = "info", skip_all)]
+    async fn create_session(&self) -> Result<SessionContext, CreateSessionError> {
+        Ok(self.session_context(QueryOptions::default())?)
+    }
+
     #[tracing::instrument(
         level = "info",
         name = "query_service::tail",

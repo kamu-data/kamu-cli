@@ -308,6 +308,33 @@ dependencies = [
 ]
 
 [[package]]
+name = "arrow-flight"
+version = "46.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e40372d37a860a742f248d4d7c137950cd793f1b46f2b99a5116c55efbe2699f"
+dependencies = [
+ "arrow-arith",
+ "arrow-array",
+ "arrow-buffer",
+ "arrow-cast",
+ "arrow-data",
+ "arrow-ipc",
+ "arrow-ord",
+ "arrow-row",
+ "arrow-schema",
+ "arrow-select",
+ "arrow-string",
+ "base64 0.21.4",
+ "bytes",
+ "futures",
+ "once_cell",
+ "paste",
+ "prost",
+ "tokio",
+ "tonic",
+]
+
+[[package]]
 name = "arrow-ipc"
 version = "46.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3098,6 +3125,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "kamu-adapter-flight-sql"
+version = "0.143.0"
+dependencies = [
+ "arrow-flight",
+ "base64 0.21.4",
+ "dashmap",
+ "datafusion",
+ "env_logger",
+ "futures",
+ "indoc 2.0.3",
+ "kamu-data-utils",
+ "like",
+ "prost",
+ "test-log",
+ "tokio",
+ "tokio-stream",
+ "tonic",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+]
+
+[[package]]
 name = "kamu-adapter-graphql"
 version = "0.143.0"
 dependencies = [
@@ -3192,6 +3242,7 @@ dependencies = [
 name = "kamu-cli"
 version = "0.143.0"
 dependencies = [
+ "arrow-flight",
  "async-graphql",
  "async-graphql-axum",
  "async-trait",
@@ -3221,6 +3272,7 @@ dependencies = [
  "itertools 0.11.0",
  "kamu",
  "kamu-adapter-auth-oso",
+ "kamu-adapter-flight-sql",
  "kamu-adapter-graphql",
  "kamu-adapter-http",
  "kamu-adapter-oauth",
@@ -3249,7 +3301,9 @@ dependencies = [
  "test-log",
  "thiserror",
  "tokio",
+ "tokio-stream",
  "tokio-util",
+ "tonic",
  "tower",
  "tower-http",
  "tracing",
@@ -3556,6 +3610,12 @@ dependencies = [
  "pkg-config",
  "vcpkg",
 ]
+
+[[package]]
+name = "like"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fc7281e4b2b1a1fae03463a7c49dd21464de50251a450f6da9715c40c7b21a70"
 
 [[package]]
 name = "linked-hash-map"
@@ -4561,9 +4621,9 @@ dependencies = [
 
 [[package]]
 name = "prost"
-version = "0.12.0"
+version = "0.11.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aa8473a65b88506c106c28ae905ca4a2b83a2993640467a41bb3080627ddfd2c"
+checksum = "0b82eaa1d779e9a4bc1c3217db8ffbeabaae1dca241bf70183242128d48681cd"
 dependencies = [
  "bytes",
  "prost-derive",
@@ -4571,15 +4631,15 @@ dependencies = [
 
 [[package]]
 name = "prost-derive"
-version = "0.12.0"
+version = "0.11.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "56075c27b20ae524d00f247b8a4dc333e5784f889fe63099f8e626bc8d73486c"
+checksum = "e5d2d8d10f3c6ded6da8b05b5fb3b8a5082514344d56c9f871412d29b4e075b4"
 dependencies = [
  "anyhow",
- "itertools 0.11.0",
+ "itertools 0.10.5",
  "proc-macro2",
  "quote",
- "syn 2.0.33",
+ "syn 1.0.109",
 ]
 
 [[package]]
@@ -4937,9 +4997,9 @@ dependencies = [
 
 [[package]]
 name = "rustls-webpki"
-version = "0.101.5"
+version = "0.101.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "45a27e3b59326c16e23d30aeb7a36a24cc0d29e71d68ff611cdfb4a01d013bed"
+checksum = "3c7d5dece342910d9ba34d259310cae3e0154b873b35408b787b59bce53d34fe"
 dependencies = [
  "ring",
  "untrusted",
@@ -5791,15 +5851,16 @@ dependencies = [
 
 [[package]]
 name = "tonic"
-version = "0.10.0"
+version = "0.9.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5469afaf78a11265c343a88969045c1568aa8ecc6c787dbf756e92e70f199861"
+checksum = "3082666a3a6433f7f511c7192923fa1fe07c69332d3c6a2e6bb040b569199d5a"
 dependencies = [
- "async-stream",
  "async-trait",
  "axum",
  "base64 0.21.4",
  "bytes",
+ "futures-core",
+ "futures-util",
  "h2",
  "http",
  "http-body",

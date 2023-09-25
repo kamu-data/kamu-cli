@@ -358,8 +358,8 @@ pub fn get_command(
                 submatches.get_one("engine").map(String::as_str),
             )),
             Some(("server", server_matches)) => {
-                if !server_matches.get_flag("livy") {
-                    Box::new(SqlServerCommand::new(
+                if server_matches.get_flag("livy") {
+                    Box::new(SqlServerLivyCommand::new(
                         cli_catalog.get_one()?,
                         cli_catalog.get_one()?,
                         cli_catalog.get_one()?,
@@ -367,8 +367,14 @@ pub fn get_command(
                         *server_matches.get_one("address").unwrap(),
                         *(server_matches.get_one("port").unwrap()),
                     ))
+                } else if server_matches.get_flag("flight-sql") {
+                    Box::new(SqlServerFlightSqlCommand::new(
+                        *server_matches.get_one("address").unwrap(),
+                        *(server_matches.get_one("port").unwrap()),
+                        cli_catalog.get_one()?,
+                    ))
                 } else {
-                    Box::new(SqlServerLivyCommand::new(
+                    Box::new(SqlServerCommand::new(
                         cli_catalog.get_one()?,
                         cli_catalog.get_one()?,
                         cli_catalog.get_one()?,

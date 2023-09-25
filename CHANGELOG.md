@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.144.0] - 2023-09-25
+### Added
+- New protocol adapter for [Arrow Flight SQL](https://arrow.apache.org/blog/2022/02/16/introducing-arrow-flight-sql/)
+  - Using this adapter you can connect to `kamu` as JDBC data source from DBeaver, Tableau and other BI tools
+  - To run Flight SQL server use `kamu sql server --flight-sql` command
+
 ## [0.143.0] - 2023-09-19
 ### Added
 - Support for multi-tenant workspaces in Jupyter Notebook extension
@@ -25,7 +31,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Github OAuth functionality isolated in a separate component `kamu-adapter-oauth`
 - GraphQL: filtering datasets based on logged account
 - Unified and clarified namings in account-related data structures
-
 
 ## [0.142.1] - 2023-09-02
 ### Fixed

@@ -18,8 +18,11 @@ members = [
     "src/infra/ingest-datafusion",
     "src/infra/task-system-inmem",
     # Adapters
+    "src/adapter/auth-oso",
+    "src/adapter/flight-sql",
     "src/adapter/graphql",
     "src/adapter/http",
+    "src/adapter/oauth",
     # Apps
     "src/app/cli",
 ]
@@ -44,9 +47,10 @@ kamu = { version = "0.143.0", path = "src/infra/core", default-features = false 
 kamu-ingest-datafusion = { version = "0.143.0", path = "src/infra/ingest-datafusion", default-features = false }
 kamu-task-system-inmem = { version = "0.143.0", path = "src/infra/task-system-inmem", default-features = false }
 # Adapters
+kamu-adapter-auth-oso = { version = "0.143.0", path = "src/adapter/auth-oso", default-features = false }
+kamu-adapter-flight-sql = { version = "0.143.0", path = "src/adapter/flight-sql", default-features = false }
 kamu-adapter-graphql = { version = "0.143.0", path = "src/adapter/graphql", default-features = false }
 kamu-adapter-http = { version = "0.143.0", path = "src/adapter/http", default-features = false }
-kamu-adapter-auth-oso = { version = "0.143.0", path = "src/adapter/auth-oso", default-features = false }
 kamu-adapter-oauth = { version = "0.143.0", path = "src/adapter/oauth", defualt-features = false }
 
 [workspace.package]

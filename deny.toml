@@ -23,12 +23,15 @@ deny = [
     { name = "md5" },
     # TODO: We should decide whether to stick with rustls or openssl and deny one of them
 
-    ### Creates we deny multiple versions of (until we flip to skip-tree) ###
+    ### Creates we deny multiple versions of ###
+    # This is a temporary approach until we deny by default with some exceptions
     { name = "arrow", deny-multiple-versions = true },
     { name = "axum", deny-multiple-versions = true },
     { name = "datafusion", deny-multiple-versions = true },
+    { name = "prost", deny-multiple-versions = true },
     # { name = "rustls", deny-multiple-versions = true },
     { name = "tokio", deny-multiple-versions = true },
+    { name = "tonic", deny-multiple-versions = true },
 ]
 
 

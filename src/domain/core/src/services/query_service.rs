@@ -9,7 +9,7 @@
 
 use datafusion::error::DataFusionError;
 use datafusion::parquet::schema::types::Type;
-use datafusion::prelude::DataFrame;
+use datafusion::prelude::{DataFrame, SessionContext};
 use opendatafabric::DatasetRef;
 use thiserror::Error;
 
@@ -19,6 +19,9 @@ use crate::*;
 // TODO: Support different engines and query dialects
 #[async_trait::async_trait]
 pub trait QueryService: Send + Sync {
+    /// Creates an SQL session for the current user
+    async fn create_session(&self) -> Result<SessionContext, CreateSessionError>;
+
     /// Returns the specified number of the latest records in the dataset
     /// This is equivalent to the SQL query: `SELECT * FROM dataset ORDER BY
     /// offset DESC LIMIT N`
@@ -29,6 +32,8 @@ pub trait QueryService: Send + Sync {
         limit: u64,
     ) -> Result<DataFrame, QueryError>;
 
+    /// Prepares an execution plan for the SQL statement and returns a
+    /// [DataFrame] that can be used to execute it and get the result.
     async fn sql_statement(
         &self,
         statement: &str,
@@ -86,6 +91,22 @@ pub enum QueryDialect {
 ///////////////////////////////////////////////////////////////////////////////
 // Errors
 ///////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Error)]
+pub enum CreateSessionError {
+    #[error(transparent)]
+    Access(
+        #[from]
+        #[backtrace]
+        AccessError,
+    ),
+    #[error(transparent)]
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
+}
 
 #[derive(Debug, Error)]
 pub enum QueryError {

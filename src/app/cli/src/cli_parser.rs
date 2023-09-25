@@ -992,8 +992,12 @@ pub fn cli() -> Command {
                                     Arg::new("livy")
                                         .long("livy")
                                         .action(ArgAction::SetTrue)
-                                        .help("Run Livy server instead of JDBC")
+                                        .help("Run Livy server instead of Spark JDBC")
                                         .hide(true),
+                                    Arg::new("flight-sql")
+                                        .long("flight-sql")
+                                        .action(ArgAction::SetTrue)
+                                        .help("Run Flight SQL server instead of Spark JDBC")
                                 ]),
                         )
                         .args([
@@ -1071,11 +1075,11 @@ pub fn cli() -> Command {
                                 Arg::new("address")
                                     .long("address")
                                     .value_parser(value_parser!(std::net::IpAddr))
-                                    .help("Expose HTTP server on specific network interface"),
+                                    .help("Bind to a specific network interface"),
                                 Arg::new("http-port")
                                     .long("http-port")
                                     .value_parser(value_parser!(u16))
-                                    .help("Expose HTTP server on specific port"),
+                                    .help("Expose HTTP+GraphQL server on specific port"),
                             ])
                             .after_help(indoc::indoc!(
                                 r#"
