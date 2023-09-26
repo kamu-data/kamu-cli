@@ -115,9 +115,9 @@ impl RemoteServerCredentialsService {
     pub fn save_credentials(
         &self,
         scope: RemoteServerCredentialsScope,
-        remote_server_frontend_url: Url,
-        remote_server_backend_url: Url,
-        account_name: AccountName,
+        remote_server_frontend_url: &Url,
+        remote_server_backend_url: &Url,
+        account_name: &AccountName,
         account_credentials: RemoteServerAccountCredentials,
     ) -> Result<(), InternalError> {
         let credentials_table_ptr = match scope {
@@ -131,9 +131,9 @@ impl RemoteServerCredentialsService {
 
         if let Some(server_credentials) = credentials_table
             .iter_mut()
-            .find(|c| c.server_frontend_url == remote_server_frontend_url)
+            .find(|c| &c.server_frontend_url == remote_server_frontend_url)
         {
-            server_credentials.add_account_credentials(account_name, account_credentials);
+            server_credentials.add_account_credentials(account_name.clone(), account_credentials);
         } else {
             let mut server_credentials = RemoteServerCredentials::new(
                 remote_server_frontend_url.clone(),

@@ -21,6 +21,7 @@ use crate::{
     RemoteServerAccountCredentials,
     RemoteServerCredentialsFindDetails,
     RemoteServerCredentialsScope,
+    RemoteServerInvalidCredentialsError,
     RemoteServerLoginError,
     RemoteServerValidateLoginError,
     DEFAULT_LOGIN_URL,
@@ -71,13 +72,20 @@ impl LoginCommand {
 
         self.remote_server_credentials_service.save_credentials(
             self.scope,
-            remote_server_frontend_url,
-            login_callback_response.backend_url,
-            account_name,
+            &remote_server_frontend_url,
+            &login_callback_response.backend_url,
+            &account_name,
             RemoteServerAccountCredentials::AccessToken(RemoteServerAccessToken {
                 access_token: login_callback_response.access_token,
             }),
         )?;
+
+        eprintln!(
+            "{}: {}@{}",
+            console::style("Login successful").green().bold(),
+            account_name,
+            remote_server_frontend_url
+        );
 
         Ok(())
     }
@@ -88,7 +96,42 @@ impl LoginCommand {
     ) -> Result<(), RemoteServerValidateLoginError> {
         self.remote_server_login_service
             .validate_login_credentials(&details.server_backend_url, &details.account_credentials)
-            .await
+            .await?;
+        Ok(())
+    }
+
+    async fn handle_credentials_expired(
+        &self,
+        remote_server_frontend_url: &Url,
+        account_name: &AccountName,
+    ) -> Result<(), CLIError> {
+        eprintln!(
+            "{}: {}@{}",
+            console::style("Dropping expired credentials")
+                .yellow()
+                .bold(),
+            account_name,
+            remote_server_frontend_url
+        );
+
+        self.remote_server_credentials_service
+            .drop_credentials(self.scope, remote_server_frontend_url, account_name)
+            .map_err(|e| CLIError::critical(e))?;
+
+        Ok(())
+    }
+
+    fn handle_credentials_invalid(
+        &self,
+        e: RemoteServerInvalidCredentialsError,
+        remote_server_frontend_url: &Url,
+        account_name: &AccountName,
+    ) -> Result<(), CLIError> {
+        self.remote_server_credentials_service
+            .drop_credentials(self.scope, remote_server_frontend_url, account_name)
+            .map_err(|e| CLIError::critical(e))?;
+
+        Err(CLIError::failure(e))
     }
 }
 
@@ -113,24 +156,29 @@ impl Command for LoginCommand {
         ) {
             match self.validate_login(details).await {
                 Ok(_) => {
-                    eprintln!("{}", console::style("Credentials valid").green().bold());
-                    return Ok(());
-                }
-                Err(RemoteServerValidateLoginError::ExpiredCredentials(_)) => {
-                    eprintln!("{}", console::style("Credentials expired").yellow().bold());
+                    eprintln!(
+                        "{}: {}@{}",
+                        console::style("Credentials valid").green().bold(),
+                        account_name,
+                        remote_server_frontend_url
+                    );
                     Ok(())
                 }
+                Err(RemoteServerValidateLoginError::ExpiredCredentials(_)) => {
+                    self.handle_credentials_expired(&remote_server_frontend_url, &account_name)
+                        .await?;
+                    self.new_login(remote_server_frontend_url, account_name)
+                        .await
+                }
                 Err(RemoteServerValidateLoginError::InvalidCredentials(e)) => {
-                    Err(CLIError::failure(e))
+                    self.handle_credentials_invalid(e, &remote_server_frontend_url, &account_name)
                 }
                 Err(RemoteServerValidateLoginError::Internal(e)) => Err(CLIError::critical(e)),
-            }?;
+            }
+        } else {
+            self.new_login(remote_server_frontend_url, account_name)
+                .await
         }
-
-        self.new_login(remote_server_frontend_url, account_name)
-            .await?;
-        eprintln!("{}", console::style("Login successful").green().bold());
-        Ok(())
     }
 }
 
