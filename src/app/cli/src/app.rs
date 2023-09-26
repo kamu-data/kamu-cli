@@ -258,6 +258,7 @@ pub fn configure_cli_catalog(base_catalog: &Catalog) -> CatalogBuilder {
     b.add::<WorkspaceService>();
 
     b.add::<RemoteServerCredentialsService>();
+    b.bind::<dyn auth::DatasetCredentialsResolver, RemoteServerCredentialsService>();
     b.add::<RemoteServerLoginService>();
     b.add::<CLIRemoteServerCredentialsStorage>();
     b.bind::<dyn RemoteServerCredentialsStorage, CLIRemoteServerCredentialsStorage>();

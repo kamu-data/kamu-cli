@@ -623,6 +623,7 @@ pub async fn dataset_import_object_file(
 pub async fn dataset_export_object_file(
     dataset: &dyn Dataset,
     object_transfer_strategy: &PushObjectTransferStrategy,
+    access_token: &str,
 ) -> Result<(), SyncError> {
     if object_transfer_strategy.push_strategy == ObjectPushStrategy::SkipUpload {
         tracing::debug!(
@@ -676,6 +677,7 @@ pub async fn dataset_export_object_file(
         )
         .header("content-type", "application/octet-stream")
         .header("content-length", size)
+        .bearer_auth(access_token)
         .body(hyper::Body::wrap_stream(reader_stream))
         .send()
         .await

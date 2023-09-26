@@ -12,9 +12,15 @@ use std::sync::{Arc, Mutex};
 
 use dill::component;
 use internal_error::{InternalError, ResultIntoInternal};
-use kamu::domain::auth::{DatasetCredentials, ResolveDatasetCredentialsError};
+use kamu::domain::auth::{
+    DatasetAccessToken,
+    DatasetCredentials,
+    DatasetLoginRequiredError,
+    ResolveDatasetCredentialsError,
+};
+use kamu::domain::CurrentAccountSubject;
 use opendatafabric::serde::yaml::Manifest;
-use opendatafabric::{AccountName, DatasetAlias};
+use opendatafabric::AccountName;
 use url::Url;
 
 use crate::{
@@ -28,13 +34,17 @@ use crate::{
 
 pub struct RemoteServerCredentialsService {
     storage: Arc<dyn RemoteServerCredentialsStorage>,
+    current_account_subject: Arc<CurrentAccountSubject>,
     workspace_credentials: Mutex<Vec<RemoteServerCredentials>>,
     user_credentials: Mutex<Vec<RemoteServerCredentials>>,
 }
 
 #[component(pub)]
 impl RemoteServerCredentialsService {
-    pub fn new(storage: Arc<dyn RemoteServerCredentialsStorage>) -> Self {
+    pub fn new(
+        storage: Arc<dyn RemoteServerCredentialsStorage>,
+        current_account_subject: Arc<CurrentAccountSubject>,
+    ) -> Self {
         let user_credentials = storage
             .read_credentials(RemoteServerCredentialsScope::User)
             .unwrap();
@@ -45,8 +55,16 @@ impl RemoteServerCredentialsService {
 
         Self {
             storage,
+            current_account_subject,
             user_credentials: Mutex::new(user_credentials),
             workspace_credentials: Mutex::new(workspace_credentials),
+        }
+    }
+
+    fn account_name<'a>(&'a self) -> &'a AccountName {
+        match self.current_account_subject.as_ref() {
+            CurrentAccountSubject::Logged(l) => &l.account_name,
+            CurrentAccountSubject::Anonymous(_) => panic!("Anonymous current account unexpected"),
         }
     }
 
@@ -54,7 +72,6 @@ impl RemoteServerCredentialsService {
         &self,
         scope: RemoteServerCredentialsScope,
         remote_server_frontend_url: &Url,
-        account_name: &AccountName,
     ) -> Option<RemoteServerCredentialsFindDetails> {
         let credentials_table_ptr = match scope {
             RemoteServerCredentialsScope::User => &self.user_credentials,
@@ -69,13 +86,13 @@ impl RemoteServerCredentialsService {
             .iter()
             .find(|c| &c.server_frontend_url == remote_server_frontend_url)
         {
-            server_credentials.for_account(account_name).map(|ac| {
-                RemoteServerCredentialsFindDetails {
+            server_credentials
+                .for_account(self.account_name())
+                .map(|ac| RemoteServerCredentialsFindDetails {
                     server_backend_url: server_credentials.server_backend_url.clone(),
                     server_frontend_url: server_credentials.server_frontend_url.clone(),
                     account_credentials: ac.clone(),
-                }
-            })
+                })
         } else {
             None
         }
@@ -85,7 +102,6 @@ impl RemoteServerCredentialsService {
         &self,
         scope: RemoteServerCredentialsScope,
         remote_server_backend_url: &Url,
-        account_name: &AccountName,
     ) -> Option<RemoteServerCredentialsFindDetails> {
         let credentials_table_ptr = match scope {
             RemoteServerCredentialsScope::User => &self.user_credentials,
@@ -100,13 +116,13 @@ impl RemoteServerCredentialsService {
             .iter()
             .find(|c| &c.server_backend_url == remote_server_backend_url)
         {
-            server_credentials.for_account(account_name).map(|ac| {
-                RemoteServerCredentialsFindDetails {
+            server_credentials
+                .for_account(self.account_name())
+                .map(|ac| RemoteServerCredentialsFindDetails {
                     server_backend_url: server_credentials.server_backend_url.clone(),
                     server_frontend_url: server_credentials.server_frontend_url.clone(),
                     account_credentials: ac.clone(),
-                }
-            })
+                })
         } else {
             None
         }
@@ -117,9 +133,10 @@ impl RemoteServerCredentialsService {
         scope: RemoteServerCredentialsScope,
         remote_server_frontend_url: &Url,
         remote_server_backend_url: &Url,
-        account_name: &AccountName,
         account_credentials: RemoteServerAccountCredentials,
     ) -> Result<(), InternalError> {
+        let account_name = self.account_name();
+
         let credentials_table_ptr = match scope {
             RemoteServerCredentialsScope::User => &self.user_credentials,
             RemoteServerCredentialsScope::Workspace => &self.workspace_credentials,
@@ -152,8 +169,9 @@ impl RemoteServerCredentialsService {
         &self,
         scope: RemoteServerCredentialsScope,
         remote_server_frontend_url: &Url,
-        account_name: &AccountName,
     ) -> Result<(), InternalError> {
+        let account_name = self.account_name();
+
         let credentials_table_ptr = match scope {
             RemoteServerCredentialsScope::User => &self.user_credentials,
             RemoteServerCredentialsScope::Workspace => &self.workspace_credentials,
@@ -181,9 +199,37 @@ impl RemoteServerCredentialsService {
 impl kamu::domain::auth::DatasetCredentialsResolver for RemoteServerCredentialsService {
     async fn resolve_dataset_credentials(
         &self,
-        _dataset_alias: &DatasetAlias,
+        dataset_http_url: &Url,
     ) -> Result<DatasetCredentials, ResolveDatasetCredentialsError> {
-        unimplemented!()
+        let origin = dataset_http_url.origin().unicode_serialization();
+        let recomposed_url = Url::parse(origin.as_str()).unwrap();
+
+        let res = if let Some(details) =
+            self.find_by_backend_url(RemoteServerCredentialsScope::Workspace, &recomposed_url)
+        {
+            Ok(details.account_credentials)
+        } else if let Some(details) =
+            self.find_by_backend_url(RemoteServerCredentialsScope::User, &recomposed_url)
+        {
+            Ok(details.account_credentials)
+        } else {
+            Err(ResolveDatasetCredentialsError::LoginRequired(
+                DatasetLoginRequiredError {
+                    server_url: recomposed_url,
+                },
+            ))
+        }?;
+
+        match res {
+            RemoteServerAccountCredentials::AccessToken(token) => {
+                Ok(DatasetCredentials::AccessToken(DatasetAccessToken {
+                    token: token.access_token,
+                }))
+            }
+            RemoteServerAccountCredentials::APIKey(_) => {
+                unimplemented!("API keys resolving not supported")
+            }
+        }
     }
 }
 

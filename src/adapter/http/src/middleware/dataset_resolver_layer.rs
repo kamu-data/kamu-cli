@@ -132,9 +132,7 @@ where
             };
 
             let dataset_ref = (layer.identity_extractor)(param1);
-            if Self::is_dataset_optional(&request) {
-                request.extensions_mut().insert(dataset_ref);
-            } else {
+            if !Self::is_dataset_optional(&request) {
                 let catalog = request
                     .extensions()
                     .get::<dill::Catalog>()
@@ -162,6 +160,8 @@ where
 
                 request.extensions_mut().insert(dataset);
             }
+
+            request.extensions_mut().insert(dataset_ref);
 
             inner.call(request).await
         })

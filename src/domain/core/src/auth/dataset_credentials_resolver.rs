@@ -8,16 +8,16 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::InternalError;
-use opendatafabric::DatasetAlias;
 use thiserror::Error;
+use url::Url;
 
 ///////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait DatasetCredentialsResolver {
+pub trait DatasetCredentialsResolver: Send + Sync {
     async fn resolve_dataset_credentials(
         &self,
-        dataset_alias: &DatasetAlias,
+        dataset_http_url: &Url,
     ) -> Result<DatasetCredentials, ResolveDatasetCredentialsError>;
 }
 
@@ -45,9 +45,9 @@ pub enum ResolveDatasetCredentialsError {
 }
 
 #[derive(Debug, Error)]
-#[error("Access to '{dataset_alias}' requires authentication")]
+#[error("Access to '{server_url}' requires authentication")]
 pub struct DatasetLoginRequiredError {
-    pub dataset_alias: DatasetAlias,
+    pub server_url: Url,
 }
 
 ///////////////////////////////////////////////////////////////////////////////

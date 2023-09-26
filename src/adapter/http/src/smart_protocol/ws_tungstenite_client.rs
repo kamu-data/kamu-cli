@@ -12,6 +12,7 @@ use std::sync::Arc;
 
 use dill::component;
 use futures::SinkExt;
+use hyper::StatusCode;
 use kamu::domain::*;
 use kamu::utils::smart_transfer_protocol::{
     DatasetFactoryFn,
@@ -22,7 +23,7 @@ use opendatafabric::{AsTypedBlock, Multihash};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use tokio::net::TcpStream;
-use tokio_tungstenite::tungstenite::Message;
+use tokio_tungstenite::tungstenite::{Error as TungsteniteError, Message};
 use tokio_tungstenite::{connect_async, MaybeTlsStream, WebSocketStream};
 use url::Url;
 
@@ -34,12 +35,20 @@ use crate::ws_common::{self, ReadMessageError, WriteMessageError};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[component(pub)]
-pub struct WsSmartTransferProtocolClient {}
+pub struct WsSmartTransferProtocolClient {
+    dataset_credential_resolver: Arc<dyn auth::DatasetCredentialsResolver>,
+}
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+#[component(pub)]
 impl WsSmartTransferProtocolClient {
+    pub fn new(dataset_credential_resolver: Arc<dyn auth::DatasetCredentialsResolver>) -> Self {
+        Self {
+            dataset_credential_resolver,
+        }
+    }
+
     async fn pull_send_request(
         &self,
         socket: &mut TungsteniteStream,
@@ -324,6 +333,7 @@ impl WsSmartTransferProtocolClient {
     async fn export_group_of_object_files(
         &self,
         socket: &mut TungsteniteStream,
+        access_token: &String,
         push_objects_response: DatasetPushObjectsTransferResponse,
         src: Arc<dyn Dataset>,
         transfer_options: ObjectTransferOptions,
@@ -336,15 +346,20 @@ impl WsSmartTransferProtocolClient {
             .map(|s| (s, uploaded_files_counter.clone()))
             .collect();
 
+        let access_token_arc = Arc::new(access_token.clone());
+
         let mut export_task = tokio::spawn(async move {
             let src_ref = src.as_ref();
+            let access_token_ref = access_token_arc.as_ref();
             use futures::stream::{StreamExt, TryStreamExt};
             futures::stream::iter(task_data)
                 .map(Ok)
                 .try_for_each_concurrent(
                     /* limit */ transfer_options.max_parallel_transfers,
                     |(s, counter)| async move {
-                        let export_result = dataset_export_object_file(src_ref, &s).await;
+                        let export_result =
+                            dataset_export_object_file(src_ref, &s, access_token_ref.as_str())
+                                .await;
                         counter.fetch_add(1, Ordering::Relaxed);
                         export_result
                     },
@@ -631,16 +646,47 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
             return Ok(SyncResult::UpToDate);
         }
 
+        let credentials = self
+            .dataset_credential_resolver
+            .resolve_dataset_credentials(http_dst_url)
+            .await
+            .int_err()?;
+
+        let access_token = match credentials {
+            auth::DatasetCredentials::AccessToken(token) => token.token,
+        };
+
         let mut push_url = http_dst_url.join("push").unwrap();
         let push_url_res = push_url.set_scheme("ws");
         assert!(push_url_res.is_ok());
 
-        tracing::debug!("Connecting to push URL: {}", push_url);
+        tracing::debug!(
+            "Connecting to push URL: {}, access token: {}",
+            push_url,
+            access_token
+        );
 
-        let mut ws_stream = match connect_async(push_url).await {
+        use tokio_tungstenite::tungstenite::client::IntoClientRequest;
+        let mut request = push_url.into_client_request().int_err()?;
+        request.headers_mut().append(
+            tokio_tungstenite::tungstenite::http::header::AUTHORIZATION,
+            tokio_tungstenite::tungstenite::http::header::HeaderValue::from_str(
+                format!("Bearer {}", access_token).as_str(),
+            )
+            .int_err()?,
+        );
+
+        let mut ws_stream = match connect_async(request).await {
             Ok((ws_stream, _)) => ws_stream,
             Err(e) => {
                 tracing::debug!("Failed to connect to push URL: {}", e);
+                if let TungsteniteError::Http(response) = &e {
+                    if response.status() == StatusCode::FORBIDDEN {
+                        return Err(SyncError::Access(AccessError::Forbidden(Box::new(e))));
+                    } else if response.status() == StatusCode::UNAUTHORIZED {
+                        return Err(SyncError::Access(AccessError::Unauthorized(Box::new(e))));
+                    }
+                }
                 return Err(SyncError::Internal(e.int_err()));
             }
         };
@@ -691,6 +737,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
 
         self.export_group_of_object_files(
             &mut ws_stream,
+            &access_token,
             push_objects_response,
             src,
             transfer_options,
