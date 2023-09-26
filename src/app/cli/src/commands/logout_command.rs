@@ -45,14 +45,14 @@ impl Command for LogoutCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
         match self.current_account_subject.as_ref() {
             CurrentAccountSubject::Logged(l) => {
-                let server_url = self
+                let remote_server_frontend_url = self
                     .server
                     .clone()
                     .unwrap_or_else(|| Url::parse(DEFAULT_LOGIN_URL).unwrap());
 
                 self.remote_server_credentials_service.drop_credentials(
                     self.scope,
-                    &server_url,
+                    &remote_server_frontend_url,
                     &l.account_name,
                 )?;
             }

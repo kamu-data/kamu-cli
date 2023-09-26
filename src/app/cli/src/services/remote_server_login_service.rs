@@ -13,11 +13,12 @@ use std::sync::Arc;
 use console::style as s;
 use dill::component;
 use internal_error::{InternalError, ResultIntoInternal};
+use serde::Deserialize;
 use thiserror::Error;
 use tokio::sync::Notify;
 use url::Url;
 
-use crate::{OutputConfig, RemoteServerAccessToken, RemoteServerAccountCredentials};
+use crate::{OutputConfig, RemoteServerAccountCredentials};
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
@@ -46,21 +47,32 @@ impl RemoteServerLoginService {
         )
     )]
     async fn post_handler(
-        axum::extract::State(token_tx): axum::extract::State<tokio::sync::mpsc::Sender<String>>,
+        axum::extract::State(response_tx): axum::extract::State<
+            tokio::sync::mpsc::Sender<LoginCallbackResponse>,
+        >,
         body: String,
     ) -> impl axum::response::IntoResponse {
-        token_tx.send(body).await.unwrap();
+        let response_result = serde_json::from_str::<LoginCallbackResponse>(body.as_str());
+        match response_result {
+            Ok(response) => {
+                response_tx.send(response).await.unwrap();
 
-        axum::response::Response::builder()
-            .status(200)
-            .body("{}".to_string())
-            .unwrap()
+                axum::response::Response::builder()
+                    .status(200)
+                    .body("{}".to_string())
+                    .unwrap()
+            }
+            Err(e) => axum::response::Response::builder()
+                .status(400)
+                .body(e.to_string())
+                .unwrap(),
+        }
     }
 
     fn initialize_cli_web_server(
         &self,
-        server_url: &Url,
-        token_tx: tokio::sync::mpsc::Sender<String>,
+        server_frontend_url: &Url,
+        response_tx: tokio::sync::mpsc::Sender<LoginCallbackResponse>,
     ) -> WebServer {
         let addr = SocketAddr::from((IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 0));
 
@@ -70,7 +82,7 @@ impl RemoteServerLoginService {
 
         let redirect_url = format!(
             "{}?callbackUrl=http://{}/",
-            server_url.join("/v/login").unwrap(),
+            server_frontend_url.join("/v/login").unwrap(),
             bound_addr.local_addr().to_string()
         );
 
@@ -92,7 +104,7 @@ impl RemoteServerLoginService {
                             .allow_headers(tower_http::cors::Any),
                     ),
             )
-            .with_state(token_tx);
+            .with_state(response_tx);
 
         axum::Server::builder(bound_addr).serve(app.into_make_service())
     }
@@ -115,16 +127,16 @@ impl RemoteServerLoginService {
         let _ = webbrowser::open(&cli_web_server_url);
     }
 
-    async fn obtain_access_token(
+    async fn obtain_callback_response(
         mut cli_web_server: WebServer,
-        mut token_rx: tokio::sync::mpsc::Receiver<String>,
-    ) -> Result<Option<String>, InternalError> {
+        mut response_rx: tokio::sync::mpsc::Receiver<LoginCallbackResponse>,
+    ) -> Result<Option<LoginCallbackResponse>, InternalError> {
         let ctrlc_rx = ctrlc_channel().int_err()?;
 
         tokio::select! {
-            maybe_access_token = token_rx.recv() => {
-                tracing::info!(?maybe_access_token, "Shutting down web server, as obtained access token");
-                Ok(maybe_access_token)
+            maybe_login_response = response_rx.recv() => {
+                tracing::info!(?maybe_login_response, "Shutting down web server, as obtained callback response");
+                Ok(maybe_login_response)
             }
             _ = ctrlc_rx.notified() => {
                 tracing::info!("Shutting down web server, as Ctrl+C pressed");
@@ -140,22 +152,19 @@ impl RemoteServerLoginService {
     #[allow(dead_code)]
     pub async fn login(
         &self,
-        remote_server_url: &Url,
-    ) -> Result<RemoteServerAccountCredentials, RemoteServerLoginError> {
-        let (token_tx, token_rx) = tokio::sync::mpsc::channel::<String>(1);
+        remote_server_frontend_url: &Url,
+    ) -> Result<LoginCallbackResponse, RemoteServerLoginError> {
+        let (response_tx, response_rx) = tokio::sync::mpsc::channel::<LoginCallbackResponse>(1);
 
-        let cli_web_server = self.initialize_cli_web_server(remote_server_url, token_tx);
+        let cli_web_server =
+            self.initialize_cli_web_server(remote_server_frontend_url, response_tx);
 
         let cli_web_server_url = format!("http://{}", cli_web_server.local_addr());
         self.open_web_browser(&cli_web_server_url);
 
-        let maybe_access_token = Self::obtain_access_token(cli_web_server, token_rx).await?;
-        match maybe_access_token {
-            Some(access_token) => Ok(RemoteServerAccountCredentials::AccessToken({
-                RemoteServerAccessToken { access_token }
-            })),
-            None => Err(RemoteServerLoginError::CredentialsNotObtained),
-        }
+        let maybe_callback_response =
+            Self::obtain_callback_response(cli_web_server, response_rx).await?;
+        maybe_callback_response.ok_or_else(|| RemoteServerLoginError::CredentialsNotObtained)
     }
 
     #[allow(dead_code)]
@@ -167,6 +176,15 @@ impl RemoteServerLoginService {
         // TODO
         unimplemented!()
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LoginCallbackResponse {
+    pub access_token: String,
+    pub backend_url: Url,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////

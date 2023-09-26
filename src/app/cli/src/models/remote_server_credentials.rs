@@ -24,16 +24,19 @@ pub enum RemoteServerCredentialsScope {
 ////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct RemoteServerCredentials {
-    pub server: Url,
-    pub account_credentials: HashMap<AccountName, RemoteServerAccountCredentials>,
+    pub server_frontend_url: Url,
+    pub server_backend_url: Url,
+    by_account_name: HashMap<AccountName, RemoteServerAccountCredentials>,
 }
 
 impl RemoteServerCredentials {
-    pub fn new(server: Url) -> Self {
+    pub fn new(server_frontend_url: Url, server_backend_url: Url) -> Self {
         Self {
-            server,
-            account_credentials: HashMap::new(),
+            server_frontend_url,
+            server_backend_url,
+            by_account_name: HashMap::new(),
         }
     }
 
@@ -42,31 +45,39 @@ impl RemoteServerCredentials {
         account_name: AccountName,
         credentials: RemoteServerAccountCredentials,
     ) {
-        self.account_credentials.insert(account_name, credentials);
+        self.by_account_name.insert(account_name, credentials);
+    }
+
+    pub fn drop_account_credentials(
+        &mut self,
+        account_name: &AccountName,
+    ) -> Option<RemoteServerAccountCredentials> {
+        self.by_account_name.remove(account_name)
     }
 
     pub fn for_account(
         &self,
         account_name: &AccountName,
     ) -> Option<RemoteServerAccountCredentials> {
-        self.account_credentials
-            .get(account_name)
-            .map(|c| c.clone())
+        self.by_account_name.get(account_name).map(|c| c.clone())
     }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "kind")]
 pub enum RemoteServerAccountCredentials {
     AccessToken(RemoteServerAccessToken),
     APIKey(RemoteServerAPIKey),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct RemoteServerAccessToken {
     pub access_token: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct RemoteServerAPIKey {
     pub api_key: String,
     pub secret_key: String,

@@ -16,6 +16,8 @@ use crate::services::{RemoteServerCredentialsService, RemoteServerLoginService};
 use crate::{
     CLIError,
     Command,
+    RemoteServerAccessToken,
+    RemoteServerAccountCredentials,
     RemoteServerCredentialsScope,
     RemoteServerLoginError,
     DEFAULT_LOGIN_URL,
@@ -57,27 +59,31 @@ impl Command for LoginCommand {
             CurrentAccountSubject::Anonymous(_) => panic!("Anonymous current account unexpected"),
         };
 
-        let server_url = self
+        let remote_server_frontend_url = self
             .server
             .as_ref()
             .map(|u| u.clone())
             .unwrap_or_else(|| Url::parse(DEFAULT_LOGIN_URL).unwrap());
 
-        let account_credentials = match self.remote_server_login_service.login(&server_url).await {
-            Ok(credentials) => Ok(credentials),
-            Err(e) => match e {
+        let login_callback_response = self
+            .remote_server_login_service
+            .login(&remote_server_frontend_url)
+            .await
+            .map_err(|e| match e {
                 RemoteServerLoginError::CredentialsNotObtained => {
-                    Err(CLIError::usage_error(e.to_string()))
+                    CLIError::usage_error(e.to_string())
                 }
-                RemoteServerLoginError::Internal(e) => Err(CLIError::failure(e)),
-            },
-        }?;
+                RemoteServerLoginError::Internal(e) => CLIError::failure(e),
+            })?;
 
         self.remote_server_credentials_service.save_credentials(
             self.scope,
-            server_url,
+            remote_server_frontend_url,
+            login_callback_response.backend_url,
             account_name,
-            account_credentials,
+            RemoteServerAccountCredentials::AccessToken(RemoteServerAccessToken {
+                access_token: login_callback_response.access_token,
+            }),
         )?;
 
         eprintln!("{}", console::style("Login Succesful").green().bold());
