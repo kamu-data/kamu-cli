@@ -15,18 +15,22 @@ use crate::auth::DEFAULT_ACCOUNT_NAME;
 
 pub enum CurrentAccountSubject {
     Logged(LoggedAccount),
-    Anonymous(AnonymousAccount),
+    Anonymous(AnonymousAccountReason),
 }
 
 pub struct LoggedAccount {
     pub account_name: AccountName,
 }
 
-pub struct AnonymousAccount {}
+pub enum AnonymousAccountReason {
+    NoAuthenticationProvided,
+    AuthenticationInvalid,
+    AuthenticationExpired,
+}
 
 impl CurrentAccountSubject {
-    pub fn anonymous() -> Self {
-        Self::Anonymous(AnonymousAccount {})
+    pub fn anonymous(reason: AnonymousAccountReason) -> Self {
+        Self::Anonymous(reason)
     }
 
     pub fn logged(account_name: AccountName) -> Self {

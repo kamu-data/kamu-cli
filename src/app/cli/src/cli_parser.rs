@@ -540,7 +540,7 @@ pub fn cli() -> Command {
                             .short('s')
                             .long("server")
                             .action(ArgAction::Set)
-                            .help("Custom remote server URL (Kamu platform is used by default)")
+                            .help("Custom remote server front-end URL (Kamu web platform is used by default)")
                     ]),
                 Command::new("logout")
                     .about("Logs out from a remote Kamu server")
@@ -554,7 +554,7 @@ pub fn cli() -> Command {
                             .short('s')
                             .long("server")
                             .action(ArgAction::Set)
-                            .help("Custom remote server URL (Kamu platform is used by default)")
+                            .help("Custom remote server front-end URL (Kamu web platform is used by default)")
                     ]),
                 Command::new("new")
                     .about("Creates a new dataset manifest from a template")

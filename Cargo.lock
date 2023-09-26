@@ -3299,6 +3299,7 @@ dependencies = [
  "rand",
  "read_input",
  "regex",
+ "reqwest",
  "rust-embed",
  "serde",
  "serde_json",

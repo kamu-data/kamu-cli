@@ -55,11 +55,11 @@ impl RemoteServerCredentials {
         self.by_account_name.remove(account_name)
     }
 
-    pub fn for_account(
-        &self,
+    pub fn for_account<'a>(
+        &'a self,
         account_name: &AccountName,
-    ) -> Option<RemoteServerAccountCredentials> {
-        self.by_account_name.get(account_name).map(|c| c.clone())
+    ) -> Option<&'a RemoteServerAccountCredentials> {
+        self.by_account_name.get(account_name)
     }
 }
 

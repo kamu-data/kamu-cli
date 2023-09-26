@@ -15,7 +15,7 @@ use axum::http::{Request, StatusCode};
 use axum::response::Response;
 use axum::RequestExt;
 use futures::Future;
-use kamu::domain::{auth, CurrentAccountSubject};
+use kamu::domain::{auth, AnonymousAccountReason, CurrentAccountSubject};
 use tower::{Layer, Service};
 
 use crate::AccessToken;
@@ -61,9 +61,14 @@ impl<Svc> AuthenticationMiddleware<Svc> {
                 .await
             {
                 Ok(account_info) => Ok(CurrentAccountSubject::logged(account_info.account_name)),
-                Err(auth::GetAccountInfoError::AccessToken(_)) => {
-                    Ok(CurrentAccountSubject::anonymous())
-                }
+                Err(auth::GetAccountInfoError::AccessToken(e)) => match e {
+                    auth::AccessTokenError::Expired => Ok(CurrentAccountSubject::anonymous(
+                        AnonymousAccountReason::AuthenticationExpired,
+                    )),
+                    auth::AccessTokenError::Invalid(_) => Ok(CurrentAccountSubject::anonymous(
+                        AnonymousAccountReason::AuthenticationInvalid,
+                    )),
+                },
                 Err(auth::GetAccountInfoError::Internal(_)) => {
                     return Err(Response::builder()
                         .status(StatusCode::INTERNAL_SERVER_ERROR)
@@ -72,7 +77,9 @@ impl<Svc> AuthenticationMiddleware<Svc> {
                 }
             }
         } else {
-            Ok(CurrentAccountSubject::anonymous())
+            Ok(CurrentAccountSubject::anonymous(
+                AnonymousAccountReason::NoAuthenticationProvided,
+            ))
         }
     }
 }

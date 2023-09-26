@@ -9,7 +9,7 @@
 
 use async_graphql::{value, EmptySubscription, Object};
 use kamu_adapter_graphql::{LoggedInGuard, ANONYMOUS_ACCESS_FORBIDDEN_MESSAGE};
-use kamu_core::CurrentAccountSubject;
+use kamu_core::{AnonymousAccountReason, CurrentAccountSubject};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -69,7 +69,9 @@ async fn logged_in_guard_logged() {
 #[tokio::test]
 async fn logged_in_guard_anonymous() {
     let catalog = dill::CatalogBuilder::new()
-        .add_value(CurrentAccountSubject::anonymous())
+        .add_value(CurrentAccountSubject::anonymous(
+            AnonymousAccountReason::NoAuthenticationProvided,
+        ))
         .build();
 
     let schema = TestSchema::build(TestQuery, TestMutation, EmptySubscription)

@@ -12,6 +12,7 @@ use std::sync::Arc;
 
 use console::style as s;
 use dill::component;
+use http::StatusCode;
 use internal_error::{InternalError, ResultIntoInternal};
 use serde::Deserialize;
 use thiserror::Error;
@@ -170,11 +171,53 @@ impl RemoteServerLoginService {
     #[allow(dead_code)]
     pub async fn validate_login_credentials(
         &self,
-        _remote_server_url: &Url,
-        _account_credentials: RemoteServerAccountCredentials,
+        remote_server_backend_url: &Url,
+        account_credentials: &RemoteServerAccountCredentials,
     ) -> Result<(), RemoteServerValidateLoginError> {
-        // TODO
-        unimplemented!()
+        match account_credentials {
+            RemoteServerAccountCredentials::AccessToken(access_token) => {
+                let client = reqwest::Client::new();
+
+                let validation_url = remote_server_backend_url
+                    .join("platform/token/validate")
+                    .unwrap();
+
+                tracing::info!(?validation_url, "Token validation request");
+
+                let response = client
+                    .get(validation_url)
+                    .bearer_auth(access_token.access_token.clone())
+                    .send()
+                    .await
+                    .int_err()?;
+
+                match response.status() {
+                    StatusCode::OK => Ok(()),
+                    StatusCode::UNAUTHORIZED => {
+                        Err(RemoteServerValidateLoginError::ExpiredCredentials(
+                            RemoteServerExpiredCredentialsError {
+                                server_url: remote_server_backend_url.clone(),
+                            },
+                        ))
+                    }
+                    StatusCode::BAD_REQUEST => {
+                        Err(RemoteServerValidateLoginError::InvalidCredentials(
+                            RemoteServerInvalidCredentialsError {
+                                server_url: remote_server_backend_url.clone(),
+                            },
+                        ))
+                    }
+                    _ => panic!(
+                        "Unexpected validation status code: {}, details: {}",
+                        response.status().as_str(),
+                        response.text().await.unwrap()
+                    ),
+                }
+            }
+            RemoteServerAccountCredentials::APIKey(_) => {
+                unimplemented!("Validating via API keys not implemented yet")
+            }
+        }
     }
 }
 
@@ -218,14 +261,20 @@ pub enum RemoteServerValidateLoginError {
     Internal(InternalError),
 }
 
+impl From<InternalError> for RemoteServerValidateLoginError {
+    fn from(value: InternalError) -> Self {
+        Self::Internal(value)
+    }
+}
+
 #[derive(Debug, Error)]
-#[error("Credentials for '{server_url}' remote server have expired. Please re-run `kamu login`")]
+#[error("Credentials for '{server_url}' remote server have expired.")]
 pub struct RemoteServerExpiredCredentialsError {
     server_url: Url,
 }
 
 #[derive(Debug, Error)]
-#[error("Credentials for '{server_url}' are invalid. Please re-run `kamu login`")]
+#[error("Credentials for '{server_url}' are invalid.")]
 pub struct RemoteServerInvalidCredentialsError {
     server_url: Url,
 }

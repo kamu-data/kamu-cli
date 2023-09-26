@@ -55,7 +55,7 @@ impl RemoteServerCredentialsService {
         scope: RemoteServerCredentialsScope,
         remote_server_frontend_url: &Url,
         account_name: &AccountName,
-    ) -> Option<RemoteServerAccountCredentials> {
+    ) -> Option<RemoteServerCredentialsFindDetails> {
         let credentials_table_ptr = match scope {
             RemoteServerCredentialsScope::User => &self.user_credentials,
             RemoteServerCredentialsScope::Workspace => &self.workspace_credentials,
@@ -69,7 +69,13 @@ impl RemoteServerCredentialsService {
             .iter()
             .find(|c| &c.server_frontend_url == remote_server_frontend_url)
         {
-            server_credentials.for_account(account_name)
+            server_credentials.for_account(account_name).map(|ac| {
+                RemoteServerCredentialsFindDetails {
+                    server_backend_url: server_credentials.server_backend_url.clone(),
+                    server_frontend_url: server_credentials.server_frontend_url.clone(),
+                    account_credentials: ac.clone(),
+                }
+            })
         } else {
             None
         }
@@ -80,7 +86,7 @@ impl RemoteServerCredentialsService {
         scope: RemoteServerCredentialsScope,
         remote_server_backend_url: &Url,
         account_name: &AccountName,
-    ) -> Option<RemoteServerAccountCredentials> {
+    ) -> Option<RemoteServerCredentialsFindDetails> {
         let credentials_table_ptr = match scope {
             RemoteServerCredentialsScope::User => &self.user_credentials,
             RemoteServerCredentialsScope::Workspace => &self.workspace_credentials,
@@ -94,7 +100,13 @@ impl RemoteServerCredentialsService {
             .iter()
             .find(|c| &c.server_backend_url == remote_server_backend_url)
         {
-            server_credentials.for_account(account_name)
+            server_credentials.for_account(account_name).map(|ac| {
+                RemoteServerCredentialsFindDetails {
+                    server_backend_url: server_credentials.server_backend_url.clone(),
+                    server_frontend_url: server_credentials.server_frontend_url.clone(),
+                    account_credentials: ac.clone(),
+                }
+            })
         } else {
             None
         }
@@ -269,6 +281,15 @@ impl RemoteServerCredentialsStorage for CLIRemoteServerCredentialsStorage {
 
         serde_yaml::to_writer(file, &manifest).int_err()
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug)]
+pub struct RemoteServerCredentialsFindDetails {
+    pub server_frontend_url: Url,
+    pub server_backend_url: Url,
+    pub account_credentials: RemoteServerAccountCredentials,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
