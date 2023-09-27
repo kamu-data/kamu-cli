@@ -17,7 +17,7 @@ use glob;
 use kamu::domain::*;
 
 use super::{CLIError, Command};
-use crate::services::ConfigService;
+use crate::config::ConfigService;
 
 pub struct CompleteCommand {
     dataset_repo: Option<Arc<dyn DatasetRepository>>,

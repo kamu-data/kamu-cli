@@ -11,25 +11,24 @@ use std::sync::Arc;
 
 use url::Url;
 
-use crate::services::OdfServerTokenService;
-use crate::{CLIError, Command, OdfServerAccessTokenStoreScope, DEFAULT_ODF_FRONTEND_URL};
+use crate::{odf_server, CLIError, Command};
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct LogoutCommand {
-    odf_server_token_service: Arc<OdfServerTokenService>,
-    scope: OdfServerAccessTokenStoreScope,
+    access_token_registry_service: Arc<odf_server::AccessTokenRegistryService>,
+    scope: odf_server::AccessTokenStoreScope,
     server: Option<Url>,
 }
 
 impl LogoutCommand {
     pub fn new(
-        odf_server_token_service: Arc<OdfServerTokenService>,
-        scope: OdfServerAccessTokenStoreScope,
+        access_token_registry_service: Arc<odf_server::AccessTokenRegistryService>,
+        scope: odf_server::AccessTokenStoreScope,
         server: Option<Url>,
     ) -> Self {
         Self {
-            odf_server_token_service,
+            access_token_registry_service,
             scope,
             server,
         }
@@ -42,9 +41,9 @@ impl Command for LogoutCommand {
         let odf_server_frontend_url = self
             .server
             .clone()
-            .unwrap_or_else(|| Url::parse(DEFAULT_ODF_FRONTEND_URL).unwrap());
+            .unwrap_or_else(|| Url::parse(odf_server::DEFAULT_ODF_FRONTEND_URL).unwrap());
 
-        self.odf_server_token_service
+        self.access_token_registry_service
             .drop_access_token(self.scope, &odf_server_frontend_url)?;
 
         Ok(())

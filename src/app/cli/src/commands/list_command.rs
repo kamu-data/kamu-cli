@@ -18,18 +18,13 @@ use opendatafabric::*;
 
 use super::{CLIError, Command};
 use crate::output::*;
-use crate::{
-    CurrentAccountIndication,
-    NotInMultiTenantWorkspace,
-    RelatedAccountIndication,
-    TargetAccountSelection,
-};
+use crate::{accounts, NotInMultiTenantWorkspace};
 
 pub struct ListCommand {
     dataset_repo: Arc<dyn DatasetRepository>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
-    current_account: CurrentAccountIndication,
-    related_account: RelatedAccountIndication,
+    current_account: accounts::CurrentAccountIndication,
+    related_account: accounts::RelatedAccountIndication,
     output_config: Arc<OutputConfig>,
     detail_level: u8,
 }
@@ -38,8 +33,8 @@ impl ListCommand {
     pub fn new(
         dataset_repo: Arc<dyn DatasetRepository>,
         remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
-        current_account: CurrentAccountIndication,
-        related_account: RelatedAccountIndication,
+        current_account: accounts::CurrentAccountIndication,
+        related_account: accounts::RelatedAccountIndication,
         output_config: Arc<OutputConfig>,
         detail_level: u8,
     ) -> Self {
@@ -182,15 +177,15 @@ impl ListCommand {
     fn stream_datasets(&self) -> DatasetHandleStream {
         if self.dataset_repo.is_multi_tenant() {
             match &self.related_account.target_account {
-                TargetAccountSelection::Current => self
+                accounts::TargetAccountSelection::Current => self
                     .dataset_repo
                     .get_datasets_by_owner(self.current_account.account_name.clone()),
-                TargetAccountSelection::Specific {
+                accounts::TargetAccountSelection::Specific {
                     account_name: user_name,
                 } => self
                     .dataset_repo
                     .get_datasets_by_owner(AccountName::from_str(user_name.as_str()).unwrap()),
-                TargetAccountSelection::AllUsers => self.dataset_repo.get_all_datasets(),
+                accounts::TargetAccountSelection::AllUsers => self.dataset_repo.get_all_datasets(),
             }
         } else {
             self.dataset_repo.get_all_datasets()

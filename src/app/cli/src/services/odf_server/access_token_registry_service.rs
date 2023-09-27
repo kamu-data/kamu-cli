@@ -18,37 +18,32 @@ use opendatafabric::serde::yaml::Manifest;
 use opendatafabric::AccountName;
 use url::Url;
 
-use crate::{
-    OdfServerAccessToken,
-    OdfServerAccessTokenMap,
-    OdfServerAccessTokenStoreScope,
-    OdfServerTokenFindReport,
-    WorkspaceLayout,
-};
+use crate::odf_server::models::*;
+use crate::WorkspaceLayout;
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
-type OdfServerAccessTokenRegistry = Vec<OdfServerAccessTokenMap>;
+type OdfServerAccessTokenRegistry = Vec<AccessTokenMap>;
 
-pub struct OdfServerTokenService {
-    storage: Arc<dyn OdfServerAccessTokenStore>,
+pub struct AccessTokenRegistryService {
+    storage: Arc<dyn AccessTokenStore>,
     current_account_subject: Arc<CurrentAccountSubject>,
     workspace_registry: Mutex<OdfServerAccessTokenRegistry>,
     user_registry: Mutex<OdfServerAccessTokenRegistry>,
 }
 
 #[component(pub)]
-impl OdfServerTokenService {
+impl AccessTokenRegistryService {
     pub fn new(
-        storage: Arc<dyn OdfServerAccessTokenStore>,
+        storage: Arc<dyn AccessTokenStore>,
         current_account_subject: Arc<CurrentAccountSubject>,
     ) -> Self {
         let user_registry = storage
-            .read_access_tokens_registry(OdfServerAccessTokenStoreScope::User)
+            .read_access_tokens_registry(AccessTokenStoreScope::User)
             .unwrap();
 
         let workspace_registry = storage
-            .read_access_tokens_registry(OdfServerAccessTokenStoreScope::Workspace)
+            .read_access_tokens_registry(AccessTokenStoreScope::Workspace)
             .unwrap();
 
         Self {
@@ -68,27 +63,27 @@ impl OdfServerTokenService {
 
     pub fn find_by_frontend_url(
         &self,
-        scope: OdfServerAccessTokenStoreScope,
+        scope: AccessTokenStoreScope,
         odf_server_frontend_url: &Url,
-    ) -> Option<OdfServerTokenFindReport> {
+    ) -> Option<AccessTokenFindReport> {
         let registry_ptr = match scope {
-            OdfServerAccessTokenStoreScope::User => &self.user_registry,
-            OdfServerAccessTokenStoreScope::Workspace => &self.workspace_registry,
+            AccessTokenStoreScope::User => &self.user_registry,
+            AccessTokenStoreScope::Workspace => &self.workspace_registry,
         };
 
         let registry = registry_ptr
             .lock()
             .expect("Could not lock access tokens registry");
 
-        if let Some(odf_server_token_map) = registry
+        if let Some(token_map) = registry
             .iter()
-            .find(|c| &c.odf_server_frontend_url == odf_server_frontend_url)
+            .find(|c| &c.frontend_url == odf_server_frontend_url)
         {
-            odf_server_token_map
+            token_map
                 .token_for_account(self.account_name())
-                .map(|ac| OdfServerTokenFindReport {
-                    odf_server_backend_url: odf_server_token_map.odf_server_backend_url.clone(),
-                    odf_server_frontend_url: odf_server_token_map.odf_server_frontend_url.clone(),
+                .map(|ac| AccessTokenFindReport {
+                    backend_url: token_map.backend_url.clone(),
+                    frontend_url: token_map.frontend_url.clone(),
                     access_token: ac.clone(),
                 })
         } else {
@@ -98,27 +93,27 @@ impl OdfServerTokenService {
 
     pub fn find_by_backend_url(
         &self,
-        scope: OdfServerAccessTokenStoreScope,
+        scope: AccessTokenStoreScope,
         odf_server_backend_url: &Url,
-    ) -> Option<OdfServerTokenFindReport> {
+    ) -> Option<AccessTokenFindReport> {
         let registry_ptr = match scope {
-            OdfServerAccessTokenStoreScope::User => &self.user_registry,
-            OdfServerAccessTokenStoreScope::Workspace => &self.workspace_registry,
+            AccessTokenStoreScope::User => &self.user_registry,
+            AccessTokenStoreScope::Workspace => &self.workspace_registry,
         };
 
         let registry = registry_ptr
             .lock()
             .expect("Could not lock access tokens registry");
 
-        if let Some(odf_server_token_map) = registry
+        if let Some(token_map) = registry
             .iter()
-            .find(|c| &c.odf_server_backend_url == odf_server_backend_url)
+            .find(|c| &c.backend_url == odf_server_backend_url)
         {
-            odf_server_token_map
+            token_map
                 .token_for_account(self.account_name())
-                .map(|ac| OdfServerTokenFindReport {
-                    odf_server_backend_url: odf_server_token_map.odf_server_backend_url.clone(),
-                    odf_server_frontend_url: odf_server_token_map.odf_server_frontend_url.clone(),
+                .map(|ac| AccessTokenFindReport {
+                    backend_url: token_map.backend_url.clone(),
+                    frontend_url: token_map.frontend_url.clone(),
                     access_token: ac.clone(),
                 })
         } else {
@@ -128,35 +123,35 @@ impl OdfServerTokenService {
 
     pub fn save_access_token(
         &self,
-        scope: OdfServerAccessTokenStoreScope,
+        scope: AccessTokenStoreScope,
         odf_server_frontend_url: &Url,
         odf_server_backend_url: &Url,
-        access_token: OdfServerAccessToken,
+        access_token: AccessToken,
     ) -> Result<(), InternalError> {
         let account_name = self.account_name();
 
         let registry_ptr = match scope {
-            OdfServerAccessTokenStoreScope::User => &self.user_registry,
-            OdfServerAccessTokenStoreScope::Workspace => &self.workspace_registry,
+            AccessTokenStoreScope::User => &self.user_registry,
+            AccessTokenStoreScope::Workspace => &self.workspace_registry,
         };
 
         let mut registry = registry_ptr
             .lock()
             .expect("Could not lock access tokens registry");
 
-        if let Some(odf_server_token_map) = registry
+        if let Some(token_map) = registry
             .iter_mut()
-            .find(|c| &c.odf_server_frontend_url == odf_server_frontend_url)
+            .find(|c| &c.frontend_url == odf_server_frontend_url)
         {
-            odf_server_token_map.add_account_token(account_name.clone(), access_token);
+            token_map.add_account_token(account_name.clone(), access_token);
         } else {
-            let mut odf_server_token_map = OdfServerAccessTokenMap::new(
+            let mut token_map = AccessTokenMap::new(
                 odf_server_frontend_url.clone(),
                 odf_server_backend_url.clone(),
             );
-            odf_server_token_map.add_account_token(account_name.clone(), access_token.clone());
+            token_map.add_account_token(account_name.clone(), access_token.clone());
 
-            registry.push(odf_server_token_map);
+            registry.push(token_map);
         }
 
         self.storage.write_access_tokens_registry(scope, &registry)
@@ -164,25 +159,25 @@ impl OdfServerTokenService {
 
     pub fn drop_access_token(
         &self,
-        scope: OdfServerAccessTokenStoreScope,
+        scope: AccessTokenStoreScope,
         odf_server_frontend_url: &Url,
     ) -> Result<(), InternalError> {
         let account_name = self.account_name();
 
         let registry_ptr = match scope {
-            OdfServerAccessTokenStoreScope::User => &self.user_registry,
-            OdfServerAccessTokenStoreScope::Workspace => &self.workspace_registry,
+            AccessTokenStoreScope::User => &self.user_registry,
+            AccessTokenStoreScope::Workspace => &self.workspace_registry,
         };
 
         let mut registry = registry_ptr
             .lock()
             .expect("Could not lock access tokens registry");
 
-        if let Some(odf_server_token_map) = registry
+        if let Some(token_map) = registry
             .iter_mut()
-            .find(|c| &c.odf_server_frontend_url == odf_server_frontend_url)
+            .find(|c| &c.frontend_url == odf_server_frontend_url)
         {
-            if let Some(_) = odf_server_token_map.drop_account_token(account_name) {
+            if let Some(_) = token_map.drop_account_token(account_name) {
                 return self.storage.write_access_tokens_registry(scope, &registry);
             }
         }
@@ -194,7 +189,7 @@ impl OdfServerTokenService {
 ////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl kamu::domain::auth::OdfServerAccessTokenResolver for OdfServerTokenService {
+impl kamu::domain::auth::OdfServerAccessTokenResolver for AccessTokenRegistryService {
     async fn resolve_odf_dataset_access_token(
         &self,
         odf_dataset_http_url: &Url,
@@ -202,15 +197,13 @@ impl kamu::domain::auth::OdfServerAccessTokenResolver for OdfServerTokenService 
         let origin = odf_dataset_http_url.origin().unicode_serialization();
         let odf_server_backend_url = Url::parse(origin.as_str()).unwrap();
 
-        if let Some(token_find_report) = self.find_by_backend_url(
-            OdfServerAccessTokenStoreScope::Workspace,
-            &odf_server_backend_url,
-        ) {
+        if let Some(token_find_report) =
+            self.find_by_backend_url(AccessTokenStoreScope::Workspace, &odf_server_backend_url)
+        {
             Ok(token_find_report.access_token.access_token)
-        } else if let Some(token_find_report) = self.find_by_backend_url(
-            OdfServerAccessTokenStoreScope::User,
-            &odf_server_backend_url,
-        ) {
+        } else if let Some(token_find_report) =
+            self.find_by_backend_url(AccessTokenStoreScope::User, &odf_server_backend_url)
+        {
             Ok(token_find_report.access_token.access_token)
         } else {
             Err(OdfServerAccessTokenResolveError::LoginRequired(
@@ -224,15 +217,15 @@ impl kamu::domain::auth::OdfServerAccessTokenResolver for OdfServerTokenService 
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
-pub trait OdfServerAccessTokenStore: Send + Sync {
+pub trait AccessTokenStore: Send + Sync {
     fn read_access_tokens_registry(
         &self,
-        scope: OdfServerAccessTokenStoreScope,
+        scope: AccessTokenStoreScope,
     ) -> Result<OdfServerAccessTokenRegistry, InternalError>;
 
     fn write_access_tokens_registry(
         &self,
-        scope: OdfServerAccessTokenStoreScope,
+        scope: AccessTokenStoreScope,
         registry: &OdfServerAccessTokenRegistry,
     ) -> Result<(), InternalError>;
 }
@@ -243,13 +236,13 @@ const KAMU_TOKEN_STORE: &str = ".kamutokenstore";
 const KAMU_TOKEN_STORE_VERSION: i32 = 1;
 const KAMU_TOKEN_STORE_MANIFEST_KIND: &str = "KamuOdfServerTokenStore";
 
-pub struct CliOdfServerAccessTokenStore {
+pub struct CLIAccessTokenStore {
     user_token_store_path: PathBuf,
     workspace_token_store_path: PathBuf,
 }
 
 #[component(pub)]
-impl CliOdfServerAccessTokenStore {
+impl CLIAccessTokenStore {
     pub fn new(workspace_layout: &WorkspaceLayout) -> Self {
         let user_token_store_path = dirs::home_dir()
             .expect("Cannot determine user home directory")
@@ -263,18 +256,18 @@ impl CliOdfServerAccessTokenStore {
         }
     }
 
-    fn token_store_path_for_scope(&self, scope: OdfServerAccessTokenStoreScope) -> &PathBuf {
+    fn token_store_path_for_scope(&self, scope: AccessTokenStoreScope) -> &PathBuf {
         match scope {
-            OdfServerAccessTokenStoreScope::User => &self.user_token_store_path,
-            OdfServerAccessTokenStoreScope::Workspace => &self.workspace_token_store_path,
+            AccessTokenStoreScope::User => &self.user_token_store_path,
+            AccessTokenStoreScope::Workspace => &self.workspace_token_store_path,
         }
     }
 }
 
-impl OdfServerAccessTokenStore for CliOdfServerAccessTokenStore {
+impl AccessTokenStore for CLIAccessTokenStore {
     fn read_access_tokens_registry(
         &self,
-        scope: OdfServerAccessTokenStoreScope,
+        scope: AccessTokenStoreScope,
     ) -> Result<OdfServerAccessTokenRegistry, InternalError> {
         let token_store_path = self.token_store_path_for_scope(scope);
         if !token_store_path.exists() {
@@ -296,7 +289,7 @@ impl OdfServerAccessTokenStore for CliOdfServerAccessTokenStore {
 
     fn write_access_tokens_registry(
         &self,
-        scope: OdfServerAccessTokenStoreScope,
+        scope: AccessTokenStoreScope,
         registry: &OdfServerAccessTokenRegistry,
     ) -> Result<(), InternalError> {
         let token_store_path = self.token_store_path_for_scope(scope);

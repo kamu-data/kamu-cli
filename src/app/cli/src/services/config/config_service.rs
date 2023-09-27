@@ -14,8 +14,9 @@ use dill::*;
 use merge::Merge;
 use opendatafabric::serde::yaml::Manifest;
 
+use crate::config::models::*;
 use crate::error::CLIError;
-use crate::{CLIConfig, ConfigScope, NotInWorkspace, WorkspaceLayout};
+use crate::{NotInWorkspace, WorkspaceLayout};
 
 ////////////////////////////////////////////////////////////////////////////////////////
 

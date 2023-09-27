@@ -19,7 +19,7 @@ use thiserror::Error;
 use tokio::sync::Notify;
 use url::Url;
 
-use crate::{OdfServerAccessToken, OutputConfig};
+use crate::{odf_server, OutputConfig};
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
@@ -30,12 +30,12 @@ type WebServer =
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct OdfServerLoginService {
+pub struct LoginService {
     output_config: Arc<OutputConfig>,
 }
 
 #[component(pub)]
-impl OdfServerLoginService {
+impl LoginService {
     pub fn new(output_config: Arc<OutputConfig>) -> Self {
         Self { output_config }
     }
@@ -49,12 +49,11 @@ impl OdfServerLoginService {
     )]
     async fn post_handler(
         axum::extract::State(response_tx): axum::extract::State<
-            tokio::sync::mpsc::Sender<OdfFrontendLoginCallbackResponse>,
+            tokio::sync::mpsc::Sender<FrontendLoginCallbackResponse>,
         >,
         body: String,
     ) -> impl axum::response::IntoResponse {
-        let response_result =
-            serde_json::from_str::<OdfFrontendLoginCallbackResponse>(body.as_str());
+        let response_result = serde_json::from_str::<FrontendLoginCallbackResponse>(body.as_str());
         match response_result {
             Ok(response) => {
                 response_tx.send(response).await.unwrap();
@@ -74,7 +73,7 @@ impl OdfServerLoginService {
     fn initialize_cli_web_server(
         &self,
         server_frontend_url: &Url,
-        response_tx: tokio::sync::mpsc::Sender<OdfFrontendLoginCallbackResponse>,
+        response_tx: tokio::sync::mpsc::Sender<FrontendLoginCallbackResponse>,
     ) -> WebServer {
         let addr = SocketAddr::from((IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 0));
 
@@ -131,8 +130,8 @@ impl OdfServerLoginService {
 
     async fn obtain_callback_response(
         mut cli_web_server: WebServer,
-        mut response_rx: tokio::sync::mpsc::Receiver<OdfFrontendLoginCallbackResponse>,
-    ) -> Result<Option<OdfFrontendLoginCallbackResponse>, InternalError> {
+        mut response_rx: tokio::sync::mpsc::Receiver<FrontendLoginCallbackResponse>,
+    ) -> Result<Option<FrontendLoginCallbackResponse>, InternalError> {
         let ctrlc_rx = ctrlc_channel().int_err()?;
 
         tokio::select! {
@@ -154,9 +153,9 @@ impl OdfServerLoginService {
     pub async fn login(
         &self,
         odf_server_frontend_url: &Url,
-    ) -> Result<OdfFrontendLoginCallbackResponse, OdfServerLoginError> {
+    ) -> Result<FrontendLoginCallbackResponse, LoginError> {
         let (response_tx, response_rx) =
-            tokio::sync::mpsc::channel::<OdfFrontendLoginCallbackResponse>(1);
+            tokio::sync::mpsc::channel::<FrontendLoginCallbackResponse>(1);
 
         let cli_web_server = self.initialize_cli_web_server(odf_server_frontend_url, response_tx);
 
@@ -165,15 +164,15 @@ impl OdfServerLoginService {
 
         let maybe_callback_response =
             Self::obtain_callback_response(cli_web_server, response_rx).await?;
-        maybe_callback_response.ok_or_else(|| OdfServerLoginError::AccessFailed)
+        maybe_callback_response.ok_or_else(|| LoginError::AccessFailed)
     }
 
     #[allow(dead_code)]
     pub async fn validate_access_token(
         &self,
         odf_server_backend_url: &Url,
-        access_token: &OdfServerAccessToken,
-    ) -> Result<(), OdfServerValidateAccessTokenError> {
+        access_token: &odf_server::AccessToken,
+    ) -> Result<(), ValidateAccessTokenError> {
         let client = reqwest::Client::new();
 
         let validation_url = odf_server_backend_url
@@ -191,16 +190,16 @@ impl OdfServerLoginService {
 
         match response.status() {
             StatusCode::OK => Ok(()),
-            StatusCode::UNAUTHORIZED => Err(OdfServerValidateAccessTokenError::ExpiredToken(
-                OdfServerExpiredTokenError {
+            StatusCode::UNAUTHORIZED => {
+                Err(ValidateAccessTokenError::ExpiredToken(ExpiredTokenError {
                     odf_server_backend_url: odf_server_backend_url.clone(),
-                },
-            )),
-            StatusCode::BAD_REQUEST => Err(OdfServerValidateAccessTokenError::InvalidToken(
-                OdfServerInvalidTokenError {
+                }))
+            }
+            StatusCode::BAD_REQUEST => {
+                Err(ValidateAccessTokenError::InvalidToken(InvalidTokenError {
                     odf_server_backend_url: odf_server_backend_url.clone(),
-                },
-            )),
+                }))
+            }
             _ => panic!(
                 "Unexpected validation status code: {}, details: {}",
                 response.status().as_str(),
@@ -214,7 +213,7 @@ impl OdfServerLoginService {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct OdfFrontendLoginCallbackResponse {
+pub struct FrontendLoginCallbackResponse {
     pub access_token: String,
     pub backend_url: Url,
 }
@@ -222,7 +221,7 @@ pub struct OdfFrontendLoginCallbackResponse {
 ////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Error)]
-pub enum OdfServerLoginError {
+pub enum LoginError {
     #[error("Did not obtain access token")]
     AccessFailed,
 
@@ -230,7 +229,7 @@ pub enum OdfServerLoginError {
     Internal(InternalError),
 }
 
-impl From<InternalError> for OdfServerLoginError {
+impl From<InternalError> for LoginError {
     fn from(value: InternalError) -> Self {
         Self::Internal(value)
     }
@@ -239,18 +238,18 @@ impl From<InternalError> for OdfServerLoginError {
 ////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Error)]
-pub enum OdfServerValidateAccessTokenError {
+pub enum ValidateAccessTokenError {
     #[error(transparent)]
-    ExpiredToken(OdfServerExpiredTokenError),
+    ExpiredToken(ExpiredTokenError),
 
     #[error(transparent)]
-    InvalidToken(OdfServerInvalidTokenError),
+    InvalidToken(InvalidTokenError),
 
     #[error(transparent)]
     Internal(InternalError),
 }
 
-impl From<InternalError> for OdfServerValidateAccessTokenError {
+impl From<InternalError> for ValidateAccessTokenError {
     fn from(value: InternalError) -> Self {
         Self::Internal(value)
     }
@@ -258,13 +257,13 @@ impl From<InternalError> for OdfServerValidateAccessTokenError {
 
 #[derive(Debug, Error)]
 #[error("Access token for '{odf_server_backend_url}' ODF server expired.")]
-pub struct OdfServerExpiredTokenError {
+pub struct ExpiredTokenError {
     odf_server_backend_url: Url,
 }
 
 #[derive(Debug, Error)]
 #[error("Access token for '{odf_server_backend_url}' ODF server are invalid.")]
-pub struct OdfServerInvalidTokenError {
+pub struct InvalidTokenError {
     odf_server_backend_url: Url,
 }
 

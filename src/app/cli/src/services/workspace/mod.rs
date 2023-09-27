@@ -7,12 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod gc_service;
-pub use gc_service::*;
+mod workspace_layout;
+mod workspace_service;
 
-mod workspace;
-pub use workspace::*;
-
-pub mod accounts;
-pub mod config;
-pub mod odf_server;
+pub use workspace_layout::*;
+pub use workspace_service::*;

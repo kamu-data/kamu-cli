@@ -12,8 +12,7 @@ use opendatafabric::*;
 use url::Url;
 
 use crate::commands::*;
-use crate::services::{AccountService, WorkspaceService};
-use crate::{CommandInterpretationFailed, OdfServerAccessTokenStoreScope};
+use crate::{accounts, odf_server, CommandInterpretationFailed, WorkspaceService};
 
 pub fn get_command(
     base_catalog: &dill::Catalog,
@@ -26,7 +25,7 @@ pub fn get_command(
             Box::new(AddCommand::new(
                 cli_catalog.get_one()?,
                 cli_catalog.get_one()?,
-                AccountService::current_account_indication(
+                accounts::AccountService::current_account_indication(
                     &arg_matches,
                     workspace_svc.is_multi_tenant_workspace(),
                 ),
@@ -167,11 +166,11 @@ pub fn get_command(
             Box::new(ListCommand::new(
                 cli_catalog.get_one()?,
                 cli_catalog.get_one()?,
-                AccountService::current_account_indication(
+                accounts::AccountService::current_account_indication(
                     &arg_matches,
                     workspace_svc.is_multi_tenant_workspace(),
                 ),
-                AccountService::related_account_indication(submatches),
+                accounts::AccountService::related_account_indication(submatches),
                 cli_catalog.get_one()?,
                 submatches.get_count("wide"),
             ))
@@ -192,9 +191,9 @@ pub fn get_command(
             cli_catalog.get_one()?,
             cli_catalog.get_one()?,
             if submatches.get_flag("g") {
-                OdfServerAccessTokenStoreScope::User
+                odf_server::AccessTokenStoreScope::User
             } else {
-                OdfServerAccessTokenStoreScope::Workspace
+                odf_server::AccessTokenStoreScope::Workspace
             },
             // TODO: improve URL parser
             submatches
@@ -204,9 +203,9 @@ pub fn get_command(
         Some(("logout", submatches)) => Box::new(LogoutCommand::new(
             cli_catalog.get_one()?,
             if submatches.get_flag("g") {
-                OdfServerAccessTokenStoreScope::User
+                odf_server::AccessTokenStoreScope::User
             } else {
-                OdfServerAccessTokenStoreScope::Workspace
+                odf_server::AccessTokenStoreScope::Workspace
             },
             // TODO: improve URL parser
             submatches

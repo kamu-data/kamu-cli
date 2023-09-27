@@ -10,8 +10,7 @@
 use std::sync::Arc;
 
 use super::{CLIError, Command};
-use crate::services::ConfigService;
-use crate::ConfigScope;
+use crate::config::{ConfigScope, ConfigService};
 
 ////////////////////////////////////////////////////////////////////////////////////////
 // List

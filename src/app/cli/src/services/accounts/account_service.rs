@@ -17,13 +17,8 @@ use kamu::domain::auth::{self, AccountInfo, AccountType};
 use opendatafabric::{AccountName, FAKE_ACCOUNT_ID};
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    CurrentAccountIndication,
-    PasswordLoginCredentials,
-    RelatedAccountIndication,
-    TargetAccountSelection,
-    UsersConfig,
-};
+use crate::accounts::models::*;
+use crate::config::UsersConfig;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 

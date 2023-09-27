@@ -19,7 +19,7 @@ async fn test_di_graph_validates() {
     base_catalog_builder.add_value(OutputConfig::default());
 
     kamu_cli::register_config_in_catalog(
-        &kamu_cli::CLIConfig::default(),
+        &kamu_cli::config::CLIConfig::default(),
         &mut base_catalog_builder,
         false,
     );

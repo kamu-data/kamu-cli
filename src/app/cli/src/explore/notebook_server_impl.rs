@@ -17,7 +17,7 @@ use std::time::Duration;
 use container_runtime::*;
 use internal_error::*;
 
-use crate::JupyterConfig;
+use crate::config::JupyterConfig;
 
 pub struct NotebookServerImpl {
     container_runtime: Arc<ContainerRuntime>,

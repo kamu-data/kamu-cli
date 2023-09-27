@@ -7,14 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod accounts;
-pub use accounts::*;
+mod access_token_registry_service;
+mod login_service;
+mod models;
 
-mod config;
-pub use config::*;
-
-mod odf_server_access_tokens;
-pub use odf_server_access_tokens::*;
-
-mod workspace_layout;
-pub use workspace_layout::*;
+pub use access_token_registry_service::*;
+pub use login_service::*;
+pub use models::*;

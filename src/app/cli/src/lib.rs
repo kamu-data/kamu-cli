@@ -25,9 +25,6 @@ pub use cli_parser::*;
 pub mod commands;
 pub use commands::*;
 
-pub mod models;
-pub use models::*;
-
 pub mod explore;
 
 pub mod error;

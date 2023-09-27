@@ -13,7 +13,7 @@ use container_runtime::ContainerRuntime;
 use kamu::EngineProvisionerLocalConfig;
 
 use super::{CLIError, Command};
-use crate::JupyterConfig;
+use crate::config::JupyterConfig;
 
 pub struct PullImagesCommand {
     container_runtime: Arc<ContainerRuntime>,

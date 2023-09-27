@@ -11,38 +11,27 @@ use std::sync::Arc;
 
 use url::Url;
 
-use crate::services::{OdfServerLoginService, OdfServerTokenService};
-use crate::{
-    CLIError,
-    Command,
-    OdfServerAccessToken,
-    OdfServerAccessTokenStoreScope,
-    OdfServerInvalidTokenError,
-    OdfServerLoginError,
-    OdfServerTokenFindReport,
-    OdfServerValidateAccessTokenError,
-    DEFAULT_ODF_FRONTEND_URL,
-};
+use crate::{odf_server, CLIError, Command};
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct LoginCommand {
-    odf_server_login_service: Arc<OdfServerLoginService>,
-    odf_server_token_service: Arc<OdfServerTokenService>,
-    scope: OdfServerAccessTokenStoreScope,
+    login_service: Arc<odf_server::LoginService>,
+    access_token_registry_service: Arc<odf_server::AccessTokenRegistryService>,
+    scope: odf_server::AccessTokenStoreScope,
     server: Option<Url>,
 }
 
 impl LoginCommand {
     pub fn new(
-        odf_server_login_service: Arc<OdfServerLoginService>,
-        odf_server_token_service: Arc<OdfServerTokenService>,
-        scope: OdfServerAccessTokenStoreScope,
+        login_service: Arc<odf_server::LoginService>,
+        access_token_registry_service: Arc<odf_server::AccessTokenRegistryService>,
+        scope: odf_server::AccessTokenStoreScope,
         server: Option<Url>,
     ) -> Self {
         Self {
-            odf_server_login_service,
-            odf_server_token_service,
+            login_service,
+            access_token_registry_service,
             scope,
             server,
         }
@@ -50,19 +39,19 @@ impl LoginCommand {
 
     async fn new_login(&self, odf_server_frontend_url: Url) -> Result<(), CLIError> {
         let login_callback_response = self
-            .odf_server_login_service
+            .login_service
             .login(&odf_server_frontend_url)
             .await
             .map_err(|e| match e {
-                OdfServerLoginError::AccessFailed => CLIError::usage_error(e.to_string()),
-                OdfServerLoginError::Internal(e) => CLIError::failure(e),
+                odf_server::LoginError::AccessFailed => CLIError::usage_error(e.to_string()),
+                odf_server::LoginError::Internal(e) => CLIError::failure(e),
             })?;
 
-        self.odf_server_token_service.save_access_token(
+        self.access_token_registry_service.save_access_token(
             self.scope,
             &odf_server_frontend_url,
             &login_callback_response.backend_url,
-            OdfServerAccessToken::new(login_callback_response.access_token),
+            odf_server::AccessToken::new(login_callback_response.access_token),
         )?;
 
         eprintln!(
@@ -76,11 +65,11 @@ impl LoginCommand {
 
     async fn validate_login(
         &self,
-        token_find_report: OdfServerTokenFindReport,
-    ) -> Result<(), OdfServerValidateAccessTokenError> {
-        self.odf_server_login_service
+        token_find_report: odf_server::AccessTokenFindReport,
+    ) -> Result<(), odf_server::ValidateAccessTokenError> {
+        self.login_service
             .validate_access_token(
-                &token_find_report.odf_server_backend_url,
+                &token_find_report.backend_url,
                 &token_find_report.access_token,
             )
             .await?;
@@ -96,7 +85,7 @@ impl LoginCommand {
             odf_server_frontend_url
         );
 
-        self.odf_server_token_service
+        self.access_token_registry_service
             .drop_access_token(self.scope, odf_server_frontend_url)
             .map_err(|e| CLIError::critical(e))?;
 
@@ -105,10 +94,10 @@ impl LoginCommand {
 
     fn handle_token_invalid(
         &self,
-        e: OdfServerInvalidTokenError,
+        e: odf_server::InvalidTokenError,
         odf_server_frontend_url: &Url,
     ) -> Result<(), CLIError> {
-        self.odf_server_token_service
+        self.access_token_registry_service
             .drop_access_token(self.scope, odf_server_frontend_url)
             .map_err(|e| CLIError::critical(e))?;
 
@@ -123,10 +112,10 @@ impl Command for LoginCommand {
             .server
             .as_ref()
             .map(|u| u.clone())
-            .unwrap_or_else(|| Url::parse(DEFAULT_ODF_FRONTEND_URL).unwrap());
+            .unwrap_or_else(|| Url::parse(odf_server::DEFAULT_ODF_FRONTEND_URL).unwrap());
 
         if let Some(token_find_report) = self
-            .odf_server_token_service
+            .access_token_registry_service
             .find_by_frontend_url(self.scope, &odf_server_frontend_url)
         {
             match self.validate_login(token_find_report).await {
@@ -138,14 +127,16 @@ impl Command for LoginCommand {
                     );
                     Ok(())
                 }
-                Err(OdfServerValidateAccessTokenError::ExpiredToken(_)) => {
+                Err(odf_server::ValidateAccessTokenError::ExpiredToken(_)) => {
                     self.handle_token_expired(&odf_server_frontend_url).await?;
                     self.new_login(odf_server_frontend_url).await
                 }
-                Err(OdfServerValidateAccessTokenError::InvalidToken(e)) => {
+                Err(odf_server::ValidateAccessTokenError::InvalidToken(e)) => {
                     self.handle_token_invalid(e, &odf_server_frontend_url)
                 }
-                Err(OdfServerValidateAccessTokenError::Internal(e)) => Err(CLIError::critical(e)),
+                Err(odf_server::ValidateAccessTokenError::Internal(e)) => {
+                    Err(CLIError::critical(e))
+                }
             }
         } else {
             self.new_login(odf_server_frontend_url).await
