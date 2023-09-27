@@ -19,23 +19,23 @@ use thiserror::Error;
 use tokio::sync::Notify;
 use url::Url;
 
-use crate::{OutputConfig, RemoteServerAccountCredentials};
+use crate::{OdfServerAccessToken, OutputConfig};
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
-pub const DEFAULT_LOGIN_URL: &str = "http://localhost:4200";
+pub const DEFAULT_ODF_FRONTEND_URL: &str = "http://localhost:4200";
 
 type WebServer =
     axum::Server<hyper::server::conn::AddrIncoming, axum::routing::IntoMakeService<axum::Router>>;
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct RemoteServerLoginService {
+pub struct OdfServerLoginService {
     output_config: Arc<OutputConfig>,
 }
 
 #[component(pub)]
-impl RemoteServerLoginService {
+impl OdfServerLoginService {
     pub fn new(output_config: Arc<OutputConfig>) -> Self {
         Self { output_config }
     }
@@ -49,11 +49,12 @@ impl RemoteServerLoginService {
     )]
     async fn post_handler(
         axum::extract::State(response_tx): axum::extract::State<
-            tokio::sync::mpsc::Sender<LoginCallbackResponse>,
+            tokio::sync::mpsc::Sender<OdfFrontendLoginCallbackResponse>,
         >,
         body: String,
     ) -> impl axum::response::IntoResponse {
-        let response_result = serde_json::from_str::<LoginCallbackResponse>(body.as_str());
+        let response_result =
+            serde_json::from_str::<OdfFrontendLoginCallbackResponse>(body.as_str());
         match response_result {
             Ok(response) => {
                 response_tx.send(response).await.unwrap();
@@ -73,7 +74,7 @@ impl RemoteServerLoginService {
     fn initialize_cli_web_server(
         &self,
         server_frontend_url: &Url,
-        response_tx: tokio::sync::mpsc::Sender<LoginCallbackResponse>,
+        response_tx: tokio::sync::mpsc::Sender<OdfFrontendLoginCallbackResponse>,
     ) -> WebServer {
         let addr = SocketAddr::from((IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 0));
 
@@ -130,8 +131,8 @@ impl RemoteServerLoginService {
 
     async fn obtain_callback_response(
         mut cli_web_server: WebServer,
-        mut response_rx: tokio::sync::mpsc::Receiver<LoginCallbackResponse>,
-    ) -> Result<Option<LoginCallbackResponse>, InternalError> {
+        mut response_rx: tokio::sync::mpsc::Receiver<OdfFrontendLoginCallbackResponse>,
+    ) -> Result<Option<OdfFrontendLoginCallbackResponse>, InternalError> {
         let ctrlc_rx = ctrlc_channel().int_err()?;
 
         tokio::select! {
@@ -150,73 +151,61 @@ impl RemoteServerLoginService {
         }
     }
 
-    #[allow(dead_code)]
     pub async fn login(
         &self,
-        remote_server_frontend_url: &Url,
-    ) -> Result<LoginCallbackResponse, RemoteServerLoginError> {
-        let (response_tx, response_rx) = tokio::sync::mpsc::channel::<LoginCallbackResponse>(1);
+        odf_server_frontend_url: &Url,
+    ) -> Result<OdfFrontendLoginCallbackResponse, OdfServerLoginError> {
+        let (response_tx, response_rx) =
+            tokio::sync::mpsc::channel::<OdfFrontendLoginCallbackResponse>(1);
 
-        let cli_web_server =
-            self.initialize_cli_web_server(remote_server_frontend_url, response_tx);
+        let cli_web_server = self.initialize_cli_web_server(odf_server_frontend_url, response_tx);
 
         let cli_web_server_url = format!("http://{}", cli_web_server.local_addr());
         self.open_web_browser(&cli_web_server_url);
 
         let maybe_callback_response =
             Self::obtain_callback_response(cli_web_server, response_rx).await?;
-        maybe_callback_response.ok_or_else(|| RemoteServerLoginError::CredentialsNotObtained)
+        maybe_callback_response.ok_or_else(|| OdfServerLoginError::AccessFailed)
     }
 
     #[allow(dead_code)]
-    pub async fn validate_login_credentials(
+    pub async fn validate_access_token(
         &self,
-        remote_server_backend_url: &Url,
-        account_credentials: &RemoteServerAccountCredentials,
-    ) -> Result<(), RemoteServerValidateLoginError> {
-        match account_credentials {
-            RemoteServerAccountCredentials::AccessToken(access_token) => {
-                let client = reqwest::Client::new();
+        odf_server_backend_url: &Url,
+        access_token: &OdfServerAccessToken,
+    ) -> Result<(), OdfServerValidateAccessTokenError> {
+        let client = reqwest::Client::new();
 
-                let validation_url = remote_server_backend_url
-                    .join("platform/token/validate")
-                    .unwrap();
+        let validation_url = odf_server_backend_url
+            .join("platform/token/validate")
+            .unwrap();
 
-                tracing::info!(?validation_url, "Token validation request");
+        tracing::info!(?validation_url, "Token validation request");
 
-                let response = client
-                    .get(validation_url)
-                    .bearer_auth(access_token.access_token.clone())
-                    .send()
-                    .await
-                    .int_err()?;
+        let response = client
+            .get(validation_url)
+            .bearer_auth(access_token.access_token.clone())
+            .send()
+            .await
+            .int_err()?;
 
-                match response.status() {
-                    StatusCode::OK => Ok(()),
-                    StatusCode::UNAUTHORIZED => {
-                        Err(RemoteServerValidateLoginError::ExpiredCredentials(
-                            RemoteServerExpiredCredentialsError {
-                                server_url: remote_server_backend_url.clone(),
-                            },
-                        ))
-                    }
-                    StatusCode::BAD_REQUEST => {
-                        Err(RemoteServerValidateLoginError::InvalidCredentials(
-                            RemoteServerInvalidCredentialsError {
-                                server_url: remote_server_backend_url.clone(),
-                            },
-                        ))
-                    }
-                    _ => panic!(
-                        "Unexpected validation status code: {}, details: {}",
-                        response.status().as_str(),
-                        response.text().await.unwrap()
-                    ),
-                }
-            }
-            RemoteServerAccountCredentials::APIKey(_) => {
-                unimplemented!("Validating via API keys not implemented yet")
-            }
+        match response.status() {
+            StatusCode::OK => Ok(()),
+            StatusCode::UNAUTHORIZED => Err(OdfServerValidateAccessTokenError::ExpiredToken(
+                OdfServerExpiredTokenError {
+                    odf_server_backend_url: odf_server_backend_url.clone(),
+                },
+            )),
+            StatusCode::BAD_REQUEST => Err(OdfServerValidateAccessTokenError::InvalidToken(
+                OdfServerInvalidTokenError {
+                    odf_server_backend_url: odf_server_backend_url.clone(),
+                },
+            )),
+            _ => panic!(
+                "Unexpected validation status code: {}, details: {}",
+                response.status().as_str(),
+                response.text().await.unwrap()
+            ),
         }
     }
 }
@@ -225,7 +214,7 @@ impl RemoteServerLoginService {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct LoginCallbackResponse {
+pub struct OdfFrontendLoginCallbackResponse {
     pub access_token: String,
     pub backend_url: Url,
 }
@@ -233,15 +222,15 @@ pub struct LoginCallbackResponse {
 ////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Error)]
-pub enum RemoteServerLoginError {
-    #[error("Did not obtain user credentials")]
-    CredentialsNotObtained,
+pub enum OdfServerLoginError {
+    #[error("Did not obtain access token")]
+    AccessFailed,
 
     #[error(transparent)]
     Internal(InternalError),
 }
 
-impl From<InternalError> for RemoteServerLoginError {
+impl From<InternalError> for OdfServerLoginError {
     fn from(value: InternalError) -> Self {
         Self::Internal(value)
     }
@@ -250,37 +239,38 @@ impl From<InternalError> for RemoteServerLoginError {
 ////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Error)]
-pub enum RemoteServerValidateLoginError {
+pub enum OdfServerValidateAccessTokenError {
     #[error(transparent)]
-    ExpiredCredentials(RemoteServerExpiredCredentialsError),
+    ExpiredToken(OdfServerExpiredTokenError),
 
     #[error(transparent)]
-    InvalidCredentials(RemoteServerInvalidCredentialsError),
+    InvalidToken(OdfServerInvalidTokenError),
 
     #[error(transparent)]
     Internal(InternalError),
 }
 
-impl From<InternalError> for RemoteServerValidateLoginError {
+impl From<InternalError> for OdfServerValidateAccessTokenError {
     fn from(value: InternalError) -> Self {
         Self::Internal(value)
     }
 }
 
 #[derive(Debug, Error)]
-#[error("Credentials for '{server_url}' remote server have expired.")]
-pub struct RemoteServerExpiredCredentialsError {
-    server_url: Url,
+#[error("Access token for '{odf_server_backend_url}' ODF server expired.")]
+pub struct OdfServerExpiredTokenError {
+    odf_server_backend_url: Url,
 }
 
 #[derive(Debug, Error)]
-#[error("Credentials for '{server_url}' are invalid.")]
-pub struct RemoteServerInvalidCredentialsError {
-    server_url: Url,
+#[error("Access token for '{odf_server_backend_url}' ODF server are invalid.")]
+pub struct OdfServerInvalidTokenError {
+    odf_server_backend_url: Url,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
+// TODO: move to CLI general location
 fn ctrlc_channel() -> Result<Arc<Notify>, ctrlc::Error> {
     let notify_rx = Arc::new(Notify::new());
     let notify_tx = notify_rx.clone();

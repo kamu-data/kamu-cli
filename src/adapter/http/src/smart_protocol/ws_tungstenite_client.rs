@@ -36,14 +36,14 @@ use crate::ws_common::{self, ReadMessageError, WriteMessageError};
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct WsSmartTransferProtocolClient {
-    dataset_credential_resolver: Arc<dyn auth::DatasetCredentialsResolver>,
+    dataset_credential_resolver: Arc<dyn auth::OdfServerAccessTokenResolver>,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
 impl WsSmartTransferProtocolClient {
-    pub fn new(dataset_credential_resolver: Arc<dyn auth::DatasetCredentialsResolver>) -> Self {
+    pub fn new(dataset_credential_resolver: Arc<dyn auth::OdfServerAccessTokenResolver>) -> Self {
         Self {
             dataset_credential_resolver,
         }
@@ -646,15 +646,11 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
             return Ok(SyncResult::UpToDate);
         }
 
-        let credentials = self
+        let access_token = self
             .dataset_credential_resolver
-            .resolve_dataset_credentials(http_dst_url)
+            .resolve_odf_dataset_access_token(http_dst_url)
             .await
             .int_err()?;
-
-        let access_token = match credentials {
-            auth::DatasetCredentials::AccessToken(token) => token.token,
-        };
 
         let mut push_url = http_dst_url.join("push").unwrap();
         let push_url_res = push_url.set_scheme("ws");

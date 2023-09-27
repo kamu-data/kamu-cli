@@ -13,7 +13,7 @@ use url::Url;
 
 use crate::commands::*;
 use crate::services::{AccountService, WorkspaceService};
-use crate::{CommandInterpretationFailed, RemoteServerCredentialsScope};
+use crate::{CommandInterpretationFailed, OdfServerAccessTokenStoreScope};
 
 pub fn get_command(
     base_catalog: &dill::Catalog,
@@ -192,9 +192,9 @@ pub fn get_command(
             cli_catalog.get_one()?,
             cli_catalog.get_one()?,
             if submatches.get_flag("g") {
-                RemoteServerCredentialsScope::User
+                OdfServerAccessTokenStoreScope::User
             } else {
-                RemoteServerCredentialsScope::Workspace
+                OdfServerAccessTokenStoreScope::Workspace
             },
             // TODO: improve URL parser
             submatches
@@ -204,9 +204,9 @@ pub fn get_command(
         Some(("logout", submatches)) => Box::new(LogoutCommand::new(
             cli_catalog.get_one()?,
             if submatches.get_flag("g") {
-                RemoteServerCredentialsScope::User
+                OdfServerAccessTokenStoreScope::User
             } else {
-                RemoteServerCredentialsScope::Workspace
+                OdfServerAccessTokenStoreScope::Workspace
             },
             // TODO: improve URL parser
             submatches

@@ -10,13 +10,13 @@
 mod account_service;
 mod config_service;
 mod gc_service;
-mod remote_server_credentials_service;
-mod remote_server_login_service;
+mod odf_server_login_service;
+mod odf_server_token_service;
 mod workspace_service;
 
 pub use account_service::*;
 pub use config_service::*;
 pub use gc_service::*;
-pub use remote_server_credentials_service::*;
-pub use remote_server_login_service::*;
+pub use odf_server_login_service::*;
+pub use odf_server_token_service::*;
 pub use workspace_service::*;

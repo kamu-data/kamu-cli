@@ -257,11 +257,11 @@ pub fn configure_cli_catalog(base_catalog: &Catalog) -> CatalogBuilder {
     b.add::<GcService>();
     b.add::<WorkspaceService>();
 
-    b.add::<RemoteServerCredentialsService>();
-    b.bind::<dyn auth::DatasetCredentialsResolver, RemoteServerCredentialsService>();
-    b.add::<RemoteServerLoginService>();
-    b.add::<CLIRemoteServerCredentialsStorage>();
-    b.bind::<dyn RemoteServerCredentialsStorage, CLIRemoteServerCredentialsStorage>();
+    b.add::<OdfServerTokenService>();
+    b.bind::<dyn auth::OdfServerAccessTokenResolver, OdfServerTokenService>();
+    b.add::<OdfServerLoginService>();
+    b.add::<CliOdfServerAccessTokenStore>();
+    b.bind::<dyn OdfServerAccessTokenStore, CliOdfServerAccessTokenStore>();
 
     b
 }

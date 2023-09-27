@@ -13,8 +13,8 @@ pub use accounts::*;
 mod config;
 pub use config::*;
 
-mod remote_server_credentials;
-pub use remote_server_credentials::*;
+mod odf_server_access_tokens;
+pub use odf_server_access_tokens::*;
 
 mod workspace_layout;
 pub use workspace_layout::*;

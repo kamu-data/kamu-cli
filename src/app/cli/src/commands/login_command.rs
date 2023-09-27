@@ -11,69 +11,64 @@ use std::sync::Arc;
 
 use url::Url;
 
-use crate::services::{RemoteServerCredentialsService, RemoteServerLoginService};
+use crate::services::{OdfServerLoginService, OdfServerTokenService};
 use crate::{
     CLIError,
     Command,
-    RemoteServerAccessToken,
-    RemoteServerAccountCredentials,
-    RemoteServerCredentialsFindDetails,
-    RemoteServerCredentialsScope,
-    RemoteServerInvalidCredentialsError,
-    RemoteServerLoginError,
-    RemoteServerValidateLoginError,
-    DEFAULT_LOGIN_URL,
+    OdfServerAccessToken,
+    OdfServerAccessTokenStoreScope,
+    OdfServerInvalidTokenError,
+    OdfServerLoginError,
+    OdfServerTokenFindReport,
+    OdfServerValidateAccessTokenError,
+    DEFAULT_ODF_FRONTEND_URL,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct LoginCommand {
-    remote_server_login_service: Arc<RemoteServerLoginService>,
-    remote_server_credentials_service: Arc<RemoteServerCredentialsService>,
-    scope: RemoteServerCredentialsScope,
+    odf_server_login_service: Arc<OdfServerLoginService>,
+    odf_server_token_service: Arc<OdfServerTokenService>,
+    scope: OdfServerAccessTokenStoreScope,
     server: Option<Url>,
 }
 
 impl LoginCommand {
     pub fn new(
-        remote_server_login_service: Arc<RemoteServerLoginService>,
-        remote_server_credentials_service: Arc<RemoteServerCredentialsService>,
-        scope: RemoteServerCredentialsScope,
+        odf_server_login_service: Arc<OdfServerLoginService>,
+        odf_server_token_service: Arc<OdfServerTokenService>,
+        scope: OdfServerAccessTokenStoreScope,
         server: Option<Url>,
     ) -> Self {
         Self {
-            remote_server_login_service,
-            remote_server_credentials_service,
+            odf_server_login_service,
+            odf_server_token_service,
             scope,
             server,
         }
     }
 
-    async fn new_login(&self, remote_server_frontend_url: Url) -> Result<(), CLIError> {
+    async fn new_login(&self, odf_server_frontend_url: Url) -> Result<(), CLIError> {
         let login_callback_response = self
-            .remote_server_login_service
-            .login(&remote_server_frontend_url)
+            .odf_server_login_service
+            .login(&odf_server_frontend_url)
             .await
             .map_err(|e| match e {
-                RemoteServerLoginError::CredentialsNotObtained => {
-                    CLIError::usage_error(e.to_string())
-                }
-                RemoteServerLoginError::Internal(e) => CLIError::failure(e),
+                OdfServerLoginError::AccessFailed => CLIError::usage_error(e.to_string()),
+                OdfServerLoginError::Internal(e) => CLIError::failure(e),
             })?;
 
-        self.remote_server_credentials_service.save_credentials(
+        self.odf_server_token_service.save_access_token(
             self.scope,
-            &remote_server_frontend_url,
+            &odf_server_frontend_url,
             &login_callback_response.backend_url,
-            RemoteServerAccountCredentials::AccessToken(RemoteServerAccessToken {
-                access_token: login_callback_response.access_token,
-            }),
+            OdfServerAccessToken::new(login_callback_response.access_token),
         )?;
 
         eprintln!(
             "{}: {}",
             console::style("Login successful").green().bold(),
-            remote_server_frontend_url
+            odf_server_frontend_url
         );
 
         Ok(())
@@ -81,40 +76,40 @@ impl LoginCommand {
 
     async fn validate_login(
         &self,
-        details: RemoteServerCredentialsFindDetails,
-    ) -> Result<(), RemoteServerValidateLoginError> {
-        self.remote_server_login_service
-            .validate_login_credentials(&details.server_backend_url, &details.account_credentials)
+        token_find_report: OdfServerTokenFindReport,
+    ) -> Result<(), OdfServerValidateAccessTokenError> {
+        self.odf_server_login_service
+            .validate_access_token(
+                &token_find_report.odf_server_backend_url,
+                &token_find_report.access_token,
+            )
             .await?;
         Ok(())
     }
 
-    async fn handle_credentials_expired(
-        &self,
-        remote_server_frontend_url: &Url,
-    ) -> Result<(), CLIError> {
+    async fn handle_token_expired(&self, odf_server_frontend_url: &Url) -> Result<(), CLIError> {
         eprintln!(
             "{}: {}",
-            console::style("Dropping expired credentials")
+            console::style("Dropping expired access token")
                 .yellow()
                 .bold(),
-            remote_server_frontend_url
+            odf_server_frontend_url
         );
 
-        self.remote_server_credentials_service
-            .drop_credentials(self.scope, remote_server_frontend_url)
+        self.odf_server_token_service
+            .drop_access_token(self.scope, odf_server_frontend_url)
             .map_err(|e| CLIError::critical(e))?;
 
         Ok(())
     }
 
-    fn handle_credentials_invalid(
+    fn handle_token_invalid(
         &self,
-        e: RemoteServerInvalidCredentialsError,
-        remote_server_frontend_url: &Url,
+        e: OdfServerInvalidTokenError,
+        odf_server_frontend_url: &Url,
     ) -> Result<(), CLIError> {
-        self.remote_server_credentials_service
-            .drop_credentials(self.scope, remote_server_frontend_url)
+        self.odf_server_token_service
+            .drop_access_token(self.scope, odf_server_frontend_url)
             .map_err(|e| CLIError::critical(e))?;
 
         Err(CLIError::failure(e))
@@ -124,37 +119,36 @@ impl LoginCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for LoginCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
-        let remote_server_frontend_url = self
+        let odf_server_frontend_url = self
             .server
             .as_ref()
             .map(|u| u.clone())
-            .unwrap_or_else(|| Url::parse(DEFAULT_LOGIN_URL).unwrap());
+            .unwrap_or_else(|| Url::parse(DEFAULT_ODF_FRONTEND_URL).unwrap());
 
-        if let Some(details) = self
-            .remote_server_credentials_service
-            .find_by_frontend_url(self.scope, &remote_server_frontend_url)
+        if let Some(token_find_report) = self
+            .odf_server_token_service
+            .find_by_frontend_url(self.scope, &odf_server_frontend_url)
         {
-            match self.validate_login(details).await {
+            match self.validate_login(token_find_report).await {
                 Ok(_) => {
                     eprintln!(
                         "{}: {}",
-                        console::style("Credentials valid").green().bold(),
-                        remote_server_frontend_url
+                        console::style("Access token valid").green().bold(),
+                        odf_server_frontend_url
                     );
                     Ok(())
                 }
-                Err(RemoteServerValidateLoginError::ExpiredCredentials(_)) => {
-                    self.handle_credentials_expired(&remote_server_frontend_url)
-                        .await?;
-                    self.new_login(remote_server_frontend_url).await
+                Err(OdfServerValidateAccessTokenError::ExpiredToken(_)) => {
+                    self.handle_token_expired(&odf_server_frontend_url).await?;
+                    self.new_login(odf_server_frontend_url).await
                 }
-                Err(RemoteServerValidateLoginError::InvalidCredentials(e)) => {
-                    self.handle_credentials_invalid(e, &remote_server_frontend_url)
+                Err(OdfServerValidateAccessTokenError::InvalidToken(e)) => {
+                    self.handle_token_invalid(e, &odf_server_frontend_url)
                 }
-                Err(RemoteServerValidateLoginError::Internal(e)) => Err(CLIError::critical(e)),
+                Err(OdfServerValidateAccessTokenError::Internal(e)) => Err(CLIError::critical(e)),
             }
         } else {
-            self.new_login(remote_server_frontend_url).await
+            self.new_login(odf_server_frontend_url).await
         }
     }
 }

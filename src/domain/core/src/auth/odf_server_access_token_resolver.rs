@@ -14,40 +14,28 @@ use url::Url;
 ///////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait DatasetCredentialsResolver: Send + Sync {
-    async fn resolve_dataset_credentials(
+pub trait OdfServerAccessTokenResolver: Send + Sync {
+    async fn resolve_odf_dataset_access_token(
         &self,
-        dataset_http_url: &Url,
-    ) -> Result<DatasetCredentials, ResolveDatasetCredentialsError>;
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Clone)]
-pub enum DatasetCredentials {
-    AccessToken(DatasetAccessToken),
-}
-
-#[derive(Debug, Clone)]
-pub struct DatasetAccessToken {
-    pub token: String,
+        odf_dataset_http_url: &Url,
+    ) -> Result<String, OdfServerAccessTokenResolveError>;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Error)]
-pub enum ResolveDatasetCredentialsError {
+pub enum OdfServerAccessTokenResolveError {
     #[error(transparent)]
-    LoginRequired(DatasetLoginRequiredError),
+    LoginRequired(OdfServerLoginRequiredError),
 
     #[error(transparent)]
     Internal(InternalError),
 }
 
 #[derive(Debug, Error)]
-#[error("Access to '{server_url}' requires authentication")]
-pub struct DatasetLoginRequiredError {
-    pub server_url: Url,
+#[error("Access to '{odf_server_backend_url}' ODF server requires authentication")]
+pub struct OdfServerLoginRequiredError {
+    pub odf_server_backend_url: Url,
 }
 
 ///////////////////////////////////////////////////////////////////////////////

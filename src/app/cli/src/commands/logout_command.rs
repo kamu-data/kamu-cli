@@ -11,25 +11,25 @@ use std::sync::Arc;
 
 use url::Url;
 
-use crate::services::RemoteServerCredentialsService;
-use crate::{CLIError, Command, RemoteServerCredentialsScope, DEFAULT_LOGIN_URL};
+use crate::services::OdfServerTokenService;
+use crate::{CLIError, Command, OdfServerAccessTokenStoreScope, DEFAULT_ODF_FRONTEND_URL};
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct LogoutCommand {
-    remote_server_credentials_service: Arc<RemoteServerCredentialsService>,
-    scope: RemoteServerCredentialsScope,
+    odf_server_token_service: Arc<OdfServerTokenService>,
+    scope: OdfServerAccessTokenStoreScope,
     server: Option<Url>,
 }
 
 impl LogoutCommand {
     pub fn new(
-        remote_server_credentials_service: Arc<RemoteServerCredentialsService>,
-        scope: RemoteServerCredentialsScope,
+        odf_server_token_service: Arc<OdfServerTokenService>,
+        scope: OdfServerAccessTokenStoreScope,
         server: Option<Url>,
     ) -> Self {
         Self {
-            remote_server_credentials_service,
+            odf_server_token_service,
             scope,
             server,
         }
@@ -39,13 +39,13 @@ impl LogoutCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for LogoutCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
-        let remote_server_frontend_url = self
+        let odf_server_frontend_url = self
             .server
             .clone()
-            .unwrap_or_else(|| Url::parse(DEFAULT_LOGIN_URL).unwrap());
+            .unwrap_or_else(|| Url::parse(DEFAULT_ODF_FRONTEND_URL).unwrap());
 
-        self.remote_server_credentials_service
-            .drop_credentials(self.scope, &remote_server_frontend_url)?;
+        self.odf_server_token_service
+            .drop_access_token(self.scope, &odf_server_frontend_url)?;
 
         Ok(())
     }
