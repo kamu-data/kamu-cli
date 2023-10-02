@@ -22,7 +22,6 @@ use kamu::domain::{
     SystemTimeSource,
     SystemTimeSourceDefault,
 };
-use kamu::testing::MockOdfServerAccessTokenResolver;
 use kamu::{DatasetLayout, DatasetRepositoryLocalFs};
 use opendatafabric::DatasetHandle;
 use tempfile::TempDir;
@@ -57,8 +56,9 @@ impl ServerSideLocalFsHarness {
             .add_value(CurrentAccountSubject::new_test())
             .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
             .bind::<dyn auth::DatasetActionAuthorizer, auth::AlwaysHappyDatasetActionAuthorizer>()
-            .add_value(MockOdfServerAccessTokenResolver::new())
-            .bind::<dyn auth::OdfServerAccessTokenResolver, MockOdfServerAccessTokenResolver>()
+            .add::<auth::DummyOdfServerAccessTokenResolve>()
+            .bind::<dyn auth::OdfServerAccessTokenResolver, auth::DummyOdfServerAccessTokenResolve>(
+            )
             .build();
 
         let api_server = TestAPIServer::new(

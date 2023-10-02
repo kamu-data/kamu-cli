@@ -42,6 +42,9 @@ impl ServerSideS3Harness {
         let catalog = dill::CatalogBuilder::new()
             .add_value(s3_repo(&s3).await)
             .bind::<dyn DatasetRepository, DatasetRepositoryS3>()
+            .add_value(CurrentAccountSubject::new_test())
+            .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
+            .bind::<dyn auth::DatasetActionAuthorizer, auth::AlwaysHappyDatasetActionAuthorizer>()
             .build();
 
         let api_server = TestAPIServer::new(

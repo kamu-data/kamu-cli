@@ -13,7 +13,6 @@ use std::sync::Arc;
 use container_runtime::ContainerRuntime;
 use dill::builder_for;
 use kamu::domain::*;
-use kamu::testing::MockOdfServerAccessTokenResolver;
 use kamu::utils::smart_transfer_protocol::SmartTransferProtocolClient;
 use kamu::*;
 use kamu_adapter_http::SmartTransferProtocolClientWs;
@@ -49,8 +48,9 @@ impl ClientSideHarness {
         b.add::<auth::AlwaysHappyDatasetActionAuthorizer>()
             .bind::<dyn auth::DatasetActionAuthorizer, auth::AlwaysHappyDatasetActionAuthorizer>();
 
-        b.add_value(MockOdfServerAccessTokenResolver::new())
-            .bind::<dyn auth::OdfServerAccessTokenResolver, MockOdfServerAccessTokenResolver>();
+        b.add::<auth::DummyOdfServerAccessTokenResolve>()
+            .bind::<dyn auth::OdfServerAccessTokenResolver, auth::DummyOdfServerAccessTokenResolve>(
+            );
 
         b.add::<SystemTimeSourceDefault>();
         b.bind::<dyn SystemTimeSource, SystemTimeSourceDefault>();
