@@ -49,11 +49,11 @@ impl APIServer {
             )
             .nest(
                 "/:dataset_name",
-                kamu_adapter_http::smart_transfer_protocol_routes().layer(
-                    kamu_adapter_http::DatasetResolverLayer::new(|Path(p): Path<DatasetByName>| {
-                        p.dataset_name.as_local_ref()
-                    }),
-                ),
+                kamu_adapter_http::smart_transfer_protocol_routes()
+                    .layer(kamu_adapter_http::DatasetAuthorizationLayer::new())
+                    .layer(kamu_adapter_http::DatasetResolverLayer::new(
+                        |Path(p): Path<DatasetByName>| p.dataset_name.as_local_ref(),
+                    )),
             )
             .layer(
                 tower::ServiceBuilder::new()

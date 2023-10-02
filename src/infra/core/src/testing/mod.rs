@@ -22,6 +22,9 @@ pub use minio_server::*;
 mod mock_authentication_service;
 pub use mock_authentication_service::*;
 
+mod mock_odf_server_access_token_resolver;
+pub use mock_odf_server_access_token_resolver::*;
+
 mod parquet_reader_helper;
 pub use parquet_reader_helper::*;
 

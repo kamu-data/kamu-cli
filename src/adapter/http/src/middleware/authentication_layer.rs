@@ -18,7 +18,7 @@ use futures::Future;
 use kamu::domain::{auth, AnonymousAccountReason, CurrentAccountSubject};
 use tower::{Layer, Service};
 
-use crate::AccessToken;
+use crate::access_token::AccessToken;
 
 /////////////////////////////////////////////////////////////////////////////////
 

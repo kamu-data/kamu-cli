@@ -34,6 +34,7 @@ impl TestAPIServer {
             .nest(
                 "/:dataset_name",
                 kamu_adapter_http::smart_transfer_protocol_routes()
+                    .layer(kamu_adapter_http::DatasetAuthorizationLayer::new())
                     .layer(kamu_adapter_http::DatasetResolverLayer::new(
                         |Path(p): Path<DatasetByName>| {
                             DatasetAlias::new(None, p.dataset_name).as_local_ref()
