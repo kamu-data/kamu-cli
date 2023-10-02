@@ -51,7 +51,7 @@ impl LoginCommand {
             self.scope,
             &odf_server_frontend_url,
             &login_callback_response.backend_url,
-            odf_server::AccessToken::new(login_callback_response.access_token),
+            login_callback_response.access_token,
         )?;
 
         eprintln!(

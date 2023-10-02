@@ -531,11 +531,10 @@ pub fn cli() -> Command {
                 Command::new("login")
                     .about("Logs in to a remote Kamu server")
                     .args([
-                        Arg::new("g")
-                            .short('g')
-                            .long("global")
+                        Arg::new("user")
+                            .long("user")
                             .action(ArgAction::SetTrue)
-                            .help("Store credentials in the user home folder rather than in the workspace"),
+                            .help("Store access token in the user home folder rather than in the workspace"),
                         Arg::new("server")
                             .short('s')
                             .long("server")
@@ -545,11 +544,10 @@ pub fn cli() -> Command {
                 Command::new("logout")
                     .about("Logs out from a remote Kamu server")
                     .args([
-                        Arg::new("g")
-                            .short('g')
-                            .long("global")
+                        Arg::new("user")
+                            .long("user")
                             .action(ArgAction::SetTrue)
-                            .help("Drop credentials stored in the user home folder rather than in the workspace"),
+                            .help("Drop access token stored in the user home folder rather than in the workspace"),
                         Arg::new("server")
                             .short('s')
                             .long("server")

@@ -190,7 +190,7 @@ pub fn get_command(
         Some(("login", submatches)) => Box::new(LoginCommand::new(
             cli_catalog.get_one()?,
             cli_catalog.get_one()?,
-            if submatches.get_flag("g") {
+            if submatches.get_flag("user") {
                 odf_server::AccessTokenStoreScope::User
             } else {
                 odf_server::AccessTokenStoreScope::Workspace
@@ -202,7 +202,7 @@ pub fn get_command(
         )),
         Some(("logout", submatches)) => Box::new(LogoutCommand::new(
             cli_catalog.get_one()?,
-            if submatches.get_flag("g") {
+            if submatches.get_flag("user") {
                 odf_server::AccessTokenStoreScope::User
             } else {
                 odf_server::AccessTokenStoreScope::Workspace

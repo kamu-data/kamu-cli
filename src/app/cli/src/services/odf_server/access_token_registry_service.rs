@@ -126,7 +126,7 @@ impl AccessTokenRegistryService {
         scope: AccessTokenStoreScope,
         odf_server_frontend_url: &Url,
         odf_server_backend_url: &Url,
-        access_token: AccessToken,
+        access_token: String,
     ) -> Result<(), InternalError> {
         let account_name = self.account_name();
 
@@ -139,17 +139,19 @@ impl AccessTokenRegistryService {
             .lock()
             .expect("Could not lock access tokens registry");
 
+        let access_token = AccessToken::new(account_name.clone(), access_token);
+
         if let Some(token_map) = registry
             .iter_mut()
             .find(|c| &c.frontend_url == odf_server_frontend_url)
         {
-            token_map.add_account_token(account_name.clone(), access_token);
+            token_map.add_account_token(access_token);
         } else {
             let mut token_map = AccessTokenMap::new(
                 odf_server_frontend_url.clone(),
                 odf_server_backend_url.clone(),
             );
-            token_map.add_account_token(account_name.clone(), access_token.clone());
+            token_map.add_account_token(access_token);
 
             registry.push(token_map);
         }
@@ -234,7 +236,7 @@ pub trait AccessTokenStore: Send + Sync {
 
 const KAMU_TOKEN_STORE: &str = ".kamutokenstore";
 const KAMU_TOKEN_STORE_VERSION: i32 = 1;
-const KAMU_TOKEN_STORE_MANIFEST_KIND: &str = "KamuOdfServerTokenStore";
+const KAMU_TOKEN_STORE_MANIFEST_KIND: &str = "KamuTokenStore";
 
 pub struct CLIAccessTokenStore {
     user_token_store_path: PathBuf,
