@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.144.1] - 2023-10-02
+### Fixed
+- Flight SQL + JDBC connector showing empty result for `GROUP BY` statements
+
 ## [0.144.0] - 2023-09-25
 ### Added
 - New protocol adapter for [Arrow Flight SQL](https://arrow.apache.org/blog/2022/02/16/introducing-arrow-flight-sql/)
