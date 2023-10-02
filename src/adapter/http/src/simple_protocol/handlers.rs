@@ -29,7 +29,7 @@ use opendatafabric::serde::MetadataBlockSerializer;
 use opendatafabric::{DatasetRef, Multihash};
 use url::Url;
 
-use crate::smart_protocol::ws_axum_server;
+use crate::smart_protocol::{AxumServerPullProtocolInstance, AxumServerPushProtocolInstance};
 
 /////////////////////////////////////////////////////////////////////////////////
 
@@ -306,13 +306,8 @@ pub async fn dataset_push_ws_upgrade_handler(
     };
 
     ws.on_upgrade(|socket| {
-        ws_axum_server::dataset_push_ws_handler(
-            socket,
-            dataset_ref,
-            dataset,
-            dataset_repo,
-            dataset_url,
-        )
+        AxumServerPushProtocolInstance::new(socket, dataset_repo, dataset_ref, dataset, dataset_url)
+            .serve()
     })
 }
 
@@ -335,7 +330,7 @@ pub async fn dataset_pull_ws_upgrade_handler(
     }
 
     ws.on_upgrade(move |socket| {
-        ws_axum_server::dataset_pull_ws_handler(socket, dataset.0, dataset_url)
+        AxumServerPullProtocolInstance::new(socket, dataset.0, dataset_url).serve()
     })
 }
 
