@@ -149,7 +149,7 @@ async fn app_handler(uri: Uri) -> impl IntoResponse {
     };
 
     Response::builder()
-        .header(axum::http::header::CONTENT_TYPE, mime.as_ref())
+        .header(http::header::CONTENT_TYPE, mime.as_ref())
         .body(axum::body::Full::from(file.data))
         .unwrap()
 }

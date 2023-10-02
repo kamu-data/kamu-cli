@@ -61,7 +61,7 @@ impl OAuthGithub {
 
         let body = client
             .post("https://github.com/login/oauth/access_token")
-            .header(reqwest::header::ACCEPT, "application/json")
+            .header(http::header::ACCEPT, "application/json")
             .form(&params)
             .send()
             .await
@@ -81,7 +81,7 @@ impl OAuthGithub {
         let account_info = client
             .get("https://api.github.com/user")
             .bearer_auth(&token.access_token)
-            .header(reqwest::header::ACCEPT, "application/vnd.github.v3+json")
+            .header(http::header::ACCEPT, "application/vnd.github.v3+json")
             .send()
             .await
             .int_err()?
@@ -106,7 +106,7 @@ impl OAuthGithub {
         let account_info = client
             .get("https://api.github.com/user")
             .bearer_auth(access_token)
-            .header(reqwest::header::ACCEPT, "application/vnd.github.v3+json")
+            .header(http::header::ACCEPT, "application/vnd.github.v3+json")
             .send()
             .await
             .int_err()?
@@ -127,7 +127,7 @@ impl OAuthGithub {
 
         let response = client
             .get(format!("https://api.github.com/users/{}", login))
-            .header(reqwest::header::ACCEPT, "application/vnd.github.v3+json")
+            .header(http::header::ACCEPT, "application/vnd.github.v3+json")
             .send()
             .await
             .int_err()?;

@@ -27,7 +27,7 @@ async fn test_anonymous_api_access() {
     let client_handle = async {
         let client = reqwest::Client::new();
         let response = client.get(test_url).send().await.unwrap();
-        assert_eq!(reqwest::StatusCode::OK, response.status());
+        assert_eq!(http::StatusCode::OK, response.status());
         assert_eq!(ANONYMOUS_RETURN_TEXT, response.text().await.unwrap());
     };
 
@@ -51,7 +51,7 @@ async fn test_non_anonymous_api_access() {
             .send()
             .await
             .unwrap();
-        assert_eq!(reqwest::StatusCode::OK, response.status());
+        assert_eq!(http::StatusCode::OK, response.status());
         assert_eq!(TEST_ACOUNT_NAME, response.text().await.unwrap());
     };
 
@@ -101,7 +101,7 @@ impl ServerHarness {
                     .layer(
                         tower_http::cors::CorsLayer::new()
                             .allow_origin(tower_http::cors::Any)
-                            .allow_methods(vec![axum::http::Method::GET, axum::http::Method::POST])
+                            .allow_methods(vec![http::Method::GET, http::Method::POST])
                             .allow_headers(tower_http::cors::Any),
                     )
                     .layer(axum::Extension(catalog))
@@ -133,7 +133,7 @@ impl ServerHarness {
 
     async fn foo_handler(
         catalog: axum::extract::Extension<dill::Catalog>,
-    ) -> Result<String, axum::http::StatusCode> {
+    ) -> Result<String, http::StatusCode> {
         let current_account_subject = catalog.0.get_one::<CurrentAccountSubject>().unwrap();
         match current_account_subject.as_ref() {
             CurrentAccountSubject::Anonymous(_) => Ok(ANONYMOUS_RETURN_TEXT.to_string()),

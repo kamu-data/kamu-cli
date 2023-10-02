@@ -30,6 +30,7 @@ chrono = { version = "0.4", features = ["serde"] }
 dill = "0.7"
 flate2 = "1"                                                           # GZip decoder
 futures = "0.3"
+http = "0.2"
 hyper = "0.14"
 reqwest = { version = "0.11", default-features = false, features = ["rustls-tls", "json", "stream", "gzip", "brotli", "deflate"] }
 serde = "1"

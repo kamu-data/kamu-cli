@@ -46,7 +46,7 @@ impl TestAPIServer {
                 tower::ServiceBuilder::new().layer(
                     tower_http::cors::CorsLayer::new()
                         .allow_origin(tower_http::cors::Any)
-                        .allow_methods(vec![axum::http::Method::GET, axum::http::Method::POST])
+                        .allow_methods(vec![http::Method::GET, http::Method::POST])
                         .allow_headers(tower_http::cors::Any),
                 ),
             );

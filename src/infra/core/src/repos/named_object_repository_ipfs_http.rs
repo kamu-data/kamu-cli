@@ -60,8 +60,8 @@ impl NamedObjectRepository for NamedObjectRepositoryIpfsHttp {
             // error on non existing block rather than risk confusing missing block with
             // actuall server errors from Kubo.
             Err(e)
-                if e.status() == Some(reqwest::StatusCode::NOT_FOUND)
-                    || e.status() == Some(reqwest::StatusCode::INTERNAL_SERVER_ERROR) =>
+                if e.status() == Some(http::StatusCode::NOT_FOUND)
+                    || e.status() == Some(http::StatusCode::INTERNAL_SERVER_ERROR) =>
             {
                 Err(GetNamedError::NotFound(NotFoundError {
                     name: name.to_owned(),

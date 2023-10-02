@@ -128,21 +128,17 @@ async fn platform_token_validate_handler(
     match current_account_subject.as_ref() {
         CurrentAccountSubject::Logged(_) => {
             return axum::response::Response::builder()
-                .status(axum::http::StatusCode::OK)
+                .status(http::StatusCode::OK)
                 .body(Default::default())
                 .unwrap()
         }
         CurrentAccountSubject::Anonymous(reason) => {
             return axum::response::Response::builder()
                 .status(match reason {
-                    AnonymousAccountReason::AuthenticationExpired => {
-                        axum::http::StatusCode::UNAUTHORIZED
-                    }
-                    AnonymousAccountReason::AuthenticationInvalid => {
-                        axum::http::StatusCode::BAD_REQUEST
-                    }
+                    AnonymousAccountReason::AuthenticationExpired => http::StatusCode::UNAUTHORIZED,
+                    AnonymousAccountReason::AuthenticationInvalid => http::StatusCode::BAD_REQUEST,
                     AnonymousAccountReason::NoAuthenticationProvided => {
-                        axum::http::StatusCode::BAD_REQUEST
+                        http::StatusCode::BAD_REQUEST
                     }
                 })
                 .body(Default::default())

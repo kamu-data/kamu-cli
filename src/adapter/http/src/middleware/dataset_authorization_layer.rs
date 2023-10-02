@@ -11,7 +11,6 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 use axum::body::Body;
-use axum::http::Request;
 use axum::response::Response;
 use futures::Future;
 use kamu::domain::{CurrentAccountSubject, GetDatasetError};
@@ -56,7 +55,7 @@ impl<Svc> DatasetAuthorizationMiddleware<Svc> {
         }
     }
 
-    fn required_access_action(request: &Request<Body>) -> kamu::domain::auth::DatasetAction {
+    fn required_access_action(request: &http::Request<Body>) -> kamu::domain::auth::DatasetAction {
         if !request.method().is_safe() || Self::is_potential_creation(request) {
             kamu::domain::auth::DatasetAction::Write
         } else {
@@ -64,15 +63,15 @@ impl<Svc> DatasetAuthorizationMiddleware<Svc> {
         }
     }
 
-    fn is_potential_creation(request: &Request<Body>) -> bool {
+    fn is_potential_creation(request: &http::Request<Body>) -> bool {
         let path = request.uri().path();
         "/push" == path
     }
 }
 
-impl<Svc> Service<Request<Body>> for DatasetAuthorizationMiddleware<Svc>
+impl<Svc> Service<http::Request<Body>> for DatasetAuthorizationMiddleware<Svc>
 where
-    Svc: Service<Request<Body>, Response = Response> + Send + 'static + Clone,
+    Svc: Service<http::Request<Body>, Response = Response> + Send + 'static + Clone,
     Svc::Future: Send + 'static,
 {
     type Response = Svc::Response;
@@ -84,7 +83,7 @@ where
         self.inner.poll_ready(cx)
     }
 
-    fn call(&mut self, request: Request<Body>) -> Self::Future {
+    fn call(&mut self, request: http::Request<Body>) -> Self::Future {
         // Inspired by https://github.com/maxcountryman/axum-login/blob/main/axum-login/src/auth.rs
         // TODO: PERF: Is cloning a performance concern?
         let mut inner = self.inner.clone();

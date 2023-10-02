@@ -12,7 +12,6 @@ use std::sync::Arc;
 
 use console::style as s;
 use dill::component;
-use http::StatusCode;
 use internal_error::{InternalError, ResultIntoInternal};
 use serde::Deserialize;
 use thiserror::Error;
@@ -189,13 +188,13 @@ impl LoginService {
             .int_err()?;
 
         match response.status() {
-            StatusCode::OK => Ok(()),
-            StatusCode::UNAUTHORIZED => {
+            http::StatusCode::OK => Ok(()),
+            http::StatusCode::UNAUTHORIZED => {
                 Err(ValidateAccessTokenError::ExpiredToken(ExpiredTokenError {
                     odf_server_backend_url: odf_server_backend_url.clone(),
                 }))
             }
-            StatusCode::BAD_REQUEST => {
+            http::StatusCode::BAD_REQUEST => {
                 Err(ValidateAccessTokenError::InvalidToken(InvalidTokenError {
                     odf_server_backend_url: odf_server_backend_url.clone(),
                 }))

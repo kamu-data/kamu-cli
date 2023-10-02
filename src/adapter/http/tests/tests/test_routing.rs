@@ -11,7 +11,6 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
 use ::serde::Deserialize;
 use axum::extract::{FromRequestParts, Path};
-use axum::http::StatusCode;
 use axum::routing::IntoMakeService;
 use axum::Router;
 use dill::builder_for;
@@ -96,7 +95,7 @@ where
             tower::ServiceBuilder::new().layer(
                 tower_http::cors::CorsLayer::new()
                     .allow_origin(tower_http::cors::Any)
-                    .allow_methods(vec![axum::http::Method::GET, axum::http::Method::POST])
+                    .allow_methods(vec![http::Method::GET, http::Method::POST])
                     .allow_headers(tower_http::cors::Any),
             ),
         );
@@ -251,7 +250,7 @@ async fn test_routing_err_invalid_identity_format() {
 
     let client = async move {
         let res = reqwest::get(dataset_url).await.unwrap();
-        assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+        assert_eq!(res.status(), http::StatusCode::BAD_REQUEST);
     };
 
     await_client_server_flow!(server, client);
@@ -273,7 +272,7 @@ async fn test_routing_err_dataset_not_found() {
 
     let client = async move {
         let res = reqwest::get(dataset_url).await.unwrap();
-        assert_eq!(res.status(), StatusCode::NOT_FOUND);
+        assert_eq!(res.status(), http::StatusCode::NOT_FOUND);
     };
 
     await_client_server_flow!(server, client);

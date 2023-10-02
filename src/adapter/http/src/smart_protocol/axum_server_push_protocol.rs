@@ -40,6 +40,9 @@ pub struct AxumServerPushProtocolInstance {
     dataset_ref: DatasetRef,
     dataset: Option<Arc<dyn Dataset>>,
     dataset_url: Url,
+    maybe_bearer_header: Option<
+        axum::TypedHeader<axum::headers::Authorization<axum::headers::authorization::Bearer>>,
+    >,
 }
 
 impl AxumServerPushProtocolInstance {
@@ -49,6 +52,9 @@ impl AxumServerPushProtocolInstance {
         dataset_ref: DatasetRef,
         dataset: Option<Arc<dyn Dataset>>,
         dataset_url: Url,
+        maybe_bearer_header: Option<
+            axum::TypedHeader<axum::headers::Authorization<axum::headers::authorization::Bearer>>,
+        >,
     ) -> Self {
         Self {
             socket,
@@ -56,6 +62,7 @@ impl AxumServerPushProtocolInstance {
             dataset_ref,
             dataset,
             dataset_url,
+            maybe_bearer_header,
         }
     }
 
@@ -233,10 +240,14 @@ impl AxumServerPushProtocolInstance {
 
         let mut object_transfer_strategies: Vec<PushObjectTransferStrategy> = Vec::new();
         for r in request.object_files {
-            let transfer_strategy =
-                prepare_push_object_transfer_strategy(dataset.as_ref(), &self.dataset_url, &r)
-                    .await
-                    .map_err(|e| PushServerError::Internal(e))?;
+            let transfer_strategy = prepare_push_object_transfer_strategy(
+                dataset.as_ref(),
+                &self.dataset_url,
+                &r,
+                &self.maybe_bearer_header,
+            )
+            .await
+            .map_err(|e| PushServerError::Internal(e))?;
 
             object_transfer_strategies.push(transfer_strategy);
         }

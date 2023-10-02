@@ -9,31 +9,37 @@
 
 /////////////////////////////////////////////////////////////////////////////////
 
+pub(crate) fn bad_request_response() -> axum::response::Response {
+    error_response(http::status::StatusCode::BAD_REQUEST)
+}
+
+/////////////////////////////////////////////////////////////////////////////////
+
 pub(crate) fn not_found_response() -> axum::response::Response {
-    error_response(axum::http::status::StatusCode::NOT_FOUND)
+    error_response(http::status::StatusCode::NOT_FOUND)
 }
 
 /////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) fn unauthorized_access_response() -> axum::response::Response {
-    error_response(axum::http::status::StatusCode::UNAUTHORIZED)
+    error_response(http::status::StatusCode::UNAUTHORIZED)
 }
 
 /////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) fn forbidden_access_response() -> axum::response::Response {
-    error_response(axum::http::status::StatusCode::FORBIDDEN)
+    error_response(http::status::StatusCode::FORBIDDEN)
 }
 
 /////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) fn internal_server_error_response() -> axum::response::Response {
-    error_response(axum::http::status::StatusCode::INTERNAL_SERVER_ERROR)
+    error_response(http::status::StatusCode::INTERNAL_SERVER_ERROR)
 }
 
 /////////////////////////////////////////////////////////////////////////////////
 
-fn error_response(status: axum::http::status::StatusCode) -> axum::response::Response {
+fn error_response(status: http::status::StatusCode) -> axum::response::Response {
     axum::response::Response::builder()
         .status(status)
         .body(Default::default())

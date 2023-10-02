@@ -211,12 +211,7 @@ async fn dataset_put_object_common(
             },
         )
         .await
-        .map_err(|_| {
-            axum::response::Response::builder()
-                .status(axum::http::StatusCode::INTERNAL_SERVER_ERROR)
-                .body(Default::default())
-                .unwrap()
-        })?;
+        .map_err(|_| internal_server_error_response())?;
 
     Ok(())
 }
@@ -229,6 +224,9 @@ pub async fn dataset_push_ws_upgrade_handler(
     Extension(catalog): Extension<dill::Catalog>,
     host: axum::extract::Host,
     uri: axum::extract::OriginalUri,
+    maybe_bearer_header: Option<
+        axum::TypedHeader<axum::headers::Authorization<axum::headers::authorization::Bearer>>,
+    >,
 ) -> axum::response::Response {
     let dataset_url = get_base_dataset_url(host, uri, 1);
 
@@ -244,8 +242,15 @@ pub async fn dataset_push_ws_upgrade_handler(
     };
 
     ws.on_upgrade(|socket| {
-        AxumServerPushProtocolInstance::new(socket, dataset_repo, dataset_ref, dataset, dataset_url)
-            .serve()
+        AxumServerPushProtocolInstance::new(
+            socket,
+            dataset_repo,
+            dataset_ref,
+            dataset,
+            dataset_url,
+            maybe_bearer_header,
+        )
+        .serve()
     })
 }
 
@@ -256,11 +261,15 @@ pub async fn dataset_pull_ws_upgrade_handler(
     dataset: Extension<Arc<dyn Dataset>>,
     host: axum::extract::Host,
     uri: axum::extract::OriginalUri,
+    maybe_bearer_header: Option<
+        axum::TypedHeader<axum::headers::Authorization<axum::headers::authorization::Bearer>>,
+    >,
 ) -> axum::response::Response {
     let dataset_url = get_base_dataset_url(host, uri, 1);
 
     ws.on_upgrade(move |socket| {
-        AxumServerPullProtocolInstance::new(socket, dataset.0, dataset_url).serve()
+        AxumServerPullProtocolInstance::new(socket, dataset.0, dataset_url, maybe_bearer_header)
+            .serve()
     })
 }
 

@@ -14,12 +14,13 @@ use std::task::{Context, Poll};
 
 use axum::body::Body;
 use axum::extract::FromRequestParts;
-use axum::http::{Request, StatusCode};
 use axum::response::Response;
 use axum::RequestExt;
 use kamu::domain::{DatasetRepository, GetDatasetError};
 use opendatafabric::DatasetRef;
 use tower::{Layer, Service};
+
+use crate::axum_utils::*;
 
 /////////////////////////////////////////////////////////////////////////////////
 
@@ -75,7 +76,7 @@ pub struct DatasetResolverMiddleware<Svc, IdExt, Extractor> {
 }
 
 impl<Svc, IdExt, Extractor> DatasetResolverMiddleware<Svc, IdExt, Extractor> {
-    fn is_dataset_optional(request: &Request<Body>) -> bool {
+    fn is_dataset_optional(request: &http::Request<Body>) -> bool {
         let path = request.uri().path();
         "/push" == path
     }
@@ -94,14 +95,14 @@ where
     }
 }
 
-impl<Svc, IdExt, Extractor> Service<Request<Body>>
+impl<Svc, IdExt, Extractor> Service<http::Request<Body>>
     for DatasetResolverMiddleware<Svc, IdExt, Extractor>
 where
     IdExt: Send + Clone + 'static,
     IdExt: Fn(Extractor) -> DatasetRef,
     Extractor: FromRequestParts<()> + Send + 'static,
     <Extractor as FromRequestParts<()>>::Rejection: std::fmt::Debug,
-    Svc: Service<Request<Body>, Response = Response> + Send + 'static + Clone,
+    Svc: Service<http::Request<Body>, Response = Response> + Send + 'static + Clone,
     Svc::Future: Send + 'static,
 {
     type Response = Svc::Response;
@@ -113,7 +114,7 @@ where
         self.inner.poll_ready(cx)
     }
 
-    fn call(&mut self, mut request: Request<Body>) -> Self::Future {
+    fn call(&mut self, mut request: http::Request<Body>) -> Self::Future {
         // Inspired by https://github.com/maxcountryman/axum-login/blob/main/axum-login/src/auth.rs
         // TODO: PERF: Is cloning a performance concern?
         let mut inner = self.inner.clone();
@@ -124,10 +125,7 @@ where
                 Ok(p) => p,
                 Err(err) => {
                     tracing::warn!("Could not extract params: {:?}", err);
-                    return Ok(Response::builder()
-                        .status(StatusCode::BAD_REQUEST)
-                        .body(Default::default())
-                        .unwrap());
+                    return Ok(bad_request_response());
                 }
             };
 
@@ -144,17 +142,11 @@ where
                     Ok(ds) => ds,
                     Err(GetDatasetError::NotFound(err)) => {
                         tracing::warn!("Dataset not found: {:?}", err);
-                        return Ok(Response::builder()
-                            .status(StatusCode::NOT_FOUND)
-                            .body(Default::default())
-                            .unwrap());
+                        return Ok(not_found_response());
                     }
                     Err(err) => {
                         tracing::error!("Could not get dataset: {:?}", err);
-                        return Ok(Response::builder()
-                            .status(StatusCode::INTERNAL_SERVER_ERROR)
-                            .body(Default::default())
-                            .unwrap());
+                        return Ok(internal_server_error_response());
                     }
                 };
 

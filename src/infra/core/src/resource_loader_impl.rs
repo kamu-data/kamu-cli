@@ -38,7 +38,7 @@ impl ResourceLoaderImpl {
                     .read_manifest(&bytes)
                     .map_err(|e| ResourceError::serde(e))
             }
-            Err(err) if err.status() == Some(reqwest::StatusCode::NOT_FOUND) => {
+            Err(err) if err.status() == Some(http::StatusCode::NOT_FOUND) => {
                 Err(ResourceError::not_found(url.as_str().to_owned(), None))
             }
             Err(err) => Err(ResourceError::unreachable(

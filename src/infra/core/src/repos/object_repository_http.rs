@@ -59,11 +59,11 @@ impl ObjectRepository for ObjectRepositoryHttp {
 
         match response.error_for_status() {
             Ok(_) => Ok(true),
-            Err(e) if e.status() == Some(reqwest::StatusCode::NOT_FOUND) => Ok(false),
-            Err(e) if e.status() == Some(reqwest::StatusCode::UNAUTHORIZED) => {
+            Err(e) if e.status() == Some(http::StatusCode::NOT_FOUND) => Ok(false),
+            Err(e) if e.status() == Some(http::StatusCode::UNAUTHORIZED) => {
                 Err(AccessError::Unauthorized(e.into()).into())
             }
-            Err(e) if e.status() == Some(reqwest::StatusCode::FORBIDDEN) => {
+            Err(e) if e.status() == Some(http::StatusCode::FORBIDDEN) => {
                 Err(AccessError::Forbidden(e.into()).into())
             }
             Err(e) => Err(e.int_err().into()),
@@ -83,15 +83,15 @@ impl ObjectRepository for ObjectRepositoryHttp {
 
         let response = match response.error_for_status() {
             Ok(resp) => Ok(resp),
-            Err(e) if e.status() == Some(reqwest::StatusCode::NOT_FOUND) => {
+            Err(e) if e.status() == Some(http::StatusCode::NOT_FOUND) => {
                 Err(GetError::NotFound(ObjectNotFoundError {
                     hash: hash.clone(),
                 }))
             }
-            Err(e) if e.status() == Some(reqwest::StatusCode::UNAUTHORIZED) => {
+            Err(e) if e.status() == Some(http::StatusCode::UNAUTHORIZED) => {
                 Err(AccessError::Unauthorized(e.into()).into())
             }
-            Err(e) if e.status() == Some(reqwest::StatusCode::FORBIDDEN) => {
+            Err(e) if e.status() == Some(http::StatusCode::FORBIDDEN) => {
                 Err(AccessError::Forbidden(e.into()).into())
             }
             Err(e) => Err(e.int_err().into()),
@@ -111,15 +111,15 @@ impl ObjectRepository for ObjectRepositoryHttp {
 
         let response = match response.error_for_status() {
             Ok(resp) => Ok(resp),
-            Err(e) if e.status() == Some(reqwest::StatusCode::NOT_FOUND) => {
+            Err(e) if e.status() == Some(http::StatusCode::NOT_FOUND) => {
                 Err(GetError::NotFound(ObjectNotFoundError {
                     hash: hash.clone(),
                 }))
             }
-            Err(e) if e.status() == Some(reqwest::StatusCode::UNAUTHORIZED) => {
+            Err(e) if e.status() == Some(http::StatusCode::UNAUTHORIZED) => {
                 Err(AccessError::Unauthorized(e.into()).into())
             }
-            Err(e) if e.status() == Some(reqwest::StatusCode::FORBIDDEN) => {
+            Err(e) if e.status() == Some(http::StatusCode::FORBIDDEN) => {
                 Err(AccessError::Forbidden(e.into()).into())
             }
             Err(e) => Err(e.int_err().into()),
@@ -149,6 +149,7 @@ impl ObjectRepository for ObjectRepositoryHttp {
         match self.base_url.join(&hash.to_multibase_string()) {
             Ok(url) => Ok(GetExternalUrlResult {
                 url,
+                header_map: http::HeaderMap::new(),
                 expires_at: None,
             }),
             Err(e) => Err(GetExternalUrlError::Internal(e.int_err())),

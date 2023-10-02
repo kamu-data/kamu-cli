@@ -419,6 +419,9 @@ pub async fn prepare_pull_object_transfer_strategy(
     dataset: &dyn Dataset,
     object_file_ref: &ObjectFileReference,
     dataset_url: &Url,
+    maybe_bearer_header: &Option<
+        axum::TypedHeader<axum::headers::Authorization<axum::headers::authorization::Bearer>>,
+    >,
 ) -> Result<PullObjectTransferStrategy, InternalError> {
     let get_download_url_result = match object_file_ref.object_type {
         ObjectType::MetadataBlock => {
@@ -454,11 +457,13 @@ pub async fn prepare_pull_object_transfer_strategy(
     let transfer_url_result = match get_download_url_result {
         Ok(result) => Ok(TransferUrl {
             url: result.url,
+            headers: primitivize_header_map(result.header_map),
             expires_at: result.expires_at,
         }),
         Err(error) => match error {
             GetExternalUrlError::NotSupported => Ok(TransferUrl {
                 url: get_simple_transfer_protocol_url(object_file_ref, dataset_url),
+                headers: get_simple_transfer_protocol_headers(maybe_bearer_header),
                 expires_at: None,
             }),
             GetExternalUrlError::Access(e) => Err(e.int_err()), /* TODO: propagate */
@@ -498,10 +503,60 @@ fn get_simple_transfer_protocol_url(
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+fn get_simple_transfer_protocol_headers(
+    maybe_bearer_header: &Option<
+        axum::TypedHeader<axum::headers::Authorization<axum::headers::authorization::Bearer>>,
+    >,
+) -> Vec<(Bytes, Bytes)> {
+    if let Some(bearer) = maybe_bearer_header {
+        vec![(
+            Bytes::copy_from_slice(http::header::AUTHORIZATION.as_str().as_bytes()),
+            Bytes::copy_from_slice(bearer.0.token().as_bytes()),
+        )]
+    } else {
+        vec![]
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+fn primitivize_header_map(header_map: http::HeaderMap) -> Vec<(Bytes, Bytes)> {
+    let mut res = Vec::new();
+
+    for (name, value) in header_map.iter() {
+        res.push((
+            Bytes::copy_from_slice(name.as_str().as_bytes()),
+            Bytes::copy_from_slice(value.as_bytes()),
+        ))
+    }
+
+    res
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+fn reconstruct_header_map(headers_as_primitives: Vec<(Bytes, Bytes)>) -> http::HeaderMap {
+    let mut res = http::HeaderMap::new();
+
+    for (name, value) in headers_as_primitives.into_iter() {
+        res.append(
+            http::HeaderName::from_bytes(&name).unwrap(),
+            http::HeaderValue::from_bytes(&value).unwrap(),
+        );
+    }
+
+    res
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
 pub async fn prepare_push_object_transfer_strategy(
     dataset: &dyn Dataset,
     dataset_url: &Url,
     object_file_ref: &ObjectFileReference,
+    maybe_bearer_header: &Option<
+        axum::TypedHeader<axum::headers::Authorization<axum::headers::authorization::Bearer>>,
+    >,
 ) -> Result<PushObjectTransferStrategy, InternalError> {
     let object_repo = match object_file_ref.object_type {
         ObjectType::MetadataBlock => dataset.as_metadata_chain().as_object_repo(),
@@ -530,11 +585,13 @@ pub async fn prepare_push_object_transfer_strategy(
         let transfer_url_result = match get_upload_url_result {
             Ok(result) => Ok(TransferUrl {
                 url: result.url,
+                headers: primitivize_header_map(result.header_map),
                 expires_at: result.expires_at,
             }),
             Err(error) => match error {
                 GetExternalUrlError::NotSupported => Ok(TransferUrl {
                     url: get_simple_transfer_protocol_url(object_file_ref, dataset_url),
+                    headers: get_simple_transfer_protocol_headers(maybe_bearer_header),
                     expires_at: None,
                 }),
                 GetExternalUrlError::Access(e) => Err(e.int_err()), /* TODO: propagate */
@@ -557,7 +614,7 @@ pub async fn prepare_push_object_transfer_strategy(
 
 pub async fn dataset_import_object_file(
     dataset: &dyn Dataset,
-    object_transfer_strategy: &PullObjectTransferStrategy,
+    object_transfer_strategy: PullObjectTransferStrategy,
 ) -> Result<(), SyncError> {
     if object_transfer_strategy.pull_strategy != ObjectPullStrategy::HttpDownload {
         panic!(
@@ -572,6 +629,9 @@ pub async fn dataset_import_object_file(
 
     let response = client
         .get(object_transfer_strategy.download_from.url.clone())
+        .headers(reconstruct_header_map(
+            object_transfer_strategy.download_from.headers,
+        ))
         .send()
         .await
         .map_err(|e| e.int_err())?;
@@ -622,8 +682,7 @@ pub async fn dataset_import_object_file(
 
 pub async fn dataset_export_object_file(
     dataset: &dyn Dataset,
-    object_transfer_strategy: &PushObjectTransferStrategy,
-    access_token: &str,
+    object_transfer_strategy: PushObjectTransferStrategy,
 ) -> Result<(), SyncError> {
     if object_transfer_strategy.push_strategy == ObjectPushStrategy::SkipUpload {
         tracing::debug!(
@@ -666,18 +725,18 @@ pub async fn dataset_export_object_file(
 
     let client = reqwest::Client::new();
 
+    let upload_to = object_transfer_strategy.upload_to.unwrap();
+
+    let mut header_map = reconstruct_header_map(upload_to.headers);
+    header_map.append(
+        http::header::CONTENT_TYPE,
+        http::HeaderValue::from_static("application/octet-stream"),
+    );
+    header_map.append(http::header::CONTENT_LENGTH, http::HeaderValue::from(size));
+
     let response = client
-        .put(
-            object_transfer_strategy
-                .upload_to
-                .as_ref()
-                .unwrap()
-                .url
-                .clone(),
-        )
-        .header("content-type", "application/octet-stream")
-        .header("content-length", size)
-        .bearer_auth(access_token)
+        .put(upload_to.url.clone())
+        .headers(header_map)
         .body(hyper::Body::wrap_stream(reader_stream))
         .send()
         .await
@@ -688,7 +747,7 @@ pub async fn dataset_export_object_file(
     } else {
         tracing::error!(
             "File transfer to {} failed, result is {:?}",
-            object_transfer_strategy.upload_to.as_ref().unwrap().url,
+            upload_to.url,
             response
         );
         Err(SyncError::Internal(

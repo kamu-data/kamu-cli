@@ -25,6 +25,9 @@ pub struct AxumServerPullProtocolInstance {
     socket: axum::extract::ws::WebSocket,
     dataset: Arc<dyn Dataset>,
     dataset_url: Url,
+    maybe_bearer_header: Option<
+        axum::TypedHeader<axum::headers::Authorization<axum::headers::authorization::Bearer>>,
+    >,
 }
 
 impl AxumServerPullProtocolInstance {
@@ -32,11 +35,15 @@ impl AxumServerPullProtocolInstance {
         socket: axum::extract::ws::WebSocket,
         dataset: Arc<dyn Dataset>,
         dataset_url: Url,
+        maybe_bearer_header: Option<
+            axum::TypedHeader<axum::headers::Authorization<axum::headers::authorization::Bearer>>,
+        >,
     ) -> Self {
         Self {
             socket,
             dataset,
             dataset_url,
+            maybe_bearer_header,
         }
     }
 
@@ -216,6 +223,7 @@ impl AxumServerPullProtocolInstance {
                         self.dataset.as_ref(),
                         &r,
                         &self.dataset_url,
+                        &self.maybe_bearer_header,
                     )
                     .await
                     .int_err()?;

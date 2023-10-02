@@ -45,7 +45,7 @@ impl NamedObjectRepository for NamedObjectRepositoryHttp {
 
         let response = match response.error_for_status() {
             Ok(resp) => Ok(resp),
-            Err(e) if e.status() == Some(reqwest::StatusCode::NOT_FOUND) => {
+            Err(e) if e.status() == Some(http::StatusCode::NOT_FOUND) => {
                 Err(GetNamedError::NotFound(NotFoundError {
                     name: name.to_owned(),
                 }))

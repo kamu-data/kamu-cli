@@ -11,7 +11,6 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 use axum::body::Body;
-use axum::http::{Request, StatusCode};
 use axum::response::Response;
 use axum::RequestExt;
 use futures::Future;
@@ -19,6 +18,7 @@ use kamu::domain::{auth, AnonymousAccountReason, CurrentAccountSubject};
 use tower::{Layer, Service};
 
 use crate::access_token::AccessToken;
+use crate::axum_utils::*;
 
 /////////////////////////////////////////////////////////////////////////////////
 
@@ -70,10 +70,7 @@ impl<Svc> AuthenticationMiddleware<Svc> {
                     )),
                 },
                 Err(auth::GetAccountInfoError::Internal(_)) => {
-                    return Err(Response::builder()
-                        .status(StatusCode::INTERNAL_SERVER_ERROR)
-                        .body(Default::default())
-                        .unwrap());
+                    return Err(internal_server_error_response());
                 }
             }
         } else {
@@ -84,9 +81,9 @@ impl<Svc> AuthenticationMiddleware<Svc> {
     }
 }
 
-impl<Svc> Service<Request<Body>> for AuthenticationMiddleware<Svc>
+impl<Svc> Service<http::Request<Body>> for AuthenticationMiddleware<Svc>
 where
-    Svc: Service<Request<Body>, Response = Response> + Send + 'static + Clone,
+    Svc: Service<http::Request<Body>, Response = Response> + Send + 'static + Clone,
     Svc::Future: Send + 'static,
 {
     type Response = Svc::Response;
@@ -98,7 +95,7 @@ where
         self.inner.poll_ready(cx)
     }
 
-    fn call(&mut self, mut request: Request<Body>) -> Self::Future {
+    fn call(&mut self, mut request: http::Request<Body>) -> Self::Future {
         // Inspired by https://github.com/maxcountryman/axum-login/blob/main/axum-login/src/auth.rs
         // TODO: PERF: Is cloning a performance concern?
         let mut inner = self.inner.clone();
