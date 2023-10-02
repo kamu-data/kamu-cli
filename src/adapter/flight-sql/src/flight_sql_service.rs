@@ -613,10 +613,23 @@ impl KamuFlightSqlService {
     ) -> Result<Response<<Self as FlightService>::DoGetStream>, Status> {
         let schema: Schema = df.schema().clone().into();
 
-        let batches = df
+        let mut batches = df
             .collect()
             .await
             .map_err(|e| Status::internal(format!("Error executing plan: {}", e)))?;
+
+        // TODO: FIXME: There seems to be some issue with JDBC connector where a
+        // non-empty result that consists of some empty batches is considered
+        // fully empty by the client. Thus below we filter out empty
+        // batches manually. Empty batches often happen in GROUP BY queries - we should
+        // dig in and file an issue.
+        let first_batch = batches[0].clone();
+        batches.retain(|b| b.num_rows() != 0);
+
+        // Add an empty batch back if entire result is empty
+        if batches.is_empty() {
+            batches.push(first_batch)
+        }
 
         let flights = batches_to_flight_data(&schema, batches)
             .map_err(|_| Status::internal("Error encoding batches".to_string()))?;
