@@ -12,17 +12,16 @@ use url::Url;
 
 ///////////////////////////////////////////////////////////////////////////////
 
-#[async_trait::async_trait]
 pub trait OdfServerAccessTokenResolver: Send + Sync {
-    async fn resolve_odf_dataset_access_token(&self, odf_dataset_http_url: &Url) -> Option<String>;
+    fn resolve_odf_dataset_access_token(&self, odf_dataset_http_url: &Url) -> Option<String>;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
-pub struct DummyOdfServerAccessTokenResolve {}
+pub struct DummyOdfServerAccessTokenResolver {}
 
-impl DummyOdfServerAccessTokenResolve {
+impl DummyOdfServerAccessTokenResolver {
     pub fn new() -> Self {
         Self {}
     }
@@ -31,11 +30,8 @@ impl DummyOdfServerAccessTokenResolve {
 const TEST_ACCESS_TOKEN: &str = "some-token";
 
 #[async_trait::async_trait]
-impl OdfServerAccessTokenResolver for DummyOdfServerAccessTokenResolve {
-    async fn resolve_odf_dataset_access_token(
-        &self,
-        _odf_dataset_http_url: &Url,
-    ) -> Option<String> {
+impl OdfServerAccessTokenResolver for DummyOdfServerAccessTokenResolver {
+    fn resolve_odf_dataset_access_token(&self, _odf_dataset_http_url: &Url) -> Option<String> {
         Some(TEST_ACCESS_TOKEN.to_string())
     }
 }

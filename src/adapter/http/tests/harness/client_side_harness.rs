@@ -48,8 +48,8 @@ impl ClientSideHarness {
         b.add::<auth::AlwaysHappyDatasetActionAuthorizer>()
             .bind::<dyn auth::DatasetActionAuthorizer, auth::AlwaysHappyDatasetActionAuthorizer>();
 
-        b.add::<auth::DummyOdfServerAccessTokenResolve>()
-            .bind::<dyn auth::OdfServerAccessTokenResolver, auth::DummyOdfServerAccessTokenResolve>(
+        b.add::<auth::DummyOdfServerAccessTokenResolver>()
+            .bind::<dyn auth::OdfServerAccessTokenResolver, auth::DummyOdfServerAccessTokenResolver>(
             );
 
         b.add::<SystemTimeSourceDefault>();

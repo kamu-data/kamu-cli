@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::sync::Arc;
 
 use ::serde::Deserialize;
 use axum::extract::{FromRequestParts, Path};
@@ -108,10 +109,13 @@ where
 /////////////////////////////////////////////////////////////////////////////////////////
 
 async fn setup_client(dataset_url: url::Url, head_expected: Multihash) {
-    let dataset = DatasetFactoryImpl::new(IpfsGateway::default())
-        .get_dataset(&dataset_url, false)
-        .await
-        .unwrap();
+    let dataset = DatasetFactoryImpl::new(
+        IpfsGateway::default(),
+        Arc::new(auth::DummyOdfServerAccessTokenResolver::new()),
+    )
+    .get_dataset(&dataset_url, false)
+    .await
+    .unwrap();
 
     let head_actual = dataset
         .as_metadata_chain()

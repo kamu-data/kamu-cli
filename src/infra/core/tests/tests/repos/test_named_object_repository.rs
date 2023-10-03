@@ -68,7 +68,7 @@ async fn test_basics_http() {
     let http_server = HttpFileServer::new(tmp_repo_dir.path());
     let base_url = url::Url::parse(&format!("http://{}/", http_server.local_addr())).unwrap();
     let _srv_handle = tokio::spawn(http_server.run());
-    let repo = NamedObjectRepositoryHttp::new(reqwest::Client::new(), base_url);
+    let repo = NamedObjectRepositoryHttp::new(reqwest::Client::new(), base_url, Default::default());
 
     assert_matches!(repo.get("head").await, Err(GetNamedError::NotFound(_)));
 

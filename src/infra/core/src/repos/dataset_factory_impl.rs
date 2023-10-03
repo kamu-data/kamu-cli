@@ -20,6 +20,7 @@ use crate::*;
 
 pub struct DatasetFactoryImpl {
     ipfs_gateway: IpfsGateway,
+    access_token_resolver: Arc<dyn kamu_core::auth::OdfServerAccessTokenResolver>,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -39,8 +40,14 @@ type DatasetImplLocalFS = DatasetImpl<
 
 #[component(pub)]
 impl DatasetFactoryImpl {
-    pub fn new(ipfs_gateway: IpfsGateway) -> Self {
-        Self { ipfs_gateway }
+    pub fn new(
+        ipfs_gateway: IpfsGateway,
+        access_token_resolver: Arc<dyn kamu_core::auth::OdfServerAccessTokenResolver>,
+    ) -> Self {
+        Self {
+            ipfs_gateway,
+            access_token_resolver,
+        }
     }
 
     pub fn get_local_fs(layout: DatasetLayout) -> DatasetImplLocalFS {
@@ -55,19 +62,36 @@ impl DatasetFactoryImpl {
         )
     }
 
-    fn get_http(base_url: Url) -> Result<impl Dataset, InternalError> {
+    fn get_http(base_url: Url, header_map: http::HeaderMap) -> Result<impl Dataset, InternalError> {
         let client = reqwest::Client::new();
         Ok(DatasetImpl::new(
             MetadataChainImpl::new(
-                ObjectRepositoryHttp::new(client.clone(), base_url.join("blocks/").unwrap()),
+                ObjectRepositoryHttp::new(
+                    client.clone(),
+                    base_url.join("blocks/").unwrap(),
+                    header_map.clone(),
+                ),
                 ReferenceRepositoryImpl::new(NamedObjectRepositoryHttp::new(
                     client.clone(),
                     base_url.join("refs/").unwrap(),
+                    header_map.clone(),
                 )),
             ),
-            ObjectRepositoryHttp::new(client.clone(), base_url.join("data/").unwrap()),
-            ObjectRepositoryHttp::new(client.clone(), base_url.join("checkpoints/").unwrap()),
-            NamedObjectRepositoryHttp::new(client.clone(), base_url.join("info/").unwrap()),
+            ObjectRepositoryHttp::new(
+                client.clone(),
+                base_url.join("data/").unwrap(),
+                header_map.clone(),
+            ),
+            ObjectRepositoryHttp::new(
+                client.clone(),
+                base_url.join("checkpoints/").unwrap(),
+                header_map.clone(),
+            ),
+            NamedObjectRepositoryHttp::new(
+                client.clone(),
+                base_url.join("info/").unwrap(),
+                header_map,
+            ),
         ))
     }
 
@@ -181,14 +205,26 @@ impl DatasetFactoryImpl {
         let client = reqwest::Client::new();
         Ok(DatasetImpl::new(
             MetadataChainImpl::new(
-                ObjectRepositoryHttp::new(client.clone(), dataset_url.join("blocks/").unwrap()),
+                ObjectRepositoryHttp::new(
+                    client.clone(),
+                    dataset_url.join("blocks/").unwrap(),
+                    Default::default(),
+                ),
                 ReferenceRepositoryImpl::new(NamedObjectRepositoryIpfsHttp::new(
                     client.clone(),
                     dataset_url.join("refs/").unwrap(),
                 )),
             ),
-            ObjectRepositoryHttp::new(client.clone(), dataset_url.join("data/").unwrap()),
-            ObjectRepositoryHttp::new(client.clone(), dataset_url.join("checkpoints/").unwrap()),
+            ObjectRepositoryHttp::new(
+                client.clone(),
+                dataset_url.join("data/").unwrap(),
+                Default::default(),
+            ),
+            ObjectRepositoryHttp::new(
+                client.clone(),
+                dataset_url.join("checkpoints/").unwrap(),
+                Default::default(),
+            ),
             NamedObjectRepositoryIpfsHttp::new(client.clone(), dataset_url.join("info/").unwrap()),
         ))
     }
@@ -209,6 +245,25 @@ impl DatasetFactoryImpl {
             }
         }
         Err(DnsLinkResolutionError { record: query }.int_err())
+    }
+
+    fn build_header_map(&self, http_dataset_url: &Url) -> http::HeaderMap {
+        let maybe_access_token = self
+            .access_token_resolver
+            .resolve_odf_dataset_access_token(http_dataset_url);
+
+        match maybe_access_token {
+            Some(access_token) => {
+                let mut header_map = http::HeaderMap::new();
+                header_map.append(
+                    http::header::AUTHORIZATION,
+                    http::HeaderValue::from_str(format!("Bearer {}", access_token).as_str())
+                        .unwrap(),
+                );
+                header_map
+            }
+            None => Default::default(),
+        }
     }
 }
 
@@ -240,7 +295,7 @@ impl DatasetFactory for DatasetFactoryImpl {
                 Ok(Arc::new(ds) as Arc<dyn Dataset>)
             }
             "http" | "https" | "odf+http" | "odf+https" => {
-                let ds = Self::get_http(url.clone())?;
+                let ds = Self::get_http(url.clone(), self.build_header_map(&url))?;
                 Ok(Arc::new(ds))
             }
             "ipfs" | "ipns" | "ipfs+http" | "ipfs+https" | "ipns+http" | "ipns+https" => {

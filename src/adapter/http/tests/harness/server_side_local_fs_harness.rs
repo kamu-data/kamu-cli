@@ -56,8 +56,8 @@ impl ServerSideLocalFsHarness {
             .add_value(CurrentAccountSubject::new_test())
             .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
             .bind::<dyn auth::DatasetActionAuthorizer, auth::AlwaysHappyDatasetActionAuthorizer>()
-            .add::<auth::DummyOdfServerAccessTokenResolve>()
-            .bind::<dyn auth::OdfServerAccessTokenResolver, auth::DummyOdfServerAccessTokenResolve>(
+            .add::<auth::DummyOdfServerAccessTokenResolver>()
+            .bind::<dyn auth::OdfServerAccessTokenResolver, auth::DummyOdfServerAccessTokenResolver>(
             )
             .build();
 

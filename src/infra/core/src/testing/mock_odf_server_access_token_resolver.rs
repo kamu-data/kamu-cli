@@ -16,7 +16,7 @@ mockall::mock! {
     pub OdfServerAccessTokenResolver {}
     #[async_trait::async_trait]
     impl OdfServerAccessTokenResolver for OdfServerAccessTokenResolver {
-        async fn resolve_odf_dataset_access_token(
+        fn resolve_odf_dataset_access_token(
             &self,
             odf_dataset_http_url: &Url,
         ) -> Option<String>;

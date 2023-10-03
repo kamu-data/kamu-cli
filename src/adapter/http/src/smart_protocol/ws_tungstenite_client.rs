@@ -468,8 +468,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
 
         let maybe_access_token = self
             .dataset_credential_resolver
-            .resolve_odf_dataset_access_token(http_src_url)
-            .await;
+            .resolve_odf_dataset_access_token(http_src_url);
 
         let mut pull_url = http_src_url.join("pull").unwrap();
         let pull_url_res = pull_url.set_scheme("ws");
@@ -485,8 +484,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
         if let Some(access_token) = maybe_access_token {
             request.headers_mut().append(
                 http::header::AUTHORIZATION,
-                http::HeaderValue::from_str(format!("Bearer {}", access_token).as_str())
-                    .int_err()?,
+                http::HeaderValue::from_str(format!("Bearer {}", access_token).as_str()).unwrap(),
             );
         }
 
@@ -659,8 +657,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
 
         let maybe_access_token = self
             .dataset_credential_resolver
-            .resolve_odf_dataset_access_token(http_dst_url)
-            .await;
+            .resolve_odf_dataset_access_token(http_dst_url);
 
         let mut push_url = http_dst_url.join("push").unwrap();
         let push_url_res = push_url.set_scheme("ws");
@@ -676,8 +673,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
         if let Some(access_token) = maybe_access_token {
             request.headers_mut().append(
                 http::header::AUTHORIZATION,
-                http::HeaderValue::from_str(format!("Bearer {}", access_token).as_str())
-                    .int_err()?,
+                http::HeaderValue::from_str(format!("Bearer {}", access_token).as_str()).unwrap(),
             );
         }
 

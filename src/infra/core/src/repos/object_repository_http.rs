@@ -26,19 +26,24 @@ type AsyncReadObj = dyn AsyncRead + Send + Unpin;
 pub struct ObjectRepositoryHttp {
     client: Client,
     base_url: Url,
+    header_map: http::HeaderMap,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 impl ObjectRepositoryHttp {
-    pub fn new(client: Client, base_url: Url) -> Self {
+    pub fn new(client: Client, base_url: Url, header_map: http::HeaderMap) -> Self {
         assert!(
             !base_url.cannot_be_a_base()
                 && (base_url.path().is_empty() || base_url.path().ends_with('/')),
             "Invalid base url: {}",
             base_url
         );
-        Self { client, base_url }
+        Self {
+            client,
+            base_url,
+            header_map,
+        }
     }
 }
 
@@ -55,7 +60,13 @@ impl ObjectRepository for ObjectRepositoryHttp {
 
         tracing::debug!(%url, "Checking for object");
 
-        let response = self.client.head(url).send().await.int_err()?;
+        let response = self
+            .client
+            .head(url)
+            .headers(self.header_map.clone())
+            .send()
+            .await
+            .int_err()?;
 
         match response.error_for_status() {
             Ok(_) => Ok(true),
@@ -79,7 +90,13 @@ impl ObjectRepository for ObjectRepositoryHttp {
 
         tracing::debug!(%url, "Reading object");
 
-        let response = self.client.get(url).send().await.int_err()?;
+        let response = self
+            .client
+            .get(url)
+            .headers(self.header_map.clone())
+            .send()
+            .await
+            .int_err()?;
 
         let response = match response.error_for_status() {
             Ok(resp) => Ok(resp),
@@ -107,7 +124,13 @@ impl ObjectRepository for ObjectRepositoryHttp {
 
         tracing::debug!(%url, "Reading object stream");
 
-        let response = self.client.get(url).send().await.int_err()?;
+        let response = self
+            .client
+            .get(url)
+            .headers(self.header_map.clone())
+            .send()
+            .await
+            .int_err()?;
 
         let response = match response.error_for_status() {
             Ok(resp) => Ok(resp),
@@ -149,7 +172,7 @@ impl ObjectRepository for ObjectRepositoryHttp {
         match self.base_url.join(&hash.to_multibase_string()) {
             Ok(url) => Ok(GetExternalUrlResult {
                 url,
-                header_map: http::HeaderMap::new(),
+                header_map: self.header_map.clone(),
                 expires_at: None,
             }),
             Err(e) => Err(GetExternalUrlError::Internal(e.int_err())),

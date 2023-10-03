@@ -162,7 +162,10 @@ async fn do_test_sync(
     );
     let remote_repo_reg =
         Arc::new(RemoteRepositoryRegistryImpl::create(tmp_workspace_dir.join("repos")).unwrap());
-    let dataset_factory = Arc::new(DatasetFactoryImpl::new(ipfs_gateway));
+    let dataset_factory = Arc::new(DatasetFactoryImpl::new(
+        ipfs_gateway,
+        Arc::new(auth::DummyOdfServerAccessTokenResolver::new()),
+    ));
 
     let sync_svc = SyncServiceImpl::new(
         remote_repo_reg.clone(),
