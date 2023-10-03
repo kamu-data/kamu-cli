@@ -19,9 +19,6 @@
 use std::str::FromStr;
 use std::sync::Arc;
 
-use axum::extract::Extension;
-use axum::headers::ContentLength;
-use axum::TypedHeader;
 use futures::TryStreamExt;
 use kamu::domain::*;
 use opendatafabric::serde::flatbuffers::FlatbuffersMetadataBlockSerializer;
@@ -30,7 +27,11 @@ use opendatafabric::{DatasetRef, Multihash};
 use url::Url;
 
 use crate::axum_utils::*;
-use crate::smart_protocol::{AxumServerPullProtocolInstance, AxumServerPushProtocolInstance};
+use crate::smart_protocol::{
+    AxumServerPullProtocolInstance,
+    AxumServerPushProtocolInstance,
+    BearerHeader,
+};
 
 /////////////////////////////////////////////////////////////////////////////////
 
@@ -52,7 +53,7 @@ pub struct PhysicalHashFromPath {
 /////////////////////////////////////////////////////////////////////////////////
 
 pub async fn dataset_refs_handler(
-    Extension(dataset): Extension<Arc<dyn Dataset>>,
+    axum::extract::Extension(dataset): axum::extract::Extension<Arc<dyn Dataset>>,
     axum::extract::Path(ref_param): axum::extract::Path<RefFromPath>,
 ) -> Result<String, axum::response::Response> {
     let block_ref = match BlockRef::from_str(&ref_param.reference.as_str()) {
@@ -78,7 +79,7 @@ pub async fn dataset_refs_handler(
 /////////////////////////////////////////////////////////////////////////////////
 
 pub async fn dataset_blocks_handler(
-    Extension(dataset): Extension<Arc<dyn Dataset>>,
+    axum::extract::Extension(dataset): axum::extract::Extension<Arc<dyn Dataset>>,
     axum::extract::Path(hash_param): axum::extract::Path<BlockHashFromPath>,
 ) -> Result<Vec<u8>, axum::response::Response> {
     let block = match dataset
@@ -106,7 +107,7 @@ pub async fn dataset_blocks_handler(
 /////////////////////////////////////////////////////////////////////////////////
 
 pub async fn dataset_data_get_handler(
-    Extension(dataset): Extension<Arc<dyn Dataset>>,
+    axum::extract::Extension(dataset): axum::extract::Extension<Arc<dyn Dataset>>,
     axum::extract::Path(hash_param): axum::extract::Path<PhysicalHashFromPath>,
 ) -> axum::response::Response {
     let data_stream = match dataset
@@ -131,7 +132,7 @@ pub async fn dataset_data_get_handler(
 /////////////////////////////////////////////////////////////////////////////////
 
 pub async fn dataset_checkpoints_get_handler(
-    Extension(dataset): Extension<Arc<dyn Dataset>>,
+    axum::extract::Extension(dataset): axum::extract::Extension<Arc<dyn Dataset>>,
     axum::extract::Path(hash_param): axum::extract::Path<PhysicalHashFromPath>,
 ) -> axum::response::Response {
     let checkpoint_stream = match dataset
@@ -156,9 +157,9 @@ pub async fn dataset_checkpoints_get_handler(
 /////////////////////////////////////////////////////////////////////////////////
 
 pub async fn dataset_data_put_handler(
-    Extension(dataset): Extension<Arc<dyn Dataset>>,
+    axum::extract::Extension(dataset): axum::extract::Extension<Arc<dyn Dataset>>,
     axum::extract::Path(hash_param): axum::extract::Path<PhysicalHashFromPath>,
-    TypedHeader(content_length): TypedHeader<ContentLength>,
+    axum::TypedHeader(content_length): axum::TypedHeader<axum::headers::ContentLength>,
     body_stream: axum::extract::BodyStream,
 ) -> Result<(), axum::response::Response> {
     dataset_put_object_common(
@@ -173,9 +174,9 @@ pub async fn dataset_data_put_handler(
 /////////////////////////////////////////////////////////////////////////////////
 
 pub async fn dataset_checkpoints_put_handler(
-    Extension(dataset): Extension<Arc<dyn Dataset>>,
+    axum::extract::Extension(dataset): axum::extract::Extension<Arc<dyn Dataset>>,
     axum::extract::Path(hash_param): axum::extract::Path<PhysicalHashFromPath>,
-    TypedHeader(content_length): TypedHeader<ContentLength>,
+    axum::TypedHeader(content_length): axum::TypedHeader<axum::headers::ContentLength>,
     body_stream: axum::extract::BodyStream,
 ) -> Result<(), axum::response::Response> {
     dataset_put_object_common(
@@ -220,13 +221,11 @@ async fn dataset_put_object_common(
 
 pub async fn dataset_push_ws_upgrade_handler(
     ws: axum::extract::ws::WebSocketUpgrade,
-    Extension(dataset_ref): Extension<DatasetRef>,
-    Extension(catalog): Extension<dill::Catalog>,
+    axum::extract::Extension(dataset_ref): axum::extract::Extension<DatasetRef>,
+    axum::extract::Extension(catalog): axum::extract::Extension<dill::Catalog>,
     host: axum::extract::Host,
     uri: axum::extract::OriginalUri,
-    maybe_bearer_header: Option<
-        axum::TypedHeader<axum::headers::Authorization<axum::headers::authorization::Bearer>>,
-    >,
+    maybe_bearer_header: Option<BearerHeader>,
 ) -> axum::response::Response {
     let dataset_url = get_base_dataset_url(host, uri, 1);
 
@@ -258,17 +257,15 @@ pub async fn dataset_push_ws_upgrade_handler(
 
 pub async fn dataset_pull_ws_upgrade_handler(
     ws: axum::extract::ws::WebSocketUpgrade,
-    dataset: Extension<Arc<dyn Dataset>>,
+    axum::extract::Extension(dataset): axum::extract::Extension<Arc<dyn Dataset>>,
     host: axum::extract::Host,
     uri: axum::extract::OriginalUri,
-    maybe_bearer_header: Option<
-        axum::TypedHeader<axum::headers::Authorization<axum::headers::authorization::Bearer>>,
-    >,
+    maybe_bearer_header: Option<BearerHeader>,
 ) -> axum::response::Response {
     let dataset_url = get_base_dataset_url(host, uri, 1);
 
     ws.on_upgrade(move |socket| {
-        AxumServerPullProtocolInstance::new(socket, dataset.0, dataset_url, maybe_bearer_header)
+        AxumServerPullProtocolInstance::new(socket, dataset, dataset_url, maybe_bearer_header)
             .serve()
     })
 }
@@ -276,13 +273,13 @@ pub async fn dataset_pull_ws_upgrade_handler(
 /////////////////////////////////////////////////////////////////////////////////
 
 fn get_base_dataset_url(
-    host: axum::extract::Host,
-    uri: axum::extract::OriginalUri,
+    axum::extract::Host(host): axum::extract::Host,
+    axum::extract::OriginalUri(uri): axum::extract::OriginalUri,
     depth: usize,
 ) -> Url {
     let api_server_url = get_api_server_url(host);
 
-    let mut path: Vec<_> = uri.0.path().split('/').collect();
+    let mut path: Vec<_> = uri.path().split('/').collect();
     for _ in 0..depth {
         path.pop();
     }
@@ -292,9 +289,9 @@ fn get_base_dataset_url(
 
 /////////////////////////////////////////////////////////////////////////////////
 
-fn get_api_server_url(host: axum::extract::Host) -> Url {
+fn get_api_server_url(host: String) -> Url {
     let scheme = std::env::var("KAMU_PROTOCOL_SCHEME").unwrap_or_else(|_| String::from("http"));
-    Url::parse(&format!("{}://{}", scheme, host.0)).unwrap()
+    Url::parse(&format!("{}://{}", scheme, host)).unwrap()
 }
 
 /////////////////////////////////////////////////////////////////////////////////

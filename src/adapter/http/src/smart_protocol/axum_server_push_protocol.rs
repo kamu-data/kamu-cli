@@ -40,9 +40,7 @@ pub struct AxumServerPushProtocolInstance {
     dataset_ref: DatasetRef,
     dataset: Option<Arc<dyn Dataset>>,
     dataset_url: Url,
-    maybe_bearer_header: Option<
-        axum::TypedHeader<axum::headers::Authorization<axum::headers::authorization::Bearer>>,
-    >,
+    maybe_bearer_header: Option<BearerHeader>,
 }
 
 impl AxumServerPushProtocolInstance {
@@ -52,9 +50,7 @@ impl AxumServerPushProtocolInstance {
         dataset_ref: DatasetRef,
         dataset: Option<Arc<dyn Dataset>>,
         dataset_url: Url,
-        maybe_bearer_header: Option<
-            axum::TypedHeader<axum::headers::Authorization<axum::headers::authorization::Bearer>>,
-        >,
+        maybe_bearer_header: Option<BearerHeader>,
     ) -> Self {
         Self {
             socket,

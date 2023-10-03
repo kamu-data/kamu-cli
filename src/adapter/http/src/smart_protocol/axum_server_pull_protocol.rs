@@ -25,9 +25,7 @@ pub struct AxumServerPullProtocolInstance {
     socket: axum::extract::ws::WebSocket,
     dataset: Arc<dyn Dataset>,
     dataset_url: Url,
-    maybe_bearer_header: Option<
-        axum::TypedHeader<axum::headers::Authorization<axum::headers::authorization::Bearer>>,
-    >,
+    maybe_bearer_header: Option<BearerHeader>,
 }
 
 impl AxumServerPullProtocolInstance {
@@ -35,9 +33,7 @@ impl AxumServerPullProtocolInstance {
         socket: axum::extract::ws::WebSocket,
         dataset: Arc<dyn Dataset>,
         dataset_url: Url,
-        maybe_bearer_header: Option<
-            axum::TypedHeader<axum::headers::Authorization<axum::headers::authorization::Bearer>>,
-        >,
+        maybe_bearer_header: Option<BearerHeader>,
     ) -> Self {
         Self {
             socket,

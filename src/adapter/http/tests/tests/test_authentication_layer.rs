@@ -132,9 +132,9 @@ impl ServerHarness {
     }
 
     async fn foo_handler(
-        catalog: axum::extract::Extension<dill::Catalog>,
+        axum::extract::Extension(catalog): axum::extract::Extension<dill::Catalog>,
     ) -> Result<String, http::StatusCode> {
-        let current_account_subject = catalog.0.get_one::<CurrentAccountSubject>().unwrap();
+        let current_account_subject = catalog.get_one::<CurrentAccountSubject>().unwrap();
         match current_account_subject.as_ref() {
             CurrentAccountSubject::Anonymous(_) => Ok(ANONYMOUS_RETURN_TEXT.to_string()),
             CurrentAccountSubject::Logged(l) => Ok(l.account_name.to_string()),

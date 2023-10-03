@@ -19,6 +19,7 @@ use tower::{Layer, Service};
 
 use crate::access_token::AccessToken;
 use crate::axum_utils::*;
+use crate::smart_protocol::BearerHeader;
 
 /////////////////////////////////////////////////////////////////////////////////
 
@@ -102,11 +103,7 @@ where
 
         Box::pin(async move {
             let maybe_access_token = request
-                .extract_parts::<Option<
-                    axum::TypedHeader<
-                        axum::headers::Authorization<axum::headers::authorization::Bearer>,
-                    >,
-                >>()
+                .extract_parts::<Option<BearerHeader>>()
                 .await
                 .unwrap()
                 .map(|th| AccessToken::new(th.token()));

@@ -19,6 +19,7 @@ use tar::Header;
 use thiserror::Error;
 use url::Url;
 
+use super::BearerHeader;
 use crate::smart_protocol::errors::ObjectUploadError;
 use crate::smart_protocol::messages::*;
 
@@ -419,9 +420,7 @@ pub async fn prepare_pull_object_transfer_strategy(
     dataset: &dyn Dataset,
     object_file_ref: &ObjectFileReference,
     dataset_url: &Url,
-    maybe_bearer_header: &Option<
-        axum::TypedHeader<axum::headers::Authorization<axum::headers::authorization::Bearer>>,
-    >,
+    maybe_bearer_header: &Option<BearerHeader>,
 ) -> Result<PullObjectTransferStrategy, InternalError> {
     let get_download_url_result = match object_file_ref.object_type {
         ObjectType::MetadataBlock => {
@@ -504,9 +503,7 @@ fn get_simple_transfer_protocol_url(
 /////////////////////////////////////////////////////////////////////////////////////////
 
 fn get_simple_transfer_protocol_headers(
-    maybe_bearer_header: &Option<
-        axum::TypedHeader<axum::headers::Authorization<axum::headers::authorization::Bearer>>,
-    >,
+    maybe_bearer_header: &Option<BearerHeader>,
 ) -> Vec<(Bytes, Bytes)> {
     if let Some(bearer) = maybe_bearer_header {
         vec![(
@@ -554,9 +551,7 @@ pub async fn prepare_push_object_transfer_strategy(
     dataset: &dyn Dataset,
     dataset_url: &Url,
     object_file_ref: &ObjectFileReference,
-    maybe_bearer_header: &Option<
-        axum::TypedHeader<axum::headers::Authorization<axum::headers::authorization::Bearer>>,
-    >,
+    maybe_bearer_header: &Option<BearerHeader>,
 ) -> Result<PushObjectTransferStrategy, InternalError> {
     let object_repo = match object_file_ref.object_type {
         ObjectType::MetadataBlock => dataset.as_metadata_chain().as_object_repo(),
