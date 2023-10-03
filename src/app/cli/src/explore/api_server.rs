@@ -12,12 +12,20 @@ use std::sync::Arc;
 
 use dill::Catalog;
 use internal_error::*;
-use kamu::domain::{AnonymousAccountReason, CurrentAccountSubject};
+use kamu::domain::{AnonymousAccountReason, CurrentAccountSubject, DatasetRepository};
 use kamu_task_system_inmem::domain::TaskExecutor;
 
-// Extractor of dataset identity for smart transfer protocol
+// Extractor of dataset identity for single-tenant smart transfer protocol
 #[derive(serde::Deserialize)]
 struct DatasetByName {
+    dataset_name: opendatafabric::DatasetName,
+}
+
+// Extractor of account + dataset identity for multi-tenant smart transfer
+// protocol
+#[derive(serde::Deserialize)]
+struct DatasetByAccountAndName {
+    account_name: opendatafabric::AccountName,
     dataset_name: opendatafabric::DatasetName,
 }
 
@@ -31,9 +39,14 @@ pub struct APIServer {
 
 impl APIServer {
     pub fn new(base_catalog: Catalog, address: Option<IpAddr>, port: Option<u16>) -> Self {
-        use axum::extract::{Extension, Path};
+        use axum::extract::Extension;
 
         let task_executor = base_catalog.get_one().unwrap();
+
+        let multi_tenant = base_catalog
+            .get_one::<dyn DatasetRepository>()
+            .unwrap()
+            .is_multi_tenant();
 
         let gql_schema = kamu_adapter_graphql::schema();
 
@@ -48,12 +61,16 @@ impl APIServer {
                 axum::routing::get(platform_token_validate_handler),
             )
             .nest(
-                "/:dataset_name",
-                kamu_adapter_http::smart_transfer_protocol_routes()
-                    .layer(kamu_adapter_http::DatasetAuthorizationLayer::new())
-                    .layer(kamu_adapter_http::DatasetResolverLayer::new(
-                        |Path(p): Path<DatasetByName>| p.dataset_name.as_local_ref(),
-                    )),
+                if multi_tenant {
+                    "/:account_name/:dataset_name"
+                } else {
+                    "/:dataset_name"
+                },
+                Self::add_dataset_resolver_layer(
+                    kamu_adapter_http::smart_transfer_protocol_routes()
+                        .layer(kamu_adapter_http::DatasetAuthorizationLayer::new()),
+                    multi_tenant,
+                ),
             )
             .layer(
                 tower::ServiceBuilder::new()
@@ -79,6 +96,26 @@ impl APIServer {
         Self {
             server,
             task_executor,
+        }
+    }
+
+    fn add_dataset_resolver_layer(
+        dataset_router: axum::Router,
+        multi_tenant: bool,
+    ) -> axum::Router {
+        use axum::extract::Path;
+
+        if multi_tenant {
+            dataset_router.layer(kamu_adapter_http::DatasetResolverLayer::new(
+                |Path(p): Path<DatasetByAccountAndName>| {
+                    opendatafabric::DatasetAlias::new(Some(p.account_name), p.dataset_name)
+                        .into_local_ref()
+                },
+            ))
+        } else {
+            dataset_router.layer(kamu_adapter_http::DatasetResolverLayer::new(
+                |Path(p): Path<DatasetByName>| p.dataset_name.as_local_ref(),
+            ))
         }
     }
 
