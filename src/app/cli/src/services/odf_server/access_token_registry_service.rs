@@ -22,7 +22,7 @@ use crate::WorkspaceLayout;
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
-type OdfServerAccessTokenRegistry = Vec<AccessTokenMap>;
+type OdfServerAccessTokenRegistry = Vec<ServerAccessTokensRecord>;
 
 pub struct AccessTokenRegistryService {
     storage: Arc<dyn AccessTokenStore>,
@@ -74,15 +74,15 @@ impl AccessTokenRegistryService {
             .lock()
             .expect("Could not lock access tokens registry");
 
-        if let Some(token_map) = registry
+        if let Some(server_record) = registry
             .iter()
             .find(|c| &c.frontend_url == odf_server_frontend_url)
         {
-            token_map
+            server_record
                 .token_for_account(self.account_name())
                 .map(|ac| AccessTokenFindReport {
-                    backend_url: token_map.backend_url.clone(),
-                    frontend_url: token_map.frontend_url.clone(),
+                    backend_url: server_record.backend_url.clone(),
+                    frontend_url: server_record.frontend_url.clone(),
                     access_token: ac.clone(),
                 })
         } else {
@@ -140,19 +140,19 @@ impl AccessTokenRegistryService {
 
         let access_token = AccessToken::new(account_name.clone(), access_token);
 
-        if let Some(token_map) = registry
+        if let Some(server_record) = registry
             .iter_mut()
             .find(|c| &c.frontend_url == odf_server_frontend_url)
         {
-            token_map.add_account_token(access_token);
+            server_record.add_account_token(access_token);
         } else {
-            let mut token_map = AccessTokenMap::new(
+            let mut server_record = ServerAccessTokensRecord::new(
                 odf_server_frontend_url.clone(),
                 odf_server_backend_url.clone(),
             );
-            token_map.add_account_token(access_token);
+            server_record.add_account_token(access_token);
 
-            registry.push(token_map);
+            registry.push(server_record);
         }
 
         self.storage.write_access_tokens_registry(scope, &registry)

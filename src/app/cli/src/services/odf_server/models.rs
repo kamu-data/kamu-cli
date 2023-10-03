@@ -23,13 +23,13 @@ pub enum AccessTokenStoreScope {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub struct AccessTokenMap {
+pub struct ServerAccessTokensRecord {
     pub frontend_url: Url,
     pub backend_url: Url,
     tokens: Vec<AccessToken>,
 }
 
-impl AccessTokenMap {
+impl ServerAccessTokensRecord {
     pub fn new(frontend_url: Url, backend_url: Url) -> Self {
         Self {
             frontend_url,
