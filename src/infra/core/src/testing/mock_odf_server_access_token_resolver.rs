@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_core::auth::{OdfServerAccessTokenResolveError, OdfServerAccessTokenResolver};
+use kamu_core::auth::OdfServerAccessTokenResolver;
 use url::Url;
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -19,7 +19,7 @@ mockall::mock! {
         async fn resolve_odf_dataset_access_token(
             &self,
             odf_dataset_http_url: &Url,
-        ) -> Result<String, OdfServerAccessTokenResolveError>;
+        ) -> Option<String>;
     }
 }
 

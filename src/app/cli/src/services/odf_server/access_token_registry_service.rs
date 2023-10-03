@@ -12,7 +12,6 @@ use std::sync::{Arc, Mutex};
 
 use dill::component;
 use internal_error::{InternalError, ResultIntoInternal};
-use kamu::domain::auth::{OdfServerAccessTokenResolveError, OdfServerLoginRequiredError};
 use kamu::domain::CurrentAccountSubject;
 use opendatafabric::serde::yaml::Manifest;
 use opendatafabric::AccountName;
@@ -192,27 +191,20 @@ impl AccessTokenRegistryService {
 
 #[async_trait::async_trait]
 impl kamu::domain::auth::OdfServerAccessTokenResolver for AccessTokenRegistryService {
-    async fn resolve_odf_dataset_access_token(
-        &self,
-        odf_dataset_http_url: &Url,
-    ) -> Result<String, OdfServerAccessTokenResolveError> {
+    async fn resolve_odf_dataset_access_token(&self, odf_dataset_http_url: &Url) -> Option<String> {
         let origin = odf_dataset_http_url.origin().unicode_serialization();
         let odf_server_backend_url = Url::parse(origin.as_str()).unwrap();
 
         if let Some(token_find_report) =
             self.find_by_backend_url(AccessTokenStoreScope::Workspace, &odf_server_backend_url)
         {
-            Ok(token_find_report.access_token.access_token)
+            Some(token_find_report.access_token.access_token)
         } else if let Some(token_find_report) =
             self.find_by_backend_url(AccessTokenStoreScope::User, &odf_server_backend_url)
         {
-            Ok(token_find_report.access_token.access_token)
+            Some(token_find_report.access_token.access_token)
         } else {
-            Err(OdfServerAccessTokenResolveError::LoginRequired(
-                OdfServerLoginRequiredError {
-                    odf_server_backend_url,
-                },
-            ))
+            None
         }
     }
 }

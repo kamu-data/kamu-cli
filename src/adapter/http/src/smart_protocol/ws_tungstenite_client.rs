@@ -466,13 +466,31 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
     ) -> Result<SyncResult, SyncError> {
         listener.begin();
 
+        let maybe_access_token = self
+            .dataset_credential_resolver
+            .resolve_odf_dataset_access_token(http_src_url)
+            .await;
+
         let mut pull_url = http_src_url.join("pull").unwrap();
         let pull_url_res = pull_url.set_scheme("ws");
         assert!(pull_url_res.is_ok());
 
-        tracing::debug!("Connecting to pull URL: {}", pull_url);
+        tracing::debug!(
+            %pull_url, access_token = ?maybe_access_token,
+            "Connecting smart pull protocol web socket",
+        );
 
-        let mut ws_stream = match connect_async(pull_url).await {
+        use tokio_tungstenite::tungstenite::client::IntoClientRequest;
+        let mut request = pull_url.into_client_request().int_err()?;
+        if let Some(access_token) = maybe_access_token {
+            request.headers_mut().append(
+                http::header::AUTHORIZATION,
+                http::HeaderValue::from_str(format!("Bearer {}", access_token).as_str())
+                    .int_err()?,
+            );
+        }
+
+        let mut ws_stream = match connect_async(request).await {
             Ok((ws_stream, _)) => ws_stream,
             Err(e) => {
                 tracing::debug!("Failed to connect to pull URL: {}", e);
@@ -639,28 +657,29 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
             return Ok(SyncResult::UpToDate);
         }
 
-        let access_token = self
+        let maybe_access_token = self
             .dataset_credential_resolver
             .resolve_odf_dataset_access_token(http_dst_url)
-            .await
-            .int_err()?;
+            .await;
 
         let mut push_url = http_dst_url.join("push").unwrap();
         let push_url_res = push_url.set_scheme("ws");
         assert!(push_url_res.is_ok());
 
         tracing::debug!(
-            "Connecting to push URL: {}, access token: {}",
-            push_url,
-            access_token
+            %push_url, access_token = ?maybe_access_token,
+            "Connecting smart push protocol web socket",
         );
 
         use tokio_tungstenite::tungstenite::client::IntoClientRequest;
         let mut request = push_url.into_client_request().int_err()?;
-        request.headers_mut().append(
-            http::header::AUTHORIZATION,
-            http::HeaderValue::from_str(format!("Bearer {}", access_token).as_str()).int_err()?,
-        );
+        if let Some(access_token) = maybe_access_token {
+            request.headers_mut().append(
+                http::header::AUTHORIZATION,
+                http::HeaderValue::from_str(format!("Bearer {}", access_token).as_str())
+                    .int_err()?,
+            );
+        }
 
         let mut ws_stream = match connect_async(request).await {
             Ok((ws_stream, _)) => ws_stream,
