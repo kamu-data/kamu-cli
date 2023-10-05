@@ -10,7 +10,6 @@
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::Arc;
 
-use console::style as s;
 use dill::component;
 use internal_error::{InternalError, ResultIntoInternal};
 use serde::Deserialize;
@@ -18,7 +17,7 @@ use thiserror::Error;
 use tokio::sync::Notify;
 use url::Url;
 
-use crate::{odf_server, OutputConfig};
+use crate::odf_server;
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
@@ -29,14 +28,12 @@ type WebServer =
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct LoginService {
-    output_config: Arc<OutputConfig>,
-}
+pub struct LoginService {}
 
 #[component(pub)]
 impl LoginService {
-    pub fn new(output_config: Arc<OutputConfig>) -> Self {
-        Self { output_config }
+    pub fn new() -> Self {
+        Self {}
     }
 
     #[tracing::instrument(
@@ -109,24 +106,6 @@ impl LoginService {
         axum::Server::builder(bound_addr).serve(app.into_make_service())
     }
 
-    fn open_web_browser(&self, cli_web_server_url: &String) {
-        tracing::info!("HTTP server is listening on: {}", cli_web_server_url);
-
-        if self.output_config.is_tty
-            && self.output_config.verbosity_level == 0
-            && !self.output_config.quiet
-        {
-            eprintln!(
-                "{}\n  {}",
-                s("HTTP server is listening on:").green().bold(),
-                s(&cli_web_server_url).bold(),
-            );
-            eprintln!("{}", s("Use Ctrl+C to stop the server").yellow());
-        }
-
-        let _ = webbrowser::open(&cli_web_server_url);
-    }
-
     async fn obtain_callback_response(
         mut cli_web_server: WebServer,
         mut response_rx: tokio::sync::mpsc::Receiver<FrontendLoginCallbackResponse>,
@@ -152,6 +131,7 @@ impl LoginService {
     pub async fn login(
         &self,
         odf_server_frontend_url: &Url,
+        web_server_started_callback: impl Fn(&String) -> (),
     ) -> Result<FrontendLoginCallbackResponse, LoginError> {
         let (response_tx, response_rx) =
             tokio::sync::mpsc::channel::<FrontendLoginCallbackResponse>(1);
@@ -159,7 +139,8 @@ impl LoginService {
         let cli_web_server = self.initialize_cli_web_server(odf_server_frontend_url, response_tx);
 
         let cli_web_server_url = format!("http://{}", cli_web_server.local_addr());
-        self.open_web_browser(&cli_web_server_url);
+        web_server_started_callback(&cli_web_server_url);
+        let _ = webbrowser::open(&cli_web_server_url);
 
         let maybe_callback_response =
             Self::obtain_callback_response(cli_web_server, response_rx).await?;

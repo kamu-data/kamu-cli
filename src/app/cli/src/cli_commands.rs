@@ -190,6 +190,7 @@ pub fn get_command(
         Some(("login", submatches)) => Box::new(LoginCommand::new(
             cli_catalog.get_one()?,
             cli_catalog.get_one()?,
+            cli_catalog.get_one()?,
             if submatches.get_flag("user") {
                 odf_server::AccessTokenStoreScope::User
             } else {

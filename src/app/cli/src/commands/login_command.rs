@@ -9,15 +9,17 @@
 
 use std::sync::Arc;
 
+use console::style as s;
 use url::Url;
 
-use crate::{odf_server, CLIError, Command};
+use crate::{odf_server, CLIError, Command, OutputConfig};
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct LoginCommand {
     login_service: Arc<odf_server::LoginService>,
     access_token_registry_service: Arc<odf_server::AccessTokenRegistryService>,
+    output_config: Arc<OutputConfig>,
     scope: odf_server::AccessTokenStoreScope,
     server: Option<Url>,
 }
@@ -26,12 +28,14 @@ impl LoginCommand {
     pub fn new(
         login_service: Arc<odf_server::LoginService>,
         access_token_registry_service: Arc<odf_server::AccessTokenRegistryService>,
+        output_config: Arc<OutputConfig>,
         scope: odf_server::AccessTokenStoreScope,
         server: Option<Url>,
     ) -> Self {
         Self {
             login_service,
             access_token_registry_service,
+            output_config,
             scope,
             server,
         }
@@ -40,7 +44,9 @@ impl LoginCommand {
     async fn new_login(&self, odf_server_frontend_url: Url) -> Result<(), CLIError> {
         let login_callback_response = self
             .login_service
-            .login(&odf_server_frontend_url)
+            .login(&odf_server_frontend_url, |u| {
+                self.report_web_server_started(u)
+            })
             .await
             .map_err(|e| match e {
                 odf_server::LoginError::AccessFailed => CLIError::usage_error(e.to_string()),
@@ -61,6 +67,26 @@ impl LoginCommand {
         );
 
         Ok(())
+    }
+
+    fn report_web_server_started(&self, cli_web_server_address: &String) {
+        tracing::info!("HTTP server is listening on: {}", cli_web_server_address);
+
+        if self.output_config.is_tty
+            && self.output_config.verbosity_level == 0
+            && !self.output_config.quiet
+        {
+            eprintln!(
+                "{}\n  {}\n{}",
+                s("Please open this URL in the browser to login:")
+                    .green()
+                    .bold(),
+                s(&cli_web_server_address).bold(),
+                s("This process will exit automatically after receiving the login result.")
+                    .yellow()
+            );
+            eprintln!("{}", s("Use Ctrl+C to stop the server").yellow());
+        }
     }
 
     async fn validate_login(
