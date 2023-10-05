@@ -9,6 +9,7 @@
 
 use std::collections::VecDeque;
 use std::io::Read;
+use std::str::FromStr;
 
 use bytes::Bytes;
 use flate2::Compression;
@@ -504,12 +505,12 @@ fn get_simple_transfer_protocol_url(
 
 fn get_simple_transfer_protocol_headers(
     maybe_bearer_header: &Option<BearerHeader>,
-) -> Vec<(Bytes, Bytes)> {
+) -> Vec<HeaderRow> {
     if let Some(bearer) = maybe_bearer_header {
-        vec![(
-            Bytes::copy_from_slice(http::header::AUTHORIZATION.as_str().as_bytes()),
-            Bytes::copy_from_slice(bearer.0.token().as_bytes()),
-        )]
+        vec![HeaderRow {
+            name: http::header::AUTHORIZATION.to_string(),
+            value: bearer.0.token().to_string(),
+        }]
     } else {
         vec![]
     }
@@ -517,14 +518,14 @@ fn get_simple_transfer_protocol_headers(
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-fn primitivize_header_map(header_map: http::HeaderMap) -> Vec<(Bytes, Bytes)> {
+fn primitivize_header_map(header_map: http::HeaderMap) -> Vec<HeaderRow> {
     let mut res = Vec::new();
 
     for (name, value) in header_map.iter() {
-        res.push((
-            Bytes::copy_from_slice(name.as_str().as_bytes()),
-            Bytes::copy_from_slice(value.as_bytes()),
-        ))
+        res.push(HeaderRow {
+            name: name.to_string(),
+            value: value.to_str().unwrap().to_string(),
+        });
     }
 
     res
@@ -532,13 +533,13 @@ fn primitivize_header_map(header_map: http::HeaderMap) -> Vec<(Bytes, Bytes)> {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-fn reconstruct_header_map(headers_as_primitives: Vec<(Bytes, Bytes)>) -> http::HeaderMap {
+fn reconstruct_header_map(headers_as_primitives: Vec<HeaderRow>) -> http::HeaderMap {
     let mut res = http::HeaderMap::new();
 
-    for (name, value) in headers_as_primitives.into_iter() {
+    for HeaderRow { name, value } in headers_as_primitives.into_iter() {
         res.append(
-            http::HeaderName::from_bytes(&name).unwrap(),
-            http::HeaderValue::from_bytes(&value).unwrap(),
+            http::HeaderName::from_str(name.as_str()).unwrap(),
+            http::HeaderValue::from_str(value.as_str()).unwrap(),
         );
     }
 

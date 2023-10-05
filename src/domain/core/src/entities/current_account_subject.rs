@@ -13,15 +13,18 @@ use crate::auth::DEFAULT_ACCOUNT_NAME;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Debug)]
 pub enum CurrentAccountSubject {
     Logged(LoggedAccount),
     Anonymous(AnonymousAccountReason),
 }
 
+#[derive(Debug)]
 pub struct LoggedAccount {
     pub account_name: AccountName,
 }
 
+#[derive(Debug)]
 pub enum AnonymousAccountReason {
     NoAuthenticationProvided,
     AuthenticationInvalid,

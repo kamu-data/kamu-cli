@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use opendatafabric::Multihash;
 use serde::{Deserialize, Serialize};
@@ -216,8 +215,14 @@ pub enum ObjectType {
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct TransferUrl {
     pub url: Url,
-    pub headers: Vec<(Bytes, Bytes)>,
+    pub headers: Vec<HeaderRow>,
     pub expires_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
+pub struct HeaderRow {
+    pub name: String,
+    pub value: String,
 }
 
 // Transfer URL

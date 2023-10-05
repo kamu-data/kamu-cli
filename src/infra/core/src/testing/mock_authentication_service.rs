@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::fmt::Display;
+
 use internal_error::InternalError;
 use kamu_core::auth::{
     AccessTokenError,
@@ -19,6 +21,7 @@ use kamu_core::auth::{
 };
 use mockall::predicate::{always, eq};
 use opendatafabric::AccountName;
+use thiserror::Error;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -86,6 +89,27 @@ impl MockAuthenticationService {
             .expect_account_info_by_token()
             .with(eq(DUMMY_TOKEN.to_string()))
             .returning(|_| Err(GetAccountInfoError::AccessToken(AccessTokenError::Expired)));
+        mock_authentication_service
+    }
+
+    pub fn invalid_token() -> Self {
+        #[derive(Debug, Error)]
+        struct InvalidTokenError {}
+        impl Display for InvalidTokenError {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                write!(f, "InvalidTokenError")
+            }
+        }
+
+        let mut mock_authentication_service = MockAuthenticationService::new();
+        mock_authentication_service
+            .expect_account_info_by_token()
+            .with(eq(DUMMY_TOKEN.to_string()))
+            .returning(|_| {
+                Err(GetAccountInfoError::AccessToken(AccessTokenError::Invalid(
+                    Box::new(InvalidTokenError {}),
+                )))
+            });
         mock_authentication_service
     }
 
