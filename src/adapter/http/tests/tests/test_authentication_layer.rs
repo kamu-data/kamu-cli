@@ -10,6 +10,7 @@
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::str::FromStr;
 
+use kamu::domain::auth::DEFAULT_ACCOUNT_NAME;
 use kamu::domain::{
     AnonymousAccountReason,
     CurrentAccountSubject,
@@ -65,7 +66,7 @@ async fn test_non_anonymous_api_valid_access() {
             .send()
             .await
             .unwrap();
-        assert_eq!(TEST_ACOUNT_NAME, response.text().await.unwrap());
+        assert_eq!(DEFAULT_ACCOUNT_NAME, response.text().await.unwrap());
     };
 
     await_client_server_flow!(api_server_handle, client_handle);
@@ -131,7 +132,6 @@ async fn test_non_anonymous_api_access_invalid_token() {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-const TEST_ACOUNT_NAME: &str = "some-account";
 const TEST_ENDPOINT: &str = "/foo";
 
 /////////////////////////////////////////////////////////////////////////////////////////
