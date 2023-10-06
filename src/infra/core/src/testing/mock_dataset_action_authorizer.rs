@@ -38,21 +38,24 @@ mockall::mock! {
 }
 
 impl MockDatasetActionAuthorizer {
+    pub fn denying_error(
+        dataset_handle: &DatasetHandle,
+        action: DatasetAction,
+    ) -> DatasetActionUnauthorizedError {
+        DatasetActionUnauthorizedError::Access(AccessError::Forbidden(
+            DatasetActionNotEnoughPermissionsError {
+                action,
+                dataset_ref: dataset_handle.as_local_ref(),
+            }
+            .into(),
+        ))
+    }
+
     pub fn denying() -> Self {
         let mut mock_dataset_action_authorizer = MockDatasetActionAuthorizer::new();
         mock_dataset_action_authorizer
             .expect_check_action_allowed()
-            .return_once(|dataset_handle, action| {
-                Err(DatasetActionUnauthorizedError::Access(
-                    AccessError::Forbidden(
-                        DatasetActionNotEnoughPermissionsError {
-                            action,
-                            dataset_ref: dataset_handle.as_local_ref(),
-                        }
-                        .into(),
-                    ),
-                ))
-            });
+            .return_once(|dataset_handle, action| Err(Self::denying_error(dataset_handle, action)));
         mock_dataset_action_authorizer
     }
 

@@ -3204,6 +3204,7 @@ dependencies = [
  "http",
  "hyper",
  "kamu",
+ "mockall",
  "opendatafabric",
  "rand",
  "reqwest",

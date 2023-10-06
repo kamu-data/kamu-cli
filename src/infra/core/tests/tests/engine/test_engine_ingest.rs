@@ -992,11 +992,10 @@ async fn test_ingest_datafusion_bad_column_names_rename() {
 #[test_log::test(tokio::test)]
 async fn test_ingest_checks_auth() {
     let harness = IngestTestHarness::new_with_authorizer(Arc::new(
-        crate::mock_dataset_action_authorizer::MockDatasetActionAuthorizer::new()
-            .expect_check_write_dataset(
-                DatasetAlias::new(None, DatasetName::new_unchecked("foo.bar")),
-                1,
-            ),
+        MockDatasetActionAuthorizer::new().expect_check_write_dataset(
+            DatasetAlias::new(None, DatasetName::new_unchecked("foo.bar")),
+            1,
+        ),
     ));
     let src_path = harness.temp_dir.path().join("data.json");
 

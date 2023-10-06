@@ -18,7 +18,6 @@ use kamu::testing::*;
 use kamu::*;
 use opendatafabric::*;
 
-use crate::mock_dataset_action_authorizer::MockDatasetActionAuthorizer;
 use crate::utils::DummySmartTransferProtocolClient;
 
 macro_rules! n {

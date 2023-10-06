@@ -10,13 +10,12 @@
 use std::sync::Arc;
 
 use kamu::domain::{auth, CurrentAccountSubject};
-use kamu::testing::LocalS3Server;
+use kamu::testing::{LocalS3Server, MockDatasetActionAuthorizer};
 use kamu::utils::s3_context::S3Context;
 use kamu::DatasetRepositoryS3;
 use opendatafabric::AccountName;
 
 use super::test_dataset_repository_shared;
-use crate::MockDatasetActionAuthorizer;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 

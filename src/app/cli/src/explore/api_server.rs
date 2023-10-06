@@ -67,8 +67,9 @@ impl APIServer {
                     "/:dataset_name"
                 },
                 Self::add_dataset_resolver_layer(
-                    kamu_adapter_http::smart_transfer_protocol_routes()
-                        .layer(kamu_adapter_http::DatasetAuthorizationLayer::new()),
+                    kamu_adapter_http::smart_transfer_protocol_routes().layer(
+                        kamu_adapter_http::DatasetAuthorizationLayer::new(vec!["/push"]),
+                    ),
                     multi_tenant,
                 ),
             )

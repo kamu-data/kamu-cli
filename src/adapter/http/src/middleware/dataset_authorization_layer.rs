@@ -22,11 +22,18 @@ use crate::axum_utils::*;
 /////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
-pub struct DatasetAuthorizationLayer {}
+pub struct DatasetAuthorizationLayer {
+    potential_write_paths: Vec<String>,
+}
 
 impl DatasetAuthorizationLayer {
-    pub fn new() -> Self {
-        Self {}
+    pub fn new(potential_write_paths: Vec<&'static str>) -> Self {
+        Self {
+            potential_write_paths: potential_write_paths
+                .iter()
+                .map(|p| p.to_string())
+                .collect(),
+        }
     }
 }
 
@@ -34,7 +41,10 @@ impl<Svc> Layer<Svc> for DatasetAuthorizationLayer {
     type Service = DatasetAuthorizationMiddleware<Svc>;
 
     fn layer(&self, inner: Svc) -> Self::Service {
-        DatasetAuthorizationMiddleware { inner }
+        DatasetAuthorizationMiddleware {
+            inner,
+            potential_write_paths: self.potential_write_paths.clone(),
+        }
     }
 }
 
@@ -43,6 +53,7 @@ impl<Svc> Layer<Svc> for DatasetAuthorizationLayer {
 #[derive(Debug, Clone)]
 pub struct DatasetAuthorizationMiddleware<Svc> {
     inner: Svc,
+    potential_write_paths: Vec<String>,
 }
 
 impl<Svc> DatasetAuthorizationMiddleware<Svc> {
@@ -55,17 +66,26 @@ impl<Svc> DatasetAuthorizationMiddleware<Svc> {
         }
     }
 
-    fn required_access_action(request: &http::Request<Body>) -> kamu::domain::auth::DatasetAction {
-        if !request.method().is_safe() || Self::is_potential_creation(request) {
+    fn required_access_action(
+        request: &http::Request<Body>,
+        potential_write_paths: &Vec<String>,
+    ) -> kamu::domain::auth::DatasetAction {
+        if !request.method().is_safe() || Self::is_potential_write(request, potential_write_paths) {
             kamu::domain::auth::DatasetAction::Write
         } else {
             kamu::domain::auth::DatasetAction::Read
         }
     }
 
-    fn is_potential_creation(request: &http::Request<Body>) -> bool {
+    fn is_potential_write(
+        request: &http::Request<Body>,
+        potential_write_paths: &Vec<String>,
+    ) -> bool {
         let path = request.uri().path();
-        "/push" == path
+        potential_write_paths
+            .iter()
+            .find(|p| p.as_str() == path)
+            .is_some()
     }
 }
 
@@ -88,6 +108,8 @@ where
         // TODO: PERF: Is cloning a performance concern?
         let mut inner = self.inner.clone();
 
+        let potential_write_paths = self.potential_write_paths.clone();
+
         Box::pin(async move {
             let catalog = request
                 .extensions()
@@ -107,7 +129,7 @@ where
                 .get::<DatasetRef>()
                 .expect("Dataset ref not found in http server extensions");
 
-            let action = Self::required_access_action(&request);
+            let action = Self::required_access_action(&request, &potential_write_paths);
 
             match dataset_repo.resolve_dataset_ref(&dataset_ref).await {
                 Ok(dataset_handle) => {
@@ -126,7 +148,7 @@ where
                 }
                 Err(e) => {
                     if let GetDatasetError::NotFound(_) = e {
-                        if Self::is_potential_creation(&request) {
+                        if Self::is_potential_write(&request, &potential_write_paths) {
                             if let Err(err_result) = Self::check_logged_in(&catalog) {
                                 return Ok(err_result);
                             }

@@ -15,14 +15,17 @@ use datafusion::arrow::array::*;
 use datafusion::arrow::datatypes::{DataType, Field, Int64Type, Schema};
 use datafusion::arrow::record_batch::RecordBatch;
 use kamu::domain::*;
-use kamu::testing::{LocalS3Server, MetadataFactory, ParquetWriterHelper};
+use kamu::testing::{
+    LocalS3Server,
+    MetadataFactory,
+    MockDatasetActionAuthorizer,
+    ParquetWriterHelper,
+};
 use kamu::utils::s3_context::S3Context;
 use kamu::*;
 use kamu_data_utils::data::format::JsonArrayWriter;
 use opendatafabric::*;
 use tempfile::TempDir;
-
-use crate::MockDatasetActionAuthorizer;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 

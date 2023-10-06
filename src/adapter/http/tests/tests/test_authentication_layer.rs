@@ -49,13 +49,7 @@ async fn test_non_anonymous_api_valid_access() {
     let server_harness = ServerHarness::new(
         kamu::testing::MockAuthenticationService::resolving_token(
             DUMMY_TOKEN,
-            kamu::domain::auth::AccountInfo {
-                account_id: opendatafabric::FAKE_ACCOUNT_ID.to_string(),
-                account_name: opendatafabric::AccountName::new_unchecked(TEST_ACOUNT_NAME),
-                account_type: kamu::domain::auth::AccountType::User,
-                display_name: TEST_ACOUNT_NAME.to_string(),
-                avatar_url: None,
-            },
+            kamu::domain::auth::AccountInfo::dummy(),
         ),
         None,
     );
@@ -143,7 +137,7 @@ const TEST_ENDPOINT: &str = "/foo";
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[allow(dead_code)]
-pub struct ServerHarness {
+struct ServerHarness {
     server: axum::Server<
         hyper::server::conn::AddrIncoming,
         axum::routing::IntoMakeService<axum::Router>,

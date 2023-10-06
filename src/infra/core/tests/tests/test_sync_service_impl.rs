@@ -19,7 +19,6 @@ use kamu::*;
 use opendatafabric::*;
 use url::Url;
 
-use crate::mock_dataset_action_authorizer;
 use crate::utils::{DummySmartTransferProtocolClient, HttpFileServer, IpfsDaemon};
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -117,7 +116,7 @@ fn construct_authorizer(
     d1_alias: &DatasetAlias,
     d2_alias: &DatasetAlias,
 ) -> Arc<dyn auth::DatasetActionAuthorizer> {
-    let authorizer = mock_dataset_action_authorizer::MockDatasetActionAuthorizer::new()
+    let authorizer = MockDatasetActionAuthorizer::new()
         .expect_check_read_dataset(d1_alias.clone(), authorization_expectations.d1_reads)
         .expect_check_read_dataset(d2_alias.clone(), authorization_expectations.d2_reads)
         .expect_check_write_dataset(d1_alias.clone(), authorization_expectations.d1_writes)

@@ -14,12 +14,11 @@ use datafusion::arrow::array::{Array, Int32Array, StringArray};
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use datafusion::arrow::record_batch::RecordBatch;
 use kamu::domain::*;
-use kamu::testing::{MetadataFactory, ParquetWriterHelper};
+use kamu::testing::{MetadataFactory, MockDatasetActionAuthorizer, ParquetWriterHelper};
 use kamu::*;
 use opendatafabric::*;
 
 use super::test_pull_service_impl::TestTransformService;
-use crate::mock_dataset_action_authorizer;
 
 #[tokio::test]
 async fn test_verify_data_consistency() {
@@ -28,8 +27,7 @@ async fn test_verify_data_consistency() {
     let dataset_alias = DatasetAlias::new(None, DatasetName::new_unchecked("bar"));
 
     let dataset_authorizer = Arc::new(
-        mock_dataset_action_authorizer::MockDatasetActionAuthorizer::new()
-            .expect_check_read_dataset(dataset_alias.clone(), 3),
+        MockDatasetActionAuthorizer::new().expect_check_read_dataset(dataset_alias.clone(), 3),
     );
 
     let dataset_repo = Arc::new(
