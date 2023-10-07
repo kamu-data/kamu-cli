@@ -86,7 +86,7 @@ where
     let app = axum::Router::new()
         .nest(
             path,
-            kamu_adapter_http::smart_transfer_protocol_routes()
+            kamu_adapter_http::smart_transfer_protocol_router()
                 .layer(kamu_adapter_http::DatasetResolverLayer::new(
                     identity_extractor,
                 ))

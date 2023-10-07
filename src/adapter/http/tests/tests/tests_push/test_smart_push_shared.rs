@@ -7,33 +7,34 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::str::FromStr;
-
 use kamu::domain::*;
 use kamu::testing::{DatasetTestHelper, MetadataFactory};
-use kamu::DatasetLayout;
 use opendatafabric::*;
-use tokio::fs::File;
-use tokio::io::AsyncWriteExt;
 
 use crate::harness::{
     await_client_server_flow,
     commit_add_data_event,
     copy_folder_recursively,
+    make_dataset_ref,
+    write_dataset_alias,
     ClientSideHarness,
     ServerSideHarness,
 };
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_smart_push_new_dataset<T: ServerSideHarness>(server_harness: T) {
-    let client_harness = ClientSideHarness::new();
-    let client_dataset_layout = client_harness.dataset_layout("foo");
+pub async fn test_smart_push_new_dataset<T: ServerSideHarness>(
+    client_harness: ClientSideHarness,
+    server_harness: T,
+) {
+    let client_account_name = client_harness.operating_account_name();
+    let server_acount_name = server_harness.operating_account_name();
+
     let client_repo = client_harness.dataset_repository();
 
-    let create_result = client_repo
+    let client_create_result = client_repo
         .create_dataset_from_snapshot(
-            None,
+            client_account_name.clone(),
             MetadataFactory::dataset_snapshot()
                 .name("foo")
                 .kind(DatasetKind::Root)
@@ -43,20 +44,32 @@ pub async fn test_smart_push_new_dataset<T: ServerSideHarness>(server_harness: T
         .await
         .unwrap();
 
-    let server_dataset_layout = server_harness.dataset_layout(&create_result.dataset_handle);
+    let client_dataset_layout =
+        client_harness.dataset_layout(&client_create_result.dataset_handle.id, "foo");
 
-    let dataset_ref = DatasetRef::from_str("foo").unwrap();
+    let foo_name = DatasetName::new_unchecked("foo");
 
-    let commit_result =
-        commit_add_data_event(client_repo.as_ref(), &dataset_ref, &client_dataset_layout).await;
+    let server_dataset_layout = server_harness.dataset_layout(&DatasetHandle::new(
+        client_create_result.dataset_handle.id.clone(),
+        DatasetAlias::new(server_acount_name.clone(), foo_name.clone()),
+    ));
 
-    let foo_odf_url = server_harness.dataset_url("foo");
-    let foo_dataset_ref = DatasetRefRemote::from(&foo_odf_url);
+    let client_dataset_ref = make_dataset_ref(&client_account_name, "foo");
+    let commit_result = commit_add_data_event(
+        client_repo.as_ref(),
+        &client_dataset_ref,
+        &client_dataset_layout,
+    )
+    .await;
+
+    let server_alias = DatasetAlias::new(server_acount_name, foo_name);
+    let server_odf_url = server_harness.dataset_url(&server_alias);
+    let server_dataset_ref = DatasetRefRemote::from(&server_odf_url);
 
     let api_server_handle = server_harness.api_server_run();
     let client_handle = async {
         let push_result = client_harness
-            .push_dataset_result(dataset_ref, foo_dataset_ref)
+            .push_dataset_result(client_dataset_ref, server_dataset_ref)
             .await;
 
         assert_eq!(
@@ -76,14 +89,18 @@ pub async fn test_smart_push_new_dataset<T: ServerSideHarness>(server_harness: T
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_smart_push_existing_up_to_date_dataset<T: ServerSideHarness>(server_harness: T) {
-    let client_harness = ClientSideHarness::new();
-    let client_dataset_layout = client_harness.dataset_layout("foo");
+pub async fn test_smart_push_existing_up_to_date_dataset<T: ServerSideHarness>(
+    client_harness: ClientSideHarness,
+    server_harness: T,
+) {
+    let client_account_name = client_harness.operating_account_name();
+    let server_acount_name = server_harness.operating_account_name();
+
     let client_repo = client_harness.dataset_repository();
 
-    let create_result = client_repo
+    let client_create_result = client_repo
         .create_dataset_from_snapshot(
-            None,
+            client_account_name.clone(),
             MetadataFactory::dataset_snapshot()
                 .name("foo")
                 .kind(DatasetKind::Root)
@@ -93,11 +110,23 @@ pub async fn test_smart_push_existing_up_to_date_dataset<T: ServerSideHarness>(s
         .await
         .unwrap();
 
-    let server_dataset_layout = server_harness.dataset_layout(&create_result.dataset_handle);
+    let client_dataset_layout =
+        client_harness.dataset_layout(&client_create_result.dataset_handle.id, "foo");
 
-    let dataset_ref: DatasetRef = DatasetRef::from_str("foo").unwrap();
+    let foo_name = DatasetName::new_unchecked("foo");
 
-    commit_add_data_event(client_repo.as_ref(), &dataset_ref, &client_dataset_layout).await;
+    let server_dataset_layout = server_harness.dataset_layout(&DatasetHandle::new(
+        client_create_result.dataset_handle.id.clone(),
+        DatasetAlias::new(server_acount_name.clone(), foo_name.clone()),
+    ));
+
+    let client_dataset_ref: DatasetRef = make_dataset_ref(&client_account_name, "foo");
+    commit_add_data_event(
+        client_repo.as_ref(),
+        &client_dataset_ref,
+        &client_dataset_layout,
+    )
+    .await;
 
     // Hard folder synchronization
     copy_folder_recursively(
@@ -106,16 +135,20 @@ pub async fn test_smart_push_existing_up_to_date_dataset<T: ServerSideHarness>(s
     )
     .unwrap();
 
-    // Note: local FS repo does not have "info/alias" file unlike S3 repo
-    write_dataset_alias(&server_dataset_layout, &create_result.dataset_handle.alias).await;
+    write_dataset_alias(
+        &server_dataset_layout,
+        &DatasetAlias::new(server_acount_name.clone(), foo_name.clone()),
+    )
+    .await;
 
-    let foo_odf_url = server_harness.dataset_url("foo");
-    let foo_dataset_ref = DatasetRefRemote::from(&foo_odf_url);
+    let server_alias = DatasetAlias::new(server_acount_name, foo_name);
+    let server_odf_url = server_harness.dataset_url(&server_alias);
+    let server_dataset_ref = DatasetRefRemote::from(&server_odf_url);
 
     let api_server_handle = server_harness.api_server_run();
     let client_handle = async {
         let push_result = client_harness
-            .push_dataset_result(dataset_ref, foo_dataset_ref)
+            .push_dataset_result(client_dataset_ref, server_dataset_ref)
             .await;
 
         assert_eq!(SyncResult::UpToDate {}, push_result);
@@ -128,14 +161,18 @@ pub async fn test_smart_push_existing_up_to_date_dataset<T: ServerSideHarness>(s
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_smart_push_existing_evolved_dataset<T: ServerSideHarness>(server_harness: T) {
-    let client_harness = ClientSideHarness::new();
-    let client_dataset_layout = client_harness.dataset_layout("foo");
+pub async fn test_smart_push_existing_evolved_dataset<T: ServerSideHarness>(
+    client_harness: ClientSideHarness,
+    server_harness: T,
+) {
+    let client_account_name = client_harness.operating_account_name();
+    let server_acount_name = server_harness.operating_account_name();
+
     let client_repo = client_harness.dataset_repository();
 
-    let create_result = client_repo
+    let client_create_result = client_repo
         .create_dataset_from_snapshot(
-            None,
+            client_account_name.clone(),
             MetadataFactory::dataset_snapshot()
                 .name("foo")
                 .kind(DatasetKind::Root)
@@ -145,7 +182,15 @@ pub async fn test_smart_push_existing_evolved_dataset<T: ServerSideHarness>(serv
         .await
         .unwrap();
 
-    let server_dataset_layout = server_harness.dataset_layout(&create_result.dataset_handle);
+    let client_dataset_layout =
+        client_harness.dataset_layout(&client_create_result.dataset_handle.id, "foo");
+
+    let foo_name = DatasetName::new_unchecked("foo");
+
+    let server_dataset_layout = server_harness.dataset_layout(&DatasetHandle::new(
+        client_create_result.dataset_handle.id.clone(),
+        DatasetAlias::new(server_acount_name.clone(), foo_name.clone()),
+    ));
 
     // Hard folder synchronization
     copy_folder_recursively(
@@ -154,13 +199,16 @@ pub async fn test_smart_push_existing_evolved_dataset<T: ServerSideHarness>(serv
     )
     .unwrap();
 
-    // Note: local FS repo does not have "info/alias" file unlike S3 repo
-    write_dataset_alias(&server_dataset_layout, &create_result.dataset_handle.alias).await;
+    write_dataset_alias(
+        &server_dataset_layout,
+        &DatasetAlias::new(server_acount_name.clone(), foo_name.clone()),
+    )
+    .await;
 
     // Extend client-side dataset with new nodes
-    let dataset_ref = DatasetRef::from_str("foo").unwrap();
+    let client_dataset_ref = make_dataset_ref(&client_account_name, "foo");
     client_repo
-        .get_dataset(&dataset_ref)
+        .get_dataset(&client_dataset_ref)
         .await
         .unwrap()
         .commit_event(
@@ -174,21 +222,26 @@ pub async fn test_smart_push_existing_evolved_dataset<T: ServerSideHarness>(serv
         .await
         .unwrap();
 
-    let commit_result =
-        commit_add_data_event(client_repo.as_ref(), &dataset_ref, &client_dataset_layout).await;
+    let commit_result = commit_add_data_event(
+        client_repo.as_ref(),
+        &client_dataset_ref,
+        &client_dataset_layout,
+    )
+    .await;
 
-    let foo_odf_url = server_harness.dataset_url("foo");
-    let foo_dataset_ref = DatasetRefRemote::from(&foo_odf_url);
+    let server_alias = DatasetAlias::new(server_acount_name, foo_name);
+    let server_odf_url = server_harness.dataset_url(&server_alias);
+    let server_dataset_ref = DatasetRefRemote::from(&server_odf_url);
 
     let api_server_handle = server_harness.api_server_run();
     let client_handle = async {
         let push_result = client_harness
-            .push_dataset_result(dataset_ref, foo_dataset_ref)
+            .push_dataset_result(client_dataset_ref, server_dataset_ref)
             .await;
 
         assert_eq!(
             SyncResult::Updated {
-                old_head: Some(create_result.head),
+                old_head: Some(client_create_result.head),
                 new_head: commit_result.new_head,
                 num_blocks: 2
             },
@@ -204,17 +257,18 @@ pub async fn test_smart_push_existing_evolved_dataset<T: ServerSideHarness>(serv
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_smart_push_existing_dataset_fails_as_server_advanced<T: ServerSideHarness>(
+    client_harness: ClientSideHarness,
     server_harness: T,
 ) {
-    let server_repo = server_harness.dataset_repository();
+    let client_account_name = client_harness.operating_account_name();
+    let server_acount_name = server_harness.operating_account_name();
 
-    let client_harness = ClientSideHarness::new();
-    let client_dataset_layout = client_harness.dataset_layout("foo");
+    let server_repo = server_harness.cli_dataset_repository();
     let client_repo = client_harness.dataset_repository();
 
-    let create_result = client_repo
+    let client_create_result = client_repo
         .create_dataset_from_snapshot(
-            None,
+            client_account_name.clone(),
             MetadataFactory::dataset_snapshot()
                 .name("foo")
                 .kind(DatasetKind::Root)
@@ -224,7 +278,15 @@ pub async fn test_smart_push_existing_dataset_fails_as_server_advanced<T: Server
         .await
         .unwrap();
 
-    let server_dataset_layout = server_harness.dataset_layout(&create_result.dataset_handle);
+    let client_dataset_layout =
+        client_harness.dataset_layout(&client_create_result.dataset_handle.id, "foo");
+
+    let foo_name = DatasetName::new_unchecked("foo");
+
+    let server_dataset_layout = server_harness.dataset_layout(&DatasetHandle::new(
+        client_create_result.dataset_handle.id.clone(),
+        DatasetAlias::new(server_acount_name.clone(), foo_name.clone()),
+    ));
 
     // Hard folder synchronization
     copy_folder_recursively(
@@ -233,14 +295,15 @@ pub async fn test_smart_push_existing_dataset_fails_as_server_advanced<T: Server
     )
     .unwrap();
 
-    // Note: local FS repo does not have "info/alias" file unlike S3 repo
-    write_dataset_alias(&server_dataset_layout, &create_result.dataset_handle.alias).await;
-
-    let dataset_ref = DatasetRef::from_str("foo").unwrap();
+    write_dataset_alias(
+        &server_dataset_layout,
+        &DatasetAlias::new(server_acount_name.clone(), foo_name.clone()),
+    )
+    .await;
 
     // Extend server-side dataset with new node
     server_repo
-        .get_dataset(&dataset_ref)
+        .get_dataset(&make_dataset_ref(&server_acount_name, "foo"))
         .await
         .unwrap()
         .commit_event(
@@ -254,13 +317,17 @@ pub async fn test_smart_push_existing_dataset_fails_as_server_advanced<T: Server
         .await
         .unwrap();
 
-    let foo_odf_url = server_harness.dataset_url("foo");
-    let foo_dataset_ref = DatasetRefRemote::from(&foo_odf_url);
+    let server_alias = DatasetAlias::new(server_acount_name, foo_name);
+    let server_odf_url = server_harness.dataset_url(&server_alias);
+    let server_dataset_ref = DatasetRefRemote::from(&server_odf_url);
 
     let api_server_handle = server_harness.api_server_run();
     let client_handle = async {
         let push_responses = client_harness
-            .push_dataset(dataset_ref, foo_dataset_ref)
+            .push_dataset(
+                make_dataset_ref(&client_account_name, "foo"),
+                server_dataset_ref,
+            )
             .await;
 
         // TODO: try expecting better error message
@@ -273,15 +340,17 @@ pub async fn test_smart_push_existing_dataset_fails_as_server_advanced<T: Server
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_smart_push_aborted_write_of_new_rewrite_succeeds<T: ServerSideHarness>(
+    client_harness: ClientSideHarness,
     server_harness: T,
 ) {
-    let client_harness = ClientSideHarness::new();
-    let client_dataset_layout = client_harness.dataset_layout("foo");
+    let client_account_name = client_harness.operating_account_name();
+    let server_acount_name = server_harness.operating_account_name();
+
     let client_repo = client_harness.dataset_repository();
 
-    let create_result = client_repo
+    let client_create_result = client_repo
         .create_dataset_from_snapshot(
-            None,
+            client_account_name.clone(),
             MetadataFactory::dataset_snapshot()
                 .name("foo")
                 .kind(DatasetKind::Root)
@@ -291,12 +360,23 @@ pub async fn test_smart_push_aborted_write_of_new_rewrite_succeeds<T: ServerSide
         .await
         .unwrap();
 
-    let server_dataset_layout = server_harness.dataset_layout(&create_result.dataset_handle);
+    let client_dataset_layout =
+        client_harness.dataset_layout(&client_create_result.dataset_handle.id, "foo");
 
-    let dataset_ref = DatasetRef::from_str("foo").unwrap();
+    let foo_name = DatasetName::new_unchecked("foo");
 
-    let commit_result =
-        commit_add_data_event(client_repo.as_ref(), &dataset_ref, &client_dataset_layout).await;
+    let server_dataset_layout = server_harness.dataset_layout(&DatasetHandle::new(
+        client_create_result.dataset_handle.id.clone(),
+        DatasetAlias::new(server_acount_name.clone(), foo_name.clone()),
+    ));
+
+    let client_dataset_ref = make_dataset_ref(&client_account_name, "foo");
+    let commit_result = commit_add_data_event(
+        client_repo.as_ref(),
+        &client_dataset_ref,
+        &client_dataset_layout,
+    )
+    .await;
 
     // Let's pretend that previous attempts uploaded some data files, but the rest
     // was discarded. To mimic this, artifficially copy just the data folder,
@@ -307,16 +387,20 @@ pub async fn test_smart_push_aborted_write_of_new_rewrite_succeeds<T: ServerSide
     )
     .unwrap();
 
-    // Note: local FS repo does not have "info/alias" file unlike S3 repo
-    write_dataset_alias(&server_dataset_layout, &create_result.dataset_handle.alias).await;
+    write_dataset_alias(
+        &server_dataset_layout,
+        &DatasetAlias::new(server_acount_name.clone(), foo_name.clone()),
+    )
+    .await;
 
-    let foo_odf_url = server_harness.dataset_url("foo");
-    let foo_dataset_ref = DatasetRefRemote::from(&foo_odf_url);
+    let server_alias = DatasetAlias::new(server_acount_name, foo_name);
+    let server_odf_url = server_harness.dataset_url(&server_alias);
+    let server_dataset_ref = DatasetRefRemote::from(&server_odf_url);
 
     let api_server_handle = server_harness.api_server_run();
     let client_handle = async {
         let push_result = client_harness
-            .push_dataset_result(dataset_ref, foo_dataset_ref)
+            .push_dataset_result(client_dataset_ref, server_dataset_ref)
             .await;
 
         assert_eq!(
@@ -337,15 +421,17 @@ pub async fn test_smart_push_aborted_write_of_new_rewrite_succeeds<T: ServerSide
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_smart_push_aborted_write_of_updated_rewrite_succeeds<T: ServerSideHarness>(
+    client_harness: ClientSideHarness,
     server_harness: T,
 ) {
-    let client_harness = ClientSideHarness::new();
-    let client_dataset_layout = client_harness.dataset_layout("foo");
+    let client_account_name = client_harness.operating_account_name();
+    let server_acount_name = server_harness.operating_account_name();
+
     let client_repo = client_harness.dataset_repository();
 
-    let create_result = client_repo
+    let client_create_result = client_repo
         .create_dataset_from_snapshot(
-            None,
+            client_account_name.clone(),
             MetadataFactory::dataset_snapshot()
                 .name("foo")
                 .kind(DatasetKind::Root)
@@ -355,7 +441,15 @@ pub async fn test_smart_push_aborted_write_of_updated_rewrite_succeeds<T: Server
         .await
         .unwrap();
 
-    let server_dataset_layout = server_harness.dataset_layout(&create_result.dataset_handle);
+    let client_dataset_layout =
+        client_harness.dataset_layout(&client_create_result.dataset_handle.id, "foo");
+
+    let foo_name = DatasetName::new_unchecked("foo");
+
+    let server_dataset_layout = server_harness.dataset_layout(&DatasetHandle::new(
+        client_create_result.dataset_handle.id.clone(),
+        DatasetAlias::new(server_acount_name.clone(), foo_name.clone()),
+    ));
 
     // Hard folder synchronization
     copy_folder_recursively(
@@ -364,13 +458,16 @@ pub async fn test_smart_push_aborted_write_of_updated_rewrite_succeeds<T: Server
     )
     .unwrap();
 
-    // Note: local FS repo does not have "info/alias" file unlike S3 repo
-    write_dataset_alias(&server_dataset_layout, &create_result.dataset_handle.alias).await;
+    write_dataset_alias(
+        &server_dataset_layout,
+        &DatasetAlias::new(server_acount_name.clone(), foo_name.clone()),
+    )
+    .await;
 
     // Extend client-side dataset with new nodes
-    let dataset_ref = DatasetRef::from_str("foo").unwrap();
+    let client_dataset_ref = make_dataset_ref(&&client_account_name, "foo");
     client_repo
-        .get_dataset(&dataset_ref)
+        .get_dataset(&client_dataset_ref)
         .await
         .unwrap()
         .commit_event(
@@ -384,8 +481,12 @@ pub async fn test_smart_push_aborted_write_of_updated_rewrite_succeeds<T: Server
         .await
         .unwrap();
 
-    let commit_result =
-        commit_add_data_event(client_repo.as_ref(), &dataset_ref, &client_dataset_layout).await;
+    let commit_result = commit_add_data_event(
+        client_repo.as_ref(),
+        &client_dataset_ref,
+        &client_dataset_layout,
+    )
+    .await;
 
     // Let's pretend that previous attempts uploaded new data files, but the commit
     // did not succceed in general. To mimic this, artifficially copy just the
@@ -396,18 +497,19 @@ pub async fn test_smart_push_aborted_write_of_updated_rewrite_succeeds<T: Server
     )
     .unwrap();
 
-    let foo_odf_url = server_harness.dataset_url("foo");
-    let foo_dataset_ref = DatasetRefRemote::from(&foo_odf_url);
+    let server_alias = DatasetAlias::new(server_acount_name, foo_name);
+    let server_odf_url = server_harness.dataset_url(&server_alias);
+    let server_dataset_ref = DatasetRefRemote::from(&server_odf_url);
 
     let api_server_handle = server_harness.api_server_run();
     let client_handle = async {
         let push_result = client_harness
-            .push_dataset_result(dataset_ref, foo_dataset_ref)
+            .push_dataset_result(client_dataset_ref, server_dataset_ref)
             .await;
 
         assert_eq!(
             SyncResult::Updated {
-                old_head: Some(create_result.head),
+                old_head: Some(client_create_result.head),
                 new_head: commit_result.new_head,
                 num_blocks: 2
             },
@@ -418,21 +520,6 @@ pub async fn test_smart_push_aborted_write_of_updated_rewrite_succeeds<T: Server
     };
 
     await_client_server_flow!(api_server_handle, client_handle)
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-async fn write_dataset_alias(dataset_layout: &DatasetLayout, alias: &DatasetAlias) {
-    if !dataset_layout.info_dir.is_dir() {
-        std::fs::create_dir_all(dataset_layout.info_dir.clone()).unwrap();
-    }
-
-    let alias_path = dataset_layout.info_dir.join("alias");
-    let mut alias_file = File::create(alias_path).await.unwrap();
-    alias_file
-        .write_all(alias.to_string().as_bytes())
-        .await
-        .unwrap();
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

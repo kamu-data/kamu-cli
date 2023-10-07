@@ -13,18 +13,24 @@ use std::sync::Arc;
 
 use kamu::domain::{DatasetRepository, InternalError};
 use kamu::DatasetLayout;
-use opendatafabric::DatasetHandle;
+use opendatafabric::{AccountName, DatasetAlias, DatasetHandle};
 use reqwest::Url;
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+pub const SERVER_ACCOUNT_NAME: &str = "kamu-server";
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 pub trait ServerSideHarness {
-    fn dataset_repository(&self) -> Arc<dyn DatasetRepository>;
+    fn operating_account_name(&self) -> Option<AccountName>;
+
+    fn cli_dataset_repository(&self) -> Arc<dyn DatasetRepository>;
 
     fn dataset_layout(&self, dataset_handle: &DatasetHandle) -> DatasetLayout;
 
-    fn dataset_url(&self, dataset_name: &str) -> Url;
+    fn dataset_url(&self, dataset_alias: &DatasetAlias) -> Url;
 
     async fn api_server_run(self) -> Result<(), InternalError>;
 }

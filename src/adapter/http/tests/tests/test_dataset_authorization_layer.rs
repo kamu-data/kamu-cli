@@ -20,7 +20,7 @@ use kamu::domain::{
     InternalError,
     ResultIntoInternal,
 };
-use kamu::testing::{MetadataFactory, MockDatasetActionAuthorizer, DUMMY_TOKEN};
+use kamu::testing::{MetadataFactory, MockDatasetActionAuthorizer};
 use kamu::DatasetRepositoryLocalFs;
 use mockall::predicate::{eq, function};
 use opendatafabric::{DatasetAlias, DatasetHandle, DatasetKind, DatasetName, DatasetRef};
@@ -212,7 +212,7 @@ impl ServerHarness {
 
         let mut catalog_builder = dill::CatalogBuilder::new();
         catalog_builder.add_value(
-            kamu::testing::MockAuthenticationService::resolving_token(DUMMY_TOKEN, kamu::domain::auth::AccountInfo::dummy())
+            kamu::testing::MockAuthenticationService::resolving_token(kamu::domain::auth::DUMMY_ACCESS_TOKEN, kamu::domain::auth::AccountInfo::dummy())
         )
             .bind::<dyn kamu::domain::auth::AuthenticationService, kamu::testing::MockAuthenticationService>();
         catalog_builder

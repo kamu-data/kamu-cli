@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use async_graphql::value;
-use kamu::testing::{MockAuthenticationService, DUMMY_LOGIN_METHOD, DUMMY_TOKEN};
+use kamu::testing::{MockAuthenticationService, DUMMY_LOGIN_METHOD};
 use kamu_core::auth::DEFAULT_ACCOUNT_NAME;
 
 ////////////////////////////////////////////////////////////////////////////////////////
@@ -44,7 +44,7 @@ fn make_account_details_request() -> async_graphql::Request {
             }}
         }}
         "#,
-        DUMMY_TOKEN,
+        kamu::domain::auth::DUMMY_ACCESS_TOKEN,
     ))
 }
 
@@ -107,7 +107,7 @@ async fn test_login() {
         value!({
             "auth": {
                 "login": {
-                    "accessToken": DUMMY_TOKEN,
+                    "accessToken": kamu::domain::auth::DUMMY_ACCESS_TOKEN,
                     "account": {
                         "accountName": DEFAULT_ACCOUNT_NAME
                     }

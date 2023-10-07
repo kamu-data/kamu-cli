@@ -13,3 +13,68 @@ mod test_routing;
 
 mod tests_pull;
 mod tests_push;
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+macro_rules! test_client_server_local_fs_harness_permutations {
+    ($test_template: expr) => {
+        $test_template(
+            ClientSideHarness::new(false),
+            ServerSideLocalFsHarness::new(false).await,
+        )
+        .await;
+
+        $test_template(
+            ClientSideHarness::new(true),
+            ServerSideLocalFsHarness::new(false).await,
+        )
+        .await;
+
+        $test_template(
+            ClientSideHarness::new(false),
+            ServerSideLocalFsHarness::new(true).await,
+        )
+        .await;
+
+        $test_template(
+            ClientSideHarness::new(true),
+            ServerSideLocalFsHarness::new(true).await,
+        )
+        .await;
+    };
+}
+
+macro_rules! test_client_server_s3_harness_permutations {
+    ($test_template: expr) => {
+        $test_template(
+            ClientSideHarness::new(false),
+            ServerSideS3Harness::new(false).await,
+        )
+        .await;
+
+        $test_template(
+            ClientSideHarness::new(true),
+            ServerSideS3Harness::new(false).await,
+        )
+        .await;
+
+        $test_template(
+            ClientSideHarness::new(false),
+            ServerSideS3Harness::new(true).await,
+        )
+        .await;
+
+        $test_template(
+            ClientSideHarness::new(true),
+            ServerSideS3Harness::new(true).await,
+        )
+        .await;
+    };
+}
+
+pub(crate) use {
+    test_client_server_local_fs_harness_permutations,
+    test_client_server_s3_harness_permutations,
+};
+
+/////////////////////////////////////////////////////////////////////////////////////////

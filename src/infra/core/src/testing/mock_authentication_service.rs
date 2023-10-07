@@ -18,6 +18,7 @@ use kamu_core::auth::{
     LoginError,
     LoginResponse,
     UnsupportedLoginMethodError,
+    DUMMY_ACCESS_TOKEN,
 };
 use mockall::predicate::{always, eq};
 use opendatafabric::AccountName;
@@ -48,7 +49,6 @@ mockall::mock! {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub const DUMMY_TOKEN: &str = "test-dummy-token";
 pub const DUMMY_LOGIN_METHOD: &str = "test";
 
 impl MockAuthenticationService {
@@ -59,13 +59,13 @@ impl MockAuthenticationService {
             .with(eq(DUMMY_LOGIN_METHOD), always())
             .returning(|_, _| {
                 Ok(LoginResponse {
-                    access_token: DUMMY_TOKEN.to_string(),
+                    access_token: DUMMY_ACCESS_TOKEN.to_string(),
                     account_info: AccountInfo::dummy(),
                 })
             });
         mock_authentication_service
             .expect_account_info_by_token()
-            .with(eq(DUMMY_TOKEN.to_string()))
+            .with(eq(DUMMY_ACCESS_TOKEN.to_string()))
             .returning(|_| Ok(AccountInfo::dummy()));
         mock_authentication_service
     }
@@ -87,7 +87,7 @@ impl MockAuthenticationService {
         let mut mock_authentication_service = MockAuthenticationService::new();
         mock_authentication_service
             .expect_account_info_by_token()
-            .with(eq(DUMMY_TOKEN.to_string()))
+            .with(eq(DUMMY_ACCESS_TOKEN.to_string()))
             .returning(|_| Err(GetAccountInfoError::AccessToken(AccessTokenError::Expired)));
         mock_authentication_service
     }
@@ -104,7 +104,7 @@ impl MockAuthenticationService {
         let mut mock_authentication_service = MockAuthenticationService::new();
         mock_authentication_service
             .expect_account_info_by_token()
-            .with(eq(DUMMY_TOKEN.to_string()))
+            .with(eq(DUMMY_ACCESS_TOKEN.to_string()))
             .returning(|_| {
                 Err(GetAccountInfoError::AccessToken(AccessTokenError::Invalid(
                     Box::new(InvalidTokenError {}),

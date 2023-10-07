@@ -8,12 +8,13 @@
 // by the Apache License, Version 2.0.
 
 use std::path::Path;
+use std::str::FromStr;
 use std::{fs, io};
 
 use kamu::domain::*;
 use kamu::testing::{AddDataBuilder, MetadataFactory};
 use kamu::{DatasetLayout, ObjectRepositoryLocalFS};
-use opendatafabric::{DatasetRef, MetadataEvent, Multihash};
+use opendatafabric::{AccountName, DatasetAlias, DatasetRef, MetadataEvent, Multihash};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -22,6 +23,23 @@ pub fn copy_folder_recursively(src: &Path, dst: &Path) -> io::Result<()> {
     let copy_options = fs_extra::dir::CopyOptions::new().content_only(true);
     fs_extra::dir::copy(src, dst, &copy_options).unwrap();
     Ok(())
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn write_dataset_alias(dataset_layout: &DatasetLayout, alias: &DatasetAlias) {
+    if !dataset_layout.info_dir.is_dir() {
+        std::fs::create_dir_all(dataset_layout.info_dir.clone()).unwrap();
+    }
+
+    use tokio::io::AsyncWriteExt;
+
+    let alias_path = dataset_layout.info_dir.join("alias");
+    let mut alias_file = tokio::fs::File::create(alias_path).await.unwrap();
+    alias_file
+        .write_all(alias.to_string().as_bytes())
+        .await
+        .unwrap();
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -73,6 +91,17 @@ pub async fn commit_add_data_event(
         )
         .await
         .unwrap()
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+pub fn make_dataset_ref(account_name: &Option<AccountName>, dataset_name: &str) -> DatasetRef {
+    match account_name {
+        Some(account_name) => {
+            DatasetRef::from_str(format!("{}/{}", account_name, dataset_name).as_str()).unwrap()
+        }
+        None => DatasetRef::from_str(dataset_name).unwrap(),
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

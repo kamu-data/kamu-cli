@@ -17,7 +17,6 @@ use kamu::domain::{
     InternalError,
     ResultIntoInternal,
 };
-use kamu::testing::DUMMY_TOKEN;
 use url::Url;
 
 use crate::harness::await_client_server_flow;
@@ -49,7 +48,7 @@ async fn test_anonymous_api_access() {
 async fn test_non_anonymous_api_valid_access() {
     let server_harness = ServerHarness::new(
         kamu::testing::MockAuthenticationService::resolving_token(
-            DUMMY_TOKEN,
+            kamu::domain::auth::DUMMY_ACCESS_TOKEN,
             kamu::domain::auth::AccountInfo::dummy(),
         ),
         None,
@@ -62,7 +61,7 @@ async fn test_non_anonymous_api_valid_access() {
         let client = reqwest::Client::new();
         let response = client
             .get(test_url)
-            .bearer_auth(DUMMY_TOKEN)
+            .bearer_auth(kamu::domain::auth::DUMMY_ACCESS_TOKEN)
             .send()
             .await
             .unwrap();
@@ -88,7 +87,7 @@ async fn test_non_anonymous_api_access_expired_token() {
         let client = reqwest::Client::new();
         let response = client
             .get(test_url)
-            .bearer_auth(DUMMY_TOKEN)
+            .bearer_auth(kamu::domain::auth::DUMMY_ACCESS_TOKEN)
             .send()
             .await
             .unwrap();
@@ -117,7 +116,7 @@ async fn test_non_anonymous_api_access_invalid_token() {
         let client = reqwest::Client::new();
         let response = client
             .get(test_url)
-            .bearer_auth(DUMMY_TOKEN)
+            .bearer_auth(kamu::domain::auth::DUMMY_ACCESS_TOKEN)
             .send()
             .await
             .unwrap();

@@ -16,8 +16,12 @@ use kamu::domain::*;
 use kamu::utils::smart_transfer_protocol::SmartTransferProtocolClient;
 use kamu::*;
 use kamu_adapter_http::SmartTransferProtocolClientWs;
-use opendatafabric::{DatasetRef, DatasetRefAny, DatasetRefRemote};
+use opendatafabric::{AccountName, DatasetID, DatasetRef, DatasetRefAny, DatasetRefRemote};
 use tempfile::TempDir;
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+const CLIENT_ACCOUNT_NAME: &str = "kamu-client";
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -27,10 +31,11 @@ pub struct ClientSideHarness {
     catalog: dill::Catalog,
     pull_service: Arc<dyn PullService>,
     push_service: Arc<dyn PushService>,
+    multi_tenant: bool,
 }
 
 impl ClientSideHarness {
-    pub fn new() -> Self {
+    pub fn new(multi_tenant: bool) -> Self {
         let tempdir = tempfile::tempdir().unwrap();
         let datasets_dir = tempdir.path().join("datasets");
         std::fs::create_dir(&datasets_dir).unwrap();
@@ -43,7 +48,9 @@ impl ClientSideHarness {
 
         let mut b = dill::CatalogBuilder::new();
 
-        b.add_value(CurrentAccountSubject::new_test());
+        b.add_value(CurrentAccountSubject::logged(AccountName::new_unchecked(
+            CLIENT_ACCOUNT_NAME,
+        )));
 
         b.add::<auth::AlwaysHappyDatasetActionAuthorizer>()
             .bind::<dyn auth::DatasetActionAuthorizer, auth::AlwaysHappyDatasetActionAuthorizer>();
@@ -58,7 +65,7 @@ impl ClientSideHarness {
         b.add_builder(
             builder_for::<DatasetRepositoryLocalFs>()
                 .with_root(datasets_dir)
-                .with_multi_tenant(false),
+                .with_multi_tenant(multi_tenant),
         )
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>();
 
@@ -113,6 +120,15 @@ impl ClientSideHarness {
             catalog,
             pull_service,
             push_service,
+            multi_tenant,
+        }
+    }
+
+    pub fn operating_account_name(&self) -> Option<AccountName> {
+        if self.multi_tenant {
+            Some(AccountName::new_unchecked(CLIENT_ACCOUNT_NAME))
+        } else {
+            None
         }
     }
 
@@ -120,12 +136,15 @@ impl ClientSideHarness {
         self.catalog.get_one::<dyn DatasetRepository>().unwrap()
     }
 
-    pub fn dataset_layout(&self, dataset_name: &str) -> DatasetLayout {
-        DatasetLayout::new(
+    pub fn dataset_layout(&self, dataset_id: &DatasetID, dataset_name: &str) -> DatasetLayout {
+        let root_path = if self.multi_tenant {
             self.internal_datasets_folder_path()
-                .join(dataset_name)
-                .as_path(),
-        )
+                .join(CLIENT_ACCOUNT_NAME)
+                .join(dataset_id.cid.to_string())
+        } else {
+            self.internal_datasets_folder_path().join(dataset_name)
+        };
+        DatasetLayout::new(root_path.as_path())
     }
 
     pub async fn pull_datasets(&self, dataset_ref: DatasetRefAny) -> Vec<PullResponse> {

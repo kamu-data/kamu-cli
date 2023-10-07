@@ -27,12 +27,12 @@ impl DummyOdfServerAccessTokenResolver {
     }
 }
 
-const TEST_ACCESS_TOKEN: &str = "some-token";
+pub const DUMMY_ACCESS_TOKEN: &str = "some-token";
 
 #[async_trait::async_trait]
 impl OdfServerAccessTokenResolver for DummyOdfServerAccessTokenResolver {
     fn resolve_odf_dataset_access_token(&self, _odf_dataset_http_url: &Url) -> Option<String> {
-        Some(TEST_ACCESS_TOKEN.to_string())
+        Some(DUMMY_ACCESS_TOKEN.to_string())
     }
 }
 
