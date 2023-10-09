@@ -8,22 +8,22 @@
 // by the Apache License, Version 2.0.
 
 mod common_harness;
-pub use common_harness::*;
+pub(crate) use common_harness::*;
 
 mod client_side_harness;
-pub use client_side_harness::*;
+pub(crate) use client_side_harness::*;
 
 mod server_side_harness;
-pub use server_side_harness::*;
+pub(crate) use server_side_harness::*;
 
 mod server_side_s3_harness;
-pub use server_side_s3_harness::*;
+pub(crate) use server_side_s3_harness::*;
 
 mod server_side_local_fs_harness;
-pub use server_side_local_fs_harness::*;
+pub(crate) use server_side_local_fs_harness::*;
 
 mod test_api_server;
-pub use test_api_server::*;
+pub(crate) use test_api_server::*;
 
 macro_rules! await_client_server_flow {
     ($api_server_handle: expr, $client_handle: expr) => {

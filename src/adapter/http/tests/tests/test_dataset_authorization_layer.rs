@@ -71,7 +71,7 @@ async fn test_dataset_access_unsafe_methods_anonymous() {
         false,
         DatasetAction::Write,
         false,
-        http::StatusCode::FORBIDDEN,
+        http::StatusCode::UNAUTHORIZED,
     )
     .await;
 }
@@ -146,7 +146,7 @@ async fn test_dataset_access_safe_method_but_potential_write_anonymous() {
         false,
         DatasetAction::Write,
         false,
-        http::StatusCode::FORBIDDEN,
+        http::StatusCode::UNAUTHORIZED,
     )
     .await;
 }

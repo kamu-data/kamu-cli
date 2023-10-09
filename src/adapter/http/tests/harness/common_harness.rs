@@ -18,7 +18,7 @@ use opendatafabric::{AccountName, DatasetAlias, DatasetRef, MetadataEvent, Multi
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn copy_folder_recursively(src: &Path, dst: &Path) -> io::Result<()> {
+pub(crate) fn copy_folder_recursively(src: &Path, dst: &Path) -> io::Result<()> {
     fs::create_dir_all(&dst)?;
     let copy_options = fs_extra::dir::CopyOptions::new().content_only(true);
     fs_extra::dir::copy(src, dst, &copy_options).unwrap();
@@ -27,7 +27,7 @@ pub fn copy_folder_recursively(src: &Path, dst: &Path) -> io::Result<()> {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn write_dataset_alias(dataset_layout: &DatasetLayout, alias: &DatasetAlias) {
+pub(crate) async fn write_dataset_alias(dataset_layout: &DatasetLayout, alias: &DatasetAlias) {
     if !dataset_layout.info_dir.is_dir() {
         std::fs::create_dir_all(dataset_layout.info_dir.clone()).unwrap();
     }
@@ -44,7 +44,7 @@ pub async fn write_dataset_alias(dataset_layout: &DatasetLayout, alias: &Dataset
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn create_random_data(dataset_layout: &DatasetLayout) -> AddDataBuilder {
+pub(crate) async fn create_random_data(dataset_layout: &DatasetLayout) -> AddDataBuilder {
     let (d_hash, d_size) = create_random_file(&dataset_layout.data_dir).await;
     let (c_hash, c_size) = create_random_file(&dataset_layout.checkpoints_dir).await;
     MetadataFactory::add_data()
@@ -76,7 +76,7 @@ async fn create_random_file(root: &Path) -> (Multihash, usize) {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn commit_add_data_event(
+pub(crate) async fn commit_add_data_event(
     dataset_repo: &dyn DatasetRepository,
     dataset_ref: &DatasetRef,
     dataset_layout: &DatasetLayout,
@@ -95,7 +95,10 @@ pub async fn commit_add_data_event(
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn make_dataset_ref(account_name: &Option<AccountName>, dataset_name: &str) -> DatasetRef {
+pub(crate) fn make_dataset_ref(
+    account_name: &Option<AccountName>,
+    dataset_name: &str,
+) -> DatasetRef {
     match account_name {
         Some(account_name) => {
             DatasetRef::from_str(format!("{}/{}", account_name, dataset_name).as_str()).unwrap()

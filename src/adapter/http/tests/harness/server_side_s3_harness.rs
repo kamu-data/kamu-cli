@@ -12,7 +12,6 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
 
-use kamu::domain::auth::{AccountType, DEFAULT_AVATAR_URL};
 use kamu::domain::{
     auth,
     CurrentAccountSubject,
@@ -23,56 +22,54 @@ use kamu::domain::{
 use kamu::testing::{LocalS3Server, MockAuthenticationService};
 use kamu::utils::s3_context::S3Context;
 use kamu::{DatasetLayout, DatasetRepositoryS3};
-use opendatafabric::{AccountName, DatasetAlias, DatasetHandle, FAKE_ACCOUNT_ID};
+use opendatafabric::{AccountName, DatasetAlias, DatasetHandle};
 use url::Url;
 
-use super::{ServerSideHarness, TestAPIServer, SERVER_ACCOUNT_NAME};
+use super::{
+    create_cli_user_catalog,
+    create_web_user_catalog,
+    server_authentication_mock,
+    ServerSideHarness,
+    ServerSideHarnessOptions,
+    TestAPIServer,
+    SERVER_ACCOUNT_NAME,
+};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[allow(dead_code)]
-pub struct ServerSideS3Harness {
+pub(crate) struct ServerSideS3Harness {
     s3: LocalS3Server,
     base_catalog: dill::Catalog,
     api_server: TestAPIServer,
-    multi_tenant: bool,
+    options: ServerSideHarnessOptions,
 }
 
 impl ServerSideS3Harness {
-    pub async fn new(multi_tenant: bool) -> Self {
-        let mock_authentication_service = MockAuthenticationService::resolving_token(
-            kamu::domain::auth::DUMMY_ACCESS_TOKEN,
-            kamu::domain::auth::AccountInfo {
-                account_id: FAKE_ACCOUNT_ID.to_string(),
-                account_name: AccountName::new_unchecked(SERVER_ACCOUNT_NAME),
-                account_type: AccountType::User,
-                display_name: SERVER_ACCOUNT_NAME.to_string(),
-                avatar_url: Some(DEFAULT_AVATAR_URL.to_string()),
-            },
-        );
-
+    pub async fn new(options: ServerSideHarnessOptions) -> Self {
         let s3 = LocalS3Server::new().await;
-        let base_catalog = dill::CatalogBuilder::new()
-            .add_value(s3_repo(&s3, multi_tenant).await)
+
+        let mut base_catalog_builder = dill::CatalogBuilder::new();
+        base_catalog_builder
+            .add_value(s3_repo(&s3, options.multi_tenant).await)
             .bind::<dyn DatasetRepository, DatasetRepositoryS3>()
-            .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
-            .bind::<dyn auth::DatasetActionAuthorizer, auth::AlwaysHappyDatasetActionAuthorizer>()
-            .add_value(mock_authentication_service)
-            .bind::<dyn auth::AuthenticationService, MockAuthenticationService>()
-            .build();
+            .add_value(server_authentication_mock())
+            .bind::<dyn auth::AuthenticationService, MockAuthenticationService>();
+
+        let base_catalog = base_catalog_builder.build();
 
         let api_server = TestAPIServer::new(
-            base_catalog.clone(),
+            create_web_user_catalog(&base_catalog, &options),
             Some(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1))),
             None,
-            multi_tenant,
+            options.multi_tenant,
         );
 
         Self {
             s3,
             base_catalog,
             api_server,
-            multi_tenant,
+            options,
         }
     }
 
@@ -88,7 +85,7 @@ impl ServerSideS3Harness {
 #[async_trait::async_trait]
 impl ServerSideHarness for ServerSideS3Harness {
     fn operating_account_name(&self) -> Option<AccountName> {
-        if self.multi_tenant {
+        if self.options.multi_tenant {
             Some(AccountName::new_unchecked(SERVER_ACCOUNT_NAME))
         } else {
             None
@@ -96,16 +93,14 @@ impl ServerSideHarness for ServerSideS3Harness {
     }
 
     fn cli_dataset_repository(&self) -> Arc<dyn DatasetRepository> {
-        let cli_catalog = dill::CatalogBuilder::new_chained(&self.base_catalog)
-            .add_value(CurrentAccountSubject::new_test())
-            .build();
+        let cli_catalog = create_cli_user_catalog(&self.base_catalog);
         cli_catalog.get_one::<dyn DatasetRepository>().unwrap()
     }
 
     fn dataset_url(&self, dataset_alias: &DatasetAlias) -> Url {
         let api_server_address = self.api_server_addr();
         Url::from_str(
-            if self.multi_tenant {
+            if self.options.multi_tenant {
                 format!(
                     "odf+http://{}/{}/{}",
                     api_server_address,

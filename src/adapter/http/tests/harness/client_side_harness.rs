@@ -26,7 +26,7 @@ const CLIENT_ACCOUNT_NAME: &str = "kamu-client";
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[allow(dead_code)]
-pub struct ClientSideHarness {
+pub(crate) struct ClientSideHarness {
     tempdir: TempDir,
     catalog: dill::Catalog,
     pull_service: Arc<dyn PullService>,
@@ -34,7 +34,7 @@ pub struct ClientSideHarness {
     options: ClientSideHarnessOptions,
 }
 
-pub struct ClientSideHarnessOptions {
+pub(crate) struct ClientSideHarnessOptions {
     pub multi_tenant: bool,
     pub authenticated_remotely: bool,
 }

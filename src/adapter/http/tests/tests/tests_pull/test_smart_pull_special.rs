@@ -25,27 +25,32 @@ use crate::harness::{
     ClientSideHarness,
     ClientSideHarnessOptions,
     ServerSideHarness,
+    ServerSideHarnessOptions,
     ServerSideLocalFsHarness,
 };
-use crate::tests::tests_pull::test_smart_pull_shared::SmartPullNewDatasetScenario;
+use crate::tests::tests_pull::scenarios::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_smart_push_unauthenticated() {
+async fn test_smart_pull_unauthenticated() {
     let scenario = SmartPullNewDatasetScenario::prepare(
         ClientSideHarness::new(ClientSideHarnessOptions {
             multi_tenant: false,
             authenticated_remotely: false,
         }),
-        ServerSideLocalFsHarness::new(false).await,
+        ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
+            multi_tenant: false,
+            authorized_writes: true,
+        })
+        .await,
     )
     .await;
 
     let api_server_handle = scenario.server_harness.api_server_run();
 
-    // Unauthenticated pull should pass, reading a dataset does not require
-    // authentication
+    // Unauthenticated pull should pass:
+    //  reading a public dataset does not require authentication
 
     let client_handle = async {
         let pull_result = scenario

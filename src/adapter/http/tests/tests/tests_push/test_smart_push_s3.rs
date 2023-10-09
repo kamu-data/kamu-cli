@@ -7,7 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::harness::{ClientSideHarness, ClientSideHarnessOptions, ServerSideS3Harness};
+use crate::harness::{
+    ClientSideHarness,
+    ClientSideHarnessOptions,
+    ServerSideHarnessOptions,
+    ServerSideS3Harness,
+};
 use crate::tests::test_client_server_s3_harness_permutations;
 use crate::tests::tests_push::test_smart_push_shared;
 

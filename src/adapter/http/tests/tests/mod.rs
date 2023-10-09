@@ -16,7 +16,11 @@ mod tests_push;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[macro_export]
+/** Test scenario in the following permutations:
+ *    - client: local fs, single-tenant x multi-tenant
+ *    x
+ *    - server: local fs, single-tenant x multi-tenant
+ */
 macro_rules! test_client_server_local_fs_harness_permutations {
     ($test_package: expr, $test_name: expr) => {
         paste::paste! {
@@ -24,7 +28,10 @@ macro_rules! test_client_server_local_fs_harness_permutations {
             async fn [<$test_name "_st_client_st_local_fs_server">] () {
                 $test_package::$test_name(
                     ClientSideHarness::new(ClientSideHarnessOptions { multi_tenant: false, authenticated_remotely: true }),
-                    ServerSideLocalFsHarness::new(false).await,
+                    ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
+                        multi_tenant: false,
+                        authorized_writes: true,
+                    }).await,
                 )
                 .await;
             }
@@ -35,7 +42,10 @@ macro_rules! test_client_server_local_fs_harness_permutations {
             async fn [<$test_name "_st_client_mt_local_fs_server">] () {
                 $test_package::$test_name(
                     ClientSideHarness::new(ClientSideHarnessOptions { multi_tenant: false, authenticated_remotely: true }),
-                    ServerSideLocalFsHarness::new(true).await,
+                    ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
+                        multi_tenant: true,
+                        authorized_writes: true,
+                    }).await,
                 )
                 .await;
             }
@@ -46,7 +56,10 @@ macro_rules! test_client_server_local_fs_harness_permutations {
             async fn [<$test_name "_mt_client_st_local_fs_server">] () {
                 $test_package::$test_name(
                     ClientSideHarness::new(ClientSideHarnessOptions { multi_tenant: true, authenticated_remotely: true }),
-                    ServerSideLocalFsHarness::new(false).await,
+                    ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
+                        multi_tenant: false,
+                        authorized_writes: true,
+                    }).await,
                 )
                 .await;
             }
@@ -57,7 +70,10 @@ macro_rules! test_client_server_local_fs_harness_permutations {
             async fn [<$test_name "_mt_client_mt_local_fs_server">] () {
                 $test_package::$test_name(
                     ClientSideHarness::new(ClientSideHarnessOptions { multi_tenant: true, authenticated_remotely: true }),
-                    ServerSideLocalFsHarness::new(true).await,
+                    ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
+                        multi_tenant: true,
+                        authorized_writes: true,
+                    }).await,
                 )
                 .await;
             }
@@ -65,7 +81,11 @@ macro_rules! test_client_server_local_fs_harness_permutations {
     };
 }
 
-#[macro_export]
+/** Test scenario in the following permutations:
+ *    - client: local fs, single-tenant
+ *    x
+ *    - server: s3, single-tenant x multi-tenant
+ */
 macro_rules! test_client_server_s3_harness_permutations {
     ($test_package: expr, $test_name: expr) => {
         paste::paste! {
@@ -74,7 +94,10 @@ macro_rules! test_client_server_s3_harness_permutations {
             async fn [<$test_name "_st_client_st_local_fs_server">] () {
                 $test_package::$test_name(
                     ClientSideHarness::new(ClientSideHarnessOptions { multi_tenant: false, authenticated_remotely: true }),
-                    ServerSideS3Harness::new(false).await,
+                    ServerSideS3Harness::new(ServerSideHarnessOptions {
+                        multi_tenant: false,
+                        authorized_writes: true,
+                    }).await,
                 )
                 .await;
             }
@@ -86,31 +109,10 @@ macro_rules! test_client_server_s3_harness_permutations {
             async fn [<$test_name "_st_client_mt_local_fs_server">] () {
                 $test_package::$test_name(
                     ClientSideHarness::new(ClientSideHarnessOptions { multi_tenant: false, authenticated_remotely: true }),
-                    ServerSideS3Harness::new(true).await,
-                )
-                .await;
-            }
-        }
-
-        paste::paste! {
-            #[test_group::group(containerized)]
-            #[test_log::test(tokio::test)]
-            async fn [<$test_name "_mt_client_st_local_fs_server">] () {
-                $test_package::$test_name(
-                    ClientSideHarness::new(ClientSideHarnessOptions { multi_tenant: true, authenticated_remotely: true }),
-                    ServerSideS3Harness::new(false).await,
-                )
-                .await;
-            }
-        }
-
-        paste::paste! {
-            #[test_group::group(containerized)]
-            #[test_log::test(tokio::test)]
-            async fn [<$test_name "_mt_client_mt_local_fs_server">] () {
-                $test_package::$test_name(
-                    ClientSideHarness::new(ClientSideHarnessOptions { multi_tenant: true, authenticated_remotely: true }),
-                    ServerSideS3Harness::new(true).await,
+                    ServerSideS3Harness::new(ServerSideHarnessOptions {
+                        multi_tenant: true,
+                        authorized_writes: true,
+                    }).await,
                 )
                 .await;
             }

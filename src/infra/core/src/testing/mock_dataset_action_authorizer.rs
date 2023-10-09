@@ -55,7 +55,7 @@ impl MockDatasetActionAuthorizer {
         let mut mock_dataset_action_authorizer = MockDatasetActionAuthorizer::new();
         mock_dataset_action_authorizer
             .expect_check_action_allowed()
-            .return_once(|dataset_handle, action| Err(Self::denying_error(dataset_handle, action)));
+            .returning(|dataset_handle, action| Err(Self::denying_error(dataset_handle, action)));
         mock_dataset_action_authorizer
     }
 

@@ -137,6 +137,15 @@ where
                         .check_action_allowed(&dataset_handle, action)
                         .await
                     {
+                        if let Err(err_result) = Self::check_logged_in(&catalog) {
+                            tracing::error!(
+                                "Dataset '{}' {} access denied: user not logged in",
+                                dataset_ref,
+                                action
+                            );
+                            return Ok(err_result);
+                        }
+
                         tracing::error!(
                             "Dataset '{}' {} access denied: {:?}",
                             dataset_ref,
@@ -150,6 +159,10 @@ where
                     if let GetDatasetError::NotFound(_) = e {
                         if Self::is_potential_write(&request, &potential_write_paths) {
                             if let Err(err_result) = Self::check_logged_in(&catalog) {
+                                tracing::error!(
+                                    "Dataset '{}' create access denied: user not logged in",
+                                    dataset_ref,
+                                );
                                 return Ok(err_result);
                             }
                         }
