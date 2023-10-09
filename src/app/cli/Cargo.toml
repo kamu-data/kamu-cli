@@ -62,7 +62,7 @@ arrow-flight = { version = "46", features = ["flight-sql-experimental"] }
 async-graphql = { version = "6", features = ["chrono", "url", "apollo_tracing"] }
 async-graphql-axum = "6"
 axum = { version = "0.6", features = ["ws"] }
-axum-extra = { version = "0.7", features = ["async-read-body"] }
+axum-extra = { version = "0.8", features = ["async-read-body"] }
 http = "0.2"
 hyper = "0.14"
 reqwest = { version = "0.11", default-features = false, features = [] }

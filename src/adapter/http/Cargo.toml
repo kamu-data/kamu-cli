@@ -23,7 +23,7 @@ opendatafabric = { workspace = true }
 kamu = { workspace = true }
 
 axum = { version = "0.6", features = ["ws", "headers"] }
-axum-extra = { version = "0.7", features = ["async-read-body"] }
+axum-extra = { version = "0.8", features = ["async-read-body"] }
 async-trait = "0.1"
 bytes = "1"
 chrono = { version = "0.4", features = ["serde"] }
