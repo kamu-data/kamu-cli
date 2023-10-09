@@ -23,4 +23,14 @@ mockall::mock! {
     }
 }
 
+impl MockOdfServerAccessTokenResolver {
+    pub fn empty() -> Self {
+        let mut mock_odf_server_access_token_resolver = MockOdfServerAccessTokenResolver::new();
+        mock_odf_server_access_token_resolver
+            .expect_resolve_odf_dataset_access_token()
+            .returning(|_| None);
+        mock_odf_server_access_token_resolver
+    }
+}
+
 /////////////////////////////////////////////////////////////////////////////////////////

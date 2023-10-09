@@ -23,7 +23,7 @@ macro_rules! test_client_server_local_fs_harness_permutations {
             #[test_log::test(tokio::test)]
             async fn [<$test_name "_st_client_st_local_fs_server">] () {
                 $test_package::$test_name(
-                    ClientSideHarness::new(false),
+                    ClientSideHarness::new(ClientSideHarnessOptions { multi_tenant: false, authenticated_remotely: true }),
                     ServerSideLocalFsHarness::new(false).await,
                 )
                 .await;
@@ -34,7 +34,7 @@ macro_rules! test_client_server_local_fs_harness_permutations {
             #[test_log::test(tokio::test)]
             async fn [<$test_name "_st_client_mt_local_fs_server">] () {
                 $test_package::$test_name(
-                    ClientSideHarness::new(false),
+                    ClientSideHarness::new(ClientSideHarnessOptions { multi_tenant: false, authenticated_remotely: true }),
                     ServerSideLocalFsHarness::new(true).await,
                 )
                 .await;
@@ -45,7 +45,7 @@ macro_rules! test_client_server_local_fs_harness_permutations {
             #[test_log::test(tokio::test)]
             async fn [<$test_name "_mt_client_st_local_fs_server">] () {
                 $test_package::$test_name(
-                    ClientSideHarness::new(true),
+                    ClientSideHarness::new(ClientSideHarnessOptions { multi_tenant: true, authenticated_remotely: true }),
                     ServerSideLocalFsHarness::new(false).await,
                 )
                 .await;
@@ -56,7 +56,7 @@ macro_rules! test_client_server_local_fs_harness_permutations {
             #[test_log::test(tokio::test)]
             async fn [<$test_name "_mt_client_mt_local_fs_server">] () {
                 $test_package::$test_name(
-                    ClientSideHarness::new(true),
+                    ClientSideHarness::new(ClientSideHarnessOptions { multi_tenant: true, authenticated_remotely: true }),
                     ServerSideLocalFsHarness::new(true).await,
                 )
                 .await;
@@ -73,7 +73,7 @@ macro_rules! test_client_server_s3_harness_permutations {
             #[test_log::test(tokio::test)]
             async fn [<$test_name "_st_client_st_local_fs_server">] () {
                 $test_package::$test_name(
-                    ClientSideHarness::new(false),
+                    ClientSideHarness::new(ClientSideHarnessOptions { multi_tenant: false, authenticated_remotely: true }),
                     ServerSideS3Harness::new(false).await,
                 )
                 .await;
@@ -85,7 +85,7 @@ macro_rules! test_client_server_s3_harness_permutations {
             #[test_log::test(tokio::test)]
             async fn [<$test_name "_st_client_mt_local_fs_server">] () {
                 $test_package::$test_name(
-                    ClientSideHarness::new(false),
+                    ClientSideHarness::new(ClientSideHarnessOptions { multi_tenant: false, authenticated_remotely: true }),
                     ServerSideS3Harness::new(true).await,
                 )
                 .await;
@@ -97,7 +97,7 @@ macro_rules! test_client_server_s3_harness_permutations {
             #[test_log::test(tokio::test)]
             async fn [<$test_name "_mt_client_st_local_fs_server">] () {
                 $test_package::$test_name(
-                    ClientSideHarness::new(true),
+                    ClientSideHarness::new(ClientSideHarnessOptions { multi_tenant: true, authenticated_remotely: true }),
                     ServerSideS3Harness::new(false).await,
                 )
                 .await;
@@ -109,7 +109,7 @@ macro_rules! test_client_server_s3_harness_permutations {
             #[test_log::test(tokio::test)]
             async fn [<$test_name "_mt_client_mt_local_fs_server">] () {
                 $test_package::$test_name(
-                    ClientSideHarness::new(true),
+                    ClientSideHarness::new(ClientSideHarnessOptions { multi_tenant: true, authenticated_remotely: true }),
                     ServerSideS3Harness::new(true).await,
                 )
                 .await;

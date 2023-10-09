@@ -10,5 +10,6 @@
 mod test_smart_pull_local_fs;
 mod test_smart_pull_s3;
 mod test_smart_pull_shared;
+mod test_smart_pull_special;
 
 /////////////////////////////////////////////////////////////////////////////////////////

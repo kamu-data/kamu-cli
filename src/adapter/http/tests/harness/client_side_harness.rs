@@ -31,11 +31,16 @@ pub struct ClientSideHarness {
     catalog: dill::Catalog,
     pull_service: Arc<dyn PullService>,
     push_service: Arc<dyn PushService>,
-    multi_tenant: bool,
+    options: ClientSideHarnessOptions,
+}
+
+pub struct ClientSideHarnessOptions {
+    pub multi_tenant: bool,
+    pub authenticated_remotely: bool,
 }
 
 impl ClientSideHarness {
-    pub fn new(multi_tenant: bool) -> Self {
+    pub fn new(options: ClientSideHarnessOptions) -> Self {
         let tempdir = tempfile::tempdir().unwrap();
         let datasets_dir = tempdir.path().join("datasets");
         std::fs::create_dir(&datasets_dir).unwrap();
@@ -55,9 +60,13 @@ impl ClientSideHarness {
         b.add::<auth::AlwaysHappyDatasetActionAuthorizer>()
             .bind::<dyn auth::DatasetActionAuthorizer, auth::AlwaysHappyDatasetActionAuthorizer>();
 
-        b.add::<auth::DummyOdfServerAccessTokenResolver>()
-            .bind::<dyn auth::OdfServerAccessTokenResolver, auth::DummyOdfServerAccessTokenResolver>(
-            );
+        if options.authenticated_remotely {
+            b.add::<auth::DummyOdfServerAccessTokenResolver>();
+            b.bind::<dyn auth::OdfServerAccessTokenResolver, auth::DummyOdfServerAccessTokenResolver>();
+        } else {
+            b.add_value(kamu::testing::MockOdfServerAccessTokenResolver::empty());
+            b.bind::<dyn auth::OdfServerAccessTokenResolver, kamu::testing::MockOdfServerAccessTokenResolver>();
+        }
 
         b.add::<SystemTimeSourceDefault>();
         b.bind::<dyn SystemTimeSource, SystemTimeSourceDefault>();
@@ -65,7 +74,7 @@ impl ClientSideHarness {
         b.add_builder(
             builder_for::<DatasetRepositoryLocalFs>()
                 .with_root(datasets_dir)
-                .with_multi_tenant(multi_tenant),
+                .with_multi_tenant(options.multi_tenant),
         )
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>();
 
@@ -120,12 +129,12 @@ impl ClientSideHarness {
             catalog,
             pull_service,
             push_service,
-            multi_tenant,
+            options,
         }
     }
 
     pub fn operating_account_name(&self) -> Option<AccountName> {
-        if self.multi_tenant {
+        if self.options.multi_tenant && self.options.authenticated_remotely {
             Some(AccountName::new_unchecked(CLIENT_ACCOUNT_NAME))
         } else {
             None
@@ -136,8 +145,9 @@ impl ClientSideHarness {
         self.catalog.get_one::<dyn DatasetRepository>().unwrap()
     }
 
+    // TODO: accept alias or handle
     pub fn dataset_layout(&self, dataset_id: &DatasetID, dataset_name: &str) -> DatasetLayout {
-        let root_path = if self.multi_tenant {
+        let root_path = if self.options.multi_tenant {
             self.internal_datasets_folder_path()
                 .join(CLIENT_ACCOUNT_NAME)
                 .join(dataset_id.cid.to_string())
