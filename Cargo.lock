@@ -3195,6 +3195,7 @@ dependencies = [
  "kamu",
  "mockall",
  "opendatafabric",
+ "paste",
  "rand",
  "reqwest",
  "serde",

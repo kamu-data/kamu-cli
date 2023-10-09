@@ -13,62 +13,41 @@ use crate::tests::tests_push::test_smart_push_shared;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(containerized)]
-#[test_log::test(tokio::test)]
-async fn test_smart_push_s3_new_dataset() {
-    test_client_server_s3_harness_permutations!(
-        test_smart_push_shared::test_smart_push_new_dataset
-    );
-}
+test_client_server_s3_harness_permutations!(test_smart_push_shared, test_smart_push_new_dataset);
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(containerized)]
-#[test_log::test(tokio::test)]
-async fn test_smart_push_s3_existing_up_to_date_dataset() {
-    test_client_server_s3_harness_permutations!(
-        test_smart_push_shared::test_smart_push_existing_up_to_date_dataset
-    );
-}
+test_client_server_s3_harness_permutations!(
+    test_smart_push_shared,
+    test_smart_push_existing_up_to_date_dataset
+);
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(containerized)]
-#[test_log::test(tokio::test)]
-async fn test_smart_push_s3_existing_evolved_dataset() {
-    test_client_server_s3_harness_permutations!(
-        test_smart_push_shared::test_smart_push_existing_evolved_dataset
-    );
-}
+test_client_server_s3_harness_permutations!(
+    test_smart_push_shared,
+    test_smart_push_existing_evolved_dataset
+);
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(containerized)]
-#[test_log::test(tokio::test)]
-async fn test_smart_push_s3_existing_dataset_fails_as_server_advanced() {
-    test_client_server_s3_harness_permutations!(
-        test_smart_push_shared::test_smart_push_existing_dataset_fails_as_server_advanced
-    );
-}
+test_client_server_s3_harness_permutations!(
+    test_smart_push_shared,
+    test_smart_push_existing_dataset_fails_as_server_advanced
+);
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(containerized)]
-#[test_log::test(tokio::test)]
-async fn test_smart_push_s3_aborted_write_of_new_rewrite_succeeds() {
-    test_client_server_s3_harness_permutations!(
-        test_smart_push_shared::test_smart_push_aborted_write_of_new_rewrite_succeeds
-    );
-}
+test_client_server_s3_harness_permutations!(
+    test_smart_push_shared,
+    test_smart_push_aborted_write_of_new_rewrite_succeeds
+);
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(containerized)]
-#[test_log::test(tokio::test)]
-async fn test_smart_push_s3_aborted_write_of_updated_rewrite_succeeds() {
-    test_client_server_s3_harness_permutations!(
-        test_smart_push_shared::test_smart_push_aborted_write_of_updated_rewrite_succeeds
-    );
-}
+test_client_server_s3_harness_permutations!(
+    test_smart_push_shared,
+    test_smart_push_aborted_write_of_updated_rewrite_succeeds
+);
 
 /////////////////////////////////////////////////////////////////////////////////////////
