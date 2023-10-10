@@ -7,6 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+pub(crate) mod scenarios;
+
 mod test_smart_pull_local_fs;
 mod test_smart_pull_s3;
 mod test_smart_pull_shared;
+mod test_smart_pull_special;
+
+/////////////////////////////////////////////////////////////////////////////////////////

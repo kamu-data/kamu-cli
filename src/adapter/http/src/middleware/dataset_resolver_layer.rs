@@ -14,50 +14,59 @@ use std::task::{Context, Poll};
 
 use axum::body::Body;
 use axum::extract::FromRequestParts;
-use axum::http::{Request, StatusCode};
 use axum::response::Response;
 use axum::RequestExt;
 use kamu::domain::{DatasetRepository, GetDatasetError};
 use opendatafabric::DatasetRef;
 use tower::{Layer, Service};
 
+use crate::axum_utils::*;
+
 /////////////////////////////////////////////////////////////////////////////////
 
-pub struct DatasetResolverLayer<IdExt, Extractor> {
+pub struct DatasetResolverLayer<IdExt, Extractor, DatasetOptPred> {
     identity_extractor: IdExt,
+    dataset_optionality_predicate: DatasetOptPred,
     _ex: PhantomData<Extractor>,
 }
 
 // Implementing manually since derive macro thinks Extractor has to be Clone too
-impl<IdExt, Extractor> Clone for DatasetResolverLayer<IdExt, Extractor>
+impl<IdExt, Extractor, DatasetOptPred> Clone
+    for DatasetResolverLayer<IdExt, Extractor, DatasetOptPred>
 where
     IdExt: Clone,
+    DatasetOptPred: Clone,
 {
     fn clone(&self) -> Self {
         Self {
             identity_extractor: self.identity_extractor.clone(),
+            dataset_optionality_predicate: self.dataset_optionality_predicate.clone(),
             _ex: PhantomData,
         }
     }
 }
 
-impl<IdExt, Extractor> DatasetResolverLayer<IdExt, Extractor>
+impl<IdExt, Extractor, DatasetOptPred> DatasetResolverLayer<IdExt, Extractor, DatasetOptPred>
 where
     IdExt: Fn(Extractor) -> DatasetRef,
+    DatasetOptPred: Fn(&http::Request<Body>) -> bool,
 {
-    pub fn new(identity_extractor: IdExt) -> Self {
+    pub fn new(identity_extractor: IdExt, dataset_optionality_predicate: DatasetOptPred) -> Self {
         Self {
             identity_extractor,
+            dataset_optionality_predicate,
             _ex: PhantomData,
         }
     }
 }
 
-impl<Svc, IdExt, Extractor> Layer<Svc> for DatasetResolverLayer<IdExt, Extractor>
+impl<Svc, IdExt, Extractor, DatasetOptPred> Layer<Svc>
+    for DatasetResolverLayer<IdExt, Extractor, DatasetOptPred>
 where
     IdExt: Clone,
+    DatasetOptPred: Clone,
 {
-    type Service = DatasetResolverMiddleware<Svc, IdExt, Extractor>;
+    type Service = DatasetResolverMiddleware<Svc, IdExt, Extractor, DatasetOptPred>;
 
     fn layer(&self, inner: Svc) -> Self::Service {
         DatasetResolverMiddleware {
@@ -69,22 +78,17 @@ where
 
 /////////////////////////////////////////////////////////////////////////////////
 
-pub struct DatasetResolverMiddleware<Svc, IdExt, Extractor> {
+pub struct DatasetResolverMiddleware<Svc, IdExt, Extractor, DatasetOptPred> {
     inner: Svc,
-    layer: DatasetResolverLayer<IdExt, Extractor>,
+    layer: DatasetResolverLayer<IdExt, Extractor, DatasetOptPred>,
 }
 
-impl<Svc, IdExt, Extractor> DatasetResolverMiddleware<Svc, IdExt, Extractor> {
-    fn is_dataset_optional(request: &Request<Body>) -> bool {
-        let path = request.uri().path();
-        "/push" == path
-    }
-}
-
-impl<Svc, IdExt, Extractor> Clone for DatasetResolverMiddleware<Svc, IdExt, Extractor>
+impl<Svc, IdExt, Extractor, DatasetOptPred> Clone
+    for DatasetResolverMiddleware<Svc, IdExt, Extractor, DatasetOptPred>
 where
     Svc: Clone,
     IdExt: Clone,
+    DatasetOptPred: Clone,
 {
     fn clone(&self) -> Self {
         Self {
@@ -94,14 +98,16 @@ where
     }
 }
 
-impl<Svc, IdExt, Extractor> Service<Request<Body>>
-    for DatasetResolverMiddleware<Svc, IdExt, Extractor>
+impl<Svc, IdExt, Extractor, DatasetOptPred> Service<http::Request<Body>>
+    for DatasetResolverMiddleware<Svc, IdExt, Extractor, DatasetOptPred>
 where
     IdExt: Send + Clone + 'static,
     IdExt: Fn(Extractor) -> DatasetRef,
     Extractor: FromRequestParts<()> + Send + 'static,
     <Extractor as FromRequestParts<()>>::Rejection: std::fmt::Debug,
-    Svc: Service<Request<Body>, Response = Response> + Send + 'static + Clone,
+    DatasetOptPred: Send + Clone + 'static,
+    DatasetOptPred: Fn(&http::Request<Body>) -> bool,
+    Svc: Service<http::Request<Body>, Response = Response> + Send + 'static + Clone,
     Svc::Future: Send + 'static,
 {
     type Response = Svc::Response;
@@ -113,7 +119,7 @@ where
         self.inner.poll_ready(cx)
     }
 
-    fn call(&mut self, mut request: Request<Body>) -> Self::Future {
+    fn call(&mut self, mut request: http::Request<Body>) -> Self::Future {
         // Inspired by https://github.com/maxcountryman/axum-login/blob/main/axum-login/src/auth.rs
         // TODO: PERF: Is cloning a performance concern?
         let mut inner = self.inner.clone();
@@ -124,17 +130,12 @@ where
                 Ok(p) => p,
                 Err(err) => {
                     tracing::warn!("Could not extract params: {:?}", err);
-                    return Ok(Response::builder()
-                        .status(StatusCode::BAD_REQUEST)
-                        .body(Default::default())
-                        .unwrap());
+                    return Ok(bad_request_response());
                 }
             };
 
             let dataset_ref = (layer.identity_extractor)(param1);
-            if Self::is_dataset_optional(&request) {
-                request.extensions_mut().insert(dataset_ref);
-            } else {
+            if !(layer.dataset_optionality_predicate)(&request) {
                 let catalog = request
                     .extensions()
                     .get::<dill::Catalog>()
@@ -146,22 +147,18 @@ where
                     Ok(ds) => ds,
                     Err(GetDatasetError::NotFound(err)) => {
                         tracing::warn!("Dataset not found: {:?}", err);
-                        return Ok(Response::builder()
-                            .status(StatusCode::NOT_FOUND)
-                            .body(Default::default())
-                            .unwrap());
+                        return Ok(not_found_response());
                     }
                     Err(err) => {
                         tracing::error!("Could not get dataset: {:?}", err);
-                        return Ok(Response::builder()
-                            .status(StatusCode::INTERNAL_SERVER_ERROR)
-                            .body(Default::default())
-                            .unwrap());
+                        return Ok(internal_server_error_response());
                     }
                 };
 
                 request.extensions_mut().insert(dataset);
             }
+
+            request.extensions_mut().insert(dataset_ref);
 
             inner.call(request).await
         })

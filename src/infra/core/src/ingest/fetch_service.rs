@@ -527,8 +527,6 @@ impl FetchService {
         system_time: &DateTime<Utc>,
         listener: &Arc<dyn FetchProgressListener>,
     ) -> Result<FetchResult, IngestError> {
-        use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
-        use reqwest::StatusCode;
         use tokio::io::AsyncWriteExt;
 
         let client = reqwest::Client::builder()
@@ -537,11 +535,11 @@ impl FetchService {
             .build()
             .int_err()?;
 
-        let mut headers: HeaderMap = headers
+        let mut headers: http::HeaderMap = headers
             .into_iter()
             .map(|h| {
-                let name = HeaderName::try_from(h.name).unwrap();
-                let value = HeaderValue::try_from(h.value).unwrap();
+                let name = http::HeaderName::try_from(h.name).unwrap();
+                let value = http::HeaderValue::try_from(h.value).unwrap();
                 (name, value)
             })
             .collect();
@@ -550,14 +548,14 @@ impl FetchService {
             None => (),
             Some(PollingSourceState::ETag(etag)) => {
                 headers.insert(
-                    reqwest::header::IF_NONE_MATCH,
-                    HeaderValue::try_from(etag).unwrap(),
+                    http::header::IF_NONE_MATCH,
+                    http::HeaderValue::try_from(etag).unwrap(),
                 );
             }
             Some(PollingSourceState::LastModified(last_modified)) => {
                 headers.insert(
-                    reqwest::header::IF_MODIFIED_SINCE,
-                    HeaderValue::try_from(last_modified.to_rfc2822()).unwrap(),
+                    http::header::IF_MODIFIED_SINCE,
+                    http::HeaderValue::try_from(last_modified.to_rfc2822()).unwrap(),
                 );
             }
         }
@@ -571,11 +569,11 @@ impl FetchService {
         }?;
 
         match response.status() {
-            StatusCode::OK => (),
-            StatusCode::NOT_MODIFIED => {
+            http::StatusCode::OK => (),
+            http::StatusCode::NOT_MODIFIED => {
                 return Ok(FetchResult::UpToDate);
             }
-            StatusCode::NOT_FOUND => {
+            http::StatusCode::NOT_FOUND => {
                 return Err(IngestError::not_found(url.as_str(), None));
             }
             code => {

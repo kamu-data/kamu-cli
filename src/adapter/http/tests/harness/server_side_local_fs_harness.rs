@@ -15,59 +15,71 @@ use std::sync::Arc;
 use dill::builder_for;
 use kamu::domain::{
     auth,
-    CurrentAccountSubject,
     DatasetRepository,
     InternalError,
     ResultIntoInternal,
     SystemTimeSource,
     SystemTimeSourceDefault,
 };
+use kamu::testing::MockAuthenticationService;
 use kamu::{DatasetLayout, DatasetRepositoryLocalFs};
-use opendatafabric::DatasetHandle;
+use opendatafabric::{AccountName, DatasetAlias, DatasetHandle};
 use tempfile::TempDir;
 use url::Url;
 
-use super::{ServerSideHarness, TestAPIServer};
+use super::{
+    create_cli_user_catalog,
+    create_web_user_catalog,
+    server_authentication_mock,
+    ServerSideHarness,
+    ServerSideHarnessOptions,
+    TestAPIServer,
+    SERVER_ACCOUNT_NAME,
+};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[allow(dead_code)]
-pub struct ServerSideLocalFsHarness {
+pub(crate) struct ServerSideLocalFsHarness {
     tempdir: TempDir,
-    catalog: dill::Catalog,
+    base_catalog: dill::Catalog,
     api_server: TestAPIServer,
+    options: ServerSideHarnessOptions,
 }
 
 impl ServerSideLocalFsHarness {
-    pub async fn new() -> Self {
+    pub async fn new(options: ServerSideHarnessOptions) -> Self {
         let tempdir = tempfile::tempdir().unwrap();
         let datasets_dir = tempdir.path().join("datasets");
         std::fs::create_dir(&datasets_dir).unwrap();
 
-        let catalog = dill::CatalogBuilder::new()
+        let mut base_catalog_builder = dill::CatalogBuilder::new();
+        base_catalog_builder
             .add::<SystemTimeSourceDefault>()
             .bind::<dyn SystemTimeSource, SystemTimeSourceDefault>()
             .add_builder(
                 builder_for::<DatasetRepositoryLocalFs>()
                     .with_root(datasets_dir)
-                    .with_multi_tenant(false),
+                    .with_multi_tenant(options.multi_tenant),
             )
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-            .add_value(CurrentAccountSubject::new_test())
-            .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
-            .bind::<dyn auth::DatasetActionAuthorizer, auth::AlwaysHappyDatasetActionAuthorizer>()
-            .build();
+            .add_value(server_authentication_mock())
+            .bind::<dyn auth::AuthenticationService, MockAuthenticationService>();
+
+        let base_catalog = base_catalog_builder.build();
 
         let api_server = TestAPIServer::new(
-            catalog.clone(),
+            create_web_user_catalog(&base_catalog, &options),
             Some(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1))),
             None,
+            options.multi_tenant,
         );
 
         Self {
             tempdir,
-            catalog,
+            base_catalog,
             api_server,
+            options,
         }
     }
 
@@ -82,22 +94,60 @@ impl ServerSideLocalFsHarness {
 
 #[async_trait::async_trait]
 impl ServerSideHarness for ServerSideLocalFsHarness {
-    fn dataset_repository(&self) -> Arc<dyn DatasetRepository> {
-        self.catalog.get_one::<dyn DatasetRepository>().unwrap()
+    fn operating_account_name(&self) -> Option<AccountName> {
+        if self.options.multi_tenant {
+            Some(AccountName::new_unchecked(SERVER_ACCOUNT_NAME))
+        } else {
+            None
+        }
     }
 
-    fn dataset_url(&self, dataset_name: &str) -> Url {
+    fn cli_dataset_repository(&self) -> Arc<dyn DatasetRepository> {
+        let cli_catalog = create_cli_user_catalog(&self.base_catalog);
+        cli_catalog.get_one::<dyn DatasetRepository>().unwrap()
+    }
+
+    fn dataset_url(&self, dataset_alias: &DatasetAlias) -> Url {
         let api_server_address = self.api_server_addr();
-        Url::from_str(format!("odf+http://{}/{}", api_server_address, dataset_name).as_str())
-            .unwrap()
+        Url::from_str(
+            if self.options.multi_tenant {
+                format!(
+                    "odf+http://{}/{}/{}",
+                    api_server_address,
+                    if let Some(account_name) = &dataset_alias.account_name {
+                        account_name.to_string()
+                    } else {
+                        panic!("Account name not specified in alias");
+                    },
+                    dataset_alias.dataset_name
+                )
+            } else {
+                format!(
+                    "odf+http://{}/{}",
+                    api_server_address, dataset_alias.dataset_name
+                )
+            }
+            .as_str(),
+        )
+        .unwrap()
     }
 
     fn dataset_layout(&self, dataset_handle: &DatasetHandle) -> DatasetLayout {
-        DatasetLayout::new(
+        let root_path = if self.options.multi_tenant {
+            self.internal_datasets_folder_path()
+                .join(
+                    if let Some(account_name) = &dataset_handle.alias.account_name {
+                        account_name.to_string()
+                    } else {
+                        panic!("Account name not specified in alias");
+                    },
+                )
+                .join(dataset_handle.id.cid.to_string())
+        } else {
             self.internal_datasets_folder_path()
                 .join(dataset_handle.alias.dataset_name.clone())
-                .as_path(),
-        )
+        };
+        DatasetLayout::new(root_path.as_path())
     }
 
     async fn api_server_run(self) -> Result<(), InternalError> {

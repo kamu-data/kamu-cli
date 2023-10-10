@@ -17,9 +17,10 @@ use internal_error::*;
 
 use super::common::PullImageProgress;
 use super::{CLIError, Command};
+use crate::config::JupyterConfig;
 use crate::explore::LivyServerImpl;
 use crate::output::*;
-use crate::{JupyterConfig, WorkspaceLayout};
+use crate::WorkspaceLayout;
 
 pub struct SqlServerLivyCommand {
     workspace_layout: Arc<WorkspaceLayout>,

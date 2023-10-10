@@ -528,6 +528,32 @@ pub fn cli() -> Command {
                             kamu log -o yaml --filter source org.example.data
                         "#
                     )),
+                Command::new("login")
+                    .about("Logs in to a remote Kamu server")
+                    .args([
+                        Arg::new("user")
+                            .long("user")
+                            .action(ArgAction::SetTrue)
+                            .help("Store access token in the user home folder rather than in the workspace"),
+                        Arg::new("server")
+                            .short('s')
+                            .long("server")
+                            .action(ArgAction::Set)
+                            .help("Custom remote server front-end URL (Kamu web platform is used by default)")
+                    ]),
+                Command::new("logout")
+                    .about("Logs out from a remote Kamu server")
+                    .args([
+                        Arg::new("user")
+                            .long("user")
+                            .action(ArgAction::SetTrue)
+                            .help("Drop access token stored in the user home folder rather than in the workspace"),
+                        Arg::new("server")
+                            .short('s')
+                            .long("server")
+                            .action(ArgAction::Set)
+                            .help("Custom remote server front-end URL (Kamu web platform is used by default)")
+                    ]),
                 Command::new("new")
                     .about("Creates a new dataset manifest from a template")
                     .args([

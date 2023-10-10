@@ -167,6 +167,7 @@ where
 
         Ok(GetExternalUrlResult {
             url: Url::parse(&res.uri().to_string()).int_err()?,
+            header_map: res.headers().clone(),
             expires_at: Some(expires_at.into()),
         })
     }
@@ -196,6 +197,7 @@ where
 
         Ok(GetExternalUrlResult {
             url: Url::parse(&res.uri().to_string()).int_err()?,
+            header_map: res.headers().clone(),
             expires_at: Some(expires_at.into()),
         })
     }

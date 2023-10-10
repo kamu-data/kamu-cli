@@ -17,9 +17,10 @@ use internal_error::*;
 
 use super::common::PullImageProgress;
 use super::{CLIError, Command};
+use crate::config::JupyterConfig;
 use crate::explore::NotebookServerImpl;
 use crate::output::OutputConfig;
-use crate::{JupyterConfig, WorkspaceLayout};
+use crate::WorkspaceLayout;
 
 pub struct NotebookCommand {
     workspace_layout: Arc<WorkspaceLayout>,

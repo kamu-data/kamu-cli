@@ -168,7 +168,7 @@ pub async fn test_create_dataset_from_snapshot(
         .build();
 
     let create_result = repo
-        .create_dataset_from_snapshot(None, snapshot.clone())
+        .create_dataset_from_snapshot(account_name.clone(), snapshot.clone())
         .await
         .unwrap();
 
@@ -198,7 +198,7 @@ pub async fn test_create_dataset_from_snapshot(
 pub async fn test_rename_dataset(repo: &dyn DatasetRepository, account_name: Option<AccountName>) {
     let alias_foo = DatasetAlias::new(account_name.clone(), DatasetName::new_unchecked("foo"));
     let alias_bar = DatasetAlias::new(account_name.clone(), DatasetName::new_unchecked("bar"));
-    let alias_baz = DatasetAlias::new(account_name, DatasetName::new_unchecked("baz"));
+    let alias_baz = DatasetAlias::new(account_name.clone(), DatasetName::new_unchecked("baz"));
 
     let snapshots = vec![
         MetadataFactory::dataset_snapshot()
@@ -213,7 +213,8 @@ pub async fn test_rename_dataset(repo: &dyn DatasetRepository, account_name: Opt
             .build(),
     ];
 
-    repo.create_datasets_from_snapshots(None, snapshots).await;
+    repo.create_datasets_from_snapshots(account_name.clone(), snapshots)
+        .await;
 
     assert_matches!(
         repo.rename_dataset(&alias_baz.as_local_ref(), &alias_foo.dataset_name)

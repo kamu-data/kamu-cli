@@ -18,7 +18,7 @@ use crate::utils::HttpFileServer;
 #[test_log::test(tokio::test)]
 async fn test_protocol() {
     let base_url = url::Url::parse("http://localhost:1234").unwrap();
-    let repo = ObjectRepositoryHttp::new(reqwest::Client::new(), base_url);
+    let repo = ObjectRepositoryHttp::new(reqwest::Client::new(), base_url, Default::default());
 
     assert_matches!(repo.protocol(), ObjectRepositoryProtocol::Http);
 }
@@ -29,7 +29,7 @@ async fn test_read_only() {
     let http_server = HttpFileServer::new(tmp_repo_dir.path());
     let base_url = url::Url::parse(&format!("http://{}/", http_server.local_addr())).unwrap();
     let _srv_handle = tokio::spawn(http_server.run());
-    let repo = ObjectRepositoryHttp::new(reqwest::Client::new(), base_url);
+    let repo = ObjectRepositoryHttp::new(reqwest::Client::new(), base_url, Default::default());
 
     assert_matches!(
         repo.insert_bytes(b"foo", InsertOpts::default()).await,
@@ -43,7 +43,7 @@ async fn test_bytes() {
     let http_server = HttpFileServer::new(tmp_repo_dir.path());
     let base_url = url::Url::parse(&format!("http://{}/", http_server.local_addr())).unwrap();
     let _srv_handle = tokio::spawn(http_server.run());
-    let repo = ObjectRepositoryHttp::new(reqwest::Client::new(), base_url);
+    let repo = ObjectRepositoryHttp::new(reqwest::Client::new(), base_url, Default::default());
 
     let hash_foo = Multihash::from_digest_sha3_256(b"foo");
     let hash_bar = Multihash::from_digest_sha3_256(b"bar");
@@ -75,7 +75,7 @@ async fn test_stream() {
     let http_server = HttpFileServer::new(tmp_repo_dir.path());
     let base_url = url::Url::parse(&format!("http://{}/", http_server.local_addr())).unwrap();
     let _srv_handle = tokio::spawn(http_server.run());
-    let repo = ObjectRepositoryHttp::new(reqwest::Client::new(), base_url);
+    let repo = ObjectRepositoryHttp::new(reqwest::Client::new(), base_url, Default::default());
 
     let hash_foobar = Multihash::from_digest_sha3_256(b"foobar");
 

@@ -215,7 +215,14 @@ pub enum ObjectType {
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct TransferUrl {
     pub url: Url,
+    pub headers: Vec<HeaderRow>,
     pub expires_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
+pub struct HeaderRow {
+    pub name: String,
+    pub value: String,
 }
 
 // Transfer URL

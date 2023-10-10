@@ -7,65 +7,41 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::str::FromStr;
-
 use kamu::domain::*;
-use kamu::testing::{DatasetTestHelper, MetadataFactory};
+use kamu::testing::DatasetTestHelper;
 use opendatafabric::*;
 
-use crate::harness::{
-    await_client_server_flow,
-    commit_add_data_event,
-    copy_folder_recursively,
-    ClientSideHarness,
-    ServerSideHarness,
-};
+use crate::harness::{await_client_server_flow, ClientSideHarness, ServerSideHarness};
+use crate::tests::tests_pull::scenarios::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_smart_pull_new_dataset<T: ServerSideHarness>(server_harness: T) {
-    let server_repo = server_harness.dataset_repository();
-    let create_result = server_repo
-        .create_dataset_from_snapshot(
-            None,
-            MetadataFactory::dataset_snapshot()
-                .name("foo")
-                .kind(DatasetKind::Root)
-                .push_event(MetadataFactory::set_polling_source().build())
-                .build(),
-        )
-        .await
-        .unwrap();
+pub(crate) async fn test_smart_pull_new_dataset<TServerHarness: ServerSideHarness>(
+    a_client_harness: ClientSideHarness,
+    a_server_harness: TServerHarness,
+) {
+    let scenario = SmartPullNewDatasetScenario::prepare(a_client_harness, a_server_harness).await;
 
-    let server_dataset_layout = server_harness.dataset_layout(&create_result.dataset_handle);
-
-    let dataset_ref = DatasetRef::from_str("foo").unwrap();
-
-    let commit_result =
-        commit_add_data_event(server_repo.as_ref(), &dataset_ref, &server_dataset_layout).await;
-
-    let client_harness = ClientSideHarness::new();
-    let client_dataset_layout = client_harness.dataset_layout("foo");
-
-    let foo_odf_url = server_harness.dataset_url("foo");
-    let foo_dataset_ref = DatasetRefRemote::from(&foo_odf_url);
-
-    let api_server_handle = server_harness.api_server_run();
+    let api_server_handle = scenario.server_harness.api_server_run();
     let client_handle = async {
-        let pull_result = client_harness
-            .pull_dataset_result(DatasetRefAny::from(foo_dataset_ref))
+        let pull_result = scenario
+            .client_harness
+            .pull_dataset_result(DatasetRefAny::from(scenario.server_dataset_ref))
             .await;
 
         assert_eq!(
             PullResult::Updated {
                 old_head: None,
-                new_head: commit_result.new_head,
+                new_head: scenario.server_commit_result.new_head,
                 num_blocks: 3
             },
             pull_result
         );
 
-        DatasetTestHelper::assert_datasets_in_sync(&server_dataset_layout, &client_dataset_layout);
+        DatasetTestHelper::assert_datasets_in_sync(
+            &scenario.server_dataset_layout,
+            &scenario.client_dataset_layout,
+        );
     };
 
     await_client_server_flow!(api_server_handle, client_handle);
@@ -73,48 +49,28 @@ pub async fn test_smart_pull_new_dataset<T: ServerSideHarness>(server_harness: T
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_smart_pull_existing_up_to_date_dataset<T: ServerSideHarness>(server_harness: T) {
-    let server_repo = server_harness.dataset_repository();
-    let create_result = server_repo
-        .create_dataset_from_snapshot(
-            None,
-            MetadataFactory::dataset_snapshot()
-                .name("foo")
-                .kind(DatasetKind::Root)
-                .push_event(MetadataFactory::set_polling_source().build())
-                .build(),
-        )
-        .await
-        .unwrap();
+pub(crate) async fn test_smart_pull_existing_up_to_date_dataset<
+    TServerHarness: ServerSideHarness,
+>(
+    a_client_harness: ClientSideHarness,
+    a_server_harness: TServerHarness,
+) {
+    let scenario =
+        SmartPullExistingUpToDateDatasetScenario::prepare(a_client_harness, a_server_harness).await;
 
-    let server_dataset_layout = server_harness.dataset_layout(&create_result.dataset_handle);
-
-    let dataset_ref = DatasetRef::from_str("foo").unwrap();
-
-    commit_add_data_event(server_repo.as_ref(), &dataset_ref, &server_dataset_layout).await;
-
-    let client_harness = ClientSideHarness::new();
-    let client_dataset_layout = client_harness.dataset_layout("foo");
-
-    // Hard folder synchronization
-    copy_folder_recursively(
-        &server_dataset_layout.root_dir,
-        &client_dataset_layout.root_dir,
-    )
-    .unwrap();
-
-    let foo_odf_url = server_harness.dataset_url("foo");
-    let foo_dataset_ref = DatasetRefRemote::from(&foo_odf_url);
-
-    let api_server_handle = server_harness.api_server_run();
+    let api_server_handle = scenario.server_harness.api_server_run();
     let client_handle = async {
-        let pull_result = client_harness
-            .pull_dataset_result(DatasetRefAny::from(foo_dataset_ref))
+        let pull_result = scenario
+            .client_harness
+            .pull_dataset_result(DatasetRefAny::from(scenario.server_dataset_ref))
             .await;
 
         assert_eq!(PullResult::UpToDate {}, pull_result);
 
-        DatasetTestHelper::assert_datasets_in_sync(&server_dataset_layout, &client_dataset_layout);
+        DatasetTestHelper::assert_datasets_in_sync(
+            &scenario.server_dataset_layout,
+            &scenario.client_dataset_layout,
+        );
     };
 
     await_client_server_flow!(api_server_handle, client_handle)
@@ -122,73 +78,33 @@ pub async fn test_smart_pull_existing_up_to_date_dataset<T: ServerSideHarness>(s
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_smart_pull_existing_evolved_dataset<T: ServerSideHarness>(server_harness: T) {
-    let server_repo = server_harness.dataset_repository();
-    let create_result = server_repo
-        .create_dataset_from_snapshot(
-            None,
-            MetadataFactory::dataset_snapshot()
-                .name("foo")
-                .kind(DatasetKind::Root)
-                .push_event(MetadataFactory::set_polling_source().build())
-                .build(),
-        )
-        .await
-        .unwrap();
+pub(crate) async fn test_smart_pull_existing_evolved_dataset<TServerHarness: ServerSideHarness>(
+    a_client_harness: ClientSideHarness,
+    a_server_harness: TServerHarness,
+) {
+    let scenario =
+        SmartPullExistingEvolvedDatasetScenario::prepare(a_client_harness, a_server_harness).await;
 
-    let server_dataset_layout = server_harness.dataset_layout(&create_result.dataset_handle);
-
-    let client_harness = ClientSideHarness::new();
-    let client_dataset_layout = client_harness.dataset_layout("foo");
-
-    // Hard folder synchronization
-    copy_folder_recursively(
-        &server_dataset_layout.root_dir,
-        &client_dataset_layout.root_dir,
-    )
-    .unwrap();
-
-    // Extend server-side dataset with new nodes
-
-    let dataset_ref = DatasetRef::from_str("foo").unwrap();
-
-    server_repo
-        .get_dataset(&dataset_ref)
-        .await
-        .unwrap()
-        .commit_event(
-            MetadataEvent::SetInfo(
-                MetadataFactory::set_info()
-                    .description("updated description")
-                    .build(),
-            ),
-            CommitOpts::default(),
-        )
-        .await
-        .unwrap();
-
-    let commit_result =
-        commit_add_data_event(server_repo.as_ref(), &dataset_ref, &server_dataset_layout).await;
-
-    let foo_odf_url = server_harness.dataset_url("foo");
-    let foo_dataset_ref = DatasetRefRemote::from(&foo_odf_url);
-
-    let api_server_handle = server_harness.api_server_run();
+    let api_server_handle = scenario.server_harness.api_server_run();
     let client_handle = async {
-        let pull_result = client_harness
-            .pull_dataset_result(DatasetRefAny::from(foo_dataset_ref))
+        let pull_result = scenario
+            .client_harness
+            .pull_dataset_result(DatasetRefAny::from(scenario.server_dataset_ref))
             .await;
 
         assert_eq!(
             PullResult::Updated {
-                old_head: Some(create_result.head),
-                new_head: commit_result.new_head,
+                old_head: Some(scenario.server_create_result.head),
+                new_head: scenario.server_commit_result.new_head,
                 num_blocks: 2
             },
             pull_result
         );
 
-        DatasetTestHelper::assert_datasets_in_sync(&server_dataset_layout, &client_dataset_layout);
+        DatasetTestHelper::assert_datasets_in_sync(
+            &scenario.server_dataset_layout,
+            &scenario.client_dataset_layout,
+        );
     };
 
     await_client_server_flow!(api_server_handle, client_handle)
@@ -196,58 +112,21 @@ pub async fn test_smart_pull_existing_evolved_dataset<T: ServerSideHarness>(serv
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_smart_pull_existing_advanced_dataset_fails<T: ServerSideHarness>(
-    server_harness: T,
+pub(crate) async fn test_smart_pull_existing_advanced_dataset_fails<
+    TServerHarness: ServerSideHarness,
+>(
+    a_client_harness: ClientSideHarness,
+    a_server_harness: TServerHarness,
 ) {
-    let server_repo = server_harness.dataset_repository();
-    let create_result = server_repo
-        .create_dataset_from_snapshot(
-            None,
-            MetadataFactory::dataset_snapshot()
-                .name("foo")
-                .kind(DatasetKind::Root)
-                .push_event(MetadataFactory::set_polling_source().build())
-                .build(),
-        )
-        .await
-        .unwrap();
+    let scenario =
+        SmartPullExistingAdvancedDatasetFailsScenario::prepare(a_client_harness, a_server_harness)
+            .await;
 
-    let server_dataset_layout = server_harness.dataset_layout(&create_result.dataset_handle);
-
-    let client_harness = ClientSideHarness::new();
-    let client_dataset_layout = client_harness.dataset_layout("foo");
-
-    // Hard folder synchronization
-    copy_folder_recursively(
-        &server_dataset_layout.root_dir,
-        &client_dataset_layout.root_dir,
-    )
-    .unwrap();
-
-    // Extend client-side dataset with new node
-    let client_repo = client_harness.dataset_repository();
-    client_repo
-        .get_dataset(&DatasetRef::from(DatasetName::try_from("foo").unwrap()))
-        .await
-        .unwrap()
-        .commit_event(
-            MetadataEvent::SetInfo(
-                MetadataFactory::set_info()
-                    .description("updated description")
-                    .build(),
-            ),
-            CommitOpts::default(),
-        )
-        .await
-        .unwrap();
-
-    let foo_odf_url = server_harness.dataset_url("foo");
-    let foo_dataset_ref = DatasetRefRemote::from(&foo_odf_url);
-
-    let api_server_handle = server_harness.api_server_run();
+    let api_server_handle = scenario.server_harness.api_server_run();
     let client_handle = async {
-        let pull_responses = client_harness
-            .pull_datasets(DatasetRefAny::from(foo_dataset_ref))
+        let pull_responses = scenario
+            .client_harness
+            .pull_datasets(DatasetRefAny::from(scenario.server_dataset_ref))
             .await;
 
         // TODO: try expecting better error message
@@ -259,60 +138,38 @@ pub async fn test_smart_pull_existing_advanced_dataset_fails<T: ServerSideHarnes
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_smart_pull_aborted_read_of_new_reread_succeeds<T: ServerSideHarness>(
-    server_harness: T,
+pub(crate) async fn test_smart_pull_aborted_read_of_new_reread_succeeds<
+    TServerHarness: ServerSideHarness,
+>(
+    a_client_harness: ClientSideHarness,
+    a_server_harness: TServerHarness,
 ) {
-    let server_repo = server_harness.dataset_repository();
-    let create_result = server_repo
-        .create_dataset_from_snapshot(
-            None,
-            MetadataFactory::dataset_snapshot()
-                .name("foo")
-                .kind(DatasetKind::Root)
-                .push_event(MetadataFactory::set_polling_source().build())
-                .build(),
-        )
-        .await
-        .unwrap();
-
-    let server_dataset_layout = server_harness.dataset_layout(&create_result.dataset_handle);
-
-    let dataset_ref = DatasetRef::from_str("foo").unwrap();
-
-    let commit_result =
-        commit_add_data_event(server_repo.as_ref(), &dataset_ref, &server_dataset_layout).await;
-
-    let client_harness = ClientSideHarness::new();
-    let client_dataset_layout = client_harness.dataset_layout("foo");
-
-    // Let's pretend that previous attempts uploaded some data files, but the rest
-    // was discarded. To mimic this, artifficially copy just the data folder,
-    // contaning a data block
-    copy_folder_recursively(
-        &server_dataset_layout.data_dir,
-        &client_dataset_layout.data_dir,
+    let scenario = SmartPullAbortedReadOfNewRereadSucceedsScenario::prepare(
+        a_client_harness,
+        a_server_harness,
     )
-    .unwrap();
+    .await;
 
-    let foo_odf_url = server_harness.dataset_url("foo");
-    let foo_dataset_ref = DatasetRefRemote::from(&foo_odf_url);
-
-    let api_server_handle = server_harness.api_server_run();
+    let api_server_handle = scenario.server_harness.api_server_run();
     let client_handle = async {
-        let pull_result = client_harness
-            .pull_dataset_result(DatasetRefAny::from(foo_dataset_ref))
+        let pull_result = scenario
+            .client_harness
+            .pull_dataset_result(DatasetRefAny::from(scenario.server_dataset_ref))
             .await;
 
         assert_eq!(
             PullResult::Updated {
                 old_head: None,
-                new_head: commit_result.new_head,
+                new_head: scenario.server_commit_result.new_head,
                 num_blocks: 3
             },
             pull_result
         );
 
-        DatasetTestHelper::assert_datasets_in_sync(&server_dataset_layout, &client_dataset_layout);
+        DatasetTestHelper::assert_datasets_in_sync(
+            &scenario.server_dataset_layout,
+            &scenario.client_dataset_layout,
+        );
     };
 
     await_client_server_flow!(api_server_handle, client_handle);
@@ -320,86 +177,38 @@ pub async fn test_smart_pull_aborted_read_of_new_reread_succeeds<T: ServerSideHa
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_smart_pull_aborted_read_of_existing_evolved_dataset_reread_succeeds<
-    T: ServerSideHarness,
+pub(crate) async fn test_smart_pull_aborted_read_of_existing_evolved_dataset_reread_succeeds<
+    TServerHarness: ServerSideHarness,
 >(
-    server_harness: T,
+    a_client_harness: ClientSideHarness,
+    a_server_harness: TServerHarness,
 ) {
-    let server_repo = server_harness.dataset_repository();
-    let create_result = server_repo
-        .create_dataset_from_snapshot(
-            None,
-            MetadataFactory::dataset_snapshot()
-                .name("foo")
-                .kind(DatasetKind::Root)
-                .push_event(MetadataFactory::set_polling_source().build())
-                .build(),
-        )
-        .await
-        .unwrap();
-
-    let server_dataset_layout = server_harness.dataset_layout(&create_result.dataset_handle);
-
-    let client_harness = ClientSideHarness::new();
-    let client_dataset_layout = client_harness.dataset_layout("foo");
-
-    // Hard folder synchronization
-    copy_folder_recursively(
-        &server_dataset_layout.root_dir,
-        &client_dataset_layout.root_dir,
+    let scenario = SmartPullAbortedReadOfExistingEvolvedRereadSucceedsScenario::prepare(
+        a_client_harness,
+        a_server_harness,
     )
-    .unwrap();
+    .await;
 
-    // Extend server-side dataset with new nodes
-
-    let dataset_ref = DatasetRef::from_str("foo").unwrap();
-
-    server_repo
-        .get_dataset(&dataset_ref)
-        .await
-        .unwrap()
-        .commit_event(
-            MetadataEvent::SetInfo(
-                MetadataFactory::set_info()
-                    .description("updated description")
-                    .build(),
-            ),
-            CommitOpts::default(),
-        )
-        .await
-        .unwrap();
-
-    let commit_result =
-        commit_add_data_event(server_repo.as_ref(), &dataset_ref, &server_dataset_layout).await;
-
-    // Let's pretend that previous attempts uploaded some data files, but the rest
-    // was discarded. To mimic this, artifficially copy just the data folder,
-    // contaning a data block
-    copy_folder_recursively(
-        &server_dataset_layout.data_dir,
-        &client_dataset_layout.data_dir,
-    )
-    .unwrap();
-
-    let foo_odf_url = server_harness.dataset_url("foo");
-    let foo_dataset_ref = DatasetRefRemote::from(&foo_odf_url);
-
-    let api_server_handle = server_harness.api_server_run();
+    let api_server_handle = scenario.server_harness.api_server_run();
     let client_handle = async {
-        let pull_result = client_harness
-            .pull_dataset_result(DatasetRefAny::from(foo_dataset_ref))
+        let pull_result = scenario
+            .client_harness
+            .pull_dataset_result(DatasetRefAny::from(scenario.server_dataset_ref))
             .await;
 
         assert_eq!(
             PullResult::Updated {
-                old_head: Some(create_result.head),
-                new_head: commit_result.new_head,
+                old_head: Some(scenario.server_create_result.head),
+                new_head: scenario.server_commit_result.new_head,
                 num_blocks: 2
             },
             pull_result
         );
 
-        DatasetTestHelper::assert_datasets_in_sync(&server_dataset_layout, &client_dataset_layout);
+        DatasetTestHelper::assert_datasets_in_sync(
+            &scenario.server_dataset_layout,
+            &scenario.client_dataset_layout,
+        );
     };
 
     await_client_server_flow!(api_server_handle, client_handle)

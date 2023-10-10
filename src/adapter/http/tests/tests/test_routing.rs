@@ -8,10 +8,10 @@
 // by the Apache License, Version 2.0.
 
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::sync::Arc;
 
 use ::serde::Deserialize;
 use axum::extract::{FromRequestParts, Path};
-use axum::http::StatusCode;
 use axum::routing::IntoMakeService;
 use axum::Router;
 use dill::builder_for;
@@ -86,9 +86,10 @@ where
     let app = axum::Router::new()
         .nest(
             path,
-            kamu_adapter_http::smart_transfer_protocol_routes()
+            kamu_adapter_http::smart_transfer_protocol_router()
                 .layer(kamu_adapter_http::DatasetResolverLayer::new(
                     identity_extractor,
+                    |_| false, /* does not mater for routing tests */
                 ))
                 .layer(axum::extract::Extension(catalog)),
         )
@@ -96,7 +97,7 @@ where
             tower::ServiceBuilder::new().layer(
                 tower_http::cors::CorsLayer::new()
                     .allow_origin(tower_http::cors::Any)
-                    .allow_methods(vec![axum::http::Method::GET, axum::http::Method::POST])
+                    .allow_methods(vec![http::Method::GET, http::Method::POST])
                     .allow_headers(tower_http::cors::Any),
             ),
         );
@@ -109,10 +110,13 @@ where
 /////////////////////////////////////////////////////////////////////////////////////////
 
 async fn setup_client(dataset_url: url::Url, head_expected: Multihash) {
-    let dataset = DatasetFactoryImpl::new(IpfsGateway::default())
-        .get_dataset(&dataset_url, false)
-        .await
-        .unwrap();
+    let dataset = DatasetFactoryImpl::new(
+        IpfsGateway::default(),
+        Arc::new(auth::DummyOdfServerAccessTokenResolver::new()),
+    )
+    .get_dataset(&dataset_url, false)
+    .await
+    .unwrap();
 
     let head_actual = dataset
         .as_metadata_chain()
@@ -251,7 +255,7 @@ async fn test_routing_err_invalid_identity_format() {
 
     let client = async move {
         let res = reqwest::get(dataset_url).await.unwrap();
-        assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+        assert_eq!(res.status(), http::StatusCode::BAD_REQUEST);
     };
 
     await_client_server_flow!(server, client);
@@ -273,7 +277,7 @@ async fn test_routing_err_dataset_not_found() {
 
     let client = async move {
         let res = reqwest::get(dataset_url).await.unwrap();
-        assert_eq!(res.status(), StatusCode::NOT_FOUND);
+        assert_eq!(res.status(), http::StatusCode::NOT_FOUND);
     };
 
     await_client_server_flow!(server, client);

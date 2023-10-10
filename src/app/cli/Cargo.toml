@@ -48,6 +48,7 @@ chrono-humanize = "0.2"  # Human readable durations
 clap = "4"
 clap_complete = "4"
 console = "0.15"  # Terminal colors
+ctrlc = "3" # Ctrl+C handler
 humansize = "2"  # Human readable data sizes
 indicatif = "0.17"  # Progress bars and spinners
 minus = { version = "5", features = ["static_output", "search"] }
@@ -61,9 +62,10 @@ arrow-flight = { version = "46", features = ["flight-sql-experimental"] }
 async-graphql = { version = "6", features = ["chrono", "url", "apollo_tracing"] }
 async-graphql-axum = "6"
 axum = { version = "0.6", features = ["ws"] }
-axum-extra = { version = "0.7", features = ["async-read-body"] }
+axum-extra = { version = "0.8", features = ["async-read-body"] }
 http = "0.2"
 hyper = "0.14"
+reqwest = { version = "0.11", default-features = false, features = [] }
 serde_json = "1"
 tonic = { version = "0.9", default-features = false }
 tower = "0.4"

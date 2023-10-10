@@ -7,63 +7,52 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::harness::ServerSideS3Harness;
+use crate::harness::{
+    ClientSideHarness,
+    ClientSideHarnessOptions,
+    ServerSideHarnessOptions,
+    ServerSideS3Harness,
+};
+use crate::tests::test_client_server_s3_harness_permutations;
 use crate::tests::tests_pull::test_smart_pull_shared;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(containerized)]
-#[test_log::test(tokio::test)]
-async fn test_smart_pull_s3_new_dataset() {
-    let server_harness = ServerSideS3Harness::new().await;
-    test_smart_pull_shared::test_smart_pull_new_dataset(server_harness).await;
-}
+test_client_server_s3_harness_permutations!(test_smart_pull_shared, test_smart_pull_new_dataset);
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(containerized)]
-#[test_log::test(tokio::test)]
-async fn test_smart_pull_s3_existing_up_to_date_dataset() {
-    let server_harness = ServerSideS3Harness::new().await;
-    test_smart_pull_shared::test_smart_pull_existing_up_to_date_dataset(server_harness).await;
-}
+test_client_server_s3_harness_permutations!(
+    test_smart_pull_shared,
+    test_smart_pull_existing_up_to_date_dataset
+);
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(containerized)]
-#[test_log::test(tokio::test)]
-async fn test_smart_pull_s3_existing_evolved_dataset() {
-    let server_harness = ServerSideS3Harness::new().await;
-    test_smart_pull_shared::test_smart_pull_existing_evolved_dataset(server_harness).await;
-}
+test_client_server_s3_harness_permutations!(
+    test_smart_pull_shared,
+    test_smart_pull_existing_evolved_dataset
+);
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(containerized)]
-#[test_log::test(tokio::test)]
-async fn test_smart_pull_s3_existing_advanced_dataset_fails() {
-    let server_harness = ServerSideS3Harness::new().await;
-    test_smart_pull_shared::test_smart_pull_existing_advanced_dataset_fails(server_harness).await;
-}
+test_client_server_s3_harness_permutations!(
+    test_smart_pull_shared,
+    test_smart_pull_existing_advanced_dataset_fails
+);
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(containerized)]
-#[test_log::test(tokio::test)]
-async fn test_smart_pull_s3_aborted_read_of_new_reread_succeeds() {
-    let server_harness = ServerSideS3Harness::new().await;
-    test_smart_pull_shared::test_smart_pull_aborted_read_of_new_reread_succeeds(server_harness)
-        .await;
-}
+test_client_server_s3_harness_permutations!(
+    test_smart_pull_shared,
+    test_smart_pull_aborted_read_of_new_reread_succeeds
+);
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(containerized)]
-#[test_log::test(tokio::test)]
-async fn test_smart_pull_s3_aborted_read_of_existing_evolved_dataset_reread_succeeds() {
-    let server_harness = ServerSideS3Harness::new().await;
-    test_smart_pull_shared::test_smart_pull_aborted_read_of_existing_evolved_dataset_reread_succeeds(server_harness)
-        .await;
-}
+test_client_server_s3_harness_permutations!(
+    test_smart_pull_shared,
+    test_smart_pull_aborted_read_of_existing_evolved_dataset_reread_succeeds
+);
 
 /////////////////////////////////////////////////////////////////////////////////////////

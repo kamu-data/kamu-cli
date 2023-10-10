@@ -16,11 +16,18 @@ use kamu::domain::*;
 use kamu::utils::smart_transfer_protocol::SmartTransferProtocolClient;
 use kamu::*;
 
-use crate::cli_commands;
 use crate::error::*;
 use crate::explore::TraceServer;
 use crate::output::*;
-use crate::services::*;
+use crate::{
+    accounts,
+    cli_commands,
+    config,
+    odf_server,
+    GcService,
+    WorkspaceLayout,
+    WorkspaceService,
+};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -45,7 +52,7 @@ pub async fn run(
     let workspace_svc = WorkspaceService::new(Arc::new(workspace_layout.clone()));
     let workspace_version = workspace_svc.workspace_version()?;
 
-    let current_account = AccountService::current_account_indication(
+    let current_account = accounts::AccountService::current_account_indication(
         &matches,
         workspace_svc.is_multi_tenant_workspace(),
     );
@@ -230,8 +237,8 @@ pub fn configure_base_catalog(
     b.add::<kamu_task_system_inmem::TaskSystemEventStoreInMemory>();
     b.bind::<dyn kamu_task_system_inmem::domain::TaskSystemEventStore, kamu_task_system_inmem::TaskSystemEventStoreInMemory>();
 
-    b.add::<AccountService>();
-    b.bind::<dyn auth::AuthenticationProvider, AccountService>();
+    b.add::<accounts::AccountService>();
+    b.bind::<dyn auth::AuthenticationProvider, accounts::AccountService>();
 
     // No Github login possible for single-tenant workspace
     if multi_tenant_workspace {
@@ -253,9 +260,15 @@ pub fn configure_base_catalog(
 pub fn configure_cli_catalog(base_catalog: &Catalog) -> CatalogBuilder {
     let mut b = CatalogBuilder::new_chained(base_catalog);
 
-    b.add::<ConfigService>();
+    b.add::<config::ConfigService>();
     b.add::<GcService>();
     b.add::<WorkspaceService>();
+
+    b.add::<odf_server::AccessTokenRegistryService>();
+    b.bind::<dyn auth::OdfServerAccessTokenResolver, odf_server::AccessTokenRegistryService>();
+    b.add::<odf_server::LoginService>();
+    b.add::<odf_server::CLIAccessTokenStore>();
+    b.bind::<dyn odf_server::AccessTokenStore, odf_server::CLIAccessTokenStore>();
 
     b
 }
@@ -264,9 +277,9 @@ pub fn configure_cli_catalog(base_catalog: &Catalog) -> CatalogBuilder {
 // Config
 /////////////////////////////////////////////////////////////////////////////////////////
 
-fn load_config(workspace_layout: &WorkspaceLayout) -> CLIConfig {
-    let config_svc = ConfigService::new(workspace_layout);
-    let config = config_svc.load_with_defaults(ConfigScope::Flattened);
+fn load_config(workspace_layout: &WorkspaceLayout) -> config::CLIConfig {
+    let config_svc = config::ConfigService::new(workspace_layout);
+    let config = config_svc.load_with_defaults(config::ConfigScope::Flattened);
 
     tracing::info!(?config, "Loaded configuration");
     config
@@ -274,7 +287,7 @@ fn load_config(workspace_layout: &WorkspaceLayout) -> CLIConfig {
 
 // Public only for tests
 pub fn register_config_in_catalog(
-    config: &CLIConfig,
+    config: &config::CLIConfig,
     catalog_builder: &mut CatalogBuilder,
     multi_tenant_workspace: bool,
 ) {
@@ -353,7 +366,7 @@ pub fn register_config_in_catalog(
             }
         }
 
-        catalog_builder.add_value(UsersConfig::single_tenant());
+        catalog_builder.add_value(config::UsersConfig::single_tenant());
     }
 }
 

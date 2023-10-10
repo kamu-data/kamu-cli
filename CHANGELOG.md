@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.145.0] - 2023-10-11
+### Added
+- Ability to login to a remote ODF server via CLI commands:
+   - `kamu login` command opens platform's frontend login form and collects access token on success
+   - `kamu logout` command drops previously saved access token
+   - tokens can be stored both in local workspace as well as in user home folder
+   - access tokens are attached as Bearer Authentication header in simple/smart protocol client requests
+- ODF server handlers for simple/smart protocols correctly implement authentication & authorization checks
+- ODF server URLs vary depending on multi-tenancy vs single-tenancy of dataset repository
+### Changed
+- Signifficantly reworked smart transfer protocol tests, support of multi-tenancy, authentication, authorization
+
+
 ## [0.144.1] - 2023-10-02
 ### Fixed
 - Flight SQL + JDBC connector showing empty result for `GROUP BY` statements

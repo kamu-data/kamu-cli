@@ -8,13 +8,15 @@
 // by the Apache License, Version 2.0.
 
 use kamu_adapter_graphql::ANONYMOUS_ACCESS_FORBIDDEN_MESSAGE;
-use kamu_core::CurrentAccountSubject;
+use kamu_core::{AnonymousAccountReason, CurrentAccountSubject};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub fn authentication_catalogs(base_catalog: &dill::Catalog) -> (dill::Catalog, dill::Catalog) {
     let catalog_anonymous = dill::CatalogBuilder::new_chained(&base_catalog)
-        .add_value(CurrentAccountSubject::anonymous())
+        .add_value(CurrentAccountSubject::anonymous(
+            AnonymousAccountReason::NoAuthenticationProvided,
+        ))
         .build();
 
     let catalog_authorized = dill::CatalogBuilder::new_chained(&base_catalog)

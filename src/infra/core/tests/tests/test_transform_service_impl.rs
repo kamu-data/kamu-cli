@@ -18,7 +18,7 @@ use kamu::*;
 use opendatafabric::*;
 use tempfile::TempDir;
 
-use crate::{mock_dataset_action_authorizer, mock_engine_provisioner, MockDatasetActionAuthorizer};
+use crate::mock_engine_provisioner;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -216,16 +216,15 @@ async fn test_get_next_operation() {
 
 #[test_log::test(tokio::test)]
 async fn test_transform_enforces_authorization() {
-    let mock_dataset_action_authorizer =
-        mock_dataset_action_authorizer::MockDatasetActionAuthorizer::new()
-            .expect_check_read_dataset(
-                DatasetAlias::new(None, DatasetName::new_unchecked("foo")),
-                1,
-            )
-            .expect_check_write_dataset(
-                DatasetAlias::new(None, DatasetName::new_unchecked("bar")),
-                1,
-            );
+    let mock_dataset_action_authorizer = MockDatasetActionAuthorizer::new()
+        .expect_check_read_dataset(
+            DatasetAlias::new(None, DatasetName::new_unchecked("foo")),
+            1,
+        )
+        .expect_check_write_dataset(
+            DatasetAlias::new(None, DatasetName::new_unchecked("bar")),
+            1,
+        );
 
     let harness = TransformTestHarness::new_custom(
         Arc::new(mock_dataset_action_authorizer),

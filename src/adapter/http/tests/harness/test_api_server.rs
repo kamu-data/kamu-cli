@@ -10,7 +10,6 @@
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
 use dill::Catalog;
-use opendatafabric::{DatasetAlias, DatasetName};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -22,32 +21,34 @@ pub struct TestAPIServer {
 }
 
 impl TestAPIServer {
-    pub fn new(catalog: Catalog, address: Option<IpAddr>, port: Option<u16>) -> Self {
-        use axum::extract::Path;
-
-        #[derive(serde::Deserialize)]
-        struct DatasetByName {
-            dataset_name: DatasetName,
-        }
-
+    pub fn new(
+        catalog: Catalog,
+        address: Option<IpAddr>,
+        port: Option<u16>,
+        multi_tenant: bool,
+    ) -> Self {
         let app = axum::Router::new()
             .nest(
-                "/:dataset_name",
-                kamu_adapter_http::smart_transfer_protocol_routes()
-                    .layer(kamu_adapter_http::DatasetResolverLayer::new(
-                        |Path(p): Path<DatasetByName>| {
-                            DatasetAlias::new(None, p.dataset_name).as_local_ref()
-                        },
-                    ))
-                    .layer(axum::extract::Extension(catalog)),
+                if multi_tenant {
+                    "/:account_name/:dataset_name"
+                } else {
+                    "/:dataset_name"
+                },
+                kamu_adapter_http::add_dataset_resolver_layer(
+                    kamu_adapter_http::smart_transfer_protocol_router(),
+                    multi_tenant,
+                ),
             )
             .layer(
-                tower::ServiceBuilder::new().layer(
-                    tower_http::cors::CorsLayer::new()
-                        .allow_origin(tower_http::cors::Any)
-                        .allow_methods(vec![axum::http::Method::GET, axum::http::Method::POST])
-                        .allow_headers(tower_http::cors::Any),
-                ),
+                tower::ServiceBuilder::new()
+                    .layer(
+                        tower_http::cors::CorsLayer::new()
+                            .allow_origin(tower_http::cors::Any)
+                            .allow_methods(vec![http::Method::GET, http::Method::POST])
+                            .allow_headers(tower_http::cors::Any),
+                    )
+                    .layer(axum::extract::Extension(catalog))
+                    .layer(kamu_adapter_http::AuthenticationLayer::new()),
             );
 
         let addr = SocketAddr::from((

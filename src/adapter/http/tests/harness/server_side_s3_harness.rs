@@ -19,41 +19,57 @@ use kamu::domain::{
     InternalError,
     ResultIntoInternal,
 };
-use kamu::testing::LocalS3Server;
+use kamu::testing::{LocalS3Server, MockAuthenticationService};
 use kamu::utils::s3_context::S3Context;
 use kamu::{DatasetLayout, DatasetRepositoryS3};
-use opendatafabric::DatasetHandle;
+use opendatafabric::{AccountName, DatasetAlias, DatasetHandle};
 use url::Url;
 
-use super::{ServerSideHarness, TestAPIServer};
+use super::{
+    create_cli_user_catalog,
+    create_web_user_catalog,
+    server_authentication_mock,
+    ServerSideHarness,
+    ServerSideHarnessOptions,
+    TestAPIServer,
+    SERVER_ACCOUNT_NAME,
+};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[allow(dead_code)]
-pub struct ServerSideS3Harness {
+pub(crate) struct ServerSideS3Harness {
     s3: LocalS3Server,
-    catalog: dill::Catalog,
+    base_catalog: dill::Catalog,
     api_server: TestAPIServer,
+    options: ServerSideHarnessOptions,
 }
 
 impl ServerSideS3Harness {
-    pub async fn new() -> Self {
+    pub async fn new(options: ServerSideHarnessOptions) -> Self {
         let s3 = LocalS3Server::new().await;
-        let catalog = dill::CatalogBuilder::new()
-            .add_value(s3_repo(&s3).await)
+
+        let mut base_catalog_builder = dill::CatalogBuilder::new();
+        base_catalog_builder
+            .add_value(s3_repo(&s3, options.multi_tenant).await)
             .bind::<dyn DatasetRepository, DatasetRepositoryS3>()
-            .build();
+            .add_value(server_authentication_mock())
+            .bind::<dyn auth::AuthenticationService, MockAuthenticationService>();
+
+        let base_catalog = base_catalog_builder.build();
 
         let api_server = TestAPIServer::new(
-            catalog.clone(),
+            create_web_user_catalog(&base_catalog, &options),
             Some(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1))),
             None,
+            options.multi_tenant,
         );
 
         Self {
             s3,
-            catalog,
+            base_catalog,
             api_server,
+            options,
         }
     }
 
@@ -68,14 +84,38 @@ impl ServerSideS3Harness {
 
 #[async_trait::async_trait]
 impl ServerSideHarness for ServerSideS3Harness {
-    fn dataset_repository(&self) -> Arc<dyn DatasetRepository> {
-        self.catalog.get_one::<dyn DatasetRepository>().unwrap()
+    fn operating_account_name(&self) -> Option<AccountName> {
+        if self.options.multi_tenant {
+            Some(AccountName::new_unchecked(SERVER_ACCOUNT_NAME))
+        } else {
+            None
+        }
     }
 
-    fn dataset_url(&self, dataset_name: &str) -> Url {
+    fn cli_dataset_repository(&self) -> Arc<dyn DatasetRepository> {
+        let cli_catalog = create_cli_user_catalog(&self.base_catalog);
+        cli_catalog.get_one::<dyn DatasetRepository>().unwrap()
+    }
+
+    fn dataset_url(&self, dataset_alias: &DatasetAlias) -> Url {
         let api_server_address = self.api_server_addr();
-        Url::from_str(format!("odf+http://{}/{}", api_server_address, dataset_name).as_str())
-            .unwrap()
+        Url::from_str(
+            if self.options.multi_tenant {
+                format!(
+                    "odf+http://{}/{}/{}",
+                    api_server_address,
+                    dataset_alias.account_name.as_ref().unwrap(),
+                    dataset_alias.dataset_name
+                )
+            } else {
+                format!(
+                    "odf+http://{}/{}",
+                    api_server_address, dataset_alias.dataset_name
+                )
+            }
+            .as_str(),
+        )
+        .unwrap()
     }
 
     fn dataset_layout(&self, dataset_handle: &DatasetHandle) -> DatasetLayout {
@@ -93,13 +133,13 @@ impl ServerSideHarness for ServerSideS3Harness {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-async fn s3_repo(s3: &LocalS3Server) -> DatasetRepositoryS3 {
+pub async fn s3_repo(s3: &LocalS3Server, multi_tenant: bool) -> DatasetRepositoryS3 {
     let s3_context = S3Context::from_url(&s3.url).await;
     DatasetRepositoryS3::new(
         s3_context,
         Arc::new(CurrentAccountSubject::new_test()),
         Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new()),
-        false,
+        multi_tenant,
     )
 }
 

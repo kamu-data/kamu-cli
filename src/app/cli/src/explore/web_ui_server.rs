@@ -16,7 +16,7 @@ use opendatafabric::AccountName;
 use rust_embed::RustEmbed;
 use serde::Serialize;
 
-use crate::{PasswordLoginCredentials, LOGIN_METHOD_PASSWORD};
+use crate::accounts;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -74,7 +74,7 @@ impl WebUIServer {
             panic!("error binding to {}: {}", addr, e);
         });
 
-        let login_credentials = PasswordLoginCredentials {
+        let login_credentials = accounts::PasswordLoginCredentials {
             login: current_account_name.to_string(),
             // Note: note a mistake, use identical login and password, equal to account name
             password: current_account_name.to_string(),
@@ -85,11 +85,10 @@ impl WebUIServer {
         let web_ui_config = WebUIConfig {
             api_server_gql_url: format!("http://{}/graphql", bound_addr.local_addr()),
             login_instructions: Some(WebUILoginInstructions {
-                login_method: LOGIN_METHOD_PASSWORD.to_string(),
-                login_credentials_json: serde_json::to_string::<PasswordLoginCredentials>(
-                    &login_credentials,
-                )
-                .unwrap(),
+                login_method: accounts::LOGIN_METHOD_PASSWORD.to_string(),
+                login_credentials_json:
+                    serde_json::to_string::<accounts::PasswordLoginCredentials>(&login_credentials)
+                        .unwrap(),
             }),
             feature_flags: WebUIFeatureFlags {
                 // No way to log out, always logging in a predefined user
@@ -150,7 +149,7 @@ async fn app_handler(uri: Uri) -> impl IntoResponse {
     };
 
     Response::builder()
-        .header(axum::http::header::CONTENT_TYPE, mime.as_ref())
+        .header(http::header::CONTENT_TYPE, mime.as_ref())
         .body(axum::body::Full::from(file.data))
         .unwrap()
 }

@@ -23,7 +23,7 @@ use thiserror::Error;
 // Test wrapper on top of CLI library
 pub struct Kamu {
     workspace_layout: WorkspaceLayout,
-    current_account: CurrentAccountIndication,
+    current_account: accounts::CurrentAccountIndication,
     workspace_path: PathBuf,
     _temp_dir: Option<tempfile::TempDir>,
 }
@@ -32,7 +32,7 @@ impl Kamu {
     pub fn new<P: Into<PathBuf>>(workspace_path: P) -> Self {
         let workspace_path = workspace_path.into();
         let workspace_layout = WorkspaceLayout::new(workspace_path.join(".kamu"));
-        let current_account = CurrentAccountIndication::new("kamu", "kamu", false);
+        let current_account = accounts::CurrentAccountIndication::new("kamu", "kamu", false);
         Self {
             workspace_layout,
             current_account,
@@ -127,7 +127,7 @@ impl Kamu {
             Arc::new(domain::auth::AlwaysHappyDatasetActionAuthorizer::new()),
             false,
         ));
-        let config_service = Arc::new(ConfigService::new(&self.workspace_layout));
+        let config_service = Arc::new(kamu_cli::config::ConfigService::new(&self.workspace_layout));
 
         let mut buf = Vec::new();
         CompleteCommand::new(

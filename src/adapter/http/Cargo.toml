@@ -23,13 +23,14 @@ opendatafabric = { workspace = true }
 kamu = { workspace = true }
 
 axum = { version = "0.6", features = ["ws", "headers"] }
-axum-extra = { version = "0.7", features = ["async-read-body"] }
+axum-extra = { version = "0.8", features = ["async-read-body"] }
 async-trait = "0.1"
 bytes = "1"
 chrono = { version = "0.4", features = ["serde"] }
 dill = "0.7"
 flate2 = "1"                                                           # GZip decoder
 futures = "0.3"
+http = "0.2"
 hyper = "0.14"
 reqwest = { version = "0.11", default-features = false, features = ["rustls-tls", "json", "stream", "gzip", "brotli", "deflate"] }
 serde = "1"
@@ -50,6 +51,7 @@ container-runtime = { workspace = true }
 
 env_logger = "0.10"
 fs_extra = "1.3"                                                    # Recursive folder copy
+paste = "1"
 serde = { version = "1", features = ["derive"] }
 tempfile = "3"
 test-group = { version = "1" }
@@ -58,3 +60,4 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tower-http = { version = "0.4", features = ["trace", "cors"] }
 rand = "0.8"
 sha3 = "0.10"
+mockall = "0.11"

@@ -142,6 +142,7 @@ pub struct ExternalTransferOpts {
 #[derive(Debug, Clone)]
 pub struct GetExternalUrlResult {
     pub url: Url,
+    pub header_map: http::HeaderMap,
     pub expires_at: Option<DateTime<Utc>>,
 }
 

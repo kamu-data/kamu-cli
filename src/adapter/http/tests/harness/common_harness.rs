@@ -8,25 +8,59 @@
 // by the Apache License, Version 2.0.
 
 use std::path::Path;
+use std::str::FromStr;
 use std::{fs, io};
 
 use kamu::domain::*;
 use kamu::testing::{AddDataBuilder, MetadataFactory};
 use kamu::{DatasetLayout, ObjectRepositoryLocalFS};
-use opendatafabric::{DatasetRef, MetadataEvent, Multihash};
+use opendatafabric::{AccountName, DatasetAlias, DatasetRef, MetadataEvent, Multihash};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn copy_folder_recursively(src: &Path, dst: &Path) -> io::Result<()> {
-    fs::create_dir_all(&dst)?;
-    let copy_options = fs_extra::dir::CopyOptions::new().content_only(true);
-    fs_extra::dir::copy(src, dst, &copy_options).unwrap();
+pub(crate) fn copy_folder_recursively(src: &Path, dst: &Path) -> io::Result<()> {
+    if src.exists() {
+        fs::create_dir_all(&dst)?;
+        let copy_options = fs_extra::dir::CopyOptions::new().content_only(true);
+        fs_extra::dir::copy(src, dst, &copy_options).unwrap();
+    }
     Ok(())
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn create_random_data(dataset_layout: &DatasetLayout) -> AddDataBuilder {
+pub(crate) fn copy_dataset_files(
+    src_layout: &DatasetLayout,
+    dst_layout: &DatasetLayout,
+) -> io::Result<()> {
+    // Don't copy `info`
+    copy_folder_recursively(&src_layout.blocks_dir, &dst_layout.blocks_dir)?;
+    copy_folder_recursively(&src_layout.checkpoints_dir, &dst_layout.checkpoints_dir)?;
+    copy_folder_recursively(&src_layout.data_dir, &dst_layout.data_dir)?;
+    copy_folder_recursively(&src_layout.refs_dir, &dst_layout.refs_dir)?;
+    Ok(())
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) async fn write_dataset_alias(dataset_layout: &DatasetLayout, alias: &DatasetAlias) {
+    if !dataset_layout.info_dir.is_dir() {
+        std::fs::create_dir_all(dataset_layout.info_dir.clone()).unwrap();
+    }
+
+    use tokio::io::AsyncWriteExt;
+
+    let alias_path = dataset_layout.info_dir.join("alias");
+    let mut alias_file = tokio::fs::File::create(alias_path).await.unwrap();
+    alias_file
+        .write_all(alias.to_string().as_bytes())
+        .await
+        .unwrap();
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) async fn create_random_data(dataset_layout: &DatasetLayout) -> AddDataBuilder {
     let (d_hash, d_size) = create_random_file(&dataset_layout.data_dir).await;
     let (c_hash, c_size) = create_random_file(&dataset_layout.checkpoints_dir).await;
     MetadataFactory::add_data()
@@ -58,7 +92,7 @@ async fn create_random_file(root: &Path) -> (Multihash, usize) {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn commit_add_data_event(
+pub(crate) async fn commit_add_data_event(
     dataset_repo: &dyn DatasetRepository,
     dataset_ref: &DatasetRef,
     dataset_layout: &DatasetLayout,
@@ -73,6 +107,20 @@ pub async fn commit_add_data_event(
         )
         .await
         .unwrap()
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) fn make_dataset_ref(
+    account_name: &Option<AccountName>,
+    dataset_name: &str,
+) -> DatasetRef {
+    match account_name {
+        Some(account_name) => {
+            DatasetRef::from_str(format!("{}/{}", account_name, dataset_name).as_str()).unwrap()
+        }
+        None => DatasetRef::from_str(dataset_name).unwrap(),
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

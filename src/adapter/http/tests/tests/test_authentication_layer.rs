@@ -10,7 +10,13 @@
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::str::FromStr;
 
-use kamu::domain::{CurrentAccountSubject, InternalError, ResultIntoInternal};
+use kamu::domain::auth::DEFAULT_ACCOUNT_NAME;
+use kamu::domain::{
+    AnonymousAccountReason,
+    CurrentAccountSubject,
+    InternalError,
+    ResultIntoInternal,
+};
 use url::Url;
 
 use crate::harness::await_client_server_flow;
@@ -19,7 +25,7 @@ use crate::harness::await_client_server_flow;
 
 #[test_log::test(tokio::test)]
 async fn test_anonymous_api_access() {
-    let server_harness = ServerHarness::new(None);
+    let server_harness = ServerHarness::new(kamu::testing::MockAuthenticationService::new(), None);
     let test_url = server_harness.test_url();
 
     let api_server_handle = server_harness.api_server_run();
@@ -27,8 +33,10 @@ async fn test_anonymous_api_access() {
     let client_handle = async {
         let client = reqwest::Client::new();
         let response = client.get(test_url).send().await.unwrap();
-        assert_eq!(reqwest::StatusCode::OK, response.status());
-        assert_eq!(ANONYMOUS_RETURN_TEXT, response.text().await.unwrap());
+        assert_eq!(
+            format!("{:?}", AnonymousAccountReason::NoAuthenticationProvided),
+            response.text().await.unwrap()
+        );
     };
 
     await_client_server_flow!(api_server_handle, client_handle);
@@ -37,8 +45,14 @@ async fn test_anonymous_api_access() {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_non_anonymous_api_access() {
-    let server_harness = ServerHarness::new(None);
+async fn test_non_anonymous_api_valid_access() {
+    let server_harness = ServerHarness::new(
+        kamu::testing::MockAuthenticationService::resolving_token(
+            kamu::domain::auth::DUMMY_ACCESS_TOKEN,
+            kamu::domain::auth::AccountInfo::dummy(),
+        ),
+        None,
+    );
     let test_url = server_harness.test_url();
 
     let api_server_handle = server_harness.api_server_run();
@@ -47,12 +61,11 @@ async fn test_non_anonymous_api_access() {
         let client = reqwest::Client::new();
         let response = client
             .get(test_url)
-            .bearer_auth(TEST_ACCESS_TOKEN)
+            .bearer_auth(kamu::domain::auth::DUMMY_ACCESS_TOKEN)
             .send()
             .await
             .unwrap();
-        assert_eq!(reqwest::StatusCode::OK, response.status());
-        assert_eq!(TEST_ACOUNT_NAME, response.text().await.unwrap());
+        assert_eq!(DEFAULT_ACCOUNT_NAME, response.text().await.unwrap());
     };
 
     await_client_server_flow!(api_server_handle, client_handle);
@@ -60,15 +73,70 @@ async fn test_non_anonymous_api_access() {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-const ANONYMOUS_RETURN_TEXT: &str = "Anonymous access detected";
-const TEST_ACCESS_TOKEN: &str = "some-token";
-const TEST_ACOUNT_NAME: &str = "some-account";
+#[test_log::test(tokio::test)]
+async fn test_non_anonymous_api_access_expired_token() {
+    let server_harness = ServerHarness::new(
+        kamu::testing::MockAuthenticationService::expired_token(),
+        None,
+    );
+    let test_url = server_harness.test_url();
+
+    let api_server_handle = server_harness.api_server_run();
+
+    let client_handle = async {
+        let client = reqwest::Client::new();
+        let response = client
+            .get(test_url)
+            .bearer_auth(kamu::domain::auth::DUMMY_ACCESS_TOKEN)
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(
+            format!("{:?}", AnonymousAccountReason::AuthenticationExpired),
+            response.text().await.unwrap()
+        );
+    };
+
+    await_client_server_flow!(api_server_handle, client_handle);
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_non_anonymous_api_access_invalid_token() {
+    let server_harness = ServerHarness::new(
+        kamu::testing::MockAuthenticationService::invalid_token(),
+        None,
+    );
+    let test_url = server_harness.test_url();
+
+    let api_server_handle = server_harness.api_server_run();
+
+    let client_handle = async {
+        let client = reqwest::Client::new();
+        let response = client
+            .get(test_url)
+            .bearer_auth(kamu::domain::auth::DUMMY_ACCESS_TOKEN)
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(
+            format!("{:?}", AnonymousAccountReason::AuthenticationInvalid),
+            response.text().await.unwrap()
+        );
+    };
+
+    await_client_server_flow!(api_server_handle, client_handle);
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
 const TEST_ENDPOINT: &str = "/foo";
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[allow(dead_code)]
-pub struct ServerHarness {
+struct ServerHarness {
     server: axum::Server<
         hyper::server::conn::AddrIncoming,
         axum::routing::IntoMakeService<axum::Router>,
@@ -76,15 +144,12 @@ pub struct ServerHarness {
 }
 
 impl ServerHarness {
-    pub fn new(initial_current_account_subject: Option<CurrentAccountSubject>) -> Self {
+    pub fn new(
+        authentication_service: kamu::testing::MockAuthenticationService,
+        initial_current_account_subject: Option<CurrentAccountSubject>,
+    ) -> Self {
         let mut catalog_builder = dill::CatalogBuilder::new();
-        catalog_builder.add_value(kamu::testing::MockAuthenticationService::resolving_token(TEST_ACCESS_TOKEN, kamu::domain::auth::AccountInfo {
-            account_id: opendatafabric::FAKE_ACCOUNT_ID.to_string(),
-            account_name: opendatafabric::AccountName::new_unchecked(TEST_ACOUNT_NAME),
-            account_type: kamu::domain::auth::AccountType::User,
-            display_name: TEST_ACOUNT_NAME.to_string(),
-            avatar_url: None,
-        })).bind::<dyn kamu::domain::auth::AuthenticationService, kamu::testing::MockAuthenticationService>();
+        catalog_builder.add_value(authentication_service).bind::<dyn kamu::domain::auth::AuthenticationService, kamu::testing::MockAuthenticationService>();
         if let Some(current_account_subject) = initial_current_account_subject {
             catalog_builder.add_value(current_account_subject);
         }
@@ -101,7 +166,7 @@ impl ServerHarness {
                     .layer(
                         tower_http::cors::CorsLayer::new()
                             .allow_origin(tower_http::cors::Any)
-                            .allow_methods(vec![axum::http::Method::GET, axum::http::Method::POST])
+                            .allow_methods(vec![http::Method::GET, http::Method::POST])
                             .allow_headers(tower_http::cors::Any),
                     )
                     .layer(axum::Extension(catalog))
@@ -132,11 +197,11 @@ impl ServerHarness {
     }
 
     async fn foo_handler(
-        catalog: axum::extract::Extension<dill::Catalog>,
-    ) -> Result<String, axum::http::StatusCode> {
-        let current_account_subject = catalog.0.get_one::<CurrentAccountSubject>().unwrap();
+        axum::extract::Extension(catalog): axum::extract::Extension<dill::Catalog>,
+    ) -> Result<String, http::StatusCode> {
+        let current_account_subject = catalog.get_one::<CurrentAccountSubject>().unwrap();
         match current_account_subject.as_ref() {
-            CurrentAccountSubject::Anonymous(_) => Ok(ANONYMOUS_RETURN_TEXT.to_string()),
+            CurrentAccountSubject::Anonymous(r) => Ok(format!("{:?}", r)),
             CurrentAccountSubject::Logged(l) => Ok(l.account_name.to_string()),
         }
     }

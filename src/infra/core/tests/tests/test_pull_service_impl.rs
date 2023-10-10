@@ -18,7 +18,6 @@ use kamu::testing::*;
 use kamu::*;
 use opendatafabric::*;
 
-use crate::mock_dataset_action_authorizer::MockDatasetActionAuthorizer;
 use crate::utils::DummySmartTransferProtocolClient;
 
 macro_rules! n {
@@ -241,7 +240,10 @@ async fn create_graph_remote(
         reg.clone(),
         dataset_repo,
         Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new()),
-        Arc::new(DatasetFactoryImpl::new(IpfsGateway::default())),
+        Arc::new(DatasetFactoryImpl::new(
+            IpfsGateway::default(),
+            Arc::new(auth::DummyOdfServerAccessTokenResolver::new()),
+        )),
         Arc::new(DummySmartTransferProtocolClient::new()),
         Arc::new(kamu::utils::ipfs_wrapper::IpfsClient::default()),
     );

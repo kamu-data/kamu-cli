@@ -12,13 +12,10 @@ use std::sync::Arc;
 
 use dill::Catalog;
 use internal_error::*;
+use kamu::domain::{AnonymousAccountReason, CurrentAccountSubject};
 use kamu_task_system_inmem::domain::TaskExecutor;
 
-// Extractor of dataset identity for smart transfer protocol
-#[derive(serde::Deserialize)]
-struct DatasetByName {
-    dataset_name: opendatafabric::DatasetName,
-}
+/////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct APIServer {
     server: axum::Server<
@@ -29,8 +26,13 @@ pub struct APIServer {
 }
 
 impl APIServer {
-    pub fn new(base_catalog: Catalog, address: Option<IpAddr>, port: Option<u16>) -> Self {
-        use axum::extract::{Extension, Path};
+    pub fn new(
+        base_catalog: Catalog,
+        multi_tenant_workspace: bool,
+        address: Option<IpAddr>,
+        port: Option<u16>,
+    ) -> Self {
+        use axum::extract::Extension;
 
         let task_executor = base_catalog.get_one().unwrap();
 
@@ -42,12 +44,19 @@ impl APIServer {
                 "/graphql",
                 axum::routing::get(graphql_playground).post(graphql_handler),
             )
+            .route(
+                "/platform/token/validate",
+                axum::routing::get(platform_token_validate_handler),
+            )
             .nest(
-                "/:dataset_name",
-                kamu_adapter_http::smart_transfer_protocol_routes().layer(
-                    kamu_adapter_http::DatasetResolverLayer::new(|Path(p): Path<DatasetByName>| {
-                        p.dataset_name.as_local_ref()
-                    }),
+                if multi_tenant_workspace {
+                    "/:account_name/:dataset_name"
+                } else {
+                    "/:dataset_name"
+                },
+                kamu_adapter_http::add_dataset_resolver_layer(
+                    kamu_adapter_http::smart_transfer_protocol_router(),
+                    multi_tenant_workspace,
                 ),
             )
             .layer(
@@ -89,6 +98,8 @@ impl APIServer {
     }
 }
 
+/////////////////////////////////////////////////////////////////////////////////////////
+
 async fn root() -> impl axum::response::IntoResponse {
     axum::response::Html(
         r#"
@@ -100,6 +111,8 @@ async fn root() -> impl axum::response::IntoResponse {
     )
 }
 
+/////////////////////////////////////////////////////////////////////////////////////////
+
 async fn graphql_handler(
     schema: axum::extract::Extension<kamu_adapter_graphql::Schema>,
     catalog: axum::extract::Extension<dill::Catalog>,
@@ -109,8 +122,41 @@ async fn graphql_handler(
     schema.execute(graphql_request).await.into()
 }
 
+/////////////////////////////////////////////////////////////////////////////////////////
+
 async fn graphql_playground() -> impl axum::response::IntoResponse {
     axum::response::Html(async_graphql::http::playground_source(
         async_graphql::http::GraphQLPlaygroundConfig::new("/graphql"),
     ))
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+async fn platform_token_validate_handler(
+    catalog: axum::extract::Extension<dill::Catalog>,
+) -> axum::response::Response {
+    let current_account_subject = catalog.get_one::<CurrentAccountSubject>().unwrap();
+
+    match current_account_subject.as_ref() {
+        CurrentAccountSubject::Logged(_) => {
+            return axum::response::Response::builder()
+                .status(http::StatusCode::OK)
+                .body(Default::default())
+                .unwrap()
+        }
+        CurrentAccountSubject::Anonymous(reason) => {
+            return axum::response::Response::builder()
+                .status(match reason {
+                    AnonymousAccountReason::AuthenticationExpired => http::StatusCode::UNAUTHORIZED,
+                    AnonymousAccountReason::AuthenticationInvalid => http::StatusCode::BAD_REQUEST,
+                    AnonymousAccountReason::NoAuthenticationProvided => {
+                        http::StatusCode::BAD_REQUEST
+                    }
+                })
+                .body(Default::default())
+                .unwrap();
+        }
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////

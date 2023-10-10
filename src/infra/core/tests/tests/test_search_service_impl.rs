@@ -42,7 +42,10 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
         remote_repo_reg.clone(),
         dataset_repo.clone(),
         dataset_action_authorizer.clone(),
-        Arc::new(DatasetFactoryImpl::new(IpfsGateway::default())),
+        Arc::new(DatasetFactoryImpl::new(
+            IpfsGateway::default(),
+            Arc::new(auth::DummyOdfServerAccessTokenResolver::new()),
+        )),
         Arc::new(DummySmartTransferProtocolClient::new()),
         Arc::new(kamu::utils::ipfs_wrapper::IpfsClient::default()),
     );

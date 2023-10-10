@@ -67,6 +67,7 @@ impl std::fmt::Display for DatasetAction {
 pub enum DatasetActionUnauthorizedError {
     #[error(transparent)]
     Access(AccessError),
+
     #[error(transparent)]
     Internal(InternalError),
 }

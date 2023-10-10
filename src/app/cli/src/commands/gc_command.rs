@@ -10,7 +10,7 @@
 use std::sync::Arc;
 
 use super::{CLIError, Command};
-use crate::services::GcService;
+use crate::GcService;
 
 pub struct GcCommand {
     gc_service: Arc<GcService>,

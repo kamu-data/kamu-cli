@@ -10,12 +10,12 @@
 use std::sync::Arc;
 
 use domain::{auth, CurrentAccountSubject};
+use kamu::testing::MockDatasetActionAuthorizer;
 use kamu::*;
 use opendatafabric::AccountName;
 use tempfile::TempDir;
 
 use super::test_dataset_repository_shared;
-use crate::MockDatasetActionAuthorizer;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 

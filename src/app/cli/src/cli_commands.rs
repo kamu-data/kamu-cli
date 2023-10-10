@@ -9,10 +9,10 @@
 
 use kamu::domain::CurrentAccountSubject;
 use opendatafabric::*;
+use url::Url;
 
 use crate::commands::*;
-use crate::services::{AccountService, WorkspaceService};
-use crate::CommandInterpretationFailed;
+use crate::{accounts, odf_server, CommandInterpretationFailed, WorkspaceService};
 
 pub fn get_command(
     base_catalog: &dill::Catalog,
@@ -25,7 +25,7 @@ pub fn get_command(
             Box::new(AddCommand::new(
                 cli_catalog.get_one()?,
                 cli_catalog.get_one()?,
-                AccountService::current_account_indication(
+                accounts::AccountService::current_account_indication(
                     &arg_matches,
                     workspace_svc.is_multi_tenant_workspace(),
                 ),
@@ -166,11 +166,11 @@ pub fn get_command(
             Box::new(ListCommand::new(
                 cli_catalog.get_one()?,
                 cli_catalog.get_one()?,
-                AccountService::current_account_indication(
+                accounts::AccountService::current_account_indication(
                     &arg_matches,
                     workspace_svc.is_multi_tenant_workspace(),
                 ),
-                AccountService::related_account_indication(submatches),
+                accounts::AccountService::related_account_indication(submatches),
                 cli_catalog.get_one()?,
                 submatches.get_count("wide"),
             ))
@@ -186,6 +186,32 @@ pub fn get_command(
             submatches.get_one("filter").map(String::as_str),
             *(submatches.get_one("limit").unwrap()),
             cli_catalog.get_one()?,
+        )),
+        Some(("login", submatches)) => Box::new(LoginCommand::new(
+            cli_catalog.get_one()?,
+            cli_catalog.get_one()?,
+            cli_catalog.get_one()?,
+            if submatches.get_flag("user") {
+                odf_server::AccessTokenStoreScope::User
+            } else {
+                odf_server::AccessTokenStoreScope::Workspace
+            },
+            // TODO: improve URL parser
+            submatches
+                .get_one::<String>("server")
+                .map(|s| Url::parse(s).unwrap()),
+        )),
+        Some(("logout", submatches)) => Box::new(LogoutCommand::new(
+            cli_catalog.get_one()?,
+            if submatches.get_flag("user") {
+                odf_server::AccessTokenStoreScope::User
+            } else {
+                odf_server::AccessTokenStoreScope::Workspace
+            },
+            // TODO: improve URL parser
+            submatches
+                .get_one::<String>("server")
+                .map(|s| Url::parse(s).unwrap()),
         )),
         Some(("new", submatches)) => Box::new(NewDatasetCommand::new(
             submatches.get_one::<DatasetName>("name").unwrap().clone(),
@@ -392,12 +418,16 @@ pub fn get_command(
                 Box::new(UpgradeWorkspaceCommand::new(cli_catalog.get_one()?))
             }
             Some(("api-server", server_matches)) => match server_matches.subcommand() {
-                None => Box::new(APIServerRunCommand::new(
-                    base_catalog.clone(), // TODO: Currently very expensive!
-                    cli_catalog.get_one()?,
-                    server_matches.get_one("address").map(|a| *a),
-                    server_matches.get_one("http-port").map(|p| *p),
-                )),
+                None => {
+                    let workspace_svc = cli_catalog.get_one::<WorkspaceService>()?;
+                    Box::new(APIServerRunCommand::new(
+                        base_catalog.clone(), // TODO: Currently very expensive!
+                        workspace_svc.is_multi_tenant_workspace(),
+                        cli_catalog.get_one()?,
+                        server_matches.get_one("address").map(|a| *a),
+                        server_matches.get_one("http-port").map(|p| *p),
+                    ))
+                }
                 Some(("gql-query", query_matches)) => Box::new(APIServerGqlQueryCommand::new(
                     base_catalog.clone(), // TODO: Currently very expensive!
                     query_matches.get_one("query").map(String::as_str).unwrap(),
