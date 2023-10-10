@@ -1,113 +1,119 @@
 name: build
 on:
-  push:
-    paths-ignore:
-      - "docs/**"
-      - "examples/**"
-      - "images/**"
-      - "**.md"
-      - "**.ipynb"
-  # manual trigger
-  workflow_dispatch: {}
+    push:
+        paths-ignore:
+            - "docs/**"
+            - "examples/**"
+            - "images/**"
+            - "**.md"
+            - "**.ipynb"
+    # manual trigger
+    workflow_dispatch: {}
 env:
-  RUST_LOG: "debug"
-  RUST_LOG_SPAN_EVENTS: "new,close"
-  RUST_BACKTRACE: "1"
+    RUST_LOG: "debug"
+    RUST_LOG_SPAN_EVENTS: "new,close"
+    RUST_BACKTRACE: "1"
 jobs:
-  lint_fmt:
-    name: Lint / Formatting
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions-rs/toolchain@v1
-        with:
-          components: rustfmt
-      - name: cargo fmt --check
-        uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: --check
-      - name: license headers
-        run: |
-          cargo test -p kamu-repo-tools -- license_header
+    lint_fmt:
+        name: Lint / Formatting
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v3
+            - uses: actions-rs/toolchain@v1
+              with:
+                  components: rustfmt
+            - name: cargo fmt --check
+              uses: actions-rs/cargo@v1
+              with:
+                  command: fmt
+                  args: --check
+            - name: license headers
+              run: |
+                  cargo test -p kamu-repo-tools -- license_header
 
-  lint_deps:
-    name: Lint / Dependencies
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions-rs/toolchain@v1
-      - run: cargo install cargo-deny
-      - run: cargo deny check
+    lint_deps:
+        name: Lint / Dependencies
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v3
+            - uses: actions-rs/toolchain@v1
+            - run: cargo install cargo-deny
+            - run: cargo deny check
 
-  test_linux:
-    name: Test / Linux
-    runs-on: ubuntu-latest
-    env:
-      CARGO_FLAGS: --profile ci --features ftp
-      NEXTEST_FLAGS: --cargo-profile ci --features ftp
-    steps:
-      - uses: ibnesayeed/setup-ipfs@master
-        with:
-          ipfs_version: "0.19"
-      - uses: actions/checkout@v3
-      - uses: actions-rs/toolchain@v1
-      - uses: swatinem/rust-cache@v2
-        with:
-          cache-on-failure: true
-      - name: Install cargo tools
-        run: |
-          cargo install --locked cargo-nextest
-      - name: Configure podman runtime
-        run: |
-          echo '{ "kind": "CLIConfig", "version": 1, "content": {"engine": { "runtime": "podman" } } }' > ~/.kamuconfig
-      - name: build
-        run: cargo test ${{ env.CARGO_FLAGS }} --no-run
-      - name: pull test images
-        run: cargo nextest run ${{ env.NEXTEST_FLAGS }} -E 'test(::setup::)' --no-capture
-      - name: run tests
-        run: cargo nextest run ${{ env.NEXTEST_FLAGS }}
-      - name: check git diff  # Ensures all generated files are up-to-date
-        run: git diff && git diff-index --quiet HEAD
+    test_linux:
+        name: Test / Linux
+        runs-on: ubuntu-latest
+        env:
+            CARGO_FLAGS: --profile ci --features ftp
+            NEXTEST_FLAGS: --cargo-profile ci --features ftp
+        steps:
+            - name: Maximize build space
+              uses: easimon/maximize-build-space@master
+              with:
+                  root-reserve-mb: 512
+                  swap-size-mb: 1024
+                  remove-dotnet: "true"
+            - uses: ibnesayeed/setup-ipfs@master
+              with:
+                  ipfs_version: "0.19"
+            - uses: actions/checkout@v3
+            - uses: actions-rs/toolchain@v1
+            - uses: swatinem/rust-cache@v2
+              with:
+                  cache-on-failure: true
+            - name: Install cargo tools
+              run: |
+                  cargo install --locked cargo-nextest
+            - name: Configure podman runtime
+              run: |
+                  echo '{ "kind": "CLIConfig", "version": 1, "content": {"engine": { "runtime": "podman" } } }' > ~/.kamuconfig
+            - name: build
+              run: cargo test ${{ env.CARGO_FLAGS }} --no-run
+            - name: pull test images
+              run: cargo nextest run ${{ env.NEXTEST_FLAGS }} -E 'test(::setup::)' --no-capture
+            - name: run tests
+              run: cargo nextest run ${{ env.NEXTEST_FLAGS }}
+            - name: check git diff # Ensures all generated files are up-to-date
+              run: git diff && git diff-index --quiet HEAD
 
-  test_macos:
-    name: Test / MacOS
-    runs-on: macos-latest
-    env:
-      CARGO_FLAGS: --profile ci
-      NEXTEST_FLAGS: --cargo-profile ci -E '!test(::containerized::)'
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions-rs/toolchain@v1
-      - uses: swatinem/rust-cache@v2
-        with:
-          cache-on-failure: true
-      - name: Install cargo tools
-        run: |
-          cargo install --locked cargo-nextest
-      - name: build
-        run: cargo test ${{ env.CARGO_FLAGS }} --no-run
-      - name: run tests
-        run: cargo nextest run ${{ env.NEXTEST_FLAGS }}
+    test_macos:
+        name: Test / MacOS
+        runs-on: macos-latest
+        env:
+            CARGO_FLAGS: --profile ci
+            NEXTEST_FLAGS: --cargo-profile ci -E '!test(::containerized::)'
+        steps:
+            - uses: actions/checkout@v3
+            - uses: actions-rs/toolchain@v1
+            - uses: swatinem/rust-cache@v2
+              with:
+                  cache-on-failure: true
+            - name: Install cargo tools
+              run: |
+                  cargo install --locked cargo-nextest
+            - name: build
+              run: cargo test ${{ env.CARGO_FLAGS }} --no-run
+            - name: run tests
+              run: cargo nextest run ${{ env.NEXTEST_FLAGS }}
 
-  test_windows:
-    name: Test / Windows
-    runs-on: windows-latest
-    env:
-      CARGO_FLAGS: --profile ci
-      # TODO: FIXME: DataFusion tests are temporarily disabled
-      # See: https://github.com/kamu-data/kamu-cli/issues/226
-      NEXTEST_FLAGS: --cargo-profile ci -E 'not (test(::containerized::) | test(::datafusion::))'
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions-rs/toolchain@v1
-      - uses: swatinem/rust-cache@v2
-        with:
-          cache-on-failure: true
-      - name: Install cargo tools
-        run: |
-          cargo install --locked cargo-nextest
-      - name: build
-        run: cargo test ${{ env.CARGO_FLAGS }} --no-run
-      - name: run tests
-        run: cargo nextest run ${{ env.NEXTEST_FLAGS }}
+    test_windows:
+        name: Test / Windows
+        runs-on: windows-latest
+        env:
+            CARGO_FLAGS: --profile ci
+            # TODO: FIXME: DataFusion tests are temporarily disabled
+            # See: https://github.com/kamu-data/kamu-cli/issues/226
+            NEXTEST_FLAGS: --cargo-profile ci -E 'not (test(::containerized::) | test(::datafusion::))'
+        steps:
+            - uses: actions/checkout@v3
+            - uses: actions-rs/toolchain@v1
+            - uses: swatinem/rust-cache@v2
+              with:
+                  cache-on-failure: true
+            - name: Install cargo tools
+              run: |
+                  cargo install --locked cargo-nextest
+            - name: build
+              run: cargo test ${{ env.CARGO_FLAGS }} --no-run
+            - name: run tests
+              run: cargo nextest run ${{ env.NEXTEST_FLAGS }}
