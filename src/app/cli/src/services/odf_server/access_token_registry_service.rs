@@ -22,7 +22,7 @@ use crate::WorkspaceLayout;
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
-type OdfServerAccessTokenRegistry = Vec<ServerAccessTokensRecord>;
+pub type OdfServerAccessTokenRegistry = Vec<ServerAccessTokensRecord>;
 
 pub struct AccessTokenRegistryService {
     storage: Arc<dyn AccessTokenStore>,
