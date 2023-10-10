@@ -19,9 +19,25 @@ use opendatafabric::{AccountName, DatasetAlias, DatasetRef, MetadataEvent, Multi
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) fn copy_folder_recursively(src: &Path, dst: &Path) -> io::Result<()> {
-    fs::create_dir_all(&dst)?;
-    let copy_options = fs_extra::dir::CopyOptions::new().content_only(true);
-    fs_extra::dir::copy(src, dst, &copy_options).unwrap();
+    if src.exists() {
+        fs::create_dir_all(&dst)?;
+        let copy_options = fs_extra::dir::CopyOptions::new().content_only(true);
+        fs_extra::dir::copy(src, dst, &copy_options).unwrap();
+    }
+    Ok(())
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) fn copy_dataset_files(
+    src_layout: &DatasetLayout,
+    dst_layout: &DatasetLayout,
+) -> io::Result<()> {
+    // Don't copy `info`
+    copy_folder_recursively(&src_layout.blocks_dir, &dst_layout.blocks_dir)?;
+    copy_folder_recursively(&src_layout.checkpoints_dir, &dst_layout.checkpoints_dir)?;
+    copy_folder_recursively(&src_layout.data_dir, &dst_layout.data_dir)?;
+    copy_folder_recursively(&src_layout.refs_dir, &dst_layout.refs_dir)?;
     Ok(())
 }
 

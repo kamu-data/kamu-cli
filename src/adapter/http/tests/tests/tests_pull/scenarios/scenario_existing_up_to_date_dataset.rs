@@ -14,7 +14,7 @@ use opendatafabric::*;
 
 use crate::harness::{
     commit_add_data_event,
-    copy_folder_recursively,
+    copy_dataset_files,
     make_dataset_ref,
     write_dataset_alias,
     ClientSideHarness,
@@ -65,11 +65,7 @@ impl<TServerHarness: ServerSideHarness> SmartPullExistingUpToDateDatasetScenario
             client_harness.dataset_layout(&server_create_result.dataset_handle.id, "foo");
 
         // Hard folder synchronization
-        copy_folder_recursively(
-            &server_dataset_layout.root_dir,
-            &client_dataset_layout.root_dir,
-        )
-        .unwrap();
+        copy_dataset_files(&server_dataset_layout, &client_dataset_layout).unwrap();
 
         let foo_name = DatasetName::new_unchecked("foo");
         write_dataset_alias(

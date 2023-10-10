@@ -63,12 +63,20 @@ pub fn add_dataset_resolver_layer(
                 opendatafabric::DatasetAlias::new(Some(p.account_name), p.dataset_name)
                     .into_local_ref()
             },
+            is_dataset_optional_for_request,
         ))
     } else {
-        dataset_router.layer(DatasetResolverLayer::new(|Path(p): Path<DatasetByName>| {
-            p.dataset_name.as_local_ref()
-        }))
+        dataset_router.layer(DatasetResolverLayer::new(
+            |Path(p): Path<DatasetByName>| p.dataset_name.as_local_ref(),
+            is_dataset_optional_for_request,
+        ))
     }
+}
+
+/////////////////////////////////////////////////////////////////////////////////
+
+fn is_dataset_optional_for_request(request: &http::Request<hyper::Body>) -> bool {
+    request.uri().path() == "/push"
 }
 
 /////////////////////////////////////////////////////////////////////////////////

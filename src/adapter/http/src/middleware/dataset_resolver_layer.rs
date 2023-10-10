@@ -24,41 +24,49 @@ use crate::axum_utils::*;
 
 /////////////////////////////////////////////////////////////////////////////////
 
-pub struct DatasetResolverLayer<IdExt, Extractor> {
+pub struct DatasetResolverLayer<IdExt, Extractor, DatasetOptPred> {
     identity_extractor: IdExt,
+    dataset_optionality_predicate: DatasetOptPred,
     _ex: PhantomData<Extractor>,
 }
 
 // Implementing manually since derive macro thinks Extractor has to be Clone too
-impl<IdExt, Extractor> Clone for DatasetResolverLayer<IdExt, Extractor>
+impl<IdExt, Extractor, DatasetOptPred> Clone
+    for DatasetResolverLayer<IdExt, Extractor, DatasetOptPred>
 where
     IdExt: Clone,
+    DatasetOptPred: Clone,
 {
     fn clone(&self) -> Self {
         Self {
             identity_extractor: self.identity_extractor.clone(),
+            dataset_optionality_predicate: self.dataset_optionality_predicate.clone(),
             _ex: PhantomData,
         }
     }
 }
 
-impl<IdExt, Extractor> DatasetResolverLayer<IdExt, Extractor>
+impl<IdExt, Extractor, DatasetOptPred> DatasetResolverLayer<IdExt, Extractor, DatasetOptPred>
 where
     IdExt: Fn(Extractor) -> DatasetRef,
+    DatasetOptPred: Fn(&http::Request<Body>) -> bool,
 {
-    pub fn new(identity_extractor: IdExt) -> Self {
+    pub fn new(identity_extractor: IdExt, dataset_optionality_predicate: DatasetOptPred) -> Self {
         Self {
             identity_extractor,
+            dataset_optionality_predicate,
             _ex: PhantomData,
         }
     }
 }
 
-impl<Svc, IdExt, Extractor> Layer<Svc> for DatasetResolverLayer<IdExt, Extractor>
+impl<Svc, IdExt, Extractor, DatasetOptPred> Layer<Svc>
+    for DatasetResolverLayer<IdExt, Extractor, DatasetOptPred>
 where
     IdExt: Clone,
+    DatasetOptPred: Clone,
 {
-    type Service = DatasetResolverMiddleware<Svc, IdExt, Extractor>;
+    type Service = DatasetResolverMiddleware<Svc, IdExt, Extractor, DatasetOptPred>;
 
     fn layer(&self, inner: Svc) -> Self::Service {
         DatasetResolverMiddleware {
@@ -70,22 +78,17 @@ where
 
 /////////////////////////////////////////////////////////////////////////////////
 
-pub struct DatasetResolverMiddleware<Svc, IdExt, Extractor> {
+pub struct DatasetResolverMiddleware<Svc, IdExt, Extractor, DatasetOptPred> {
     inner: Svc,
-    layer: DatasetResolverLayer<IdExt, Extractor>,
+    layer: DatasetResolverLayer<IdExt, Extractor, DatasetOptPred>,
 }
 
-impl<Svc, IdExt, Extractor> DatasetResolverMiddleware<Svc, IdExt, Extractor> {
-    fn is_dataset_optional(request: &http::Request<Body>) -> bool {
-        let path = request.uri().path();
-        "/push" == path
-    }
-}
-
-impl<Svc, IdExt, Extractor> Clone for DatasetResolverMiddleware<Svc, IdExt, Extractor>
+impl<Svc, IdExt, Extractor, DatasetOptPred> Clone
+    for DatasetResolverMiddleware<Svc, IdExt, Extractor, DatasetOptPred>
 where
     Svc: Clone,
     IdExt: Clone,
+    DatasetOptPred: Clone,
 {
     fn clone(&self) -> Self {
         Self {
@@ -95,13 +98,15 @@ where
     }
 }
 
-impl<Svc, IdExt, Extractor> Service<http::Request<Body>>
-    for DatasetResolverMiddleware<Svc, IdExt, Extractor>
+impl<Svc, IdExt, Extractor, DatasetOptPred> Service<http::Request<Body>>
+    for DatasetResolverMiddleware<Svc, IdExt, Extractor, DatasetOptPred>
 where
     IdExt: Send + Clone + 'static,
     IdExt: Fn(Extractor) -> DatasetRef,
     Extractor: FromRequestParts<()> + Send + 'static,
     <Extractor as FromRequestParts<()>>::Rejection: std::fmt::Debug,
+    DatasetOptPred: Send + Clone + 'static,
+    DatasetOptPred: Fn(&http::Request<Body>) -> bool,
     Svc: Service<http::Request<Body>, Response = Response> + Send + 'static + Clone,
     Svc::Future: Send + 'static,
 {
@@ -130,7 +135,7 @@ where
             };
 
             let dataset_ref = (layer.identity_extractor)(param1);
-            if !Self::is_dataset_optional(&request) {
+            if !(layer.dataset_optionality_predicate)(&request) {
                 let catalog = request
                     .extensions()
                     .get::<dill::Catalog>()

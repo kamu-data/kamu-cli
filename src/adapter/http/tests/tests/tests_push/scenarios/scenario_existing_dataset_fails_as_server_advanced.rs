@@ -12,7 +12,7 @@ use kamu::testing::MetadataFactory;
 use opendatafabric::*;
 
 use crate::harness::{
-    copy_folder_recursively,
+    copy_dataset_files,
     make_dataset_ref,
     write_dataset_alias,
     ClientSideHarness,
@@ -68,11 +68,7 @@ impl<TServerHarness: ServerSideHarness>
         ));
 
         // Hard folder synchronization
-        copy_folder_recursively(
-            &client_dataset_layout.root_dir,
-            &server_dataset_layout.root_dir,
-        )
-        .unwrap();
+        copy_dataset_files(&client_dataset_layout, &server_dataset_layout).unwrap();
 
         write_dataset_alias(
             &server_dataset_layout,
