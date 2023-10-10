@@ -46,7 +46,9 @@ pub fn smart_transfer_protocol_router() -> axum::Router {
         )
         .route("/pull", axum::routing::get(dataset_pull_ws_upgrade_handler))
         .route("/push", axum::routing::get(dataset_push_ws_upgrade_handler))
-        .layer(DatasetAuthorizationLayer::new(vec!["/push"]))
+        .layer(DatasetAuthorizationLayer::new(
+            get_dataset_action_for_request,
+        ))
 }
 
 /////////////////////////////////////////////////////////////////////////////////
@@ -77,6 +79,18 @@ pub fn add_dataset_resolver_layer(
 
 fn is_dataset_optional_for_request(request: &http::Request<hyper::Body>) -> bool {
     request.uri().path() == "/push"
+}
+
+/////////////////////////////////////////////////////////////////////////////////
+
+fn get_dataset_action_for_request(
+    request: &http::Request<hyper::Body>,
+) -> kamu::domain::auth::DatasetAction {
+    if !request.method().is_safe() || request.uri().path() == "/push" {
+        kamu::domain::auth::DatasetAction::Write
+    } else {
+        kamu::domain::auth::DatasetAction::Read
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////

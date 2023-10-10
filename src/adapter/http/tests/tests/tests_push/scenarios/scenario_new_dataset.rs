@@ -29,6 +29,7 @@ pub(crate) struct SmartPushNewDatasetScenario<TServerHarness: ServerSideHarness>
     pub server_dataset_ref: DatasetRefRemote,
     pub client_dataset_ref: DatasetRef,
     pub client_commit_result: CommitResult,
+    pub dataset_name: DatasetName,
 }
 
 impl<TServerHarness: ServerSideHarness> SmartPushNewDatasetScenario<TServerHarness> {
@@ -71,7 +72,7 @@ impl<TServerHarness: ServerSideHarness> SmartPushNewDatasetScenario<TServerHarne
         )
         .await;
 
-        let server_alias = DatasetAlias::new(server_acount_name, foo_name);
+        let server_alias = DatasetAlias::new(server_acount_name, foo_name.clone());
         let server_odf_url = server_harness.dataset_url(&server_alias);
         let server_dataset_ref = DatasetRefRemote::from(&server_odf_url);
 
@@ -83,6 +84,7 @@ impl<TServerHarness: ServerSideHarness> SmartPushNewDatasetScenario<TServerHarne
             server_dataset_ref,
             client_dataset_ref,
             client_commit_result,
+            dataset_name: foo_name,
         }
     }
 }

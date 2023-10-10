@@ -253,9 +253,15 @@ impl ServerHarness {
                 tower::ServiceBuilder::new()
                     .layer(axum::Extension(catalog))
                     .layer(axum::Extension(DatasetRef::from_str("mydataset").unwrap()))
-                    .layer(kamu_adapter_http::DatasetAuthorizationLayer::new(vec![
-                        "/bar",
-                    ])),
+                    .layer(kamu_adapter_http::DatasetAuthorizationLayer::new(
+                        |request| {
+                            if !request.method().is_safe() || request.uri().path() == "/bar" {
+                                kamu::domain::auth::DatasetAction::Write
+                            } else {
+                                kamu::domain::auth::DatasetAction::Read
+                            }
+                        },
+                    )),
             );
 
         let addr = SocketAddr::from((IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 0));

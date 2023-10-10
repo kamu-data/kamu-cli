@@ -233,7 +233,21 @@ pub async fn dataset_push_ws_upgrade_handler(
 
     let dataset = match dataset_repo.get_dataset(&dataset_ref).await {
         Ok(ds) => Some(ds),
-        Err(GetDatasetError::NotFound(_)) => None,
+        Err(GetDatasetError::NotFound(_)) => {
+            let current_account_subject = catalog.get_one::<CurrentAccountSubject>().unwrap();
+            match current_account_subject.as_ref() {
+                CurrentAccountSubject::Anonymous(_) => return unauthorized_access_response(),
+                CurrentAccountSubject::Logged(l) => {
+                    // Make sure account in dataset ref being created and token account match
+                    if let Some(ref_account_name) = dataset_ref.account_name() {
+                        if ref_account_name != &l.account_name {
+                            return forbidden_access_response();
+                        }
+                    }
+                }
+            }
+            None
+        }
         Err(err) => {
             tracing::error!("Could not get dataset: {:?}", err);
             return internal_server_error_response();

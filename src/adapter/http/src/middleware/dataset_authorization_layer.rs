@@ -22,28 +22,31 @@ use crate::axum_utils::*;
 /////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
-pub struct DatasetAuthorizationLayer {
-    potential_write_paths: Vec<String>,
+pub struct DatasetAuthorizationLayer<DatasetActionQuery> {
+    dataset_action_query: DatasetActionQuery,
 }
 
-impl DatasetAuthorizationLayer {
-    pub fn new(potential_write_paths: Vec<&'static str>) -> Self {
+impl<DatasetActionQuery> DatasetAuthorizationLayer<DatasetActionQuery>
+where
+    DatasetActionQuery: Fn(&http::Request<Body>) -> kamu::domain::auth::DatasetAction,
+{
+    pub fn new(dataset_action_query: DatasetActionQuery) -> Self {
         Self {
-            potential_write_paths: potential_write_paths
-                .iter()
-                .map(|p| p.to_string())
-                .collect(),
+            dataset_action_query,
         }
     }
 }
 
-impl<Svc> Layer<Svc> for DatasetAuthorizationLayer {
-    type Service = DatasetAuthorizationMiddleware<Svc>;
+impl<Svc, DatasetActionQuery> Layer<Svc> for DatasetAuthorizationLayer<DatasetActionQuery>
+where
+    DatasetActionQuery: Clone,
+{
+    type Service = DatasetAuthorizationMiddleware<Svc, DatasetActionQuery>;
 
     fn layer(&self, inner: Svc) -> Self::Service {
         DatasetAuthorizationMiddleware {
             inner,
-            potential_write_paths: self.potential_write_paths.clone(),
+            dataset_action_query: self.dataset_action_query.clone(),
         }
     }
 }
@@ -51,12 +54,12 @@ impl<Svc> Layer<Svc> for DatasetAuthorizationLayer {
 /////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
-pub struct DatasetAuthorizationMiddleware<Svc> {
+pub struct DatasetAuthorizationMiddleware<Svc, DatasetActionQuery> {
     inner: Svc,
-    potential_write_paths: Vec<String>,
+    dataset_action_query: DatasetActionQuery,
 }
 
-impl<Svc> DatasetAuthorizationMiddleware<Svc> {
+impl<Svc, DatasetActionQuery> DatasetAuthorizationMiddleware<Svc, DatasetActionQuery> {
     fn check_logged_in(catalog: &dill::Catalog) -> Result<(), axum::response::Response> {
         let current_account_subject = catalog.get_one::<CurrentAccountSubject>().unwrap();
         if let CurrentAccountSubject::Anonymous(_) = current_account_subject.as_ref() {
@@ -65,34 +68,15 @@ impl<Svc> DatasetAuthorizationMiddleware<Svc> {
             Ok(())
         }
     }
-
-    fn required_access_action(
-        request: &http::Request<Body>,
-        potential_write_paths: &Vec<String>,
-    ) -> kamu::domain::auth::DatasetAction {
-        if !request.method().is_safe() || Self::is_potential_write(request, potential_write_paths) {
-            kamu::domain::auth::DatasetAction::Write
-        } else {
-            kamu::domain::auth::DatasetAction::Read
-        }
-    }
-
-    fn is_potential_write(
-        request: &http::Request<Body>,
-        potential_write_paths: &Vec<String>,
-    ) -> bool {
-        let path = request.uri().path();
-        potential_write_paths
-            .iter()
-            .find(|p| p.as_str() == path)
-            .is_some()
-    }
 }
 
-impl<Svc> Service<http::Request<Body>> for DatasetAuthorizationMiddleware<Svc>
+impl<Svc, DatasetActionQuery> Service<http::Request<Body>>
+    for DatasetAuthorizationMiddleware<Svc, DatasetActionQuery>
 where
     Svc: Service<http::Request<Body>, Response = Response> + Send + 'static + Clone,
     Svc::Future: Send + 'static,
+    DatasetActionQuery: Send + Clone + 'static,
+    DatasetActionQuery: Fn(&http::Request<Body>) -> kamu::domain::auth::DatasetAction,
 {
     type Response = Svc::Response;
     type Error = Svc::Error;
@@ -108,7 +92,7 @@ where
         // TODO: PERF: Is cloning a performance concern?
         let mut inner = self.inner.clone();
 
-        let potential_write_paths = self.potential_write_paths.clone();
+        let dataset_action_query = self.dataset_action_query.clone();
 
         Box::pin(async move {
             let catalog = request
@@ -129,7 +113,7 @@ where
                 .get::<DatasetRef>()
                 .expect("Dataset ref not found in http server extensions");
 
-            let action = Self::required_access_action(&request, &potential_write_paths);
+            let action = (dataset_action_query)(&request);
 
             match dataset_repo.resolve_dataset_ref(&dataset_ref).await {
                 Ok(dataset_handle) => {
@@ -155,22 +139,8 @@ where
                         return Ok(forbidden_access_response());
                     }
                 }
-                Err(e) => {
-                    if let GetDatasetError::NotFound(_) = e {
-                        if Self::is_potential_write(&request, &potential_write_paths) {
-                            if let Err(err_result) = Self::check_logged_in(&catalog) {
-                                tracing::error!(
-                                    "Dataset '{}' create access denied: user not logged in",
-                                    dataset_ref,
-                                );
-                                return Ok(err_result);
-                            }
-                        }
-                    } else {
-                        tracing::error!("Could not get dataset: {:?}", e);
-                        return Ok(internal_server_error_response());
-                    }
-                }
+                Err(GetDatasetError::NotFound(_)) => {}
+                Err(GetDatasetError::Internal(_)) => return Ok(internal_server_error_response()),
             }
 
             inner.call(request).await
