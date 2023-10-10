@@ -18,6 +18,7 @@ use crate::OutputConfig;
 
 pub struct APIServerRunCommand {
     catalog: Catalog,
+    multi_tenant_workspace: bool,
     output_config: Arc<OutputConfig>,
     address: Option<IpAddr>,
     port: Option<u16>,
@@ -26,12 +27,14 @@ pub struct APIServerRunCommand {
 impl APIServerRunCommand {
     pub fn new(
         catalog: Catalog,
+        multi_tenant_workspace: bool,
         output_config: Arc<OutputConfig>,
         address: Option<IpAddr>,
         port: Option<u16>,
     ) -> Self {
         Self {
             catalog,
+            multi_tenant_workspace,
             output_config,
             address,
             port,
@@ -43,8 +46,12 @@ impl APIServerRunCommand {
 impl Command for APIServerRunCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
         // TODO: Cloning catalog is too expensive currently
-        let api_server =
-            crate::explore::APIServer::new(self.catalog.clone(), self.address, self.port);
+        let api_server = crate::explore::APIServer::new(
+            self.catalog.clone(),
+            self.multi_tenant_workspace,
+            self.address,
+            self.port,
+        );
 
         tracing::info!(
             "API server is listening on: http://{}",

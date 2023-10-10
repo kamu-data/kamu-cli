@@ -418,12 +418,16 @@ pub fn get_command(
                 Box::new(UpgradeWorkspaceCommand::new(cli_catalog.get_one()?))
             }
             Some(("api-server", server_matches)) => match server_matches.subcommand() {
-                None => Box::new(APIServerRunCommand::new(
-                    base_catalog.clone(), // TODO: Currently very expensive!
-                    cli_catalog.get_one()?,
-                    server_matches.get_one("address").map(|a| *a),
-                    server_matches.get_one("http-port").map(|p| *p),
-                )),
+                None => {
+                    let workspace_svc = cli_catalog.get_one::<WorkspaceService>()?;
+                    Box::new(APIServerRunCommand::new(
+                        base_catalog.clone(), // TODO: Currently very expensive!
+                        workspace_svc.is_multi_tenant_workspace(),
+                        cli_catalog.get_one()?,
+                        server_matches.get_one("address").map(|a| *a),
+                        server_matches.get_one("http-port").map(|p| *p),
+                    ))
+                }
                 Some(("gql-query", query_matches)) => Box::new(APIServerGqlQueryCommand::new(
                     base_catalog.clone(), // TODO: Currently very expensive!
                     query_matches.get_one("query").map(String::as_str).unwrap(),

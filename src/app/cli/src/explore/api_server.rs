@@ -12,7 +12,7 @@ use std::sync::Arc;
 
 use dill::Catalog;
 use internal_error::*;
-use kamu::domain::{AnonymousAccountReason, CurrentAccountSubject, DatasetRepository};
+use kamu::domain::{AnonymousAccountReason, CurrentAccountSubject};
 use kamu_task_system_inmem::domain::TaskExecutor;
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -26,15 +26,15 @@ pub struct APIServer {
 }
 
 impl APIServer {
-    pub fn new(base_catalog: Catalog, address: Option<IpAddr>, port: Option<u16>) -> Self {
+    pub fn new(
+        base_catalog: Catalog,
+        multi_tenant_workspace: bool,
+        address: Option<IpAddr>,
+        port: Option<u16>,
+    ) -> Self {
         use axum::extract::Extension;
 
         let task_executor = base_catalog.get_one().unwrap();
-
-        let multi_tenant = base_catalog
-            .get_one::<dyn DatasetRepository>()
-            .unwrap()
-            .is_multi_tenant();
 
         let gql_schema = kamu_adapter_graphql::schema();
 
@@ -49,14 +49,14 @@ impl APIServer {
                 axum::routing::get(platform_token_validate_handler),
             )
             .nest(
-                if multi_tenant {
+                if multi_tenant_workspace {
                     "/:account_name/:dataset_name"
                 } else {
                     "/:dataset_name"
                 },
                 kamu_adapter_http::add_dataset_resolver_layer(
                     kamu_adapter_http::smart_transfer_protocol_router(),
-                    multi_tenant,
+                    multi_tenant_workspace,
                 ),
             )
             .layer(
