@@ -33,7 +33,7 @@ pub async fn axum_read_payload<TMessagePayload: DeserializeOwned>(
 
 /////////////////////////////////////////////////////////////////////////////////
 
-pub async fn axum_write_payload<TMessagePayload: Serialize>(
+pub(crate) async fn axum_write_payload<TMessagePayload: Serialize>(
     socket: &mut axum::extract::ws::WebSocket,
     payload: TMessagePayload,
 ) -> Result<(), WriteMessageError> {
@@ -46,10 +46,5 @@ pub async fn axum_write_payload<TMessagePayload: Serialize>(
         Err(e) => Err(WriteMessageError::SocketError(Box::new(e))),
     }
 }
-
-/////////////////////////////////////////////////////////////////////////////////
-
-pub type BearerHeader =
-    axum::TypedHeader<axum::headers::Authorization<axum::headers::authorization::Bearer>>;
 
 /////////////////////////////////////////////////////////////////////////////////

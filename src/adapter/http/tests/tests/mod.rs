@@ -9,6 +9,7 @@
 
 mod test_authentication_layer;
 mod test_dataset_authorization_layer;
+mod test_protocol_dataset_helpers;
 mod test_routing;
 
 mod tests_pull;

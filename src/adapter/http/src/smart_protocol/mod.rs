@@ -7,9 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-pub mod dataset_helper;
+pub mod protocol_dataset_helper;
 
-mod axum_server_protocol_common;
+pub mod axum_server_protocol_common;
 mod axum_server_pull_protocol;
 mod axum_server_push_protocol;
 
@@ -18,7 +18,14 @@ pub(crate) use axum_server_pull_protocol::*;
 pub(crate) use axum_server_push_protocol::*;
 
 mod errors;
-mod messages;
+pub mod messages;
 mod phases;
 
 pub mod ws_tungstenite_client;
+
+/////////////////////////////////////////////////////////////////////////////////
+
+pub type BearerHeader =
+    axum::TypedHeader<axum::headers::Authorization<axum::headers::authorization::Bearer>>;
+
+/////////////////////////////////////////////////////////////////////////////////

@@ -550,8 +550,8 @@ fn reconstruct_header_map(headers_as_primitives: Vec<HeaderRow>) -> http::Header
 
 pub async fn prepare_push_object_transfer_strategy(
     dataset: &dyn Dataset,
-    dataset_url: &Url,
     object_file_ref: &ObjectFileReference,
+    dataset_url: &Url,
     maybe_bearer_header: &Option<BearerHeader>,
 ) -> Result<PushObjectTransferStrategy, InternalError> {
     let object_repo = match object_file_ref.object_type {

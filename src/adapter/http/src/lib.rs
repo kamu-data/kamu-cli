@@ -19,7 +19,7 @@ pub use middleware::*;
 mod access_token;
 mod axum_utils;
 mod simple_protocol;
-mod smart_protocol;
+pub mod smart_protocol;
 mod ws_common;
 
 pub type SmartTransferProtocolClientWs =

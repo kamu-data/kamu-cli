@@ -17,6 +17,10 @@ use crate::utils::docker_images;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+pub const TEST_BUCKET_NAME: &str = "test-bucket";
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
 pub struct MinioServer {
     pub container_name: String,
     pub address: String,
@@ -103,7 +107,7 @@ impl LocalS3Server {
         std::env::set_var("AWS_SECRET_ACCESS_KEY", secret_key);
 
         let tmp_dir = tempfile::tempdir().unwrap();
-        let bucket = "test-bucket".to_string();
+        let bucket = TEST_BUCKET_NAME.to_string();
         std::fs::create_dir(tmp_dir.path().join(&bucket)).unwrap();
 
         let minio = MinioServer::new(tmp_dir.path(), access_key, secret_key).await;

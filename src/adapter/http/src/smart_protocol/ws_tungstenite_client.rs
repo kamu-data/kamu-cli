@@ -26,10 +26,10 @@ use tokio_tungstenite::tungstenite::{Error as TungsteniteError, Message};
 use tokio_tungstenite::{connect_async, MaybeTlsStream, WebSocketStream};
 use url::Url;
 
-use crate::smart_protocol::dataset_helper::*;
 use crate::smart_protocol::errors::*;
 use crate::smart_protocol::messages::*;
 use crate::smart_protocol::phases::*;
+use crate::smart_protocol::protocol_dataset_helper::*;
 use crate::ws_common::{self, ReadMessageError, WriteMessageError};
 
 /////////////////////////////////////////////////////////////////////////////////////////

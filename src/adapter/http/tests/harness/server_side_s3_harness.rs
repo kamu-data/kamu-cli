@@ -133,7 +133,7 @@ impl ServerSideHarness for ServerSideS3Harness {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-async fn s3_repo(s3: &LocalS3Server, multi_tenant: bool) -> DatasetRepositoryS3 {
+pub async fn s3_repo(s3: &LocalS3Server, multi_tenant: bool) -> DatasetRepositoryS3 {
     let s3_context = S3Context::from_url(&s3.url).await;
     DatasetRepositoryS3::new(
         s3_context,

@@ -21,10 +21,10 @@ use kamu::domain::{
 use opendatafabric::{AsTypedBlock, DatasetRef, MetadataBlock, Multihash};
 use url::Url;
 
-use super::dataset_helper::*;
 use super::errors::*;
 use super::messages::*;
 use super::phases::*;
+use super::protocol_dataset_helper::*;
 use crate::smart_protocol::*;
 
 /////////////////////////////////////////////////////////////////////////////////
@@ -238,8 +238,8 @@ impl AxumServerPushProtocolInstance {
         for r in request.object_files {
             let transfer_strategy = prepare_push_object_transfer_strategy(
                 dataset.as_ref(),
-                &self.dataset_url,
                 &r,
+                &self.dataset_url,
                 &self.maybe_bearer_header,
             )
             .await

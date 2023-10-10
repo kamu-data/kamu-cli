@@ -12,10 +12,10 @@ use std::sync::Arc;
 use kamu::domain::{BlockRef, Dataset, ErrorIntoInternal, ResultIntoInternal};
 use url::Url;
 
-use super::dataset_helper::*;
 use super::errors::*;
 use super::messages::*;
 use super::phases::*;
+use super::protocol_dataset_helper::*;
 use crate::smart_protocol::*;
 use crate::ws_common::ReadMessageError;
 
