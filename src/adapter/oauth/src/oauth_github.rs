@@ -7,7 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use dill::component;
+use std::collections::HashMap;
+use std::sync::Mutex;
+
+use dill::{component, scope, Singleton};
 use kamu_core::auth::{AccountInfo, AccountType};
 use kamu_core::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use opendatafabric::{AccountName, FAKE_ACCOUNT_ID};
@@ -19,12 +22,19 @@ const LOGIN_METHOD_GITHUB: &str = "oauth_github";
 
 ///////////////////////////////////////////////////////////////////////////////
 
-pub struct OAuthGithub;
+pub struct OAuthGithub {
+    cached_accounts_by_name: Mutex<HashMap<String, GithubAccountInfo>>,
+    cached_accounts_by_token: Mutex<HashMap<String, GithubAccountInfo>>,
+}
 
 #[component(pub)]
+#[scope(Singleton)]
 impl OAuthGithub {
     pub fn new() -> Self {
-        Self {}
+        Self {
+            cached_accounts_by_name: Mutex::new(HashMap::new()),
+            cached_accounts_by_token: Mutex::new(HashMap::new()),
+        }
     }
 
     fn get_client_id() -> String {
@@ -78,7 +88,7 @@ impl OAuthGithub {
             )
         })?;
 
-        let account_info = client
+        let github_account_info = client
             .get("https://api.github.com/user")
             .bearer_auth(&token.access_token)
             .header(http::header::ACCEPT, "application/vnd.github.v3+json")
@@ -91,9 +101,12 @@ impl OAuthGithub {
             .await
             .int_err()?;
 
+        self.store_github_account_info_in_cache(&github_account_info);
+        self.store_token_resolution_in_cache(&token.access_token, &github_account_info);
+
         Ok(GithubLoginResponse {
             token,
-            account_info,
+            account_info: github_account_info,
         })
     }
 
@@ -101,11 +114,15 @@ impl OAuthGithub {
         &self,
         access_token: String,
     ) -> Result<GithubAccountInfo, InternalError> {
+        if let Some(github_account_info) = self.find_token_resolution_in_cache(&access_token) {
+            return Ok(github_account_info);
+        }
+
         let client = self.get_client().int_err()?;
 
-        let account_info = client
+        let github_account_info = client
             .get("https://api.github.com/user")
-            .bearer_auth(access_token)
+            .bearer_auth(access_token.clone())
             .header(http::header::ACCEPT, "application/vnd.github.v3+json")
             .send()
             .await
@@ -116,13 +133,20 @@ impl OAuthGithub {
             .await
             .int_err()?;
 
-        Ok(account_info)
+        self.store_github_account_info_in_cache(&github_account_info);
+        self.store_token_resolution_in_cache(&access_token, &github_account_info);
+
+        Ok(github_account_info)
     }
 
     async fn github_find_account_info_by_login(
         &self,
         login: &String,
     ) -> Result<Option<GithubAccountInfo>, InternalError> {
+        if let Some(github_account_info) = self.find_github_account_info_in_cache(login) {
+            return Ok(Some(github_account_info));
+        }
+
         let client = self.get_client().int_err()?;
 
         let response = client
@@ -137,9 +161,51 @@ impl OAuthGithub {
         } else if response.status().is_server_error() {
             Err(response.error_for_status().unwrap_err().int_err())
         } else {
-            let account_info = response.json::<GithubAccountInfo>().await.int_err()?;
-            Ok(Some(account_info))
+            let github_account_info = response.json::<GithubAccountInfo>().await.int_err()?;
+            self.store_github_account_info_in_cache(&github_account_info);
+            Ok(Some(github_account_info))
         }
+    }
+
+    fn store_github_account_info_in_cache(&self, github_account_info: &GithubAccountInfo) {
+        let mut cache = self
+            .cached_accounts_by_name
+            .lock()
+            .expect("Could not lock account info cache");
+        cache.insert(
+            github_account_info.login.clone(),
+            github_account_info.clone(),
+        );
+    }
+
+    fn store_token_resolution_in_cache(
+        &self,
+        access_token: &String,
+        github_account_info: &GithubAccountInfo,
+    ) {
+        let mut cache = self
+            .cached_accounts_by_token
+            .lock()
+            .expect("Could not lock token resolution cache");
+        cache.insert(access_token.clone(), github_account_info.clone());
+    }
+
+    fn find_github_account_info_in_cache(&self, login: &String) -> Option<GithubAccountInfo> {
+        let cache = self
+            .cached_accounts_by_name
+            .lock()
+            .expect("Could not lock account info cache");
+
+        cache.get(login).map(|a| a.clone())
+    }
+
+    fn find_token_resolution_in_cache(&self, access_token: &String) -> Option<GithubAccountInfo> {
+        let cache = self
+            .cached_accounts_by_token
+            .lock()
+            .expect("Could not lock token resolution cache");
+
+        cache.get(access_token).map(|a| a.clone())
     }
 }
 
