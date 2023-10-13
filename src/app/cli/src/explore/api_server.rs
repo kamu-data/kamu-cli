@@ -12,7 +12,6 @@ use std::sync::Arc;
 
 use dill::Catalog;
 use internal_error::*;
-use kamu::domain::{AnonymousAccountReason, CurrentAccountSubject};
 use kamu_task_system_inmem::domain::TaskExecutor;
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -46,7 +45,7 @@ impl APIServer {
             )
             .route(
                 "/platform/token/validate",
-                axum::routing::get(platform_token_validate_handler),
+                axum::routing::get(kamu_adapter_http::platform_token_validate_handler),
             )
             .nest(
                 if multi_tenant_workspace {
@@ -128,35 +127,6 @@ async fn graphql_playground() -> impl axum::response::IntoResponse {
     axum::response::Html(async_graphql::http::playground_source(
         async_graphql::http::GraphQLPlaygroundConfig::new("/graphql"),
     ))
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-async fn platform_token_validate_handler(
-    catalog: axum::extract::Extension<dill::Catalog>,
-) -> axum::response::Response {
-    let current_account_subject = catalog.get_one::<CurrentAccountSubject>().unwrap();
-
-    match current_account_subject.as_ref() {
-        CurrentAccountSubject::Logged(_) => {
-            return axum::response::Response::builder()
-                .status(http::StatusCode::OK)
-                .body(Default::default())
-                .unwrap()
-        }
-        CurrentAccountSubject::Anonymous(reason) => {
-            return axum::response::Response::builder()
-                .status(match reason {
-                    AnonymousAccountReason::AuthenticationExpired => http::StatusCode::UNAUTHORIZED,
-                    AnonymousAccountReason::AuthenticationInvalid => http::StatusCode::BAD_REQUEST,
-                    AnonymousAccountReason::NoAuthenticationProvided => {
-                        http::StatusCode::BAD_REQUEST
-                    }
-                })
-                .body(Default::default())
-                .unwrap();
-        }
-    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

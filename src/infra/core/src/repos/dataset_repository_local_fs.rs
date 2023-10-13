@@ -592,6 +592,7 @@ impl DatasetMultiTenantStorageStrategy {
 
     async fn attempt_resolving_dataset_alias_via_path(
         &self,
+        account_name: &AccountName,
         dataset_path: &PathBuf,
         dataset_id: &DatasetID,
     ) -> Result<DatasetAlias, ResolveDatasetError> {
@@ -600,7 +601,11 @@ impl DatasetMultiTenantStorageStrategy {
         match dataset.as_info_repo().get("alias").await {
             Ok(bytes) => {
                 let dataset_alias_str = std::str::from_utf8(&bytes[..]).int_err()?.trim();
-                let dataset_alias = DatasetAlias::try_from(dataset_alias_str).int_err()?;
+                let mut dataset_alias = DatasetAlias::try_from(dataset_alias_str).int_err()?;
+                if !dataset_alias.is_multi_tenant() {
+                    dataset_alias =
+                        DatasetAlias::new(Some(account_name.clone()), dataset_alias.dataset_name);
+                }
                 Ok(dataset_alias)
             }
             Err(GetNamedError::Internal(e)) => Err(ResolveDatasetError::Internal(e)),
@@ -627,7 +632,11 @@ impl DatasetMultiTenantStorageStrategy {
         Ok(())
     }
 
-    fn stream_account_datasets<'s>(&'s self, account_dir_path: PathBuf) -> DatasetHandleStream<'s> {
+    fn stream_account_datasets<'s>(
+        &'s self,
+        account_name: &'s AccountName,
+        account_dir_path: PathBuf,
+    ) -> DatasetHandleStream<'s> {
         Box::pin(async_stream::try_stream! {
             let read_dataset_dir = std::fs::read_dir(account_dir_path).int_err()?;
 
@@ -647,7 +656,7 @@ impl DatasetMultiTenantStorageStrategy {
                 let dataset_path = dataset_dir_entry.path();
 
                 match self
-                    .attempt_resolving_dataset_alias_via_path(&dataset_path, &dataset_id)
+                    .attempt_resolving_dataset_alias_via_path(account_name, &dataset_path, &dataset_id)
                     .await
                 {
                     Ok(dataset_alias) => {
@@ -692,7 +701,8 @@ impl DatasetStorageStrategy for DatasetMultiTenantStorageStrategy {
                     continue;
                 }
 
-                let mut account_datasets = self.stream_account_datasets(account_dir_entry.path());
+                let account_name = AccountName::try_from(&account_dir_entry.file_name()).int_err()?;
+                let mut account_datasets = self.stream_account_datasets(&account_name, account_dir_entry.path());
 
                 use tokio_stream::StreamExt;
                 while let Some(dataset_handle) = account_datasets.next().await {
@@ -704,12 +714,12 @@ impl DatasetStorageStrategy for DatasetMultiTenantStorageStrategy {
 
     fn get_datasets_by_owner<'s>(&'s self, account_name: AccountName) -> DatasetHandleStream<'s> {
         Box::pin(async_stream::try_stream! {
-            let account_dir_path = self.root.join(account_name);
+            let account_dir_path = self.root.join(account_name.clone());
             if !account_dir_path.is_dir() {
                 return;
             }
 
-            let mut account_datasets = self.stream_account_datasets(account_dir_path);
+            let mut account_datasets = self.stream_account_datasets(&account_name, account_dir_path);
 
             use tokio_stream::StreamExt;
             while let Some(dataset_handle) = account_datasets.next().await {
@@ -746,7 +756,11 @@ impl DatasetStorageStrategy for DatasetMultiTenantStorageStrategy {
                 let dataset_path = dataset_dir_entry.path();
 
                 let candidate_dataset_alias = self
-                    .attempt_resolving_dataset_alias_via_path(&dataset_path, &dataset_id)
+                    .attempt_resolving_dataset_alias_via_path(
+                        &effective_account_name,
+                        &dataset_path,
+                        &dataset_id,
+                    )
                     .await?;
 
                 if candidate_dataset_alias.dataset_name == dataset_alias.dataset_name {
@@ -775,10 +789,15 @@ impl DatasetStorageStrategy for DatasetMultiTenantStorageStrategy {
                 }
             }
 
+            let account_name = AccountName::try_from(&account_dir_entry.file_name()).int_err()?;
             let dataset_path = account_dir_entry.path().join(id_as_string.clone());
             if dataset_path.exists() {
                 let dataset_alias = self
-                    .attempt_resolving_dataset_alias_via_path(&dataset_path, dataset_id)
+                    .attempt_resolving_dataset_alias_via_path(
+                        &account_name,
+                        &dataset_path,
+                        dataset_id,
+                    )
                     .await?;
 
                 return Ok(DatasetHandle::new(dataset_id.to_owned(), dataset_alias));

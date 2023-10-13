@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.145.1] - 2023-10-13
+### Changed
+- GitHub Client ID now delivered as a part of runtime configuration for UI
+### Fixed
+- Crashes upon iterating multi-tenant local FS datasets with short dataset alias
+
 ## [0.145.0] - 2023-10-11
 ### Added
 - Ability to login to a remote ODF server via CLI commands:
