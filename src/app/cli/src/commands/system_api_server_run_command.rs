@@ -12,9 +12,14 @@ use std::sync::Arc;
 
 use console::style as s;
 use dill::Catalog;
+use kamu::ENV_VAR_KAMU_JWT_SECRET;
+use kamu_adapter_oauth::{
+    ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_ID,
+    ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_SECRET,
+};
 
 use super::{CLIError, Command};
-use crate::OutputConfig;
+use crate::{ensure_env_var_set, OutputConfig};
 
 pub struct APIServerRunCommand {
     catalog: Catalog,
@@ -40,11 +45,25 @@ impl APIServerRunCommand {
             port,
         }
     }
+
+    fn check_required_env_vars(&self) -> Result<(), CLIError> {
+        ensure_env_var_set(ENV_VAR_KAMU_JWT_SECRET)?;
+
+        if self.multi_tenant_workspace {
+            ensure_env_var_set(ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_ID)?;
+            ensure_env_var_set(ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_SECRET)?;
+        }
+
+        Ok(())
+    }
 }
 
 #[async_trait::async_trait(?Send)]
 impl Command for APIServerRunCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
+        // Check required env variables are present before starting API server
+        self.check_required_env_vars()?;
+
         // TODO: Cloning catalog is too expensive currently
         let api_server = crate::explore::APIServer::new(
             self.catalog.clone(),

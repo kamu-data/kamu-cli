@@ -20,6 +20,9 @@ use serde::{Deserialize, Serialize};
 
 const LOGIN_METHOD_GITHUB: &str = "oauth_github";
 
+pub const ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_ID: &str = "KAMU_AUTH_GITHUB_CLIENT_ID";
+pub const ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_SECRET: &str = "KAMU_AUTH_GITHUB_CLIENT_SECRET";
+
 ///////////////////////////////////////////////////////////////////////////////
 
 pub struct OAuthGithub {
@@ -36,13 +39,18 @@ impl OAuthGithub {
     }
 
     fn get_client_id() -> String {
-        std::env::var("KAMU_AUTH_GITHUB_CLIENT_ID")
-            .expect("KAMU_AUTH_GITHUB_CLIENT_ID env var is not set")
+        std::env::var(ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_ID)
+            .expect(format!("{} env var is not set", ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_ID).as_str())
     }
 
     fn get_client_secret() -> String {
-        std::env::var("KAMU_AUTH_GITHUB_CLIENT_SECRET")
-            .expect("KAMU_AUTH_GITHUB_CLIENT_SECRET env var is not set")
+        std::env::var(ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_SECRET).expect(
+            format!(
+                "{} env var is not set",
+                ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_SECRET
+            )
+            .as_str(),
+        )
     }
 
     fn get_client(&self) -> Result<reqwest::Client, reqwest::Error> {

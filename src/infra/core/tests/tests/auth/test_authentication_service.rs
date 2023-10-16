@@ -11,7 +11,7 @@ use std::assert_matches::assert_matches;
 
 use chrono::Utc;
 use internal_error::InternalError;
-use kamu::AuthenticationServiceImpl;
+use kamu::{AuthenticationServiceImpl, ENV_VAR_KAMU_JWT_SECRET};
 use kamu_core::auth::{
     AccessTokenError,
     AccountInfo,
@@ -24,6 +24,8 @@ use kamu_core::auth::{
 };
 use kamu_core::{SystemTimeSource, SystemTimeSourceStub};
 use opendatafabric::AccountName;
+use rand::distributions::Alphanumeric;
+use rand::{thread_rng, Rng};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -127,6 +129,8 @@ async fn test_find_account_info() {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 fn make_catalog() -> dill::Catalog {
+    set_random_jwt_secret();
+
     dill::CatalogBuilder::new()
         .add::<DummyAuthenticationProviderA>()
         .bind::<dyn AuthenticationProvider, DummyAuthenticationProviderA>()
@@ -234,6 +238,18 @@ impl AuthenticationProvider for DummyAuthenticationProviderB {
             Ok(None)
         }
     }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+fn set_random_jwt_secret() {
+    let random_jwt_secret: String = thread_rng()
+        .sample_iter(&Alphanumeric)
+        .take(64)
+        .map(char::from)
+        .collect();
+
+    std::env::set_var(ENV_VAR_KAMU_JWT_SECRET, random_jwt_secret);
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

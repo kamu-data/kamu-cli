@@ -19,14 +19,14 @@ use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, 
 use kamu_core::auth::*;
 use kamu_core::SystemTimeSource;
 use opendatafabric::AccountName;
-use rand::distributions::Alphanumeric;
-use rand::{thread_rng, Rng};
 use serde::{Deserialize, Serialize};
 
 ///////////////////////////////////////////////////////////////////////////////
 
 const KAMU_JWT_ISSUER: &str = "dev.kamu";
 const KAMU_JWT_ALGORITHM: Algorithm = Algorithm::HS384;
+
+pub const ENV_VAR_KAMU_JWT_SECRET: &str = "KAMU_JWT_SECRET";
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -44,10 +44,8 @@ impl AuthenticationServiceImpl {
         authentication_providers: Vec<Arc<dyn AuthenticationProvider>>,
         time_source: Arc<dyn SystemTimeSource>,
     ) -> Self {
-        let kamu_jwt_secret = match std::env::var("KAMU_JWT_SECRET") {
-            Ok(jwt_secret) => jwt_secret,
-            Err(_) => Self::random_jwt_secret(),
-        };
+        let kamu_jwt_secret = std::env::var(ENV_VAR_KAMU_JWT_SECRET)
+            .expect(format!("{} env var is not set", ENV_VAR_KAMU_JWT_SECRET).as_str());
 
         let mut authentication_providers_by_method = HashMap::new();
 
@@ -72,14 +70,6 @@ impl AuthenticationServiceImpl {
             authentication_providers_by_method,
             authentication_providers,
         }
-    }
-
-    fn random_jwt_secret() -> String {
-        thread_rng()
-            .sample_iter(&Alphanumeric)
-            .take(64)
-            .map(char::from)
-            .collect()
     }
 
     fn resolve_authentication_provider(
