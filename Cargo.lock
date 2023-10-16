@@ -3164,7 +3164,6 @@ dependencies = [
  "kamu-task-system",
  "mockall",
  "opendatafabric",
- "rand",
  "serde",
  "serde_json",
  "tempfile",
