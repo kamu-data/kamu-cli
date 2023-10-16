@@ -184,7 +184,9 @@ impl AuthenticationService for AuthenticationServiceImpl {
 
         let provider = self
             .resolve_authentication_provider(decoded_access_token.login_method.as_str())
-            .map_err(|e| GetAccountInfoError::Internal(e.int_err()))?;
+            .map_err(|e| {
+                GetAccountInfoError::AccessToken(AccessTokenError::Invalid(Box::new(e)))
+            })?;
 
         provider
             .account_info_by_token(decoded_access_token.provider_credentials_json)
