@@ -261,3 +261,23 @@ pub struct CommandInterpretationFailed;
     "Workspace needs to be upgraded before continuing - please run `kamu system upgrade-workspace`"
 )]
 pub struct WorkspaceUpgradeRequired;
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Error)]
+#[error("Environment variable {var_name} is not set")]
+pub struct RequiredEnvVarNotSet {
+    pub var_name: String,
+}
+
+pub fn ensure_env_var_set(var_name: &str) -> Result<(), CLIError> {
+    std::env::var(var_name).map_err(|_| {
+        return CLIError::usage_error_from(RequiredEnvVarNotSet {
+            var_name: var_name.to_string(),
+        });
+    })?;
+
+    Ok(())
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
