@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.145.3] - 2023-10-18
+### Changed
+- Demanding required env vars to be set before API server / Web UI server startup
+- Custom error messages for non-valid session in GraphQL queries depending on the reason
+### Fixed
+- If access token points on unsupported login method, it's a client error (4xx), not (5xx).
+
+## [0.145.2] - 2023-10-16
+### Changed
+- GitHub API results (login, token resolution, account queries) now have a runtime cache
+  to avoid excessive number of external calls (and related call rate bans)
+
 ## [0.145.1] - 2023-10-13
 ### Changed
 - GitHub Client ID now delivered as a part of runtime configuration for UI
