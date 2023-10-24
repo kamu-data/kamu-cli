@@ -7,7 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod flight_sql_service;
-mod flight_sql_service_builder;
-pub use flight_sql_service::*;
-pub use flight_sql_service_builder::*;
+mod service;
+mod service_builder;
+mod session_factory;
+pub use service::*;
+pub use service_builder::*;
+pub use session_factory::*;

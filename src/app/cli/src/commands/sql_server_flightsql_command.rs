@@ -12,10 +12,13 @@ use std::sync::Arc;
 
 use arrow_flight::flight_service_server::FlightServiceServer;
 use console::style as s;
+use datafusion::prelude::SessionContext;
 use internal_error::*;
 use kamu::domain::QueryService;
+use kamu_adapter_flight_sql::{SessionFactory, Token};
 use tokio::net::TcpListener;
 use tonic::transport::Server;
+use tonic::Status;
 
 use super::{CLIError, Command};
 
@@ -38,15 +41,11 @@ impl SqlServerFlightSqlCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for SqlServerFlightSqlCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
-        let ctx = Arc::new(self.query_svc.create_session().await.int_err()?);
-
         let kamu_service = kamu_adapter_flight_sql::KamuFlightSqlService::builder()
-            .with_auth("kamu", "kamu")
             .with_server_name(crate::BINARY_NAME, crate::VERSION)
-            .with_context_factory(move || {
-                let ret = ctx.clone();
-                async { ret }
-            })
+            .with_session_factory(Arc::new(SessionFactoryImpl {
+                query_svc: self.query_svc.clone(),
+            }))
             .build();
 
         let listener = TcpListener::bind((self.address, self.port)).await.unwrap();
@@ -81,5 +80,24 @@ impl Command for SqlServerFlightSqlCommand {
             .int_err()?;
 
         Ok(())
+    }
+}
+
+struct SessionFactoryImpl {
+    query_svc: Arc<dyn QueryService>,
+}
+
+#[async_trait::async_trait]
+impl SessionFactory for SessionFactoryImpl {
+    async fn authenticate(&self, username: &str, password: &str) -> Result<Token, Status> {
+        if username == "kamu" && password == "kamu" {
+            Ok(String::new())
+        } else {
+            Err(Status::unauthenticated("Invalid credentials!"))
+        }
+    }
+
+    async fn get_context(&self, _token: &Token) -> Result<Arc<SessionContext>, Status> {
+        Ok(Arc::new(self.query_svc.create_session().await.unwrap()))
     }
 }

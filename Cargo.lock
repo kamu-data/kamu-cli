@@ -3127,6 +3127,7 @@ name = "kamu-adapter-flight-sql"
 version = "0.145.4"
 dependencies = [
  "arrow-flight",
+ "async-trait",
  "base64 0.21.5",
  "dashmap",
  "datafusion",

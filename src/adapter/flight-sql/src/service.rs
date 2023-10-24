@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use std::convert::TryFrom;
-use std::future::Future;
 use std::pin::Pin;
 use std::str::FromStr;
 use std::string::ToString;
@@ -78,25 +77,21 @@ use tonic::metadata::MetadataValue;
 use tonic::{Request, Response, Status, Streaming};
 use uuid::Uuid;
 
-use crate::KamuFlightSqlServiceBuilder;
+use crate::{KamuFlightSqlServiceBuilder, SessionFactory};
 
 ///////////////////////////////////////////////////////////////////////////////
 
 const TABLE_TYPES: [&str; 2] = ["TABLE", "VIEW"];
-
-pub(crate) type ContextFactory =
-    Box<dyn Fn() -> Pin<Box<dyn Future<Output = Arc<SessionContext>> + Send>> + Sync + Send>;
 
 ///////////////////////////////////////////////////////////////////////////////
 // KamuFlightSqlService
 ///////////////////////////////////////////////////////////////////////////////
 
 pub struct KamuFlightSqlService {
-    username: String,
-    password: String,
+    session_factory: Arc<dyn SessionFactory>,
     sql_info: SqlInfoData,
-    context_factory: ContextFactory,
     statements: Arc<DashMap<Uuid, LogicalPlan>>,
+    // TODO: PERF: Clean up contexts when connection is closed or after inactivity timeout
     contexts: Arc<DashMap<Uuid, Arc<SessionContext>>>,
 }
 
@@ -107,17 +102,10 @@ impl KamuFlightSqlService {
         KamuFlightSqlServiceBuilder::new()
     }
 
-    pub(crate) fn new(
-        username: String,
-        password: String,
-        sql_info: SqlInfoData,
-        context_factory: ContextFactory,
-    ) -> Self {
+    pub(crate) fn new(session_factory: Arc<dyn SessionFactory>, sql_info: SqlInfoData) -> Self {
         Self {
-            username,
-            password,
+            session_factory,
             sql_info,
-            context_factory,
             statements: Default::default(),
             contexts: Default::default(),
         }
@@ -427,8 +415,8 @@ impl KamuFlightSqlService {
         Ok(rb)
     }
 
-    async fn create_ctx(&self) -> Result<Uuid, Status> {
-        let ctx = (self.context_factory)().await;
+    async fn create_ctx(&self, token: &crate::Token) -> Result<Uuid, Status> {
+        let ctx = self.session_factory.get_context(token).await?;
         let handle = Uuid::new_v4();
         self.contexts.insert(handle, ctx);
         Ok(handle)
@@ -680,13 +668,15 @@ impl FlightSqlService for KamuFlightSqlService {
         if parts.len() != 2 {
             Err(Status::invalid_argument("Invalid authorization header"))?;
         }
-        let user = parts[0];
-        let pass = parts[1];
-        if user != self.username || pass != self.password {
-            Err(Status::unauthenticated("Invalid credentials!"))?
-        }
+        let username = parts[0];
+        let password = parts[1];
 
-        let token = self.create_ctx().await?;
+        let session_token = self
+            .session_factory
+            .authenticate(username, password)
+            .await?;
+
+        let token = self.create_ctx(&session_token).await?;
 
         let result = HandshakeResponse {
             protocol_version: 0,

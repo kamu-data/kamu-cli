@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::future::Future;
 use std::sync::Arc;
 
 use arrow_flight::sql::metadata::SqlInfoDataBuilder;
@@ -18,17 +17,14 @@ use arrow_flight::sql::{
     SqlSupportedTransactions,
     SupportedSqlGrammar,
 };
-use datafusion::prelude::SessionContext;
 
-use crate::{ContextFactory, KamuFlightSqlService};
+use crate::{KamuFlightSqlService, SessionFactory};
 
 ///////////////////////////////////////////////////////////////////////////////
 
 pub struct KamuFlightSqlServiceBuilder {
+    session_factory: Option<Arc<dyn SessionFactory>>,
     sql_info: SqlInfoDataBuilder,
-    context_factory: Option<ContextFactory>,
-    username: Option<String>,
-    password: Option<String>,
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -38,19 +34,15 @@ impl KamuFlightSqlServiceBuilder {
         let sql_info = Self::default_sql_info();
 
         Self {
+            session_factory: None,
             sql_info,
-            context_factory: None,
-            username: None,
-            password: None,
         }
     }
 
     pub fn build(self) -> KamuFlightSqlService {
         KamuFlightSqlService::new(
-            self.username.unwrap(),
-            self.password.unwrap(),
+            self.session_factory.unwrap(),
             self.sql_info.build().unwrap(),
-            self.context_factory.unwrap(),
         )
     }
 
@@ -61,18 +53,8 @@ impl KamuFlightSqlServiceBuilder {
         self
     }
 
-    pub fn with_context_factory<F, Fut>(mut self, f: F) -> Self
-    where
-        F: Fn() -> Fut + 'static + Send + Sync,
-        Fut: Future<Output = Arc<SessionContext>> + 'static + Send,
-    {
-        self.context_factory = Some(Box::new(move || Box::pin(f())));
-        self
-    }
-
-    pub fn with_auth(mut self, username: impl Into<String>, password: impl Into<String>) -> Self {
-        self.username = Some(username.into());
-        self.password = Some(password.into());
+    pub fn with_session_factory(mut self, session_factory: Arc<dyn SessionFactory>) -> Self {
+        self.session_factory = Some(session_factory);
         self
     }
 
