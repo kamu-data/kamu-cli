@@ -16,11 +16,11 @@ use std::sync::Arc;
 
 use console::style as s;
 use dill::Catalog;
-use kamu::ENV_VAR_KAMU_JWT_SECRET;
+use kamu::{set_random_jwt_secret, ENV_VAR_KAMU_JWT_SECRET};
 use opendatafabric::AccountName;
 
 use super::{CLIError, Command};
-use crate::{ensure_env_var_set, OutputConfig};
+use crate::{check_env_var_set, OutputConfig};
 
 pub struct UICommand {
     base_catalog: Catalog,
@@ -47,9 +47,11 @@ impl UICommand {
         }
     }
 
-    fn check_required_env_vars(&self) -> Result<(), CLIError> {
-        ensure_env_var_set(ENV_VAR_KAMU_JWT_SECRET)?;
-        Ok(())
+    fn ensure_required_env_vars(&self) {
+        match check_env_var_set(ENV_VAR_KAMU_JWT_SECRET) {
+            Ok(_) => {}
+            Err(_) => set_random_jwt_secret(),
+        }
     }
 }
 
@@ -57,8 +59,8 @@ impl UICommand {
 #[async_trait::async_trait(?Send)]
 impl Command for UICommand {
     async fn run(&mut self) -> Result<(), CLIError> {
-        // Check required env variables are present before starting UI server
-        self.check_required_env_vars()?;
+        // Ensure required env variables are present before starting UI server
+        self.ensure_required_env_vars();
 
         let web_server = crate::explore::WebUIServer::new(
             self.base_catalog.clone(),

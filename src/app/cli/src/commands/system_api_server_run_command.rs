@@ -19,7 +19,7 @@ use kamu_adapter_oauth::{
 };
 
 use super::{CLIError, Command};
-use crate::{ensure_env_var_set, OutputConfig};
+use crate::{check_env_var_set, OutputConfig};
 
 pub struct APIServerRunCommand {
     catalog: Catalog,
@@ -47,11 +47,11 @@ impl APIServerRunCommand {
     }
 
     fn check_required_env_vars(&self) -> Result<(), CLIError> {
-        ensure_env_var_set(ENV_VAR_KAMU_JWT_SECRET)?;
+        check_env_var_set(ENV_VAR_KAMU_JWT_SECRET)?;
 
         if self.multi_tenant_workspace {
-            ensure_env_var_set(ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_ID)?;
-            ensure_env_var_set(ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_SECRET)?;
+            check_env_var_set(ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_ID)?;
+            check_env_var_set(ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_SECRET)?;
         }
 
         Ok(())
