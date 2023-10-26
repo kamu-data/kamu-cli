@@ -1,0 +1,4 @@
+flightsql-dbapi
+sqlalchemy
+pandas
+jpype1
