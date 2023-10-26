@@ -77,9 +77,5 @@ unsound = "warn"
 yanked = "deny"
 notice = "warn"
 ignore = [
-    # https://rustsec.org/advisories/RUSTSEC-2020-0071
-    # Ignoring it until `chrono` updates to new version of `time` crate.
-    # We are not affected by this voulnerability as `chrono` doesn't call the affected code.
-    "RUSTSEC-2020-0071",
 ]
 
