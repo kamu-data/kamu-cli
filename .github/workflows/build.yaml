@@ -18,7 +18,7 @@ jobs:
     name: Lint / Formatting
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: actions-rs/toolchain@v1
         with:
           components: rustfmt
@@ -35,7 +35,7 @@ jobs:
     name: Lint / Dependencies
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: actions-rs/toolchain@v1
       - run: cargo install cargo-deny
       - run: cargo deny check
@@ -50,7 +50,7 @@ jobs:
       - uses: ibnesayeed/setup-ipfs@master
         with:
           ipfs_version: "0.19"
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: actions-rs/toolchain@v1
       - uses: swatinem/rust-cache@v2
         with:
@@ -77,7 +77,7 @@ jobs:
       CARGO_FLAGS: --profile ci
       NEXTEST_FLAGS: --cargo-profile ci -E '!test(::containerized::)'
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: actions-rs/toolchain@v1
       - uses: swatinem/rust-cache@v2
         with:
@@ -99,7 +99,7 @@ jobs:
       # See: https://github.com/kamu-data/kamu-cli/issues/226
       NEXTEST_FLAGS: --cargo-profile ci -E 'not (test(::containerized::) | test(::datafusion::))'
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: actions-rs/toolchain@v1
       - uses: swatinem/rust-cache@v2
         with:
