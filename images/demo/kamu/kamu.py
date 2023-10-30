@@ -73,9 +73,9 @@ class KamuMagics(Magics):
 
     @line_magic
     @magic_arguments.magic_arguments()
-    @magic_arguments.argument('dataset_id',
+    @magic_arguments.argument('dataset_ref',
         nargs=1,
-        help='ID of the dataset to load'
+        help='Dataset to load'
     )
     @magic_arguments.argument('--alias',
         help='Also registers the dataset under provided alias'
