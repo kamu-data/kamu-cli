@@ -1,5 +1,5 @@
 IMAGE_REPO = ghcr.io/kamu-data
-IMAGE_JUPYTER_TAG = 0.5.1
+IMAGE_JUPYTER_TAG = 0.5.2
 
 KAMU_VERSION = $(shell cargo metadata --format-version 1 | jq -r '.packages[] | select( .name == "kamu") | .version')
 
