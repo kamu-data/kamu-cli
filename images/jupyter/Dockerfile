@@ -13,7 +13,7 @@ RUN apt update \
 USER $NB_USER
 
 # This is needed because requests-kerberos fails to install on debian due to missing linux headers
-RUN conda install requests-kerberos -y
+RUN conda install requests-kerberos==0.12.0 -y
 
 COPY requirements.txt requirements.txt
 RUN pip --no-cache-dir install --upgrade -r requirements.txt && rm requirements.txt
