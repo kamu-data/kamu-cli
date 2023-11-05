@@ -10,9 +10,11 @@
   - [Async](#async)
   - [Error Handling](#error-handling)
   - [Test Groups](#test-groups)
-- [Typical Workflow](#typical-workflow)
+- [Typical Workflows](#typical-workflows)
   - [Feature Branches](#feature-branches)
   - [Release Procedure](#release-procedure)
+  - [Minor Dependencies Update](#minor-dependencies-update)
+  - [Major Dependencies Update](#major-dependencies-update)
 - [Tips](#tips)
   - [IDE Configuration](#ide-configuration)
   - [Debugging](#debugging)
@@ -49,6 +51,7 @@ Prerequisites:
     * `cargo binstall cargo-edit` - for setting crate versions during release
     * `cargo binstall cargo-update` - for keeping up with major dependency updates
     * `cargo binstall cargo-deny` - for linting dependencies
+  * To keep all these cargo tools up-to-date use `cargo install-update -a`
 
 Clone the repository:
 ```shell
@@ -205,21 +208,25 @@ We use the homegrown [`test-group`](https://crates.io/crates/test-group) crate t
 - `flaky` - special group for tests that sometimes fail and need to be retried (use very sparingly and create tickets)
 - `setup` - special group for tests that initialize the environment (e.g. pull container images) - this group is run by CI before executing the rest of the tests
 
-## Typical Workflow
+
+## Typical Workflows
 
 ### Feature Branches
-1. Our policy is to have `master` branch always stable, ready to be released at any point in time
-2. Thus all changes are developed on feature branches and merged to `master` only when they passess all the checks
+1. Our policy is to have `master` branch **always stable, ready to be released at any point in time**, thus all changes are developed on feature branches and merged to `master` only when they passess all the checks
+2. Continuous **upkeep** of our repo is every developer's responsibility, so before starting a feature branch check if [major dependency update](#major-dependencies-update) is due and perform it on a separate branch
 3. Please follow this convention for branch names:
    1. `bug/invalid-url-path-in-s3-store`
    2. `feature/recursive-pull-flag`
    3. `refactor/core-crate-reorg`
    4. `ci/linter-improvements`
    5. `docs/expand-developer-docs`
+   6. `chore/bump-dependencies`
 4. Include brief description of your changes under `## Unreleased` section of the `CHANGELOG.md` in your PR
-5. Please [sign your commits](https://docs.github.com/en/authentication/managing-commit-signature-verification/signing-commits)
+5. (Recommended) Please configure git to [sign your commits](https://docs.github.com/en/authentication/managing-commit-signature-verification/signing-commits)
 6. Branches should have coarse-grained commits with good descriptions - otherwise commits should be squashed
-7. Maintainers who merge branches should do so via `git merge --ff-only` and NOT rebasing not to lose commit signatures
+7. Follow [minor dependency update](#minor-dependencies-update) procedure - do it right before merging to avoid merge conflicts in `Cargo.lock` while you're maintaining your branch
+8. (Optional) We usually create a new release for every feature merged into `master`, so follow the [release procedure](#release-procedure)
+9. Maintainers who merge branches should do so via `git merge --ff-only` and NOT rebasing not to lose **commit signatures**
 
 ### Release Procedure
 1. Start by either creating a release branch or with an existing feature branch
@@ -233,6 +240,29 @@ We use the homegrown [`test-group`](https://crates.io/crates/test-group) crate t
 6. On `master` tag the latest commit with a new version: `git tag vX.Y.Z`.
 7. Push the tag to the repo: `git push origin tag vX.Y.Z`
 8. Github Actions will pick up the new tag and create a new GitHub release from it
+
+### Minor Dependencies Update
+1. Run `cargo update` to pull in any minor updates
+2. Run `cargo deny check` to audit new dependencies for duplicates and security advisories
+3. (Optional) Periodically run `cargo clean` to prevent your `target` dir from growing too big
+
+### Major Dependencies Update
+1. (Optional) Start by upgrading your local tools: `cargo install-update -a`
+2. Run `cargo update` to pull in any minor releases first
+3. Run `cargo upgrade --dry-run` and see which packages have major upgrades
+4. To perfom major upgrades You can go crate by crate or all at once - it's up to you
+5. The tricky part is usually `arrow` and `datafusion` family of crates, to upgrade them you need to:
+   1. See what is the latest version of `datafusion`
+   2. Go to [datafusion repo](https://github.com/apache/arrow-datafusion/), switch to corresponding tag, and check its `Cargo.toml` to see which version of `arrow` it depends on
+   3. Update to those major versions. For example `datafusion v32` depends on `arrow v47`, so the command is:
+       ```shell
+       cargo upgrade -p arrow@47 -p arrow-digest@47 -p arrow-flight@47 -p datafusion@32
+       ```
+   4. Note that [arrow-digest](https://github.com/kamu-data/arrow-digest) is our repo versioned in lockstep with `arrow`, so if the right version of it is missing - you should update it as well
+6. If some updates prove to be difficult - ticket them up and leave a `# TODO:` comment in `Cargo.toml`
+7. Run `cargo update` again to to pull in any minor releases that were affected by your upgrades
+8. Run `cargo deny check` to audit new dependencies for duplicates and security advisories
+9. (Optional) Periodically run `cargo clean` to prevent your `target` dir from growing too big
 
 
 ## Tips
