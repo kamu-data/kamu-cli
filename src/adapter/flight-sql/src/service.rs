@@ -16,7 +16,7 @@ use std::sync::Arc;
 use arrow_flight::flight_descriptor::DescriptorType;
 use arrow_flight::flight_service_server::FlightService;
 use arrow_flight::sql::metadata::SqlInfoData;
-use arrow_flight::sql::server::FlightSqlService;
+use arrow_flight::sql::server::{FlightSqlService, PeekableFlightDataStream};
 use arrow_flight::sql::{
     ActionBeginSavepointRequest,
     ActionBeginSavepointResult,
@@ -52,7 +52,6 @@ use arrow_flight::sql::{
 use arrow_flight::utils::batches_to_flight_data;
 use arrow_flight::{
     Action,
-    FlightData,
     FlightDescriptor,
     FlightEndpoint,
     FlightInfo,
@@ -72,7 +71,7 @@ use datafusion::common::DFSchema;
 use datafusion::logical_expr::LogicalPlan;
 use datafusion::prelude::{DataFrame, SessionContext};
 use prost::Message;
-use tonic::codegen::futures_core::Stream;
+use tonic::codegen::tokio_stream::Stream;
 use tonic::metadata::MetadataValue;
 use tonic::{Request, Response, Status, Streaming};
 use uuid::Uuid;
@@ -1011,7 +1010,7 @@ impl FlightSqlService for KamuFlightSqlService {
     async fn do_put_statement_update(
         &self,
         ticket: CommandStatementUpdate,
-        _request: Request<Streaming<FlightData>>,
+        _request: Request<PeekableFlightDataStream>,
     ) -> Result<i64, Status> {
         Err(Status::unimplemented("Implement do_put_statement_update"))
     }
@@ -1020,7 +1019,7 @@ impl FlightSqlService for KamuFlightSqlService {
     async fn do_put_prepared_statement_query(
         &self,
         query: CommandPreparedStatementQuery,
-        _request: Request<Streaming<FlightData>>,
+        _request: Request<PeekableFlightDataStream>,
     ) -> Result<Response<<Self as FlightService>::DoPutStream>, Status> {
         Err(Status::unimplemented(
             "Implement do_put_prepared_statement_query",
@@ -1031,7 +1030,7 @@ impl FlightSqlService for KamuFlightSqlService {
     async fn do_put_prepared_statement_update(
         &self,
         handle: CommandPreparedStatementUpdate,
-        request: Request<Streaming<FlightData>>,
+        _request: Request<PeekableFlightDataStream>,
     ) -> Result<i64, Status> {
         Err(Status::unimplemented(
             "Implement do_put_prepared_statement_update",
@@ -1086,7 +1085,7 @@ impl FlightSqlService for KamuFlightSqlService {
     async fn do_put_substrait_plan(
         &self,
         query: CommandStatementSubstraitPlan,
-        _request: Request<Streaming<FlightData>>,
+        _request: Request<PeekableFlightDataStream>,
     ) -> Result<i64, Status> {
         Err(Status::unimplemented("Implement do_put_substrait_plan"))
     }

@@ -9,6 +9,7 @@
 
 use std::path::Path;
 
+use datafusion::datasource::file_format::file_compression_type::FileCompressionType;
 use datafusion::prelude::*;
 use internal_error::*;
 use kamu_core::ingest::ReadError;
@@ -78,7 +79,7 @@ impl Reader for ReaderNdJson {
             // TODO: PERF: Reader support compression, thus we could detect decompress step and
             // optimize the ingest plan to avoid writing uncompressed data to disc or having to
             // re-compress it.
-            file_compression_type: datafusion::common::FileCompressionType::UNCOMPRESSED,
+            file_compression_type: FileCompressionType::UNCOMPRESSED,
             file_sort_order: Vec::new(),
             infinite: false,
             insert_mode: datafusion::datasource::listing::ListingTableInsertMode::Error,

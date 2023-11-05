@@ -58,7 +58,7 @@ impl QueryServiceImpl {
             ..RuntimeConfig::default()
         };
         let runtime = Arc::new(RuntimeEnv::new(runtime_config).unwrap());
-        let session_context = SessionContext::with_config_rt(cfg, runtime);
+        let session_context = SessionContext::new_with_config_rt(cfg, runtime);
 
         session_context.register_catalog(
             "kamu",

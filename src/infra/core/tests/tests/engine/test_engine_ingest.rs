@@ -1100,7 +1100,7 @@ impl IngestTestHarness {
             dataset_repo,
             ingest_svc,
             time_source,
-            ctx: SessionContext::with_config(SessionConfig::new().with_target_partitions(1)),
+            ctx: SessionContext::new_with_config(SessionConfig::new().with_target_partitions(1)),
         }
     }
 

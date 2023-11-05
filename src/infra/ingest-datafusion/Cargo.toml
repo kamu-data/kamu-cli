@@ -23,7 +23,7 @@ opendatafabric = { workspace = true }
 kamu-core = { workspace = true }
 kamu-data-utils = { workspace = true }
 
-datafusion = "31"
+datafusion = "32"
 digest = "0.10"
 geo-types = { version = "0.7", default-features = false, features = [] }
 geojson ={ version = "0.24", default-features = false, features = ["geo-types"] }

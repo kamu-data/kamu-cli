@@ -37,7 +37,7 @@ impl SessionFactory for TestSessionFactory {
         let cfg = SessionConfig::new()
             .with_information_schema(true)
             .with_default_catalog_and_schema("test", "public");
-        let ctx = SessionContext::with_config(cfg);
+        let ctx = SessionContext::new_with_config(cfg);
 
         ctx.sql(indoc!(
             "

@@ -708,7 +708,7 @@ impl IngestServiceImpl {
 
         let runtime = Arc::new(RuntimeEnv::new(runtime_config).unwrap());
 
-        SessionContext::with_config_rt(config, runtime)
+        SessionContext::new_with_config_rt(config, runtime)
     }
 
     // TODO: Introduce intermediate structs to avoid full unpacking

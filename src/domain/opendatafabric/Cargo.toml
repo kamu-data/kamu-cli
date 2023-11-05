@@ -46,5 +46,5 @@ serde_with = "3"
 serde_yaml = "0.9"
 
 # gRPC
-prost = "0.11"
-tonic = "0.9"
+prost = "0.12"
+tonic = "0.10"

@@ -465,7 +465,7 @@ impl Harness {
             .await
             .unwrap();
 
-        let ctx = SessionContext::with_config(SessionConfig::new().with_target_partitions(1));
+        let ctx = SessionContext::new_with_config(SessionConfig::new().with_target_partitions(1));
 
         let writer = DataWriterDataFusion::builder(dataset.clone(), ctx.clone())
             .build()
