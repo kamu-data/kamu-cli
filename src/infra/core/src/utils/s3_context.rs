@@ -15,7 +15,6 @@ use aws_sdk_s3::operation::head_object::{HeadObjectError, HeadObjectOutput};
 use aws_sdk_s3::operation::put_object::{PutObjectError, PutObjectOutput};
 use aws_sdk_s3::types::{CommonPrefix, Delete, ObjectIdentifier};
 use aws_sdk_s3::Client;
-use aws_smithy_http::byte_stream::ByteStream;
 use kamu_core::*;
 use tokio::io::AsyncRead;
 use tokio_util::io::ReaderStream;
@@ -205,7 +204,7 @@ impl S3Context {
             .bucket(&self.bucket)
             .key(key)
             // TODO: PERF: Avoid copying data into a buffer
-            .body(ByteStream::from(Vec::from(data)))
+            .body(Vec::from(data).into())
             .content_length(data.len() as i64)
             .send()
             .await
@@ -222,7 +221,7 @@ impl S3Context {
             .put_object()
             .bucket(&self.bucket)
             .key(key)
-            .body(ByteStream::from(body))
+            .body(body.into())
             .content_length(size)
             .send()
             .await
@@ -290,10 +289,11 @@ impl S3Context {
                 .int_err()?;
 
             if let Some(contents) = list_response.contents {
-                let object_identifiers: Vec<_> = contents
+                let object_identifiers = contents
                     .into_iter()
                     .map(|obj| ObjectIdentifier::builder().key(obj.key().unwrap()).build())
-                    .collect();
+                    .collect::<Result<Vec<_>, _>>()
+                    .int_err()?;
 
                 has_next_page = list_response.is_truncated;
                 self.client
@@ -303,7 +303,8 @@ impl S3Context {
                         Delete::builder()
                             .set_objects(Some(object_identifiers))
                             .quiet(true)
-                            .build(),
+                            .build()
+                            .int_err()?,
                     )
                     .send()
                     .await
@@ -359,10 +360,11 @@ impl S3Context {
                         .int_err()?;
                 }
 
-                let object_identifiers: Vec<_> = contents
+                let object_identifiers = contents
                     .into_iter()
                     .map(|obj| ObjectIdentifier::builder().key(obj.key().unwrap()).build())
-                    .collect();
+                    .collect::<Result<Vec<_>, _>>()
+                    .int_err()?;
 
                 self.client
                     .delete_objects()
@@ -371,7 +373,8 @@ impl S3Context {
                         Delete::builder()
                             .set_objects(Some(object_identifiers))
                             .quiet(true)
-                            .build(),
+                            .build()
+                            .int_err()?,
                     )
                     .send()
                     .await

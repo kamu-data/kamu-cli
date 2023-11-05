@@ -30,7 +30,7 @@ thiserror = { version = "=1.0.44", default-features = false }  # TODO: Pinned un
 bs58 = "0.5"  # base58 codec
 digest = "0.10"
 sha3 = "0.10"
-unsigned-varint = "0.7"
+unsigned-varint = "0.8"
 url = "2"
 
 # Crypto

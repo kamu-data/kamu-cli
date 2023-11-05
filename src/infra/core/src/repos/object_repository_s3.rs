@@ -47,6 +47,16 @@ where
     fn get_key(&self, hash: &Multihash) -> String {
         self.s3_context.get_key(hash.to_multibase_string().as_str())
     }
+
+    fn into_header_map<'a>(iter: impl Iterator<Item = (&'a str, &'a str)>) -> http::HeaderMap {
+        iter.map(|(k, v)| {
+            (
+                http::HeaderName::from_bytes(k.as_bytes()).unwrap(),
+                http::HeaderValue::from_str(v).unwrap(),
+            )
+        })
+        .collect()
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -167,7 +177,7 @@ where
 
         Ok(GetExternalUrlResult {
             url: Url::parse(&res.uri().to_string()).int_err()?,
-            header_map: res.headers().clone(),
+            header_map: Self::into_header_map(res.headers()),
             expires_at: Some(expires_at.into()),
         })
     }
@@ -197,7 +207,7 @@ where
 
         Ok(GetExternalUrlResult {
             url: Url::parse(&res.uri().to_string()).int_err()?,
-            header_map: res.headers().clone(),
+            header_map: Self::into_header_map(res.headers()),
             expires_at: Some(expires_at.into()),
         })
     }
