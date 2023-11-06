@@ -150,16 +150,13 @@ impl S3Context {
     }
 
     pub async fn credentials(&self) -> Credentials {
-        use aws_credential_types::cache::ProvideCachedCredentials;
-        let credentials_cache = self.client.conf().credentials_cache();
-        credentials_cache
-            .provide_cached_credentials()
-            .await
-            .unwrap()
+        use aws_credential_types::provider::ProvideCredentials;
+        let credentials_cache = self.client.config().credentials_provider().unwrap();
+        credentials_cache.provide_credentials().await.unwrap()
     }
 
     pub fn region(&self) -> Option<&str> {
-        self.client.conf().region().map(|r| r.as_ref())
+        self.client.config().region().map(|r| r.as_ref())
     }
 
     pub fn get_key(&self, sub_key: &str) -> String {
@@ -216,12 +213,16 @@ impl S3Context {
         stream: ReaderStream<Box<AsyncReadObj>>,
         size: i64,
     ) -> Result<PutObjectOutput, SdkError<PutObjectError>> {
+        use aws_smithy_types::body::SdkBody;
+        use aws_smithy_types::byte_stream::ByteStream;
+
         let body = hyper::Body::wrap_stream(stream);
+        let stream = ByteStream::new(SdkBody::from_body_0_4(body));
         self.client
             .put_object()
             .bucket(&self.bucket)
             .key(key)
-            .body(body.into())
+            .body(stream)
             .content_length(size)
             .send()
             .await

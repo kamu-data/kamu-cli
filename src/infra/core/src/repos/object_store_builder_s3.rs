@@ -9,7 +9,7 @@
 
 use std::sync::{Arc, Mutex};
 
-use aws_credential_types::cache::{ProvideCachedCredentials, SharedCredentialsCache};
+use aws_credential_types::provider::SharedCredentialsProvider;
 use dill::*;
 use kamu_core::*;
 use object_store::aws::{AmazonS3Builder, AwsCredential};
@@ -58,7 +58,12 @@ impl ObjectStoreBuilder for ObjectStoreBuilderS3 {
     fn build_object_store(&self) -> Result<Arc<dyn object_store::ObjectStore>, InternalError> {
         let mut s3_builder = AmazonS3Builder::from_env()
             .with_credentials(Arc::new(AwsSdkCredentialProvider::new(
-                self.s3_context.client.conf().credentials_cache().clone(),
+                self.s3_context
+                    .client
+                    .config()
+                    .credentials_provider()
+                    .unwrap()
+                    .clone(),
             )))
             .with_bucket_name(self.s3_context.bucket.clone())
             .with_allow_http(self.allow_http);
@@ -95,7 +100,7 @@ impl ObjectStoreBuilder for ObjectStoreBuilderS3 {
 /// provider in [object_store] crate.
 #[derive(Debug)]
 struct AwsSdkCredentialProvider {
-    credentials_cache: SharedCredentialsCache,
+    credentials_provider: SharedCredentialsProvider,
     state: Mutex<AwsSdkCredentialProviderState>,
 }
 
@@ -106,9 +111,9 @@ struct AwsSdkCredentialProviderState {
 }
 
 impl AwsSdkCredentialProvider {
-    fn new(credentials_cache: SharedCredentialsCache) -> Self {
+    fn new(credentials_provider: SharedCredentialsProvider) -> Self {
         Self {
-            credentials_cache,
+            credentials_provider,
             state: Mutex::new(AwsSdkCredentialProviderState::default()),
         }
     }
@@ -119,9 +124,10 @@ impl CredentialProvider for AwsSdkCredentialProvider {
     type Credential = AwsCredential;
 
     async fn get_credential(&self) -> Result<Arc<Self::Credential>, object_store::Error> {
+        use aws_credential_types::provider::ProvideCredentials;
         let new_creds = self
-            .credentials_cache
-            .provide_cached_credentials()
+            .credentials_provider
+            .provide_credentials()
             .await
             .map_err(|e| object_store::Error::Generic {
                 store: "S3",
