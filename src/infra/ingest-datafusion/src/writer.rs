@@ -306,16 +306,40 @@ impl DataWriterDataFusion {
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(?path))]
-    async fn write_output(&self, path: PathBuf, df: DataFrame) -> Result<OwnedFile, InternalError> {
-        df.write_parquet(
-            path.as_os_str().to_str().unwrap(),
-            DataFrameWriteOptions::new().with_single_file_output(true),
-            Some(self.get_write_properties()),
-        )
-        .await
-        .int_err()?;
+    async fn write_output(
+        &self,
+        path: PathBuf,
+        df: DataFrame,
+    ) -> Result<Option<OwnedFile>, InternalError> {
+        use datafusion::arrow::array::UInt64Array;
 
-        Ok(OwnedFile::new(path))
+        let res = df
+            .write_parquet(
+                path.as_os_str().to_str().unwrap(),
+                DataFrameWriteOptions::new().with_single_file_output(true),
+                Some(self.get_write_properties()),
+            )
+            .await
+            .int_err()?;
+
+        let file = OwnedFile::new(path);
+
+        assert_eq!(res.len(), 1);
+        assert_eq!(res[0].num_columns(), 1);
+        assert_eq!(res[0].num_rows(), 1);
+        let num_records = res[0]
+            .column(0)
+            .as_any()
+            .downcast_ref::<UInt64Array>()
+            .unwrap()
+            .value(0);
+
+        if num_records > 0 {
+            Ok(Some(file))
+        } else {
+            // Empty file will be cleaned up here
+            Ok(None)
+        }
     }
 
     // Read output file back (metadata-only query) to get offsets and watermark
@@ -323,9 +347,7 @@ impl DataWriterDataFusion {
         &self,
         path: &Path,
         prev_watermark: Option<DateTime<Utc>>,
-        input_checkpoint: Option<odf::Multihash>,
-        source_state: Option<odf::SourceState>,
-    ) -> Result<AddDataParams, InternalError> {
+    ) -> Result<(odf::OffsetInterval, Option<DateTime<Utc>>), InternalError> {
         use datafusion::arrow::array::{
             Date32Array,
             Date64Array,
@@ -350,17 +372,8 @@ impl DataWriterDataFusion {
             .await
             .int_err()?;
 
-        // Result is empty?
-        if df.clone().count().await.int_err()? == 0 {
-            std::fs::remove_file(&path).int_err()?;
-
-            return Ok(AddDataParams {
-                input_checkpoint,
-                output_data: None,
-                output_watermark: prev_watermark,
-                source_state,
-            });
-        }
+        // Data must not be empty
+        assert_ne!(df.clone().count().await.int_err()?, 0);
 
         // Calculate stats
         let stats = df
@@ -393,6 +406,11 @@ impl DataWriterDataFusion {
             .unwrap()
             .value(0);
 
+        let offset_interval = odf::OffsetInterval {
+            start: offset_min,
+            end: offset_max,
+        };
+
         // Event time is either Date or Timestamp(Millisecond, UTC)
         let event_time_arr = batches[0].column(2).as_any();
         let event_time_max = if let Some(event_time_arr) =
@@ -423,15 +441,7 @@ impl DataWriterDataFusion {
             prev => prev,
         };
 
-        Ok(AddDataParams {
-            input_checkpoint,
-            output_data: Some(odf::OffsetInterval {
-                start: offset_min,
-                end: offset_max,
-            }),
-            output_watermark,
-            source_state,
-        })
+        Ok((offset_interval, output_watermark))
     }
 }
 
@@ -490,19 +500,39 @@ impl DataWriter for DataWriterDataFusion {
             let data_file = self.write_output(opts.data_staging_path, df).await?;
 
             // Prepare commit info
-            let add_data = self
-                .compute_offset_and_watermark(
-                    data_file.as_path(),
-                    self.meta.last_watermark.clone(),
-                    self.meta.last_checkpoint.clone(),
-                    opts.source_state.clone(),
+            let input_checkpoint = self.meta.last_checkpoint.clone();
+            let source_state = opts.source_state.clone();
+            let prev_watermark = self.meta.last_watermark.clone();
+
+            if data_file.is_none() {
+                // Empty result - carry watermark and propagate source state
+                (
+                    AddDataParams {
+                        input_checkpoint,
+                        output_data: None,
+                        output_watermark: prev_watermark,
+                        source_state,
+                    },
+                    None,
                 )
-                .await?;
+            } else {
+                let (offset_interval, output_watermark) = self
+                    .compute_offset_and_watermark(
+                        data_file.as_ref().unwrap().as_path(),
+                        prev_watermark,
+                    )
+                    .await?;
 
-            // Empty file will be cleaned up here
-            let data_file = add_data.output_data.as_ref().map(|_| data_file);
-
-            (add_data, data_file)
+                (
+                    AddDataParams {
+                        input_checkpoint,
+                        output_data: Some(offset_interval),
+                        output_watermark,
+                        source_state,
+                    },
+                    data_file,
+                )
+            }
         } else {
             // TODO: Should watermark be advanced by the source event time?
             let add_data = AddDataParams {

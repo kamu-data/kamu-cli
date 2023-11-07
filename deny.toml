@@ -67,7 +67,10 @@ license-files = [
 [sources]
 unknown-git = "deny"
 unknown-registry = "deny"
-allow-git = []
+allow-git = [
+    # TODO: Remove after we switch to datafusion 33.0.0 release
+    "https://github.com/apache/arrow-datafusion"
+]
 
 
 [advisories]

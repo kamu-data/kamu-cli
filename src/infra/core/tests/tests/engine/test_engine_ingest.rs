@@ -209,7 +209,7 @@ async fn test_ingest_datafusion_snapshot() {
         indoc!(
             r#"
             message arrow_schema {
-              REQUIRED INT64 offset;
+              OPTIONAL INT64 offset;
               REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
               REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
               REQUIRED BYTE_ARRAY observed (STRING);
@@ -397,7 +397,7 @@ async fn test_ingest_datafusion_ledger() {
         indoc!(
             r#"
             message arrow_schema {
-              REQUIRED INT64 offset;
+              OPTIONAL INT64 offset;
               REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
               OPTIONAL INT64 date (TIMESTAMP(MILLIS,true));
               OPTIONAL BYTE_ARRAY city (STRING);
@@ -685,7 +685,7 @@ async fn test_ingest_datafusion_event_time_as_date() {
         indoc!(
             r#"
             message arrow_schema {
-              REQUIRED INT64 offset;
+              OPTIONAL INT64 offset;
               REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
               OPTIONAL INT32 date (DATE);
               OPTIONAL BYTE_ARRAY city (STRING);
@@ -863,7 +863,7 @@ async fn test_ingest_datafusion_bad_column_names_preserve() {
         indoc!(
             r#"
             message arrow_schema {
-              REQUIRED INT64 offset;
+              OPTIONAL INT64 offset;
               REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
               REQUIRED INT32 Date (UTC) (DATE);
               REQUIRED BYTE_ARRAY City Name (STRING);
@@ -959,7 +959,7 @@ async fn test_ingest_datafusion_bad_column_names_rename() {
         indoc!(
             r#"
             message arrow_schema {
-              REQUIRED INT64 offset;
+              OPTIONAL INT64 offset;
               REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
               OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
               OPTIONAL BYTE_ARRAY city (STRING);
