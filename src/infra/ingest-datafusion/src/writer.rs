@@ -11,12 +11,12 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use chrono::{DateTime, TimeZone, Utc};
+use datafusion::dataframe::DataFrameWriteOptions;
 use datafusion::parquet::file::properties::WriterProperties;
 use datafusion::prelude::*;
 use internal_error::*;
 use kamu_core::ingest::*;
 use kamu_core::*;
-use kamu_data_utils::data::dataframe_ext::*;
 use odf::AsTypedBlock;
 use opendatafabric as odf;
 
@@ -307,10 +307,13 @@ impl DataWriterDataFusion {
 
     #[tracing::instrument(level = "debug", skip_all, fields(?path))]
     async fn write_output(&self, path: PathBuf, df: DataFrame) -> Result<OwnedFile, InternalError> {
-        self.ctx
-            .write_parquet_single_file(df, &path, Some(self.get_write_properties()))
-            .await
-            .int_err()?;
+        df.write_parquet(
+            path.as_os_str().to_str().unwrap(),
+            DataFrameWriteOptions::new().with_single_file_output(true),
+            Some(self.get_write_properties()),
+        )
+        .await
+        .int_err()?;
 
         Ok(OwnedFile::new(path))
     }
