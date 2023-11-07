@@ -50,7 +50,7 @@ impl DataBatch {
         {
             let mut writer: Box<dyn RecordsWriter> = match format {
                 DataBatchFormat::Csv => {
-                    Box::new(CsvWriterBuilder::new().has_headers(true).build(&mut buf))
+                    Box::new(CsvWriterBuilder::new().with_header(true).build(&mut buf))
                 }
                 DataBatchFormat::Json => {
                     // HACK: JsonArrayWriter should be producing [] when there are no rows

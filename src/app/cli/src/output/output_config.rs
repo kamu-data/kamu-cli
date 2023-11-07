@@ -31,7 +31,7 @@ impl OutputConfig {
         match self.format {
             OutputFormat::Csv => Box::new(
                 CsvWriterBuilder::new()
-                    .has_headers(true)
+                    .with_header(true)
                     .build(std::io::stdout()),
             ),
             OutputFormat::Json => Box::new(JsonArrayWriter::new(std::io::stdout())),

@@ -100,7 +100,7 @@ async fn test_read_parquet() {
         indoc!(
             r#"
             message arrow_schema {
-              OPTIONAL INT64 offset;
+              REQUIRED INT64 offset;
               REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
               REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
               REQUIRED BYTE_ARRAY city (STRING);

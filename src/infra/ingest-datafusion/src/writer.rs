@@ -235,11 +235,7 @@ impl DataWriterDataFusion {
             .schema()
             .has_column_with_unqualified_name(&self.meta.vocab.event_time_column)
         {
-            // Events within one chunk must be sorted by event_time
-            df.sort(vec![
-                col(self.meta.vocab.event_time_column.as_ref()).sort(true, false)
-            ])
-            .int_err()?
+            df
         } else {
             df.with_column(
                 &self.meta.vocab.event_time_column,
@@ -252,9 +248,15 @@ impl DataWriterDataFusion {
         };
 
         // Offset
-        // TODO: For some reason this adds two collumns: the expected "offset", but also
-        // "ROW_NUMBER()" for now we simply filter out the latter.
+        // Note: ODF expects events within one chunk to be sorted by event time, so we
+        // ensure data is held in one partition to avoid reordering when saving to
+        // parquet.
+        // TODO: For some reason this adds two collumns: the expected
+        // "offset", but also "ROW_NUMBER()" for now we simply filter out the
+        // latter.
         let df = df
+            .repartition(Partitioning::RoundRobinBatch(1))
+            .int_err()?
             .with_column(
                 &self.meta.vocab.offset_column,
                 Expr::WindowFunction(WindowFunction {
@@ -263,7 +265,9 @@ impl DataWriterDataFusion {
                     ),
                     args: vec![],
                     partition_by: vec![],
-                    order_by: vec![],
+                    order_by: vec![
+                        col(&self.meta.vocab.event_time_column as &str).sort(true, false)
+                    ],
                     window_frame: expr::WindowFrame::new(false),
                 }),
             )
