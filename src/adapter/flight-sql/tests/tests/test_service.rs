@@ -120,7 +120,7 @@ async fn test_statement() {
         .await
         .unwrap();
 
-    let flight_data: Vec<_> = client
+    let mut record_batches: Vec<_> = client
         .do_get(fi.endpoint[0].ticket.clone().unwrap())
         .await
         .unwrap()
@@ -128,7 +128,6 @@ async fn test_statement() {
         .await
         .unwrap();
 
-    let mut record_batches = arrow_flight::utils::flight_data_to_batches(&flight_data[..]).unwrap();
     assert_eq!(record_batches.len(), 1);
 
     let ctx = SessionContext::new();
