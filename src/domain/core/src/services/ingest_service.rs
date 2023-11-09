@@ -16,6 +16,7 @@ use opendatafabric::*;
 use thiserror::Error;
 
 use super::ingest;
+use crate::engine::{EngineError, ProcessError};
 use crate::*;
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -24,44 +25,35 @@ use crate::*;
 
 #[async_trait::async_trait]
 pub trait IngestService: Send + Sync {
-    async fn ingest(
+    /// Uses polling source definition in metadata to ingest data from an
+    /// external source
+    async fn polling_ingest(
         &self,
         dataset_ref: &DatasetRef,
-        options: IngestOptions,
+        options: PollingIngestOptions,
         listener: Option<Arc<dyn IngestListener>>,
     ) -> Result<IngestResult, IngestError>;
 
-    async fn ingest_from(
-        &self,
-        dataset_ref: &DatasetRef,
-        fetch: FetchStep,
-        options: IngestOptions,
-        listener: Option<Arc<dyn IngestListener>>,
-    ) -> Result<IngestResult, IngestError>;
-
-    async fn ingest_multi(
+    /// A batch version of [IngestService::polling_ingest]
+    async fn polling_ingest_multi(
         &self,
         dataset_refs: Vec<DatasetRef>,
-        options: IngestOptions,
+        options: PollingIngestOptions,
         listener: Option<Arc<dyn IngestMultiListener>>,
-    ) -> Vec<(DatasetRef, Result<IngestResult, IngestError>)>;
+    ) -> Vec<IngestResponse>;
 
-    async fn ingest_multi_ext(
+    /// Uses push source defenition in metadata to ingest data from the
+    /// specified source
+    async fn push_ingest(
         &self,
-        requests: Vec<IngestParams>,
-        options: IngestOptions,
-        listener: Option<Arc<dyn IngestMultiListener>>,
-    ) -> Vec<(DatasetRef, Result<IngestResult, IngestError>)>;
-}
-
-#[derive(Clone, Debug)]
-pub struct IngestParams {
-    pub dataset_ref: DatasetRef,
-    pub fetch_override: Option<FetchStep>,
+        dataset_ref: &DatasetRef,
+        data_url: url::Url,
+        listener: Option<Arc<dyn IngestListener>>,
+    ) -> Result<IngestResult, IngestError>;
 }
 
 #[derive(Debug, Clone)]
-pub struct IngestOptions {
+pub struct PollingIngestOptions {
     /// Fetch latest data from uncacheable data sources
     pub fetch_uncacheable: bool,
     /// Pull sources that yield multiple data files until they are
@@ -69,13 +61,19 @@ pub struct IngestOptions {
     pub exhaust_sources: bool,
 }
 
-impl Default for IngestOptions {
+impl Default for PollingIngestOptions {
     fn default() -> Self {
         Self {
             fetch_uncacheable: false,
             exhaust_sources: false,
         }
     }
+}
+
+#[derive(Debug)]
+pub struct IngestResponse {
+    pub dataset_ref: DatasetRef,
+    pub result: Result<IngestResult, IngestError>,
 }
 
 #[derive(Debug)]

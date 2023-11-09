@@ -105,6 +105,22 @@ pub fn get_command(
             submatches.get_flag("recursive"),
             submatches.get_flag("yes"),
         )),
+        Some(("ingest", submatches)) => Box::new(IngestCommand::new(
+            cli_catalog.get_one()?,
+            cli_catalog.get_one()?,
+            cli_catalog.get_one()?,
+            cli_catalog.get_one()?,
+            validate_dataset_ref(
+                cli_catalog,
+                submatches.get_one::<DatasetRef>("dataset").unwrap().clone(),
+            )?,
+            submatches
+                .get_many("file")
+                .unwrap_or_default()
+                .map(String::as_str),
+            submatches.get_flag("stdin"),
+            submatches.get_flag("recursive"),
+        )),
         Some(("init", submatches)) => {
             if submatches.get_flag("pull-images") {
                 Box::new(PullImagesCommand::new(
@@ -255,14 +271,12 @@ pub fn get_command(
                     cli_catalog.get_one()?,
                     cli_catalog.get_one()?,
                     cli_catalog.get_one()?,
-                    cli_catalog.get_one()?,
                     datasets,
                     submatches.get_flag("all"),
                     submatches.get_flag("recursive"),
                     submatches.get_flag("fetch-uncacheable"),
                     submatches.get_one("as").map(|s: &DatasetName| s.clone()),
                     !submatches.get_flag("no-alias"),
-                    submatches.get_one("fetch").map(String::as_str),
                     submatches.get_flag("force"),
                 ))
             }

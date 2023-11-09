@@ -59,13 +59,10 @@ pub trait PullService: Send + Sync {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PullRequest {
     pub local_ref: Option<DatasetRef>,
     pub remote_ref: Option<DatasetRefRemote>,
-    /// Allows to override the fetch source on root datasets (e.g. to pull data
-    /// from a specific file)
-    pub ingest_from: Option<FetchStep>,
 }
 
 impl PullRequest {
@@ -77,12 +74,10 @@ impl PullRequest {
             Ok(local_ref) => Self {
                 local_ref: Some(local_ref),
                 remote_ref: None,
-                ingest_from: None,
             },
             Err(remote_ref) => Self {
                 local_ref: None,
                 remote_ref: Some(remote_ref),
-                ingest_from: None,
             },
         }
     }
@@ -107,7 +102,7 @@ pub struct PullOptions {
     /// associated with them
     pub add_aliases: bool,
     /// Ingest-specific options
-    pub ingest_options: IngestOptions,
+    pub ingest_options: PollingIngestOptions,
     /// Sync-specific options,
     pub sync_options: SyncOptions,
 }
@@ -116,7 +111,7 @@ impl Default for PullOptions {
     fn default() -> Self {
         Self {
             add_aliases: true,
-            ingest_options: IngestOptions::default(),
+            ingest_options: PollingIngestOptions::default(),
             sync_options: SyncOptions::default(),
         }
     }
@@ -132,7 +127,7 @@ pub struct PullMultiOptions {
     /// associated with them
     pub add_aliases: bool,
     /// Ingest-specific options
-    pub ingest_options: IngestOptions,
+    pub ingest_options: PollingIngestOptions,
     /// Sync-specific options,
     pub sync_options: SyncOptions,
 }
@@ -143,7 +138,7 @@ impl Default for PullMultiOptions {
             recursive: false,
             all: false,
             add_aliases: true,
-            ingest_options: IngestOptions::default(),
+            ingest_options: PollingIngestOptions::default(),
             sync_options: SyncOptions::default(),
         }
     }

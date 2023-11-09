@@ -19,6 +19,7 @@ use domain::auth::DatasetActionAuthorizer;
 use futures::StreamExt;
 use indoc::indoc;
 use itertools::Itertools;
+use kamu::domain::engine::*;
 use kamu::domain::*;
 use kamu::testing::*;
 use kamu::*;
@@ -1113,9 +1114,9 @@ impl IngestTestHarness {
 
     async fn ingest(&self, dataset_name: &DatasetName) -> Result<IngestResult, IngestError> {
         self.ingest_svc
-            .ingest(
+            .polling_ingest(
                 &DatasetAlias::new(None, dataset_name.clone()).as_local_ref(),
-                IngestOptions::default(),
+                PollingIngestOptions::default(),
                 None,
             )
             .await

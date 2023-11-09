@@ -14,6 +14,7 @@ use std::time::Duration;
 
 use container_runtime::*;
 use dill::*;
+use kamu_core::engine::*;
 use kamu_core::*;
 
 use super::engine_odf::*;

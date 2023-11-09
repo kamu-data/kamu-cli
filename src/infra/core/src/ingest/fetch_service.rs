@@ -17,6 +17,7 @@ use ::serde::{Deserialize, Serialize};
 use ::serde_with::skip_serializing_none;
 use chrono::{DateTime, SubsecRound, TimeZone, Utc};
 use container_runtime::*;
+use kamu_core::engine::ProcessError;
 use kamu_core::*;
 use opendatafabric::serde::yaml::*;
 use opendatafabric::*;

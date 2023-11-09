@@ -16,6 +16,7 @@ use ::serde::{Deserialize, Serialize};
 use ::serde_with::skip_serializing_none;
 use chrono::{DateTime, Utc};
 use container_runtime::*;
+use kamu_core::engine::{IngestResponse, *};
 use kamu_core::*;
 use opendatafabric::engine::ExecuteQueryError;
 use opendatafabric::serde::yaml::{YamlEngineProtocol, *};

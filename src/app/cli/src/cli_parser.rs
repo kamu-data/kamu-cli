@@ -325,6 +325,41 @@ pub fn cli() -> Command {
                             kamu delete my.dataset
                         "#
                     )),
+                Command::new("ingest")
+                    .about("Adds data to the root dataset according to its push source configuration")
+                    .args([
+                        Arg::new("dataset")
+                            .required(true)
+                            .index(1)
+                            .value_parser(value_parse_dataset_ref_local)
+                            .help("Local dataset reference"),
+                        Arg::new("file")
+                            .action(ArgAction::Append)
+                            .index(2)
+                            .value_name("FILE")
+                            .help("Data file(s) to ingest"),
+                        Arg::new("stdin")
+                            .long("stdin")
+                            .action(ArgAction::SetTrue)
+                            .help("Read data from the standard input"),
+                        Arg::new("recursive")
+                            .short('r')
+                            .long("recursive")
+                            .action(ArgAction::SetTrue)
+                            .help("Recursively propagate the updates into all downstream datasets"),
+                    ]).after_help(indoc::indoc!(
+                        r#"
+                        ### Examples ###
+
+                        Ingest data from files:
+
+                            kamu ingest org.example.data path/to/data.csv
+
+                        Ingest data from standard input:
+
+                            echo '{"key": "value1"}\n{"key": "value2"}' | kamu ingest org.example.data --stdin
+                        "#
+                    )),
                 Command::new("init")
                     .about("Initialize an empty workspace in the current directory")
                     .args([
@@ -638,10 +673,6 @@ pub fn cli() -> Command {
                             .long("no-alias")
                             .action(ArgAction::SetTrue)
                             .help("Don't automatically add a remote push alias for this destination"),
-                        Arg::new("fetch")
-                            .long("fetch")
-                            .value_name("SRC")
-                            .help("Data location (path or URL)"),
                         Arg::new("set-watermark")
                             .long("set-watermark")
                             .value_name("TIME")
@@ -654,8 +685,8 @@ pub fn cli() -> Command {
                     ])
                     .after_help(indoc::indoc!(
                         r#"
-                        Pull is a multi-functional command that lets you make changes to a local dataset. Depending on the parameters and the types of datasets involved it can be used to:
-                        - Ingest new data into a root dataset from an external source
+                        Pull is a multi-functional command that lets you update a local dataset. Depending on the parameters and the types of datasets involved it can be used to:
+                        - Run polling ingest to pull data into a root dataset from an external source
                         - Run transformations on a derivative dataset to process previously unseen data
                         - Pull dataset from a remote repository into your workspace
                         - Update watermark on a dataset
@@ -687,11 +718,6 @@ pub fn cli() -> Command {
                         Advance the watermark of a dataset:
 
                             kamu pull --set-watermark 2020-01-01 org.example.data
-
-                        Ingest data into the root dataset from file or URL (format should match one expected by the 'prepare' step):
-
-                            kamu pull org.example.data --fetch path/to/data.csv
-                            kamu pull org.example.data --fetch https://example.com/data.csv
                         "#
                     )),
                 Command::new("push")

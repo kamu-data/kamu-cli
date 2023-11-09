@@ -25,20 +25,26 @@ pub trait SyncService: Send + Sync {
         &self,
         src: &DatasetRefAny,
         dst: &DatasetRefAny,
-        opts: SyncOptions,
+        options: SyncOptions,
         listener: Option<Arc<dyn SyncListener>>,
     ) -> Result<SyncResult, SyncError>;
 
     async fn sync_multi(
         &self,
-        src_dst: Vec<(DatasetRefAny, DatasetRefAny)>,
-        opts: SyncOptions,
+        requests: Vec<SyncRequest>,
+        options: SyncOptions,
         listener: Option<Arc<dyn SyncMultiListener>>,
     ) -> Vec<SyncResultMulti>;
 
     /// Adds dataset to IPFS and returns the root CID.
     /// Unlike `sync` it does not do IPNS resolution and publishing.
     async fn ipfs_add(&self, src: &DatasetRef) -> Result<String, SyncError>;
+}
+
+#[derive(Debug, Clone)]
+pub struct SyncRequest {
+    pub src: DatasetRefAny,
+    pub dst: DatasetRefAny,
 }
 
 #[derive(Debug, Clone)]

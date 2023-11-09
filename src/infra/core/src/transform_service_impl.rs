@@ -13,6 +13,7 @@ use std::sync::Arc;
 use chrono::{DateTime, Utc};
 use dill::*;
 use futures::{StreamExt, TryFutureExt, TryStreamExt};
+use kamu_core::engine::*;
 use kamu_core::*;
 use opendatafabric::*;
 use thiserror::Error;

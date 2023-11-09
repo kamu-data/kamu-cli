@@ -199,7 +199,7 @@ impl CompleteCommand {
                                 "REPO" => self.complete_repository(output, to_complete),
                                 "TIME" => self.complete_timestamp(output),
                                 "VAR" => self.complete_env_var(output, to_complete),
-                                "SRC" => self.complete_path(output, to_complete),
+                                "FILE" => self.complete_path(output, to_complete),
                                 _ => (),
                             }
                         }
@@ -224,11 +224,12 @@ impl CompleteCommand {
         // Complete positionals
         for pos in last_cmd.get_positionals() {
             match pos.get_id().as_str() {
-                "dataset" => self.complete_dataset(output, to_complete).await,
-                "repository" => self.complete_repository(output, to_complete),
                 "alias" => self.complete_alias(output, to_complete).await,
-                "manifest" => self.complete_path(output, to_complete),
                 "cfgkey" => self.complete_config_key(output, to_complete),
+                "dataset" => self.complete_dataset(output, to_complete).await,
+                "file" => self.complete_path(output, to_complete),
+                "manifest" => self.complete_path(output, to_complete),
+                "repository" => self.complete_repository(output, to_complete),
                 _ => (),
             }
         }

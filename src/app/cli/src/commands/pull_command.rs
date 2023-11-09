@@ -7,14 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use chrono::{DateTime, Utc};
 use kamu::domain::*;
 use opendatafabric::*;
-use url::Url;
 
 use super::{BatchError, CLIError, Command};
 use crate::output::OutputConfig;
@@ -26,7 +24,6 @@ use crate::output::OutputConfig;
 pub struct PullCommand {
     pull_svc: Arc<dyn PullService>,
     dataset_repo: Arc<dyn DatasetRepository>,
-    remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
     output_config: Arc<OutputConfig>,
     refs: Vec<DatasetRefAny>,
     all: bool,
@@ -34,15 +31,13 @@ pub struct PullCommand {
     fetch_uncacheable: bool,
     as_name: Option<DatasetName>,
     add_aliases: bool,
-    fetch: Option<String>,
     force: bool,
 }
 
 impl PullCommand {
-    pub fn new<I, SS>(
+    pub fn new<I>(
         pull_svc: Arc<dyn PullService>,
         dataset_repo: Arc<dyn DatasetRepository>,
-        remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
         output_config: Arc<OutputConfig>,
         refs: I,
         all: bool,
@@ -50,17 +45,14 @@ impl PullCommand {
         fetch_uncacheable: bool,
         as_name: Option<DatasetName>,
         add_aliases: bool,
-        fetch: Option<SS>,
         force: bool,
     ) -> Self
     where
         I: IntoIterator<Item = DatasetRefAny>,
-        SS: Into<String>,
     {
         Self {
             pull_svc,
             dataset_repo,
-            remote_alias_reg,
             output_config,
             refs: refs.into_iter().map(|s| s.clone()).collect(),
             all,
@@ -68,7 +60,6 @@ impl PullCommand {
             fetch_uncacheable,
             as_name,
             add_aliases,
-            fetch: fetch.map(|s| s.into()),
             force,
         }
     }
@@ -88,98 +79,12 @@ impl PullCommand {
                 vec![PullRequest {
                     local_ref: Some(local_name.into()),
                     remote_ref: Some(remote_ref),
-                    ingest_from: None,
                 }],
                 PullMultiOptions {
                     add_aliases: self.add_aliases,
                     ..Default::default()
                 },
                 listener.map(|v| v as Arc<dyn PullMultiListener>),
-            )
-            .await?)
-    }
-
-    async fn ingest_from(
-        &self,
-        listener: Option<Arc<dyn PullMultiListener>>,
-    ) -> Result<Vec<PullResponse>, CLIError> {
-        let dataset_ref = self.refs[0]
-            .as_local_ref(|_| !self.dataset_repo.is_multi_tenant())
-            .map_err(|_| {
-                CLIError::usage_error(
-                    "When using --fetch reference should point to a local dataset",
-                )
-            })?;
-
-        let dataset_handle = self.dataset_repo.resolve_dataset_ref(&dataset_ref).await?;
-
-        let summary = self
-            .dataset_repo
-            .get_dataset(&dataset_handle.as_local_ref())
-            .await?
-            .get_summary(GetSummaryOpts::default())
-            .await?;
-
-        if summary.kind != DatasetKind::Root {
-            return Err(CLIError::usage_error(
-                "Cannot ingest data into non-root dataset",
-            ));
-        }
-
-        let aliases = self
-            .remote_alias_reg
-            .get_remote_aliases(&dataset_handle.as_local_ref())
-            .await
-            .map_err(CLIError::failure)?;
-        let pull_aliases: Vec<_> = aliases
-            .get_by_kind(RemoteAliasKind::Pull)
-            .map(|r| r.to_string())
-            .collect();
-
-        if !pull_aliases.is_empty() {
-            return Err(CLIError::usage_error(format!(
-                "Ingesting data into remote dataset will cause histories to diverge. Existing \
-                 pull aliases:\n{}",
-                pull_aliases.join("\n- ")
-            )));
-        }
-
-        let fetch_str = self.fetch.as_ref().unwrap();
-        let path = Path::new(fetch_str);
-        let url = if path.is_file() {
-            Url::from_file_path(path.canonicalize().unwrap()).unwrap()
-        } else {
-            Url::parse(fetch_str).map_err(|e| {
-                CLIError::usage_error(format!(
-                    "Invalid fetch source, should be URL or path: {}",
-                    e
-                ))
-            })?
-        };
-
-        let fetch_step = FetchStep::Url(FetchStepUrl {
-            url: url.to_string(),
-            event_time: None,
-            cache: None,
-            headers: None,
-        });
-
-        Ok(self
-            .pull_svc
-            .pull_multi_ext(
-                vec![PullRequest {
-                    local_ref: Some(dataset_ref),
-                    remote_ref: None,
-                    ingest_from: Some(fetch_step),
-                }],
-                PullMultiOptions {
-                    ingest_options: IngestOptions {
-                        fetch_uncacheable: self.fetch_uncacheable,
-                        exhaust_sources: true,
-                    },
-                    ..Default::default()
-                },
-                listener,
             )
             .await?)
     }
@@ -196,7 +101,7 @@ impl PullCommand {
                     recursive: self.recursive,
                     all: self.all,
                     add_aliases: self.add_aliases,
-                    ingest_options: IngestOptions {
+                    ingest_options: PollingIngestOptions {
                         fetch_uncacheable: self.fetch_uncacheable,
                         exhaust_sources: true,
                     },
@@ -223,8 +128,6 @@ impl PullCommand {
     ) -> Result<Vec<PullResponse>, CLIError> {
         if self.as_name.is_some() {
             self.sync_from(listener).await
-        } else if self.fetch.is_some() {
-            self.ingest_from(listener).await
         } else {
             self.pull_multi(listener).await
         }
@@ -239,21 +142,12 @@ impl PullCommand {
             .original_request
             .as_ref()
             .and_then(|r| r.remote_ref.as_ref()));
-        match (
-            local_ref,
-            remote_ref,
-            pr.original_request
-                .as_ref()
-                .and_then(|r| r.ingest_from.as_ref()),
-        ) {
-            (Some(local_ref), _, Some(_)) => {
-                format!("ingest data into {} from custom source", local_ref)
-            }
-            (Some(local_ref), Some(remote_ref), _) => {
+        match (local_ref, remote_ref) {
+            (Some(local_ref), Some(remote_ref)) => {
                 format!("sync {} from {}", local_ref, remote_ref)
             }
-            (None, Some(remote_ref), _) => format!("sync dataset from {}", remote_ref),
-            (Some(local_ref), None, _) => format!("pull {}", local_ref),
+            (None, Some(remote_ref)) => format!("sync dataset from {}", remote_ref),
+            (Some(local_ref), None) => format!("pull {}", local_ref),
             _ => format!("???"),
         }
     }
@@ -262,14 +156,12 @@ impl PullCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for PullCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
-        match (self.recursive, self.all, &self.as_name, &self.fetch) {
-            (false, false, _, _) if self.refs.is_empty() => {
-                Err(CLIError::usage_error("Specify a dataset or pass --all"))
-            }
-            (false, true, None, None) if self.refs.is_empty() => Ok(()),
-            (_, false, None, None) if !self.refs.is_empty() => Ok(()),
-            (false, false, Some(_), None) if self.refs.len() == 1 => Ok(()),
-            (false, false, None, Some(_)) if self.refs.len() == 1 => Ok(()),
+        match (self.refs.len(), self.recursive, self.all, &self.as_name) {
+            (0, _, false, _) => Err(CLIError::usage_error("Specify a dataset or pass --all")),
+            (0, false, true, None) => Ok(()),
+            (1, false, false, Some(_)) if self.refs.len() == 1 => Ok(()),
+            (1, false, false, None) if self.refs.len() == 1 => Ok(()),
+            (refs, _, false, None) if refs > 0 => Ok(()),
             _ => Err(CLIError::usage_error(
                 "Invalid combination of arguments".to_owned(),
             )),
@@ -412,7 +304,7 @@ enum ProgressStyle {
     Bar,
 }
 
-struct PrettyIngestProgress {
+pub(crate) struct PrettyIngestProgress {
     dataset_handle: DatasetHandle,
     multi_progress: Arc<indicatif::MultiProgress>,
     fetch_uncacheable: bool,
@@ -426,7 +318,7 @@ struct PrettyIngestProgressState {
 }
 
 impl PrettyIngestProgress {
-    fn new(
+    pub fn new(
         dataset_handle: &DatasetHandle,
         multi_progress: Arc<indicatif::MultiProgress>,
         fetch_uncacheable: bool,

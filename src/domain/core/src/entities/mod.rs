@@ -17,6 +17,5 @@ pub mod metadata_stream;
 pub use current_account_subject::*;
 pub use dataset::*;
 pub use dataset_summary::*;
-pub use engine::*;
 pub use metadata_chain::*;
 pub use metadata_stream::*;

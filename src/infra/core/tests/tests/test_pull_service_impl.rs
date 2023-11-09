@@ -575,7 +575,6 @@ async fn test_sync_from() {
             vec![PullRequest {
                 local_ref: Some(n!("bar").into()),
                 remote_ref: Some(rr!("myrepo/foo")),
-                ingest_from: None,
             }],
             PullMultiOptions::default(),
             None,
@@ -623,7 +622,6 @@ async fn test_sync_from_url_and_local_ref() {
             vec![PullRequest {
                 local_ref: Some(n!("bar").into()),
                 remote_ref: Some(rr!("http://example.com/odf/bar")),
-                ingest_from: None,
             }],
             PullMultiOptions::default(),
             None,
@@ -671,7 +669,6 @@ async fn test_sync_from_url_and_local_multi_tenant_ref() {
             vec![PullRequest {
                 local_ref: Some(mn!("x/bar").into()),
                 remote_ref: Some(rr!("http://example.com/odf/bar")),
-                ingest_from: None,
             }],
             PullMultiOptions::default(),
             None,
@@ -719,7 +716,6 @@ async fn test_sync_from_url_only() {
             vec![PullRequest {
                 local_ref: None,
                 remote_ref: Some(rr!("http://example.com/odf/bar")),
-                ingest_from: None,
             }],
             PullMultiOptions::default(),
             None,
@@ -767,7 +763,6 @@ async fn test_sync_from_url_only_multi_tenant_case() {
             vec![PullRequest {
                 local_ref: None,
                 remote_ref: Some(rr!("http://example.com/odf/bar")),
-                ingest_from: None,
             }],
             PullMultiOptions::default(),
             None,
@@ -1098,56 +1093,44 @@ impl TestIngestService {
 
 #[async_trait::async_trait]
 impl IngestService for TestIngestService {
-    async fn ingest(
+    async fn polling_ingest(
         &self,
         _dataset_ref: &DatasetRef,
-        _ingest_options: IngestOptions,
+        _ingest_options: PollingIngestOptions,
         _maybe_listener: Option<Arc<dyn IngestListener>>,
     ) -> Result<IngestResult, IngestError> {
         unimplemented!();
     }
 
-    async fn ingest_from(
+    async fn polling_ingest_multi(
         &self,
-        _dataset_ref: &DatasetRef,
-        _fetch: FetchStep,
-        _options: IngestOptions,
-        _listener: Option<Arc<dyn IngestListener>>,
-    ) -> Result<IngestResult, IngestError> {
-        unimplemented!()
-    }
-
-    async fn ingest_multi(
-        &self,
-        _dataset_refs: Vec<DatasetRef>,
-        _ingest_options: IngestOptions,
-        _maybe_multi_listener: Option<Arc<dyn IngestMultiListener>>,
-    ) -> Vec<(DatasetRef, Result<IngestResult, IngestError>)> {
-        unimplemented!()
-    }
-
-    async fn ingest_multi_ext(
-        &self,
-        requests: Vec<IngestParams>,
-        _options: IngestOptions,
+        dataset_refs: Vec<DatasetRef>,
+        _options: PollingIngestOptions,
         _listener: Option<Arc<dyn IngestMultiListener>>,
-    ) -> Vec<(DatasetRef, Result<IngestResult, IngestError>)> {
-        let results = requests
+    ) -> Vec<IngestResponse> {
+        let results = dataset_refs
             .iter()
-            .map(|r| {
-                (
-                    r.dataset_ref.clone(),
-                    Ok(IngestResult::UpToDate {
-                        no_polling_source: false,
-                        uncacheable: false,
-                    }),
-                )
+            .map(|r| IngestResponse {
+                dataset_ref: r.clone(),
+                result: Ok(IngestResult::UpToDate {
+                    no_polling_source: false,
+                    uncacheable: false,
+                }),
             })
             .collect();
         self.calls.lock().unwrap().push(PullBatch::Ingest(
-            requests.into_iter().map(|i| i.dataset_ref.into()).collect(),
+            dataset_refs.into_iter().map(|r| r.into()).collect(),
         ));
         results
+    }
+
+    async fn push_ingest(
+        &self,
+        _dataset_ref: &DatasetRef,
+        _data_url: url::Url,
+        _listener: Option<Arc<dyn IngestListener>>,
+    ) -> Result<IngestResult, IngestError> {
+        unimplemented!()
     }
 }
 
@@ -1236,13 +1219,13 @@ impl SyncService for TestSyncService {
 
     async fn sync_multi(
         &self,
-        src_dst: Vec<(DatasetRefAny, DatasetRefAny)>,
+        requests: Vec<SyncRequest>,
         _options: SyncOptions,
         _listener: Option<Arc<dyn SyncMultiListener>>,
     ) -> Vec<SyncResultMulti> {
         let mut call = Vec::new();
         let mut results = Vec::new();
-        for (src, dst) in src_dst {
+        for SyncRequest { src, dst } in requests {
             call.push((src.clone(), dst.clone()));
 
             let local_ref = dst.as_local_single_tenant_ref().unwrap();

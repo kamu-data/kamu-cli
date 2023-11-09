@@ -111,7 +111,11 @@ async fn test_engine_io_common(
         .unwrap();
 
     ingest_svc
-        .ingest(&root_alias.as_local_ref(), IngestOptions::default(), None)
+        .polling_ingest(
+            &root_alias.as_local_ref(),
+            PollingIngestOptions::default(),
+            None,
+        )
         .await
         .unwrap();
 
@@ -179,7 +183,11 @@ async fn test_engine_io_common(
     .unwrap();
 
     ingest_svc
-        .ingest(&root_alias.as_local_ref(), IngestOptions::default(), None)
+        .polling_ingest(
+            &root_alias.as_local_ref(),
+            PollingIngestOptions::default(),
+            None,
+        )
         .await
         .unwrap();
 

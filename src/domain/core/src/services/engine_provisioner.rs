@@ -14,7 +14,7 @@ use container_runtime::{ImagePullError, PullImageListener};
 use internal_error::InternalError;
 use thiserror::Error;
 
-use crate::entities::{Engine, IngestEngine};
+use crate::entities::engine::{Engine, IngestEngine};
 
 ///////////////////////////////////////////////////////////////////////////////
 // EngineProvisioner

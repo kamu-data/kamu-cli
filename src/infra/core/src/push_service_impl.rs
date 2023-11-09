@@ -230,7 +230,10 @@ impl PushService for PushServiceImpl {
             .sync_svc
             .sync_multi(
                 plan.iter()
-                    .map(|pi| (pi.local_handle.as_any_ref(), pi.remote_ref.as_any_ref()))
+                    .map(|pi| SyncRequest {
+                        src: pi.local_handle.as_any_ref(),
+                        dst: pi.remote_ref.as_any_ref(),
+                    })
                     .collect(),
                 options.sync_options,
                 sync_listener,

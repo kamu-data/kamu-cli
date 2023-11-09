@@ -12,6 +12,7 @@ use std::sync::Arc;
 
 use chrono::{TimeZone, Utc};
 use futures::TryStreamExt;
+use kamu::domain::engine::*;
 use kamu::domain::*;
 use kamu::testing::*;
 use kamu::*;

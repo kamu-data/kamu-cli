@@ -12,6 +12,7 @@ use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 use container_runtime::ContainerRuntime;
+use kamu_core::engine::{IngestRequest, IngestResponse};
 use kamu_core::*;
 use opendatafabric::serde::yaml::*;
 use opendatafabric::*;
@@ -21,7 +22,7 @@ use super::*;
 pub struct IngestTask {
     dataset: Arc<dyn Dataset>,
     request: IngestRequest,
-    options: IngestOptions,
+    options: PollingIngestOptions,
     fetch_override: Option<FetchStep>,
     listener: Arc<dyn IngestListener>,
 
@@ -37,7 +38,7 @@ impl IngestTask {
     pub async fn new<'a>(
         dataset: Arc<dyn Dataset>,
         request: IngestRequest,
-        options: IngestOptions,
+        options: PollingIngestOptions,
         fetch_override: Option<FetchStep>,
         listener: Arc<dyn IngestListener>,
         engine_provisioner: Arc<dyn EngineProvisioner>,

@@ -17,7 +17,7 @@ use datafusion::error::DataFusionError;
 use datafusion::prelude::{DataFrame, SessionContext};
 use dill::*;
 use kamu_core::ingest::*;
-use kamu_core::*;
+use kamu_core::{engine, *};
 use kamu_ingest_datafusion::DataWriterDataFusion;
 use opendatafabric::serde::yaml::Manifest;
 use opendatafabric::*;
@@ -66,7 +66,7 @@ impl IngestServiceImpl {
     async fn do_ingest(
         &self,
         dataset_ref: &DatasetRef,
-        options: IngestOptions,
+        options: PollingIngestOptions,
         fetch_override: Option<FetchStep>,
         get_listener: impl FnOnce(&DatasetHandle) -> Option<Arc<dyn IngestListener>>,
     ) -> Result<IngestResult, IngestError> {
@@ -576,7 +576,7 @@ impl IngestServiceImpl {
         &self,
         ctx: &SessionContext,
         step: &SqlQueryStep,
-    ) -> Result<(), EngineError> {
+    ) -> Result<(), engine::EngineError> {
         use datafusion::logical_expr::*;
         use datafusion::sql::TableReference;
 
@@ -596,7 +596,7 @@ impl IngestServiceImpl {
                     query = %step.query,
                     "Error when setting up query"
                 );
-                return Err(InvalidQueryError::new(error.to_string(), Vec::new()).into());
+                return Err(engine::InvalidQueryError::new(error.to_string(), Vec::new()).into());
             }
         };
 
@@ -615,13 +615,13 @@ impl IngestServiceImpl {
         &self,
         df: &DataFrame,
         vocab: &DatasetVocabularyResolved<'_>,
-    ) -> Result<(), EngineError> {
+    ) -> Result<(), engine::EngineError> {
         use datafusion::arrow::datatypes::DataType;
 
         let system_columns = [&vocab.offset_column, &vocab.system_time_column];
         for system_column in system_columns {
             if df.schema().has_column_with_unqualified_name(system_column) {
-                return Err(InvalidQueryError::new(
+                return Err(engine::InvalidQueryError::new(
                     format!(
                         "Transformed data contains a column that conflicts with the system column \
                          name, you should either rename the data column or configure the dataset \
@@ -649,7 +649,7 @@ impl IngestServiceImpl {
                 DataType::Date32 | DataType::Date64 => {}
                 DataType::Timestamp(_, _) => {}
                 typ => {
-                    return Err(InvalidQueryError::new(
+                    return Err(engine::InvalidQueryError::new(
                         format!(
                             "Event time column '{}' should be either Date or Timestamp, but \
                              found: {}",
@@ -770,7 +770,7 @@ impl IngestServiceImpl {
         &self,
         dataset_handle: DatasetHandle,
         dataset: Arc<dyn Dataset>,
-        options: IngestOptions,
+        options: PollingIngestOptions,
         fetch_override: Option<FetchStep>,
         listener: Arc<dyn IngestListener>,
     ) -> Result<IngestResult, IngestError> {
@@ -797,7 +797,7 @@ impl IngestServiceImpl {
 
     async fn legacy_poll_until_exhausted(
         mut task: IngestTask,
-        options: IngestOptions,
+        options: PollingIngestOptions,
     ) -> Result<IngestResult, IngestError> {
         let mut combined_result = None;
 
@@ -826,7 +826,7 @@ impl IngestServiceImpl {
         &self,
         dataset_handle: DatasetHandle,
         dataset: Arc<dyn Dataset>,
-    ) -> Result<IngestRequest, InternalError> {
+    ) -> Result<engine::IngestRequest, InternalError> {
         // TODO: PERF: Full metadata scan below - this is expensive and should be cached
         let mut polling_source = None;
         let mut prev_source_state = None;
@@ -888,7 +888,7 @@ impl IngestServiceImpl {
             }
         }
 
-        Ok(IngestRequest {
+        Ok(engine::IngestRequest {
             operation_id: "".to_string(), // TODO: Will be filled out by IngestTask
             dataset_handle,
             polling_source: polling_source.unwrap(),
@@ -909,85 +909,78 @@ impl IngestServiceImpl {
 
 #[async_trait::async_trait]
 impl IngestService for IngestServiceImpl {
-    async fn ingest(
+    #[tracing::instrument(level = "info", skip_all, fields(%dataset_ref))]
+    async fn polling_ingest(
         &self,
         dataset_ref: &DatasetRef,
-        options: IngestOptions,
+        options: PollingIngestOptions,
         maybe_listener: Option<Arc<dyn IngestListener>>,
     ) -> Result<IngestResult, IngestError> {
-        tracing::info!(%dataset_ref, "Ingesting single dataset");
         self.do_ingest(dataset_ref, options, None, |_| maybe_listener)
             .await
     }
 
-    async fn ingest_from(
-        &self,
-        dataset_ref: &DatasetRef,
-        fetch: FetchStep,
-        options: IngestOptions,
-        maybe_listener: Option<Arc<dyn IngestListener>>,
-    ) -> Result<IngestResult, IngestError> {
-        tracing::info!(%dataset_ref, ?fetch, "Ingesting single dataset from overriden source");
-        self.do_ingest(dataset_ref, options, Some(fetch), |_| maybe_listener)
-            .await
-    }
-
-    async fn ingest_multi(
+    #[tracing::instrument(level = "info", skip_all, fields(?dataset_refs))]
+    async fn polling_ingest_multi(
         &self,
         dataset_refs: Vec<DatasetRef>,
-        options: IngestOptions,
+        options: PollingIngestOptions,
         maybe_multi_listener: Option<Arc<dyn IngestMultiListener>>,
-    ) -> Vec<(DatasetRef, Result<IngestResult, IngestError>)> {
-        self.ingest_multi_ext(
-            dataset_refs
-                .into_iter()
-                .map(|r| IngestParams {
-                    dataset_ref: r,
-                    fetch_override: None,
-                })
-                .collect(),
-            options,
-            maybe_multi_listener,
-        )
-        .await
-    }
-
-    async fn ingest_multi_ext(
-        &self,
-        requests: Vec<IngestParams>,
-        options: IngestOptions,
-        maybe_multi_listener: Option<Arc<dyn IngestMultiListener>>,
-    ) -> Vec<(DatasetRef, Result<IngestResult, IngestError>)> {
+    ) -> Vec<IngestResponse> {
         let multi_listener =
             maybe_multi_listener.unwrap_or_else(|| Arc::new(NullIngestMultiListener));
 
-        tracing::info!(?requests, "Ingesting multiple datasets");
-
-        let futures: Vec<_> = requests
+        let futures: Vec<_> = dataset_refs
             .iter()
-            .map(|req| {
-                self.do_ingest(
-                    &req.dataset_ref,
-                    options.clone(),
-                    req.fetch_override.clone(),
-                    |hdl| multi_listener.begin_ingest(hdl),
-                )
+            .map(|dataset_ref| {
+                self.do_ingest(dataset_ref, options.clone(), None, |hdl| {
+                    multi_listener.begin_ingest(hdl)
+                })
             })
             .collect();
 
         let results = futures::future::join_all(futures).await;
-        requests
+        dataset_refs
             .into_iter()
-            .map(|r| r.dataset_ref)
             .zip(results)
+            .map(|(dataset_ref, result)| IngestResponse {
+                dataset_ref,
+                result,
+            })
             .collect()
+    }
+
+    #[tracing::instrument(level = "info", skip_all, fields(%dataset_ref))]
+    async fn push_ingest(
+        &self,
+        dataset_ref: &DatasetRef,
+        data_url: url::Url,
+        listener: Option<Arc<dyn IngestListener>>,
+    ) -> Result<IngestResult, IngestError> {
+        let fetch = FetchStep::Url(FetchStepUrl {
+            url: data_url.to_string(),
+            event_time: None,
+            cache: None,
+            headers: None,
+        });
+
+        self.do_ingest(
+            dataset_ref,
+            PollingIngestOptions {
+                fetch_uncacheable: true,
+                exhaust_sources: false,
+            },
+            Some(fetch),
+            |_| listener,
+        )
+        .await
     }
 }
 
 struct IngestLoopArgs {
     dataset_handle: DatasetHandle,
     dataset: Arc<dyn Dataset>,
-    options: IngestOptions,
+    options: PollingIngestOptions,
     polling_source: SetPollingSource,
     fetch_override: Option<FetchStep>,
     listener: Arc<dyn IngestListener>,
@@ -998,7 +991,7 @@ struct IngestIterationArgs<'a> {
     operation_id: String,
     operation_dir: PathBuf,
     system_time: DateTime<Utc>,
-    options: IngestOptions,
+    options: PollingIngestOptions,
     polling_source: SetPollingSource,
     fetch_override: Option<FetchStep>,
     listener: Arc<dyn IngestListener>,

@@ -576,13 +576,13 @@ impl SyncService for SyncServiceImpl {
         &self,
         src: &DatasetRefAny,
         dst: &DatasetRefAny,
-        opts: SyncOptions,
+        options: SyncOptions,
         listener: Option<Arc<dyn SyncListener>>,
     ) -> Result<SyncResult, SyncError> {
         let listener = listener.unwrap_or(Arc::new(NullSyncListener));
         listener.begin();
 
-        match self.sync_impl(src, dst, opts, listener.clone()).await {
+        match self.sync_impl(src, dst, options, listener.clone()).await {
             Ok(result) => {
                 listener.success(&result);
                 Ok(result)
@@ -597,15 +597,15 @@ impl SyncService for SyncServiceImpl {
     // TODO: Parallelism
     async fn sync_multi(
         &self,
-        src_dst: Vec<(DatasetRefAny, DatasetRefAny)>,
-        opts: SyncOptions,
+        requests: Vec<SyncRequest>,
+        options: SyncOptions,
         listener: Option<Arc<dyn SyncMultiListener>>,
     ) -> Vec<SyncResultMulti> {
         let mut results = Vec::new();
 
-        for (src, dst) in src_dst {
+        for SyncRequest { src, dst } in requests {
             let listener = listener.as_ref().and_then(|l| l.begin_sync(&src, &dst));
-            let result = self.sync(&src, &dst, opts.clone(), listener).await;
+            let result = self.sync(&src, &dst, options.clone(), listener).await;
             results.push(SyncResultMulti { src, dst, result });
         }
 

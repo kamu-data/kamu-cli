@@ -10,7 +10,7 @@
 use std::path::{Path, PathBuf};
 
 use container_runtime::*;
-use kamu_core::EngineError;
+use kamu_core::engine::EngineError;
 use opendatafabric::engine::EngineGrpcClient;
 
 use super::ODFEngineConfig;

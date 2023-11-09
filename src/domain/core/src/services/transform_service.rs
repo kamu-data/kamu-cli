@@ -13,6 +13,7 @@ use std::usize;
 use opendatafabric::*;
 use thiserror::Error;
 
+use crate::engine::EngineError;
 use crate::*;
 
 ///////////////////////////////////////////////////////////////////////////////

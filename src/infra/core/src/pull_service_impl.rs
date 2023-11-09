@@ -13,6 +13,7 @@ use std::sync::Arc;
 
 use chrono::prelude::*;
 use dill::*;
+use kamu_core::ingest_service::IngestResponse;
 use kamu_core::*;
 use opendatafabric::*;
 use url::Url;
@@ -179,7 +180,7 @@ impl PullServiceImpl {
         let mut pull_item = if remote_ref.is_some() {
             // Datasets synced from remotes are depth 0
             PullItem {
-                original_request: None,
+                original_request: None, // May be set below
                 depth: 0,
                 local_ref: local_handle
                     .map(|h| h.into())
@@ -199,12 +200,6 @@ impl PullServiceImpl {
                 .await
                 .int_err()?;
 
-            if summary.kind != DatasetKind::Root && request.ingest_from.is_some() {
-                return Err(PullError::InvalidOperation(
-                    "Cannot ingest data into a non-root dataset".to_owned(),
-                ));
-            }
-
             // TODO: EVO: Should be accounting for historical dependencies, not only current
             // ones?
             let mut max_dep_depth = -1;
@@ -218,7 +213,6 @@ impl PullServiceImpl {
                         &PullRequest {
                             local_ref: Some(id.as_local_ref()),
                             remote_ref: None,
-                            ingest_from: None,
                         },
                         false,
                         options,
@@ -229,7 +223,7 @@ impl PullServiceImpl {
             }
 
             PullItem {
-                original_request: None,
+                original_request: None, // May be set below
                 depth: max_dep_depth + 1,
                 local_ref: local_handle.into(),
                 remote_ref: None,
@@ -355,27 +349,18 @@ impl PullServiceImpl {
         options: &PullMultiOptions,
         listener: Option<Arc<dyn IngestMultiListener>>,
     ) -> Result<Vec<PullResponse>, InternalError> {
-        let ingest_requests = batch
-            .iter()
-            .map(|pi| IngestParams {
-                dataset_ref: pi.local_ref.clone(),
-                fetch_override: pi
-                    .original_request
-                    .as_ref()
-                    .and_then(|r| r.ingest_from.clone()),
-            })
-            .collect();
+        let ingest_requests = batch.iter().map(|pi| pi.local_ref.clone()).collect();
 
-        let ingest_results = self
+        let ingest_responses = self
             .ingest_svc
-            .ingest_multi_ext(ingest_requests, options.ingest_options.clone(), listener)
+            .polling_ingest_multi(ingest_requests, options.ingest_options.clone(), listener)
             .await;
 
-        assert_eq!(batch.len(), ingest_results.len());
+        assert_eq!(batch.len(), ingest_responses.len());
 
-        Ok(std::iter::zip(batch, ingest_results)
+        Ok(std::iter::zip(batch, ingest_responses)
             .map(|(pi, res)| {
-                assert_eq!(pi.local_ref, res.0);
+                assert_eq!(pi.local_ref, res.dataset_ref);
                 pi.clone().into_response_ingest(res)
             })
             .collect())
@@ -389,11 +374,9 @@ impl PullServiceImpl {
     ) -> Result<Vec<PullResponse>, InternalError> {
         let sync_requests = batch
             .iter()
-            .map(|pi| {
-                (
-                    pi.remote_ref.as_ref().unwrap().into(),
-                    pi.local_ref.as_any_ref(),
-                )
+            .map(|pi| SyncRequest {
+                src: pi.remote_ref.as_ref().unwrap().into(),
+                dst: pi.local_ref.as_any_ref(),
             })
             .collect();
 
@@ -456,6 +439,7 @@ impl PullServiceImpl {
 
 #[async_trait::async_trait]
 impl PullService for PullServiceImpl {
+    #[tracing::instrument(level = "info", skip_all)]
     async fn pull(
         &self,
         dataset_ref: &DatasetRefAny,
@@ -468,6 +452,7 @@ impl PullService for PullServiceImpl {
         self.pull_ext(&request, options, listener).await
     }
 
+    #[tracing::instrument(level = "info", skip_all)]
     async fn pull_ext(
         &self,
         request: &PullRequest,
@@ -497,6 +482,7 @@ impl PullService for PullServiceImpl {
         responses.pop().unwrap().result
     }
 
+    #[tracing::instrument(level = "info", skip_all)]
     async fn pull_multi(
         &self,
         dataset_refs: Vec<DatasetRefAny>,
@@ -511,7 +497,7 @@ impl PullService for PullServiceImpl {
         self.pull_multi_ext(requests, options, listener).await
     }
 
-    #[tracing::instrument(level = "info", name = "pull_multi", skip_all)]
+    #[tracing::instrument(level = "info", skip_all)]
     async fn pull_multi_ext(
         &self,
         requests: Vec<PullRequest>,
@@ -527,7 +513,6 @@ impl PullService for PullServiceImpl {
                 .map_ok(|hdl| PullRequest {
                     local_ref: Some(hdl.into()),
                     remote_ref: None,
-                    ingest_from: None,
                 })
                 .try_collect()
                 .await?
@@ -667,15 +652,12 @@ struct PullItem {
 }
 
 impl PullItem {
-    fn into_response_ingest(
-        self,
-        r: (DatasetRef, Result<IngestResult, IngestError>),
-    ) -> PullResponse {
+    fn into_response_ingest(self, r: IngestResponse) -> PullResponse {
         PullResponse {
             original_request: self.original_request,
-            local_ref: Some(r.0),
+            local_ref: Some(r.dataset_ref),
             remote_ref: None,
-            result: match r.1 {
+            result: match r.result {
                 Ok(r) => Ok(r.into()),
                 Err(e) => Err(e.into()),
             },

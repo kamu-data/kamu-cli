@@ -12,6 +12,7 @@ use std::process::Stdio;
 use std::sync::Arc;
 
 use container_runtime::*;
+use kamu_core::engine::*;
 use kamu_core::*;
 use odf::engine::{EngineGrpcClient, ExecuteQueryError};
 use odf::ExecuteQueryResponseSuccess;

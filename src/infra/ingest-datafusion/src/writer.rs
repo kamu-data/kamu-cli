@@ -339,10 +339,15 @@ impl DataWriterDataFusion {
             .value(0);
 
         if num_records > 0 {
+            tracing::info!(
+                path = ?file.as_path(),
+                num_records,
+                "Produced parquet file",
+            );
             Ok(Some(file))
         } else {
-            // Empty file will be cleaned up here
-            Ok(None)
+            tracing::info!("Produced empty result",);
+            Ok(None) // Empty file will be cleaned up here
         }
     }
 
