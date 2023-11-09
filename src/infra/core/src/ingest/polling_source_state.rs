@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::path::{Path, PathBuf};
+
 use chrono::{DateTime, SecondsFormat, Utc};
 use kamu_core::{InternalError, ResultIntoInternal};
 use opendatafabric::serde::yaml::{datetime_rfc3339, datetime_rfc3339_opt, SourceStateDef};
@@ -98,13 +100,36 @@ impl PollingSourceState {
 #[skip_serializing_none]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub struct FetchSavepoint {
+pub(crate) struct FetchSavepoint {
     #[serde(with = "datetime_rfc3339")]
     pub created_at: DateTime<Utc>,
     #[serde(default, with = "PollingSourceState")]
     pub source_state: Option<PollingSourceState>,
     #[serde(default, with = "datetime_rfc3339_opt")]
     pub source_event_time: Option<DateTime<Utc>>,
-    pub data_cache_key: String,
+    pub data: SavepointData,
     pub has_more: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase", tag = "kind")]
+pub(crate) enum SavepointData {
+    Owned { cache_key: String },
+    Ref { path: PathBuf },
+}
+
+impl SavepointData {
+    pub fn path(&self, cache_dir: &Path) -> PathBuf {
+        match self {
+            SavepointData::Owned { cache_key } => cache_dir.join(cache_key),
+            SavepointData::Ref { path } => path.clone(),
+        }
+    }
+
+    pub fn remove_owned(&self, cache_dir: &Path) -> Result<(), std::io::Error> {
+        match self {
+            SavepointData::Owned { cache_key } => std::fs::remove_file(cache_dir.join(cache_key)),
+            SavepointData::Ref { .. } => Ok(()),
+        }
+    }
 }

@@ -264,6 +264,7 @@ impl IngestServiceImpl {
             self.validate_new_data(&df, args.data_writer.vocab())?;
             Some(df)
         } else {
+            tracing::info!("Read produced an empty data frame");
             None
         };
 
@@ -292,8 +293,11 @@ impl IngestServiceImpl {
         // Clean up intermediate files
         // Note that we are leaving the fetch data and savepoint intact
         // in case user wants to iterate on the dataset.
-        if prepare_result.data_cache_key != savepoint.data_cache_key {
-            std::fs::remove_file(self.cache_dir.join(prepare_result.data_cache_key)).int_err()?;
+        if prepare_result.data != savepoint.data {
+            prepare_result
+                .data
+                .remove_owned(&self.cache_dir)
+                .int_err()?;
         }
 
         match stage_result {
@@ -377,6 +381,14 @@ impl IngestServiceImpl {
         match fetch_result {
             FetchResult::UpToDate => Ok(FetchStepResult::UpToDate),
             FetchResult::Updated(upd) => {
+                let data = if let Some(path) = upd.zero_copy_path {
+                    SavepointData::Ref { path }
+                } else {
+                    SavepointData::Owned {
+                        cache_key: data_cache_key,
+                    }
+                };
+
                 let savepoint = FetchSavepoint {
                     created_at: args.system_time.clone(),
                     // If fetch source was overridden we don't want to put its
@@ -387,7 +399,7 @@ impl IngestServiceImpl {
                         None
                     },
                     source_event_time: upd.source_event_time,
-                    data_cache_key,
+                    data,
                     has_more: upd.has_more,
                 };
                 self.write_fetch_savepoint(&savepoint_path, &savepoint)?;
@@ -469,12 +481,12 @@ impl IngestServiceImpl {
         let prep_steps = args.polling_source.prepare.clone().unwrap_or_default();
 
         if prep_steps.is_empty() {
+            // Specify input as output
             Ok(PrepStepResult {
-                // Specify input as output
-                data_cache_key: fetch_result.data_cache_key.clone(),
+                data: fetch_result.data.clone(),
             })
         } else {
-            let src_path = self.cache_dir.join(&fetch_result.data_cache_key);
+            let src_path = fetch_result.data.path(&self.cache_dir);
             let data_cache_key = self.get_random_cache_key("prepare-");
             let target_path = self.cache_dir.join(&data_cache_key);
 
@@ -493,7 +505,11 @@ impl IngestServiceImpl {
             .await
             .int_err()??;
 
-            Ok(PrepStepResult { data_cache_key })
+            Ok(PrepStepResult {
+                data: SavepointData::Owned {
+                    cache_key: data_cache_key,
+                },
+            })
         }
     }
 
@@ -503,9 +519,10 @@ impl IngestServiceImpl {
         args: &IngestIterationArgs<'_>,
         prep_result: &PrepStepResult,
     ) -> Result<Option<DataFrame>, IngestError> {
-        let input_data_path = self.cache_dir.join(&prep_result.data_cache_key);
+        let input_data_path = prep_result.data.path(&self.cache_dir);
 
         if input_data_path.metadata().int_err()?.len() == 0 {
+            tracing::info!(path = ?input_data_path, "Early return due to an empty file");
             return Ok(None);
         }
 

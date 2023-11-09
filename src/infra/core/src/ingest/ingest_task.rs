@@ -152,8 +152,10 @@ impl IngestTask {
                 // Clean up intermediate files
                 // Note that we are leaving the fetch data and savepoint intact
                 // in case user wants to iterate on the dataset.
-                if prepare_result.data_cache_key != savepoint.data_cache_key {
-                    std::fs::remove_file(self.cache_dir.join(prepare_result.data_cache_key))
+                if prepare_result.data != savepoint.data {
+                    prepare_result
+                        .data
+                        .remove_owned(&self.cache_dir)
                         .int_err()?;
                 }
 
@@ -325,6 +327,14 @@ impl IngestTask {
         match fetch_result {
             FetchResult::UpToDate => Ok(FetchStepResult::UpToDate),
             FetchResult::Updated(upd) => {
+                let data = if let Some(path) = upd.zero_copy_path {
+                    SavepointData::Ref { path }
+                } else {
+                    SavepointData::Owned {
+                        cache_key: data_cache_key,
+                    }
+                };
+
                 let savepoint = FetchSavepoint {
                     created_at: self.request.system_time.clone(),
                     // If fetch source was overridden, we don't want to put its
@@ -335,7 +345,7 @@ impl IngestTask {
                         None
                     },
                     source_event_time: upd.source_event_time,
-                    data_cache_key,
+                    data,
                     has_more: upd.has_more,
                 };
                 self.write_fetch_savepoint(&savepoint_path, &savepoint)?;
@@ -358,19 +368,23 @@ impl IngestTask {
             .unwrap_or(&null_steps);
 
         if prep_steps.is_empty() {
+            // Specify input as output
             Ok(PrepStepResult {
-                // Specify input as output
-                data_cache_key: fetch_result.data_cache_key.clone(),
+                data: fetch_result.data.clone(),
             })
         } else {
-            let src_path = self.cache_dir.join(&fetch_result.data_cache_key);
+            let src_path = fetch_result.data.path(&self.cache_dir);
             let data_cache_key = self.get_random_cache_key("prepare-");
             let target_path = self.cache_dir.join(&data_cache_key);
 
             self.prep_service
                 .prepare(prep_steps, &src_path, &target_path)?;
 
-            Ok(PrepStepResult { data_cache_key })
+            Ok(PrepStepResult {
+                data: SavepointData::Owned {
+                    cache_key: data_cache_key,
+                },
+            })
         }
     }
 
@@ -380,7 +394,7 @@ impl IngestTask {
         prep_result: &PrepStepResult,
         source_event_time: Option<DateTime<Utc>>,
     ) -> Result<IngestResponse, IngestError> {
-        let input_data_path = self.cache_dir.join(&prep_result.data_cache_key);
+        let input_data_path = prep_result.data.path(&self.cache_dir);
 
         // Terminate early for zero-sized files
         // TODO: Should we still call an engine if only to propagate source_event_time
@@ -473,7 +487,7 @@ pub(crate) enum FetchStepResult {
 }
 
 pub(crate) struct PrepStepResult {
-    pub data_cache_key: String,
+    pub data: SavepointData,
 }
 
 enum CommitStepResult {

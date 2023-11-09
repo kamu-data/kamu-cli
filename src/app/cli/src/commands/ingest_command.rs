@@ -112,7 +112,7 @@ impl Command for IngestCommand {
                 .collect::<Result<Vec<_>, _>>()?
         };
 
-        let listener = if !self.output_config.is_tty {
+        let listener = if !self.output_config.is_tty || (self.output_config.is_tty && self.stdin) {
             None
         } else {
             Some(Arc::new(crate::PrettyIngestProgress::new(

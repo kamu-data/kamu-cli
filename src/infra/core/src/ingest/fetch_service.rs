@@ -7,19 +7,15 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::assert_matches::assert_matches;
 use std::borrow::Cow;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::Arc;
 
-use ::serde::{Deserialize, Serialize};
-use ::serde_with::skip_serializing_none;
 use chrono::{DateTime, SubsecRound, TimeZone, Utc};
 use container_runtime::*;
 use kamu_core::engine::ProcessError;
 use kamu_core::*;
-use opendatafabric::serde::yaml::*;
 use opendatafabric::*;
 use url::Url;
 
@@ -342,6 +338,7 @@ impl FetchService {
                 source_state,
                 source_event_time: None,
                 has_more: false,
+                zero_copy_path: None,
             }))
         }
     }
@@ -418,20 +415,23 @@ impl FetchService {
             }
         };
 
-        let fetch_res =
-            Self::fetch_file(&first_path, None, None, target_path, system_time, listener).await?;
-        assert_matches!(fetch_res, FetchResult::Updated(_));
+        let FetchResult::Updated(fetch_res) =
+            Self::fetch_file(&first_path, None, None, target_path, system_time, listener).await?
+        else {
+            panic!("Glob rule should be caching individual files")
+        };
 
         Ok(FetchResult::Updated(FetchResultUpdated {
             source_state: Some(PollingSourceState::ETag(first_filename)),
             source_event_time,
             has_more: !matched_files.is_empty(),
+            zero_copy_path: fetch_res.zero_copy_path,
         }))
     }
 
     // TODO: Validate event_time_source
     // TODO: Support event time from ctime/modtime
-    // TODO: PERF: Use symlinks
+    // TODO: Resolve symlinks
     // TODO: PERF: Consider compression
     async fn fetch_file(
         path: &Path,
@@ -443,14 +443,12 @@ impl FetchService {
     ) -> Result<FetchResult, IngestError> {
         tracing::info!(?path, "Ingesting file");
 
-        let meta = tokio::fs::metadata(path)
-            .await
-            .map_err(|e| match e.kind() {
-                std::io::ErrorKind::NotFound => {
-                    IngestError::not_found(path.as_os_str().to_string_lossy(), Some(e.into()))
-                }
-                _ => e.int_err().into(),
-            })?;
+        let meta = std::fs::metadata(path).map_err(|e| match e.kind() {
+            std::io::ErrorKind::NotFound => {
+                IngestError::not_found(path.as_os_str().to_string_lossy(), Some(e.into()))
+            }
+            _ => e.int_err().into(),
+        })?;
 
         let mod_time: DateTime<Utc> = meta
             .modified()
@@ -475,43 +473,55 @@ impl FetchService {
             }
         };
 
-        let total_bytes = TotalBytes::Exact(meta.len());
-        let mut source = std::fs::File::open(path).int_err()?;
-        let mut target = std::fs::File::create(target_path).int_err()?;
-        let listener = listener.clone();
+        // Heuristics for STDIN (/dev/fd/0) and other special device files
+        if meta.is_file() {
+            Ok(FetchResult::Updated(FetchResultUpdated {
+                source_state: Some(PollingSourceState::LastModified(mod_time)),
+                source_event_time,
+                has_more: false,
+                zero_copy_path: Some(path.to_path_buf()),
+            }))
+        } else {
+            // Copy data into the cache, not to confuse the engines
+            let total_bytes = TotalBytes::Exact(meta.len());
+            let mut source = std::fs::File::open(path).int_err()?;
+            let mut target = std::fs::File::create(target_path).int_err()?;
+            let listener = listener.clone();
 
-        tokio::task::spawn_blocking(move || -> Result<(), std::io::Error> {
-            use std::io::{Read, Write};
+            tokio::task::spawn_blocking(move || -> Result<(), std::io::Error> {
+                use std::io::{Read, Write};
 
-            let mut buf = [0u8; 1024];
-            let mut fetched_bytes = 0;
+                let mut buf = [0u8; 1024];
+                let mut fetched_bytes = 0;
 
-            loop {
-                let read = source.read(&mut buf)?;
-                if read == 0 {
-                    break;
+                loop {
+                    let read = source.read(&mut buf)?;
+                    if read == 0 {
+                        break;
+                    }
+
+                    target.write_all(&buf[..read])?;
+
+                    fetched_bytes += read as u64;
+                    listener.on_progress(&FetchProgress {
+                        fetched_bytes,
+                        total_bytes,
+                    });
                 }
 
-                target.write_all(&buf[..read])?;
+                Ok(())
+            })
+            .await
+            .int_err()?
+            .int_err()?;
 
-                fetched_bytes += read as u64;
-                listener.on_progress(&FetchProgress {
-                    fetched_bytes,
-                    total_bytes,
-                });
-            }
-
-            Ok(())
-        })
-        .await
-        .int_err()?
-        .int_err()?;
-
-        Ok(FetchResult::Updated(FetchResultUpdated {
-            source_state: Some(PollingSourceState::LastModified(mod_time)),
-            source_event_time,
-            has_more: false,
-        }))
+            Ok(FetchResult::Updated(FetchResultUpdated {
+                source_state: Some(PollingSourceState::LastModified(mod_time)),
+                source_event_time,
+                has_more: false,
+                zero_copy_path: None,
+            }))
+        }
     }
 
     // TODO: Externalize configuration
@@ -634,6 +644,7 @@ impl FetchService {
             source_state,
             source_event_time,
             has_more: false,
+            zero_copy_path: None,
         }))
     }
 
@@ -734,6 +745,7 @@ impl FetchService {
             source_state: None,
             source_event_time: Some(system_time),
             has_more: false,
+            zero_copy_path: None,
         }))
     }
 
@@ -784,22 +796,18 @@ impl FetchService {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase", tag = "kind")]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FetchResult {
     UpToDate,
     Updated(FetchResultUpdated),
 }
 
-#[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FetchResultUpdated {
-    #[serde(default, with = "PollingSourceState")]
     pub source_state: Option<PollingSourceState>,
-    #[serde(default, with = "datetime_rfc3339_opt")]
     pub source_event_time: Option<DateTime<Utc>>,
     pub has_more: bool,
+    pub zero_copy_path: Option<PathBuf>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////

@@ -137,6 +137,7 @@ impl WorkspaceService {
                 WorkspaceVersion::V0_Initial => self.upgrade_0_to_1()?,
                 WorkspaceVersion::V1_WorkspaceCacheDir => self.upgrade_1_to_2()?,
                 WorkspaceVersion::V2_DatasetConfig => self.upgrade_2_to_3()?,
+                WorkspaceVersion::V3_SavepointCreatedAt => self.upgrade_3_to_4()?,
                 _ => unreachable!(),
             }
 
@@ -190,6 +191,22 @@ impl WorkspaceService {
     }
 
     fn upgrade_2_to_3(&self) -> Result<(), InternalError> {
+        if self.workspace_layout.cache_dir.exists() {
+            tracing::info!("Clearing the cache directory");
+
+            for res in self.workspace_layout.cache_dir.read_dir().int_err()? {
+                let entry = res.int_err()?;
+                if entry.path().is_dir() {
+                    std::fs::remove_dir_all(entry.path()).int_err()?;
+                } else {
+                    std::fs::remove_file(entry.path()).int_err()?;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn upgrade_3_to_4(&self) -> Result<(), InternalError> {
         if self.workspace_layout.cache_dir.exists() {
             tracing::info!("Clearing the cache directory");
 

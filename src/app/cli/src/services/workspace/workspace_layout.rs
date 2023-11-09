@@ -36,7 +36,7 @@ pub struct WorkspaceLayout {
 }
 
 impl WorkspaceLayout {
-    pub const VERSION: WorkspaceVersion = WorkspaceVersion::V3_SavepointCreatedAt;
+    pub const VERSION: WorkspaceVersion = WorkspaceVersion::V4_SavepointZeroCopy;
 
     pub fn new(root: impl Into<PathBuf>) -> Self {
         let root_dir = root.into();
@@ -84,6 +84,8 @@ pub enum WorkspaceVersion {
     V2_DatasetConfig,
     // Added a `createdAt` field to fetch savepoints
     V3_SavepointCreatedAt,
+    // Added a zero-copy ingest for loca FS files that affected the savepoint schema
+    V4_SavepointZeroCopy,
     Unknown(u32),
 }
 
@@ -101,6 +103,7 @@ impl From<u32> for WorkspaceVersion {
             1 => WorkspaceVersion::V1_WorkspaceCacheDir,
             2 => WorkspaceVersion::V2_DatasetConfig,
             3 => WorkspaceVersion::V3_SavepointCreatedAt,
+            4 => WorkspaceVersion::V4_SavepointZeroCopy,
             _ => WorkspaceVersion::Unknown(value),
         }
     }
@@ -113,6 +116,7 @@ impl Into<u32> for WorkspaceVersion {
             Self::V1_WorkspaceCacheDir => 1,
             Self::V2_DatasetConfig => 2,
             Self::V3_SavepointCreatedAt => 3,
+            Self::V4_SavepointZeroCopy => 4,
             Self::Unknown(value) => value,
         }
     }
