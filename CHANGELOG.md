@@ -5,6 +5,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
+### Added
+- New `kamu ingest` command allows you to push data into a root dataset, examples:
+  - `kamu ingest my.dataset data-2023-*.json` - to push from files
+  - `echo '{"city": "Vancouver", "population": 675218}' | kamu ingest cities --stdin`
+- New `/:dataset/data/ingest` REST endpoint also allows you to push data via API, example:
+  - Run API server and get JWT token: `kamu ui --http-port 8080 --get-token`
+  - Push data: `echo '{...}' | curl -v -X POST http://localhost:8080/freezer/data/ingest -H 'Authorization:  Bearer <token>'`
+- The `kamu ui` command now supports `--get-token` flag to print out the access token upon server start that you can use to experiment with API
 ### Changed
 - Upgraded to `arrow v48`, `datafusion v33`, and latest AWS SDK
 

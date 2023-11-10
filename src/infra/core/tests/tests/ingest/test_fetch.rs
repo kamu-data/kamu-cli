@@ -69,13 +69,11 @@ async fn test_fetch_url_file() {
         .fetch("1", &fetch_step, None, &target_path, &Utc::now(), None)
         .await
         .unwrap();
-    assert_matches!(res, FetchResult::Updated(_));
-    assert!(target_path.exists());
-
-    let update = match res {
-        FetchResult::Updated(upd) => upd,
-        _ => unreachable!(),
+    let FetchResult::Updated(update) = res else {
+        panic!("Unexpected result: {:#?}", res);
     };
+    assert!(!target_path.exists()); // Uses zero-copy path
+    assert_eq!(update.zero_copy_path.as_ref(), Some(&src_path));
 
     // No modifications
     let res2 = fetch_svc
@@ -479,12 +477,11 @@ async fn test_fetch_files_glob() {
         .fetch("1", &fetch_step, None, &target_path, &Utc::now(), None)
         .await
         .unwrap();
-    assert_matches!(res, FetchResult::Updated(_));
-    let update = match res {
-        FetchResult::Updated(upd) => upd,
-        _ => unreachable!(),
+    let FetchResult::Updated(update) = res else {
+        panic!("Unexpected result: {:#?}", res);
     };
-    assert!(target_path.exists());
+    assert!(!target_path.exists()); // Uses zero-copy path
+    assert_eq!(update.zero_copy_path.as_ref(), Some(&src_path_1));
     assert_matches!(
         &update.source_state,
         Some(PollingSourceState::ETag(etag)) if etag == "data-2020-10-01.csv"
@@ -523,7 +520,7 @@ async fn test_fetch_files_glob() {
         .unwrap();
     assert_matches!(res3, FetchResult::UpToDate);
 
-    // Doesn't consider files with names lexicographically "smaller" than last
+    // Doesn't consider files with names lexicographically "less" than last
     // fetched
     let src_path_0 = tempdir.path().join("data-2020-01-01.csv");
     std::fs::write(
@@ -588,12 +585,11 @@ async fn test_fetch_files_glob() {
         )
         .await
         .unwrap();
-    assert_matches!(res5, FetchResult::Updated(_));
-    let update5 = match res5 {
-        FetchResult::Updated(upd) => upd,
-        _ => unreachable!(),
+    let FetchResult::Updated(update5) = res5 else {
+        panic!("Unexpected result: {:#?}", res5);
     };
-    assert!(target_path.exists());
+    assert!(!target_path.exists()); // Uses zero-copy path
+    assert_eq!(update5.zero_copy_path.as_ref(), Some(&src_path_2));
     assert_matches!(
         &update5.source_state,
         Some(PollingSourceState::ETag(etag)) if etag == "data-2020-10-05.csv"
@@ -615,12 +611,11 @@ async fn test_fetch_files_glob() {
         )
         .await
         .unwrap();
-    assert_matches!(res6, FetchResult::Updated(_));
-    let update6 = match res6 {
-        FetchResult::Updated(upd) => upd,
-        _ => unreachable!(),
+    let FetchResult::Updated(update6) = res6 else {
+        panic!("Unexpected result: {:#?}", res6);
     };
-    assert!(target_path.exists());
+    assert!(!target_path.exists()); // Uses zero-copy path
+    assert_eq!(update6.zero_copy_path.as_ref(), Some(&src_path_3));
     assert_matches!(
         update6.source_state,
         Some(PollingSourceState::ETag(etag)) if etag == "data-2020-10-10.csv"

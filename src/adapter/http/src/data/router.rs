@@ -21,7 +21,7 @@ use super::ingest_handler::dataset_ingest_handler;
 /////////////////////////////////////////////////////////////////////////////////
 
 pub fn router() -> axum::Router {
-    axum::Router::new().route("/ingest/", axum::routing::post(dataset_ingest_handler))
+    axum::Router::new().route("/ingest", axum::routing::post(dataset_ingest_handler))
 }
 
 /////////////////////////////////////////////////////////////////////////////////
