@@ -24,26 +24,32 @@ use crate::{check_env_var_set, OutputConfig};
 
 pub struct UICommand {
     base_catalog: Catalog,
+    multi_tenant_workspace: bool,
     current_account_name: AccountName,
     output_config: Arc<OutputConfig>,
     address: Option<IpAddr>,
     port: Option<u16>,
+    get_token: bool,
 }
 
 impl UICommand {
     pub fn new(
         base_catalog: Catalog,
+        multi_tenant_workspace: bool,
         current_account_name: AccountName,
         output_config: Arc<OutputConfig>,
         address: Option<IpAddr>,
         port: Option<u16>,
+        get_token: bool,
     ) -> Self {
         Self {
             base_catalog,
+            multi_tenant_workspace,
             current_account_name,
             output_config,
             address,
             port,
+            get_token,
         }
     }
 
@@ -64,13 +70,22 @@ impl Command for UICommand {
 
         let web_server = crate::explore::WebUIServer::new(
             self.base_catalog.clone(),
+            self.multi_tenant_workspace,
             self.current_account_name.clone(),
             self.address,
             self.port,
-        );
+        )
+        .await;
 
         let web_server_url = format!("http://{}", web_server.local_addr());
         tracing::info!("HTTP server is listening on: {}", web_server_url);
+
+        if self.get_token {
+            tracing::info!(
+                token = %web_server.get_access_token(),
+                "Issued API server token"
+            );
+        }
 
         if self.output_config.is_tty
             && self.output_config.verbosity_level == 0
@@ -82,6 +97,14 @@ impl Command for UICommand {
                 s(&web_server_url).bold(),
             );
             eprintln!("{}", s("Use Ctrl+C to stop the server").yellow());
+
+            if self.get_token {
+                eprintln!(
+                    "{} {}",
+                    s("JWT token:").green().bold(),
+                    s(web_server.get_access_token()).dim()
+                );
+            }
         }
 
         let _ = webbrowser::open(&web_server_url);

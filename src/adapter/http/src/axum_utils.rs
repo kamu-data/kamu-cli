@@ -8,6 +8,8 @@
 // by the Apache License, Version 2.0.
 
 /////////////////////////////////////////////////////////////////////////////////
+// Errors
+/////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) fn bad_request_response() -> axum::response::Response {
     error_response(http::status::StatusCode::BAD_REQUEST)
@@ -44,6 +46,22 @@ fn error_response(status: http::status::StatusCode) -> axum::response::Response 
         .status(status)
         .body(Default::default())
         .unwrap()
+}
+
+/////////////////////////////////////////////////////////////////////////////////
+// Misc
+/////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) fn body_into_async_read(
+    body_stream: axum::extract::BodyStream,
+) -> impl tokio::io::AsyncRead {
+    use futures::TryStreamExt;
+    use tokio_util::compat::FuturesAsyncReadCompatExt;
+
+    body_stream
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
+        .into_async_read()
+        .compat()
 }
 
 /////////////////////////////////////////////////////////////////////////////////

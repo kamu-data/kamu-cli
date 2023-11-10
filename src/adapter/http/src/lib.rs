@@ -18,6 +18,7 @@ pub use middleware::*;
 
 mod access_token;
 mod axum_utils;
+pub mod data;
 mod simple_protocol;
 pub mod smart_protocol;
 mod ws_common;

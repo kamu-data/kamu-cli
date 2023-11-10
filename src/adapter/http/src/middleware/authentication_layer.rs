@@ -57,6 +57,8 @@ impl<Svc> AuthenticationMiddleware<Svc> {
                 .get_one::<dyn auth::AuthenticationService>()
                 .unwrap();
 
+            // TODO: Getting the full account info here is expensive while all we need is
+            // the caller identity
             match authentication_service
                 .account_info_by_token(access_token.token)
                 .await
@@ -118,6 +120,8 @@ where
                     Ok(current_account_subject) => current_account_subject,
                     Err(response) => return Ok(response),
                 };
+
+            tracing::debug!(subject = ?current_account_subject, "Authenticated request");
 
             let derived_catalog = dill::CatalogBuilder::new_chained(base_catalog)
                 .add_value(current_account_subject)

@@ -19,7 +19,6 @@
 use std::str::FromStr;
 use std::sync::Arc;
 
-use futures::TryStreamExt;
 use kamu::domain::*;
 use opendatafabric::serde::flatbuffers::FlatbuffersMetadataBlockSerializer;
 use opendatafabric::serde::MetadataBlockSerializer;
@@ -196,15 +195,11 @@ async fn dataset_put_object_common(
     content_length: usize,
     body_stream: axum::extract::BodyStream,
 ) -> Result<(), axum::response::Response> {
-    use tokio_util::compat::FuturesAsyncReadCompatExt;
-    let reader = body_stream
-        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
-        .into_async_read()
-        .compat();
+    let src = Box::new(crate::axum_utils::body_into_async_read(body_stream));
 
     object_repository
         .insert_stream(
-            Box::new(reader),
+            src,
             InsertOpts {
                 precomputed_hash: None,
                 expected_hash: Some(&physical_hash),

@@ -435,7 +435,7 @@ pub fn get_command(
                 None => {
                     let workspace_svc = cli_catalog.get_one::<WorkspaceService>()?;
                     Box::new(APIServerRunCommand::new(
-                        base_catalog.clone(), // TODO: Currently very expensive!
+                        base_catalog.clone(),
                         workspace_svc.is_multi_tenant_workspace(),
                         cli_catalog.get_one()?,
                         server_matches.get_one("address").map(|a| *a),
@@ -443,7 +443,7 @@ pub fn get_command(
                     ))
                 }
                 Some(("gql-query", query_matches)) => Box::new(APIServerGqlQueryCommand::new(
-                    base_catalog.clone(), // TODO: Currently very expensive!
+                    base_catalog.clone(),
                     query_matches.get_one("query").map(String::as_str).unwrap(),
                     query_matches.get_flag("full"),
                 )),
@@ -477,6 +477,8 @@ pub fn get_command(
             cli_catalog.get_one()?,
         )),
         Some(("ui", submatches)) => {
+            let workspace_svc = cli_catalog.get_one::<WorkspaceService>()?;
+
             let current_account_subject = cli_catalog.get_one::<CurrentAccountSubject>()?;
 
             let current_account_name = match current_account_subject.as_ref() {
@@ -487,11 +489,13 @@ pub fn get_command(
             };
 
             Box::new(UICommand::new(
-                base_catalog.clone(), // TODO: Currently very expensive!
+                base_catalog.clone(),
+                workspace_svc.is_multi_tenant_workspace(),
                 current_account_name,
                 cli_catalog.get_one()?,
                 submatches.get_one("address").map(|a| *a),
                 submatches.get_one("http-port").map(|p| *p),
+                submatches.get_flag("get-token"),
             ))
         }
         Some(("verify", submatches)) => Box::new(VerifyCommand::new(

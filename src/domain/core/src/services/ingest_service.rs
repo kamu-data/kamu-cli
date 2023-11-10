@@ -14,6 +14,7 @@ use chrono::{DateTime, Utc};
 use container_runtime::ImagePullError;
 use opendatafabric::*;
 use thiserror::Error;
+use tokio::io::AsyncRead;
 
 use super::ingest;
 use crate::engine::{EngineError, ProcessError};
@@ -44,10 +45,18 @@ pub trait IngestService: Send + Sync {
 
     /// Uses push source defenition in metadata to ingest data from the
     /// specified source
-    async fn push_ingest(
+    async fn push_ingest_from_url(
         &self,
         dataset_ref: &DatasetRef,
         data_url: url::Url,
+        listener: Option<Arc<dyn IngestListener>>,
+    ) -> Result<IngestResult, IngestError>;
+
+    /// Uses push source defenition in metadata to ingest data passessed in-band
+    async fn push_ingest_from_stream(
+        &self,
+        dataset_ref: &DatasetRef,
+        data: Box<dyn AsyncRead + Send + Unpin>,
         listener: Option<Arc<dyn IngestListener>>,
     ) -> Result<IngestResult, IngestError>;
 }

@@ -1091,6 +1091,7 @@ impl TestIngestService {
     }
 }
 
+// TODO: Replace with a mock
 #[async_trait::async_trait]
 impl IngestService for TestIngestService {
     async fn polling_ingest(
@@ -1124,10 +1125,19 @@ impl IngestService for TestIngestService {
         results
     }
 
-    async fn push_ingest(
+    async fn push_ingest_from_url(
         &self,
         _dataset_ref: &DatasetRef,
         _data_url: url::Url,
+        _listener: Option<Arc<dyn IngestListener>>,
+    ) -> Result<IngestResult, IngestError> {
+        unimplemented!()
+    }
+
+    async fn push_ingest_from_stream(
+        &self,
+        _dataset_ref: &DatasetRef,
+        _data: Box<dyn tokio::io::AsyncRead + Send + Unpin>,
         _listener: Option<Arc<dyn IngestListener>>,
     ) -> Result<IngestResult, IngestError> {
         unimplemented!()

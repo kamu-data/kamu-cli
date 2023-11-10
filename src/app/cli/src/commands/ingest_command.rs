@@ -112,7 +112,11 @@ impl Command for IngestCommand {
                 .collect::<Result<Vec<_>, _>>()?
         };
 
-        let listener = if !self.output_config.is_tty || (self.output_config.is_tty && self.stdin) {
+        let listener = if !self.output_config.is_tty
+            || self.output_config.quiet
+            || self.output_config.verbosity_level != 0
+            || (self.output_config.is_tty && self.stdin)
+        {
             None
         } else {
             Some(Arc::new(crate::PrettyIngestProgress::new(
@@ -126,7 +130,7 @@ impl Command for IngestCommand {
         for url in urls {
             let result = self
                 .ingest_svc
-                .push_ingest(&self.dataset_ref, url, listener.clone())
+                .push_ingest_from_url(&self.dataset_ref, url, listener.clone())
                 .await
                 .map_err(|e| CLIError::failure(e))?;
 

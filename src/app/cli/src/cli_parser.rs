@@ -1213,6 +1213,10 @@ pub fn cli() -> Command {
                             .long("http-port")
                             .value_parser(value_parser!(u16))
                             .help("Which port to run HTTP server on"),
+                        Arg::new("get-token")
+                            .long("get-token")
+                            .action(ArgAction::SetTrue)
+                            .help("Output a JWT token you can use to authorize API queries"),
                     ])
                     .after_help(indoc::indoc!(
                         r#"

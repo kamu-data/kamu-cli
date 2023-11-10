@@ -12,6 +12,7 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use axum::http::Uri;
 use axum::response::{IntoResponse, Response};
 use dill::Catalog;
+use kamu::domain::auth::AuthenticationService;
 use opendatafabric::AccountName;
 use rust_embed::RustEmbed;
 use serde::Serialize;
@@ -54,13 +55,15 @@ pub struct WebUIServer {
         hyper::server::conn::AddrIncoming,
         axum::routing::IntoMakeService<axum::Router>,
     >,
+    access_token: String,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 impl WebUIServer {
-    pub fn new(
+    pub async fn new(
         base_catalog: Catalog,
+        multi_tenant_workspace: bool,
         current_account_name: AccountName,
         address: Option<IpAddr>,
         port: Option<u16>,
@@ -82,14 +85,27 @@ impl WebUIServer {
 
         let gql_schema = kamu_adapter_graphql::schema();
 
+        let login_instructions = WebUILoginInstructions {
+            login_method: accounts::LOGIN_METHOD_PASSWORD.to_string(),
+            login_credentials_json: serde_json::to_string::<accounts::PasswordLoginCredentials>(
+                &login_credentials,
+            )
+            .unwrap(),
+        };
+
+        let auth_svc = base_catalog.get_one::<dyn AuthenticationService>().unwrap();
+        let access_token = auth_svc
+            .login(
+                &login_instructions.login_method,
+                login_instructions.login_credentials_json.clone(),
+            )
+            .await
+            .unwrap()
+            .access_token;
+
         let web_ui_config = WebUIConfig {
             api_server_gql_url: format!("http://{}/graphql", bound_addr.local_addr()),
-            login_instructions: Some(WebUILoginInstructions {
-                login_method: accounts::LOGIN_METHOD_PASSWORD.to_string(),
-                login_credentials_json:
-                    serde_json::to_string::<accounts::PasswordLoginCredentials>(&login_credentials)
-                        .unwrap(),
-            }),
+            login_instructions: Some(login_instructions),
             feature_flags: WebUIFeatureFlags {
                 // No way to log out, always logging in a predefined user
                 enable_logout: false,
@@ -98,12 +114,29 @@ impl WebUIServer {
 
         let app = axum::Router::new()
             .route(
+                "/assets/runtime-config.json",
+                axum::routing::get(runtime_config_handler),
+            )
+            .route(
                 "/graphql",
                 axum::routing::get(graphql_playground_handler).post(graphql_handler),
             )
             .route(
-                "/assets/runtime-config.json",
-                axum::routing::get(runtime_config_handler),
+                "/platform/token/validate",
+                axum::routing::get(kamu_adapter_http::platform_token_validate_handler),
+            )
+            .nest(
+                if multi_tenant_workspace {
+                    "/:account_name/:dataset_name"
+                } else {
+                    "/:dataset_name"
+                },
+                kamu_adapter_http::add_dataset_resolver_layer(
+                    axum::Router::new()
+                        .nest("/", kamu_adapter_http::smart_transfer_protocol_router())
+                        .nest("/data", kamu_adapter_http::data::router()),
+                    multi_tenant_workspace,
+                ),
             )
             .fallback(app_handler)
             .layer(
@@ -123,11 +156,18 @@ impl WebUIServer {
 
         let server = axum::Server::builder(bound_addr).serve(app.into_make_service());
 
-        Self { server }
+        Self {
+            server,
+            access_token,
+        }
     }
 
     pub fn local_addr(&self) -> SocketAddr {
         self.server.local_addr()
+    }
+
+    pub fn get_access_token(&self) -> String {
+        self.access_token.clone()
     }
 
     pub async fn run(self) -> Result<(), hyper::Error> {

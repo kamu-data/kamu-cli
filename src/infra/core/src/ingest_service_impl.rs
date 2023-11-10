@@ -21,6 +21,7 @@ use kamu_core::{engine, *};
 use kamu_ingest_datafusion::DataWriterDataFusion;
 use opendatafabric::serde::yaml::Manifest;
 use opendatafabric::*;
+use tokio::io::AsyncRead;
 
 use super::ingest::*;
 
@@ -967,8 +968,8 @@ impl IngestService for IngestServiceImpl {
             .collect()
     }
 
-    #[tracing::instrument(level = "info", skip_all, fields(%dataset_ref))]
-    async fn push_ingest(
+    #[tracing::instrument(level = "info", skip_all, fields(%dataset_ref, %data_url))]
+    async fn push_ingest_from_url(
         &self,
         dataset_ref: &DatasetRef,
         data_url: url::Url,
@@ -976,7 +977,7 @@ impl IngestService for IngestServiceImpl {
     ) -> Result<IngestResult, IngestError> {
         let fetch = FetchStep::Url(FetchStepUrl {
             url: data_url.to_string(),
-            event_time: None,
+            event_time: Some(EventTimeSource::FromSystemTime),
             cache: None,
             headers: None,
         });
@@ -991,6 +992,48 @@ impl IngestService for IngestServiceImpl {
             |_| listener,
         )
         .await
+    }
+
+    #[tracing::instrument(level = "info", skip_all, fields(%dataset_ref))]
+    async fn push_ingest_from_stream(
+        &self,
+        dataset_ref: &DatasetRef,
+        mut data: Box<dyn AsyncRead + Send + Unpin>,
+        listener: Option<Arc<dyn IngestListener>>,
+    ) -> Result<IngestResult, IngestError> {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+        // Save stream to a file in cache
+        //
+        // TODO: Breaking all architecture layers here - need to extract cache into a
+        // service
+        let path = self
+            .cache_dir
+            .join(self.get_random_cache_key("push-ingest-"));
+
+        {
+            let mut file = tokio::fs::File::create(&path).await.int_err()?;
+            let mut buf = [0u8; 2048];
+            loop {
+                let read = data.read(&mut buf).await.int_err()?;
+                if read == 0 {
+                    break;
+                }
+                file.write_all(&buf[..read]).await.int_err()?;
+            }
+            file.flush().await.int_err()?;
+        }
+
+        let data_url: url::Url = url::Url::from_file_path(&path).unwrap();
+
+        let res = self
+            .push_ingest_from_url(dataset_ref, data_url, listener)
+            .await;
+
+        // Clean up the file in cache as it's non-reusable
+        std::fs::remove_file(path).int_err()?;
+
+        res
     }
 }
 
