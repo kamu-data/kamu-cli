@@ -17,11 +17,10 @@
 // by the Apache License, Version 2.0.
 
 use axum::extract::Extension;
-use axum::response::Response;
 use kamu::domain::*;
 use opendatafabric::DatasetRef;
 
-use crate::axum_utils::internal_server_error_response;
+use crate::api_error::*;
 
 /////////////////////////////////////////////////////////////////////////////////
 
@@ -35,17 +34,14 @@ pub async fn dataset_ingest_handler(
     Extension(catalog): Extension<dill::Catalog>,
     Extension(dataset_ref): Extension<DatasetRef>,
     body_stream: axum::extract::BodyStream,
-) -> Result<(), Response> {
+) -> Result<(), ApiError> {
     let data = Box::new(crate::axum_utils::body_into_async_read(body_stream));
 
     let ingest_svc = catalog.get_one::<dyn IngestService>().unwrap();
     ingest_svc
         .push_ingest_from_stream(&dataset_ref, data, None)
         .await
-        .map_err(|error| {
-            tracing::error!(?error);
-            internal_server_error_response()
-        })?;
+        .api_err()?;
 
     // Per note above, we're must not include any extra information about the result
     // of the ingest operation

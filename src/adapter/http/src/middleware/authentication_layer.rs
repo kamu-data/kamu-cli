@@ -68,9 +68,12 @@ impl<Svc> AuthenticationMiddleware<Svc> {
                     auth::AccessTokenError::Expired => Ok(CurrentAccountSubject::anonymous(
                         AnonymousAccountReason::AuthenticationExpired,
                     )),
-                    auth::AccessTokenError::Invalid(_) => Ok(CurrentAccountSubject::anonymous(
-                        AnonymousAccountReason::AuthenticationInvalid,
-                    )),
+                    auth::AccessTokenError::Invalid(_) => {
+                        tracing::warn!("Ingoring invalid auth token");
+                        Ok(CurrentAccountSubject::anonymous(
+                            AnonymousAccountReason::AuthenticationInvalid,
+                        ))
+                    }
                 },
                 Err(auth::GetAccountInfoError::Internal(_)) => {
                     return Err(internal_server_error_response());

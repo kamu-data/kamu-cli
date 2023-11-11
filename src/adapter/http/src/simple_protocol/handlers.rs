@@ -25,7 +25,7 @@ use opendatafabric::serde::MetadataBlockSerializer;
 use opendatafabric::{DatasetRef, Multihash};
 use url::Url;
 
-use crate::axum_utils::*;
+use crate::api_error::*;
 use crate::smart_protocol::{
     AxumServerPullProtocolInstance,
     AxumServerPushProtocolInstance,
@@ -54,24 +54,16 @@ pub struct PhysicalHashFromPath {
 pub async fn dataset_refs_handler(
     axum::extract::Extension(dataset): axum::extract::Extension<Arc<dyn Dataset>>,
     axum::extract::Path(ref_param): axum::extract::Path<RefFromPath>,
-) -> Result<String, axum::response::Response> {
+) -> Result<String, ApiError> {
     let block_ref = match BlockRef::from_str(&ref_param.reference.as_str()) {
         Ok(block_ref) => Ok(block_ref),
-        Err(_) => Err(not_found_response()),
+        Err(e) => Err(ApiError::not_found(e)),
     }?;
 
-    let get_ref_result = dataset.as_metadata_chain().get_ref(&block_ref).await;
-
-    match get_ref_result {
+    match dataset.as_metadata_chain().get_ref(&block_ref).await {
         Ok(hash) => Ok(hash.to_string()),
-        Err(GetRefError::NotFound(_)) => Err(not_found_response()),
-        Err(_) => {
-            tracing::debug!(
-                reference = %ref_param.reference,
-                "Internal error while resolving reference"
-            );
-            return Err(internal_server_error_response());
-        }
+        Err(e @ GetRefError::NotFound(_)) => Err(ApiError::not_found(e)),
+        Err(e) => Err(e.api_err()),
     }
 }
 
@@ -80,27 +72,23 @@ pub async fn dataset_refs_handler(
 pub async fn dataset_blocks_handler(
     axum::extract::Extension(dataset): axum::extract::Extension<Arc<dyn Dataset>>,
     axum::extract::Path(hash_param): axum::extract::Path<BlockHashFromPath>,
-) -> Result<Vec<u8>, axum::response::Response> {
-    let block = match dataset
+) -> Result<Vec<u8>, ApiError> {
+    let block: opendatafabric::MetadataBlock = match dataset
         .as_metadata_chain()
         .get_block(&hash_param.block_hash)
         .await
     {
-        Ok(block) => block,
-        Err(GetBlockError::NotFound(_)) => return Err(not_found_response()),
-        Err(e) => {
-            tracing::debug!(block_hash = %hash_param.block_hash, "GetBlockError: {}", e);
-            return Err(internal_server_error_response());
-        }
-    };
+        Ok(block) => Ok(block),
+        Err(e @ GetBlockError::NotFound(_)) => Err(ApiError::not_found(e)),
+        Err(e) => Err(e.api_err()),
+    }?;
 
-    match FlatbuffersMetadataBlockSerializer.write_manifest(&block) {
-        Ok(block_bytes) => Ok(block_bytes.collapse_vec()),
-        Err(e) => {
-            tracing::debug!(block_hash = %hash_param.block_hash, "Block serialization failed: {}", e);
-            Err(internal_server_error_response())
-        }
-    }
+    let block_bytes = FlatbuffersMetadataBlockSerializer
+        .write_manifest(&block)
+        .int_err()
+        .api_err()?;
+
+    Ok(block_bytes.collapse_vec())
 }
 
 /////////////////////////////////////////////////////////////////////////////////
@@ -108,24 +96,8 @@ pub async fn dataset_blocks_handler(
 pub async fn dataset_data_get_handler(
     axum::extract::Extension(dataset): axum::extract::Extension<Arc<dyn Dataset>>,
     axum::extract::Path(hash_param): axum::extract::Path<PhysicalHashFromPath>,
-) -> axum::response::Response {
-    let data_stream = match dataset
-        .as_data_repo()
-        .get_stream(&hash_param.physical_hash)
-        .await
-    {
-        Ok(stream) => stream,
-        Err(GetError::NotFound(_)) => return not_found_response(),
-        Err(e) => {
-            tracing::debug!(physical_hash = %hash_param.physical_hash, "Data GetError: {}", e);
-            return internal_server_error_response();
-        }
-    };
-
-    let body = axum_extra::body::AsyncReadBody::new(data_stream);
-    axum::response::Response::builder()
-        .body(axum::body::boxed(body))
-        .unwrap()
+) -> Result<axum::response::Response, ApiError> {
+    dataset_get_object_common(dataset.as_data_repo(), &hash_param.physical_hash).await
 }
 
 /////////////////////////////////////////////////////////////////////////////////
@@ -133,24 +105,28 @@ pub async fn dataset_data_get_handler(
 pub async fn dataset_checkpoints_get_handler(
     axum::extract::Extension(dataset): axum::extract::Extension<Arc<dyn Dataset>>,
     axum::extract::Path(hash_param): axum::extract::Path<PhysicalHashFromPath>,
-) -> axum::response::Response {
-    let checkpoint_stream = match dataset
-        .as_checkpoint_repo()
-        .get_stream(&hash_param.physical_hash)
-        .await
-    {
-        Ok(stream) => stream,
-        Err(GetError::NotFound(_)) => return not_found_response(),
-        Err(e) => {
-            tracing::debug!(physical_hash = %hash_param.physical_hash, "Checkpoint GetError: {}", e);
-            return internal_server_error_response();
-        }
-    };
+) -> Result<axum::response::Response, ApiError> {
+    dataset_get_object_common(dataset.as_checkpoint_repo(), &hash_param.physical_hash).await
+}
 
-    let body = axum_extra::body::AsyncReadBody::new(checkpoint_stream);
+/////////////////////////////////////////////////////////////////////////////////
+
+async fn dataset_get_object_common(
+    object_repository: &dyn ObjectRepository,
+    physical_hash: &Multihash,
+) -> Result<axum::response::Response, ApiError> {
+    let stream = match object_repository.get_stream(physical_hash).await {
+        Ok(stream) => Ok(stream),
+        Err(e @ GetError::NotFound(_)) => Err(ApiError::not_found(e)),
+        Err(e) => Err(e.api_err()),
+    }?;
+
     axum::response::Response::builder()
-        .body(axum::body::boxed(body))
-        .unwrap()
+        .body(axum::body::boxed(axum_extra::body::AsyncReadBody::new(
+            stream,
+        )))
+        .int_err()
+        .api_err()
 }
 
 /////////////////////////////////////////////////////////////////////////////////
@@ -160,7 +136,7 @@ pub async fn dataset_data_put_handler(
     axum::extract::Path(hash_param): axum::extract::Path<PhysicalHashFromPath>,
     axum::TypedHeader(content_length): axum::TypedHeader<axum::headers::ContentLength>,
     body_stream: axum::extract::BodyStream,
-) -> Result<(), axum::response::Response> {
+) -> Result<(), ApiError> {
     dataset_put_object_common(
         dataset.as_data_repo(),
         hash_param.physical_hash,
@@ -177,7 +153,7 @@ pub async fn dataset_checkpoints_put_handler(
     axum::extract::Path(hash_param): axum::extract::Path<PhysicalHashFromPath>,
     axum::TypedHeader(content_length): axum::TypedHeader<axum::headers::ContentLength>,
     body_stream: axum::extract::BodyStream,
-) -> Result<(), axum::response::Response> {
+) -> Result<(), ApiError> {
     dataset_put_object_common(
         dataset.as_checkpoint_repo(),
         hash_param.physical_hash,
@@ -194,7 +170,7 @@ async fn dataset_put_object_common(
     physical_hash: Multihash,
     content_length: usize,
     body_stream: axum::extract::BodyStream,
-) -> Result<(), axum::response::Response> {
+) -> Result<(), ApiError> {
     let src = Box::new(crate::axum_utils::body_into_async_read(body_stream));
 
     object_repository
@@ -207,7 +183,7 @@ async fn dataset_put_object_common(
             },
         )
         .await
-        .map_err(|_| internal_server_error_response())?;
+        .api_err()?;
 
     Ok(())
 }
@@ -221,35 +197,35 @@ pub async fn dataset_push_ws_upgrade_handler(
     host: axum::extract::Host,
     uri: axum::extract::OriginalUri,
     maybe_bearer_header: Option<BearerHeader>,
-) -> axum::response::Response {
+) -> Result<axum::response::Response, ApiError> {
+    let current_account_subject = catalog.get_one::<CurrentAccountSubject>().unwrap();
+    match current_account_subject.as_ref() {
+        CurrentAccountSubject::Logged(_) => Ok(()),
+        CurrentAccountSubject::Anonymous(_) => Err(ApiError::new_unauthorized()),
+    }?;
+
     let dataset_url = get_base_dataset_url(host, uri, 1);
 
     let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
 
     let dataset = match dataset_repo.get_dataset(&dataset_ref).await {
-        Ok(ds) => Some(ds),
+        Ok(ds) => Ok(Some(ds)),
         Err(GetDatasetError::NotFound(_)) => {
-            let current_account_subject = catalog.get_one::<CurrentAccountSubject>().unwrap();
-            match current_account_subject.as_ref() {
-                CurrentAccountSubject::Anonymous(_) => return unauthorized_access_response(),
-                CurrentAccountSubject::Logged(l) => {
-                    // Make sure account in dataset ref being created and token account match
-                    if let Some(ref_account_name) = dataset_ref.account_name() {
-                        if ref_account_name != &l.account_name {
-                            return forbidden_access_response();
-                        }
-                    }
+            // Make sure account in dataset ref being created and token account match
+            let CurrentAccountSubject::Logged(acc) = current_account_subject.as_ref() else {
+                unreachable!()
+            };
+            if let Some(ref_account_name) = dataset_ref.account_name() {
+                if ref_account_name != &acc.account_name {
+                    return Err(ApiError::new_forbidden());
                 }
             }
-            None
+            Ok(None)
         }
-        Err(err) => {
-            tracing::error!("Could not get dataset: {:?}", err);
-            return internal_server_error_response();
-        }
-    };
+        Err(err) => Err(err.api_err()),
+    }?;
 
-    ws.on_upgrade(|socket| {
+    Ok(ws.on_upgrade(|socket| {
         AxumServerPushProtocolInstance::new(
             socket,
             dataset_repo,
@@ -259,7 +235,7 @@ pub async fn dataset_push_ws_upgrade_handler(
             maybe_bearer_header,
         )
         .serve()
-    })
+    }))
 }
 
 /////////////////////////////////////////////////////////////////////////////////
