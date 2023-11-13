@@ -30,12 +30,12 @@ impl ReaderParquet {
 
 #[async_trait::async_trait]
 impl Reader for ReaderParquet {
-    async fn output_schema(
+    async fn read_schema(
         &self,
         ctx: &SessionContext,
         conf: &ReadStep,
     ) -> Result<Option<datafusion::arrow::datatypes::Schema>, ReadError> {
-        super::output_schema_common(ctx, conf).await
+        super::read_schema_common(ctx, conf).await
     }
 
     async fn read(
@@ -44,7 +44,7 @@ impl Reader for ReaderParquet {
         path: &Path,
         conf: &ReadStep,
     ) -> Result<DataFrame, ReadError> {
-        let schema = self.output_schema(ctx, conf).await?;
+        let schema = self.read_schema(ctx, conf).await?;
 
         let ReadStep::Parquet(_) = conf else {
             unreachable!()

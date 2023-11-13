@@ -15,10 +15,10 @@ use chrono::{TimeZone, Utc};
 use container_runtime::ContainerRuntime;
 use datafusion::parquet::record::RowAccessor;
 use datafusion::prelude::*;
-use domain::auth::DatasetActionAuthorizer;
 use futures::StreamExt;
 use indoc::indoc;
 use itertools::Itertools;
+use kamu::domain::auth::DatasetActionAuthorizer;
 use kamu::domain::engine::*;
 use kamu::domain::*;
 use kamu::testing::*;
@@ -30,7 +30,7 @@ use tempfile::TempDir;
 
 #[test_group::group(containerized, engine, ingest, spark)]
 #[test_log::test(tokio::test)]
-async fn test_ingest_legacy_spark() {
+async fn test_ingest_polling_legacy_spark() {
     let harness = IngestTestHarness::new();
 
     let src_path = harness.temp_dir.path().join("data.csv");
@@ -113,7 +113,7 @@ async fn test_ingest_legacy_spark() {
 
 #[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
-async fn test_ingest_datafusion_snapshot() {
+async fn test_ingest_polling_datafusion_snapshot() {
     let harness = IngestTestHarness::new();
 
     let src_path = harness.temp_dir.path().join("data.csv");
@@ -325,7 +325,7 @@ async fn test_ingest_datafusion_snapshot() {
 
 #[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
-async fn test_ingest_datafusion_ledger() {
+async fn test_ingest_polling_datafusion_ledger() {
     let harness = IngestTestHarness::new();
     let src_path = harness.temp_dir.path().join("data.csv");
 
@@ -554,170 +554,7 @@ async fn test_ingest_datafusion_ledger() {
 
 #[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
-async fn test_ingest_datafusion_push() {
-    let harness = IngestTestHarness::new();
-
-    let dataset_snapshot = MetadataFactory::dataset_snapshot()
-        .name("foo.bar")
-        .kind(DatasetKind::Root)
-        .push_event(
-            // TODO: This will be replaced with `AddPushSource` event in future
-            MetadataFactory::set_polling_source()
-                .fetch(FetchStep::Url(FetchStepUrl {
-                    url: "http://localhost".to_string(),
-                    event_time: Some(EventTimeSource::FromSystemTime),
-                    cache: None,
-                    headers: None,
-                }))
-                .read(ReadStep::Csv(ReadStepCsv {
-                    header: Some(true),
-                    schema: Some(
-                        ["date TIMESTAMP", "city STRING", "population BIGINT"]
-                            .iter()
-                            .map(|s| s.to_string())
-                            .collect(),
-                    ),
-                    ..ReadStepCsv::default()
-                }))
-                // TODO: This will be default engine in future
-                .preprocess(TransformSql {
-                    engine: "datafusion".to_string(),
-                    version: None,
-                    query: Some("select * from input".to_string()),
-                    queries: None,
-                    temporal_tables: None,
-                })
-                .merge(MergeStrategyLedger {
-                    primary_key: vec!["date".to_string(), "city".to_string()],
-                })
-                .build(),
-        )
-        .push_event(SetVocab {
-            system_time_column: None,
-            event_time_column: Some("date".to_string()),
-            offset_column: None,
-        })
-        .build();
-
-    let dataset_name = dataset_snapshot.name.clone();
-    let dataset_ref = DatasetAlias::new(None, dataset_name.clone()).as_local_ref();
-
-    harness.create_dataset(dataset_snapshot).await;
-
-    // Round 1: Push from URL
-    let src_path = harness.temp_dir.path().join("data.csv");
-    std::fs::write(
-        &src_path,
-        indoc!(
-            "
-            date,city,population
-            2020-01-01,A,1000
-            2020-01-01,B,2000
-            2020-01-01,C,3000
-            "
-        ),
-    )
-    .unwrap();
-
-    harness
-        .ingest_svc
-        .push_ingest_from_url(
-            &dataset_ref,
-            url::Url::from_file_path(&src_path).unwrap(),
-            None,
-        )
-        .await
-        .unwrap();
-
-    let df = harness.get_last_data(&dataset_name).await;
-    kamu_data_utils::testing::assert_schema_eq(
-        df.schema(),
-        indoc!(
-            r#"
-            message arrow_schema {
-              OPTIONAL INT64 offset;
-              REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
-              OPTIONAL INT64 date (TIMESTAMP(MILLIS,true));
-              OPTIONAL BYTE_ARRAY city (STRING);
-              OPTIONAL INT64 population;
-            }
-            "#
-        ),
-    );
-
-    kamu_data_utils::testing::assert_data_eq(
-        df,
-        indoc!(
-            r#"
-            +--------+----------------------+----------------------+------+------------+
-            | offset | system_time          | date                 | city | population |
-            +--------+----------------------+----------------------+------+------------+
-            | 0      | 2050-01-01T12:00:00Z | 2020-01-01T00:00:00Z | A    | 1000       |
-            | 1      | 2050-01-01T12:00:00Z | 2020-01-01T00:00:00Z | B    | 2000       |
-            | 2      | 2050-01-01T12:00:00Z | 2020-01-01T00:00:00Z | C    | 3000       |
-            +--------+----------------------+----------------------+------+------------+
-            "#
-        ),
-    )
-    .await;
-
-    assert_eq!(
-        harness
-            .get_last_data_block(&dataset_name)
-            .await
-            .event
-            .output_watermark
-            .map(|dt| dt.to_rfc3339()),
-        Some("2020-01-01T00:00:00+00:00".to_string())
-    );
-
-    // Round 2: Push from Stream
-    let data = std::io::Cursor::new(indoc!(
-        "
-        date,city,population
-        2020-01-01,B,2000
-        2020-01-01,C,3000
-        2021-01-01,C,4000
-        "
-    ));
-
-    harness
-        .ingest_svc
-        .push_ingest_from_stream(&dataset_ref, Box::new(data), None)
-        .await
-        .unwrap();
-
-    let df = harness.get_last_data(&dataset_name).await;
-    kamu_data_utils::testing::assert_data_eq(
-        df,
-        indoc!(
-            r#"
-            +--------+----------------------+----------------------+------+------------+
-            | offset | system_time          | date                 | city | population |
-            +--------+----------------------+----------------------+------+------------+
-            | 3      | 2050-01-01T12:00:00Z | 2021-01-01T00:00:00Z | C    | 4000       |
-            +--------+----------------------+----------------------+------+------------+
-            "#
-        ),
-    )
-    .await;
-
-    assert_eq!(
-        harness
-            .get_last_data_block(&dataset_name)
-            .await
-            .event
-            .output_watermark
-            .map(|dt| dt.to_rfc3339()),
-        Some("2021-01-01T00:00:00+00:00".to_string())
-    );
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_group::group(engine, ingest, datafusion)]
-#[test_log::test(tokio::test)]
-async fn test_ingest_datafusion_empty_data() {
+async fn test_ingest_polling_datafusion_empty_data() {
     let harness = IngestTestHarness::new();
     let src_path = harness.temp_dir.path().join("data.csv");
 
@@ -777,7 +614,7 @@ async fn test_ingest_datafusion_empty_data() {
 
 #[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
-async fn test_ingest_datafusion_event_time_as_date() {
+async fn test_ingest_polling_datafusion_event_time_as_date() {
     let harness = IngestTestHarness::new();
     let src_path = harness.temp_dir.path().join("data.csv");
 
@@ -890,7 +727,7 @@ async fn test_ingest_datafusion_event_time_as_date() {
 
 #[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
-async fn test_ingest_datafusion_event_time_of_invalid_type() {
+async fn test_ingest_polling_datafusion_event_time_of_invalid_type() {
     let harness = IngestTestHarness::new();
     let src_path = harness.temp_dir.path().join("data.csv");
 
@@ -953,7 +790,9 @@ async fn test_ingest_datafusion_event_time_of_invalid_type() {
     let res = harness.ingest(&dataset_name).await;
     assert_matches!(
         res,
-        Err(IngestError::EngineError(EngineError::InvalidQuery(_)))
+        Err(PollingIngestError::EngineError(EngineError::InvalidQuery(
+            _
+        )))
     );
 }
 
@@ -961,7 +800,7 @@ async fn test_ingest_datafusion_event_time_of_invalid_type() {
 
 #[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
-async fn test_ingest_datafusion_bad_column_names_preserve() {
+async fn test_ingest_polling_datafusion_bad_column_names_preserve() {
     let harness = IngestTestHarness::new();
     let src_path = harness.temp_dir.path().join("data.json");
 
@@ -1058,7 +897,7 @@ async fn test_ingest_datafusion_bad_column_names_preserve() {
 
 #[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
-async fn test_ingest_datafusion_bad_column_names_rename() {
+async fn test_ingest_polling_datafusion_bad_column_names_rename() {
     let harness = IngestTestHarness::new();
     let src_path = harness.temp_dir.path().join("data.json");
 
@@ -1154,7 +993,7 @@ async fn test_ingest_datafusion_bad_column_names_rename() {
 
 #[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
-async fn test_ingest_checks_auth() {
+async fn test_ingest_polling_checks_auth() {
     let harness = IngestTestHarness::new_with_authorizer(Arc::new(
         MockDatasetActionAuthorizer::new().expect_check_write_dataset(
             DatasetAlias::new(None, DatasetName::new_unchecked("foo.bar")),
@@ -1206,7 +1045,7 @@ async fn test_ingest_checks_auth() {
 struct IngestTestHarness {
     temp_dir: TempDir,
     dataset_repo: Arc<DatasetRepositoryLocalFs>,
-    ingest_svc: Arc<IngestServiceImpl>,
+    ingest_svc: Arc<PollingIngestServiceImpl>,
     time_source: Arc<SystemTimeSourceStub>,
     ctx: SessionContext,
 }
@@ -1246,7 +1085,7 @@ impl IngestTestHarness {
             Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap(),
         ));
 
-        let ingest_svc = Arc::new(IngestServiceImpl::new(
+        let ingest_svc = Arc::new(PollingIngestServiceImpl::new(
             dataset_repo.clone(),
             dataset_action_authorizer,
             engine_provisioner,
@@ -1275,9 +1114,12 @@ impl IngestTestHarness {
             .unwrap();
     }
 
-    async fn ingest(&self, dataset_name: &DatasetName) -> Result<IngestResult, IngestError> {
+    async fn ingest(
+        &self,
+        dataset_name: &DatasetName,
+    ) -> Result<PollingIngestResult, PollingIngestError> {
         self.ingest_svc
-            .polling_ingest(
+            .ingest(
                 &DatasetAlias::new(None, dataset_name.clone()).as_local_ref(),
                 PollingIngestOptions::default(),
                 None,

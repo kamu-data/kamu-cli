@@ -201,7 +201,7 @@ impl ApiErrorCategorizable for AccessError {
     }
 }
 
-impl ApiErrorCategorizable for IngestError {
+impl ApiErrorCategorizable for PushIngestError {
     fn categorize<'a>(&'a self) -> ApiErrorCategory<'a> {
         match &self {
             Self::Access(e) => ApiErrorCategory::Access(e),

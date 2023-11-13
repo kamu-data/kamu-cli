@@ -21,13 +21,12 @@ use kamu_core::{engine, *};
 use kamu_ingest_datafusion::DataWriterDataFusion;
 use opendatafabric::serde::yaml::Manifest;
 use opendatafabric::*;
-use tokio::io::AsyncRead;
 
-use super::ingest::*;
+use super::*;
 
 ///////////////////////////////////////////////////////////////////////////////
 
-pub struct IngestServiceImpl {
+pub struct PollingIngestServiceImpl {
     dataset_repo: Arc<dyn DatasetRepository>,
     dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
     engine_provisioner: Arc<dyn EngineProvisioner>,
@@ -41,7 +40,7 @@ pub struct IngestServiceImpl {
 ///////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
-impl IngestServiceImpl {
+impl PollingIngestServiceImpl {
     pub fn new(
         dataset_repo: Arc<dyn DatasetRepository>,
         dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
@@ -69,8 +68,8 @@ impl IngestServiceImpl {
         dataset_ref: &DatasetRef,
         options: PollingIngestOptions,
         fetch_override: Option<FetchStep>,
-        get_listener: impl FnOnce(&DatasetHandle) -> Option<Arc<dyn IngestListener>>,
-    ) -> Result<IngestResult, IngestError> {
+        get_listener: impl FnOnce(&DatasetHandle) -> Option<Arc<dyn PollingIngestListener>>,
+    ) -> Result<PollingIngestResult, PollingIngestError> {
         let dataset_handle = self.dataset_repo.resolve_dataset_ref(&dataset_ref).await?;
 
         self.dataset_action_authorizer
@@ -83,7 +82,7 @@ impl IngestServiceImpl {
             .await?;
 
         let listener =
-            get_listener(&dataset_handle).unwrap_or_else(|| Arc::new(NullIngestListener));
+            get_listener(&dataset_handle).unwrap_or_else(|| Arc::new(NullPollingIngestListener));
 
         // TODO: Remove this scan after we eliminate Spark ingest
         let Some((_, polling_source_block)) = dataset
@@ -97,8 +96,8 @@ impl IngestServiceImpl {
                 "Dataset does not define a polling source - considering up-to-date",
             );
 
-            let result = IngestResult::UpToDate {
-                no_polling_source: true,
+            let result = PollingIngestResult::UpToDate {
+                no_source_defined: true,
                 uncacheable: false,
             };
 
@@ -138,7 +137,10 @@ impl IngestServiceImpl {
             dataset_handle = %args.dataset_handle,
         )
     )]
-    async fn ingest_loop(&self, args: IngestLoopArgs) -> Result<IngestResult, IngestError> {
+    async fn ingest_loop(
+        &self,
+        args: IngestLoopArgs,
+    ) -> Result<PollingIngestResult, PollingIngestError> {
         let ctx = self.new_session_context();
 
         let mut data_writer = DataWriterDataFusion::builder(args.dataset.clone(), ctx.clone())
@@ -175,8 +177,8 @@ impl IngestServiceImpl {
                     combined_result = Some(Self::merge_results(combined_result, res));
 
                     let has_more = match combined_result {
-                        Some(IngestResult::UpToDate { .. }) => false,
-                        Some(IngestResult::Updated { has_more, .. }) => has_more,
+                        Some(PollingIngestResult::UpToDate { .. }) => false,
+                        Some(PollingIngestResult::Updated { has_more, .. }) => has_more,
                         None => unreachable!(),
                     };
 
@@ -201,7 +203,7 @@ impl IngestServiceImpl {
     async fn ingest_iteration(
         &self,
         args: IngestIterationArgs<'_>,
-    ) -> Result<IngestResult, IngestError> {
+    ) -> Result<PollingIngestResult, PollingIngestError> {
         tracing::info!(?args.options, ?args.fetch_override, "Ingest iteration details");
 
         let listener = args.listener.clone();
@@ -224,9 +226,9 @@ impl IngestServiceImpl {
     async fn ingest_iteration_inner(
         &self,
         args: IngestIterationArgs<'_>,
-    ) -> Result<IngestResult, IngestError> {
+    ) -> Result<PollingIngestResult, PollingIngestError> {
         args.listener
-            .on_stage_progress(IngestStage::CheckCache, 0, TotalSteps::Exact(1));
+            .on_stage_progress(PollingIngestStage::CheckCache, 0, TotalSteps::Exact(1));
 
         let uncacheable = args.data_writer.last_offset().is_some()
             && args.data_writer.last_source_state().is_none()
@@ -234,8 +236,8 @@ impl IngestServiceImpl {
 
         if uncacheable && !args.options.fetch_uncacheable {
             tracing::info!("Skipping fetch of uncacheable source");
-            return Ok(IngestResult::UpToDate {
-                no_polling_source: false,
+            return Ok(PollingIngestResult::UpToDate {
+                no_source_defined: false,
                 uncacheable,
             });
         }
@@ -243,24 +245,22 @@ impl IngestServiceImpl {
         let savepoint = match self.fetch(&args).await? {
             FetchStepResult::Updated(savepoint) => savepoint,
             FetchStepResult::UpToDate => {
-                return Ok(IngestResult::UpToDate {
-                    no_polling_source: false,
+                return Ok(PollingIngestResult::UpToDate {
+                    no_source_defined: false,
                     uncacheable,
                 })
             }
         };
 
         args.listener
-            .on_stage_progress(IngestStage::Prepare, 0, TotalSteps::Exact(1));
+            .on_stage_progress(PollingIngestStage::Prepare, 0, TotalSteps::Exact(1));
 
         let prepare_result = self.prepare(&args, &savepoint).await?;
 
         args.listener
-            .on_stage_progress(IngestStage::Read, 0, TotalSteps::Exact(1));
+            .on_stage_progress(PollingIngestStage::Read, 0, TotalSteps::Exact(1));
 
-        let df = self.read(&args, &prepare_result).await?;
-
-        let df = if let Some(df) = df {
+        let df = if let Some(df) = self.read(&args, &prepare_result).await? {
             let df = self.preprocess(&args, df).await?;
             self.validate_new_data(&df, args.data_writer.vocab())?;
             Some(df)
@@ -303,12 +303,15 @@ impl IngestServiceImpl {
 
         match stage_result {
             Ok(staged) => {
-                args.listener
-                    .on_stage_progress(IngestStage::Commit, 0, TotalSteps::Exact(1));
+                args.listener.on_stage_progress(
+                    PollingIngestStage::Commit,
+                    0,
+                    TotalSteps::Exact(1),
+                );
 
                 let res = args.data_writer.commit(staged).await?;
 
-                Ok(IngestResult::Updated {
+                Ok(PollingIngestResult::Updated {
                     old_head: res.old_head,
                     new_head: res.new_head,
                     num_blocks: 1,
@@ -316,8 +319,8 @@ impl IngestServiceImpl {
                     uncacheable,
                 })
             }
-            Err(StageDataError::EmptyCommit(_)) => Ok(IngestResult::UpToDate {
-                no_polling_source: false,
+            Err(StageDataError::EmptyCommit(_)) => Ok(PollingIngestResult::UpToDate {
+                no_source_defined: false,
                 uncacheable,
             }),
             Err(StageDataError::MergeError(e)) => Err(e.into()),
@@ -326,7 +329,10 @@ impl IngestServiceImpl {
     }
 
     #[tracing::instrument(level = "info", skip_all)]
-    async fn fetch(&self, args: &IngestIterationArgs<'_>) -> Result<FetchStepResult, IngestError> {
+    async fn fetch(
+        &self,
+        args: &IngestIterationArgs<'_>,
+    ) -> Result<FetchStepResult, PollingIngestError> {
         // Ignore source state for overridden fetch step
         let (fetch_step, prev_source_state) = if let Some(fetch_override) = &args.fetch_override {
             (fetch_override, None)
@@ -478,7 +484,7 @@ impl IngestServiceImpl {
         &self,
         args: &IngestIterationArgs<'_>,
         fetch_result: &FetchSavepoint,
-    ) -> Result<PrepStepResult, IngestError> {
+    ) -> Result<PrepStepResult, PollingIngestError> {
         let prep_steps = args.polling_source.prepare.clone().unwrap_or_default();
 
         if prep_steps.is_empty() {
@@ -519,7 +525,7 @@ impl IngestServiceImpl {
         &self,
         args: &IngestIterationArgs<'_>,
         prep_result: &PrepStepResult,
-    ) -> Result<Option<DataFrame>, IngestError> {
+    ) -> Result<Option<DataFrame>, PollingIngestError> {
         let input_data_path = prep_result.data.path(&self.cache_dir);
 
         if input_data_path.metadata().int_err()?.len() == 0 {
@@ -558,7 +564,7 @@ impl IngestServiceImpl {
         &self,
         args: &IngestIterationArgs<'_>,
         df: DataFrame,
-    ) -> Result<DataFrame, IngestError> {
+    ) -> Result<DataFrame, PollingIngestError> {
         let Some(preprocess) = args.polling_source.preprocess.clone() else {
             return Ok(df);
         };
@@ -731,24 +737,24 @@ impl IngestServiceImpl {
 
     // TODO: Introduce intermediate structs to avoid full unpacking
     fn merge_results(
-        combined_result: Option<IngestResult>,
-        new_result: IngestResult,
-    ) -> IngestResult {
+        combined_result: Option<PollingIngestResult>,
+        new_result: PollingIngestResult,
+    ) -> PollingIngestResult {
         match (combined_result, new_result) {
             (None, n) => n,
-            (Some(IngestResult::UpToDate { .. }), n) => n,
+            (Some(PollingIngestResult::UpToDate { .. }), n) => n,
             (
-                Some(IngestResult::Updated {
+                Some(PollingIngestResult::Updated {
                     old_head,
                     new_head,
                     num_blocks,
                     ..
                 }),
-                IngestResult::UpToDate {
-                    no_polling_source: _,
+                PollingIngestResult::UpToDate {
+                    no_source_defined: _,
                     uncacheable,
                 },
-            ) => IngestResult::Updated {
+            ) => PollingIngestResult::Updated {
                 old_head,
                 new_head,
                 num_blocks,
@@ -756,19 +762,19 @@ impl IngestServiceImpl {
                 uncacheable,
             },
             (
-                Some(IngestResult::Updated {
+                Some(PollingIngestResult::Updated {
                     old_head: prev_old_head,
                     num_blocks: prev_num_blocks,
                     ..
                 }),
-                IngestResult::Updated {
+                PollingIngestResult::Updated {
                     new_head,
                     num_blocks,
                     has_more,
                     uncacheable,
                     ..
                 },
-            ) => IngestResult::Updated {
+            ) => PollingIngestResult::Updated {
                 old_head: prev_old_head,
                 new_head,
                 num_blocks: num_blocks + prev_num_blocks,
@@ -783,15 +789,15 @@ impl IngestServiceImpl {
 // Legacy Spark-based ingest path
 ///////////////////////////////////////////////////////////////////////////////
 
-impl IngestServiceImpl {
+impl PollingIngestServiceImpl {
     async fn legacy_spark_ingest(
         &self,
         dataset_handle: DatasetHandle,
         dataset: Arc<dyn Dataset>,
         options: PollingIngestOptions,
         fetch_override: Option<FetchStep>,
-        listener: Arc<dyn IngestListener>,
-    ) -> Result<IngestResult, IngestError> {
+        listener: Arc<dyn PollingIngestListener>,
+    ) -> Result<PollingIngestResult, PollingIngestError> {
         let request = self
             .legacy_prepare_ingest_request(dataset_handle, dataset.clone())
             .await?;
@@ -816,7 +822,7 @@ impl IngestServiceImpl {
     async fn legacy_poll_until_exhausted(
         mut task: IngestTask,
         options: PollingIngestOptions,
-    ) -> Result<IngestResult, IngestError> {
+    ) -> Result<PollingIngestResult, PollingIngestError> {
         let mut combined_result = None;
 
         loop {
@@ -825,8 +831,8 @@ impl IngestServiceImpl {
                     combined_result = Some(Self::merge_results(combined_result, res));
 
                     let has_more = match combined_result {
-                        Some(IngestResult::UpToDate { .. }) => false,
-                        Some(IngestResult::Updated { has_more, .. }) => has_more,
+                        Some(PollingIngestResult::UpToDate { .. }) => false,
+                        Some(PollingIngestResult::Updated { has_more, .. }) => has_more,
                         None => unreachable!(),
                     };
 
@@ -926,27 +932,27 @@ impl IngestServiceImpl {
 ///////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl IngestService for IngestServiceImpl {
+impl PollingIngestService for PollingIngestServiceImpl {
     #[tracing::instrument(level = "info", skip_all, fields(%dataset_ref))]
-    async fn polling_ingest(
+    async fn ingest(
         &self,
         dataset_ref: &DatasetRef,
         options: PollingIngestOptions,
-        maybe_listener: Option<Arc<dyn IngestListener>>,
-    ) -> Result<IngestResult, IngestError> {
+        maybe_listener: Option<Arc<dyn PollingIngestListener>>,
+    ) -> Result<PollingIngestResult, PollingIngestError> {
         self.do_ingest(dataset_ref, options, None, |_| maybe_listener)
             .await
     }
 
     #[tracing::instrument(level = "info", skip_all, fields(?dataset_refs))]
-    async fn polling_ingest_multi(
+    async fn ingest_multi(
         &self,
         dataset_refs: Vec<DatasetRef>,
         options: PollingIngestOptions,
-        maybe_multi_listener: Option<Arc<dyn IngestMultiListener>>,
-    ) -> Vec<IngestResponse> {
+        maybe_multi_listener: Option<Arc<dyn PollingIngestMultiListener>>,
+    ) -> Vec<PollingIngestResponse> {
         let multi_listener =
-            maybe_multi_listener.unwrap_or_else(|| Arc::new(NullIngestMultiListener));
+            maybe_multi_listener.unwrap_or_else(|| Arc::new(NullPollingIngestMultiListener));
 
         let futures: Vec<_> = dataset_refs
             .iter()
@@ -961,79 +967,11 @@ impl IngestService for IngestServiceImpl {
         dataset_refs
             .into_iter()
             .zip(results)
-            .map(|(dataset_ref, result)| IngestResponse {
+            .map(|(dataset_ref, result)| PollingIngestResponse {
                 dataset_ref,
                 result,
             })
             .collect()
-    }
-
-    #[tracing::instrument(level = "info", skip_all, fields(%dataset_ref, %data_url))]
-    async fn push_ingest_from_url(
-        &self,
-        dataset_ref: &DatasetRef,
-        data_url: url::Url,
-        listener: Option<Arc<dyn IngestListener>>,
-    ) -> Result<IngestResult, IngestError> {
-        let fetch = FetchStep::Url(FetchStepUrl {
-            url: data_url.to_string(),
-            event_time: Some(EventTimeSource::FromSystemTime),
-            cache: None,
-            headers: None,
-        });
-
-        self.do_ingest(
-            dataset_ref,
-            PollingIngestOptions {
-                fetch_uncacheable: true,
-                exhaust_sources: false,
-            },
-            Some(fetch),
-            |_| listener,
-        )
-        .await
-    }
-
-    #[tracing::instrument(level = "info", skip_all, fields(%dataset_ref))]
-    async fn push_ingest_from_stream(
-        &self,
-        dataset_ref: &DatasetRef,
-        mut data: Box<dyn AsyncRead + Send + Unpin>,
-        listener: Option<Arc<dyn IngestListener>>,
-    ) -> Result<IngestResult, IngestError> {
-        use tokio::io::{AsyncReadExt, AsyncWriteExt};
-
-        // Save stream to a file in cache
-        //
-        // TODO: Breaking all architecture layers here - need to extract cache into a
-        // service
-        let path = self
-            .cache_dir
-            .join(self.get_random_cache_key("push-ingest-"));
-
-        {
-            let mut file = tokio::fs::File::create(&path).await.int_err()?;
-            let mut buf = [0u8; 2048];
-            loop {
-                let read = data.read(&mut buf).await.int_err()?;
-                if read == 0 {
-                    break;
-                }
-                file.write_all(&buf[..read]).await.int_err()?;
-            }
-            file.flush().await.int_err()?;
-        }
-
-        let data_url: url::Url = url::Url::from_file_path(&path).unwrap();
-
-        let res = self
-            .push_ingest_from_url(dataset_ref, data_url, listener)
-            .await;
-
-        // Clean up the file in cache as it's non-reusable
-        std::fs::remove_file(path).int_err()?;
-
-        res
     }
 }
 
@@ -1043,7 +981,7 @@ struct IngestLoopArgs {
     options: PollingIngestOptions,
     polling_source: SetPollingSource,
     fetch_override: Option<FetchStep>,
-    listener: Arc<dyn IngestListener>,
+    listener: Arc<dyn PollingIngestListener>,
 }
 
 struct IngestIterationArgs<'a> {
@@ -1054,7 +992,7 @@ struct IngestIterationArgs<'a> {
     options: PollingIngestOptions,
     polling_source: SetPollingSource,
     fetch_override: Option<FetchStep>,
-    listener: Arc<dyn IngestListener>,
+    listener: Arc<dyn PollingIngestListener>,
     ctx: &'a SessionContext,
     data_writer: &'a mut DataWriterDataFusion,
 }

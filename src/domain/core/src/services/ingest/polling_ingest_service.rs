@@ -14,9 +14,7 @@ use chrono::{DateTime, Utc};
 use container_runtime::ImagePullError;
 use opendatafabric::*;
 use thiserror::Error;
-use tokio::io::AsyncRead;
 
-use super::ingest;
 use crate::engine::{EngineError, ProcessError};
 use crate::*;
 
@@ -25,41 +23,26 @@ use crate::*;
 ///////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait IngestService: Send + Sync {
+pub trait PollingIngestService: Send + Sync {
     /// Uses polling source definition in metadata to ingest data from an
     /// external source
-    async fn polling_ingest(
+    async fn ingest(
         &self,
         dataset_ref: &DatasetRef,
         options: PollingIngestOptions,
-        listener: Option<Arc<dyn IngestListener>>,
-    ) -> Result<IngestResult, IngestError>;
+        listener: Option<Arc<dyn PollingIngestListener>>,
+    ) -> Result<PollingIngestResult, PollingIngestError>;
 
-    /// A batch version of [IngestService::polling_ingest]
-    async fn polling_ingest_multi(
+    /// A batch version of [PollingIngestService::ingest]
+    async fn ingest_multi(
         &self,
         dataset_refs: Vec<DatasetRef>,
         options: PollingIngestOptions,
-        listener: Option<Arc<dyn IngestMultiListener>>,
-    ) -> Vec<IngestResponse>;
-
-    /// Uses push source defenition in metadata to ingest data from the
-    /// specified source
-    async fn push_ingest_from_url(
-        &self,
-        dataset_ref: &DatasetRef,
-        data_url: url::Url,
-        listener: Option<Arc<dyn IngestListener>>,
-    ) -> Result<IngestResult, IngestError>;
-
-    /// Uses push source defenition in metadata to ingest data passessed in-band
-    async fn push_ingest_from_stream(
-        &self,
-        dataset_ref: &DatasetRef,
-        data: Box<dyn AsyncRead + Send + Unpin>,
-        listener: Option<Arc<dyn IngestListener>>,
-    ) -> Result<IngestResult, IngestError>;
+        listener: Option<Arc<dyn PollingIngestMultiListener>>,
+    ) -> Vec<PollingIngestResponse>;
 }
+
+///////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
 pub struct PollingIngestOptions {
@@ -79,16 +62,18 @@ impl Default for PollingIngestOptions {
     }
 }
 
+///////////////////////////////////////////////////////////////////////////////
+
 #[derive(Debug)]
-pub struct IngestResponse {
+pub struct PollingIngestResponse {
     pub dataset_ref: DatasetRef,
-    pub result: Result<IngestResult, IngestError>,
+    pub result: Result<PollingIngestResult, PollingIngestError>,
 }
 
 #[derive(Debug)]
-pub enum IngestResult {
+pub enum PollingIngestResult {
     UpToDate {
-        no_polling_source: bool,
+        no_source_defined: bool,
         uncacheable: bool,
     },
     Updated {
@@ -105,7 +90,7 @@ pub enum IngestResult {
 ///////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum IngestStage {
+pub enum PollingIngestStage {
     CheckCache,
     Fetch,
     Prepare,
@@ -116,12 +101,12 @@ pub enum IngestStage {
 }
 
 #[allow(unused_variables)]
-pub trait IngestListener: Send + Sync {
+pub trait PollingIngestListener: Send + Sync {
     fn begin(&self) {}
     fn on_cache_hit(&self, created_at: &DateTime<Utc>) {}
-    fn on_stage_progress(&self, stage: IngestStage, _progress: u64, _out_of: TotalSteps) {}
-    fn success(&self, result: &IngestResult) {}
-    fn error(&self, error: &IngestError) {}
+    fn on_stage_progress(&self, stage: PollingIngestStage, _progress: u64, _out_of: TotalSteps) {}
+    fn success(&self, result: &PollingIngestResult) {}
+    fn error(&self, error: &PollingIngestError) {}
 
     fn get_pull_image_listener(self: Arc<Self>) -> Option<Arc<dyn PullImageListener>> {
         None
@@ -139,17 +124,17 @@ pub enum TotalSteps {
     Exact(u64),
 }
 
-pub struct NullIngestListener;
-impl IngestListener for NullIngestListener {}
+pub struct NullPollingIngestListener;
+impl PollingIngestListener for NullPollingIngestListener {}
 
-pub trait IngestMultiListener: Send + Sync {
-    fn begin_ingest(&self, _dataset: &DatasetHandle) -> Option<Arc<dyn IngestListener>> {
+pub trait PollingIngestMultiListener: Send + Sync {
+    fn begin_ingest(&self, _dataset: &DatasetHandle) -> Option<Arc<dyn PollingIngestListener>> {
         None
     }
 }
 
-pub struct NullIngestMultiListener;
-impl IngestMultiListener for NullIngestMultiListener {}
+pub struct NullPollingIngestMultiListener;
+impl PollingIngestMultiListener for NullPollingIngestMultiListener {}
 
 ///////////////////////////////////////////////////////////////////////////////
 // Errors
@@ -169,7 +154,7 @@ impl IngestParameterNotFound {
 
 // TODO: Revisit error granularity
 #[derive(Debug, Error)]
-pub enum IngestError {
+pub enum PollingIngestError {
     #[error(transparent)]
     DatasetNotFound(
         #[from]
@@ -223,7 +208,7 @@ pub enum IngestError {
     ReadError(
         #[from]
         #[backtrace]
-        ingest::ReadError,
+        ReadError,
     ),
 
     #[error("Engine provisioning error")]
@@ -244,7 +229,7 @@ pub enum IngestError {
     MergeError(
         #[from]
         #[backtrace]
-        ingest::MergeError,
+        MergeError,
     ),
 
     #[error(transparent)]
@@ -269,7 +254,7 @@ pub enum IngestError {
     ),
 }
 
-impl From<GetDatasetError> for IngestError {
+impl From<GetDatasetError> for PollingIngestError {
     fn from(v: GetDatasetError) -> Self {
         match v {
             GetDatasetError::NotFound(e) => Self::DatasetNotFound(e),
@@ -278,7 +263,7 @@ impl From<GetDatasetError> for IngestError {
     }
 }
 
-impl From<auth::DatasetActionUnauthorizedError> for IngestError {
+impl From<auth::DatasetActionUnauthorizedError> for PollingIngestError {
     fn from(v: auth::DatasetActionUnauthorizedError) -> Self {
         match v {
             auth::DatasetActionUnauthorizedError::Access(e) => Self::Access(e),
@@ -287,23 +272,23 @@ impl From<auth::DatasetActionUnauthorizedError> for IngestError {
     }
 }
 
-impl IngestError {
+impl PollingIngestError {
     pub fn unreachable(path: impl Into<String>, source: Option<BoxedError>) -> Self {
-        IngestError::Unreachable {
+        Self::Unreachable {
             path: path.into(),
             source,
         }
     }
 
     pub fn not_found(path: impl Into<String>, source: Option<BoxedError>) -> Self {
-        IngestError::NotFound {
+        Self::NotFound {
             path: path.into(),
             source,
         }
     }
 
     pub fn pipe(command: Vec<String>, e: impl std::error::Error + Send + Sync + 'static) -> Self {
-        IngestError::PipeError {
+        Self::PipeError {
             command,
             source: e.into(),
             backtrace: Backtrace::capture(),

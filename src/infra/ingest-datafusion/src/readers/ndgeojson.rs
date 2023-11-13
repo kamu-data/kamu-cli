@@ -90,12 +90,12 @@ impl ReaderNdGeoJson {
 
 #[async_trait::async_trait]
 impl Reader for ReaderNdGeoJson {
-    async fn output_schema(
+    async fn read_schema(
         &self,
         ctx: &SessionContext,
         conf: &ReadStep,
     ) -> Result<Option<datafusion::arrow::datatypes::Schema>, ReadError> {
-        super::output_schema_common(ctx, conf).await
+        super::read_schema_common(ctx, conf).await
     }
 
     async fn read(

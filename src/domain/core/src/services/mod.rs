@@ -12,7 +12,6 @@ pub use container_runtime::{NullPullImageListener, PullImageListener};
 
 pub mod engine_provisioner;
 pub mod ingest;
-pub mod ingest_service;
 pub mod provenance_service;
 pub mod pull_service;
 pub mod push_service;
@@ -28,7 +27,7 @@ pub mod transform_service;
 pub mod verification_service;
 
 pub use engine_provisioner::*;
-pub use ingest_service::*;
+pub use ingest::*;
 pub use provenance_service::*;
 pub use pull_service::*;
 pub use push_service::*;

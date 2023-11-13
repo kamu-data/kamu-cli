@@ -147,13 +147,13 @@ impl Default for PullMultiOptions {
 ///////////////////////////////////////////////////////////////////////////////
 
 pub trait PullListener: Send + Sync {
-    fn get_ingest_listener(self: Arc<Self>) -> Option<Arc<dyn IngestListener>>;
+    fn get_ingest_listener(self: Arc<Self>) -> Option<Arc<dyn PollingIngestListener>>;
     fn get_transform_listener(self: Arc<Self>) -> Option<Arc<dyn TransformListener>>;
     fn get_sync_listener(self: Arc<Self>) -> Option<Arc<dyn SyncListener>>;
 }
 
 pub trait PullMultiListener: Send + Sync {
-    fn get_ingest_listener(self: Arc<Self>) -> Option<Arc<dyn IngestMultiListener>>;
+    fn get_ingest_listener(self: Arc<Self>) -> Option<Arc<dyn PollingIngestMultiListener>>;
     fn get_transform_listener(self: Arc<Self>) -> Option<Arc<dyn TransformMultiListener>>;
     fn get_sync_listener(self: Arc<Self>) -> Option<Arc<dyn SyncMultiListener>>;
 }
@@ -170,14 +170,14 @@ pub enum PullResult {
     },
 }
 
-impl From<IngestResult> for PullResult {
-    fn from(other: IngestResult) -> Self {
+impl From<PollingIngestResult> for PullResult {
+    fn from(other: PollingIngestResult) -> Self {
         match other {
-            IngestResult::UpToDate {
-                no_polling_source: _,
+            PollingIngestResult::UpToDate {
+                no_source_defined: _,
                 uncacheable: _,
             } => PullResult::UpToDate,
-            IngestResult::Updated {
+            PollingIngestResult::Updated {
                 old_head,
                 new_head,
                 num_blocks,
@@ -245,10 +245,10 @@ pub enum PullError {
     #[error("{0}")]
     InvalidOperation(String),
     #[error(transparent)]
-    IngestError(
+    PollingIngestError(
         #[from]
         #[backtrace]
-        IngestError,
+        PollingIngestError,
     ),
     #[error(transparent)]
     TransformError(

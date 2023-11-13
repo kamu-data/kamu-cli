@@ -50,7 +50,7 @@ impl FetchService {
         target_path: &Path,
         system_time: &DateTime<Utc>,
         maybe_listener: Option<Arc<dyn FetchProgressListener>>,
-    ) -> Result<FetchResult, IngestError> {
+    ) -> Result<FetchResult, PollingIngestError> {
         let listener = maybe_listener.unwrap_or_else(|| Arc::new(NullFetchProgressListener));
 
         match fetch_step {
@@ -113,14 +113,14 @@ impl FetchService {
         }
     }
 
-    fn template_url(url_tpl: &str) -> Result<Url, IngestError> {
+    fn template_url(url_tpl: &str) -> Result<Url, PollingIngestError> {
         let url = Self::template_string(url_tpl)?;
         Ok(Url::parse(&url).int_err()?)
     }
 
     fn template_headers(
         headers_tpl: &Option<Vec<RequestHeader>>,
-    ) -> Result<Vec<RequestHeader>, IngestError> {
+    ) -> Result<Vec<RequestHeader>, PollingIngestError> {
         let mut res = Vec::new();
         let empty = Vec::new();
         for htpl in headers_tpl.as_ref().unwrap_or(&empty) {
@@ -133,7 +133,7 @@ impl FetchService {
         Ok(res)
     }
 
-    fn template_string<'a>(s: &'a str) -> Result<Cow<'a, str>, IngestError> {
+    fn template_string<'a>(s: &'a str) -> Result<Cow<'a, str>, PollingIngestError> {
         let mut s = Cow::from(s);
         let re_tpl = regex::Regex::new(r"\$\{\{([^}]*)\}\}").unwrap();
         let re_env = regex::Regex::new(r"^env\.([a-zA-Z-_]+)$").unwrap();
@@ -179,7 +179,7 @@ impl FetchService {
         prev_source_state: Option<&PollingSourceState>,
         target_path: &Path,
         listener: &Arc<dyn FetchProgressListener>,
-    ) -> Result<FetchResult, IngestError> {
+    ) -> Result<FetchResult, PollingIngestError> {
         // Pull image
         let pull_image_listener = listener
             .clone()
@@ -349,7 +349,7 @@ impl FetchService {
         target_path: &Path,
         system_time: &DateTime<Utc>,
         listener: &Arc<dyn FetchProgressListener>,
-    ) -> Result<FetchResult, IngestError> {
+    ) -> Result<FetchResult, PollingIngestError> {
         match &fglob.order {
             None => (),
             Some(SourceOrdering::ByName) => (),
@@ -395,7 +395,7 @@ impl FetchService {
             return if prev_source_state.is_some() {
                 Ok(FetchResult::UpToDate)
             } else {
-                Err(IngestError::not_found(&fglob.path, None))
+                Err(PollingIngestError::not_found(&fglob.path, None))
             };
         }
 
@@ -432,20 +432,19 @@ impl FetchService {
     // TODO: Validate event_time_source
     // TODO: Support event time from ctime/modtime
     // TODO: Resolve symlinks
-    // TODO: PERF: Consider compression
     async fn fetch_file(
         path: &Path,
         event_time_source: Option<&EventTimeSource>,
         prev_source_state: Option<&PollingSourceState>,
-        target_path: &Path,
+        _target_path: &Path,
         system_time: &DateTime<Utc>,
-        listener: &Arc<dyn FetchProgressListener>,
-    ) -> Result<FetchResult, IngestError> {
+        _listener: &Arc<dyn FetchProgressListener>,
+    ) -> Result<FetchResult, PollingIngestError> {
         tracing::info!(?path, "Ingesting file");
 
         let meta = std::fs::metadata(path).map_err(|e| match e.kind() {
             std::io::ErrorKind::NotFound => {
-                IngestError::not_found(path.as_os_str().to_string_lossy(), Some(e.into()))
+                PollingIngestError::not_found(path.as_os_str().to_string_lossy(), Some(e.into()))
             }
             _ => e.int_err().into(),
         })?;
@@ -473,61 +472,19 @@ impl FetchService {
             }
         };
 
-        // Heuristics for STDIN (/dev/fd/0) and other special device files
-        if meta.is_file() {
-            Ok(FetchResult::Updated(FetchResultUpdated {
-                source_state: Some(PollingSourceState::LastModified(mod_time)),
-                source_event_time,
-                has_more: false,
-                zero_copy_path: Some(path.to_path_buf()),
-            }))
-        } else {
-            // Copy data into the cache, not to confuse the engines
-            let total_bytes = TotalBytes::Exact(meta.len());
-            let mut source = std::fs::File::open(path).int_err()?;
-            let mut target = std::fs::File::create(target_path).int_err()?;
-            let listener = listener.clone();
-
-            tokio::task::spawn_blocking(move || -> Result<(), std::io::Error> {
-                use std::io::{Read, Write};
-
-                let mut buf = [0u8; 1024];
-                let mut fetched_bytes = 0;
-
-                loop {
-                    let read = source.read(&mut buf)?;
-                    if read == 0 {
-                        break;
-                    }
-
-                    target.write_all(&buf[..read])?;
-
-                    fetched_bytes += read as u64;
-                    listener.on_progress(&FetchProgress {
-                        fetched_bytes,
-                        total_bytes,
-                    });
-                }
-
-                Ok(())
-            })
-            .await
-            .int_err()?
-            .int_err()?;
-
-            Ok(FetchResult::Updated(FetchResultUpdated {
-                source_state: Some(PollingSourceState::LastModified(mod_time)),
-                source_event_time,
-                has_more: false,
-                zero_copy_path: None,
-            }))
-        }
+        Ok(FetchResult::Updated(FetchResultUpdated {
+            source_state: Some(PollingSourceState::LastModified(mod_time)),
+            source_event_time,
+            has_more: false,
+            zero_copy_path: Some(path.to_path_buf()),
+        }))
     }
 
     // TODO: Externalize configuration
     const HTTP_CONNECT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
     const HTTP_MAX_REDIRECTS: usize = 10;
 
+    // TODO: PERF: Consider compression
     async fn fetch_http(
         &self,
         url: Url,
@@ -537,7 +494,7 @@ impl FetchService {
         target_path: &Path,
         system_time: &DateTime<Utc>,
         listener: &Arc<dyn FetchProgressListener>,
-    ) -> Result<FetchResult, IngestError> {
+    ) -> Result<FetchResult, PollingIngestError> {
         use tokio::io::AsyncWriteExt;
 
         let client = reqwest::Client::builder()
@@ -573,9 +530,9 @@ impl FetchService {
 
         let mut response = match client.get(url.clone()).headers(headers).send().await {
             Ok(r) => Ok(r),
-            Err(err) if err.is_connect() || err.is_timeout() => {
-                Err(IngestError::unreachable(url.as_str(), Some(err.into())))
-            }
+            Err(err) if err.is_connect() || err.is_timeout() => Err(
+                PollingIngestError::unreachable(url.as_str(), Some(err.into())),
+            ),
             Err(err) => Err(err.int_err().into()),
         }?;
 
@@ -585,10 +542,10 @@ impl FetchService {
                 return Ok(FetchResult::UpToDate);
             }
             http::StatusCode::NOT_FOUND => {
-                return Err(IngestError::not_found(url.as_str(), None));
+                return Err(PollingIngestError::not_found(url.as_str(), None));
             }
             code => {
-                return Err(IngestError::unreachable(
+                return Err(PollingIngestError::unreachable(
                     url.as_str(),
                     Some(HttpStatusError::new(code.as_u16() as u32).into()),
                 ));
@@ -654,7 +611,7 @@ impl FetchService {
         target_path: &Path,
         system_time: &DateTime<Utc>,
         listener: &Arc<dyn FetchProgressListener>,
-    ) -> Result<FetchResult, IngestError> {
+    ) -> Result<FetchResult, PollingIngestError> {
         cfg_if::cfg_if! {
             if #[cfg(feature = "ftp")] {
                 let target_path = target_path.to_owned();
@@ -758,7 +715,7 @@ impl FetchService {
     fn extract_event_time_from_path(
         filename: &str,
         src: &EventTimeSourceFromPath,
-    ) -> Result<DateTime<Utc>, IngestError> {
+    ) -> Result<DateTime<Utc>, PollingIngestError> {
         let time_re = regex::Regex::new(&src.pattern).int_err()?;
 
         let time_fmt = match src.timestamp_format {
@@ -901,7 +858,7 @@ struct EventTimeSourceExtractError {
     pub message: String,
 }
 
-impl std::convert::From<EventTimeSourceError> for IngestError {
+impl std::convert::From<EventTimeSourceError> for PollingIngestError {
     fn from(e: EventTimeSourceError) -> Self {
         Self::Internal(e.int_err())
     }

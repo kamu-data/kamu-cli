@@ -24,7 +24,7 @@ pub struct IngestTask {
     request: IngestRequest,
     options: PollingIngestOptions,
     fetch_override: Option<FetchStep>,
-    listener: Arc<dyn IngestListener>,
+    listener: Arc<dyn PollingIngestListener>,
 
     prev_source_state: Option<PollingSourceState>,
 
@@ -40,7 +40,7 @@ impl IngestTask {
         request: IngestRequest,
         options: PollingIngestOptions,
         fetch_override: Option<FetchStep>,
-        listener: Arc<dyn IngestListener>,
+        listener: Arc<dyn PollingIngestListener>,
         engine_provisioner: Arc<dyn EngineProvisioner>,
         container_runtime: Arc<ContainerRuntime>,
         run_info_dir: &Path,
@@ -73,7 +73,10 @@ impl IngestTask {
         })
     }
 
-    pub async fn ingest(&mut self, operation_id: String) -> Result<IngestResult, IngestError> {
+    pub async fn ingest(
+        &mut self,
+        operation_id: String,
+    ) -> Result<PollingIngestResult, PollingIngestError> {
         self.request.operation_id = operation_id;
 
         tracing::info!(
@@ -99,7 +102,7 @@ impl IngestTask {
         }
     }
 
-    pub async fn ingest_inner(&mut self) -> Result<IngestResult, IngestError> {
+    pub async fn ingest_inner(&mut self) -> Result<PollingIngestResult, PollingIngestError> {
         let prev_head = self
             .dataset
             .as_metadata_chain()
@@ -108,7 +111,7 @@ impl IngestTask {
             .int_err()?;
 
         self.listener
-            .on_stage_progress(IngestStage::CheckCache, 0, TotalSteps::Exact(1));
+            .on_stage_progress(PollingIngestStage::CheckCache, 0, TotalSteps::Exact(1));
 
         let first_ingest = self.request.next_offset == 0;
         let uncacheable =
@@ -116,34 +119,43 @@ impl IngestTask {
 
         if uncacheable && !self.options.fetch_uncacheable {
             tracing::info!("Skipping fetch of uncacheable source");
-            return Ok(IngestResult::UpToDate {
-                no_polling_source: false,
+            return Ok(PollingIngestResult::UpToDate {
+                no_source_defined: false,
                 uncacheable,
             });
         }
 
         match self.maybe_fetch().await? {
-            FetchStepResult::UpToDate => Ok(IngestResult::UpToDate {
-                no_polling_source: false,
+            FetchStepResult::UpToDate => Ok(PollingIngestResult::UpToDate {
+                no_source_defined: false,
                 uncacheable,
             }),
             FetchStepResult::Updated(savepoint) => {
-                self.listener
-                    .on_stage_progress(IngestStage::Prepare, 0, TotalSteps::Exact(1));
+                self.listener.on_stage_progress(
+                    PollingIngestStage::Prepare,
+                    0,
+                    TotalSteps::Exact(1),
+                );
                 let prepare_result = self.prepare(&savepoint).await?;
 
                 self.listener
-                    .on_stage_progress(IngestStage::Read, 0, TotalSteps::Exact(1));
+                    .on_stage_progress(PollingIngestStage::Read, 0, TotalSteps::Exact(1));
                 let read_result = self
                     .read(&prepare_result, savepoint.source_event_time)
                     .await?;
 
+                self.listener.on_stage_progress(
+                    PollingIngestStage::Preprocess,
+                    0,
+                    TotalSteps::Exact(1),
+                );
                 self.listener
-                    .on_stage_progress(IngestStage::Preprocess, 0, TotalSteps::Exact(1));
-                self.listener
-                    .on_stage_progress(IngestStage::Merge, 0, TotalSteps::Exact(1));
-                self.listener
-                    .on_stage_progress(IngestStage::Commit, 0, TotalSteps::Exact(1));
+                    .on_stage_progress(PollingIngestStage::Merge, 0, TotalSteps::Exact(1));
+                self.listener.on_stage_progress(
+                    PollingIngestStage::Commit,
+                    0,
+                    TotalSteps::Exact(1),
+                );
 
                 let commit_res = self
                     .maybe_commit(savepoint.source_state.as_ref(), read_result, &prev_head)
@@ -160,8 +172,8 @@ impl IngestTask {
                 }
 
                 match commit_res {
-                    CommitStepResult::UpToDate => Ok(IngestResult::UpToDate {
-                        no_polling_source: false,
+                    CommitStepResult::UpToDate => Ok(PollingIngestResult::UpToDate {
+                        no_source_defined: false,
                         uncacheable,
                     }),
                     CommitStepResult::Updated(commit) => {
@@ -182,7 +194,7 @@ impl IngestTask {
                             .as_ref()
                             .map(|ss| ss.to_source_state());
 
-                        Ok(IngestResult::Updated {
+                        Ok(PollingIngestResult::Updated {
                             old_head: prev_head,
                             new_head: commit.new_head,
                             num_blocks: 1,
@@ -275,7 +287,7 @@ impl IngestTask {
     }
 
     #[tracing::instrument(level = "info", name = "fetch", skip(self))]
-    async fn maybe_fetch(&mut self) -> Result<FetchStepResult, IngestError> {
+    async fn maybe_fetch(&mut self) -> Result<FetchStepResult, PollingIngestError> {
         // Ignore source state for overridden fetch step
         let (fetch_step, prev_source_state) = if let Some(fetch_override) = &self.fetch_override {
             (fetch_override, None)
@@ -358,7 +370,7 @@ impl IngestTask {
     async fn prepare(
         &mut self,
         fetch_result: &FetchSavepoint,
-    ) -> Result<PrepStepResult, IngestError> {
+    ) -> Result<PrepStepResult, PollingIngestError> {
         let null_steps = Vec::new();
         let prep_steps = self
             .request
@@ -393,7 +405,7 @@ impl IngestTask {
         &mut self,
         prep_result: &PrepStepResult,
         source_event_time: Option<DateTime<Utc>>,
-    ) -> Result<IngestResponse, IngestError> {
+    ) -> Result<IngestResponse, PollingIngestError> {
         let input_data_path = prep_result.data.path(&self.cache_dir);
 
         // Terminate early for zero-sized files
@@ -430,7 +442,7 @@ impl IngestTask {
         source_state: Option<&PollingSourceState>,
         read_result: IngestResponse,
         prev_hash: &Multihash,
-    ) -> Result<CommitStepResult, IngestError> {
+    ) -> Result<CommitStepResult, PollingIngestError> {
         let data_interval = read_result.data_interval.clone();
         let output_watermark = read_result.output_watermark;
         let source_state = source_state.map(|v| v.to_source_state());
@@ -503,11 +515,11 @@ struct CommitStepResultUpdated {
 ///////////////////////////////////////////////////////////////////////////////
 
 pub(crate) struct FetchProgressListenerBridge {
-    listener: Arc<dyn IngestListener>,
+    listener: Arc<dyn PollingIngestListener>,
 }
 
 impl FetchProgressListenerBridge {
-    pub(crate) fn new(listener: Arc<dyn IngestListener>) -> Self {
+    pub(crate) fn new(listener: Arc<dyn PollingIngestListener>) -> Self {
         Self { listener }
     }
 }
@@ -515,7 +527,7 @@ impl FetchProgressListenerBridge {
 impl FetchProgressListener for FetchProgressListenerBridge {
     fn on_progress(&self, progress: &FetchProgress) {
         self.listener.on_stage_progress(
-            IngestStage::Fetch,
+            PollingIngestStage::Fetch,
             progress.fetched_bytes,
             match progress.total_bytes {
                 TotalBytes::Unknown => TotalSteps::Unknown,

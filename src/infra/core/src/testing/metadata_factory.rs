@@ -215,9 +215,9 @@ impl SetPollingSourceBuilder {
         }
     }
 
-    pub fn fetch(mut self, fetch_step: FetchStep) -> Self {
+    pub fn fetch(mut self, fetch_step: impl Into<FetchStep>) -> Self {
         self.v = SetPollingSource {
-            fetch: fetch_step,
+            fetch: fetch_step.into(),
             ..self.v
         };
         self

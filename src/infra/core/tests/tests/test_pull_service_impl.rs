@@ -1093,28 +1093,28 @@ impl TestIngestService {
 
 // TODO: Replace with a mock
 #[async_trait::async_trait]
-impl IngestService for TestIngestService {
-    async fn polling_ingest(
+impl PollingIngestService for TestIngestService {
+    async fn ingest(
         &self,
         _dataset_ref: &DatasetRef,
         _ingest_options: PollingIngestOptions,
-        _maybe_listener: Option<Arc<dyn IngestListener>>,
-    ) -> Result<IngestResult, IngestError> {
+        _maybe_listener: Option<Arc<dyn PollingIngestListener>>,
+    ) -> Result<PollingIngestResult, PollingIngestError> {
         unimplemented!();
     }
 
-    async fn polling_ingest_multi(
+    async fn ingest_multi(
         &self,
         dataset_refs: Vec<DatasetRef>,
         _options: PollingIngestOptions,
-        _listener: Option<Arc<dyn IngestMultiListener>>,
-    ) -> Vec<IngestResponse> {
+        _listener: Option<Arc<dyn PollingIngestMultiListener>>,
+    ) -> Vec<PollingIngestResponse> {
         let results = dataset_refs
             .iter()
-            .map(|r| IngestResponse {
+            .map(|r| PollingIngestResponse {
                 dataset_ref: r.clone(),
-                result: Ok(IngestResult::UpToDate {
-                    no_polling_source: false,
+                result: Ok(PollingIngestResult::UpToDate {
+                    no_source_defined: false,
                     uncacheable: false,
                 }),
             })
@@ -1123,24 +1123,6 @@ impl IngestService for TestIngestService {
             dataset_refs.into_iter().map(|r| r.into()).collect(),
         ));
         results
-    }
-
-    async fn push_ingest_from_url(
-        &self,
-        _dataset_ref: &DatasetRef,
-        _data_url: url::Url,
-        _listener: Option<Arc<dyn IngestListener>>,
-    ) -> Result<IngestResult, IngestError> {
-        unimplemented!()
-    }
-
-    async fn push_ingest_from_stream(
-        &self,
-        _dataset_ref: &DatasetRef,
-        _data: Box<dyn tokio::io::AsyncRead + Send + Unpin>,
-        _listener: Option<Arc<dyn IngestListener>>,
-    ) -> Result<IngestResult, IngestError> {
-        unimplemented!()
     }
 }
 

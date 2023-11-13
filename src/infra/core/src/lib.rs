@@ -25,7 +25,6 @@ pub mod utils;
 
 mod dataset_config;
 mod dataset_layout;
-mod ingest_service_impl;
 mod provenance_service_impl;
 mod pull_service_impl;
 mod push_service_impl;
@@ -43,7 +42,7 @@ pub use auth::*;
 pub use dataset_config::*;
 pub use dataset_layout::*;
 pub use engine::*;
-pub use ingest_service_impl::*;
+pub use ingest::*;
 pub use provenance_service_impl::*;
 pub use pull_service_impl::*;
 pub use push_service_impl::*;

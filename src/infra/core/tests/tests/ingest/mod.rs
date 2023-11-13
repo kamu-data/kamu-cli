@@ -8,5 +8,7 @@
 // by the Apache License, Version 2.0.
 
 mod test_fetch;
+mod test_polling_ingest;
 mod test_prep;
+mod test_push_ingest;
 mod test_writer;

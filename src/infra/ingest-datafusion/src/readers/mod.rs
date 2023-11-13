@@ -23,7 +23,7 @@ pub use ndjson::*;
 pub use parquet::*;
 pub use shapefile::*;
 
-pub(crate) async fn output_schema_common(
+pub(crate) async fn read_schema_common(
     ctx: &datafusion::prelude::SessionContext,
     conf: &opendatafabric::ReadStep,
 ) -> Result<Option<datafusion::arrow::datatypes::Schema>, kamu_core::ingest::ReadError> {

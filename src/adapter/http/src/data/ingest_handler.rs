@@ -37,9 +37,9 @@ pub async fn dataset_ingest_handler(
 ) -> Result<(), ApiError> {
     let data = Box::new(crate::axum_utils::body_into_async_read(body_stream));
 
-    let ingest_svc = catalog.get_one::<dyn IngestService>().unwrap();
+    let ingest_svc = catalog.get_one::<dyn PushIngestService>().unwrap();
     ingest_svc
-        .push_ingest_from_stream(&dataset_ref, data, None)
+        .ingest_from_file_stream(&dataset_ref, data, IngestMediaTypes::NDJSON, None)
         .await
         .api_err()?;
 

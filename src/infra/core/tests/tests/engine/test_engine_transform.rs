@@ -252,7 +252,7 @@ async fn test_transform_common(transform: Transform) {
 
     let dataset_action_authorizer = Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new());
 
-    let ingest_svc = IngestServiceImpl::new(
+    let ingest_svc = PollingIngestServiceImpl::new(
         dataset_repo.clone(),
         dataset_action_authorizer.clone(),
         engine_provisioner.clone(),
@@ -325,7 +325,7 @@ async fn test_transform_common(transform: Transform) {
         .unwrap();
 
     ingest_svc
-        .polling_ingest(
+        .ingest(
             &root_alias.as_local_ref(),
             PollingIngestOptions::default(),
             None,
@@ -418,7 +418,7 @@ async fn test_transform_common(transform: Transform) {
     .unwrap();
 
     ingest_svc
-        .polling_ingest(
+        .ingest(
             &root_alias.as_local_ref(),
             PollingIngestOptions::default(),
             None,

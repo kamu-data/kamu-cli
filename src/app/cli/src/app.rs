@@ -180,11 +180,18 @@ pub fn configure_base_catalog(
     b.bind::<dyn ResourceLoader, ResourceLoaderImpl>();
 
     b.add_builder(
-        builder_for::<IngestServiceImpl>()
+        builder_for::<PollingIngestServiceImpl>()
             .with_run_info_dir(workspace_layout.run_info_dir.clone())
             .with_cache_dir(workspace_layout.cache_dir.clone()),
     );
-    b.bind::<dyn IngestService, IngestServiceImpl>();
+    b.bind::<dyn PollingIngestService, PollingIngestServiceImpl>();
+
+    b.add_builder(
+        builder_for::<PushIngestServiceImpl>()
+            .with_run_info_dir(workspace_layout.run_info_dir.clone())
+            .with_cache_dir(workspace_layout.cache_dir.clone()),
+    );
+    b.bind::<dyn PushIngestService, PushIngestServiceImpl>();
 
     b.add::<TransformServiceImpl>();
     b.bind::<dyn TransformService, TransformServiceImpl>();

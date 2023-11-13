@@ -11,7 +11,7 @@ use std::assert_matches::assert_matches;
 use std::io::prelude::*;
 
 use indoc::indoc;
-use kamu::domain::IngestError;
+use kamu::domain::PollingIngestError;
 use kamu::ingest::*;
 use opendatafabric::*;
 
@@ -124,7 +124,7 @@ fn test_prep_decompress_zip_bad_file() {
     let prep_svc = PrepService::new();
 
     let res = prep_svc.prepare(&prep_steps, &src_path, &target_path);
-    assert_matches!(res, Err(IngestError::Internal(_)));
+    assert_matches!(res, Err(PollingIngestError::Internal(_)));
 }
 
 #[test]

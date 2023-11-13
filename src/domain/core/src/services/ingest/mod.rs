@@ -9,8 +9,12 @@
 
 mod data_writer;
 mod merge_strategy;
+mod polling_ingest_service;
+mod push_ingest_service;
 mod reader;
 
 pub use data_writer::*;
 pub use merge_strategy::*;
+pub use polling_ingest_service::*;
+pub use push_ingest_service::*;
 pub use reader::*;

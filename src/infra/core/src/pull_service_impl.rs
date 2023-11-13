@@ -13,7 +13,6 @@ use std::sync::Arc;
 
 use chrono::prelude::*;
 use dill::*;
-use kamu_core::ingest_service::IngestResponse;
 use kamu_core::*;
 use opendatafabric::*;
 use url::Url;
@@ -21,7 +20,7 @@ use url::Url;
 pub struct PullServiceImpl {
     dataset_repo: Arc<dyn DatasetRepository>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
-    ingest_svc: Arc<dyn IngestService>,
+    ingest_svc: Arc<dyn PollingIngestService>,
     transform_svc: Arc<dyn TransformService>,
     sync_svc: Arc<dyn SyncService>,
     current_account_subject: Arc<CurrentAccountSubject>,
@@ -33,7 +32,7 @@ impl PullServiceImpl {
     pub fn new(
         dataset_repo: Arc<dyn DatasetRepository>,
         remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
-        ingest_svc: Arc<dyn IngestService>,
+        ingest_svc: Arc<dyn PollingIngestService>,
         transform_svc: Arc<dyn TransformService>,
         sync_svc: Arc<dyn SyncService>,
         current_account_subject: Arc<CurrentAccountSubject>,
@@ -347,13 +346,13 @@ impl PullServiceImpl {
         &self,
         batch: &[PullItem], // TODO: Move to avoid cloning
         options: &PullMultiOptions,
-        listener: Option<Arc<dyn IngestMultiListener>>,
+        listener: Option<Arc<dyn PollingIngestMultiListener>>,
     ) -> Result<Vec<PullResponse>, InternalError> {
         let ingest_requests = batch.iter().map(|pi| pi.local_ref.clone()).collect();
 
         let ingest_responses = self
             .ingest_svc
-            .polling_ingest_multi(ingest_requests, options.ingest_options.clone(), listener)
+            .ingest_multi(ingest_requests, options.ingest_options.clone(), listener)
             .await;
 
         assert_eq!(batch.len(), ingest_responses.len());
@@ -652,7 +651,7 @@ struct PullItem {
 }
 
 impl PullItem {
-    fn into_response_ingest(self, r: IngestResponse) -> PullResponse {
+    fn into_response_ingest(self, r: PollingIngestResponse) -> PullResponse {
         PullResponse {
             original_request: self.original_request,
             local_ref: Some(r.dataset_ref),
@@ -727,7 +726,7 @@ impl Ord for PullItem {
 struct ListenerMultiAdapter(Arc<dyn PullListener>);
 
 impl PullMultiListener for ListenerMultiAdapter {
-    fn get_ingest_listener(self: Arc<Self>) -> Option<Arc<dyn IngestMultiListener>> {
+    fn get_ingest_listener(self: Arc<Self>) -> Option<Arc<dyn PollingIngestMultiListener>> {
         Some(self)
     }
 
@@ -740,8 +739,8 @@ impl PullMultiListener for ListenerMultiAdapter {
     }
 }
 
-impl IngestMultiListener for ListenerMultiAdapter {
-    fn begin_ingest(&self, _dataset: &DatasetHandle) -> Option<Arc<dyn IngestListener>> {
+impl PollingIngestMultiListener for ListenerMultiAdapter {
+    fn begin_ingest(&self, _dataset: &DatasetHandle) -> Option<Arc<dyn PollingIngestListener>> {
         self.0.clone().get_ingest_listener()
     }
 }

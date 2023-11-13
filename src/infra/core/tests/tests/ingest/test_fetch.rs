@@ -47,7 +47,7 @@ async fn test_fetch_url_file() {
         fetch_svc
             .fetch("1", &fetch_step, None, &target_path, &Utc::now(), None)
             .await,
-        Err(IngestError::NotFound { .. })
+        Err(PollingIngestError::NotFound { .. })
     );
     assert!(!target_path.exists());
 
@@ -130,7 +130,7 @@ async fn test_fetch_url_http_unreachable() {
         fetch_svc
             .fetch("1", &fetch_step, None, &target_path, &Utc::now(), None)
             .await,
-        Err(IngestError::Unreachable { .. })
+        Err(PollingIngestError::Unreachable { .. })
     );
     assert!(!target_path.exists());
 }
@@ -159,7 +159,7 @@ async fn test_fetch_url_http_not_found() {
         fetch_svc
             .fetch("1", &fetch_step, None, &target_path, &Utc::now(), None)
             .await,
-        Err(IngestError::NotFound { .. })
+        Err(PollingIngestError::NotFound { .. })
     );
     assert!(!target_path.exists());
 }
@@ -271,7 +271,7 @@ async fn test_fetch_url_http_ok() {
                 None
             )
             .await,
-        Err(IngestError::NotFound { .. })
+        Err(PollingIngestError::NotFound { .. })
     );
 
     assert!(target_path.exists());
@@ -455,7 +455,7 @@ async fn test_fetch_files_glob() {
         fetch_svc
             .fetch("1", &fetch_step, None, &target_path, &Utc::now(), None)
             .await,
-        Err(IngestError::NotFound { .. })
+        Err(PollingIngestError::NotFound { .. })
     );
     assert!(!target_path.exists());
 

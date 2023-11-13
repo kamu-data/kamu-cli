@@ -21,9 +21,9 @@ use opendatafabric::ReadStep;
 /// defined in the [ReadStep].
 #[async_trait::async_trait]
 pub trait Reader: Send + Sync {
-    /// Returns schema that the output will be coerced into, if such schema is
-    /// defined in the [ReadStep].
-    async fn output_schema(
+    /// Returns schema that the read output will be coerced into, if such schema
+    /// is defined in the [ReadStep].
+    async fn read_schema(
         &self,
         ctx: &SessionContext,
         conf: &ReadStep,

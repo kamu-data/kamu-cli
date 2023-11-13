@@ -91,11 +91,11 @@ impl ClientSideHarness {
             .bind::<dyn ObjectStoreRegistry, ObjectStoreRegistryImpl>();
 
         b.add_builder(
-            builder_for::<IngestServiceImpl>()
+            builder_for::<PollingIngestServiceImpl>()
                 .with_run_info_dir(run_info_dir)
                 .with_cache_dir(cache_dir),
         )
-        .bind::<dyn IngestService, IngestServiceImpl>();
+        .bind::<dyn PollingIngestService, PollingIngestServiceImpl>();
 
         b.add::<DatasetFactoryImpl>()
             .bind::<dyn DatasetFactory, DatasetFactoryImpl>();

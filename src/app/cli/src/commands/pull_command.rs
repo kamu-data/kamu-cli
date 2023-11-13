@@ -246,7 +246,7 @@ impl PrettyPullProgress {
 }
 
 impl PullMultiListener for PrettyPullProgress {
-    fn get_ingest_listener(self: Arc<Self>) -> Option<Arc<dyn IngestMultiListener>> {
+    fn get_ingest_listener(self: Arc<Self>) -> Option<Arc<dyn PollingIngestMultiListener>> {
         Some(self)
     }
 
@@ -259,8 +259,11 @@ impl PullMultiListener for PrettyPullProgress {
     }
 }
 
-impl IngestMultiListener for PrettyPullProgress {
-    fn begin_ingest(&self, dataset_handle: &DatasetHandle) -> Option<Arc<dyn IngestListener>> {
+impl PollingIngestMultiListener for PrettyPullProgress {
+    fn begin_ingest(
+        &self,
+        dataset_handle: &DatasetHandle,
+    ) -> Option<Arc<dyn PollingIngestListener>> {
         Some(Arc::new(PrettyIngestProgress::new(
             dataset_handle,
             self.multi_progress.clone(),
@@ -304,7 +307,7 @@ enum ProgressStyle {
     Bar,
 }
 
-pub(crate) struct PrettyIngestProgress {
+pub struct PrettyIngestProgress {
     dataset_handle: DatasetHandle,
     multi_progress: Arc<indicatif::MultiProgress>,
     fetch_uncacheable: bool,
@@ -312,7 +315,7 @@ pub(crate) struct PrettyIngestProgress {
 }
 
 struct PrettyIngestProgressState {
-    stage: IngestStage,
+    stage: PollingIngestStage,
     curr_progress: indicatif::ProgressBar,
     curr_progress_style: ProgressStyle,
 }
@@ -326,7 +329,7 @@ impl PrettyIngestProgress {
         Self {
             dataset_handle: dataset_handle.clone(),
             state: Mutex::new(PrettyIngestProgressState {
-                stage: IngestStage::CheckCache,
+                stage: PollingIngestStage::CheckCache,
                 curr_progress_style: ProgressStyle::Spinner,
                 curr_progress: multi_progress.add(Self::new_spinner(&Self::spinner_message(
                     dataset_handle,
@@ -382,28 +385,28 @@ impl PrettyIngestProgress {
         )
     }
 
-    fn style_for_stage(&self, stage: IngestStage) -> ProgressStyle {
+    fn style_for_stage(&self, stage: PollingIngestStage) -> ProgressStyle {
         match stage {
-            IngestStage::Fetch => ProgressStyle::Bar,
+            PollingIngestStage::Fetch => ProgressStyle::Bar,
             _ => ProgressStyle::Spinner,
         }
     }
 
-    fn message_for_stage(&self, stage: IngestStage) -> String {
+    fn message_for_stage(&self, stage: PollingIngestStage) -> String {
         let msg = match stage {
-            IngestStage::CheckCache => "Checking for updates",
-            IngestStage::Fetch => "Downloading data",
-            IngestStage::Prepare => "Preparing data",
-            IngestStage::Read => "Reading data",
-            IngestStage::Preprocess => "Preprocessing data",
-            IngestStage::Merge => "Merging data",
-            IngestStage::Commit => "Committing data",
+            PollingIngestStage::CheckCache => "Checking for updates",
+            PollingIngestStage::Fetch => "Downloading data",
+            PollingIngestStage::Prepare => "Preparing data",
+            PollingIngestStage::Read => "Reading data",
+            PollingIngestStage::Preprocess => "Preprocessing data",
+            PollingIngestStage::Merge => "Merging data",
+            PollingIngestStage::Commit => "Committing data",
         };
         Self::spinner_message(&self.dataset_handle, stage as u32, msg)
     }
 }
 
-impl IngestListener for PrettyIngestProgress {
+impl PollingIngestListener for PrettyIngestProgress {
     fn on_cache_hit(&self, created_at: &DateTime<Utc>) {
         let mut state = self.state.lock().unwrap();
 
@@ -411,7 +414,7 @@ impl IngestListener for PrettyIngestProgress {
             .curr_progress
             .finish_with_message(Self::spinner_message(
                 &self.dataset_handle,
-                IngestStage::Fetch as u32,
+                PollingIngestStage::Fetch as u32,
                 console::style(format!(
                     "Using cached data from {} (use kamu system gc to clear cache)",
                     chrono_humanize::HumanTime::from(*created_at - Utc::now())
@@ -421,7 +424,7 @@ impl IngestListener for PrettyIngestProgress {
         state.curr_progress = self.multi_progress.add(Self::new_spinner(""));
     }
 
-    fn on_stage_progress(&self, stage: IngestStage, n: u64, out_of: TotalSteps) {
+    fn on_stage_progress(&self, stage: PollingIngestStage, n: u64, out_of: TotalSteps) {
         let mut state = self.state.lock().unwrap();
         state.stage = stage;
 
@@ -457,20 +460,20 @@ impl IngestListener for PrettyIngestProgress {
         }
     }
 
-    fn success(&self, result: &IngestResult) {
+    fn success(&self, result: &PollingIngestResult) {
         let mut state = self.state.lock().unwrap();
 
         match result {
-            IngestResult::UpToDate {
-                no_polling_source,
+            PollingIngestResult::UpToDate {
+                no_source_defined,
                 uncacheable,
             } => {
                 state
                     .curr_progress
                     .finish_with_message(Self::spinner_message(
                         &self.dataset_handle,
-                        IngestStage::Commit as u32,
-                        if *no_polling_source {
+                        PollingIngestStage::Commit as u32,
+                        if *no_source_defined {
                             console::style("Dataset does not specify a polling source".to_owned())
                                 .yellow()
                         } else if *uncacheable && !self.fetch_uncacheable {
@@ -484,7 +487,7 @@ impl IngestListener for PrettyIngestProgress {
                         },
                     ));
             }
-            IngestResult::Updated {
+            PollingIngestResult::Updated {
                 old_head: _,
                 ref new_head,
                 num_blocks: _,
@@ -496,7 +499,7 @@ impl IngestListener for PrettyIngestProgress {
                         .curr_progress
                         .finish_with_message(Self::spinner_message(
                             &self.dataset_handle,
-                            IngestStage::Commit as u32,
+                            PollingIngestStage::Commit as u32,
                             console::style("Data source is uncacheable").yellow(),
                         ));
                     state.curr_progress = self.multi_progress.add(Self::new_spinner(""));
@@ -505,14 +508,14 @@ impl IngestListener for PrettyIngestProgress {
                     .curr_progress
                     .finish_with_message(Self::spinner_message(
                         &self.dataset_handle,
-                        IngestStage::Commit as u32,
+                        PollingIngestStage::Commit as u32,
                         console::style(format!("Committed new block {}", new_head.short())).green(),
                     ));
             }
         };
     }
 
-    fn error(&self, _error: &IngestError) {
+    fn error(&self, _error: &PollingIngestError) {
         let state = self.state.lock().unwrap();
         state
             .curr_progress
@@ -541,13 +544,13 @@ impl EngineProvisioningListener for PrettyIngestProgress {
         // This currently happens during the Read stage
         state.curr_progress.set_message(Self::spinner_message(
             &self.dataset_handle,
-            IngestStage::Read as u32,
+            PollingIngestStage::Read as u32,
             format!("Waiting for engine {}", engine_id),
         ));
     }
 
     fn success(&self) {
-        self.on_stage_progress(IngestStage::Read, 0, TotalSteps::Exact(0));
+        self.on_stage_progress(PollingIngestStage::Read, 0, TotalSteps::Exact(0));
     }
 
     fn get_pull_image_listener(self: Arc<Self>) -> Option<Arc<dyn PullImageListener>> {
@@ -562,7 +565,7 @@ impl PullImageListener for PrettyIngestProgress {
         // This currently happens during the Read stage
         state.curr_progress.set_message(Self::spinner_message(
             &self.dataset_handle,
-            IngestStage::Read as u32,
+            PollingIngestStage::Read as u32,
             format!("Pulling image {}", image),
         ));
     }
