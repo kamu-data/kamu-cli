@@ -23,7 +23,6 @@ pub struct IngestTask {
     dataset: Arc<dyn Dataset>,
     request: IngestRequest,
     options: PollingIngestOptions,
-    fetch_override: Option<FetchStep>,
     listener: Arc<dyn PollingIngestListener>,
 
     prev_source_state: Option<PollingSourceState>,
@@ -39,27 +38,15 @@ impl IngestTask {
         dataset: Arc<dyn Dataset>,
         request: IngestRequest,
         options: PollingIngestOptions,
-        fetch_override: Option<FetchStep>,
         listener: Arc<dyn PollingIngestListener>,
         engine_provisioner: Arc<dyn EngineProvisioner>,
         container_runtime: Arc<ContainerRuntime>,
         run_info_dir: &Path,
         cache_dir: &Path,
     ) -> Result<Self, InternalError> {
-        if fetch_override.is_some() {
-            if let FetchStep::FilesGlob(_) = &request.polling_source.fetch {
-                return Err(concat!(
-                    "Fetch override use is not supported for glob sources, ",
-                    "as globs maintain strict ordering and state"
-                )
-                .int_err());
-            }
-        }
-
         Ok(Self {
             dataset,
             options,
-            fetch_override,
             listener,
             prev_source_state: request
                 .prev_source_state
@@ -82,7 +69,6 @@ impl IngestTask {
         tracing::info!(
             request = ?self.request,
             options = ?self.options,
-            fetch_override = ?self.fetch_override,
             "Ingest details",
         );
 
@@ -114,8 +100,7 @@ impl IngestTask {
             .on_stage_progress(PollingIngestStage::CheckCache, 0, TotalSteps::Exact(1));
 
         let first_ingest = self.request.next_offset == 0;
-        let uncacheable =
-            !first_ingest && self.prev_source_state.is_none() && self.fetch_override.is_none();
+        let uncacheable = !first_ingest && self.prev_source_state.is_none();
 
         if uncacheable && !self.options.fetch_uncacheable {
             tracing::info!("Skipping fetch of uncacheable source");
@@ -288,15 +273,8 @@ impl IngestTask {
 
     #[tracing::instrument(level = "info", name = "fetch", skip(self))]
     async fn maybe_fetch(&mut self) -> Result<FetchStepResult, PollingIngestError> {
-        // Ignore source state for overridden fetch step
-        let (fetch_step, prev_source_state) = if let Some(fetch_override) = &self.fetch_override {
-            (fetch_override, None)
-        } else {
-            (
-                &self.request.polling_source.fetch,
-                self.prev_source_state.as_ref(),
-            )
-        };
+        let fetch_step = &self.request.polling_source.fetch;
+        let prev_source_state = self.prev_source_state.as_ref();
 
         let savepoint_path = self.get_savepoint_path(fetch_step, prev_source_state)?;
         let savepoint = self.read_fetch_savepoint(&savepoint_path)?;
@@ -349,13 +327,7 @@ impl IngestTask {
 
                 let savepoint = FetchSavepoint {
                     created_at: self.request.system_time.clone(),
-                    // If fetch source was overridden, we don't want to put its
-                    // source state into the metadata.
-                    source_state: if self.fetch_override.is_none() {
-                        upd.source_state
-                    } else {
-                        None
-                    },
+                    source_state: upd.source_state,
                     source_event_time: upd.source_event_time,
                     data,
                     has_more: upd.has_more,

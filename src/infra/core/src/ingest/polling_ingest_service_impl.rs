@@ -67,7 +67,6 @@ impl PollingIngestServiceImpl {
         &self,
         dataset_ref: &DatasetRef,
         options: PollingIngestOptions,
-        fetch_override: Option<FetchStep>,
         get_listener: impl FnOnce(&DatasetHandle) -> Option<Arc<dyn PollingIngestListener>>,
     ) -> Result<PollingIngestResult, PollingIngestError> {
         let dataset_handle = self.dataset_repo.resolve_dataset_ref(&dataset_ref).await?;
@@ -120,12 +119,11 @@ impl PollingIngestServiceImpl {
                 dataset,
                 options,
                 polling_source: polling_source_block.event,
-                fetch_override,
                 listener,
             })
             .await
         } else {
-            self.legacy_spark_ingest(dataset_handle, dataset, options, fetch_override, listener)
+            self.legacy_spark_ingest(dataset_handle, dataset, options, listener)
                 .await
         }
     }
@@ -166,7 +164,6 @@ impl PollingIngestServiceImpl {
                 system_time: self.time_source.now(),
                 options: args.options.clone(),
                 polling_source: args.polling_source.clone(),
-                fetch_override: args.fetch_override.clone(),
                 listener: args.listener.clone(),
                 ctx: &ctx,
                 data_writer: &mut data_writer,
@@ -204,7 +201,10 @@ impl PollingIngestServiceImpl {
         &self,
         args: IngestIterationArgs<'_>,
     ) -> Result<PollingIngestResult, PollingIngestError> {
-        tracing::info!(?args.options, ?args.fetch_override, "Ingest iteration details");
+        tracing::info!(
+            options = ?args.options,
+            "Ingest iteration details",
+        );
 
         let listener = args.listener.clone();
         listener.begin();
@@ -231,8 +231,7 @@ impl PollingIngestServiceImpl {
             .on_stage_progress(PollingIngestStage::CheckCache, 0, TotalSteps::Exact(1));
 
         let uncacheable = args.data_writer.last_offset().is_some()
-            && args.data_writer.last_source_state().is_none()
-            && args.fetch_override.is_none();
+            && args.data_writer.last_source_state().is_none();
 
         if uncacheable && !args.options.fetch_uncacheable {
             tracing::info!("Skipping fetch of uncacheable source");
@@ -333,18 +332,11 @@ impl PollingIngestServiceImpl {
         &self,
         args: &IngestIterationArgs<'_>,
     ) -> Result<FetchStepResult, PollingIngestError> {
-        // Ignore source state for overridden fetch step
-        let (fetch_step, prev_source_state) = if let Some(fetch_override) = &args.fetch_override {
-            (fetch_override, None)
-        } else {
-            (
-                &args.polling_source.fetch,
-                args.data_writer.last_source_state(),
-            )
-        };
-
-        let prev_source_state =
-            prev_source_state.and_then(|ss| PollingSourceState::try_from_source_state(&ss));
+        let fetch_step = &args.polling_source.fetch;
+        let prev_source_state = args
+            .data_writer
+            .last_source_state()
+            .and_then(|ss| PollingSourceState::try_from_source_state(&ss));
 
         let savepoint_path = self.get_savepoint_path(fetch_step, prev_source_state.as_ref())?;
         let savepoint = self.read_fetch_savepoint(&savepoint_path)?;
@@ -398,13 +390,7 @@ impl PollingIngestServiceImpl {
 
                 let savepoint = FetchSavepoint {
                     created_at: args.system_time.clone(),
-                    // If fetch source was overridden we don't want to put its
-                    // source state into the metadata.
-                    source_state: if args.fetch_override.is_none() {
-                        upd.source_state
-                    } else {
-                        None
-                    },
+                    source_state: upd.source_state,
                     source_event_time: upd.source_event_time,
                     data,
                     has_more: upd.has_more,
@@ -795,7 +781,6 @@ impl PollingIngestServiceImpl {
         dataset_handle: DatasetHandle,
         dataset: Arc<dyn Dataset>,
         options: PollingIngestOptions,
-        fetch_override: Option<FetchStep>,
         listener: Arc<dyn PollingIngestListener>,
     ) -> Result<PollingIngestResult, PollingIngestError> {
         let request = self
@@ -807,7 +792,6 @@ impl PollingIngestServiceImpl {
             dataset,
             request,
             options.clone(),
-            fetch_override,
             listener,
             self.engine_provisioner.clone(),
             self.container_runtime.clone(),
@@ -940,7 +924,7 @@ impl PollingIngestService for PollingIngestServiceImpl {
         options: PollingIngestOptions,
         maybe_listener: Option<Arc<dyn PollingIngestListener>>,
     ) -> Result<PollingIngestResult, PollingIngestError> {
-        self.do_ingest(dataset_ref, options, None, |_| maybe_listener)
+        self.do_ingest(dataset_ref, options, |_| maybe_listener)
             .await
     }
 
@@ -957,7 +941,7 @@ impl PollingIngestService for PollingIngestServiceImpl {
         let futures: Vec<_> = dataset_refs
             .iter()
             .map(|dataset_ref| {
-                self.do_ingest(dataset_ref, options.clone(), None, |hdl| {
+                self.do_ingest(dataset_ref, options.clone(), |hdl| {
                     multi_listener.begin_ingest(hdl)
                 })
             })
@@ -980,7 +964,6 @@ struct IngestLoopArgs {
     dataset: Arc<dyn Dataset>,
     options: PollingIngestOptions,
     polling_source: SetPollingSource,
-    fetch_override: Option<FetchStep>,
     listener: Arc<dyn PollingIngestListener>,
 }
 
@@ -991,7 +974,6 @@ struct IngestIterationArgs<'a> {
     system_time: DateTime<Utc>,
     options: PollingIngestOptions,
     polling_source: SetPollingSource,
-    fetch_override: Option<FetchStep>,
     listener: Arc<dyn PollingIngestListener>,
     ctx: &'a SessionContext,
     data_writer: &'a mut DataWriterDataFusion,
