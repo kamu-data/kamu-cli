@@ -86,7 +86,7 @@ impl SqlShellCommand {
                 match self.output_config.format {
                     OutputFormat::Csv => Some("csv"),
                     OutputFormat::Json => Some("json"),
-                    OutputFormat::JsonLD => {
+                    OutputFormat::NdJson => {
                         unimplemented!("Line-delimited Json is not yet supported by this command")
                     }
                     OutputFormat::JsonSoA => {

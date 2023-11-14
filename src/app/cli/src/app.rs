@@ -516,7 +516,7 @@ fn configure_output_format(
     let format = match format_str {
         Some("csv") => OutputFormat::Csv,
         Some("json") => OutputFormat::Json,
-        Some("json-ld") => OutputFormat::JsonLD,
+        Some("ndjson") => OutputFormat::NdJson,
         Some("json-soa") => OutputFormat::JsonSoA,
         Some("table") => OutputFormat::Table,
         None | Some(_) => {

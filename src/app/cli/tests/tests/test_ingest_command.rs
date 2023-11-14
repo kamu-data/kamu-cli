@@ -13,7 +13,6 @@ use datafusion::parquet::record::RowAccessor;
 use indoc::indoc;
 use itertools::Itertools;
 use opendatafabric::*;
-use url::Url;
 
 use crate::utils::Kamu;
 
@@ -28,22 +27,21 @@ async fn test_push_ingest_from_file() {
         // TODO: In future this will be replaced by AddPushSource event
         metadata: vec![MetadataEvent::SetPollingSource(SetPollingSource {
             fetch: FetchStep::Url(FetchStepUrl {
-                url: Url::from_file_path(&kamu.workspace_path().join("data.csv"))
-                    .unwrap()
-                    .to_string(),
+                url: "http://localhost".to_string(),
                 event_time: None,
                 cache: None,
                 headers: None,
             }),
             prepare: None,
-            read: ReadStep::Csv(ReadStepCsv {
+            read: ReadStepNdJson {
                 schema: Some(vec![
                     "event_time TIMESTAMP".to_owned(),
                     "city STRING".to_owned(),
                     "population BIGINT".to_owned(),
                 ]),
-                ..ReadStepCsv::default()
-            }),
+                ..Default::default()
+            }
+            .into(),
             // TODO: Temporary to force ingest to use new DataFusion engine
             preprocess: Some(
                 TransformSql {
@@ -68,17 +66,23 @@ async fn test_push_ingest_from_file() {
         &data_path,
         indoc!(
             "
-                2020-01-01,A,1000
-                2020-01-01,B,2000
-                2020-01-01,C,3000
-                "
+            2020-01-01,A,1000
+            2020-01-01,B,2000
+            2020-01-01,C,3000
+            "
         ),
     )
     .unwrap();
 
-    kamu.execute(["ingest", "population", path(&data_path)])
-        .await
-        .unwrap();
+    kamu.execute([
+        "ingest",
+        "population",
+        "--input-format",
+        "csv",
+        path(&data_path),
+    ])
+    .await
+    .unwrap();
 
     let parquet = kamu
         .get_last_data_slice(&DatasetName::new_unchecked("population"))

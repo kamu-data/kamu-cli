@@ -34,6 +34,7 @@ async fn test_object_url_local_fs() {
     let server_harness = ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
         multi_tenant: false,
         authorized_writes: true,
+        base_catalog: None,
     })
     .await;
 
@@ -238,6 +239,7 @@ async fn test_pull_object_url_s3() {
     let server_harness = ServerSideS3Harness::new(ServerSideHarnessOptions {
         multi_tenant: false,
         authorized_writes: true,
+        base_catalog: None,
     })
     .await;
 

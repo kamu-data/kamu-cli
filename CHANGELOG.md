@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `echo '{"city": "Vancouver", "population": 675218}' | kamu ingest cities --stdin`
 - New `/:dataset/data/ingest` REST endpoint also allows you to push data via API, example:
   - Run API server and get JWT token: `kamu ui --http-port 8080 --get-token`
-  - Push data: `echo '{...}' | curl -v -X POST http://localhost:8080/freezer/data/ingest -H 'Authorization:  Bearer <token>'`
+  - Push data: `echo '[{...}]' | curl -v -X POST http://localhost:8080/freezer/data/ingest -H 'Authorization:  Bearer <token>'`
 - The `kamu ui` command now supports `--get-token` flag to print out the access token upon server start that you can use to experiment with API
 ### Changed
 - Upgraded to `arrow v48`, `datafusion v33`, and latest AWS SDK

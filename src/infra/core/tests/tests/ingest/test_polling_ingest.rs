@@ -8,14 +8,12 @@
 // by the Apache License, Version 2.0.
 
 use std::assert_matches::assert_matches;
-use std::path::PathBuf;
 use std::sync::Arc;
 
 use chrono::{TimeZone, Utc};
 use container_runtime::ContainerRuntime;
 use datafusion::parquet::record::RowAccessor;
 use datafusion::prelude::*;
-use futures::StreamExt;
 use indoc::indoc;
 use itertools::Itertools;
 use kamu::domain::auth::DatasetActionAuthorizer;
@@ -187,6 +185,7 @@ async fn test_ingest_polling_datafusion_snapshot() {
     let dataset_name = dataset_snapshot.name.clone();
 
     harness.create_dataset(dataset_snapshot).await;
+    let data_helper = harness.dataset_data_helper(&dataset_name).await;
 
     // Round 1
     std::fs::write(
@@ -204,42 +203,37 @@ async fn test_ingest_polling_datafusion_snapshot() {
 
     harness.ingest(&dataset_name).await.unwrap();
 
-    let df = harness.get_last_data(&dataset_name).await;
-    kamu_data_utils::testing::assert_schema_eq(
-        df.schema(),
-        indoc!(
-            r#"
-            message arrow_schema {
-              OPTIONAL INT64 offset;
-              REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
-              REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
-              REQUIRED BYTE_ARRAY observed (STRING);
-              OPTIONAL BYTE_ARRAY city (STRING);
-              OPTIONAL INT64 population;
-            }
-            "#
-        ),
-    );
-
-    kamu_data_utils::testing::assert_data_eq(
-        df,
-        indoc!(
-            r#"
-            +--------+----------------------+----------------------+----------+------+------------+
-            | offset | system_time          | event_time           | observed | city | population |
-            +--------+----------------------+----------------------+----------+------+------------+
-            | 0      | 2050-01-01T12:00:00Z | 2050-01-01T12:00:00Z | I        | A    | 10001      |
-            | 1      | 2050-01-01T12:00:00Z | 2050-01-01T12:00:00Z | I        | B    | 20001      |
-            | 2      | 2050-01-01T12:00:00Z | 2050-01-01T12:00:00Z | I        | C    | 30001      |
-            +--------+----------------------+----------------------+----------+------+------------+
-            "#
-        ),
-    )
-    .await;
+    data_helper
+        .assert_last_data_eq(
+            indoc!(
+                r#"
+                message arrow_schema {
+                  OPTIONAL INT64 offset;
+                  REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
+                  REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
+                  REQUIRED BYTE_ARRAY observed (STRING);
+                  OPTIONAL BYTE_ARRAY city (STRING);
+                  OPTIONAL INT64 population;
+                }
+                "#
+            ),
+            indoc!(
+                r#"
+                +--------+----------------------+----------------------+----------+------+------------+
+                | offset | system_time          | event_time           | observed | city | population |
+                +--------+----------------------+----------------------+----------+------+------------+
+                | 0      | 2050-01-01T12:00:00Z | 2050-01-01T12:00:00Z | I        | A    | 10001      |
+                | 1      | 2050-01-01T12:00:00Z | 2050-01-01T12:00:00Z | I        | B    | 20001      |
+                | 2      | 2050-01-01T12:00:00Z | 2050-01-01T12:00:00Z | I        | C    | 30001      |
+                +--------+----------------------+----------------------+----------+------+------------+
+                "#
+            ),
+        )
+        .await;
 
     assert_eq!(
-        harness
-            .get_last_data_block(&dataset_name)
+        data_helper
+            .get_last_data_block()
             .await
             .event
             .output_watermark
@@ -267,10 +261,8 @@ async fn test_ingest_polling_datafusion_snapshot() {
 
     harness.ingest(&dataset_name).await.unwrap();
 
-    let df = harness.get_last_data(&dataset_name).await;
-    kamu_data_utils::testing::assert_data_eq(
-        df,
-        indoc!(
+    data_helper
+        .assert_last_data_records_eq(indoc!(
             r#"
             +--------+----------------------+----------------------+----------+------+------------+
             | offset | system_time          | event_time           | observed | city | population |
@@ -278,13 +270,12 @@ async fn test_ingest_polling_datafusion_snapshot() {
             | 3      | 2050-02-01T12:00:00Z | 2050-02-01T12:00:00Z | U        | C    | 40001      |
             +--------+----------------------+----------------------+----------+------+------------+
             "#
-        ),
-    )
-    .await;
+        ))
+        .await;
 
     assert_eq!(
-        harness
-            .get_last_data_block(&dataset_name)
+        data_helper
+            .get_last_data_block()
             .await
             .event
             .output_watermark
@@ -311,7 +302,7 @@ async fn test_ingest_polling_datafusion_snapshot() {
         .set(Utc.with_ymd_and_hms(2050, 2, 1, 12, 0, 0).unwrap());
 
     harness.ingest(&dataset_name).await.unwrap();
-    let event = harness.get_last_data_block(&dataset_name).await.event;
+    let event = data_helper.get_last_data_block().await.event;
 
     assert_eq!(event.output_data, None);
     assert_eq!(
@@ -375,6 +366,7 @@ async fn test_ingest_polling_datafusion_ledger() {
     let dataset_name = dataset_snapshot.name.clone();
 
     harness.create_dataset(dataset_snapshot).await;
+    let data_helper = harness.dataset_data_helper(&dataset_name).await;
 
     // Round 1
     std::fs::write(
@@ -391,27 +383,21 @@ async fn test_ingest_polling_datafusion_ledger() {
     .unwrap();
 
     harness.ingest(&dataset_name).await.unwrap();
-
-    let df = harness.get_last_data(&dataset_name).await;
-    kamu_data_utils::testing::assert_schema_eq(
-        df.schema(),
-        indoc!(
-            r#"
-            message arrow_schema {
-              OPTIONAL INT64 offset;
-              REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
-              OPTIONAL INT64 date (TIMESTAMP(MILLIS,true));
-              OPTIONAL BYTE_ARRAY city (STRING);
-              OPTIONAL INT64 population;
-            }
-            "#
-        ),
-    );
-
-    kamu_data_utils::testing::assert_data_eq(
-        df,
-        indoc!(
-            r#"
+    data_helper
+        .assert_last_data_eq(
+            indoc!(
+                r#"
+                message arrow_schema {
+                  OPTIONAL INT64 offset;
+                  REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
+                  OPTIONAL INT64 date (TIMESTAMP(MILLIS,true));
+                  OPTIONAL BYTE_ARRAY city (STRING);
+                  OPTIONAL INT64 population;
+                }
+                "#
+            ),
+            indoc!(
+                r#"
             +--------+----------------------+----------------------+------+------------+
             | offset | system_time          | date                 | city | population |
             +--------+----------------------+----------------------+------+------------+
@@ -420,13 +406,13 @@ async fn test_ingest_polling_datafusion_ledger() {
             | 2      | 2050-01-01T12:00:00Z | 2020-01-01T00:00:00Z | C    | 3000       |
             +--------+----------------------+----------------------+------+------------+
             "#
-        ),
-    )
-    .await;
+            ),
+        )
+        .await;
 
     assert_eq!(
-        harness
-            .get_last_data_block(&dataset_name)
+        data_helper
+            .get_last_data_block()
             .await
             .event
             .output_watermark
@@ -450,10 +436,8 @@ async fn test_ingest_polling_datafusion_ledger() {
 
     harness.ingest(&dataset_name).await.unwrap();
 
-    let df = harness.get_last_data(&dataset_name).await;
-    kamu_data_utils::testing::assert_data_eq(
-        df,
-        indoc!(
+    data_helper
+        .assert_last_data_records_eq(indoc!(
             r#"
             +--------+----------------------+----------------------+------+------------+
             | offset | system_time          | date                 | city | population |
@@ -461,13 +445,12 @@ async fn test_ingest_polling_datafusion_ledger() {
             | 3      | 2050-01-01T12:00:00Z | 2021-01-01T00:00:00Z | C    | 4000       |
             +--------+----------------------+----------------------+------+------------+
             "#
-        ),
-    )
-    .await;
+        ))
+        .await;
 
     assert_eq!(
-        harness
-            .get_last_data_block(&dataset_name)
+        data_helper
+            .get_last_data_block()
             .await
             .event
             .output_watermark
@@ -489,10 +472,8 @@ async fn test_ingest_polling_datafusion_ledger() {
 
     harness.ingest(&dataset_name).await.unwrap();
 
-    let df = harness.get_last_data(&dataset_name).await;
-    kamu_data_utils::testing::assert_data_eq(
-        df,
-        indoc!(
+    data_helper
+        .assert_last_data_records_eq(indoc!(
             r#"
             +--------+----------------------+----------------------+------+------------+
             | offset | system_time          | date                 | city | population |
@@ -500,13 +481,12 @@ async fn test_ingest_polling_datafusion_ledger() {
             | 4      | 2050-01-01T12:00:00Z | 2020-01-01T00:00:00Z | D    | 4000       |
             +--------+----------------------+----------------------+------+------------+
             "#
-        ),
-    )
-    .await;
+        ))
+        .await;
 
     assert_eq!(
-        harness
-            .get_last_data_block(&dataset_name)
+        data_helper
+            .get_last_data_block()
             .await
             .event
             .output_watermark
@@ -527,7 +507,7 @@ async fn test_ingest_polling_datafusion_ledger() {
     .unwrap();
 
     harness.ingest(&dataset_name).await.unwrap();
-    let event = harness.get_last_data_block(&dataset_name).await.event;
+    let event = data_helper.get_last_data_block().await.event;
 
     assert_eq!(event.output_data, None);
     assert_eq!(
@@ -540,7 +520,7 @@ async fn test_ingest_polling_datafusion_ledger() {
     std::fs::write(&src_path, "").unwrap();
 
     harness.ingest(&dataset_name).await.unwrap();
-    let event = harness.get_last_data_block(&dataset_name).await.event;
+    let event = data_helper.get_last_data_block().await.event;
 
     assert_eq!(event.output_data, None);
     assert_eq!(
@@ -599,12 +579,13 @@ async fn test_ingest_polling_datafusion_empty_data() {
     let dataset_name = dataset_snapshot.name.clone();
 
     harness.create_dataset(dataset_snapshot).await;
+    let data_helper = harness.dataset_data_helper(&dataset_name).await;
 
     std::fs::write(&src_path, "").unwrap();
     harness.ingest(&dataset_name).await.unwrap();
 
     // Should only containe source state
-    let event = harness.get_last_data_block(&dataset_name).await.event;
+    let event = data_helper.get_last_data_block().await.event;
     assert_eq!(event.output_data, None);
     assert_eq!(event.output_watermark, None);
     assert!(event.source_state.is_some());
@@ -664,6 +645,7 @@ async fn test_ingest_polling_datafusion_event_time_as_date() {
     let dataset_name = dataset_snapshot.name.clone();
 
     harness.create_dataset(dataset_snapshot).await;
+    let data_helper = harness.dataset_data_helper(&dataset_name).await;
 
     std::fs::write(
         &src_path,
@@ -680,41 +662,36 @@ async fn test_ingest_polling_datafusion_event_time_as_date() {
 
     harness.ingest(&dataset_name).await.unwrap();
 
-    let df = harness.get_last_data(&dataset_name).await;
-    kamu_data_utils::testing::assert_schema_eq(
-        df.schema(),
-        indoc!(
-            r#"
-            message arrow_schema {
-              OPTIONAL INT64 offset;
-              REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
-              OPTIONAL INT32 date (DATE);
-              OPTIONAL BYTE_ARRAY city (STRING);
-              OPTIONAL INT64 population;
-            }
-            "#
-        ),
-    );
-
-    kamu_data_utils::testing::assert_data_eq(
-        df,
-        indoc!(
-            r#"
-            +--------+----------------------+------------+------+------------+
-            | offset | system_time          | date       | city | population |
-            +--------+----------------------+------------+------+------------+
-            | 0      | 2050-01-01T12:00:00Z | 2020-01-01 | A    | 1000       |
-            | 1      | 2050-01-01T12:00:00Z | 2020-01-01 | B    | 2000       |
-            | 2      | 2050-01-01T12:00:00Z | 2020-01-01 | C    | 3000       |
-            +--------+----------------------+------------+------+------------+
-            "#
-        ),
-    )
-    .await;
+    data_helper
+        .assert_last_data_eq(
+            indoc!(
+                r#"
+                message arrow_schema {
+                  OPTIONAL INT64 offset;
+                  REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
+                  OPTIONAL INT32 date (DATE);
+                  OPTIONAL BYTE_ARRAY city (STRING);
+                  OPTIONAL INT64 population;
+                }
+                "#
+            ),
+            indoc!(
+                r#"
+                +--------+----------------------+------------+------+------------+
+                | offset | system_time          | date       | city | population |
+                +--------+----------------------+------------+------+------------+
+                | 0      | 2050-01-01T12:00:00Z | 2020-01-01 | A    | 1000       |
+                | 1      | 2050-01-01T12:00:00Z | 2020-01-01 | B    | 2000       |
+                | 2      | 2050-01-01T12:00:00Z | 2020-01-01 | C    | 3000       |
+                +--------+----------------------+------------+------+------------+
+                "#
+            ),
+        )
+        .await;
 
     assert_eq!(
-        harness
-            .get_last_data_block(&dataset_name)
+        data_helper
+            .get_last_data_block()
             .await
             .event
             .output_watermark
@@ -845,6 +822,7 @@ async fn test_ingest_polling_datafusion_bad_column_names_preserve() {
     let dataset_name = dataset_snapshot.name.clone();
 
     harness.create_dataset(dataset_snapshot).await;
+    let data_helper = harness.dataset_data_helper(&dataset_name).await;
 
     std::fs::write(
         &src_path,
@@ -859,38 +837,32 @@ async fn test_ingest_polling_datafusion_bad_column_names_preserve() {
     .unwrap();
 
     harness.ingest(&dataset_name).await.unwrap();
-
-    let df = harness.get_last_data(&dataset_name).await;
-    kamu_data_utils::testing::assert_schema_eq(
-        df.schema(),
-        indoc!(
-            r#"
-            message arrow_schema {
-              OPTIONAL INT64 offset;
-              REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
-              REQUIRED INT32 Date (UTC) (DATE);
-              REQUIRED BYTE_ARRAY City Name (STRING);
-              REQUIRED INT64 Population;
-            }
-            "#
-        ),
-    );
-
-    kamu_data_utils::testing::assert_data_eq(
-        df,
-        indoc!(
-            r#"
-            +--------+----------------------+------------+-----------+------------+
-            | offset | system_time          | Date (UTC) | City Name | Population |
-            +--------+----------------------+------------+-----------+------------+
-            | 0      | 2050-01-01T12:00:00Z | 2020-01-01 | A         | 1000       |
-            | 1      | 2050-01-01T12:00:00Z | 2020-01-01 | B         | 2000       |
-            | 2      | 2050-01-01T12:00:00Z | 2020-01-01 | C         | 3000       |
-            +--------+----------------------+------------+-----------+------------+
-            "#
-        ),
-    )
-    .await;
+    data_helper
+        .assert_last_data_eq(
+            indoc!(
+                r#"
+                message arrow_schema {
+                  OPTIONAL INT64 offset;
+                  REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
+                  REQUIRED INT32 Date (UTC) (DATE);
+                  REQUIRED BYTE_ARRAY City Name (STRING);
+                  REQUIRED INT64 Population;
+                }
+                "#
+            ),
+            indoc!(
+                r#"
+                +--------+----------------------+------------+-----------+------------+
+                | offset | system_time          | Date (UTC) | City Name | Population |
+                +--------+----------------------+------------+-----------+------------+
+                | 0      | 2050-01-01T12:00:00Z | 2020-01-01 | A         | 1000       |
+                | 1      | 2050-01-01T12:00:00Z | 2020-01-01 | B         | 2000       |
+                | 2      | 2050-01-01T12:00:00Z | 2020-01-01 | C         | 3000       |
+                +--------+----------------------+------------+-----------+------------+
+                "#
+            ),
+        )
+        .await;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -941,6 +913,7 @@ async fn test_ingest_polling_datafusion_bad_column_names_rename() {
     let dataset_name = dataset_snapshot.name.clone();
 
     harness.create_dataset(dataset_snapshot).await;
+    let data_helper = harness.dataset_data_helper(&dataset_name).await;
 
     std::fs::write(
         &src_path,
@@ -956,37 +929,32 @@ async fn test_ingest_polling_datafusion_bad_column_names_rename() {
 
     harness.ingest(&dataset_name).await.unwrap();
 
-    let df = harness.get_last_data(&dataset_name).await;
-    kamu_data_utils::testing::assert_schema_eq(
-        df.schema(),
-        indoc!(
-            r#"
-            message arrow_schema {
-              OPTIONAL INT64 offset;
-              REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
-              OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
-              OPTIONAL BYTE_ARRAY city (STRING);
-              OPTIONAL INT64 population;
-            }
-            "#
-        ),
-    );
-
-    kamu_data_utils::testing::assert_data_eq(
-        df,
-        indoc!(
-            r#"
-            +--------+----------------------+----------------------+------+------------+
-            | offset | system_time          | event_time           | city | population |
-            +--------+----------------------+----------------------+------+------------+
-            | 0      | 2050-01-01T12:00:00Z | 2020-01-01T12:00:00Z | A    | 1000       |
-            | 1      | 2050-01-01T12:00:00Z | 2020-01-01T12:00:00Z | B    | 2000       |
-            | 2      | 2050-01-01T12:00:00Z | 2020-01-01T12:00:00Z | C    | 3000       |
-            +--------+----------------------+----------------------+------+------------+
-            "#
-        ),
-    )
-    .await;
+    data_helper
+        .assert_last_data_eq(
+            indoc!(
+                r#"
+                message arrow_schema {
+                  OPTIONAL INT64 offset;
+                  REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
+                  OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
+                  OPTIONAL BYTE_ARRAY city (STRING);
+                  OPTIONAL INT64 population;
+                }
+                "#
+            ),
+            indoc!(
+                r#"
+                +--------+----------------------+----------------------+------+------------+
+                | offset | system_time          | event_time           | city | population |
+                +--------+----------------------+----------------------+------+------------+
+                | 0      | 2050-01-01T12:00:00Z | 2020-01-01T12:00:00Z | A    | 1000       |
+                | 1      | 2050-01-01T12:00:00Z | 2020-01-01T12:00:00Z | B    | 2000       |
+                | 2      | 2050-01-01T12:00:00Z | 2020-01-01T12:00:00Z | C    | 3000       |
+                +--------+----------------------+----------------------+------+------------+
+                "#
+            ),
+        )
+        .await;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -1081,7 +1049,7 @@ impl IngestTestHarness {
             run_info_dir.clone(),
         ));
 
-        let time_source = Arc::new(SystemTimeSourceStub::new(
+        let time_source = Arc::new(SystemTimeSourceStub::new_set(
             Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap(),
         ));
 
@@ -1127,44 +1095,22 @@ impl IngestTestHarness {
             .await
     }
 
-    async fn get_last_data_block(&self, dataset_name: &DatasetName) -> MetadataBlockTyped<AddData> {
+    async fn dataset_data_helper(&self, dataset_name: &DatasetName) -> DatasetDataHelper {
         let dataset = self
             .dataset_repo
             .get_dataset(&dataset_name.as_local_ref())
             .await
             .unwrap();
 
-        let mut stream = dataset.as_metadata_chain().iter_blocks();
-        while let Some(v) = stream.next().await {
-            let (_, b) = v.unwrap();
-            if let Some(b) = b.into_typed::<AddData>() {
-                return b;
-            }
-        }
-
-        unreachable!()
-    }
-
-    async fn get_last_data_file(&self, dataset_name: &DatasetName) -> PathBuf {
-        let dataset = self
-            .dataset_repo
-            .get_dataset(&dataset_name.as_local_ref())
-            .await
-            .unwrap();
-
-        let block = self.get_last_data_block(dataset_name).await;
-
-        kamu_data_utils::data::local_url::into_local_path(
-            dataset
-                .as_data_repo()
-                .get_internal_url(&block.event.output_data.unwrap().physical_hash)
-                .await,
-        )
-        .unwrap()
+        DatasetDataHelper::new_with_context(dataset, self.ctx.clone())
     }
 
     async fn read_datafile(&self, dataset_name: &DatasetName) -> ParquetReaderHelper {
-        let part_file = self.get_last_data_file(dataset_name).await;
+        let part_file = self
+            .dataset_data_helper(dataset_name)
+            .await
+            .get_last_data_file()
+            .await;
         ParquetReaderHelper::open(&part_file)
     }
 
@@ -1175,22 +1121,5 @@ impl IngestTestHarness {
             r.get_string(3).unwrap().clone(),
             r.get_int(4).unwrap(),
         )
-    }
-
-    async fn get_last_data(&self, dataset_name: &DatasetName) -> DataFrame {
-        let part_file = self.get_last_data_file(dataset_name).await;
-        self.ctx
-            .read_parquet(
-                part_file.to_string_lossy().as_ref(),
-                ParquetReadOptions {
-                    file_extension: part_file
-                        .extension()
-                        .and_then(|s| s.to_str())
-                        .unwrap_or_default(),
-                    ..Default::default()
-                },
-            )
-            .await
-            .unwrap()
     }
 }

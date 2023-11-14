@@ -136,7 +136,7 @@ fn make_catalog() -> dill::Catalog {
         .bind::<dyn AuthenticationProvider, DummyAuthenticationProviderB>()
         .add::<AuthenticationServiceImpl>()
         .bind::<dyn AuthenticationService, AuthenticationServiceImpl>()
-        .add_value(SystemTimeSourceStub::new(Utc::now()))
+        .add_value(SystemTimeSourceStub::new_set(Utc::now()))
         .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
         .build()
 }

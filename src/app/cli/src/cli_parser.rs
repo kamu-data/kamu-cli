@@ -19,7 +19,7 @@ fn tabular_output_params<'a>(app: Command) -> Command {
             .short('o')
             .value_name("FMT")
             .value_parser([
-                "table", "csv", "json", "json-ld",
+                "table", "csv", "json", "ndjson",
                 "json-soa",
                 // "vertical",
                 // "tsv",
@@ -347,6 +347,19 @@ pub fn cli() -> Command {
                             .long("recursive")
                             .action(ArgAction::SetTrue)
                             .help("Recursively propagate the updates into all downstream datasets"),
+                        Arg::new("input-format")
+                            .long("input-format")
+                            .value_name("FMT")
+                            .value_parser([
+                                "csv",
+                                "json",
+                                "ndjson",
+                                "geojson",
+                                "ndgeojson",
+                                "parquet",
+                                "esrishapefile",
+                            ])
+                            .help("Overrides the media type of the data expected by the push source"),
                     ]).after_help(indoc::indoc!(
                         r#"
                         ### Examples ###
@@ -355,9 +368,13 @@ pub fn cli() -> Command {
 
                             kamu ingest org.example.data path/to/data.csv
 
-                        Ingest data from standard input:
+                        Ingest data from standard input (assumes source is defined to use NDJSON):
 
                             echo '{"key": "value1"}\n{"key": "value2"}' | kamu ingest org.example.data --stdin
+
+                        Ingest data with format conversion:
+
+                            echo '[{"key": "value1"}, {"key": "value2"}]' | kamu ingest org.example.data --stdin --input-format json
                         "#
                     )),
                 Command::new("init")

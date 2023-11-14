@@ -19,7 +19,7 @@ use kamu::domain::{
     InternalError,
     ResultIntoInternal,
     SystemTimeSource,
-    SystemTimeSourceDefault,
+    SystemTimeSourceStub,
 };
 use kamu::testing::MockAuthenticationService;
 use kamu::{DatasetLayout, DatasetRepositoryLocalFs};
@@ -45,6 +45,7 @@ pub(crate) struct ServerSideLocalFsHarness {
     base_catalog: dill::Catalog,
     api_server: TestAPIServer,
     options: ServerSideHarnessOptions,
+    time_source: SystemTimeSourceStub,
 }
 
 impl ServerSideLocalFsHarness {
@@ -53,10 +54,16 @@ impl ServerSideLocalFsHarness {
         let datasets_dir = tempdir.path().join("datasets");
         std::fs::create_dir(&datasets_dir).unwrap();
 
-        let mut base_catalog_builder = dill::CatalogBuilder::new();
+        let mut base_catalog_builder = match &options.base_catalog {
+            None => dill::CatalogBuilder::new(),
+            Some(c) => dill::CatalogBuilder::new_chained(c),
+        };
+
+        let time_source = SystemTimeSourceStub::new();
+
         base_catalog_builder
-            .add::<SystemTimeSourceDefault>()
-            .bind::<dyn SystemTimeSource, SystemTimeSourceDefault>()
+            .add_value(time_source.clone())
+            .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
             .add_builder(
                 builder_for::<DatasetRepositoryLocalFs>()
                     .with_root(datasets_dir)
@@ -80,6 +87,7 @@ impl ServerSideLocalFsHarness {
             base_catalog,
             api_server,
             options,
+            time_source,
         }
     }
 
@@ -107,12 +115,13 @@ impl ServerSideHarness for ServerSideLocalFsHarness {
         cli_catalog.get_one::<dyn DatasetRepository>().unwrap()
     }
 
-    fn dataset_url(&self, dataset_alias: &DatasetAlias) -> Url {
+    fn dataset_url_with_scheme(&self, dataset_alias: &DatasetAlias, scheme: &str) -> Url {
         let api_server_address = self.api_server_addr();
         Url::from_str(
             if self.options.multi_tenant {
                 format!(
-                    "odf+http://{}/{}/{}",
+                    "{}://{}/{}/{}",
+                    scheme,
                     api_server_address,
                     if let Some(account_name) = &dataset_alias.account_name {
                         account_name.to_string()
@@ -123,8 +132,8 @@ impl ServerSideHarness for ServerSideLocalFsHarness {
                 )
             } else {
                 format!(
-                    "odf+http://{}/{}",
-                    api_server_address, dataset_alias.dataset_name
+                    "{}://{}/{}",
+                    scheme, api_server_address, dataset_alias.dataset_name
                 )
             }
             .as_str(),
@@ -148,6 +157,10 @@ impl ServerSideHarness for ServerSideLocalFsHarness {
                 .join(dataset_handle.alias.dataset_name.clone())
         };
         DatasetLayout::new(root_path.as_path())
+    }
+
+    fn system_time_source(&self) -> &SystemTimeSourceStub {
+        &self.time_source
     }
 
     async fn api_server_run(self) -> Result<(), InternalError> {

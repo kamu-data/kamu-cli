@@ -34,6 +34,7 @@ async fn test_smart_push_new_dataset_unauthenticated() {
         ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
             multi_tenant: true,
             authorized_writes: true,
+            base_catalog: None,
         })
         .await,
     )
@@ -74,6 +75,7 @@ async fn test_smart_push_new_dataset_wrong_user() {
         ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
             multi_tenant: true,
             authorized_writes: true,
+            base_catalog: None,
         })
         .await,
     )
@@ -119,6 +121,7 @@ async fn test_smart_push_existing_dataset_unauthenticated() {
         ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
             multi_tenant: true,
             authorized_writes: false,
+            base_catalog: None,
         })
         .await,
     )
@@ -157,6 +160,7 @@ async fn test_smart_push_existing_dataset_unauthorized() {
         ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
             multi_tenant: true,
             authorized_writes: false,
+            base_catalog: None,
         })
         .await,
     )

@@ -3299,6 +3299,7 @@ dependencies = [
  "futures",
  "http",
  "hyper",
+ "indoc 2.0.4",
  "kamu",
  "mockall",
  "opendatafabric",

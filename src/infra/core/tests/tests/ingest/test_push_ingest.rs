@@ -7,12 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::path::PathBuf;
 use std::sync::Arc;
 
 use chrono::{TimeZone, Utc};
 use datafusion::prelude::*;
-use futures::StreamExt;
 use indoc::indoc;
 use kamu::domain::auth::DatasetActionAuthorizer;
 use kamu::domain::*;
@@ -74,6 +72,7 @@ async fn test_ingest_push_url_stream() {
     let dataset_ref = DatasetAlias::new(None, dataset_name.clone()).as_local_ref();
 
     harness.create_dataset(dataset_snapshot).await;
+    let data_helper = harness.dataset_data_helper(&dataset_name).await;
 
     // Round 1: Push from URL
     let src_path = harness.temp_dir.path().join("data.csv");
@@ -95,47 +94,42 @@ async fn test_ingest_push_url_stream() {
         .ingest_from_url(
             &dataset_ref,
             url::Url::from_file_path(&src_path).unwrap(),
-            IngestMediaTypes::CSV,
+            None,
             None,
         )
         .await
         .unwrap();
 
-    let df = harness.get_last_data(&dataset_name).await;
-    kamu_data_utils::testing::assert_schema_eq(
-        df.schema(),
-        indoc!(
-            r#"
-            message arrow_schema {
-              OPTIONAL INT64 offset;
-              REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
-              OPTIONAL INT64 date (TIMESTAMP(MILLIS,true));
-              OPTIONAL BYTE_ARRAY city (STRING);
-              OPTIONAL INT64 population;
-            }
-            "#
-        ),
-    );
-
-    kamu_data_utils::testing::assert_data_eq(
-        df,
-        indoc!(
-            r#"
-            +--------+----------------------+----------------------+------+------------+
-            | offset | system_time          | date                 | city | population |
-            +--------+----------------------+----------------------+------+------------+
-            | 0      | 2050-01-01T12:00:00Z | 2020-01-01T00:00:00Z | A    | 1000       |
-            | 1      | 2050-01-01T12:00:00Z | 2020-01-01T00:00:00Z | B    | 2000       |
-            | 2      | 2050-01-01T12:00:00Z | 2020-01-01T00:00:00Z | C    | 3000       |
-            +--------+----------------------+----------------------+------+------------+
-            "#
-        ),
-    )
-    .await;
+    data_helper
+        .assert_last_data_eq(
+            indoc!(
+                r#"
+                message arrow_schema {
+                  OPTIONAL INT64 offset;
+                  REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
+                  OPTIONAL INT64 date (TIMESTAMP(MILLIS,true));
+                  OPTIONAL BYTE_ARRAY city (STRING);
+                  OPTIONAL INT64 population;
+                }
+                "#
+            ),
+            indoc!(
+                r#"
+                +--------+----------------------+----------------------+------+------------+
+                | offset | system_time          | date                 | city | population |
+                +--------+----------------------+----------------------+------+------------+
+                | 0      | 2050-01-01T12:00:00Z | 2020-01-01T00:00:00Z | A    | 1000       |
+                | 1      | 2050-01-01T12:00:00Z | 2020-01-01T00:00:00Z | B    | 2000       |
+                | 2      | 2050-01-01T12:00:00Z | 2020-01-01T00:00:00Z | C    | 3000       |
+                +--------+----------------------+----------------------+------+------------+
+                "#
+            ),
+        )
+        .await;
 
     assert_eq!(
-        harness
-            .get_last_data_block(&dataset_name)
+        data_helper
+            .get_last_data_block()
             .await
             .event
             .output_watermark
@@ -155,14 +149,12 @@ async fn test_ingest_push_url_stream() {
 
     harness
         .push_ingest_svc
-        .ingest_from_file_stream(&dataset_ref, Box::new(data), IngestMediaTypes::CSV, None)
+        .ingest_from_file_stream(&dataset_ref, Box::new(data), None, None)
         .await
         .unwrap();
 
-    let df = harness.get_last_data(&dataset_name).await;
-    kamu_data_utils::testing::assert_data_eq(
-        df,
-        indoc!(
+    data_helper
+        .assert_last_data_records_eq(indoc!(
             r#"
             +--------+----------------------+----------------------+------+------------+
             | offset | system_time          | date                 | city | population |
@@ -170,13 +162,12 @@ async fn test_ingest_push_url_stream() {
             | 3      | 2050-01-01T12:00:00Z | 2021-01-01T00:00:00Z | C    | 4000       |
             +--------+----------------------+----------------------+------+------------+
             "#
-        ),
-    )
-    .await;
+        ))
+        .await;
 
     assert_eq!(
-        harness
-            .get_last_data_block(&dataset_name)
+        data_helper
+            .get_last_data_block()
             .await
             .event
             .output_watermark
@@ -189,7 +180,7 @@ async fn test_ingest_push_url_stream() {
 
 #[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
-async fn test_ingest_push_content_type_conversion() {
+async fn test_ingest_push_media_type_override() {
     let harness = IngestTestHarness::new();
 
     let dataset_snapshot = MetadataFactory::dataset_snapshot()
@@ -237,6 +228,7 @@ async fn test_ingest_push_content_type_conversion() {
     let dataset_ref = DatasetAlias::new(None, dataset_name.clone()).as_local_ref();
 
     harness.create_dataset(dataset_snapshot).await;
+    let data_helper = harness.dataset_data_helper(&dataset_name).await;
 
     // Push CSV conversion
     let src_path = harness.temp_dir.path().join("data.csv");
@@ -255,41 +247,36 @@ async fn test_ingest_push_content_type_conversion() {
         .ingest_from_url(
             &dataset_ref,
             url::Url::from_file_path(&src_path).unwrap(),
-            IngestMediaTypes::CSV,
+            Some(IngestMediaTypes::CSV),
             None,
         )
         .await
         .unwrap();
 
-    let df = harness.get_last_data(&dataset_name).await;
-    kamu_data_utils::testing::assert_schema_eq(
-        df.schema(),
-        indoc!(
-            r#"
-            message arrow_schema {
-              OPTIONAL INT64 offset;
-              REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
-              OPTIONAL INT64 date (TIMESTAMP(MILLIS,true));
-              OPTIONAL BYTE_ARRAY city (STRING);
-              OPTIONAL INT64 population;
-            }
-            "#
-        ),
-    );
-
-    kamu_data_utils::testing::assert_data_eq(
-        df,
-        indoc!(
-            r#"
-            +--------+----------------------+----------------------+------+------------+
-            | offset | system_time          | date                 | city | population |
-            +--------+----------------------+----------------------+------+------------+
-            | 0      | 2050-01-01T12:00:00Z | 2020-01-01T00:00:00Z | A    | 1000       |
-            +--------+----------------------+----------------------+------+------------+
-            "#
-        ),
-    )
-    .await;
+    data_helper
+        .assert_last_data_eq(
+            indoc!(
+                r#"
+                message arrow_schema {
+                  OPTIONAL INT64 offset;
+                  REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
+                  OPTIONAL INT64 date (TIMESTAMP(MILLIS,true));
+                  OPTIONAL BYTE_ARRAY city (STRING);
+                  OPTIONAL INT64 population;
+                }
+                "#
+            ),
+            indoc!(
+                r#"
+                +--------+----------------------+----------------------+------+------------+
+                | offset | system_time          | date                 | city | population |
+                +--------+----------------------+----------------------+------+------------+
+                | 0      | 2050-01-01T12:00:00Z | 2020-01-01T00:00:00Z | A    | 1000       |
+                +--------+----------------------+----------------------+------+------------+
+                "#
+            ),
+        )
+        .await;
 
     // Push NDJSON native
     let src_path = harness.temp_dir.path().join("data.json");
@@ -308,41 +295,36 @@ async fn test_ingest_push_content_type_conversion() {
         .ingest_from_url(
             &dataset_ref,
             url::Url::from_file_path(&src_path).unwrap(),
-            IngestMediaTypes::NDJSON,
+            Some(IngestMediaTypes::NDJSON),
             None,
         )
         .await
         .unwrap();
 
-    let df = harness.get_last_data(&dataset_name).await;
-    kamu_data_utils::testing::assert_schema_eq(
-        df.schema(),
-        indoc!(
-            r#"
-            message arrow_schema {
-              OPTIONAL INT64 offset;
-              REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
-              OPTIONAL INT64 date (TIMESTAMP(MILLIS,true));
-              OPTIONAL BYTE_ARRAY city (STRING);
-              OPTIONAL INT64 population;
-            }
-            "#
-        ),
-    );
-
-    kamu_data_utils::testing::assert_data_eq(
-        df,
-        indoc!(
-            r#"
-            +--------+----------------------+----------------------+------+------------+
-            | offset | system_time          | date                 | city | population |
-            +--------+----------------------+----------------------+------+------------+
-            | 1      | 2050-01-01T12:00:00Z | 2020-01-01T00:00:00Z | B    | 2000       |
-            +--------+----------------------+----------------------+------+------------+
-            "#
-        ),
-    )
-    .await;
+    data_helper
+        .assert_last_data_eq(
+            indoc!(
+                r#"
+                message arrow_schema {
+                  OPTIONAL INT64 offset;
+                  REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
+                  OPTIONAL INT64 date (TIMESTAMP(MILLIS,true));
+                  OPTIONAL BYTE_ARRAY city (STRING);
+                  OPTIONAL INT64 population;
+                }
+                "#
+            ),
+            indoc!(
+                r#"
+                +--------+----------------------+----------------------+------+------------+
+                | offset | system_time          | date                 | city | population |
+                +--------+----------------------+----------------------+------+------------+
+                | 1      | 2050-01-01T12:00:00Z | 2020-01-01T00:00:00Z | B    | 2000       |
+                +--------+----------------------+----------------------+------+------------+
+                "#
+            ),
+        )
+        .await;
 
     // Push JSON conversion
     let src_path = harness.temp_dir.path().join("data.json");
@@ -363,41 +345,36 @@ async fn test_ingest_push_content_type_conversion() {
         .ingest_from_url(
             &dataset_ref,
             url::Url::from_file_path(&src_path).unwrap(),
-            IngestMediaTypes::JSON,
+            Some(IngestMediaTypes::JSON),
             None,
         )
         .await
         .unwrap();
 
-    let df = harness.get_last_data(&dataset_name).await;
-    kamu_data_utils::testing::assert_schema_eq(
-        df.schema(),
-        indoc!(
-            r#"
-            message arrow_schema {
-              OPTIONAL INT64 offset;
-              REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
-              OPTIONAL INT64 date (TIMESTAMP(MILLIS,true));
-              OPTIONAL BYTE_ARRAY city (STRING);
-              OPTIONAL INT64 population;
-            }
-            "#
-        ),
-    );
-
-    kamu_data_utils::testing::assert_data_eq(
-        df,
-        indoc!(
-            r#"
-            +--------+----------------------+----------------------+------+------------+
-            | offset | system_time          | date                 | city | population |
-            +--------+----------------------+----------------------+------+------------+
-            | 2      | 2050-01-01T12:00:00Z | 2020-01-01T00:00:00Z | C    | 3000       |
-            +--------+----------------------+----------------------+------+------------+
-            "#
-        ),
-    )
-    .await;
+    data_helper
+        .assert_last_data_eq(
+            indoc!(
+                r#"
+                message arrow_schema {
+                  OPTIONAL INT64 offset;
+                  REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
+                  OPTIONAL INT64 date (TIMESTAMP(MILLIS,true));
+                  OPTIONAL BYTE_ARRAY city (STRING);
+                  OPTIONAL INT64 population;
+                }
+                "#
+            ),
+            indoc!(
+                r#"
+                +--------+----------------------+----------------------+------+------------+
+                | offset | system_time          | date                 | city | population |
+                +--------+----------------------+----------------------+------+------------+
+                | 2      | 2050-01-01T12:00:00Z | 2020-01-01T00:00:00Z | C    | 3000       |
+                +--------+----------------------+----------------------+------+------------+
+                "#
+            ),
+        )
+        .await;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -433,7 +410,7 @@ impl IngestTestHarness {
             .unwrap(),
         );
 
-        let time_source = Arc::new(SystemTimeSourceStub::new(
+        let time_source = Arc::new(SystemTimeSourceStub::new_set(
             Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap(),
         ));
 
@@ -463,56 +440,13 @@ impl IngestTestHarness {
             .unwrap();
     }
 
-    async fn get_last_data_block(&self, dataset_name: &DatasetName) -> MetadataBlockTyped<AddData> {
+    async fn dataset_data_helper(&self, dataset_name: &DatasetName) -> DatasetDataHelper {
         let dataset = self
             .dataset_repo
             .get_dataset(&dataset_name.as_local_ref())
             .await
             .unwrap();
 
-        let mut stream = dataset.as_metadata_chain().iter_blocks();
-        while let Some(v) = stream.next().await {
-            let (_, b) = v.unwrap();
-            if let Some(b) = b.into_typed::<AddData>() {
-                return b;
-            }
-        }
-
-        unreachable!()
-    }
-
-    async fn get_last_data_file(&self, dataset_name: &DatasetName) -> PathBuf {
-        let dataset = self
-            .dataset_repo
-            .get_dataset(&dataset_name.as_local_ref())
-            .await
-            .unwrap();
-
-        let block = self.get_last_data_block(dataset_name).await;
-
-        kamu_data_utils::data::local_url::into_local_path(
-            dataset
-                .as_data_repo()
-                .get_internal_url(&block.event.output_data.unwrap().physical_hash)
-                .await,
-        )
-        .unwrap()
-    }
-
-    async fn get_last_data(&self, dataset_name: &DatasetName) -> DataFrame {
-        let part_file = self.get_last_data_file(dataset_name).await;
-        self.ctx
-            .read_parquet(
-                part_file.to_string_lossy().as_ref(),
-                ParquetReadOptions {
-                    file_extension: part_file
-                        .extension()
-                        .and_then(|s| s.to_str())
-                        .unwrap_or_default(),
-                    ..Default::default()
-                },
-            )
-            .await
-            .unwrap()
+        DatasetDataHelper::new_with_context(dataset, self.ctx.clone())
     }
 }

@@ -120,6 +120,7 @@ pub fn get_command(
                 .map(String::as_str),
             submatches.get_flag("stdin"),
             submatches.get_flag("recursive"),
+            submatches.get_one("input-format").map(String::as_str),
         )),
         Some(("init", submatches)) => {
             if submatches.get_flag("pull-images") {

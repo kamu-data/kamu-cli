@@ -18,6 +18,8 @@ use kamu::domain::{
     DatasetRepository,
     InternalError,
     ResultIntoInternal,
+    SystemTimeSource,
+    SystemTimeSourceStub,
 };
 use kamu::testing::{LocalS3Server, MockAuthenticationService};
 use kamu::utils::s3_context::S3Context;
@@ -43,14 +45,19 @@ pub(crate) struct ServerSideS3Harness {
     base_catalog: dill::Catalog,
     api_server: TestAPIServer,
     options: ServerSideHarnessOptions,
+    time_source: SystemTimeSourceStub,
 }
 
 impl ServerSideS3Harness {
     pub async fn new(options: ServerSideHarnessOptions) -> Self {
         let s3 = LocalS3Server::new().await;
 
+        let time_source = SystemTimeSourceStub::new();
+
         let mut base_catalog_builder = dill::CatalogBuilder::new();
         base_catalog_builder
+            .add_value(time_source.clone())
+            .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
             .add_value(s3_repo(&s3, options.multi_tenant).await)
             .bind::<dyn DatasetRepository, DatasetRepositoryS3>()
             .add_value(server_authentication_mock())
@@ -70,6 +77,7 @@ impl ServerSideS3Harness {
             base_catalog,
             api_server,
             options,
+            time_source,
         }
     }
 
@@ -97,20 +105,21 @@ impl ServerSideHarness for ServerSideS3Harness {
         cli_catalog.get_one::<dyn DatasetRepository>().unwrap()
     }
 
-    fn dataset_url(&self, dataset_alias: &DatasetAlias) -> Url {
+    fn dataset_url_with_scheme(&self, dataset_alias: &DatasetAlias, scheme: &str) -> Url {
         let api_server_address = self.api_server_addr();
         Url::from_str(
             if self.options.multi_tenant {
                 format!(
-                    "odf+http://{}/{}/{}",
+                    "{}://{}/{}/{}",
+                    scheme,
                     api_server_address,
                     dataset_alias.account_name.as_ref().unwrap(),
                     dataset_alias.dataset_name
                 )
             } else {
                 format!(
-                    "odf+http://{}/{}",
-                    api_server_address, dataset_alias.dataset_name
+                    "{}://{}/{}",
+                    scheme, api_server_address, dataset_alias.dataset_name
                 )
             }
             .as_str(),
@@ -124,6 +133,10 @@ impl ServerSideHarness for ServerSideS3Harness {
                 .join(dataset_handle.id.cid.to_string())
                 .as_path(),
         )
+    }
+
+    fn system_time_source(&self) -> &SystemTimeSourceStub {
+        &self.time_source
     }
 
     async fn api_server_run(self) -> Result<(), InternalError> {

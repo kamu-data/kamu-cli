@@ -84,6 +84,13 @@ impl ApiError {
         AccessError::Forbidden("Forbidden access".into()).api_err()
     }
 
+    pub fn new_unsupported_media_type() -> Self {
+        Self {
+            source: "Unsupported media type".into(),
+            status_code: http::StatusCode::UNSUPPORTED_MEDIA_TYPE,
+        }
+    }
+
     pub fn not_found(source: impl std::error::Error + Send + Sync + 'static) -> Self {
         Self::new(source, http::StatusCode::NOT_FOUND)
     }

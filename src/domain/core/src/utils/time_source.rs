@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use chrono::{DateTime, Utc};
 
@@ -31,22 +31,38 @@ impl SystemTimeSource for SystemTimeSourceDefault {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Debug, Clone)]
 pub struct SystemTimeSourceStub {
-    t: Mutex<DateTime<Utc>>,
+    t: Arc<Mutex<Option<DateTime<Utc>>>>,
 }
 
 impl SystemTimeSourceStub {
-    pub fn new(t: DateTime<Utc>) -> Self {
-        Self { t: Mutex::new(t) }
+    pub fn new() -> Self {
+        Self {
+            t: Arc::new(Mutex::new(None)),
+        }
+    }
+
+    pub fn new_set(t: DateTime<Utc>) -> Self {
+        Self {
+            t: Arc::new(Mutex::new(Some(t))),
+        }
     }
 
     pub fn set(&self, t: DateTime<Utc>) {
-        *self.t.lock().unwrap() = t;
+        *self.t.lock().unwrap() = Some(t);
+    }
+
+    pub fn unset(&self) {
+        *self.t.lock().unwrap() = None;
     }
 }
 
 impl SystemTimeSource for SystemTimeSourceStub {
     fn now(&self) -> DateTime<Utc> {
-        (*self.t.lock().unwrap()).clone()
+        match *self.t.lock().unwrap() {
+            None => Utc::now(),
+            Some(ref t) => t.clone(),
+        }
     }
 }

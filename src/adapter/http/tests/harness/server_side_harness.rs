@@ -12,7 +12,13 @@
 use std::sync::Arc;
 
 use kamu::domain::auth::{AccountType, DEFAULT_AVATAR_URL};
-use kamu::domain::{auth, CurrentAccountSubject, DatasetRepository, InternalError};
+use kamu::domain::{
+    auth,
+    CurrentAccountSubject,
+    DatasetRepository,
+    InternalError,
+    SystemTimeSourceStub,
+};
 use kamu::testing::{MockAuthenticationService, MockDatasetActionAuthorizer};
 use kamu::DatasetLayout;
 use opendatafabric::{AccountName, DatasetAlias, DatasetHandle, FAKE_ACCOUNT_ID};
@@ -32,7 +38,13 @@ pub(crate) trait ServerSideHarness {
 
     fn dataset_layout(&self, dataset_handle: &DatasetHandle) -> DatasetLayout;
 
-    fn dataset_url(&self, dataset_alias: &DatasetAlias) -> Url;
+    fn dataset_url_with_scheme(&self, dataset_alias: &DatasetAlias, scheme: &str) -> Url;
+
+    fn dataset_url(&self, dataset_alias: &DatasetAlias) -> Url {
+        self.dataset_url_with_scheme(dataset_alias, "odf+http")
+    }
+
+    fn system_time_source(&self) -> &SystemTimeSourceStub;
 
     async fn api_server_run(self) -> Result<(), InternalError>;
 }
@@ -42,6 +54,7 @@ pub(crate) trait ServerSideHarness {
 pub(crate) struct ServerSideHarnessOptions {
     pub multi_tenant: bool,
     pub authorized_writes: bool,
+    pub base_catalog: Option<dill::Catalog>,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

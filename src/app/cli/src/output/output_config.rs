@@ -35,7 +35,7 @@ impl OutputConfig {
                     .build(std::io::stdout()),
             ),
             OutputFormat::Json => Box::new(JsonArrayWriter::new(std::io::stdout())),
-            OutputFormat::JsonLD => Box::new(JsonLineDelimitedWriter::new(std::io::stdout())),
+            OutputFormat::NdJson => Box::new(JsonLineDelimitedWriter::new(std::io::stdout())),
             OutputFormat::JsonSoA => unimplemented!("SoA Json format is not yet implemented"),
             OutputFormat::Table => Box::new(TableWriter::new(fmt)),
         }
@@ -50,7 +50,7 @@ pub enum OutputFormat {
     /// Array of Structures format
     Json,
     /// One Json object per line - easily splittable format
-    JsonLD,
+    NdJson,
     /// Structure of arrays - more compact and efficient format for encoding
     /// entire dataframe
     JsonSoA,

@@ -30,10 +30,11 @@ pub struct IngestCommand {
     files_refs: Vec<String>,
     stdin: bool,
     recursive: bool,
+    input_format: Option<String>,
 }
 
 impl IngestCommand {
-    pub fn new<'s, I>(
+    pub fn new<'s, I, S>(
         dataset_repo: Arc<dyn DatasetRepository>,
         push_ingest_svc: Arc<dyn PushIngestService>,
         output_config: Arc<OutputConfig>,
@@ -42,9 +43,11 @@ impl IngestCommand {
         files_refs: I,
         stdin: bool,
         recursive: bool,
+        input_format: Option<S>,
     ) -> Self
     where
         I: Iterator<Item = &'s str>,
+        S: Into<String>,
     {
         Self {
             dataset_repo,
@@ -55,6 +58,7 @@ impl IngestCommand {
             files_refs: files_refs.map(|s| s.to_string()).collect(),
             stdin,
             recursive,
+            input_format: input_format.map(|s| s.into()),
         }
     }
 
@@ -64,6 +68,50 @@ impl IngestCommand {
             .map_err(|e| CLIError::usage_error(format!("Ivalid path {}: {}", path, e)))?;
         url::Url::from_file_path(p)
             .map_err(|_| CLIError::usage_error(format!("Ivalid path {}", path)))
+    }
+
+    async fn ensure_valid_push_target(
+        &self,
+        dataset_handle: &DatasetHandle,
+    ) -> Result<(), CLIError> {
+        let aliases = self
+            .remote_alias_reg
+            .get_remote_aliases(&dataset_handle.as_local_ref())
+            .await
+            .map_err(CLIError::failure)?;
+        let pull_aliases: Vec<_> = aliases
+            .get_by_kind(RemoteAliasKind::Pull)
+            .map(|r| r.to_string())
+            .collect();
+        if !pull_aliases.is_empty() {
+            return Err(CLIError::usage_error(format!(
+                "Ingesting data into remote dataset will cause histories to diverge. Existing \
+                 pull aliases:\n{}",
+                pull_aliases.join("\n- ")
+            )));
+        }
+        Ok(())
+    }
+
+    fn get_media_type(&self) -> Result<Option<&str>, CLIError> {
+        let Some(short_name) = &self.input_format else {
+            return Ok(None);
+        };
+
+        // TODO: Keep in sync with CLI parser
+        match short_name.to_lowercase().as_str() {
+            "csv" => Ok(Some(IngestMediaTypes::CSV)),
+            "json" => Ok(Some(IngestMediaTypes::JSON)),
+            "ndjson" => Ok(Some(IngestMediaTypes::NDJSON)),
+            "geojson" => Ok(Some(IngestMediaTypes::GEOJSON)),
+            "ndgeojson" => Ok(Some(IngestMediaTypes::NDGEOJSON)),
+            "parquet" => Ok(Some(IngestMediaTypes::PARQUET)),
+            "esrishapefile" => Ok(Some(IngestMediaTypes::ESRISHAPEFILE)),
+            _ => Err(CLIError::usage_error(format!(
+                "Unsupported format {}",
+                short_name
+            ))),
+        }
     }
 }
 
@@ -87,22 +135,7 @@ impl Command for IngestCommand {
             .await
             .map_err(|e| CLIError::failure(e))?;
 
-        let aliases = self
-            .remote_alias_reg
-            .get_remote_aliases(&dataset_handle.as_local_ref())
-            .await
-            .map_err(CLIError::failure)?;
-        let pull_aliases: Vec<_> = aliases
-            .get_by_kind(RemoteAliasKind::Pull)
-            .map(|r| r.to_string())
-            .collect();
-        if !pull_aliases.is_empty() {
-            return Err(CLIError::usage_error(format!(
-                "Ingesting data into remote dataset will cause histories to diverge. Existing \
-                 pull aliases:\n{}",
-                pull_aliases.join("\n- ")
-            )));
-        }
+        self.ensure_valid_push_target(&dataset_handle).await?;
 
         let urls = if self.stdin {
             vec![url::Url::parse("file:///dev/fd/0").unwrap()]
@@ -133,7 +166,7 @@ impl Command for IngestCommand {
                 .ingest_from_url(
                     &self.dataset_ref,
                     url,
-                    IngestMediaTypes::NDJSON,
+                    self.get_media_type()?,
                     listener.clone(),
                 )
                 .await

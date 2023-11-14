@@ -56,7 +56,7 @@ impl PushIngestServiceImpl {
         &self,
         dataset_ref: &DatasetRef,
         url: url::Url,
-        media_type: &str,
+        media_type: Option<&str>,
         listener: Arc<dyn PushIngestListener>,
     ) -> Result<PushIngestResult, PushIngestError> {
         let dataset_handle = self.dataset_repo.resolve_dataset_ref(&dataset_ref).await?;
@@ -100,7 +100,7 @@ impl PushIngestServiceImpl {
             operation_dir,
             system_time: self.time_source.now(),
             url,
-            media_type: media_type.to_string(),
+            media_type: media_type.map(|s| s.to_string()),
             listener,
             ctx,
             data_writer,
@@ -229,14 +229,20 @@ impl PushIngestServiceImpl {
             return Ok(None);
         }
 
-        let read_step = if Self::media_type_for(&args.polling_source.read) == args.media_type {
-            // Can use read step from source
-            args.polling_source.read.clone()
+        let read_step = if let Some(media_type) = &args.media_type {
+            if Self::media_type_for(&args.polling_source.read) == media_type {
+                // Use the read format from source
+                args.polling_source.read.clone()
+            } else {
+                // Pushing with different format than the source - will have to perform
+                // best-effort conversion
+                Self::get_read_step_for(media_type, &args.polling_source.read)?
+            }
         } else {
-            // Pushing with different format than the source - will have to perform
-            // best-effort conversion
-            Self::get_read_step_for(&args.media_type, &args.polling_source.read)?
+            // Use the read format from source
+            args.polling_source.read.clone()
         };
+
         let reader = Self::get_reader_for(&read_step, &args.operation_dir);
         let df = reader.read(&args.ctx, &input_data_path, &read_step).await?;
 
@@ -267,6 +273,25 @@ impl PushIngestServiceImpl {
         .await
         .int_err()?
         .int_err()
+    }
+
+    async fn copy_stream_to_file(
+        mut data: Box<dyn AsyncRead + Send + Unpin>,
+        target_path: &Path,
+    ) -> Result<(), std::io::Error> {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+        let mut file = tokio::fs::File::create(target_path).await?;
+        let mut buf = [0u8; 2048];
+        loop {
+            let read = data.read(&mut buf).await?;
+            if read == 0 {
+                break;
+            }
+            file.write_all(&buf[..read]).await?;
+        }
+        file.flush().await?;
+        Ok(())
     }
 
     fn media_type_for(source_read_step: &ReadStep) -> &'static str {
@@ -515,12 +540,12 @@ impl PushIngestServiceImpl {
 
 #[async_trait::async_trait]
 impl PushIngestService for PushIngestServiceImpl {
-    #[tracing::instrument(level = "info", skip_all, fields(%dataset_ref, %url, %media_type))]
+    #[tracing::instrument(level = "info", skip_all, fields(%dataset_ref, %url, ?media_type))]
     async fn ingest_from_url(
         &self,
         dataset_ref: &DatasetRef,
         url: url::Url,
-        media_type: &str,
+        media_type: Option<&str>,
         listener: Option<Arc<dyn PushIngestListener>>,
     ) -> Result<PushIngestResult, PushIngestError> {
         let listener = listener.unwrap_or_else(|| Arc::new(NullPushIngestListener));
@@ -528,16 +553,14 @@ impl PushIngestService for PushIngestServiceImpl {
         self.do_ingest(dataset_ref, url, media_type, listener).await
     }
 
-    #[tracing::instrument(level = "info", skip_all, fields(%dataset_ref, %media_type))]
+    #[tracing::instrument(level = "info", skip_all, fields(%dataset_ref, ?media_type))]
     async fn ingest_from_file_stream(
         &self,
         dataset_ref: &DatasetRef,
-        mut data: Box<dyn AsyncRead + Send + Unpin>,
-        media_type: &str,
+        data: Box<dyn AsyncRead + Send + Unpin>,
+        media_type: Option<&str>,
         listener: Option<Arc<dyn PushIngestListener>>,
     ) -> Result<PushIngestResult, PushIngestError> {
-        use tokio::io::{AsyncReadExt, AsyncWriteExt};
-
         // Save stream to a file in cache
         //
         // TODO: Breaking all architecture layers here - need to extract cache into a
@@ -545,19 +568,7 @@ impl PushIngestService for PushIngestServiceImpl {
         let path = self
             .cache_dir
             .join(self.get_random_cache_key("push-ingest-"));
-
-        {
-            let mut file = tokio::fs::File::create(&path).await.int_err()?;
-            let mut buf = [0u8; 2048];
-            loop {
-                let read = data.read(&mut buf).await.int_err()?;
-                if read == 0 {
-                    break;
-                }
-                file.write_all(&buf[..read]).await.int_err()?;
-            }
-            file.flush().await.int_err()?;
-        }
+        Self::copy_stream_to_file(data, &path).await.int_err()?;
 
         let listener = listener.unwrap_or_else(|| Arc::new(NullPushIngestListener));
         let url: url::Url = url::Url::from_file_path(&path).unwrap();
@@ -576,7 +587,7 @@ struct PushIngestArgs {
     operation_dir: PathBuf,
     system_time: DateTime<Utc>,
     url: url::Url,
-    media_type: String,
+    media_type: Option<String>,
     listener: Arc<dyn PushIngestListener>,
     ctx: SessionContext,
     data_writer: DataWriterDataFusion,

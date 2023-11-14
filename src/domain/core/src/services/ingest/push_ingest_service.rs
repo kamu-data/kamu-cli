@@ -29,7 +29,7 @@ pub trait PushIngestService: Send + Sync {
         &self,
         dataset_ref: &DatasetRef,
         url: url::Url,
-        media_type: &str,
+        media_type: Option<&str>,
         listener: Option<Arc<dyn PushIngestListener>>,
     ) -> Result<PushIngestResult, PushIngestError>;
 
@@ -41,7 +41,7 @@ pub trait PushIngestService: Send + Sync {
         &self,
         dataset_ref: &DatasetRef,
         data: Box<dyn AsyncRead + Send + Unpin>,
-        media_type: &str,
+        media_type: Option<&str>,
         listener: Option<Arc<dyn PushIngestListener>>,
     ) -> Result<PushIngestResult, PushIngestError>;
 }

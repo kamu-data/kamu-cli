@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 mod test_authentication_layer;
+mod test_data;
 mod test_dataset_authorization_layer;
 mod test_protocol_dataset_helpers;
 mod test_routing;
@@ -32,6 +33,7 @@ macro_rules! test_client_server_local_fs_harness_permutations {
                     ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
                         multi_tenant: false,
                         authorized_writes: true,
+                        base_catalog: None,
                     }).await,
                 )
                 .await;
@@ -46,6 +48,7 @@ macro_rules! test_client_server_local_fs_harness_permutations {
                     ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
                         multi_tenant: true,
                         authorized_writes: true,
+                        base_catalog: None,
                     }).await,
                 )
                 .await;
@@ -60,6 +63,7 @@ macro_rules! test_client_server_local_fs_harness_permutations {
                     ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
                         multi_tenant: false,
                         authorized_writes: true,
+                        base_catalog: None,
                     }).await,
                 )
                 .await;
@@ -74,6 +78,7 @@ macro_rules! test_client_server_local_fs_harness_permutations {
                     ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
                         multi_tenant: true,
                         authorized_writes: true,
+                        base_catalog: None,
                     }).await,
                 )
                 .await;
@@ -98,6 +103,7 @@ macro_rules! test_client_server_s3_harness_permutations {
                     ServerSideS3Harness::new(ServerSideHarnessOptions {
                         multi_tenant: false,
                         authorized_writes: true,
+                        base_catalog: None,
                     }).await,
                 )
                 .await;
@@ -113,6 +119,7 @@ macro_rules! test_client_server_s3_harness_permutations {
                     ServerSideS3Harness::new(ServerSideHarnessOptions {
                         multi_tenant: true,
                         authorized_writes: true,
+                        base_catalog: None,
                     }).await,
                 )
                 .await;
