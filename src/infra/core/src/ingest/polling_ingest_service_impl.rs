@@ -12,8 +12,6 @@ use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 use container_runtime::ContainerRuntime;
-use datafusion::common::SchemaError;
-use datafusion::error::DataFusionError;
 use datafusion::prelude::{DataFrame, SessionContext};
 use dill::*;
 use kamu_core::ingest::*;
@@ -139,7 +137,7 @@ impl PollingIngestServiceImpl {
         &self,
         args: IngestLoopArgs,
     ) -> Result<PollingIngestResult, PollingIngestError> {
-        let ctx = self.new_session_context();
+        let ctx = ingest_common::new_session_context(self.object_store_registry.clone());
 
         let mut data_writer = DataWriterDataFusion::builder(args.dataset.clone(), ctx.clone())
             .with_metadata_state_scanned()
@@ -151,7 +149,7 @@ impl PollingIngestServiceImpl {
         let mut combined_result = None;
         loop {
             iteration += 1;
-            let operation_id = Self::next_operation_id();
+            let operation_id = ingest_common::next_operation_id();
 
             let operation_dir = self.run_info_dir.join(format!("ingest-{}", operation_id));
             std::fs::create_dir_all(&operation_dir).int_err()?;
@@ -260,9 +258,11 @@ impl PollingIngestServiceImpl {
             .on_stage_progress(PollingIngestStage::Read, 0, TotalSteps::Exact(1));
 
         let df = if let Some(df) = self.read(&args, &prepare_result).await? {
-            let df = self.preprocess(&args, df).await?;
-            self.validate_new_data(&df, args.data_writer.vocab())?;
-            Some(df)
+            if let Some(transform) = args.polling_source.preprocess.clone() {
+                Some(ingest_common::preprocess(&args.ctx, transform, df).await?)
+            } else {
+                Some(df)
+            }
         } else {
             tracing::info!("Read produced an empty data frame");
             None
@@ -318,11 +318,12 @@ impl PollingIngestServiceImpl {
                     uncacheable,
                 })
             }
+            Err(StageDataError::BadInputSchema(e)) => Err(e.into()),
+            Err(StageDataError::MergeError(e)) => Err(e.into()),
             Err(StageDataError::EmptyCommit(_)) => Ok(PollingIngestResult::UpToDate {
                 no_source_defined: false,
                 uncacheable,
             }),
-            Err(StageDataError::MergeError(e)) => Err(e.into()),
             Err(StageDataError::Internal(e)) => Err(e.into()),
         }
     }
@@ -359,7 +360,7 @@ impl PollingIngestServiceImpl {
             std::fs::create_dir(&self.cache_dir).int_err()?;
         }
 
-        let data_cache_key = self.get_random_cache_key("fetch-");
+        let data_cache_key = ingest_common::get_random_cache_key("fetch-");
         let target_path = self.cache_dir.join(&data_cache_key);
 
         let fetch_service = FetchService::new(self.container_runtime.clone(), &self.run_info_dir);
@@ -480,7 +481,7 @@ impl PollingIngestServiceImpl {
             })
         } else {
             let src_path = fetch_result.data.path(&self.cache_dir);
-            let data_cache_key = self.get_random_cache_key("prepare-");
+            let data_cache_key = ingest_common::get_random_cache_key("prepare-");
             let target_path = self.cache_dir.join(&data_cache_key);
 
             tracing::debug!(
@@ -543,182 +544,6 @@ impl PollingIngestServiceImpl {
             ReadStep::EsriShapefile(_) => Arc::new(ReaderEsriShapefile::new(temp_path)),
             ReadStep::Parquet(_) => Arc::new(ReaderParquet {}),
         }
-    }
-
-    #[tracing::instrument(level = "info", skip_all)]
-    async fn preprocess(
-        &self,
-        args: &IngestIterationArgs<'_>,
-        df: DataFrame,
-    ) -> Result<DataFrame, PollingIngestError> {
-        let Some(preprocess) = args.polling_source.preprocess.clone() else {
-            return Ok(df);
-        };
-
-        let Transform::Sql(preprocess) = preprocess;
-
-        // TODO: Support other engines
-        assert_eq!(preprocess.engine.to_lowercase(), "datafusion");
-
-        let preprocess = preprocess.normalize_queries(Some("output".to_string()));
-
-        // Setup input
-        args.ctx.register_table("input", df.into_view()).int_err()?;
-
-        // Setup queries
-        for query_step in preprocess.queries.unwrap_or_default() {
-            self.register_view_for_step(args.ctx, &query_step).await?;
-        }
-
-        // Get result's execution plan
-        let df = args.ctx.table("output").await.int_err()?;
-
-        tracing::debug!(
-            schema = ?df.schema(),
-            logical_plan = ?df.logical_plan(),
-            "Performing preprocess step",
-        );
-
-        Ok(df)
-    }
-
-    async fn register_view_for_step(
-        &self,
-        ctx: &SessionContext,
-        step: &SqlQueryStep,
-    ) -> Result<(), engine::EngineError> {
-        use datafusion::logical_expr::*;
-        use datafusion::sql::TableReference;
-
-        let name = step.alias.as_ref().unwrap();
-
-        tracing::debug!(
-            %name,
-            query = %step.query,
-            "Creating view for a query",
-        );
-
-        let logical_plan = match ctx.state().create_logical_plan(&step.query).await {
-            Ok(plan) => plan,
-            Err(error) => {
-                tracing::error!(
-                    error = &error as &dyn std::error::Error,
-                    query = %step.query,
-                    "Error when setting up query"
-                );
-                return Err(engine::InvalidQueryError::new(error.to_string(), Vec::new()).into());
-            }
-        };
-
-        let create_view = LogicalPlan::Ddl(DdlStatement::CreateView(CreateView {
-            name: TableReference::bare(step.alias.as_ref().unwrap()).to_owned_reference(),
-            input: Arc::new(logical_plan),
-            or_replace: false,
-            definition: Some(step.query.clone()),
-        }));
-
-        ctx.execute_logical_plan(create_view).await.int_err()?;
-        Ok(())
-    }
-
-    fn validate_new_data(
-        &self,
-        df: &DataFrame,
-        vocab: &DatasetVocabularyResolved<'_>,
-    ) -> Result<(), engine::EngineError> {
-        use datafusion::arrow::datatypes::DataType;
-
-        let system_columns = [&vocab.offset_column, &vocab.system_time_column];
-        for system_column in system_columns {
-            if df.schema().has_column_with_unqualified_name(system_column) {
-                return Err(engine::InvalidQueryError::new(
-                    format!(
-                        "Transformed data contains a column that conflicts with the system column \
-                         name, you should either rename the data column or configure the dataset \
-                         vocabulary to use a different name: {}",
-                        system_column
-                    ),
-                    Vec::new(),
-                )
-                .into());
-            }
-        }
-
-        // Event time: If present must be a TIMESTAMP or DATE
-        let event_time_col = match df
-            .schema()
-            .field_with_unqualified_name(&vocab.event_time_column)
-        {
-            Ok(f) => Some(f),
-            Err(DataFusionError::SchemaError(SchemaError::FieldNotFound { .. })) => None,
-            Err(err) => return Err(err.int_err().into()),
-        };
-
-        if let Some(event_time_col) = event_time_col {
-            match event_time_col.data_type() {
-                DataType::Date32 | DataType::Date64 => {}
-                DataType::Timestamp(_, _) => {}
-                typ => {
-                    return Err(engine::InvalidQueryError::new(
-                        format!(
-                            "Event time column '{}' should be either Date or Timestamp, but \
-                             found: {}",
-                            vocab.event_time_column, typ
-                        ),
-                        Vec::new(),
-                    )
-                    .into());
-                }
-            }
-        };
-
-        Ok(())
-    }
-
-    fn next_operation_id() -> String {
-        use rand::distributions::Alphanumeric;
-        use rand::Rng;
-
-        let mut name = String::with_capacity(16);
-        name.extend(
-            rand::thread_rng()
-                .sample_iter(&Alphanumeric)
-                .take(10)
-                .map(char::from),
-        );
-
-        name
-    }
-
-    fn get_random_cache_key(&self, prefix: &str) -> String {
-        use rand::distributions::Alphanumeric;
-        use rand::Rng;
-
-        let mut name = String::with_capacity(10 + prefix.len());
-        name.push_str(prefix);
-        name.extend(
-            rand::thread_rng()
-                .sample_iter(&Alphanumeric)
-                .take(10)
-                .map(char::from),
-        );
-        name
-    }
-
-    fn new_session_context(&self) -> SessionContext {
-        use datafusion::execution::runtime_env::{RuntimeConfig, RuntimeEnv};
-        use datafusion::prelude::*;
-
-        let config = SessionConfig::new().with_default_catalog_and_schema("kamu", "kamu");
-
-        let runtime_config = RuntimeConfig {
-            object_store_registry: self.object_store_registry.clone().as_datafusion_registry(),
-            ..RuntimeConfig::default()
-        };
-
-        let runtime = Arc::new(RuntimeEnv::new(runtime_config).unwrap());
-
-        SessionContext::new_with_config_rt(config, runtime)
     }
 
     // TODO: Introduce intermediate structs to avoid full unpacking
@@ -810,7 +635,7 @@ impl PollingIngestServiceImpl {
         let mut combined_result = None;
 
         loop {
-            match task.ingest(Self::next_operation_id()).await {
+            match task.ingest(ingest_common::next_operation_id()).await {
                 Ok(res) => {
                     combined_result = Some(Self::merge_results(combined_result, res));
 

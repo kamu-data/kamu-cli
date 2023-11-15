@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 mod fetch_service;
+mod ingest_common;
 mod ingest_task;
 mod polling_ingest_service_impl;
 mod polling_source_state;

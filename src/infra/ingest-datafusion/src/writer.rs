@@ -81,7 +81,7 @@ impl DataWriterDataFusion {
         &self.meta.vocab
     }
 
-    fn validate_input(&self, df: &DataFrame) -> Result<(), InternalError> {
+    fn validate_input(&self, df: &DataFrame) -> Result<(), BadInputSchemaError> {
         use datafusion::arrow::datatypes::DataType;
 
         for system_column in [
@@ -89,16 +89,16 @@ impl DataWriterDataFusion {
             &self.meta.vocab.system_time_column,
         ] {
             if df.schema().has_column_with_unqualified_name(system_column) {
-                return Err(format!(
-                    "Transformed data contains a column that conflicts with the system column \
-                     name, you should either rename the data column or configure the dataset \
-                     vocabulary to use a different name: {}",
+                return Err(BadInputSchemaError::new(format!(
+                    "Data contains a column that conflicts with the system column name, you \
+                     should either rename the data column or configure the dataset vocabulary to \
+                     use a different name: {}",
                     system_column
-                )
-                .int_err());
+                )));
             }
         }
 
+        // Event time: If present must be a TIMESTAMP or DATE
         let event_time_col = df
             .schema()
             .fields()
@@ -109,11 +109,10 @@ impl DataWriterDataFusion {
             match event_time_col.data_type() {
                 DataType::Date32 | DataType::Date64 | DataType::Timestamp(_, _) => {}
                 typ => {
-                    return Err(format!(
+                    return Err(BadInputSchemaError::new(format!(
                         "Event time column '{}' should be either Date or Timestamp, but found: {}",
                         self.meta.vocab.event_time_column, typ
-                    )
-                    .int_err());
+                    )));
                 }
             }
         }

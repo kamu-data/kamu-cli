@@ -17,7 +17,6 @@ use datafusion::prelude::*;
 use indoc::indoc;
 use itertools::Itertools;
 use kamu::domain::auth::DatasetActionAuthorizer;
-use kamu::domain::engine::*;
 use kamu::domain::*;
 use kamu::testing::*;
 use kamu::*;
@@ -765,12 +764,7 @@ async fn test_ingest_polling_datafusion_event_time_of_invalid_type() {
     .unwrap();
 
     let res = harness.ingest(&dataset_name).await;
-    assert_matches!(
-        res,
-        Err(PollingIngestError::EngineError(EngineError::InvalidQuery(
-            _
-        )))
-    );
+    assert_matches!(res, Err(PollingIngestError::BadInputSchema(_)));
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

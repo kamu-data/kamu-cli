@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::backtrace::Backtrace;
 use std::path::PathBuf;
 
 use chrono::{DateTime, Utc};
@@ -83,10 +84,13 @@ pub struct StageDataResult {
 #[derive(Debug, thiserror::Error)]
 pub enum WriteDataError {
     #[error(transparent)]
-    EmptyCommit(#[from] EmptyCommitError),
+    BadInputSchema(#[from] BadInputSchemaError),
 
     #[error(transparent)]
     MergeError(#[from] MergeError),
+
+    #[error(transparent)]
+    EmptyCommit(#[from] EmptyCommitError),
 
     #[error(transparent)]
     CommitError(#[from] CommitError),
@@ -98,8 +102,9 @@ pub enum WriteDataError {
 impl From<StageDataError> for WriteDataError {
     fn from(value: StageDataError) -> Self {
         match value {
-            StageDataError::EmptyCommit(v) => WriteDataError::EmptyCommit(v),
+            StageDataError::BadInputSchema(v) => WriteDataError::BadInputSchema(v),
             StageDataError::MergeError(v) => WriteDataError::MergeError(v),
+            StageDataError::EmptyCommit(v) => WriteDataError::EmptyCommit(v),
             StageDataError::Internal(v) => WriteDataError::Internal(v),
         }
     }
@@ -110,16 +115,35 @@ impl From<StageDataError> for WriteDataError {
 #[derive(Debug, thiserror::Error)]
 pub enum StageDataError {
     #[error(transparent)]
-    EmptyCommit(#[from] EmptyCommitError),
+    BadInputSchema(#[from] BadInputSchemaError),
 
     #[error(transparent)]
     MergeError(#[from] MergeError),
+
+    #[error(transparent)]
+    EmptyCommit(#[from] EmptyCommitError),
 
     #[error(transparent)]
     Internal(#[from] InternalError),
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, thiserror::Error)]
+#[error("Bad input schema: {message}")]
+pub struct BadInputSchemaError {
+    message: String,
+    backtrace: Backtrace,
+}
+
+impl BadInputSchemaError {
+    pub fn new(message: impl Into<String>) -> Self {
+        Self {
+            message: message.into(),
+            backtrace: Backtrace::capture(),
+        }
+    }
+}
 
 #[derive(Debug, thiserror::Error)]
 #[error("Nothing to commit")]

@@ -226,6 +226,13 @@ pub enum PollingIngestError {
     ),
 
     #[error(transparent)]
+    BadInputSchema(
+        #[from]
+        #[backtrace]
+        BadInputSchemaError,
+    ),
+
+    #[error(transparent)]
     MergeError(
         #[from]
         #[backtrace]
