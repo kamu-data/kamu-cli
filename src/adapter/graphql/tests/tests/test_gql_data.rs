@@ -13,6 +13,8 @@ use std::sync::Arc;
 use datafusion::arrow::array::*;
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use datafusion::arrow::record_batch::RecordBatch;
+use dill::Component;
+use event_bus::EventBus;
 use kamu::testing::{MetadataFactory, ParquetWriterHelper};
 use kamu::*;
 use kamu_core::*;
@@ -22,21 +24,19 @@ use opendatafabric::*;
 
 async fn create_catalog_with_local_workspace(tempdir: &Path) -> dill::Catalog {
     dill::CatalogBuilder::new()
+        .add::<EventBus>()
+        .add::<DependencyGraphServiceInMemory>()
         .add_builder(
-            dill::builder_for::<DatasetRepositoryLocalFs>()
+            DatasetRepositoryLocalFs::builder()
                 .with_root(tempdir.join("datasets"))
                 .with_current_account_subject(Arc::new(CurrentAccountSubject::new_test()))
                 .with_multi_tenant(false),
         )
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
         .add::<QueryServiceImpl>()
-        .bind::<dyn QueryService, QueryServiceImpl>()
         .add::<ObjectStoreRegistryImpl>()
-        .bind::<dyn ObjectStoreRegistry, ObjectStoreRegistryImpl>()
-        .add_value(ObjectStoreBuilderLocalFs::new())
-        .bind::<dyn ObjectStoreBuilder, ObjectStoreBuilderLocalFs>()
+        .add::<ObjectStoreBuilderLocalFs>()
         .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
-        .bind::<dyn auth::DatasetActionAuthorizer, auth::AlwaysHappyDatasetActionAuthorizer>()
         .build()
 }
 

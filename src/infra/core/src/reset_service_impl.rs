@@ -19,6 +19,7 @@ pub struct ResetServiceImpl {
 }
 
 #[component(pub)]
+#[interface(dyn ResetService)]
 impl ResetServiceImpl {
     pub fn new(
         dataset_repo: Arc<dyn DatasetRepository>,

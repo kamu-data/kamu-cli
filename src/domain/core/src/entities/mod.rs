@@ -11,6 +11,7 @@ pub mod current_account_subject;
 pub mod dataset;
 pub mod dataset_summary;
 pub mod engine;
+pub mod events;
 pub mod metadata_chain;
 pub mod metadata_stream;
 

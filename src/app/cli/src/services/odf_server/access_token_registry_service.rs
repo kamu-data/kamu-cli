@@ -10,7 +10,7 @@
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
-use dill::component;
+use dill::*;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::CurrentAccountSubject;
 use opendatafabric::serde::yaml::Manifest;
@@ -32,6 +32,7 @@ pub struct AccessTokenRegistryService {
 }
 
 #[component(pub)]
+#[interface(dyn kamu::domain::auth::OdfServerAccessTokenResolver)]
 impl AccessTokenRegistryService {
     pub fn new(
         storage: Arc<dyn AccessTokenStore>,
@@ -236,6 +237,7 @@ pub struct CLIAccessTokenStore {
 }
 
 #[component(pub)]
+#[interface(dyn AccessTokenStore)]
 impl CLIAccessTokenStore {
     pub fn new(workspace_layout: &WorkspaceLayout) -> Self {
         let user_token_store_path = dirs::home_dir()

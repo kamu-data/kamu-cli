@@ -99,6 +99,23 @@ where
         Self::load_ext(query, event_store, LoadOpts::default()).await
     }
 
+    /// Attempt initializing an aggregate from event history, but allow the not
+    /// found case
+    #[inline]
+    pub async fn try_load(
+        query: Proj::Query,
+        event_store: &Store,
+    ) -> Result<Option<Self>, TryLoadError<Proj>> {
+        match Self::load_ext(query, event_store, LoadOpts::default()).await {
+            Ok(a) => Ok(Some(a)),
+            Err(e) => match e {
+                LoadError::NotFound(_) => Ok(None),
+                LoadError::Internal(e) => Err(TryLoadError::Internal(e)),
+                LoadError::ProjectionError(e) => Err(TryLoadError::ProjectionError(e)),
+            },
+        }
+    }
+
     /// Same as [EventStore::load()] but with extra control knobs
     #[tracing::instrument(
         level = "debug",
@@ -328,6 +345,14 @@ pub struct LoadOpts {
 pub enum LoadError<Proj: Projection> {
     #[error(transparent)]
     NotFound(#[from] AggrateNotFoundError<Proj::Query>),
+    #[error(transparent)]
+    ProjectionError(ProjectionError<Proj>),
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum TryLoadError<Proj: Projection> {
     #[error(transparent)]
     ProjectionError(ProjectionError<Proj>),
     #[error(transparent)]

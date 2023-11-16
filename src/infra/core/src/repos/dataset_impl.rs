@@ -7,8 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::sync::Arc;
+
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
+use event_bus::EventBus;
+use kamu_core::events::DatasetEventDependenciesUpdated;
 use kamu_core::*;
 use opendatafabric::serde::yaml::Manifest;
 use opendatafabric::*;
@@ -16,6 +20,7 @@ use opendatafabric::*;
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct DatasetImpl<MetaChain, DataRepo, CheckpointRepo, InfoRepo> {
+    event_bus: Arc<EventBus>,
     metadata_chain: MetaChain,
     data_repo: DataRepo,
     checkpoint_repo: CheckpointRepo,
@@ -33,12 +38,14 @@ where
     InfoRepo: NamedObjectRepository + Sync + Send,
 {
     pub fn new(
+        event_bus: Arc<EventBus>,
         metadata_chain: MetaChain,
         data_repo: DataRepo,
         checkpoint_repo: CheckpointRepo,
         info_repo: InfoRepo,
     ) -> Self {
         Self {
+            event_bus,
             metadata_chain,
             data_repo,
             checkpoint_repo,
@@ -405,6 +412,22 @@ where
             0
         };
 
+        let mut new_upstream_ids: Vec<opendatafabric::DatasetID> = vec![];
+        if let opendatafabric::MetadataEvent::SetTransform(transform) = &event {
+            for new_input in transform.inputs.iter() {
+                if let Some(id) = &new_input.id {
+                    new_upstream_ids.push(id.clone());
+                } else {
+                    return Err(CommitError::MetadataAppendError(AppendError::InvalidBlock(
+                        AppendValidationError::InvalidEvent(InvalidEventError::new(
+                            event,
+                            "Transform input with unresolved ID",
+                        )),
+                    )));
+                }
+            }
+        }
+
         let block = MetadataBlock {
             prev_block_hash: prev_block_hash.clone(),
             sequence_number,
@@ -426,6 +449,21 @@ where
             .await?;
 
         tracing::info!(%new_head, "Committed new block");
+
+        if !new_upstream_ids.is_empty() {
+            let summary = self
+                .get_summary(GetSummaryOpts::default())
+                .await
+                .int_err()?;
+
+            self.event_bus
+                .dispatch_event(DatasetEventDependenciesUpdated {
+                    dataset_id: summary.id.clone(),
+                    new_upstream_ids,
+                })
+                .await
+                .int_err()?;
+        }
 
         Ok(CommitResult {
             old_head: prev_block_hash,

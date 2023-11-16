@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use crate::ProjectionEvent;
+
 /// Projections reconstruct some state from a series of events
 #[async_trait::async_trait]
 #[allow(drop_bounds)]
@@ -14,15 +16,14 @@ pub trait Projection
 where
     Self: Sized + Send + Sync + 'static,
     Self::Query: Sized + Send + Sync + 'static,
-    Self::Event: Sized + Send + Sync + 'static,
 
     Self: Clone,
     Self::Query: Clone,
-    Self::Event: Clone,
 
     Self: std::fmt::Debug,
     Self::Query: std::fmt::Debug,
-    Self::Event: std::fmt::Debug,
+
+    Self::Event: ProjectionEvent<Self::Query>,
 {
     /// Type of the query this projection uses to filter events in the event
     /// store

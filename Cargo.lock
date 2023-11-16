@@ -2084,9 +2084,9 @@ dependencies = [
 
 [[package]]
 name = "dill"
-version = "0.7.2"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f3ecd8df0b8dd4697b1e06e96e27b33a1486d58362b29dbbd56fbd7f170a444b"
+checksum = "c8465cf5d6f0f0389d5b2e26f5b9f88d826ced639db09093abbd9b5f957566a4"
 dependencies = [
  "dill-impl",
  "multimap",
@@ -2095,9 +2095,9 @@ dependencies = [
 
 [[package]]
 name = "dill-impl"
-version = "0.7.2"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "805173fe24f50fa870af109652b052ea8ab275374ea6d5eaa0cbab7460b60d7e"
+checksum = "4d0f263fd9b684a66c34bea8aa1e814f82f451d9101078ed465193708da174c4"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2306,9 +2306,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "event-bus"
+version = "0.148.0"
+dependencies = [
+ "async-trait",
+ "dill",
+ "futures",
+ "internal-error",
+]
+
+[[package]]
 name = "event-sourcing"
 version = "0.148.0"
 dependencies = [
+ "async-stream",
  "async-trait",
  "chrono",
  "event-sourcing-macros",
@@ -3151,6 +3162,7 @@ dependencies = [
  "digest",
  "dill",
  "env_logger",
+ "event-bus",
  "filetime",
  "flatbuffers",
  "flate2",
@@ -3170,6 +3182,7 @@ dependencies = [
  "mockall",
  "object_store",
  "opendatafabric",
+ "petgraph",
  "pin-project",
  "rand",
  "regex",
@@ -3207,6 +3220,7 @@ dependencies = [
  "async-trait",
  "dill",
  "env_logger",
+ "event-bus",
  "kamu",
  "kamu-core",
  "opendatafabric",
@@ -3254,12 +3268,14 @@ dependencies = [
  "datafusion",
  "dill",
  "env_logger",
+ "event-bus",
  "futures",
  "indoc 2.0.4",
  "internal-error",
  "kamu",
  "kamu-core",
  "kamu-data-utils",
+ "kamu-flow-system",
  "kamu-task-system",
  "mockall",
  "opendatafabric",
@@ -3270,6 +3286,7 @@ dependencies = [
  "test-log",
  "thiserror",
  "tokio",
+ "tokio-stream",
  "tracing",
  "tracing-subscriber",
 ]
@@ -3286,6 +3303,7 @@ dependencies = [
  "container-runtime",
  "dill",
  "env_logger",
+ "event-bus",
  "flate2",
  "fs_extra",
  "futures",
@@ -3363,6 +3381,7 @@ dependencies = [
  "dirs",
  "duration-string",
  "env_logger",
+ "event-bus",
  "fs_extra",
  "futures",
  "glob",
@@ -3380,6 +3399,7 @@ dependencies = [
  "kamu-adapter-http",
  "kamu-adapter-oauth",
  "kamu-data-utils",
+ "kamu-flow-system-inmem",
  "kamu-task-system-inmem",
  "libc",
  "merge",
@@ -3471,6 +3491,53 @@ dependencies = [
 ]
 
 [[package]]
+name = "kamu-flow-system"
+version = "0.148.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "enum-variants",
+ "event-sourcing",
+ "internal-error",
+ "kamu-core",
+ "kamu-task-system",
+ "opendatafabric",
+ "serde",
+ "serde_with",
+ "thiserror",
+ "tokio-stream",
+ "tracing",
+ "url",
+]
+
+[[package]]
+name = "kamu-flow-system-inmem"
+version = "0.148.0"
+dependencies = [
+ "async-stream",
+ "async-trait",
+ "chrono",
+ "dill",
+ "env_logger",
+ "event-bus",
+ "futures",
+ "kamu-core",
+ "kamu-flow-system",
+ "kamu-task-system",
+ "mockall",
+ "opendatafabric",
+ "serde",
+ "serde_with",
+ "test-log",
+ "thiserror",
+ "tokio",
+ "tokio-stream",
+ "tracing",
+ "tracing-subscriber",
+ "url",
+]
+
+[[package]]
 name = "kamu-ingest-datafusion"
 version = "0.148.0"
 dependencies = [
@@ -3550,6 +3617,7 @@ dependencies = [
  "chrono",
  "dill",
  "env_logger",
+ "event-bus",
  "futures",
  "kamu-core",
  "kamu-task-system",
@@ -3560,6 +3628,7 @@ dependencies = [
  "test-log",
  "thiserror",
  "tokio",
+ "tokio-stream",
  "tracing",
  "tracing-subscriber",
  "url",

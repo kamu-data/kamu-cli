@@ -14,9 +14,10 @@ use chrono::{TimeZone, Utc};
 use container_runtime::ContainerRuntime;
 use datafusion::parquet::record::RowAccessor;
 use datafusion::prelude::*;
+use dill::Component;
+use event_bus::EventBus;
 use indoc::indoc;
 use itertools::Itertools;
-use kamu::domain::auth::DatasetActionAuthorizer;
 use kamu::domain::*;
 use kamu::testing::*;
 use kamu::*;
@@ -955,13 +956,13 @@ async fn test_ingest_polling_datafusion_bad_column_names_rename() {
 
 #[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
-async fn test_ingest_polling_checks_auth() {
-    let harness = IngestTestHarness::new_with_authorizer(Arc::new(
+async fn test_ingest_checks_auth() {
+    let harness = IngestTestHarness::new_with_authorizer(
         MockDatasetActionAuthorizer::new().expect_check_write_dataset(
             DatasetAlias::new(None, DatasetName::new_unchecked("foo.bar")),
             1,
         ),
-    ));
+    );
     let src_path = harness.temp_dir.path().join("data.json");
 
     let dataset_snapshot = MetadataFactory::dataset_snapshot()
@@ -1006,60 +1007,65 @@ async fn test_ingest_polling_checks_auth() {
 
 struct IngestTestHarness {
     temp_dir: TempDir,
-    dataset_repo: Arc<DatasetRepositoryLocalFs>,
-    ingest_svc: Arc<PollingIngestServiceImpl>,
+    dataset_repo: Arc<dyn DatasetRepository>,
+    ingest_svc: Arc<dyn PollingIngestService>,
     time_source: Arc<SystemTimeSourceStub>,
     ctx: SessionContext,
 }
 
 impl IngestTestHarness {
     fn new() -> Self {
-        Self::new_with_authorizer(Arc::new(
-            kamu_core::auth::AlwaysHappyDatasetActionAuthorizer::new(),
-        ))
+        Self::new_with_authorizer(kamu_core::auth::AlwaysHappyDatasetActionAuthorizer::new())
     }
 
-    fn new_with_authorizer(dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>) -> Self {
+    fn new_with_authorizer<TDatasetAuthorizer: auth::DatasetActionAuthorizer + 'static>(
+        dataset_action_authorizer: TDatasetAuthorizer,
+    ) -> Self {
         let temp_dir = tempfile::tempdir().unwrap();
         let run_info_dir = temp_dir.path().join("run");
         let cache_dir = temp_dir.path().join("cache");
         std::fs::create_dir(&run_info_dir).unwrap();
         std::fs::create_dir(&cache_dir).unwrap();
 
-        let dataset_repo = Arc::new(
-            DatasetRepositoryLocalFs::create(
-                temp_dir.path().join("datasets"),
-                Arc::new(CurrentAccountSubject::new_test()),
-                dataset_action_authorizer.clone(),
-                false,
+        let catalog = dill::CatalogBuilder::new()
+            .add::<EventBus>()
+            .add::<DependencyGraphServiceInMemory>()
+            .add_value(CurrentAccountSubject::new_test())
+            .add_value(dataset_action_authorizer)
+            .bind::<dyn auth::DatasetActionAuthorizer, TDatasetAuthorizer>()
+            .add_builder(
+                DatasetRepositoryLocalFs::builder()
+                    .with_root(temp_dir.path().join("datasets"))
+                    .with_multi_tenant(false),
             )
-            .unwrap(),
-        );
+            .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+            .add_builder(
+                EngineProvisionerLocal::builder()
+                    .with_config(EngineProvisionerLocalConfig::default())
+                    .with_container_runtime(ContainerRuntime::default())
+                    .with_run_info_dir(run_info_dir.clone()),
+            )
+            .bind::<dyn EngineProvisioner, EngineProvisionerLocal>()
+            .add_value(SystemTimeSourceStub::new_set(
+                Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap(),
+            ))
+            .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
+            .add_builder(
+                PollingIngestServiceImpl::builder()
+                    .with_cache_dir(cache_dir)
+                    .with_container_runtime(Arc::new(ContainerRuntime::default()))
+                    .with_object_store_registry(Arc::new(ObjectStoreRegistryImpl::new(vec![
+                        Arc::new(ObjectStoreBuilderLocalFs::new()),
+                    ])))
+                    .with_data_format_registry(Arc::new(DataFormatRegistryImpl::new()))
+                    .with_run_info_dir(run_info_dir),
+            )
+            .bind::<dyn PollingIngestService, PollingIngestServiceImpl>()
+            .build();
 
-        let engine_provisioner = Arc::new(EngineProvisionerLocal::new(
-            EngineProvisionerLocalConfig::default(),
-            ContainerRuntime::default(),
-            dataset_repo.clone(),
-            run_info_dir.clone(),
-        ));
-
-        let time_source = Arc::new(SystemTimeSourceStub::new_set(
-            Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap(),
-        ));
-
-        let ingest_svc = Arc::new(PollingIngestServiceImpl::new(
-            dataset_repo.clone(),
-            dataset_action_authorizer,
-            engine_provisioner,
-            Arc::new(ObjectStoreRegistryImpl::new(vec![Arc::new(
-                ObjectStoreBuilderLocalFs::new(),
-            )])),
-            Arc::new(DataFormatRegistryImpl::new()),
-            Arc::new(ContainerRuntime::default()),
-            run_info_dir,
-            cache_dir,
-            time_source.clone(),
-        ));
+        let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
+        let ingest_svc = catalog.get_one::<dyn PollingIngestService>().unwrap();
+        let time_source = catalog.get_one::<SystemTimeSourceStub>().unwrap();
 
         Self {
             temp_dir,

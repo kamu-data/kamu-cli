@@ -11,7 +11,7 @@ use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
 use kamu::domain::auth::DUMMY_ACCESS_TOKEN;
-use kamu::domain::{Dataset, DatasetRepositoryExt};
+use kamu::domain::Dataset;
 use kamu::testing::{MetadataFactory, TEST_BUCKET_NAME};
 use kamu_adapter_http::smart_protocol::protocol_dataset_helper::*;
 use kamu_adapter_http::smart_protocol::{messages, BearerHeader};

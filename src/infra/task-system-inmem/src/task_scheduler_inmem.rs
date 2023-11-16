@@ -12,12 +12,14 @@ use std::sync::{Arc, Mutex};
 
 use dill::*;
 use futures::TryStreamExt;
+use kamu_core::SystemTimeSource;
 use kamu_task_system::*;
 use opendatafabric::DatasetID;
 
 pub struct TaskSchedulerInMemory {
     state: Arc<Mutex<State>>,
     event_store: Arc<dyn TaskSystemEventStore>,
+    time_source: Arc<dyn SystemTimeSource>,
 }
 
 #[derive(Default)]
@@ -26,12 +28,17 @@ struct State {
 }
 
 #[component(pub)]
+#[interface(dyn TaskScheduler)]
 #[scope(Singleton)]
 impl TaskSchedulerInMemory {
-    pub fn new(event_store: Arc<dyn TaskSystemEventStore>) -> Self {
+    pub fn new(
+        event_store: Arc<dyn TaskSystemEventStore>,
+        time_source: Arc<dyn SystemTimeSource>,
+    ) -> Self {
         Self {
             state: Arc::new(Mutex::new(State::default())),
             event_store,
+            time_source,
         }
     }
 }
@@ -40,7 +47,11 @@ impl TaskSchedulerInMemory {
 impl TaskScheduler for TaskSchedulerInMemory {
     #[tracing::instrument(level = "info", skip_all, fields(?logical_plan))]
     async fn create_task(&self, logical_plan: LogicalPlan) -> Result<TaskState, CreateTaskError> {
-        let mut task = Task::new(self.event_store.new_task_id(), logical_plan);
+        let mut task = Task::new(
+            self.time_source.now(),
+            self.event_store.new_task_id(),
+            logical_plan,
+        );
         task.save(self.event_store.as_ref()).await.int_err()?;
 
         let queue_len = {
@@ -69,7 +80,7 @@ impl TaskScheduler for TaskSchedulerInMemory {
         let mut task = Task::load(task_id, self.event_store.as_ref()).await?;
 
         if task.can_cancel() {
-            task.cancel().int_err()?;
+            task.cancel(self.time_source.now()).int_err()?;
             task.save(self.event_store.as_ref()).await.int_err()?;
 
             let mut state = self.state.lock().unwrap();
@@ -80,11 +91,14 @@ impl TaskScheduler for TaskSchedulerInMemory {
     }
 
     #[tracing::instrument(level = "info", skip_all, fields(%dataset_id))]
-    fn list_tasks_by_dataset(&self, dataset_id: &DatasetID) -> TaskStateStream {
+    fn list_tasks_by_dataset(
+        &self,
+        dataset_id: &DatasetID,
+    ) -> Result<TaskStateStream, ListTasksByDatasetError> {
         let dataset_id = dataset_id.clone();
 
         // TODO: This requires a lot more thinking on how to make this performant
-        Box::pin(async_stream::try_stream! {
+        Ok(Box::pin(async_stream::try_stream! {
             let relevant_tasks: Vec<_> = self
                 .event_store
                 .get_tasks_by_dataset(&dataset_id)
@@ -96,7 +110,7 @@ impl TaskScheduler for TaskSchedulerInMemory {
 
                 yield task.into();
             }
-        })
+        }))
     }
 
     // TODO: Use signaling instead of a loop
@@ -126,7 +140,7 @@ impl TaskScheduler for TaskSchedulerInMemory {
         let mut task = Task::load(task_id, self.event_store.as_ref())
             .await
             .int_err()?;
-        task.run().int_err()?;
+        task.run(self.time_source.now()).int_err()?;
         task.save(self.event_store.as_ref()).await.int_err()?;
 
         tracing::info!(

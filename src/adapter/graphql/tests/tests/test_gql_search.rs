@@ -8,6 +8,8 @@
 // by the Apache License, Version 2.0.
 
 use async_graphql::*;
+use dill::Component;
+use event_bus::EventBus;
 use kamu::testing::MetadataFactory;
 use kamu::*;
 use kamu_core::*;
@@ -18,11 +20,12 @@ async fn query() {
     let tempdir = tempfile::tempdir().unwrap();
 
     let cat = dill::CatalogBuilder::new()
+        .add::<EventBus>()
+        .add::<DependencyGraphServiceInMemory>()
         .add_value(CurrentAccountSubject::new_test())
         .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
-        .bind::<dyn auth::DatasetActionAuthorizer, auth::AlwaysHappyDatasetActionAuthorizer>()
         .add_builder(
-            dill::builder_for::<DatasetRepositoryLocalFs>()
+            DatasetRepositoryLocalFs::builder()
                 .with_root(tempdir.path().join("datasets"))
                 .with_multi_tenant(false),
         )

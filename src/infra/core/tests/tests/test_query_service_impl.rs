@@ -14,6 +14,8 @@ use std::sync::Arc;
 use datafusion::arrow::array::*;
 use datafusion::arrow::datatypes::{DataType, Field, Int64Type, Schema};
 use datafusion::arrow::record_batch::RecordBatch;
+use dill::Component;
+use event_bus::EventBus;
 use kamu::domain::*;
 use kamu::testing::{
     LocalS3Server,
@@ -107,18 +109,17 @@ async fn create_catalog_with_local_workspace(
     dataset_action_authorizer: MockDatasetActionAuthorizer,
 ) -> dill::Catalog {
     dill::CatalogBuilder::new()
+        .add::<EventBus>()
+        .add::<DependencyGraphServiceInMemory>()
         .add_builder(
-            dill::builder_for::<DatasetRepositoryLocalFs>()
+            DatasetRepositoryLocalFs::builder()
                 .with_root(tempdir.join("datasets"))
                 .with_multi_tenant(false),
         )
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
         .add::<QueryServiceImpl>()
-        .bind::<dyn QueryService, QueryServiceImpl>()
         .add::<ObjectStoreRegistryImpl>()
-        .bind::<dyn ObjectStoreRegistry, ObjectStoreRegistryImpl>()
-        .add_value(ObjectStoreBuilderLocalFs::new())
-        .bind::<dyn ObjectStoreBuilder, ObjectStoreBuilderLocalFs>()
+        .add::<ObjectStoreBuilderLocalFs>()
         .add_value(CurrentAccountSubject::new_test())
         .add_value(dataset_action_authorizer)
         .bind::<dyn auth::DatasetActionAuthorizer, MockDatasetActionAuthorizer>()
@@ -135,18 +136,17 @@ async fn create_catalog_with_s3_workspace(
     let s3_context = S3Context::from_items(endpoint.clone(), bucket, key_prefix).await;
 
     dill::CatalogBuilder::new()
+        .add::<EventBus>()
+        .add::<DependencyGraphServiceInMemory>()
         .add_builder(
-            dill::builder_for::<DatasetRepositoryS3>()
+            DatasetRepositoryS3::builder()
                 .with_s3_context(s3_context.clone())
                 .with_multi_tenant(false),
         )
         .bind::<dyn DatasetRepository, DatasetRepositoryS3>()
         .add::<QueryServiceImpl>()
-        .bind::<dyn QueryService, QueryServiceImpl>()
         .add::<ObjectStoreRegistryImpl>()
-        .bind::<dyn ObjectStoreRegistry, ObjectStoreRegistryImpl>()
-        .add_value(ObjectStoreBuilderLocalFs::new())
-        .bind::<dyn ObjectStoreBuilder, ObjectStoreBuilderLocalFs>()
+        .add::<ObjectStoreBuilderLocalFs>()
         .add_value(ObjectStoreBuilderS3::new(s3_context, true))
         .bind::<dyn ObjectStoreBuilder, ObjectStoreBuilderS3>()
         .add_value(CurrentAccountSubject::new_test())

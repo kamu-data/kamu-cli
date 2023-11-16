@@ -12,9 +12,10 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
 
+use dill::Component;
+use event_bus::EventBus;
 use kamu::domain::{
     auth,
-    CurrentAccountSubject,
     DatasetRepository,
     InternalError,
     ResultIntoInternal,
@@ -23,7 +24,7 @@ use kamu::domain::{
 };
 use kamu::testing::{LocalS3Server, MockAuthenticationService};
 use kamu::utils::s3_context::S3Context;
-use kamu::{DatasetLayout, DatasetRepositoryS3};
+use kamu::{DatasetLayout, DatasetRepositoryS3, DependencyGraphServiceInMemory};
 use opendatafabric::{AccountName, DatasetAlias, DatasetHandle};
 use url::Url;
 
@@ -51,6 +52,7 @@ pub(crate) struct ServerSideS3Harness {
 impl ServerSideS3Harness {
     pub async fn new(options: ServerSideHarnessOptions) -> Self {
         let s3 = LocalS3Server::new().await;
+        let s3_context = S3Context::from_url(&s3.url).await;
 
         let time_source = SystemTimeSourceStub::new();
 
@@ -58,7 +60,13 @@ impl ServerSideS3Harness {
         base_catalog_builder
             .add_value(time_source.clone())
             .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
-            .add_value(s3_repo(&s3, options.multi_tenant).await)
+            .add::<EventBus>()
+            .add::<DependencyGraphServiceInMemory>()
+            .add_builder(
+                DatasetRepositoryS3::builder()
+                    .with_s3_context(s3_context)
+                    .with_multi_tenant(false),
+            )
             .bind::<dyn DatasetRepository, DatasetRepositoryS3>()
             .add_value(server_authentication_mock())
             .bind::<dyn auth::AuthenticationService, MockAuthenticationService>();
@@ -142,18 +150,6 @@ impl ServerSideHarness for ServerSideS3Harness {
     async fn api_server_run(self) -> Result<(), InternalError> {
         self.api_server.run().await.int_err()
     }
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-pub async fn s3_repo(s3: &LocalS3Server, multi_tenant: bool) -> DatasetRepositoryS3 {
-    let s3_context = S3Context::from_url(&s3.url).await;
-    DatasetRepositoryS3::new(
-        s3_context,
-        Arc::new(CurrentAccountSubject::new_test()),
-        Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new()),
-        multi_tenant,
-    )
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

@@ -14,9 +14,13 @@ pub use internal_error::*;
 mod aggregate;
 mod event_id;
 mod event_store;
+mod event_store_inmem;
 mod projection;
+mod projection_event;
 
 pub use aggregate::*;
 pub use event_id::*;
 pub use event_store::*;
+pub use event_store_inmem::*;
 pub use projection::*;
+pub use projection_event::*;

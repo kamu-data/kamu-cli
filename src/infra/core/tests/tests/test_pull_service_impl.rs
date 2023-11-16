@@ -13,6 +13,8 @@ use std::path::Path;
 use std::sync::{Arc, Mutex};
 
 use chrono::prelude::*;
+use dill::Component;
+use event_bus::EventBus;
 use kamu::domain::*;
 use kamu::testing::*;
 use kamu::*;
@@ -153,12 +155,13 @@ async fn create_graph(
 
 // TODO: Rewrite this abomination
 async fn create_graph_in_repository(
+    event_bus: Arc<EventBus>,
     repo_path: &Path,
     datasets: Vec<(DatasetAlias, Vec<DatasetAlias>)>,
 ) {
     for (dataset_alias, deps) in datasets {
         let layout = DatasetLayout::create(repo_path.join(&dataset_alias.dataset_name)).unwrap();
-        let ds = DatasetFactoryImpl::get_local_fs(layout);
+        let ds = DatasetFactoryImpl::get_local_fs(layout, event_bus.clone());
         let chain = ds.as_metadata_chain();
 
         if deps.is_empty() {
@@ -220,13 +223,14 @@ async fn create_graph_in_repository(
 // dir and syncing it into the main workspace. TODO: Add simpler way to import
 // remote dataset
 async fn create_graph_remote(
+    event_bus: Arc<EventBus>,
     dataset_repo: Arc<dyn DatasetRepository>,
     reg: Arc<RemoteRepositoryRegistryImpl>,
     datasets: Vec<(DatasetAlias, Vec<DatasetAlias>)>,
     to_import: Vec<DatasetAlias>,
 ) {
     let tmp_repo_dir = tempfile::tempdir().unwrap();
-    create_graph_in_repository(tmp_repo_dir.path(), datasets).await;
+    create_graph_in_repository(event_bus.clone(), tmp_repo_dir.path(), datasets).await;
 
     let tmp_repo_name = RepoName::new_unchecked("tmp");
 
@@ -243,6 +247,7 @@ async fn create_graph_remote(
         Arc::new(DatasetFactoryImpl::new(
             IpfsGateway::default(),
             Arc::new(auth::DummyOdfServerAccessTokenResolver::new()),
+            event_bus,
         )),
         Arc::new(DummySmartTransferProtocolClient::new()),
         Arc::new(kamu::utils::ipfs_wrapper::IpfsClient::default()),
@@ -430,6 +435,7 @@ async fn test_pull_batching_complex_with_remote() {
     // C --------/   /
     // D -----------/
     create_graph_remote(
+        harness.event_bus.clone(),
         harness.dataset_repo.clone(),
         harness.remote_repo_reg.clone(),
         vec![
@@ -804,11 +810,9 @@ async fn test_set_watermark() {
     let tmp_dir = tempfile::tempdir().unwrap();
     let harness = PullTestHarness::new_with_authorizer(
         tmp_dir.path(),
-        Arc::new(
-            MockDatasetActionAuthorizer::new().expect_check_write_dataset(
-                DatasetAlias::new(None, DatasetName::new_unchecked("foo")),
-                4,
-            ),
+        MockDatasetActionAuthorizer::new().expect_check_write_dataset(
+            DatasetAlias::new(None, DatasetName::new_unchecked("foo")),
+            4,
         ),
         false,
     );
@@ -872,7 +876,7 @@ async fn test_set_watermark_unauthorized() {
     let tmp_dir = tempfile::tempdir().unwrap();
     let harness = PullTestHarness::new_with_authorizer(
         tmp_dir.path(),
-        Arc::new(MockDatasetActionAuthorizer::denying()),
+        MockDatasetActionAuthorizer::denying(),
         true,
     );
 
@@ -899,51 +903,59 @@ struct PullTestHarness {
     calls: Arc<Mutex<Vec<PullBatch>>>,
     dataset_repo: Arc<DatasetRepositoryLocalFs>,
     remote_repo_reg: Arc<RemoteRepositoryRegistryImpl>,
-    remote_alias_reg: Arc<RemoteAliasesRegistryImpl>,
-    pull_svc: PullServiceImpl,
+    remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
+    pull_svc: Arc<dyn PullService>,
+    event_bus: Arc<EventBus>,
 }
 
 impl PullTestHarness {
     fn new(tmp_path: &Path, multi_tenant: bool) -> Self {
         Self::new_with_authorizer(
             tmp_path,
-            Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new()),
+            auth::AlwaysHappyDatasetActionAuthorizer::new(),
             multi_tenant,
         )
     }
 
-    fn new_with_authorizer(
+    fn new_with_authorizer<TDatasetAuthorizer: auth::DatasetActionAuthorizer + 'static>(
         tmp_path: &Path,
-        dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
+        dataset_action_authorizer: TDatasetAuthorizer,
         multi_tenant: bool,
     ) -> Self {
         let calls = Arc::new(Mutex::new(Vec::new()));
-        let current_account_config = Arc::new(CurrentAccountSubject::new_test());
-        let dataset_repo = Arc::new(
-            DatasetRepositoryLocalFs::create(
-                tmp_path.join("datasets"),
-                current_account_config.clone(),
-                Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new()),
-                multi_tenant,
-            )
-            .unwrap(),
-        );
-        let remote_repo_reg =
-            Arc::new(RemoteRepositoryRegistryImpl::create(tmp_path.join("repos")).unwrap());
-        let remote_alias_reg = Arc::new(RemoteAliasesRegistryImpl::new(dataset_repo.clone()));
-        let ingest_svc = Arc::new(TestIngestService::new(calls.clone()));
-        let transform_svc = Arc::new(TestTransformService::new(calls.clone()));
-        let sync_svc = Arc::new(TestSyncService::new(calls.clone(), dataset_repo.clone()));
 
-        let pull_svc = PullServiceImpl::new(
-            dataset_repo.clone(),
-            remote_alias_reg.clone(),
-            ingest_svc,
-            transform_svc,
-            sync_svc,
-            current_account_config,
-            dataset_action_authorizer,
-        );
+        let datasets_dir_path = tmp_path.join("datasets");
+        std::fs::create_dir(&datasets_dir_path).unwrap();
+
+        let catalog = dill::CatalogBuilder::new()
+            .add::<EventBus>()
+            .add::<DependencyGraphServiceInMemory>()
+            .add_value(CurrentAccountSubject::new_test())
+            .add_value(dataset_action_authorizer)
+            .bind::<dyn auth::DatasetActionAuthorizer, TDatasetAuthorizer>()
+            .add_builder(
+                DatasetRepositoryLocalFs::builder()
+                    .with_root(datasets_dir_path)
+                    .with_multi_tenant(multi_tenant),
+            )
+            .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+            .add_value(RemoteRepositoryRegistryImpl::create(tmp_path.join("repos")).unwrap())
+            .bind::<dyn RemoteRepositoryRegistry, RemoteRepositoryRegistryImpl>()
+            .add::<RemoteAliasesRegistryImpl>()
+            .add_value(TestIngestService::new(calls.clone()))
+            .bind::<dyn PollingIngestService, TestIngestService>()
+            .add_value(TestTransformService::new(calls.clone()))
+            .bind::<dyn TransformService, TestTransformService>()
+            .add_builder(TestSyncService::builder().with_calls(calls.clone()))
+            .bind::<dyn SyncService, TestSyncService>()
+            .add::<PullServiceImpl>()
+            .build();
+
+        let dataset_repo = catalog.get_one::<DatasetRepositoryLocalFs>().unwrap();
+        let remote_repo_reg = catalog.get_one::<RemoteRepositoryRegistryImpl>().unwrap();
+        let remote_alias_reg = catalog.get_one::<dyn RemoteAliasesRegistry>().unwrap();
+        let pull_svc = catalog.get_one::<dyn PullService>().unwrap();
+        let event_bus = catalog.get_one::<EventBus>().unwrap();
 
         Self {
             calls,
@@ -951,6 +963,7 @@ impl PullTestHarness {
             remote_repo_reg,
             remote_alias_reg,
             pull_svc,
+            event_bus,
         }
     }
 
@@ -1202,6 +1215,7 @@ struct TestSyncService {
     dataset_repo: Arc<dyn DatasetRepository>,
 }
 
+#[dill::component(pub)]
 impl TestSyncService {
     fn new(calls: Arc<Mutex<Vec<PullBatch>>>, dataset_repo: Arc<dyn DatasetRepository>) -> Self {
         Self {

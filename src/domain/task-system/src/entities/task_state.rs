@@ -40,14 +40,14 @@ pub struct TaskState {
 
 impl Projection for TaskState {
     type Query = TaskID;
-    type Event = TaskSystemEvent;
+    type Event = TaskEvent;
 
     fn apply(state: Option<Self>, event: Self::Event) -> Result<Self, ProjectionError<Self>> {
-        use TaskSystemEvent as E;
+        use TaskEvent as E;
 
         match (state, event) {
             (None, event) => match event {
-                E::TaskCreated(TaskCreated {
+                E::TaskCreated(TaskEventCreated {
                     event_time,
                     task_id,
                     logical_plan,
@@ -68,7 +68,7 @@ impl Projection for TaskState {
 
                 match event {
                     E::TaskCreated(_) => Err(ProjectionError::new(Some(s), event)),
-                    E::TaskRunning(TaskRunning {
+                    E::TaskRunning(TaskEventRunning {
                         event_time,
                         task_id: _,
                     }) if s.status == TaskStatus::Queued => Ok(Self {
@@ -76,7 +76,7 @@ impl Projection for TaskState {
                         ran_at: Some(event_time),
                         ..s
                     }),
-                    E::TaskCancelled(TaskCancelled {
+                    E::TaskCancelled(TaskEventCancelled {
                         event_time,
                         task_id: _,
                     }) if s.status == TaskStatus::Queued
@@ -88,7 +88,7 @@ impl Projection for TaskState {
                             ..s
                         })
                     }
-                    E::TaskFinished(TaskFinished {
+                    E::TaskFinished(TaskEventFinished {
                         event_time,
                         task_id: _,
                         outcome,
@@ -107,3 +107,13 @@ impl Projection for TaskState {
         }
     }
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+impl ProjectionEvent<TaskID> for TaskEvent {
+    fn matches_query(&self, query: &TaskID) -> bool {
+        self.task_id() == *query
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////

@@ -12,7 +12,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use chrono::Duration;
-use dill::component;
+use dill::*;
 use internal_error::{ErrorIntoInternal, InternalError};
 use jsonwebtoken::errors::ErrorKind;
 use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
@@ -53,6 +53,7 @@ pub struct AuthenticationServiceImpl {
 }
 
 #[component(pub)]
+#[interface(dyn AuthenticationService)]
 impl AuthenticationServiceImpl {
     pub fn new(
         authentication_providers: Vec<Arc<dyn AuthenticationProvider>>,

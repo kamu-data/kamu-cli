@@ -11,6 +11,7 @@ use std::assert_matches::assert_matches;
 use std::error::Error;
 use std::path::Path;
 
+use event_bus::EventBus;
 use kamu::domain::*;
 use kamu::testing::{MetadataFactory, ParquetWriterHelper};
 use kamu::*;
@@ -29,7 +30,12 @@ async fn init_v0_workspace(workspace_path: &Path) {
 
     let dataset_name = DatasetName::new_unchecked("foo");
     let dataset_dir = datasets_dir.join(&dataset_name);
-    let dataset = DatasetFactoryImpl::get_local_fs(DatasetLayout::create(&dataset_dir).unwrap());
+
+    let catalog = dill::CatalogBuilder::new().add::<EventBus>().build();
+    let dataset = DatasetFactoryImpl::get_local_fs(
+        DatasetLayout::create(&dataset_dir).unwrap(),
+        catalog.get_one().unwrap(),
+    );
 
     // Metadata & refs
     dataset

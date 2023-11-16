@@ -11,8 +11,9 @@ use std::sync::Arc;
 
 use chrono::{TimeZone, Utc};
 use datafusion::prelude::*;
+use dill::Component;
+use event_bus::EventBus;
 use indoc::indoc;
-use kamu::domain::auth::DatasetActionAuthorizer;
 use kamu::domain::*;
 use kamu::testing::*;
 use kamu::*;
@@ -355,49 +356,54 @@ async fn test_ingest_push_media_type_override() {
 
 struct IngestTestHarness {
     temp_dir: TempDir,
-    dataset_repo: Arc<DatasetRepositoryLocalFs>,
-    push_ingest_svc: Arc<PushIngestServiceImpl>,
+    dataset_repo: Arc<dyn DatasetRepository>,
+    push_ingest_svc: Arc<dyn PushIngestService>,
     ctx: SessionContext,
 }
 
 impl IngestTestHarness {
     fn new() -> Self {
-        Self::new_with_authorizer(Arc::new(
-            kamu_core::auth::AlwaysHappyDatasetActionAuthorizer::new(),
-        ))
+        Self::new_with_authorizer(kamu_core::auth::AlwaysHappyDatasetActionAuthorizer::new())
     }
 
-    fn new_with_authorizer(dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>) -> Self {
+    fn new_with_authorizer<TDatasetAuthorizer: auth::DatasetActionAuthorizer + 'static>(
+        dataset_action_authorizer: TDatasetAuthorizer,
+    ) -> Self {
         let temp_dir = tempfile::tempdir().unwrap();
         let run_info_dir = temp_dir.path().join("run");
         let cache_dir = temp_dir.path().join("cache");
         std::fs::create_dir(&run_info_dir).unwrap();
         std::fs::create_dir(&cache_dir).unwrap();
 
-        let dataset_repo = Arc::new(
-            DatasetRepositoryLocalFs::create(
-                temp_dir.path().join("datasets"),
-                Arc::new(CurrentAccountSubject::new_test()),
-                dataset_action_authorizer.clone(),
-                false,
+        let catalog = dill::CatalogBuilder::new()
+            .add::<EventBus>()
+            .add::<DependencyGraphServiceInMemory>()
+            .add_value(CurrentAccountSubject::new_test())
+            .add_value(dataset_action_authorizer)
+            .bind::<dyn auth::DatasetActionAuthorizer, TDatasetAuthorizer>()
+            .add_builder(
+                DatasetRepositoryLocalFs::builder()
+                    .with_root(temp_dir.path().join("datasets"))
+                    .with_multi_tenant(false),
             )
-            .unwrap(),
-        );
+            .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+            .add_value(SystemTimeSourceStub::new_set(
+                Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap(),
+            ))
+            .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
+            .add_builder(
+                PushIngestServiceImpl::builder()
+                    .with_object_store_registry(Arc::new(ObjectStoreRegistryImpl::new(vec![
+                        Arc::new(ObjectStoreBuilderLocalFs::new()),
+                    ])))
+                    .with_data_format_registry(Arc::new(DataFormatRegistryImpl::new()))
+                    .with_run_info_dir(run_info_dir),
+            )
+            .bind::<dyn PushIngestService, PushIngestServiceImpl>()
+            .build();
 
-        let time_source = Arc::new(SystemTimeSourceStub::new_set(
-            Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap(),
-        ));
-
-        let push_ingest_svc = Arc::new(PushIngestServiceImpl::new(
-            dataset_repo.clone(),
-            dataset_action_authorizer,
-            Arc::new(ObjectStoreRegistryImpl::new(vec![Arc::new(
-                ObjectStoreBuilderLocalFs::new(),
-            )])),
-            Arc::new(DataFormatRegistryImpl::new()),
-            run_info_dir,
-            time_source,
-        ));
+        let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
+        let push_ingest_svc = catalog.get_one::<dyn PushIngestService>().unwrap();
 
         Self {
             temp_dir,

@@ -20,6 +20,7 @@ pub struct PushServiceImpl {
 }
 
 #[component(pub)]
+#[interface(dyn PushService)]
 impl PushServiceImpl {
     pub fn new(
         dataset_repo: Arc<dyn DatasetRepository>,

@@ -10,6 +10,8 @@
 use std::sync::Arc;
 
 use async_graphql::*;
+use dill::Component;
+use event_bus::EventBus;
 use indoc::indoc;
 use kamu::testing::MetadataFactory;
 use kamu::*;
@@ -26,14 +28,15 @@ async fn test_metadata_chain_events() {
     let tempdir = tempfile::tempdir().unwrap();
 
     let base_catalog = dill::CatalogBuilder::new()
+        .add::<EventBus>()
+        .add::<DependencyGraphServiceInMemory>()
         .add_builder(
-            dill::builder_for::<DatasetRepositoryLocalFs>()
+            DatasetRepositoryLocalFs::builder()
                 .with_root(tempdir.path().join("datasets"))
                 .with_multi_tenant(false),
         )
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
         .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
-        .bind::<dyn auth::DatasetActionAuthorizer, auth::AlwaysHappyDatasetActionAuthorizer>()
         .build();
 
     // Init dataset
@@ -175,14 +178,15 @@ async fn metadata_chain_append_event() {
     let tempdir = tempfile::tempdir().unwrap();
 
     let base_catalog = dill::CatalogBuilder::new()
+        .add::<EventBus>()
+        .add::<DependencyGraphServiceInMemory>()
         .add_builder(
-            dill::builder_for::<DatasetRepositoryLocalFs>()
+            DatasetRepositoryLocalFs::builder()
                 .with_root(tempdir.path().join("datasets"))
                 .with_multi_tenant(false),
         )
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
         .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
-        .bind::<dyn auth::DatasetActionAuthorizer, auth::AlwaysHappyDatasetActionAuthorizer>()
         .build();
 
     let (catalog_anonymous, catalog_authorized) = authentication_catalogs(&base_catalog);
@@ -271,14 +275,15 @@ async fn metadata_update_readme_new() {
     let tempdir = tempfile::tempdir().unwrap();
 
     let base_catalog = dill::CatalogBuilder::new()
+        .add::<EventBus>()
+        .add::<DependencyGraphServiceInMemory>()
         .add_builder(
-            dill::builder_for::<DatasetRepositoryLocalFs>()
+            DatasetRepositoryLocalFs::builder()
                 .with_root(tempdir.path().join("datasets"))
                 .with_multi_tenant(false),
         )
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
         .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
-        .bind::<dyn auth::DatasetActionAuthorizer, auth::AlwaysHappyDatasetActionAuthorizer>()
         .build();
 
     let (catalog_anonymous, catalog_authorized) = authentication_catalogs(&base_catalog);

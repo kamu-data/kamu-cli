@@ -8,19 +8,18 @@
 // by the Apache License, Version 2.0.
 
 use std::collections::hash_map::{Entry, HashMap};
-use std::sync::{Arc, Mutex};
 
 use dill::*;
 use kamu_task_system::*;
 use opendatafabric::DatasetID;
 
 pub struct TaskSystemEventStoreInMemory {
-    state: Arc<Mutex<State>>,
+    inner: EventStoreInMemory<TaskState, State>,
 }
 
 #[derive(Default)]
 struct State {
-    events: Vec<TaskSystemEvent>,
+    events: Vec<TaskEvent>,
     tasks_by_dataset: HashMap<DatasetID, Vec<TaskID>>,
     last_task_id: Option<TaskID>,
 }
@@ -38,20 +37,35 @@ impl State {
     }
 }
 
+impl EventStoreState<TaskState> for State {
+    fn events_count(&self) -> usize {
+        self.events.len()
+    }
+
+    fn get_events(&self) -> &[<TaskState as Projection>::Event] {
+        &self.events
+    }
+
+    fn add_event(&mut self, event: <TaskState as Projection>::Event) {
+        self.events.push(event);
+    }
+}
+
 #[component(pub)]
+#[interface(dyn TaskSystemEventStore)]
 #[scope(Singleton)]
 impl TaskSystemEventStoreInMemory {
     pub fn new() -> Self {
         Self {
-            state: Arc::new(Mutex::new(State::default())),
+            inner: EventStoreInMemory::new(),
         }
     }
 
     fn update_index_by_dataset(
         tasks_by_dataset: &mut HashMap<DatasetID, Vec<TaskID>>,
-        event: &TaskSystemEvent,
+        event: &TaskEvent,
     ) {
-        if let TaskSystemEvent::TaskCreated(e) = &event {
+        if let TaskEvent::TaskCreated(e) = &event {
             if let Some(dataset_id) = e.logical_plan.dataset_id() {
                 let entries = match tasks_by_dataset.entry(dataset_id.clone()) {
                     Entry::Occupied(v) => v.into_mut(),
@@ -66,67 +80,38 @@ impl TaskSystemEventStoreInMemory {
 #[async_trait::async_trait]
 impl EventStore<TaskState> for TaskSystemEventStoreInMemory {
     async fn len(&self) -> Result<usize, InternalError> {
-        Ok(self.state.lock().unwrap().events.len())
+        self.inner.len().await
     }
 
     fn get_events<'a>(
         &'a self,
         task_id: &TaskID,
         opts: GetEventsOpts,
-    ) -> EventStream<'a, TaskSystemEvent> {
-        let task_id = task_id.clone();
-
-        // TODO: This should be a buffered stream so we don't lock per event
-        Box::pin(async_stream::try_stream! {
-            let mut seen = opts.from.map(|id| (id.into_inner() + 1) as usize).unwrap_or(0);
-
-            loop {
-                let next = {
-                    let s = self.state.lock().unwrap();
-
-                    let to = opts.to.map(|id| (id.into_inner() + 1) as usize).unwrap_or(s.events.len());
-
-                    s.events[..to]
-                        .iter()
-                        .enumerate()
-                        .skip(seen)
-                        .filter(|(_, e)| e.task_id() == task_id)
-                        .map(|(i, e)| (i, e.clone()))
-                        .next()
-                };
-
-                match next {
-                    None => break,
-                    Some((i, event)) => {
-                        seen = i + 1;
-                        yield (EventID::new(i as u64), event)
-                    }
-                }
-            }
-        })
+    ) -> EventStream<'a, TaskEvent> {
+        self.inner.get_events(task_id, opts)
     }
 
-    // TODO: concurrency
     async fn save_events(
         &self,
-        _task_id: &TaskID,
-        events: Vec<TaskSystemEvent>,
+        task_id: &TaskID,
+        events: Vec<TaskEvent>,
     ) -> Result<EventID, SaveEventsError> {
-        let mut s = self.state.lock().unwrap();
-
-        for event in events {
-            Self::update_index_by_dataset(&mut s.tasks_by_dataset, &event);
-            s.events.push(event);
+        {
+            let state = self.inner.as_state();
+            let mut g = state.lock().unwrap();
+            for event in &events {
+                Self::update_index_by_dataset(&mut g.tasks_by_dataset, &event);
+            }
         }
 
-        Ok(EventID::new((s.events.len() - 1) as u64))
+        self.inner.save_events(task_id, events).await
     }
 }
 
 #[async_trait::async_trait]
 impl TaskSystemEventStore for TaskSystemEventStoreInMemory {
     fn new_task_id(&self) -> TaskID {
-        self.state.lock().unwrap().next_task_id()
+        self.inner.as_state().lock().unwrap().next_task_id()
     }
 
     fn get_tasks_by_dataset<'a>(&'a self, dataset_id: &DatasetID) -> TaskIDStream<'a> {
@@ -135,8 +120,9 @@ impl TaskSystemEventStore for TaskSystemEventStoreInMemory {
         // TODO: This should be a buffered stream so we don't lock per record
         Box::pin(async_stream::try_stream! {
             let mut pos = {
-                let s = self.state.lock().unwrap();
-                s.tasks_by_dataset.get(&dataset_id).map(|tasks| tasks.len()).unwrap_or(0)
+                let state = self.inner.as_state();
+                let g = state.lock().unwrap();
+                g.tasks_by_dataset.get(&dataset_id).map(|tasks| tasks.len()).unwrap_or(0)
             };
 
             loop {
@@ -147,8 +133,9 @@ impl TaskSystemEventStore for TaskSystemEventStoreInMemory {
                 pos -= 1;
 
                 let next = {
-                    let s = self.state.lock().unwrap();
-                    s.tasks_by_dataset
+                    let state = self.inner.as_state();
+                    let g = state.lock().unwrap();
+                    g.tasks_by_dataset
                         .get(&dataset_id)
                         .and_then(|tasks| tasks.get(pos).cloned())
                 };

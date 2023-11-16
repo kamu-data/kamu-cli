@@ -20,6 +20,7 @@ use opendatafabric::*;
 pub struct DataFormatRegistryImpl {}
 
 #[dill::component(pub)]
+#[dill::interface(dyn DataFormatRegistry)]
 impl DataFormatRegistryImpl {
     pub const FMT_CSV: DataFormatDesc = DataFormatDesc {
         short_name: "CSV",

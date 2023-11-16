@@ -35,6 +35,7 @@ pub struct QueryServiceImpl {
 }
 
 #[component(pub)]
+#[interface(dyn QueryService)]
 impl QueryServiceImpl {
     pub fn new(
         dataset_repo: Arc<dyn DatasetRepository>,

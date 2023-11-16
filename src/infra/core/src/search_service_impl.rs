@@ -21,6 +21,7 @@ pub struct SearchServiceImpl {
 }
 
 #[component(pub)]
+#[interface(dyn SearchService)]
 impl SearchServiceImpl {
     pub fn new(remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>) -> Self {
         Self { remote_repo_reg }

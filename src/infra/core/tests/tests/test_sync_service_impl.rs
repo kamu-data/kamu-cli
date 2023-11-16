@@ -10,8 +10,9 @@
 use std::assert_matches::assert_matches;
 use std::path::Path;
 use std::str::FromStr;
-use std::sync::Arc;
 
+use dill::Component;
+use event_bus::EventBus;
 use kamu::domain::*;
 use kamu::testing::*;
 use kamu::utils::ipfs_wrapper::IpfsClient;
@@ -115,14 +116,12 @@ fn construct_authorizer(
     authorization_expectations: AuthorizationExpectations,
     d1_alias: &DatasetAlias,
     d2_alias: &DatasetAlias,
-) -> Arc<dyn auth::DatasetActionAuthorizer> {
-    let authorizer = MockDatasetActionAuthorizer::new()
+) -> impl auth::DatasetActionAuthorizer {
+    MockDatasetActionAuthorizer::new()
         .expect_check_read_dataset(d1_alias.clone(), authorization_expectations.d1_reads)
         .expect_check_read_dataset(d2_alias.clone(), authorization_expectations.d2_reads)
         .expect_check_write_dataset(d1_alias.clone(), authorization_expectations.d1_writes)
-        .expect_check_write_dataset(d2_alias.clone(), authorization_expectations.d2_writes);
-
-    Arc::new(authorizer)
+        .expect_check_write_dataset(d2_alias.clone(), authorization_expectations.d2_writes)
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -139,7 +138,7 @@ async fn do_test_sync(
 
     let (ipfs_gateway, ipfs_client) = ipfs.unwrap_or_default();
 
-    let dataset_action_authorizer = construct_authorizer(
+    let dataset_authorizer = construct_authorizer(
         AuthorizationExpectations {
             d1_reads: 7,
             d2_reads: 2,
@@ -150,30 +149,32 @@ async fn do_test_sync(
         &dataset_alias_2,
     );
 
-    let dataset_repo = Arc::new(
-        DatasetRepositoryLocalFs::create(
-            tmp_workspace_dir.join("datasets"),
-            Arc::new(CurrentAccountSubject::new_test()),
-            dataset_action_authorizer.clone(),
-            false,
+    let catalog = dill::CatalogBuilder::new()
+        .add::<EventBus>()
+        .add::<DependencyGraphServiceInMemory>()
+        .add_value(ipfs_gateway)
+        .add_value(ipfs_client)
+        .add_value(CurrentAccountSubject::new_test())
+        .add_value(dataset_authorizer)
+        .bind::<dyn auth::DatasetActionAuthorizer, MockDatasetActionAuthorizer>()
+        .add_builder(
+            DatasetRepositoryLocalFs::builder()
+                .with_root(tmp_workspace_dir.join("datasets"))
+                .with_multi_tenant(false),
         )
-        .unwrap(),
-    );
-    let remote_repo_reg =
-        Arc::new(RemoteRepositoryRegistryImpl::create(tmp_workspace_dir.join("repos")).unwrap());
-    let dataset_factory = Arc::new(DatasetFactoryImpl::new(
-        ipfs_gateway,
-        Arc::new(auth::DummyOdfServerAccessTokenResolver::new()),
-    ));
+        .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+        .add_builder(
+            RemoteRepositoryRegistryImpl::builder().with_repos_dir(tmp_workspace_dir.join("repos")),
+        )
+        .bind::<dyn RemoteRepositoryRegistry, RemoteRepositoryRegistryImpl>()
+        .add::<auth::DummyOdfServerAccessTokenResolver>()
+        .add::<DatasetFactoryImpl>()
+        .add::<SyncServiceImpl>()
+        .add::<DummySmartTransferProtocolClient>()
+        .build();
 
-    let sync_svc = SyncServiceImpl::new(
-        remote_repo_reg.clone(),
-        dataset_repo.clone(),
-        dataset_action_authorizer.clone(),
-        dataset_factory,
-        Arc::new(DummySmartTransferProtocolClient::new()),
-        Arc::new(ipfs_client),
-    );
+    let sync_svc = catalog.get_one::<dyn SyncService>().unwrap();
+    let dataset_repo = catalog.get_one::<DatasetRepositoryLocalFs>().unwrap();
 
     // Dataset does not exist locally / remotely //////////////////////////////
     assert_matches!(

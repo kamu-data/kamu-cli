@@ -10,6 +10,7 @@
 use std::sync::Arc;
 
 use dill::*;
+use event_bus::EventBus;
 use kamu_core::*;
 use url::Url;
 
@@ -21,6 +22,7 @@ use crate::*;
 pub struct DatasetFactoryImpl {
     ipfs_gateway: IpfsGateway,
     access_token_resolver: Arc<dyn kamu_core::auth::OdfServerAccessTokenResolver>,
+    event_bus: Arc<EventBus>,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -39,19 +41,23 @@ type DatasetImplLocalFS = DatasetImpl<
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
+#[interface(dyn DatasetFactory)]
 impl DatasetFactoryImpl {
     pub fn new(
         ipfs_gateway: IpfsGateway,
         access_token_resolver: Arc<dyn kamu_core::auth::OdfServerAccessTokenResolver>,
+        event_bus: Arc<EventBus>,
     ) -> Self {
         Self {
             ipfs_gateway,
             access_token_resolver,
+            event_bus,
         }
     }
 
-    pub fn get_local_fs(layout: DatasetLayout) -> DatasetImplLocalFS {
+    pub fn get_local_fs(layout: DatasetLayout, event_bus: Arc<EventBus>) -> DatasetImplLocalFS {
         DatasetImpl::new(
+            event_bus,
             MetadataChainImpl::new(
                 ObjectRepositoryLocalFS::new(layout.blocks_dir),
                 ReferenceRepositoryImpl::new(NamedObjectRepositoryLocalFS::new(layout.refs_dir)),
@@ -62,9 +68,14 @@ impl DatasetFactoryImpl {
         )
     }
 
-    fn get_http(base_url: Url, header_map: http::HeaderMap) -> Result<impl Dataset, InternalError> {
+    fn get_http(
+        base_url: Url,
+        header_map: http::HeaderMap,
+        event_bus: Arc<EventBus>,
+    ) -> Result<impl Dataset, InternalError> {
         let client = reqwest::Client::new();
         Ok(DatasetImpl::new(
+            event_bus,
             MetadataChainImpl::new(
                 ObjectRepositoryHttp::new(
                     client.clone(),
@@ -101,20 +112,27 @@ impl DatasetFactoryImpl {
     /// credental resolution from scratch which can be very expensive. If you
     /// already have an established [S3Context] use [get_s3_with_context]
     /// function instead.
-    pub async fn get_s3_from_url(base_url: Url) -> Result<impl Dataset, InternalError> {
+    pub async fn get_s3_from_url(
+        base_url: Url,
+        event_bus: Arc<EventBus>,
+    ) -> Result<impl Dataset, InternalError> {
         // TODO: We should ensure optimal credential reuse. Perhaps in future we should
         // create a cache of S3Contexts keyed by an endpoint.
         let s3_context = S3Context::from_url(&base_url).await;
-        Self::get_s3_from_context(s3_context).await
+        Self::get_s3_from_context(s3_context, event_bus).await
     }
 
-    pub async fn get_s3_from_context(s3_context: S3Context) -> Result<impl Dataset, InternalError> {
+    pub async fn get_s3_from_context(
+        s3_context: S3Context,
+        event_bus: Arc<EventBus>,
+    ) -> Result<impl Dataset, InternalError> {
         let client = s3_context.client;
         let endpoint = s3_context.endpoint;
         let bucket = s3_context.bucket;
         let key_prefix = s3_context.key_prefix;
 
         Ok(DatasetImpl::new(
+            event_bus,
             MetadataChainImpl::new(
                 ObjectRepositoryS3::<sha3::Sha3_256, 0x16>::new(S3Context::new(
                     client.clone(),
@@ -150,7 +168,11 @@ impl DatasetFactoryImpl {
         ))
     }
 
-    async fn get_ipfs_http(&self, base_url: Url) -> Result<impl Dataset, InternalError> {
+    async fn get_ipfs_http(
+        &self,
+        base_url: Url,
+        event_bus: Arc<EventBus>,
+    ) -> Result<impl Dataset, InternalError> {
         // Resolve IPNS DNSLink names if configured
         let dataset_url = match base_url.scheme() {
             "ipns" if self.ipfs_gateway.pre_resolve_dnslink => {
@@ -204,6 +226,7 @@ impl DatasetFactoryImpl {
 
         let client = reqwest::Client::new();
         Ok(DatasetImpl::new(
+            event_bus,
             MetadataChainImpl::new(
                 ObjectRepositoryHttp::new(
                     client.clone(),
@@ -291,19 +314,25 @@ impl DatasetFactory for DatasetFactoryImpl {
                 } else {
                     DatasetLayout::new(path)
                 };
-                let ds = Self::get_local_fs(layout);
+                let ds = Self::get_local_fs(layout, self.event_bus.clone());
                 Ok(Arc::new(ds) as Arc<dyn Dataset>)
             }
             "http" | "https" | "odf+http" | "odf+https" => {
-                let ds = Self::get_http(url.clone(), self.build_header_map(&url))?;
+                let ds = Self::get_http(
+                    url.clone(),
+                    self.build_header_map(&url),
+                    self.event_bus.clone(),
+                )?;
                 Ok(Arc::new(ds))
             }
             "ipfs" | "ipns" | "ipfs+http" | "ipfs+https" | "ipns+http" | "ipns+https" => {
-                let ds = self.get_ipfs_http(url.clone()).await?;
+                let ds = self
+                    .get_ipfs_http(url.clone(), self.event_bus.clone())
+                    .await?;
                 Ok(Arc::new(ds))
             }
             "s3" | "s3+http" | "s3+https" => {
-                let ds = Self::get_s3_from_url(url.clone()).await?;
+                let ds = Self::get_s3_from_url(url.clone(), self.event_bus.clone()).await?;
                 Ok(Arc::new(ds))
             }
             _ => Err(UnsupportedProtocolError {

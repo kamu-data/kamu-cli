@@ -12,6 +12,8 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+use dill::Component;
+use event_bus::EventBus;
 use kamu::domain::*;
 use kamu::testing::ParquetReaderHelper;
 use kamu::*;
@@ -64,12 +66,20 @@ impl Kamu {
     }
 
     pub async fn get_last_data_slice(&self, dataset_name: &DatasetName) -> ParquetReaderHelper {
-        let dataset_repo = DatasetRepositoryLocalFs::new(
-            self.workspace_layout.datasets_dir.clone(),
-            Arc::new(self.current_account.to_current_account_subject()),
-            Arc::new(domain::auth::AlwaysHappyDatasetActionAuthorizer::new()),
-            false,
-        );
+        let catalog = dill::CatalogBuilder::new()
+            .add::<EventBus>()
+            .add::<DependencyGraphServiceInMemory>()
+            .add_value(self.current_account.to_current_account_subject())
+            .add::<domain::auth::AlwaysHappyDatasetActionAuthorizer>()
+            .add_builder(
+                DatasetRepositoryLocalFs::builder()
+                    .with_root(self.workspace_layout.datasets_dir.clone())
+                    .with_multi_tenant(false),
+            )
+            .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+            .build();
+
+        let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
 
         let dataset = dataset_repo
             .get_dataset(&dataset_name.as_local_ref())
@@ -121,12 +131,22 @@ impl Kamu {
         S: Into<String>,
     {
         let cli = kamu_cli::cli();
-        let dataset_repo = Arc::new(DatasetRepositoryLocalFs::new(
-            self.workspace_layout.datasets_dir.clone(),
-            Arc::new(CurrentAccountSubject::new_test()),
-            Arc::new(domain::auth::AlwaysHappyDatasetActionAuthorizer::new()),
-            false,
-        ));
+
+        let catalog = dill::CatalogBuilder::new()
+            .add::<EventBus>()
+            .add::<DependencyGraphServiceInMemory>()
+            .add_value(self.current_account.to_current_account_subject())
+            .add::<domain::auth::AlwaysHappyDatasetActionAuthorizer>()
+            .add_builder(
+                DatasetRepositoryLocalFs::builder()
+                    .with_root(self.workspace_layout.datasets_dir.clone())
+                    .with_multi_tenant(false),
+            )
+            .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+            .build();
+
+        let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
+
         let config_service = Arc::new(kamu_cli::config::ConfigService::new(&self.workspace_layout));
 
         let mut buf = Vec::new();

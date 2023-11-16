@@ -4,6 +4,7 @@ members = [
     "src/utils/container-runtime",
     "src/utils/data-utils",
     "src/utils/enum-variants",
+    "src/utils/event-bus",
     "src/utils/event-sourcing",
     "src/utils/event-sourcing-macros",
     "src/utils/internal-error",
@@ -13,10 +14,12 @@ members = [
     "src/domain/opendatafabric",
     "src/domain/core",
     "src/domain/task-system",
+    "src/domain/flow-system",
     # Infra
     "src/infra/core",
     "src/infra/ingest-datafusion",
     "src/infra/task-system-inmem",
+    "src/infra/flow-system-inmem",
     # Adapters
     "src/adapter/auth-oso",
     "src/adapter/flight-sql",
@@ -33,6 +36,7 @@ resolver = "2"
 # Utils
 container-runtime = { version = "0.148.0", path = "src/utils/container-runtime", default-features = false }
 enum-variants = { version = "0.148.0", path = "src/utils/enum-variants", default-features = false }
+event-bus = { version = "0.148.0", path = "src/utils/event-bus", default-features = false}
 event-sourcing = { version = "0.148.0", path = "src/utils/event-sourcing", default-features = false }
 event-sourcing-macros = { version = "0.148.0", path = "src/utils/event-sourcing-macros", default-features = false }
 internal-error = { version = "0.148.0", path = "src/utils/internal-error", default-features = false }
@@ -42,10 +46,12 @@ tracing-perfetto = { version = "0.148.0", path = "src/utils/tracing-perfetto", d
 opendatafabric = { version = "0.148.0", path = "src/domain/opendatafabric", default-features = false }
 kamu-core = { version = "0.148.0", path = "src/domain/core", default-features = false }
 kamu-task-system = { version = "0.148.0", path = "src/domain/task-system", default-features = false }
+kamu-flow-system = { version = "0.148.0", path = "src/domain/flow-system", default-features = false }
 # Infra
 kamu = { version = "0.148.0", path = "src/infra/core", default-features = false }
 kamu-ingest-datafusion = { version = "0.148.0", path = "src/infra/ingest-datafusion", default-features = false }
 kamu-task-system-inmem = { version = "0.148.0", path = "src/infra/task-system-inmem", default-features = false }
+kamu-flow-system-inmem = { version = "0.148.0", path = "src/infra/flow-system-inmem", default-features = false }
 # Adapters
 kamu-adapter-auth-oso = { version = "0.148.0", path = "src/adapter/auth-oso", default-features = false }
 kamu-adapter-flight-sql = { version = "0.148.0", path = "src/adapter/flight-sql", default-features = false }

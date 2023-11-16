@@ -11,6 +11,8 @@ use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
 use chrono::{TimeZone, Utc};
+use dill::Component;
+use event_bus::EventBus;
 use futures::TryStreamExt;
 use kamu::domain::engine::*;
 use kamu::domain::*;
@@ -26,30 +28,39 @@ use crate::mock_engine_provisioner;
 struct TransformTestHarness {
     _tempdir: TempDir,
     dataset_repo: Arc<dyn DatasetRepository>,
-    transform_service: TransformServiceImpl,
+    transform_service: Arc<TransformServiceImpl>,
 }
 
 impl TransformTestHarness {
-    pub fn new_custom(
-        dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
-        engine_provisioner: Arc<dyn EngineProvisioner>,
+    pub fn new_custom<
+        TAuthorizer: auth::DatasetActionAuthorizer + 'static,
+        TEngineProvisioner: EngineProvisioner + 'static,
+    >(
+        dataset_action_authorizer: TAuthorizer,
+        engine_provisioner: TEngineProvisioner,
     ) -> Self {
         let tempdir = tempfile::tempdir().unwrap();
-        let dataset_repo = Arc::new(
-            DatasetRepositoryLocalFs::create(
-                tempdir.path().join("datasets"),
-                Arc::new(CurrentAccountSubject::new_test()),
-                dataset_action_authorizer.clone(),
-                false,
+
+        let catalog = dill::CatalogBuilder::new()
+            .add::<EventBus>()
+            .add::<DependencyGraphServiceInMemory>()
+            .add_value(CurrentAccountSubject::new_test())
+            .add_value(dataset_action_authorizer)
+            .bind::<dyn auth::DatasetActionAuthorizer, TAuthorizer>()
+            .add_value(engine_provisioner)
+            .bind::<dyn EngineProvisioner, TEngineProvisioner>()
+            .add_builder(
+                DatasetRepositoryLocalFs::builder()
+                    .with_root(tempdir.path().join("datasets"))
+                    .with_multi_tenant(false),
             )
-            .unwrap(),
-        );
-        let transform_service = TransformServiceImpl::new(
-            dataset_repo.clone(),
-            dataset_action_authorizer.clone(),
-            engine_provisioner,
-            Arc::new(SystemTimeSourceDefault),
-        );
+            .add::<SystemTimeSourceDefault>()
+            .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+            .add::<TransformServiceImpl>()
+            .build();
+
+        let transform_service = catalog.get_one::<TransformServiceImpl>().unwrap();
+        let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
 
         Self {
             _tempdir: tempdir,
@@ -60,8 +71,8 @@ impl TransformTestHarness {
 
     pub fn new() -> Self {
         Self::new_custom(
-            Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new()),
-            Arc::new(EngineProvisionerNull),
+            auth::AlwaysHappyDatasetActionAuthorizer::new(),
+            EngineProvisionerNull,
         )
     }
 
@@ -230,8 +241,8 @@ async fn test_transform_enforces_authorization() {
         );
 
     let harness = TransformTestHarness::new_custom(
-        Arc::new(mock_dataset_action_authorizer),
-        Arc::new(mock_engine_provisioner::MockEngineProvisioner::new().stub_provision_engine()),
+        mock_dataset_action_authorizer,
+        mock_engine_provisioner::MockEngineProvisioner::new().stub_provision_engine(),
     );
 
     let foo = harness.new_root("foo").await;
@@ -252,8 +263,8 @@ async fn test_transform_enforces_authorization() {
 #[test_log::test(tokio::test)]
 async fn test_transform_unauthorized() {
     let harness = TransformTestHarness::new_custom(
-        Arc::new(MockDatasetActionAuthorizer::denying()),
-        Arc::new(EngineProvisionerNull),
+        MockDatasetActionAuthorizer::denying(),
+        EngineProvisionerNull,
     );
 
     let foo = harness.new_root("foo").await;

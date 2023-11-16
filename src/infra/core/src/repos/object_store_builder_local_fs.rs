@@ -16,6 +16,7 @@ use url::Url;
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
+#[interface(dyn ObjectStoreBuilder)]
 pub struct ObjectStoreBuilderLocalFs {}
 
 impl ObjectStoreBuilderLocalFs {
