@@ -9,6 +9,7 @@
 
 use std::path::Path;
 
+use datafusion::arrow::datatypes::Schema;
 use datafusion::prelude::*;
 use internal_error::*;
 use kamu_core::ingest::ReadError;
@@ -18,11 +19,17 @@ use crate::*;
 
 ///////////////////////////////////////////////////////////////////////////////
 
-pub struct ReaderParquet {}
+pub struct ReaderParquet {
+    ctx: SessionContext,
+    schema: Option<Schema>,
+}
 
 impl ReaderParquet {
-    pub fn new() -> Self {
-        Self {}
+    pub async fn new(ctx: SessionContext, conf: ReadStepParquet) -> Result<Self, ReadError> {
+        Ok(Self {
+            schema: super::from_ddl_schema(&ctx, &conf.schema).await?,
+            ctx,
+        })
     }
 }
 
@@ -30,28 +37,13 @@ impl ReaderParquet {
 
 #[async_trait::async_trait]
 impl Reader for ReaderParquet {
-    async fn read_schema(
-        &self,
-        ctx: &SessionContext,
-        conf: &ReadStep,
-    ) -> Result<Option<datafusion::arrow::datatypes::Schema>, ReadError> {
-        super::read_schema_common(ctx, conf).await
+    async fn input_schema(&self) -> Option<Schema> {
+        self.schema.clone()
     }
 
-    async fn read(
-        &self,
-        ctx: &SessionContext,
-        path: &Path,
-        conf: &ReadStep,
-    ) -> Result<DataFrame, ReadError> {
-        let schema = self.read_schema(ctx, conf).await?;
-
-        let ReadStep::Parquet(_) = conf else {
-            unreachable!()
-        };
-
+    async fn read(&self, path: &Path) -> Result<DataFrame, ReadError> {
         let options = ParquetReadOptions {
-            schema: schema.as_ref(),
+            schema: self.schema.as_ref(),
             file_extension: path.extension().and_then(|s| s.to_str()).unwrap_or(""),
             table_partition_cols: Vec::new(),
             parquet_pruning: None,
@@ -60,7 +52,8 @@ impl Reader for ReaderParquet {
             insert_mode: datafusion::datasource::listing::ListingTableInsertMode::Error,
         };
 
-        let df = ctx
+        let df = self
+            .ctx
             .read_parquet(path.to_str().unwrap(), options)
             .await
             .int_err()?;

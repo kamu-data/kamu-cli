@@ -15,6 +15,8 @@ use kamu_core::engine::*;
 use kamu_core::ObjectStoreRegistry;
 use opendatafabric::*;
 
+///////////////////////////////////////////////////////////////////////////////
+
 #[tracing::instrument(level = "info", skip_all)]
 pub(crate) async fn preprocess(
     ctx: &SessionContext,
@@ -47,6 +49,8 @@ pub(crate) async fn preprocess(
 
     Ok(df)
 }
+
+///////////////////////////////////////////////////////////////////////////////
 
 async fn register_view_for_step(
     ctx: &SessionContext,
@@ -86,6 +90,8 @@ async fn register_view_for_step(
     Ok(())
 }
 
+///////////////////////////////////////////////////////////////////////////////
+
 pub(crate) fn new_session_context(
     object_store_registry: Arc<dyn ObjectStoreRegistry>,
 ) -> SessionContext {
@@ -104,6 +110,8 @@ pub(crate) fn new_session_context(
     SessionContext::new_with_config_rt(config, runtime)
 }
 
+///////////////////////////////////////////////////////////////////////////////
+
 pub(crate) fn next_operation_id() -> String {
     use rand::distributions::Alphanumeric;
     use rand::Rng;
@@ -118,6 +126,8 @@ pub(crate) fn next_operation_id() -> String {
 
     name
 }
+
+///////////////////////////////////////////////////////////////////////////////
 
 pub(crate) fn get_random_cache_key(prefix: &str) -> String {
     use rand::distributions::Alphanumeric;

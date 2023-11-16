@@ -39,6 +39,7 @@ async fn test_engine_io_common(
         dataset_action_authorizer.clone(),
         engine_provisioner.clone(),
         Arc::new(ObjectStoreRegistryImpl::new(object_stores)),
+        Arc::new(DataFormatRegistryImpl::new()),
         Arc::new(ContainerRuntime::default()),
         run_info_dir.to_path_buf(),
         cache_dir.to_path_buf(),

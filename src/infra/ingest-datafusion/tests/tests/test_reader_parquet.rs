@@ -11,6 +11,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use chrono::DateTime;
+use datafusion::prelude::SessionContext;
 use indoc::indoc;
 use kamu_ingest_datafusion::*;
 use opendatafabric::*;
@@ -92,8 +93,9 @@ fn write_test_data(path: impl AsRef<Path>) {
 #[test_log::test(tokio::test)]
 async fn test_read_parquet() {
     test_reader_common::test_reader_success(
-        ReaderParquet {},
-        ReadStepParquet { schema: None },
+        ReaderParquet::new(SessionContext::new(), ReadStepParquet { schema: None })
+            .await
+            .unwrap(),
         |path| async {
             write_test_data(path);
         },
@@ -129,14 +131,18 @@ async fn test_read_parquet() {
 #[test_log::test(tokio::test)]
 async fn test_read_parquet_schema_coercion() {
     test_reader_common::test_reader_success(
-        ReaderParquet {},
-        ReadStepParquet {
-            schema: Some(vec![
-                "event_time string not null".to_string(),
-                "city string not null".to_string(),
-                "population int not null".to_string(),
-            ]),
-        },
+        ReaderParquet::new(
+            SessionContext::new(),
+            ReadStepParquet {
+                schema: Some(vec![
+                    "event_time string not null".to_string(),
+                    "city string not null".to_string(),
+                    "population int not null".to_string(),
+                ]),
+            },
+        )
+        .await
+        .unwrap(),
         |path| async {
             write_test_data(path);
         },

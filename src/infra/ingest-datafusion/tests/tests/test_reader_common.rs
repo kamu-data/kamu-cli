@@ -13,20 +13,17 @@ use std::path::PathBuf;
 use datafusion::prelude::*;
 use kamu_data_utils::testing::*;
 use kamu_ingest_datafusion::*;
-use opendatafabric::*;
 
 ///////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_reader_success_textual<R: Reader, C: Into<ReadStep>>(
+pub async fn test_reader_success_textual<R: Reader>(
     reader: R,
-    conf: C,
     input: &str,
     expected_schema: &str,
     expected_data: &str,
 ) {
     test_reader_success(
         reader,
-        conf,
         |path| async {
             std::fs::write(path, input.trim()).unwrap();
         },
@@ -38,18 +35,13 @@ pub async fn test_reader_success_textual<R: Reader, C: Into<ReadStep>>(
 
 ///////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_reader_textual<R: Reader, C: Into<ReadStep>, F, Fut>(
-    reader: R,
-    conf: C,
-    input: &str,
-    check_result: F,
-) where
+pub async fn test_reader_textual<R: Reader, F, Fut>(reader: R, input: &str, check_result: F)
+where
     F: FnOnce(Result<DataFrame, ReadError>) -> Fut,
     Fut: Future<Output = ()>,
 {
     test_reader(
         reader,
-        conf,
         |path| async {
             std::fs::write(path, input.trim()).unwrap();
         },
@@ -60,9 +52,8 @@ pub async fn test_reader_textual<R: Reader, C: Into<ReadStep>, F, Fut>(
 
 ///////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_reader_success<R: Reader, C: Into<ReadStep>, F, Fut>(
+pub async fn test_reader_success<R: Reader, F, Fut>(
     reader: R,
-    conf: C,
     input: F,
     expected_schema: &str,
     expected_data: &str,
@@ -70,7 +61,7 @@ pub async fn test_reader_success<R: Reader, C: Into<ReadStep>, F, Fut>(
     F: FnOnce(PathBuf) -> Fut,
     Fut: Future<Output = ()>,
 {
-    test_reader(reader, conf, input, |res| async {
+    test_reader(reader, input, |res| async {
         let df = res.unwrap();
         assert_schema_eq(df.schema(), expected_schema);
         assert_data_eq(df, expected_data).await;
@@ -80,12 +71,8 @@ pub async fn test_reader_success<R: Reader, C: Into<ReadStep>, F, Fut>(
 
 ///////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_reader<R: Reader, C: Into<ReadStep>, F1, Fut1, F2, Fut2>(
-    reader: R,
-    conf: C,
-    input: F1,
-    check_result: F2,
-) where
+pub async fn test_reader<R: Reader, F1, Fut1, F2, Fut2>(reader: R, input: F1, check_result: F2)
+where
     F1: FnOnce(PathBuf) -> Fut1,
     Fut1: Future<Output = ()>,
     F2: FnOnce(Result<DataFrame, ReadError>) -> Fut2,
@@ -96,7 +83,6 @@ pub async fn test_reader<R: Reader, C: Into<ReadStep>, F1, Fut1, F2, Fut2>(
     let path = temp_dir.path().join("data");
     input(path.clone()).await;
 
-    let ctx = SessionContext::new();
-    let res = reader.read(&ctx, &path, &conf.into()).await;
+    let res = reader.read(&path).await;
     check_result(res).await;
 }

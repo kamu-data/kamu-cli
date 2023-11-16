@@ -43,7 +43,12 @@ pub async fn dataset_ingest_handler(
     let ingest_svc = catalog.get_one::<dyn PushIngestService>().unwrap();
 
     match ingest_svc
-        .ingest_from_file_stream(&dataset_ref, data, Some(&content_type.to_string()), None)
+        .ingest_from_file_stream(
+            &dataset_ref,
+            data,
+            Some(MediaType(content_type.to_string())),
+            None,
+        )
         .await
     {
         // Per note above, we're not including any extra information about the result

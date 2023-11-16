@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use datafusion::prelude::SessionContext;
 use indoc::indoc;
 use kamu_ingest_datafusion::*;
 use opendatafabric::*;
@@ -19,15 +20,19 @@ use super::test_reader_common;
 #[test_log::test(tokio::test)]
 async fn test_read_csv_with_schema() {
     test_reader_common::test_reader_success_textual(
-        ReaderCsv {},
-        ReadStepCsv {
-            header: Some(true),
-            schema: Some(vec![
-                "city string not null".to_string(),
-                "population int not null".to_string(),
-            ]),
-            ..Default::default()
-        },
+        ReaderCsv::new(
+            SessionContext::new(),
+            ReadStepCsv {
+                header: Some(true),
+                schema: Some(vec![
+                    "city string not null".to_string(),
+                    "population int not null".to_string(),
+                ]),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap(),
         indoc!(
             r#"
             city,population
@@ -65,11 +70,15 @@ async fn test_read_csv_with_schema() {
 #[test_log::test(tokio::test)]
 async fn test_read_csv_no_schema_no_infer() {
     test_reader_common::test_reader_success_textual(
-        ReaderCsv {},
-        ReadStepCsv {
-            header: Some(true),
-            ..Default::default()
-        },
+        ReaderCsv::new(
+            SessionContext::new(),
+            ReadStepCsv {
+                header: Some(true),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap(),
         indoc!(
             r#"
             city,population
@@ -107,12 +116,16 @@ async fn test_read_csv_no_schema_no_infer() {
 #[test_log::test(tokio::test)]
 async fn test_read_csv_no_schema_infer() {
     test_reader_common::test_reader_success_textual(
-        ReaderCsv {},
-        ReadStepCsv {
-            header: Some(true),
-            infer_schema: Some(true),
-            ..Default::default()
-        },
+        ReaderCsv::new(
+            SessionContext::new(),
+            ReadStepCsv {
+                header: Some(true),
+                infer_schema: Some(true),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap(),
         indoc!(
             r#"
             city,population
@@ -150,14 +163,18 @@ async fn test_read_csv_no_schema_infer() {
 #[test_log::test(tokio::test)]
 async fn test_read_csv_no_header() {
     test_reader_common::test_reader_success_textual(
-        ReaderCsv {},
-        ReadStepCsv {
-            schema: Some(vec![
-                "city STRING".to_string(),
-                "population BIGINT".to_string(),
-            ]),
-            ..Default::default()
-        },
+        ReaderCsv::new(
+            SessionContext::new(),
+            ReadStepCsv {
+                schema: Some(vec![
+                    "city STRING".to_string(),
+                    "population BIGINT".to_string(),
+                ]),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap(),
         indoc!(
             r#"
             A,1000
@@ -194,12 +211,16 @@ async fn test_read_csv_no_header() {
 #[test_log::test(tokio::test)]
 async fn test_read_csv_null_values() {
     test_reader_common::test_reader_success_textual(
-        ReaderCsv {},
-        ReadStepCsv {
-            header: Some(true),
-            infer_schema: Some(true),
-            ..Default::default()
-        },
+        ReaderCsv::new(
+            SessionContext::new(),
+            ReadStepCsv {
+                header: Some(true),
+                infer_schema: Some(true),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap(),
         indoc!(
             r#"
             city,population
@@ -237,18 +258,22 @@ async fn test_read_csv_null_values() {
 #[test_log::test(tokio::test)]
 async fn test_read_tsv_null_values() {
     test_reader_common::test_reader_success_textual(
-        ReaderCsv {},
-        ReadStepCsv {
-            header: Some(false),
-            separator: Some("\t".to_string()),
-            schema: Some(vec![
-                "a INT".to_string(),
-                "b INT".to_string(),
-                "c INT".to_string(),
-                "d INT".to_string(),
-            ]),
-            ..Default::default()
-        },
+        ReaderCsv::new(
+            SessionContext::new(),
+            ReadStepCsv {
+                header: Some(false),
+                separator: Some("\t".to_string()),
+                schema: Some(vec![
+                    "a INT".to_string(),
+                    "b INT".to_string(),
+                    "c INT".to_string(),
+                    "d INT".to_string(),
+                ]),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap(),
         indoc!(
             "
             1\t2\t3\t4

@@ -27,6 +27,7 @@ pub struct PushIngestServiceImpl {
     dataset_repo: Arc<dyn DatasetRepository>,
     dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
     object_store_registry: Arc<dyn ObjectStoreRegistry>,
+    data_format_registry: Arc<dyn DataFormatRegistry>,
     run_info_dir: PathBuf,
     cache_dir: PathBuf,
     time_source: Arc<dyn SystemTimeSource>,
@@ -40,6 +41,7 @@ impl PushIngestServiceImpl {
         dataset_repo: Arc<dyn DatasetRepository>,
         dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
         object_store_registry: Arc<dyn ObjectStoreRegistry>,
+        data_format_registry: Arc<dyn DataFormatRegistry>,
         run_info_dir: PathBuf,
         cache_dir: PathBuf,
         time_source: Arc<dyn SystemTimeSource>,
@@ -48,6 +50,7 @@ impl PushIngestServiceImpl {
             dataset_repo,
             dataset_action_authorizer,
             object_store_registry,
+            data_format_registry,
             run_info_dir,
             cache_dir,
             time_source,
@@ -58,7 +61,7 @@ impl PushIngestServiceImpl {
         &self,
         dataset_ref: &DatasetRef,
         url: url::Url,
-        media_type: Option<&str>,
+        media_type: Option<MediaType>,
         listener: Arc<dyn PushIngestListener>,
     ) -> Result<PushIngestResult, PushIngestError> {
         let dataset_handle = self.dataset_repo.resolve_dataset_ref(&dataset_ref).await?;
@@ -103,7 +106,7 @@ impl PushIngestServiceImpl {
             operation_dir,
             system_time: self.time_source.now(),
             url,
-            media_type: media_type.map(|s| s.to_string()),
+            media_type,
             listener,
             ctx,
             data_writer,
@@ -235,22 +238,27 @@ impl PushIngestServiceImpl {
             return Ok(None);
         }
 
-        let read_step = if let Some(media_type) = &args.media_type {
-            if Self::media_type_for(&args.polling_source.read) == media_type {
-                // Use the read format from source
-                args.polling_source.read.clone()
-            } else {
-                // Pushing with different format than the source - will have to perform
-                // best-effort conversion
-                Self::get_read_step_for(media_type, &args.polling_source.read)?
-            }
+        let conf = if let Some(media_type) = &args.media_type {
+            let conf = self
+                .data_format_registry
+                .get_compatible_read_config(args.polling_source.read.clone(), media_type)?;
+
+            tracing::debug!(
+                ?conf,
+                "Proceeding with best-effort compatibility read configuration"
+            );
+            conf
         } else {
-            // Use the read format from source
             args.polling_source.read.clone()
         };
 
-        let reader = Self::get_reader_for(&read_step, &args.operation_dir);
-        let df = reader.read(&args.ctx, &input_data_path, &read_step).await?;
+        let temp_path = args.operation_dir.join("reader.tmp");
+        let reader = self
+            .data_format_registry
+            .get_reader(args.ctx.clone(), conf, temp_path)
+            .await?;
+
+        let df = reader.read(&input_data_path).await?;
 
         Ok(Some(df))
     }
@@ -299,69 +307,6 @@ impl PushIngestServiceImpl {
         file.flush().await?;
         Ok(())
     }
-
-    fn media_type_for(source_read_step: &ReadStep) -> &'static str {
-        match source_read_step {
-            ReadStep::Csv(_) => IngestMediaTypes::CSV,
-            ReadStep::Json(_) => IngestMediaTypes::JSON,
-            ReadStep::NdJson(_) => IngestMediaTypes::NDJSON,
-            ReadStep::JsonLines(_) => IngestMediaTypes::NDJSON,
-            ReadStep::GeoJson(_) => IngestMediaTypes::GEOJSON,
-            ReadStep::NdGeoJson(_) => IngestMediaTypes::NDGEOJSON,
-            ReadStep::Parquet(_) => IngestMediaTypes::PARQUET,
-            ReadStep::EsriShapefile(_) => IngestMediaTypes::ESRISHAPEFILE,
-        }
-    }
-
-    fn get_read_step_for(
-        media_type: &str,
-        source_read_step: &ReadStep,
-    ) -> Result<ReadStep, PushIngestError> {
-        let schema = source_read_step.schema().cloned();
-        match media_type {
-            IngestMediaTypes::CSV => Ok(ReadStepCsv {
-                schema,
-                ..Default::default()
-            }
-            .into()),
-            IngestMediaTypes::JSON => Ok(ReadStepJson {
-                schema,
-                ..Default::default()
-            }
-            .into()),
-            IngestMediaTypes::NDJSON => Ok(ReadStepNdJson {
-                schema,
-                ..Default::default()
-            }
-            .into()),
-            IngestMediaTypes::GEOJSON => Ok(ReadStepGeoJson { schema }.into()),
-            IngestMediaTypes::NDGEOJSON => Ok(ReadStepNdGeoJson { schema }.into()),
-            IngestMediaTypes::PARQUET => Ok(ReadStepParquet { schema }.into()),
-            IngestMediaTypes::ESRISHAPEFILE => Ok(ReadStepEsriShapefile {
-                schema,
-                ..Default::default()
-            }
-            .into()),
-            _ => Err(UnsupportedMediaTypeError::new(media_type).into()),
-        }
-    }
-
-    // TODO: Replace with DI
-    fn get_reader_for(conf: &ReadStep, operation_dir: &Path) -> Arc<dyn Reader> {
-        use kamu_ingest_datafusion::readers::*;
-
-        let temp_path = operation_dir.join("reader.tmp");
-        match conf {
-            ReadStep::Csv(_) => Arc::new(ReaderCsv {}),
-            ReadStep::Json(_) => Arc::new(ReaderJson::new(temp_path)),
-            ReadStep::NdJson(_) => Arc::new(ReaderNdJson {}),
-            ReadStep::JsonLines(_) => Arc::new(ReaderNdJson {}),
-            ReadStep::GeoJson(_) => Arc::new(ReaderGeoJson::new(temp_path)),
-            ReadStep::NdGeoJson(_) => Arc::new(ReaderNdGeoJson::new(temp_path)),
-            ReadStep::EsriShapefile(_) => Arc::new(ReaderEsriShapefile::new(temp_path)),
-            ReadStep::Parquet(_) => Arc::new(ReaderParquet {}),
-        }
-    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -373,7 +318,7 @@ impl PushIngestService for PushIngestServiceImpl {
         &self,
         dataset_ref: &DatasetRef,
         url: url::Url,
-        media_type: Option<&str>,
+        media_type: Option<MediaType>,
         listener: Option<Arc<dyn PushIngestListener>>,
     ) -> Result<PushIngestResult, PushIngestError> {
         let listener = listener.unwrap_or_else(|| Arc::new(NullPushIngestListener));
@@ -386,7 +331,7 @@ impl PushIngestService for PushIngestServiceImpl {
         &self,
         dataset_ref: &DatasetRef,
         data: Box<dyn AsyncRead + Send + Unpin>,
-        media_type: Option<&str>,
+        media_type: Option<MediaType>,
         listener: Option<Arc<dyn PushIngestListener>>,
     ) -> Result<PushIngestResult, PushIngestError> {
         // Save stream to a file in cache
@@ -415,7 +360,7 @@ struct PushIngestArgs {
     operation_dir: PathBuf,
     system_time: DateTime<Utc>,
     url: url::Url,
-    media_type: Option<String>,
+    media_type: Option<MediaType>,
     listener: Arc<dyn PushIngestListener>,
     ctx: SessionContext,
     data_writer: DataWriterDataFusion,

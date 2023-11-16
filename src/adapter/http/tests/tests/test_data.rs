@@ -26,6 +26,8 @@ async fn test_data_push_ingest_handler() {
     let cache_dir = tempfile::tempdir().unwrap();
 
     let catalog = dill::CatalogBuilder::new()
+        .add::<DataFormatRegistryImpl>()
+        .bind::<dyn DataFormatRegistry, DataFormatRegistryImpl>()
         .add_builder(
             dill::builder_for::<PushIngestServiceImpl>()
                 .with_run_info_dir(run_info_dir.path().to_path_buf())

@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use datafusion::prelude::SessionContext;
 use indoc::indoc;
 use kamu_ingest_datafusion::*;
 use opendatafabric::*;
@@ -21,15 +22,20 @@ async fn test_read_ndgeojson_with_schema() {
     let temp_dir: tempfile::TempDir = tempfile::tempdir().unwrap();
 
     test_reader_common::test_reader_success_textual(
-        ReaderNdGeoJson::new(temp_dir.path().join("reader-tmp")),
-        ReadStepNdGeoJson {
-            schema: Some(vec![
-                "id int not null".to_string(),
-                "zipcode string not null".to_string(),
-                "name string not null".to_string(),
-                "geometry string not null".to_string(),
-            ]),
-        },
+        ReaderNdGeoJson::new(
+            SessionContext::new(),
+            ReadStepNdGeoJson {
+                schema: Some(vec![
+                    "id int not null".to_string(),
+                    "zipcode string not null".to_string(),
+                    "name string not null".to_string(),
+                    "geometry string not null".to_string(),
+                ]),
+            },
+            temp_dir.path().join("reader-tmp")
+        )
+        .await
+        .unwrap(),
         indoc!(
             r#"
             {"type": "Feature", "properties": {"id": 0, "zipcode": "00101", "name": "A"}, "geometry": {"type": "Polygon", "coordinates": [[[0.0, 0.0],[10.0, 0.0],[10.0, 10.0],[0.0, 10.0],[0.0, 0.0]]]}}
@@ -68,10 +74,15 @@ async fn test_read_ndgeojson_infer_schema() {
     let temp_dir: tempfile::TempDir = tempfile::tempdir().unwrap();
 
     test_reader_common::test_reader_success_textual(
-        ReaderNdGeoJson::new(temp_dir.path().join("reader-tmp")),
-        ReadStepNdGeoJson {
-            schema: None,
-        },
+        ReaderNdGeoJson::new(
+            SessionContext::new(),
+            ReadStepNdGeoJson {
+                schema: None,
+            },
+            temp_dir.path().join("reader-tmp"),
+        )
+        .await
+        .unwrap(),
         indoc!(
             r#"
             {"type": "Feature", "properties": {"id": 0, "zipcode": "00101", "name": "A"}, "geometry": {"type": "Polygon", "coordinates": [[[0.0, 0.0],[10.0, 0.0],[10.0, 10.0],[0.0, 10.0],[0.0, 0.0]]]}}

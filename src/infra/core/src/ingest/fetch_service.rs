@@ -642,7 +642,7 @@ impl FetchService {
         target_path: &Path,
         system_time: DateTime<Utc>,
         listener: &dyn FetchProgressListener,
-    ) -> Result<FetchResult, IngestError> {
+    ) -> Result<FetchResult, PollingIngestError> {
         use std::io::prelude::*;
 
         let target_path_tmp = target_path.with_extension("tmp");
@@ -686,10 +686,10 @@ impl FetchService {
                 std::fs::remove_file(&target_path_tmp).unwrap();
                 match e.code() {
                     curl_sys::CURLE_COULDNT_RESOLVE_HOST => {
-                        IngestError::unreachable(url.as_str(), Some(e.into()))
+                        PollingIngestError::unreachable(url.as_str(), Some(e.into()))
                     }
                     curl_sys::CURLE_COULDNT_CONNECT => {
-                        IngestError::unreachable(url.as_str(), Some(e.into()))
+                        PollingIngestError::unreachable(url.as_str(), Some(e.into()))
                     }
                     _ => e.int_err().into(),
                 }

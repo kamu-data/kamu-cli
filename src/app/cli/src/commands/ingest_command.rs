@@ -22,6 +22,7 @@ use crate::OutputConfig;
 ///////////////////////////////////////////////////////////////////////////////
 
 pub struct IngestCommand {
+    data_format_reg: Arc<dyn DataFormatRegistry>,
     dataset_repo: Arc<dyn DatasetRepository>,
     push_ingest_svc: Arc<dyn PushIngestService>,
     output_config: Arc<OutputConfig>,
@@ -35,6 +36,7 @@ pub struct IngestCommand {
 
 impl IngestCommand {
     pub fn new<'s, I, S>(
+        data_format_reg: Arc<dyn DataFormatRegistry>,
         dataset_repo: Arc<dyn DatasetRepository>,
         push_ingest_svc: Arc<dyn PushIngestService>,
         output_config: Arc<OutputConfig>,
@@ -50,6 +52,7 @@ impl IngestCommand {
         S: Into<String>,
     {
         Self {
+            data_format_reg,
             dataset_repo,
             push_ingest_svc,
             output_config,
@@ -93,25 +96,23 @@ impl IngestCommand {
         Ok(())
     }
 
-    fn get_media_type(&self) -> Result<Option<&str>, CLIError> {
+    fn get_media_type(&self) -> Result<Option<MediaType>, CLIError> {
         let Some(short_name) = &self.input_format else {
             return Ok(None);
         };
 
-        // TODO: Keep in sync with CLI parser
-        match short_name.to_lowercase().as_str() {
-            "csv" => Ok(Some(IngestMediaTypes::CSV)),
-            "json" => Ok(Some(IngestMediaTypes::JSON)),
-            "ndjson" => Ok(Some(IngestMediaTypes::NDJSON)),
-            "geojson" => Ok(Some(IngestMediaTypes::GEOJSON)),
-            "ndgeojson" => Ok(Some(IngestMediaTypes::NDGEOJSON)),
-            "parquet" => Ok(Some(IngestMediaTypes::PARQUET)),
-            "esrishapefile" => Ok(Some(IngestMediaTypes::ESRISHAPEFILE)),
-            _ => Err(CLIError::usage_error(format!(
-                "Unsupported format {}",
-                short_name
-            ))),
+        let short_name_lower = short_name.to_lowercase();
+
+        for fmt in self.data_format_reg.list_formats() {
+            if fmt.short_name.to_lowercase() == short_name_lower {
+                return Ok(Some(fmt.media_type.to_owned()));
+            }
         }
+
+        Err(CLIError::usage_error(format!(
+            "Unsupported format {}",
+            short_name
+        )))
     }
 }
 

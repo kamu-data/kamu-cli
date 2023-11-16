@@ -502,18 +502,19 @@ impl Harness {
             let data_path = self.temp_dir.path().join("data.bin");
             std::fs::write(&data_path, data).unwrap();
 
-            let df = ReaderCsv::new()
-                .read(
-                    &self.ctx,
-                    &data_path,
-                    &odf::ReadStep::Csv(odf::ReadStepCsv {
-                        header: Some(true),
-                        schema: Some(schema.split(',').map(|s| s.to_string()).collect()),
-                        ..Default::default()
-                    }),
-                )
-                .await
-                .unwrap();
+            let df = ReaderCsv::new(
+                self.ctx.clone(),
+                odf::ReadStepCsv {
+                    header: Some(true),
+                    schema: Some(schema.split(',').map(|s| s.to_string()).collect()),
+                    ..Default::default()
+                },
+            )
+            .await
+            .unwrap()
+            .read(&data_path)
+            .await
+            .unwrap();
 
             Some(df)
         };

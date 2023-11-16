@@ -247,7 +247,7 @@ async fn test_ingest_push_media_type_override() {
         .ingest_from_url(
             &dataset_ref,
             url::Url::from_file_path(&src_path).unwrap(),
-            Some(IngestMediaTypes::CSV),
+            Some(MediaType::CSV.to_owned()),
             None,
         )
         .await
@@ -295,7 +295,7 @@ async fn test_ingest_push_media_type_override() {
         .ingest_from_url(
             &dataset_ref,
             url::Url::from_file_path(&src_path).unwrap(),
-            Some(IngestMediaTypes::NDJSON),
+            Some(MediaType::NDJSON.to_owned()),
             None,
         )
         .await
@@ -345,7 +345,7 @@ async fn test_ingest_push_media_type_override() {
         .ingest_from_url(
             &dataset_ref,
             url::Url::from_file_path(&src_path).unwrap(),
-            Some(IngestMediaTypes::JSON),
+            Some(MediaType::JSON.to_owned()),
             None,
         )
         .await
@@ -420,6 +420,7 @@ impl IngestTestHarness {
             Arc::new(ObjectStoreRegistryImpl::new(vec![Arc::new(
                 ObjectStoreBuilderLocalFs::new(),
             )])),
+            Arc::new(DataFormatRegistryImpl::new()),
             run_info_dir,
             cache_dir,
             time_source,

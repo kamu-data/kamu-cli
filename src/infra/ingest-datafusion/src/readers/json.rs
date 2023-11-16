@@ -9,6 +9,7 @@
 
 use std::path::{Path, PathBuf};
 
+use datafusion::arrow::datatypes::Schema;
 use datafusion::prelude::*;
 use internal_error::*;
 use kamu_core::ingest::ReadError;
@@ -19,17 +20,32 @@ use crate::*;
 ///////////////////////////////////////////////////////////////////////////////
 
 pub struct ReaderJson {
+    sub_path: Option<String>,
     temp_path: PathBuf,
+    inner: ReaderNdJson,
 }
 
 impl ReaderJson {
     // TODO: This is an ugly API that leaves it to the caller to clean up our temp
     // file mess. Ideally we should not produce any temp files at all and stream in
     // all data.
-    pub fn new(temp_path: impl Into<PathBuf>) -> Self {
-        Self {
+    pub async fn new(
+        ctx: SessionContext,
+        conf: ReadStepJson,
+        temp_path: impl Into<PathBuf>,
+    ) -> Result<Self, ReadError> {
+        let inner_conf = ReadStepNdJson {
+            schema: conf.schema,
+            date_format: conf.date_format,
+            encoding: conf.encoding,
+            timestamp_format: conf.timestamp_format,
+        };
+
+        Ok(Self {
+            sub_path: conf.sub_path,
             temp_path: temp_path.into(),
-        }
+            inner: ReaderNdJson::new(ctx, inner_conf).await?,
+        })
     }
 
     fn convert_to_ndjson_blocking(
@@ -82,28 +98,14 @@ impl ReaderJson {
 
 #[async_trait::async_trait]
 impl Reader for ReaderJson {
-    async fn read_schema(
-        &self,
-        ctx: &SessionContext,
-        conf: &ReadStep,
-    ) -> Result<Option<datafusion::arrow::datatypes::Schema>, ReadError> {
-        super::read_schema_common(ctx, conf).await
+    async fn input_schema(&self) -> Option<Schema> {
+        self.inner.input_schema().await
     }
 
-    async fn read(
-        &self,
-        ctx: &SessionContext,
-        path: &Path,
-        conf: &ReadStep,
-    ) -> Result<DataFrame, ReadError> {
-        let conf = match conf {
-            ReadStep::Json(v) => v,
-            _ => unreachable!(),
-        };
-
+    async fn read(&self, path: &Path) -> Result<DataFrame, ReadError> {
         // TODO: PERF: This is a temporary, highly inefficient implementation that
         // re-encodes GeoJson into NdJson which DataFusion can read natively
-        let sub_path = conf.sub_path.clone();
+        let sub_path = self.sub_path.clone();
         let in_path = path.to_path_buf();
         let out_path = self.temp_path.clone();
         tokio::task::spawn_blocking(move || {
@@ -116,13 +118,6 @@ impl Reader for ReaderJson {
         .await
         .int_err()??;
 
-        let conf = ReadStep::NdJson(ReadStepNdJson {
-            schema: conf.schema.clone(),
-            date_format: conf.date_format.clone(),
-            encoding: conf.encoding.clone(),
-            timestamp_format: conf.timestamp_format.clone(),
-        });
-
-        ReaderNdJson::new().read(ctx, &self.temp_path, &conf).await
+        self.inner.read(&self.temp_path).await
     }
 }

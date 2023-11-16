@@ -110,6 +110,7 @@ pub fn get_command(
             cli_catalog.get_one()?,
             cli_catalog.get_one()?,
             cli_catalog.get_one()?,
+            cli_catalog.get_one()?,
             validate_dataset_ref(
                 cli_catalog,
                 submatches.get_one::<DatasetRef>("dataset").unwrap().clone(),

@@ -259,6 +259,7 @@ async fn test_transform_common(transform: Transform) {
         Arc::new(ObjectStoreRegistryImpl::new(vec![Arc::new(
             ObjectStoreBuilderLocalFs::new(),
         )])),
+        Arc::new(DataFormatRegistryImpl::new()),
         Arc::new(ContainerRuntime::default()),
         run_info_dir,
         cache_dir,

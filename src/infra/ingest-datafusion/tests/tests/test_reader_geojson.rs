@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use datafusion::prelude::SessionContext;
 use indoc::indoc;
 use kamu_ingest_datafusion::*;
 use opendatafabric::*;
@@ -21,15 +22,20 @@ async fn test_read_geojson_with_schema() {
     let temp_dir: tempfile::TempDir = tempfile::tempdir().unwrap();
 
     test_reader_common::test_reader_success_textual(
-        ReaderGeoJson::new(temp_dir.path().join("reader-tmp")),
-        ReadStepGeoJson {
-            schema: Some(vec![
-                "id int not null".to_string(),
-                "zipcode string not null".to_string(),
-                "name string not null".to_string(),
-                "geometry string not null".to_string(),
-            ]),
-        },
+        ReaderGeoJson::new(
+            SessionContext::new(),
+            ReadStepGeoJson {
+                schema: Some(vec![
+                    "id int not null".to_string(),
+                    "zipcode string not null".to_string(),
+                    "name string not null".to_string(),
+                    "geometry string not null".to_string(),
+                ]),
+            },
+            temp_dir.path().join("reader-tmp")
+        )
+        .await
+        .unwrap(),
         indoc!(
             r#"
             {"type":"FeatureCollection","features":[
@@ -70,10 +76,15 @@ async fn test_read_geojson_infer_schema() {
     let temp_dir: tempfile::TempDir = tempfile::tempdir().unwrap();
 
     test_reader_common::test_reader_success_textual(
-        ReaderGeoJson::new(temp_dir.path().join("reader-tmp")),
-        ReadStepGeoJson {
-            schema: None,
-        },
+        ReaderGeoJson::new(
+            SessionContext::new(),
+            ReadStepGeoJson {
+                schema: None,
+            },
+            temp_dir.path().join("reader-tmp"),
+            )
+            .await
+            .unwrap(),
         indoc!(
             r#"
             {"type":"FeatureCollection","features":[

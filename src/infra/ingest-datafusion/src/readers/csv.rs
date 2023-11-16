@@ -9,6 +9,7 @@
 
 use std::path::Path;
 
+use datafusion::arrow::datatypes::Schema;
 use datafusion::datasource::file_format::file_compression_type::FileCompressionType;
 use datafusion::prelude::*;
 use internal_error::*;
@@ -19,13 +20,21 @@ use crate::*;
 
 ///////////////////////////////////////////////////////////////////////////////
 
-pub struct ReaderCsv {}
+pub struct ReaderCsv {
+    ctx: SessionContext,
+    schema: Option<Schema>,
+    conf: ReadStepCsv,
+}
 
 impl ReaderCsv {
     const DEFAULT_INFER_SCHEMA_ROWS: usize = 1000;
 
-    pub fn new() -> Self {
-        Self {}
+    pub async fn new(ctx: SessionContext, conf: ReadStepCsv) -> Result<Self, ReadError> {
+        Ok(Self {
+            schema: super::from_ddl_schema(&ctx, &conf.schema).await?,
+            ctx,
+            conf,
+        })
     }
 }
 
@@ -33,27 +42,13 @@ impl ReaderCsv {
 
 #[async_trait::async_trait]
 impl Reader for ReaderCsv {
-    async fn read_schema(
-        &self,
-        ctx: &SessionContext,
-        conf: &ReadStep,
-    ) -> Result<Option<datafusion::arrow::datatypes::Schema>, ReadError> {
-        super::read_schema_common(ctx, conf).await
+    async fn input_schema(&self) -> Option<Schema> {
+        self.schema.clone()
     }
 
-    async fn read(
-        &self,
-        ctx: &SessionContext,
-        path: &Path,
-        conf: &ReadStep,
-    ) -> Result<DataFrame, ReadError> {
-        let schema = self.read_schema(ctx, conf).await?;
-
-        let ReadStep::Csv(conf) = conf else {
-            unreachable!()
-        };
-
-        let delimiter = match &conf.separator {
+    async fn read(&self, path: &Path) -> Result<DataFrame, ReadError> {
+        // TODO: Move this to reader construction phase
+        let delimiter = match &self.conf.separator {
             Some(v) if v.len() > 0 => {
                 if v.as_bytes().len() > 1 {
                     return Err("Csv.separator supports only single-character ascii values"
@@ -64,7 +59,7 @@ impl Reader for ReaderCsv {
             }
             _ => b',',
         };
-        let quote = match &conf.quote {
+        let quote = match &self.conf.quote {
             Some(v) if v.len() > 0 => {
                 if v.as_bytes().len() > 1 {
                     Err(unsupported!(
@@ -77,7 +72,7 @@ impl Reader for ReaderCsv {
             }
             _ => Ok(b'"'),
         }?;
-        let escape = match &conf.escape {
+        let escape = match &self.conf.escape {
             Some(v) if v.len() > 0 => {
                 if v.as_bytes().len() > 1 {
                     Err(unsupported!(
@@ -90,70 +85,70 @@ impl Reader for ReaderCsv {
             }
             _ => Ok(None),
         }?;
-        match conf.encoding.as_ref().map(|s| s.as_str()) {
+        match self.conf.encoding.as_ref().map(|s| s.as_str()) {
             None | Some("utf8") => Ok(()),
             Some(v) => Err(unsupported!("Unsupported Csv.encoding: {}", v)),
         }?;
-        match conf.comment.as_ref().map(|s| s.as_str()) {
+        match self.conf.comment.as_ref().map(|s| s.as_str()) {
             None => Ok(()),
             Some(v) => Err(unsupported!("Unsupported Csv.comment: {}", v)),
         }?;
-        match conf.enforce_schema {
+        match self.conf.enforce_schema {
             None | Some(true) => Ok(()),
             Some(v) => Err(unsupported!("Unsupported Csv.enforceSchema: {}", v)),
         }?;
-        match conf.ignore_leading_white_space {
+        match self.conf.ignore_leading_white_space {
             None | Some(false) => Ok(()),
             Some(v) => Err(unsupported!(
                 "Unsupported Csv.ignoreLeadingWhiteSpace: {}",
                 v
             )),
         }?;
-        match conf.ignore_trailing_white_space {
+        match self.conf.ignore_trailing_white_space {
             None | Some(false) => Ok(()),
             Some(v) => Err(unsupported!(
                 "Unsupported Csv.ignoreTrailingWhiteSpace: {}",
                 v
             )),
         }?;
-        match conf.null_value.as_ref().map(|s| s.as_str()) {
+        match self.conf.null_value.as_ref().map(|s| s.as_str()) {
             None | Some("") => Ok(()),
             Some(v) => Err(unsupported!("Unsupported Csv.nullValue: {}", v)),
         }?;
-        match conf.empty_value.as_ref().map(|s| s.as_str()) {
+        match self.conf.empty_value.as_ref().map(|s| s.as_str()) {
             None => Ok(()),
             Some(v) => Err(unsupported!("Unsupported Csv.emptyValue: {}", v)),
         }?;
-        match conf.nan_value.as_ref().map(|s| s.as_str()) {
+        match self.conf.nan_value.as_ref().map(|s| s.as_str()) {
             None => Ok(()),
             Some(v) => Err(unsupported!("Unsupported Csv.nanValue: {}", v)),
         }?;
-        match conf.positive_inf.as_ref().map(|s| s.as_str()) {
+        match self.conf.positive_inf.as_ref().map(|s| s.as_str()) {
             None => Ok(()),
             Some(v) => Err(unsupported!("Unsupported Csv.positiveInf: {}", v)),
         }?;
-        match conf.negative_inf.as_ref().map(|s| s.as_str()) {
+        match self.conf.negative_inf.as_ref().map(|s| s.as_str()) {
             None => Ok(()),
             Some(v) => Err(unsupported!("Unsupported Csv.negativeInf: {}", v)),
         }?;
-        match conf.date_format.as_ref().map(|s| s.as_str()) {
+        match self.conf.date_format.as_ref().map(|s| s.as_str()) {
             None | Some("rfc3339") => Ok(()),
             Some(v) => Err(unsupported!("Unsupported Csv.dateFormat: {}", v)),
         }?;
-        match conf.timestamp_format.as_ref().map(|s| s.as_str()) {
+        match self.conf.timestamp_format.as_ref().map(|s| s.as_str()) {
             None | Some("rfc3339") => Ok(()),
             Some(v) => Err(unsupported!("Unsupported Csv.timestampFormat: {}", v)),
         }?;
-        match conf.multi_line {
+        match self.conf.multi_line {
             None | Some(false) => Ok(()),
             Some(v) => Err(unsupported!("Unsupported Csv.multiLine: {}", v)),
         }?;
 
         let options = CsvReadOptions {
-            schema: schema.as_ref(),
+            schema: self.schema.as_ref(),
             delimiter,
-            has_header: conf.header.unwrap_or(false),
-            schema_infer_max_records: if conf.infer_schema.unwrap_or(false) {
+            has_header: self.conf.header.unwrap_or(false),
+            schema_infer_max_records: if self.conf.infer_schema.unwrap_or(false) {
                 Self::DEFAULT_INFER_SCHEMA_ROWS
             } else {
                 0
@@ -171,7 +166,8 @@ impl Reader for ReaderCsv {
             infinite: false,
         };
 
-        let df = ctx
+        let df = self
+            .ctx
             .read_csv(path.to_str().unwrap(), options)
             .await
             .int_err()?;

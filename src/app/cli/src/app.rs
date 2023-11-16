@@ -179,6 +179,9 @@ pub fn configure_base_catalog(
     b.add::<ResourceLoaderImpl>();
     b.bind::<dyn ResourceLoader, ResourceLoaderImpl>();
 
+    b.add::<DataFormatRegistryImpl>();
+    b.bind::<dyn DataFormatRegistry, DataFormatRegistryImpl>();
+
     b.add_builder(
         builder_for::<PollingIngestServiceImpl>()
             .with_run_info_dir(workspace_layout.run_info_dir.clone())

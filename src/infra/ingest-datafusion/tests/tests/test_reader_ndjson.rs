@@ -10,6 +10,7 @@
 use std::assert_matches::assert_matches;
 
 use datafusion::error::DataFusionError;
+use datafusion::prelude::SessionContext;
 use indoc::indoc;
 use kamu_ingest_datafusion::*;
 use opendatafabric::*;
@@ -22,14 +23,18 @@ use super::test_reader_common;
 #[test_log::test(tokio::test)]
 async fn test_read_ndjson_with_schema() {
     test_reader_common::test_reader_success_textual(
-        ReaderNdJson {},
-        ReadStepJsonLines {
-            schema: Some(vec![
-                "city string not null".to_string(),
-                "population int not null".to_string(),
-            ]),
-            ..Default::default()
-        },
+        ReaderNdJson::new(
+            SessionContext::new(),
+            ReadStepNdJson {
+                schema: Some(vec![
+                    "city string not null".to_string(),
+                    "population int not null".to_string(),
+                ]),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap(),
         indoc!(
             r#"
             {"city": "A", "population": 1000}
@@ -66,10 +71,14 @@ async fn test_read_ndjson_with_schema() {
 #[test_log::test(tokio::test)]
 async fn test_read_ndjson_infer_schema() {
     test_reader_common::test_reader_success_textual(
-        ReaderNdJson {},
-        ReadStepJsonLines {
-            ..Default::default()
-        },
+        ReaderNdJson::new(
+            SessionContext::new(),
+            ReadStepNdJson {
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap(),
         indoc!(
             r#"
             {"city": "A", "population": 1000}
@@ -106,11 +115,15 @@ async fn test_read_ndjson_infer_schema() {
 #[test_log::test(tokio::test)]
 async fn test_read_ndjson_format_date() {
     test_reader_common::test_reader_success_textual(
-        ReaderNdJson {},
-        ReadStepJsonLines {
-            schema: Some(vec!["date date not null".to_string()]),
-            ..Default::default()
-        },
+        ReaderNdJson::new(
+            SessionContext::new(),
+            ReadStepNdJson {
+                schema: Some(vec!["date date not null".to_string()]),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap(),
         indoc!(
             r#"
             {"date": "2022-09-25"}
@@ -148,11 +161,15 @@ async fn test_read_ndjson_format_timestamp() {
     // - naive date-times are treated as UTC
     // - different timezones are normalized to UTC with TZ information getting lost
     test_reader_common::test_reader_success_textual(
-        ReaderNdJson {},
-        ReadStepJsonLines {
-            schema: Some(vec!["event_time timestamp not null".to_string()]),
-            ..Default::default()
-        },
+        ReaderNdJson::new(
+            SessionContext::new(),
+            ReadStepNdJson {
+                schema: Some(vec!["event_time timestamp not null".to_string()]),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap(),
         indoc!(
             r#"
             {"event_time": "2022-09-25 01:02:03"}
@@ -196,11 +213,15 @@ async fn test_read_ndjson_format_timestamp_parse_failed() {
     // - naive date-times are treated as UTC
     // - different timezones are normalized to UTC with TZ information getting lost
     test_reader_common::test_reader_textual(
-        ReaderNdJson {},
-        ReadStepJsonLines {
-            schema: Some(vec!["event_time timestamp not null".to_string()]),
-            ..Default::default()
-        },
+        ReaderNdJson::new(
+            SessionContext::new(),
+            ReadStepNdJson {
+                schema: Some(vec!["event_time timestamp not null".to_string()]),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap(),
         indoc!(
             r#"
             {"event_time": "9/25/2022 1:02:03"}

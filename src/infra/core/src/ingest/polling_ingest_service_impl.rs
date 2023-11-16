@@ -29,6 +29,7 @@ pub struct PollingIngestServiceImpl {
     dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
     engine_provisioner: Arc<dyn EngineProvisioner>,
     object_store_registry: Arc<dyn ObjectStoreRegistry>,
+    data_format_registry: Arc<dyn DataFormatRegistry>,
     container_runtime: Arc<ContainerRuntime>,
     run_info_dir: PathBuf,
     cache_dir: PathBuf,
@@ -44,6 +45,7 @@ impl PollingIngestServiceImpl {
         dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
         engine_provisioner: Arc<dyn EngineProvisioner>,
         object_store_registry: Arc<dyn ObjectStoreRegistry>,
+        data_format_registry: Arc<dyn DataFormatRegistry>,
         container_runtime: Arc<ContainerRuntime>,
         run_info_dir: PathBuf,
         cache_dir: PathBuf,
@@ -54,6 +56,7 @@ impl PollingIngestServiceImpl {
             dataset_action_authorizer,
             engine_provisioner,
             object_store_registry,
+            data_format_registry,
             container_runtime,
             run_info_dir,
             cache_dir,
@@ -520,30 +523,19 @@ impl PollingIngestServiceImpl {
             return Ok(None);
         }
 
-        let reader = Self::get_reader_for(&args.polling_source.read, &args.operation_dir);
-
-        let df = reader
-            .read(&args.ctx, &input_data_path, &args.polling_source.read)
+        let temp_path = args.operation_dir.join("reader.tmp");
+        let reader = self
+            .data_format_registry
+            .get_reader(
+                args.ctx.clone(),
+                args.polling_source.read.clone(),
+                temp_path,
+            )
             .await?;
 
+        let df = reader.read(&input_data_path).await?;
+
         Ok(Some(df))
-    }
-
-    // TODO: Replace with DI
-    fn get_reader_for(conf: &ReadStep, operation_dir: &Path) -> Arc<dyn Reader> {
-        use kamu_ingest_datafusion::readers::*;
-
-        let temp_path = operation_dir.join("reader.tmp");
-        match conf {
-            ReadStep::Csv(_) => Arc::new(ReaderCsv {}),
-            ReadStep::Json(_) => Arc::new(ReaderJson::new(temp_path)),
-            ReadStep::NdJson(_) => Arc::new(ReaderNdJson {}),
-            ReadStep::JsonLines(_) => Arc::new(ReaderNdJson {}),
-            ReadStep::GeoJson(_) => Arc::new(ReaderGeoJson::new(temp_path)),
-            ReadStep::NdGeoJson(_) => Arc::new(ReaderNdGeoJson::new(temp_path)),
-            ReadStep::EsriShapefile(_) => Arc::new(ReaderEsriShapefile::new(temp_path)),
-            ReadStep::Parquet(_) => Arc::new(ReaderParquet {}),
-        }
     }
 
     // TODO: Introduce intermediate structs to avoid full unpacking

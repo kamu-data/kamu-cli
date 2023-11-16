@@ -24,45 +24,26 @@ pub trait PushIngestService: Send + Sync {
     /// Uses push source defenition in metadata to ingest data from the
     /// specified source.
     ///
-    /// See also [IngestMediaTypes].
+    /// See also [MediaType].
     async fn ingest_from_url(
         &self,
         dataset_ref: &DatasetRef,
         url: url::Url,
-        media_type: Option<&str>,
+        media_type: Option<MediaType>,
         listener: Option<Arc<dyn PushIngestListener>>,
     ) -> Result<PushIngestResult, PushIngestError>;
 
     /// Uses push source defenition in metadata to ingest data passessed
     /// in-band as a file stream.
     ///
-    /// See also [IngestMediaTypes].
+    /// See also [MediaType].
     async fn ingest_from_file_stream(
         &self,
         dataset_ref: &DatasetRef,
         data: Box<dyn AsyncRead + Send + Unpin>,
-        media_type: Option<&str>,
+        media_type: Option<MediaType>,
         listener: Option<Arc<dyn PushIngestListener>>,
     ) -> Result<PushIngestResult, PushIngestError>;
-}
-
-/// Some media types of data formats acceptable by the ingest.
-///
-/// We use IANA types where we can:
-///     https://www.iana.org/assignments/media-types/media-types.xhtml
-pub struct IngestMediaTypes;
-impl IngestMediaTypes {
-    pub const CSV: &str = "text/csv";
-    pub const JSON: &str = "application/json";
-    /// Unofficial but used by several software projects
-    pub const NDJSON: &str = "application/x-ndjson";
-    pub const GEOJSON: &str = "application/geo+json";
-    /// No standard found
-    pub const NDGEOJSON: &str = "application/x-ndgeojson";
-    /// See: https://issues.apache.org/jira/browse/PARQUET-1889
-    pub const PARQUET: &str = "application/vnd.apache.parquet";
-    /// No standard found
-    pub const ESRISHAPEFILE: &str = "application/vnd.esri.shapefile";
 }
 
 #[derive(Debug)]
@@ -215,13 +196,11 @@ pub struct PushSourceNotFoundError;
 #[derive(Debug, Error)]
 #[error("Unsupported media type {media_type}")]
 pub struct UnsupportedMediaTypeError {
-    pub media_type: String,
+    pub media_type: MediaType,
 }
 
 impl UnsupportedMediaTypeError {
-    pub fn new(media_type: impl Into<String>) -> Self {
-        Self {
-            media_type: media_type.into(),
-        }
+    pub fn new(media_type: MediaType) -> Self {
+        Self { media_type }
     }
 }

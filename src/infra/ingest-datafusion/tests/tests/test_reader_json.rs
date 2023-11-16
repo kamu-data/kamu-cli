@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use datafusion::prelude::SessionContext;
 use indoc::indoc;
 use kamu_ingest_datafusion::*;
 use opendatafabric::*;
@@ -21,15 +22,20 @@ async fn test_read_json_object() {
     let temp_dir: tempfile::TempDir = tempfile::tempdir().unwrap();
 
     test_reader_common::test_reader_success_textual(
-        ReaderJson::new(temp_dir.path().join("reader-tmp")),
-        ReadStepJson {
-            sub_path: Some("result.cities".to_string()),
-            schema: Some(vec![
-                "city string not null".to_string(),
-                "population int not null".to_string(),
-            ]),
-            ..Default::default()
-        },
+        ReaderJson::new(
+            SessionContext::new(),
+            ReadStepJson {
+                sub_path: Some("result.cities".to_string()),
+                schema: Some(vec![
+                    "city string not null".to_string(),
+                    "population int not null".to_string(),
+                ]),
+                ..Default::default()
+            },
+            temp_dir.path().join("reader-tmp"),
+        )
+        .await
+        .unwrap(),
         indoc!(
             r#"
             {
@@ -74,15 +80,20 @@ async fn test_read_json_array() {
     let temp_dir: tempfile::TempDir = tempfile::tempdir().unwrap();
 
     test_reader_common::test_reader_success_textual(
-        ReaderJson::new(temp_dir.path().join("reader-tmp")),
-        ReadStepJson {
-            sub_path: None,
-            schema: Some(vec![
-                "city string not null".to_string(),
-                "population int not null".to_string(),
-            ]),
-            ..Default::default()
-        },
+        ReaderJson::new(
+            SessionContext::new(),
+            ReadStepJson {
+                sub_path: None,
+                schema: Some(vec![
+                    "city string not null".to_string(),
+                    "population int not null".to_string(),
+                ]),
+                ..Default::default()
+            },
+            temp_dir.path().join("reader-tmp"),
+        )
+        .await
+        .unwrap(),
         indoc!(
             r#"
             [

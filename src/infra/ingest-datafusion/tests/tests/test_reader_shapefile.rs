@@ -10,7 +10,7 @@
 use std::assert_matches::assert_matches;
 
 use datafusion::arrow::array::StringArray;
-use datafusion::prelude::*;
+use datafusion::prelude::{SessionContext, *};
 use indoc::indoc;
 use kamu_ingest_datafusion::*;
 use opendatafabric::*;
@@ -25,15 +25,20 @@ async fn test_read_shapefile_with_schema() {
     let temp_dir: tempfile::TempDir = tempfile::tempdir().unwrap();
 
     test_reader_common::test_reader_success(
-        ReaderEsriShapefile::new(temp_dir.path().join("reader-tmp")),
-        ReadStepEsriShapefile {
-            schema: Some(vec![
-                "iso string not null".to_string(),
-                "name_0 string not null".to_string(),
-                "name_1 string not null".to_string(),
-            ]),
-            sub_path: None,
-        },
+        ReaderEsriShapefile::new(
+            SessionContext::new(),
+            ReadStepEsriShapefile {
+                schema: Some(vec![
+                    "iso string not null".to_string(),
+                    "name_0 string not null".to_string(),
+                    "name_1 string not null".to_string(),
+                ]),
+                sub_path: None,
+            },
+            temp_dir.path().join("reader-tmp"),
+        )
+        .await
+        .unwrap(),
         |path| async {
             std::fs::copy("tests/data/ukraine.zip", path).unwrap();
         },
@@ -93,11 +98,16 @@ async fn test_read_shapefile_infer_schema() {
     let temp_dir: tempfile::TempDir = tempfile::tempdir().unwrap();
 
     test_reader_common::test_reader(
-        ReaderEsriShapefile::new(temp_dir.path().join("reader-tmp")),
-        ReadStepEsriShapefile {
-            schema: None,
-            sub_path: None,
-        },
+        ReaderEsriShapefile::new(
+            SessionContext::new(),
+            ReadStepEsriShapefile {
+                schema: None,
+                sub_path: None,
+            },
+            temp_dir.path().join("reader-tmp"),
+        )
+        .await
+        .unwrap(),
         |path| async {
             std::fs::copy("tests/data/ukraine.zip", path).unwrap();
         },
@@ -138,11 +148,16 @@ async fn test_read_shapefile_with_subpath_exists() {
     let temp_dir: tempfile::TempDir = tempfile::tempdir().unwrap();
 
     test_reader_common::test_reader(
-        ReaderEsriShapefile::new(temp_dir.path().join("reader-tmp")),
-        ReadStepEsriShapefile {
-            schema: None,
-            sub_path: Some("gg870xt4706.shp".to_string()),
-        },
+        ReaderEsriShapefile::new(
+            SessionContext::new(),
+            ReadStepEsriShapefile {
+                schema: None,
+                sub_path: Some("gg870xt4706.shp".to_string()),
+            },
+            temp_dir.path().join("reader-tmp"),
+        )
+        .await
+        .unwrap(),
         |path| async {
             std::fs::copy("tests/data/ukraine.zip", path).unwrap();
         },
@@ -161,11 +176,16 @@ async fn test_read_shapefile_with_subpath_missing() {
     let temp_dir: tempfile::TempDir = tempfile::tempdir().unwrap();
 
     test_reader_common::test_reader(
-        ReaderEsriShapefile::new(temp_dir.path().join("reader-tmp")),
-        ReadStepEsriShapefile {
-            schema: None,
-            sub_path: Some("invalid.shp".to_string()),
-        },
+        ReaderEsriShapefile::new(
+            SessionContext::new(),
+            ReadStepEsriShapefile {
+                schema: None,
+                sub_path: Some("invalid.shp".to_string()),
+            },
+            temp_dir.path().join("reader-tmp"),
+        )
+        .await
+        .unwrap(),
         |path| async {
             std::fs::copy("tests/data/ukraine.zip", path).unwrap();
         },
@@ -184,14 +204,19 @@ async fn test_read_shapefile_geom() {
     let temp_dir: tempfile::TempDir = tempfile::tempdir().unwrap();
 
     test_reader_common::test_reader(
-        ReaderEsriShapefile::new(temp_dir.path().join("reader-tmp")),
+        ReaderEsriShapefile::new(
+            SessionContext::new(),
         ReadStepEsriShapefile {
-            schema: Some(vec![
-                "geometry string not null".to_string(),
-                "name_1 string not null".to_string(),
-            ]),
-            sub_path: None,
-        },
+                schema: Some(vec![
+                    "geometry string not null".to_string(),
+                    "name_1 string not null".to_string(),
+                ]),
+                sub_path: None,
+            },
+            temp_dir.path().join("reader-tmp")
+        )
+        .await
+        .unwrap(),
         |path| async {
             std::fs::copy("tests/data/ukraine.zip", path).unwrap();
         },
@@ -225,7 +250,9 @@ async fn test_read_shapefile_geom() {
                 geojson,
                 serde_json::json!({
                     "type": "MultiPolygon",
-                    "coordinates": [[[[30.466304779052763, 50.58700942993181], [30.466583251953324, 50.58112716674821]]]],
+                    "coordinates": [[[
+                        [30.466304779052763, 50.58700942993181], [30.466583251953324, 50.58112716674821]
+                    ]]],
                 })
             );
         },

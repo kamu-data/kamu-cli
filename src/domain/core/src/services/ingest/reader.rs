@@ -13,7 +13,6 @@ use std::path::Path;
 use datafusion::arrow::datatypes::Schema;
 use datafusion::prelude::*;
 use internal_error::*;
-use opendatafabric::ReadStep;
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -21,26 +20,17 @@ use opendatafabric::ReadStep;
 /// defined in the [ReadStep].
 #[async_trait::async_trait]
 pub trait Reader: Send + Sync {
-    /// Returns schema that the read output will be coerced into, if such schema
-    /// is defined in the [ReadStep].
-    async fn read_schema(
-        &self,
-        ctx: &SessionContext,
-        conf: &ReadStep,
-    ) -> Result<Option<Schema>, ReadError>;
+    /// Returns schema that the input will be coerced into, if such schema
+    /// is defined explicitly.
+    async fn input_schema(&self) -> Option<Schema>;
 
-    /// Returns a [DataFrame] that is ready to read the data.
+    /// Returns a [DataFrame] with a logical plan set up to read the data.
     ///
-    /// Note that [DataFrame] represents a physical plan, and no data has been
-    /// read yet when function returs, so you will need to handle read errors
-    /// when consuming the data. Some input data may be touched to infer the
-    /// schema if one was not specified explicilty.
-    async fn read(
-        &self,
-        ctx: &SessionContext,
-        path: &Path,
-        conf: &ReadStep,
-    ) -> Result<DataFrame, ReadError>;
+    /// Note that [DataFrame] represents a logical plan, and data has not been
+    /// fully read yet when function returs, so you will need to handle read
+    /// errors when consuming the data. Some input data may be touched to
+    /// infer the schema if one was not specified explicilty.
+    async fn read(&self, path: &Path) -> Result<DataFrame, ReadError>;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

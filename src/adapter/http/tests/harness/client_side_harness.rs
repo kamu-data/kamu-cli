@@ -90,6 +90,9 @@ impl ClientSideHarness {
         b.add::<ObjectStoreRegistryImpl>()
             .bind::<dyn ObjectStoreRegistry, ObjectStoreRegistryImpl>();
 
+        b.add::<DataFormatRegistryImpl>();
+        b.bind::<dyn DataFormatRegistry, DataFormatRegistryImpl>();
+
         b.add_builder(
             builder_for::<PollingIngestServiceImpl>()
                 .with_run_info_dir(run_info_dir)

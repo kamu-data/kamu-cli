@@ -9,6 +9,7 @@
 
 use std::path::{Path, PathBuf};
 
+use datafusion::arrow::datatypes::Schema;
 use datafusion::prelude::*;
 use internal_error::*;
 use kamu_core::ingest::ReadError;
@@ -19,30 +20,45 @@ use crate::*;
 ///////////////////////////////////////////////////////////////////////////////
 
 pub struct ReaderEsriShapefile {
+    sub_path: Option<String>,
     temp_path: PathBuf,
+    inner: ReaderNdJson,
 }
 
 impl ReaderEsriShapefile {
     // TODO: This is an ugly API that leaves it to the caller to clean up our temp
     // file mess. Ideally we should not produce any temp files at all and stream in
     // all data.
-    pub fn new(temp_path: impl Into<PathBuf>) -> Self {
-        Self {
+    pub async fn new(
+        ctx: SessionContext,
+        conf: ReadStepEsriShapefile,
+        temp_path: impl Into<PathBuf>,
+    ) -> Result<Self, ReadError> {
+        let inner_conf = ReadStepNdJson {
+            schema: conf.schema,
+            date_format: None,
+            encoding: None,
+            timestamp_format: None,
+        };
+
+        Ok(Self {
+            sub_path: conf.sub_path,
             temp_path: temp_path.into(),
-        }
+            inner: ReaderNdJson::new(ctx, inner_conf).await?,
+        })
     }
 
     fn convert_to_ndjson_blocking(
         in_path: &Path,
         tmp_path: &Path,
-        conf: &ReadStepEsriShapefile,
+        sub_path: Option<&str>,
     ) -> Result<PathBuf, ReadError> {
         use std::io::Write;
 
         use serde_json::Value as JsonValue;
 
         Self::extract_zip(in_path, tmp_path)?;
-        let shp_path = Self::locate_shp_file(tmp_path, conf.sub_path.as_ref().map(|s| s.as_str()))?;
+        let shp_path = Self::locate_shp_file(tmp_path, sub_path)?;
 
         let temp_json_path = tmp_path.join("__temp.json");
         let mut file = std::fs::File::create_new(&temp_json_path).int_err()?;
@@ -207,43 +223,27 @@ impl ReaderEsriShapefile {
 
 #[async_trait::async_trait]
 impl Reader for ReaderEsriShapefile {
-    async fn read_schema(
-        &self,
-        ctx: &SessionContext,
-        conf: &ReadStep,
-    ) -> Result<Option<datafusion::arrow::datatypes::Schema>, ReadError> {
-        super::read_schema_common(ctx, conf).await
+    async fn input_schema(&self) -> Option<Schema> {
+        self.inner.input_schema().await
     }
 
-    async fn read(
-        &self,
-        ctx: &SessionContext,
-        path: &Path,
-        conf: &ReadStep,
-    ) -> Result<DataFrame, ReadError> {
-        let ReadStep::EsriShapefile(conf) = conf.clone() else {
-            unreachable!()
-        };
-
+    async fn read(&self, path: &Path) -> Result<DataFrame, ReadError> {
         // TODO: PERF: This is a temporary, highly inefficient implementation that
         // decodes Shapefile into NdJson which DataFusion can read natively
-        let schema = conf.schema.clone();
         let in_path = path.to_path_buf();
         let out_path = self.temp_path.clone();
+        let sub_path = self.sub_path.clone();
 
         let temp_json_path = tokio::task::spawn_blocking(move || {
-            Self::convert_to_ndjson_blocking(&in_path, &out_path, &conf)
+            Self::convert_to_ndjson_blocking(
+                &in_path,
+                &out_path,
+                sub_path.as_ref().map(String::as_str),
+            )
         })
         .await
         .int_err()??;
 
-        let conf = ReadStep::NdJson(ReadStepNdJson {
-            schema,
-            date_format: None,
-            encoding: None,
-            timestamp_format: None,
-        });
-
-        ReaderNdJson::new().read(ctx, &temp_json_path, &conf).await
+        self.inner.read(&temp_json_path).await
     }
 }
