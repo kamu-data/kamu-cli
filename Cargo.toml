@@ -42,6 +42,7 @@ tracing-perfetto = { version = "0.146.1", path = "src/utils/tracing-perfetto", d
 opendatafabric = { version = "0.146.1", path = "src/domain/opendatafabric", default-features = false }
 kamu-core = { version = "0.146.1", path = "src/domain/core", default-features = false }
 kamu-task-system = { version = "0.146.1", path = "src/domain/task-system", default-features = false }
+kamu-dataset-update-flow = { version = "0.146.1", path = "src/domain/dataset-update-flow", default-features = false }
 # Infra
 kamu = { version = "0.146.1", path = "src/infra/core", default-features = false }
 kamu-ingest-datafusion = { version = "0.146.1", path = "src/infra/ingest-datafusion", default-features = false }

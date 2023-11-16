@@ -3278,6 +3278,7 @@ dependencies = [
  "kamu",
  "kamu-core",
  "kamu-data-utils",
+ "kamu-dataset-update-flow",
  "kamu-task-system",
  "mockall",
  "opendatafabric",
@@ -3485,6 +3486,25 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
+ "url",
+]
+
+[[package]]
+name = "kamu-dataset-update-flow"
+version = "0.145.6"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "enum-variants",
+ "event-sourcing",
+ "internal-error",
+ "kamu-core",
+ "opendatafabric",
+ "serde",
+ "serde_with",
+ "thiserror",
+ "tokio-stream",
+ "tracing",
  "url",
 ]
 
