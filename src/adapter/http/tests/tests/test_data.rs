@@ -19,6 +19,7 @@ use crate::harness::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_data_push_ingest_handler() {
     // TODO: Need access to these from harness level
