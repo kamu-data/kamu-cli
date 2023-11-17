@@ -3499,6 +3499,7 @@ dependencies = [
  "event-sourcing",
  "internal-error",
  "kamu-core",
+ "kamu-task-system",
  "opendatafabric",
  "serde",
  "serde_with",

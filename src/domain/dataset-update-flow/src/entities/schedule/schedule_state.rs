@@ -16,27 +16,27 @@ use crate::*;
 
 /// Represents the state of the task at specific point in time (projection)
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DatasetUpdateFlowState {
+pub struct UpdateScheduleState {
     /// Identifier of the related dataset
     pub dataset_id: DatasetID,
     /// Update schedule
-    pub schedule: UpdateSchedule,
+    pub schedule: ScheduleType,
     /// Pause indication
     pub paused: bool,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-impl Projection for DatasetUpdateFlowState {
+impl Projection for UpdateScheduleState {
     type Query = DatasetID;
-    type Event = DatasetUpdateFlowEvent;
+    type Event = UpdateScheduleEvent;
 
     fn apply(state: Option<Self>, event: Self::Event) -> Result<Self, ProjectionError<Self>> {
-        use DatasetUpdateFlowEvent as E;
+        use UpdateScheduleEvent as E;
 
         match (state, event) {
             (None, event) => match event {
-                E::FlowCreated(DatasetUpdateFlowCreated {
+                E::ScheduleCreated(UpdateScheduleCreated {
                     event_time: _,
                     dataset_id,
                     schedule,
@@ -51,26 +51,26 @@ impl Projection for DatasetUpdateFlowState {
                 assert_eq!(&s.dataset_id, event.dataset_id());
 
                 match event {
-                    E::FlowCreated(_) => Err(ProjectionError::new(Some(s), event)),
-                    E::FlowPaused(_) => {
+                    E::ScheduleCreated(_) => Err(ProjectionError::new(Some(s), event)),
+                    E::SchedulePaused(_) => {
                         if s.paused {
                             Err(ProjectionError::new(Some(s), event))
                         } else {
-                            Ok(DatasetUpdateFlowState { paused: true, ..s })
+                            Ok(UpdateScheduleState { paused: true, ..s })
                         }
                     }
-                    E::FlowResumed(_) => {
+                    E::ScheduleResumed(_) => {
                         if s.paused {
-                            Ok(DatasetUpdateFlowState { paused: false, ..s })
+                            Ok(UpdateScheduleState { paused: false, ..s })
                         } else {
                             Err(ProjectionError::new(Some(s), event))
                         }
                     }
-                    E::ScheduleModified(DatasetUpdateFlowScheduleModified {
+                    E::ScheduleModified(UpdateScheduleModified {
                         event_time: _,
                         dataset_id: _,
                         new_schedule,
-                    }) => Ok(DatasetUpdateFlowState {
+                    }) => Ok(UpdateScheduleState {
                         schedule: new_schedule,
                         ..s
                     }),

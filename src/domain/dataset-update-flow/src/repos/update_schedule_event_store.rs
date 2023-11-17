@@ -7,8 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod update_event_store;
-mod update_schedule_event_store;
+use event_sourcing::EventStore;
 
-pub use update_event_store::*;
-pub use update_schedule_event_store::*;
+use crate::*;
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait::async_trait]
+pub trait UpdateScheduleEventStore: EventStore<UpdateScheduleState> {}
+
+/////////////////////////////////////////////////////////////////////////////////////////

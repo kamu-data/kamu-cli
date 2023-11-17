@@ -7,13 +7,16 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use event_sourcing::EventStore;
+mod update_delay_reason;
+mod update_event;
+mod update_id;
+mod update_outcome;
+mod update_state;
+mod update_trigger;
 
-use crate::*;
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-#[async_trait::async_trait]
-pub trait DatasetUpdateFlowEventStore: EventStore<DatasetUpdateFlowState> {}
-
-/////////////////////////////////////////////////////////////////////////////////////////
+pub use update_delay_reason::*;
+pub use update_event::*;
+pub use update_id::*;
+pub use update_outcome::*;
+pub use update_state::*;
+pub use update_trigger::*;

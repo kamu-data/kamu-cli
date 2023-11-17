@@ -7,8 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod update_event_store;
-mod update_schedule_event_store;
+mod schedule_event;
+mod schedule_state;
+mod schedule_type;
 
-pub use update_event_store::*;
-pub use update_schedule_event_store::*;
+pub use schedule_event::*;
+pub use schedule_state::*;
+pub use schedule_type::*;

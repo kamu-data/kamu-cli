@@ -16,17 +16,15 @@ use crate::*;
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Aggregate, Debug)]
-pub struct DatasetUpdateFlow(
-    Aggregate<DatasetUpdateFlowState, (dyn DatasetUpdateFlowEventStore + 'static)>,
-);
+pub struct UpdateSchedule(Aggregate<UpdateScheduleState, (dyn UpdateScheduleEventStore + 'static)>);
 
-impl DatasetUpdateFlow {
+impl UpdateSchedule {
     /// Creates a dataset update flow
-    pub fn new(dataset_id: DatasetID, schedule: UpdateSchedule) -> Self {
+    pub fn new(dataset_id: DatasetID, schedule: ScheduleType) -> Self {
         Self(
             Aggregate::new(
                 dataset_id.clone(),
-                DatasetUpdateFlowCreated {
+                UpdateScheduleCreated {
                     event_time: Utc::now(),
                     dataset_id,
                     schedule,
@@ -37,8 +35,8 @@ impl DatasetUpdateFlow {
     }
 
     /// Pause flow
-    pub fn pause(&mut self) -> Result<(), ProjectionError<DatasetUpdateFlowState>> {
-        let event = DatasetUpdateFlowPaused {
+    pub fn pause(&mut self) -> Result<(), ProjectionError<UpdateScheduleState>> {
+        let event = UpdateSchedulePaused {
             event_time: Utc::now(),
             dataset_id: self.dataset_id.clone(),
         };
@@ -46,8 +44,8 @@ impl DatasetUpdateFlow {
     }
 
     /// Resume flow
-    pub fn resume(&mut self) -> Result<(), ProjectionError<DatasetUpdateFlowState>> {
-        let event = DatasetUpdateFlowResumed {
+    pub fn resume(&mut self) -> Result<(), ProjectionError<UpdateScheduleState>> {
+        let event = UpdateScheduleResumed {
             event_time: Utc::now(),
             dataset_id: self.dataset_id.clone(),
         };
@@ -57,9 +55,9 @@ impl DatasetUpdateFlow {
     /// Modifie schedule
     pub fn modify_schedule(
         &mut self,
-        new_schedule: UpdateSchedule,
-    ) -> Result<(), ProjectionError<DatasetUpdateFlowState>> {
-        let event = DatasetUpdateFlowScheduleModified {
+        new_schedule: ScheduleType,
+    ) -> Result<(), ProjectionError<UpdateScheduleState>> {
+        let event = UpdateScheduleModified {
             event_time: Utc::now(),
             dataset_id: self.dataset_id.clone(),
             new_schedule,

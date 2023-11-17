@@ -17,30 +17,26 @@ use crate::*;
 
 /// All events that model life-cycle of a task
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum DatasetUpdateFlowEvent {
-    /// New update flow created
-    FlowCreated(DatasetUpdateFlowCreated),
-    /// Flow paused
-    FlowPaused(DatasetUpdateFlowPaused),
-    /// Flow resumed
-    FlowResumed(DatasetUpdateFlowResumed),
-    /// Schedule modified
-    ScheduleModified(DatasetUpdateFlowScheduleModified),
+pub enum UpdateScheduleEvent {
+    ScheduleCreated(UpdateScheduleCreated),
+    SchedulePaused(UpdateSchedulePaused),
+    ScheduleResumed(UpdateScheduleResumed),
+    ScheduleModified(UpdateScheduleModified),
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DatasetUpdateFlowCreated {
+pub struct UpdateScheduleCreated {
     pub event_time: DateTime<Utc>,
     pub dataset_id: DatasetID,
-    pub schedule: UpdateSchedule,
+    pub schedule: ScheduleType,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DatasetUpdateFlowPaused {
+pub struct UpdateSchedulePaused {
     pub event_time: DateTime<Utc>,
     pub dataset_id: DatasetID,
 }
@@ -48,7 +44,7 @@ pub struct DatasetUpdateFlowPaused {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DatasetUpdateFlowResumed {
+pub struct UpdateScheduleResumed {
     pub event_time: DateTime<Utc>,
     pub dataset_id: DatasetID,
 }
@@ -56,44 +52,40 @@ pub struct DatasetUpdateFlowResumed {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DatasetUpdateFlowScheduleModified {
+pub struct UpdateScheduleModified {
     pub event_time: DateTime<Utc>,
     pub dataset_id: DatasetID,
-    pub new_schedule: UpdateSchedule,
+    pub new_schedule: ScheduleType,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-impl DatasetUpdateFlowEvent {
+impl UpdateScheduleEvent {
     pub fn dataset_id(&self) -> &DatasetID {
         match self {
-            DatasetUpdateFlowEvent::FlowCreated(e) => &e.dataset_id,
-            DatasetUpdateFlowEvent::FlowPaused(e) => &e.dataset_id,
-            DatasetUpdateFlowEvent::FlowResumed(e) => &e.dataset_id,
-            DatasetUpdateFlowEvent::ScheduleModified(e) => &e.dataset_id,
+            UpdateScheduleEvent::ScheduleCreated(e) => &e.dataset_id,
+            UpdateScheduleEvent::SchedulePaused(e) => &e.dataset_id,
+            UpdateScheduleEvent::ScheduleResumed(e) => &e.dataset_id,
+            UpdateScheduleEvent::ScheduleModified(e) => &e.dataset_id,
         }
     }
 
     pub fn event_time(&self) -> &DateTime<Utc> {
         match self {
-            DatasetUpdateFlowEvent::FlowCreated(e) => &e.event_time,
-            DatasetUpdateFlowEvent::FlowPaused(e) => &e.event_time,
-            DatasetUpdateFlowEvent::FlowResumed(e) => &e.event_time,
-            DatasetUpdateFlowEvent::ScheduleModified(e) => &e.event_time,
+            UpdateScheduleEvent::ScheduleCreated(e) => &e.event_time,
+            UpdateScheduleEvent::SchedulePaused(e) => &e.event_time,
+            UpdateScheduleEvent::ScheduleResumed(e) => &e.event_time,
+            UpdateScheduleEvent::ScheduleModified(e) => &e.event_time,
         }
     }
 }
 
-impl_enum_with_variants!(DatasetUpdateFlowEvent);
-impl_enum_variant!(DatasetUpdateFlowEvent::FlowCreated(
-    DatasetUpdateFlowCreated
-));
-impl_enum_variant!(DatasetUpdateFlowEvent::FlowPaused(DatasetUpdateFlowPaused));
-impl_enum_variant!(DatasetUpdateFlowEvent::FlowResumed(
-    DatasetUpdateFlowResumed
-));
-impl_enum_variant!(DatasetUpdateFlowEvent::ScheduleModified(
-    DatasetUpdateFlowScheduleModified
+impl_enum_with_variants!(UpdateScheduleEvent);
+impl_enum_variant!(UpdateScheduleEvent::ScheduleCreated(UpdateScheduleCreated));
+impl_enum_variant!(UpdateScheduleEvent::SchedulePaused(UpdateSchedulePaused));
+impl_enum_variant!(UpdateScheduleEvent::ScheduleResumed(UpdateScheduleResumed));
+impl_enum_variant!(UpdateScheduleEvent::ScheduleModified(
+    UpdateScheduleModified
 ));
 
 /////////////////////////////////////////////////////////////////////////////////////////
