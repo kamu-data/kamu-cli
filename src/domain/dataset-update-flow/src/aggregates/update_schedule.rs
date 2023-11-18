@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use event_sourcing::*;
 use opendatafabric::DatasetID;
 
@@ -20,12 +20,12 @@ pub struct UpdateSchedule(Aggregate<UpdateScheduleState, (dyn UpdateScheduleEven
 
 impl UpdateSchedule {
     /// Creates a dataset update flow
-    pub fn new(dataset_id: DatasetID, schedule: Schedule) -> Self {
+    pub fn new(now: DateTime<Utc>, dataset_id: DatasetID, schedule: Schedule) -> Self {
         Self(
             Aggregate::new(
                 dataset_id.clone(),
                 UpdateScheduleEventCreated {
-                    event_time: Utc::now(),
+                    event_time: now,
                     dataset_id,
                     schedule,
                 },
@@ -35,30 +35,37 @@ impl UpdateSchedule {
     }
 
     /// Pause flow
-    pub fn pause(&mut self) -> Result<(), ProjectionError<UpdateScheduleState>> {
+    pub fn pause(
+        &mut self,
+        now: DateTime<Utc>,
+    ) -> Result<(), ProjectionError<UpdateScheduleState>> {
         let event = UpdateScheduleEventPaused {
-            event_time: Utc::now(),
+            event_time: now,
             dataset_id: self.dataset_id.clone(),
         };
         self.apply(event)
     }
 
     /// Resume flow
-    pub fn resume(&mut self) -> Result<(), ProjectionError<UpdateScheduleState>> {
+    pub fn resume(
+        &mut self,
+        now: DateTime<Utc>,
+    ) -> Result<(), ProjectionError<UpdateScheduleState>> {
         let event = UpdateScheduleEventResumed {
-            event_time: Utc::now(),
+            event_time: now,
             dataset_id: self.dataset_id.clone(),
         };
         self.apply(event)
     }
 
-    /// Modifie schedule
+    /// Modify schedule
     pub fn modify_schedule(
         &mut self,
+        now: DateTime<Utc>,
         new_schedule: Schedule,
     ) -> Result<(), ProjectionError<UpdateScheduleState>> {
         let event = UpdateScheduleEventModified {
-            event_time: Utc::now(),
+            event_time: now,
             dataset_id: self.dataset_id.clone(),
             new_schedule,
         };

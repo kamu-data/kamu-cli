@@ -30,12 +30,17 @@ pub struct Update(Aggregate<UpdateState, (dyn UpdateEventStore + 'static)>);
 
 impl Update {
     /// Creates a dataset update process
-    pub fn new(update_id: UpdateID, dataset_id: DatasetID, trigger: UpdateTrigger) -> Self {
+    pub fn new(
+        now: DateTime<Utc>,
+        update_id: UpdateID,
+        dataset_id: DatasetID,
+        trigger: UpdateTrigger,
+    ) -> Self {
         Self(
             Aggregate::new(
                 dataset_id.clone(),
                 UpdateEventInitiated {
-                    event_time: Utc::now(),
+                    event_time: now,
                     update_id,
                     dataset_id,
                     trigger,
@@ -48,10 +53,11 @@ impl Update {
     /// Postpone launching for now
     pub fn postpone(
         &mut self,
+        now: DateTime<Utc>,
         delay_reason: UpdateDelayReason,
     ) -> Result<(), ProjectionError<UpdateState>> {
         let event = UpdateEventPostponed {
-            event_time: Utc::now(),
+            event_time: now,
             update_id: self.update_id.clone(),
             delay_reason,
         };
@@ -61,10 +67,11 @@ impl Update {
     /// Queue for time
     pub fn queue_for_time(
         &mut self,
+        now: DateTime<Utc>,
         queued_for: DateTime<Utc>,
     ) -> Result<(), ProjectionError<UpdateState>> {
         let event = UpdateEventQueued {
-            event_time: Utc::now(),
+            event_time: now,
             update_id: self.update_id.clone(),
             queued_for,
         };
@@ -74,10 +81,11 @@ impl Update {
     /// Extra trigger
     pub fn retrigger(
         &mut self,
+        now: DateTime<Utc>,
         trigger: UpdateTrigger,
     ) -> Result<(), ProjectionError<UpdateState>> {
         let event = UpdateEventSecondaryTrigger {
-            event_time: Utc::now(),
+            event_time: now,
             update_id: self.update_id.clone(),
             trigger,
         };
@@ -87,10 +95,11 @@ impl Update {
     /// Attaches a scheduled task
     pub fn on_task_scheduled(
         &mut self,
+        now: DateTime<Utc>,
         task_id: TaskID,
     ) -> Result<(), ProjectionError<UpdateState>> {
         let event = UpdateEventTaskScheduled {
-            event_time: Utc::now(),
+            event_time: now,
             update_id: self.update_id.clone(),
             task_id,
         };
@@ -98,9 +107,13 @@ impl Update {
     }
 
     /// Task succeeded
-    pub fn on_task_success(&mut self, task_id: TaskID) -> Result<(), ProjectionError<UpdateState>> {
+    pub fn on_task_success(
+        &mut self,
+        now: DateTime<Utc>,
+        task_id: TaskID,
+    ) -> Result<(), ProjectionError<UpdateState>> {
         let event = UpdateEventTaskSucceeded {
-            event_time: Utc::now(),
+            event_time: now,
             update_id: self.update_id.clone(),
             task_id,
         };
@@ -110,10 +123,11 @@ impl Update {
     /// Task cancelled
     pub fn on_task_cancelled(
         &mut self,
+        now: DateTime<Utc>,
         task_id: TaskID,
     ) -> Result<(), ProjectionError<UpdateState>> {
         let event = UpdateEventTaskCancelled {
-            event_time: Utc::now(),
+            event_time: now,
             update_id: self.update_id.clone(),
             task_id,
         };
@@ -121,9 +135,13 @@ impl Update {
     }
 
     /// Task failed
-    pub fn on_task_failed(&mut self, task_id: TaskID) -> Result<(), ProjectionError<UpdateState>> {
+    pub fn on_task_failed(
+        &mut self,
+        now: DateTime<Utc>,
+        task_id: TaskID,
+    ) -> Result<(), ProjectionError<UpdateState>> {
         let event = UpdateEventTaskFailed {
-            event_time: Utc::now(),
+            event_time: now,
             update_id: self.update_id.clone(),
             task_id,
         };

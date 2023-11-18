@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use event_sourcing::*;
 
 use crate::*;
@@ -19,12 +19,12 @@ pub struct Task(Aggregate<TaskState, (dyn TaskSystemEventStore + 'static)>);
 
 impl Task {
     /// Creates a task with a pending TaskCreated event
-    pub fn new(task_id: TaskID, logical_plan: LogicalPlan) -> Self {
+    pub fn new(now: DateTime<Utc>, task_id: TaskID, logical_plan: LogicalPlan) -> Self {
         Self(
             Aggregate::new(
                 task_id,
                 TaskCreated {
-                    event_time: Utc::now(),
+                    event_time: now,
                     task_id,
                     logical_plan,
                 },
@@ -34,9 +34,9 @@ impl Task {
     }
 
     /// Transition task to a `Running` state
-    pub fn run(&mut self) -> Result<(), ProjectionError<TaskState>> {
+    pub fn run(&mut self, now: DateTime<Utc>) -> Result<(), ProjectionError<TaskState>> {
         let event = TaskRunning {
-            event_time: Utc::now(),
+            event_time: now,
             task_id: self.task_id,
         };
         self.apply(event)
@@ -52,22 +52,26 @@ impl Task {
     }
 
     /// Set cancellation flag (if not already set)
-    pub fn cancel(&mut self) -> Result<(), ProjectionError<TaskState>> {
+    pub fn cancel(&mut self, now: DateTime<Utc>) -> Result<(), ProjectionError<TaskState>> {
         if self.cancellation_requested {
             return Ok(());
         }
 
         let event = TaskCancelled {
-            event_time: Utc::now(),
+            event_time: now,
             task_id: self.task_id,
         };
         self.apply(event)
     }
 
     /// Transition task to a `Finished` state with the specified outcome
-    pub fn finish(&mut self, outcome: TaskOutcome) -> Result<(), ProjectionError<TaskState>> {
+    pub fn finish(
+        &mut self,
+        now: DateTime<Utc>,
+        outcome: TaskOutcome,
+    ) -> Result<(), ProjectionError<TaskState>> {
         let event = TaskFinished {
-            event_time: Utc::now(),
+            event_time: now,
             task_id: self.task_id,
             outcome,
         };

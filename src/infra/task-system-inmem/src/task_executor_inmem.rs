@@ -10,12 +10,13 @@
 use std::sync::Arc;
 
 use dill::*;
-use kamu_core::{PullOptions, PullService};
+use kamu_core::{PullOptions, PullService, SystemTimeSource};
 use kamu_task_system::*;
 
 pub struct TaskExecutorInMemory {
     task_sched: Arc<dyn TaskScheduler>,
     event_store: Arc<dyn TaskSystemEventStore>,
+    time_source: Arc<dyn SystemTimeSource>,
     catalog: Catalog,
 }
 
@@ -25,11 +26,13 @@ impl TaskExecutorInMemory {
     pub fn new(
         task_sched: Arc<dyn TaskScheduler>,
         event_store: Arc<dyn TaskSystemEventStore>,
+        time_source: Arc<dyn SystemTimeSource>,
         catalog: Catalog,
     ) -> Self {
         Self {
             task_sched,
             event_store,
+            time_source,
             catalog,
         }
     }
@@ -85,7 +88,7 @@ impl TaskExecutor for TaskExecutorInMemory {
 
             // Refresh the task in case it was updated concurrently (e.g. late cancellation)
             task.update(self.event_store.as_ref()).await.int_err()?;
-            task.finish(outcome).int_err()?;
+            task.finish(self.time_source.now(), outcome).int_err()?;
             task.save(self.event_store.as_ref()).await.int_err()?;
         }
     }
