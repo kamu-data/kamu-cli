@@ -10,7 +10,7 @@
 use chrono::{DateTime, Utc};
 use enum_variants::*;
 use kamu_task_system::{TaskID, TaskOutcome};
-use opendatafabric::DatasetID;
+use opendatafabric::{AccountID, AccountName, DatasetID};
 
 use crate::*;
 
@@ -31,6 +31,8 @@ pub enum UpdateEvent {
     TaskScheduled(UpdateEventTaskScheduled),
     /// Finished task
     TaskFinished(UpdateEventTaskFinished),
+    /// Cancelled update
+    Cancelled(UpdateEventCancelled),
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -91,6 +93,16 @@ pub struct UpdateEventTaskFinished {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UpdateEventCancelled {
+    pub event_time: DateTime<Utc>,
+    pub update_id: UpdateID,
+    pub by_account_id: AccountID,
+    pub by_account_name: AccountName,
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
 impl UpdateEvent {
     pub fn update_id(&self) -> UpdateID {
         match self {
@@ -100,6 +112,7 @@ impl UpdateEvent {
             UpdateEvent::SecondaryTrigger(e) => e.update_id,
             UpdateEvent::TaskScheduled(e) => e.update_id,
             UpdateEvent::TaskFinished(e) => e.update_id,
+            UpdateEvent::Cancelled(e) => e.update_id,
         }
     }
 
@@ -111,6 +124,7 @@ impl UpdateEvent {
             UpdateEvent::SecondaryTrigger(e) => &e.event_time,
             UpdateEvent::TaskScheduled(e) => &e.event_time,
             UpdateEvent::TaskFinished(e) => &e.event_time,
+            UpdateEvent::Cancelled(e) => &e.event_time,
         }
     }
 }
@@ -122,5 +136,6 @@ impl_enum_variant!(UpdateEvent::Queued(UpdateEventQueued));
 impl_enum_variant!(UpdateEvent::SecondaryTrigger(UpdateEventSecondaryTrigger));
 impl_enum_variant!(UpdateEvent::TaskScheduled(UpdateEventTaskScheduled));
 impl_enum_variant!(UpdateEvent::TaskFinished(UpdateEventTaskFinished));
+impl_enum_variant!(UpdateEvent::Cancelled(UpdateEventCancelled));
 
 /////////////////////////////////////////////////////////////////////////////////////////

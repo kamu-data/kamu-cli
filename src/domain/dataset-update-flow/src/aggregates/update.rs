@@ -19,7 +19,7 @@
 use chrono::{DateTime, Utc};
 use event_sourcing::*;
 use kamu_task_system::{TaskID, TaskOutcome};
-use opendatafabric::DatasetID;
+use opendatafabric::{AccountID, AccountName, DatasetID};
 
 use crate::*;
 
@@ -79,7 +79,7 @@ impl Update {
     }
 
     /// Extra trigger
-    pub fn retrigger(
+    pub fn track_extra_trigger(
         &mut self,
         now: DateTime<Utc>,
         trigger: UpdateTrigger,
@@ -118,6 +118,22 @@ impl Update {
             update_id: self.update_id.clone(),
             task_id,
             task_outcome,
+        };
+        self.apply(event)
+    }
+
+    /// Cancel update before task started
+    pub fn cancel(
+        &mut self,
+        now: DateTime<Utc>,
+        by_account_id: AccountID,
+        by_account_name: AccountName,
+    ) -> Result<(), ProjectionError<UpdateState>> {
+        let event = UpdateEventCancelled {
+            event_time: now,
+            update_id: self.update_id.clone(),
+            by_account_id,
+            by_account_name,
         };
         self.apply(event)
     }

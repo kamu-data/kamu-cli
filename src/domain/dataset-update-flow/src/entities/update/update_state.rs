@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use chrono::{DateTime, Utc};
 use event_sourcing::*;
 use kamu_task_system::{TaskID, TaskOutcome};
 use opendatafabric::DatasetID;
@@ -27,11 +28,13 @@ pub struct UpdateState {
     /// Identifier of the related dataset
     pub dataset_id: DatasetID,
     /// Queued for time
-    pub queued_for: Option<chrono::DateTime<chrono::Utc>>,
+    pub queued_for: Option<DateTime<Utc>>,
     /// Associated task IDs
     pub task_ids: Vec<TaskID>,
     /// Update outcome
     pub outcome: Option<UpdateOutcome>,
+    /// Cancellation time
+    pub cancelled_at: Option<DateTime<Utc>>,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -56,6 +59,7 @@ impl Projection for UpdateState {
                     queued_for: None,
                     task_ids: vec![],
                     outcome: None,
+                    cancelled_at: None,
                 }),
                 _ => Err(ProjectionError::new(None, event)),
             },
@@ -118,7 +122,7 @@ impl Projection for UpdateState {
                         }
                     }
                     E::TaskFinished(UpdateEventTaskFinished {
-                        event_time: _,
+                        event_time,
                         update_id: _,
                         task_id,
                         task_outcome,
@@ -132,7 +136,8 @@ impl Projection for UpdateState {
                                     ..s
                                 }),
                                 TaskOutcome::Cancelled => Ok(UpdateState {
-                                    outcome: Some(UpdateOutcome::Success),
+                                    outcome: Some(UpdateOutcome::Cancelled),
+                                    cancelled_at: Some(event_time.clone()),
                                     ..s
                                 }),
                                 TaskOutcome::Failed => {
@@ -146,6 +151,22 @@ impl Projection for UpdateState {
                                     }
                                 }
                             }
+                        }
+                    }
+                    E::Cancelled(UpdateEventCancelled {
+                        event_time,
+                        update_id: _,
+                        by_account_id: _,
+                        by_account_name: _,
+                    }) => {
+                        if s.outcome.is_some() || !s.task_ids.is_empty() {
+                            Err(ProjectionError::new(Some(s), event))
+                        } else {
+                            Ok(UpdateState {
+                                outcome: Some(UpdateOutcome::Cancelled),
+                                cancelled_at: Some(event_time.clone()),
+                                ..s
+                            })
                         }
                     }
                 }
