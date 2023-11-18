@@ -7,16 +7,16 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod update_delay_reason;
 mod update_event;
 mod update_id;
 mod update_outcome;
+mod update_start_condition;
 mod update_state;
 mod update_trigger;
 
-pub use update_delay_reason::*;
 pub use update_event::*;
 pub use update_id::*;
 pub use update_outcome::*;
+pub use update_start_condition::*;
 pub use update_state::*;
 pub use update_trigger::*;

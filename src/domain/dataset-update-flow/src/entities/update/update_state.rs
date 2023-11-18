@@ -68,10 +68,10 @@ impl Projection for UpdateState {
 
                 match &event {
                     E::Initiated(_) => Err(ProjectionError::new(Some(s), event)),
-                    E::Postponed(UpdateEventPostponed {
+                    E::StartConditionDefined(UpdateEventStartConditionDefined {
                         event_time: _,
                         update_id: _,
-                        delay_reason: _,
+                        start_condition: _,
                     }) => {
                         if s.outcome.is_some() || !s.task_ids.is_empty() {
                             Err(ProjectionError::new(Some(s), event))
@@ -93,7 +93,7 @@ impl Projection for UpdateState {
                             })
                         }
                     }
-                    E::SecondaryTrigger(UpdateEventSecondaryTrigger {
+                    E::TriggerAdded(UpdateEventTriggerAdded {
                         event_time: _,
                         update_id: _,
                         trigger: _,

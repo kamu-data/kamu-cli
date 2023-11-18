@@ -21,12 +21,12 @@ use crate::*;
 pub enum UpdateEvent {
     /// Update initiated
     Initiated(UpdateEventInitiated),
-    /// Postponed
-    Postponed(UpdateEventPostponed),
+    /// Start condition defined
+    StartConditionDefined(UpdateEventStartConditionDefined),
     /// Queued for time
     Queued(UpdateEventQueued),
-    /// Secondary triger
-    SecondaryTrigger(UpdateEventSecondaryTrigger),
+    /// Secondary triger added
+    TriggerAdded(UpdateEventTriggerAdded),
     /// Scheduled/Rescheduled a task
     TaskScheduled(UpdateEventTaskScheduled),
     /// Finished task
@@ -48,10 +48,10 @@ pub struct UpdateEventInitiated {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct UpdateEventPostponed {
+pub struct UpdateEventStartConditionDefined {
     pub event_time: DateTime<Utc>,
     pub update_id: UpdateID,
-    pub delay_reason: UpdateDelayReason,
+    pub start_condition: UpdateStartCondition,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -66,7 +66,7 @@ pub struct UpdateEventQueued {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct UpdateEventSecondaryTrigger {
+pub struct UpdateEventTriggerAdded {
     pub event_time: DateTime<Utc>,
     pub update_id: UpdateID,
     pub trigger: UpdateTrigger,
@@ -107,9 +107,9 @@ impl UpdateEvent {
     pub fn update_id(&self) -> UpdateID {
         match self {
             UpdateEvent::Initiated(e) => e.update_id,
-            UpdateEvent::Postponed(e) => e.update_id,
+            UpdateEvent::StartConditionDefined(e) => e.update_id,
             UpdateEvent::Queued(e) => e.update_id,
-            UpdateEvent::SecondaryTrigger(e) => e.update_id,
+            UpdateEvent::TriggerAdded(e) => e.update_id,
             UpdateEvent::TaskScheduled(e) => e.update_id,
             UpdateEvent::TaskFinished(e) => e.update_id,
             UpdateEvent::Cancelled(e) => e.update_id,
@@ -119,9 +119,9 @@ impl UpdateEvent {
     pub fn event_time(&self) -> &DateTime<Utc> {
         match self {
             UpdateEvent::Initiated(e) => &e.event_time,
-            UpdateEvent::Postponed(e) => &e.event_time,
+            UpdateEvent::StartConditionDefined(e) => &e.event_time,
             UpdateEvent::Queued(e) => &e.event_time,
-            UpdateEvent::SecondaryTrigger(e) => &e.event_time,
+            UpdateEvent::TriggerAdded(e) => &e.event_time,
             UpdateEvent::TaskScheduled(e) => &e.event_time,
             UpdateEvent::TaskFinished(e) => &e.event_time,
             UpdateEvent::Cancelled(e) => &e.event_time,
@@ -131,9 +131,11 @@ impl UpdateEvent {
 
 impl_enum_with_variants!(UpdateEvent);
 impl_enum_variant!(UpdateEvent::Initiated(UpdateEventInitiated));
-impl_enum_variant!(UpdateEvent::Postponed(UpdateEventPostponed));
+impl_enum_variant!(UpdateEvent::StartConditionDefined(
+    UpdateEventStartConditionDefined
+));
 impl_enum_variant!(UpdateEvent::Queued(UpdateEventQueued));
-impl_enum_variant!(UpdateEvent::SecondaryTrigger(UpdateEventSecondaryTrigger));
+impl_enum_variant!(UpdateEvent::TriggerAdded(UpdateEventTriggerAdded));
 impl_enum_variant!(UpdateEvent::TaskScheduled(UpdateEventTaskScheduled));
 impl_enum_variant!(UpdateEvent::TaskFinished(UpdateEventTaskFinished));
 impl_enum_variant!(UpdateEvent::Cancelled(UpdateEventCancelled));

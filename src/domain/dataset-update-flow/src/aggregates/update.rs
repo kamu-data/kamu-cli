@@ -50,16 +50,16 @@ impl Update {
         )
     }
 
-    /// Postpone launching for now
-    pub fn postpone(
+    /// Define start condition for the history
+    pub fn define_start_condition(
         &mut self,
         now: DateTime<Utc>,
-        delay_reason: UpdateDelayReason,
+        start_condition: UpdateStartCondition,
     ) -> Result<(), ProjectionError<UpdateState>> {
-        let event = UpdateEventPostponed {
+        let event = UpdateEventStartConditionDefined {
             event_time: now,
             update_id: self.update_id.clone(),
-            delay_reason,
+            start_condition,
         };
         self.apply(event)
     }
@@ -79,12 +79,12 @@ impl Update {
     }
 
     /// Extra trigger
-    pub fn track_extra_trigger(
+    pub fn add_trigger(
         &mut self,
         now: DateTime<Utc>,
         trigger: UpdateTrigger,
     ) -> Result<(), ProjectionError<UpdateState>> {
-        let event = UpdateEventSecondaryTrigger {
+        let event = UpdateEventTriggerAdded {
             event_time: now,
             update_id: self.update_id.clone(),
             trigger,
