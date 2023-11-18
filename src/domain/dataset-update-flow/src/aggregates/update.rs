@@ -18,7 +18,7 @@
 
 use chrono::{DateTime, Utc};
 use event_sourcing::*;
-use kamu_task_system::TaskID;
+use kamu_task_system::{TaskID, TaskOutcome};
 use opendatafabric::DatasetID;
 
 use crate::*;
@@ -106,44 +106,18 @@ impl Update {
         self.apply(event)
     }
 
-    /// Task succeeded
-    pub fn on_task_success(
+    /// Task finished
+    pub fn on_task_finished(
         &mut self,
         now: DateTime<Utc>,
         task_id: TaskID,
+        task_outcome: TaskOutcome,
     ) -> Result<(), ProjectionError<UpdateState>> {
-        let event = UpdateEventTaskSucceeded {
+        let event = UpdateEventTaskFinished {
             event_time: now,
             update_id: self.update_id.clone(),
             task_id,
-        };
-        self.apply(event)
-    }
-
-    /// Task cancelled
-    pub fn on_task_cancelled(
-        &mut self,
-        now: DateTime<Utc>,
-        task_id: TaskID,
-    ) -> Result<(), ProjectionError<UpdateState>> {
-        let event = UpdateEventTaskCancelled {
-            event_time: now,
-            update_id: self.update_id.clone(),
-            task_id,
-        };
-        self.apply(event)
-    }
-
-    /// Task failed
-    pub fn on_task_failed(
-        &mut self,
-        now: DateTime<Utc>,
-        task_id: TaskID,
-    ) -> Result<(), ProjectionError<UpdateState>> {
-        let event = UpdateEventTaskFailed {
-            event_time: now,
-            update_id: self.update_id.clone(),
-            task_id,
+            task_outcome,
         };
         self.apply(event)
     }

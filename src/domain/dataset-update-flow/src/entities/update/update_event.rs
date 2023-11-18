@@ -9,7 +9,7 @@
 
 use chrono::{DateTime, Utc};
 use enum_variants::*;
-use kamu_task_system::TaskID;
+use kamu_task_system::{TaskID, TaskOutcome};
 use opendatafabric::DatasetID;
 
 use crate::*;
@@ -29,12 +29,8 @@ pub enum UpdateEvent {
     SecondaryTrigger(UpdateEventSecondaryTrigger),
     /// Scheduled/Rescheduled a task
     TaskScheduled(UpdateEventTaskScheduled),
-    /// Succeeded task
-    TaskSucceeded(UpdateEventTaskSucceeded),
-    /// Failed task
-    TaskFailed(UpdateEventTaskFailed),
-    /// Cancelled task
-    TaskCancelled(UpdateEventTaskCancelled),
+    /// Finished task
+    TaskFinished(UpdateEventTaskFinished),
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -86,28 +82,11 @@ pub struct UpdateEventTaskScheduled {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct UpdateEventTaskSucceeded {
+pub struct UpdateEventTaskFinished {
     pub event_time: DateTime<Utc>,
     pub update_id: UpdateID,
     pub task_id: TaskID,
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct UpdateEventTaskFailed {
-    pub event_time: DateTime<Utc>,
-    pub update_id: UpdateID,
-    pub task_id: TaskID,
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct UpdateEventTaskCancelled {
-    pub event_time: DateTime<Utc>,
-    pub update_id: UpdateID,
-    pub task_id: TaskID,
+    pub task_outcome: TaskOutcome,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -120,9 +99,7 @@ impl UpdateEvent {
             UpdateEvent::Queued(e) => e.update_id,
             UpdateEvent::SecondaryTrigger(e) => e.update_id,
             UpdateEvent::TaskScheduled(e) => e.update_id,
-            UpdateEvent::TaskSucceeded(e) => e.update_id,
-            UpdateEvent::TaskFailed(e) => e.update_id,
-            UpdateEvent::TaskCancelled(e) => e.update_id,
+            UpdateEvent::TaskFinished(e) => e.update_id,
         }
     }
 
@@ -133,9 +110,7 @@ impl UpdateEvent {
             UpdateEvent::Queued(e) => &e.event_time,
             UpdateEvent::SecondaryTrigger(e) => &e.event_time,
             UpdateEvent::TaskScheduled(e) => &e.event_time,
-            UpdateEvent::TaskSucceeded(e) => &e.event_time,
-            UpdateEvent::TaskFailed(e) => &e.event_time,
-            UpdateEvent::TaskCancelled(e) => &e.event_time,
+            UpdateEvent::TaskFinished(e) => &e.event_time,
         }
     }
 }
@@ -146,8 +121,6 @@ impl_enum_variant!(UpdateEvent::Postponed(UpdateEventPostponed));
 impl_enum_variant!(UpdateEvent::Queued(UpdateEventQueued));
 impl_enum_variant!(UpdateEvent::SecondaryTrigger(UpdateEventSecondaryTrigger));
 impl_enum_variant!(UpdateEvent::TaskScheduled(UpdateEventTaskScheduled));
-impl_enum_variant!(UpdateEvent::TaskSucceeded(UpdateEventTaskSucceeded));
-impl_enum_variant!(UpdateEvent::TaskFailed(UpdateEventTaskFailed));
-impl_enum_variant!(UpdateEvent::TaskCancelled(UpdateEventTaskCancelled));
+impl_enum_variant!(UpdateEvent::TaskFinished(UpdateEventTaskFinished));
 
 /////////////////////////////////////////////////////////////////////////////////////////

@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use event_sourcing::*;
-use kamu_task_system::TaskID;
+use kamu_task_system::{TaskID, TaskOutcome};
 use opendatafabric::DatasetID;
 
 use crate::*;
@@ -117,48 +117,35 @@ impl Projection for UpdateState {
                             Ok(UpdateState { task_ids, ..s })
                         }
                     }
-                    E::TaskSucceeded(UpdateEventTaskSucceeded {
+                    E::TaskFinished(UpdateEventTaskFinished {
                         event_time: _,
                         update_id: _,
                         task_id,
+                        task_outcome,
                     }) => {
                         if s.outcome.is_some() || !s.task_ids.contains(task_id) {
                             Err(ProjectionError::new(Some(s), event))
                         } else {
-                            Ok(UpdateState {
-                                outcome: Some(UpdateOutcome::Success),
-                                ..s
-                            })
-                        }
-                    }
-                    E::TaskFailed(UpdateEventTaskFailed {
-                        event_time: _,
-                        update_id: _,
-                        task_id,
-                    }) => {
-                        if s.outcome.is_some() || !s.task_ids.contains(task_id) {
-                            Err(ProjectionError::new(Some(s), event))
-                        } else if s.task_ids.len() == MAX_UPDATE_TASKS {
-                            Ok(UpdateState {
-                                outcome: Some(UpdateOutcome::Failed),
-                                ..s
-                            })
-                        } else {
-                            Ok(s)
-                        }
-                    }
-                    E::TaskCancelled(UpdateEventTaskCancelled {
-                        event_time: _,
-                        update_id: _,
-                        task_id,
-                    }) => {
-                        if s.outcome.is_some() || !s.task_ids.contains(task_id) {
-                            Err(ProjectionError::new(Some(s), event))
-                        } else {
-                            Ok(UpdateState {
-                                outcome: Some(UpdateOutcome::Cancelled),
-                                ..s
-                            })
+                            match task_outcome {
+                                TaskOutcome::Success => Ok(UpdateState {
+                                    outcome: Some(UpdateOutcome::Success),
+                                    ..s
+                                }),
+                                TaskOutcome::Cancelled => Ok(UpdateState {
+                                    outcome: Some(UpdateOutcome::Success),
+                                    ..s
+                                }),
+                                TaskOutcome::Failed => {
+                                    if s.task_ids.len() == MAX_UPDATE_TASKS {
+                                        Ok(UpdateState {
+                                            outcome: Some(UpdateOutcome::Failed),
+                                            ..s
+                                        })
+                                    } else {
+                                        Ok(s)
+                                    }
+                                }
+                            }
                         }
                     }
                 }
