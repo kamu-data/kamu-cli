@@ -45,7 +45,7 @@ impl Projection for UpdateState {
 
         match (state, event) {
             (None, event) => match event {
-                E::Initiated(UpdateInitiated {
+                E::Initiated(UpdateEventInitiated {
                     event_time: _,
                     update_id,
                     dataset_id,
@@ -64,7 +64,7 @@ impl Projection for UpdateState {
 
                 match &event {
                     E::Initiated(_) => Err(ProjectionError::new(Some(s), event)),
-                    E::Postponed(UpdatePostponed {
+                    E::Postponed(UpdateEventPostponed {
                         event_time: _,
                         update_id: _,
                         delay_reason: _,
@@ -75,7 +75,7 @@ impl Projection for UpdateState {
                             Ok(s)
                         }
                     }
-                    E::Queued(UpdateQueued {
+                    E::Queued(UpdateEventQueued {
                         event_time: _,
                         update_id: _,
                         queued_for,
@@ -89,7 +89,7 @@ impl Projection for UpdateState {
                             })
                         }
                     }
-                    E::SecondaryTrigger(UpdateSecondaryTrigger {
+                    E::SecondaryTrigger(UpdateEventSecondaryTrigger {
                         event_time: _,
                         update_id: _,
                         trigger: _,
@@ -100,7 +100,7 @@ impl Projection for UpdateState {
                             Ok(s)
                         }
                     }
-                    E::TaskScheduled(UpdateTaskScheduled {
+                    E::TaskScheduled(UpdateEventTaskScheduled {
                         event_time: _,
                         update_id: _,
                         task_id,
@@ -117,7 +117,7 @@ impl Projection for UpdateState {
                             Ok(UpdateState { task_ids, ..s })
                         }
                     }
-                    E::TaskSucceeded(UpdateTaskSucceeded {
+                    E::TaskSucceeded(UpdateEventTaskSucceeded {
                         event_time: _,
                         update_id: _,
                         task_id,
@@ -131,7 +131,7 @@ impl Projection for UpdateState {
                             })
                         }
                     }
-                    E::TaskFailed(UpdateTaskFailed {
+                    E::TaskFailed(UpdateEventTaskFailed {
                         event_time: _,
                         update_id: _,
                         task_id,
@@ -147,7 +147,7 @@ impl Projection for UpdateState {
                             Ok(s)
                         }
                     }
-                    E::TaskCancelled(UpdateTaskCancelled {
+                    E::TaskCancelled(UpdateEventTaskCancelled {
                         event_time: _,
                         update_id: _,
                         task_id,

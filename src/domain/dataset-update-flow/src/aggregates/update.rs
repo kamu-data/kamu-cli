@@ -34,7 +34,7 @@ impl Update {
         Self(
             Aggregate::new(
                 dataset_id.clone(),
-                UpdateInitiated {
+                UpdateEventInitiated {
                     event_time: Utc::now(),
                     update_id,
                     dataset_id,
@@ -50,7 +50,7 @@ impl Update {
         &mut self,
         delay_reason: UpdateDelayReason,
     ) -> Result<(), ProjectionError<UpdateState>> {
-        let event = UpdatePostponed {
+        let event = UpdateEventPostponed {
             event_time: Utc::now(),
             update_id: self.update_id.clone(),
             delay_reason,
@@ -63,7 +63,7 @@ impl Update {
         &mut self,
         queued_for: DateTime<Utc>,
     ) -> Result<(), ProjectionError<UpdateState>> {
-        let event = UpdateQueued {
+        let event = UpdateEventQueued {
             event_time: Utc::now(),
             update_id: self.update_id.clone(),
             queued_for,
@@ -76,7 +76,7 @@ impl Update {
         &mut self,
         trigger: UpdateTrigger,
     ) -> Result<(), ProjectionError<UpdateState>> {
-        let event = UpdateSecondaryTrigger {
+        let event = UpdateEventSecondaryTrigger {
             event_time: Utc::now(),
             update_id: self.update_id.clone(),
             trigger,
@@ -89,7 +89,7 @@ impl Update {
         &mut self,
         task_id: TaskID,
     ) -> Result<(), ProjectionError<UpdateState>> {
-        let event = UpdateTaskScheduled {
+        let event = UpdateEventTaskScheduled {
             event_time: Utc::now(),
             update_id: self.update_id.clone(),
             task_id,
@@ -99,7 +99,7 @@ impl Update {
 
     /// Task succeeded
     pub fn on_task_success(&mut self, task_id: TaskID) -> Result<(), ProjectionError<UpdateState>> {
-        let event = UpdateTaskSucceeded {
+        let event = UpdateEventTaskSucceeded {
             event_time: Utc::now(),
             update_id: self.update_id.clone(),
             task_id,
@@ -112,7 +112,7 @@ impl Update {
         &mut self,
         task_id: TaskID,
     ) -> Result<(), ProjectionError<UpdateState>> {
-        let event = UpdateTaskCancelled {
+        let event = UpdateEventTaskCancelled {
             event_time: Utc::now(),
             update_id: self.update_id.clone(),
             task_id,
@@ -122,7 +122,7 @@ impl Update {
 
     /// Task failed
     pub fn on_task_failed(&mut self, task_id: TaskID) -> Result<(), ProjectionError<UpdateState>> {
-        let event = UpdateTaskFailed {
+        let event = UpdateEventTaskFailed {
             event_time: Utc::now(),
             update_id: self.update_id.clone(),
             task_id,

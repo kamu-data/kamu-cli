@@ -13,21 +13,21 @@ use chrono::Duration;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UpdateDelayReason {
-    Throttling(UpdateThrottlingDelayReason),
-    Batching(UpdateBatchingDelayReason),
+    Throttling(UpdateDelayReasonThrottling),
+    Batching(UpdateDelayReasonBatching),
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct UpdateThrottlingDelayReason {
+pub struct UpdateDelayReasonThrottling {
     pub interval: Duration,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct UpdateBatchingDelayReason {
+pub struct UpdateDelayReasonBatching {
     pub available_records: usize,
     pub threshold_recods: usize,
 }

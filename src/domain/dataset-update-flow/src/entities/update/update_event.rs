@@ -20,27 +20,27 @@ use crate::*;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum UpdateEvent {
     /// Update initiated
-    Initiated(UpdateInitiated),
+    Initiated(UpdateEventInitiated),
     /// Postponed
-    Postponed(UpdatePostponed),
+    Postponed(UpdateEventPostponed),
     /// Queued for time
-    Queued(UpdateQueued),
+    Queued(UpdateEventQueued),
     /// Secondary triger
-    SecondaryTrigger(UpdateSecondaryTrigger),
+    SecondaryTrigger(UpdateEventSecondaryTrigger),
     /// Scheduled/Rescheduled a task
-    TaskScheduled(UpdateTaskScheduled),
+    TaskScheduled(UpdateEventTaskScheduled),
     /// Succeeded task
-    TaskSucceeded(UpdateTaskSucceeded),
+    TaskSucceeded(UpdateEventTaskSucceeded),
     /// Failed task
-    TaskFailed(UpdateTaskFailed),
+    TaskFailed(UpdateEventTaskFailed),
     /// Cancelled task
-    TaskCancelled(UpdateTaskCancelled),
+    TaskCancelled(UpdateEventTaskCancelled),
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct UpdateInitiated {
+pub struct UpdateEventInitiated {
     pub event_time: DateTime<Utc>,
     pub update_id: UpdateID,
     pub dataset_id: DatasetID,
@@ -50,7 +50,7 @@ pub struct UpdateInitiated {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct UpdatePostponed {
+pub struct UpdateEventPostponed {
     pub event_time: DateTime<Utc>,
     pub update_id: UpdateID,
     pub delay_reason: UpdateDelayReason,
@@ -59,7 +59,7 @@ pub struct UpdatePostponed {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct UpdateQueued {
+pub struct UpdateEventQueued {
     pub event_time: DateTime<Utc>,
     pub update_id: UpdateID,
     pub queued_for: DateTime<Utc>,
@@ -68,7 +68,7 @@ pub struct UpdateQueued {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct UpdateSecondaryTrigger {
+pub struct UpdateEventSecondaryTrigger {
     pub event_time: DateTime<Utc>,
     pub update_id: UpdateID,
     pub trigger: UpdateTrigger,
@@ -77,7 +77,7 @@ pub struct UpdateSecondaryTrigger {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct UpdateTaskScheduled {
+pub struct UpdateEventTaskScheduled {
     pub event_time: DateTime<Utc>,
     pub update_id: UpdateID,
     pub task_id: TaskID,
@@ -86,7 +86,7 @@ pub struct UpdateTaskScheduled {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct UpdateTaskSucceeded {
+pub struct UpdateEventTaskSucceeded {
     pub event_time: DateTime<Utc>,
     pub update_id: UpdateID,
     pub task_id: TaskID,
@@ -95,7 +95,7 @@ pub struct UpdateTaskSucceeded {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct UpdateTaskFailed {
+pub struct UpdateEventTaskFailed {
     pub event_time: DateTime<Utc>,
     pub update_id: UpdateID,
     pub task_id: TaskID,
@@ -104,7 +104,7 @@ pub struct UpdateTaskFailed {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct UpdateTaskCancelled {
+pub struct UpdateEventTaskCancelled {
     pub event_time: DateTime<Utc>,
     pub update_id: UpdateID,
     pub task_id: TaskID,
@@ -141,13 +141,13 @@ impl UpdateEvent {
 }
 
 impl_enum_with_variants!(UpdateEvent);
-impl_enum_variant!(UpdateEvent::Initiated(UpdateInitiated));
-impl_enum_variant!(UpdateEvent::Postponed(UpdatePostponed));
-impl_enum_variant!(UpdateEvent::Queued(UpdateQueued));
-impl_enum_variant!(UpdateEvent::SecondaryTrigger(UpdateSecondaryTrigger));
-impl_enum_variant!(UpdateEvent::TaskScheduled(UpdateTaskScheduled));
-impl_enum_variant!(UpdateEvent::TaskSucceeded(UpdateTaskSucceeded));
-impl_enum_variant!(UpdateEvent::TaskFailed(UpdateTaskFailed));
-impl_enum_variant!(UpdateEvent::TaskCancelled(UpdateTaskCancelled));
+impl_enum_variant!(UpdateEvent::Initiated(UpdateEventInitiated));
+impl_enum_variant!(UpdateEvent::Postponed(UpdateEventPostponed));
+impl_enum_variant!(UpdateEvent::Queued(UpdateEventQueued));
+impl_enum_variant!(UpdateEvent::SecondaryTrigger(UpdateEventSecondaryTrigger));
+impl_enum_variant!(UpdateEvent::TaskScheduled(UpdateEventTaskScheduled));
+impl_enum_variant!(UpdateEvent::TaskSucceeded(UpdateEventTaskSucceeded));
+impl_enum_variant!(UpdateEvent::TaskFailed(UpdateEventTaskFailed));
+impl_enum_variant!(UpdateEvent::TaskCancelled(UpdateEventTaskCancelled));
 
 /////////////////////////////////////////////////////////////////////////////////////////

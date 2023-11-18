@@ -15,16 +15,16 @@ use crate::*;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum UpdateTrigger {
-    Manual(UpdateManualTrigger),
-    AutoPolling(UpdateAutoPollingTrigger),
-    Push(UpdatePushTrigger),
-    InputDataset(UpdateInputDatasetTrigger),
+    Manual(UpdateTriggerManual),
+    AutoPolling(UpdateTriggerAutoPolling),
+    Push(UpdateTriggerPush),
+    InputDataset(UpdateTriggerInputDataset),
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct UpdateManualTrigger {
+pub struct UpdateTriggerManual {
     pub initiator_account_id: AccountID,
     pub initiator_account_name: AccountName,
 }
@@ -32,19 +32,19 @@ pub struct UpdateManualTrigger {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct UpdateAutoPollingTrigger {}
+pub struct UpdateTriggerAutoPolling {}
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct UpdatePushTrigger {
+pub struct UpdateTriggerPush {
     // TODO: source (HTTP, MQTT, CMD, ...)
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct UpdateInputDatasetTrigger {
+pub struct UpdateTriggerInputDataset {
     pub input_dataset_id: DatasetID,
     pub input_update_id: UpdateID,
 }

@@ -20,7 +20,7 @@ pub struct UpdateScheduleState {
     /// Identifier of the related dataset
     pub dataset_id: DatasetID,
     /// Update schedule
-    pub schedule: ScheduleType,
+    pub schedule: Schedule,
     /// Pause indication
     pub paused: bool,
 }
@@ -36,7 +36,7 @@ impl Projection for UpdateScheduleState {
 
         match (state, event) {
             (None, event) => match event {
-                E::ScheduleCreated(UpdateScheduleCreated {
+                E::Created(UpdateScheduleEventCreated {
                     event_time: _,
                     dataset_id,
                     schedule,
@@ -51,22 +51,22 @@ impl Projection for UpdateScheduleState {
                 assert_eq!(&s.dataset_id, event.dataset_id());
 
                 match event {
-                    E::ScheduleCreated(_) => Err(ProjectionError::new(Some(s), event)),
-                    E::SchedulePaused(_) => {
+                    E::Created(_) => Err(ProjectionError::new(Some(s), event)),
+                    E::Paused(_) => {
                         if s.paused {
                             Err(ProjectionError::new(Some(s), event))
                         } else {
                             Ok(UpdateScheduleState { paused: true, ..s })
                         }
                     }
-                    E::ScheduleResumed(_) => {
+                    E::Resumed(_) => {
                         if s.paused {
                             Ok(UpdateScheduleState { paused: false, ..s })
                         } else {
                             Err(ProjectionError::new(Some(s), event))
                         }
                     }
-                    E::ScheduleModified(UpdateScheduleModified {
+                    E::Modified(UpdateScheduleEventModified {
                         event_time: _,
                         dataset_id: _,
                         new_schedule,

@@ -11,33 +11,33 @@
 
 /// Represents dataset update settings
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ScheduleType {
+pub enum Schedule {
     /// Time-delta based schedule
-    TimeDelta(TimeDeltaSchedule),
+    TimeDelta(ScheduleTimeDelta),
     /// Cron-based schedule
-    CronExpression(CronExpressionSchedule),
+    CronExpression(ScheduleCronExpression),
     /// Reactive schedule
-    Reactive(ReactiveSchedule),
+    Reactive(ScheduleReactive),
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TimeDeltaSchedule {
+pub struct ScheduleTimeDelta {
     pub every: chrono::Duration,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CronExpressionSchedule {
+pub struct ScheduleCronExpression {
     pub expression: String,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ReactiveSchedule {
+pub struct ScheduleReactive {
     pub throttling_period: Option<chrono::Duration>,
     pub minimal_data_batch: Option<i32>,
 }
