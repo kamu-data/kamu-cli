@@ -22,7 +22,7 @@ pub struct FtpServer {
 }
 
 impl FtpServer {
-    pub const IMAGE: &str = docker_images::FTP;
+    pub const IMAGE: &'static str = docker_images::FTP;
 
     pub async fn new(server_dir: &Path) -> Self {
         let container_runtime = ContainerRuntime::default();
