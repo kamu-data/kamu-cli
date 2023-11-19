@@ -89,7 +89,7 @@ regex = "1"
 strum = "0.25"  # Enum from string
 strum_macros = "0.25"
 tempfile = "3"
-thiserror = { version = "=1.0.44", default-features = false }  # TODO: Pinned until rustc upgrade
+thiserror = { version = "1", default-features = false }
 tokio = { version = "1", default-features = false, features=["fs", "process"] }
 tokio-stream = "0.1"
 tokio-util = { version = "0.7", default-features = false, features=["codec", "compat", "io"] }

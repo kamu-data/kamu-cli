@@ -28,7 +28,7 @@ async-trait = "0.1"
 digest = "0.10"
 pretty_assertions = { version = "1" }
 sha3 = "0.10"
-thiserror = { version = "=1.0.44", default-features = false }  # TODO: Pinned until rustc upgrade
+thiserror = { version = "1", default-features = false }
 url = "2"
 
 

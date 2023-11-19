@@ -24,7 +24,7 @@ internal-error = { workspace = true }
 chrono = { version = "0.4", features = ["serde"] }
 indoc = "2"
 futures-core = "0.3"
-thiserror = { version = "=1.0.44", default-features = false }  # TODO: Pinned until rustc upgrade
+thiserror = { version = "1", default-features = false }
 
 # Multiformats
 bs58 = "0.5"  # base58 codec

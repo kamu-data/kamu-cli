@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 #![feature(error_generic_member_access)]
-#![feature(provide_any)]
+#![feature(error_in_core)]
 
 use std::backtrace::Backtrace;
 
@@ -32,7 +32,7 @@ pub struct InternalError {
 impl InternalError {
     pub fn new<E: Into<BoxedError>>(e: E) -> Self {
         let source = e.into();
-        let backtrace = if source.request_ref::<Backtrace>().is_some() {
+        let backtrace = if core::error::request_ref::<Backtrace>(source.as_ref()).is_some() {
             None
         } else {
             Some(Backtrace::capture())

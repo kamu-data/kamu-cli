@@ -282,7 +282,7 @@ pub struct JupyterConfig {
 }
 
 impl JupyterConfig {
-    pub const IMAGE: &str = docker_images::JUPYTER;
+    pub const IMAGE: &'static str = docker_images::JUPYTER;
 
     pub fn new() -> Self {
         Self {

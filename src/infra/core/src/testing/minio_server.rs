@@ -32,7 +32,7 @@ pub struct MinioServer {
 }
 
 impl MinioServer {
-    pub const IMAGE: &str = docker_images::MINIO;
+    pub const IMAGE: &'static str = docker_images::MINIO;
 
     pub async fn new(server_dir: &Path, access_key: &str, secret_key: &str) -> Self {
         use rand::Rng;

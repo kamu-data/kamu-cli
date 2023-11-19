@@ -25,7 +25,7 @@ pub struct HttpServer {
 }
 
 impl HttpServer {
-    pub const IMAGE: &str = docker_images::HTTPD;
+    pub const IMAGE: &'static str = docker_images::HTTPD;
 
     pub async fn new(server_dir: &Path) -> Self {
         let container_runtime = ContainerRuntime::default();

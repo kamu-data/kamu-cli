@@ -31,7 +31,7 @@ futures = { version = "0.3", default-features = false }
 http = { version = "0.2" }
 pathdiff = { version = "0.2", default-features = false }
 pin-project = { version = "1", default-features = false }
-thiserror = { version = "=1.0.44", default-features = false }  # TODO: Pinned until rustc upgrade
+thiserror = { version = "1", default-features = false }
 tokio = { version = "1", default-features = false }
 tokio-stream = { version = "0.1", default-features = false }
 tracing = { version = "0.1", default-features = false }

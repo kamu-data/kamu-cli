@@ -168,7 +168,7 @@ impl WorkspaceConfig {
         let manifest = Manifest {
             kind: "WorkspaceConfig".to_owned(),
             version: WORKSPACE_CONFIG_VERSION,
-            content: self.clone(),
+            content: self,
         };
 
         serde_yaml::to_writer(file, &manifest)

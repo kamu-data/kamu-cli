@@ -9,7 +9,6 @@
 
 #![feature(error_generic_member_access)]
 #![feature(file_create_new)]
-#![feature(provide_any)]
 
 pub mod merge_strategies;
 pub mod readers;
