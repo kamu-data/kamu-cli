@@ -7,12 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-#![feature(provide_any)]
 #![feature(error_generic_member_access)]
 
 // Re-exports
 pub use event_sourcing::*;
-pub use internal_error::*;
 
 pub mod aggregates;
 pub mod entities;
@@ -22,4 +20,3 @@ pub mod services;
 pub use aggregates::*;
 pub use entities::*;
 pub use repos::*;
-pub use services::*;
