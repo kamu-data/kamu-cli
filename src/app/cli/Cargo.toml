@@ -37,6 +37,7 @@ kamu-data-utils = { workspace = true }
 opendatafabric = { workspace = true }
 kamu = { workspace = true }
 kamu-task-system-inmem = { workspace = true }
+kamu-dataset-update-flow-inmem = { workspace = true }
 kamu-adapter-auth-oso = { workspace = true }
 kamu-adapter-flight-sql = { workspace = true }
 kamu-adapter-graphql = { workspace = true }

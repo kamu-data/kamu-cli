@@ -3399,6 +3399,7 @@ dependencies = [
  "kamu-adapter-http",
  "kamu-adapter-oauth",
  "kamu-data-utils",
+ "kamu-dataset-update-flow-inmem",
  "kamu-task-system-inmem",
  "libc",
  "merge",
@@ -3491,7 +3492,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-dataset-update-flow"
-version = "0.145.6"
+version = "0.146.1"
 dependencies = [
  "async-trait",
  "chrono",
@@ -3506,6 +3507,31 @@ dependencies = [
  "thiserror",
  "tokio-stream",
  "tracing",
+ "url",
+]
+
+[[package]]
+name = "kamu-dataset-update-flow-inmem"
+version = "0.146.1"
+dependencies = [
+ "async-stream",
+ "async-trait",
+ "chrono",
+ "dill",
+ "env_logger",
+ "futures",
+ "kamu-core",
+ "kamu-dataset-update-flow",
+ "kamu-task-system",
+ "mockall",
+ "opendatafabric",
+ "serde",
+ "serde_with",
+ "test-log",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
  "url",
 ]
 
@@ -5850,18 +5876,18 @@ dependencies = [
 
 [[package]]
 name = "thiserror"
-version = "1.0.50"
+version = "1.0.44"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f9a7210f5c9a7156bb50aa36aed4c95afb51df0df00713949448cf9e97d382d2"
+checksum = "611040a08a0439f8248d1990b111c95baa9c704c805fa1f62104b39655fd7f90"
 dependencies = [
  "thiserror-impl",
 ]
 
 [[package]]
 name = "thiserror-impl"
-version = "1.0.50"
+version = "1.0.44"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "266b2e40bc00e5a6c09c3584011e08b06f123c00362c92b975ba9843aaaa14b8"
+checksum = "090198534930841fab3a5d1bb637cde49e339654e606195f8d9c76eeb081dc96"
 dependencies = [
  "proc-macro2",
  "quote",

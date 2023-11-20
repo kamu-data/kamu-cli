@@ -246,6 +246,12 @@ pub fn configure_base_catalog(
     b.add::<kamu_task_system_inmem::TaskSystemEventStoreInMemory>();
     b.bind::<dyn kamu_task_system_inmem::domain::TaskSystemEventStore, kamu_task_system_inmem::TaskSystemEventStoreInMemory>();
 
+    b.add::<kamu_dataset_update_flow_inmem::UpdateEventStoreInMem>();
+    b.bind::<dyn kamu_dataset_update_flow_inmem::domain::UpdateEventStore, kamu_dataset_update_flow_inmem::UpdateEventStoreInMem>();
+
+    b.add::<kamu_dataset_update_flow_inmem::UpdateScheduleEventStoreInMem>();
+    b.bind::<dyn kamu_dataset_update_flow_inmem::domain::UpdateScheduleEventStore, kamu_dataset_update_flow_inmem::UpdateScheduleEventStoreInMem>();
+
     b.add::<accounts::AccountService>();
     b.bind::<dyn auth::AuthenticationProvider, accounts::AccountService>();
 

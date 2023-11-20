@@ -38,7 +38,7 @@ impl Update {
     ) -> Self {
         Self(
             Aggregate::new(
-                dataset_id.clone(),
+                update_id,
                 UpdateEventInitiated {
                     event_time: now,
                     update_id,

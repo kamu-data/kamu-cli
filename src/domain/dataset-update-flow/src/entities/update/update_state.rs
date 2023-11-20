@@ -40,7 +40,7 @@ pub struct UpdateState {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 impl Projection for UpdateState {
-    type Query = DatasetID;
+    type Query = UpdateID;
     type Event = UpdateEvent;
 
     fn apply(state: Option<Self>, event: Self::Event) -> Result<Self, ProjectionError<Self>> {

@@ -47,6 +47,7 @@ kamu-dataset-update-flow = { version = "0.146.1", path = "src/domain/dataset-upd
 kamu = { version = "0.146.1", path = "src/infra/core", default-features = false }
 kamu-ingest-datafusion = { version = "0.146.1", path = "src/infra/ingest-datafusion", default-features = false }
 kamu-task-system-inmem = { version = "0.146.1", path = "src/infra/task-system-inmem", default-features = false }
+kamu-dataset-update-flow-inmem = { version = "0.146.1", path = "src/infra/dataset-update-flow-inmem", default-features = false }
 # Adapters
 kamu-adapter-auth-oso = { version = "0.146.1", path = "src/adapter/auth-oso", default-features = false }
 kamu-adapter-flight-sql = { version = "0.146.1", path = "src/adapter/flight-sql", default-features = false }
