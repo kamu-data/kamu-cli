@@ -12,6 +12,8 @@ pub use kamu_dataset_update_flow as domain;
 
 mod update_event_store_inmem;
 mod update_schedule_event_store_inmem;
+mod update_schedule_service;
 
 pub use update_event_store_inmem::*;
 pub use update_schedule_event_store_inmem::*;
+pub use update_schedule_service::*;

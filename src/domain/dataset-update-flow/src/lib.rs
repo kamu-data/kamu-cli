@@ -20,3 +20,4 @@ pub mod services;
 pub use aggregates::*;
 pub use entities::*;
 pub use repos::*;
+pub use services::*;
