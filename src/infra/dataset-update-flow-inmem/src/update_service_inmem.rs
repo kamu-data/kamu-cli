@@ -16,7 +16,7 @@ use dill::{component, scope, Singleton};
 use futures::TryStreamExt;
 use kamu_core::{InternalError, SystemTimeSource};
 use kamu_dataset_update_flow::*;
-use kamu_task_system::{TaskID, TaskOutcome, TaskScheduler};
+use kamu_task_system::*;
 use opendatafabric::{AccountID, AccountName, DatasetID};
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -25,12 +25,14 @@ pub struct UpdateServiceInMemory {
     state: Arc<Mutex<State>>,
     event_store: Arc<dyn UpdateEventStore>,
     time_source: Arc<dyn SystemTimeSource>,
-    _task_scheduler: Arc<dyn TaskScheduler>,
+    task_scheduler: Arc<dyn TaskScheduler>,
+    update_schedule_service: Arc<dyn UpdateScheduleService>,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 struct State {
+    active_schedules: HashMap<DatasetID, Schedule>,
     pending_updates_by_dataset: HashMap<DatasetID, UpdateID>,
     pending_updates_by_tasks: HashMap<TaskID, UpdateID>,
 }
@@ -38,6 +40,7 @@ struct State {
 impl State {
     fn new() -> Self {
         Self {
+            active_schedules: HashMap::new(),
             pending_updates_by_dataset: HashMap::new(),
             pending_updates_by_tasks: HashMap::new(),
         }
@@ -53,13 +56,54 @@ impl UpdateServiceInMemory {
         event_store: Arc<dyn UpdateEventStore>,
         time_source: Arc<dyn SystemTimeSource>,
         task_scheduler: Arc<dyn TaskScheduler>,
+        update_schedule_service: Arc<dyn UpdateScheduleService>,
     ) -> Self {
         Self {
             state: Arc::new(Mutex::new(State::new())),
             event_store,
             time_source,
-            _task_scheduler: task_scheduler,
+            task_scheduler,
+            update_schedule_service,
         }
+    }
+
+    async fn read_initial_schedule(&self) -> Result<(), InternalError> {
+        let active_schedules: Vec<_> = self
+            .update_schedule_service
+            .list_active_schedules()
+            .try_collect()
+            .await
+            .int_err()?;
+
+        let mut state = self.state.lock().unwrap();
+        for active_schedule in active_schedules {
+            state
+                .active_schedules
+                .insert(active_schedule.dataset_id.clone(), active_schedule.schedule);
+        }
+
+        Ok(())
+    }
+
+    async fn schedule_update_task(&self, update: &mut Update) -> Result<(), InternalError> {
+        let task = self
+            .task_scheduler
+            .create_task(LogicalPlan::UpdateDataset(UpdateDataset {
+                dataset_id: update.dataset_id.clone(),
+            }))
+            .await
+            .int_err()?;
+
+        update
+            .on_task_scheduled(self.time_source.now(), task.task_id)
+            .int_err()?;
+
+        let mut state = self.state.lock().unwrap();
+        state
+            .pending_updates_by_tasks
+            .insert(task.task_id, update.update_id);
+
+        Ok(())
     }
 }
 
@@ -69,6 +113,8 @@ impl UpdateServiceInMemory {
 impl UpdateService for UpdateServiceInMemory {
     /// Runs the update main loop
     async fn run(&self) -> Result<(), InternalError> {
+        self.read_initial_schedule().await?;
+
         loop {
             // TODO: implement real scheduling
             tracing::info!("Update service not implemented yet..");
@@ -118,6 +164,7 @@ impl UpdateService for UpdateServiceInMemory {
                     dataset_id,
                     trigger,
                 );
+                self.schedule_update_task(&mut update).await?;
                 update.save(self.event_store.as_ref()).await.int_err()?;
 
                 {
@@ -186,6 +233,8 @@ impl UpdateService for UpdateServiceInMemory {
 
     /// Handles task execution outcome.
     /// Reacts correspondingly if the task is related to updates
+    ///
+    /// TODO: connect to event bus
     async fn on_task_finished(
         &self,
         task_id: TaskID,
@@ -218,6 +267,26 @@ impl UpdateService for UpdateServiceInMemory {
         } else {
             Ok(None)
         }
+    }
+
+    /// Notifies about changes in dataset update schedule
+    ///
+    /// TODO: connect to event bus
+    async fn update_schedule_modified(
+        &self,
+        update_schedule_state: UpdateScheduleState,
+    ) -> Result<(), InternalError> {
+        let dataset_id = update_schedule_state.dataset_id;
+        let schedule = update_schedule_state.schedule;
+
+        let mut state = self.state.lock().unwrap();
+        state
+            .active_schedules
+            .entry(dataset_id)
+            .and_modify(|e| *e = schedule.clone())
+            .or_insert(schedule);
+
+        Ok(())
     }
 }
 

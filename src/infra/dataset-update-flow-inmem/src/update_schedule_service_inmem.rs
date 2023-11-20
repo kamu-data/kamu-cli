@@ -10,6 +10,7 @@
 use std::sync::Arc;
 
 use dill::{component, scope, Singleton};
+use futures::StreamExt;
 use kamu_core::SystemTimeSource;
 use kamu_dataset_update_flow::*;
 use opendatafabric::DatasetID;
@@ -41,6 +42,18 @@ impl UpdateScheduleServiceInMemory {
 
 #[async_trait::async_trait]
 impl UpdateScheduleService for UpdateScheduleServiceInMemory {
+    /// Lists update schedules, which are currently active
+    fn list_active_schedules(&self) -> UpdateScheduleStateStream {
+        // Note: terribly ineffecient - walks over events multiple times
+        Box::pin(async_stream::try_stream! {
+            let dataset_ids: Vec<_> = self.event_store.get_queries().collect().await;
+            for dataset_id in dataset_ids {
+                let update_schedule = UpdateSchedule::load(dataset_id, self.event_store.as_ref()).await.int_err()?;
+                yield update_schedule.into();
+            }
+        })
+    }
+
     /// Find current schedule, which may or may not be associated with the given
     /// dataset
     #[tracing::instrument(level = "info", skip_all, fields(%dataset_id))]

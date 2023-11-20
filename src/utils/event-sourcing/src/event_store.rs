@@ -16,6 +16,9 @@ use crate::{EventID, Projection};
 /// Common set of operations for an event store
 #[async_trait::async_trait]
 pub trait EventStore<Proj: Projection>: Send + Sync {
+    /// Returns all unique values of event queries
+    fn get_queries<'a>(&'a self) -> QueryStream<'a, Proj::Query>;
+
     /// Returns the event history of an aggregate in chronological order
     fn get_events<'a>(
         &'a self,
@@ -44,6 +47,9 @@ pub type EventStream<'a, Event> = std::pin::Pin<
     Box<dyn tokio_stream::Stream<Item = Result<(EventID, Event), GetEventsError>> + Send + 'a>,
 >;
 
+pub type QueryStream<'a, Query> =
+    std::pin::Pin<Box<dyn tokio_stream::Stream<Item = Query> + Send + 'a>>;
+
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Default)]
@@ -60,6 +66,12 @@ pub struct GetEventsOpts {
 
 #[derive(thiserror::Error, Debug)]
 pub enum GetEventsError {
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum GetQueriesError {
     #[error(transparent)]
     Internal(#[from] InternalError),
 }

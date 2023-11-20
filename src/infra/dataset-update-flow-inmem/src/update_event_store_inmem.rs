@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::collections::hash_map::Entry;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
 
 use dill::{component, scope, Singleton};
@@ -74,6 +74,27 @@ impl UpdateEventStoreInMem {
 impl EventStore<UpdateState> for UpdateEventStoreInMem {
     async fn len(&self) -> Result<usize, InternalError> {
         Ok(self.state.lock().unwrap().events.len())
+    }
+
+    fn get_queries<'a>(&'a self) -> QueryStream<'a, UpdateID> {
+        Box::pin(async_stream::stream! {
+            let seen_update_ids =
+            {
+                let mut seen_update_ids = HashSet::new();
+
+                let s = self.state.lock().unwrap();
+                for event in &s.events {
+                    seen_update_ids.insert(event.update_id());
+                }
+
+                seen_update_ids
+            };
+
+
+            for update_id in seen_update_ids {
+                yield update_id;
+            }
+        })
     }
 
     fn get_events<'a>(

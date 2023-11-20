@@ -10,6 +10,7 @@
 use event_sourcing::TryLoadError;
 use internal_error::{ErrorIntoInternal, InternalError};
 use opendatafabric::DatasetID;
+use tokio_stream::Stream;
 
 use crate::{Schedule, UpdateScheduleState};
 
@@ -17,6 +18,9 @@ use crate::{Schedule, UpdateScheduleState};
 
 #[async_trait::async_trait]
 pub trait UpdateScheduleService: Sync + Send {
+    /// Lists update schedules, which are currently active
+    fn list_active_schedules(&self) -> UpdateScheduleStateStream;
+
     /// Find current schedule, which may or may not be associated with the given
     /// dataset
     async fn find_schedule(
@@ -31,6 +35,11 @@ pub trait UpdateScheduleService: Sync + Send {
         schedule: Schedule,
     ) -> Result<UpdateScheduleState, SetScheduleError>;
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+pub type UpdateScheduleStateStream<'a> =
+    std::pin::Pin<Box<dyn Stream<Item = Result<UpdateScheduleState, InternalError>> + Send + 'a>>;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 

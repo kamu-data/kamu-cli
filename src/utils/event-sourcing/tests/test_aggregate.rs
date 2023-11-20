@@ -45,6 +45,10 @@ impl CalcEventStore {
 
 #[async_trait::async_trait]
 impl EventStore<CalcState> for CalcEventStore {
+    fn get_queries<'a>(&'a self) -> QueryStream<'a, ()> {
+        unimplemented!()
+    }
+
     fn get_events<'a>(&'a self, _query: &(), _opts: GetEventsOpts) -> EventStream<'a, CalcEvents> {
         use futures::StreamExt;
         Box::pin(

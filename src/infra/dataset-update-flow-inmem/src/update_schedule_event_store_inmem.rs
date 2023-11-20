@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 
 use dill::{component, scope, Singleton};
@@ -44,6 +45,27 @@ impl UpdateScheduleEventStoreInMem {
 impl EventStore<UpdateScheduleState> for UpdateScheduleEventStoreInMem {
     async fn len(&self) -> Result<usize, InternalError> {
         Ok(self.state.lock().unwrap().events.len())
+    }
+
+    fn get_queries<'a>(&'a self) -> QueryStream<'a, DatasetID> {
+        Box::pin(async_stream::stream! {
+            let seen_dataset_ids =
+            {
+                let mut seen_dataset_ids = HashSet::new();
+
+                let s = self.state.lock().unwrap();
+                for event in &s.events {
+                    seen_dataset_ids.insert(event.dataset_id().clone());
+                }
+
+                seen_dataset_ids
+            };
+
+
+            for dataset_id in seen_dataset_ids {
+                yield dataset_id;
+            }
+        })
     }
 
     fn get_events<'a>(

@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::collections::hash_map::{Entry, HashMap};
+use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 
 use dill::*;
@@ -67,6 +68,27 @@ impl TaskSystemEventStoreInMemory {
 impl EventStore<TaskState> for TaskSystemEventStoreInMemory {
     async fn len(&self) -> Result<usize, InternalError> {
         Ok(self.state.lock().unwrap().events.len())
+    }
+
+    fn get_queries<'a>(&'a self) -> QueryStream<'a, TaskID> {
+        Box::pin(async_stream::stream! {
+            let seen_task_ids =
+            {
+                let mut seen_task_ids = HashSet::new();
+
+                let s = self.state.lock().unwrap();
+                for event in &s.events {
+                    seen_task_ids.insert(event.task_id());
+                }
+
+                seen_task_ids
+            };
+
+
+            for task_id in seen_task_ids {
+                yield task_id;
+            }
+        })
     }
 
     fn get_events<'a>(
