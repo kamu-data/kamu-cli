@@ -19,6 +19,8 @@ use kamu_dataset_update_flow::*;
 use kamu_task_system::*;
 use opendatafabric::{AccountID, AccountName, DatasetID};
 
+use crate::update_time_wheel::UpdateTimeWheel;
+
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct UpdateServiceInMemory {
@@ -35,6 +37,7 @@ struct State {
     active_schedules: HashMap<DatasetID, Schedule>,
     pending_updates_by_dataset: HashMap<DatasetID, UpdateID>,
     pending_updates_by_tasks: HashMap<TaskID, UpdateID>,
+    update_time_wheel: UpdateTimeWheel,
 }
 
 impl State {
@@ -43,6 +46,7 @@ impl State {
             active_schedules: HashMap::new(),
             pending_updates_by_dataset: HashMap::new(),
             pending_updates_by_tasks: HashMap::new(),
+            update_time_wheel: UpdateTimeWheel::new(),
         }
     }
 }

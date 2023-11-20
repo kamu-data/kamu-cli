@@ -16,8 +16,10 @@ mod update_event_store_inmem;
 mod update_schedule_event_store_inmem;
 mod update_schedule_service_inmem;
 mod update_service_inmem;
+mod update_time_wheel;
 
 pub use update_event_store_inmem::*;
 pub use update_schedule_event_store_inmem::*;
 pub use update_schedule_service_inmem::*;
 pub use update_service_inmem::*;
+pub(crate) use update_time_wheel::*;
