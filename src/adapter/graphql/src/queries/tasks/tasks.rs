@@ -47,8 +47,11 @@ impl Tasks {
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_PER_PAGE);
 
-        let mut nodes: Vec<_> = task_sched
+        let tasks_stream = task_sched
             .list_tasks_by_dataset(&dataset_id)
+            .map_err(|e| e.int_err())?;
+
+        let mut nodes: Vec<_> = tasks_stream
             .skip(page * per_page)
             .take(per_page + 1) // Take one extra to see if next page exists
             .map_ok(|t| Task::new(t))

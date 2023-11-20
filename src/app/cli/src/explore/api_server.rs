@@ -12,6 +12,7 @@ use std::sync::Arc;
 
 use dill::Catalog;
 use internal_error::*;
+use kamu_dataset_update_flow_inmem::domain::UpdateService;
 use kamu_task_system_inmem::domain::TaskExecutor;
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -22,6 +23,7 @@ pub struct APIServer {
         axum::routing::IntoMakeService<axum::Router>,
     >,
     task_executor: Arc<dyn TaskExecutor>,
+    update_service: Arc<dyn UpdateService>,
 }
 
 impl APIServer {
@@ -34,6 +36,8 @@ impl APIServer {
         use axum::extract::Extension;
 
         let task_executor = base_catalog.get_one().unwrap();
+
+        let update_service = base_catalog.get_one().unwrap();
 
         let gql_schema = kamu_adapter_graphql::schema();
 
@@ -84,6 +88,7 @@ impl APIServer {
         Self {
             server,
             task_executor,
+            update_service,
         }
     }
 
@@ -95,6 +100,7 @@ impl APIServer {
         tokio::select! {
             res = self.server => { res.int_err() },
             res = self.task_executor.run() => { res.int_err() },
+            res = self.update_service.run() => { res.int_err() }
         }
     }
 }

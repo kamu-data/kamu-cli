@@ -249,6 +249,9 @@ pub fn configure_base_catalog(
     b.add::<kamu_dataset_update_flow_inmem::UpdateScheduleServiceInMemory>();
     b.bind::<dyn kamu_dataset_update_flow_inmem::domain::UpdateScheduleService, kamu_dataset_update_flow_inmem::UpdateScheduleServiceInMemory>();
 
+    b.add::<kamu_dataset_update_flow_inmem::UpdateServiceInMemory>();
+    b.bind::<dyn kamu_dataset_update_flow_inmem::domain::UpdateService, kamu_dataset_update_flow_inmem::UpdateServiceInMemory>();
+
     b.add::<kamu_dataset_update_flow_inmem::UpdateEventStoreInMem>();
     b.bind::<dyn kamu_dataset_update_flow_inmem::domain::UpdateEventStore, kamu_dataset_update_flow_inmem::UpdateEventStoreInMem>();
 

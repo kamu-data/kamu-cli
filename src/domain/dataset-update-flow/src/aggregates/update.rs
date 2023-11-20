@@ -122,6 +122,11 @@ impl Update {
         self.apply(event)
     }
 
+    /// Checks if update may be cancelled
+    pub fn can_cancel(&mut self) -> bool {
+        !self.outcome.is_some() && self.task_ids.is_empty() && self.cancelled_at.is_none()
+    }
+
     /// Cancel update before task started
     pub fn cancel(
         &mut self,

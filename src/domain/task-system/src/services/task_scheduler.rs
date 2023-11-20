@@ -23,7 +23,10 @@ pub trait TaskScheduler: Sync + Send {
 
     /// Returns states of tasks associated with a given dataset ordered by
     /// creation time from newest to oldest
-    fn list_tasks_by_dataset(&self, dataset_id: &DatasetID) -> TaskStateStream;
+    fn list_tasks_by_dataset(
+        &self,
+        dataset_id: &DatasetID,
+    ) -> Result<TaskStateStream, ListTasksByDatasetError>;
 
     /// Returns current state of a given task
     async fn get_task(&self, task_id: TaskID) -> Result<TaskState, GetTaskError>;

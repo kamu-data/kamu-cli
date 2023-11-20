@@ -90,11 +90,14 @@ impl TaskScheduler for TaskSchedulerInMemory {
     }
 
     #[tracing::instrument(level = "info", skip_all, fields(%dataset_id))]
-    fn list_tasks_by_dataset(&self, dataset_id: &DatasetID) -> TaskStateStream {
+    fn list_tasks_by_dataset(
+        &self,
+        dataset_id: &DatasetID,
+    ) -> Result<TaskStateStream, ListTasksByDatasetError> {
         let dataset_id = dataset_id.clone();
 
         // TODO: This requires a lot more thinking on how to make this performant
-        Box::pin(async_stream::try_stream! {
+        Ok(Box::pin(async_stream::try_stream! {
             let relevant_tasks: Vec<_> = self
                 .event_store
                 .get_tasks_by_dataset(&dataset_id)
@@ -106,7 +109,7 @@ impl TaskScheduler for TaskSchedulerInMemory {
 
                 yield task.into();
             }
-        })
+        }))
     }
 
     // TODO: Use signaling instead of a loop
