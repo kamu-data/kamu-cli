@@ -26,6 +26,7 @@ pub struct UpdateEventStoreInMem {
 #[derive(Default)]
 struct State {
     events: Vec<UpdateEvent>,
+    queries: HashSet<UpdateID>,
     updates_by_dataset: HashMap<DatasetID, Vec<UpdateID>>,
     last_update_id: Option<UpdateID>,
 }
@@ -77,24 +78,9 @@ impl EventStore<UpdateState> for UpdateEventStoreInMem {
     }
 
     fn get_queries<'a>(&'a self) -> QueryStream<'a, UpdateID> {
-        Box::pin(async_stream::stream! {
-            let seen_update_ids =
-            {
-                let mut seen_update_ids = HashSet::new();
-
-                let s = self.state.lock().unwrap();
-                for event in &s.events {
-                    seen_update_ids.insert(event.update_id());
-                }
-
-                seen_update_ids
-            };
-
-
-            for update_id in seen_update_ids {
-                yield update_id;
-            }
-        })
+        Box::pin(tokio_stream::iter(
+            self.state.lock().unwrap().queries.clone(),
+        ))
     }
 
     fn get_events<'a>(
@@ -137,7 +123,7 @@ impl EventStore<UpdateState> for UpdateEventStoreInMem {
     // TODO: concurrency
     async fn save_events(
         &self,
-        _update_id: &UpdateID,
+        update_id: &UpdateID,
         events: Vec<UpdateEvent>,
     ) -> Result<EventID, SaveEventsError> {
         let mut s = self.state.lock().unwrap();
@@ -146,6 +132,8 @@ impl EventStore<UpdateState> for UpdateEventStoreInMem {
             Self::update_index_by_dataset(&mut s.updates_by_dataset, &event);
             s.events.push(event);
         }
+
+        s.queries.get_or_insert(*update_id);
 
         Ok(EventID::new((s.events.len() - 1) as u64))
     }

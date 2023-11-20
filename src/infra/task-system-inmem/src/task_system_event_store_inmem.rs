@@ -22,6 +22,7 @@ pub struct TaskSystemEventStoreInMemory {
 #[derive(Default)]
 struct State {
     events: Vec<TaskSystemEvent>,
+    queries: HashSet<TaskID>,
     tasks_by_dataset: HashMap<DatasetID, Vec<TaskID>>,
     last_task_id: Option<TaskID>,
 }
@@ -71,24 +72,9 @@ impl EventStore<TaskState> for TaskSystemEventStoreInMemory {
     }
 
     fn get_queries<'a>(&'a self) -> QueryStream<'a, TaskID> {
-        Box::pin(async_stream::stream! {
-            let seen_task_ids =
-            {
-                let mut seen_task_ids = HashSet::new();
-
-                let s = self.state.lock().unwrap();
-                for event in &s.events {
-                    seen_task_ids.insert(event.task_id());
-                }
-
-                seen_task_ids
-            };
-
-
-            for task_id in seen_task_ids {
-                yield task_id;
-            }
-        })
+        Box::pin(tokio_stream::iter(
+            self.state.lock().unwrap().queries.clone(),
+        ))
     }
 
     fn get_events<'a>(
@@ -131,7 +117,7 @@ impl EventStore<TaskState> for TaskSystemEventStoreInMemory {
     // TODO: concurrency
     async fn save_events(
         &self,
-        _task_id: &TaskID,
+        task_id: &TaskID,
         events: Vec<TaskSystemEvent>,
     ) -> Result<EventID, SaveEventsError> {
         let mut s = self.state.lock().unwrap();
@@ -140,6 +126,8 @@ impl EventStore<TaskState> for TaskSystemEventStoreInMemory {
             Self::update_index_by_dataset(&mut s.tasks_by_dataset, &event);
             s.events.push(event);
         }
+
+        s.queries.get_or_insert(*task_id);
 
         Ok(EventID::new((s.events.len() - 1) as u64))
     }

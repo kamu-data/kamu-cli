@@ -49,7 +49,9 @@ impl UpdateScheduleService for UpdateScheduleServiceInMemory {
             let dataset_ids: Vec<_> = self.event_store.get_queries().collect().await;
             for dataset_id in dataset_ids {
                 let update_schedule = UpdateSchedule::load(dataset_id, self.event_store.as_ref()).await.int_err()?;
-                yield update_schedule.into();
+                if !update_schedule.paused {
+                    yield update_schedule.into();
+                }
             }
         })
     }
