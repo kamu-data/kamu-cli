@@ -86,7 +86,7 @@ impl UpdateServiceInMemory {
 
         for enabled_schedule in enabled_schedules {
             if enabled_schedule.schedule.is_active() {
-                self.queue_auto_polling_update(
+                self.enqueue_auto_polling_update(
                     &enabled_schedule.dataset_id,
                     &enabled_schedule.schedule,
                 )
@@ -103,7 +103,30 @@ impl UpdateServiceInMemory {
         Ok(())
     }
 
-    async fn queue_auto_polling_update(
+    async fn try_enqueue_auto_polling_update_if_enabled(
+        &self,
+        dataset_id: &DatasetID,
+    ) -> Result<(), InternalError> {
+        let maybe_active_schedule = {
+            let state = self.state.lock().unwrap();
+            if let Some(schedule) = state.active_schedules.get(&dataset_id)
+                && schedule.is_active()
+            {
+                Some(schedule.clone())
+            } else {
+                None
+            }
+        };
+
+        if let Some(active_schedule) = maybe_active_schedule {
+            self.enqueue_auto_polling_update(&dataset_id, &active_schedule)
+                .await?;
+        }
+
+        Ok(())
+    }
+
+    async fn enqueue_auto_polling_update(
         &self,
         dataset_id: &DatasetID,
         schedule: &Schedule,
@@ -121,7 +144,7 @@ impl UpdateServiceInMemory {
                 if let Some(next_activation_time) =
                     schedule.next_activation_time(self.time_source.now())
                 {
-                    self.queue_update(update.update_id, next_activation_time)?;
+                    self.enqueue_update(update.update_id, next_activation_time)?;
                     update
                         .queued_for_time(self.time_source.now(), next_activation_time)
                         .int_err()?;
@@ -133,7 +156,7 @@ impl UpdateServiceInMemory {
         }
     }
 
-    async fn queue_dependent_updates(
+    async fn enqueue_dependent_updates(
         &self,
         dataset_id: &DatasetID,
         update_id: &UpdateID,
@@ -185,7 +208,10 @@ impl UpdateServiceInMemory {
 
                         if let Some(throttling_period) = reactive_schedule.throttling_period {
                             let now = self.time_source.now();
-                            self.queue_update(dependent_update.update_id, now + throttling_period)?;
+                            self.enqueue_update(
+                                dependent_update.update_id,
+                                now + throttling_period,
+                            )?;
 
                             dependent_update
                                 .define_start_condition(
@@ -256,7 +282,7 @@ impl UpdateServiceInMemory {
         Ok(update.into())
     }
 
-    fn queue_update(
+    fn enqueue_update(
         &self,
         update_id: UpdateID,
         activation_time: DateTime<Utc>,
@@ -438,6 +464,7 @@ impl UpdateService for UpdateServiceInMemory {
                 .map(|update_id| update_id.clone())
         };
 
+        // Is this a task associated with updates?
         if let Some(update_id) = maybe_update_id {
             let mut update = Update::load(update_id, self.event_store.as_ref())
                 .await
@@ -453,10 +480,18 @@ impl UpdateService for UpdateServiceInMemory {
                 state.pending_updates_by_tasks.remove(&task_id);
             }
 
+            // In case of success:
+            //  - enqueue next auto-polling update cycle
+            //  - enqueue dependent datasets
             if task_outcome == TaskOutcome::Success {
-                self.queue_dependent_updates(&update.dataset_id, &update.update_id)
+                self.try_enqueue_auto_polling_update_if_enabled(&update.dataset_id)
+                    .await?;
+
+                self.enqueue_dependent_updates(&update.dataset_id, &update.update_id)
                     .await?;
             }
+
+            // TODO: retry logic in case of failed outcome
 
             Ok(Some(update.into()))
         } else {
@@ -475,7 +510,7 @@ impl UpdateService for UpdateServiceInMemory {
         let schedule = update_schedule_state.schedule;
 
         if schedule.is_active() {
-            self.queue_auto_polling_update(&dataset_id, &schedule)
+            self.enqueue_auto_polling_update(&dataset_id, &schedule)
                 .await?;
         }
 

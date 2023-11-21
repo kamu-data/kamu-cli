@@ -67,6 +67,7 @@ pub trait UpdateService: Sync + Send {
         update_schedule_state: UpdateScheduleState,
     ) -> Result<(), InternalError>;
 }
+
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub type UpdateStateStream<'a> =
