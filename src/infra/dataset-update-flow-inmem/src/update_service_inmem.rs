@@ -12,6 +12,7 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
+use chrono::{DateTime, Utc};
 use dill::{component, scope, Singleton};
 use futures::TryStreamExt;
 use kamu_core::{InternalError, SystemTimeSource};
@@ -19,7 +20,7 @@ use kamu_dataset_update_flow::*;
 use kamu_task_system::*;
 use opendatafabric::{AccountID, AccountName, DatasetID};
 
-use crate::update_time_wheel::UpdateTimeWheel;
+use crate::ActivityTimeWheel;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -37,7 +38,7 @@ struct State {
     active_schedules: HashMap<DatasetID, Schedule>,
     pending_updates_by_dataset: HashMap<DatasetID, UpdateID>,
     pending_updates_by_tasks: HashMap<TaskID, UpdateID>,
-    update_time_wheel: UpdateTimeWheel,
+    time_wheel: ActivityTimeWheel,
 }
 
 impl State {
@@ -46,7 +47,7 @@ impl State {
             active_schedules: HashMap::new(),
             pending_updates_by_dataset: HashMap::new(),
             pending_updates_by_tasks: HashMap::new(),
-            update_time_wheel: UpdateTimeWheel::new(),
+            time_wheel: ActivityTimeWheel::new(),
         }
     }
 }
@@ -71,21 +72,118 @@ impl UpdateServiceInMemory {
         }
     }
 
-    async fn read_initial_schedule(&self) -> Result<(), InternalError> {
-        let active_schedules: Vec<_> = self
+    async fn read_initial_schedules(&self) -> Result<(), InternalError> {
+        let enabled_schedules: Vec<_> = self
             .update_schedule_service
-            .list_active_schedules()
+            .list_enabled_schedules()
             .try_collect()
             .await
             .int_err()?;
 
-        let mut state = self.state.lock().unwrap();
-        for active_schedule in active_schedules {
-            state
-                .active_schedules
-                .insert(active_schedule.dataset_id.clone(), active_schedule.schedule);
+        for enabled_schedule in enabled_schedules {
+            if enabled_schedule.schedule.is_active() {
+                self.queue_auto_polling_update(
+                    &enabled_schedule.dataset_id,
+                    &enabled_schedule.schedule,
+                )
+                .await?;
+            }
+
+            let mut state = self.state.lock().unwrap();
+            state.active_schedules.insert(
+                enabled_schedule.dataset_id.clone(),
+                enabled_schedule.schedule,
+            );
         }
 
+        Ok(())
+    }
+
+    async fn queue_auto_polling_update(
+        &self,
+        dataset_id: &DatasetID,
+        schedule: &Schedule,
+    ) -> Result<UpdateState, InternalError> {
+        let trigger = UpdateTrigger::AutoPolling(UpdateTriggerAutoPolling {});
+
+        match self.find_pending_update(&dataset_id) {
+            // If update is already pending for this dataset, simply merge triggers
+            Some(update_id) => self.merge_secondary_trigger(update_id, trigger).await,
+
+            // Otherwise, initiate a new update, and enqueue it in the time wheel
+            None => {
+                let mut update = self.make_new_update(dataset_id.clone(), trigger).await?;
+
+                if let Some(next_activation_time) =
+                    schedule.next_activation_time(self.time_source.now())
+                {
+                    self.queue_update(update.update_id, next_activation_time)?;
+                    update
+                        .queued_for_time(self.time_source.now(), next_activation_time)
+                        .int_err()?;
+                }
+
+                update.save(self.event_store.as_ref()).await.int_err()?;
+                Ok(update.into())
+            }
+        }
+    }
+
+    fn find_pending_update(&self, dataset_id: &DatasetID) -> Option<UpdateID> {
+        let state = self.state.lock().unwrap();
+        state
+            .pending_updates_by_dataset
+            .get(&dataset_id)
+            .map(|update_id| update_id.to_owned())
+    }
+
+    async fn make_new_update(
+        &self,
+        dataset_id: DatasetID,
+        trigger: UpdateTrigger,
+    ) -> Result<Update, InternalError> {
+        let update = Update::new(
+            self.time_source.now(),
+            self.event_store.new_update_id(),
+            dataset_id,
+            trigger,
+        );
+
+        {
+            let mut state = self.state.lock().unwrap();
+            state
+                .pending_updates_by_dataset
+                .insert(update.dataset_id.clone(), update.update_id);
+        }
+
+        Ok(update)
+    }
+
+    async fn merge_secondary_trigger(
+        &self,
+        update_id: UpdateID,
+        trigger: UpdateTrigger,
+    ) -> Result<UpdateState, InternalError> {
+        let mut update = Update::load(update_id, self.event_store.as_ref())
+            .await
+            .int_err()?;
+        update
+            .add_trigger(self.time_source.now(), trigger)
+            .int_err()?;
+        update.save(self.event_store.as_ref()).await.int_err()?;
+        Ok(update.into())
+    }
+
+    fn queue_update(
+        &self,
+        update_id: UpdateID,
+        activation_time: DateTime<Utc>,
+    ) -> Result<(), InternalError> {
+        self.state
+            .lock()
+            .unwrap()
+            .time_wheel
+            .activate_at(activation_time, update_id.into())?;
         Ok(())
     }
 
@@ -117,11 +215,34 @@ impl UpdateServiceInMemory {
 impl UpdateService for UpdateServiceInMemory {
     /// Runs the update main loop
     async fn run(&self) -> Result<(), InternalError> {
-        self.read_initial_schedule().await?;
+        self.read_initial_schedules().await?;
 
         loop {
-            // TODO: implement real scheduling
-            tracing::info!("Update service not implemented yet..");
+            let maybe_nearest_activation_time = {
+                let state = self.state.lock().unwrap();
+                state.time_wheel.nearest_activation_moment()
+            };
+
+            if let Some(nearest_activation_time) = maybe_nearest_activation_time
+                && nearest_activation_time <= self.time_source.now()
+            {
+                let planned_updates: Vec<_> = {
+                    let state = self.state.lock().unwrap();
+                    state.time_wheel.nearest_planned_activities().collect()
+                };
+
+                for update_id in planned_updates {
+                    let mut update =
+                        Update::load(UpdateID::new(update_id), self.event_store.as_ref())
+                            .await
+                            .int_err()?;
+                    self.schedule_update_task(&mut update).await?;
+                }
+
+                let mut state = self.state.lock().unwrap();
+                state.time_wheel.spin();
+            }
+
             tokio::time::sleep(std::time::Duration::from_secs(1)).await;
             continue;
         }
@@ -133,51 +254,25 @@ impl UpdateService for UpdateServiceInMemory {
         dataset_id: DatasetID,
         initiator_account_id: AccountID,
         initiator_account_name: AccountName,
-    ) -> Result<UpdateState, RequestManualUpdateError> {
+    ) -> Result<UpdateState, RequestUpdateError> {
         let trigger = UpdateTrigger::Manual(UpdateTriggerManual {
             initiator_account_id,
             initiator_account_name,
         });
 
-        let maybe_update_id = {
-            let state = self.state.lock().unwrap();
-            state
-                .pending_updates_by_dataset
-                .get(&dataset_id)
-                .map(|update_id| update_id.clone())
-        };
-
-        match maybe_update_id {
+        match self.find_pending_update(&dataset_id) {
             // If update is already pending for this dataset, simply merge triggers
-            Some(update_id) => {
-                let mut update = Update::load(update_id, self.event_store.as_ref())
-                    .await
-                    .int_err()?;
-                update
-                    .add_trigger(self.time_source.now(), trigger)
-                    .int_err()?;
-                update.save(self.event_store.as_ref()).await.int_err()?;
-                Ok(update.into())
-            }
+            Some(update_id) => self
+                .merge_secondary_trigger(update_id, trigger)
+                .await
+                .map_err(|e| RequestUpdateError::Internal(e)),
 
-            // Otherwise, initiate a new update
+            // Otherwise, initiate a new update and schedule immediate task
             None => {
-                let mut update = Update::new(
-                    self.time_source.now(),
-                    self.event_store.new_update_id(),
-                    dataset_id,
-                    trigger,
-                );
+                let mut update = self.make_new_update(dataset_id, trigger).await?;
                 self.schedule_update_task(&mut update).await?;
                 update.save(self.event_store.as_ref()).await.int_err()?;
-
-                {
-                    let mut state = self.state.lock().unwrap();
-                    state
-                        .pending_updates_by_dataset
-                        .insert(update.dataset_id.clone(), update.update_id);
-                    Ok(update.into())
-                }
+                Ok(update.into())
             }
         }
     }
@@ -228,6 +323,15 @@ impl UpdateService for UpdateServiceInMemory {
 
             {
                 let mut state = self.state.lock().unwrap();
+                if state
+                    .time_wheel
+                    .is_activation_planned(update.update_id.into())
+                {
+                    state
+                        .time_wheel
+                        .cancel_activation(update.update_id.into())
+                        .map_err(|e| CancelUpdateError::Internal(e.int_err()))?;
+                }
                 state.pending_updates_by_dataset.remove(&update.dataset_id);
             }
         }
@@ -282,6 +386,11 @@ impl UpdateService for UpdateServiceInMemory {
     ) -> Result<(), InternalError> {
         let dataset_id = update_schedule_state.dataset_id;
         let schedule = update_schedule_state.schedule;
+
+        if schedule.is_active() {
+            self.queue_auto_polling_update(&dataset_id, &schedule)
+                .await?;
+        }
 
         let mut state = self.state.lock().unwrap();
         state

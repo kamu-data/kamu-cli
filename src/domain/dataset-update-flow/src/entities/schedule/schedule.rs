@@ -9,6 +9,8 @@
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+use chrono::{DateTime, Utc};
+
 /// Represents dataset update settings
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Schedule {
@@ -40,6 +42,28 @@ pub struct ScheduleCronExpression {
 pub struct ScheduleReactive {
     pub throttling_period: Option<chrono::Duration>,
     pub minimal_data_batch: Option<i32>,
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+impl Schedule {
+    pub fn is_active(&self) -> bool {
+        match self {
+            Schedule::TimeDelta(_) => true,
+            Schedule::CronExpression(_) => true,
+            Schedule::Reactive(_) => false,
+        }
+    }
+
+    pub fn next_activation_time(&self, now: DateTime<Utc>) -> Option<DateTime<Utc>> {
+        match self {
+            Schedule::TimeDelta(td) => Some(now + td.every),
+            Schedule::CronExpression(_) => {
+                unimplemented!()
+            }
+            Schedule::Reactive(_) => None,
+        }
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

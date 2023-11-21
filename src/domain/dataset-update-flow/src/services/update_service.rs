@@ -29,7 +29,7 @@ pub trait UpdateService: Sync + Send {
         dataset_id: DatasetID,
         initiator_account_id: AccountID,
         initiator_account_name: AccountName,
-    ) -> Result<UpdateState, RequestManualUpdateError>;
+    ) -> Result<UpdateState, RequestUpdateError>;
 
     /// Returns states of updates associated with a given dataset ordered by
     /// creation time from newest to oldest
@@ -75,7 +75,7 @@ pub type UpdateStateStream<'a> =
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(thiserror::Error, Debug)]
-pub enum RequestManualUpdateError {
+pub enum RequestUpdateError {
     #[error(transparent)]
     Internal(#[from] InternalError),
 }

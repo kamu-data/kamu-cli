@@ -18,8 +18,8 @@ use crate::{Schedule, UpdateScheduleState};
 
 #[async_trait::async_trait]
 pub trait UpdateScheduleService: Sync + Send {
-    /// Lists update schedules, which are currently active
-    fn list_active_schedules(&self) -> UpdateScheduleStateStream;
+    /// Lists update schedules, which are currently enabled
+    fn list_enabled_schedules(&self) -> UpdateScheduleStateStream;
 
     /// Find current schedule, which may or may not be associated with the given
     /// dataset

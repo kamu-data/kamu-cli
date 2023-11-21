@@ -42,8 +42,8 @@ impl UpdateScheduleServiceInMemory {
 
 #[async_trait::async_trait]
 impl UpdateScheduleService for UpdateScheduleServiceInMemory {
-    /// Lists update schedules, which are currently active
-    fn list_active_schedules(&self) -> UpdateScheduleStateStream {
+    /// Lists update schedules, which are currently enabled
+    fn list_enabled_schedules(&self) -> UpdateScheduleStateStream {
         // Note: terribly ineffecient - walks over events multiple times
         Box::pin(async_stream::try_stream! {
             let dataset_ids: Vec<_> = self.event_store.get_queries().collect().await;

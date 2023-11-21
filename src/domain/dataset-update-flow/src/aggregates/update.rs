@@ -65,7 +65,7 @@ impl Update {
     }
 
     /// Queue for time
-    pub fn queue_for_time(
+    pub fn queued_for_time(
         &mut self,
         now: DateTime<Utc>,
         queued_for: DateTime<Utc>,
