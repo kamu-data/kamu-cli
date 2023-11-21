@@ -14,12 +14,14 @@
 pub use kamu_dataset_update_flow as domain;
 
 mod activity_time_wheel;
+mod dependency_graph_service_inmem;
 mod update_event_store_inmem;
 mod update_schedule_event_store_inmem;
 mod update_schedule_service_inmem;
 mod update_service_inmem;
 
 pub(crate) use activity_time_wheel::*;
+pub use dependency_graph_service_inmem::*;
 pub use update_event_store_inmem::*;
 pub use update_schedule_event_store_inmem::*;
 pub use update_schedule_service_inmem::*;

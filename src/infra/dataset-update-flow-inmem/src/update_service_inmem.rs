@@ -19,6 +19,7 @@ use kamu_core::{InternalError, SystemTimeSource};
 use kamu_dataset_update_flow::*;
 use kamu_task_system::*;
 use opendatafabric::{AccountID, AccountName, DatasetID};
+use tokio_stream::StreamExt;
 
 use crate::ActivityTimeWheel;
 
@@ -30,6 +31,7 @@ pub struct UpdateServiceInMemory {
     time_source: Arc<dyn SystemTimeSource>,
     task_scheduler: Arc<dyn TaskScheduler>,
     update_schedule_service: Arc<dyn UpdateScheduleService>,
+    dependency_graph_service: Arc<dyn DependencyGraphService>,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -62,6 +64,7 @@ impl UpdateServiceInMemory {
         time_source: Arc<dyn SystemTimeSource>,
         task_scheduler: Arc<dyn TaskScheduler>,
         update_schedule_service: Arc<dyn UpdateScheduleService>,
+        dependency_graph_service: Arc<dyn DependencyGraphService>,
     ) -> Self {
         Self {
             state: Arc::new(Mutex::new(State::new())),
@@ -69,6 +72,7 @@ impl UpdateServiceInMemory {
             time_source,
             task_scheduler,
             update_schedule_service,
+            dependency_graph_service,
         }
     }
 
@@ -127,6 +131,84 @@ impl UpdateServiceInMemory {
                 Ok(update.into())
             }
         }
+    }
+
+    async fn queue_dependent_updates(
+        &self,
+        dataset_id: &DatasetID,
+        update_id: &UpdateID,
+    ) -> Result<(), InternalError> {
+        // Extract list of downstream 1 level datasets
+        let dependent_dataset_ids: Vec<_> = self
+            .dependency_graph_service
+            .get_downstream_dependencies(dataset_id)
+            .await
+            .int_err()?
+            .collect()
+            .await;
+
+        // For each, scan if updates are on
+        for dependent_dataset_id in dependent_dataset_ids {
+            let maybe_dependent_schedule = self
+                .state
+                .lock()
+                .unwrap()
+                .active_schedules
+                .get(&dependent_dataset_id)
+                .map(|schedule| schedule.clone());
+
+            // Expect reactive updates only
+            if let Some(dependent_schedule) = maybe_dependent_schedule
+                && let Schedule::Reactive(reactive_schedule) = dependent_schedule
+            {
+                let trigger = UpdateTrigger::InputDataset(UpdateTriggerInputDataset {
+                    input_dataset_id: dataset_id.clone(),
+                    input_update_id: update_id.clone(),
+                });
+
+                match self.find_pending_update(&dependent_dataset_id) {
+                    // If update is already pending for this dataset, simply merge triggers
+                    Some(dependent_update_id) => {
+                        self.merge_secondary_trigger(dependent_update_id, trigger)
+                            .await?;
+                    }
+
+                    // Otherwise, initiate a new update accordingly to start condition rules
+                    None => {
+                        let mut dependent_update = self
+                            .make_new_update(dependent_dataset_id.clone(), trigger)
+                            .await?;
+
+                        if reactive_schedule.minimal_data_batch.is_some() {
+                            unimplemented!("Data batching not supported yet in scheduler")
+                        }
+
+                        if let Some(throttling_period) = reactive_schedule.throttling_period {
+                            let now = self.time_source.now();
+                            self.queue_update(dependent_update.update_id, now + throttling_period)?;
+
+                            dependent_update
+                                .define_start_condition(
+                                    now,
+                                    UpdateStartCondition::Throttling(
+                                        UpdateStardConditionThrottling {
+                                            interval: throttling_period,
+                                        },
+                                    ),
+                                )
+                                .int_err()?;
+                        }
+
+                        dependent_update
+                            .save(self.event_store.as_ref())
+                            .await
+                            .int_err()?;
+                    }
+                }
+            }
+        }
+
+        Ok(())
     }
 
     fn find_pending_update(&self, dataset_id: &DatasetID) -> Option<UpdateID> {
@@ -369,6 +451,11 @@ impl UpdateService for UpdateServiceInMemory {
             {
                 let mut state = self.state.lock().unwrap();
                 state.pending_updates_by_tasks.remove(&task_id);
+            }
+
+            if task_outcome == TaskOutcome::Success {
+                self.queue_dependent_updates(&update.dataset_id, &update.update_id)
+                    .await?;
             }
 
             Ok(Some(update.into()))

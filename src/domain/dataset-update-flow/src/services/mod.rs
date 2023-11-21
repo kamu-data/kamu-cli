@@ -7,8 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod dependency_graph_service;
 mod update_schedule_service;
 mod update_service;
 
+pub use dependency_graph_service::*;
 pub use update_schedule_service::*;
 pub use update_service::*;

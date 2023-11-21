@@ -3525,6 +3525,7 @@ dependencies = [
  "kamu-task-system",
  "mockall",
  "opendatafabric",
+ "petgraph",
  "serde",
  "serde_with",
  "test-log",

@@ -246,6 +246,10 @@ pub fn configure_base_catalog(
     b.add::<kamu_task_system_inmem::TaskSystemEventStoreInMemory>();
     b.bind::<dyn kamu_task_system_inmem::domain::TaskSystemEventStore, kamu_task_system_inmem::TaskSystemEventStoreInMemory>();
 
+    b.add::<kamu_dataset_update_flow_inmem::DependencyGraphServiceInMemory>();
+    b.bind::<dyn kamu_dataset_update_flow_inmem::domain::DependencyGraphService, kamu_dataset_update_flow_inmem::DependencyGraphServiceInMemory>();
+
+    // TODO: initialize graph dependencies when starting API server
     b.add::<kamu_dataset_update_flow_inmem::UpdateScheduleServiceInMemory>();
     b.bind::<dyn kamu_dataset_update_flow_inmem::domain::UpdateScheduleService, kamu_dataset_update_flow_inmem::UpdateScheduleServiceInMemory>();
 
