@@ -13,7 +13,8 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use chrono::{DateTime, Utc};
-use dill::{component, scope, Singleton};
+use dill::{component, scope, Catalog, Singleton};
+use event_bus::EventBus;
 use futures::TryStreamExt;
 use kamu_core::{InternalError, SystemTimeSource};
 use kamu_dataset_update_flow::*;
@@ -61,11 +62,14 @@ impl State {
 impl UpdateServiceInMemory {
     pub fn new(
         event_store: Arc<dyn UpdateEventStore>,
+        event_bus: Arc<EventBus>,
         time_source: Arc<dyn SystemTimeSource>,
         task_scheduler: Arc<dyn TaskScheduler>,
         update_schedule_service: Arc<dyn UpdateScheduleService>,
         dependency_graph_service: Arc<dyn DependencyGraphService>,
     ) -> Self {
+        Self::setup_event_handlers(event_bus.as_ref());
+
         Self {
             state: Arc::new(Mutex::new(State::new())),
             event_store,
@@ -74,6 +78,19 @@ impl UpdateServiceInMemory {
             update_schedule_service,
             dependency_graph_service,
         }
+    }
+
+    fn setup_event_handlers(event_bus: &EventBus) {
+        event_bus.subscribe_event(
+            async move |catalog: Arc<Catalog>, event: UpdateScheduleBusEventModified| {
+                let update_service = { catalog.get_one::<dyn UpdateService>().unwrap() };
+                update_service
+                    .update_schedule_modified(event.dataset_id.clone())
+                    .await?;
+
+                Ok(())
+            },
+        );
     }
 
     async fn read_initial_schedules(&self) -> Result<(), InternalError> {
@@ -500,26 +517,33 @@ impl UpdateService for UpdateServiceInMemory {
     }
 
     /// Notifies about changes in dataset update schedule
-    ///
-    /// TODO: connect to event bus
-    async fn update_schedule_modified(
-        &self,
-        update_schedule_state: UpdateScheduleState,
-    ) -> Result<(), InternalError> {
-        let dataset_id = update_schedule_state.dataset_id;
-        let schedule = update_schedule_state.schedule;
+    async fn update_schedule_modified(&self, dataset_id: DatasetID) -> Result<(), InternalError> {
+        let maybe_update_schedule = self
+            .update_schedule_service
+            .find_schedule(&dataset_id)
+            .await
+            .map_err(|e| match e {
+                FindScheduleError::Internal(e) => e,
+            })?;
 
-        if schedule.is_active() {
-            self.enqueue_auto_polling_update(&dataset_id, &schedule)
-                .await?;
+        if maybe_update_schedule.is_none() || maybe_update_schedule.as_ref().unwrap().paused {
+            let mut state = self.state.lock().unwrap();
+            state.active_schedules.remove(&dataset_id);
+        } else {
+            let schedule = maybe_update_schedule.unwrap().schedule;
+
+            if schedule.is_active() {
+                self.enqueue_auto_polling_update(&dataset_id, &schedule)
+                    .await?;
+            }
+
+            let mut state = self.state.lock().unwrap();
+            state
+                .active_schedules
+                .entry(dataset_id)
+                .and_modify(|e| *e = schedule.clone())
+                .or_insert(schedule);
         }
-
-        let mut state = self.state.lock().unwrap();
-        state
-            .active_schedules
-            .entry(dataset_id)
-            .and_modify(|e| *e = schedule.clone())
-            .or_insert(schedule);
 
         Ok(())
     }

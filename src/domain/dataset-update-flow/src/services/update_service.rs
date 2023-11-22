@@ -14,7 +14,7 @@ use kamu_task_system::{TaskID, TaskOutcome};
 use opendatafabric::{AccountID, AccountName, DatasetID};
 use tokio_stream::Stream;
 
-use crate::{UpdateID, UpdateScheduleState, UpdateState};
+use crate::{UpdateID, UpdateState};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -60,12 +60,7 @@ pub trait UpdateService: Sync + Send {
     ) -> Result<Option<UpdateState>, InternalError>;
 
     /// Notifies about changes in dataset update schedule
-    ///
-    /// TODO: connect to event bus
-    async fn update_schedule_modified(
-        &self,
-        update_schedule_state: UpdateScheduleState,
-    ) -> Result<(), InternalError>;
+    async fn update_schedule_modified(&self, dataset_id: DatasetID) -> Result<(), InternalError>;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

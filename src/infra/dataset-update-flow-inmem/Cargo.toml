@@ -22,6 +22,7 @@ opendatafabric = { workspace = true }
 kamu-core = { workspace = true }
 kamu-task-system = { workspace = true }
 kamu-dataset-update-flow = { workspace = true }
+event-bus = { workspace = true }
 
 async-stream = "0.3"
 async-trait = { version = "0.1", default-features = false }

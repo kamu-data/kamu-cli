@@ -10,6 +10,7 @@
 use std::sync::Arc;
 
 use dill::{component, scope, Singleton};
+use event_bus::EventBus;
 use futures::StreamExt;
 use kamu_core::SystemTimeSource;
 use kamu_dataset_update_flow::*;
@@ -20,6 +21,7 @@ use opendatafabric::DatasetID;
 pub struct UpdateScheduleServiceInMemory {
     event_store: Arc<dyn UpdateScheduleEventStore>,
     time_source: Arc<dyn SystemTimeSource>,
+    event_bus: Arc<EventBus>,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -30,11 +32,23 @@ impl UpdateScheduleServiceInMemory {
     pub fn new(
         event_store: Arc<dyn UpdateScheduleEventStore>,
         time_source: Arc<dyn SystemTimeSource>,
+        event_bus: Arc<EventBus>,
     ) -> Self {
         Self {
             event_store,
             time_source,
+            event_bus,
         }
+    }
+
+    async fn issue_update_schedule_modified(
+        &self,
+        dataset_id: &DatasetID,
+    ) -> Result<(), InternalError> {
+        let event = UpdateScheduleBusEventModified {
+            dataset_id: dataset_id.clone(),
+        };
+        self.event_bus.dispatch_event(event).await
     }
 }
 
@@ -61,27 +75,92 @@ impl UpdateScheduleService for UpdateScheduleServiceInMemory {
     #[tracing::instrument(level = "info", skip_all, fields(%dataset_id))]
     async fn find_schedule(
         &self,
-        dataset_id: DatasetID,
+        dataset_id: &DatasetID,
     ) -> Result<Option<UpdateScheduleState>, FindScheduleError> {
         let maybe_update_schedule =
-            UpdateSchedule::try_load(dataset_id, self.event_store.as_ref()).await?;
+            UpdateSchedule::try_load(dataset_id.clone(), self.event_store.as_ref()).await?;
         Ok(maybe_update_schedule.map(|us| us.into()))
     }
 
-    /// Set dataset update schedule
+    /// Set or modify dataset update schedule
     #[tracing::instrument(level = "info", skip_all)]
     async fn set_schedule(
         &self,
         dataset_id: DatasetID,
         schedule: Schedule,
     ) -> Result<UpdateScheduleState, SetScheduleError> {
-        let mut update_schedule = UpdateSchedule::new(self.time_source.now(), dataset_id, schedule);
+        let maybe_update_schedule =
+            UpdateSchedule::try_load(dataset_id.clone(), self.event_store.as_ref()).await?;
+
+        match maybe_update_schedule {
+            // Modification
+            Some(mut update_schedule) => {
+                update_schedule
+                    .modify_schedule(self.time_source.now(), schedule)
+                    .int_err()?;
+
+                update_schedule
+                    .save(self.event_store.as_ref())
+                    .await
+                    .int_err()?;
+
+                self.issue_update_schedule_modified(&update_schedule.dataset_id)
+                    .await?;
+
+                Ok(update_schedule.into())
+            }
+            // New schedule
+            None => {
+                let mut update_schedule =
+                    UpdateSchedule::new(self.time_source.now(), dataset_id, schedule);
+
+                update_schedule
+                    .save(self.event_store.as_ref())
+                    .await
+                    .int_err()?;
+
+                self.issue_update_schedule_modified(&update_schedule.dataset_id)
+                    .await?;
+
+                Ok(update_schedule.into())
+            }
+        }
+    }
+
+    /// Pause dataset update schedule
+    async fn pause_schedule(&self, dataset_id: &DatasetID) -> Result<(), PauseScheduleError> {
+        let mut update_schedule =
+            UpdateSchedule::load(dataset_id.clone(), self.event_store.as_ref()).await?;
+
+        update_schedule.pause(self.time_source.now()).int_err()?;
+
         update_schedule
             .save(self.event_store.as_ref())
             .await
             .int_err()?;
 
-        Ok(update_schedule.into())
+        self.issue_update_schedule_modified(&update_schedule.dataset_id)
+            .await?;
+
+        Ok(())
+    }
+
+    /// Resume paused dataset update schedule
+    async fn resume_schedule(&self, dataset_id: &DatasetID) -> Result<(), ResumeScheduleError> {
+        let mut update_schedule =
+            UpdateSchedule::load(dataset_id.clone(), self.event_store.as_ref()).await?;
+
+        update_schedule.resume(self.time_source.now()).int_err()?;
+
+        update_schedule
+            .save(self.event_store.as_ref())
+            .await
+            .int_err()?;
+
+        self.issue_update_schedule_modified(&update_schedule.dataset_id)
+            .await?;
+
+        Ok(())
     }
 }
 

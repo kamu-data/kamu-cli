@@ -7,12 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod schedule;
-mod update_schedule_bus_event;
-mod update_schedule_event;
-mod update_schedule_state;
+#![feature(fn_traits)]
 
-pub use schedule::*;
-pub use update_schedule_bus_event::*;
-pub use update_schedule_event::*;
-pub use update_schedule_state::*;
+mod event_bus;
+
+pub use event_bus::*;

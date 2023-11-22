@@ -7,12 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod schedule;
-mod update_schedule_bus_event;
-mod update_schedule_event;
-mod update_schedule_state;
+use opendatafabric::DatasetID;
 
-pub use schedule::*;
-pub use update_schedule_bus_event::*;
-pub use update_schedule_event::*;
-pub use update_schedule_state::*;
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone)]
+pub struct UpdateScheduleBusEventModified {
+    pub dataset_id: DatasetID,
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////

@@ -2327,6 +2327,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "event-bus"
+version = "0.146.1"
+dependencies = [
+ "dill",
+ "internal-error",
+]
+
+[[package]]
 name = "event-sourcing"
 version = "0.146.1"
 dependencies = [
@@ -3382,6 +3390,7 @@ dependencies = [
  "dirs 5.0.1",
  "duration-string",
  "env_logger",
+ "event-bus",
  "fs_extra",
  "futures",
  "glob",
@@ -3497,6 +3506,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "enum-variants",
+ "event-bus",
  "event-sourcing",
  "internal-error",
  "kamu-core",
@@ -3519,6 +3529,7 @@ dependencies = [
  "chrono",
  "dill",
  "env_logger",
+ "event-bus",
  "futures",
  "kamu-core",
  "kamu-dataset-update-flow",

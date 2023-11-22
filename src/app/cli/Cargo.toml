@@ -33,6 +33,7 @@ ftp = ["kamu/ftp"]
 # Kamu
 internal-error = { workspace = true }
 container-runtime = { workspace = true }
+event-bus = { workspace = true }
 kamu-data-utils = { workspace = true }
 opendatafabric = { workspace = true }
 kamu = { workspace = true }

@@ -19,7 +19,8 @@ doctest = false
 
 [dependencies]
 enum-variants = { workspace = true }
-event-sourcing ={ workspace = true }
+event-sourcing = { workspace = true }
+event-bus = { workspace = true }
 internal-error = { workspace = true }
 opendatafabric = { workspace = true }
 kamu-core = { workspace = true }

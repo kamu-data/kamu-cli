@@ -9,6 +9,7 @@
 
 #![feature(hash_set_entry)]
 #![feature(let_chains)]
+#![feature(async_closure)]
 
 // Re-exports
 pub use kamu_dataset_update_flow as domain;

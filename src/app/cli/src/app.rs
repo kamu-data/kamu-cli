@@ -157,6 +157,8 @@ pub fn configure_base_catalog(
     b.add::<SystemTimeSourceDefault>();
     b.bind::<dyn SystemTimeSource, SystemTimeSourceDefault>();
 
+    b.add::<event_bus::EventBus>();
+
     b.add_builder(
         builder_for::<DatasetRepositoryLocalFs>()
             .with_root(workspace_layout.datasets_dir.clone())
