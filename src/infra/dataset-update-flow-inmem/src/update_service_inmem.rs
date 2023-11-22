@@ -85,7 +85,7 @@ impl UpdateServiceInMemory {
             async move |catalog: Arc<Catalog>, event: UpdateScheduleBusEventModified| {
                 let update_service = { catalog.get_one::<dyn UpdateService>().unwrap() };
                 update_service
-                    .update_schedule_modified(event.dataset_id.clone())
+                    .update_schedule_modified(event.update_schedule_state)
                     .await?;
 
                 Ok(())
@@ -517,21 +517,17 @@ impl UpdateService for UpdateServiceInMemory {
     }
 
     /// Notifies about changes in dataset update schedule
-    async fn update_schedule_modified(&self, dataset_id: DatasetID) -> Result<(), InternalError> {
-        let maybe_update_schedule = self
-            .update_schedule_service
-            .find_schedule(&dataset_id)
-            .await
-            .map_err(|e| match e {
-                FindScheduleError::Internal(e) => e,
-            })?;
+    async fn update_schedule_modified(
+        &self,
+        update_schedule_state: UpdateScheduleState,
+    ) -> Result<(), InternalError> {
+        let dataset_id = update_schedule_state.dataset_id;
 
-        if maybe_update_schedule.is_none() || maybe_update_schedule.as_ref().unwrap().paused {
+        if update_schedule_state.paused {
             let mut state = self.state.lock().unwrap();
             state.active_schedules.remove(&dataset_id);
         } else {
-            let schedule = maybe_update_schedule.unwrap().schedule;
-
+            let schedule = update_schedule_state.schedule;
             if schedule.is_active() {
                 self.enqueue_auto_polling_update(&dataset_id, &schedule)
                     .await?;

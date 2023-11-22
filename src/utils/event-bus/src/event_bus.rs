@@ -33,10 +33,10 @@ impl EventBus {
         }
     }
 
-    pub async fn dispatch_event<TEvent: 'static + Clone>(
-        &self,
-        event: TEvent,
-    ) -> Result<(), InternalError> {
+    pub async fn dispatch_event<TEvent>(&self, event: TEvent) -> Result<(), InternalError>
+    where
+        TEvent: 'static + Clone,
+    {
         let handlers: Vec<_> = {
             let map = self.event_handlers_map.lock().unwrap();
             if let Some(handlers) = map.get(&TypeId::of::<TEvent>()) {
@@ -84,7 +84,7 @@ impl EventBus {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub type EventCallback<TEvent> = Arc<
+type EventCallback<TEvent> = Arc<
     dyn Fn(Arc<Catalog>, TEvent) -> Pin<Box<dyn Future<Output = Result<(), InternalError>> + Send>>
         + Send
         + Sync,

@@ -3506,7 +3506,6 @@ dependencies = [
  "async-trait",
  "chrono",
  "enum-variants",
- "event-bus",
  "event-sourcing",
  "internal-error",
  "kamu-core",

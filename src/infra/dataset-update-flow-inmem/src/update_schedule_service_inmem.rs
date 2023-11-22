@@ -43,10 +43,10 @@ impl UpdateScheduleServiceInMemory {
 
     async fn issue_update_schedule_modified(
         &self,
-        dataset_id: &DatasetID,
+        update_schedule_state: &UpdateScheduleState,
     ) -> Result<(), InternalError> {
         let event = UpdateScheduleBusEventModified {
-            dataset_id: dataset_id.clone(),
+            update_schedule_state: update_schedule_state.clone(),
         };
         self.event_bus.dispatch_event(event).await
     }
@@ -104,7 +104,7 @@ impl UpdateScheduleService for UpdateScheduleServiceInMemory {
                     .await
                     .int_err()?;
 
-                self.issue_update_schedule_modified(&update_schedule.dataset_id)
+                self.issue_update_schedule_modified(&update_schedule)
                     .await?;
 
                 Ok(update_schedule.into())
@@ -119,7 +119,7 @@ impl UpdateScheduleService for UpdateScheduleServiceInMemory {
                     .await
                     .int_err()?;
 
-                self.issue_update_schedule_modified(&update_schedule.dataset_id)
+                self.issue_update_schedule_modified(&update_schedule)
                     .await?;
 
                 Ok(update_schedule.into())
@@ -139,7 +139,7 @@ impl UpdateScheduleService for UpdateScheduleServiceInMemory {
             .await
             .int_err()?;
 
-        self.issue_update_schedule_modified(&update_schedule.dataset_id)
+        self.issue_update_schedule_modified(&update_schedule)
             .await?;
 
         Ok(())
@@ -157,7 +157,7 @@ impl UpdateScheduleService for UpdateScheduleServiceInMemory {
             .await
             .int_err()?;
 
-        self.issue_update_schedule_modified(&update_schedule.dataset_id)
+        self.issue_update_schedule_modified(&update_schedule)
             .await?;
 
         Ok(())

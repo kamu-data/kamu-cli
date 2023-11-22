@@ -7,13 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use opendatafabric::DatasetID;
+use crate::UpdateScheduleState;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
 pub struct UpdateScheduleBusEventModified {
-    pub dataset_id: DatasetID,
+    pub update_schedule_state: UpdateScheduleState,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
