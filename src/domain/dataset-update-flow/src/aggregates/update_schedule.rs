@@ -39,9 +39,11 @@ impl UpdateSchedule {
         &mut self,
         now: DateTime<Utc>,
     ) -> Result<(), ProjectionError<UpdateScheduleState>> {
-        let event = UpdateScheduleEventPaused {
+        let event = UpdateScheduleEventModified {
             event_time: now,
             dataset_id: self.dataset_id.clone(),
+            paused: true,
+            schedule: self.schedule.clone(),
         };
         self.apply(event)
     }
@@ -51,9 +53,11 @@ impl UpdateSchedule {
         &mut self,
         now: DateTime<Utc>,
     ) -> Result<(), ProjectionError<UpdateScheduleState>> {
-        let event = UpdateScheduleEventResumed {
+        let event = UpdateScheduleEventModified {
             event_time: now,
             dataset_id: self.dataset_id.clone(),
+            paused: false,
+            schedule: self.schedule.clone(),
         };
         self.apply(event)
     }
@@ -67,7 +71,8 @@ impl UpdateSchedule {
         let event = UpdateScheduleEventModified {
             event_time: now,
             dataset_id: self.dataset_id.clone(),
-            new_schedule,
+            paused: self.paused,
+            schedule: new_schedule,
         };
         self.apply(event)
     }

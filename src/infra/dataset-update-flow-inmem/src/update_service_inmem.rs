@@ -82,10 +82,10 @@ impl UpdateServiceInMemory {
 
     fn setup_event_handlers(event_bus: &EventBus) {
         event_bus.subscribe_event(
-            async move |catalog: Arc<Catalog>, event: UpdateScheduleBusEventModified| {
+            async move |catalog: Arc<Catalog>, event: UpdateScheduleEventModified| {
                 let update_service = { catalog.get_one::<dyn UpdateService>().unwrap() };
                 update_service
-                    .update_schedule_modified(event.update_schedule_state)
+                    .update_schedule_modified(event.dataset_id, event.paused, event.schedule)
                     .await?;
 
                 Ok(())
@@ -519,15 +519,14 @@ impl UpdateService for UpdateServiceInMemory {
     /// Notifies about changes in dataset update schedule
     async fn update_schedule_modified(
         &self,
-        update_schedule_state: UpdateScheduleState,
+        dataset_id: DatasetID,
+        paused: bool,
+        schedule: Schedule,
     ) -> Result<(), InternalError> {
-        let dataset_id = update_schedule_state.dataset_id;
-
-        if update_schedule_state.paused {
+        if paused {
             let mut state = self.state.lock().unwrap();
             state.active_schedules.remove(&dataset_id);
         } else {
-            let schedule = update_schedule_state.schedule;
             if schedule.is_active() {
                 self.enqueue_auto_polling_update(&dataset_id, &schedule)
                     .await?;

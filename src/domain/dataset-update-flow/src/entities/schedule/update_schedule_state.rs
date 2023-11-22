@@ -52,26 +52,14 @@ impl Projection for UpdateScheduleState {
 
                 match event {
                     E::Created(_) => Err(ProjectionError::new(Some(s), event)),
-                    E::Paused(_) => {
-                        if s.paused {
-                            Err(ProjectionError::new(Some(s), event))
-                        } else {
-                            Ok(UpdateScheduleState { paused: true, ..s })
-                        }
-                    }
-                    E::Resumed(_) => {
-                        if s.paused {
-                            Ok(UpdateScheduleState { paused: false, ..s })
-                        } else {
-                            Err(ProjectionError::new(Some(s), event))
-                        }
-                    }
                     E::Modified(UpdateScheduleEventModified {
                         event_time: _,
                         dataset_id: _,
-                        new_schedule,
+                        paused,
+                        schedule,
                     }) => Ok(UpdateScheduleState {
-                        schedule: new_schedule,
+                        schedule,
+                        paused,
                         ..s
                     }),
                 }

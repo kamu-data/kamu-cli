@@ -45,8 +45,11 @@ impl UpdateScheduleServiceInMemory {
         &self,
         update_schedule_state: &UpdateScheduleState,
     ) -> Result<(), InternalError> {
-        let event = UpdateScheduleBusEventModified {
-            update_schedule_state: update_schedule_state.clone(),
+        let event = UpdateScheduleEventModified {
+            event_time: self.time_source.now(),
+            dataset_id: update_schedule_state.dataset_id.clone(),
+            paused: update_schedule_state.paused,
+            schedule: update_schedule_state.schedule.clone(),
         };
         self.event_bus.dispatch_event(event).await
     }
