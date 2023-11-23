@@ -47,12 +47,12 @@ impl EventBus {
             }
         };
 
-        // TODO: concurrent launch
-        for handler in handlers.iter() {
-            (*handler)
-                .call((self.catalog.clone(), event.clone()))
-                .await?;
-        }
+        let handler_futures: Vec<_> = handlers
+            .iter()
+            .map(|handler| (*handler).call((self.catalog.clone(), event.clone())))
+            .collect();
+
+        futures::future::try_join_all(handler_futures).await?;
 
         Ok(())
     }

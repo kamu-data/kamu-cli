@@ -2331,6 +2331,7 @@ name = "event-bus"
 version = "0.146.1"
 dependencies = [
  "dill",
+ "futures",
  "internal-error",
 ]
 

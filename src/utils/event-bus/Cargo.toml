@@ -20,5 +20,6 @@ doctest = false
 [dependencies]
 internal-error = { workspace = true }
 dill = "0.7"
+futures = "0.3"
 
 [dev-dependencies]
