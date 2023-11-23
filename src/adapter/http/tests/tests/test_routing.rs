@@ -15,6 +15,7 @@ use axum::extract::{FromRequestParts, Path};
 use axum::routing::IntoMakeService;
 use axum::Router;
 use dill::builder_for;
+use event_bus::EventBus;
 use hyper::server::conn::AddrIncoming;
 use kamu::domain::*;
 use kamu::testing::*;
@@ -38,6 +39,7 @@ async fn setup_repo() -> RepoFixture {
     std::fs::create_dir(&datasets_dir).unwrap();
 
     let catalog = dill::CatalogBuilder::new()
+        .add::<EventBus>()
         .add_builder(
             builder_for::<DatasetRepositoryLocalFs>()
                 .with_root(datasets_dir)

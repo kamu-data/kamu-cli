@@ -19,6 +19,34 @@ use crate::*;
 pub struct UpdateScheduleState {
     /// Identifier of the related dataset
     pub dataset_id: DatasetID,
+    /// Relevance state
+    pub relevance: UpdateScheduleStateRelevance,
+}
+
+impl UpdateScheduleState {
+    pub fn paused(&self) -> bool {
+        match &self.relevance {
+            UpdateScheduleStateRelevance::Relevant(r) => r.paused,
+            UpdateScheduleStateRelevance::RemovedDataset => true,
+        }
+    }
+
+    pub fn schedule(&self) -> Schedule {
+        match &self.relevance {
+            UpdateScheduleStateRelevance::Relevant(r) => r.schedule.clone(),
+            UpdateScheduleStateRelevance::RemovedDataset => Schedule::None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum UpdateScheduleStateRelevance {
+    Relevant(UpdateScheduleRelevantState),
+    RemovedDataset,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UpdateScheduleRelevantState {
     /// Update schedule
     pub schedule: Schedule,
     /// Pause indication
@@ -42,26 +70,51 @@ impl Projection for UpdateScheduleState {
                     schedule,
                 }) => Ok(Self {
                     dataset_id,
-                    schedule,
-                    paused: false,
+                    relevance: UpdateScheduleStateRelevance::Relevant(
+                        UpdateScheduleRelevantState {
+                            schedule,
+                            paused: false,
+                        },
+                    ),
                 }),
                 _ => Err(ProjectionError::new(None, event)),
             },
             (Some(s), event) => {
                 assert_eq!(&s.dataset_id, event.dataset_id());
 
-                match event {
+                match &event {
                     E::Created(_) => Err(ProjectionError::new(Some(s), event)),
+
                     E::Modified(UpdateScheduleEventModified {
                         event_time: _,
                         dataset_id: _,
                         paused,
                         schedule,
-                    }) => Ok(UpdateScheduleState {
-                        schedule,
-                        paused,
-                        ..s
-                    }),
+                    }) => match &s.relevance {
+                        UpdateScheduleStateRelevance::RemovedDataset => {
+                            Err(ProjectionError::new(Some(s), event))
+                        }
+                        UpdateScheduleStateRelevance::Relevant(_) => Ok(UpdateScheduleState {
+                            relevance: UpdateScheduleStateRelevance::Relevant(
+                                UpdateScheduleRelevantState {
+                                    schedule: schedule.clone(),
+                                    paused: *paused,
+                                },
+                            ),
+                            ..s
+                        }),
+                    },
+
+                    E::DatasetRemoved(UpdateScheduleEventDatasetRemoved {
+                        event_time: _,
+                        dataset_id: _,
+                    }) => match s.relevance {
+                        UpdateScheduleStateRelevance::Relevant(_) => Ok(UpdateScheduleState {
+                            relevance: UpdateScheduleStateRelevance::RemovedDataset,
+                            ..s
+                        }),
+                        UpdateScheduleStateRelevance::RemovedDataset => Ok(s), // idempotent DELETE
+                    },
                 }
             }
         }

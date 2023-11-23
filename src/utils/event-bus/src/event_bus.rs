@@ -47,6 +47,7 @@ impl EventBus {
             }
         };
 
+        // TODO: concurrent launch
         for handler in handlers.iter() {
             (*handler)
                 .call((self.catalog.clone(), event.clone()))

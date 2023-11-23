@@ -12,6 +12,7 @@
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::str::FromStr;
 
+use event_bus::EventBus;
 use kamu::domain::auth::DatasetAction;
 use kamu::domain::{
     AnonymousAccountReason,
@@ -211,6 +212,7 @@ impl ServerHarness {
         let temp_dir = tempfile::TempDir::new().unwrap();
 
         let mut catalog_builder = dill::CatalogBuilder::new();
+        catalog_builder.add::<EventBus>();
         catalog_builder.add_value(
             kamu::testing::MockAuthenticationService::resolving_token(kamu::domain::auth::DUMMY_ACCESS_TOKEN, kamu::domain::auth::AccountInfo::dummy())
         )

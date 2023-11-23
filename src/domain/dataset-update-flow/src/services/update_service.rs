@@ -51,8 +51,6 @@ pub trait UpdateService: Sync + Send {
 
     /// Handles task execution outcome.
     /// Reacts correspondingly if the task is related to updates
-    ///
-    /// TODO: connect to event bus
     async fn on_task_finished(
         &self,
         task_id: TaskID,
@@ -66,6 +64,9 @@ pub trait UpdateService: Sync + Send {
         paused: bool,
         schedule: Schedule,
     ) -> Result<(), InternalError>;
+
+    /// Notifies about dataset removal
+    async fn on_dataset_removed(&self, dataset_id: DatasetID) -> Result<(), InternalError>;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

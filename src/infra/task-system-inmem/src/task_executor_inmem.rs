@@ -10,12 +10,14 @@
 use std::sync::Arc;
 
 use dill::*;
+use event_bus::EventBus;
 use kamu_core::{PullOptions, PullService, SystemTimeSource};
 use kamu_task_system::*;
 
 pub struct TaskExecutorInMemory {
     task_sched: Arc<dyn TaskScheduler>,
     event_store: Arc<dyn TaskSystemEventStore>,
+    event_bus: Arc<EventBus>,
     time_source: Arc<dyn SystemTimeSource>,
     catalog: Catalog,
 }
@@ -26,15 +28,31 @@ impl TaskExecutorInMemory {
     pub fn new(
         task_sched: Arc<dyn TaskScheduler>,
         event_store: Arc<dyn TaskSystemEventStore>,
+        event_bus: Arc<EventBus>,
         time_source: Arc<dyn SystemTimeSource>,
         catalog: Catalog,
     ) -> Self {
         Self {
             task_sched,
             event_store,
+            event_bus,
             time_source,
             catalog,
         }
+    }
+
+    async fn publish_task_finished(
+        &self,
+        task_id: TaskID,
+        outcome: TaskOutcome,
+    ) -> Result<(), InternalError> {
+        self.event_bus
+            .dispatch_event(TaskFinished {
+                event_time: self.time_source.now(),
+                task_id,
+                outcome,
+            })
+            .await
     }
 }
 
@@ -90,6 +108,8 @@ impl TaskExecutor for TaskExecutorInMemory {
             task.update(self.event_store.as_ref()).await.int_err()?;
             task.finish(self.time_source.now(), outcome).int_err()?;
             task.save(self.event_store.as_ref()).await.int_err()?;
+
+            self.publish_task_finished(task.task_id, outcome).await?;
         }
     }
 }

@@ -13,6 +13,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use dill::builder_for;
+use event_bus::EventBus;
 use kamu::domain::{
     auth,
     DatasetRepository,
@@ -62,6 +63,7 @@ impl ServerSideLocalFsHarness {
         let time_source = SystemTimeSourceStub::new();
 
         base_catalog_builder
+            .add::<EventBus>()
             .add_value(time_source.clone())
             .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
             .add_builder(

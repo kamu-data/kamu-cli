@@ -10,6 +10,7 @@
 use std::sync::Arc;
 
 use domain::{auth, CurrentAccountSubject};
+use event_bus::EventBus;
 use kamu::testing::MockDatasetActionAuthorizer;
 use kamu::*;
 use opendatafabric::AccountName;
@@ -24,10 +25,14 @@ fn local_fs_repo(
     dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
     multi_tenant: bool,
 ) -> DatasetRepositoryLocalFs {
+    let dummy_catalog = dill::CatalogBuilder::new().build();
+    let event_bus = Arc::new(EventBus::new(Arc::new(dummy_catalog)));
+
     DatasetRepositoryLocalFs::create(
         tempdir.path().join("datasets"),
         Arc::new(CurrentAccountSubject::new_test()),
         dataset_action_authorizer,
+        event_bus,
         multi_tenant,
     )
     .unwrap()

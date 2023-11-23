@@ -41,7 +41,7 @@ pub trait DependencyGraphService: Sync + Send {
     ) -> Result<(), RemoveDependencyError>;
 
     /// Removes dataset node and downstream nodes completely
-    async fn remove_dataset(&self, dataset_id: &DatasetID) -> Result<(), RemoveDatasetError>;
+    async fn on_dataset_removed(&self, dataset_id: &DatasetID) -> Result<(), InternalError>;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -68,14 +68,6 @@ pub enum RemoveDependencyError {
     Internal(#[from] InternalError),
     #[error(transparent)]
     NotFound(#[from] DependencyEdgeNotFoundError),
-}
-
-#[derive(Error, Debug)]
-pub enum RemoveDatasetError {
-    #[error(transparent)]
-    Internal(#[from] InternalError),
-    #[error(transparent)]
-    DatasetNotFound(#[from] DatasetNodeNotFoundError),
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

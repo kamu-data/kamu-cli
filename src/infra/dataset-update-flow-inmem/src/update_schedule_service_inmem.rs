@@ -12,6 +12,7 @@ use std::sync::Arc;
 use dill::{component, scope, Singleton};
 use event_bus::EventBus;
 use futures::StreamExt;
+use kamu_core::events::DatasetEventRemoved;
 use kamu_core::SystemTimeSource;
 use kamu_dataset_update_flow::*;
 use opendatafabric::DatasetID;
@@ -34,6 +35,9 @@ impl UpdateScheduleServiceInMemory {
         time_source: Arc<dyn SystemTimeSource>,
         event_bus: Arc<EventBus>,
     ) -> Self {
+        // TODO: lazy_static?
+        Self::setup_event_handlers(event_bus.as_ref());
+
         Self {
             event_store,
             time_source,
@@ -41,15 +45,29 @@ impl UpdateScheduleServiceInMemory {
         }
     }
 
-    async fn issue_update_schedule_modified(
+    fn setup_event_handlers(event_bus: &EventBus) {
+        event_bus.subscribe_event(
+            async move |catalog: Arc<dill::Catalog>, event: DatasetEventRemoved| {
+                let update_schedule_service =
+                    { catalog.get_one::<dyn UpdateScheduleService>().unwrap() };
+                update_schedule_service
+                    .on_dataset_removed(event.dataset_id)
+                    .await?;
+
+                Ok(())
+            },
+        );
+    }
+
+    async fn publish_update_schedule_modified(
         &self,
         update_schedule_state: &UpdateScheduleState,
     ) -> Result<(), InternalError> {
         let event = UpdateScheduleEventModified {
             event_time: self.time_source.now(),
             dataset_id: update_schedule_state.dataset_id.clone(),
-            paused: update_schedule_state.paused,
-            schedule: update_schedule_state.schedule.clone(),
+            paused: update_schedule_state.paused(),
+            schedule: update_schedule_state.schedule().clone(),
         };
         self.event_bus.dispatch_event(event).await
     }
@@ -66,7 +84,7 @@ impl UpdateScheduleService for UpdateScheduleServiceInMemory {
             let dataset_ids: Vec<_> = self.event_store.get_queries().collect().await;
             for dataset_id in dataset_ids {
                 let update_schedule = UpdateSchedule::load(dataset_id, self.event_store.as_ref()).await.int_err()?;
-                if !update_schedule.paused {
+                if !update_schedule.paused() {
                     yield update_schedule.into();
                 }
             }
@@ -107,7 +125,7 @@ impl UpdateScheduleService for UpdateScheduleServiceInMemory {
                     .await
                     .int_err()?;
 
-                self.issue_update_schedule_modified(&update_schedule)
+                self.publish_update_schedule_modified(&update_schedule)
                     .await?;
 
                 Ok(update_schedule.into())
@@ -122,7 +140,7 @@ impl UpdateScheduleService for UpdateScheduleServiceInMemory {
                     .await
                     .int_err()?;
 
-                self.issue_update_schedule_modified(&update_schedule)
+                self.publish_update_schedule_modified(&update_schedule)
                     .await?;
 
                 Ok(update_schedule.into())
@@ -142,7 +160,7 @@ impl UpdateScheduleService for UpdateScheduleServiceInMemory {
             .await
             .int_err()?;
 
-        self.issue_update_schedule_modified(&update_schedule)
+        self.publish_update_schedule_modified(&update_schedule)
             .await?;
 
         Ok(())
@@ -160,8 +178,27 @@ impl UpdateScheduleService for UpdateScheduleServiceInMemory {
             .await
             .int_err()?;
 
-        self.issue_update_schedule_modified(&update_schedule)
+        self.publish_update_schedule_modified(&update_schedule)
             .await?;
+
+        Ok(())
+    }
+
+    /// Notifies about dataset removal
+    async fn on_dataset_removed(&self, dataset_id: DatasetID) -> Result<(), InternalError> {
+        let mut update_schedule =
+            UpdateSchedule::load(dataset_id.clone(), self.event_store.as_ref())
+                .await
+                .int_err()?;
+
+        update_schedule
+            .notify_dataset_removed(self.time_source.now())
+            .int_err()?;
+
+        update_schedule
+            .save(self.event_store.as_ref())
+            .await
+            .int_err()?;
 
         Ok(())
     }

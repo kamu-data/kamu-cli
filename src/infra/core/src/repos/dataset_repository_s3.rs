@@ -11,6 +11,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use dill::*;
+use event_bus::EventBus;
 use futures::TryStreamExt;
 use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer, DEFAULT_ACCOUNT_NAME};
 use kamu_core::*;
@@ -27,6 +28,7 @@ pub struct DatasetRepositoryS3 {
     s3_context: S3Context,
     current_account_subject: Arc<CurrentAccountSubject>,
     dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
+    event_bus: Arc<EventBus>,
     multi_tenant: bool,
 }
 
@@ -37,12 +39,14 @@ impl DatasetRepositoryS3 {
         s3_context: S3Context,
         current_account_subject: Arc<CurrentAccountSubject>,
         dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
+        event_bus: Arc<EventBus>,
         multi_tenant: bool,
     ) -> Self {
         Self {
             s3_context,
             current_account_subject,
             dataset_action_authorizer,
+            event_bus,
             multi_tenant,
         }
     }
@@ -366,10 +370,17 @@ impl DatasetRepository for DatasetRepositoryS3 {
             .check_action_allowed(&dataset_handle, DatasetAction::Write)
             .await?;
 
-        match self.delete_dataset_s3_objects(&dataset_handle.id).await {
-            Ok(_) => Ok(()),
-            Err(e) => Err(DeleteDatasetError::Internal(e)),
-        }
+        self.delete_dataset_s3_objects(&dataset_handle.id)
+            .await
+            .map_err(|e| DeleteDatasetError::Internal(e))?;
+
+        self.event_bus
+            .dispatch_event(events::DatasetEventRemoved {
+                dataset_id: dataset_handle.id,
+            })
+            .await?;
+
+        Ok(())
     }
 
     fn get_downstream_dependencies<'s>(

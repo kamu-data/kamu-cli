@@ -7,8 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::sync::Arc;
-
+use event_bus::EventBus;
 use indoc::indoc;
 use kamu::*;
 use kamu_core::*;
@@ -57,18 +56,21 @@ async fn test_malformed_argument() {
 async fn test_internal_error() {
     let tempdir = tempfile::tempdir().unwrap();
 
-    // Note: Not creating a repo to cause an error
-    let dataset_repo = DatasetRepositoryLocalFs::new(
-        tempdir.path().join("datasets"),
-        Arc::new(CurrentAccountSubject::new_test()),
-        Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new()),
-        false,
-    );
-
     let cat = dill::CatalogBuilder::new()
-        .add_value(dataset_repo)
+        .add::<EventBus>()
+        .add_value(CurrentAccountSubject::new_test())
+        .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
+        .bind::<dyn auth::DatasetActionAuthorizer, auth::AlwaysHappyDatasetActionAuthorizer>()
+        .add_builder(
+            dill::builder_for::<DatasetRepositoryLocalFs>()
+                .with_root(tempdir.path().join("datasets"))
+                .with_multi_tenant(false),
+        )
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
         .build();
+
+    // Note: Not creating a repo to cause an error
+    let _ = cat.get_one::<dyn DatasetRepository>().unwrap();
 
     let schema = kamu_adapter_graphql::schema_quiet();
     let res = schema.execute(async_graphql::Request::new(indoc!(

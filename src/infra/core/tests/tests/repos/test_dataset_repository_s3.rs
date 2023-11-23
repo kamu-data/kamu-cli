@@ -9,6 +9,7 @@
 
 use std::sync::Arc;
 
+use event_bus::EventBus;
 use kamu::domain::{auth, CurrentAccountSubject};
 use kamu::testing::{LocalS3Server, MockDatasetActionAuthorizer};
 use kamu::utils::s3_context::S3Context;
@@ -25,10 +26,15 @@ async fn s3_repo(
     multi_tenant: bool,
 ) -> DatasetRepositoryS3 {
     let s3_context = S3Context::from_url(&s3.url).await;
+
+    let dummy_catalog = dill::CatalogBuilder::new().build();
+    let event_bus = Arc::new(EventBus::new(Arc::new(dummy_catalog)));
+
     DatasetRepositoryS3::new(
         s3_context,
         Arc::new(CurrentAccountSubject::new_test()),
         dataset_action_authorizer,
+        event_bus,
         multi_tenant,
     )
 }

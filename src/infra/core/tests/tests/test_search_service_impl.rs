@@ -9,10 +9,11 @@
 
 use std::assert_matches::assert_matches;
 use std::path::Path;
-use std::sync::Arc;
 
+use event_bus::EventBus;
 use kamu::domain::*;
 use kamu::testing::*;
+use kamu::utils::smart_transfer_protocol::SmartTransferProtocolClient;
 use kamu::*;
 use opendatafabric::*;
 use url::Url;
@@ -25,32 +26,37 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
     let repo_name = RepoName::new_unchecked("repo");
     let dataset_remote_alias = DatasetAliasRemote::try_from("repo/bar").unwrap();
 
-    let dataset_action_authorizer = Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new());
-
-    let dataset_repo = Arc::new(
-        DatasetRepositoryLocalFs::create(
-            tmp_workspace_dir.join("datasets"),
-            Arc::new(CurrentAccountSubject::new_test()),
-            dataset_action_authorizer.clone(),
-            false,
+    let catalog = dill::CatalogBuilder::new()
+        .add::<EventBus>()
+        .add_value(CurrentAccountSubject::new_test())
+        .add_builder(
+            dill::builder_for::<DatasetRepositoryLocalFs>()
+                .with_root(tmp_workspace_dir.join("datasets"))
+                .with_multi_tenant(false),
         )
-        .unwrap(),
-    );
-    let remote_repo_reg =
-        Arc::new(RemoteRepositoryRegistryImpl::create(tmp_workspace_dir.join("repos")).unwrap());
-    let sync_svc = SyncServiceImpl::new(
-        remote_repo_reg.clone(),
-        dataset_repo.clone(),
-        dataset_action_authorizer.clone(),
-        Arc::new(DatasetFactoryImpl::new(
-            IpfsGateway::default(),
-            Arc::new(auth::DummyOdfServerAccessTokenResolver::new()),
-        )),
-        Arc::new(DummySmartTransferProtocolClient::new()),
-        Arc::new(kamu::utils::ipfs_wrapper::IpfsClient::default()),
-    );
+        .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+        .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
+        .bind::<dyn auth::DatasetActionAuthorizer, auth::AlwaysHappyDatasetActionAuthorizer>()
+        .add_value(RemoteRepositoryRegistryImpl::create(tmp_workspace_dir.join("repos")).unwrap())
+        .bind::<dyn RemoteRepositoryRegistry, RemoteRepositoryRegistryImpl>()
+        .add_value(IpfsGateway::default())
+        .add_value(kamu::utils::ipfs_wrapper::IpfsClient::default())
+        .add::<auth::DummyOdfServerAccessTokenResolver>()
+        .bind::<dyn auth::OdfServerAccessTokenResolver, auth::DummyOdfServerAccessTokenResolver>()
+        .add::<DatasetFactoryImpl>()
+        .bind::<dyn DatasetFactory, DatasetFactoryImpl>()
+        .add::<SyncServiceImpl>()
+        .bind::<dyn SyncService, SyncServiceImpl>()
+        .add_value(DummySmartTransferProtocolClient {})
+        .bind::<dyn SmartTransferProtocolClient, DummySmartTransferProtocolClient>()
+        .add::<SearchServiceImpl>()
+        .bind::<dyn SearchService, SearchServiceImpl>()
+        .build();
 
-    let search_svc = SearchServiceImpl::new(remote_repo_reg.clone());
+    let remote_repo_reg = catalog.get_one::<dyn RemoteRepositoryRegistry>().unwrap();
+    let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
+    let sync_svc = catalog.get_one::<dyn SyncService>().unwrap();
+    let search_svc = catalog.get_one::<dyn SearchService>().unwrap();
 
     // Add repository
     remote_repo_reg

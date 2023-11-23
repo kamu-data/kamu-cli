@@ -13,9 +13,10 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use chrono::{DateTime, Utc};
-use dill::{component, scope, Catalog, Singleton};
+use dill::{component, scope, Singleton};
 use event_bus::EventBus;
 use futures::TryStreamExt;
+use kamu_core::events::DatasetEventRemoved;
 use kamu_core::{InternalError, SystemTimeSource};
 use kamu_dataset_update_flow::*;
 use kamu_task_system::*;
@@ -68,6 +69,7 @@ impl UpdateServiceInMemory {
         update_schedule_service: Arc<dyn UpdateScheduleService>,
         dependency_graph_service: Arc<dyn DependencyGraphService>,
     ) -> Self {
+        // TODO: lazy_static?
         Self::setup_event_handlers(event_bus.as_ref());
 
         Self {
@@ -81,12 +83,28 @@ impl UpdateServiceInMemory {
     }
 
     fn setup_event_handlers(event_bus: &EventBus) {
+        event_bus.subscribe_event(async move |catalog, event: UpdateScheduleEventModified| {
+            let update_service = { catalog.get_one::<dyn UpdateService>().unwrap() };
+            update_service
+                .update_schedule_modified(event.dataset_id, event.paused, event.schedule)
+                .await?;
+
+            Ok(())
+        });
+
+        event_bus.subscribe_event(async move |catalog, event: TaskFinished| {
+            let update_service = { catalog.get_one::<dyn UpdateService>().unwrap() };
+            update_service
+                .on_task_finished(event.task_id, event.outcome)
+                .await?;
+
+            Ok(())
+        });
+
         event_bus.subscribe_event(
-            async move |catalog: Arc<Catalog>, event: UpdateScheduleEventModified| {
+            async move |catalog: Arc<dill::Catalog>, event: DatasetEventRemoved| {
                 let update_service = { catalog.get_one::<dyn UpdateService>().unwrap() };
-                update_service
-                    .update_schedule_modified(event.dataset_id, event.paused, event.schedule)
-                    .await?;
+                update_service.on_dataset_removed(event.dataset_id).await?;
 
                 Ok(())
             },
@@ -102,19 +120,16 @@ impl UpdateServiceInMemory {
             .int_err()?;
 
         for enabled_schedule in enabled_schedules {
-            if enabled_schedule.schedule.is_active() {
-                self.enqueue_auto_polling_update(
-                    &enabled_schedule.dataset_id,
-                    &enabled_schedule.schedule,
-                )
-                .await?;
+            let schedule = enabled_schedule.schedule();
+            if schedule.is_active() {
+                self.enqueue_auto_polling_update(&enabled_schedule.dataset_id, &schedule)
+                    .await?;
             }
 
             let mut state = self.state.lock().unwrap();
-            state.active_schedules.insert(
-                enabled_schedule.dataset_id.clone(),
-                enabled_schedule.schedule,
-            );
+            state
+                .active_schedules
+                .insert(enabled_schedule.dataset_id.clone(), schedule);
         }
 
         Ok(())
@@ -224,6 +239,8 @@ impl UpdateServiceInMemory {
                         }
 
                         if let Some(throttling_period) = reactive_schedule.throttling_period {
+                            // TODO: throttle not from NOW, but from last update of the dependent
+                            // daataset
                             let now = self.time_source.now();
                             self.enqueue_update(
                                 dependent_update.update_id,
@@ -466,8 +483,6 @@ impl UpdateService for UpdateServiceInMemory {
 
     /// Handles task execution outcome.
     /// Reacts correspondingly if the task is related to updates
-    ///
-    /// TODO: connect to event bus
     async fn on_task_finished(
         &self,
         task_id: TaskID,
@@ -539,6 +554,28 @@ impl UpdateService for UpdateServiceInMemory {
                 .and_modify(|e| *e = schedule.clone())
                 .or_insert(schedule);
         }
+
+        Ok(())
+    }
+
+    /// Notifies about dataset removal
+    async fn on_dataset_removed(&self, dataset_id: DatasetID) -> Result<(), InternalError> {
+        let mut state = self.state.lock().unwrap();
+
+        state.active_schedules.remove(&dataset_id);
+        if let Some(update_id) = state.pending_updates_by_dataset.remove(&dataset_id) {
+            state
+                .time_wheel
+                .cancel_activation(update_id.into())
+                .int_err()?;
+        }
+
+        // Not deleting task->update association, it should be safe.
+        // Most of the time the outcome of the task will be "Cancelled".
+        // Even if task squeezes to succeed in between cancellations, it's safe:
+        //   - we will record a successful update, no consequence
+        //   - no further updates will be attempted (schedule deactivated above)
+        //   - no dependent tasks will be launched (dependency graph erases neighbors)
 
         Ok(())
     }

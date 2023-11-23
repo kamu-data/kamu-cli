@@ -43,7 +43,7 @@ impl UpdateSchedule {
             event_time: now,
             dataset_id: self.dataset_id.clone(),
             paused: true,
-            schedule: self.schedule.clone(),
+            schedule: self.schedule(),
         };
         self.apply(event)
     }
@@ -57,7 +57,7 @@ impl UpdateSchedule {
             event_time: now,
             dataset_id: self.dataset_id.clone(),
             paused: false,
-            schedule: self.schedule.clone(),
+            schedule: self.schedule(),
         };
         self.apply(event)
     }
@@ -71,8 +71,20 @@ impl UpdateSchedule {
         let event = UpdateScheduleEventModified {
             event_time: now,
             dataset_id: self.dataset_id.clone(),
-            paused: self.paused,
+            paused: self.paused(),
             schedule: new_schedule,
+        };
+        self.apply(event)
+    }
+
+    /// Handle dataset removal
+    pub fn notify_dataset_removed(
+        &mut self,
+        now: DateTime<Utc>,
+    ) -> Result<(), ProjectionError<UpdateScheduleState>> {
+        let event = UpdateScheduleEventDatasetRemoved {
+            event_time: now,
+            dataset_id: self.dataset_id.clone(),
         };
         self.apply(event)
     }

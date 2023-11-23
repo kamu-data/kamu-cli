@@ -40,6 +40,9 @@ pub trait UpdateScheduleService: Sync + Send {
 
     /// Resume paused dataset update schedule
     async fn resume_schedule(&self, dataset_id: &DatasetID) -> Result<(), ResumeScheduleError>;
+
+    /// Notifies about dataset removal
+    async fn on_dataset_removed(&self, dataset_id: DatasetID) -> Result<(), InternalError>;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

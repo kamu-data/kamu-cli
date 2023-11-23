@@ -14,6 +14,8 @@ use chrono::{DateTime, Utc};
 /// Represents dataset update settings
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Schedule {
+    /// No schedule
+    None,
     /// Time-delta based schedule
     TimeDelta(ScheduleTimeDelta),
     /// Cron-based schedule
@@ -49,6 +51,7 @@ pub struct ScheduleReactive {
 impl Schedule {
     pub fn is_active(&self) -> bool {
         match self {
+            Schedule::None => false,
             Schedule::TimeDelta(_) => true,
             Schedule::CronExpression(_) => true,
             Schedule::Reactive(_) => false,
@@ -61,7 +64,7 @@ impl Schedule {
             Schedule::CronExpression(_) => {
                 unimplemented!()
             }
-            Schedule::Reactive(_) => None,
+            _ => None,
         }
     }
 }

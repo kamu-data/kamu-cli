@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use async_graphql::*;
+use event_bus::EventBus;
 use indoc::indoc;
 use kamu::testing::MetadataFactory;
 use kamu::*;
@@ -541,6 +542,7 @@ impl GraphQLDatasetsHarness {
         std::fs::create_dir(&datasets_dir).unwrap();
 
         let base_catalog = dill::CatalogBuilder::new()
+            .add::<EventBus>()
             .add_builder(
                 dill::builder_for::<DatasetRepositoryLocalFs>()
                     .with_root(datasets_dir)

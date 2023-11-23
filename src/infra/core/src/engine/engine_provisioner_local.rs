@@ -286,6 +286,7 @@ impl Default for EngineProvisionerLocalConfig {
 // Null Object
 /////////////////////////////////////////////////////////////////////////////////////////
 
+#[component(pub)]
 pub struct EngineProvisionerNull;
 
 #[async_trait::async_trait]

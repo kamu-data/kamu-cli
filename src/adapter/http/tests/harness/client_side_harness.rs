@@ -12,6 +12,7 @@ use std::sync::Arc;
 
 use container_runtime::ContainerRuntime;
 use dill::builder_for;
+use event_bus::EventBus;
 use kamu::domain::*;
 use kamu::utils::smart_transfer_protocol::SmartTransferProtocolClient;
 use kamu::*;
@@ -52,6 +53,8 @@ impl ClientSideHarness {
         std::fs::create_dir(&cache_dir).unwrap();
 
         let mut b = dill::CatalogBuilder::new();
+
+        b.add::<EventBus>();
 
         b.add_value(CurrentAccountSubject::logged(AccountName::new_unchecked(
             CLIENT_ACCOUNT_NAME,

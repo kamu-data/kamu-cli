@@ -14,6 +14,7 @@ use std::sync::Arc;
 use container_runtime::ContainerRuntime;
 use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::parquet::record::RowAccessor;
+use event_bus::EventBus;
 use futures::StreamExt;
 use indoc::indoc;
 use itertools::Itertools;
@@ -234,43 +235,47 @@ async fn test_transform_common(transform: Transform) {
     std::fs::create_dir(&run_info_dir).unwrap();
     std::fs::create_dir(&cache_dir).unwrap();
 
-    let dataset_repo = Arc::new(
-        DatasetRepositoryLocalFs::create(
-            tempdir.path().join("datasets"),
-            Arc::new(CurrentAccountSubject::new_test()),
-            Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new()),
-            false,
+    let catalog = dill::CatalogBuilder::new()
+        .add::<EventBus>()
+        .add::<kamu_core::auth::AlwaysHappyDatasetActionAuthorizer>()
+        .bind::<dyn kamu_core::auth::DatasetActionAuthorizer, kamu_core::auth::AlwaysHappyDatasetActionAuthorizer>()
+        .add_value(CurrentAccountSubject::new_test())
+        .add_builder(
+            dill::builder_for::<DatasetRepositoryLocalFs>()
+                .with_root(tempdir.path().join("datasets"))
+                .with_multi_tenant(false)
         )
-        .unwrap(),
-    );
-    let engine_provisioner = Arc::new(EngineProvisionerLocal::new(
-        EngineProvisionerLocalConfig::default(),
-        ContainerRuntime::default(),
-        dataset_repo.clone(),
-        run_info_dir.clone(),
-    ));
+        .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+        .add_builder(
+            dill::builder_for::<EngineProvisionerLocal>()
+                .with_config(EngineProvisionerLocalConfig::default())
+                .with_container_runtime(ContainerRuntime::default())
+                .with_run_info_dir(run_info_dir.clone())
+        )
+        .bind::<dyn EngineProvisioner, EngineProvisionerLocal>()
+        .add_value(
+            ObjectStoreRegistryImpl::new(vec![Arc::new(
+                ObjectStoreBuilderLocalFs::new(),
+            )])
+        )
+        .bind::<dyn ObjectStoreRegistry, ObjectStoreRegistryImpl>()
+        .add_builder(
+            dill::builder_for::<PollingIngestServiceImpl>()
+                .with_cache_dir(cache_dir)
+                .with_run_info_dir(run_info_dir)
+                .with_container_runtime(Arc::new(ContainerRuntime::default()))
+                .with_data_format_registory(Arc::new(dataFormatRegistryImpl::new()))
+        )
+        .bind::<dyn PollingIngestService, PollingIngestServiceImpl>()
+        .add::<SystemTimeSourceDefault>()
+        .bind::<dyn SystemTimeSource, SystemTimeSourceDefault>()
+        .add::<TransformServiceImpl>()
+        .bind::<dyn TransformService, TransformServiceImpl>()
+        .build();
 
-    let dataset_action_authorizer = Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new());
-
-    let ingest_svc = PollingIngestServiceImpl::new(
-        dataset_repo.clone(),
-        dataset_action_authorizer.clone(),
-        engine_provisioner.clone(),
-        Arc::new(ObjectStoreRegistryImpl::new(vec![Arc::new(
-            ObjectStoreBuilderLocalFs::new(),
-        )])),
-        Arc::new(DataFormatRegistryImpl::new()),
-        Arc::new(ContainerRuntime::default()),
-        run_info_dir,
-        cache_dir,
-        Arc::new(SystemTimeSourceDefault),
-    );
-
-    let transform_svc = TransformServiceImpl::new(
-        dataset_repo.clone(),
-        dataset_action_authorizer.clone(),
-        engine_provisioner.clone(),
-    );
+    let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
+    let ingest_svc = catalog.get_one::<dyn IngestService>().unwrap();
+    let transform_svc = catalog.get_one::<dyn TransformService>().unwrap();
 
     ///////////////////////////////////////////////////////////////////////////
     // Root setup

@@ -13,6 +13,7 @@ use std::sync::Arc;
 
 use chrono::{DateTime, TimeZone, Utc};
 use datafusion::prelude::*;
+use event_bus::EventBus;
 use indoc::indoc;
 use kamu::testing::MetadataFactory;
 use kamu::DatasetRepositoryLocalFs;
@@ -431,15 +432,20 @@ impl Harness {
         let temp_dir = tempfile::tempdir().unwrap();
         let system_time = Utc.with_ymd_and_hms(2010, 1, 1, 12, 0, 0).unwrap();
 
-        let dataset_repo = Arc::new(
-            DatasetRepositoryLocalFs::create(
-                temp_dir.path().join("datasets"),
-                Arc::new(CurrentAccountSubject::new_test()),
-                Arc::new(kamu_core::auth::AlwaysHappyDatasetActionAuthorizer::new()),
-                false,
+        let catalog = dill::CatalogBuilder::new()
+            .add::<EventBus>()
+            .add::<kamu_core::auth::AlwaysHappyDatasetActionAuthorizer>()
+            .bind::<dyn kamu_core::auth::DatasetActionAuthorizer, kamu_core::auth::AlwaysHappyDatasetActionAuthorizer>()
+            .add_value(CurrentAccountSubject::new_test())
+            .add_builder(
+                dill::builder_for::<DatasetRepositoryLocalFs>()
+                    .with_root(temp_dir.path().join("datasets"))
+                    .with_multi_tenant(false)
             )
-            .unwrap(),
-        );
+            .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+            .build();
+
+        let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
 
         let dataset = dataset_repo
             .create_dataset(

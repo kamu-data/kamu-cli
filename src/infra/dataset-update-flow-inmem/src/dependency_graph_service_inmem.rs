@@ -11,6 +11,8 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use dill::{component, scope, Singleton};
+use event_bus::EventBus;
+use kamu_core::events::DatasetEventRemoved;
 use kamu_dataset_update_flow::*;
 use opendatafabric::DatasetID;
 use petgraph::stable_graph::{NodeIndex, StableDiGraph};
@@ -61,10 +63,27 @@ impl State {
 #[component(pub)]
 #[scope(Singleton)]
 impl DependencyGraphServiceInMemory {
-    pub fn new() -> Self {
+    pub fn new(event_bus: Arc<EventBus>) -> Self {
+        // TODO: lazy_static?
+        Self::setup_event_handlers(event_bus.as_ref());
+
         Self {
             state: Arc::new(Mutex::new(State::new())),
         }
+    }
+
+    fn setup_event_handlers(event_bus: &EventBus) {
+        event_bus.subscribe_event(
+            async move |catalog: Arc<dill::Catalog>, event: DatasetEventRemoved| {
+                let dependency_graph_service =
+                    { catalog.get_one::<dyn DependencyGraphService>().unwrap() };
+                dependency_graph_service
+                    .on_dataset_removed(&event.dataset_id)
+                    .await?;
+
+                Ok(())
+            },
+        );
     }
 }
 
@@ -149,12 +168,12 @@ impl DependencyGraphService for DependencyGraphServiceInMemory {
     }
 
     /// Removes dataset node and downstream nodes completely
-    async fn remove_dataset(&self, dataset_id: &DatasetID) -> Result<(), RemoveDatasetError> {
+    async fn on_dataset_removed(&self, dataset_id: &DatasetID) -> Result<(), InternalError> {
         let mut state = self.state.lock().unwrap();
 
         let node_index = state
             .get_dataset_node(dataset_id)
-            .map_err(|e| RemoveDatasetError::DatasetNotFound(e))?;
+            .map_err(|e| e.int_err())?;
 
         state.datasets_graph.remove_node(node_index);
         state.dataset_node_indices.remove(dataset_id);

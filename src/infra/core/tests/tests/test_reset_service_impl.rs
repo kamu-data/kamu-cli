@@ -10,6 +10,7 @@
 use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
+use event_bus::EventBus;
 use kamu::domain::*;
 use kamu::testing::*;
 use kamu::*;
@@ -102,27 +103,31 @@ impl ChainWith2BlocksTestCase {
 
 struct ResetTestHarness {
     _temp_dir: TempDir,
-    dataset_repo: Arc<DatasetRepositoryLocalFs>,
-    reset_svc: ResetServiceImpl,
+    dataset_repo: Arc<dyn DatasetRepository>,
+    reset_svc: Arc<dyn ResetService>,
 }
 
 impl ResetTestHarness {
     fn new() -> Self {
         let tempdir = tempfile::tempdir().unwrap();
-        let dataset_authorizer =
-            Arc::new(MockDatasetActionAuthorizer::new().expect_check_write_a_dataset(1));
 
-        let dataset_repo = Arc::new(
-            DatasetRepositoryLocalFs::create(
-                tempdir.path().join("datasets"),
-                Arc::new(CurrentAccountSubject::new_test()),
-                dataset_authorizer.clone(),
-                false,
+        let catalog = dill::CatalogBuilder::new()
+            .add::<EventBus>()
+            .add_value(CurrentAccountSubject::new_test())
+            .add_value(MockDatasetActionAuthorizer::new().expect_check_write_a_dataset(1))
+            .bind::<dyn auth::DatasetActionAuthorizer, MockDatasetActionAuthorizer>()
+            .add_builder(
+                dill::builder_for::<DatasetRepositoryLocalFs>()
+                    .with_root(tempdir.path().join("datasets"))
+                    .with_multi_tenant(false),
             )
-            .unwrap(),
-        );
+            .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+            .add::<ResetServiceImpl>()
+            .bind::<dyn ResetService, ResetServiceImpl>()
+            .build();
 
-        let reset_svc = ResetServiceImpl::new(dataset_repo.clone(), dataset_authorizer.clone());
+        let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
+        let reset_svc = catalog.get_one::<dyn ResetService>().unwrap();
 
         Self {
             _temp_dir: tempdir,

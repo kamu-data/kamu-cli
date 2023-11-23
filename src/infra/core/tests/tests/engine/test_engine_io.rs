@@ -12,6 +12,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use container_runtime::ContainerRuntime;
+use event_bus::EventBus;
 use indoc::indoc;
 use kamu::domain::*;
 use kamu::testing::*;
@@ -234,15 +235,20 @@ async fn test_engine_io_local_file_mount() {
     std::fs::create_dir(&run_info_dir).unwrap();
     std::fs::create_dir(&cache_dir).unwrap();
 
-    let dataset_repo = Arc::new(
-        DatasetRepositoryLocalFs::create(
-            tempdir.path().join("datasets"),
-            Arc::new(CurrentAccountSubject::new_test()),
-            Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new()),
-            false,
+    let catalog = dill::CatalogBuilder::new()
+        .add::<EventBus>()
+        .add::<kamu_core::auth::AlwaysHappyDatasetActionAuthorizer>()
+        .bind::<dyn kamu_core::auth::DatasetActionAuthorizer, kamu_core::auth::AlwaysHappyDatasetActionAuthorizer>()
+        .add_value(CurrentAccountSubject::new_test())
+        .add_builder(
+            dill::builder_for::<DatasetRepositoryLocalFs>()
+                .with_root(tempdir.path().join("datasets"))
+                .with_multi_tenant(false)
         )
-        .unwrap(),
-    );
+        .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+        .build();
+
+    let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
 
     test_engine_io_common(
         vec![Arc::new(ObjectStoreBuilderLocalFs::new())],
@@ -271,12 +277,20 @@ async fn test_engine_io_s3_to_local_file_mount_proxy() {
 
     let s3_context = kamu::utils::s3_context::S3Context::from_url(&s3.url).await;
 
-    let dataset_repo = Arc::new(DatasetRepositoryS3::new(
-        s3_context.clone(),
-        Arc::new(CurrentAccountSubject::new_test()),
-        Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new()),
-        false,
-    ));
+    let catalog = dill::CatalogBuilder::new()
+        .add::<EventBus>()
+        .add::<kamu_core::auth::AlwaysHappyDatasetActionAuthorizer>()
+        .bind::<dyn kamu_core::auth::DatasetActionAuthorizer, kamu_core::auth::AlwaysHappyDatasetActionAuthorizer>()
+        .add_value(CurrentAccountSubject::new_test())
+        .add_builder(
+            dill::builder_for::<DatasetRepositoryS3>()
+                .with_s3_context(s3_context.clone())
+                .with_multi_tenant(false)
+        )
+        .bind::<dyn DatasetRepository, DatasetRepositoryS3>()
+        .build();
+
+    let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
 
     test_engine_io_common(
         vec![

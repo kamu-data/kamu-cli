@@ -13,6 +13,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use dill::*;
 use domain::auth::{DatasetAction, DatasetActionAuthorizer, DEFAULT_ACCOUNT_NAME};
+use event_bus::EventBus;
 use futures::TryStreamExt;
 use kamu_core::*;
 use opendatafabric::*;
@@ -25,6 +26,7 @@ use crate::*;
 pub struct DatasetRepositoryLocalFs {
     storage_strategy: Box<dyn DatasetStorageStrategy>,
     dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
+    event_bus: Arc<EventBus>,
     thrash_lock: tokio::sync::Mutex<()>,
 }
 
@@ -36,6 +38,7 @@ impl DatasetRepositoryLocalFs {
         root: PathBuf,
         current_account_subject: Arc<CurrentAccountSubject>,
         dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
+        event_bus: Arc<EventBus>,
         multi_tenant: bool,
     ) -> Self {
         Self {
@@ -48,6 +51,7 @@ impl DatasetRepositoryLocalFs {
                 Box::new(DatasetSingleTenantStorageStrategy::new(root))
             },
             dataset_action_authorizer,
+            event_bus,
             thrash_lock: tokio::sync::Mutex::new(()),
         }
     }
@@ -56,6 +60,7 @@ impl DatasetRepositoryLocalFs {
         root: impl Into<PathBuf>,
         current_account_subject: Arc<CurrentAccountSubject>,
         dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
+        event_bus: Arc<EventBus>,
         multi_tenant: bool,
     ) -> Result<Self, std::io::Error> {
         let root = root.into();
@@ -64,6 +69,7 @@ impl DatasetRepositoryLocalFs {
             root,
             current_account_subject,
             dataset_action_authorizer,
+            event_bus,
             multi_tenant,
         ))
     }
@@ -336,6 +342,13 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
 
         let dataset_dir = self.storage_strategy.get_dataset_path(&dataset_handle);
         tokio::fs::remove_dir_all(dataset_dir).await.int_err()?;
+
+        self.event_bus
+            .dispatch_event(events::DatasetEventRemoved {
+                dataset_id: dataset_handle.id,
+            })
+            .await?;
+
         Ok(())
     }
 
