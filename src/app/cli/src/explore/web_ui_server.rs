@@ -134,7 +134,7 @@ impl WebUIServer {
                 kamu_adapter_http::add_dataset_resolver_layer(
                     axum::Router::new()
                         .nest("/", kamu_adapter_http::smart_transfer_protocol_router())
-                        .nest("/data", kamu_adapter_http::data::router()),
+                        .nest("/", kamu_adapter_http::data::router()),
                     multi_tenant_workspace,
                 ),
             )
