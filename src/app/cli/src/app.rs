@@ -191,8 +191,7 @@ pub fn configure_base_catalog(
 
     b.add_builder(
         builder_for::<PushIngestServiceImpl>()
-            .with_run_info_dir(workspace_layout.run_info_dir.clone())
-            .with_cache_dir(workspace_layout.cache_dir.clone()),
+            .with_run_info_dir(workspace_layout.run_info_dir.clone()),
     );
     b.bind::<dyn PushIngestService, PushIngestServiceImpl>();
 

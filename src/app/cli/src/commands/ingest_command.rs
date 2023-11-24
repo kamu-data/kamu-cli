@@ -209,11 +209,11 @@ impl PushIngestProgress {
     ) -> Self {
         Self {
             state: Mutex::new(PushIngestProgressState {
-                stage: PushIngestStage::CheckSource,
+                stage: PushIngestStage::Read,
                 curr_progress: multi_progress.add(Self::new_spinner(&Self::spinner_message(
                     dataset_handle,
                     0,
-                    "Checking source for updates",
+                    "Reading data",
                 ))),
             }),
             dataset_handle: dataset_handle.clone(),
@@ -249,8 +249,6 @@ impl PushIngestProgress {
 
     fn message_for_stage(&self, stage: PushIngestStage) -> String {
         let msg = match stage {
-            PushIngestStage::CheckSource => "Checking source for updates",
-            PushIngestStage::Fetch => "Downloading data",
             PushIngestStage::Read => "Reading data",
             PushIngestStage::Preprocess => "Preprocessing data",
             PushIngestStage::Merge => "Merging data",

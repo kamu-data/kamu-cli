@@ -29,7 +29,6 @@ pub struct PushIngestServiceImpl {
     object_store_registry: Arc<dyn ObjectStoreRegistry>,
     data_format_registry: Arc<dyn DataFormatRegistry>,
     run_info_dir: PathBuf,
-    cache_dir: PathBuf,
     time_source: Arc<dyn SystemTimeSource>,
 }
 
@@ -43,7 +42,6 @@ impl PushIngestServiceImpl {
         object_store_registry: Arc<dyn ObjectStoreRegistry>,
         data_format_registry: Arc<dyn DataFormatRegistry>,
         run_info_dir: PathBuf,
-        cache_dir: PathBuf,
         time_source: Arc<dyn SystemTimeSource>,
     ) -> Self {
         Self {
@@ -52,7 +50,6 @@ impl PushIngestServiceImpl {
             object_store_registry,
             data_format_registry,
             run_info_dir,
-            cache_dir,
             time_source,
         }
     }
@@ -60,7 +57,7 @@ impl PushIngestServiceImpl {
     async fn do_ingest(
         &self,
         dataset_ref: &DatasetRef,
-        url: url::Url,
+        source: DataSource,
         media_type: Option<MediaType>,
         listener: Arc<dyn PushIngestListener>,
     ) -> Result<PushIngestResult, PushIngestError> {
@@ -105,7 +102,6 @@ impl PushIngestServiceImpl {
             operation_id,
             operation_dir,
             system_time: self.time_source.now(),
-            url,
             media_type,
             listener,
             ctx,
@@ -116,7 +112,7 @@ impl PushIngestServiceImpl {
         let listener = args.listener.clone();
         listener.begin();
 
-        match self.do_ingest_inner(args).await {
+        match self.do_ingest_inner(source, args).await {
             Ok(res) => {
                 tracing::info!(result = ?res, "Ingest iteration successful");
                 listener.success(&res);
@@ -139,16 +135,15 @@ impl PushIngestServiceImpl {
     )]
     async fn do_ingest_inner(
         &self,
+        source: DataSource,
         mut args: PushIngestArgs,
     ) -> Result<PushIngestResult, PushIngestError> {
         args.listener
-            .on_stage_progress(PushIngestStage::CheckSource, 0, TotalSteps::Exact(1));
-        args.listener
-            .on_stage_progress(PushIngestStage::Fetch, 0, TotalSteps::Exact(1));
-        args.listener
             .on_stage_progress(PushIngestStage::Read, 0, TotalSteps::Exact(1));
 
-        let df = if let Some(df) = self.read(&args).await? {
+        let input_data_path = self.maybe_fetch(source, &args).await?;
+
+        let df = if let Some(df) = self.read(&input_data_path, &args).await? {
             if let Some(transform) = args.polling_source.preprocess.clone() {
                 Some(ingest_common::preprocess(&args.ctx, transform, df).await?)
             } else {
@@ -197,44 +192,69 @@ impl PushIngestServiceImpl {
     }
 
     #[tracing::instrument(level = "info", skip_all)]
-    async fn read(&self, args: &PushIngestArgs) -> Result<Option<DataFrame>, PushIngestError> {
+    async fn maybe_fetch(
+        &self,
+        source: DataSource,
+        args: &PushIngestArgs,
+    ) -> Result<PathBuf, PushIngestError> {
         // TODO: Support S3
-        let input_data_path: PathBuf = match args.url.scheme() {
-            "file" => {
-                let p = args
-                    .url
-                    .to_file_path()
-                    .map_err(|_| format!("Invalid file URL {}", args.url).int_err())?;
+        let temp_path = args.operation_dir.join("input-data");
 
-                // TODO: In case of STDIN (/dev/fd/0) or other pipes and special device files
-                // we have to copy data into a temporary file, as DataFusion cannot read from
-                // them directly.
-                cfg_if::cfg_if! {
-                    if #[cfg(unix)] {
-                        use std::os::unix::fs::FileTypeExt;
-                        let ft = p.metadata().int_err()?.file_type();
-                        if ft.is_fifo() || ft.is_char_device() || ft.is_block_device() {
-                            let temp_path = args.operation_dir.join(ingest_common::get_random_cache_key("read-"));
-                            tracing::info!(
-                                from_path = %p.display(),
-                                to_path = %temp_path.display(),
-                                "Detected a special file type - copying into temporary path first",
-                            );
-                            Self::copy_special_file(&p, &temp_path).await?;
-                            Ok(temp_path)
-                        } else {
-                            Ok(p)
+        match source {
+            DataSource::Url(url) => {
+                match url.scheme() {
+                    "file" => {
+                        let p = url
+                            .to_file_path()
+                            .map_err(|_| format!("Invalid file URL {}", url).int_err())?;
+
+                        // TODO: In case of STDIN (/dev/fd/0) or other pipes and special device
+                        // files we have to copy data into a temporary file,
+                        // as DataFusion cannot read from them directly.
+                        cfg_if::cfg_if! {
+                            if #[cfg(unix)] {
+                                use std::os::unix::fs::FileTypeExt;
+                                let ft = p.metadata().int_err()?.file_type();
+                                if ft.is_fifo() || ft.is_char_device() || ft.is_block_device() {
+                                    tracing::info!(
+                                        from_path = %p.display(),
+                                        to_path = %temp_path.display(),
+                                        "Detected a special file type - copying into temporary path first",
+                                    );
+                                    Self::copy_special_file(&p, &temp_path).await?;
+                                    Ok(temp_path)
+                                } else {
+                                    Ok(p)
+                                }
+                            } else {
+                                Ok(p)
+                            }
                         }
-                    } else {
-                        Ok(p)
                     }
+                    _ => Err(format!("Unsupported source: {}", url).int_err().into()),
                 }
             }
-            _ => Err(format!("Unsupported source: {}", args.url).int_err()),
-        }?;
+            DataSource::Stream(stream) => {
+                // Save stream to a file so datafusion can read it
+                // TODO: We likely can avoid this and build a DataFrame directly
+                tracing::info!(path = ?temp_path, "Copying stream into a temp file");
+                Self::copy_stream_to_file(stream, &temp_path)
+                    .await
+                    .int_err()?;
+                Ok(temp_path)
+            }
+        }
+    }
 
+    #[tracing::instrument(level = "info", skip_all)]
+    async fn read(
+        &self,
+        input_data_path: &Path,
+        args: &PushIngestArgs,
+    ) -> Result<Option<DataFrame>, PushIngestError> {
         if input_data_path.metadata().int_err()?.len() == 0 {
-            tracing::info!(path = ?input_data_path, "Early return due to an empty file");
+            tracing::info!(path = ?input_data_path, "Early return due to an empty
+        file");
             return Ok(None);
         }
 
@@ -273,15 +293,7 @@ impl PushIngestServiceImpl {
         let mut target = std::fs::File::create(target_path).int_err()?;
 
         tokio::task::spawn_blocking(move || -> Result<(), std::io::Error> {
-            use std::io::{Read, Write};
-            let mut buf = [0u8; 2048];
-            loop {
-                let read = source.read(&mut buf)?;
-                if read == 0 {
-                    break;
-                }
-                target.write_all(&buf[..read])?;
-            }
+            std::io::copy(&mut source, &mut target)?;
             Ok(())
         })
         .await
@@ -293,18 +305,8 @@ impl PushIngestServiceImpl {
         mut data: Box<dyn AsyncRead + Send + Unpin>,
         target_path: &Path,
     ) -> Result<(), std::io::Error> {
-        use tokio::io::{AsyncReadExt, AsyncWriteExt};
-
         let mut file = tokio::fs::File::create(target_path).await?;
-        let mut buf = [0u8; 2048];
-        loop {
-            let read = data.read(&mut buf).await?;
-            if read == 0 {
-                break;
-            }
-            file.write_all(&buf[..read]).await?;
-        }
-        file.flush().await?;
+        tokio::io::copy(&mut data, &mut file).await?;
         Ok(())
     }
 }
@@ -323,7 +325,8 @@ impl PushIngestService for PushIngestServiceImpl {
     ) -> Result<PushIngestResult, PushIngestError> {
         let listener = listener.unwrap_or_else(|| Arc::new(NullPushIngestListener));
 
-        self.do_ingest(dataset_ref, url, media_type, listener).await
+        self.do_ingest(dataset_ref, DataSource::Url(url), media_type, listener)
+            .await
     }
 
     #[tracing::instrument(level = "info", skip_all, fields(%dataset_ref, ?media_type))]
@@ -334,24 +337,10 @@ impl PushIngestService for PushIngestServiceImpl {
         media_type: Option<MediaType>,
         listener: Option<Arc<dyn PushIngestListener>>,
     ) -> Result<PushIngestResult, PushIngestError> {
-        // Save stream to a file in cache
-        //
-        // TODO: Breaking all architecture layers here - need to extract cache into a
-        // service
-        let path = self
-            .cache_dir
-            .join(ingest_common::get_random_cache_key("push-ingest-"));
-        Self::copy_stream_to_file(data, &path).await.int_err()?;
-
         let listener = listener.unwrap_or_else(|| Arc::new(NullPushIngestListener));
-        let url: url::Url = url::Url::from_file_path(&path).unwrap();
 
-        let res = self.do_ingest(dataset_ref, url, media_type, listener).await;
-
-        // Clean up the file in cache as it's non-reusable
-        std::fs::remove_file(path).int_err()?;
-
-        res
+        self.do_ingest(dataset_ref, DataSource::Stream(data), media_type, listener)
+            .await
     }
 }
 
@@ -359,10 +348,14 @@ struct PushIngestArgs {
     operation_id: String,
     operation_dir: PathBuf,
     system_time: DateTime<Utc>,
-    url: url::Url,
     media_type: Option<MediaType>,
     listener: Arc<dyn PushIngestListener>,
     ctx: SessionContext,
     data_writer: DataWriterDataFusion,
     polling_source: SetPollingSource,
+}
+
+enum DataSource {
+    Url(url::Url),
+    Stream(Box<dyn AsyncRead + Send + Unpin>),
 }

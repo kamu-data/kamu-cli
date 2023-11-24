@@ -422,7 +422,6 @@ impl IngestTestHarness {
             )])),
             Arc::new(DataFormatRegistryImpl::new()),
             run_info_dir,
-            cache_dir,
             time_source,
         ));
 

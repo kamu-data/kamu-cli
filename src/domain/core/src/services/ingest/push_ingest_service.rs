@@ -62,8 +62,6 @@ pub enum PushIngestResult {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PushIngestStage {
-    CheckSource,
-    Fetch,
     Read,
     Preprocess,
     Merge,
