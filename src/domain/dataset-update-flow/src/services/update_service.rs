@@ -10,11 +10,10 @@
 use event_sourcing::LoadError;
 use internal_error::{ErrorIntoInternal, InternalError};
 use kamu_core::DatasetNotFoundError;
-use kamu_task_system::{TaskID, TaskOutcome};
 use opendatafabric::{AccountID, AccountName, DatasetID};
 use tokio_stream::Stream;
 
-use crate::{Schedule, UpdateID, UpdateState};
+use crate::{UpdateID, UpdateState};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -48,25 +47,6 @@ pub trait UpdateService: Sync + Send {
         by_account_id: AccountID,
         by_account_name: AccountName,
     ) -> Result<UpdateState, CancelUpdateError>;
-
-    /// Handles task execution outcome.
-    /// Reacts correspondingly if the task is related to updates
-    async fn on_task_finished(
-        &self,
-        task_id: TaskID,
-        task_outcome: TaskOutcome,
-    ) -> Result<Option<UpdateState>, InternalError>;
-
-    /// Notifies about changes in dataset update schedule
-    async fn update_schedule_modified(
-        &self,
-        dataset_id: DatasetID,
-        paused: bool,
-        schedule: Schedule,
-    ) -> Result<(), InternalError>;
-
-    /// Notifies about dataset removal
-    async fn on_dataset_removed(&self, dataset_id: DatasetID) -> Result<(), InternalError>;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

@@ -14,7 +14,7 @@ use std::sync::{Arc, Mutex};
 
 use chrono::{DateTime, Utc};
 use dill::{component, scope, Singleton};
-use event_bus::EventBus;
+use event_bus::AsyncEventHandler;
 use futures::TryStreamExt;
 use kamu_core::events::DatasetEventRemoved;
 use kamu_core::{InternalError, SystemTimeSource};
@@ -63,15 +63,11 @@ impl State {
 impl UpdateServiceInMemory {
     pub fn new(
         event_store: Arc<dyn UpdateEventStore>,
-        event_bus: Arc<EventBus>,
         time_source: Arc<dyn SystemTimeSource>,
         task_scheduler: Arc<dyn TaskScheduler>,
         update_schedule_service: Arc<dyn UpdateScheduleService>,
         dependency_graph_service: Arc<dyn DependencyGraphService>,
     ) -> Self {
-        // TODO: lazy_static?
-        Self::setup_event_handlers(event_bus.as_ref());
-
         Self {
             state: Arc::new(Mutex::new(State::new())),
             event_store,
@@ -80,35 +76,6 @@ impl UpdateServiceInMemory {
             update_schedule_service,
             dependency_graph_service,
         }
-    }
-
-    fn setup_event_handlers(event_bus: &EventBus) {
-        event_bus.subscribe_event(async move |catalog, event: UpdateScheduleEventModified| {
-            let update_service = { catalog.get_one::<dyn UpdateService>().unwrap() };
-            update_service
-                .update_schedule_modified(event.dataset_id, event.paused, event.schedule)
-                .await?;
-
-            Ok(())
-        });
-
-        event_bus.subscribe_event(async move |catalog, event: TaskFinished| {
-            let update_service = { catalog.get_one::<dyn UpdateService>().unwrap() };
-            update_service
-                .on_task_finished(event.task_id, event.outcome)
-                .await?;
-
-            Ok(())
-        });
-
-        event_bus.subscribe_event(
-            async move |catalog: Arc<dill::Catalog>, event: DatasetEventRemoved| {
-                let update_service = { catalog.get_one::<dyn UpdateService>().unwrap() };
-                update_service.on_dataset_removed(event.dataset_id).await?;
-
-                Ok(())
-            },
-        );
     }
 
     async fn read_initial_schedules(&self) -> Result<(), InternalError> {
@@ -480,19 +447,18 @@ impl UpdateService for UpdateServiceInMemory {
 
         Ok(update.into())
     }
+}
 
-    /// Handles task execution outcome.
-    /// Reacts correspondingly if the task is related to updates
-    async fn on_task_finished(
-        &self,
-        task_id: TaskID,
-        task_outcome: TaskOutcome,
-    ) -> Result<Option<UpdateState>, InternalError> {
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait::async_trait]
+impl AsyncEventHandler<TaskFinished> for UpdateServiceInMemory {
+    async fn handle(&self, event: TaskFinished) -> Result<(), InternalError> {
         let maybe_update_id = {
             let state = self.state.lock().unwrap();
             state
                 .pending_updates_by_tasks
-                .get(&task_id)
+                .get(&event.task_id)
                 .map(|update_id| update_id.clone())
         };
 
@@ -502,20 +468,20 @@ impl UpdateService for UpdateServiceInMemory {
                 .await
                 .int_err()?;
             update
-                .on_task_finished(self.time_source.now(), task_id, task_outcome)
+                .on_task_finished(self.time_source.now(), event.task_id, event.outcome)
                 .int_err()?;
 
             update.save(self.event_store.as_ref()).await.int_err()?;
 
             {
                 let mut state = self.state.lock().unwrap();
-                state.pending_updates_by_tasks.remove(&task_id);
+                state.pending_updates_by_tasks.remove(&event.task_id);
             }
 
             // In case of success:
             //  - enqueue next auto-polling update cycle
             //  - enqueue dependent datasets
-            if task_outcome == TaskOutcome::Success {
+            if event.outcome == TaskOutcome::Success {
                 self.try_enqueue_auto_polling_update_if_enabled(&update.dataset_id)
                     .await?;
 
@@ -524,46 +490,47 @@ impl UpdateService for UpdateServiceInMemory {
             }
 
             // TODO: retry logic in case of failed outcome
-
-            Ok(Some(update.into()))
-        } else {
-            Ok(None)
         }
-    }
 
-    /// Notifies about changes in dataset update schedule
-    async fn update_schedule_modified(
-        &self,
-        dataset_id: DatasetID,
-        paused: bool,
-        schedule: Schedule,
-    ) -> Result<(), InternalError> {
-        if paused {
+        Ok(())
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait::async_trait]
+impl AsyncEventHandler<UpdateScheduleEventModified> for UpdateServiceInMemory {
+    async fn handle(&self, event: UpdateScheduleEventModified) -> Result<(), InternalError> {
+        if event.paused {
             let mut state = self.state.lock().unwrap();
-            state.active_schedules.remove(&dataset_id);
+            state.active_schedules.remove(&event.dataset_id);
         } else {
-            if schedule.is_active() {
-                self.enqueue_auto_polling_update(&dataset_id, &schedule)
+            if event.schedule.is_active() {
+                self.enqueue_auto_polling_update(&event.dataset_id, &event.schedule)
                     .await?;
             }
 
             let mut state = self.state.lock().unwrap();
             state
                 .active_schedules
-                .entry(dataset_id)
-                .and_modify(|e| *e = schedule.clone())
-                .or_insert(schedule);
+                .entry(event.dataset_id)
+                .and_modify(|e| *e = event.schedule.clone())
+                .or_insert(event.schedule);
         }
 
         Ok(())
     }
+}
 
-    /// Notifies about dataset removal
-    async fn on_dataset_removed(&self, dataset_id: DatasetID) -> Result<(), InternalError> {
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait::async_trait]
+impl AsyncEventHandler<DatasetEventRemoved> for UpdateServiceInMemory {
+    async fn handle(&self, event: DatasetEventRemoved) -> Result<(), InternalError> {
         let mut state = self.state.lock().unwrap();
 
-        state.active_schedules.remove(&dataset_id);
-        if let Some(update_id) = state.pending_updates_by_dataset.remove(&dataset_id) {
+        state.active_schedules.remove(&event.dataset_id);
+        if let Some(update_id) = state.pending_updates_by_dataset.remove(&event.dataset_id) {
             state
                 .time_wheel
                 .cancel_activation(update_id.into())

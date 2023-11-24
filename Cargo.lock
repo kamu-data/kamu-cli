@@ -2330,6 +2330,7 @@ dependencies = [
 name = "event-bus"
 version = "0.146.1"
 dependencies = [
+ "async-trait",
  "dill",
  "futures",
  "internal-error",

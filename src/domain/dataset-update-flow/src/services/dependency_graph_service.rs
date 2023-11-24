@@ -39,9 +39,6 @@ pub trait DependencyGraphService: Sync + Send {
         dataset_upstream_id: &DatasetID,
         dataset_downstream_id: &DatasetID,
     ) -> Result<(), RemoveDependencyError>;
-
-    /// Removes dataset node and downstream nodes completely
-    async fn on_dataset_removed(&self, dataset_id: &DatasetID) -> Result<(), InternalError>;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

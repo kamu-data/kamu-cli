@@ -19,6 +19,8 @@ doctest = false
 
 [dependencies]
 internal-error = { workspace = true }
+
+async-trait = "0.1"
 dill = "0.7"
 futures = "0.3"
 

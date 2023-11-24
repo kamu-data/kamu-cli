@@ -10,7 +10,7 @@
 use std::sync::Arc;
 
 use dill::{component, scope, Singleton};
-use event_bus::EventBus;
+use event_bus::{AsyncEventHandler, EventBus};
 use futures::StreamExt;
 use kamu_core::events::DatasetEventRemoved;
 use kamu_core::SystemTimeSource;
@@ -35,28 +35,11 @@ impl UpdateScheduleServiceInMemory {
         time_source: Arc<dyn SystemTimeSource>,
         event_bus: Arc<EventBus>,
     ) -> Self {
-        // TODO: lazy_static?
-        Self::setup_event_handlers(event_bus.as_ref());
-
         Self {
             event_store,
             time_source,
             event_bus,
         }
-    }
-
-    fn setup_event_handlers(event_bus: &EventBus) {
-        event_bus.subscribe_event(
-            async move |catalog: Arc<dill::Catalog>, event: DatasetEventRemoved| {
-                let update_schedule_service =
-                    { catalog.get_one::<dyn UpdateScheduleService>().unwrap() };
-                update_schedule_service
-                    .on_dataset_removed(event.dataset_id)
-                    .await?;
-
-                Ok(())
-            },
-        );
     }
 
     async fn publish_update_schedule_modified(
@@ -183,13 +166,16 @@ impl UpdateScheduleService for UpdateScheduleServiceInMemory {
 
         Ok(())
     }
+}
 
-    /// Notifies about dataset removal
-    async fn on_dataset_removed(&self, dataset_id: DatasetID) -> Result<(), InternalError> {
-        let mut update_schedule =
-            UpdateSchedule::load(dataset_id.clone(), self.event_store.as_ref())
-                .await
-                .int_err()?;
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait::async_trait]
+impl AsyncEventHandler<DatasetEventRemoved> for UpdateScheduleServiceInMemory {
+    async fn handle(&self, event: DatasetEventRemoved) -> Result<(), InternalError> {
+        let mut update_schedule = UpdateSchedule::load(event.dataset_id, self.event_store.as_ref())
+            .await
+            .int_err()?;
 
         update_schedule
             .notify_dataset_removed(self.time_source.now())

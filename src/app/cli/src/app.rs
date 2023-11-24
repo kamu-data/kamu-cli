@@ -12,9 +12,13 @@ use std::sync::Arc;
 
 use container_runtime::{ContainerRuntime, ContainerRuntimeConfig};
 use dill::*;
+use event_bus::AsyncEventHandler;
+use kamu::domain::events::DatasetEventRemoved;
 use kamu::domain::*;
 use kamu::utils::smart_transfer_protocol::SmartTransferProtocolClient;
 use kamu::*;
+use kamu_dataset_update_flow_inmem::domain::UpdateScheduleEventModified;
+use kamu_task_system_inmem::domain::TaskFinished;
 
 use crate::error::*;
 use crate::explore::TraceServer;
@@ -250,6 +254,7 @@ pub fn configure_base_catalog(
 
     b.add::<kamu_dataset_update_flow_inmem::DependencyGraphServiceInMemory>();
     b.bind::<dyn kamu_dataset_update_flow_inmem::domain::DependencyGraphService, kamu_dataset_update_flow_inmem::DependencyGraphServiceInMemory>();
+    b.bind::<dyn AsyncEventHandler<DatasetEventRemoved>, kamu_dataset_update_flow_inmem::DependencyGraphServiceInMemory>();
 
     // TODO: initialize graph dependencies when starting API server
     b.add::<kamu_dataset_update_flow_inmem::UpdateScheduleServiceInMemory>();
@@ -257,6 +262,9 @@ pub fn configure_base_catalog(
 
     b.add::<kamu_dataset_update_flow_inmem::UpdateServiceInMemory>();
     b.bind::<dyn kamu_dataset_update_flow_inmem::domain::UpdateService, kamu_dataset_update_flow_inmem::UpdateServiceInMemory>();
+    b.bind::<dyn AsyncEventHandler<TaskFinished>, kamu_dataset_update_flow_inmem::UpdateServiceInMemory>();
+    b.bind::<dyn AsyncEventHandler<DatasetEventRemoved>, kamu_dataset_update_flow_inmem::UpdateServiceInMemory>();
+    b.bind::<dyn AsyncEventHandler<UpdateScheduleEventModified>, kamu_dataset_update_flow_inmem::UpdateServiceInMemory>();
 
     b.add::<kamu_dataset_update_flow_inmem::UpdateEventStoreInMem>();
     b.bind::<dyn kamu_dataset_update_flow_inmem::domain::UpdateEventStore, kamu_dataset_update_flow_inmem::UpdateEventStoreInMem>();
