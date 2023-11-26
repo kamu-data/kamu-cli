@@ -937,7 +937,7 @@ impl PullTestHarness {
             .add::<RemoteAliasesRegistryImpl>()
             .bind::<dyn RemoteAliasesRegistry, RemoteAliasesRegistryImpl>()
             .add_value(TestIngestService::new(calls.clone()))
-            .bind::<dyn IngestService, TestIngestService>()
+            .bind::<dyn PollingIngestService, TestIngestService>()
             .add_value(TestTransformService::new(calls.clone()))
             .bind::<dyn TransformService, TestTransformService>()
             .add_builder(dill::builder_for::<TestSyncService>().with_calls(calls.clone()))

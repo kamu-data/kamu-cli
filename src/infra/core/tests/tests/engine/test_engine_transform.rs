@@ -264,7 +264,7 @@ async fn test_transform_common(transform: Transform) {
                 .with_cache_dir(cache_dir)
                 .with_run_info_dir(run_info_dir)
                 .with_container_runtime(Arc::new(ContainerRuntime::default()))
-                .with_data_format_registory(Arc::new(dataFormatRegistryImpl::new()))
+                .with_data_format_registry(Arc::new(DataFormatRegistryImpl::new()))
         )
         .bind::<dyn PollingIngestService, PollingIngestServiceImpl>()
         .add::<SystemTimeSourceDefault>()
@@ -274,7 +274,7 @@ async fn test_transform_common(transform: Transform) {
         .build();
 
     let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
-    let ingest_svc = catalog.get_one::<dyn IngestService>().unwrap();
+    let ingest_svc = catalog.get_one::<dyn PollingIngestService>().unwrap();
     let transform_svc = catalog.get_one::<dyn TransformService>().unwrap();
 
     ///////////////////////////////////////////////////////////////////////////

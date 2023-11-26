@@ -14,12 +14,9 @@ use chrono::{TimeZone, Utc};
 use container_runtime::ContainerRuntime;
 use datafusion::parquet::record::RowAccessor;
 use datafusion::prelude::*;
-use domain::auth::DatasetActionAuthorizer;
 use event_bus::EventBus;
-use futures::StreamExt;
 use indoc::indoc;
 use itertools::Itertools;
-use kamu::domain::auth::DatasetActionAuthorizer;
 use kamu::domain::*;
 use kamu::testing::*;
 use kamu::*;
@@ -1010,8 +1007,8 @@ async fn test_ingest_checks_auth() {
 struct IngestTestHarness {
     temp_dir: TempDir,
     dataset_repo: Arc<dyn DatasetRepository>,
-    ingest_svc: Arc<dyn IngestService>,
-    time_source: Arc<dyn SystemTimeSource>,
+    ingest_svc: Arc<dyn PollingIngestService>,
+    time_source: Arc<SystemTimeSourceStub>,
     ctx: SessionContext,
 }
 
@@ -1020,7 +1017,7 @@ impl IngestTestHarness {
         Self::new_with_authorizer(kamu_core::auth::AlwaysHappyDatasetActionAuthorizer::new())
     }
 
-    fn new_with_authorizer<TDatasetAuthorizer: DatasetActionAuthorizer + 'static>(
+    fn new_with_authorizer<TDatasetAuthorizer: auth::DatasetActionAuthorizer + 'static>(
         dataset_action_authorizer: TDatasetAuthorizer,
     ) -> Self {
         let temp_dir = tempfile::tempdir().unwrap();
@@ -1033,7 +1030,7 @@ impl IngestTestHarness {
             .add::<EventBus>()
             .add_value(CurrentAccountSubject::new_test())
             .add_value(dataset_action_authorizer)
-            .bind::<dyn DatasetActionAuthorizer, TDatasetAuthorizer>()
+            .bind::<dyn auth::DatasetActionAuthorizer, TDatasetAuthorizer>()
             .add_builder(
                 dill::builder_for::<DatasetRepositoryLocalFs>()
                     .with_root(temp_dir.path().join("datasets"))
@@ -1061,11 +1058,11 @@ impl IngestTestHarness {
                     .with_data_format_registry(Arc::new(DataFormatRegistryImpl::new()))
                     .with_run_info_dir(run_info_dir),
             )
-            .bind::<dyn IngestService, IngestServiceImpl>()
+            .bind::<dyn PollingIngestService, PollingIngestServiceImpl>()
             .build();
 
         let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
-        let ingest_svc = catalog.get_one::<dyn IngestService>().unwrap();
+        let ingest_svc = catalog.get_one::<dyn PollingIngestService>().unwrap();
         let time_source = catalog.get_one::<SystemTimeSourceStub>().unwrap();
 
         Self {

@@ -15,7 +15,6 @@ use std::sync::Arc;
 use event_bus::EventBus;
 use kamu::domain::{
     auth,
-    CurrentAccountSubject,
     DatasetRepository,
     InternalError,
     ResultIntoInternal,

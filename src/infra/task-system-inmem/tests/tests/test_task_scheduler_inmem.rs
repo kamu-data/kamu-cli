@@ -18,7 +18,7 @@ use kamu_task_system_inmem::*;
 #[test_log::test(tokio::test)]
 async fn test_creates_task() {
     let event_store = Arc::new(TaskSystemEventStoreInMemory::new());
-    let time_source = Arc::new(SystemTimeSourceStub::new(Utc::now()));
+    let time_source = Arc::new(SystemTimeSourceStub::new_set(Utc::now()));
     let task_sched = TaskSchedulerInMemory::new(event_store, time_source);
 
     let logical_plan_expected: LogicalPlan = Probe { ..Probe::default() }.into();
@@ -43,7 +43,7 @@ async fn test_creates_task() {
 #[test_log::test(tokio::test)]
 async fn test_queues_tasks() {
     let event_store = Arc::new(TaskSystemEventStoreInMemory::new());
-    let time_source = Arc::new(SystemTimeSourceStub::new(Utc::now()));
+    let time_source = Arc::new(SystemTimeSourceStub::new_set(Utc::now()));
     let task_sched = TaskSchedulerInMemory::new(event_store, time_source);
 
     let task_id_1 = task_sched
@@ -66,7 +66,7 @@ async fn test_queues_tasks() {
 #[test_log::test(tokio::test)]
 async fn test_task_cancellation() {
     let event_store = Arc::new(TaskSystemEventStoreInMemory::new());
-    let time_source = Arc::new(SystemTimeSourceStub::new(Utc::now()));
+    let time_source = Arc::new(SystemTimeSourceStub::new_set(Utc::now()));
     let task_sched = TaskSchedulerInMemory::new(event_store, time_source);
 
     let task_id_1 = task_sched
