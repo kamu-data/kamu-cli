@@ -46,6 +46,7 @@ struct WebUILoginInstructions {
 #[serde(rename_all = "camelCase")]
 struct WebUIFeatureFlags {
     enable_logout: bool,
+    enable_scheduling: bool,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -109,6 +110,8 @@ impl WebUIServer {
             feature_flags: WebUIFeatureFlags {
                 // No way to log out, always logging in a predefined user
                 enable_logout: false,
+                // No way to configure scheduling of datasets
+                enable_scheduling: false,
             },
         };
 

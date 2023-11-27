@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 ### Added
 - New dataset permission for UI: `canSchedule`
+- Added `kamu ui` feature flag to control availability of datasets scheduling
 
 ## [0.146.0] - 2023-11-24
 ### Added
