@@ -69,14 +69,11 @@ async fn test_event_store_get_streams() {
     };
 
     event_store
-        .save_events(
-            &task_id_1, // Cheating a bit
-            vec![
-                event_1.clone().into(),
-                event_2.clone().into(),
-                event_3.clone().into(),
-            ],
-        )
+        .save_events(vec![
+            event_1.clone().into(),
+            event_2.clone().into(),
+            event_3.clone().into(),
+        ])
         .await
         .unwrap();
 

@@ -242,7 +242,7 @@ where
             let num_events = events.len();
             let prev_stored_event = self.last_stored_event.clone();
 
-            let last_stored_event = event_store.save_events(&self.query, events).await?;
+            let last_stored_event = event_store.save_events(events).await?;
             self.last_stored_event = Some(last_stored_event);
 
             tracing::debug!(

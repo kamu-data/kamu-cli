@@ -64,7 +64,7 @@ impl UpdateScheduleService for UpdateScheduleServiceInMemory {
     fn list_enabled_schedules(&self) -> UpdateScheduleStateStream {
         // Note: terribly ineffecient - walks over events multiple times
         Box::pin(async_stream::try_stream! {
-            let dataset_ids: Vec<_> = self.event_store.get_queries().collect().await;
+            let dataset_ids: Vec<_> = self.event_store.list_all_dataset_ids().collect().await;
             for dataset_id in dataset_ids {
                 let update_schedule = UpdateSchedule::load(dataset_id, self.event_store.as_ref()).await.int_err()?;
                 if !update_schedule.paused() {

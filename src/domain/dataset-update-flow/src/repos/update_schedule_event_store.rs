@@ -8,12 +8,16 @@
 // by the Apache License, Version 2.0.
 
 use event_sourcing::EventStore;
+use opendatafabric::DatasetID;
 
 use crate::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait UpdateScheduleEventStore: EventStore<UpdateScheduleState> {}
+pub trait UpdateScheduleEventStore: EventStore<UpdateScheduleState> {
+    /// Returns all unique values of dataset IDs associated with schedules
+    fn list_all_dataset_ids<'a>(&'a self) -> QueryStream<'a, DatasetID>;
+}
 
 /////////////////////////////////////////////////////////////////////////////////////////

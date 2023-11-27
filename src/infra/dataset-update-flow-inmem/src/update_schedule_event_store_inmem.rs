@@ -48,12 +48,6 @@ impl EventStore<UpdateScheduleState> for UpdateScheduleEventStoreInMem {
         Ok(self.state.lock().unwrap().events.len())
     }
 
-    fn get_queries<'a>(&'a self) -> QueryStream<'a, DatasetID> {
-        Box::pin(tokio_stream::iter(
-            self.state.lock().unwrap().queries.clone(),
-        ))
-    }
-
     fn get_events<'a>(
         &'a self,
         dataset_id: &DatasetID,
@@ -94,16 +88,17 @@ impl EventStore<UpdateScheduleState> for UpdateScheduleEventStoreInMem {
     // TODO: concurrency
     async fn save_events(
         &self,
-        dataset_id: &DatasetID,
         events: Vec<UpdateScheduleEvent>,
     ) -> Result<EventID, SaveEventsError> {
         let mut s = self.state.lock().unwrap();
+        if !events.is_empty() {
+            let dataset_id = events.first().unwrap().dataset_id().clone();
+            s.queries.get_or_insert(dataset_id);
 
-        for event in events {
-            s.events.push(event);
+            for event in events {
+                s.events.push(event);
+            }
         }
-
-        s.queries.get_or_insert(dataset_id.clone());
 
         Ok(EventID::new((s.events.len() - 1) as u64))
     }
@@ -111,6 +106,12 @@ impl EventStore<UpdateScheduleState> for UpdateScheduleEventStoreInMem {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-impl UpdateScheduleEventStore for UpdateScheduleEventStoreInMem {}
+impl UpdateScheduleEventStore for UpdateScheduleEventStoreInMem {
+    fn list_all_dataset_ids<'a>(&'a self) -> QueryStream<'a, DatasetID> {
+        Box::pin(tokio_stream::iter(
+            self.state.lock().unwrap().queries.clone(),
+        ))
+    }
+}
 
 /////////////////////////////////////////////////////////////////////////////////////////

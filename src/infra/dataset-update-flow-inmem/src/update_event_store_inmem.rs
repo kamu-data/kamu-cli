@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::collections::hash_map::Entry;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use dill::{component, scope, Singleton};
@@ -26,7 +26,6 @@ pub struct UpdateEventStoreInMem {
 #[derive(Default)]
 struct State {
     events: Vec<UpdateEvent>,
-    queries: HashSet<UpdateID>,
     updates_by_dataset: HashMap<DatasetID, Vec<UpdateID>>,
     last_update_id: Option<UpdateID>,
 }
@@ -77,12 +76,6 @@ impl EventStore<UpdateState> for UpdateEventStoreInMem {
         Ok(self.state.lock().unwrap().events.len())
     }
 
-    fn get_queries<'a>(&'a self) -> QueryStream<'a, UpdateID> {
-        Box::pin(tokio_stream::iter(
-            self.state.lock().unwrap().queries.clone(),
-        ))
-    }
-
     fn get_events<'a>(
         &'a self,
         update_id: &UpdateID,
@@ -121,19 +114,13 @@ impl EventStore<UpdateState> for UpdateEventStoreInMem {
     }
 
     // TODO: concurrency
-    async fn save_events(
-        &self,
-        update_id: &UpdateID,
-        events: Vec<UpdateEvent>,
-    ) -> Result<EventID, SaveEventsError> {
+    async fn save_events(&self, events: Vec<UpdateEvent>) -> Result<EventID, SaveEventsError> {
         let mut s = self.state.lock().unwrap();
 
         for event in events {
             Self::update_index_by_dataset(&mut s.updates_by_dataset, &event);
             s.events.push(event);
         }
-
-        s.queries.get_or_insert(*update_id);
 
         Ok(EventID::new((s.events.len() - 1) as u64))
     }

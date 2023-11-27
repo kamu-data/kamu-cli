@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use std::collections::hash_map::{Entry, HashMap};
-use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 
 use dill::*;
@@ -22,7 +21,6 @@ pub struct TaskSystemEventStoreInMemory {
 #[derive(Default)]
 struct State {
     events: Vec<TaskSystemEvent>,
-    queries: HashSet<TaskID>,
     tasks_by_dataset: HashMap<DatasetID, Vec<TaskID>>,
     last_task_id: Option<TaskID>,
 }
@@ -71,12 +69,6 @@ impl EventStore<TaskState> for TaskSystemEventStoreInMemory {
         Ok(self.state.lock().unwrap().events.len())
     }
 
-    fn get_queries<'a>(&'a self) -> QueryStream<'a, TaskID> {
-        Box::pin(tokio_stream::iter(
-            self.state.lock().unwrap().queries.clone(),
-        ))
-    }
-
     fn get_events<'a>(
         &'a self,
         task_id: &TaskID,
@@ -115,19 +107,13 @@ impl EventStore<TaskState> for TaskSystemEventStoreInMemory {
     }
 
     // TODO: concurrency
-    async fn save_events(
-        &self,
-        task_id: &TaskID,
-        events: Vec<TaskSystemEvent>,
-    ) -> Result<EventID, SaveEventsError> {
+    async fn save_events(&self, events: Vec<TaskSystemEvent>) -> Result<EventID, SaveEventsError> {
         let mut s = self.state.lock().unwrap();
 
         for event in events {
             Self::update_index_by_dataset(&mut s.tasks_by_dataset, &event);
             s.events.push(event);
         }
-
-        s.queries.get_or_insert(*task_id);
 
         Ok(EventID::new((s.events.len() - 1) as u64))
     }

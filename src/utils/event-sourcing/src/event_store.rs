@@ -16,9 +16,6 @@ use crate::{EventID, Projection};
 /// Common set of operations for an event store
 #[async_trait::async_trait]
 pub trait EventStore<Proj: Projection>: Send + Sync {
-    /// Returns all unique values of event queries
-    fn get_queries<'a>(&'a self) -> QueryStream<'a, Proj::Query>;
-
     /// Returns the event history of an aggregate in chronological order
     fn get_events<'a>(
         &'a self,
@@ -31,11 +28,7 @@ pub trait EventStore<Proj: Projection>: Send + Sync {
     /// The `query` argument must be the same as query passed when retrieving
     /// the events. It will be used prior to saving events to ensure that there
     /// were no concurrent updates that could've influenced this transaction.
-    async fn save_events(
-        &self,
-        query: &Proj::Query,
-        events: Vec<Proj::Event>,
-    ) -> Result<EventID, SaveEventsError>;
+    async fn save_events(&self, events: Vec<Proj::Event>) -> Result<EventID, SaveEventsError>;
 
     /// Returns the number of events stored
     async fn len(&self) -> Result<usize, InternalError>;
