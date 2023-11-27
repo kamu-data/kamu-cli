@@ -145,6 +145,7 @@ impl Dataset {
             can_delete: can_write,
             can_rename: can_write,
             can_commit: can_write,
+            can_schedule: can_write,
         })
     }
 }
@@ -155,4 +156,5 @@ pub struct DatasetPermissions {
     can_delete: bool,
     can_rename: bool,
     can_commit: bool,
+    can_schedule: bool,
 }

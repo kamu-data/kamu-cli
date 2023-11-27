@@ -496,6 +496,7 @@ async fn dataset_view_permissions() {
                         canDelete
                         canRename
                         canCommit
+                        canSchedule
                     }
                 }
             }
@@ -515,7 +516,8 @@ async fn dataset_view_permissions() {
                         "canView": true,
                         "canDelete": true,
                         "canRename": true,
-                        "canCommit": true
+                        "canCommit": true,
+                        "canSchedule": true,
                     }
                 }
             }
