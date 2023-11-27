@@ -93,7 +93,8 @@ impl EventBus {
             .map(|handler| handler.handle(event))
             .collect();
 
-        futures::future::try_join_all(async_handler_futures).await?;
+        let results = futures::future::join_all(async_handler_futures).await;
+        results.into_iter().try_for_each(|res| res)?;
 
         Ok(())
     }
@@ -116,7 +117,8 @@ impl EventBus {
                 .map(|handler| (*handler).call((event_arc.clone(),)))
                 .collect();
 
-            futures::future::try_join_all(closure_handler_futures).await?;
+            let results = futures::future::join_all(closure_handler_futures).await;
+            results.into_iter().try_for_each(|res| res)?;
         }
 
         Ok(())
