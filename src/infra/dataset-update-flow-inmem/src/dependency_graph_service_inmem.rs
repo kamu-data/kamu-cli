@@ -155,7 +155,7 @@ impl DependencyGraphService for DependencyGraphServiceInMemory {
 
 #[async_trait::async_trait]
 impl AsyncEventHandler<DatasetDeleted> for DependencyGraphServiceInMemory {
-    async fn handle(&self, event: DatasetDeleted) -> Result<(), InternalError> {
+    async fn handle(&self, event: &DatasetDeleted) -> Result<(), InternalError> {
         let mut state = self.state.lock().unwrap();
 
         let node_index = state

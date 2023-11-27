@@ -453,7 +453,7 @@ impl UpdateService for UpdateServiceInMemory {
 
 #[async_trait::async_trait]
 impl AsyncEventHandler<TaskFinished> for UpdateServiceInMemory {
-    async fn handle(&self, event: TaskFinished) -> Result<(), InternalError> {
+    async fn handle(&self, event: &TaskFinished) -> Result<(), InternalError> {
         let maybe_update_id = {
             let state = self.state.lock().unwrap();
             state
@@ -500,7 +500,7 @@ impl AsyncEventHandler<TaskFinished> for UpdateServiceInMemory {
 
 #[async_trait::async_trait]
 impl AsyncEventHandler<UpdateScheduleEventModified> for UpdateServiceInMemory {
-    async fn handle(&self, event: UpdateScheduleEventModified) -> Result<(), InternalError> {
+    async fn handle(&self, event: &UpdateScheduleEventModified) -> Result<(), InternalError> {
         if event.paused {
             let mut state = self.state.lock().unwrap();
             state.active_schedules.remove(&event.dataset_id);
@@ -513,9 +513,9 @@ impl AsyncEventHandler<UpdateScheduleEventModified> for UpdateServiceInMemory {
             let mut state = self.state.lock().unwrap();
             state
                 .active_schedules
-                .entry(event.dataset_id)
+                .entry(event.dataset_id.clone())
                 .and_modify(|e| *e = event.schedule.clone())
-                .or_insert(event.schedule);
+                .or_insert(event.schedule.clone());
         }
 
         Ok(())
@@ -526,7 +526,7 @@ impl AsyncEventHandler<UpdateScheduleEventModified> for UpdateServiceInMemory {
 
 #[async_trait::async_trait]
 impl AsyncEventHandler<DatasetDeleted> for UpdateServiceInMemory {
-    async fn handle(&self, event: DatasetDeleted) -> Result<(), InternalError> {
+    async fn handle(&self, event: &DatasetDeleted) -> Result<(), InternalError> {
         let mut state = self.state.lock().unwrap();
 
         state.active_schedules.remove(&event.dataset_id);

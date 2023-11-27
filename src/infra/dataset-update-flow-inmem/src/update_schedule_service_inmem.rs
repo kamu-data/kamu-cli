@@ -172,10 +172,11 @@ impl UpdateScheduleService for UpdateScheduleServiceInMemory {
 
 #[async_trait::async_trait]
 impl AsyncEventHandler<DatasetDeleted> for UpdateScheduleServiceInMemory {
-    async fn handle(&self, event: DatasetDeleted) -> Result<(), InternalError> {
-        let mut update_schedule = UpdateSchedule::load(event.dataset_id, self.event_store.as_ref())
-            .await
-            .int_err()?;
+    async fn handle(&self, event: &DatasetDeleted) -> Result<(), InternalError> {
+        let mut update_schedule =
+            UpdateSchedule::load(event.dataset_id.clone(), self.event_store.as_ref())
+                .await
+                .int_err()?;
 
         update_schedule
             .notify_dataset_removed(self.time_source.now())

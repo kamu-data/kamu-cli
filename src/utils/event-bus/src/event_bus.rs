@@ -38,7 +38,7 @@ impl EventBus {
     pub fn subscribe_async_closure<TEvent, H, HFut>(&self, callback: H)
     where
         TEvent: 'static + Clone,
-        H: Fn(TEvent) -> HFut + Send + Sync + 'static,
+        H: Fn(Arc<TEvent>) -> HFut + Send + Sync + 'static,
         HFut: std::future::Future<Output = Result<(), InternalError>> + Send + 'static,
     {
         let mut state = self.state.lock().unwrap();
@@ -46,7 +46,7 @@ impl EventBus {
         let event_handlers = state.take_closure_handlers_for::<TEvent>();
 
         let async_closure_handler = Arc::new(
-            move |event: TEvent|
+            move |event: Arc<TEvent>|
                   -> Pin<Box<dyn Future<Output = Result<(), InternalError>> + Send>> {
                 Box::pin(callback(event))
             },
@@ -73,7 +73,7 @@ impl EventBus {
             .unwrap();
 
         for sync_handler in sync_handlers {
-            sync_handler.handle(event.clone())?;
+            sync_handler.handle(event)?;
         }
 
         Ok(())
@@ -90,7 +90,7 @@ impl EventBus {
 
         let async_handler_futures: Vec<_> = async_handlers
             .iter()
-            .map(|handler| handler.handle(event.clone()))
+            .map(|handler| handler.handle(event))
             .collect();
 
         futures::future::try_join_all(async_handler_futures).await?;
@@ -109,10 +109,11 @@ impl EventBus {
         };
 
         if let Some(closure_handlers) = maybe_closure_handlers {
+            let event_arc = Arc::new(event.clone());
             let closure_handler_futures: Vec<_> = closure_handlers
                 .0
                 .iter()
-                .map(|handler| (*handler).call((event.clone(),)))
+                .map(|handler| (*handler).call((event_arc.clone(),)))
                 .collect();
 
             futures::future::try_join_all(closure_handler_futures).await?;
@@ -165,7 +166,9 @@ impl State {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 type AsyncEventClosure<TEvent> = Arc<
-    dyn Fn(TEvent) -> Pin<Box<dyn Future<Output = Result<(), InternalError>> + Send>> + Send + Sync,
+    dyn Fn(Arc<TEvent>) -> Pin<Box<dyn Future<Output = Result<(), InternalError>> + Send>>
+        + Send
+        + Sync,
 >;
 
 /////////////////////////////////////////////////////////////////////////////////////////
