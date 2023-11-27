@@ -12,7 +12,7 @@ use std::sync::Arc;
 use dill::{component, scope, Singleton};
 use event_bus::{AsyncEventHandler, EventBus};
 use futures::StreamExt;
-use kamu_core::events::DatasetEventRemoved;
+use kamu_core::events::DatasetDeleted;
 use kamu_core::SystemTimeSource;
 use kamu_dataset_update_flow::*;
 use opendatafabric::DatasetID;
@@ -171,8 +171,8 @@ impl UpdateScheduleService for UpdateScheduleServiceInMemory {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl AsyncEventHandler<DatasetEventRemoved> for UpdateScheduleServiceInMemory {
-    async fn handle(&self, event: DatasetEventRemoved) -> Result<(), InternalError> {
+impl AsyncEventHandler<DatasetDeleted> for UpdateScheduleServiceInMemory {
+    async fn handle(&self, event: DatasetDeleted) -> Result<(), InternalError> {
         let mut update_schedule = UpdateSchedule::load(event.dataset_id, self.event_store.as_ref())
             .await
             .int_err()?;

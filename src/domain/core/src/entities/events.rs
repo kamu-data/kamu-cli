@@ -12,7 +12,7 @@ use opendatafabric::DatasetID;
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
-pub struct DatasetEventRemoved {
+pub struct DatasetDeleted {
     pub dataset_id: DatasetID,
 }
 

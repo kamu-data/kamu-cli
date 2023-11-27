@@ -375,7 +375,7 @@ impl DatasetRepository for DatasetRepositoryS3 {
             .map_err(|e| DeleteDatasetError::Internal(e))?;
 
         self.event_bus
-            .dispatch_event(events::DatasetEventRemoved {
+            .dispatch_event(events::DatasetDeleted {
                 dataset_id: dataset_handle.id,
             })
             .await?;
