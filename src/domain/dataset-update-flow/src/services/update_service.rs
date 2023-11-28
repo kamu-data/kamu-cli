@@ -37,7 +37,7 @@ pub trait UpdateService: Sync + Send {
         dataset_id: &DatasetID,
     ) -> Result<UpdateStateStream, ListUpdatesByDatasetError>;
 
-    /// Returns state of the latest update created for the given dataset  
+    /// Returns state of the latest update created for the given dataset
     async fn get_last_update(
         &self,
         dataset_id: &DatasetID,
@@ -76,7 +76,6 @@ pub enum ListUpdatesByDatasetError {
     Internal(#[from] InternalError),
 }
 
-
 #[derive(thiserror::Error, Debug)]
 pub enum GetLastUpdateError {
     #[error(transparent)]
@@ -92,7 +91,6 @@ pub enum GetUpdateError {
     #[error(transparent)]
     Internal(#[from] InternalError),
 }
-
 
 #[derive(thiserror::Error, Debug)]
 pub enum CancelUpdateError {

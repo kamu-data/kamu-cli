@@ -409,14 +409,14 @@ impl UpdateService for UpdateServiceInMemory {
         }))
     }
 
-    /// Returns state of the latest update created for the given dataset  
+    /// Returns state of the latest update created for the given dataset
     async fn get_last_update(
         &self,
         dataset_id: &DatasetID,
     ) -> Result<Option<UpdateState>, GetLastUpdateError> {
         let res = match self.event_store.get_last_dataset_update(dataset_id) {
             Some(update_id) => Some(self.get_update(update_id).await.int_err()?),
-            None => None
+            None => None,
         };
         Ok(res)
     }
