@@ -2,7 +2,7 @@
 # Downloads cached root datasets from S3 repository for faster experimetation and testing
 set -e
 
-S3_BASE_URL="https://s3.us-west-2.amazonaws.com/datasets.kamu.dev/odf/v1/examples/"
+S3_BASE_URL="https://s3.us-west-2.amazonaws.com/datasets.kamu.dev/odf/v1/example/"
 
 kamu init || true
 
