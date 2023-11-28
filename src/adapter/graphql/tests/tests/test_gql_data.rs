@@ -33,13 +33,9 @@ async fn create_catalog_with_local_workspace(tempdir: &Path) -> dill::Catalog {
         )
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
         .add::<QueryServiceImpl>()
-        .bind::<dyn QueryService, QueryServiceImpl>()
         .add::<ObjectStoreRegistryImpl>()
-        .bind::<dyn ObjectStoreRegistry, ObjectStoreRegistryImpl>()
-        .add_value(ObjectStoreBuilderLocalFs::new())
-        .bind::<dyn ObjectStoreBuilder, ObjectStoreBuilderLocalFs>()
+        .add::<ObjectStoreBuilderLocalFs>()
         .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
-        .bind::<dyn auth::DatasetActionAuthorizer, auth::AlwaysHappyDatasetActionAuthorizer>()
         .build()
 }
 

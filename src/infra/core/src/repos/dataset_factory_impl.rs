@@ -39,6 +39,7 @@ type DatasetImplLocalFS = DatasetImpl<
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
+#[interface(dyn DatasetFactory)]
 impl DatasetFactoryImpl {
     pub fn new(
         ipfs_gateway: IpfsGateway,

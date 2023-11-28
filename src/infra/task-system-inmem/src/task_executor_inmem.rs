@@ -23,6 +23,7 @@ pub struct TaskExecutorInMemory {
 }
 
 #[component(pub)]
+#[interface(dyn TaskExecutor)]
 #[scope(Singleton)]
 impl TaskExecutorInMemory {
     pub fn new(

@@ -124,7 +124,6 @@ impl ResetTestHarness {
             )
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
             .add::<ResetServiceImpl>()
-            .bind::<dyn ResetService, ResetServiceImpl>()
             .build();
 
         let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();

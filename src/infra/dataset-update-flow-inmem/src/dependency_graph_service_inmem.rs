@@ -10,7 +10,7 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-use dill::{component, scope, Singleton};
+use dill::*;
 use event_bus::AsyncEventHandler;
 use kamu_core::events::DatasetDeleted;
 use kamu_dataset_update_flow::*;
@@ -61,6 +61,8 @@ impl State {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
+#[interface(dyn DependencyGraphService)]
+#[interface(dyn AsyncEventHandler<DatasetDeleted>)]
 #[scope(Singleton)]
 impl DependencyGraphServiceInMemory {
     pub fn new() -> Self {

@@ -39,6 +39,7 @@ impl State {
 }
 
 #[component(pub)]
+#[interface(dyn TaskSystemEventStore)]
 #[scope(Singleton)]
 impl TaskSystemEventStoreInMemory {
     pub fn new() -> Self {

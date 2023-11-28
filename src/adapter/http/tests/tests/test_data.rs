@@ -28,15 +28,12 @@ async fn test_data_push_ingest_handler() {
 
     let catalog = dill::CatalogBuilder::new()
         .add::<DataFormatRegistryImpl>()
-        .bind::<dyn DataFormatRegistry, DataFormatRegistryImpl>()
         .add_builder(
             PushIngestServiceImpl::builder().with_run_info_dir(run_info_dir.path().to_path_buf()),
         )
         .bind::<dyn PushIngestService, PushIngestServiceImpl>()
         .add::<ObjectStoreRegistryImpl>()
-        .bind::<dyn ObjectStoreRegistry, ObjectStoreRegistryImpl>()
-        .add_value(ObjectStoreBuilderLocalFs::new())
-        .bind::<dyn ObjectStoreBuilder, ObjectStoreBuilderLocalFs>()
+        .add::<ObjectStoreBuilderLocalFs>()
         .build();
 
     let server_harness = ServerSideLocalFsHarness::new(ServerSideHarnessOptions {

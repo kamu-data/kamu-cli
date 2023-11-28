@@ -70,11 +70,10 @@ impl Kamu {
             .add::<EventBus>()
             .add_value(self.current_account.to_current_account_subject())
             .add::<domain::auth::AlwaysHappyDatasetActionAuthorizer>()
-            .bind::<dyn domain::auth::DatasetActionAuthorizer, domain::auth::AlwaysHappyDatasetActionAuthorizer>()
             .add_builder(
                 DatasetRepositoryLocalFs::builder()
                     .with_root(self.workspace_layout.datasets_dir.clone())
-                    .with_multi_tenant(false)
+                    .with_multi_tenant(false),
             )
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
             .build();
@@ -136,11 +135,10 @@ impl Kamu {
             .add::<EventBus>()
             .add_value(self.current_account.to_current_account_subject())
             .add::<domain::auth::AlwaysHappyDatasetActionAuthorizer>()
-            .bind::<dyn domain::auth::DatasetActionAuthorizer, domain::auth::AlwaysHappyDatasetActionAuthorizer>()
             .add_builder(
                 DatasetRepositoryLocalFs::builder()
                     .with_root(self.workspace_layout.datasets_dir.clone())
-                    .with_multi_tenant(false)
+                    .with_multi_tenant(false),
             )
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
             .build();

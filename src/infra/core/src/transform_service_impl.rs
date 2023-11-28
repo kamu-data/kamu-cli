@@ -25,6 +25,7 @@ pub struct TransformServiceImpl {
 }
 
 #[component(pub)]
+#[interface(dyn TransformService)]
 impl TransformServiceImpl {
     pub fn new(
         dataset_repo: Arc<dyn DatasetRepository>,

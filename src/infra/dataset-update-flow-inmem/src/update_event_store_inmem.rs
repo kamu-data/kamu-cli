@@ -11,7 +11,7 @@ use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-use dill::{component, scope, Singleton};
+use dill::*;
 use kamu_dataset_update_flow::*;
 use opendatafabric::DatasetID;
 
@@ -46,6 +46,7 @@ impl State {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
+#[interface(dyn UpdateEventStore)]
 #[scope(Singleton)]
 impl UpdateEventStoreInMem {
     pub fn new() -> Self {

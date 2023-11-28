@@ -10,7 +10,7 @@
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 
-use dill::{component, scope, Singleton};
+use dill::*;
 use kamu_dataset_update_flow::*;
 use opendatafabric::DatasetID;
 
@@ -31,6 +31,7 @@ struct State {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
+#[interface(dyn UpdateScheduleEventStore)]
 #[scope(Singleton)]
 impl UpdateScheduleEventStoreInMem {
     pub fn new() -> Self {

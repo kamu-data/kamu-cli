@@ -9,13 +9,14 @@
 
 use std::path::Path;
 
-use dill::component;
+use dill::{component, interface};
 use kamu_core::*;
 use opendatafabric::serde::yaml::*;
 use opendatafabric::*;
 use url::Url;
 
 #[component]
+#[interface(dyn ResourceLoader)]
 pub struct ResourceLoaderImpl {}
 
 impl ResourceLoaderImpl {

@@ -21,6 +21,7 @@ pub trait SystemTimeSource: Send + Sync {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
+#[dill::interface(dyn SystemTimeSource)]
 pub struct SystemTimeSourceDefault;
 
 impl SystemTimeSource for SystemTimeSourceDefault {

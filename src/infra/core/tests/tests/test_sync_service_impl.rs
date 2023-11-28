@@ -16,7 +16,6 @@ use event_bus::EventBus;
 use kamu::domain::*;
 use kamu::testing::*;
 use kamu::utils::ipfs_wrapper::IpfsClient;
-use kamu::utils::smart_transfer_protocol::SmartTransferProtocolClient;
 use kamu::*;
 use opendatafabric::*;
 use url::Url;
@@ -168,13 +167,9 @@ async fn do_test_sync(
         )
         .bind::<dyn RemoteRepositoryRegistry, RemoteRepositoryRegistryImpl>()
         .add::<auth::DummyOdfServerAccessTokenResolver>()
-        .bind::<dyn auth::OdfServerAccessTokenResolver, auth::DummyOdfServerAccessTokenResolver>()
         .add::<DatasetFactoryImpl>()
-        .bind::<dyn DatasetFactory, DatasetFactoryImpl>()
         .add::<SyncServiceImpl>()
-        .bind::<dyn SyncService, SyncServiceImpl>()
-        .add_value(DummySmartTransferProtocolClient {})
-        .bind::<dyn SmartTransferProtocolClient, DummySmartTransferProtocolClient>()
+        .add::<DummySmartTransferProtocolClient>()
         .build();
 
     let sync_svc = catalog.get_one::<dyn SyncService>().unwrap();

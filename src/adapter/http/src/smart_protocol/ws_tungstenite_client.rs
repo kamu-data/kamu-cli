@@ -10,7 +10,7 @@
 use std::sync::atomic::{AtomicI32, Ordering};
 use std::sync::Arc;
 
-use dill::component;
+use dill::*;
 use futures::SinkExt;
 use kamu::domain::*;
 use kamu::utils::smart_transfer_protocol::{
@@ -41,6 +41,7 @@ pub struct WsSmartTransferProtocolClient {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
+#[interface(dyn SmartTransferProtocolClient)]
 impl WsSmartTransferProtocolClient {
     pub fn new(dataset_credential_resolver: Arc<dyn auth::OdfServerAccessTokenResolver>) -> Self {
         Self {

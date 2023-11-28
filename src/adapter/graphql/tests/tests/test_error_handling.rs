@@ -61,7 +61,6 @@ async fn test_internal_error() {
         .add::<EventBus>()
         .add_value(CurrentAccountSubject::new_test())
         .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
-        .bind::<dyn auth::DatasetActionAuthorizer, auth::AlwaysHappyDatasetActionAuthorizer>()
         .add_builder(
             DatasetRepositoryLocalFs::builder()
                 .with_root(tempdir.path().join("datasets"))

@@ -44,7 +44,6 @@ async fn test_verify_data_consistency() {
         .add_value(TestTransformService::new(Arc::new(Mutex::new(Vec::new()))))
         .bind::<dyn TransformService, TestTransformService>()
         .add::<VerificationServiceImpl>()
-        .bind::<dyn VerificationService, VerificationServiceImpl>()
         .build();
 
     let verification_svc = catalog.get_one::<dyn VerificationService>().unwrap();

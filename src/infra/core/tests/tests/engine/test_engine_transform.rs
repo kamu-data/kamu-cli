@@ -239,39 +239,34 @@ async fn test_transform_common(transform: Transform) {
     let catalog = dill::CatalogBuilder::new()
         .add::<EventBus>()
         .add::<kamu_core::auth::AlwaysHappyDatasetActionAuthorizer>()
-        .bind::<dyn kamu_core::auth::DatasetActionAuthorizer, kamu_core::auth::AlwaysHappyDatasetActionAuthorizer>()
         .add_value(CurrentAccountSubject::new_test())
         .add_builder(
             DatasetRepositoryLocalFs::builder()
                 .with_root(tempdir.path().join("datasets"))
-                .with_multi_tenant(false)
+                .with_multi_tenant(false),
         )
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
         .add_builder(
             EngineProvisionerLocal::builder()
                 .with_config(EngineProvisionerLocalConfig::default())
                 .with_container_runtime(ContainerRuntime::default())
-                .with_run_info_dir(run_info_dir.clone())
+                .with_run_info_dir(run_info_dir.clone()),
         )
         .bind::<dyn EngineProvisioner, EngineProvisionerLocal>()
-        .add_value(
-            ObjectStoreRegistryImpl::new(vec![Arc::new(
-                ObjectStoreBuilderLocalFs::new(),
-            )])
-        )
+        .add_value(ObjectStoreRegistryImpl::new(vec![Arc::new(
+            ObjectStoreBuilderLocalFs::new(),
+        )]))
         .bind::<dyn ObjectStoreRegistry, ObjectStoreRegistryImpl>()
         .add_builder(
             PollingIngestServiceImpl::builder()
                 .with_cache_dir(cache_dir)
                 .with_run_info_dir(run_info_dir)
                 .with_container_runtime(Arc::new(ContainerRuntime::default()))
-                .with_data_format_registry(Arc::new(DataFormatRegistryImpl::new()))
+                .with_data_format_registry(Arc::new(DataFormatRegistryImpl::new())),
         )
         .bind::<dyn PollingIngestService, PollingIngestServiceImpl>()
         .add::<SystemTimeSourceDefault>()
-        .bind::<dyn SystemTimeSource, SystemTimeSourceDefault>()
         .add::<TransformServiceImpl>()
-        .bind::<dyn TransformService, TransformServiceImpl>()
         .build();
 
     let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();

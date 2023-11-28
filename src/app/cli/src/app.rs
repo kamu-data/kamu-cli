@@ -12,13 +12,8 @@ use std::sync::Arc;
 
 use container_runtime::{ContainerRuntime, ContainerRuntimeConfig};
 use dill::*;
-use event_bus::AsyncEventHandler;
-use kamu::domain::events::DatasetDeleted;
 use kamu::domain::*;
-use kamu::utils::smart_transfer_protocol::SmartTransferProtocolClient;
 use kamu::*;
-use kamu_dataset_update_flow_inmem::domain::UpdateScheduleEventModified;
-use kamu_task_system_inmem::domain::TaskFinished;
 
 use crate::error::*;
 use crate::explore::TraceServer;
@@ -159,7 +154,6 @@ pub fn configure_base_catalog(
     b.add::<ContainerRuntime>();
 
     b.add::<SystemTimeSourceDefault>();
-    b.bind::<dyn SystemTimeSource, SystemTimeSourceDefault>();
 
     b.add::<event_bus::EventBus>();
 
@@ -171,7 +165,6 @@ pub fn configure_base_catalog(
     b.bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>();
 
     b.add::<DatasetFactoryImpl>();
-    b.bind::<dyn DatasetFactory, DatasetFactoryImpl>();
 
     b.add_builder(
         RemoteRepositoryRegistryImpl::builder().with_repos_dir(workspace_layout.repos_dir.clone()),
@@ -179,13 +172,10 @@ pub fn configure_base_catalog(
     b.bind::<dyn RemoteRepositoryRegistry, RemoteRepositoryRegistryImpl>();
 
     b.add::<RemoteAliasesRegistryImpl>();
-    b.bind::<dyn RemoteAliasesRegistry, RemoteAliasesRegistryImpl>();
 
     b.add::<ResourceLoaderImpl>();
-    b.bind::<dyn ResourceLoader, ResourceLoaderImpl>();
 
     b.add::<DataFormatRegistryImpl>();
-    b.bind::<dyn DataFormatRegistry, DataFormatRegistryImpl>();
 
     b.add_builder(
         PollingIngestServiceImpl::builder()
@@ -200,37 +190,26 @@ pub fn configure_base_catalog(
     b.bind::<dyn PushIngestService, PushIngestServiceImpl>();
 
     b.add::<TransformServiceImpl>();
-    b.bind::<dyn TransformService, TransformServiceImpl>();
 
     b.add::<VerificationServiceImpl>();
-    b.bind::<dyn VerificationService, VerificationServiceImpl>();
 
     b.add::<SearchServiceImpl>();
-    b.bind::<dyn SearchService, SearchServiceImpl>();
 
     b.add::<SyncServiceImpl>();
-    b.bind::<dyn SyncService, SyncServiceImpl>();
 
     b.add::<PullServiceImpl>();
-    b.bind::<dyn PullService, PullServiceImpl>();
 
     b.add::<PushServiceImpl>();
-    b.bind::<dyn PushService, PushServiceImpl>();
 
     b.add::<ResetServiceImpl>();
-    b.bind::<dyn ResetService, ResetServiceImpl>();
 
     b.add::<ProvenanceServiceImpl>();
-    b.bind::<dyn ProvenanceService, ProvenanceServiceImpl>();
 
     b.add::<QueryServiceImpl>();
-    b.bind::<dyn QueryService, QueryServiceImpl>();
 
     b.add::<ObjectStoreRegistryImpl>();
-    b.bind::<dyn ObjectStoreRegistry, ObjectStoreRegistryImpl>();
 
-    b.add_value(ObjectStoreBuilderLocalFs::new());
-    b.bind::<dyn ObjectStoreBuilder, ObjectStoreBuilderLocalFs>();
+    b.add::<ObjectStoreBuilderLocalFs>();
 
     b.add_builder(
         EngineProvisionerLocal::builder().with_run_info_dir(workspace_layout.run_info_dir.clone()),
@@ -238,52 +217,35 @@ pub fn configure_base_catalog(
     b.bind::<dyn EngineProvisioner, EngineProvisionerLocal>();
 
     b.add::<kamu_adapter_http::SmartTransferProtocolClientWs>();
-    b.bind::<dyn SmartTransferProtocolClient, kamu_adapter_http::SmartTransferProtocolClientWs>();
 
     b.add::<kamu_task_system_inmem::TaskSchedulerInMemory>();
-    b.bind::<dyn kamu_task_system_inmem::domain::TaskScheduler, kamu_task_system_inmem::TaskSchedulerInMemory>();
 
     b.add::<kamu_task_system_inmem::TaskExecutorInMemory>();
-    b.bind::<dyn kamu_task_system_inmem::domain::TaskExecutor, kamu_task_system_inmem::TaskExecutorInMemory>();
 
     b.add::<kamu_task_system_inmem::TaskSystemEventStoreInMemory>();
-    b.bind::<dyn kamu_task_system_inmem::domain::TaskSystemEventStore, kamu_task_system_inmem::TaskSystemEventStoreInMemory>();
 
     b.add::<kamu_dataset_update_flow_inmem::DependencyGraphServiceInMemory>();
-    b.bind::<dyn kamu_dataset_update_flow_inmem::domain::DependencyGraphService, kamu_dataset_update_flow_inmem::DependencyGraphServiceInMemory>();
-    b.bind::<dyn AsyncEventHandler<DatasetDeleted>, kamu_dataset_update_flow_inmem::DependencyGraphServiceInMemory>();
 
     // TODO: initialize graph dependencies when starting API server
     b.add::<kamu_dataset_update_flow_inmem::UpdateScheduleServiceInMemory>();
-    b.bind::<dyn kamu_dataset_update_flow_inmem::domain::UpdateScheduleService, kamu_dataset_update_flow_inmem::UpdateScheduleServiceInMemory>();
 
     b.add::<kamu_dataset_update_flow_inmem::UpdateServiceInMemory>();
-    b.bind::<dyn kamu_dataset_update_flow_inmem::domain::UpdateService, kamu_dataset_update_flow_inmem::UpdateServiceInMemory>();
-    b.bind::<dyn AsyncEventHandler<TaskFinished>, kamu_dataset_update_flow_inmem::UpdateServiceInMemory>();
-    b.bind::<dyn AsyncEventHandler<DatasetDeleted>, kamu_dataset_update_flow_inmem::UpdateServiceInMemory>();
-    b.bind::<dyn AsyncEventHandler<UpdateScheduleEventModified>, kamu_dataset_update_flow_inmem::UpdateServiceInMemory>();
 
     b.add::<kamu_dataset_update_flow_inmem::UpdateEventStoreInMem>();
-    b.bind::<dyn kamu_dataset_update_flow_inmem::domain::UpdateEventStore, kamu_dataset_update_flow_inmem::UpdateEventStoreInMem>();
 
     b.add::<kamu_dataset_update_flow_inmem::UpdateScheduleEventStoreInMem>();
-    b.bind::<dyn kamu_dataset_update_flow_inmem::domain::UpdateScheduleEventStore, kamu_dataset_update_flow_inmem::UpdateScheduleEventStoreInMem>();
 
     b.add::<accounts::AccountService>();
-    b.bind::<dyn auth::AuthenticationProvider, accounts::AccountService>();
 
     // No Github login possible for single-tenant workspace
     if multi_tenant_workspace {
         b.add::<kamu_adapter_oauth::OAuthGithub>();
-        b.bind::<dyn domain::auth::AuthenticationProvider, kamu_adapter_oauth::OAuthGithub>();
     }
 
     b.add::<AuthenticationServiceImpl>();
-    b.bind::<dyn domain::auth::AuthenticationService, AuthenticationServiceImpl>();
 
     b.add::<kamu_adapter_auth_oso::KamuAuthOso>();
     b.add::<kamu_adapter_auth_oso::OsoDatasetAuthorizer>();
-    b.bind::<dyn domain::auth::DatasetActionAuthorizer, kamu_adapter_auth_oso::OsoDatasetAuthorizer>();
 
     b
 }
@@ -297,10 +259,8 @@ pub fn configure_cli_catalog(base_catalog: &Catalog) -> CatalogBuilder {
     b.add::<WorkspaceService>();
 
     b.add::<odf_server::AccessTokenRegistryService>();
-    b.bind::<dyn auth::OdfServerAccessTokenResolver, odf_server::AccessTokenRegistryService>();
     b.add::<odf_server::LoginService>();
     b.add::<odf_server::CLIAccessTokenStore>();
-    b.bind::<dyn odf_server::AccessTokenStore, odf_server::CLIAccessTokenStore>();
 
     b
 }

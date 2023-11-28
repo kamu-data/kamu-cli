@@ -28,6 +28,7 @@ struct State {
 }
 
 #[component(pub)]
+#[interface(dyn TaskScheduler)]
 #[scope(Singleton)]
 impl TaskSchedulerInMemory {
     pub fn new(

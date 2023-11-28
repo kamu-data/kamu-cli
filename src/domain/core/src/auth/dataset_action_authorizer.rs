@@ -10,7 +10,7 @@
 use std::collections::HashSet;
 use std::str::FromStr;
 
-use dill::component;
+use dill::*;
 use internal_error::{ErrorIntoInternal, InternalError};
 use opendatafabric::{DatasetHandle, DatasetRef};
 use thiserror::Error;
@@ -82,6 +82,7 @@ pub struct DatasetActionNotEnoughPermissionsError {
 ///////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
+#[interface(dyn DatasetActionAuthorizer)]
 pub struct AlwaysHappyDatasetActionAuthorizer {}
 
 impl AlwaysHappyDatasetActionAuthorizer {

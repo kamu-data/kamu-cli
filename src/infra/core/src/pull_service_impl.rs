@@ -28,6 +28,7 @@ pub struct PullServiceImpl {
 }
 
 #[component(pub)]
+#[interface(dyn PullService)]
 impl PullServiceImpl {
     pub fn new(
         dataset_repo: Arc<dyn DatasetRepository>,

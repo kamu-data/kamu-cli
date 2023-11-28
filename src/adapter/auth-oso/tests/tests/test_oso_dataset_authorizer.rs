@@ -111,7 +111,6 @@ impl DatasetAuthorizerHarness {
             )))
             .add::<KamuAuthOso>()
             .add::<OsoDatasetAuthorizer>()
-            .bind::<dyn DatasetActionAuthorizer, OsoDatasetAuthorizer>()
             .add_builder(
                 DatasetRepositoryLocalFs::builder()
                     .with_root(datasets_dir)

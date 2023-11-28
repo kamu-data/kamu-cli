@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use dill::{component, scope, Singleton};
+use dill::*;
 use event_bus::{AsyncEventHandler, EventBus};
 use futures::StreamExt;
 use kamu_core::events::DatasetDeleted;
@@ -28,6 +28,8 @@ pub struct UpdateScheduleServiceInMemory {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
+#[interface(dyn UpdateScheduleService)]
+#[interface(dyn AsyncEventHandler<DatasetDeleted>)]
 #[scope(Singleton)]
 impl UpdateScheduleServiceInMemory {
     pub fn new(

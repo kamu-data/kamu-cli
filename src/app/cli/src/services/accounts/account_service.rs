@@ -11,7 +11,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use clap::ArgMatches;
-use dill::component;
+use dill::*;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::auth::{self, AccountInfo, AccountType};
 use opendatafabric::{AccountName, FAKE_ACCOUNT_ID};
@@ -32,6 +32,7 @@ pub struct AccountService {
 }
 
 #[component(pub)]
+#[interface(dyn auth::AuthenticationProvider)]
 impl AccountService {
     pub fn new(users_config: Arc<UsersConfig>) -> Self {
         let mut predefined_accounts: HashMap<String, auth::AccountInfo> = HashMap::new();

@@ -14,7 +14,6 @@ use container_runtime::ContainerRuntime;
 use dill::Component;
 use event_bus::EventBus;
 use kamu::domain::*;
-use kamu::utils::smart_transfer_protocol::SmartTransferProtocolClient;
 use kamu::*;
 use kamu_adapter_http::SmartTransferProtocolClientWs;
 use opendatafabric::{AccountName, DatasetID, DatasetRef, DatasetRefAny, DatasetRefRemote};
@@ -60,19 +59,16 @@ impl ClientSideHarness {
             CLIENT_ACCOUNT_NAME,
         )));
 
-        b.add::<auth::AlwaysHappyDatasetActionAuthorizer>()
-            .bind::<dyn auth::DatasetActionAuthorizer, auth::AlwaysHappyDatasetActionAuthorizer>();
+        b.add::<auth::AlwaysHappyDatasetActionAuthorizer>();
 
         if options.authenticated_remotely {
             b.add::<auth::DummyOdfServerAccessTokenResolver>();
-            b.bind::<dyn auth::OdfServerAccessTokenResolver, auth::DummyOdfServerAccessTokenResolver>();
         } else {
             b.add_value(kamu::testing::MockOdfServerAccessTokenResolver::empty());
             b.bind::<dyn auth::OdfServerAccessTokenResolver, kamu::testing::MockOdfServerAccessTokenResolver>();
         }
 
         b.add::<SystemTimeSourceDefault>();
-        b.bind::<dyn SystemTimeSource, SystemTimeSourceDefault>();
 
         b.add_builder(
             DatasetRepositoryLocalFs::builder()
@@ -84,17 +80,13 @@ impl ClientSideHarness {
         b.add_builder(RemoteRepositoryRegistryImpl::builder().with_repos_dir(repos_dir))
             .bind::<dyn RemoteRepositoryRegistry, RemoteRepositoryRegistryImpl>();
 
-        b.add::<RemoteAliasesRegistryImpl>()
-            .bind::<dyn RemoteAliasesRegistry, RemoteAliasesRegistryImpl>();
+        b.add::<RemoteAliasesRegistryImpl>();
 
-        b.add_value(EngineProvisionerNull)
-            .bind::<dyn EngineProvisioner, EngineProvisionerNull>();
+        b.add::<EngineProvisionerNull>();
 
-        b.add::<ObjectStoreRegistryImpl>()
-            .bind::<dyn ObjectStoreRegistry, ObjectStoreRegistryImpl>();
+        b.add::<ObjectStoreRegistryImpl>();
 
         b.add::<DataFormatRegistryImpl>();
-        b.bind::<dyn DataFormatRegistry, DataFormatRegistryImpl>();
 
         b.add_builder(
             PollingIngestServiceImpl::builder()
@@ -103,23 +95,17 @@ impl ClientSideHarness {
         )
         .bind::<dyn PollingIngestService, PollingIngestServiceImpl>();
 
-        b.add::<DatasetFactoryImpl>()
-            .bind::<dyn DatasetFactory, DatasetFactoryImpl>();
+        b.add::<DatasetFactoryImpl>();
 
-        b.add::<SmartTransferProtocolClientWs>()
-            .bind::<dyn SmartTransferProtocolClient, SmartTransferProtocolClientWs>();
+        b.add::<SmartTransferProtocolClientWs>();
 
-        b.add::<SyncServiceImpl>()
-            .bind::<dyn SyncService, SyncServiceImpl>();
+        b.add::<SyncServiceImpl>();
 
-        b.add::<TransformServiceImpl>()
-            .bind::<dyn TransformService, TransformServiceImpl>();
+        b.add::<TransformServiceImpl>();
 
-        b.add::<PullServiceImpl>()
-            .bind::<dyn PullService, PullServiceImpl>();
+        b.add::<PullServiceImpl>();
 
-        b.add::<PushServiceImpl>()
-            .bind::<dyn PushService, PushServiceImpl>();
+        b.add::<PushServiceImpl>();
 
         b.add_value(ContainerRuntime::default());
         b.add_value(kamu::utils::ipfs_wrapper::IpfsClient::default());

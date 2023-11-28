@@ -936,7 +936,6 @@ impl PullTestHarness {
             .add_value(RemoteRepositoryRegistryImpl::create(tmp_path.join("repos")).unwrap())
             .bind::<dyn RemoteRepositoryRegistry, RemoteRepositoryRegistryImpl>()
             .add::<RemoteAliasesRegistryImpl>()
-            .bind::<dyn RemoteAliasesRegistry, RemoteAliasesRegistryImpl>()
             .add_value(TestIngestService::new(calls.clone()))
             .bind::<dyn PollingIngestService, TestIngestService>()
             .add_value(TestTransformService::new(calls.clone()))
@@ -944,7 +943,6 @@ impl PullTestHarness {
             .add_builder(TestSyncService::builder().with_calls(calls.clone()))
             .bind::<dyn SyncService, TestSyncService>()
             .add::<PullServiceImpl>()
-            .bind::<dyn PullService, PullServiceImpl>()
             .build();
 
         let dataset_repo = catalog.get_one::<DatasetRepositoryLocalFs>().unwrap();

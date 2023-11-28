@@ -36,7 +36,6 @@ async fn metadata_chain_append_event() {
         )
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
         .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
-        .bind::<dyn auth::DatasetActionAuthorizer, auth::AlwaysHappyDatasetActionAuthorizer>()
         .build();
 
     let (catalog_anonymous, catalog_authorized) = authentication_catalogs(&base_catalog);
@@ -133,7 +132,6 @@ async fn metadata_update_readme_new() {
         )
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
         .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
-        .bind::<dyn auth::DatasetActionAuthorizer, auth::AlwaysHappyDatasetActionAuthorizer>()
         .build();
 
     let (catalog_anonymous, catalog_authorized) = authentication_catalogs(&base_catalog);

@@ -14,7 +14,6 @@ use dill::Component;
 use event_bus::EventBus;
 use kamu::domain::*;
 use kamu::testing::*;
-use kamu::utils::smart_transfer_protocol::SmartTransferProtocolClient;
 use kamu::*;
 use opendatafabric::*;
 use url::Url;
@@ -37,21 +36,15 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
         )
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
         .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
-        .bind::<dyn auth::DatasetActionAuthorizer, auth::AlwaysHappyDatasetActionAuthorizer>()
         .add_value(RemoteRepositoryRegistryImpl::create(tmp_workspace_dir.join("repos")).unwrap())
         .bind::<dyn RemoteRepositoryRegistry, RemoteRepositoryRegistryImpl>()
         .add_value(IpfsGateway::default())
         .add_value(kamu::utils::ipfs_wrapper::IpfsClient::default())
         .add::<auth::DummyOdfServerAccessTokenResolver>()
-        .bind::<dyn auth::OdfServerAccessTokenResolver, auth::DummyOdfServerAccessTokenResolver>()
         .add::<DatasetFactoryImpl>()
-        .bind::<dyn DatasetFactory, DatasetFactoryImpl>()
         .add::<SyncServiceImpl>()
-        .bind::<dyn SyncService, SyncServiceImpl>()
-        .add_value(DummySmartTransferProtocolClient {})
-        .bind::<dyn SmartTransferProtocolClient, DummySmartTransferProtocolClient>()
+        .add::<DummySmartTransferProtocolClient>()
         .add::<SearchServiceImpl>()
-        .bind::<dyn SearchService, SearchServiceImpl>()
         .build();
 
     let remote_repo_reg = catalog.get_one::<dyn RemoteRepositoryRegistry>().unwrap();

@@ -55,7 +55,6 @@ impl TransformTestHarness {
             )
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
             .add::<TransformServiceImpl>()
-            .bind::<dyn TransformService, TransformServiceImpl>()
             .build();
 
         let transform_service = catalog.get_one::<TransformServiceImpl>().unwrap();

@@ -80,7 +80,6 @@ pub(crate) fn create_cli_user_catalog(base_catalog: &dill::Catalog) -> dill::Cat
             SERVER_ACCOUNT_NAME,
         )))
         .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
-        .bind::<dyn auth::DatasetActionAuthorizer, auth::AlwaysHappyDatasetActionAuthorizer>()
         .build()
 }
 
@@ -92,9 +91,7 @@ pub(crate) fn create_web_user_catalog(
 ) -> dill::Catalog {
     let mut web_catalog_builder = dill::CatalogBuilder::new_chained(&base_catalog);
     if options.authorized_writes {
-        web_catalog_builder
-            .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
-            .bind::<dyn auth::DatasetActionAuthorizer, auth::AlwaysHappyDatasetActionAuthorizer>();
+        web_catalog_builder.add::<auth::AlwaysHappyDatasetActionAuthorizer>();
     } else {
         let mut mock_dataset_action_authorizer = MockDatasetActionAuthorizer::new();
         mock_dataset_action_authorizer

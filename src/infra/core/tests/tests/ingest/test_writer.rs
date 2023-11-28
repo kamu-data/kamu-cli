@@ -436,12 +436,11 @@ impl Harness {
         let catalog = dill::CatalogBuilder::new()
             .add::<EventBus>()
             .add::<kamu_core::auth::AlwaysHappyDatasetActionAuthorizer>()
-            .bind::<dyn kamu_core::auth::DatasetActionAuthorizer, kamu_core::auth::AlwaysHappyDatasetActionAuthorizer>()
             .add_value(CurrentAccountSubject::new_test())
             .add_builder(
                 DatasetRepositoryLocalFs::builder()
                     .with_root(temp_dir.path().join("datasets"))
-                    .with_multi_tenant(false)
+                    .with_multi_tenant(false),
             )
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
             .build();

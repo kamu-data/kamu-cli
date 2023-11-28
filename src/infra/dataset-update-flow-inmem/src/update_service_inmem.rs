@@ -13,7 +13,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use chrono::{DateTime, Utc};
-use dill::{component, scope, Singleton};
+use dill::*;
 use event_bus::AsyncEventHandler;
 use futures::TryStreamExt;
 use kamu_core::events::DatasetDeleted;
@@ -59,6 +59,10 @@ impl State {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
+#[interface(dyn UpdateService)]
+#[interface(dyn AsyncEventHandler<TaskFinished>)]
+#[interface(dyn AsyncEventHandler<DatasetDeleted>)]
+#[interface(dyn AsyncEventHandler<UpdateScheduleEventModified>)]
 #[scope(Singleton)]
 impl UpdateServiceInMemory {
     pub fn new(

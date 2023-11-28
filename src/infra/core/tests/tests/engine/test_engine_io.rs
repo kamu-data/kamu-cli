@@ -239,12 +239,11 @@ async fn test_engine_io_local_file_mount() {
     let catalog = dill::CatalogBuilder::new()
         .add::<EventBus>()
         .add::<kamu_core::auth::AlwaysHappyDatasetActionAuthorizer>()
-        .bind::<dyn kamu_core::auth::DatasetActionAuthorizer, kamu_core::auth::AlwaysHappyDatasetActionAuthorizer>()
         .add_value(CurrentAccountSubject::new_test())
         .add_builder(
             DatasetRepositoryLocalFs::builder()
                 .with_root(tempdir.path().join("datasets"))
-                .with_multi_tenant(false)
+                .with_multi_tenant(false),
         )
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
         .build();
@@ -281,12 +280,11 @@ async fn test_engine_io_s3_to_local_file_mount_proxy() {
     let catalog = dill::CatalogBuilder::new()
         .add::<EventBus>()
         .add::<kamu_core::auth::AlwaysHappyDatasetActionAuthorizer>()
-        .bind::<dyn kamu_core::auth::DatasetActionAuthorizer, kamu_core::auth::AlwaysHappyDatasetActionAuthorizer>()
         .add_value(CurrentAccountSubject::new_test())
         .add_builder(
             DatasetRepositoryS3::builder()
                 .with_s3_context(s3_context.clone())
-                .with_multi_tenant(false)
+                .with_multi_tenant(false),
         )
         .bind::<dyn DatasetRepository, DatasetRepositoryS3>()
         .build();

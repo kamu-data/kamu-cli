@@ -10,7 +10,7 @@
 use std::collections::HashMap;
 use std::sync::Mutex;
 
-use dill::{component, scope, Singleton};
+use dill::*;
 use kamu_core::auth::{AccountInfo, AccountType};
 use kamu_core::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use opendatafabric::{AccountName, FAKE_ACCOUNT_ID};
@@ -30,6 +30,7 @@ pub struct OAuthGithub {
 }
 
 #[component(pub)]
+#[interface(dyn kamu_core::auth::AuthenticationProvider)]
 #[scope(Singleton)]
 impl OAuthGithub {
     pub fn new() -> Self {
