@@ -134,6 +134,10 @@ type CreateDatasetResultSuccess implements CreateDatasetResult & CreateDatasetFr
 	message: String!
 }
 
+type CronExpression {
+	expression: String!
+}
+
 type DataBatch {
 	format: DataBatchFormat!
 	content: String!
@@ -237,6 +241,10 @@ type Dataset {
 	Permissions of the current user
 	"""
 	permissions: DatasetPermissions!
+	"""
+	Configured update schedule
+	"""
+	updatesSchedule: DatasetUpdatesSchedule
 }
 
 scalar DatasetAlias
@@ -351,6 +359,10 @@ type DatasetMut {
 	"""
 	metadata: DatasetMetadataMut!
 	"""
+	Access to the schedule operations for the dataset
+	"""
+	updatesSchedule: DatasetUpdatesScheduleMut!
+	"""
 	Rename the dataset
 	"""
 	rename(newName: DatasetName!): RenameResult!
@@ -373,6 +385,30 @@ type DatasetPermissions {
 scalar DatasetRef
 
 scalar DatasetRefAny
+
+union DatasetUpdatesPollingSchedule = TimeDelta | CronExpression
+
+type DatasetUpdatesSchedule {
+	paused: Boolean!
+	updateSettings: DatasetUpdatesSettings!
+}
+
+type DatasetUpdatesScheduleMut {
+	setPollingTimeDelta(paused: Boolean!, every: TimeDeltaInput!): SetUpdateScheduleResult!
+	setPollingCronExpression(paused: Boolean!, cronExpression: String!): SetUpdateScheduleResult!
+	setThrottling(paused: Boolean!, throttlingPeriod: TimeDeltaInput, minimalDataBatch: Int): SetUpdateScheduleResult!
+}
+
+union DatasetUpdatesSettings = DatasetUpdatesSettingsPolling | DatasetUpdatesSettingsThrottling
+
+type DatasetUpdatesSettingsPolling {
+	schedule: DatasetUpdatesPollingSchedule!
+}
+
+type DatasetUpdatesSettingsThrottling {
+	throttlingPeriod: TimeDelta
+	minimalDataBatch: Int
+}
 
 type Datasets {
 	"""
@@ -868,6 +904,15 @@ type SetTransform {
 	transform: Transform!
 }
 
+interface SetUpdateScheduleResult {
+	message: String!
+}
+
+type SetUpdateScheduleResultSuccess implements SetUpdateScheduleResult {
+	success: Boolean!
+	message: String!
+}
+
 type SetVocab {
 	systemTimeColumn: String
 	eventTimeColumn: String
@@ -1027,6 +1072,23 @@ type TasksMut {
 type TemporalTable {
 	name: String!
 	primaryKey: [String!]!
+}
+
+type TimeDelta {
+	every: Int!
+	unit: TimeUnit!
+}
+
+input TimeDeltaInput {
+	every: Int!
+	unit: TimeUnit!
+}
+
+enum TimeUnit {
+	MINUTES
+	HOURS
+	DAYS
+	WEEKS
 }
 
 union Transform = TransformSql

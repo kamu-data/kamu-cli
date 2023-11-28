@@ -10,10 +10,19 @@
 use chrono::prelude::*;
 use futures::TryStreamExt;
 use kamu_core::{self as domain, MetadataChainExt, TryStreamExtExt};
+use kamu_dataset_update_flow::{
+    Schedule,
+    ScheduleCronExpression,
+    ScheduleReactive,
+    UpdateScheduleService,
+};
 use opendatafabric as odf;
 
 use crate::prelude::*;
 use crate::queries::*;
+use crate::utils;
+
+/////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
 pub struct Dataset {
@@ -49,12 +58,9 @@ impl Dataset {
 
     #[graphql(skip)]
     async fn get_dataset(&self, ctx: &Context<'_>) -> Result<std::sync::Arc<dyn domain::Dataset>> {
-        let dataset_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
-        let dataset = dataset_repo
-            .get_dataset(&self.dataset_handle.as_local_ref())
+        utils::get_dataset(ctx, &self.dataset_handle)
             .await
-            .int_err()?;
-        Ok(dataset)
+            .map_err(|e| e.into())
     }
 
     /// Unique identifier of the dataset
@@ -148,7 +154,57 @@ impl Dataset {
             can_schedule: can_write,
         })
     }
+
+    /// Configured update schedule
+    async fn updates_schedule(&self, ctx: &Context<'_>) -> Result<Option<DatasetUpdatesSchedule>> {
+        use kamu_core::auth;
+        let dataset_action_authorizer =
+            from_catalog::<dyn auth::DatasetActionAuthorizer>(ctx).unwrap();
+
+        dataset_action_authorizer
+            .check_action_allowed(&self.dataset_handle, auth::DatasetAction::Read)
+            .await
+            .map_err(|_| {
+                GqlError::Gql(
+                    Error::new("Dataset access error").extend_with(|_, eev| {
+                        eev.set("alias", self.dataset_handle.alias.to_string())
+                    }),
+                )
+            })?;
+
+        let update_schedule_service = from_catalog::<dyn UpdateScheduleService>(ctx).unwrap();
+        let maybe_update_schedule = update_schedule_service
+            .find_schedule(&self.dataset_handle.id)
+            .await
+            .int_err()?;
+
+        Ok(
+            maybe_update_schedule.map(|update_schedule| DatasetUpdatesSchedule {
+                paused: update_schedule.paused(),
+                update_settings: match update_schedule.schedule() {
+                    Schedule::None => unreachable!("May only be applied to removed dataset"),
+                    Schedule::TimeDelta(time_delta) => {
+                        DatasetUpdatesSettings::Polling(DatasetUpdatesSettingsPolling {
+                            schedule: DatasetUpdatesPollingSchedule::TimeDelta(
+                                time_delta.every.into(),
+                            ),
+                        })
+                    }
+                    Schedule::CronExpression(cron) => {
+                        DatasetUpdatesSettings::Polling(DatasetUpdatesSettingsPolling {
+                            schedule: DatasetUpdatesPollingSchedule::Cron(cron.into()),
+                        })
+                    }
+                    Schedule::Reactive(reactive) => {
+                        DatasetUpdatesSettings::Throttling(reactive.into())
+                    }
+                },
+            }),
+        )
+    }
 }
+
+/////////////////////////////////////////////////////////////////////////////////
 
 #[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct DatasetPermissions {
@@ -158,3 +214,120 @@ pub struct DatasetPermissions {
     can_commit: bool,
     can_schedule: bool,
 }
+
+/////////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
+pub struct DatasetUpdatesSchedule {
+    pub paused: bool,
+    pub update_settings: DatasetUpdatesSettings,
+}
+
+#[derive(Union, Debug, Clone, PartialEq, Eq)]
+pub enum DatasetUpdatesSettings {
+    Polling(DatasetUpdatesSettingsPolling),
+    Throttling(DatasetUpdatesSettingsThrottling),
+}
+
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
+pub struct DatasetUpdatesSettingsPolling {
+    pub schedule: DatasetUpdatesPollingSchedule,
+}
+
+#[derive(Union, Debug, Clone, PartialEq, Eq)]
+pub enum DatasetUpdatesPollingSchedule {
+    TimeDelta(TimeDelta),
+    Cron(CronExpression),
+}
+
+/////////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
+pub struct CronExpression {
+    pub expression: String,
+}
+
+impl From<ScheduleCronExpression> for CronExpression {
+    fn from(value: ScheduleCronExpression) -> Self {
+        Self {
+            expression: value.expression,
+        }
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
+pub struct DatasetUpdatesSettingsThrottling {
+    pub throttling_period: Option<TimeDelta>,
+    pub minimal_data_batch: Option<i32>,
+}
+
+impl From<ScheduleReactive> for DatasetUpdatesSettingsThrottling {
+    fn from(value: ScheduleReactive) -> Self {
+        Self {
+            throttling_period: value.throttling_period.map(|tp| tp.into()),
+            minimal_data_batch: value.minimal_data_batch,
+        }
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
+pub struct TimeDelta {
+    pub every: u32,
+    pub unit: TimeUnit,
+}
+
+#[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TimeUnit {
+    Minutes,
+    Hours,
+    Days,
+    Weeks,
+}
+
+impl From<chrono::Duration> for TimeDelta {
+    fn from(value: chrono::Duration) -> Self {
+        let num_weeks = value.num_weeks();
+        if num_weeks > 0 {
+            assert!((value - chrono::Duration::weeks(num_weeks)).is_zero());
+            return Self {
+                every: num_weeks as u32,
+                unit: TimeUnit::Weeks,
+            };
+        }
+
+        let num_days = value.num_days();
+        if num_days > 0 {
+            assert!((value - chrono::Duration::days(num_days)).is_zero());
+            return Self {
+                every: num_days as u32,
+                unit: TimeUnit::Days,
+            };
+        }
+
+        let num_hours = value.num_hours();
+        if num_hours > 0 {
+            assert!((value - chrono::Duration::hours(num_hours)).is_zero());
+            return Self {
+                every: num_hours as u32,
+                unit: TimeUnit::Hours,
+            };
+        }
+
+        let num_minutes = value.num_minutes();
+        if num_minutes > 0 {
+            assert!((value - chrono::Duration::minutes(num_minutes)).is_zero());
+            return Self {
+                every: num_minutes as u32,
+                unit: TimeUnit::Minutes,
+            };
+        }
+
+        unreachable!("Expecting intervals not tinier than 1 minute");
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////

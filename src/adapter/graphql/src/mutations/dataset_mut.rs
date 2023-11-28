@@ -9,11 +9,14 @@
 
 use domain::{DeleteDatasetError, RenameDatasetError};
 use kamu_core::{self as domain};
+use kamu_dataset_update_flow::*;
 use opendatafabric as odf;
 
-use super::DatasetMetadataMut;
+use super::{DatasetMetadataMut, DatasetUpdatesScheduleMut};
 use crate::prelude::*;
 use crate::LoggedInGuard;
+
+////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
 pub struct DatasetMut {
@@ -30,6 +33,11 @@ impl DatasetMut {
     /// Access to the mutable metadata of the dataset
     async fn metadata(&self) -> DatasetMetadataMut {
         DatasetMetadataMut::new(self.dataset_handle.clone())
+    }
+
+    /// Access to the schedule operations for the dataset
+    async fn updates_schedule(&self) -> DatasetUpdatesScheduleMut {
+        DatasetUpdatesScheduleMut::new(self.dataset_handle.clone())
     }
 
     /// Rename the dataset

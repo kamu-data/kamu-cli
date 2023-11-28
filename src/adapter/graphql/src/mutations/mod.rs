@@ -10,12 +10,15 @@
 mod auth_mut;
 mod dataset_metadata_mut;
 mod dataset_mut;
+mod dataset_updates_schedule_mut;
 mod datasets_mut;
 mod metadata_chain_mut;
 mod tasks_mut;
+
 pub(crate) use auth_mut::*;
 pub(crate) use dataset_metadata_mut::*;
 pub(crate) use dataset_mut::*;
+pub(crate) use dataset_updates_schedule_mut::*;
 pub(crate) use datasets_mut::*;
 pub(crate) use metadata_chain_mut::*;
 pub(crate) use tasks_mut::*;

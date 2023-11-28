@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use async_graphql::Context;
 use internal_error::*;
-use kamu_core::AccessError;
+use kamu_core::{AccessError, Dataset, DatasetRepository};
 use opendatafabric::DatasetHandle;
 use thiserror::Error;
 
@@ -24,6 +24,20 @@ where
 {
     let cat = ctx.data::<dill::Catalog>().unwrap();
     cat.get_one::<T>()
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+pub(crate) async fn get_dataset(
+    ctx: &Context<'_>,
+    dataset_handle: &DatasetHandle,
+) -> Result<Arc<dyn Dataset>, InternalError> {
+    let dataset_repo = from_catalog::<dyn DatasetRepository>(ctx).unwrap();
+    let dataset = dataset_repo
+        .get_dataset(&dataset_handle.as_local_ref())
+        .await
+        .int_err()?;
+    Ok(dataset)
 }
 
 ///////////////////////////////////////////////////////////////////////////////
