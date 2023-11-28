@@ -54,7 +54,11 @@ impl EventStore<CalcState> for CalcEventStore {
         )
     }
 
-    async fn save_events(&self, mut events: Vec<CalcEvents>) -> Result<EventID, SaveEventsError> {
+    async fn save_events(
+        &self,
+        _query: &(),
+        mut events: Vec<CalcEvents>,
+    ) -> Result<EventID, SaveEventsError> {
         let mut s = self.0.lock().unwrap();
         s.append(&mut events);
         Ok(EventID::new((s.len() - 1) as u64))

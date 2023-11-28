@@ -114,7 +114,11 @@ impl EventStore<UpdateState> for UpdateEventStoreInMem {
     }
 
     // TODO: concurrency
-    async fn save_events(&self, events: Vec<UpdateEvent>) -> Result<EventID, SaveEventsError> {
+    async fn save_events(
+        &self,
+        _update_id: &UpdateID,
+        events: Vec<UpdateEvent>,
+    ) -> Result<EventID, SaveEventsError> {
         let mut s = self.state.lock().unwrap();
 
         for event in events {

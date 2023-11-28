@@ -15,7 +15,6 @@ use crate::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-/// All events that model life-cycle of a task
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum UpdateScheduleEvent {
     Created(UpdateScheduleEventCreated),

@@ -28,7 +28,11 @@ pub trait EventStore<Proj: Projection>: Send + Sync {
     /// The `query` argument must be the same as query passed when retrieving
     /// the events. It will be used prior to saving events to ensure that there
     /// were no concurrent updates that could've influenced this transaction.
-    async fn save_events(&self, events: Vec<Proj::Event>) -> Result<EventID, SaveEventsError>;
+    async fn save_events(
+        &self,
+        query: &Proj::Query,
+        events: Vec<Proj::Event>,
+    ) -> Result<EventID, SaveEventsError>;
 
     /// Returns the number of events stored
     async fn len(&self) -> Result<usize, InternalError>;
@@ -39,9 +43,6 @@ pub trait EventStore<Proj: Projection>: Send + Sync {
 pub type EventStream<'a, Event> = std::pin::Pin<
     Box<dyn tokio_stream::Stream<Item = Result<(EventID, Event), GetEventsError>> + Send + 'a>,
 >;
-
-pub type QueryStream<'a, Query> =
-    std::pin::Pin<Box<dyn tokio_stream::Stream<Item = Query> + Send + 'a>>;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -59,12 +60,6 @@ pub struct GetEventsOpts {
 
 #[derive(thiserror::Error, Debug)]
 pub enum GetEventsError {
-    #[error(transparent)]
-    Internal(#[from] InternalError),
-}
-
-#[derive(thiserror::Error, Debug)]
-pub enum GetQueriesError {
     #[error(transparent)]
     Internal(#[from] InternalError),
 }

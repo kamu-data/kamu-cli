@@ -64,16 +64,16 @@ impl Update {
         self.apply(event)
     }
 
-    /// Queue for time
-    pub fn queued_for_time(
+    /// Activate at time
+    pub fn activate_at_time(
         &mut self,
         now: DateTime<Utc>,
-        queued_for: DateTime<Utc>,
+        activate_at: DateTime<Utc>,
     ) -> Result<(), ProjectionError<UpdateState>> {
         let event = UpdateEventQueued {
             event_time: now,
             update_id: self.update_id.clone(),
-            queued_for,
+            activate_at,
         };
         self.apply(event)
     }

@@ -145,7 +145,7 @@ impl UpdateServiceInMemory {
                 {
                     self.enqueue_update(update.update_id, next_activation_time)?;
                     update
-                        .queued_for_time(self.time_source.now(), next_activation_time)
+                        .activate_at_time(self.time_source.now(), next_activation_time)
                         .int_err()?;
                 }
 
@@ -183,7 +183,7 @@ impl UpdateServiceInMemory {
             if let Some(dependent_schedule) = maybe_dependent_schedule
                 && let Schedule::Reactive(reactive_schedule) = dependent_schedule
             {
-                let trigger = UpdateTrigger::InputDataset(UpdateTriggerInputDataset {
+                let trigger = UpdateTrigger::InputUpdated(UpdateTriggerInputUpdated {
                     input_dataset_id: dataset_id.clone(),
                     input_update_id: update_id.clone(),
                 });

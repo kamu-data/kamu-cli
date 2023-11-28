@@ -20,15 +20,14 @@ const MAX_UPDATE_TASKS: usize = 3;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-/// Represents the state of the task at specific point in time (projection)
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UpdateState {
     /// Unique update identifier
     pub update_id: UpdateID,
     /// Identifier of the related dataset
     pub dataset_id: DatasetID,
-    /// Queued for time
-    pub queued_for: Option<DateTime<Utc>>,
+    /// Activating at time
+    pub activate_at: Option<DateTime<Utc>>,
     /// Associated task IDs
     pub task_ids: Vec<TaskID>,
     /// Update outcome
@@ -56,7 +55,7 @@ impl Projection for UpdateState {
                 }) => Ok(Self {
                     update_id,
                     dataset_id,
-                    queued_for: None,
+                    activate_at: None,
                     task_ids: vec![],
                     outcome: None,
                     cancelled_at: None,
@@ -82,13 +81,13 @@ impl Projection for UpdateState {
                     E::Queued(UpdateEventQueued {
                         event_time: _,
                         update_id: _,
-                        queued_for,
+                        activate_at,
                     }) => {
                         if s.outcome.is_some() || !s.task_ids.is_empty() {
                             Err(ProjectionError::new(Some(s), event))
                         } else {
                             Ok(UpdateState {
-                                queued_for: Some(*queued_for),
+                                activate_at: Some(*activate_at),
                                 ..s
                             })
                         }
@@ -110,7 +109,7 @@ impl Projection for UpdateState {
                         task_id,
                     }) => {
                         if s.outcome.is_some()
-                            || s.queued_for.is_none()
+                            || s.activate_at.is_none()
                             || s.task_ids.len() >= MAX_UPDATE_TASKS
                         {
                             Err(ProjectionError::new(Some(s), event))

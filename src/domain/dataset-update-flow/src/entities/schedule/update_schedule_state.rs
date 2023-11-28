@@ -14,7 +14,6 @@ use crate::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-/// Represents the state of the task at specific point in time (projection)
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UpdateScheduleState {
     /// Identifier of the related dataset

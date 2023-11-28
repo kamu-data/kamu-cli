@@ -107,7 +107,11 @@ impl EventStore<TaskState> for TaskSystemEventStoreInMemory {
     }
 
     // TODO: concurrency
-    async fn save_events(&self, events: Vec<TaskSystemEvent>) -> Result<EventID, SaveEventsError> {
+    async fn save_events(
+        &self,
+        _task_id: &TaskID,
+        events: Vec<TaskSystemEvent>,
+    ) -> Result<EventID, SaveEventsError> {
         let mut s = self.state.lock().unwrap();
 
         for event in events {

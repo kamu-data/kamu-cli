@@ -18,7 +18,7 @@ pub enum UpdateTrigger {
     Manual(UpdateTriggerManual),
     AutoPolling(UpdateTriggerAutoPolling),
     Push(UpdateTriggerPush),
-    InputDataset(UpdateTriggerInputDataset),
+    InputUpdated(UpdateTriggerInputUpdated),
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -44,7 +44,7 @@ pub struct UpdateTriggerPush {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct UpdateTriggerInputDataset {
+pub struct UpdateTriggerInputUpdated {
     pub input_dataset_id: DatasetID,
     pub input_update_id: UpdateID,
 }

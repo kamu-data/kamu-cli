@@ -16,7 +16,6 @@ use crate::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-/// All events that model life-cycle of a task
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum UpdateEvent {
     /// Update initiated
@@ -60,7 +59,7 @@ pub struct UpdateEventStartConditionDefined {
 pub struct UpdateEventQueued {
     pub event_time: DateTime<Utc>,
     pub update_id: UpdateID,
-    pub queued_for: DateTime<Utc>,
+    pub activate_at: DateTime<Utc>,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
