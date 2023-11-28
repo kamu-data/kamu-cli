@@ -37,6 +37,12 @@ pub trait UpdateService: Sync + Send {
         dataset_id: &DatasetID,
     ) -> Result<UpdateStateStream, ListUpdatesByDatasetError>;
 
+    /// Returns state of the latest update created for the given dataset  
+    async fn get_last_update(
+        &self,
+        dataset_id: &DatasetID,
+    ) -> Result<Option<UpdateState>, GetLastUpdateError>;
+
     /// Returns current state of a given update
     async fn get_update(&self, update_id: UpdateID) -> Result<UpdateState, GetUpdateError>;
 
@@ -70,6 +76,15 @@ pub enum ListUpdatesByDatasetError {
     Internal(#[from] InternalError),
 }
 
+
+#[derive(thiserror::Error, Debug)]
+pub enum GetLastUpdateError {
+    #[error(transparent)]
+    DatasetNotFound(#[from] DatasetNotFoundError),
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+
 #[derive(thiserror::Error, Debug)]
 pub enum GetUpdateError {
     #[error(transparent)]
@@ -77,6 +92,7 @@ pub enum GetUpdateError {
     #[error(transparent)]
     Internal(#[from] InternalError),
 }
+
 
 #[derive(thiserror::Error, Debug)]
 pub enum CancelUpdateError {

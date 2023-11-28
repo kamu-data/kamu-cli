@@ -138,6 +138,13 @@ impl UpdateEventStore for UpdateEventStoreInMem {
         self.state.lock().unwrap().next_update_id()
     }
 
+    fn get_last_dataset_update(&self, dataset_id: &DatasetID) -> Option<UpdateID> {
+        let s = self.state.lock().unwrap();
+        s.updates_by_dataset
+            .get(&dataset_id)
+            .and_then(|updates| updates.last().cloned())
+    }
+
     fn get_updates_by_dataset<'a>(&'a self, dataset_id: &DatasetID) -> UpdateIDStream<'a> {
         let dataset_id = dataset_id.clone();
 

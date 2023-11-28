@@ -19,6 +19,9 @@ pub trait UpdateEventStore: EventStore<UpdateState> {
     /// Generates new unique update identifier
     fn new_update_id(&self) -> UpdateID;
 
+    /// Returns the last update associated with the specified dataset
+    fn get_last_dataset_update(&self, dataset_id: &DatasetID) -> Option<UpdateID>;
+
     /// Returns the updates associated with the specified dataset in reverse
     /// chronological order based on creation time
     fn get_updates_by_dataset<'a>(&'a self, dataset_id: &DatasetID) -> UpdateIDStream<'a>;
