@@ -14,6 +14,7 @@ use std::sync::Arc;
 use container_runtime::ContainerRuntime;
 use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::parquet::record::RowAccessor;
+use dill::Component;
 use event_bus::EventBus;
 use futures::StreamExt;
 use indoc::indoc;
@@ -241,13 +242,13 @@ async fn test_transform_common(transform: Transform) {
         .bind::<dyn kamu_core::auth::DatasetActionAuthorizer, kamu_core::auth::AlwaysHappyDatasetActionAuthorizer>()
         .add_value(CurrentAccountSubject::new_test())
         .add_builder(
-            dill::builder_for::<DatasetRepositoryLocalFs>()
+            DatasetRepositoryLocalFs::builder()
                 .with_root(tempdir.path().join("datasets"))
                 .with_multi_tenant(false)
         )
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
         .add_builder(
-            dill::builder_for::<EngineProvisionerLocal>()
+            EngineProvisionerLocal::builder()
                 .with_config(EngineProvisionerLocalConfig::default())
                 .with_container_runtime(ContainerRuntime::default())
                 .with_run_info_dir(run_info_dir.clone())
@@ -260,7 +261,7 @@ async fn test_transform_common(transform: Transform) {
         )
         .bind::<dyn ObjectStoreRegistry, ObjectStoreRegistryImpl>()
         .add_builder(
-            dill::builder_for::<PollingIngestServiceImpl>()
+            PollingIngestServiceImpl::builder()
                 .with_cache_dir(cache_dir)
                 .with_run_info_dir(run_info_dir)
                 .with_container_runtime(Arc::new(ContainerRuntime::default()))

@@ -11,6 +11,7 @@ use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
 use chrono::{TimeZone, Utc};
+use dill::Component;
 use event_bus::EventBus;
 use futures::TryStreamExt;
 use kamu::domain::engine::*;
@@ -48,7 +49,7 @@ impl TransformTestHarness {
             .add_value(engine_provisioner)
             .bind::<dyn EngineProvisioner, TEngineProvisioner>()
             .add_builder(
-                dill::builder_for::<DatasetRepositoryLocalFs>()
+                DatasetRepositoryLocalFs::builder()
                     .with_root(tempdir.path().join("datasets"))
                     .with_multi_tenant(false),
             )

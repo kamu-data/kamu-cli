@@ -13,6 +13,7 @@ use std::sync::Arc;
 
 use chrono::{DateTime, TimeZone, Utc};
 use datafusion::prelude::*;
+use dill::Component;
 use event_bus::EventBus;
 use indoc::indoc;
 use kamu::testing::MetadataFactory;
@@ -438,7 +439,7 @@ impl Harness {
             .bind::<dyn kamu_core::auth::DatasetActionAuthorizer, kamu_core::auth::AlwaysHappyDatasetActionAuthorizer>()
             .add_value(CurrentAccountSubject::new_test())
             .add_builder(
-                dill::builder_for::<DatasetRepositoryLocalFs>()
+                DatasetRepositoryLocalFs::builder()
                     .with_root(temp_dir.path().join("datasets"))
                     .with_multi_tenant(false)
             )

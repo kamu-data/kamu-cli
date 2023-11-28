@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use async_graphql::*;
+use dill::Component;
 use event_bus::EventBus;
 use indoc::indoc;
 use kamu::testing::MetadataFactory;
@@ -544,7 +545,7 @@ impl GraphQLDatasetsHarness {
         let base_catalog = dill::CatalogBuilder::new()
             .add::<EventBus>()
             .add_builder(
-                dill::builder_for::<DatasetRepositoryLocalFs>()
+                DatasetRepositoryLocalFs::builder()
                     .with_root(datasets_dir)
                     .with_multi_tenant(false),
             )

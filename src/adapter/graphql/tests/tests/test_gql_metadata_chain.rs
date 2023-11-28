@@ -10,6 +10,7 @@
 use std::sync::Arc;
 
 use async_graphql::*;
+use dill::Component;
 use event_bus::EventBus;
 use indoc::indoc;
 use kamu::testing::MetadataFactory;
@@ -29,7 +30,7 @@ async fn metadata_chain_append_event() {
     let base_catalog = dill::CatalogBuilder::new()
         .add::<EventBus>()
         .add_builder(
-            dill::builder_for::<DatasetRepositoryLocalFs>()
+            DatasetRepositoryLocalFs::builder()
                 .with_root(tempdir.path().join("datasets"))
                 .with_multi_tenant(false),
         )
@@ -126,7 +127,7 @@ async fn metadata_update_readme_new() {
     let base_catalog = dill::CatalogBuilder::new()
         .add::<EventBus>()
         .add_builder(
-            dill::builder_for::<DatasetRepositoryLocalFs>()
+            DatasetRepositoryLocalFs::builder()
                 .with_root(tempdir.path().join("datasets"))
                 .with_multi_tenant(false),
         )

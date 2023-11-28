@@ -11,6 +11,7 @@ use std::assert_matches::assert_matches;
 use std::path::Path;
 use std::str::FromStr;
 
+use dill::Component;
 use event_bus::EventBus;
 use kamu::domain::*;
 use kamu::testing::*;
@@ -157,14 +158,13 @@ async fn do_test_sync(
         .add_value(dataset_authorizer)
         .bind::<dyn auth::DatasetActionAuthorizer, MockDatasetActionAuthorizer>()
         .add_builder(
-            dill::builder_for::<DatasetRepositoryLocalFs>()
+            DatasetRepositoryLocalFs::builder()
                 .with_root(tmp_workspace_dir.join("datasets"))
                 .with_multi_tenant(false),
         )
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
         .add_builder(
-            dill::builder_for::<RemoteRepositoryRegistryImpl>()
-                .with_repos_dir(tmp_workspace_dir.join("repos")),
+            RemoteRepositoryRegistryImpl::builder().with_repos_dir(tmp_workspace_dir.join("repos")),
         )
         .bind::<dyn RemoteRepositoryRegistry, RemoteRepositoryRegistryImpl>()
         .add::<auth::DummyOdfServerAccessTokenResolver>()

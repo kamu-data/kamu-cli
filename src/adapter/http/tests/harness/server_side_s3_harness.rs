@@ -12,6 +12,7 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
 
+use dill::Component;
 use event_bus::EventBus;
 use kamu::domain::{
     auth,
@@ -61,7 +62,7 @@ impl ServerSideS3Harness {
             .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
             .add::<EventBus>()
             .add_builder(
-                dill::builder_for::<DatasetRepositoryS3>()
+                DatasetRepositoryS3::builder()
                     .with_s3_context(s3_context)
                     .with_multi_tenant(false),
             )

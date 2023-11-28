@@ -14,7 +14,7 @@ use ::serde::Deserialize;
 use axum::extract::{FromRequestParts, Path};
 use axum::routing::IntoMakeService;
 use axum::Router;
-use dill::builder_for;
+use dill::Component;
 use event_bus::EventBus;
 use hyper::server::conn::AddrIncoming;
 use kamu::domain::*;
@@ -41,7 +41,7 @@ async fn setup_repo() -> RepoFixture {
     let catalog = dill::CatalogBuilder::new()
         .add::<EventBus>()
         .add_builder(
-            builder_for::<DatasetRepositoryLocalFs>()
+            DatasetRepositoryLocalFs::builder()
                 .with_root(datasets_dir)
                 .with_multi_tenant(false),
         )

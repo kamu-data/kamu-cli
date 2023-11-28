@@ -11,6 +11,7 @@ use std::assert_matches::assert_matches;
 use std::collections::HashSet;
 use std::sync::Arc;
 
+use dill::Component;
 use event_bus::EventBus;
 use kamu::testing::MetadataFactory;
 use kamu::DatasetRepositoryLocalFs;
@@ -112,7 +113,7 @@ impl DatasetAuthorizerHarness {
             .add::<OsoDatasetAuthorizer>()
             .bind::<dyn DatasetActionAuthorizer, OsoDatasetAuthorizer>()
             .add_builder(
-                dill::builder_for::<DatasetRepositoryLocalFs>()
+                DatasetRepositoryLocalFs::builder()
                     .with_root(datasets_dir)
                     .with_multi_tenant(true),
             )

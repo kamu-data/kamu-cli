@@ -13,6 +13,7 @@ use std::sync::{Arc, Mutex};
 use datafusion::arrow::array::{Array, Int32Array, StringArray};
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use datafusion::arrow::record_batch::RecordBatch;
+use dill::Component;
 use event_bus::EventBus;
 use kamu::domain::*;
 use kamu::testing::{MetadataFactory, MockDatasetActionAuthorizer, ParquetWriterHelper};
@@ -35,7 +36,7 @@ async fn test_verify_data_consistency() {
         )
         .bind::<dyn auth::DatasetActionAuthorizer, MockDatasetActionAuthorizer>()
         .add_builder(
-            dill::builder_for::<DatasetRepositoryLocalFs>()
+            DatasetRepositoryLocalFs::builder()
                 .with_root(tempdir.path().join("datasets"))
                 .with_multi_tenant(false),
         )

@@ -12,7 +12,7 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
 
-use dill::builder_for;
+use dill::Component;
 use event_bus::EventBus;
 use kamu::domain::{
     auth,
@@ -67,7 +67,7 @@ impl ServerSideLocalFsHarness {
             .add_value(time_source.clone())
             .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
             .add_builder(
-                builder_for::<DatasetRepositoryLocalFs>()
+                DatasetRepositoryLocalFs::builder()
                     .with_root(datasets_dir)
                     .with_multi_tenant(options.multi_tenant),
             )

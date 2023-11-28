@@ -12,6 +12,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+use dill::Component;
 use event_bus::EventBus;
 use kamu::domain::*;
 use kamu::testing::ParquetReaderHelper;
@@ -71,7 +72,7 @@ impl Kamu {
             .add::<domain::auth::AlwaysHappyDatasetActionAuthorizer>()
             .bind::<dyn domain::auth::DatasetActionAuthorizer, domain::auth::AlwaysHappyDatasetActionAuthorizer>()
             .add_builder(
-                dill::builder_for::<DatasetRepositoryLocalFs>()
+                DatasetRepositoryLocalFs::builder()
                     .with_root(self.workspace_layout.datasets_dir.clone())
                     .with_multi_tenant(false)
             )
@@ -137,7 +138,7 @@ impl Kamu {
             .add::<domain::auth::AlwaysHappyDatasetActionAuthorizer>()
             .bind::<dyn domain::auth::DatasetActionAuthorizer, domain::auth::AlwaysHappyDatasetActionAuthorizer>()
             .add_builder(
-                dill::builder_for::<DatasetRepositoryLocalFs>()
+                DatasetRepositoryLocalFs::builder()
                     .with_root(self.workspace_layout.datasets_dir.clone())
                     .with_multi_tenant(false)
             )

@@ -13,6 +13,7 @@ use std::path::Path;
 use std::sync::{Arc, Mutex};
 
 use chrono::prelude::*;
+use dill::Component;
 use event_bus::EventBus;
 use kamu::domain::*;
 use kamu::testing::*;
@@ -927,7 +928,7 @@ impl PullTestHarness {
             .add_value(dataset_action_authorizer)
             .bind::<dyn auth::DatasetActionAuthorizer, TDatasetAuthorizer>()
             .add_builder(
-                dill::builder_for::<DatasetRepositoryLocalFs>()
+                DatasetRepositoryLocalFs::builder()
                     .with_root(datasets_dir_path)
                     .with_multi_tenant(multi_tenant),
             )
@@ -940,7 +941,7 @@ impl PullTestHarness {
             .bind::<dyn PollingIngestService, TestIngestService>()
             .add_value(TestTransformService::new(calls.clone()))
             .bind::<dyn TransformService, TestTransformService>()
-            .add_builder(dill::builder_for::<TestSyncService>().with_calls(calls.clone()))
+            .add_builder(TestSyncService::builder().with_calls(calls.clone()))
             .bind::<dyn SyncService, TestSyncService>()
             .add::<PullServiceImpl>()
             .bind::<dyn PullService, PullServiceImpl>()

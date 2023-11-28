@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use dill::Component;
 use event_bus::EventBus;
 use indoc::indoc;
 use kamu::*;
@@ -62,7 +63,7 @@ async fn test_internal_error() {
         .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
         .bind::<dyn auth::DatasetActionAuthorizer, auth::AlwaysHappyDatasetActionAuthorizer>()
         .add_builder(
-            dill::builder_for::<DatasetRepositoryLocalFs>()
+            DatasetRepositoryLocalFs::builder()
                 .with_root(tempdir.path().join("datasets"))
                 .with_multi_tenant(false),
         )

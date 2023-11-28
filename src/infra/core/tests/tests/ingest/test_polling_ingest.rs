@@ -14,6 +14,7 @@ use chrono::{TimeZone, Utc};
 use container_runtime::ContainerRuntime;
 use datafusion::parquet::record::RowAccessor;
 use datafusion::prelude::*;
+use dill::Component;
 use event_bus::EventBus;
 use indoc::indoc;
 use itertools::Itertools;
@@ -1032,13 +1033,13 @@ impl IngestTestHarness {
             .add_value(dataset_action_authorizer)
             .bind::<dyn auth::DatasetActionAuthorizer, TDatasetAuthorizer>()
             .add_builder(
-                dill::builder_for::<DatasetRepositoryLocalFs>()
+                DatasetRepositoryLocalFs::builder()
                     .with_root(temp_dir.path().join("datasets"))
                     .with_multi_tenant(false),
             )
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
             .add_builder(
-                dill::builder_for::<EngineProvisionerLocal>()
+                EngineProvisionerLocal::builder()
                     .with_config(EngineProvisionerLocalConfig::default())
                     .with_container_runtime(ContainerRuntime::default())
                     .with_run_info_dir(run_info_dir.clone()),
@@ -1049,7 +1050,7 @@ impl IngestTestHarness {
             ))
             .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
             .add_builder(
-                dill::builder_for::<PollingIngestServiceImpl>()
+                PollingIngestServiceImpl::builder()
                     .with_cache_dir(cache_dir)
                     .with_container_runtime(Arc::new(ContainerRuntime::default()))
                     .with_object_store_registry(Arc::new(ObjectStoreRegistryImpl::new(vec![

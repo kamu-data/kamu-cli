@@ -13,6 +13,7 @@ use std::sync::Arc;
 use datafusion::arrow::array::*;
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use datafusion::arrow::record_batch::RecordBatch;
+use dill::Component;
 use event_bus::EventBus;
 use kamu::testing::{MetadataFactory, ParquetWriterHelper};
 use kamu::*;
@@ -25,7 +26,7 @@ async fn create_catalog_with_local_workspace(tempdir: &Path) -> dill::Catalog {
     dill::CatalogBuilder::new()
         .add::<EventBus>()
         .add_builder(
-            dill::builder_for::<DatasetRepositoryLocalFs>()
+            DatasetRepositoryLocalFs::builder()
                 .with_root(tempdir.join("datasets"))
                 .with_current_account_subject(Arc::new(CurrentAccountSubject::new_test()))
                 .with_multi_tenant(false),

@@ -11,6 +11,7 @@ use std::sync::Arc;
 
 use chrono::{TimeZone, Utc};
 use datafusion::prelude::*;
+use dill::Component;
 use event_bus::EventBus;
 use indoc::indoc;
 use kamu::domain::*;
@@ -406,7 +407,7 @@ impl IngestTestHarness {
             .add_value(dataset_action_authorizer)
             .bind::<dyn auth::DatasetActionAuthorizer, TDatasetAuthorizer>()
             .add_builder(
-                dill::builder_for::<DatasetRepositoryLocalFs>()
+                DatasetRepositoryLocalFs::builder()
                     .with_root(temp_dir.path().join("datasets"))
                     .with_multi_tenant(false),
             )
@@ -416,7 +417,7 @@ impl IngestTestHarness {
             ))
             .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
             .add_builder(
-                dill::builder_for::<PushIngestServiceImpl>()
+                PushIngestServiceImpl::builder()
                     .with_object_store_registry(Arc::new(ObjectStoreRegistryImpl::new(vec![
                         Arc::new(ObjectStoreBuilderLocalFs::new()),
                     ])))

@@ -21,7 +21,7 @@ opendatafabric = { workspace = true }
 kamu-core = { workspace = true }
 
 async-trait = "0.1"
-dill = "0.7"
+dill = "0.8"
 
 # Authorization
 oso = "0.27"

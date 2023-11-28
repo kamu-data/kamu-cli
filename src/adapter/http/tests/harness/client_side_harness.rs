@@ -11,7 +11,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use container_runtime::ContainerRuntime;
-use dill::builder_for;
+use dill::Component;
 use event_bus::EventBus;
 use kamu::domain::*;
 use kamu::utils::smart_transfer_protocol::SmartTransferProtocolClient;
@@ -75,13 +75,13 @@ impl ClientSideHarness {
         b.bind::<dyn SystemTimeSource, SystemTimeSourceDefault>();
 
         b.add_builder(
-            builder_for::<DatasetRepositoryLocalFs>()
+            DatasetRepositoryLocalFs::builder()
                 .with_root(datasets_dir)
                 .with_multi_tenant(options.multi_tenant),
         )
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>();
 
-        b.add_builder(builder_for::<RemoteRepositoryRegistryImpl>().with_repos_dir(repos_dir))
+        b.add_builder(RemoteRepositoryRegistryImpl::builder().with_repos_dir(repos_dir))
             .bind::<dyn RemoteRepositoryRegistry, RemoteRepositoryRegistryImpl>();
 
         b.add::<RemoteAliasesRegistryImpl>()
@@ -97,7 +97,7 @@ impl ClientSideHarness {
         b.bind::<dyn DataFormatRegistry, DataFormatRegistryImpl>();
 
         b.add_builder(
-            builder_for::<PollingIngestServiceImpl>()
+            PollingIngestServiceImpl::builder()
                 .with_run_info_dir(run_info_dir)
                 .with_cache_dir(cache_dir),
         )

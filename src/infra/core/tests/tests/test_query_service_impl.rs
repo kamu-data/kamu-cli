@@ -14,6 +14,7 @@ use std::sync::Arc;
 use datafusion::arrow::array::*;
 use datafusion::arrow::datatypes::{DataType, Field, Int64Type, Schema};
 use datafusion::arrow::record_batch::RecordBatch;
+use dill::Component;
 use event_bus::EventBus;
 use kamu::domain::*;
 use kamu::testing::{
@@ -97,7 +98,7 @@ async fn create_catalog_with_local_workspace(
     dill::CatalogBuilder::new()
         .add::<EventBus>()
         .add_builder(
-            dill::builder_for::<DatasetRepositoryLocalFs>()
+            DatasetRepositoryLocalFs::builder()
                 .with_root(tempdir.join("datasets"))
                 .with_multi_tenant(false),
         )
@@ -126,7 +127,7 @@ async fn create_catalog_with_s3_workspace(
     dill::CatalogBuilder::new()
         .add::<EventBus>()
         .add_builder(
-            dill::builder_for::<DatasetRepositoryS3>()
+            DatasetRepositoryS3::builder()
                 .with_s3_context(s3_context.clone())
                 .with_multi_tenant(false),
         )

@@ -12,6 +12,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use container_runtime::ContainerRuntime;
+use dill::Component;
 use event_bus::EventBus;
 use indoc::indoc;
 use kamu::domain::*;
@@ -241,7 +242,7 @@ async fn test_engine_io_local_file_mount() {
         .bind::<dyn kamu_core::auth::DatasetActionAuthorizer, kamu_core::auth::AlwaysHappyDatasetActionAuthorizer>()
         .add_value(CurrentAccountSubject::new_test())
         .add_builder(
-            dill::builder_for::<DatasetRepositoryLocalFs>()
+            DatasetRepositoryLocalFs::builder()
                 .with_root(tempdir.path().join("datasets"))
                 .with_multi_tenant(false)
         )
@@ -283,7 +284,7 @@ async fn test_engine_io_s3_to_local_file_mount_proxy() {
         .bind::<dyn kamu_core::auth::DatasetActionAuthorizer, kamu_core::auth::AlwaysHappyDatasetActionAuthorizer>()
         .add_value(CurrentAccountSubject::new_test())
         .add_builder(
-            dill::builder_for::<DatasetRepositoryS3>()
+            DatasetRepositoryS3::builder()
                 .with_s3_context(s3_context.clone())
                 .with_multi_tenant(false)
         )

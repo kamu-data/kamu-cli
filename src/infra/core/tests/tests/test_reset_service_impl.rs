@@ -10,6 +10,7 @@
 use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
+use dill::Component;
 use event_bus::EventBus;
 use kamu::domain::*;
 use kamu::testing::*;
@@ -117,7 +118,7 @@ impl ResetTestHarness {
             .add_value(MockDatasetActionAuthorizer::new().expect_check_write_a_dataset(1))
             .bind::<dyn auth::DatasetActionAuthorizer, MockDatasetActionAuthorizer>()
             .add_builder(
-                dill::builder_for::<DatasetRepositoryLocalFs>()
+                DatasetRepositoryLocalFs::builder()
                     .with_root(tempdir.path().join("datasets"))
                     .with_multi_tenant(false),
             )

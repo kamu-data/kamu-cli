@@ -10,6 +10,7 @@
 use std::assert_matches::assert_matches;
 use std::path::Path;
 
+use dill::Component;
 use event_bus::EventBus;
 use kamu::domain::*;
 use kamu::testing::*;
@@ -30,7 +31,7 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
         .add::<EventBus>()
         .add_value(CurrentAccountSubject::new_test())
         .add_builder(
-            dill::builder_for::<DatasetRepositoryLocalFs>()
+            DatasetRepositoryLocalFs::builder()
                 .with_root(tmp_workspace_dir.join("datasets"))
                 .with_multi_tenant(false),
         )

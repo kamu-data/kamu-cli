@@ -12,6 +12,7 @@
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::str::FromStr;
 
+use dill::Component;
 use event_bus::EventBus;
 use kamu::domain::auth::DatasetAction;
 use kamu::domain::{
@@ -223,7 +224,7 @@ impl ServerHarness {
         catalog_builder.add_value(current_account_subject);
         catalog_builder
             .add_builder(
-                dill::builder_for::<DatasetRepositoryLocalFs>()
+                DatasetRepositoryLocalFs::builder()
                     .with_multi_tenant(false)
                     .with_root(temp_dir.path().join("datasets")),
             )

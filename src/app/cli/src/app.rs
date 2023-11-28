@@ -164,7 +164,7 @@ pub fn configure_base_catalog(
     b.add::<event_bus::EventBus>();
 
     b.add_builder(
-        builder_for::<DatasetRepositoryLocalFs>()
+        DatasetRepositoryLocalFs::builder()
             .with_root(workspace_layout.datasets_dir.clone())
             .with_multi_tenant(multi_tenant_workspace),
     );
@@ -174,8 +174,7 @@ pub fn configure_base_catalog(
     b.bind::<dyn DatasetFactory, DatasetFactoryImpl>();
 
     b.add_builder(
-        builder_for::<RemoteRepositoryRegistryImpl>()
-            .with_repos_dir(workspace_layout.repos_dir.clone()),
+        RemoteRepositoryRegistryImpl::builder().with_repos_dir(workspace_layout.repos_dir.clone()),
     );
     b.bind::<dyn RemoteRepositoryRegistry, RemoteRepositoryRegistryImpl>();
 
@@ -189,15 +188,14 @@ pub fn configure_base_catalog(
     b.bind::<dyn DataFormatRegistry, DataFormatRegistryImpl>();
 
     b.add_builder(
-        builder_for::<PollingIngestServiceImpl>()
+        PollingIngestServiceImpl::builder()
             .with_run_info_dir(workspace_layout.run_info_dir.clone())
             .with_cache_dir(workspace_layout.cache_dir.clone()),
     );
     b.bind::<dyn PollingIngestService, PollingIngestServiceImpl>();
 
     b.add_builder(
-        builder_for::<PushIngestServiceImpl>()
-            .with_run_info_dir(workspace_layout.run_info_dir.clone()),
+        PushIngestServiceImpl::builder().with_run_info_dir(workspace_layout.run_info_dir.clone()),
     );
     b.bind::<dyn PushIngestService, PushIngestServiceImpl>();
 
@@ -235,8 +233,7 @@ pub fn configure_base_catalog(
     b.bind::<dyn ObjectStoreBuilder, ObjectStoreBuilderLocalFs>();
 
     b.add_builder(
-        builder_for::<EngineProvisionerLocal>()
-            .with_run_info_dir(workspace_layout.run_info_dir.clone()),
+        EngineProvisionerLocal::builder().with_run_info_dir(workspace_layout.run_info_dir.clone()),
     );
     b.bind::<dyn EngineProvisioner, EngineProvisionerLocal>();
 
