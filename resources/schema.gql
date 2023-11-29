@@ -396,7 +396,7 @@ type DatasetUpdatesSchedule {
 type DatasetUpdatesScheduleMut {
 	setPollingTimeDelta(paused: Boolean!, every: TimeDeltaInput!): Boolean!
 	setPollingCronExpression(paused: Boolean!, cronExpression: String!): Boolean!
-	setThrottling(paused: Boolean!, throttlingPeriod: TimeDeltaInput, minimalDataBatch: Int): Boolean!
+	setReactive(paused: Boolean!, throttlingPeriod: TimeDeltaInput, minimalDataBatch: Int): Boolean!
 }
 
 union DatasetUpdatesSettings = DatasetUpdatesSettingsPolling | DatasetUpdatesSettingsThrottling

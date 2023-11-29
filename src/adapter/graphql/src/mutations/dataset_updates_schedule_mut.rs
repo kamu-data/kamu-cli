@@ -88,7 +88,7 @@ impl DatasetUpdatesScheduleMut {
     }
 
     #[graphql(guard = "LoggedInGuard::new()")]
-    async fn set_throttling(
+    async fn set_reactive(
         &self,
         ctx: &Context<'_>,
         paused: bool,
