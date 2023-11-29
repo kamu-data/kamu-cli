@@ -180,9 +180,8 @@ impl Dataset {
 
         Ok(
             maybe_update_schedule.map(|update_schedule| DatasetUpdatesSchedule {
-                paused: update_schedule.paused(),
-                update_settings: match update_schedule.schedule() {
-                    Schedule::None => unreachable!("May only be applied to removed dataset"),
+                paused: !update_schedule.is_active(),
+                update_settings: match update_schedule.schedule {
                     Schedule::TimeDelta(time_delta) => {
                         DatasetUpdatesSettings::Polling(DatasetUpdatesSettingsPolling {
                             schedule: DatasetUpdatesPollingSchedule::TimeDelta(

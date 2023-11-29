@@ -42,9 +42,10 @@ impl DatasetUpdatesScheduleMut {
 
         let update_schedule_service = from_catalog::<dyn UpdateScheduleService>(ctx).unwrap();
 
-        let update_state = update_schedule_service
+        update_schedule_service
             .set_schedule(
                 self.dataset_handle.id.clone(),
+                paused,
                 Schedule::TimeDelta(ScheduleTimeDelta {
                     every: every.into(),
                 }),
@@ -53,9 +54,6 @@ impl DatasetUpdatesScheduleMut {
             .map_err(|e| match e {
                 SetScheduleError::Internal(e) => GqlError::Internal(e),
             })?;
-
-        self.apply_pause_resume_schedule(update_schedule_service.as_ref(), paused, &update_state)
-            .await?;
 
         Ok(SetUpdateScheduleResult::Success(
             SetUpdateScheduleResultSuccess { success: true },
@@ -75,9 +73,10 @@ impl DatasetUpdatesScheduleMut {
 
         let update_schedule_service = from_catalog::<dyn UpdateScheduleService>(ctx).unwrap();
 
-        let update_state = update_schedule_service
+        update_schedule_service
             .set_schedule(
                 self.dataset_handle.id.clone(),
+                paused,
                 Schedule::CronExpression(ScheduleCronExpression {
                     expression: cron_expression,
                 }),
@@ -86,9 +85,6 @@ impl DatasetUpdatesScheduleMut {
             .map_err(|e| match e {
                 SetScheduleError::Internal(e) => GqlError::Internal(e),
             })?;
-
-        self.apply_pause_resume_schedule(update_schedule_service.as_ref(), paused, &update_state)
-            .await?;
 
         Ok(SetUpdateScheduleResult::Success(
             SetUpdateScheduleResultSuccess { success: true },
@@ -109,9 +105,10 @@ impl DatasetUpdatesScheduleMut {
 
         let update_schedule_service = from_catalog::<dyn UpdateScheduleService>(ctx).unwrap();
 
-        let update_state = update_schedule_service
+        update_schedule_service
             .set_schedule(
                 self.dataset_handle.id.clone(),
+                paused,
                 Schedule::Reactive(ScheduleReactive {
                     throttling_period: throttling_period.map(|tp| tp.into()),
                     minimal_data_batch,
@@ -121,9 +118,6 @@ impl DatasetUpdatesScheduleMut {
             .map_err(|e| match e {
                 SetScheduleError::Internal(e) => GqlError::Internal(e),
             })?;
-
-        self.apply_pause_resume_schedule(update_schedule_service.as_ref(), paused, &update_state)
-            .await?;
 
         Ok(SetUpdateScheduleResult::Success(
             SetUpdateScheduleResultSuccess { success: true },
@@ -170,38 +164,6 @@ impl DatasetUpdatesScheduleMut {
                     }),
                 )
             })?;
-
-        Ok(())
-    }
-
-    #[graphql(skip)]
-    async fn apply_pause_resume_schedule(
-        &self,
-        update_schedule_service: &dyn UpdateScheduleService,
-        paused: bool,
-        update_state: &UpdateScheduleState,
-    ) -> Result<()> {
-        if paused && !update_state.paused() {
-            update_schedule_service
-                .pause_schedule(&self.dataset_handle.id)
-                .await
-                .map_err(|e| {
-                    GqlError::Internal(match e {
-                        PauseScheduleError::Internal(e) => e,
-                        PauseScheduleError::NotFound(e) => e.int_err(),
-                    })
-                })?;
-        } else if !paused && update_state.paused() {
-            update_schedule_service
-                .resume_schedule(&self.dataset_handle.id)
-                .await
-                .map_err(|e| {
-                    GqlError::Internal(match e {
-                        ResumeScheduleError::Internal(e) => e,
-                        ResumeScheduleError::NotFound(e) => e.int_err(),
-                    })
-                })?;
-        }
 
         Ok(())
     }
