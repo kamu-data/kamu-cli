@@ -82,6 +82,33 @@ impl UpdateServiceInMemory {
         }
     }
 
+    async fn run_current_timeslot(&self) {
+        let planned_updates: Vec<_> = {
+            let mut state = self.state.lock().unwrap();
+            state.time_wheel.take_nearest_planned_activities()
+        };
+
+        let update_schedule_futures: Vec<_> = planned_updates
+            .iter()
+            .map(async move |update_id| {
+                let mut update = Update::load(UpdateID::new(*update_id), self.event_store.as_ref())
+                    .await
+                    .int_err()?;
+                self.schedule_update_task(&mut update).await?;
+                Ok(())
+            })
+            .collect();
+
+        let results = futures::future::join_all(update_schedule_futures).await;
+        results
+            .into_iter()
+            .filter(|res| res.is_err())
+            .map(|e| e.err().unwrap())
+            .for_each(|e: InternalError| {
+                tracing::error!("Scheduling update failed: {:?}", e);
+            });
+    }
+
     async fn launch_enabled_proactive_schedules(&self) -> Result<(), InternalError> {
         let enabled_proactive_schedules: Vec<_> = self
             .update_schedule_service
@@ -326,32 +353,23 @@ impl UpdateServiceInMemory {
 impl UpdateService for UpdateServiceInMemory {
     /// Runs the update main loop
     async fn run(&self) -> Result<(), InternalError> {
+        // Initial scheduling
         self.launch_enabled_proactive_schedules().await?;
 
+        // Main scanning loop
         loop {
+            // Do we have a timeslot scheduled?
             let maybe_nearest_activation_time = {
                 let state = self.state.lock().unwrap();
                 state.time_wheel.nearest_activation_moment()
             };
 
+            // Is it time to execute it yet?
             if let Some(nearest_activation_time) = maybe_nearest_activation_time
                 && nearest_activation_time <= self.time_source.now()
             {
-                let planned_updates: Vec<_> = {
-                    let state = self.state.lock().unwrap();
-                    state.time_wheel.nearest_planned_activities().collect()
-                };
-
-                for update_id in planned_updates {
-                    let mut update =
-                        Update::load(UpdateID::new(update_id), self.event_store.as_ref())
-                            .await
-                            .int_err()?;
-                    self.schedule_update_task(&mut update).await?;
-                }
-
-                let mut state = self.state.lock().unwrap();
-                state.time_wheel.spin();
+                // Run scheduling for current time slot. Should not throw any errors
+                self.run_current_timeslot().await;
             }
 
             tokio::time::sleep(std::time::Duration::from_secs(1)).await;
