@@ -394,9 +394,9 @@ type DatasetUpdatesSchedule {
 }
 
 type DatasetUpdatesScheduleMut {
-	setPollingTimeDelta(paused: Boolean!, every: TimeDeltaInput!): SetUpdateScheduleResult!
-	setPollingCronExpression(paused: Boolean!, cronExpression: String!): SetUpdateScheduleResult!
-	setThrottling(paused: Boolean!, throttlingPeriod: TimeDeltaInput, minimalDataBatch: Int): SetUpdateScheduleResult!
+	setPollingTimeDelta(paused: Boolean!, every: TimeDeltaInput!): Boolean!
+	setPollingCronExpression(paused: Boolean!, cronExpression: String!): Boolean!
+	setThrottling(paused: Boolean!, throttlingPeriod: TimeDeltaInput, minimalDataBatch: Int): Boolean!
 }
 
 union DatasetUpdatesSettings = DatasetUpdatesSettingsPolling | DatasetUpdatesSettingsThrottling
@@ -902,15 +902,6 @@ type SetPollingSource {
 type SetTransform {
 	inputs: [TransformInput!]!
 	transform: Transform!
-}
-
-interface SetUpdateScheduleResult {
-	message: String!
-}
-
-type SetUpdateScheduleResultSuccess implements SetUpdateScheduleResult {
-	success: Boolean!
-	message: String!
 }
 
 type SetVocab {

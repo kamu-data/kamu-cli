@@ -35,7 +35,7 @@ impl DatasetUpdatesScheduleMut {
         ctx: &Context<'_>,
         paused: bool,
         every: TimeDeltaInput,
-    ) -> Result<SetUpdateScheduleResult> {
+    ) -> Result<bool> {
         self.ensure_expected_dataset_kind(ctx, opendatafabric::DatasetKind::Root)
             .await?;
         self.ensure_scheduling_permission(ctx).await?;
@@ -55,9 +55,7 @@ impl DatasetUpdatesScheduleMut {
                 SetScheduleError::Internal(e) => GqlError::Internal(e),
             })?;
 
-        Ok(SetUpdateScheduleResult::Success(
-            SetUpdateScheduleResultSuccess { success: true },
-        ))
+        Ok(true)
     }
 
     #[graphql(guard = "LoggedInGuard::new()")]
@@ -66,7 +64,7 @@ impl DatasetUpdatesScheduleMut {
         ctx: &Context<'_>,
         paused: bool,
         cron_expression: String,
-    ) -> Result<SetUpdateScheduleResult> {
+    ) -> Result<bool> {
         self.ensure_expected_dataset_kind(ctx, opendatafabric::DatasetKind::Root)
             .await?;
         self.ensure_scheduling_permission(ctx).await?;
@@ -86,9 +84,7 @@ impl DatasetUpdatesScheduleMut {
                 SetScheduleError::Internal(e) => GqlError::Internal(e),
             })?;
 
-        Ok(SetUpdateScheduleResult::Success(
-            SetUpdateScheduleResultSuccess { success: true },
-        ))
+        Ok(true)
     }
 
     #[graphql(guard = "LoggedInGuard::new()")]
@@ -98,7 +94,7 @@ impl DatasetUpdatesScheduleMut {
         paused: bool,
         throttling_period: Option<TimeDeltaInput>,
         minimal_data_batch: Option<i32>,
-    ) -> Result<SetUpdateScheduleResult> {
+    ) -> Result<bool> {
         self.ensure_expected_dataset_kind(ctx, opendatafabric::DatasetKind::Derivative)
             .await?;
         self.ensure_scheduling_permission(ctx).await?;
@@ -119,9 +115,7 @@ impl DatasetUpdatesScheduleMut {
                 SetScheduleError::Internal(e) => GqlError::Internal(e),
             })?;
 
-        Ok(SetUpdateScheduleResult::Success(
-            SetUpdateScheduleResultSuccess { success: true },
-        ))
+        Ok(true)
     }
 
     #[graphql(skip)]
@@ -186,27 +180,6 @@ impl From<TimeDeltaInput> for chrono::Duration {
             TimeUnit::Hours => chrono::Duration::hours(every),
             TimeUnit::Minutes => chrono::Duration::minutes(every),
         }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Interface, Debug, Clone)]
-#[graphql(field(name = "message", ty = "String"))]
-pub enum SetUpdateScheduleResult {
-    Success(SetUpdateScheduleResultSuccess),
-}
-
-#[derive(SimpleObject, Debug, Clone)]
-#[graphql(complex)]
-pub struct SetUpdateScheduleResultSuccess {
-    success: bool,
-}
-
-#[ComplexObject]
-impl SetUpdateScheduleResultSuccess {
-    async fn message(&self) -> String {
-        format!("Success")
     }
 }
 
