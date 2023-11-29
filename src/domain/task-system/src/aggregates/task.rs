@@ -23,7 +23,7 @@ impl Task {
         Self(
             Aggregate::new(
                 task_id,
-                TaskCreated {
+                TaskEventCreated {
                     event_time: now,
                     task_id,
                     logical_plan,
@@ -35,7 +35,7 @@ impl Task {
 
     /// Transition task to a `Running` state
     pub fn run(&mut self, now: DateTime<Utc>) -> Result<(), ProjectionError<TaskState>> {
-        let event = TaskRunning {
+        let event = TaskEventRunning {
             event_time: now,
             task_id: self.task_id,
         };
@@ -57,7 +57,7 @@ impl Task {
             return Ok(());
         }
 
-        let event = TaskCancelled {
+        let event = TaskEventCancelled {
             event_time: now,
             task_id: self.task_id,
         };
@@ -70,7 +70,7 @@ impl Task {
         now: DateTime<Utc>,
         outcome: TaskOutcome,
     ) -> Result<(), ProjectionError<TaskState>> {
-        let event = TaskFinished {
+        let event = TaskEventFinished {
             event_time: now,
             task_id: self.task_id,
             outcome,

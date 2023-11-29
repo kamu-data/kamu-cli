@@ -42,7 +42,7 @@ async fn test_event_store_get_streams() {
     let task_id_2 = TaskID::new(321);
     let dataset_id = DatasetID::from_pub_key_ed25519(b"foo");
 
-    let event_1 = TaskCreated {
+    let event_1 = TaskEventCreated {
         event_time: Utc::now(),
         task_id: task_id_1,
         logical_plan: Probe {
@@ -52,7 +52,7 @@ async fn test_event_store_get_streams() {
         .into(),
     };
 
-    let event_2 = TaskCreated {
+    let event_2 = TaskEventCreated {
         event_time: Utc::now(),
         task_id: task_id_2,
         logical_plan: Probe {
@@ -62,7 +62,7 @@ async fn test_event_store_get_streams() {
         .into(),
     };
 
-    let event_3 = TaskFinished {
+    let event_3 = TaskEventFinished {
         event_time: Utc::now(),
         task_id: task_id_1,
         outcome: TaskOutcome::Cancelled,

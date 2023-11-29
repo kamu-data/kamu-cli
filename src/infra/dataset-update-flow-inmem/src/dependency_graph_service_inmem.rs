@@ -12,7 +12,7 @@ use std::sync::{Arc, Mutex};
 
 use dill::*;
 use event_bus::AsyncEventHandler;
-use kamu_core::events::DatasetDeleted;
+use kamu_core::events::DatasetEventDeleted;
 use kamu_dataset_update_flow::*;
 use opendatafabric::DatasetID;
 use petgraph::stable_graph::{NodeIndex, StableDiGraph};
@@ -62,7 +62,7 @@ impl State {
 
 #[component(pub)]
 #[interface(dyn DependencyGraphService)]
-#[interface(dyn AsyncEventHandler<DatasetDeleted>)]
+#[interface(dyn AsyncEventHandler<DatasetEventDeleted>)]
 #[scope(Singleton)]
 impl DependencyGraphServiceInMemory {
     pub fn new() -> Self {
@@ -156,8 +156,8 @@ impl DependencyGraphService for DependencyGraphServiceInMemory {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl AsyncEventHandler<DatasetDeleted> for DependencyGraphServiceInMemory {
-    async fn handle(&self, event: &DatasetDeleted) -> Result<(), InternalError> {
+impl AsyncEventHandler<DatasetEventDeleted> for DependencyGraphServiceInMemory {
+    async fn handle(&self, event: &DatasetEventDeleted) -> Result<(), InternalError> {
         let mut state = self.state.lock().unwrap();
 
         let node_index = state

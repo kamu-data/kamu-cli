@@ -11,8 +11,15 @@ use opendatafabric::DatasetID;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone)]
-pub struct DatasetDeleted {
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DatasetEvent {
+    Deleted(DatasetEventDeleted),
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DatasetEventDeleted {
     pub dataset_id: DatasetID,
 }
 

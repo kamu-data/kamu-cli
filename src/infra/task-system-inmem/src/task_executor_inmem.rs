@@ -48,7 +48,7 @@ impl TaskExecutorInMemory {
         outcome: TaskOutcome,
     ) -> Result<(), InternalError> {
         self.event_bus
-            .dispatch_event(TaskFinished {
+            .dispatch_event(TaskEventFinished {
                 event_time: self.time_source.now(),
                 task_id,
                 outcome,

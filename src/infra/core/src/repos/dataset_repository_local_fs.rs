@@ -344,7 +344,7 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
         tokio::fs::remove_dir_all(dataset_dir).await.int_err()?;
 
         self.event_bus
-            .dispatch_event(events::DatasetDeleted {
+            .dispatch_event(events::DatasetEventDeleted {
                 dataset_id: dataset_handle.id,
             })
             .await?;

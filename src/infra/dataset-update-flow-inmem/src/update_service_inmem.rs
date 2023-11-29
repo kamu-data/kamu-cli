@@ -16,7 +16,7 @@ use chrono::{DateTime, Utc};
 use dill::*;
 use event_bus::AsyncEventHandler;
 use futures::TryStreamExt;
-use kamu_core::events::DatasetDeleted;
+use kamu_core::events::DatasetEventDeleted;
 use kamu_core::{InternalError, SystemTimeSource};
 use kamu_dataset_update_flow::*;
 use kamu_task_system::*;
@@ -60,8 +60,8 @@ impl State {
 
 #[component(pub)]
 #[interface(dyn UpdateService)]
-#[interface(dyn AsyncEventHandler<TaskFinished>)]
-#[interface(dyn AsyncEventHandler<DatasetDeleted>)]
+#[interface(dyn AsyncEventHandler<TaskEventFinished>)]
+#[interface(dyn AsyncEventHandler<DatasetEventDeleted>)]
 #[interface(dyn AsyncEventHandler<UpdateScheduleEventModified>)]
 #[scope(Singleton)]
 impl UpdateServiceInMemory {
@@ -468,8 +468,8 @@ impl UpdateService for UpdateServiceInMemory {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl AsyncEventHandler<TaskFinished> for UpdateServiceInMemory {
-    async fn handle(&self, event: &TaskFinished) -> Result<(), InternalError> {
+impl AsyncEventHandler<TaskEventFinished> for UpdateServiceInMemory {
+    async fn handle(&self, event: &TaskEventFinished) -> Result<(), InternalError> {
         let maybe_update_id = {
             let state = self.state.lock().unwrap();
             state
@@ -541,8 +541,8 @@ impl AsyncEventHandler<UpdateScheduleEventModified> for UpdateServiceInMemory {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl AsyncEventHandler<DatasetDeleted> for UpdateServiceInMemory {
-    async fn handle(&self, event: &DatasetDeleted) -> Result<(), InternalError> {
+impl AsyncEventHandler<DatasetEventDeleted> for UpdateServiceInMemory {
+    async fn handle(&self, event: &DatasetEventDeleted) -> Result<(), InternalError> {
         let mut state = self.state.lock().unwrap();
 
         state.active_schedules.remove(&event.dataset_id);

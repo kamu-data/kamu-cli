@@ -16,22 +16,22 @@ use super::*;
 
 /// All events that model life-cycle of a task
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum TaskSystemEvent {
+pub enum TaskEvent {
     /// New task entered the queue
-    TaskCreated(TaskCreated),
+    TaskCreated(TaskEventCreated),
     /// Task execution had started
-    TaskRunning(TaskRunning),
+    TaskRunning(TaskEventRunning),
     /// Cancellation of task was requested (this is not immediate and task may
     /// still finish with a different outcome than cancelled)
-    TaskCancelled(TaskCancelled),
+    TaskCancelled(TaskEventCancelled),
     /// Task has reached a final outcome
-    TaskFinished(TaskFinished),
+    TaskFinished(TaskEventFinished),
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TaskCreated {
+pub struct TaskEventCreated {
     pub event_time: DateTime<Utc>,
     pub task_id: TaskID,
     pub logical_plan: LogicalPlan,
@@ -40,7 +40,7 @@ pub struct TaskCreated {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TaskRunning {
+pub struct TaskEventRunning {
     pub event_time: DateTime<Utc>,
     pub task_id: TaskID,
 }
@@ -48,7 +48,7 @@ pub struct TaskRunning {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TaskCancelled {
+pub struct TaskEventCancelled {
     pub event_time: DateTime<Utc>,
     pub task_id: TaskID,
 }
@@ -56,7 +56,7 @@ pub struct TaskCancelled {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TaskFinished {
+pub struct TaskEventFinished {
     pub event_time: DateTime<Utc>,
     pub task_id: TaskID,
     pub outcome: TaskOutcome,
@@ -64,29 +64,31 @@ pub struct TaskFinished {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-impl TaskSystemEvent {
+impl TaskEvent {
     pub fn task_id(&self) -> TaskID {
         match self {
-            TaskSystemEvent::TaskCreated(e) => e.task_id,
-            TaskSystemEvent::TaskRunning(e) => e.task_id,
-            TaskSystemEvent::TaskCancelled(e) => e.task_id,
-            TaskSystemEvent::TaskFinished(e) => e.task_id,
+            TaskEvent::TaskCreated(e) => e.task_id,
+            TaskEvent::TaskRunning(e) => e.task_id,
+            TaskEvent::TaskCancelled(e) => e.task_id,
+            TaskEvent::TaskFinished(e) => e.task_id,
         }
     }
 
     pub fn event_time(&self) -> &DateTime<Utc> {
         match self {
-            TaskSystemEvent::TaskCreated(e) => &e.event_time,
-            TaskSystemEvent::TaskRunning(e) => &e.event_time,
-            TaskSystemEvent::TaskCancelled(e) => &e.event_time,
-            TaskSystemEvent::TaskFinished(e) => &e.event_time,
+            TaskEvent::TaskCreated(e) => &e.event_time,
+            TaskEvent::TaskRunning(e) => &e.event_time,
+            TaskEvent::TaskCancelled(e) => &e.event_time,
+            TaskEvent::TaskFinished(e) => &e.event_time,
         }
     }
 }
 
 // TODO: Replace with derive macro
-impl_enum_with_variants!(TaskSystemEvent);
-impl_enum_variant!(TaskSystemEvent::TaskCreated(TaskCreated));
-impl_enum_variant!(TaskSystemEvent::TaskRunning(TaskRunning));
-impl_enum_variant!(TaskSystemEvent::TaskCancelled(TaskCancelled));
-impl_enum_variant!(TaskSystemEvent::TaskFinished(TaskFinished));
+impl_enum_with_variants!(TaskEvent);
+impl_enum_variant!(TaskEvent::TaskCreated(TaskEventCreated));
+impl_enum_variant!(TaskEvent::TaskRunning(TaskEventRunning));
+impl_enum_variant!(TaskEvent::TaskCancelled(TaskEventCancelled));
+impl_enum_variant!(TaskEvent::TaskFinished(TaskEventFinished));
+
+/////////////////////////////////////////////////////////////////////////////////////////
