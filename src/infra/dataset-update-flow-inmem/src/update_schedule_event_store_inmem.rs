@@ -109,6 +109,7 @@ impl EventStore<UpdateScheduleState> for UpdateScheduleEventStoreInMem {
 
 impl UpdateScheduleEventStore for UpdateScheduleEventStoreInMem {
     fn list_all_dataset_ids<'a>(&'a self) -> DatasetIDStream<'a> {
+        // TODO: re-consider performance impact
         Box::pin(tokio_stream::iter(
             self.state.lock().unwrap().queries.clone(),
         ))

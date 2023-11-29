@@ -23,6 +23,7 @@ pub trait TaskScheduler: Sync + Send {
 
     /// Returns states of tasks associated with a given dataset ordered by
     /// creation time from newest to oldest
+    // TODO: reconsider performance impact
     fn list_tasks_by_dataset(
         &self,
         dataset_id: &DatasetID,

@@ -16,6 +16,7 @@ use crate::*;
 #[async_trait::async_trait]
 pub trait UpdateScheduleEventStore: EventStore<UpdateScheduleState> {
     /// Returns all unique values of dataset IDs associated with schedules
+    // TODO: re-consider performance impact
     fn list_all_dataset_ids<'a>(&'a self) -> DatasetIDStream<'a>;
 }
 
