@@ -7,8 +7,17 @@ content:
     - kind: setPollingSource
       fetch:
         kind: url
+        # Around September, 2023 Government of Ontario have started blocking requests for data
+        # from non-browser tools (e.g. curl, wget, kamu). Another testament to how fragile the world's
+        # open data infrastructure is. To keep the demo operational we have switched the source to use
+        # the last seen version of this dataset.
+        #
+        # Original URL: https://data.ontario.ca/dataset/f4112442-bdc8-45d2-be3c-12efae72fb27/resource/455fd63b-603d-4608-8216-7d8647f43350/download/conposcovidloc.csv
         # Official page: https://data.ontario.ca/dataset/confirmed-positive-cases-of-covid-19-in-ontario
-        url: https://data.ontario.ca/dataset/f4112442-bdc8-45d2-be3c-12efae72fb27/resource/455fd63b-603d-4608-8216-7d8647f43350/download/conposcovidloc.csv
+        url: https://s3.us-west-2.amazonaws.com/datasets.kamu.dev/demo/covid/covid-19-ontario-2023-11-28.csv.gz
+      prepare:
+        - kind: decompress
+          format: gzip
       read:
         kind: csv
         separator: ","
