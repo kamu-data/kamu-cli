@@ -43,7 +43,7 @@ impl UpdateSchedule {
             event_time: now,
             dataset_id: self.dataset_id.clone(),
             paused: true,
-            schedule: self.schedule(),
+            schedule: self.schedule.clone(),
         };
         self.apply(event)
     }
@@ -57,7 +57,7 @@ impl UpdateSchedule {
             event_time: now,
             dataset_id: self.dataset_id.clone(),
             paused: false,
-            schedule: self.schedule(),
+            schedule: self.schedule.clone(),
         };
         self.apply(event)
     }
@@ -71,7 +71,7 @@ impl UpdateSchedule {
         let event = UpdateScheduleEventModified {
             event_time: now,
             dataset_id: self.dataset_id.clone(),
-            paused: self.paused(),
+            paused: self.is_active(),
             schedule: new_schedule,
         };
         self.apply(event)

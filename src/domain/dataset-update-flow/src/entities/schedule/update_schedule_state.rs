@@ -18,38 +18,27 @@ use crate::*;
 pub struct UpdateScheduleState {
     /// Identifier of the related dataset
     pub dataset_id: DatasetID,
-    /// Relevance state
-    pub relevance: UpdateScheduleStateRelevance,
+    /// Update schedule
+    pub schedule: Schedule,
+    /// Schedule status
+    pub status: UpdateScheduleStatus,
 }
 
 impl UpdateScheduleState {
-    pub fn paused(&self) -> bool {
-        match &self.relevance {
-            UpdateScheduleStateRelevance::Relevant(r) => r.paused,
-            UpdateScheduleStateRelevance::RemovedDataset => true,
-        }
-    }
-
-    pub fn schedule(&self) -> Schedule {
-        match &self.relevance {
-            UpdateScheduleStateRelevance::Relevant(r) => r.schedule.clone(),
-            UpdateScheduleStateRelevance::RemovedDataset => Schedule::None,
+    pub fn is_active(&self) -> bool {
+        match self.status {
+            UpdateScheduleStatus::Active => true,
+            UpdateScheduleStatus::PausedTemporarily => false,
+            UpdateScheduleStatus::StoppedPermanently => false,
         }
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum UpdateScheduleStateRelevance {
-    Relevant(UpdateScheduleRelevantState),
-    RemovedDataset,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct UpdateScheduleRelevantState {
-    /// Update schedule
-    pub schedule: Schedule,
-    /// Pause indication
-    pub paused: bool,
+pub enum UpdateScheduleStatus {
+    Active,
+    PausedTemporarily,
+    StoppedPermanently,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -69,12 +58,8 @@ impl Projection for UpdateScheduleState {
                     schedule,
                 }) => Ok(Self {
                     dataset_id,
-                    relevance: UpdateScheduleStateRelevance::Relevant(
-                        UpdateScheduleRelevantState {
-                            schedule,
-                            paused: false,
-                        },
-                    ),
+                    status: UpdateScheduleStatus::PausedTemporarily,
+                    schedule,
                 }),
                 _ => Err(ProjectionError::new(None, event)),
             },
@@ -89,31 +74,35 @@ impl Projection for UpdateScheduleState {
                         dataset_id: _,
                         paused,
                         schedule,
-                    }) => match &s.relevance {
-                        UpdateScheduleStateRelevance::RemovedDataset => {
+                    }) => {
+                        if s.status == UpdateScheduleStatus::StoppedPermanently {
                             Err(ProjectionError::new(Some(s), event))
-                        }
-                        UpdateScheduleStateRelevance::Relevant(_) => Ok(UpdateScheduleState {
-                            relevance: UpdateScheduleStateRelevance::Relevant(
-                                UpdateScheduleRelevantState {
-                                    schedule: schedule.clone(),
-                                    paused: *paused,
+                        } else {
+                            Ok(UpdateScheduleState {
+                                status: if *paused {
+                                    UpdateScheduleStatus::PausedTemporarily
+                                } else {
+                                    UpdateScheduleStatus::Active
                                 },
-                            ),
-                            ..s
-                        }),
-                    },
+                                schedule: schedule.clone(),
+                                ..s
+                            })
+                        }
+                    }
 
                     E::DatasetRemoved(UpdateScheduleEventDatasetRemoved {
                         event_time: _,
                         dataset_id: _,
-                    }) => match s.relevance {
-                        UpdateScheduleStateRelevance::Relevant(_) => Ok(UpdateScheduleState {
-                            relevance: UpdateScheduleStateRelevance::RemovedDataset,
-                            ..s
-                        }),
-                        UpdateScheduleStateRelevance::RemovedDataset => Ok(s), // idempotent DELETE
-                    },
+                    }) => {
+                        if s.status == UpdateScheduleStatus::StoppedPermanently {
+                            Ok(s) // idempotent DELETE
+                        } else {
+                            Ok(UpdateScheduleState {
+                                status: UpdateScheduleStatus::StoppedPermanently,
+                                ..s
+                            })
+                        }
+                    }
                 }
             }
         }

@@ -51,8 +51,8 @@ impl UpdateScheduleServiceInMemory {
         let event = UpdateScheduleEventModified {
             event_time: self.time_source.now(),
             dataset_id: update_schedule_state.dataset_id.clone(),
-            paused: update_schedule_state.paused(),
-            schedule: update_schedule_state.schedule().clone(),
+            paused: update_schedule_state.is_active(),
+            schedule: update_schedule_state.schedule.clone(),
         };
         self.event_bus.dispatch_event(event).await
     }
@@ -62,14 +62,14 @@ impl UpdateScheduleServiceInMemory {
 
 #[async_trait::async_trait]
 impl UpdateScheduleService for UpdateScheduleServiceInMemory {
-    /// Lists update schedules, which are currently enabled
-    fn list_enabled_schedules(&self) -> UpdateScheduleStateStream {
+    /// Lists proactive update schedules, which are currently enabled
+    fn list_enabled_proactive_schedules(&self) -> UpdateScheduleStateStream {
         // Note: terribly ineffecient - walks over events multiple times
         Box::pin(async_stream::try_stream! {
             let dataset_ids: Vec<_> = self.event_store.list_all_dataset_ids().collect().await;
             for dataset_id in dataset_ids {
                 let update_schedule = UpdateSchedule::load(dataset_id, self.event_store.as_ref()).await.int_err()?;
-                if !update_schedule.paused() {
+                if update_schedule.schedule.is_proactive() && update_schedule.is_active() {
                     yield update_schedule.into();
                 }
             }

@@ -82,25 +82,23 @@ impl UpdateServiceInMemory {
         }
     }
 
-    async fn read_initial_schedules(&self) -> Result<(), InternalError> {
-        let enabled_schedules: Vec<_> = self
+    async fn launch_enabled_proactive_schedules(&self) -> Result<(), InternalError> {
+        let enabled_proactive_schedules: Vec<_> = self
             .update_schedule_service
-            .list_enabled_schedules()
+            .list_enabled_proactive_schedules()
             .try_collect()
             .await
             .int_err()?;
 
-        for enabled_schedule in enabled_schedules {
-            let schedule = enabled_schedule.schedule();
-            if schedule.is_active() {
-                self.enqueue_auto_polling_update(&enabled_schedule.dataset_id, &schedule)
-                    .await?;
-            }
+        for enabled_proactive_schedule in enabled_proactive_schedules {
+            let schedule = enabled_proactive_schedule.schedule;
+            self.enqueue_auto_polling_update(&enabled_proactive_schedule.dataset_id, &schedule)
+                .await?;
 
             let mut state = self.state.lock().unwrap();
             state
                 .active_schedules
-                .insert(enabled_schedule.dataset_id.clone(), schedule);
+                .insert(enabled_proactive_schedule.dataset_id.clone(), schedule);
         }
 
         Ok(())
@@ -113,7 +111,7 @@ impl UpdateServiceInMemory {
         let maybe_active_schedule = {
             let state = self.state.lock().unwrap();
             if let Some(schedule) = state.active_schedules.get(&dataset_id)
-                && schedule.is_active()
+                && schedule.is_proactive()
             {
                 Some(schedule.clone())
             } else {
@@ -328,7 +326,7 @@ impl UpdateServiceInMemory {
 impl UpdateService for UpdateServiceInMemory {
     /// Runs the update main loop
     async fn run(&self) -> Result<(), InternalError> {
-        self.read_initial_schedules().await?;
+        self.launch_enabled_proactive_schedules().await?;
 
         loop {
             let maybe_nearest_activation_time = {
@@ -521,7 +519,7 @@ impl AsyncEventHandler<UpdateScheduleEventModified> for UpdateServiceInMemory {
             let mut state = self.state.lock().unwrap();
             state.active_schedules.remove(&event.dataset_id);
         } else {
-            if event.schedule.is_active() {
+            if event.schedule.is_proactive() {
                 self.enqueue_auto_polling_update(&event.dataset_id, &event.schedule)
                     .await?;
             }
