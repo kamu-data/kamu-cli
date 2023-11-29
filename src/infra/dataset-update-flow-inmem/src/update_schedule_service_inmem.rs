@@ -93,6 +93,7 @@ impl UpdateScheduleService for UpdateScheduleServiceInMemory {
     async fn set_schedule(
         &self,
         dataset_id: DatasetID,
+        paused: bool,
         schedule: Schedule,
     ) -> Result<UpdateScheduleState, SetScheduleError> {
         let maybe_update_schedule =
@@ -102,7 +103,7 @@ impl UpdateScheduleService for UpdateScheduleServiceInMemory {
             // Modification
             Some(mut update_schedule) => {
                 update_schedule
-                    .modify_schedule(self.time_source.now(), schedule)
+                    .modify_schedule(self.time_source.now(), paused, schedule)
                     .int_err()?;
 
                 update_schedule
@@ -118,7 +119,7 @@ impl UpdateScheduleService for UpdateScheduleServiceInMemory {
             // New schedule
             None => {
                 let mut update_schedule =
-                    UpdateSchedule::new(self.time_source.now(), dataset_id, schedule);
+                    UpdateSchedule::new(self.time_source.now(), dataset_id, paused, schedule);
 
                 update_schedule
                     .save(self.event_store.as_ref())
@@ -131,42 +132,6 @@ impl UpdateScheduleService for UpdateScheduleServiceInMemory {
                 Ok(update_schedule.into())
             }
         }
-    }
-
-    /// Pause dataset update schedule
-    async fn pause_schedule(&self, dataset_id: &DatasetID) -> Result<(), PauseScheduleError> {
-        let mut update_schedule =
-            UpdateSchedule::load(dataset_id.clone(), self.event_store.as_ref()).await?;
-
-        update_schedule.pause(self.time_source.now()).int_err()?;
-
-        update_schedule
-            .save(self.event_store.as_ref())
-            .await
-            .int_err()?;
-
-        self.publish_update_schedule_modified(&update_schedule)
-            .await?;
-
-        Ok(())
-    }
-
-    /// Resume paused dataset update schedule
-    async fn resume_schedule(&self, dataset_id: &DatasetID) -> Result<(), ResumeScheduleError> {
-        let mut update_schedule =
-            UpdateSchedule::load(dataset_id.clone(), self.event_store.as_ref()).await?;
-
-        update_schedule.resume(self.time_source.now()).int_err()?;
-
-        update_schedule
-            .save(self.event_store.as_ref())
-            .await
-            .int_err()?;
-
-        self.publish_update_schedule_modified(&update_schedule)
-            .await?;
-
-        Ok(())
     }
 }
 

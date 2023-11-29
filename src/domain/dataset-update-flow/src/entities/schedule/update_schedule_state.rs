@@ -55,10 +55,15 @@ impl Projection for UpdateScheduleState {
                 E::Created(UpdateScheduleEventCreated {
                     event_time: _,
                     dataset_id,
+                    paused,
                     schedule,
                 }) => Ok(Self {
                     dataset_id,
-                    status: UpdateScheduleStatus::PausedTemporarily,
+                    status: if paused {
+                        UpdateScheduleStatus::PausedTemporarily
+                    } else {
+                        UpdateScheduleStatus::Active
+                    },
                     schedule,
                 }),
                 _ => Err(ProjectionError::new(None, event)),

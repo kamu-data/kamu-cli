@@ -20,13 +20,19 @@ pub struct UpdateSchedule(Aggregate<UpdateScheduleState, (dyn UpdateScheduleEven
 
 impl UpdateSchedule {
     /// Creates a dataset update flow
-    pub fn new(now: DateTime<Utc>, dataset_id: DatasetID, schedule: Schedule) -> Self {
+    pub fn new(
+        now: DateTime<Utc>,
+        dataset_id: DatasetID,
+        paused: bool,
+        schedule: Schedule,
+    ) -> Self {
         Self(
             Aggregate::new(
                 dataset_id.clone(),
                 UpdateScheduleEventCreated {
                     event_time: now,
                     dataset_id,
+                    paused,
                     schedule,
                 },
             )
@@ -34,44 +40,17 @@ impl UpdateSchedule {
         )
     }
 
-    /// Pause flow
-    pub fn pause(
-        &mut self,
-        now: DateTime<Utc>,
-    ) -> Result<(), ProjectionError<UpdateScheduleState>> {
-        let event = UpdateScheduleEventModified {
-            event_time: now,
-            dataset_id: self.dataset_id.clone(),
-            paused: true,
-            schedule: self.schedule.clone(),
-        };
-        self.apply(event)
-    }
-
-    /// Resume flow
-    pub fn resume(
-        &mut self,
-        now: DateTime<Utc>,
-    ) -> Result<(), ProjectionError<UpdateScheduleState>> {
-        let event = UpdateScheduleEventModified {
-            event_time: now,
-            dataset_id: self.dataset_id.clone(),
-            paused: false,
-            schedule: self.schedule.clone(),
-        };
-        self.apply(event)
-    }
-
     /// Modify schedule
     pub fn modify_schedule(
         &mut self,
         now: DateTime<Utc>,
+        paused: bool,
         new_schedule: Schedule,
     ) -> Result<(), ProjectionError<UpdateScheduleState>> {
         let event = UpdateScheduleEventModified {
             event_time: now,
             dataset_id: self.dataset_id.clone(),
-            paused: self.is_active(),
+            paused,
             schedule: new_schedule,
         };
         self.apply(event)
