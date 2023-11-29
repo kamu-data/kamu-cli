@@ -38,7 +38,7 @@ pub struct ScheduleCronExpression {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct ScheduleReactive {
     pub throttling_period: Option<chrono::Duration>,
     pub minimal_data_batch: Option<i32>,

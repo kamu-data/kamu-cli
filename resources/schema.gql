@@ -388,26 +388,21 @@ scalar DatasetRefAny
 
 union DatasetUpdatesPollingSchedule = TimeDelta | CronExpression
 
+type DatasetUpdatesReactiveSchedule {
+	throttlingPeriod: TimeDelta
+	minimalDataBatch: Int
+}
+
 type DatasetUpdatesSchedule {
 	paused: Boolean!
-	updateSettings: DatasetUpdatesSettings!
+	pollingSchedule: DatasetUpdatesPollingSchedule
+	reactiveSchedule: DatasetUpdatesReactiveSchedule
 }
 
 type DatasetUpdatesScheduleMut {
 	setPollingTimeDelta(paused: Boolean!, every: TimeDeltaInput!): Boolean!
 	setPollingCronExpression(paused: Boolean!, cronExpression: String!): Boolean!
 	setReactive(paused: Boolean!, throttlingPeriod: TimeDeltaInput, minimalDataBatch: Int): Boolean!
-}
-
-union DatasetUpdatesSettings = DatasetUpdatesSettingsPolling | DatasetUpdatesSettingsThrottling
-
-type DatasetUpdatesSettingsPolling {
-	schedule: DatasetUpdatesPollingSchedule!
-}
-
-type DatasetUpdatesSettingsThrottling {
-	throttlingPeriod: TimeDelta
-	minimalDataBatch: Int
 }
 
 type Datasets {

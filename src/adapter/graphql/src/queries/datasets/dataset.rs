@@ -181,22 +181,19 @@ impl Dataset {
         Ok(
             maybe_update_schedule.map(|update_schedule| DatasetUpdatesSchedule {
                 paused: !update_schedule.is_active(),
-                update_settings: match update_schedule.schedule {
-                    Schedule::TimeDelta(time_delta) => {
-                        DatasetUpdatesSettings::Polling(DatasetUpdatesSettingsPolling {
-                            schedule: DatasetUpdatesPollingSchedule::TimeDelta(
-                                time_delta.every.into(),
-                            ),
-                        })
-                    }
+                reactive_schedule: if let Schedule::Reactive(reactive) = &update_schedule.schedule {
+                    Some((*reactive).into())
+                } else {
+                    None
+                },
+                polling_schedule: match update_schedule.schedule {
+                    Schedule::TimeDelta(time_delta) => Some(
+                        DatasetUpdatesPollingSchedule::TimeDelta(time_delta.every.into()),
+                    ),
                     Schedule::CronExpression(cron) => {
-                        DatasetUpdatesSettings::Polling(DatasetUpdatesSettingsPolling {
-                            schedule: DatasetUpdatesPollingSchedule::Cron(cron.into()),
-                        })
+                        Some(DatasetUpdatesPollingSchedule::Cron(cron.into()))
                     }
-                    Schedule::Reactive(reactive) => {
-                        DatasetUpdatesSettings::Throttling(reactive.into())
-                    }
+                    Schedule::Reactive(_) => None,
                 },
             }),
         )
@@ -219,18 +216,8 @@ pub struct DatasetPermissions {
 #[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct DatasetUpdatesSchedule {
     pub paused: bool,
-    pub update_settings: DatasetUpdatesSettings,
-}
-
-#[derive(Union, Debug, Clone, PartialEq, Eq)]
-pub enum DatasetUpdatesSettings {
-    Polling(DatasetUpdatesSettingsPolling),
-    Throttling(DatasetUpdatesSettingsThrottling),
-}
-
-#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
-pub struct DatasetUpdatesSettingsPolling {
-    pub schedule: DatasetUpdatesPollingSchedule,
+    pub polling_schedule: Option<DatasetUpdatesPollingSchedule>,
+    pub reactive_schedule: Option<DatasetUpdatesReactiveSchedule>,
 }
 
 #[derive(Union, Debug, Clone, PartialEq, Eq)]
@@ -257,12 +244,12 @@ impl From<ScheduleCronExpression> for CronExpression {
 /////////////////////////////////////////////////////////////////////////////////
 
 #[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
-pub struct DatasetUpdatesSettingsThrottling {
+pub struct DatasetUpdatesReactiveSchedule {
     pub throttling_period: Option<TimeDelta>,
     pub minimal_data_batch: Option<i32>,
 }
 
-impl From<ScheduleReactive> for DatasetUpdatesSettingsThrottling {
+impl From<ScheduleReactive> for DatasetUpdatesReactiveSchedule {
     fn from(value: ScheduleReactive) -> Self {
         Self {
             throttling_period: value.throttling_period.map(|tp| tp.into()),
