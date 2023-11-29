@@ -75,19 +75,17 @@ impl Projection for UpdateScheduleState {
                         paused,
                         schedule,
                     }) => {
-                        if s.status == UpdateScheduleStatus::StoppedPermanently {
-                            Err(ProjectionError::new(Some(s), event))
-                        } else {
-                            Ok(UpdateScheduleState {
-                                status: if *paused {
-                                    UpdateScheduleStatus::PausedTemporarily
-                                } else {
-                                    UpdateScheduleStatus::Active
-                                },
-                                schedule: schedule.clone(),
-                                ..s
-                            })
-                        }
+                        // Note: when deleted dataset is re-added with the same id, we have to
+                        // gracefully react on this, as if it wasn't a terminal state
+                        Ok(UpdateScheduleState {
+                            status: if *paused {
+                                UpdateScheduleStatus::PausedTemporarily
+                            } else {
+                                UpdateScheduleStatus::Active
+                            },
+                            schedule: schedule.clone(),
+                            ..s
+                        })
                     }
 
                     E::DatasetRemoved(UpdateScheduleEventDatasetRemoved {
