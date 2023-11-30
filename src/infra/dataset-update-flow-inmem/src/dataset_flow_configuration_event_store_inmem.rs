@@ -16,7 +16,7 @@ use opendatafabric::DatasetID;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct UpdateConfigurationEventStoreInMem {
+pub struct DatasetFlowConfigurationEventStoreInMem {
     state: Arc<Mutex<State>>,
 }
 
@@ -24,16 +24,16 @@ pub struct UpdateConfigurationEventStoreInMem {
 
 #[derive(Default)]
 struct State {
-    events: Vec<UpdateConfigurationEvent>,
+    events: Vec<DatasetFlowConfigurationEvent>,
     queries: HashSet<DatasetID>,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
-#[interface(dyn UpdateConfigurationEventStore)]
+#[interface(dyn DatasetFlowConfigurationEventStore)]
 #[scope(Singleton)]
-impl UpdateConfigurationEventStoreInMem {
+impl DatasetFlowConfigurationEventStoreInMem {
     pub fn new() -> Self {
         Self {
             state: Arc::new(Mutex::new(State::default())),
@@ -44,17 +44,18 @@ impl UpdateConfigurationEventStoreInMem {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl EventStore<UpdateConfigurationState> for UpdateConfigurationEventStoreInMem {
+impl EventStore<DatasetFlowConfigurationState> for DatasetFlowConfigurationEventStoreInMem {
     async fn len(&self) -> Result<usize, InternalError> {
         Ok(self.state.lock().unwrap().events.len())
     }
 
     fn get_events<'a>(
         &'a self,
-        dataset_id: &DatasetID,
+        query: &(DatasetID, DatasetFlowType),
         opts: GetEventsOpts,
-    ) -> EventStream<'a, UpdateConfigurationEvent> {
-        let dataset_id = dataset_id.clone();
+    ) -> EventStream<'a, DatasetFlowConfigurationEvent> {
+        let dataset_id = query.0.clone();
+        let flow_type = query.1;
 
         // TODO: This should be a buffered stream so we don't lock per event
         Box::pin(async_stream::try_stream! {
@@ -70,7 +71,7 @@ impl EventStore<UpdateConfigurationState> for UpdateConfigurationEventStoreInMem
                         .iter()
                         .enumerate()
                         .skip(seen)
-                        .filter(|(_, e)| e.dataset_id() == &dataset_id)
+                        .filter(|(_, e)| e.dataset_id() == &dataset_id && e.flow_type() == flow_type)
                         .map(|(i, e)| (i, e.clone()))
                         .next()
                 };
@@ -89,12 +90,12 @@ impl EventStore<UpdateConfigurationState> for UpdateConfigurationEventStoreInMem
     // TODO: concurrency
     async fn save_events(
         &self,
-        dataset_id: &DatasetID,
-        events: Vec<UpdateConfigurationEvent>,
+        query: &(DatasetID, DatasetFlowType),
+        events: Vec<DatasetFlowConfigurationEvent>,
     ) -> Result<EventID, SaveEventsError> {
         let mut s = self.state.lock().unwrap();
         if !events.is_empty() {
-            s.queries.get_or_insert(dataset_id.clone());
+            s.queries.get_or_insert(query.0.clone());
 
             for event in events {
                 s.events.push(event);
@@ -107,7 +108,7 @@ impl EventStore<UpdateConfigurationState> for UpdateConfigurationEventStoreInMem
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-impl UpdateConfigurationEventStore for UpdateConfigurationEventStoreInMem {
+impl DatasetFlowConfigurationEventStore for DatasetFlowConfigurationEventStoreInMem {
     fn list_all_dataset_ids<'a>(&'a self) -> DatasetIDStream<'a> {
         // TODO: re-consider performance impact
         Box::pin(tokio_stream::iter(

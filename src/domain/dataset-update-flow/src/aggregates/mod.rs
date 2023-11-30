@@ -7,8 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod dataset_flow_configuration;
 mod update;
-mod update_configuration;
 
+pub use dataset_flow_configuration::*;
 pub use update::*;
-pub use update_configuration::*;

@@ -19,8 +19,8 @@ use opendatafabric::DatasetID;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct UpdateConfigurationServiceInMemory {
-    event_store: Arc<dyn UpdateConfigurationEventStore>,
+pub struct DatasetFlowConfigurationServiceInMemory {
+    event_store: Arc<dyn DatasetFlowConfigurationEventStore>,
     time_source: Arc<dyn SystemTimeSource>,
     event_bus: Arc<EventBus>,
 }
@@ -28,12 +28,12 @@ pub struct UpdateConfigurationServiceInMemory {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
-#[interface(dyn UpdateConfigurationService)]
+#[interface(dyn DatasetFlowConfigurationService)]
 #[interface(dyn AsyncEventHandler<DatasetEventDeleted>)]
 #[scope(Singleton)]
-impl UpdateConfigurationServiceInMemory {
+impl DatasetFlowConfigurationServiceInMemory {
     pub fn new(
-        event_store: Arc<dyn UpdateConfigurationEventStore>,
+        event_store: Arc<dyn DatasetFlowConfigurationEventStore>,
         time_source: Arc<dyn SystemTimeSource>,
         event_bus: Arc<EventBus>,
     ) -> Self {
@@ -44,15 +44,16 @@ impl UpdateConfigurationServiceInMemory {
         }
     }
 
-    async fn publish_update_configuration_modified(
+    async fn publish_dataset_flow_configuration_modified(
         &self,
-        update_configuration_state: &UpdateConfigurationState,
+        dataset_flow_configuration_state: &DatasetFlowConfigurationState,
     ) -> Result<(), InternalError> {
-        let event = UpdateConfigurationEventModified {
+        let event = DatasetFlowConfigurationEventModified {
             event_time: self.time_source.now(),
-            dataset_id: update_configuration_state.dataset_id.clone(),
-            paused: update_configuration_state.is_active(),
-            rule: update_configuration_state.rule.clone(),
+            dataset_id: dataset_flow_configuration_state.dataset_id.clone(),
+            flow_type: dataset_flow_configuration_state.flow_type,
+            paused: dataset_flow_configuration_state.is_active(),
+            rule: dataset_flow_configuration_state.rule.clone(),
         };
         self.event_bus.dispatch_event(event).await
     }
@@ -61,17 +62,19 @@ impl UpdateConfigurationServiceInMemory {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl UpdateConfigurationService for UpdateConfigurationServiceInMemory {
+impl DatasetFlowConfigurationService for DatasetFlowConfigurationServiceInMemory {
     /// Lists update configurations, which are currently enabled
-    fn list_enabled_configurations(&self) -> UpdateConfigurationStateStream {
+    fn list_enabled_configurations(
+        &self,
+        flow_type: DatasetFlowType,
+    ) -> DatasetFlowConfigurationStateStream {
         // Note: terribly ineffecient - walks over events multiple times
         Box::pin(async_stream::try_stream! {
             let dataset_ids: Vec<_> = self.event_store.list_all_dataset_ids().collect().await;
             for dataset_id in dataset_ids {
-                let update_configuration = UpdateConfiguration::load(dataset_id, self.event_store.as_ref()).await.int_err()?;
-                if update_configuration.is_active() {
+                let maybe_update_configuration = DatasetFlowConfiguration::try_load((dataset_id, flow_type), self.event_store.as_ref()).await.int_err()?;
+                if let Some(update_configuration) = maybe_update_configuration && update_configuration.is_active() {
                     yield update_configuration.into();
-
                 }
             }
         })
@@ -83,9 +86,13 @@ impl UpdateConfigurationService for UpdateConfigurationServiceInMemory {
     async fn find_configuration(
         &self,
         dataset_id: &DatasetID,
-    ) -> Result<Option<UpdateConfigurationState>, FindConfigurationError> {
-        let maybe_update_configuration =
-            UpdateConfiguration::try_load(dataset_id.clone(), self.event_store.as_ref()).await?;
+        flow_type: DatasetFlowType,
+    ) -> Result<Option<DatasetFlowConfigurationState>, FindConfigurationError> {
+        let maybe_update_configuration = DatasetFlowConfiguration::try_load(
+            (dataset_id.clone(), flow_type),
+            self.event_store.as_ref(),
+        )
+        .await?;
         Ok(maybe_update_configuration.map(|us| us.into()))
     }
 
@@ -94,11 +101,15 @@ impl UpdateConfigurationService for UpdateConfigurationServiceInMemory {
     async fn set_configuration(
         &self,
         dataset_id: DatasetID,
+        flow_type: DatasetFlowType,
         paused: bool,
-        rule: UpdateConfigurationRule,
-    ) -> Result<UpdateConfigurationState, SetConfigurationError> {
-        let maybe_update_configuration =
-            UpdateConfiguration::try_load(dataset_id.clone(), self.event_store.as_ref()).await?;
+        rule: DatasetFlowConfigurationRule,
+    ) -> Result<DatasetFlowConfigurationState, SetConfigurationError> {
+        let maybe_update_configuration = DatasetFlowConfiguration::try_load(
+            (dataset_id.clone(), flow_type),
+            self.event_store.as_ref(),
+        )
+        .await?;
 
         match maybe_update_configuration {
             // Modification
@@ -112,22 +123,27 @@ impl UpdateConfigurationService for UpdateConfigurationServiceInMemory {
                     .await
                     .int_err()?;
 
-                self.publish_update_configuration_modified(&update_configuration)
+                self.publish_dataset_flow_configuration_modified(&update_configuration)
                     .await?;
 
                 Ok(update_configuration.into())
             }
             // New configuration
             None => {
-                let mut update_configuration =
-                    UpdateConfiguration::new(self.time_source.now(), dataset_id, paused, rule);
+                let mut update_configuration = DatasetFlowConfiguration::new(
+                    self.time_source.now(),
+                    dataset_id,
+                    flow_type,
+                    paused,
+                    rule,
+                );
 
                 update_configuration
                     .save(self.event_store.as_ref())
                     .await
                     .int_err()?;
 
-                self.publish_update_configuration_modified(&update_configuration)
+                self.publish_dataset_flow_configuration_modified(&update_configuration)
                     .await?;
 
                 Ok(update_configuration.into())
@@ -139,21 +155,27 @@ impl UpdateConfigurationService for UpdateConfigurationServiceInMemory {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl AsyncEventHandler<DatasetEventDeleted> for UpdateConfigurationServiceInMemory {
+impl AsyncEventHandler<DatasetEventDeleted> for DatasetFlowConfigurationServiceInMemory {
     async fn handle(&self, event: &DatasetEventDeleted) -> Result<(), InternalError> {
-        let mut update_configuration =
-            UpdateConfiguration::load(event.dataset_id.clone(), self.event_store.as_ref())
-                .await
-                .int_err()?;
-
-        update_configuration
-            .notify_dataset_removed(self.time_source.now())
-            .int_err()?;
-
-        update_configuration
-            .save(self.event_store.as_ref())
+        for flow_type in DatasetFlowType::iterator() {
+            let maybe_update_configuration = DatasetFlowConfiguration::try_load(
+                (event.dataset_id.clone(), flow_type),
+                self.event_store.as_ref(),
+            )
             .await
             .int_err()?;
+
+            if let Some(mut update_configuration) = maybe_update_configuration {
+                update_configuration
+                    .notify_dataset_removed(self.time_source.now())
+                    .int_err()?;
+
+                update_configuration
+                    .save(self.event_store.as_ref())
+                    .await
+                    .int_err()?;
+            }
+        }
 
         Ok(())
     }

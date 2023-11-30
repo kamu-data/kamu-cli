@@ -16,24 +16,26 @@ use crate::*;
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Aggregate, Debug)]
-pub struct UpdateConfiguration(
-    Aggregate<UpdateConfigurationState, (dyn UpdateConfigurationEventStore + 'static)>,
+pub struct DatasetFlowConfiguration(
+    Aggregate<DatasetFlowConfigurationState, (dyn DatasetFlowConfigurationEventStore + 'static)>,
 );
 
-impl UpdateConfiguration {
-    /// Creates a dataset update configuration
+impl DatasetFlowConfiguration {
+    /// Creates a dataset flow configuration
     pub fn new(
         now: DateTime<Utc>,
         dataset_id: DatasetID,
+        flow_type: DatasetFlowType,
         paused: bool,
-        rule: UpdateConfigurationRule,
+        rule: DatasetFlowConfigurationRule,
     ) -> Self {
         Self(
             Aggregate::new(
-                dataset_id.clone(),
-                UpdateConfigurationEventCreated {
+                (dataset_id.clone(), flow_type),
+                DatasetFlowConfigurationEventCreated {
                     event_time: now,
                     dataset_id,
+                    flow_type,
                     paused,
                     rule,
                 },
@@ -47,10 +49,11 @@ impl UpdateConfiguration {
         &mut self,
         now: DateTime<Utc>,
         paused: bool,
-        new_rule: UpdateConfigurationRule,
-    ) -> Result<(), ProjectionError<UpdateConfigurationState>> {
-        let event = UpdateConfigurationEventModified {
+        new_rule: DatasetFlowConfigurationRule,
+    ) -> Result<(), ProjectionError<DatasetFlowConfigurationState>> {
+        let event = DatasetFlowConfigurationEventModified {
             event_time: now,
+            flow_type: self.flow_type,
             dataset_id: self.dataset_id.clone(),
             paused,
             rule: new_rule,
@@ -62,10 +65,11 @@ impl UpdateConfiguration {
     pub fn notify_dataset_removed(
         &mut self,
         now: DateTime<Utc>,
-    ) -> Result<(), ProjectionError<UpdateConfigurationState>> {
-        let event = UpdateConfigurationEventDatasetRemoved {
+    ) -> Result<(), ProjectionError<DatasetFlowConfigurationState>> {
+        let event = DatasetFlowConfigurationEventDatasetRemoved {
             event_time: now,
             dataset_id: self.dataset_id.clone(),
+            flow_type: self.flow_type,
         };
         self.apply(event)
     }

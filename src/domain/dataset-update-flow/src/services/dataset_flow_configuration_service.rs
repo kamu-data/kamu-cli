@@ -12,35 +12,40 @@ use internal_error::{ErrorIntoInternal, InternalError};
 use opendatafabric::DatasetID;
 use tokio_stream::Stream;
 
-use crate::{UpdateConfigurationRule, UpdateConfigurationState};
+use crate::{DatasetFlowConfigurationRule, DatasetFlowConfigurationState, DatasetFlowType};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait UpdateConfigurationService: Sync + Send {
-    /// Lists update configurations, which are currently enabled
-    fn list_enabled_configurations(&self) -> UpdateConfigurationStateStream;
+pub trait DatasetFlowConfigurationService: Sync + Send {
+    /// Lists flow configurations, which are currently enabled
+    fn list_enabled_configurations(
+        &self,
+        flow_type: DatasetFlowType,
+    ) -> DatasetFlowConfigurationStateStream;
 
-    /// Find current configuration, which may or may not be associated with the
-    /// given dataset
+    /// Find current configuration of a certian type,
+    /// which may or may not be associated with the given dataset
     async fn find_configuration(
         &self,
         dataset_id: &DatasetID,
-    ) -> Result<Option<UpdateConfigurationState>, FindConfigurationError>;
+        flow_type: DatasetFlowType,
+    ) -> Result<Option<DatasetFlowConfigurationState>, FindConfigurationError>;
 
-    /// Set or modify dataset update configuration
+    /// Set or modify dataset flow configuration
     async fn set_configuration(
         &self,
         dataset_id: DatasetID,
+        flow_type: DatasetFlowType,
         paused: bool,
-        rule: UpdateConfigurationRule,
-    ) -> Result<UpdateConfigurationState, SetConfigurationError>;
+        rule: DatasetFlowConfigurationRule,
+    ) -> Result<DatasetFlowConfigurationState, SetConfigurationError>;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub type UpdateConfigurationStateStream<'a> = std::pin::Pin<
-    Box<dyn Stream<Item = Result<UpdateConfigurationState, InternalError>> + Send + 'a>,
+pub type DatasetFlowConfigurationStateStream<'a> = std::pin::Pin<
+    Box<dyn Stream<Item = Result<DatasetFlowConfigurationState, InternalError>> + Send + 'a>,
 >;
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -57,8 +62,8 @@ pub enum FindConfigurationError {
     Internal(#[from] InternalError),
 }
 
-impl From<TryLoadError<UpdateConfigurationState>> for FindConfigurationError {
-    fn from(value: TryLoadError<UpdateConfigurationState>) -> Self {
+impl From<TryLoadError<DatasetFlowConfigurationState>> for FindConfigurationError {
+    fn from(value: TryLoadError<DatasetFlowConfigurationState>) -> Self {
         match value {
             TryLoadError::ProjectionError(err) => Self::Internal(err.int_err()),
             TryLoadError::Internal(err) => Self::Internal(err),
@@ -66,8 +71,8 @@ impl From<TryLoadError<UpdateConfigurationState>> for FindConfigurationError {
     }
 }
 
-impl From<TryLoadError<UpdateConfigurationState>> for SetConfigurationError {
-    fn from(value: TryLoadError<UpdateConfigurationState>) -> Self {
+impl From<TryLoadError<DatasetFlowConfigurationState>> for SetConfigurationError {
+    fn from(value: TryLoadError<DatasetFlowConfigurationState>) -> Self {
         match value {
             TryLoadError::ProjectionError(err) => Self::Internal(err.int_err()),
             TryLoadError::Internal(err) => Self::Internal(err),

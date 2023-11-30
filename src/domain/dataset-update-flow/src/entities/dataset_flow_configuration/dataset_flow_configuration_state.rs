@@ -15,16 +15,18 @@ use crate::*;
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct UpdateConfigurationState {
+pub struct DatasetFlowConfigurationState {
     /// Identifier of the related dataset
     pub dataset_id: DatasetID,
-    /// Update configuration rule
-    pub rule: UpdateConfigurationRule,
+    /// Flow type
+    pub flow_type: DatasetFlowType,
+    /// Flow configuration rule
+    pub rule: DatasetFlowConfigurationRule,
     /// Configuration status
     pub status: UpdateConfigurationStatus,
 }
 
-impl UpdateConfigurationState {
+impl DatasetFlowConfigurationState {
     pub fn is_active(&self) -> bool {
         match self.status {
             UpdateConfigurationStatus::Active => true,
@@ -42,29 +44,31 @@ pub enum UpdateConfigurationStatus {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum UpdateConfigurationRule {
+pub enum DatasetFlowConfigurationRule {
     Schedule(Schedule),
     StartCondition(StartCondition),
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-impl Projection for UpdateConfigurationState {
-    type Query = DatasetID;
-    type Event = UpdateConfigurationEvent;
+impl Projection for DatasetFlowConfigurationState {
+    type Query = (DatasetID, DatasetFlowType);
+    type Event = DatasetFlowConfigurationEvent;
 
     fn apply(state: Option<Self>, event: Self::Event) -> Result<Self, ProjectionError<Self>> {
-        use UpdateConfigurationEvent as E;
+        use DatasetFlowConfigurationEvent as E;
 
         match (state, event) {
             (None, event) => match event {
-                E::Created(UpdateConfigurationEventCreated {
+                E::Created(DatasetFlowConfigurationEventCreated {
                     event_time: _,
                     dataset_id,
+                    flow_type,
                     paused,
                     rule,
                 }) => Ok(Self {
                     dataset_id,
+                    flow_type,
                     status: if paused {
                         UpdateConfigurationStatus::PausedTemporarily
                     } else {
@@ -76,19 +80,21 @@ impl Projection for UpdateConfigurationState {
             },
             (Some(s), event) => {
                 assert_eq!(&s.dataset_id, event.dataset_id());
+                assert_eq!(s.flow_type, event.flow_type());
 
                 match &event {
                     E::Created(_) => Err(ProjectionError::new(Some(s), event)),
 
-                    E::Modified(UpdateConfigurationEventModified {
+                    E::Modified(DatasetFlowConfigurationEventModified {
                         event_time: _,
                         dataset_id: _,
+                        flow_type: _,
                         paused,
                         rule,
                     }) => {
                         // Note: when deleted dataset is re-added with the same id, we have to
                         // gracefully react on this, as if it wasn't a terminal state
-                        Ok(UpdateConfigurationState {
+                        Ok(DatasetFlowConfigurationState {
                             status: if *paused {
                                 UpdateConfigurationStatus::PausedTemporarily
                             } else {
@@ -99,14 +105,11 @@ impl Projection for UpdateConfigurationState {
                         })
                     }
 
-                    E::DatasetRemoved(UpdateConfigurationEventDatasetRemoved {
-                        event_time: _,
-                        dataset_id: _,
-                    }) => {
+                    E::DatasetRemoved(_) => {
                         if s.status == UpdateConfigurationStatus::StoppedPermanently {
                             Ok(s) // idempotent DELETE
                         } else {
-                            Ok(UpdateConfigurationState {
+                            Ok(DatasetFlowConfigurationState {
                                 status: UpdateConfigurationStatus::StoppedPermanently,
                                 ..s
                             })

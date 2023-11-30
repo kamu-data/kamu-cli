@@ -15,15 +15,15 @@
 pub use kamu_dataset_update_flow as domain;
 
 mod activity_time_wheel;
+mod dataset_flow_configuration_event_store_inmem;
+mod dataset_flow_configuration_service_inmem;
 mod dependency_graph_service_inmem;
-mod update_configuration_event_store_inmem;
-mod update_configuration_service_inmem;
 mod update_event_store_inmem;
 mod update_service_inmem;
 
 pub(crate) use activity_time_wheel::*;
+pub use dataset_flow_configuration_event_store_inmem::*;
+pub use dataset_flow_configuration_service_inmem::*;
 pub use dependency_graph_service_inmem::*;
-pub use update_configuration_event_store_inmem::*;
-pub use update_configuration_service_inmem::*;
 pub use update_event_store_inmem::*;
 pub use update_service_inmem::*;

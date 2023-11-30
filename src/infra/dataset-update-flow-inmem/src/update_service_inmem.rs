@@ -32,7 +32,7 @@ pub struct UpdateServiceInMemory {
     event_store: Arc<dyn UpdateEventStore>,
     time_source: Arc<dyn SystemTimeSource>,
     task_scheduler: Arc<dyn TaskScheduler>,
-    update_configuration_service: Arc<dyn UpdateConfigurationService>,
+    update_configuration_service: Arc<dyn DatasetFlowConfigurationService>,
     dependency_graph_service: Arc<dyn DependencyGraphService>,
 }
 
@@ -64,14 +64,14 @@ impl State {
 #[interface(dyn UpdateService)]
 #[interface(dyn AsyncEventHandler<TaskEventFinished>)]
 #[interface(dyn AsyncEventHandler<DatasetEventDeleted>)]
-#[interface(dyn AsyncEventHandler<UpdateConfigurationEventModified>)]
+#[interface(dyn AsyncEventHandler<DatasetFlowConfigurationEventModified>)]
 #[scope(Singleton)]
 impl UpdateServiceInMemory {
     pub fn new(
         event_store: Arc<dyn UpdateEventStore>,
         time_source: Arc<dyn SystemTimeSource>,
         task_scheduler: Arc<dyn TaskScheduler>,
-        update_configuration_service: Arc<dyn UpdateConfigurationService>,
+        update_configuration_service: Arc<dyn DatasetFlowConfigurationService>,
         dependency_graph_service: Arc<dyn DependencyGraphService>,
     ) -> Self {
         Self {
@@ -114,14 +114,14 @@ impl UpdateServiceInMemory {
     async fn initialize_enabled_configurations(&self) -> Result<(), InternalError> {
         let enabled_configurations: Vec<_> = self
             .update_configuration_service
-            .list_enabled_configurations()
+            .list_enabled_configurations(DatasetFlowType::Update)
             .try_collect()
             .await
             .int_err()?;
 
         for enabled_config in enabled_configurations {
             match enabled_config.rule {
-                UpdateConfigurationRule::Schedule(schedule) => {
+                DatasetFlowConfigurationRule::Schedule(schedule) => {
                     self.enqueue_auto_polling_update(&enabled_config.dataset_id, &schedule)
                         .await?;
 
@@ -130,7 +130,7 @@ impl UpdateServiceInMemory {
                         .active_schedules
                         .insert(enabled_config.dataset_id.clone(), schedule);
                 }
-                UpdateConfigurationRule::StartCondition(start_condition) => {
+                DatasetFlowConfigurationRule::StartCondition(start_condition) => {
                     let mut state = self.state.lock().unwrap();
                     state
                         .active_start_conditions
@@ -535,14 +535,17 @@ impl AsyncEventHandler<TaskEventFinished> for UpdateServiceInMemory {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl AsyncEventHandler<UpdateConfigurationEventModified> for UpdateServiceInMemory {
-    async fn handle(&self, event: &UpdateConfigurationEventModified) -> Result<(), InternalError> {
+impl AsyncEventHandler<DatasetFlowConfigurationEventModified> for UpdateServiceInMemory {
+    async fn handle(
+        &self,
+        event: &DatasetFlowConfigurationEventModified,
+    ) -> Result<(), InternalError> {
         if event.paused {
             let mut state = self.state.lock().unwrap();
             state.active_schedules.remove(&event.dataset_id);
         } else {
             match &event.rule {
-                UpdateConfigurationRule::Schedule(schedule) => {
+                DatasetFlowConfigurationRule::Schedule(schedule) => {
                     self.enqueue_auto_polling_update(&event.dataset_id, &schedule)
                         .await?;
 
@@ -553,7 +556,7 @@ impl AsyncEventHandler<UpdateConfigurationEventModified> for UpdateServiceInMemo
                         .and_modify(|e| *e = schedule.clone())
                         .or_insert(schedule.clone());
                 }
-                UpdateConfigurationRule::StartCondition(start_condition) => {
+                DatasetFlowConfigurationRule::StartCondition(start_condition) => {
                     let mut state = self.state.lock().unwrap();
                     state
                         .active_start_conditions

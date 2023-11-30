@@ -14,7 +14,7 @@ use crate::*;
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait UpdateConfigurationEventStore: EventStore<UpdateConfigurationState> {
+pub trait DatasetFlowConfigurationEventStore: EventStore<DatasetFlowConfigurationState> {
     /// Returns all unique values of dataset IDs associated with update configs
     // TODO: re-consider performance impact
     fn list_all_dataset_ids<'a>(&'a self) -> DatasetIDStream<'a>;
