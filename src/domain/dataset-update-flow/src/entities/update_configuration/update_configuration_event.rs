@@ -16,16 +16,16 @@ use crate::*;
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum UpdateScheduleEvent {
-    Created(UpdateScheduleEventCreated),
-    Modified(UpdateScheduleEventModified),
-    DatasetRemoved(UpdateScheduleEventDatasetRemoved),
+pub enum UpdateConfigurationEvent {
+    Created(UpdateConfigurationEventCreated),
+    Modified(UpdateConfigurationEventModified),
+    DatasetRemoved(UpdateConfigurationEventDatasetRemoved),
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct UpdateScheduleEventCreated {
+pub struct UpdateConfigurationEventCreated {
     pub event_time: DateTime<Utc>,
     pub dataset_id: DatasetID,
     pub paused: bool,
@@ -35,7 +35,7 @@ pub struct UpdateScheduleEventCreated {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct UpdateScheduleEventModified {
+pub struct UpdateConfigurationEventModified {
     pub event_time: DateTime<Utc>,
     pub dataset_id: DatasetID,
     pub paused: bool,
@@ -45,36 +45,40 @@ pub struct UpdateScheduleEventModified {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct UpdateScheduleEventDatasetRemoved {
+pub struct UpdateConfigurationEventDatasetRemoved {
     pub event_time: DateTime<Utc>,
     pub dataset_id: DatasetID,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-impl UpdateScheduleEvent {
+impl UpdateConfigurationEvent {
     pub fn dataset_id(&self) -> &DatasetID {
         match self {
-            UpdateScheduleEvent::Created(e) => &e.dataset_id,
-            UpdateScheduleEvent::Modified(e) => &e.dataset_id,
-            UpdateScheduleEvent::DatasetRemoved(e) => &e.dataset_id,
+            UpdateConfigurationEvent::Created(e) => &e.dataset_id,
+            UpdateConfigurationEvent::Modified(e) => &e.dataset_id,
+            UpdateConfigurationEvent::DatasetRemoved(e) => &e.dataset_id,
         }
     }
 
     pub fn event_time(&self) -> &DateTime<Utc> {
         match self {
-            UpdateScheduleEvent::Created(e) => &e.event_time,
-            UpdateScheduleEvent::Modified(e) => &e.event_time,
-            UpdateScheduleEvent::DatasetRemoved(e) => &e.event_time,
+            UpdateConfigurationEvent::Created(e) => &e.event_time,
+            UpdateConfigurationEvent::Modified(e) => &e.event_time,
+            UpdateConfigurationEvent::DatasetRemoved(e) => &e.event_time,
         }
     }
 }
 
-impl_enum_with_variants!(UpdateScheduleEvent);
-impl_enum_variant!(UpdateScheduleEvent::Created(UpdateScheduleEventCreated));
-impl_enum_variant!(UpdateScheduleEvent::Modified(UpdateScheduleEventModified));
-impl_enum_variant!(UpdateScheduleEvent::DatasetRemoved(
-    UpdateScheduleEventDatasetRemoved
+impl_enum_with_variants!(UpdateConfigurationEvent);
+impl_enum_variant!(UpdateConfigurationEvent::Created(
+    UpdateConfigurationEventCreated
+));
+impl_enum_variant!(UpdateConfigurationEvent::Modified(
+    UpdateConfigurationEventModified
+));
+impl_enum_variant!(UpdateConfigurationEvent::DatasetRemoved(
+    UpdateConfigurationEventDatasetRemoved
 ));
 
 /////////////////////////////////////////////////////////////////////////////////////////

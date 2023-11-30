@@ -32,7 +32,7 @@ pub struct UpdateServiceInMemory {
     event_store: Arc<dyn UpdateEventStore>,
     time_source: Arc<dyn SystemTimeSource>,
     task_scheduler: Arc<dyn TaskScheduler>,
-    update_schedule_service: Arc<dyn UpdateScheduleService>,
+    update_configuration_service: Arc<dyn UpdateConfigurationService>,
     dependency_graph_service: Arc<dyn DependencyGraphService>,
 }
 
@@ -62,14 +62,14 @@ impl State {
 #[interface(dyn UpdateService)]
 #[interface(dyn AsyncEventHandler<TaskEventFinished>)]
 #[interface(dyn AsyncEventHandler<DatasetEventDeleted>)]
-#[interface(dyn AsyncEventHandler<UpdateScheduleEventModified>)]
+#[interface(dyn AsyncEventHandler<UpdateConfigurationEventModified>)]
 #[scope(Singleton)]
 impl UpdateServiceInMemory {
     pub fn new(
         event_store: Arc<dyn UpdateEventStore>,
         time_source: Arc<dyn SystemTimeSource>,
         task_scheduler: Arc<dyn TaskScheduler>,
-        update_schedule_service: Arc<dyn UpdateScheduleService>,
+        update_configuration_service: Arc<dyn UpdateConfigurationService>,
         dependency_graph_service: Arc<dyn DependencyGraphService>,
     ) -> Self {
         Self {
@@ -77,7 +77,7 @@ impl UpdateServiceInMemory {
             event_store,
             time_source,
             task_scheduler,
-            update_schedule_service,
+            update_configuration_service,
             dependency_graph_service,
         }
     }
@@ -109,23 +109,23 @@ impl UpdateServiceInMemory {
             });
     }
 
-    async fn launch_enabled_proactive_schedules(&self) -> Result<(), InternalError> {
-        let enabled_proactive_schedules: Vec<_> = self
-            .update_schedule_service
-            .list_enabled_proactive_schedules()
+    async fn launch_enabled_proactive_configurations(&self) -> Result<(), InternalError> {
+        let enabled_proactive_configurations: Vec<_> = self
+            .update_configuration_service
+            .list_enabled_proactive_configurations()
             .try_collect()
             .await
             .int_err()?;
 
-        for enabled_proactive_schedule in enabled_proactive_schedules {
-            let schedule = enabled_proactive_schedule.schedule;
-            self.enqueue_auto_polling_update(&enabled_proactive_schedule.dataset_id, &schedule)
+        for enabled_proactive_config in enabled_proactive_configurations {
+            let schedule = enabled_proactive_config.schedule;
+            self.enqueue_auto_polling_update(&enabled_proactive_config.dataset_id, &schedule)
                 .await?;
 
             let mut state = self.state.lock().unwrap();
             state
                 .active_schedules
-                .insert(enabled_proactive_schedule.dataset_id.clone(), schedule);
+                .insert(enabled_proactive_config.dataset_id.clone(), schedule);
         }
 
         Ok(())
@@ -354,7 +354,7 @@ impl UpdateService for UpdateServiceInMemory {
     /// Runs the update main loop
     async fn run(&self) -> Result<(), InternalError> {
         // Initial scheduling
-        self.launch_enabled_proactive_schedules().await?;
+        self.launch_enabled_proactive_configurations().await?;
 
         // Main scanning loop
         loop {
@@ -531,8 +531,8 @@ impl AsyncEventHandler<TaskEventFinished> for UpdateServiceInMemory {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl AsyncEventHandler<UpdateScheduleEventModified> for UpdateServiceInMemory {
-    async fn handle(&self, event: &UpdateScheduleEventModified) -> Result<(), InternalError> {
+impl AsyncEventHandler<UpdateConfigurationEventModified> for UpdateServiceInMemory {
+    async fn handle(&self, event: &UpdateConfigurationEventModified) -> Result<(), InternalError> {
         if event.paused {
             let mut state = self.state.lock().unwrap();
             state.active_schedules.remove(&event.dataset_id);

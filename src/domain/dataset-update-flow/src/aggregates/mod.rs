@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 mod update;
-mod update_schedule;
+mod update_configuration;
 
 pub use update::*;
-pub use update_schedule::*;
+pub use update_configuration::*;

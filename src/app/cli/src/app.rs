@@ -227,13 +227,13 @@ pub fn configure_base_catalog(
     b.add::<kamu_dataset_update_flow_inmem::DependencyGraphServiceInMemory>();
 
     // TODO: initialize graph dependencies when starting API server
-    b.add::<kamu_dataset_update_flow_inmem::UpdateScheduleServiceInMemory>();
+    b.add::<kamu_dataset_update_flow_inmem::UpdateConfigurationServiceInMemory>();
 
     b.add::<kamu_dataset_update_flow_inmem::UpdateServiceInMemory>();
 
     b.add::<kamu_dataset_update_flow_inmem::UpdateEventStoreInMem>();
 
-    b.add::<kamu_dataset_update_flow_inmem::UpdateScheduleEventStoreInMem>();
+    b.add::<kamu_dataset_update_flow_inmem::UpdateConfigurationEventStoreInMem>();
 
     b.add::<accounts::AccountService>();
 

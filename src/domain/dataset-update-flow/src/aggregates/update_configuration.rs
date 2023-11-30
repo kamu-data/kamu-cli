@@ -16,10 +16,12 @@ use crate::*;
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Aggregate, Debug)]
-pub struct UpdateSchedule(Aggregate<UpdateScheduleState, (dyn UpdateScheduleEventStore + 'static)>);
+pub struct UpdateConfiguration(
+    Aggregate<UpdateConfigurationState, (dyn UpdateConfigurationEventStore + 'static)>,
+);
 
-impl UpdateSchedule {
-    /// Creates a dataset update flow
+impl UpdateConfiguration {
+    /// Creates a dataset update configuration
     pub fn new(
         now: DateTime<Utc>,
         dataset_id: DatasetID,
@@ -29,7 +31,7 @@ impl UpdateSchedule {
         Self(
             Aggregate::new(
                 dataset_id.clone(),
-                UpdateScheduleEventCreated {
+                UpdateConfigurationEventCreated {
                     event_time: now,
                     dataset_id,
                     paused,
@@ -40,14 +42,14 @@ impl UpdateSchedule {
         )
     }
 
-    /// Modify schedule
-    pub fn modify_schedule(
+    /// Modify configuration
+    pub fn modify_configuration(
         &mut self,
         now: DateTime<Utc>,
         paused: bool,
         new_schedule: Schedule,
-    ) -> Result<(), ProjectionError<UpdateScheduleState>> {
-        let event = UpdateScheduleEventModified {
+    ) -> Result<(), ProjectionError<UpdateConfigurationState>> {
+        let event = UpdateConfigurationEventModified {
             event_time: now,
             dataset_id: self.dataset_id.clone(),
             paused,
@@ -60,8 +62,8 @@ impl UpdateSchedule {
     pub fn notify_dataset_removed(
         &mut self,
         now: DateTime<Utc>,
-    ) -> Result<(), ProjectionError<UpdateScheduleState>> {
-        let event = UpdateScheduleEventDatasetRemoved {
+    ) -> Result<(), ProjectionError<UpdateConfigurationState>> {
+        let event = UpdateConfigurationEventDatasetRemoved {
             event_time: now,
             dataset_id: self.dataset_id.clone(),
         };

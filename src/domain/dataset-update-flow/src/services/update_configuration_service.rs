@@ -12,52 +12,53 @@ use internal_error::{ErrorIntoInternal, InternalError};
 use opendatafabric::DatasetID;
 use tokio_stream::Stream;
 
-use crate::{Schedule, UpdateScheduleState};
+use crate::{Schedule, UpdateConfigurationState};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait UpdateScheduleService: Sync + Send {
-    /// Lists proactive update schedules, which are currently enabled
-    fn list_enabled_proactive_schedules(&self) -> UpdateScheduleStateStream;
+pub trait UpdateConfigurationService: Sync + Send {
+    /// Lists proactive update configurations, which are currently enabled
+    fn list_enabled_proactive_configurations(&self) -> UpdateConfigurationStateStream;
 
-    /// Find current schedule, which may or may not be associated with the given
-    /// dataset
-    async fn find_schedule(
+    /// Find current configuration, which may or may not be associated with the
+    /// given dataset
+    async fn find_configuration(
         &self,
         dataset_id: &DatasetID,
-    ) -> Result<Option<UpdateScheduleState>, FindScheduleError>;
+    ) -> Result<Option<UpdateConfigurationState>, FindConfigurationError>;
 
-    /// Set or modify dataset update schedule
-    async fn set_schedule(
+    /// Set or modify dataset update configuration
+    async fn set_configuration(
         &self,
         dataset_id: DatasetID,
         paused: bool,
         schedule: Schedule,
-    ) -> Result<UpdateScheduleState, SetScheduleError>;
+    ) -> Result<UpdateConfigurationState, SetConfigurationError>;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub type UpdateScheduleStateStream<'a> =
-    std::pin::Pin<Box<dyn Stream<Item = Result<UpdateScheduleState, InternalError>> + Send + 'a>>;
+pub type UpdateConfigurationStateStream<'a> = std::pin::Pin<
+    Box<dyn Stream<Item = Result<UpdateConfigurationState, InternalError>> + Send + 'a>,
+>;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(thiserror::Error, Debug)]
-pub enum SetScheduleError {
+pub enum SetConfigurationError {
     #[error(transparent)]
     Internal(#[from] InternalError),
 }
 
 #[derive(thiserror::Error, Debug)]
-pub enum FindScheduleError {
+pub enum FindConfigurationError {
     #[error(transparent)]
     Internal(#[from] InternalError),
 }
 
-impl From<TryLoadError<UpdateScheduleState>> for FindScheduleError {
-    fn from(value: TryLoadError<UpdateScheduleState>) -> Self {
+impl From<TryLoadError<UpdateConfigurationState>> for FindConfigurationError {
+    fn from(value: TryLoadError<UpdateConfigurationState>) -> Self {
         match value {
             TryLoadError::ProjectionError(err) => Self::Internal(err.int_err()),
             TryLoadError::Internal(err) => Self::Internal(err),
@@ -65,8 +66,8 @@ impl From<TryLoadError<UpdateScheduleState>> for FindScheduleError {
     }
 }
 
-impl From<TryLoadError<UpdateScheduleState>> for SetScheduleError {
-    fn from(value: TryLoadError<UpdateScheduleState>) -> Self {
+impl From<TryLoadError<UpdateConfigurationState>> for SetConfigurationError {
+    fn from(value: TryLoadError<UpdateConfigurationState>) -> Self {
         match value {
             TryLoadError::ProjectionError(err) => Self::Internal(err.int_err()),
             TryLoadError::Internal(err) => Self::Internal(err),

@@ -8,9 +8,9 @@
 // by the Apache License, Version 2.0.
 
 mod schedule;
-mod update_schedule_event;
-mod update_schedule_state;
+mod update_configuration_event;
+mod update_configuration_state;
 
 pub use schedule::*;
-pub use update_schedule_event::*;
-pub use update_schedule_state::*;
+pub use update_configuration_event::*;
+pub use update_configuration_state::*;

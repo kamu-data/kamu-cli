@@ -16,7 +16,7 @@ use opendatafabric::DatasetID;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct UpdateScheduleEventStoreInMem {
+pub struct UpdateConfigurationEventStoreInMem {
     state: Arc<Mutex<State>>,
 }
 
@@ -24,16 +24,16 @@ pub struct UpdateScheduleEventStoreInMem {
 
 #[derive(Default)]
 struct State {
-    events: Vec<UpdateScheduleEvent>,
+    events: Vec<UpdateConfigurationEvent>,
     queries: HashSet<DatasetID>,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
-#[interface(dyn UpdateScheduleEventStore)]
+#[interface(dyn UpdateConfigurationEventStore)]
 #[scope(Singleton)]
-impl UpdateScheduleEventStoreInMem {
+impl UpdateConfigurationEventStoreInMem {
     pub fn new() -> Self {
         Self {
             state: Arc::new(Mutex::new(State::default())),
@@ -44,7 +44,7 @@ impl UpdateScheduleEventStoreInMem {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl EventStore<UpdateScheduleState> for UpdateScheduleEventStoreInMem {
+impl EventStore<UpdateConfigurationState> for UpdateConfigurationEventStoreInMem {
     async fn len(&self) -> Result<usize, InternalError> {
         Ok(self.state.lock().unwrap().events.len())
     }
@@ -53,7 +53,7 @@ impl EventStore<UpdateScheduleState> for UpdateScheduleEventStoreInMem {
         &'a self,
         dataset_id: &DatasetID,
         opts: GetEventsOpts,
-    ) -> EventStream<'a, UpdateScheduleEvent> {
+    ) -> EventStream<'a, UpdateConfigurationEvent> {
         let dataset_id = dataset_id.clone();
 
         // TODO: This should be a buffered stream so we don't lock per event
@@ -90,7 +90,7 @@ impl EventStore<UpdateScheduleState> for UpdateScheduleEventStoreInMem {
     async fn save_events(
         &self,
         dataset_id: &DatasetID,
-        events: Vec<UpdateScheduleEvent>,
+        events: Vec<UpdateConfigurationEvent>,
     ) -> Result<EventID, SaveEventsError> {
         let mut s = self.state.lock().unwrap();
         if !events.is_empty() {
@@ -107,7 +107,7 @@ impl EventStore<UpdateScheduleState> for UpdateScheduleEventStoreInMem {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-impl UpdateScheduleEventStore for UpdateScheduleEventStoreInMem {
+impl UpdateConfigurationEventStore for UpdateConfigurationEventStoreInMem {
     fn list_all_dataset_ids<'a>(&'a self) -> DatasetIDStream<'a> {
         // TODO: re-consider performance impact
         Box::pin(tokio_stream::iter(

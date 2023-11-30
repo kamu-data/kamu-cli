@@ -19,8 +19,8 @@ use opendatafabric::DatasetID;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct UpdateScheduleServiceInMemory {
-    event_store: Arc<dyn UpdateScheduleEventStore>,
+pub struct UpdateConfigurationServiceInMemory {
+    event_store: Arc<dyn UpdateConfigurationEventStore>,
     time_source: Arc<dyn SystemTimeSource>,
     event_bus: Arc<EventBus>,
 }
@@ -28,12 +28,12 @@ pub struct UpdateScheduleServiceInMemory {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
-#[interface(dyn UpdateScheduleService)]
+#[interface(dyn UpdateConfigurationService)]
 #[interface(dyn AsyncEventHandler<DatasetEventDeleted>)]
 #[scope(Singleton)]
-impl UpdateScheduleServiceInMemory {
+impl UpdateConfigurationServiceInMemory {
     pub fn new(
-        event_store: Arc<dyn UpdateScheduleEventStore>,
+        event_store: Arc<dyn UpdateConfigurationEventStore>,
         time_source: Arc<dyn SystemTimeSource>,
         event_bus: Arc<EventBus>,
     ) -> Self {
@@ -44,15 +44,15 @@ impl UpdateScheduleServiceInMemory {
         }
     }
 
-    async fn publish_update_schedule_modified(
+    async fn publish_update_configuration_modified(
         &self,
-        update_schedule_state: &UpdateScheduleState,
+        update_configuration_state: &UpdateConfigurationState,
     ) -> Result<(), InternalError> {
-        let event = UpdateScheduleEventModified {
+        let event = UpdateConfigurationEventModified {
             event_time: self.time_source.now(),
-            dataset_id: update_schedule_state.dataset_id.clone(),
-            paused: update_schedule_state.is_active(),
-            schedule: update_schedule_state.schedule.clone(),
+            dataset_id: update_configuration_state.dataset_id.clone(),
+            paused: update_configuration_state.is_active(),
+            schedule: update_configuration_state.schedule.clone(),
         };
         self.event_bus.dispatch_event(event).await
     }
@@ -61,16 +61,16 @@ impl UpdateScheduleServiceInMemory {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl UpdateScheduleService for UpdateScheduleServiceInMemory {
+impl UpdateConfigurationService for UpdateConfigurationServiceInMemory {
     /// Lists proactive update schedules, which are currently enabled
-    fn list_enabled_proactive_schedules(&self) -> UpdateScheduleStateStream {
+    fn list_enabled_proactive_configurations(&self) -> UpdateConfigurationStateStream {
         // Note: terribly ineffecient - walks over events multiple times
         Box::pin(async_stream::try_stream! {
             let dataset_ids: Vec<_> = self.event_store.list_all_dataset_ids().collect().await;
             for dataset_id in dataset_ids {
-                let update_schedule = UpdateSchedule::load(dataset_id, self.event_store.as_ref()).await.int_err()?;
-                if update_schedule.schedule.is_proactive() && update_schedule.is_active() {
-                    yield update_schedule.into();
+                let update_configuration = UpdateConfiguration::load(dataset_id, self.event_store.as_ref()).await.int_err()?;
+                if update_configuration.schedule.is_proactive() && update_configuration.is_active() {
+                    yield update_configuration.into();
                 }
             }
         })
@@ -79,57 +79,57 @@ impl UpdateScheduleService for UpdateScheduleServiceInMemory {
     /// Find current schedule, which may or may not be associated with the given
     /// dataset
     #[tracing::instrument(level = "info", skip_all, fields(%dataset_id))]
-    async fn find_schedule(
+    async fn find_configuration(
         &self,
         dataset_id: &DatasetID,
-    ) -> Result<Option<UpdateScheduleState>, FindScheduleError> {
-        let maybe_update_schedule =
-            UpdateSchedule::try_load(dataset_id.clone(), self.event_store.as_ref()).await?;
-        Ok(maybe_update_schedule.map(|us| us.into()))
+    ) -> Result<Option<UpdateConfigurationState>, FindConfigurationError> {
+        let maybe_update_configuration =
+            UpdateConfiguration::try_load(dataset_id.clone(), self.event_store.as_ref()).await?;
+        Ok(maybe_update_configuration.map(|us| us.into()))
     }
 
     /// Set or modify dataset update schedule
     #[tracing::instrument(level = "info", skip_all)]
-    async fn set_schedule(
+    async fn set_configuration(
         &self,
         dataset_id: DatasetID,
         paused: bool,
         schedule: Schedule,
-    ) -> Result<UpdateScheduleState, SetScheduleError> {
-        let maybe_update_schedule =
-            UpdateSchedule::try_load(dataset_id.clone(), self.event_store.as_ref()).await?;
+    ) -> Result<UpdateConfigurationState, SetConfigurationError> {
+        let maybe_update_configuration =
+            UpdateConfiguration::try_load(dataset_id.clone(), self.event_store.as_ref()).await?;
 
-        match maybe_update_schedule {
+        match maybe_update_configuration {
             // Modification
-            Some(mut update_schedule) => {
-                update_schedule
-                    .modify_schedule(self.time_source.now(), paused, schedule)
+            Some(mut update_configuration) => {
+                update_configuration
+                    .modify_configuration(self.time_source.now(), paused, schedule)
                     .int_err()?;
 
-                update_schedule
+                update_configuration
                     .save(self.event_store.as_ref())
                     .await
                     .int_err()?;
 
-                self.publish_update_schedule_modified(&update_schedule)
+                self.publish_update_configuration_modified(&update_configuration)
                     .await?;
 
-                Ok(update_schedule.into())
+                Ok(update_configuration.into())
             }
-            // New schedule
+            // New configuration
             None => {
-                let mut update_schedule =
-                    UpdateSchedule::new(self.time_source.now(), dataset_id, paused, schedule);
+                let mut update_configuration =
+                    UpdateConfiguration::new(self.time_source.now(), dataset_id, paused, schedule);
 
-                update_schedule
+                update_configuration
                     .save(self.event_store.as_ref())
                     .await
                     .int_err()?;
 
-                self.publish_update_schedule_modified(&update_schedule)
+                self.publish_update_configuration_modified(&update_configuration)
                     .await?;
 
-                Ok(update_schedule.into())
+                Ok(update_configuration.into())
             }
         }
     }
@@ -138,18 +138,18 @@ impl UpdateScheduleService for UpdateScheduleServiceInMemory {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl AsyncEventHandler<DatasetEventDeleted> for UpdateScheduleServiceInMemory {
+impl AsyncEventHandler<DatasetEventDeleted> for UpdateConfigurationServiceInMemory {
     async fn handle(&self, event: &DatasetEventDeleted) -> Result<(), InternalError> {
-        let mut update_schedule =
-            UpdateSchedule::load(event.dataset_id.clone(), self.event_store.as_ref())
+        let mut update_configuration =
+            UpdateConfiguration::load(event.dataset_id.clone(), self.event_store.as_ref())
                 .await
                 .int_err()?;
 
-        update_schedule
+        update_configuration
             .notify_dataset_removed(self.time_source.now())
             .int_err()?;
 
-        update_schedule
+        update_configuration
             .save(self.event_store.as_ref())
             .await
             .int_err()?;

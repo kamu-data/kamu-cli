@@ -15,27 +15,27 @@ use crate::*;
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct UpdateScheduleState {
+pub struct UpdateConfigurationState {
     /// Identifier of the related dataset
     pub dataset_id: DatasetID,
     /// Update schedule
     pub schedule: Schedule,
-    /// Schedule status
-    pub status: UpdateScheduleStatus,
+    /// Configuration status
+    pub status: UpdateConfigurationStatus,
 }
 
-impl UpdateScheduleState {
+impl UpdateConfigurationState {
     pub fn is_active(&self) -> bool {
         match self.status {
-            UpdateScheduleStatus::Active => true,
-            UpdateScheduleStatus::PausedTemporarily => false,
-            UpdateScheduleStatus::StoppedPermanently => false,
+            UpdateConfigurationStatus::Active => true,
+            UpdateConfigurationStatus::PausedTemporarily => false,
+            UpdateConfigurationStatus::StoppedPermanently => false,
         }
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum UpdateScheduleStatus {
+pub enum UpdateConfigurationStatus {
     Active,
     PausedTemporarily,
     StoppedPermanently,
@@ -43,16 +43,16 @@ pub enum UpdateScheduleStatus {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-impl Projection for UpdateScheduleState {
+impl Projection for UpdateConfigurationState {
     type Query = DatasetID;
-    type Event = UpdateScheduleEvent;
+    type Event = UpdateConfigurationEvent;
 
     fn apply(state: Option<Self>, event: Self::Event) -> Result<Self, ProjectionError<Self>> {
-        use UpdateScheduleEvent as E;
+        use UpdateConfigurationEvent as E;
 
         match (state, event) {
             (None, event) => match event {
-                E::Created(UpdateScheduleEventCreated {
+                E::Created(UpdateConfigurationEventCreated {
                     event_time: _,
                     dataset_id,
                     paused,
@@ -60,9 +60,9 @@ impl Projection for UpdateScheduleState {
                 }) => Ok(Self {
                     dataset_id,
                     status: if paused {
-                        UpdateScheduleStatus::PausedTemporarily
+                        UpdateConfigurationStatus::PausedTemporarily
                     } else {
-                        UpdateScheduleStatus::Active
+                        UpdateConfigurationStatus::Active
                     },
                     schedule,
                 }),
@@ -74,7 +74,7 @@ impl Projection for UpdateScheduleState {
                 match &event {
                     E::Created(_) => Err(ProjectionError::new(Some(s), event)),
 
-                    E::Modified(UpdateScheduleEventModified {
+                    E::Modified(UpdateConfigurationEventModified {
                         event_time: _,
                         dataset_id: _,
                         paused,
@@ -82,26 +82,26 @@ impl Projection for UpdateScheduleState {
                     }) => {
                         // Note: when deleted dataset is re-added with the same id, we have to
                         // gracefully react on this, as if it wasn't a terminal state
-                        Ok(UpdateScheduleState {
+                        Ok(UpdateConfigurationState {
                             status: if *paused {
-                                UpdateScheduleStatus::PausedTemporarily
+                                UpdateConfigurationStatus::PausedTemporarily
                             } else {
-                                UpdateScheduleStatus::Active
+                                UpdateConfigurationStatus::Active
                             },
                             schedule: schedule.clone(),
                             ..s
                         })
                     }
 
-                    E::DatasetRemoved(UpdateScheduleEventDatasetRemoved {
+                    E::DatasetRemoved(UpdateConfigurationEventDatasetRemoved {
                         event_time: _,
                         dataset_id: _,
                     }) => {
-                        if s.status == UpdateScheduleStatus::StoppedPermanently {
+                        if s.status == UpdateConfigurationStatus::StoppedPermanently {
                             Ok(s) // idempotent DELETE
                         } else {
-                            Ok(UpdateScheduleState {
-                                status: UpdateScheduleStatus::StoppedPermanently,
+                            Ok(UpdateConfigurationState {
+                                status: UpdateConfigurationStatus::StoppedPermanently,
                                 ..s
                             })
                         }
