@@ -8,9 +8,12 @@
 // by the Apache License, Version 2.0.
 
 mod dataset_flow_configuration_service;
+mod system_flow_configuration_service;
+
 mod dependency_graph_service;
 mod update_service;
 
 pub use dataset_flow_configuration_service::*;
 pub use dependency_graph_service::*;
+pub use system_flow_configuration_service::*;
 pub use update_service::*;

@@ -8,7 +8,9 @@
 // by the Apache License, Version 2.0.
 
 mod dataset_flow_configuration_event_store;
+mod system_flow_configuration_event_store;
 mod update_event_store;
 
 pub use dataset_flow_configuration_event_store::*;
+pub use system_flow_configuration_event_store::*;
 pub use update_event_store::*;

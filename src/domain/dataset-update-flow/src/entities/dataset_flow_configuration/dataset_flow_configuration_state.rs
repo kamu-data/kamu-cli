@@ -23,24 +23,17 @@ pub struct DatasetFlowConfigurationState {
     /// Flow configuration rule
     pub rule: DatasetFlowConfigurationRule,
     /// Configuration status
-    pub status: UpdateConfigurationStatus,
+    pub status: FlowConfigurationStatus,
 }
 
 impl DatasetFlowConfigurationState {
     pub fn is_active(&self) -> bool {
         match self.status {
-            UpdateConfigurationStatus::Active => true,
-            UpdateConfigurationStatus::PausedTemporarily => false,
-            UpdateConfigurationStatus::StoppedPermanently => false,
+            FlowConfigurationStatus::Active => true,
+            FlowConfigurationStatus::PausedTemporarily => false,
+            FlowConfigurationStatus::StoppedPermanently => false,
         }
     }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum UpdateConfigurationStatus {
-    Active,
-    PausedTemporarily,
-    StoppedPermanently,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -70,9 +63,9 @@ impl Projection for DatasetFlowConfigurationState {
                     dataset_id,
                     flow_type,
                     status: if paused {
-                        UpdateConfigurationStatus::PausedTemporarily
+                        FlowConfigurationStatus::PausedTemporarily
                     } else {
-                        UpdateConfigurationStatus::Active
+                        FlowConfigurationStatus::Active
                     },
                     rule,
                 }),
@@ -96,9 +89,9 @@ impl Projection for DatasetFlowConfigurationState {
                         // gracefully react on this, as if it wasn't a terminal state
                         Ok(DatasetFlowConfigurationState {
                             status: if *paused {
-                                UpdateConfigurationStatus::PausedTemporarily
+                                FlowConfigurationStatus::PausedTemporarily
                             } else {
-                                UpdateConfigurationStatus::Active
+                                FlowConfigurationStatus::Active
                             },
                             rule: rule.clone(),
                             ..s
@@ -106,11 +99,11 @@ impl Projection for DatasetFlowConfigurationState {
                     }
 
                     E::DatasetRemoved(_) => {
-                        if s.status == UpdateConfigurationStatus::StoppedPermanently {
+                        if s.status == FlowConfigurationStatus::StoppedPermanently {
                             Ok(s) // idempotent DELETE
                         } else {
                             Ok(DatasetFlowConfigurationState {
-                                status: UpdateConfigurationStatus::StoppedPermanently,
+                                status: FlowConfigurationStatus::StoppedPermanently,
                                 ..s
                             })
                         }

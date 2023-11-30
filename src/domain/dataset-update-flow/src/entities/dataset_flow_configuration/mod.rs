@@ -10,11 +10,9 @@
 mod dataset_flow_configuration_event;
 mod dataset_flow_configuration_state;
 mod dataset_flow_type;
-mod schedule;
 mod start_condition;
 
 pub use dataset_flow_configuration_event::*;
 pub use dataset_flow_configuration_state::*;
 pub use dataset_flow_type::*;
-pub use schedule::*;
 pub use start_condition::*;

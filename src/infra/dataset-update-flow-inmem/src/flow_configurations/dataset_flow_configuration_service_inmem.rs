@@ -87,7 +87,7 @@ impl DatasetFlowConfigurationService for DatasetFlowConfigurationServiceInMemory
         &self,
         dataset_id: &DatasetID,
         flow_type: DatasetFlowType,
-    ) -> Result<Option<DatasetFlowConfigurationState>, FindConfigurationError> {
+    ) -> Result<Option<DatasetFlowConfigurationState>, FindDatasetFlowConfigurationError> {
         let maybe_update_configuration = DatasetFlowConfiguration::try_load(
             (dataset_id.clone(), flow_type),
             self.event_store.as_ref(),
@@ -104,7 +104,7 @@ impl DatasetFlowConfigurationService for DatasetFlowConfigurationServiceInMemory
         flow_type: DatasetFlowType,
         paused: bool,
         rule: DatasetFlowConfigurationRule,
-    ) -> Result<DatasetFlowConfigurationState, SetConfigurationError> {
+    ) -> Result<DatasetFlowConfigurationState, SetDatasetFlowConfigurationError> {
         let maybe_update_configuration = DatasetFlowConfiguration::try_load(
             (dataset_id.clone(), flow_type),
             self.event_store.as_ref(),

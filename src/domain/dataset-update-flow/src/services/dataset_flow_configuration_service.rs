@@ -30,7 +30,7 @@ pub trait DatasetFlowConfigurationService: Sync + Send {
         &self,
         dataset_id: &DatasetID,
         flow_type: DatasetFlowType,
-    ) -> Result<Option<DatasetFlowConfigurationState>, FindConfigurationError>;
+    ) -> Result<Option<DatasetFlowConfigurationState>, FindDatasetFlowConfigurationError>;
 
     /// Set or modify dataset flow configuration
     async fn set_configuration(
@@ -39,7 +39,7 @@ pub trait DatasetFlowConfigurationService: Sync + Send {
         flow_type: DatasetFlowType,
         paused: bool,
         rule: DatasetFlowConfigurationRule,
-    ) -> Result<DatasetFlowConfigurationState, SetConfigurationError>;
+    ) -> Result<DatasetFlowConfigurationState, SetDatasetFlowConfigurationError>;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -51,18 +51,18 @@ pub type DatasetFlowConfigurationStateStream<'a> = std::pin::Pin<
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(thiserror::Error, Debug)]
-pub enum SetConfigurationError {
+pub enum SetDatasetFlowConfigurationError {
     #[error(transparent)]
     Internal(#[from] InternalError),
 }
 
 #[derive(thiserror::Error, Debug)]
-pub enum FindConfigurationError {
+pub enum FindDatasetFlowConfigurationError {
     #[error(transparent)]
     Internal(#[from] InternalError),
 }
 
-impl From<TryLoadError<DatasetFlowConfigurationState>> for FindConfigurationError {
+impl From<TryLoadError<DatasetFlowConfigurationState>> for FindDatasetFlowConfigurationError {
     fn from(value: TryLoadError<DatasetFlowConfigurationState>) -> Self {
         match value {
             TryLoadError::ProjectionError(err) => Self::Internal(err.int_err()),
@@ -71,7 +71,7 @@ impl From<TryLoadError<DatasetFlowConfigurationState>> for FindConfigurationErro
     }
 }
 
-impl From<TryLoadError<DatasetFlowConfigurationState>> for SetConfigurationError {
+impl From<TryLoadError<DatasetFlowConfigurationState>> for SetDatasetFlowConfigurationError {
     fn from(value: TryLoadError<DatasetFlowConfigurationState>) -> Self {
         match value {
             TryLoadError::ProjectionError(err) => Self::Internal(err.int_err()),
