@@ -12,14 +12,14 @@ use internal_error::{ErrorIntoInternal, InternalError};
 use opendatafabric::DatasetID;
 use tokio_stream::Stream;
 
-use crate::{Schedule, UpdateConfigurationState};
+use crate::{UpdateConfigurationRule, UpdateConfigurationState};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 pub trait UpdateConfigurationService: Sync + Send {
-    /// Lists proactive update configurations, which are currently enabled
-    fn list_enabled_proactive_configurations(&self) -> UpdateConfigurationStateStream;
+    /// Lists update configurations, which are currently enabled
+    fn list_enabled_configurations(&self) -> UpdateConfigurationStateStream;
 
     /// Find current configuration, which may or may not be associated with the
     /// given dataset
@@ -33,7 +33,7 @@ pub trait UpdateConfigurationService: Sync + Send {
         &self,
         dataset_id: DatasetID,
         paused: bool,
-        schedule: Schedule,
+        rule: UpdateConfigurationRule,
     ) -> Result<UpdateConfigurationState, SetConfigurationError>;
 }
 

@@ -40,6 +40,7 @@ pub struct UpdateServiceInMemory {
 
 struct State {
     active_schedules: HashMap<DatasetID, Schedule>,
+    active_start_conditions: HashMap<DatasetID, StartCondition>,
     pending_updates_by_dataset: HashMap<DatasetID, UpdateID>,
     pending_updates_by_tasks: HashMap<TaskID, UpdateID>,
     time_wheel: ActivityTimeWheel,
@@ -49,6 +50,7 @@ impl State {
     fn new() -> Self {
         Self {
             active_schedules: HashMap::new(),
+            active_start_conditions: HashMap::new(),
             pending_updates_by_dataset: HashMap::new(),
             pending_updates_by_tasks: HashMap::new(),
             time_wheel: ActivityTimeWheel::new(),
@@ -88,7 +90,7 @@ impl UpdateServiceInMemory {
             state.time_wheel.take_nearest_planned_activities()
         };
 
-        let update_schedule_futures: Vec<_> = planned_updates
+        let update_task_futures: Vec<_> = planned_updates
             .iter()
             .map(async move |update_id| {
                 let mut update = Update::load(UpdateID::new(*update_id), self.event_store.as_ref())
@@ -99,7 +101,7 @@ impl UpdateServiceInMemory {
             })
             .collect();
 
-        let results = futures::future::join_all(update_schedule_futures).await;
+        let results = futures::future::join_all(update_task_futures).await;
         results
             .into_iter()
             .filter(|res| res.is_err())
@@ -109,23 +111,32 @@ impl UpdateServiceInMemory {
             });
     }
 
-    async fn launch_enabled_proactive_configurations(&self) -> Result<(), InternalError> {
-        let enabled_proactive_configurations: Vec<_> = self
+    async fn initialize_enabled_configurations(&self) -> Result<(), InternalError> {
+        let enabled_configurations: Vec<_> = self
             .update_configuration_service
-            .list_enabled_proactive_configurations()
+            .list_enabled_configurations()
             .try_collect()
             .await
             .int_err()?;
 
-        for enabled_proactive_config in enabled_proactive_configurations {
-            let schedule = enabled_proactive_config.schedule;
-            self.enqueue_auto_polling_update(&enabled_proactive_config.dataset_id, &schedule)
-                .await?;
+        for enabled_config in enabled_configurations {
+            match enabled_config.rule {
+                UpdateConfigurationRule::Schedule(schedule) => {
+                    self.enqueue_auto_polling_update(&enabled_config.dataset_id, &schedule)
+                        .await?;
 
-            let mut state = self.state.lock().unwrap();
-            state
-                .active_schedules
-                .insert(enabled_proactive_config.dataset_id.clone(), schedule);
+                    let mut state = self.state.lock().unwrap();
+                    state
+                        .active_schedules
+                        .insert(enabled_config.dataset_id.clone(), schedule);
+                }
+                UpdateConfigurationRule::StartCondition(start_condition) => {
+                    let mut state = self.state.lock().unwrap();
+                    state
+                        .active_start_conditions
+                        .insert(enabled_config.dataset_id.clone(), start_condition);
+                }
+            }
         }
 
         Ok(())
@@ -137,9 +148,7 @@ impl UpdateServiceInMemory {
     ) -> Result<(), InternalError> {
         let maybe_active_schedule = {
             let state = self.state.lock().unwrap();
-            if let Some(schedule) = state.active_schedules.get(&dataset_id)
-                && schedule.is_proactive()
-            {
+            if let Some(schedule) = state.active_schedules.get(&dataset_id) {
                 Some(schedule.clone())
             } else {
                 None
@@ -169,14 +178,12 @@ impl UpdateServiceInMemory {
             None => {
                 let mut update = self.make_new_update(dataset_id.clone(), trigger).await?;
 
-                if let Some(next_activation_time) =
-                    schedule.next_activation_time(self.time_source.now())
-                {
-                    self.enqueue_update(update.update_id, next_activation_time)?;
-                    update
-                        .activate_at_time(self.time_source.now(), next_activation_time)
-                        .int_err()?;
-                }
+                let next_activation_time = schedule.next_activation_time(self.time_source.now());
+                self.enqueue_update(update.update_id, next_activation_time)?;
+
+                update
+                    .activate_at_time(self.time_source.now(), next_activation_time)
+                    .int_err()?;
 
                 update.save(self.event_store.as_ref()).await.int_err()?;
                 Ok(update.into())
@@ -200,18 +207,15 @@ impl UpdateServiceInMemory {
 
         // For each, scan if updates are on
         for dependent_dataset_id in dependent_dataset_ids {
-            let maybe_dependent_schedule = self
+            let maybe_dependent_start_condition = self
                 .state
                 .lock()
                 .unwrap()
-                .active_schedules
+                .active_start_conditions
                 .get(&dependent_dataset_id)
                 .map(|schedule| schedule.clone());
 
-            // Expect reactive updates only
-            if let Some(dependent_schedule) = maybe_dependent_schedule
-                && let Schedule::Reactive(reactive_schedule) = dependent_schedule
-            {
+            if let Some(start_condition) = maybe_dependent_start_condition {
                 let trigger = UpdateTrigger::InputUpdated(UpdateTriggerInputUpdated {
                     input_dataset_id: dataset_id.clone(),
                     input_update_id: update_id.clone(),
@@ -230,11 +234,11 @@ impl UpdateServiceInMemory {
                             .make_new_update(dependent_dataset_id.clone(), trigger)
                             .await?;
 
-                        if reactive_schedule.minimal_data_batch.is_some() {
+                        if start_condition.minimal_data_batch.is_some() {
                             unimplemented!("Data batching not supported yet in scheduler")
                         }
 
-                        if let Some(throttling_period) = reactive_schedule.throttling_period {
+                        if let Some(throttling_period) = start_condition.throttling_period {
                             // TODO: throttle not from NOW, but from last update of the dependent
                             // daataset
                             let now = self.time_source.now();
@@ -354,7 +358,7 @@ impl UpdateService for UpdateServiceInMemory {
     /// Runs the update main loop
     async fn run(&self) -> Result<(), InternalError> {
         // Initial scheduling
-        self.launch_enabled_proactive_configurations().await?;
+        self.initialize_enabled_configurations().await?;
 
         // Main scanning loop
         loop {
@@ -537,17 +541,27 @@ impl AsyncEventHandler<UpdateConfigurationEventModified> for UpdateServiceInMemo
             let mut state = self.state.lock().unwrap();
             state.active_schedules.remove(&event.dataset_id);
         } else {
-            if event.schedule.is_proactive() {
-                self.enqueue_auto_polling_update(&event.dataset_id, &event.schedule)
-                    .await?;
-            }
+            match &event.rule {
+                UpdateConfigurationRule::Schedule(schedule) => {
+                    self.enqueue_auto_polling_update(&event.dataset_id, &schedule)
+                        .await?;
 
-            let mut state = self.state.lock().unwrap();
-            state
-                .active_schedules
-                .entry(event.dataset_id.clone())
-                .and_modify(|e| *e = event.schedule.clone())
-                .or_insert(event.schedule.clone());
+                    let mut state = self.state.lock().unwrap();
+                    state
+                        .active_schedules
+                        .entry(event.dataset_id.clone())
+                        .and_modify(|e| *e = schedule.clone())
+                        .or_insert(schedule.clone());
+                }
+                UpdateConfigurationRule::StartCondition(start_condition) => {
+                    let mut state = self.state.lock().unwrap();
+                    state
+                        .active_start_conditions
+                        .entry(event.dataset_id.clone())
+                        .and_modify(|e| *e = start_condition.clone())
+                        .or_insert_with(|| start_condition.clone());
+                }
+            }
         }
 
         Ok(())

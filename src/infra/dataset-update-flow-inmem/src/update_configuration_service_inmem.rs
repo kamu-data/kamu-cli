@@ -52,7 +52,7 @@ impl UpdateConfigurationServiceInMemory {
             event_time: self.time_source.now(),
             dataset_id: update_configuration_state.dataset_id.clone(),
             paused: update_configuration_state.is_active(),
-            schedule: update_configuration_state.schedule.clone(),
+            rule: update_configuration_state.rule.clone(),
         };
         self.event_bus.dispatch_event(event).await
     }
@@ -62,15 +62,16 @@ impl UpdateConfigurationServiceInMemory {
 
 #[async_trait::async_trait]
 impl UpdateConfigurationService for UpdateConfigurationServiceInMemory {
-    /// Lists proactive update schedules, which are currently enabled
-    fn list_enabled_proactive_configurations(&self) -> UpdateConfigurationStateStream {
+    /// Lists update configurations, which are currently enabled
+    fn list_enabled_configurations(&self) -> UpdateConfigurationStateStream {
         // Note: terribly ineffecient - walks over events multiple times
         Box::pin(async_stream::try_stream! {
             let dataset_ids: Vec<_> = self.event_store.list_all_dataset_ids().collect().await;
             for dataset_id in dataset_ids {
                 let update_configuration = UpdateConfiguration::load(dataset_id, self.event_store.as_ref()).await.int_err()?;
-                if update_configuration.schedule.is_proactive() && update_configuration.is_active() {
+                if update_configuration.is_active() {
                     yield update_configuration.into();
+
                 }
             }
         })
@@ -94,7 +95,7 @@ impl UpdateConfigurationService for UpdateConfigurationServiceInMemory {
         &self,
         dataset_id: DatasetID,
         paused: bool,
-        schedule: Schedule,
+        rule: UpdateConfigurationRule,
     ) -> Result<UpdateConfigurationState, SetConfigurationError> {
         let maybe_update_configuration =
             UpdateConfiguration::try_load(dataset_id.clone(), self.event_store.as_ref()).await?;
@@ -103,7 +104,7 @@ impl UpdateConfigurationService for UpdateConfigurationServiceInMemory {
             // Modification
             Some(mut update_configuration) => {
                 update_configuration
-                    .modify_configuration(self.time_source.now(), paused, schedule)
+                    .modify_configuration(self.time_source.now(), paused, rule)
                     .int_err()?;
 
                 update_configuration
@@ -119,7 +120,7 @@ impl UpdateConfigurationService for UpdateConfigurationServiceInMemory {
             // New configuration
             None => {
                 let mut update_configuration =
-                    UpdateConfiguration::new(self.time_source.now(), dataset_id, paused, schedule);
+                    UpdateConfiguration::new(self.time_source.now(), dataset_id, paused, rule);
 
                 update_configuration
                     .save(self.event_store.as_ref())

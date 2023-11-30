@@ -18,8 +18,8 @@ use crate::*;
 pub struct UpdateConfigurationState {
     /// Identifier of the related dataset
     pub dataset_id: DatasetID,
-    /// Update schedule
-    pub schedule: Schedule,
+    /// Update configuration rule
+    pub rule: UpdateConfigurationRule,
     /// Configuration status
     pub status: UpdateConfigurationStatus,
 }
@@ -41,6 +41,12 @@ pub enum UpdateConfigurationStatus {
     StoppedPermanently,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum UpdateConfigurationRule {
+    Schedule(Schedule),
+    StartCondition(StartCondition),
+}
+
 /////////////////////////////////////////////////////////////////////////////////////////
 
 impl Projection for UpdateConfigurationState {
@@ -56,7 +62,7 @@ impl Projection for UpdateConfigurationState {
                     event_time: _,
                     dataset_id,
                     paused,
-                    schedule,
+                    rule,
                 }) => Ok(Self {
                     dataset_id,
                     status: if paused {
@@ -64,7 +70,7 @@ impl Projection for UpdateConfigurationState {
                     } else {
                         UpdateConfigurationStatus::Active
                     },
-                    schedule,
+                    rule,
                 }),
                 _ => Err(ProjectionError::new(None, event)),
             },
@@ -78,7 +84,7 @@ impl Projection for UpdateConfigurationState {
                         event_time: _,
                         dataset_id: _,
                         paused,
-                        schedule,
+                        rule,
                     }) => {
                         // Note: when deleted dataset is re-added with the same id, we have to
                         // gracefully react on this, as if it wasn't a terminal state
@@ -88,7 +94,7 @@ impl Projection for UpdateConfigurationState {
                             } else {
                                 UpdateConfigurationStatus::Active
                             },
-                            schedule: schedule.clone(),
+                            rule: rule.clone(),
                             ..s
                         })
                     }

@@ -29,7 +29,7 @@ pub struct UpdateConfigurationEventCreated {
     pub event_time: DateTime<Utc>,
     pub dataset_id: DatasetID,
     pub paused: bool,
-    pub schedule: Schedule,
+    pub rule: UpdateConfigurationRule,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -39,7 +39,7 @@ pub struct UpdateConfigurationEventModified {
     pub event_time: DateTime<Utc>,
     pub dataset_id: DatasetID,
     pub paused: bool,
-    pub schedule: Schedule,
+    pub rule: UpdateConfigurationRule,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

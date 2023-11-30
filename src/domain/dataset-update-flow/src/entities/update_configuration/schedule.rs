@@ -7,9 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-/////////////////////////////////////////////////////////////////////////////////////////
-
 use chrono::{DateTime, Utc};
+
+/////////////////////////////////////////////////////////////////////////////////////////
 
 /// Represents dataset update settings
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -18,8 +18,6 @@ pub enum Schedule {
     TimeDelta(ScheduleTimeDelta),
     /// Cron-based schedule
     CronExpression(ScheduleCronExpression),
-    /// Reactive schedule
-    Reactive(ScheduleReactive),
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -38,30 +36,13 @@ pub struct ScheduleCronExpression {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ScheduleReactive {
-    pub throttling_period: Option<chrono::Duration>,
-    pub minimal_data_batch: Option<i32>,
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
 impl Schedule {
-    pub fn is_proactive(&self) -> bool {
+    pub fn next_activation_time(&self, now: DateTime<Utc>) -> DateTime<Utc> {
         match self {
-            Schedule::TimeDelta(_) => true,
-            Schedule::CronExpression(_) => true,
-            Schedule::Reactive(_) => false,
-        }
-    }
-
-    pub fn next_activation_time(&self, now: DateTime<Utc>) -> Option<DateTime<Utc>> {
-        match self {
-            Schedule::TimeDelta(td) => Some(now + td.every),
+            Schedule::TimeDelta(td) => now + td.every,
             Schedule::CronExpression(_) => {
                 unimplemented!()
             }
-            _ => None,
         }
     }
 }

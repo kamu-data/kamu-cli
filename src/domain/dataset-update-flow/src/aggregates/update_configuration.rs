@@ -26,7 +26,7 @@ impl UpdateConfiguration {
         now: DateTime<Utc>,
         dataset_id: DatasetID,
         paused: bool,
-        schedule: Schedule,
+        rule: UpdateConfigurationRule,
     ) -> Self {
         Self(
             Aggregate::new(
@@ -35,7 +35,7 @@ impl UpdateConfiguration {
                     event_time: now,
                     dataset_id,
                     paused,
-                    schedule,
+                    rule,
                 },
             )
             .unwrap(),
@@ -47,13 +47,13 @@ impl UpdateConfiguration {
         &mut self,
         now: DateTime<Utc>,
         paused: bool,
-        new_schedule: Schedule,
+        new_rule: UpdateConfigurationRule,
     ) -> Result<(), ProjectionError<UpdateConfigurationState>> {
         let event = UpdateConfigurationEventModified {
             event_time: now,
             dataset_id: self.dataset_id.clone(),
             paused,
-            schedule: new_schedule,
+            rule: new_rule,
         };
         self.apply(event)
     }

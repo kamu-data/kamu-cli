@@ -8,9 +8,11 @@
 // by the Apache License, Version 2.0.
 
 mod schedule;
+mod start_condition;
 mod update_configuration_event;
 mod update_configuration_state;
 
 pub use schedule::*;
+pub use start_condition::*;
 pub use update_configuration_event::*;
 pub use update_configuration_state::*;
