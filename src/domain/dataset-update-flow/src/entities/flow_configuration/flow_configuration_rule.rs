@@ -7,16 +7,24 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::{FlowStrategy, SystemFlowID, SystemFlowKey};
+use chrono::Duration;
+
+use crate::Schedule;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone)]
-pub struct SystemFlowStrategy {}
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FlowConfigurationRule {
+    Schedule(Schedule),
+    StartCondition(StartConditionConfiguration),
+}
 
-impl FlowStrategy for SystemFlowStrategy {
-    type FlowID = SystemFlowID;
-    type FlowKey = SystemFlowKey;
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StartConditionConfiguration {
+    pub throttling_period: Option<Duration>,
+    pub minimal_data_batch: Option<i32>,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

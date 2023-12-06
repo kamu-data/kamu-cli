@@ -7,9 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use opendatafabric::DatasetID;
-
-use crate::{DatasetFlowID, DatasetFlowType, FlowStrategy};
+use crate::{DatasetFlowID, DatasetFlowKey, FlowStrategy};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -19,23 +17,6 @@ pub struct DatasetFlowStrategy {}
 impl FlowStrategy for DatasetFlowStrategy {
     type FlowID = DatasetFlowID;
     type FlowKey = DatasetFlowKey;
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub struct DatasetFlowKey {
-    pub dataset_id: DatasetID,
-    pub flow_type: DatasetFlowType,
-}
-
-impl DatasetFlowKey {
-    pub fn new(dataset_id: DatasetID, flow_type: DatasetFlowType) -> Self {
-        Self {
-            dataset_id,
-            flow_type,
-        }
-    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

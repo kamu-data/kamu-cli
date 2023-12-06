@@ -14,6 +14,11 @@ use crate::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+pub type SystemFlowConfigurationState = FlowConfigurationState<SystemFlowKey>;
+pub type SystemFlowConfigurationEvent = FlowConfigurationEvent<SystemFlowKey>;
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Aggregate, Debug)]
 pub struct SystemFlowConfiguration(
     Aggregate<SystemFlowConfigurationState, (dyn SystemFlowConfigurationEventStore + 'static)>,
@@ -29,12 +34,12 @@ impl SystemFlowConfiguration {
     ) -> Self {
         Self(
             Aggregate::new(
-                flow_type,
-                SystemFlowConfigurationEventCreated {
+                SystemFlowKey::new(flow_type),
+                FlowConfigurationEventCreated::<SystemFlowKey> {
                     event_time: now,
-                    flow_type,
+                    flow_key: SystemFlowKey::new(flow_type),
                     paused,
-                    schedule,
+                    rule: FlowConfigurationRule::Schedule(schedule),
                 },
             )
             .unwrap(),
@@ -48,11 +53,11 @@ impl SystemFlowConfiguration {
         paused: bool,
         new_schedule: Schedule,
     ) -> Result<(), ProjectionError<SystemFlowConfigurationState>> {
-        let event = SystemFlowConfigurationEventModified {
+        let event = FlowConfigurationEventModified::<SystemFlowKey> {
             event_time: now,
-            flow_type: self.flow_type,
+            flow_key: self.flow_key.clone(),
             paused,
-            schedule: new_schedule,
+            rule: FlowConfigurationRule::Schedule(new_schedule),
         };
         self.apply(event)
     }

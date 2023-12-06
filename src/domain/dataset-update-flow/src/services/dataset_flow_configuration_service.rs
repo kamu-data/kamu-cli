@@ -12,7 +12,7 @@ use internal_error::{ErrorIntoInternal, InternalError};
 use opendatafabric::DatasetID;
 use tokio_stream::Stream;
 
-use crate::{DatasetFlowConfigurationRule, DatasetFlowConfigurationState, DatasetFlowType};
+use crate::{DatasetFlowConfigurationState, DatasetFlowType, FlowConfigurationRule};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -38,7 +38,7 @@ pub trait DatasetFlowConfigurationService: Sync + Send {
         dataset_id: DatasetID,
         flow_type: DatasetFlowType,
         paused: bool,
-        rule: DatasetFlowConfigurationRule,
+        rule: FlowConfigurationRule,
     ) -> Result<DatasetFlowConfigurationState, SetDatasetFlowConfigurationError>;
 }
 

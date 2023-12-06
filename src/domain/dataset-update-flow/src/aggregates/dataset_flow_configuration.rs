@@ -15,6 +15,11 @@ use crate::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+pub type DatasetFlowConfigurationState = FlowConfigurationState<DatasetFlowKey>;
+pub type DatasetFlowConfigurationEvent = FlowConfigurationEvent<DatasetFlowKey>;
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Aggregate, Debug)]
 pub struct DatasetFlowConfiguration(
     Aggregate<DatasetFlowConfigurationState, (dyn DatasetFlowConfigurationEventStore + 'static)>,
@@ -27,15 +32,14 @@ impl DatasetFlowConfiguration {
         dataset_id: DatasetID,
         flow_type: DatasetFlowType,
         paused: bool,
-        rule: DatasetFlowConfigurationRule,
+        rule: FlowConfigurationRule,
     ) -> Self {
         Self(
             Aggregate::new(
-                (dataset_id.clone(), flow_type),
-                DatasetFlowConfigurationEventCreated {
+                DatasetFlowKey::new(dataset_id.clone(), flow_type),
+                FlowConfigurationEventCreated::<DatasetFlowKey> {
                     event_time: now,
-                    dataset_id,
-                    flow_type,
+                    flow_key: DatasetFlowKey::new(dataset_id, flow_type),
                     paused,
                     rule,
                 },
@@ -49,12 +53,11 @@ impl DatasetFlowConfiguration {
         &mut self,
         now: DateTime<Utc>,
         paused: bool,
-        new_rule: DatasetFlowConfigurationRule,
+        new_rule: FlowConfigurationRule,
     ) -> Result<(), ProjectionError<DatasetFlowConfigurationState>> {
-        let event = DatasetFlowConfigurationEventModified {
+        let event = FlowConfigurationEventModified::<DatasetFlowKey> {
             event_time: now,
-            flow_type: self.flow_type,
-            dataset_id: self.dataset_id.clone(),
+            flow_key: self.flow_key.clone(),
             paused,
             rule: new_rule,
         };
@@ -66,10 +69,9 @@ impl DatasetFlowConfiguration {
         &mut self,
         now: DateTime<Utc>,
     ) -> Result<(), ProjectionError<DatasetFlowConfigurationState>> {
-        let event = DatasetFlowConfigurationEventDatasetRemoved {
+        let event = FlowConfigurationEventDatasetRemoved::<DatasetFlowKey> {
             event_time: now,
-            dataset_id: self.dataset_id.clone(),
-            flow_type: self.flow_type,
+            flow_key: self.flow_key.clone(),
         };
         self.apply(event)
     }

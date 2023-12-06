@@ -48,10 +48,10 @@ impl EventStore<SystemFlowConfigurationState> for SystemFlowConfigurationEventSt
 
     fn get_events<'a>(
         &'a self,
-        query: &SystemFlowType,
+        query: &SystemFlowKey,
         opts: GetEventsOpts,
     ) -> EventStream<'a, SystemFlowConfigurationEvent> {
-        let flow_type = *query;
+        let flow_type = query.flow_type;
 
         // TODO: This should be a buffered stream so we don't lock per event
         Box::pin(async_stream::try_stream! {
@@ -67,7 +67,7 @@ impl EventStore<SystemFlowConfigurationState> for SystemFlowConfigurationEventSt
                         .iter()
                         .enumerate()
                         .skip(seen)
-                        .filter(|(_, e)| e.flow_type() == flow_type)
+                        .filter(|(_, e)| e.flow_key().flow_type == flow_type)
                         .map(|(i, e)| (i, e.clone()))
                         .next()
                 };
@@ -86,7 +86,7 @@ impl EventStore<SystemFlowConfigurationState> for SystemFlowConfigurationEventSt
     // TODO: concurrency
     async fn save_events(
         &self,
-        _: &SystemFlowType,
+        _: &SystemFlowKey,
         events: Vec<SystemFlowConfigurationEvent>,
     ) -> Result<EventID, SaveEventsError> {
         let mut s = self.state.lock().unwrap();

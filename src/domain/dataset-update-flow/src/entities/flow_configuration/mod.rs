@@ -7,12 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod dataset_flow_configuration_event;
-mod dataset_flow_configuration_state;
-mod dataset_flow_type;
-mod start_condition;
+mod flow_configuration_event;
+mod flow_configuration_rule;
+mod flow_configuration_state;
+mod flow_configuration_status;
 
-pub use dataset_flow_configuration_event::*;
-pub use dataset_flow_configuration_state::*;
-pub use dataset_flow_type::*;
-pub use start_condition::*;
+pub use flow_configuration_event::*;
+pub use flow_configuration_rule::*;
+pub use flow_configuration_state::*;
+pub use flow_configuration_status::*;

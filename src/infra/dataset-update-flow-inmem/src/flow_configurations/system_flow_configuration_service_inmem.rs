@@ -42,13 +42,13 @@ impl SystemFlowConfigurationServiceInMemory {
 
     async fn publish_system_flow_configuration_modified(
         &self,
-        system_flow_configuration_state: &SystemFlowConfigurationState,
+        state: &SystemFlowConfigurationState,
     ) -> Result<(), InternalError> {
-        let event = SystemFlowConfigurationEventModified {
+        let event = FlowConfigurationEventModified::<SystemFlowKey> {
             event_time: self.time_source.now(),
-            flow_type: system_flow_configuration_state.flow_type,
-            paused: system_flow_configuration_state.is_active(),
-            schedule: system_flow_configuration_state.schedule.clone(),
+            flow_key: SystemFlowKey::new(state.flow_key.flow_type),
+            paused: state.is_active(),
+            rule: state.rule.clone(),
         };
         self.event_bus.dispatch_event(event).await
     }
@@ -64,8 +64,11 @@ impl SystemFlowConfigurationService for SystemFlowConfigurationServiceInMemory {
         &self,
         flow_type: SystemFlowType,
     ) -> Result<Option<SystemFlowConfigurationState>, FindSystemFlowConfigurationError> {
-        let maybe_update_configuration =
-            SystemFlowConfiguration::try_load(flow_type, self.event_store.as_ref()).await?;
+        let maybe_update_configuration = SystemFlowConfiguration::try_load(
+            SystemFlowKey::new(flow_type),
+            self.event_store.as_ref(),
+        )
+        .await?;
         Ok(maybe_update_configuration.map(|us| us.into()))
     }
 
@@ -77,8 +80,11 @@ impl SystemFlowConfigurationService for SystemFlowConfigurationServiceInMemory {
         paused: bool,
         schedule: Schedule,
     ) -> Result<SystemFlowConfigurationState, SetSystemFlowConfigurationError> {
-        let maybe_flow_configuration =
-            SystemFlowConfiguration::try_load(flow_type, self.event_store.as_ref()).await?;
+        let maybe_flow_configuration = SystemFlowConfiguration::try_load(
+            SystemFlowKey::new(flow_type),
+            self.event_store.as_ref(),
+        )
+        .await?;
 
         match maybe_flow_configuration {
             // Modification

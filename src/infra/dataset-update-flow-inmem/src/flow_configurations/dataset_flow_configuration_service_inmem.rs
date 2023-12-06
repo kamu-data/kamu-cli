@@ -46,14 +46,16 @@ impl DatasetFlowConfigurationServiceInMemory {
 
     async fn publish_dataset_flow_configuration_modified(
         &self,
-        dataset_flow_configuration_state: &DatasetFlowConfigurationState,
+        state: &DatasetFlowConfigurationState,
     ) -> Result<(), InternalError> {
-        let event = DatasetFlowConfigurationEventModified {
+        let event = FlowConfigurationEventModified::<DatasetFlowKey> {
             event_time: self.time_source.now(),
-            dataset_id: dataset_flow_configuration_state.dataset_id.clone(),
-            flow_type: dataset_flow_configuration_state.flow_type,
-            paused: dataset_flow_configuration_state.is_active(),
-            rule: dataset_flow_configuration_state.rule.clone(),
+            flow_key: DatasetFlowKey::new(
+                state.flow_key.dataset_id.clone(),
+                state.flow_key.flow_type,
+            ),
+            paused: state.is_active(),
+            rule: state.rule.clone(),
         };
         self.event_bus.dispatch_event(event).await
     }
@@ -72,7 +74,7 @@ impl DatasetFlowConfigurationService for DatasetFlowConfigurationServiceInMemory
         Box::pin(async_stream::try_stream! {
             let dataset_ids: Vec<_> = self.event_store.list_all_dataset_ids().collect().await;
             for dataset_id in dataset_ids {
-                let maybe_update_configuration = DatasetFlowConfiguration::try_load((dataset_id, flow_type), self.event_store.as_ref()).await.int_err()?;
+                let maybe_update_configuration = DatasetFlowConfiguration::try_load(DatasetFlowKey::new(dataset_id, flow_type), self.event_store.as_ref()).await.int_err()?;
                 if let Some(update_configuration) = maybe_update_configuration && update_configuration.is_active() {
                     yield update_configuration.into();
                 }
@@ -89,7 +91,7 @@ impl DatasetFlowConfigurationService for DatasetFlowConfigurationServiceInMemory
         flow_type: DatasetFlowType,
     ) -> Result<Option<DatasetFlowConfigurationState>, FindDatasetFlowConfigurationError> {
         let maybe_update_configuration = DatasetFlowConfiguration::try_load(
-            (dataset_id.clone(), flow_type),
+            DatasetFlowKey::new(dataset_id.clone(), flow_type),
             self.event_store.as_ref(),
         )
         .await?;
@@ -103,10 +105,10 @@ impl DatasetFlowConfigurationService for DatasetFlowConfigurationServiceInMemory
         dataset_id: DatasetID,
         flow_type: DatasetFlowType,
         paused: bool,
-        rule: DatasetFlowConfigurationRule,
+        rule: FlowConfigurationRule,
     ) -> Result<DatasetFlowConfigurationState, SetDatasetFlowConfigurationError> {
         let maybe_update_configuration = DatasetFlowConfiguration::try_load(
-            (dataset_id.clone(), flow_type),
+            DatasetFlowKey::new(dataset_id.clone(), flow_type),
             self.event_store.as_ref(),
         )
         .await?;
@@ -159,7 +161,7 @@ impl AsyncEventHandler<DatasetEventDeleted> for DatasetFlowConfigurationServiceI
     async fn handle(&self, event: &DatasetEventDeleted) -> Result<(), InternalError> {
         for flow_type in DatasetFlowType::iterator() {
             let maybe_update_configuration = DatasetFlowConfiguration::try_load(
-                (event.dataset_id.clone(), flow_type),
+                DatasetFlowKey::new(event.dataset_id.clone(), flow_type),
                 self.event_store.as_ref(),
             )
             .await

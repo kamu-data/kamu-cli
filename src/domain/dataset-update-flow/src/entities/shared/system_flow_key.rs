@@ -7,16 +7,19 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::{FlowStrategy, SystemFlowID, SystemFlowKey};
+use crate::SystemFlowType;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone)]
-pub struct SystemFlowStrategy {}
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct SystemFlowKey {
+    pub flow_type: SystemFlowType,
+}
 
-impl FlowStrategy for SystemFlowStrategy {
-    type FlowID = SystemFlowID;
-    type FlowKey = SystemFlowKey;
+impl SystemFlowKey {
+    pub fn new(flow_type: SystemFlowType) -> Self {
+        Self { flow_type }
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

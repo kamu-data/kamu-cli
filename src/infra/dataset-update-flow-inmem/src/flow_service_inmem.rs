@@ -41,7 +41,7 @@ pub struct FlowServiceInMemory {
 
 struct State {
     active_schedules: HashMap<OwnedDatasetFlowKey, Schedule>,
-    active_start_conditions: HashMap<OwnedDatasetFlowKey, StartCondition>,
+    active_start_conditions: HashMap<OwnedDatasetFlowKey, StartConditionConfiguration>,
     pending_dataset_flows_by_dataset: HashMap<OwnedDatasetFlowKey, DatasetFlowID>,
     pending_dataset_flows_by_tasks: HashMap<TaskID, DatasetFlowID>,
     time_wheel: ActivityTimeWheel,
@@ -65,7 +65,7 @@ impl State {
 #[interface(dyn FlowService)]
 #[interface(dyn AsyncEventHandler<TaskEventFinished>)]
 #[interface(dyn AsyncEventHandler<DatasetEventDeleted>)]
-#[interface(dyn AsyncEventHandler<DatasetFlowConfigurationEventModified>)]
+#[interface(dyn AsyncEventHandler<FlowConfigurationEventModified<DatasetFlowKey>>)]
 #[scope(Singleton)]
 impl FlowServiceInMemory {
     pub fn new(
@@ -129,9 +129,9 @@ impl FlowServiceInMemory {
 
         for enabled_config in enabled_configurations {
             match enabled_config.rule {
-                DatasetFlowConfigurationRule::Schedule(schedule) => {
+                FlowConfigurationRule::Schedule(schedule) => {
                     self.enqueue_auto_polling_dataset_flow(
-                        &enabled_config.dataset_id,
+                        &enabled_config.flow_key.dataset_id,
                         flow_type,
                         &schedule,
                     )
@@ -139,14 +139,20 @@ impl FlowServiceInMemory {
 
                     let mut state = self.state.lock().unwrap();
                     state.active_schedules.insert(
-                        OwnedDatasetFlowKey::new(enabled_config.dataset_id.clone(), flow_type),
+                        OwnedDatasetFlowKey::new(
+                            enabled_config.flow_key.dataset_id.clone(),
+                            flow_type,
+                        ),
                         schedule,
                     );
                 }
-                DatasetFlowConfigurationRule::StartCondition(start_condition) => {
+                FlowConfigurationRule::StartCondition(start_condition) => {
                     let mut state = self.state.lock().unwrap();
                     state.active_start_conditions.insert(
-                        OwnedDatasetFlowKey::new(enabled_config.dataset_id.clone(), flow_type),
+                        OwnedDatasetFlowKey::new(
+                            enabled_config.flow_key.dataset_id.clone(),
+                            flow_type,
+                        ),
                         start_condition,
                     );
                 }
@@ -678,36 +684,43 @@ impl AsyncEventHandler<TaskEventFinished> for FlowServiceInMemory {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl AsyncEventHandler<DatasetFlowConfigurationEventModified> for FlowServiceInMemory {
+impl AsyncEventHandler<FlowConfigurationEventModified<DatasetFlowKey>> for FlowServiceInMemory {
     async fn handle(
         &self,
-        event: &DatasetFlowConfigurationEventModified,
+        event: &FlowConfigurationEventModified<DatasetFlowKey>,
     ) -> Result<(), InternalError> {
         if event.paused {
             let mut state = self.state.lock().unwrap();
-            state
-                .active_schedules
-                .remove(BorrowedDatasetFlowKey::new(&event.dataset_id, event.flow_type).as_trait());
+            state.active_schedules.remove(
+                BorrowedDatasetFlowKey::new(&event.flow_key.dataset_id, event.flow_key.flow_type)
+                    .as_trait(),
+            );
         } else {
             match &event.rule {
-                DatasetFlowConfigurationRule::Schedule(schedule) => {
+                FlowConfigurationRule::Schedule(schedule) => {
                     self.enqueue_auto_polling_dataset_flow(
-                        &event.dataset_id,
-                        event.flow_type,
+                        &event.flow_key.dataset_id,
+                        event.flow_key.flow_type,
                         &schedule,
                     )
                     .await?;
 
                     let mut state = self.state.lock().unwrap();
                     state.active_schedules.insert(
-                        OwnedDatasetFlowKey::new(event.dataset_id.clone(), event.flow_type),
+                        OwnedDatasetFlowKey::new(
+                            event.flow_key.dataset_id.clone(),
+                            event.flow_key.flow_type,
+                        ),
                         schedule.clone(),
                     );
                 }
-                DatasetFlowConfigurationRule::StartCondition(start_condition) => {
+                FlowConfigurationRule::StartCondition(start_condition) => {
                     let mut state = self.state.lock().unwrap();
                     state.active_start_conditions.insert(
-                        OwnedDatasetFlowKey::new(event.dataset_id.clone(), event.flow_type),
+                        OwnedDatasetFlowKey::new(
+                            event.flow_key.dataset_id.clone(),
+                            event.flow_key.flow_type,
+                        ),
                         start_condition.clone(),
                     );
                 }

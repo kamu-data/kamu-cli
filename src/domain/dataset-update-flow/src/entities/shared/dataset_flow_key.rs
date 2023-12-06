@@ -7,14 +7,25 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use chrono::Duration;
+use opendatafabric::DatasetID;
+
+use crate::DatasetFlowType;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct StartCondition {
-    pub throttling_period: Option<Duration>,
-    pub minimal_data_batch: Option<i32>,
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct DatasetFlowKey {
+    pub dataset_id: DatasetID,
+    pub flow_type: DatasetFlowType,
+}
+
+impl DatasetFlowKey {
+    pub fn new(dataset_id: DatasetID, flow_type: DatasetFlowType) -> Self {
+        Self {
+            dataset_id,
+            flow_type,
+        }
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

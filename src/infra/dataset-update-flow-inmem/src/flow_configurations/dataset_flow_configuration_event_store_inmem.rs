@@ -25,7 +25,7 @@ pub struct DatasetFlowConfigurationEventStoreInMem {
 #[derive(Default)]
 struct State {
     events: Vec<DatasetFlowConfigurationEvent>,
-    queries: HashSet<DatasetID>,
+    dataset_ids: HashSet<DatasetID>,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -51,11 +51,11 @@ impl EventStore<DatasetFlowConfigurationState> for DatasetFlowConfigurationEvent
 
     fn get_events<'a>(
         &'a self,
-        query: &(DatasetID, DatasetFlowType),
+        query: &DatasetFlowKey,
         opts: GetEventsOpts,
     ) -> EventStream<'a, DatasetFlowConfigurationEvent> {
-        let dataset_id = query.0.clone();
-        let flow_type = query.1;
+        let dataset_id = query.dataset_id.clone();
+        let flow_type = query.flow_type;
 
         // TODO: This should be a buffered stream so we don't lock per event
         Box::pin(async_stream::try_stream! {
@@ -71,7 +71,7 @@ impl EventStore<DatasetFlowConfigurationState> for DatasetFlowConfigurationEvent
                         .iter()
                         .enumerate()
                         .skip(seen)
-                        .filter(|(_, e)| e.dataset_id() == &dataset_id && e.flow_type() == flow_type)
+                        .filter(|(_, e)| e.flow_key().dataset_id == dataset_id && e.flow_key().flow_type == flow_type)
                         .map(|(i, e)| (i, e.clone()))
                         .next()
                 };
@@ -90,12 +90,12 @@ impl EventStore<DatasetFlowConfigurationState> for DatasetFlowConfigurationEvent
     // TODO: concurrency
     async fn save_events(
         &self,
-        query: &(DatasetID, DatasetFlowType),
+        query: &DatasetFlowKey,
         events: Vec<DatasetFlowConfigurationEvent>,
     ) -> Result<EventID, SaveEventsError> {
         let mut s = self.state.lock().unwrap();
         if !events.is_empty() {
-            s.queries.get_or_insert(query.0.clone());
+            s.dataset_ids.get_or_insert(query.dataset_id.clone());
 
             for event in events {
                 s.events.push(event);
@@ -112,7 +112,7 @@ impl DatasetFlowConfigurationEventStore for DatasetFlowConfigurationEventStoreIn
     fn list_all_dataset_ids<'a>(&'a self) -> DatasetIDStream<'a> {
         // TODO: re-consider performance impact
         Box::pin(tokio_stream::iter(
-            self.state.lock().unwrap().queries.clone(),
+            self.state.lock().unwrap().dataset_ids.clone(),
         ))
     }
 }
