@@ -10,7 +10,6 @@
 use chrono::{DateTime, Utc};
 use event_sourcing::*;
 use kamu_task_system::{TaskID, TaskOutcome};
-use opendatafabric::DatasetID;
 
 use crate::*;
 
@@ -21,13 +20,11 @@ const MAX_RETRY_TASKS: usize = 3;
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DatasetFlowState {
+pub struct FlowState<TFlowStrategy: FlowStrategy> {
     /// Unique flow identifier
-    pub flow_id: DatasetFlowID,
-    /// Identifier of the related dataset
-    pub dataset_id: DatasetID,
-    /// Flow type
-    pub flow_type: DatasetFlowType,
+    pub flow_id: TFlowStrategy::FlowID,
+    /// Flow key
+    pub flow_key: TFlowStrategy::FlowKey,
     /// Activating at time
     pub activate_at: Option<DateTime<Utc>>,
     /// Associated task IDs
@@ -40,25 +37,23 @@ pub struct DatasetFlowState {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-impl Projection for DatasetFlowState {
-    type Query = DatasetFlowID;
-    type Event = DatasetFlowEvent;
+impl<TFlowStrategy: FlowStrategy + 'static> Projection for FlowState<TFlowStrategy> {
+    type Query = TFlowStrategy::FlowID;
+    type Event = FlowEvent<TFlowStrategy>;
 
     fn apply(state: Option<Self>, event: Self::Event) -> Result<Self, ProjectionError<Self>> {
-        use DatasetFlowEvent as E;
+        use FlowEvent as E;
 
         match (state, event) {
             (None, event) => match event {
-                E::Initiated(DatasetFlowEventInitiated {
+                E::Initiated(FlowEventInitiated::<TFlowStrategy> {
                     event_time: _,
                     flow_id,
-                    dataset_id,
-                    flow_type,
+                    flow_key,
                     trigger: _,
                 }) => Ok(Self {
                     flow_id,
-                    dataset_id,
-                    flow_type,
+                    flow_key,
                     activate_at: None,
                     task_ids: vec![],
                     outcome: None,
@@ -71,7 +66,7 @@ impl Projection for DatasetFlowState {
 
                 match &event {
                     E::Initiated(_) => Err(ProjectionError::new(Some(s), event)),
-                    E::StartConditionDefined(DatasetFlowEventStartConditionDefined {
+                    E::StartConditionDefined(FlowEventStartConditionDefined::<TFlowStrategy> {
                         event_time: _,
                         flow_id: _,
                         start_condition: _,
@@ -82,7 +77,7 @@ impl Projection for DatasetFlowState {
                             Ok(s)
                         }
                     }
-                    E::Queued(DatasetFlowEventQueued {
+                    E::Queued(FlowEventQueued::<TFlowStrategy> {
                         event_time: _,
                         flow_id: _,
                         activate_at,
@@ -90,13 +85,13 @@ impl Projection for DatasetFlowState {
                         if s.outcome.is_some() || !s.task_ids.is_empty() {
                             Err(ProjectionError::new(Some(s), event))
                         } else {
-                            Ok(DatasetFlowState {
+                            Ok(FlowState {
                                 activate_at: Some(*activate_at),
                                 ..s
                             })
                         }
                     }
-                    E::TriggerAdded(DatasetFlowEventTriggerAdded {
+                    E::TriggerAdded(FlowEventTriggerAdded::<TFlowStrategy> {
                         event_time: _,
                         flow_id: _,
                         trigger: _,
@@ -107,7 +102,7 @@ impl Projection for DatasetFlowState {
                             Ok(s)
                         }
                     }
-                    E::TaskScheduled(DatasetFlowEventTaskScheduled {
+                    E::TaskScheduled(FlowEventTaskScheduled::<TFlowStrategy> {
                         event_time: _,
                         flow_id: _,
                         task_id,
@@ -121,10 +116,10 @@ impl Projection for DatasetFlowState {
                             let mut task_ids = s.task_ids.clone();
                             task_ids.push(*task_id);
 
-                            Ok(DatasetFlowState { task_ids, ..s })
+                            Ok(FlowState { task_ids, ..s })
                         }
                     }
-                    E::TaskFinished(DatasetFlowEventTaskFinished {
+                    E::TaskFinished(FlowEventTaskFinished::<TFlowStrategy> {
                         event_time,
                         flow_id: _,
                         task_id,
@@ -134,18 +129,18 @@ impl Projection for DatasetFlowState {
                             Err(ProjectionError::new(Some(s), event))
                         } else {
                             match task_outcome {
-                                TaskOutcome::Success => Ok(DatasetFlowState {
+                                TaskOutcome::Success => Ok(FlowState {
                                     outcome: Some(FlowOutcome::Success),
                                     ..s
                                 }),
-                                TaskOutcome::Cancelled => Ok(DatasetFlowState {
+                                TaskOutcome::Cancelled => Ok(FlowState {
                                     outcome: Some(FlowOutcome::Cancelled),
                                     cancelled_at: Some(event_time.clone()),
                                     ..s
                                 }),
                                 TaskOutcome::Failed => {
                                     if s.task_ids.len() == MAX_RETRY_TASKS {
-                                        Ok(DatasetFlowState {
+                                        Ok(FlowState {
                                             outcome: Some(FlowOutcome::Failed),
                                             ..s
                                         })
@@ -156,7 +151,7 @@ impl Projection for DatasetFlowState {
                             }
                         }
                     }
-                    E::Cancelled(DatasetFlowEventCancelled {
+                    E::Cancelled(FlowEventCancelled::<TFlowStrategy> {
                         event_time,
                         flow_id: _,
                         by_account_id: _,
@@ -165,7 +160,7 @@ impl Projection for DatasetFlowState {
                         if s.outcome.is_some() || !s.task_ids.is_empty() {
                             Err(ProjectionError::new(Some(s), event))
                         } else {
-                            Ok(DatasetFlowState {
+                            Ok(FlowState {
                                 outcome: Some(FlowOutcome::Cancelled),
                                 cancelled_at: Some(event_time.clone()),
                                 ..s

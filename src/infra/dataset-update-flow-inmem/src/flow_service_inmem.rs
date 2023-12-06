@@ -326,7 +326,7 @@ impl FlowServiceInMemory {
         {
             let mut state = self.state.lock().unwrap();
             state.pending_dataset_flows_by_dataset.insert(
-                OwnedDatasetFlowKey::new(dataset_flow.dataset_id.clone(), flow_type),
+                OwnedDatasetFlowKey::new(dataset_flow.flow_key.dataset_id.clone(), flow_type),
                 dataset_flow.flow_id,
             );
         }
@@ -369,9 +369,9 @@ impl FlowServiceInMemory {
         &self,
         dataset_flow: &mut DatasetFlow,
     ) -> Result<(), InternalError> {
-        let logical_plan = match dataset_flow.flow_type {
+        let logical_plan = match dataset_flow.flow_key.flow_type {
             DatasetFlowType::Update => LogicalPlan::UpdateDataset(UpdateDataset {
-                dataset_id: dataset_flow.dataset_id.clone(),
+                dataset_id: dataset_flow.flow_key.dataset_id.clone(),
             }),
             DatasetFlowType::Compacting => unimplemented!(),
         };
@@ -593,8 +593,11 @@ impl FlowService for FlowServiceInMemory {
                         .map_err(|e| CancelDatasetFlowError::Internal(e.int_err()))?;
                 }
                 state.pending_dataset_flows_by_dataset.remove(
-                    BorrowedDatasetFlowKey::new(&dataset_flow.dataset_id, dataset_flow.flow_type)
-                        .as_trait(),
+                    BorrowedDatasetFlowKey::new(
+                        &dataset_flow.flow_key.dataset_id,
+                        dataset_flow.flow_key.flow_type,
+                    )
+                    .as_trait(),
                 );
             }
         }
@@ -652,14 +655,14 @@ impl AsyncEventHandler<TaskEventFinished> for FlowServiceInMemory {
             //  - enqueue dependent datasets
             if event.outcome == TaskOutcome::Success {
                 self.try_enqueue_auto_polling_dataset_flow_if_enabled(
-                    &dataset_flow.dataset_id,
-                    dataset_flow.flow_type,
+                    &dataset_flow.flow_key.dataset_id,
+                    dataset_flow.flow_key.flow_type,
                 )
                 .await?;
 
                 self.enqueue_dependent_dataset_flows(
-                    &dataset_flow.dataset_id,
-                    dataset_flow.flow_type,
+                    &dataset_flow.flow_key.dataset_id,
+                    dataset_flow.flow_key.flow_type,
                     dataset_flow.flow_id,
                 )
                 .await?;

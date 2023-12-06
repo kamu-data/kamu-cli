@@ -60,16 +60,19 @@ impl DatasetFlowEventStoreInMem {
 
     fn update_index_by_dataset(state: &mut State, event: &DatasetFlowEvent) {
         if let DatasetFlowEvent::Initiated(e) = &event {
-            let typed_entries = match state
-                .typed_flows_by_dataset
-                .entry(OwnedDatasetFlowKey::new(e.dataset_id.clone(), e.flow_type))
-            {
+            let typed_entries = match state.typed_flows_by_dataset.entry(OwnedDatasetFlowKey::new(
+                e.flow_key.dataset_id.clone(),
+                e.flow_key.flow_type,
+            )) {
                 Entry::Occupied(v) => v.into_mut(),
                 Entry::Vacant(v) => v.insert(Vec::default()),
             };
             typed_entries.push(event.flow_id());
 
-            let all_entries = match state.all_flows_by_dataset.entry(e.dataset_id.clone()) {
+            let all_entries = match state
+                .all_flows_by_dataset
+                .entry(e.flow_key.dataset_id.clone())
+            {
                 Entry::Occupied(v) => v.into_mut(),
                 Entry::Vacant(v) => v.insert(Vec::default()),
             };

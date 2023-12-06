@@ -16,6 +16,11 @@ use crate::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+pub type DatasetFlowState = FlowState<DatasetFlowStrategy>;
+pub type DatasetFlowEvent = FlowEvent<DatasetFlowStrategy>;
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Aggregate, Debug)]
 pub struct DatasetFlow(Aggregate<DatasetFlowState, (dyn DatasetFlowEventStore + 'static)>);
 
@@ -31,11 +36,10 @@ impl DatasetFlow {
         Self(
             Aggregate::new(
                 flow_id,
-                DatasetFlowEventInitiated {
+                FlowEventInitiated::<DatasetFlowStrategy> {
                     event_time: now,
                     flow_id,
-                    dataset_id,
-                    flow_type,
+                    flow_key: DatasetFlowKey::new(dataset_id, flow_type),
                     trigger,
                 },
             )
@@ -49,7 +53,7 @@ impl DatasetFlow {
         now: DateTime<Utc>,
         start_condition: FlowStartCondition,
     ) -> Result<(), ProjectionError<DatasetFlowState>> {
-        let event = DatasetFlowEventStartConditionDefined {
+        let event = FlowEventStartConditionDefined::<DatasetFlowStrategy> {
             event_time: now,
             flow_id: self.flow_id.clone(),
             start_condition,
@@ -63,7 +67,7 @@ impl DatasetFlow {
         now: DateTime<Utc>,
         activate_at: DateTime<Utc>,
     ) -> Result<(), ProjectionError<DatasetFlowState>> {
-        let event = DatasetFlowEventQueued {
+        let event = FlowEventQueued::<DatasetFlowStrategy> {
             event_time: now,
             flow_id: self.flow_id.clone(),
             activate_at,
@@ -77,7 +81,7 @@ impl DatasetFlow {
         now: DateTime<Utc>,
         trigger: FlowTrigger,
     ) -> Result<(), ProjectionError<DatasetFlowState>> {
-        let event = DatasetFlowEventTriggerAdded {
+        let event = FlowEventTriggerAdded::<DatasetFlowStrategy> {
             event_time: now,
             flow_id: self.flow_id.clone(),
             trigger,
@@ -91,7 +95,7 @@ impl DatasetFlow {
         now: DateTime<Utc>,
         task_id: TaskID,
     ) -> Result<(), ProjectionError<DatasetFlowState>> {
-        let event = DatasetFlowEventTaskScheduled {
+        let event = FlowEventTaskScheduled::<DatasetFlowStrategy> {
             event_time: now,
             flow_id: self.flow_id.clone(),
             task_id,
@@ -106,7 +110,7 @@ impl DatasetFlow {
         task_id: TaskID,
         task_outcome: TaskOutcome,
     ) -> Result<(), ProjectionError<DatasetFlowState>> {
-        let event = DatasetFlowEventTaskFinished {
+        let event = FlowEventTaskFinished::<DatasetFlowStrategy> {
             event_time: now,
             flow_id: self.flow_id.clone(),
             task_id,
@@ -127,7 +131,7 @@ impl DatasetFlow {
         by_account_id: AccountID,
         by_account_name: AccountName,
     ) -> Result<(), ProjectionError<DatasetFlowState>> {
-        let event = DatasetFlowEventCancelled {
+        let event = FlowEventCancelled::<DatasetFlowStrategy> {
             event_time: now,
             flow_id: self.flow_id.clone(),
             by_account_id,

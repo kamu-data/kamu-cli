@@ -16,6 +16,11 @@ use crate::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+pub type SystemFlowState = FlowState<SystemFlowStrategy>;
+pub type SystemFlowEvent = FlowEvent<SystemFlowStrategy>;
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Aggregate, Debug)]
 pub struct SystemFlow(Aggregate<SystemFlowState, (dyn SystemFlowEventStore + 'static)>);
 
@@ -30,10 +35,10 @@ impl SystemFlow {
         Self(
             Aggregate::new(
                 flow_id,
-                SystemFlowEventInitiated {
+                FlowEventInitiated::<SystemFlowStrategy> {
                     event_time: now,
                     flow_id,
-                    flow_type,
+                    flow_key: SystemFlowKey::new(flow_type),
                     trigger,
                 },
             )
@@ -47,7 +52,7 @@ impl SystemFlow {
         now: DateTime<Utc>,
         start_condition: FlowStartCondition,
     ) -> Result<(), ProjectionError<SystemFlowState>> {
-        let event = SystemFlowEventStartConditionDefined {
+        let event = FlowEventStartConditionDefined::<SystemFlowStrategy> {
             event_time: now,
             flow_id: self.flow_id.clone(),
             start_condition,
@@ -61,7 +66,7 @@ impl SystemFlow {
         now: DateTime<Utc>,
         activate_at: DateTime<Utc>,
     ) -> Result<(), ProjectionError<SystemFlowState>> {
-        let event = SystemFlowEventQueued {
+        let event = FlowEventQueued::<SystemFlowStrategy> {
             event_time: now,
             flow_id: self.flow_id.clone(),
             activate_at,
@@ -75,7 +80,7 @@ impl SystemFlow {
         now: DateTime<Utc>,
         trigger: FlowTrigger,
     ) -> Result<(), ProjectionError<SystemFlowState>> {
-        let event = SystemFlowEventTriggerAdded {
+        let event = FlowEventTriggerAdded::<SystemFlowStrategy> {
             event_time: now,
             flow_id: self.flow_id.clone(),
             trigger,
@@ -89,7 +94,7 @@ impl SystemFlow {
         now: DateTime<Utc>,
         task_id: TaskID,
     ) -> Result<(), ProjectionError<SystemFlowState>> {
-        let event = SystemFlowEventTaskScheduled {
+        let event = FlowEventTaskScheduled::<SystemFlowStrategy> {
             event_time: now,
             flow_id: self.flow_id.clone(),
             task_id,
@@ -104,7 +109,7 @@ impl SystemFlow {
         task_id: TaskID,
         task_outcome: TaskOutcome,
     ) -> Result<(), ProjectionError<SystemFlowState>> {
-        let event = SystemFlowEventTaskFinished {
+        let event = FlowEventTaskFinished::<SystemFlowStrategy> {
             event_time: now,
             flow_id: self.flow_id.clone(),
             task_id,
@@ -125,7 +130,7 @@ impl SystemFlow {
         by_account_id: AccountID,
         by_account_name: AccountName,
     ) -> Result<(), ProjectionError<SystemFlowState>> {
-        let event = SystemFlowEventCancelled {
+        let event = FlowEventCancelled::<SystemFlowStrategy> {
             event_time: now,
             flow_id: self.flow_id.clone(),
             by_account_id,
