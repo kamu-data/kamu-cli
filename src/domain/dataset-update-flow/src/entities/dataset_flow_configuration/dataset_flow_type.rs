@@ -9,7 +9,7 @@
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq)]
 pub enum DatasetFlowType {
     Update,
     Compacting,

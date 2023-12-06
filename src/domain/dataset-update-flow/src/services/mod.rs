@@ -11,9 +11,9 @@ mod dataset_flow_configuration_service;
 mod system_flow_configuration_service;
 
 mod dependency_graph_service;
-mod update_service;
+mod flow_service;
 
 pub use dataset_flow_configuration_service::*;
 pub use dependency_graph_service::*;
+pub use flow_service::*;
 pub use system_flow_configuration_service::*;
-pub use update_service::*;

@@ -8,13 +8,13 @@
 // by the Apache License, Version 2.0.
 
 mod dataset_flow_configuration;
+mod flow;
 mod flow_configuration_status;
 mod schedule;
 mod system_flow_configuration;
-mod update;
 
 pub use dataset_flow_configuration::*;
+pub use flow::*;
 pub use flow_configuration_status::*;
 pub use schedule::*;
 pub use system_flow_configuration::*;
-pub use update::*;

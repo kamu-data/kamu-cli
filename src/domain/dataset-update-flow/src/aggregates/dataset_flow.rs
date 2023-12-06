@@ -7,15 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-// Copyright Kamu Data, Inc. and contributors. All rights reserved.
-//
-// Use of this software is governed by the Business Source License
-// included in the LICENSE file.
-//
-// As of the Change Date specified in that file, in accordance with
-// the Business Source License, use of this software will be governed
-// by the Apache License, Version 2.0.
-
 use chrono::{DateTime, Utc};
 use event_sourcing::*;
 use kamu_task_system::{TaskID, TaskOutcome};
@@ -26,23 +17,25 @@ use crate::*;
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Aggregate, Debug)]
-pub struct Update(Aggregate<UpdateState, (dyn UpdateEventStore + 'static)>);
+pub struct DatasetFlow(Aggregate<DatasetFlowState, (dyn DatasetFlowEventStore + 'static)>);
 
-impl Update {
-    /// Creates a dataset update process
+impl DatasetFlow {
+    /// Creates a dataset flow
     pub fn new(
         now: DateTime<Utc>,
-        update_id: UpdateID,
+        flow_id: DatasetFlowID,
         dataset_id: DatasetID,
-        trigger: UpdateTrigger,
+        flow_type: DatasetFlowType,
+        trigger: FlowTrigger, // TODO: generalize triggers
     ) -> Self {
         Self(
             Aggregate::new(
-                update_id,
-                UpdateEventInitiated {
+                flow_id,
+                DatasetFlowEventInitiated {
                     event_time: now,
-                    update_id,
+                    flow_id,
                     dataset_id,
+                    flow_type,
                     trigger,
                 },
             )
@@ -54,11 +47,11 @@ impl Update {
     pub fn define_start_condition(
         &mut self,
         now: DateTime<Utc>,
-        start_condition: UpdateStartCondition,
-    ) -> Result<(), ProjectionError<UpdateState>> {
-        let event = UpdateEventStartConditionDefined {
+        start_condition: FlowStartCondition,
+    ) -> Result<(), ProjectionError<DatasetFlowState>> {
+        let event = DatasetFlowEventStartConditionDefined {
             event_time: now,
-            update_id: self.update_id.clone(),
+            flow_id: self.flow_id.clone(),
             start_condition,
         };
         self.apply(event)
@@ -69,10 +62,10 @@ impl Update {
         &mut self,
         now: DateTime<Utc>,
         activate_at: DateTime<Utc>,
-    ) -> Result<(), ProjectionError<UpdateState>> {
-        let event = UpdateEventQueued {
+    ) -> Result<(), ProjectionError<DatasetFlowState>> {
+        let event = DatasetFlowEventQueued {
             event_time: now,
-            update_id: self.update_id.clone(),
+            flow_id: self.flow_id.clone(),
             activate_at,
         };
         self.apply(event)
@@ -82,11 +75,11 @@ impl Update {
     pub fn add_trigger(
         &mut self,
         now: DateTime<Utc>,
-        trigger: UpdateTrigger,
-    ) -> Result<(), ProjectionError<UpdateState>> {
-        let event = UpdateEventTriggerAdded {
+        trigger: FlowTrigger,
+    ) -> Result<(), ProjectionError<DatasetFlowState>> {
+        let event = DatasetFlowEventTriggerAdded {
             event_time: now,
-            update_id: self.update_id.clone(),
+            flow_id: self.flow_id.clone(),
             trigger,
         };
         self.apply(event)
@@ -97,10 +90,10 @@ impl Update {
         &mut self,
         now: DateTime<Utc>,
         task_id: TaskID,
-    ) -> Result<(), ProjectionError<UpdateState>> {
-        let event = UpdateEventTaskScheduled {
+    ) -> Result<(), ProjectionError<DatasetFlowState>> {
+        let event = DatasetFlowEventTaskScheduled {
             event_time: now,
-            update_id: self.update_id.clone(),
+            flow_id: self.flow_id.clone(),
             task_id,
         };
         self.apply(event)
@@ -112,31 +105,31 @@ impl Update {
         now: DateTime<Utc>,
         task_id: TaskID,
         task_outcome: TaskOutcome,
-    ) -> Result<(), ProjectionError<UpdateState>> {
-        let event = UpdateEventTaskFinished {
+    ) -> Result<(), ProjectionError<DatasetFlowState>> {
+        let event = DatasetFlowEventTaskFinished {
             event_time: now,
-            update_id: self.update_id.clone(),
+            flow_id: self.flow_id.clone(),
             task_id,
             task_outcome,
         };
         self.apply(event)
     }
 
-    /// Checks if update may be cancelled
+    /// Checks if flow may be cancelled
     pub fn can_cancel(&mut self) -> bool {
         !self.outcome.is_some() && self.task_ids.is_empty() && self.cancelled_at.is_none()
     }
 
-    /// Cancel update before task started
+    /// Cancel flow before task started
     pub fn cancel(
         &mut self,
         now: DateTime<Utc>,
         by_account_id: AccountID,
         by_account_name: AccountName,
-    ) -> Result<(), ProjectionError<UpdateState>> {
-        let event = UpdateEventCancelled {
+    ) -> Result<(), ProjectionError<DatasetFlowState>> {
+        let event = DatasetFlowEventCancelled {
             event_time: now,
-            update_id: self.update_id.clone(),
+            flow_id: self.flow_id.clone(),
             by_account_id,
             by_account_name,
         };

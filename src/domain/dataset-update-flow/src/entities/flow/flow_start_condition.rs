@@ -12,22 +12,22 @@ use chrono::Duration;
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum UpdateStartCondition {
-    Throttling(UpdateStardConditionThrottling),
-    Batching(UpdateStartConditionBatching),
+pub enum FlowStartCondition {
+    Throttling(FlowStartConditionThrottling),
+    Batching(FlowStartConditionBatching),
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct UpdateStardConditionThrottling {
+pub struct FlowStartConditionThrottling {
     pub interval: Duration,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct UpdateStartConditionBatching {
+pub struct FlowStartConditionBatching {
     pub available_records: usize,
     pub threshold_recods: usize,
 }

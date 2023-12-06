@@ -230,9 +230,9 @@ pub fn configure_base_catalog(
     b.add::<kamu_dataset_update_flow_inmem::DatasetFlowConfigurationServiceInMemory>();
     b.add::<kamu_dataset_update_flow_inmem::SystemFlowConfigurationServiceInMemory>();
 
-    b.add::<kamu_dataset_update_flow_inmem::UpdateServiceInMemory>();
+    b.add::<kamu_dataset_update_flow_inmem::FlowServiceInMemory>();
 
-    b.add::<kamu_dataset_update_flow_inmem::UpdateEventStoreInMem>();
+    b.add::<kamu_dataset_update_flow_inmem::DatasetFlowEventStoreInMem>();
 
     b.add::<kamu_dataset_update_flow_inmem::DatasetFlowConfigurationEventStoreInMem>();
     b.add::<kamu_dataset_update_flow_inmem::SystemFlowConfigurationEventStoreInMem>();

@@ -25,11 +25,7 @@ pub struct SystemFlowConfigurationState {
 
 impl SystemFlowConfigurationState {
     pub fn is_active(&self) -> bool {
-        match self.status {
-            FlowConfigurationStatus::Active => true,
-            FlowConfigurationStatus::PausedTemporarily => false,
-            FlowConfigurationStatus::StoppedPermanently => false,
-        }
+        self.status.is_active()
     }
 }
 

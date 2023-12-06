@@ -9,11 +9,13 @@
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-/// Uniquely identifies a task within a compute node deployment
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct UpdateID(u64);
+use internal_error::InternalError;
 
-impl UpdateID {
+/// Uniquely identifies a flow
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct DatasetFlowID(u64);
+
+impl DatasetFlowID {
     pub fn new(id: u64) -> Self {
         Self(id)
     }
@@ -21,16 +23,22 @@ impl UpdateID {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-impl std::fmt::Display for UpdateID {
+impl std::fmt::Display for DatasetFlowID {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)
     }
 }
 
-impl Into<u64> for UpdateID {
+impl Into<u64> for DatasetFlowID {
     fn into(self) -> u64 {
         self.0
     }
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+pub type DatasetFlowIDStream<'a> = std::pin::Pin<
+    Box<dyn tokio_stream::Stream<Item = Result<DatasetFlowID, InternalError>> + Send + 'a>,
+>;
 
 /////////////////////////////////////////////////////////////////////////////////////////

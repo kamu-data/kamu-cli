@@ -14,17 +14,17 @@ use crate::*;
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum UpdateTrigger {
-    Manual(UpdateTriggerManual),
-    AutoPolling(UpdateTriggerAutoPolling),
-    Push(UpdateTriggerPush),
-    InputUpdated(UpdateTriggerInputUpdated),
+pub enum FlowTrigger {
+    Manual(FlowTriggerManual),
+    AutoPolling(FlowTriggerAutoPolling),
+    Push(FlowTriggerPush),
+    InputDatasetEvent(FlowTriggerInputDatasetEvent),
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct UpdateTriggerManual {
+pub struct FlowTriggerManual {
     pub initiator_account_id: AccountID,
     pub initiator_account_name: AccountName,
 }
@@ -32,21 +32,22 @@ pub struct UpdateTriggerManual {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct UpdateTriggerAutoPolling {}
+pub struct FlowTriggerAutoPolling {}
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct UpdateTriggerPush {
+pub struct FlowTriggerPush {
     // TODO: source (HTTP, MQTT, CMD, ...)
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct UpdateTriggerInputUpdated {
+pub struct FlowTriggerInputDatasetEvent {
     pub input_dataset_id: DatasetID,
-    pub input_update_id: UpdateID,
+    pub input_flow_type: DatasetFlowType,
+    pub input_flow_id: DatasetFlowID,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

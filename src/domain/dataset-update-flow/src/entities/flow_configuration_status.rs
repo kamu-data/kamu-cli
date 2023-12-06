@@ -16,4 +16,14 @@ pub enum FlowConfigurationStatus {
     StoppedPermanently,
 }
 
+impl FlowConfigurationStatus {
+    pub fn is_active(&self) -> bool {
+        match self {
+            FlowConfigurationStatus::Active => true,
+            FlowConfigurationStatus::PausedTemporarily => false,
+            FlowConfigurationStatus::StoppedPermanently => false,
+        }
+    }
+}
+
 /////////////////////////////////////////////////////////////////////////////////////////

@@ -16,45 +16,49 @@ use crate::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-const MAX_UPDATE_TASKS: usize = 3;
+const MAX_RETRY_TASKS: usize = 3;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct UpdateState {
-    /// Unique update identifier
-    pub update_id: UpdateID,
+pub struct DatasetFlowState {
+    /// Unique flow identifier
+    pub flow_id: DatasetFlowID,
     /// Identifier of the related dataset
     pub dataset_id: DatasetID,
+    /// Flow type
+    pub flow_type: DatasetFlowType,
     /// Activating at time
     pub activate_at: Option<DateTime<Utc>>,
     /// Associated task IDs
     pub task_ids: Vec<TaskID>,
-    /// Update outcome
-    pub outcome: Option<UpdateOutcome>,
+    /// Flow outcome
+    pub outcome: Option<FlowOutcome>,
     /// Cancellation time
     pub cancelled_at: Option<DateTime<Utc>>,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-impl Projection for UpdateState {
-    type Query = UpdateID;
-    type Event = UpdateEvent;
+impl Projection for DatasetFlowState {
+    type Query = DatasetFlowID;
+    type Event = DatasetFlowEvent;
 
     fn apply(state: Option<Self>, event: Self::Event) -> Result<Self, ProjectionError<Self>> {
-        use UpdateEvent as E;
+        use DatasetFlowEvent as E;
 
         match (state, event) {
             (None, event) => match event {
-                E::Initiated(UpdateEventInitiated {
+                E::Initiated(DatasetFlowEventInitiated {
                     event_time: _,
-                    update_id,
+                    flow_id,
                     dataset_id,
+                    flow_type,
                     trigger: _,
                 }) => Ok(Self {
-                    update_id,
+                    flow_id,
                     dataset_id,
+                    flow_type,
                     activate_at: None,
                     task_ids: vec![],
                     outcome: None,
@@ -63,13 +67,13 @@ impl Projection for UpdateState {
                 _ => Err(ProjectionError::new(None, event)),
             },
             (Some(s), event) => {
-                assert_eq!(s.update_id, event.update_id());
+                assert_eq!(s.flow_id, event.flow_id());
 
                 match &event {
                     E::Initiated(_) => Err(ProjectionError::new(Some(s), event)),
-                    E::StartConditionDefined(UpdateEventStartConditionDefined {
+                    E::StartConditionDefined(DatasetFlowEventStartConditionDefined {
                         event_time: _,
-                        update_id: _,
+                        flow_id: _,
                         start_condition: _,
                     }) => {
                         if s.outcome.is_some() || !s.task_ids.is_empty() {
@@ -78,23 +82,23 @@ impl Projection for UpdateState {
                             Ok(s)
                         }
                     }
-                    E::Queued(UpdateEventQueued {
+                    E::Queued(DatasetFlowEventQueued {
                         event_time: _,
-                        update_id: _,
+                        flow_id: _,
                         activate_at,
                     }) => {
                         if s.outcome.is_some() || !s.task_ids.is_empty() {
                             Err(ProjectionError::new(Some(s), event))
                         } else {
-                            Ok(UpdateState {
+                            Ok(DatasetFlowState {
                                 activate_at: Some(*activate_at),
                                 ..s
                             })
                         }
                     }
-                    E::TriggerAdded(UpdateEventTriggerAdded {
+                    E::TriggerAdded(DatasetFlowEventTriggerAdded {
                         event_time: _,
-                        update_id: _,
+                        flow_id: _,
                         trigger: _,
                     }) => {
                         if s.outcome.is_some() {
@@ -103,26 +107,26 @@ impl Projection for UpdateState {
                             Ok(s)
                         }
                     }
-                    E::TaskScheduled(UpdateEventTaskScheduled {
+                    E::TaskScheduled(DatasetFlowEventTaskScheduled {
                         event_time: _,
-                        update_id: _,
+                        flow_id: _,
                         task_id,
                     }) => {
                         if s.outcome.is_some()
                             || s.activate_at.is_none()
-                            || s.task_ids.len() >= MAX_UPDATE_TASKS
+                            || s.task_ids.len() >= MAX_RETRY_TASKS
                         {
                             Err(ProjectionError::new(Some(s), event))
                         } else {
                             let mut task_ids = s.task_ids.clone();
                             task_ids.push(*task_id);
 
-                            Ok(UpdateState { task_ids, ..s })
+                            Ok(DatasetFlowState { task_ids, ..s })
                         }
                     }
-                    E::TaskFinished(UpdateEventTaskFinished {
+                    E::TaskFinished(DatasetFlowEventTaskFinished {
                         event_time,
-                        update_id: _,
+                        flow_id: _,
                         task_id,
                         task_outcome,
                     }) => {
@@ -130,19 +134,19 @@ impl Projection for UpdateState {
                             Err(ProjectionError::new(Some(s), event))
                         } else {
                             match task_outcome {
-                                TaskOutcome::Success => Ok(UpdateState {
-                                    outcome: Some(UpdateOutcome::Success),
+                                TaskOutcome::Success => Ok(DatasetFlowState {
+                                    outcome: Some(FlowOutcome::Success),
                                     ..s
                                 }),
-                                TaskOutcome::Cancelled => Ok(UpdateState {
-                                    outcome: Some(UpdateOutcome::Cancelled),
+                                TaskOutcome::Cancelled => Ok(DatasetFlowState {
+                                    outcome: Some(FlowOutcome::Cancelled),
                                     cancelled_at: Some(event_time.clone()),
                                     ..s
                                 }),
                                 TaskOutcome::Failed => {
-                                    if s.task_ids.len() == MAX_UPDATE_TASKS {
-                                        Ok(UpdateState {
-                                            outcome: Some(UpdateOutcome::Failed),
+                                    if s.task_ids.len() == MAX_RETRY_TASKS {
+                                        Ok(DatasetFlowState {
+                                            outcome: Some(FlowOutcome::Failed),
                                             ..s
                                         })
                                     } else {
@@ -152,17 +156,17 @@ impl Projection for UpdateState {
                             }
                         }
                     }
-                    E::Cancelled(UpdateEventCancelled {
+                    E::Cancelled(DatasetFlowEventCancelled {
                         event_time,
-                        update_id: _,
+                        flow_id: _,
                         by_account_id: _,
                         by_account_name: _,
                     }) => {
                         if s.outcome.is_some() || !s.task_ids.is_empty() {
                             Err(ProjectionError::new(Some(s), event))
                         } else {
-                            Ok(UpdateState {
-                                outcome: Some(UpdateOutcome::Cancelled),
+                            Ok(DatasetFlowState {
+                                outcome: Some(FlowOutcome::Cancelled),
                                 cancelled_at: Some(event_time.clone()),
                                 ..s
                             })

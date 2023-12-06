@@ -12,7 +12,7 @@ use std::sync::Arc;
 
 use dill::Catalog;
 use internal_error::*;
-use kamu_dataset_update_flow_inmem::domain::UpdateService;
+use kamu_dataset_update_flow_inmem::domain::FlowService;
 use kamu_task_system_inmem::domain::TaskExecutor;
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -23,7 +23,7 @@ pub struct APIServer {
         axum::routing::IntoMakeService<axum::Router>,
     >,
     task_executor: Arc<dyn TaskExecutor>,
-    update_service: Arc<dyn UpdateService>,
+    update_service: Arc<dyn FlowService>,
 }
 
 impl APIServer {

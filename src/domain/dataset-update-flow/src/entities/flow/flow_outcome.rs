@@ -10,7 +10,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum UpdateOutcome {
+pub enum FlowOutcome {
     /// Update succeeded
     Success,
     /// Update failed to complete, even after retry logic
