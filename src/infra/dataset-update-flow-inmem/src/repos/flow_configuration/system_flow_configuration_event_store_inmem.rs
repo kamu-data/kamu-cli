@@ -7,22 +7,16 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::sync::{Arc, Mutex};
-
 use dill::*;
 use kamu_dataset_update_flow::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct SystemFlowConfigurationEventStoreInMem {
-    state: Arc<Mutex<State>>,
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Default)]
-struct State {
-    events: Vec<SystemFlowConfigurationEvent>,
+    inner: EventStoreInMemory<
+        SystemFlowConfigurationState,
+        EventStoreStateImpl<SystemFlowConfigurationState>,
+    >,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -33,7 +27,7 @@ struct State {
 impl SystemFlowConfigurationEventStoreInMem {
     pub fn new() -> Self {
         Self {
-            state: Arc::new(Mutex::new(State::default())),
+            inner: EventStoreInMemory::new(),
         }
     }
 }
@@ -43,7 +37,7 @@ impl SystemFlowConfigurationEventStoreInMem {
 #[async_trait::async_trait]
 impl EventStore<SystemFlowConfigurationState> for SystemFlowConfigurationEventStoreInMem {
     async fn len(&self) -> Result<usize, InternalError> {
-        Ok(self.state.lock().unwrap().events.len())
+        self.inner.len().await
     }
 
     fn get_events<'a>(
@@ -51,50 +45,16 @@ impl EventStore<SystemFlowConfigurationState> for SystemFlowConfigurationEventSt
         query: &SystemFlowKey,
         opts: GetEventsOpts,
     ) -> EventStream<'a, SystemFlowConfigurationEvent> {
-        let flow_type = query.flow_type;
-
-        // TODO: This should be a buffered stream so we don't lock per event
-        Box::pin(async_stream::try_stream! {
-            let mut seen = opts.from.map(|id| (id.into_inner() + 1) as usize).unwrap_or(0);
-
-            loop {
-                let next = {
-                    let s = self.state.lock().unwrap();
-
-                    let to = opts.to.map(|id| (id.into_inner() + 1) as usize).unwrap_or(s.events.len());
-
-                    s.events[..to]
-                        .iter()
-                        .enumerate()
-                        .skip(seen)
-                        .filter(|(_, e)| e.flow_key().flow_type == flow_type)
-                        .map(|(i, e)| (i, e.clone()))
-                        .next()
-                };
-
-                match next {
-                    None => break,
-                    Some((i, event)) => {
-                        seen = i + 1;
-                        yield (EventID::new(i as u64), event)
-                    }
-                }
-            }
-        })
+        self.inner.get_events(query, opts)
     }
 
     // TODO: concurrency
     async fn save_events(
         &self,
-        _: &SystemFlowKey,
+        query: &SystemFlowKey,
         events: Vec<SystemFlowConfigurationEvent>,
     ) -> Result<EventID, SaveEventsError> {
-        let mut s = self.state.lock().unwrap();
-        for event in events {
-            s.events.push(event);
-        }
-
-        Ok(EventID::new((s.events.len() - 1) as u64))
+        self.inner.save_events(query, events).await
     }
 }
 

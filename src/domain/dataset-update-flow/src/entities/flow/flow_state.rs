@@ -179,3 +179,13 @@ impl<TFlowStrategy: FlowStrategy + 'static> Projection for FlowState<TFlowStrate
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
+
+impl<TFlowStrategy: FlowStrategy + 'static> ProjectionEvent<TFlowStrategy::FlowID>
+    for FlowEvent<TFlowStrategy>
+{
+    fn matches_query(&self, query: &TFlowStrategy::FlowID) -> bool {
+        self.flow_id() == *query
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////

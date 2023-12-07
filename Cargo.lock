@@ -2340,6 +2340,7 @@ dependencies = [
 name = "event-sourcing"
 version = "0.146.1"
 dependencies = [
+ "async-stream",
  "async-trait",
  "chrono",
  "event-sourcing-macros",

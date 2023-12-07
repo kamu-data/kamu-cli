@@ -7,20 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-// Re-exports
-pub use event_sourcing_macros::*;
-pub use internal_error::*;
+/////////////////////////////////////////////////////////////////////////////////////////
 
-mod aggregate;
-mod event_id;
-mod event_store;
-mod event_store_inmem;
-mod projection;
-mod projection_event;
+pub trait ProjectionEvent<Query>: Sized + std::fmt::Debug + Clone + Sync + Send + 'static {
+    fn matches_query(&self, query: &Query) -> bool;
+}
 
-pub use aggregate::*;
-pub use event_id::*;
-pub use event_store::*;
-pub use event_store_inmem::*;
-pub use projection::*;
-pub use projection_event::*;
+/////////////////////////////////////////////////////////////////////////////////////////

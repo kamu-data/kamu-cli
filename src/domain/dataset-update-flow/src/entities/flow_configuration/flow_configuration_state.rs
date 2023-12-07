@@ -100,3 +100,13 @@ impl<TFlowKey: std::fmt::Debug + Clone + PartialEq + Eq + Send + Sync + 'static>
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
+
+impl<TFlowKey: std::fmt::Debug + Clone + Eq + PartialEq + Send + Sync + 'static>
+    ProjectionEvent<TFlowKey> for FlowConfigurationEvent<TFlowKey>
+{
+    fn matches_query(&self, query: &TFlowKey) -> bool {
+        self.flow_key() == query
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////

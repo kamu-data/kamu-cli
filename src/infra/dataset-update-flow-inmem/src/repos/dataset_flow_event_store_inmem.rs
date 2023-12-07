@@ -9,7 +9,6 @@
 
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
 
 use dill::*;
 use kamu_dataset_update_flow::*;
@@ -20,7 +19,7 @@ use crate::dataset_flow_key::{BorrowedDatasetFlowKey, OwnedDatasetFlowKey};
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct DatasetFlowEventStoreInMem {
-    state: Arc<Mutex<State>>,
+    inner: EventStoreInMemory<DatasetFlowState, State>,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -46,6 +45,20 @@ impl State {
     }
 }
 
+impl EventStoreState<DatasetFlowState> for State {
+    fn events_count(&self) -> usize {
+        self.events.len()
+    }
+
+    fn get_events(&self) -> &[DatasetFlowEvent] {
+        &self.events
+    }
+
+    fn add_event(&mut self, event: DatasetFlowEvent) {
+        self.events.push(event);
+    }
+}
+
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
@@ -54,7 +67,7 @@ impl State {
 impl DatasetFlowEventStoreInMem {
     pub fn new() -> Self {
         Self {
-            state: Arc::new(Mutex::new(State::default())),
+            inner: EventStoreInMemory::new(),
         }
     }
 
@@ -86,60 +99,32 @@ impl DatasetFlowEventStoreInMem {
 #[async_trait::async_trait]
 impl EventStore<DatasetFlowState> for DatasetFlowEventStoreInMem {
     async fn len(&self) -> Result<usize, InternalError> {
-        Ok(self.state.lock().unwrap().events.len())
+        self.inner.len().await
     }
 
     fn get_events<'a>(
         &'a self,
-        flow_id: &DatasetFlowID,
+        query: &DatasetFlowID,
         opts: GetEventsOpts,
     ) -> EventStream<'a, DatasetFlowEvent> {
-        let flow_id = flow_id.clone();
-
-        // TODO: This should be a buffered stream so we don't lock per event
-        Box::pin(async_stream::try_stream! {
-            let mut seen = opts.from.map(|id| (id.into_inner() + 1) as usize).unwrap_or(0);
-
-            loop {
-                let next = {
-                    let s = self.state.lock().unwrap();
-
-                    let to = opts.to.map(|id| (id.into_inner() + 1) as usize).unwrap_or(s.events.len());
-
-                    s.events[..to]
-                        .iter()
-                        .enumerate()
-                        .skip(seen)
-                        .filter(|(_, e)| e.flow_id() == flow_id)
-                        .map(|(i, e)| (i, e.clone()))
-                        .next()
-                };
-
-                match next {
-                    None => break,
-                    Some((i, event)) => {
-                        seen = i + 1;
-                        yield (EventID::new(i as u64), event)
-                    }
-                }
-            }
-        })
+        self.inner.get_events(query, opts)
     }
 
     // TODO: concurrency
     async fn save_events(
         &self,
-        _flow_id: &DatasetFlowID,
+        query: &DatasetFlowID,
         events: Vec<DatasetFlowEvent>,
     ) -> Result<EventID, SaveEventsError> {
-        let mut s = self.state.lock().unwrap();
-
-        for event in events {
-            Self::update_index_by_dataset(&mut s, &event);
-            s.events.push(event);
+        {
+            let state = self.inner.as_state();
+            let mut g = state.lock().unwrap();
+            for event in &events {
+                Self::update_index_by_dataset(&mut g, &event);
+            }
         }
 
-        Ok(EventID::new((s.events.len() - 1) as u64))
+        self.inner.save_events(query, events).await
     }
 }
 
@@ -148,7 +133,7 @@ impl EventStore<DatasetFlowState> for DatasetFlowEventStoreInMem {
 #[async_trait::async_trait]
 impl DatasetFlowEventStore for DatasetFlowEventStoreInMem {
     fn new_flow_id(&self) -> DatasetFlowID {
-        self.state.lock().unwrap().next_flow_id()
+        self.inner.as_state().lock().unwrap().next_flow_id()
     }
 
     fn get_last_specific_dataset_flow(
@@ -156,8 +141,9 @@ impl DatasetFlowEventStore for DatasetFlowEventStoreInMem {
         dataset_id: &DatasetID,
         flow_type: DatasetFlowType,
     ) -> Option<DatasetFlowID> {
-        let s = self.state.lock().unwrap();
-        s.typed_flows_by_dataset
+        let state = self.inner.as_state();
+        let g = state.lock().unwrap();
+        g.typed_flows_by_dataset
             .get(BorrowedDatasetFlowKey::new(&dataset_id, flow_type).as_trait())
             .and_then(|flows| flows.last().cloned())
     }
@@ -174,8 +160,9 @@ impl DatasetFlowEventStore for DatasetFlowEventStoreInMem {
             let borrowed_key = BorrowedDatasetFlowKey::new(&dataset_id, flow_type);
 
             let mut pos = {
-                let s = self.state.lock().unwrap();
-                s.typed_flows_by_dataset.get(borrowed_key.as_trait()).map(|flows| flows.len()).unwrap_or(0)
+                let state = self.inner.as_state();
+                let g = state.lock().unwrap();
+                g.typed_flows_by_dataset.get(borrowed_key.as_trait()).map(|flows| flows.len()).unwrap_or(0)
             };
 
             loop {
@@ -186,8 +173,9 @@ impl DatasetFlowEventStore for DatasetFlowEventStoreInMem {
                 pos -= 1;
 
                 let next = {
-                    let s = self.state.lock().unwrap();
-                    s.typed_flows_by_dataset
+                    let state = self.inner.as_state();
+                    let g = state.lock().unwrap();
+                    g.typed_flows_by_dataset
                         .get(borrowed_key.as_trait())
                         .and_then(|flows| flows.get(pos).cloned())
                 };
@@ -208,8 +196,9 @@ impl DatasetFlowEventStore for DatasetFlowEventStoreInMem {
         // TODO: This should be a buffered stream so we don't lock per record
         Box::pin(async_stream::try_stream! {
             let mut pos = {
-                let s = self.state.lock().unwrap();
-                s.all_flows_by_dataset.get(&dataset_id).map(|flows| flows.len()).unwrap_or(0)
+                let state = self.inner.as_state();
+                let g = state.lock().unwrap();
+                g.all_flows_by_dataset.get(&dataset_id).map(|flows| flows.len()).unwrap_or(0)
             };
 
             loop {
@@ -220,8 +209,9 @@ impl DatasetFlowEventStore for DatasetFlowEventStoreInMem {
                 pos -= 1;
 
                 let next = {
-                    let s = self.state.lock().unwrap();
-                    s.all_flows_by_dataset
+                    let state = self.inner.as_state();
+                    let g = state.lock().unwrap();
+                    g.all_flows_by_dataset
                         .get(&dataset_id)
                         .and_then(|flows| flows.get(pos).cloned())
                 };
