@@ -35,7 +35,12 @@ pub struct FlowState<TFlowStrategy: FlowStrategy> {
     pub cancelled_at: Option<DateTime<Utc>>,
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////
+impl<TFlowStrategy: FlowStrategy> FlowState<TFlowStrategy> {
+    /// Checks if flow may be cancelled
+    pub fn can_cancel(&self) -> bool {
+        !self.outcome.is_some() && self.task_ids.is_empty() && self.cancelled_at.is_none()
+    }
+}
 
 impl<TFlowStrategy: FlowStrategy + 'static> Projection for FlowState<TFlowStrategy> {
     type Query = TFlowStrategy::FlowID;

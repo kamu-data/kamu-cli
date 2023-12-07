@@ -249,7 +249,7 @@ impl FlowServiceInMemory {
                 .map(|schedule| schedule.clone());
 
             if let Some(start_condition) = maybe_dependent_start_condition {
-                let trigger = FlowTrigger::InputDatasetEvent(FlowTriggerInputDatasetEvent {
+                let trigger = FlowTrigger::InputDatasetFlow(FlowTriggerInputDatasetFlow {
                     input_dataset_id: dataset_id.clone(),
                     input_flow_type: flow_type,
                     input_flow_id: flow_id,
@@ -324,8 +324,7 @@ impl FlowServiceInMemory {
         let dataset_flow = DatasetFlow::new(
             self.time_source.now(),
             self.dataset_flow_event_store.new_flow_id(),
-            dataset_id,
-            flow_type,
+            DatasetFlowKey::new(dataset_id, flow_type),
             trigger,
         );
 

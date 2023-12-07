@@ -90,7 +90,11 @@ impl SystemFlowConfigurationService for SystemFlowConfigurationServiceInMemory {
             // Modification
             Some(mut flow_configuration) => {
                 flow_configuration
-                    .modify_configuration(self.time_source.now(), paused, schedule)
+                    .modify_configuration(
+                        self.time_source.now(),
+                        paused,
+                        FlowConfigurationRule::Schedule(schedule),
+                    )
                     .int_err()?;
 
                 flow_configuration
@@ -107,9 +111,9 @@ impl SystemFlowConfigurationService for SystemFlowConfigurationServiceInMemory {
             None => {
                 let mut flow_configuration = SystemFlowConfiguration::new(
                     self.time_source.now(),
-                    flow_type,
+                    SystemFlowKey::new(flow_type),
                     paused,
-                    schedule,
+                    FlowConfigurationRule::Schedule(schedule),
                 );
 
                 flow_configuration

@@ -18,7 +18,7 @@ pub enum FlowTrigger {
     Manual(FlowTriggerManual),
     AutoPolling(FlowTriggerAutoPolling),
     Push(FlowTriggerPush),
-    InputDatasetEvent(FlowTriggerInputDatasetEvent),
+    InputDatasetFlow(FlowTriggerInputDatasetFlow),
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -44,7 +44,7 @@ pub struct FlowTriggerPush {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct FlowTriggerInputDatasetEvent {
+pub struct FlowTriggerInputDatasetFlow {
     pub input_dataset_id: DatasetID,
     pub input_flow_type: DatasetFlowType,
     pub input_flow_id: DatasetFlowID,

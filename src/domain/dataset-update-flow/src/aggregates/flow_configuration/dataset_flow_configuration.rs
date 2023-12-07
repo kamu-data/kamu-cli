@@ -9,7 +9,6 @@
 
 use chrono::{DateTime, Utc};
 use event_sourcing::*;
-use opendatafabric::DatasetID;
 
 use crate::*;
 
@@ -29,39 +28,22 @@ impl DatasetFlowConfiguration {
     /// Creates a dataset flow configuration
     pub fn new(
         now: DateTime<Utc>,
-        dataset_id: DatasetID,
-        flow_type: DatasetFlowType,
+        flow_key: DatasetFlowKey,
         paused: bool,
         rule: FlowConfigurationRule,
     ) -> Self {
         Self(
             Aggregate::new(
-                DatasetFlowKey::new(dataset_id.clone(), flow_type),
+                flow_key.clone(),
                 FlowConfigurationEventCreated::<DatasetFlowKey> {
                     event_time: now,
-                    flow_key: DatasetFlowKey::new(dataset_id, flow_type),
+                    flow_key,
                     paused,
                     rule,
                 },
             )
             .unwrap(),
         )
-    }
-
-    /// Modify configuration
-    pub fn modify_configuration(
-        &mut self,
-        now: DateTime<Utc>,
-        paused: bool,
-        new_rule: FlowConfigurationRule,
-    ) -> Result<(), ProjectionError<DatasetFlowConfigurationState>> {
-        let event = FlowConfigurationEventModified::<DatasetFlowKey> {
-            event_time: now,
-            flow_key: self.flow_key.clone(),
-            paused,
-            rule: new_rule,
-        };
-        self.apply(event)
     }
 
     /// Handle dataset removal
@@ -74,6 +56,21 @@ impl DatasetFlowConfiguration {
             flow_key: self.flow_key.clone(),
         };
         self.apply(event)
+    }
+}
+
+impl FlowConfiguration<DatasetFlowKey> for DatasetFlowConfiguration {
+    /// Returns assigned flow key
+    fn flow_key(&self) -> &DatasetFlowKey {
+        &self.flow_key
+    }
+
+    /// Applies an event on the flow configuration
+    fn apply_event(
+        &mut self,
+        event: FlowConfigurationEvent<DatasetFlowKey>,
+    ) -> Result<(), ProjectionError<DatasetFlowConfigurationState>> {
+        self.0.apply(event)
     }
 }
 

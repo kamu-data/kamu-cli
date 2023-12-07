@@ -28,38 +28,37 @@ impl SystemFlowConfiguration {
     /// Creates a system flow configuration
     pub fn new(
         now: DateTime<Utc>,
-        flow_type: SystemFlowType,
+        flow_key: SystemFlowKey,
         paused: bool,
-        schedule: Schedule,
+        rule: FlowConfigurationRule,
     ) -> Self {
         Self(
             Aggregate::new(
-                SystemFlowKey::new(flow_type),
+                flow_key.clone(),
                 FlowConfigurationEventCreated::<SystemFlowKey> {
                     event_time: now,
-                    flow_key: SystemFlowKey::new(flow_type),
+                    flow_key,
                     paused,
-                    rule: FlowConfigurationRule::Schedule(schedule),
+                    rule,
                 },
             )
             .unwrap(),
         )
     }
+}
 
-    /// Modify configuration
-    pub fn modify_configuration(
+impl FlowConfiguration<SystemFlowKey> for SystemFlowConfiguration {
+    /// Returns assigned flow key
+    fn flow_key(&self) -> &SystemFlowKey {
+        &self.flow_key
+    }
+
+    /// Applies an event on the flow configuration
+    fn apply_event(
         &mut self,
-        now: DateTime<Utc>,
-        paused: bool,
-        new_schedule: Schedule,
+        event: FlowConfigurationEvent<SystemFlowKey>,
     ) -> Result<(), ProjectionError<SystemFlowConfigurationState>> {
-        let event = FlowConfigurationEventModified::<SystemFlowKey> {
-            event_time: now,
-            flow_key: self.flow_key.clone(),
-            paused,
-            rule: FlowConfigurationRule::Schedule(new_schedule),
-        };
-        self.apply(event)
+        self.0.apply(event)
     }
 }
 

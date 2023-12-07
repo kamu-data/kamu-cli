@@ -134,8 +134,7 @@ impl DatasetFlowConfigurationService for DatasetFlowConfigurationServiceInMemory
             None => {
                 let mut update_configuration = DatasetFlowConfiguration::new(
                     self.time_source.now(),
-                    dataset_id,
-                    flow_type,
+                    DatasetFlowKey::new(dataset_id, flow_type),
                     paused,
                     rule,
                 );
