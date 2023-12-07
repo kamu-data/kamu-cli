@@ -91,7 +91,6 @@ impl EventStore<TaskState> for TaskSystemEventStoreInMemory {
         self.inner.get_events(task_id, opts)
     }
 
-    // TODO: concurrency
     async fn save_events(
         &self,
         task_id: &TaskID,

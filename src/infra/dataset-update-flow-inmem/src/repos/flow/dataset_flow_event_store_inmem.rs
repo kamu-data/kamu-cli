@@ -110,7 +110,6 @@ impl EventStore<DatasetFlowState> for DatasetFlowEventStoreInMem {
         self.inner.get_events(query, opts)
     }
 
-    // TODO: concurrency
     async fn save_events(
         &self,
         query: &DatasetFlowID,

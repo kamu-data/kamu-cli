@@ -70,7 +70,6 @@ impl EventStore<DatasetFlowConfigurationState> for DatasetFlowConfigurationEvent
         self.inner.get_events(query, opts)
     }
 
-    // TODO: concurrency
     async fn save_events(
         &self,
         query: &DatasetFlowKey,
