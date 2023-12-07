@@ -73,10 +73,9 @@ impl TaskExecutor for TaskExecutorInMemory {
                 "Executing task",
             );
 
-            let pull_svc = self.catalog.get_one::<dyn PullService>().int_err()?;
-
             let outcome = match &task.logical_plan {
                 LogicalPlan::UpdateDataset(upd) => {
+                    let pull_svc = self.catalog.get_one::<dyn PullService>().int_err()?;
                     let res = pull_svc
                         .pull(&upd.dataset_id.as_any_ref(), PullOptions::default(), None)
                         .await;

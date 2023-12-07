@@ -25,6 +25,7 @@ pub struct SystemFlowEventStoreInMem {
 struct State {
     events: Vec<SystemFlowEvent>,
     flows_by_type: HashMap<SystemFlowType, Vec<SystemFlowID>>,
+    all_flows: Vec<SystemFlowID>,
     last_flow_id: Option<SystemFlowID>,
 }
 
@@ -74,6 +75,8 @@ impl SystemFlowEventStoreInMem {
                 Entry::Vacant(v) => v.insert(Vec::default()),
             };
             entries.push(event.flow_id());
+
+            state.all_flows.push(event.flow_id());
         }
     }
 }
@@ -156,6 +159,40 @@ impl SystemFlowEventStore for SystemFlowEventStoreInMem {
                     g.flows_by_type
                         .get(&flow_type)
                         .and_then(|flows| flows.get(pos).cloned())
+                };
+
+                let flow_id = match next {
+                    None => break,
+                    Some(flow_id) => flow_id,
+                };
+
+                yield flow_id;
+            }
+        })
+    }
+
+    /// Returns the flows of any type in reverse chronological order based on
+    /// creation time
+    fn get_all_flows<'a>(&'a self) -> SystemFlowIDStream<'a> {
+        // TODO: This should be a buffered stream so we don't lock per record
+        Box::pin(async_stream::try_stream! {
+            let mut pos = {
+                let state = self.inner.as_state();
+                let g = state.lock().unwrap();
+                g.all_flows.len()
+            };
+
+            loop {
+                if pos == 0 {
+                    break;
+                }
+
+                pos -= 1;
+
+                let next = {
+                    let state = self.inner.as_state();
+                    let g = state.lock().unwrap();
+                    g.all_flows.get(pos).cloned()
                 };
 
                 let flow_id = match next {

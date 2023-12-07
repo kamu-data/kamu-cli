@@ -186,6 +186,8 @@ pub enum CancelDatasetFlowError {
 #[derive(thiserror::Error, Debug)]
 pub enum CancelSystemFlowError {
     #[error(transparent)]
+    NotFound(#[from] SystemFlowNotFoundError),
+    #[error(transparent)]
     Internal(#[from] InternalError),
 }
 
@@ -219,11 +221,39 @@ impl From<LoadError<DatasetFlowState>> for GetDatasetFlowError {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+impl From<LoadError<SystemFlowState>> for GetSystemFlowError {
+    fn from(value: LoadError<SystemFlowState>) -> Self {
+        match value {
+            LoadError::NotFound(err) => {
+                Self::NotFound(SystemFlowNotFoundError { flow_id: err.query })
+            }
+            LoadError::ProjectionError(err) => Self::Internal(err.int_err()),
+            LoadError::Internal(err) => Self::Internal(err),
+        }
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
 impl From<LoadError<DatasetFlowState>> for CancelDatasetFlowError {
     fn from(value: LoadError<DatasetFlowState>) -> Self {
         match value {
             LoadError::NotFound(err) => {
                 Self::NotFound(DatasetFlowNotFoundError { flow_id: err.query })
+            }
+            LoadError::ProjectionError(err) => Self::Internal(err.int_err()),
+            LoadError::Internal(err) => Self::Internal(err),
+        }
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+impl From<LoadError<SystemFlowState>> for CancelSystemFlowError {
+    fn from(value: LoadError<SystemFlowState>) -> Self {
+        match value {
+            LoadError::NotFound(err) => {
+                Self::NotFound(SystemFlowNotFoundError { flow_id: err.query })
             }
             LoadError::ProjectionError(err) => Self::Internal(err.int_err()),
             LoadError::Internal(err) => Self::Internal(err),

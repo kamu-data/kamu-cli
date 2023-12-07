@@ -12,7 +12,7 @@
 use internal_error::InternalError;
 
 /// Uniquely identifies a flow
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct SystemFlowID(u64);
 
 impl SystemFlowID {

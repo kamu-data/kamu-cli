@@ -14,11 +14,13 @@
 // Re-exports
 pub use kamu_dataset_update_flow as domain;
 
-mod activity_time_wheel;
+mod any_flow_id;
 mod dataset_flow_key;
+mod flow_time_wheel;
 mod repos;
 mod services;
 
-pub(crate) use activity_time_wheel::*;
+pub(crate) use any_flow_id::*;
+pub(crate) use flow_time_wheel::*;
 pub use repos::*;
 pub use services::*;
