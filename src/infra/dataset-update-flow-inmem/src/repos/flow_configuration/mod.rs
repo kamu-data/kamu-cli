@@ -7,8 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod flow;
-mod flow_configuration;
+mod dataset_flow_configuration_event_store_inmem;
+mod system_flow_configuration_event_store_inmem;
 
-pub use flow::*;
-pub use flow_configuration::*;
+pub use dataset_flow_configuration_event_store_inmem::*;
+pub use system_flow_configuration_event_store_inmem::*;

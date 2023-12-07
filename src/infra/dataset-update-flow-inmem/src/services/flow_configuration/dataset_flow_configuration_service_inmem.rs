@@ -15,7 +15,6 @@ use futures::StreamExt;
 use kamu_core::events::DatasetEventDeleted;
 use kamu_core::SystemTimeSource;
 use kamu_dataset_update_flow::*;
-use opendatafabric::DatasetID;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -64,37 +63,16 @@ impl DatasetFlowConfigurationServiceInMemory {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl DatasetFlowConfigurationService for DatasetFlowConfigurationServiceInMemory {
-    /// Lists update configurations, which are currently enabled
-    fn list_enabled_configurations(
-        &self,
-        flow_type: DatasetFlowType,
-    ) -> DatasetFlowConfigurationStateStream {
-        // Note: terribly ineffecient - walks over events multiple times
-        Box::pin(async_stream::try_stream! {
-            let dataset_ids: Vec<_> = self.event_store.list_all_dataset_ids().collect().await;
-            for dataset_id in dataset_ids {
-                let maybe_update_configuration = DatasetFlowConfiguration::try_load(DatasetFlowKey::new(dataset_id, flow_type), self.event_store.as_ref()).await.int_err()?;
-                if let Some(update_configuration) = maybe_update_configuration && update_configuration.is_active() {
-                    yield update_configuration.into();
-                }
-            }
-        })
-    }
-
+impl FlowConfigurationService<DatasetFlowKey> for DatasetFlowConfigurationServiceInMemory {
     /// Find current schedule, which may or may not be associated with the given
     /// dataset
-    #[tracing::instrument(level = "info", skip_all, fields(%dataset_id))]
+    #[tracing::instrument(level = "info", skip_all)]
     async fn find_configuration(
         &self,
-        dataset_id: &DatasetID,
-        flow_type: DatasetFlowType,
-    ) -> Result<Option<DatasetFlowConfigurationState>, FindDatasetFlowConfigurationError> {
-        let maybe_update_configuration = DatasetFlowConfiguration::try_load(
-            DatasetFlowKey::new(dataset_id.clone(), flow_type),
-            self.event_store.as_ref(),
-        )
-        .await?;
+        flow_key: DatasetFlowKey,
+    ) -> Result<Option<DatasetFlowConfigurationState>, FindFlowConfigurationError> {
+        let maybe_update_configuration =
+            DatasetFlowConfiguration::try_load(flow_key, self.event_store.as_ref()).await?;
         Ok(maybe_update_configuration.map(|us| us.into()))
     }
 
@@ -102,16 +80,12 @@ impl DatasetFlowConfigurationService for DatasetFlowConfigurationServiceInMemory
     #[tracing::instrument(level = "info", skip_all)]
     async fn set_configuration(
         &self,
-        dataset_id: DatasetID,
-        flow_type: DatasetFlowType,
+        flow_key: DatasetFlowKey,
         paused: bool,
         rule: FlowConfigurationRule,
-    ) -> Result<DatasetFlowConfigurationState, SetDatasetFlowConfigurationError> {
-        let maybe_update_configuration = DatasetFlowConfiguration::try_load(
-            DatasetFlowKey::new(dataset_id.clone(), flow_type),
-            self.event_store.as_ref(),
-        )
-        .await?;
+    ) -> Result<DatasetFlowConfigurationState, SetFlowConfigurationError> {
+        let maybe_update_configuration =
+            DatasetFlowConfiguration::try_load(flow_key.clone(), self.event_store.as_ref()).await?;
 
         match maybe_update_configuration {
             // Modification
@@ -134,7 +108,7 @@ impl DatasetFlowConfigurationService for DatasetFlowConfigurationServiceInMemory
             None => {
                 let mut update_configuration = DatasetFlowConfiguration::new(
                     self.time_source.now(),
-                    DatasetFlowKey::new(dataset_id, flow_type),
+                    flow_key.clone(),
                     paused,
                     rule,
                 );
@@ -150,6 +124,28 @@ impl DatasetFlowConfigurationService for DatasetFlowConfigurationServiceInMemory
                 Ok(update_configuration.into())
             }
         }
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait::async_trait]
+impl DatasetFlowConfigurationService for DatasetFlowConfigurationServiceInMemory {
+    /// Lists update configurations, which are currently enabled
+    fn list_enabled_configurations(
+        &self,
+        flow_type: DatasetFlowType,
+    ) -> DatasetFlowConfigurationStateStream {
+        // Note: terribly ineffecient - walks over events multiple times
+        Box::pin(async_stream::try_stream! {
+            let dataset_ids: Vec<_> = self.event_store.list_all_dataset_ids().collect().await;
+            for dataset_id in dataset_ids {
+                let maybe_update_configuration = DatasetFlowConfiguration::try_load(DatasetFlowKey::new(dataset_id, flow_type), self.event_store.as_ref()).await.int_err()?;
+                if let Some(update_configuration) = maybe_update_configuration && update_configuration.is_active() {
+                    yield update_configuration.into();
+                }
+            }
+        })
     }
 }
 

@@ -9,37 +9,26 @@
 
 use event_sourcing::TryLoadError;
 use internal_error::{ErrorIntoInternal, InternalError};
-use opendatafabric::DatasetID;
 use tokio_stream::Stream;
 
-use crate::{DatasetFlowConfigurationState, DatasetFlowType, FlowConfigurationRule};
+use crate::{
+    DatasetFlowConfigurationState,
+    DatasetFlowKey,
+    DatasetFlowType,
+    FindFlowConfigurationError,
+    FlowConfigurationService,
+    SetFlowConfigurationError,
+};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait DatasetFlowConfigurationService: Sync + Send {
-    /// Lists flow configurations, which are currently enabled
+pub trait DatasetFlowConfigurationService: FlowConfigurationService<DatasetFlowKey> {
+    /// Lists dataset flow configurations, which are currently enabled
     fn list_enabled_configurations(
         &self,
         flow_type: DatasetFlowType,
     ) -> DatasetFlowConfigurationStateStream;
-
-    /// Find current configuration of a certian type,
-    /// which may or may not be associated with the given dataset
-    async fn find_configuration(
-        &self,
-        dataset_id: &DatasetID,
-        flow_type: DatasetFlowType,
-    ) -> Result<Option<DatasetFlowConfigurationState>, FindDatasetFlowConfigurationError>;
-
-    /// Set or modify dataset flow configuration
-    async fn set_configuration(
-        &self,
-        dataset_id: DatasetID,
-        flow_type: DatasetFlowType,
-        paused: bool,
-        rule: FlowConfigurationRule,
-    ) -> Result<DatasetFlowConfigurationState, SetDatasetFlowConfigurationError>;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -50,19 +39,7 @@ pub type DatasetFlowConfigurationStateStream<'a> = std::pin::Pin<
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(thiserror::Error, Debug)]
-pub enum SetDatasetFlowConfigurationError {
-    #[error(transparent)]
-    Internal(#[from] InternalError),
-}
-
-#[derive(thiserror::Error, Debug)]
-pub enum FindDatasetFlowConfigurationError {
-    #[error(transparent)]
-    Internal(#[from] InternalError),
-}
-
-impl From<TryLoadError<DatasetFlowConfigurationState>> for FindDatasetFlowConfigurationError {
+impl From<TryLoadError<DatasetFlowConfigurationState>> for FindFlowConfigurationError {
     fn from(value: TryLoadError<DatasetFlowConfigurationState>) -> Self {
         match value {
             TryLoadError::ProjectionError(err) => Self::Internal(err.int_err()),
@@ -71,7 +48,7 @@ impl From<TryLoadError<DatasetFlowConfigurationState>> for FindDatasetFlowConfig
     }
 }
 
-impl From<TryLoadError<DatasetFlowConfigurationState>> for SetDatasetFlowConfigurationError {
+impl From<TryLoadError<DatasetFlowConfigurationState>> for SetFlowConfigurationError {
     fn from(value: TryLoadError<DatasetFlowConfigurationState>) -> Self {
         match value {
             TryLoadError::ProjectionError(err) => Self::Internal(err.int_err()),

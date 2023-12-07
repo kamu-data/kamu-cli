@@ -57,18 +57,15 @@ impl SystemFlowConfigurationServiceInMemory {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl SystemFlowConfigurationService for SystemFlowConfigurationServiceInMemory {
+impl FlowConfigurationService<SystemFlowKey> for SystemFlowConfigurationServiceInMemory {
     /// Find current schedule
     #[tracing::instrument(level = "info", skip_all)]
     async fn find_configuration(
         &self,
-        flow_type: SystemFlowType,
-    ) -> Result<Option<SystemFlowConfigurationState>, FindSystemFlowConfigurationError> {
-        let maybe_update_configuration = SystemFlowConfiguration::try_load(
-            SystemFlowKey::new(flow_type),
-            self.event_store.as_ref(),
-        )
-        .await?;
+        flow_key: SystemFlowKey,
+    ) -> Result<Option<SystemFlowConfigurationState>, FindFlowConfigurationError> {
+        let maybe_update_configuration =
+            SystemFlowConfiguration::try_load(flow_key, self.event_store.as_ref()).await?;
         Ok(maybe_update_configuration.map(|us| us.into()))
     }
 
@@ -76,25 +73,18 @@ impl SystemFlowConfigurationService for SystemFlowConfigurationServiceInMemory {
     #[tracing::instrument(level = "info", skip_all)]
     async fn set_configuration(
         &self,
-        flow_type: SystemFlowType,
+        flow_key: SystemFlowKey,
         paused: bool,
-        schedule: Schedule,
-    ) -> Result<SystemFlowConfigurationState, SetSystemFlowConfigurationError> {
-        let maybe_flow_configuration = SystemFlowConfiguration::try_load(
-            SystemFlowKey::new(flow_type),
-            self.event_store.as_ref(),
-        )
-        .await?;
+        rule: FlowConfigurationRule,
+    ) -> Result<SystemFlowConfigurationState, SetFlowConfigurationError> {
+        let maybe_flow_configuration =
+            SystemFlowConfiguration::try_load(flow_key.clone(), self.event_store.as_ref()).await?;
 
         match maybe_flow_configuration {
             // Modification
             Some(mut flow_configuration) => {
                 flow_configuration
-                    .modify_configuration(
-                        self.time_source.now(),
-                        paused,
-                        FlowConfigurationRule::Schedule(schedule),
-                    )
+                    .modify_configuration(self.time_source.now(), paused, rule)
                     .int_err()?;
 
                 flow_configuration
@@ -109,12 +99,8 @@ impl SystemFlowConfigurationService for SystemFlowConfigurationServiceInMemory {
             }
             // New configuration
             None => {
-                let mut flow_configuration = SystemFlowConfiguration::new(
-                    self.time_source.now(),
-                    SystemFlowKey::new(flow_type),
-                    paused,
-                    FlowConfigurationRule::Schedule(schedule),
-                );
+                let mut flow_configuration =
+                    SystemFlowConfiguration::new(self.time_source.now(), flow_key, paused, rule);
 
                 flow_configuration
                     .save(self.event_store.as_ref())
@@ -129,5 +115,10 @@ impl SystemFlowConfigurationService for SystemFlowConfigurationServiceInMemory {
         }
     }
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait::async_trait]
+impl SystemFlowConfigurationService for SystemFlowConfigurationServiceInMemory {}
 
 /////////////////////////////////////////////////////////////////////////////////////////

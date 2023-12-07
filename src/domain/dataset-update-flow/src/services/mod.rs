@@ -7,13 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod dataset_flow_configuration_service;
-mod system_flow_configuration_service;
+mod flow_configuration;
 
 mod dependency_graph_service;
 mod flow_service;
 
-pub use dataset_flow_configuration_service::*;
 pub use dependency_graph_service::*;
+pub use flow_configuration::*;
 pub use flow_service::*;
-pub use system_flow_configuration_service::*;
