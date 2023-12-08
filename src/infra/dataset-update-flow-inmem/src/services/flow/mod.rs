@@ -7,10 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod dependency_graph_service_inmem;
-mod flow;
-mod flow_configuration;
+mod active_configs_state;
+mod flow_service_inmem;
 
-pub use dependency_graph_service_inmem::*;
-pub use flow::*;
-pub use flow_configuration::*;
+pub use flow_service_inmem::*;
