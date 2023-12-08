@@ -9,7 +9,6 @@
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use chrono::{DateTime, Utc};
@@ -24,8 +23,8 @@ use opendatafabric::{AccountID, AccountName, DatasetID};
 use tokio_stream::StreamExt;
 
 use super::active_configs_state::ActiveConfigsState;
+use super::pending_flows_state::PendingFlowsState;
 use crate::any_flow_id::AnyFlowID;
-use crate::dataset_flow_key::{BorrowedDatasetFlowKey, OwnedDatasetFlowKey};
 use crate::FlowTimeWheel;
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -46,9 +45,7 @@ pub struct FlowServiceInMemory {
 #[derive(Default)]
 struct State {
     active_configs: ActiveConfigsState,
-    pending_dataset_flows: HashMap<OwnedDatasetFlowKey, DatasetFlowID>,
-    pending_system_flows: HashMap<SystemFlowType, SystemFlowID>,
-    pending_flows_by_tasks: HashMap<TaskID, AnyFlowID>,
+    pending_flows: PendingFlowsState,
     time_wheel: FlowTimeWheel,
 }
 
@@ -425,17 +422,13 @@ impl FlowServiceInMemory {
     ) -> Option<DatasetFlowID> {
         let state = self.state.lock().unwrap();
         state
-            .pending_dataset_flows
-            .get(BorrowedDatasetFlowKey::new(&dataset_id, flow_type).as_trait())
-            .map(|flow_id| *flow_id)
+            .pending_flows
+            .try_get_dataset_pending_flow(dataset_id, flow_type)
     }
 
     fn find_pending_system_flow(&self, flow_type: SystemFlowType) -> Option<SystemFlowID> {
         let state = self.state.lock().unwrap();
-        state
-            .pending_system_flows
-            .get(&flow_type)
-            .map(|flow_id| *flow_id)
+        state.pending_flows.try_get_system_pending_flow(flow_type)
     }
 
     async fn make_new_dataset_flow(
@@ -447,17 +440,14 @@ impl FlowServiceInMemory {
         let dataset_flow = DatasetFlow::new(
             self.time_source.now(),
             self.dataset_flow_event_store.new_flow_id(),
-            DatasetFlowKey::new(dataset_id, flow_type),
+            DatasetFlowKey::new(dataset_id.clone(), flow_type),
             trigger,
         );
 
-        {
-            let mut state = self.state.lock().unwrap();
-            state.pending_dataset_flows.insert(
-                OwnedDatasetFlowKey::new(dataset_flow.flow_key.dataset_id.clone(), flow_type),
-                dataset_flow.flow_id,
-            );
-        }
+        let mut state = self.state.lock().unwrap();
+        state
+            .pending_flows
+            .add_dataset_pending_flow(dataset_id, flow_type, dataset_flow.flow_id);
 
         Ok(dataset_flow)
     }
@@ -474,12 +464,10 @@ impl FlowServiceInMemory {
             trigger,
         );
 
-        {
-            let mut state = self.state.lock().unwrap();
-            state
-                .pending_system_flows
-                .insert(flow_type, system_flow.flow_id);
-        }
+        let mut state = self.state.lock().unwrap();
+        state
+            .pending_flows
+            .add_system_pending_flow(flow_type, system_flow.flow_id);
 
         Ok(system_flow)
     }
@@ -560,8 +548,8 @@ impl FlowServiceInMemory {
 
         let mut state = self.state.lock().unwrap();
         state
-            .pending_flows_by_tasks
-            .insert(task.task_id, AnyFlowID::Dataset(dataset_flow.flow_id));
+            .pending_flows
+            .track_dataset_flow_task(dataset_flow.flow_id, task.task_id);
 
         Ok(())
     }
@@ -595,8 +583,8 @@ impl FlowServiceInMemory {
 
         let mut state = self.state.lock().unwrap();
         state
-            .pending_flows_by_tasks
-            .insert(task.task_id, AnyFlowID::System(system_flow.flow_id));
+            .pending_flows
+            .track_system_flow_task(system_flow.flow_id, task.task_id);
 
         Ok(())
     }
@@ -857,22 +845,17 @@ impl FlowService for FlowServiceInMemory {
 
             let any_flow_id = AnyFlowID::Dataset(flow_id);
 
-            {
-                let mut state = self.state.lock().unwrap();
-                if state.time_wheel.is_flow_activation_planned(&any_flow_id) {
-                    state
-                        .time_wheel
-                        .cancel_flow_activation(any_flow_id)
-                        .map_err(|e| CancelDatasetFlowError::Internal(e.int_err()))?;
-                }
-                state.pending_dataset_flows.remove(
-                    BorrowedDatasetFlowKey::new(
-                        &dataset_flow.flow_key.dataset_id,
-                        dataset_flow.flow_key.flow_type,
-                    )
-                    .as_trait(),
-                );
+            let mut state = self.state.lock().unwrap();
+            if state.time_wheel.is_flow_activation_planned(&any_flow_id) {
+                state
+                    .time_wheel
+                    .cancel_flow_activation(any_flow_id)
+                    .map_err(|e| CancelDatasetFlowError::Internal(e.int_err()))?;
             }
+            state.pending_flows.drop_dataset_flow(
+                &dataset_flow.flow_key.dataset_id,
+                dataset_flow.flow_key.flow_type,
+            );
         }
 
         Ok(dataset_flow.into())
@@ -899,18 +882,16 @@ impl FlowService for FlowServiceInMemory {
 
             let any_flow_id = AnyFlowID::System(flow_id);
 
-            {
-                let mut state = self.state.lock().unwrap();
-                if state.time_wheel.is_flow_activation_planned(&any_flow_id) {
-                    state
-                        .time_wheel
-                        .cancel_flow_activation(any_flow_id)
-                        .map_err(|e| CancelSystemFlowError::Internal(e.int_err()))?;
-                }
+            let mut state = self.state.lock().unwrap();
+            if state.time_wheel.is_flow_activation_planned(&any_flow_id) {
                 state
-                    .pending_system_flows
-                    .remove(&system_flow.flow_key.flow_type);
+                    .time_wheel
+                    .cancel_flow_activation(any_flow_id)
+                    .map_err(|e| CancelSystemFlowError::Internal(e.int_err()))?;
             }
+            state
+                .pending_flows
+                .drop_system_flow(system_flow.flow_key.flow_type);
         }
 
         Ok(system_flow.into())
@@ -922,15 +903,14 @@ impl FlowService for FlowServiceInMemory {
 #[async_trait::async_trait]
 impl AsyncEventHandler<TaskEventFinished> for FlowServiceInMemory {
     async fn handle(&self, event: &TaskEventFinished) -> Result<(), InternalError> {
-        let maybe_flow_id = {
-            let state = self.state.lock().unwrap();
-            state
-                .pending_flows_by_tasks
-                .get(&event.task_id)
-                .map(|flow_id| *flow_id)
-        };
-
         // Is this a task associated with flows?
+        let maybe_flow_id = self
+            .state
+            .lock()
+            .unwrap()
+            .pending_flows
+            .try_get_flow_id_by_task(event.task_id);
+
         if let Some(flow_id) = maybe_flow_id {
             match *&flow_id {
                 AnyFlowID::Dataset(flow_id) => {
@@ -948,12 +928,9 @@ impl AsyncEventHandler<TaskEventFinished> for FlowServiceInMemory {
 
                     {
                         let mut state = self.state.lock().unwrap();
-                        state.pending_dataset_flows.remove(
-                            BorrowedDatasetFlowKey::new(
-                                &dataset_flow.flow_key.dataset_id,
-                                dataset_flow.flow_key.flow_type,
-                            )
-                            .as_trait(),
+                        state.pending_flows.drop_dataset_flow(
+                            &dataset_flow.flow_key.dataset_id,
+                            dataset_flow.flow_key.flow_type,
                         );
                     }
 
@@ -994,8 +971,8 @@ impl AsyncEventHandler<TaskEventFinished> for FlowServiceInMemory {
                     {
                         let mut state = self.state.lock().unwrap();
                         state
-                            .pending_system_flows
-                            .remove(&system_flow.flow_key.flow_type);
+                            .pending_flows
+                            .drop_system_flow(system_flow.flow_key.flow_type);
                     }
 
                     // In case of success:
@@ -1007,10 +984,8 @@ impl AsyncEventHandler<TaskEventFinished> for FlowServiceInMemory {
                 }
             }
 
-            {
-                let mut state = self.state.lock().unwrap();
-                state.pending_flows_by_tasks.remove(&event.task_id);
-            }
+            let mut state = self.state.lock().unwrap();
+            state.pending_flows.untrack_flow_by_task(event.task_id);
 
             // TODO: retry logic in case of failed outcome
         }
@@ -1081,8 +1056,8 @@ impl AsyncEventHandler<DatasetEventDeleted> for FlowServiceInMemory {
 
         for flow_type in DatasetFlowType::iterator() {
             if let Some(flow_id) = state
-                .pending_dataset_flows
-                .remove(BorrowedDatasetFlowKey::new(&event.dataset_id, flow_type).as_trait())
+                .pending_flows
+                .drop_dataset_flow(&event.dataset_id, flow_type)
             {
                 state
                     .time_wheel

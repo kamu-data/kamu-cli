@@ -9,5 +9,6 @@
 
 mod active_configs_state;
 mod flow_service_inmem;
+mod pending_flows_state;
 
 pub use flow_service_inmem::*;
