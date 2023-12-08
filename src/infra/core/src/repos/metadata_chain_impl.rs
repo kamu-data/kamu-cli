@@ -294,8 +294,8 @@ where
                     }
                 }
 
-                // Validate schema was defined
-                if prev_schema.is_none() {
+                // Validate schema was defined if we're adding data
+                if prev_schema.is_none() && e.output_data.is_some() {
                     return Err(AppendValidationError::InvalidEvent(InvalidEventError::new(
                         e.clone(),
                         "SetDataSchema event must be present before adding data",

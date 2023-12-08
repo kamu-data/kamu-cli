@@ -604,6 +604,11 @@ impl ExecuteQueryBuilder {
         }
     }
 
+    pub fn input_checkpoint(mut self, checkpoint: Option<Multihash>) -> Self {
+        self.v.input_checkpoint = checkpoint;
+        self
+    }
+
     pub fn some_output_data(mut self) -> Self {
         if self.v.output_data.is_none() {
             self.v.output_data = Some(DataSlice {

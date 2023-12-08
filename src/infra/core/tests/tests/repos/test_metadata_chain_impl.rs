@@ -466,7 +466,7 @@ async fn test_append_add_data_empty_commit() {
     let tmp_dir = tempfile::tempdir().unwrap();
     let chain = init_chain(tmp_dir.path());
 
-    let hash: MultihashGeneric<32> = chain
+    let hash = chain
         .append(
             MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build())
                 .build(),
@@ -475,7 +475,7 @@ async fn test_append_add_data_empty_commit() {
         .await
         .unwrap();
 
-    let hash: MultihashGeneric<32> = chain
+    let hash = chain
         .append(
             MetadataFactory::metadata_block(MetadataFactory::set_data_schema().build())
                 .prev(&hash, 0)
@@ -520,7 +520,7 @@ async fn test_append_execute_query_empty_commit() {
     let tmp_dir = tempfile::tempdir().unwrap();
     let chain = init_chain(tmp_dir.path());
 
-    let hash: MultihashGeneric<32> = chain
+    let hash = chain
         .append(
             MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build())
                 .build(),
@@ -529,7 +529,7 @@ async fn test_append_execute_query_empty_commit() {
         .await
         .unwrap();
 
-    let hash: MultihashGeneric<32> = chain
+    let hash = chain
         .append(
             MetadataFactory::metadata_block(MetadataFactory::set_data_schema().build())
                 .prev(&hash, 0)
@@ -566,6 +566,166 @@ async fn test_append_execute_query_empty_commit() {
             AppendValidationError::InvalidEvent(_)
         ))
     );
+}
+
+#[tokio::test]
+async fn test_append_add_data_must_be_preceeded_by_schema() {
+    let tmp_dir = tempfile::tempdir().unwrap();
+    let chain = init_chain(tmp_dir.path());
+
+    let hash = chain
+        .append(
+            MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build())
+                .build(),
+            AppendOpts::default(),
+        )
+        .await
+        .unwrap();
+
+    // Accepts one with empty data (in case when we infer schema, but upon initial
+    // pull only source state has been set)
+    let hash = chain
+        .append(
+            MetadataFactory::metadata_block(AddDataBuilder::empty().some_source_state().build())
+                .prev(&hash, 0)
+                .build(),
+            AppendOpts::default(),
+        )
+        .await
+        .unwrap();
+
+    // Rejects one with data
+    assert_matches!(
+        chain
+            .append(
+                MetadataFactory::metadata_block(
+                    MetadataFactory::add_data()
+                        .some_output_data()
+                        .some_source_state()
+                        .build()
+                )
+                .prev(&hash, 1)
+                .build(),
+                AppendOpts::default()
+            )
+            .await,
+        Err(AppendError::InvalidBlock(
+            AppendValidationError::InvalidEvent(_)
+        ))
+    );
+
+    // Schema is now set
+    let hash = chain
+        .append(
+            MetadataFactory::metadata_block(MetadataFactory::set_data_schema().build())
+                .prev(&hash, 1)
+                .build(),
+            AppendOpts::default(),
+        )
+        .await
+        .unwrap();
+
+    // Accepts one with data
+    chain
+        .append(
+            MetadataFactory::metadata_block(
+                MetadataFactory::add_data()
+                    .some_output_data()
+                    .some_source_state()
+                    .build(),
+            )
+            .prev(&hash, 2)
+            .build(),
+            AppendOpts::default(),
+        )
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn test_append_execute_query_must_be_preceeded_by_schema() {
+    let tmp_dir = tempfile::tempdir().unwrap();
+    let chain = init_chain(tmp_dir.path());
+
+    let hash = chain
+        .append(
+            MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build())
+                .build(),
+            AppendOpts::default(),
+        )
+        .await
+        .unwrap();
+
+    // Accepts one with empty data (in case when we infer schema, but upon initial
+    // transform only checkpoint was produced)
+    // TODO: we should make engines to always return the schema
+    let hash = chain
+        .append(
+            MetadataFactory::metadata_block(
+                MetadataFactory::execute_query()
+                    .output_checkpoint(Some(Checkpoint {
+                        physical_hash: Multihash::from_digest_sha3_256(b"foo"),
+                        size: 1,
+                    }))
+                    .build(),
+            )
+            .prev(&hash, 0)
+            .build(),
+            AppendOpts::default(),
+        )
+        .await
+        .unwrap();
+
+    // Rejects one with data
+    assert_matches!(
+        chain
+            .append(
+                MetadataFactory::metadata_block(
+                    MetadataFactory::execute_query()
+                        .some_output_checkpoint()
+                        .some_output_data()
+                        .build()
+                )
+                .prev(&hash, 1)
+                .build(),
+                AppendOpts::default()
+            )
+            .await,
+        Err(AppendError::InvalidBlock(
+            AppendValidationError::InvalidEvent(_)
+        ))
+    );
+
+    // Schema is now set
+    let hash = chain
+        .append(
+            MetadataFactory::metadata_block(MetadataFactory::set_data_schema().build())
+                .prev(&hash, 1)
+                .build(),
+            AppendOpts::default(),
+        )
+        .await
+        .unwrap();
+
+    // Accepts one with data
+    chain
+        .append(
+            MetadataFactory::metadata_block(
+                MetadataFactory::execute_query()
+                    .input_checkpoint(Some(Multihash::from_digest_sha3_256(b"foo")))
+                    .output_checkpoint(Some(Checkpoint {
+                        physical_hash: Multihash::from_digest_sha3_256(b"bar"),
+                        size: 1,
+                    }))
+                    .some_output_data()
+                    .build(),
+            )
+            .prev(&hash, 2)
+            .build(),
+            AppendOpts::default(),
+        )
+        .await
+        .unwrap();
 }
 
 #[tokio::test]
