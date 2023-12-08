@@ -33,8 +33,7 @@ pub struct FlowServiceInMemory {
     flow_event_store: Arc<dyn FlowEventStore>,
     time_source: Arc<dyn SystemTimeSource>,
     task_scheduler: Arc<dyn TaskScheduler>,
-    dataset_flow_configuration_service: Arc<dyn DatasetFlowConfigurationService>,
-    system_flow_configuration_service: Arc<dyn SystemFlowConfigurationService>,
+    flow_configuration_service: Arc<dyn FlowConfigurationService>,
     dependency_graph_service: Arc<dyn DependencyGraphService>,
 }
 
@@ -53,16 +52,14 @@ struct State {
 #[interface(dyn FlowService)]
 #[interface(dyn AsyncEventHandler<TaskEventFinished>)]
 #[interface(dyn AsyncEventHandler<DatasetEventDeleted>)]
-#[interface(dyn AsyncEventHandler<FlowConfigurationEventModified<DatasetFlowKey>>)]
-#[interface(dyn AsyncEventHandler<FlowConfigurationEventModified<SystemFlowKey>>)]
+#[interface(dyn AsyncEventHandler<FlowConfigurationEventModified>)]
 #[scope(Singleton)]
 impl FlowServiceInMemory {
     pub fn new(
         flow_event_store: Arc<dyn FlowEventStore>,
         time_source: Arc<dyn SystemTimeSource>,
         task_scheduler: Arc<dyn TaskScheduler>,
-        dataset_flow_configuration_service: Arc<dyn DatasetFlowConfigurationService>,
-        system_flow_configuration_service: Arc<dyn SystemFlowConfigurationService>,
+        flow_configuration_service: Arc<dyn FlowConfigurationService>,
         dependency_graph_service: Arc<dyn DependencyGraphService>,
     ) -> Self {
         Self {
@@ -70,8 +67,7 @@ impl FlowServiceInMemory {
             flow_event_store,
             time_source,
             task_scheduler,
-            dataset_flow_configuration_service,
-            system_flow_configuration_service,
+            flow_configuration_service,
             dependency_graph_service,
         }
     }
@@ -123,19 +119,24 @@ impl FlowServiceInMemory {
         flow_type: DatasetFlowType,
     ) -> Result<(), InternalError> {
         let enabled_configurations: Vec<_> = self
-            .dataset_flow_configuration_service
-            .list_enabled_configurations(flow_type)
+            .flow_configuration_service
+            .list_enabled_dataset_flow_configurations(flow_type)
             .try_collect()
             .await
             .int_err()?;
 
         for enabled_config in enabled_configurations {
-            self.activate_dataset_flow_configuration(
-                &enabled_config.flow_key.dataset_id,
-                flow_type,
-                enabled_config.rule,
-            )
-            .await?;
+            match &enabled_config.flow_key {
+                FlowKey::Dataset(flow_key) => {
+                    self.activate_dataset_flow_configuration(
+                        &flow_key.dataset_id,
+                        flow_type,
+                        enabled_config.rule,
+                    )
+                    .await?;
+                }
+                FlowKey::System(_) => unreachable!(),
+            }
         }
 
         Ok(())
@@ -146,8 +147,8 @@ impl FlowServiceInMemory {
         flow_type: SystemFlowType,
     ) -> Result<(), InternalError> {
         let maybe_system_flow_config = self
-            .system_flow_configuration_service
-            .find_configuration(SystemFlowKey::new(flow_type))
+            .flow_configuration_service
+            .find_configuration(FlowKey::System(FlowKeySystem::new(flow_type)))
             .await
             .map_err(|e| match e {
                 FindFlowConfigurationError::Internal(e) => e,
@@ -833,49 +834,38 @@ impl AsyncEventHandler<TaskEventFinished> for FlowServiceInMemory {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl AsyncEventHandler<FlowConfigurationEventModified<DatasetFlowKey>> for FlowServiceInMemory {
-    async fn handle(
-        &self,
-        event: &FlowConfigurationEventModified<DatasetFlowKey>,
-    ) -> Result<(), InternalError> {
+impl AsyncEventHandler<FlowConfigurationEventModified> for FlowServiceInMemory {
+    async fn handle(&self, event: &FlowConfigurationEventModified) -> Result<(), InternalError> {
         if event.paused {
             let mut state = self.state.lock().unwrap();
-            state
-                .active_configs
-                .drop_dataset_flow_config(&event.flow_key.dataset_id, event.flow_key.flow_type);
-
+            match &event.flow_key {
+                FlowKey::Dataset(flow_key) => {
+                    state
+                        .active_configs
+                        .drop_dataset_flow_config(&flow_key.dataset_id, flow_key.flow_type);
+                }
+                FlowKey::System(flow_key) => {
+                    state
+                        .active_configs
+                        .drop_system_flow_config(flow_key.flow_type);
+                }
+            }
             // TODO: should we unqueue pending flows / abort scheduled tasks?
         } else {
-            self.activate_dataset_flow_configuration(
-                &event.flow_key.dataset_id,
-                event.flow_key.flow_type,
-                event.rule.clone(),
-            )
-            .await?;
-        }
-
-        Ok(())
-    }
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-#[async_trait::async_trait]
-impl AsyncEventHandler<FlowConfigurationEventModified<SystemFlowKey>> for FlowServiceInMemory {
-    async fn handle(
-        &self,
-        event: &FlowConfigurationEventModified<SystemFlowKey>,
-    ) -> Result<(), InternalError> {
-        if event.paused {
-            let mut state = self.state.lock().unwrap();
-            state
-                .active_configs
-                .drop_system_flow_config(event.flow_key.flow_type);
-
-            // TODO: should we unqueue pending flows / abort scheduled tasks?
-        } else {
-            self.activate_system_flow_configuration(event.flow_key.flow_type, event.rule.clone())
-                .await?;
+            match &event.flow_key {
+                FlowKey::Dataset(flow_key) => {
+                    self.activate_dataset_flow_configuration(
+                        &flow_key.dataset_id,
+                        flow_key.flow_type,
+                        event.rule.clone(),
+                    )
+                    .await?;
+                }
+                FlowKey::System(flow_key) => {
+                    self.activate_system_flow_configuration(flow_key.flow_type, event.rule.clone())
+                        .await?;
+                }
+            }
         }
 
         Ok(())

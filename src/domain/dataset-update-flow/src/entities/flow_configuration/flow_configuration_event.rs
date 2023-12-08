@@ -15,18 +15,18 @@ use crate::*;
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum FlowConfigurationEvent<TFlowKey> {
-    Created(FlowConfigurationEventCreated<TFlowKey>),
-    Modified(FlowConfigurationEventModified<TFlowKey>),
-    DatasetRemoved(FlowConfigurationEventDatasetRemoved<TFlowKey>),
+pub enum FlowConfigurationEvent {
+    Created(FlowConfigurationEventCreated),
+    Modified(FlowConfigurationEventModified),
+    DatasetRemoved(FlowConfigurationEventDatasetRemoved),
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct FlowConfigurationEventCreated<TFlowKey> {
+pub struct FlowConfigurationEventCreated {
     pub event_time: DateTime<Utc>,
-    pub flow_key: TFlowKey,
+    pub flow_key: FlowKey,
     pub paused: bool,
     pub rule: FlowConfigurationRule,
 }
@@ -34,9 +34,9 @@ pub struct FlowConfigurationEventCreated<TFlowKey> {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct FlowConfigurationEventModified<TFlowKey> {
+pub struct FlowConfigurationEventModified {
     pub event_time: DateTime<Utc>,
-    pub flow_key: TFlowKey,
+    pub flow_key: FlowKey,
     pub paused: bool,
     pub rule: FlowConfigurationRule,
 }
@@ -44,42 +44,42 @@ pub struct FlowConfigurationEventModified<TFlowKey> {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct FlowConfigurationEventDatasetRemoved<TFlowKey> {
+pub struct FlowConfigurationEventDatasetRemoved {
     pub event_time: DateTime<Utc>,
-    pub flow_key: TFlowKey,
+    pub flow_key: FlowKey,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-impl<TFlowKey> FlowConfigurationEvent<TFlowKey> {
-    pub fn flow_key(&self) -> &TFlowKey {
+impl FlowConfigurationEvent {
+    pub fn flow_key(&self) -> &FlowKey {
         match self {
-            FlowConfigurationEvent::<TFlowKey>::Created(e) => &e.flow_key,
-            FlowConfigurationEvent::<TFlowKey>::Modified(e) => &e.flow_key,
-            FlowConfigurationEvent::<TFlowKey>::DatasetRemoved(e) => &e.flow_key,
+            FlowConfigurationEvent::Created(e) => &e.flow_key,
+            FlowConfigurationEvent::Modified(e) => &e.flow_key,
+            FlowConfigurationEvent::DatasetRemoved(e) => &e.flow_key,
         }
     }
 
     pub fn event_time(&self) -> &DateTime<Utc> {
         match self {
-            FlowConfigurationEvent::<TFlowKey>::Created(e) => &e.event_time,
-            FlowConfigurationEvent::<TFlowKey>::Modified(e) => &e.event_time,
-            FlowConfigurationEvent::<TFlowKey>::DatasetRemoved(e) => &e.event_time,
+            FlowConfigurationEvent::Created(e) => &e.event_time,
+            FlowConfigurationEvent::Modified(e) => &e.event_time,
+            FlowConfigurationEvent::DatasetRemoved(e) => &e.event_time,
         }
     }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-impl_generic_enum_with_variants!(FlowConfigurationEvent<TFlowKey: Clone>);
-impl_generic_enum_variant!(
-    FlowConfigurationEvent::Created(FlowConfigurationEventCreated<TFlowKey: Clone>)
-);
-impl_generic_enum_variant!(
-    FlowConfigurationEvent::Modified(FlowConfigurationEventModified<TFlowKey: Clone>)
-);
-impl_generic_enum_variant!(
-    FlowConfigurationEvent::DatasetRemoved(FlowConfigurationEventDatasetRemoved<TFlowKey: Clone>)
-);
+impl_enum_with_variants!(FlowConfigurationEvent);
+impl_enum_variant!(FlowConfigurationEvent::Created(
+    FlowConfigurationEventCreated
+));
+impl_enum_variant!(FlowConfigurationEvent::Modified(
+    FlowConfigurationEventModified
+));
+impl_enum_variant!(FlowConfigurationEvent::DatasetRemoved(
+    FlowConfigurationEventDatasetRemoved
+));
 
 /////////////////////////////////////////////////////////////////////////////////////////

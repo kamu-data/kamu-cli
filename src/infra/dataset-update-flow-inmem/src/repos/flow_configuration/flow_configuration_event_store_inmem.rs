@@ -15,28 +15,28 @@ use opendatafabric::DatasetID;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct DatasetFlowConfigurationEventStoreInMem {
-    inner: EventStoreInMemory<DatasetFlowConfigurationState, State>,
+pub struct FlowConfigurationEventStoreInMem {
+    inner: EventStoreInMemory<FlowConfigurationState, State>,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Default)]
 struct State {
-    events: Vec<DatasetFlowConfigurationEvent>,
+    events: Vec<FlowConfigurationEvent>,
     dataset_ids: HashSet<DatasetID>,
 }
 
-impl EventStoreState<DatasetFlowConfigurationState> for State {
+impl EventStoreState<FlowConfigurationState> for State {
     fn events_count(&self) -> usize {
         self.events.len()
     }
 
-    fn get_events(&self) -> &[DatasetFlowConfigurationEvent] {
+    fn get_events(&self) -> &[FlowConfigurationEvent] {
         &self.events
     }
 
-    fn add_event(&mut self, event: DatasetFlowConfigurationEvent) {
+    fn add_event(&mut self, event: FlowConfigurationEvent) {
         self.events.push(event);
     }
 }
@@ -44,9 +44,9 @@ impl EventStoreState<DatasetFlowConfigurationState> for State {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
-#[interface(dyn DatasetFlowConfigurationEventStore)]
+#[interface(dyn FlowConfigurationEventStore)]
 #[scope(Singleton)]
-impl DatasetFlowConfigurationEventStoreInMem {
+impl FlowConfigurationEventStoreInMem {
     pub fn new() -> Self {
         Self {
             inner: EventStoreInMemory::new(),
@@ -57,31 +57,37 @@ impl DatasetFlowConfigurationEventStoreInMem {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl EventStore<DatasetFlowConfigurationState> for DatasetFlowConfigurationEventStoreInMem {
+impl EventStore<FlowConfigurationState> for FlowConfigurationEventStoreInMem {
     async fn len(&self) -> Result<usize, InternalError> {
         self.inner.len().await
     }
 
     fn get_events<'a>(
         &'a self,
-        query: &DatasetFlowKey,
+        query: &FlowKey,
         opts: GetEventsOpts,
-    ) -> EventStream<'a, DatasetFlowConfigurationEvent> {
+    ) -> EventStream<'a, FlowConfigurationEvent> {
         self.inner.get_events(query, opts)
     }
 
     async fn save_events(
         &self,
-        query: &DatasetFlowKey,
-        events: Vec<DatasetFlowConfigurationEvent>,
+        query: &FlowKey,
+        events: Vec<FlowConfigurationEvent>,
     ) -> Result<EventID, SaveEventsError> {
+        if let FlowKey::Dataset(flow_key) = query {
+            let state = self.inner.as_state();
+            let mut g = state.lock().unwrap();
+            g.dataset_ids.insert(flow_key.dataset_id.clone());
+        }
+
         self.inner.save_events(query, events).await
     }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-impl DatasetFlowConfigurationEventStore for DatasetFlowConfigurationEventStoreInMem {
+impl FlowConfigurationEventStore for FlowConfigurationEventStoreInMem {
     fn list_all_dataset_ids<'a>(&'a self) -> DatasetIDStream<'a> {
         // TODO: re-consider performance impact
         Box::pin(tokio_stream::iter(

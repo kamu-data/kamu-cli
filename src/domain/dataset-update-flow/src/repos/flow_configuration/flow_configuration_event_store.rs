@@ -7,25 +7,17 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use opendatafabric::DatasetID;
+use event_sourcing::EventStore;
 
-use crate::DatasetFlowType;
+use crate::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub struct DatasetFlowKey {
-    pub dataset_id: DatasetID,
-    pub flow_type: DatasetFlowType,
-}
-
-impl DatasetFlowKey {
-    pub fn new(dataset_id: DatasetID, flow_type: DatasetFlowType) -> Self {
-        Self {
-            dataset_id,
-            flow_type,
-        }
-    }
+#[async_trait::async_trait]
+pub trait FlowConfigurationEventStore: EventStore<FlowConfigurationState> {
+    /// Returns all unique values of dataset IDs associated with update configs
+    // TODO: re-consider performance impact
+    fn list_all_dataset_ids<'a>(&'a self) -> DatasetIDStream<'a>;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

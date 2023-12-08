@@ -18,8 +18,8 @@ use kamu_dataset_update_flow::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct DatasetFlowConfigurationServiceInMemory {
-    event_store: Arc<dyn DatasetFlowConfigurationEventStore>,
+pub struct FlowConfigurationServiceInMemory {
+    event_store: Arc<dyn FlowConfigurationEventStore>,
     time_source: Arc<dyn SystemTimeSource>,
     event_bus: Arc<EventBus>,
 }
@@ -27,12 +27,12 @@ pub struct DatasetFlowConfigurationServiceInMemory {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
-#[interface(dyn DatasetFlowConfigurationService)]
+#[interface(dyn FlowConfigurationService)]
 #[interface(dyn AsyncEventHandler<DatasetEventDeleted>)]
 #[scope(Singleton)]
-impl DatasetFlowConfigurationServiceInMemory {
+impl FlowConfigurationServiceInMemory {
     pub fn new(
-        event_store: Arc<dyn DatasetFlowConfigurationEventStore>,
+        event_store: Arc<dyn FlowConfigurationEventStore>,
         time_source: Arc<dyn SystemTimeSource>,
         event_bus: Arc<EventBus>,
     ) -> Self {
@@ -43,16 +43,13 @@ impl DatasetFlowConfigurationServiceInMemory {
         }
     }
 
-    async fn publish_dataset_flow_configuration_modified(
+    async fn publish_flow_configuration_modified(
         &self,
-        state: &DatasetFlowConfigurationState,
+        state: &FlowConfigurationState,
     ) -> Result<(), InternalError> {
-        let event = FlowConfigurationEventModified::<DatasetFlowKey> {
+        let event = FlowConfigurationEventModified {
             event_time: self.time_source.now(),
-            flow_key: DatasetFlowKey::new(
-                state.flow_key.dataset_id.clone(),
-                state.flow_key.flow_type,
-            ),
+            flow_key: state.flow_key.clone(),
             paused: state.is_active(),
             rule: state.rule.clone(),
         };
@@ -63,86 +60,77 @@ impl DatasetFlowConfigurationServiceInMemory {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl FlowConfigurationService<DatasetFlowKey> for DatasetFlowConfigurationServiceInMemory {
+impl FlowConfigurationService for FlowConfigurationServiceInMemory {
     /// Find current schedule, which may or may not be associated with the given
     /// dataset
     #[tracing::instrument(level = "info", skip_all)]
     async fn find_configuration(
         &self,
-        flow_key: DatasetFlowKey,
-    ) -> Result<Option<DatasetFlowConfigurationState>, FindFlowConfigurationError> {
-        let maybe_update_configuration =
-            DatasetFlowConfiguration::try_load(flow_key, self.event_store.as_ref()).await?;
-        Ok(maybe_update_configuration.map(|us| us.into()))
+        flow_key: FlowKey,
+    ) -> Result<Option<FlowConfigurationState>, FindFlowConfigurationError> {
+        let maybe_flow_configuration =
+            FlowConfiguration::try_load(flow_key, self.event_store.as_ref()).await?;
+        Ok(maybe_flow_configuration.map(|fcfg| fcfg.into()))
     }
 
     /// Set or modify dataset update schedule
     #[tracing::instrument(level = "info", skip_all)]
     async fn set_configuration(
         &self,
-        flow_key: DatasetFlowKey,
+        flow_key: FlowKey,
         paused: bool,
         rule: FlowConfigurationRule,
-    ) -> Result<DatasetFlowConfigurationState, SetFlowConfigurationError> {
-        let maybe_update_configuration =
-            DatasetFlowConfiguration::try_load(flow_key.clone(), self.event_store.as_ref()).await?;
+    ) -> Result<FlowConfigurationState, SetFlowConfigurationError> {
+        let maybe_flow_configuration =
+            FlowConfiguration::try_load(flow_key.clone(), self.event_store.as_ref()).await?;
 
-        match maybe_update_configuration {
+        match maybe_flow_configuration {
             // Modification
-            Some(mut update_configuration) => {
-                update_configuration
+            Some(mut flow_configuration) => {
+                flow_configuration
                     .modify_configuration(self.time_source.now(), paused, rule)
                     .int_err()?;
 
-                update_configuration
+                flow_configuration
                     .save(self.event_store.as_ref())
                     .await
                     .int_err()?;
 
-                self.publish_dataset_flow_configuration_modified(&update_configuration)
+                self.publish_flow_configuration_modified(&flow_configuration)
                     .await?;
 
-                Ok(update_configuration.into())
+                Ok(flow_configuration.into())
             }
             // New configuration
             None => {
-                let mut update_configuration = DatasetFlowConfiguration::new(
-                    self.time_source.now(),
-                    flow_key.clone(),
-                    paused,
-                    rule,
-                );
+                let mut flow_configuration =
+                    FlowConfiguration::new(self.time_source.now(), flow_key.clone(), paused, rule);
 
-                update_configuration
+                flow_configuration
                     .save(self.event_store.as_ref())
                     .await
                     .int_err()?;
 
-                self.publish_dataset_flow_configuration_modified(&update_configuration)
+                self.publish_flow_configuration_modified(&flow_configuration)
                     .await?;
 
-                Ok(update_configuration.into())
+                Ok(flow_configuration.into())
             }
         }
     }
-}
 
-/////////////////////////////////////////////////////////////////////////////////////////
-
-#[async_trait::async_trait]
-impl DatasetFlowConfigurationService for DatasetFlowConfigurationServiceInMemory {
-    /// Lists update configurations, which are currently enabled
-    fn list_enabled_configurations(
+    /// Lists dataset flow configurations, which are currently enabled
+    fn list_enabled_dataset_flow_configurations(
         &self,
         flow_type: DatasetFlowType,
-    ) -> DatasetFlowConfigurationStateStream {
+    ) -> FlowConfigurationStateStream {
         // Note: terribly ineffecient - walks over events multiple times
         Box::pin(async_stream::try_stream! {
             let dataset_ids: Vec<_> = self.event_store.list_all_dataset_ids().collect().await;
             for dataset_id in dataset_ids {
-                let maybe_update_configuration = DatasetFlowConfiguration::try_load(DatasetFlowKey::new(dataset_id, flow_type), self.event_store.as_ref()).await.int_err()?;
-                if let Some(update_configuration) = maybe_update_configuration && update_configuration.is_active() {
-                    yield update_configuration.into();
+                let maybe_flow_configuration = FlowConfiguration::try_load(FlowKey::Dataset(FlowKeyDataset::new(dataset_id, flow_type)), self.event_store.as_ref()).await.int_err()?;
+                if let Some(flow_configuration) = maybe_flow_configuration && flow_configuration.is_active() {
+                    yield flow_configuration.into();
                 }
             }
         })
@@ -152,22 +140,22 @@ impl DatasetFlowConfigurationService for DatasetFlowConfigurationServiceInMemory
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl AsyncEventHandler<DatasetEventDeleted> for DatasetFlowConfigurationServiceInMemory {
+impl AsyncEventHandler<DatasetEventDeleted> for FlowConfigurationServiceInMemory {
     async fn handle(&self, event: &DatasetEventDeleted) -> Result<(), InternalError> {
         for flow_type in DatasetFlowType::iterator() {
-            let maybe_update_configuration = DatasetFlowConfiguration::try_load(
-                DatasetFlowKey::new(event.dataset_id.clone(), flow_type),
+            let maybe_flow_configuration = FlowConfiguration::try_load(
+                FlowKey::Dataset(FlowKeyDataset::new(event.dataset_id.clone(), flow_type)),
                 self.event_store.as_ref(),
             )
             .await
             .int_err()?;
 
-            if let Some(mut update_configuration) = maybe_update_configuration {
-                update_configuration
+            if let Some(mut flow_configuration) = maybe_flow_configuration {
+                flow_configuration
                     .notify_dataset_removed(self.time_source.now())
                     .int_err()?;
 
-                update_configuration
+                flow_configuration
                     .save(self.event_store.as_ref())
                     .await
                     .int_err()?;

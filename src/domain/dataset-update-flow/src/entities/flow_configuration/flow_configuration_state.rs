@@ -14,16 +14,16 @@ use crate::*;
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct FlowConfigurationState<TFlowKey> {
+pub struct FlowConfigurationState {
     /// Flow key
-    pub flow_key: TFlowKey,
+    pub flow_key: FlowKey,
     /// Flow configuration rule
     pub rule: FlowConfigurationRule,
     /// Configuration status
     pub status: FlowConfigurationStatus,
 }
 
-impl<TFlowKey> FlowConfigurationState<TFlowKey> {
+impl FlowConfigurationState {
     pub fn is_active(&self) -> bool {
         self.status.is_active()
     }
@@ -31,18 +31,16 @@ impl<TFlowKey> FlowConfigurationState<TFlowKey> {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-impl<TFlowKey: std::fmt::Debug + Clone + PartialEq + Eq + Send + Sync + 'static> Projection
-    for FlowConfigurationState<TFlowKey>
-{
-    type Query = TFlowKey;
-    type Event = FlowConfigurationEvent<TFlowKey>;
+impl Projection for FlowConfigurationState {
+    type Query = FlowKey;
+    type Event = FlowConfigurationEvent;
 
     fn apply(state: Option<Self>, event: Self::Event) -> Result<Self, ProjectionError<Self>> {
         use FlowConfigurationEvent as E;
 
         match (state, event) {
             (None, event) => match event {
-                E::Created(FlowConfigurationEventCreated::<TFlowKey> {
+                E::Created(FlowConfigurationEventCreated {
                     event_time: _,
                     flow_key,
                     paused,
@@ -64,7 +62,7 @@ impl<TFlowKey: std::fmt::Debug + Clone + PartialEq + Eq + Send + Sync + 'static>
                 match &event {
                     E::Created(_) => Err(ProjectionError::new(Some(s), event)),
 
-                    E::Modified(FlowConfigurationEventModified::<TFlowKey> {
+                    E::Modified(FlowConfigurationEventModified {
                         event_time: _,
                         flow_key: _,
                         paused,
@@ -84,13 +82,17 @@ impl<TFlowKey: std::fmt::Debug + Clone + PartialEq + Eq + Send + Sync + 'static>
                     }
 
                     E::DatasetRemoved(_) => {
-                        if s.status == FlowConfigurationStatus::StoppedPermanently {
-                            Ok(s) // idempotent DELETE
+                        if let FlowKey::Dataset(_) = &s.flow_key {
+                            if s.status == FlowConfigurationStatus::StoppedPermanently {
+                                Ok(s) // idempotent DELETE
+                            } else {
+                                Ok(FlowConfigurationState {
+                                    status: FlowConfigurationStatus::StoppedPermanently,
+                                    ..s
+                                })
+                            }
                         } else {
-                            Ok(FlowConfigurationState {
-                                status: FlowConfigurationStatus::StoppedPermanently,
-                                ..s
-                            })
+                            Err(ProjectionError::new(Some(s), event))
                         }
                     }
                 }
@@ -101,10 +103,8 @@ impl<TFlowKey: std::fmt::Debug + Clone + PartialEq + Eq + Send + Sync + 'static>
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-impl<TFlowKey: std::fmt::Debug + Clone + Eq + PartialEq + Send + Sync + 'static>
-    ProjectionEvent<TFlowKey> for FlowConfigurationEvent<TFlowKey>
-{
-    fn matches_query(&self, query: &TFlowKey) -> bool {
+impl ProjectionEvent<FlowKey> for FlowConfigurationEvent {
+    fn matches_query(&self, query: &FlowKey) -> bool {
         self.flow_key() == query
     }
 }

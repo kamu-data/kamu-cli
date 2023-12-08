@@ -7,14 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod dataset_flow_key;
 mod dataset_flow_type;
+mod flow_key;
 mod schedule;
-mod system_flow_key;
 mod system_flow_type;
 
-pub use dataset_flow_key::*;
 pub use dataset_flow_type::*;
+pub use flow_key::*;
 pub use schedule::*;
-pub use system_flow_key::*;
 pub use system_flow_type::*;

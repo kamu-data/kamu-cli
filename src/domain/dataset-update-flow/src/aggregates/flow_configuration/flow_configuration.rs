@@ -14,33 +14,59 @@ use crate::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub trait FlowConfiguration<
-    TFlowKey: std::fmt::Debug + Clone + Eq + PartialEq + Send + Sync + 'static,
->
-{
-    /// Returns assigned flow key
-    fn flow_key(&self) -> &TFlowKey;
+#[derive(Aggregate, Debug)]
+pub struct FlowConfiguration(
+    Aggregate<FlowConfigurationState, (dyn FlowConfigurationEventStore + 'static)>,
+);
 
-    /// Applies an event on the flow configuration
-    fn apply_event(
-        &mut self,
-        event: <FlowConfigurationState<TFlowKey> as event_sourcing::Projection>::Event,
-    ) -> Result<(), ProjectionError<FlowConfigurationState<TFlowKey>>>;
+impl FlowConfiguration {
+    /// Creates a flow configuration
+    pub fn new(
+        now: DateTime<Utc>,
+        flow_key: FlowKey,
+        paused: bool,
+        rule: FlowConfigurationRule,
+    ) -> Self {
+        Self(
+            Aggregate::new(
+                flow_key.clone(),
+                FlowConfigurationEventCreated {
+                    event_time: now,
+                    flow_key,
+                    paused,
+                    rule,
+                },
+            )
+            .unwrap(),
+        )
+    }
 
     /// Modify configuration
-    fn modify_configuration(
+    pub fn modify_configuration(
         &mut self,
         now: DateTime<Utc>,
         paused: bool,
         new_rule: FlowConfigurationRule,
-    ) -> Result<(), ProjectionError<FlowConfigurationState<TFlowKey>>> {
-        let event = FlowConfigurationEventModified::<TFlowKey> {
+    ) -> Result<(), ProjectionError<FlowConfigurationState>> {
+        let event = FlowConfigurationEventModified {
             event_time: now,
-            flow_key: self.flow_key().clone(),
+            flow_key: self.flow_key.clone(),
             paused,
             rule: new_rule,
         };
-        self.apply_event(event.into())
+        self.apply(event)
+    }
+
+    /// Handle dataset removal
+    pub fn notify_dataset_removed(
+        &mut self,
+        now: DateTime<Utc>,
+    ) -> Result<(), ProjectionError<FlowConfigurationState>> {
+        let event = FlowConfigurationEventDatasetRemoved {
+            event_time: now,
+            flow_key: self.flow_key.clone(),
+        };
+        self.apply(event)
     }
 }
 
