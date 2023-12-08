@@ -13,9 +13,9 @@ use internal_error::InternalError;
 
 /// Uniquely identifies a flow
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct SystemFlowID(u64);
+pub struct FlowID(u64);
 
-impl SystemFlowID {
+impl FlowID {
     pub fn new(id: u64) -> Self {
         Self(id)
     }
@@ -23,13 +23,13 @@ impl SystemFlowID {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-impl std::fmt::Display for SystemFlowID {
+impl std::fmt::Display for FlowID {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)
     }
 }
 
-impl Into<u64> for SystemFlowID {
+impl Into<u64> for FlowID {
     fn into(self) -> u64 {
         self.0
     }
@@ -37,8 +37,7 @@ impl Into<u64> for SystemFlowID {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub type SystemFlowIDStream<'a> = std::pin::Pin<
-    Box<dyn tokio_stream::Stream<Item = Result<SystemFlowID, InternalError>> + Send + 'a>,
->;
+pub type FlowIDStream<'a> =
+    std::pin::Pin<Box<dyn tokio_stream::Stream<Item = Result<FlowID, InternalError>> + Send + 'a>>;
 
 /////////////////////////////////////////////////////////////////////////////////////////

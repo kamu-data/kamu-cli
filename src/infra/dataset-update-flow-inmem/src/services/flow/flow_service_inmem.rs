@@ -23,16 +23,14 @@ use opendatafabric::{AccountID, AccountName, DatasetID};
 use tokio_stream::StreamExt;
 
 use super::active_configs_state::ActiveConfigsState;
+use super::flow_time_wheel::FlowTimeWheel;
 use super::pending_flows_state::PendingFlowsState;
-use crate::any_flow_id::AnyFlowID;
-use crate::FlowTimeWheel;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct FlowServiceInMemory {
     state: Arc<Mutex<State>>,
-    dataset_flow_event_store: Arc<dyn DatasetFlowEventStore>,
-    system_flow_event_store: Arc<dyn SystemFlowEventStore>,
+    flow_event_store: Arc<dyn FlowEventStore>,
     time_source: Arc<dyn SystemTimeSource>,
     task_scheduler: Arc<dyn TaskScheduler>,
     dataset_flow_configuration_service: Arc<dyn DatasetFlowConfigurationService>,
@@ -60,8 +58,7 @@ struct State {
 #[scope(Singleton)]
 impl FlowServiceInMemory {
     pub fn new(
-        dataset_flow_event_store: Arc<dyn DatasetFlowEventStore>,
-        system_flow_event_store: Arc<dyn SystemFlowEventStore>,
+        flow_event_store: Arc<dyn FlowEventStore>,
         time_source: Arc<dyn SystemTimeSource>,
         task_scheduler: Arc<dyn TaskScheduler>,
         dataset_flow_configuration_service: Arc<dyn DatasetFlowConfigurationService>,
@@ -70,8 +67,7 @@ impl FlowServiceInMemory {
     ) -> Self {
         Self {
             state: Arc::new(Mutex::new(State::default())),
-            dataset_flow_event_store,
-            system_flow_event_store,
+            flow_event_store,
             time_source,
             task_scheduler,
             dataset_flow_configuration_service,
@@ -88,25 +84,12 @@ impl FlowServiceInMemory {
 
         let planned_task_futures: Vec<_> = planned_flows
             .iter()
-            .map(async move |any_flow_id| {
-                match *any_flow_id {
-                    AnyFlowID::Dataset(flow_id) => {
-                        let mut dataset_flow =
-                            DatasetFlow::load(flow_id, self.dataset_flow_event_store.as_ref())
-                                .await
-                                .int_err()?;
+            .map(async move |flow_id| {
+                let mut flow = Flow::load(*flow_id, self.flow_event_store.as_ref())
+                    .await
+                    .int_err()?;
 
-                        self.schedule_dataset_flow_task(&mut dataset_flow).await?;
-                    }
-                    AnyFlowID::System(flow_id) => {
-                        let mut system_flow =
-                            SystemFlow::load(flow_id, self.system_flow_event_store.as_ref())
-                                .await
-                                .int_err()?;
-
-                        self.schedule_system_flow_task(&mut system_flow).await?;
-                    }
-                }
+                self.schedule_flow_task(&mut flow).await?;
                 Ok(())
             })
             .collect();
@@ -264,38 +247,28 @@ impl FlowServiceInMemory {
         dataset_id: &DatasetID,
         flow_type: DatasetFlowType,
         schedule: &Schedule,
-    ) -> Result<DatasetFlowState, InternalError> {
+    ) -> Result<FlowState, InternalError> {
         let trigger = FlowTrigger::AutoPolling(FlowTriggerAutoPolling {});
 
         match self.find_pending_dataset_flow(&dataset_id, flow_type) {
             // If flow is already pending for this dataset, simply merge triggers
-            Some(flow_id) => {
-                self.merge_secondary_dataset_flow_trigger(flow_id, trigger)
-                    .await
-            }
+            Some(flow_id) => self.merge_secondary_flow_trigger(flow_id, trigger).await,
 
             // Otherwise, initiate a new flow, and enqueue it in the time wheel
             None => {
-                let mut dataset_flow = self
+                let mut flow = self
                     .make_new_dataset_flow(dataset_id.clone(), flow_type, trigger)
                     .await?;
 
                 let next_activation_time = schedule.next_activation_time(self.time_source.now());
-                self.enqueue_flow(
-                    AnyFlowID::Dataset(dataset_flow.flow_id),
-                    next_activation_time,
-                )?;
+                self.enqueue_flow(flow.flow_id, next_activation_time)?;
 
-                dataset_flow
-                    .activate_at_time(self.time_source.now(), next_activation_time)
+                flow.activate_at_time(self.time_source.now(), next_activation_time)
                     .int_err()?;
 
-                dataset_flow
-                    .save(self.dataset_flow_event_store.as_ref())
-                    .await
-                    .int_err()?;
+                flow.save(self.flow_event_store.as_ref()).await.int_err()?;
 
-                Ok(dataset_flow.into())
+                Ok(flow.into())
             }
         }
     }
@@ -304,31 +277,24 @@ impl FlowServiceInMemory {
         &self,
         flow_type: SystemFlowType,
         schedule: &Schedule,
-    ) -> Result<SystemFlowState, InternalError> {
+    ) -> Result<FlowState, InternalError> {
         let trigger = FlowTrigger::AutoPolling(FlowTriggerAutoPolling {});
 
         match self.find_pending_system_flow(flow_type) {
             // If flow is already pending, simply merge triggers
-            Some(flow_id) => {
-                self.merge_secondary_system_flow_trigger(flow_id, trigger)
-                    .await
-            }
+            Some(flow_id) => self.merge_secondary_flow_trigger(flow_id, trigger).await,
 
             // Otherwise, initiate a new flow, and enqueue it in the time wheel
             None => {
-                let mut system_flow = self.make_new_system_flow(flow_type, trigger).await?;
+                let mut flow = self.make_new_system_flow(flow_type, trigger).await?;
                 let next_activation_time = schedule.next_activation_time(self.time_source.now());
-                self.enqueue_flow(AnyFlowID::System(system_flow.flow_id), next_activation_time)?;
+                self.enqueue_flow(flow.flow_id, next_activation_time)?;
 
-                system_flow
-                    .activate_at_time(self.time_source.now(), next_activation_time)
+                flow.activate_at_time(self.time_source.now(), next_activation_time)
                     .int_err()?;
 
-                system_flow
-                    .save(self.system_flow_event_store.as_ref())
-                    .await
-                    .int_err()?;
-                Ok(system_flow.into())
+                flow.save(self.flow_event_store.as_ref()).await.int_err()?;
+                Ok(flow.into())
             }
         }
     }
@@ -337,7 +303,7 @@ impl FlowServiceInMemory {
         &self,
         dataset_id: &DatasetID,
         flow_type: DatasetFlowType,
-        flow_id: DatasetFlowID,
+        flow_id: FlowID,
     ) -> Result<(), InternalError> {
         // Note: this is applicable to dataset updates only
         assert_eq!(flow_type, DatasetFlowType::Update);
@@ -370,7 +336,7 @@ impl FlowServiceInMemory {
                 match self.find_pending_dataset_flow(&dependent_dataset_id, flow_type) {
                     // If flow is already pending for this dataset, simply merge triggers
                     Some(dependent_flow_id) => {
-                        self.merge_secondary_dataset_flow_trigger(dependent_flow_id, trigger)
+                        self.merge_secondary_flow_trigger(dependent_flow_id, trigger)
                             .await?;
                     }
 
@@ -389,7 +355,7 @@ impl FlowServiceInMemory {
                             //  but from last flow of the dependent daataset
                             let now = self.time_source.now();
                             self.enqueue_flow(
-                                AnyFlowID::Dataset(dependent_dataset_flow.flow_id),
+                                dependent_dataset_flow.flow_id,
                                 now + throttling_period,
                             )?;
 
@@ -404,7 +370,7 @@ impl FlowServiceInMemory {
                         }
 
                         dependent_dataset_flow
-                            .save(self.dataset_flow_event_store.as_ref())
+                            .save(self.flow_event_store.as_ref())
                             .await
                             .int_err()?;
                     }
@@ -419,14 +385,14 @@ impl FlowServiceInMemory {
         &self,
         dataset_id: &DatasetID,
         flow_type: DatasetFlowType,
-    ) -> Option<DatasetFlowID> {
+    ) -> Option<FlowID> {
         let state = self.state.lock().unwrap();
         state
             .pending_flows
             .try_get_dataset_pending_flow(dataset_id, flow_type)
     }
 
-    fn find_pending_system_flow(&self, flow_type: SystemFlowType) -> Option<SystemFlowID> {
+    fn find_pending_system_flow(&self, flow_type: SystemFlowType) -> Option<FlowID> {
         let state = self.state.lock().unwrap();
         state.pending_flows.try_get_system_pending_flow(flow_type)
     }
@@ -436,100 +402,87 @@ impl FlowServiceInMemory {
         dataset_id: DatasetID,
         flow_type: DatasetFlowType,
         trigger: FlowTrigger,
-    ) -> Result<DatasetFlow, InternalError> {
-        let dataset_flow = DatasetFlow::new(
+    ) -> Result<Flow, InternalError> {
+        let flow = Flow::new(
             self.time_source.now(),
-            self.dataset_flow_event_store.new_flow_id(),
-            DatasetFlowKey::new(dataset_id.clone(), flow_type),
+            self.flow_event_store.new_flow_id(),
+            FlowKey::Dataset(FlowKeyDataset::new(dataset_id.clone(), flow_type)),
             trigger,
         );
 
         let mut state = self.state.lock().unwrap();
         state
             .pending_flows
-            .add_dataset_pending_flow(dataset_id, flow_type, dataset_flow.flow_id);
+            .add_dataset_pending_flow(dataset_id, flow_type, flow.flow_id);
 
-        Ok(dataset_flow)
+        Ok(flow)
     }
 
     async fn make_new_system_flow(
         &self,
         flow_type: SystemFlowType,
         trigger: FlowTrigger,
-    ) -> Result<SystemFlow, InternalError> {
-        let system_flow = SystemFlow::new(
+    ) -> Result<Flow, InternalError> {
+        let flow = Flow::new(
             self.time_source.now(),
-            self.system_flow_event_store.new_flow_id(),
-            SystemFlowKey::new(flow_type),
+            self.flow_event_store.new_flow_id(),
+            FlowKey::System(FlowKeySystem::new(flow_type)),
             trigger,
         );
 
         let mut state = self.state.lock().unwrap();
         state
             .pending_flows
-            .add_system_pending_flow(flow_type, system_flow.flow_id);
+            .add_system_pending_flow(flow_type, flow.flow_id);
 
-        Ok(system_flow)
+        Ok(flow)
     }
 
-    async fn merge_secondary_dataset_flow_trigger(
+    async fn merge_secondary_flow_trigger(
         &self,
-        flow_id: DatasetFlowID,
+        flow_id: FlowID,
         trigger: FlowTrigger,
-    ) -> Result<DatasetFlowState, InternalError> {
-        let mut dataset_flow = DatasetFlow::load(flow_id, self.dataset_flow_event_store.as_ref())
+    ) -> Result<FlowState, InternalError> {
+        let mut flow = Flow::load(flow_id, self.flow_event_store.as_ref())
             .await
             .int_err()?;
-        dataset_flow
-            .add_trigger(self.time_source.now(), trigger)
+        flow.add_trigger(self.time_source.now(), trigger)
             .int_err()?;
-        dataset_flow
-            .save(self.dataset_flow_event_store.as_ref())
-            .await
-            .int_err()?;
-        Ok(dataset_flow.into())
-    }
-
-    async fn merge_secondary_system_flow_trigger(
-        &self,
-        flow_id: SystemFlowID,
-        trigger: FlowTrigger,
-    ) -> Result<SystemFlowState, InternalError> {
-        let mut system_flow = SystemFlow::load(flow_id, self.system_flow_event_store.as_ref())
-            .await
-            .int_err()?;
-        system_flow
-            .add_trigger(self.time_source.now(), trigger)
-            .int_err()?;
-        system_flow
-            .save(self.system_flow_event_store.as_ref())
-            .await
-            .int_err()?;
-        Ok(system_flow.into())
+        flow.save(self.flow_event_store.as_ref()).await.int_err()?;
+        Ok(flow.into())
     }
 
     fn enqueue_flow(
         &self,
-        any_flow_id: AnyFlowID,
+        flow_id: FlowID,
         activation_time: DateTime<Utc>,
     ) -> Result<(), InternalError> {
         self.state
             .lock()
             .unwrap()
             .time_wheel
-            .activate_at(activation_time, any_flow_id)?;
+            .activate_at(activation_time, flow_id)?;
         Ok(())
     }
 
-    async fn schedule_dataset_flow_task(
-        &self,
-        dataset_flow: &mut DatasetFlow,
-    ) -> Result<(), InternalError> {
-        let logical_plan = match dataset_flow.flow_key.flow_type {
-            DatasetFlowType::Update => LogicalPlan::UpdateDataset(UpdateDataset {
-                dataset_id: dataset_flow.flow_key.dataset_id.clone(),
-            }),
-            DatasetFlowType::Compacting => unimplemented!(),
+    async fn schedule_flow_task(&self, flow: &mut Flow) -> Result<(), InternalError> {
+        let logical_plan = match &flow.flow_key {
+            FlowKey::Dataset(flow_key) => match flow_key.flow_type {
+                DatasetFlowType::Update => LogicalPlan::UpdateDataset(UpdateDataset {
+                    dataset_id: flow_key.dataset_id.clone(),
+                }),
+                DatasetFlowType::Compacting => unimplemented!(),
+            },
+            FlowKey::System(flow_key) => {
+                match flow_key.flow_type {
+                    // TODO: replace on correct logical plan
+                    SystemFlowType::GC => LogicalPlan::Probe(Probe {
+                        dataset_id: None,
+                        busy_time: Some(std::time::Duration::from_secs(20)),
+                        end_with_outcome: Some(TaskOutcome::Success),
+                    }),
+                }
+            }
         };
 
         let task = self
@@ -538,53 +491,14 @@ impl FlowServiceInMemory {
             .await
             .int_err()?;
 
-        dataset_flow
-            .on_task_scheduled(self.time_source.now(), task.task_id)
+        flow.on_task_scheduled(self.time_source.now(), task.task_id)
             .int_err()?;
-        dataset_flow
-            .save(self.dataset_flow_event_store.as_ref())
-            .await
-            .int_err()?;
+        flow.save(self.flow_event_store.as_ref()).await.int_err()?;
 
         let mut state = self.state.lock().unwrap();
         state
             .pending_flows
-            .track_dataset_flow_task(dataset_flow.flow_id, task.task_id);
-
-        Ok(())
-    }
-
-    async fn schedule_system_flow_task(
-        &self,
-        system_flow: &mut SystemFlow,
-    ) -> Result<(), InternalError> {
-        let logical_plan = match system_flow.flow_key.flow_type {
-            // TODO: replace on correct logical plan
-            SystemFlowType::GC => LogicalPlan::Probe(Probe {
-                dataset_id: None,
-                busy_time: Some(std::time::Duration::from_secs(20)),
-                end_with_outcome: Some(TaskOutcome::Success),
-            }),
-        };
-
-        let task = self
-            .task_scheduler
-            .create_task(logical_plan)
-            .await
-            .int_err()?;
-
-        system_flow
-            .on_task_scheduled(self.time_source.now(), task.task_id)
-            .int_err()?;
-        system_flow
-            .save(self.system_flow_event_store.as_ref())
-            .await
-            .int_err()?;
-
-        let mut state = self.state.lock().unwrap();
-        state
-            .pending_flows
-            .track_system_flow_task(system_flow.flow_id, task.task_id);
+            .track_flow_task(flow.flow_id, task.task_id);
 
         Ok(())
     }
@@ -628,7 +542,7 @@ impl FlowService for FlowServiceInMemory {
         flow_type: DatasetFlowType,
         initiator_account_id: AccountID,
         initiator_account_name: AccountName,
-    ) -> Result<DatasetFlowState, RequestFlowError> {
+    ) -> Result<FlowState, RequestFlowError> {
         let trigger = FlowTrigger::Manual(FlowTriggerManual {
             initiator_account_id,
             initiator_account_name,
@@ -637,21 +551,18 @@ impl FlowService for FlowServiceInMemory {
         match self.find_pending_dataset_flow(&dataset_id, flow_type) {
             // If flow is already pending for this dataset, simply merge triggers
             Some(flow_id) => self
-                .merge_secondary_dataset_flow_trigger(flow_id, trigger)
+                .merge_secondary_flow_trigger(flow_id, trigger)
                 .await
                 .map_err(|e| RequestFlowError::Internal(e)),
 
             // Otherwise, initiate a new flow and schedule immediate task
             None => {
-                let mut dataset_flow = self
+                let mut flow = self
                     .make_new_dataset_flow(dataset_id, flow_type, trigger)
                     .await?;
-                self.schedule_dataset_flow_task(&mut dataset_flow).await?;
-                dataset_flow
-                    .save(self.dataset_flow_event_store.as_ref())
-                    .await
-                    .int_err()?;
-                Ok(dataset_flow.into())
+                self.schedule_flow_task(&mut flow).await?;
+                flow.save(self.flow_event_store.as_ref()).await.int_err()?;
+                Ok(flow.into())
             }
         }
     }
@@ -661,7 +572,7 @@ impl FlowService for FlowServiceInMemory {
         flow_type: SystemFlowType,
         initiator_account_id: AccountID,
         initiator_account_name: AccountName,
-    ) -> Result<SystemFlowState, RequestFlowError> {
+    ) -> Result<FlowState, RequestFlowError> {
         let trigger = FlowTrigger::Manual(FlowTriggerManual {
             initiator_account_id,
             initiator_account_name,
@@ -670,19 +581,16 @@ impl FlowService for FlowServiceInMemory {
         match self.find_pending_system_flow(flow_type) {
             // If flow is already pending, simply merge triggers
             Some(flow_id) => self
-                .merge_secondary_system_flow_trigger(flow_id, trigger)
+                .merge_secondary_flow_trigger(flow_id, trigger)
                 .await
                 .map_err(|e| RequestFlowError::Internal(e)),
 
             // Otherwise, initiate a new flow and schedule immediate task
             None => {
-                let mut system_flow = self.make_new_system_flow(flow_type, trigger).await?;
-                self.schedule_system_flow_task(&mut system_flow).await?;
-                system_flow
-                    .save(self.system_flow_event_store.as_ref())
-                    .await
-                    .int_err()?;
-                Ok(system_flow.into())
+                let mut flow = self.make_new_system_flow(flow_type, trigger).await?;
+                self.schedule_flow_task(&mut flow).await?;
+                flow.save(self.flow_event_store.as_ref()).await.int_err()?;
+                Ok(flow.into())
             }
         }
     }
@@ -693,18 +601,18 @@ impl FlowService for FlowServiceInMemory {
         &self,
         dataset_id: &DatasetID,
         flow_type: DatasetFlowType,
-    ) -> Result<DatasetFlowStateStream, ListFlowsByDatasetError> {
+    ) -> Result<FlowStateStream, ListFlowsByDatasetError> {
         let dataset_id = dataset_id.clone();
 
         Ok(Box::pin(async_stream::try_stream! {
             let relevant_flows: Vec<_> = self
-                .dataset_flow_event_store
+                .flow_event_store
                 .get_specific_flows_by_dataset(&dataset_id, flow_type)
                 .try_collect()
                 .await?;
 
             for flow_id in relevant_flows.into_iter() {
-                let flow = DatasetFlow::load(flow_id, self.dataset_flow_event_store.as_ref()).await.int_err()?;
+                let flow = Flow::load(flow_id, self.flow_event_store.as_ref()).await.int_err()?;
 
                 yield flow.into();
             }
@@ -716,16 +624,16 @@ impl FlowService for FlowServiceInMemory {
     fn list_specific_system_flows(
         &self,
         flow_type: SystemFlowType,
-    ) -> Result<SystemFlowStateStream, ListSystemFlowsError> {
+    ) -> Result<FlowStateStream, ListSystemFlowsError> {
         Ok(Box::pin(async_stream::try_stream! {
             let relevant_flows: Vec<_> = self
-                .system_flow_event_store
-                .get_specific_flows(flow_type)
+                .flow_event_store
+                .get_specific_system_flows(flow_type)
                 .try_collect()
                 .await?;
 
             for flow_id in relevant_flows.into_iter() {
-                let flow = SystemFlow::load(flow_id, self.system_flow_event_store.as_ref()).await.int_err()?;
+                let flow = Flow::load(flow_id, self.flow_event_store.as_ref()).await.int_err()?;
 
                 yield flow.into();
             }
@@ -737,18 +645,18 @@ impl FlowService for FlowServiceInMemory {
     fn list_all_flows_by_dataset(
         &self,
         dataset_id: &DatasetID,
-    ) -> Result<DatasetFlowStateStream, ListFlowsByDatasetError> {
+    ) -> Result<FlowStateStream, ListFlowsByDatasetError> {
         let dataset_id = dataset_id.clone();
 
         Ok(Box::pin(async_stream::try_stream! {
             let relevant_flows: Vec<_> = self
-                .dataset_flow_event_store
+                .flow_event_store
                 .get_all_flows_by_dataset(&dataset_id)
                 .try_collect()
                 .await?;
 
             for flow_id in relevant_flows.into_iter() {
-                let flow = DatasetFlow::load(flow_id, self.dataset_flow_event_store.as_ref()).await.int_err()?;
+                let flow = Flow::load(flow_id, self.flow_event_store.as_ref()).await.int_err()?;
 
                 yield flow.into();
             }
@@ -757,16 +665,16 @@ impl FlowService for FlowServiceInMemory {
 
     /// Returns states of system flows of any type
     /// ordered by creation time from newest to oldest
-    fn list_all_system_flows(&self) -> Result<SystemFlowStateStream, ListSystemFlowsError> {
+    fn list_all_system_flows(&self) -> Result<FlowStateStream, ListSystemFlowsError> {
         Ok(Box::pin(async_stream::try_stream! {
             let all_flows: Vec<_> = self
-                .system_flow_event_store
-                .get_all_flows()
+                .flow_event_store
+                .get_all_system_flows()
                 .try_collect()
                 .await?;
 
             for flow_id in all_flows.into_iter() {
-                let flow = SystemFlow::load(flow_id, self.system_flow_event_store.as_ref()).await.int_err()?;
+                let flow = Flow::load(flow_id, self.flow_event_store.as_ref()).await.int_err()?;
 
                 yield flow.into();
             }
@@ -779,12 +687,12 @@ impl FlowService for FlowServiceInMemory {
         &self,
         dataset_id: &DatasetID,
         flow_type: DatasetFlowType,
-    ) -> Result<Option<DatasetFlowState>, GetLastDatasetFlowError> {
+    ) -> Result<Option<FlowState>, GetLastDatasetFlowError> {
         let res = match self
-            .dataset_flow_event_store
+            .flow_event_store
             .get_last_specific_dataset_flow(dataset_id, flow_type)
         {
-            Some(flow_id) => Some(self.get_dataset_flow(flow_id).await.int_err()?),
+            Some(flow_id) => Some(self.get_flow(flow_id).await.int_err()?),
             None => None,
         };
         Ok(res)
@@ -794,107 +702,58 @@ impl FlowService for FlowServiceInMemory {
     async fn get_last_specific_system_flow(
         &self,
         flow_type: SystemFlowType,
-    ) -> Result<Option<SystemFlowState>, GetLastSystemtFlowError> {
+    ) -> Result<Option<FlowState>, GetLastSystemtFlowError> {
         let res = match self
-            .system_flow_event_store
-            .get_last_specific_flow(flow_type)
+            .flow_event_store
+            .get_last_specific_system_flow(flow_type)
         {
-            Some(flow_id) => Some(self.get_system_flow(flow_id).await.int_err()?),
+            Some(flow_id) => Some(self.get_flow(flow_id).await.int_err()?),
             None => None,
         };
         Ok(res)
     }
 
-    /// Returns current state of a given dataset flow
-    async fn get_dataset_flow(
-        &self,
-        flow_id: DatasetFlowID,
-    ) -> Result<DatasetFlowState, GetDatasetFlowError> {
-        let dataset_flow =
-            DatasetFlow::load(flow_id, self.dataset_flow_event_store.as_ref()).await?;
-        Ok(dataset_flow.into())
+    /// Returns current state of a given flow
+    async fn get_flow(&self, flow_id: FlowID) -> Result<FlowState, GetFlowError> {
+        let flow = Flow::load(flow_id, self.flow_event_store.as_ref()).await?;
+        Ok(flow.into())
     }
 
-    /// Returns current state of a given system flow
-    async fn get_system_flow(
+    /// Attempts to cancel the given flow
+    async fn cancel_flow(
         &self,
-        flow_id: SystemFlowID,
-    ) -> Result<SystemFlowState, GetSystemFlowError> {
-        let system_flow = SystemFlow::load(flow_id, self.system_flow_event_store.as_ref()).await?;
-        Ok(system_flow.into())
-    }
-
-    /// Attempts to cancel the given dataset flow
-    async fn cancel_dataset_flow(
-        &self,
-        flow_id: DatasetFlowID,
+        flow_id: FlowID,
         by_account_id: AccountID,
         by_account_name: AccountName,
-    ) -> Result<DatasetFlowState, CancelDatasetFlowError> {
-        let mut dataset_flow =
-            DatasetFlow::load(flow_id, self.dataset_flow_event_store.as_ref()).await?;
+    ) -> Result<FlowState, CancelFlowError> {
+        let mut flow = Flow::load(flow_id, self.flow_event_store.as_ref()).await?;
 
-        if dataset_flow.can_cancel() {
-            dataset_flow
-                .cancel(self.time_source.now(), by_account_id, by_account_name)
+        if flow.can_cancel() {
+            flow.cancel(self.time_source.now(), by_account_id, by_account_name)
                 .int_err()?;
-            dataset_flow
-                .save(self.dataset_flow_event_store.as_ref())
-                .await
-                .int_err()?;
-
-            let any_flow_id = AnyFlowID::Dataset(flow_id);
+            flow.save(self.flow_event_store.as_ref()).await.int_err()?;
 
             let mut state = self.state.lock().unwrap();
-            if state.time_wheel.is_flow_activation_planned(&any_flow_id) {
+            if state.time_wheel.is_flow_activation_planned(flow_id) {
                 state
                     .time_wheel
-                    .cancel_flow_activation(any_flow_id)
-                    .map_err(|e| CancelDatasetFlowError::Internal(e.int_err()))?;
+                    .cancel_flow_activation(flow_id)
+                    .map_err(|e| CancelFlowError::Internal(e.int_err()))?;
             }
-            state.pending_flows.drop_dataset_flow(
-                &dataset_flow.flow_key.dataset_id,
-                dataset_flow.flow_key.flow_type,
-            );
+
+            match &flow.flow_key {
+                FlowKey::Dataset(flow_key) => {
+                    state
+                        .pending_flows
+                        .drop_dataset_flow(&flow_key.dataset_id, flow_key.flow_type);
+                }
+                FlowKey::System(flow_key) => {
+                    state.pending_flows.drop_system_flow(flow_key.flow_type);
+                }
+            }
         }
 
-        Ok(dataset_flow.into())
-    }
-
-    /// Attempts to cancel the given system flow
-    async fn cancel_system_flow(
-        &self,
-        flow_id: SystemFlowID,
-        by_account_id: AccountID,
-        by_account_name: AccountName,
-    ) -> Result<SystemFlowState, CancelSystemFlowError> {
-        let mut system_flow =
-            SystemFlow::load(flow_id, self.system_flow_event_store.as_ref()).await?;
-
-        if system_flow.can_cancel() {
-            system_flow
-                .cancel(self.time_source.now(), by_account_id, by_account_name)
-                .int_err()?;
-            system_flow
-                .save(self.system_flow_event_store.as_ref())
-                .await
-                .int_err()?;
-
-            let any_flow_id = AnyFlowID::System(flow_id);
-
-            let mut state = self.state.lock().unwrap();
-            if state.time_wheel.is_flow_activation_planned(&any_flow_id) {
-                state
-                    .time_wheel
-                    .cancel_flow_activation(any_flow_id)
-                    .map_err(|e| CancelSystemFlowError::Internal(e.int_err()))?;
-            }
-            state
-                .pending_flows
-                .drop_system_flow(system_flow.flow_key.flow_type);
-        }
-
-        Ok(system_flow.into())
+        Ok(flow.into())
     }
 }
 
@@ -912,26 +771,20 @@ impl AsyncEventHandler<TaskEventFinished> for FlowServiceInMemory {
             .try_get_flow_id_by_task(event.task_id);
 
         if let Some(flow_id) = maybe_flow_id {
-            match *&flow_id {
-                AnyFlowID::Dataset(flow_id) => {
-                    let mut dataset_flow =
-                        DatasetFlow::load(flow_id, self.dataset_flow_event_store.as_ref())
-                            .await
-                            .int_err()?;
-                    dataset_flow
-                        .on_task_finished(self.time_source.now(), event.task_id, event.outcome)
-                        .int_err()?;
-                    dataset_flow
-                        .save(self.dataset_flow_event_store.as_ref())
-                        .await
-                        .int_err()?;
+            let mut flow = Flow::load(flow_id, self.flow_event_store.as_ref())
+                .await
+                .int_err()?;
+            flow.on_task_finished(self.time_source.now(), event.task_id, event.outcome)
+                .int_err()?;
+            flow.save(self.flow_event_store.as_ref()).await.int_err()?;
 
+            match &flow.flow_key {
+                FlowKey::Dataset(flow_key) => {
                     {
                         let mut state = self.state.lock().unwrap();
-                        state.pending_flows.drop_dataset_flow(
-                            &dataset_flow.flow_key.dataset_id,
-                            dataset_flow.flow_key.flow_type,
-                        );
+                        state
+                            .pending_flows
+                            .drop_dataset_flow(&flow_key.dataset_id, flow_key.flow_type);
                     }
 
                     // In case of success:
@@ -939,48 +792,31 @@ impl AsyncEventHandler<TaskEventFinished> for FlowServiceInMemory {
                     //  - enqueue dependent datasets
                     if event.outcome == TaskOutcome::Success {
                         self.try_enqueue_auto_polling_dataset_flow_if_enabled(
-                            &dataset_flow.flow_key.dataset_id,
-                            dataset_flow.flow_key.flow_type,
+                            &flow_key.dataset_id,
+                            flow_key.flow_type,
                         )
                         .await?;
 
-                        if dataset_flow.flow_key.flow_type == DatasetFlowType::Update {
+                        if flow_key.flow_type == DatasetFlowType::Update {
                             self.enqueue_dependent_dataset_flows(
-                                &dataset_flow.flow_key.dataset_id,
-                                dataset_flow.flow_key.flow_type,
-                                dataset_flow.flow_id,
+                                &flow_key.dataset_id,
+                                flow_key.flow_type,
+                                flow.flow_id,
                             )
                             .await?;
                         }
                     }
                 }
-                AnyFlowID::System(flow_id) => {
-                    let mut system_flow =
-                        SystemFlow::load(flow_id, self.system_flow_event_store.as_ref())
-                            .await
-                            .int_err()?;
-
-                    system_flow
-                        .on_task_finished(self.time_source.now(), event.task_id, event.outcome)
-                        .int_err()?;
-                    system_flow
-                        .save(self.system_flow_event_store.as_ref())
-                        .await
-                        .int_err()?;
-
+                FlowKey::System(flow_key) => {
                     {
                         let mut state = self.state.lock().unwrap();
-                        state
-                            .pending_flows
-                            .drop_system_flow(system_flow.flow_key.flow_type);
+                        state.pending_flows.drop_system_flow(flow_key.flow_type);
                     }
 
                     // In case of success:
                     //  - enqueue next auto-polling flow cycle
-                    self.try_enqueue_auto_polling_system_flow_if_enabled(
-                        system_flow.flow_key.flow_type,
-                    )
-                    .await?;
+                    self.try_enqueue_auto_polling_system_flow_if_enabled(flow_key.flow_type)
+                        .await?;
                 }
             }
 
@@ -1059,10 +895,7 @@ impl AsyncEventHandler<DatasetEventDeleted> for FlowServiceInMemory {
                 .pending_flows
                 .drop_dataset_flow(&event.dataset_id, flow_type)
             {
-                state
-                    .time_wheel
-                    .cancel_flow_activation(AnyFlowID::Dataset(flow_id))
-                    .int_err()?;
+                state.time_wheel.cancel_flow_activation(flow_id).int_err()?;
             }
         }
 

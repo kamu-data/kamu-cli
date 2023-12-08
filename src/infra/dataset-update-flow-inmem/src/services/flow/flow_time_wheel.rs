@@ -12,16 +12,15 @@ use std::collections::{BinaryHeap, HashMap};
 
 use chrono::{DateTime, Utc};
 use kamu_core::InternalError;
+use kamu_dataset_update_flow::FlowID;
 use thiserror::Error;
-
-use crate::AnyFlowID;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Default)]
 pub(crate) struct FlowTimeWheel {
     flow_heap: BinaryHeap<Reverse<FlowRecord>>,
-    flow_activation_times_by_id: HashMap<AnyFlowID, DateTime<Utc>>,
+    flow_activation_times_by_id: HashMap<FlowID, DateTime<Utc>>,
 }
 
 // TODO: assign a score, and use it as an ordering criteria for the tasks within
@@ -29,14 +28,14 @@ pub(crate) struct FlowTimeWheel {
 #[derive(PartialEq, Eq, PartialOrd, Ord)]
 struct FlowRecord {
     pub activation_time: DateTime<Utc>,
-    pub any_flow_id: AnyFlowID,
+    pub flow_id: FlowID,
 }
 
 impl FlowRecord {
-    fn new(activation_time: DateTime<Utc>, any_flow_id: AnyFlowID) -> Self {
+    fn new(activation_time: DateTime<Utc>, flow_id: FlowID) -> Self {
         Self {
             activation_time,
-            any_flow_id,
+            flow_id,
         }
     }
 }
@@ -46,7 +45,7 @@ impl FlowTimeWheel {
         self.flow_heap.peek().map(|ar| ar.0.activation_time)
     }
 
-    pub fn take_nearest_planned_flows(&mut self) -> Vec<AnyFlowID> {
+    pub fn take_nearest_planned_flows(&mut self) -> Vec<FlowID> {
         if self.flow_heap.is_empty() {
             vec![]
         } else {
@@ -58,8 +57,8 @@ impl FlowTimeWheel {
                     break;
                 }
 
-                if self.is_flow_activation_planned(&ar.0.any_flow_id) {
-                    res.push(ar.0.any_flow_id);
+                if self.is_flow_activation_planned(ar.0.flow_id) {
+                    res.push(ar.0.flow_id);
                 }
 
                 self.flow_heap.pop();
@@ -76,56 +75,56 @@ impl FlowTimeWheel {
     pub fn activate_at(
         &mut self,
         activation_time: DateTime<Utc>,
-        any_flow_id: AnyFlowID,
+        flow_id: FlowID,
     ) -> Result<(), InternalError> {
-        match self.flow_activation_times_by_id.get(&any_flow_id) {
+        match self.flow_activation_times_by_id.get(&flow_id) {
             Some(earlier_activation_time) => {
                 if activation_time < *earlier_activation_time {
-                    self.unplan_flow(&any_flow_id);
-                    self.plan_flow(FlowRecord::new(activation_time, any_flow_id));
+                    self.unplan_flow(flow_id);
+                    self.plan_flow(FlowRecord::new(activation_time, flow_id));
                 }
                 Ok(())
             }
             None => {
-                self.plan_flow(FlowRecord::new(activation_time, any_flow_id));
+                self.plan_flow(FlowRecord::new(activation_time, flow_id));
                 Ok(())
             }
         }
     }
 
-    pub fn is_flow_activation_planned(&self, any_flow_id: &AnyFlowID) -> bool {
-        self.flow_activation_times_by_id.contains_key(&any_flow_id)
+    pub fn is_flow_activation_planned(&self, flow_id: FlowID) -> bool {
+        self.flow_activation_times_by_id.contains_key(&flow_id)
     }
 
     pub fn cancel_flow_activation(
         &mut self,
-        any_flow_id: AnyFlowID,
+        flow_id: FlowID,
     ) -> Result<(), TimeWheelCancelActivationError> {
-        if self.flow_activation_times_by_id.contains_key(&any_flow_id) {
-            self.unplan_flow(&any_flow_id);
+        if self.flow_activation_times_by_id.contains_key(&flow_id) {
+            self.unplan_flow(flow_id);
             Ok(())
         } else {
             Err(TimeWheelCancelActivationError::FlowNotPlanned(
-                TimeWheelFlowNotPlannedError { any_flow_id },
+                TimeWheelFlowNotPlannedError { flow_id },
             ))
         }
     }
 
     fn plan_flow(&mut self, flow_record: FlowRecord) {
         self.flow_activation_times_by_id
-            .insert(flow_record.any_flow_id, flow_record.activation_time);
+            .insert(flow_record.flow_id, flow_record.activation_time);
 
         self.flow_heap.push(Reverse(flow_record));
     }
 
-    fn unplan_flow(&mut self, any_flow_id: &AnyFlowID) {
-        self.flow_activation_times_by_id.remove(any_flow_id);
+    fn unplan_flow(&mut self, flow_id: FlowID) {
+        self.flow_activation_times_by_id.remove(&flow_id);
         self.clean_top_cancellations();
     }
 
     fn clean_top_cancellations(&mut self) {
         while let Some(ar) = self.flow_heap.peek() {
-            if self.is_flow_activation_planned(&ar.0.any_flow_id) {
+            if self.is_flow_activation_planned(ar.0.flow_id) {
                 break;
             }
 
@@ -143,9 +142,9 @@ pub(crate) enum TimeWheelCancelActivationError {
 }
 
 #[derive(Error, Debug)]
-#[error("Flow {:?} not found planned in the time wheel", any_flow_id)]
+#[error("Flow '{flow_id}' not found planned in the time wheel")]
 pub(crate) struct TimeWheelFlowNotPlannedError {
-    any_flow_id: AnyFlowID,
+    flow_id: FlowID,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

@@ -18,43 +18,45 @@ use crate::dataset_flow_key::{BorrowedDatasetFlowKey, OwnedDatasetFlowKey};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct DatasetFlowEventStoreInMem {
-    inner: EventStoreInMemory<DatasetFlowState, State>,
+pub struct FlowEventStoreInMem {
+    inner: EventStoreInMemory<FlowState, State>,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Default)]
 struct State {
-    events: Vec<DatasetFlowEvent>,
-    typed_flows_by_dataset: HashMap<OwnedDatasetFlowKey, Vec<DatasetFlowID>>,
-    all_flows_by_dataset: HashMap<DatasetID, Vec<DatasetFlowID>>,
-    last_flow_id: Option<DatasetFlowID>,
+    events: Vec<FlowEvent>,
+    typed_flows_by_dataset: HashMap<OwnedDatasetFlowKey, Vec<FlowID>>,
+    all_flows_by_dataset: HashMap<DatasetID, Vec<FlowID>>,
+    system_flows_by_type: HashMap<SystemFlowType, Vec<FlowID>>,
+    all_system_flows: Vec<FlowID>,
+    last_flow_id: Option<FlowID>,
 }
 
 impl State {
-    fn next_flow_id(&mut self) -> DatasetFlowID {
+    fn next_flow_id(&mut self) -> FlowID {
         let next_flow_id = if let Some(last_flow_id) = self.last_flow_id {
             let id: u64 = last_flow_id.into();
-            DatasetFlowID::new(id + 1)
+            FlowID::new(id + 1)
         } else {
-            DatasetFlowID::new(0)
+            FlowID::new(0)
         };
         self.last_flow_id = Some(next_flow_id);
         next_flow_id
     }
 }
 
-impl EventStoreState<DatasetFlowState> for State {
+impl EventStoreState<FlowState> for State {
     fn events_count(&self) -> usize {
         self.events.len()
     }
 
-    fn get_events(&self) -> &[DatasetFlowEvent] {
+    fn get_events(&self) -> &[FlowEvent] {
         &self.events
     }
 
-    fn add_event(&mut self, event: DatasetFlowEvent) {
+    fn add_event(&mut self, event: FlowEvent) {
         self.events.push(event);
     }
 }
@@ -62,34 +64,47 @@ impl EventStoreState<DatasetFlowState> for State {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
-#[interface(dyn DatasetFlowEventStore)]
+#[interface(dyn FlowEventStore)]
 #[scope(Singleton)]
-impl DatasetFlowEventStoreInMem {
+impl FlowEventStoreInMem {
     pub fn new() -> Self {
         Self {
             inner: EventStoreInMemory::new(),
         }
     }
 
-    fn update_index_by_dataset(state: &mut State, event: &DatasetFlowEvent) {
-        if let DatasetFlowEvent::Initiated(e) = &event {
-            let typed_entries = match state.typed_flows_by_dataset.entry(OwnedDatasetFlowKey::new(
-                e.flow_key.dataset_id.clone(),
-                e.flow_key.flow_type,
-            )) {
-                Entry::Occupied(v) => v.into_mut(),
-                Entry::Vacant(v) => v.insert(Vec::default()),
-            };
-            typed_entries.push(event.flow_id());
+    fn update_index(state: &mut State, event: &FlowEvent) {
+        if let FlowEvent::Initiated(e) = &event {
+            match &e.flow_key {
+                FlowKey::Dataset(flow_key) => {
+                    let typed_entries = match state.typed_flows_by_dataset.entry(
+                        OwnedDatasetFlowKey::new(flow_key.dataset_id.clone(), flow_key.flow_type),
+                    ) {
+                        Entry::Occupied(v) => v.into_mut(),
+                        Entry::Vacant(v) => v.insert(Vec::default()),
+                    };
+                    typed_entries.push(event.flow_id());
 
-            let all_entries = match state
-                .all_flows_by_dataset
-                .entry(e.flow_key.dataset_id.clone())
-            {
-                Entry::Occupied(v) => v.into_mut(),
-                Entry::Vacant(v) => v.insert(Vec::default()),
-            };
-            all_entries.push(event.flow_id());
+                    let all_entries = match state
+                        .all_flows_by_dataset
+                        .entry(flow_key.dataset_id.clone())
+                    {
+                        Entry::Occupied(v) => v.into_mut(),
+                        Entry::Vacant(v) => v.insert(Vec::default()),
+                    };
+                    all_entries.push(event.flow_id());
+                }
+
+                FlowKey::System(flow_key) => {
+                    let entries = match state.system_flows_by_type.entry(flow_key.flow_type) {
+                        Entry::Occupied(v) => v.into_mut(),
+                        Entry::Vacant(v) => v.insert(Vec::default()),
+                    };
+                    entries.push(event.flow_id());
+
+                    state.all_system_flows.push(event.flow_id());
+                }
+            }
         }
     }
 }
@@ -97,29 +112,25 @@ impl DatasetFlowEventStoreInMem {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl EventStore<DatasetFlowState> for DatasetFlowEventStoreInMem {
+impl EventStore<FlowState> for FlowEventStoreInMem {
     async fn len(&self) -> Result<usize, InternalError> {
         self.inner.len().await
     }
 
-    fn get_events<'a>(
-        &'a self,
-        query: &DatasetFlowID,
-        opts: GetEventsOpts,
-    ) -> EventStream<'a, DatasetFlowEvent> {
+    fn get_events<'a>(&'a self, query: &FlowID, opts: GetEventsOpts) -> EventStream<'a, FlowEvent> {
         self.inner.get_events(query, opts)
     }
 
     async fn save_events(
         &self,
-        query: &DatasetFlowID,
-        events: Vec<DatasetFlowEvent>,
+        query: &FlowID,
+        events: Vec<FlowEvent>,
     ) -> Result<EventID, SaveEventsError> {
         {
             let state = self.inner.as_state();
             let mut g = state.lock().unwrap();
             for event in &events {
-                Self::update_index_by_dataset(&mut g, &event);
+                Self::update_index(&mut g, &event);
             }
         }
 
@@ -130,8 +141,8 @@ impl EventStore<DatasetFlowState> for DatasetFlowEventStoreInMem {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl DatasetFlowEventStore for DatasetFlowEventStoreInMem {
-    fn new_flow_id(&self) -> DatasetFlowID {
+impl FlowEventStore for FlowEventStoreInMem {
+    fn new_flow_id(&self) -> FlowID {
         self.inner.as_state().lock().unwrap().next_flow_id()
     }
 
@@ -139,7 +150,7 @@ impl DatasetFlowEventStore for DatasetFlowEventStoreInMem {
         &self,
         dataset_id: &DatasetID,
         flow_type: DatasetFlowType,
-    ) -> Option<DatasetFlowID> {
+    ) -> Option<FlowID> {
         let state = self.inner.as_state();
         let g = state.lock().unwrap();
         g.typed_flows_by_dataset
@@ -147,11 +158,19 @@ impl DatasetFlowEventStore for DatasetFlowEventStoreInMem {
             .and_then(|flows| flows.last().cloned())
     }
 
+    fn get_last_specific_system_flow(&self, flow_type: SystemFlowType) -> Option<FlowID> {
+        let state = self.inner.as_state();
+        let g = state.lock().unwrap();
+        g.system_flows_by_type
+            .get(&flow_type)
+            .and_then(|flows| flows.last().cloned())
+    }
+
     fn get_specific_flows_by_dataset<'a>(
         &'a self,
         dataset_id: &DatasetID,
         flow_type: DatasetFlowType,
-    ) -> DatasetFlowIDStream<'a> {
+    ) -> FlowIDStream<'a> {
         let dataset_id = dataset_id.clone();
 
         // TODO: This should be a buffered stream so we don't lock per record
@@ -189,7 +208,44 @@ impl DatasetFlowEventStore for DatasetFlowEventStoreInMem {
         })
     }
 
-    fn get_all_flows_by_dataset<'a>(&'a self, dataset_id: &DatasetID) -> DatasetFlowIDStream<'a> {
+    fn get_specific_system_flows<'a>(&'a self, flow_type: SystemFlowType) -> FlowIDStream<'a> {
+        let mut pos = {
+            let state = self.inner.as_state();
+            let g = state.lock().unwrap();
+            g.system_flows_by_type
+                .get(&flow_type)
+                .map(|flows| flows.len())
+                .unwrap_or(0)
+        };
+
+        // TODO: This should be a buffered stream so we don't lock per record
+        Box::pin(async_stream::try_stream! {
+            loop {
+                if pos == 0 {
+                    break;
+                }
+
+                pos -= 1;
+
+                let next = {
+                    let state = self.inner.as_state();
+                    let g: std::sync::MutexGuard<'_, State> = state.lock().unwrap();
+                    g.system_flows_by_type
+                        .get(&flow_type)
+                        .and_then(|flows| flows.get(pos).cloned())
+                };
+
+                let flow_id = match next {
+                    None => break,
+                    Some(flow_id) => flow_id,
+                };
+
+                yield flow_id;
+            }
+        })
+    }
+
+    fn get_all_flows_by_dataset<'a>(&'a self, dataset_id: &DatasetID) -> FlowIDStream<'a> {
         let dataset_id = dataset_id.clone();
 
         // TODO: This should be a buffered stream so we don't lock per record
@@ -213,6 +269,38 @@ impl DatasetFlowEventStore for DatasetFlowEventStoreInMem {
                     g.all_flows_by_dataset
                         .get(&dataset_id)
                         .and_then(|flows| flows.get(pos).cloned())
+                };
+
+                let flow_id = match next {
+                    None => break,
+                    Some(flow_id) => flow_id,
+                };
+
+                yield flow_id;
+            }
+        })
+    }
+
+    fn get_all_system_flows<'a>(&'a self) -> FlowIDStream<'a> {
+        // TODO: This should be a buffered stream so we don't lock per record
+        Box::pin(async_stream::try_stream! {
+            let mut pos = {
+                let state = self.inner.as_state();
+                let g = state.lock().unwrap();
+                g.all_system_flows.len()
+            };
+
+            loop {
+                if pos == 0 {
+                    break;
+                }
+
+                pos -= 1;
+
+                let next = {
+                    let state = self.inner.as_state();
+                    let g = state.lock().unwrap();
+                    g.all_system_flows.get(pos).cloned()
                 };
 
                 let flow_id = match next {

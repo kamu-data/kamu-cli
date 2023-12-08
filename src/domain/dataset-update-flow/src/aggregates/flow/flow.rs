@@ -16,110 +16,122 @@ use crate::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub trait Flow<TFlowStrategy: FlowStrategy + 'static> {
-    /// Returns assigned flow ID
-    fn flow_id(&self) -> TFlowStrategy::FlowID;
+#[derive(Aggregate, Debug)]
+pub struct Flow(Aggregate<FlowState, (dyn FlowEventStore + 'static)>);
 
-    /// Returns flow state reference
-    fn as_state(&self) -> &FlowState<TFlowStrategy>;
-
-    /// Applies an event on the flow
-    fn apply_event(
-        &mut self,
-        event: <FlowState<TFlowStrategy> as event_sourcing::Projection>::Event,
-    ) -> Result<(), ProjectionError<FlowState<TFlowStrategy>>>;
+impl Flow {
+    /// Creates a flow
+    pub fn new(
+        now: DateTime<Utc>,
+        flow_id: FlowID,
+        flow_key: FlowKey,
+        trigger: FlowTrigger,
+    ) -> Self {
+        Self(
+            Aggregate::new(
+                flow_id,
+                FlowEventInitiated {
+                    event_time: now,
+                    flow_id,
+                    flow_key,
+                    trigger,
+                },
+            )
+            .unwrap(),
+        )
+    }
 
     /// Define start condition for the history
-    fn define_start_condition(
+    pub fn define_start_condition(
         &mut self,
         now: DateTime<Utc>,
         start_condition: FlowStartCondition,
-    ) -> Result<(), ProjectionError<FlowState<TFlowStrategy>>> {
-        let event = FlowEventStartConditionDefined::<TFlowStrategy> {
+    ) -> Result<(), ProjectionError<FlowState>> {
+        let event = FlowEventStartConditionDefined {
             event_time: now,
-            flow_id: self.flow_id(),
+            flow_id: self.flow_id,
             start_condition,
         };
-        self.apply_event(event.into())
+        self.apply(event)
     }
 
     /// Activate at time
-    fn activate_at_time(
+    pub fn activate_at_time(
         &mut self,
         now: DateTime<Utc>,
         activate_at: DateTime<Utc>,
-    ) -> Result<(), ProjectionError<FlowState<TFlowStrategy>>> {
-        let event = FlowEventQueued::<TFlowStrategy> {
+    ) -> Result<(), ProjectionError<FlowState>> {
+        let event = FlowEventQueued {
             event_time: now,
-            flow_id: self.flow_id(),
+            flow_id: self.flow_id,
             activate_at,
         };
-        self.apply_event(event.into())
+        self.apply(event)
     }
 
     /// Extra trigger
-    fn add_trigger(
+    pub fn add_trigger(
         &mut self,
         now: DateTime<Utc>,
         trigger: FlowTrigger,
-    ) -> Result<(), ProjectionError<FlowState<TFlowStrategy>>> {
-        let event = FlowEventTriggerAdded::<TFlowStrategy> {
+    ) -> Result<(), ProjectionError<FlowState>> {
+        let event = FlowEventTriggerAdded {
             event_time: now,
-            flow_id: self.flow_id(),
+            flow_id: self.flow_id,
             trigger,
         };
-        self.apply_event(event.into())
+        self.apply(event)
     }
 
     /// Attaches a scheduled task
-    fn on_task_scheduled(
+    pub fn on_task_scheduled(
         &mut self,
         now: DateTime<Utc>,
         task_id: TaskID,
-    ) -> Result<(), ProjectionError<FlowState<TFlowStrategy>>> {
-        let event = FlowEventTaskScheduled::<TFlowStrategy> {
+    ) -> Result<(), ProjectionError<FlowState>> {
+        let event = FlowEventTaskScheduled {
             event_time: now,
-            flow_id: self.flow_id(),
+            flow_id: self.flow_id,
             task_id,
         };
-        self.apply_event(event.into())
+        self.apply(event)
     }
 
     /// Task finished
-    fn on_task_finished(
+    pub fn on_task_finished(
         &mut self,
         now: DateTime<Utc>,
         task_id: TaskID,
         task_outcome: TaskOutcome,
-    ) -> Result<(), ProjectionError<FlowState<TFlowStrategy>>> {
-        let event = FlowEventTaskFinished::<TFlowStrategy> {
+    ) -> Result<(), ProjectionError<FlowState>> {
+        let event = FlowEventTaskFinished {
             event_time: now,
-            flow_id: self.flow_id(),
+            flow_id: self.flow_id,
             task_id,
             task_outcome,
         };
-        self.apply_event(event.into())
+        self.apply(event)
     }
 
     /// Checks if flow may be cancelled
-    fn can_cancel(&self) -> bool {
-        self.as_state().can_cancel()
+    pub fn can_cancel(&self) -> bool {
+        self.0.as_state().can_cancel()
     }
 
     /// Cancel flow before task started
-    fn cancel(
+    pub fn cancel(
         &mut self,
         now: DateTime<Utc>,
         by_account_id: AccountID,
         by_account_name: AccountName,
-    ) -> Result<(), ProjectionError<FlowState<TFlowStrategy>>> {
-        let event = FlowEventCancelled::<TFlowStrategy> {
+    ) -> Result<(), ProjectionError<FlowState>> {
+        let event = FlowEventCancelled {
             event_time: now,
-            flow_id: self.flow_id(),
+            flow_id: self.flow_id,
             by_account_id,
             by_account_name,
         };
-        self.apply_event(event.into())
+        self.apply(event)
     }
 }
 

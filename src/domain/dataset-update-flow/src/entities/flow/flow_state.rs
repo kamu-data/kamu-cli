@@ -20,11 +20,11 @@ const MAX_RETRY_TASKS: usize = 3;
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct FlowState<TFlowStrategy: FlowStrategy> {
+pub struct FlowState {
     /// Unique flow identifier
-    pub flow_id: TFlowStrategy::FlowID,
+    pub flow_id: FlowID,
     /// Flow key
-    pub flow_key: TFlowStrategy::FlowKey,
+    pub flow_key: FlowKey,
     /// Activating at time
     pub activate_at: Option<DateTime<Utc>>,
     /// Associated task IDs
@@ -35,23 +35,23 @@ pub struct FlowState<TFlowStrategy: FlowStrategy> {
     pub cancelled_at: Option<DateTime<Utc>>,
 }
 
-impl<TFlowStrategy: FlowStrategy> FlowState<TFlowStrategy> {
+impl FlowState {
     /// Checks if flow may be cancelled
     pub fn can_cancel(&self) -> bool {
         !self.outcome.is_some() && self.task_ids.is_empty() && self.cancelled_at.is_none()
     }
 }
 
-impl<TFlowStrategy: FlowStrategy + 'static> Projection for FlowState<TFlowStrategy> {
-    type Query = TFlowStrategy::FlowID;
-    type Event = FlowEvent<TFlowStrategy>;
+impl Projection for FlowState {
+    type Query = FlowID;
+    type Event = FlowEvent;
 
     fn apply(state: Option<Self>, event: Self::Event) -> Result<Self, ProjectionError<Self>> {
         use FlowEvent as E;
 
         match (state, event) {
             (None, event) => match event {
-                E::Initiated(FlowEventInitiated::<TFlowStrategy> {
+                E::Initiated(FlowEventInitiated {
                     event_time: _,
                     flow_id,
                     flow_key,
@@ -71,7 +71,7 @@ impl<TFlowStrategy: FlowStrategy + 'static> Projection for FlowState<TFlowStrate
 
                 match &event {
                     E::Initiated(_) => Err(ProjectionError::new(Some(s), event)),
-                    E::StartConditionDefined(FlowEventStartConditionDefined::<TFlowStrategy> {
+                    E::StartConditionDefined(FlowEventStartConditionDefined {
                         event_time: _,
                         flow_id: _,
                         start_condition: _,
@@ -82,7 +82,7 @@ impl<TFlowStrategy: FlowStrategy + 'static> Projection for FlowState<TFlowStrate
                             Ok(s)
                         }
                     }
-                    E::Queued(FlowEventQueued::<TFlowStrategy> {
+                    E::Queued(FlowEventQueued {
                         event_time: _,
                         flow_id: _,
                         activate_at,
@@ -96,7 +96,7 @@ impl<TFlowStrategy: FlowStrategy + 'static> Projection for FlowState<TFlowStrate
                             })
                         }
                     }
-                    E::TriggerAdded(FlowEventTriggerAdded::<TFlowStrategy> {
+                    E::TriggerAdded(FlowEventTriggerAdded {
                         event_time: _,
                         flow_id: _,
                         trigger: _,
@@ -107,7 +107,7 @@ impl<TFlowStrategy: FlowStrategy + 'static> Projection for FlowState<TFlowStrate
                             Ok(s)
                         }
                     }
-                    E::TaskScheduled(FlowEventTaskScheduled::<TFlowStrategy> {
+                    E::TaskScheduled(FlowEventTaskScheduled {
                         event_time: _,
                         flow_id: _,
                         task_id,
@@ -124,7 +124,7 @@ impl<TFlowStrategy: FlowStrategy + 'static> Projection for FlowState<TFlowStrate
                             Ok(FlowState { task_ids, ..s })
                         }
                     }
-                    E::TaskFinished(FlowEventTaskFinished::<TFlowStrategy> {
+                    E::TaskFinished(FlowEventTaskFinished {
                         event_time,
                         flow_id: _,
                         task_id,
@@ -156,7 +156,7 @@ impl<TFlowStrategy: FlowStrategy + 'static> Projection for FlowState<TFlowStrate
                             }
                         }
                     }
-                    E::Cancelled(FlowEventCancelled::<TFlowStrategy> {
+                    E::Cancelled(FlowEventCancelled {
                         event_time,
                         flow_id: _,
                         by_account_id: _,
@@ -180,10 +180,8 @@ impl<TFlowStrategy: FlowStrategy + 'static> Projection for FlowState<TFlowStrate
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-impl<TFlowStrategy: FlowStrategy + 'static> ProjectionEvent<TFlowStrategy::FlowID>
-    for FlowEvent<TFlowStrategy>
-{
-    fn matches_query(&self, query: &TFlowStrategy::FlowID) -> bool {
+impl ProjectionEvent<FlowID> for FlowEvent {
+    fn matches_query(&self, query: &FlowID) -> bool {
         self.flow_id() == *query
     }
 }

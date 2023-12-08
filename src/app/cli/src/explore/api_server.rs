@@ -23,7 +23,7 @@ pub struct APIServer {
         axum::routing::IntoMakeService<axum::Router>,
     >,
     task_executor: Arc<dyn TaskExecutor>,
-    update_service: Arc<dyn FlowService>,
+    flow_service: Arc<dyn FlowService>,
 }
 
 impl APIServer {
@@ -37,7 +37,7 @@ impl APIServer {
 
         let task_executor = base_catalog.get_one().unwrap();
 
-        let update_service = base_catalog.get_one().unwrap();
+        let flow_service = base_catalog.get_one().unwrap();
 
         let gql_schema = kamu_adapter_graphql::schema();
 
@@ -88,7 +88,7 @@ impl APIServer {
         Self {
             server,
             task_executor,
-            update_service,
+            flow_service,
         }
     }
 
@@ -100,7 +100,7 @@ impl APIServer {
         tokio::select! {
             res = self.server => { res.int_err() },
             res = self.task_executor.run() => { res.int_err() },
-            res = self.update_service.run() => { res.int_err() }
+            res = self.flow_service.run() => { res.int_err() }
         }
     }
 }

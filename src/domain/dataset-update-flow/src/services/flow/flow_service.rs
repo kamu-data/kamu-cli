@@ -13,14 +13,7 @@ use kamu_core::DatasetNotFoundError;
 use opendatafabric::{AccountID, AccountName, DatasetID};
 use tokio_stream::Stream;
 
-use crate::{
-    DatasetFlowID,
-    DatasetFlowState,
-    DatasetFlowType,
-    SystemFlowID,
-    SystemFlowState,
-    SystemFlowType,
-};
+use crate::{DatasetFlowType, FlowID, FlowState, SystemFlowType};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -36,7 +29,7 @@ pub trait FlowService: Sync + Send {
         flow_type: DatasetFlowType,
         initiator_account_id: AccountID,
         initiator_account_name: AccountName,
-    ) -> Result<DatasetFlowState, RequestFlowError>;
+    ) -> Result<FlowState, RequestFlowError>;
 
     /// Creates a new manual system flow request
     async fn request_manual_system_flow(
@@ -44,7 +37,7 @@ pub trait FlowService: Sync + Send {
         flow_type: SystemFlowType,
         initiator_account_id: AccountID,
         initiator_account_name: AccountName,
-    ) -> Result<SystemFlowState, RequestFlowError>;
+    ) -> Result<FlowState, RequestFlowError>;
 
     /// Returns states of flows of certian type associated with a given dataset
     /// ordered by creation time from newest to oldest
@@ -52,25 +45,25 @@ pub trait FlowService: Sync + Send {
         &self,
         dataset_id: &DatasetID,
         flow_type: DatasetFlowType,
-    ) -> Result<DatasetFlowStateStream, ListFlowsByDatasetError>;
+    ) -> Result<FlowStateStream, ListFlowsByDatasetError>;
 
     /// Returns states of system flows of certian type
     /// ordered by creation time from newest to oldest
     fn list_specific_system_flows(
         &self,
         flow_type: SystemFlowType,
-    ) -> Result<SystemFlowStateStream, ListSystemFlowsError>;
+    ) -> Result<FlowStateStream, ListSystemFlowsError>;
 
     /// Returns states of flows of any type associated with a given dataset
     /// ordered by creation time from newest to oldest
     fn list_all_flows_by_dataset(
         &self,
         dataset_id: &DatasetID,
-    ) -> Result<DatasetFlowStateStream, ListFlowsByDatasetError>;
+    ) -> Result<FlowStateStream, ListFlowsByDatasetError>;
 
     /// Returns states of system flows of any type
     /// ordered by creation time from newest to oldest
-    fn list_all_system_flows(&self) -> Result<SystemFlowStateStream, ListSystemFlowsError>;
+    fn list_all_system_flows(&self) -> Result<FlowStateStream, ListSystemFlowsError>;
 
     /// Returns state of the latest flow of certain type created for the given
     /// dataset
@@ -78,50 +71,30 @@ pub trait FlowService: Sync + Send {
         &self,
         dataset_id: &DatasetID,
         flow_type: DatasetFlowType,
-    ) -> Result<Option<DatasetFlowState>, GetLastDatasetFlowError>;
+    ) -> Result<Option<FlowState>, GetLastDatasetFlowError>;
 
     /// Returns state of the latest sstem flow of certain type
     async fn get_last_specific_system_flow(
         &self,
         flow_type: SystemFlowType,
-    ) -> Result<Option<SystemFlowState>, GetLastSystemtFlowError>;
+    ) -> Result<Option<FlowState>, GetLastSystemtFlowError>;
 
-    /// Returns current state of a given dataset flow
-    async fn get_dataset_flow(
-        &self,
-        flow_id: DatasetFlowID,
-    ) -> Result<DatasetFlowState, GetDatasetFlowError>;
+    /// Returns current state of a given flow
+    async fn get_flow(&self, flow_id: FlowID) -> Result<FlowState, GetFlowError>;
 
-    /// Returns current state of a given system flow
-    async fn get_system_flow(
+    /// Attempts to cancel the given flow
+    async fn cancel_flow(
         &self,
-        flow_id: SystemFlowID,
-    ) -> Result<SystemFlowState, GetSystemFlowError>;
-
-    /// Attempts to cancel the given dataset flow
-    async fn cancel_dataset_flow(
-        &self,
-        flow_id: DatasetFlowID,
+        flow_id: FlowID,
         by_account_id: AccountID,
         by_account_name: AccountName,
-    ) -> Result<DatasetFlowState, CancelDatasetFlowError>;
-
-    /// Attempts to cancel the given system flow
-    async fn cancel_system_flow(
-        &self,
-        flow_id: SystemFlowID,
-        by_account_id: AccountID,
-        by_account_name: AccountName,
-    ) -> Result<SystemFlowState, CancelSystemFlowError>;
+    ) -> Result<FlowState, CancelFlowError>;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub type DatasetFlowStateStream<'a> =
-    std::pin::Pin<Box<dyn Stream<Item = Result<DatasetFlowState, InternalError>> + Send + 'a>>;
-
-pub type SystemFlowStateStream<'a> =
-    std::pin::Pin<Box<dyn Stream<Item = Result<SystemFlowState, InternalError>> + Send + 'a>>;
+pub type FlowStateStream<'a> =
+    std::pin::Pin<Box<dyn Stream<Item = Result<FlowState, InternalError>> + Send + 'a>>;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -160,33 +133,17 @@ pub enum GetLastSystemtFlowError {
 }
 
 #[derive(thiserror::Error, Debug)]
-pub enum GetDatasetFlowError {
+pub enum GetFlowError {
     #[error(transparent)]
-    NotFound(#[from] DatasetFlowNotFoundError),
-    #[error(transparent)]
-    Internal(#[from] InternalError),
-}
-
-#[derive(thiserror::Error, Debug)]
-pub enum GetSystemFlowError {
-    #[error(transparent)]
-    NotFound(#[from] SystemFlowNotFoundError),
+    NotFound(#[from] FlowNotFoundError),
     #[error(transparent)]
     Internal(#[from] InternalError),
 }
 
 #[derive(thiserror::Error, Debug)]
-pub enum CancelDatasetFlowError {
+pub enum CancelFlowError {
     #[error(transparent)]
-    NotFound(#[from] DatasetFlowNotFoundError),
-    #[error(transparent)]
-    Internal(#[from] InternalError),
-}
-
-#[derive(thiserror::Error, Debug)]
-pub enum CancelSystemFlowError {
-    #[error(transparent)]
-    NotFound(#[from] SystemFlowNotFoundError),
+    NotFound(#[from] FlowNotFoundError),
     #[error(transparent)]
     Internal(#[from] InternalError),
 }
@@ -194,25 +151,17 @@ pub enum CancelSystemFlowError {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(thiserror::Error, Debug)]
-#[error("Dataset flow {flow_id} not found")]
-pub struct DatasetFlowNotFoundError {
-    pub flow_id: DatasetFlowID,
-}
-
-#[derive(thiserror::Error, Debug)]
-#[error("System flow {flow_id} not found")]
-pub struct SystemFlowNotFoundError {
-    pub flow_id: SystemFlowID,
+#[error("Flow {flow_id} not found")]
+pub struct FlowNotFoundError {
+    pub flow_id: FlowID,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-impl From<LoadError<DatasetFlowState>> for GetDatasetFlowError {
-    fn from(value: LoadError<DatasetFlowState>) -> Self {
+impl From<LoadError<FlowState>> for GetFlowError {
+    fn from(value: LoadError<FlowState>) -> Self {
         match value {
-            LoadError::NotFound(err) => {
-                Self::NotFound(DatasetFlowNotFoundError { flow_id: err.query })
-            }
+            LoadError::NotFound(err) => Self::NotFound(FlowNotFoundError { flow_id: err.query }),
             LoadError::ProjectionError(err) => Self::Internal(err.int_err()),
             LoadError::Internal(err) => Self::Internal(err),
         }
@@ -221,40 +170,10 @@ impl From<LoadError<DatasetFlowState>> for GetDatasetFlowError {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-impl From<LoadError<SystemFlowState>> for GetSystemFlowError {
-    fn from(value: LoadError<SystemFlowState>) -> Self {
+impl From<LoadError<FlowState>> for CancelFlowError {
+    fn from(value: LoadError<FlowState>) -> Self {
         match value {
-            LoadError::NotFound(err) => {
-                Self::NotFound(SystemFlowNotFoundError { flow_id: err.query })
-            }
-            LoadError::ProjectionError(err) => Self::Internal(err.int_err()),
-            LoadError::Internal(err) => Self::Internal(err),
-        }
-    }
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-impl From<LoadError<DatasetFlowState>> for CancelDatasetFlowError {
-    fn from(value: LoadError<DatasetFlowState>) -> Self {
-        match value {
-            LoadError::NotFound(err) => {
-                Self::NotFound(DatasetFlowNotFoundError { flow_id: err.query })
-            }
-            LoadError::ProjectionError(err) => Self::Internal(err.int_err()),
-            LoadError::Internal(err) => Self::Internal(err),
-        }
-    }
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-impl From<LoadError<SystemFlowState>> for CancelSystemFlowError {
-    fn from(value: LoadError<SystemFlowState>) -> Self {
-        match value {
-            LoadError::NotFound(err) => {
-                Self::NotFound(SystemFlowNotFoundError { flow_id: err.query })
-            }
+            LoadError::NotFound(err) => Self::NotFound(FlowNotFoundError { flow_id: err.query }),
             LoadError::ProjectionError(err) => Self::Internal(err.int_err()),
             LoadError::Internal(err) => Self::Internal(err),
         }

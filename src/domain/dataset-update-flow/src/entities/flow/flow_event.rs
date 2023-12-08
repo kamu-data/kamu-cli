@@ -16,83 +16,76 @@ use crate::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub trait FlowStrategy: std::fmt::Debug + Clone {
-    type FlowID: std::fmt::Debug + Copy + PartialEq + Eq + Send + Sync + 'static;
-    type FlowKey: std::fmt::Debug + Clone + PartialEq + Eq + Send + Sync + 'static;
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum FlowEvent<TFlowStrategy: FlowStrategy> {
-    /// Update initiated
-    Initiated(FlowEventInitiated<TFlowStrategy>),
+pub enum FlowEvent {
+    /// Flow initiated
+    Initiated(FlowEventInitiated),
     /// Start condition defined
-    StartConditionDefined(FlowEventStartConditionDefined<TFlowStrategy>),
+    StartConditionDefined(FlowEventStartConditionDefined),
     /// Queued for time
-    Queued(FlowEventQueued<TFlowStrategy>),
+    Queued(FlowEventQueued),
     /// Secondary triger added
-    TriggerAdded(FlowEventTriggerAdded<TFlowStrategy>),
+    TriggerAdded(FlowEventTriggerAdded),
     /// Scheduled/Rescheduled a task
-    TaskScheduled(FlowEventTaskScheduled<TFlowStrategy>),
+    TaskScheduled(FlowEventTaskScheduled),
     /// Finished task
-    TaskFinished(FlowEventTaskFinished<TFlowStrategy>),
+    TaskFinished(FlowEventTaskFinished),
     /// Cancelled update
-    Cancelled(FlowEventCancelled<TFlowStrategy>),
+    Cancelled(FlowEventCancelled),
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct FlowEventInitiated<TFlowStrategy: FlowStrategy> {
+pub struct FlowEventInitiated {
     pub event_time: DateTime<Utc>,
-    pub flow_id: TFlowStrategy::FlowID,
-    pub flow_key: TFlowStrategy::FlowKey,
+    pub flow_id: FlowID,
+    pub flow_key: FlowKey,
     pub trigger: FlowTrigger,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct FlowEventStartConditionDefined<TFlowStrategy: FlowStrategy> {
+pub struct FlowEventStartConditionDefined {
     pub event_time: DateTime<Utc>,
-    pub flow_id: TFlowStrategy::FlowID,
+    pub flow_id: FlowID,
     pub start_condition: FlowStartCondition,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct FlowEventQueued<TFlowStrategy: FlowStrategy> {
+pub struct FlowEventQueued {
     pub event_time: DateTime<Utc>,
-    pub flow_id: TFlowStrategy::FlowID,
+    pub flow_id: FlowID,
     pub activate_at: DateTime<Utc>,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct FlowEventTriggerAdded<TFlowStrategy: FlowStrategy> {
+pub struct FlowEventTriggerAdded {
     pub event_time: DateTime<Utc>,
-    pub flow_id: TFlowStrategy::FlowID,
+    pub flow_id: FlowID,
     pub trigger: FlowTrigger,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct FlowEventTaskScheduled<TFlowStrategy: FlowStrategy> {
+pub struct FlowEventTaskScheduled {
     pub event_time: DateTime<Utc>,
-    pub flow_id: TFlowStrategy::FlowID,
+    pub flow_id: FlowID,
     pub task_id: TaskID,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct FlowEventTaskFinished<TFlowStrategy: FlowStrategy> {
+pub struct FlowEventTaskFinished {
     pub event_time: DateTime<Utc>,
-    pub flow_id: TFlowStrategy::FlowID,
+    pub flow_id: FlowID,
     pub task_id: TaskID,
     pub task_outcome: TaskOutcome,
 }
@@ -100,57 +93,51 @@ pub struct FlowEventTaskFinished<TFlowStrategy: FlowStrategy> {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct FlowEventCancelled<TFlowStrategy: FlowStrategy> {
+pub struct FlowEventCancelled {
     pub event_time: DateTime<Utc>,
-    pub flow_id: TFlowStrategy::FlowID,
+    pub flow_id: FlowID,
     pub by_account_id: AccountID,
     pub by_account_name: AccountName,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-impl<TFlowStrategy: FlowStrategy> FlowEvent<TFlowStrategy> {
-    pub fn flow_id(&self) -> TFlowStrategy::FlowID {
+impl FlowEvent {
+    pub fn flow_id(&self) -> FlowID {
         match self {
-            FlowEvent::<TFlowStrategy>::Initiated(e) => e.flow_id,
-            FlowEvent::<TFlowStrategy>::StartConditionDefined(e) => e.flow_id,
-            FlowEvent::<TFlowStrategy>::Queued(e) => e.flow_id,
-            FlowEvent::<TFlowStrategy>::TriggerAdded(e) => e.flow_id,
-            FlowEvent::<TFlowStrategy>::TaskScheduled(e) => e.flow_id,
-            FlowEvent::<TFlowStrategy>::TaskFinished(e) => e.flow_id,
-            FlowEvent::<TFlowStrategy>::Cancelled(e) => e.flow_id,
+            FlowEvent::Initiated(e) => e.flow_id,
+            FlowEvent::StartConditionDefined(e) => e.flow_id,
+            FlowEvent::Queued(e) => e.flow_id,
+            FlowEvent::TriggerAdded(e) => e.flow_id,
+            FlowEvent::TaskScheduled(e) => e.flow_id,
+            FlowEvent::TaskFinished(e) => e.flow_id,
+            FlowEvent::Cancelled(e) => e.flow_id,
         }
     }
 
     pub fn event_time(&self) -> &DateTime<Utc> {
         match self {
-            FlowEvent::<TFlowStrategy>::Initiated(e) => &e.event_time,
-            FlowEvent::<TFlowStrategy>::StartConditionDefined(e) => &e.event_time,
-            FlowEvent::<TFlowStrategy>::Queued(e) => &e.event_time,
-            FlowEvent::<TFlowStrategy>::TriggerAdded(e) => &e.event_time,
-            FlowEvent::<TFlowStrategy>::TaskScheduled(e) => &e.event_time,
-            FlowEvent::<TFlowStrategy>::TaskFinished(e) => &e.event_time,
-            FlowEvent::<TFlowStrategy>::Cancelled(e) => &e.event_time,
+            FlowEvent::Initiated(e) => &e.event_time,
+            FlowEvent::StartConditionDefined(e) => &e.event_time,
+            FlowEvent::Queued(e) => &e.event_time,
+            FlowEvent::TriggerAdded(e) => &e.event_time,
+            FlowEvent::TaskScheduled(e) => &e.event_time,
+            FlowEvent::TaskFinished(e) => &e.event_time,
+            FlowEvent::Cancelled(e) => &e.event_time,
         }
     }
 }
 
-impl_generic_enum_with_variants!(FlowEvent<TFlowStrategy: FlowStrategy>);
+impl_enum_with_variants!(FlowEvent);
 
-impl_generic_enum_variant!(FlowEvent::Initiated(FlowEventInitiated<TFlowStrategy: FlowStrategy>));
-impl_generic_enum_variant!(
-    FlowEvent::StartConditionDefined(FlowEventStartConditionDefined<TFlowStrategy: FlowStrategy>)
-);
-impl_generic_enum_variant!(FlowEvent::Queued(FlowEventQueued<TFlowStrategy: FlowStrategy>));
-impl_generic_enum_variant!(
-    FlowEvent::TriggerAdded(FlowEventTriggerAdded<TFlowStrategy: FlowStrategy>)
-);
-impl_generic_enum_variant!(
-    FlowEvent::TaskScheduled(FlowEventTaskScheduled<TFlowStrategy: FlowStrategy>)
-);
-impl_generic_enum_variant!(
-    FlowEvent::TaskFinished(FlowEventTaskFinished<TFlowStrategy: FlowStrategy>)
-);
-impl_generic_enum_variant!(FlowEvent::Cancelled(FlowEventCancelled<TFlowStrategy: FlowStrategy>));
+impl_enum_variant!(FlowEvent::Initiated(FlowEventInitiated));
+impl_enum_variant!(FlowEvent::StartConditionDefined(
+    FlowEventStartConditionDefined
+));
+impl_enum_variant!(FlowEvent::Queued(FlowEventQueued));
+impl_enum_variant!(FlowEvent::TriggerAdded(FlowEventTriggerAdded));
+impl_enum_variant!(FlowEvent::TaskScheduled(FlowEventTaskScheduled));
+impl_enum_variant!(FlowEvent::TaskFinished(FlowEventTaskFinished));
+impl_enum_variant!(FlowEvent::Cancelled(FlowEventCancelled));
 
 /////////////////////////////////////////////////////////////////////////////////////////
