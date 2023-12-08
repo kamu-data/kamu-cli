@@ -33,6 +33,14 @@ impl MetadataFactory {
         SetPollingSourceBuilder::new()
     }
 
+    pub fn add_push_source() -> AddPushSourceBuilder {
+        AddPushSourceBuilder::new()
+    }
+
+    pub fn set_data_schema() -> SetDataSchemaBuilder {
+        SetDataSchemaBuilder::new()
+    }
+
     pub fn add_data() -> AddDataBuilder {
         AddDataBuilder::new()
     }
@@ -210,7 +218,7 @@ impl SetPollingSourceBuilder {
                 prepare: None,
                 read: ReadStep::GeoJson(ReadStepGeoJson { schema: None }),
                 preprocess: None,
-                merge: MergeStrategy::Append,
+                merge: MergeStrategy::Append(MergeStrategyAppend {}),
             },
         }
     }
@@ -226,7 +234,7 @@ impl SetPollingSourceBuilder {
     pub fn fetch_file(self, path: &Path) -> Self {
         self.fetch(FetchStep::Url(FetchStepUrl {
             url: url::Url::from_file_path(path).unwrap().as_str().to_owned(),
-            event_time: None, // TODO: Some(EventTimeSource::FromMetadata),
+            event_time: Some(EventTimeSourceFromSystemTime {}.into()),
             cache: None,
             headers: None,
         }))
@@ -257,6 +265,67 @@ impl SetPollingSourceBuilder {
     }
 
     pub fn build(self) -> SetPollingSource {
+        self.v
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// AddPushSourceBuilder
+///////////////////////////////////////////////////////////////////////////////
+
+pub struct AddPushSourceBuilder {
+    v: AddPushSource,
+}
+
+impl AddPushSourceBuilder {
+    fn new() -> Self {
+        Self {
+            v: AddPushSource {
+                source: "source_1".to_string(),
+                read: ReadStepNdJson {
+                    schema: None,
+                    ..Default::default()
+                }
+                .into(),
+                preprocess: None,
+                merge: MergeStrategy::Append(MergeStrategyAppend {}),
+            },
+        }
+    }
+
+    pub fn source(mut self, name: impl Into<String>) -> Self {
+        self.v = AddPushSource {
+            source: name.into(),
+            ..self.v
+        };
+        self
+    }
+
+    pub fn read(mut self, read_step: impl Into<ReadStep>) -> Self {
+        self.v = AddPushSource {
+            read: read_step.into(),
+            ..self.v
+        };
+        self
+    }
+
+    pub fn preprocess(mut self, preprocess_step: impl Into<Transform>) -> Self {
+        self.v = AddPushSource {
+            preprocess: Some(preprocess_step.into()),
+            ..self.v
+        };
+        self
+    }
+
+    pub fn merge(mut self, merge_strategy: impl Into<MergeStrategy>) -> Self {
+        self.v = AddPushSource {
+            merge: merge_strategy.into(),
+            ..self.v
+        };
+        self
+    }
+
+    pub fn build(self) -> AddPushSource {
         self.v
     }
 }
@@ -348,6 +417,36 @@ impl SetTransformBuilder {
     }
 
     pub fn build(self) -> SetTransform {
+        self.v
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// SetDataSchemaBuilder
+///////////////////////////////////////////////////////////////////////////////
+
+pub struct SetDataSchemaBuilder {
+    v: SetDataSchema,
+}
+
+impl SetDataSchemaBuilder {
+    pub fn new() -> Self {
+        use datafusion::arrow::datatypes::*;
+        let schema = Schema::new(vec![
+            Field::new("city", DataType::Utf8, false),
+            Field::new("population", DataType::Int64, false),
+        ]);
+        Self {
+            v: SetDataSchema::new(&schema),
+        }
+    }
+
+    pub fn schema(mut self, schema: &datafusion::arrow::datatypes::Schema) -> Self {
+        self.v = SetDataSchema::new(schema);
+        self
+    }
+
+    pub fn build(self) -> SetDataSchema {
         self.v
     }
 }

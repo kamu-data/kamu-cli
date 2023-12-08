@@ -152,16 +152,17 @@ where
         mut snapshot: DatasetSnapshot,
     ) -> Result<CreateDatasetResult, CreateDatasetFromSnapshotError> {
         // Validate / resolve events
+        // TODO: Move some of the validation to MetadataChain
         for event in snapshot.metadata.iter_mut() {
             match event {
-                MetadataEvent::Seed(_) => Err(InvalidSnapshotError {
-                    reason: "Seed event is generated and cannot be specified explicitly".to_owned(),
-                }
+                MetadataEvent::Seed(_) => Err(InvalidSnapshotError::new(
+                    "Seed event is generated and cannot be specified explicitly",
+                )
                 .into()),
-                MetadataEvent::SetPollingSource(_) => {
+                MetadataEvent::SetPollingSource(_) | MetadataEvent::AddPushSource(_) => {
                     if snapshot.kind != DatasetKind::Root {
                         Err(InvalidSnapshotError {
-                            reason: "SetPollingSource is only allowed on root datasets".to_owned(),
+                            reason: format!("Event is only allowed on root datasets: {:?}", event),
                         }
                         .into())
                     } else {
@@ -170,14 +171,19 @@ where
                 }
                 MetadataEvent::SetTransform(e) => {
                     if snapshot.kind != DatasetKind::Derivative {
-                        Err(InvalidSnapshotError {
-                            reason: "SetTransform is only allowed on derivative datasets"
-                                .to_owned(),
-                        }
+                        Err(InvalidSnapshotError::new(
+                            "SetTransform is only allowed on derivative datasets",
+                        )
                         .into())
                     } else {
                         resolve_transform_inputs(self, &snapshot.name, &mut e.inputs).await
                     }
+                }
+                MetadataEvent::SetDataSchema(_) => {
+                    // It shouldn't be common to provide schema as part of the snapshot. In most
+                    // cases it will inferred upon first ingest/transform. But no reason not to
+                    // allow it.
+                    Ok(())
                 }
                 MetadataEvent::SetAttachments(_)
                 | MetadataEvent::SetInfo(_)
@@ -185,12 +191,12 @@ where
                 | MetadataEvent::SetVocab(_) => Ok(()),
                 MetadataEvent::AddData(_)
                 | MetadataEvent::ExecuteQuery(_)
-                | MetadataEvent::SetWatermark(_) => Err(InvalidSnapshotError {
-                    reason: format!(
-                        "Event is not allowed to appear in a DatasetSnapshot: {:?}",
-                        event
-                    ),
-                }
+                | MetadataEvent::SetWatermark(_)
+                | MetadataEvent::DisablePollingSource(_)
+                | MetadataEvent::DisablePushSource(_) => Err(InvalidSnapshotError::new(format!(
+                    "Event is not allowed to appear in a DatasetSnapshot: {:?}",
+                    event
+                ))
                 .into()),
             }?;
         }
@@ -447,6 +453,14 @@ pub struct NameCollisionError {
 #[error("Invalid snapshot: {reason}")]
 pub struct InvalidSnapshotError {
     pub reason: String,
+}
+
+impl InvalidSnapshotError {
+    pub fn new(reason: impl Into<String>) -> Self {
+        Self {
+            reason: reason.into(),
+        }
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

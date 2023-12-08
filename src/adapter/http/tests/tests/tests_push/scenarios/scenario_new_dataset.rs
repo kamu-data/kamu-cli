@@ -49,6 +49,7 @@ impl<TServerHarness: ServerSideHarness> SmartPushNewDatasetScenario<TServerHarne
                     .name("foo")
                     .kind(DatasetKind::Root)
                     .push_event(MetadataFactory::set_polling_source().build())
+                    .push_event(MetadataFactory::set_data_schema().build())
                     .build(),
             )
             .await

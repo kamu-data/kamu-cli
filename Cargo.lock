@@ -4214,6 +4214,8 @@ checksum = "0ab1bc2a289d34bd04a330323ac98a1b4bc82c9d9fcb1e66b63caa84da26b575"
 name = "opendatafabric"
 version = "0.146.1"
 dependencies = [
+ "arrow",
+ "base64 0.21.5",
  "bs58",
  "byteorder",
  "chrono",

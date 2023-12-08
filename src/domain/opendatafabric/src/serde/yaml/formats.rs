@@ -10,6 +10,23 @@
 // TODO: Yep... all this to serde an Option<DateTime> in a slightly different
 // format. See: https://github.com/serde-rs/serde/issues/723
 
+pub mod base64 {
+    use ::base64::Engine;
+    use serde::{Deserialize, Deserializer, Serializer};
+
+    pub fn serialize<S: Serializer>(data: &Vec<u8>, serializer: S) -> Result<S::Ok, S::Error> {
+        let s = ::base64::engine::general_purpose::STANDARD.encode(data);
+        serializer.serialize_str(&s)
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Vec<u8>, D::Error> {
+        let s = String::deserialize(deserializer)?;
+        ::base64::engine::general_purpose::STANDARD
+            .decode(s)
+            .map_err(|e| serde::de::Error::custom(e.to_string()))
+    }
+}
+
 pub mod datetime_rfc3339 {
     use chrono::{DateTime, SecondsFormat, Utc};
     use serde::{Deserialize, Deserializer, Serializer};

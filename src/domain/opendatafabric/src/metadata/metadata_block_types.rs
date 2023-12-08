@@ -134,8 +134,12 @@ impl IntoDataStreamEvent for MetadataEvent {
             | MetadataEvent::SetInfo(_)
             | MetadataEvent::SetLicense(_)
             | MetadataEvent::SetPollingSource(_)
+            | MetadataEvent::DisablePollingSource(_)
+            | MetadataEvent::AddPushSource(_)
+            | MetadataEvent::DisablePushSource(_)
             | MetadataEvent::SetTransform(_)
-            | MetadataEvent::SetVocab(_) => return None,
+            | MetadataEvent::SetVocab(_)
+            | MetadataEvent::SetDataSchema(_) => return None,
         };
         Some(MetadataEventDataStream {
             output_data,
@@ -162,8 +166,12 @@ impl IntoDataStreamEvent for MetadataEvent {
             | MetadataEvent::SetInfo(_)
             | MetadataEvent::SetLicense(_)
             | MetadataEvent::SetPollingSource(_)
+            | MetadataEvent::DisablePollingSource(_)
+            | MetadataEvent::AddPushSource(_)
+            | MetadataEvent::DisablePushSource(_)
             | MetadataEvent::SetTransform(_)
-            | MetadataEvent::SetVocab(_) => return None,
+            | MetadataEvent::SetVocab(_)
+            | MetadataEvent::SetDataSchema(_) => return None,
         };
         Some(MetadataEventDataStreamRef {
             output_data,

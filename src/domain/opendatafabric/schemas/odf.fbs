@@ -67,6 +67,161 @@ table AddData {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// ReadStep
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstep-schema
+////////////////////////////////////////////////////////////////////////////////
+
+table ReadStepCsv {
+  schema: [string];
+  separator: string;
+  encoding: string;
+  quote: string;
+  escape: string;
+  comment: string;
+  header: bool = null;
+  enforce_schema: bool = null;
+  infer_schema: bool = null;
+  ignore_leading_white_space: bool = null;
+  ignore_trailing_white_space: bool = null;
+  null_value: string;
+  empty_value: string;
+  nan_value: string;
+  positive_inf: string;
+  negative_inf: string;
+  date_format: string;
+  timestamp_format: string;
+  multi_line: bool = null;
+}
+
+table ReadStepJsonLines {
+  schema: [string];
+  date_format: string;
+  encoding: string;
+  multi_line: bool = null;
+  primitives_as_string: bool = null;
+  timestamp_format: string;
+}
+
+table ReadStepGeoJson {
+  schema: [string];
+}
+
+table ReadStepEsriShapefile {
+  schema: [string];
+  sub_path: string;
+}
+
+table ReadStepParquet {
+  schema: [string];
+}
+
+table ReadStepJson {
+  sub_path: string;
+  schema: [string];
+  date_format: string;
+  encoding: string;
+  timestamp_format: string;
+}
+
+table ReadStepNdJson {
+  schema: [string];
+  date_format: string;
+  encoding: string;
+  timestamp_format: string;
+}
+
+table ReadStepNdGeoJson {
+  schema: [string];
+}
+
+union ReadStep {
+  ReadStepCsv,
+  ReadStepJsonLines,
+  ReadStepGeoJson,
+  ReadStepEsriShapefile,
+  ReadStepParquet,
+  ReadStepJson,
+  ReadStepNdJson,
+  ReadStepNdGeoJson,
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// SqlQueryStep
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#sqlquerystep-schema
+////////////////////////////////////////////////////////////////////////////////
+
+table SqlQueryStep {
+  alias: string;
+  query: string;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// TemporalTable
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#temporaltable-schema
+////////////////////////////////////////////////////////////////////////////////
+
+table TemporalTable {
+  name: string;
+  primary_key: [string];
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Transform
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#transform-schema
+////////////////////////////////////////////////////////////////////////////////
+
+table TransformSql {
+  engine: string;
+  version: string;
+  query: string;
+  queries: [SqlQueryStep];
+  temporal_tables: [TemporalTable];
+}
+
+union Transform {
+  TransformSql,
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// MergeStrategy
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mergestrategy-schema
+////////////////////////////////////////////////////////////////////////////////
+
+table MergeStrategyAppend {
+}
+
+table MergeStrategyLedger {
+  primary_key: [string];
+}
+
+table MergeStrategySnapshot {
+  primary_key: [string];
+  compare_columns: [string];
+  observation_column: string;
+  obsv_added: string;
+  obsv_changed: string;
+  obsv_removed: string;
+}
+
+union MergeStrategy {
+  MergeStrategyAppend,
+  MergeStrategyLedger,
+  MergeStrategySnapshot,
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// AddPushSource
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#addpushsource-schema
+////////////////////////////////////////////////////////////////////////////////
+
+table AddPushSource {
+  source: string;
+  read: ReadStep;
+  preprocess: Transform;
+  merge: MergeStrategy;
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // AttachmentEmbedded
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#attachmentembedded-schema
 ////////////////////////////////////////////////////////////////////////////////
@@ -259,149 +414,6 @@ union PrepStep {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// ReadStep
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstep-schema
-////////////////////////////////////////////////////////////////////////////////
-
-table ReadStepCsv {
-  schema: [string];
-  separator: string;
-  encoding: string;
-  quote: string;
-  escape: string;
-  comment: string;
-  header: bool = null;
-  enforce_schema: bool = null;
-  infer_schema: bool = null;
-  ignore_leading_white_space: bool = null;
-  ignore_trailing_white_space: bool = null;
-  null_value: string;
-  empty_value: string;
-  nan_value: string;
-  positive_inf: string;
-  negative_inf: string;
-  date_format: string;
-  timestamp_format: string;
-  multi_line: bool = null;
-}
-
-table ReadStepJsonLines {
-  schema: [string];
-  date_format: string;
-  encoding: string;
-  multi_line: bool = null;
-  primitives_as_string: bool = null;
-  timestamp_format: string;
-}
-
-table ReadStepGeoJson {
-  schema: [string];
-}
-
-table ReadStepEsriShapefile {
-  schema: [string];
-  sub_path: string;
-}
-
-table ReadStepParquet {
-  schema: [string];
-}
-
-table ReadStepJson {
-  sub_path: string;
-  schema: [string];
-  date_format: string;
-  encoding: string;
-  timestamp_format: string;
-}
-
-table ReadStepNdJson {
-  schema: [string];
-  date_format: string;
-  encoding: string;
-  timestamp_format: string;
-}
-
-table ReadStepNdGeoJson {
-  schema: [string];
-}
-
-union ReadStep {
-  ReadStepCsv,
-  ReadStepJsonLines,
-  ReadStepGeoJson,
-  ReadStepEsriShapefile,
-  ReadStepParquet,
-  ReadStepJson,
-  ReadStepNdJson,
-  ReadStepNdGeoJson,
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// SqlQueryStep
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#sqlquerystep-schema
-////////////////////////////////////////////////////////////////////////////////
-
-table SqlQueryStep {
-  alias: string;
-  query: string;
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// TemporalTable
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#temporaltable-schema
-////////////////////////////////////////////////////////////////////////////////
-
-table TemporalTable {
-  name: string;
-  primary_key: [string];
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// Transform
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#transform-schema
-////////////////////////////////////////////////////////////////////////////////
-
-table TransformSql {
-  engine: string;
-  version: string;
-  query: string;
-  queries: [SqlQueryStep];
-  temporal_tables: [TemporalTable];
-}
-
-union Transform {
-  TransformSql,
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// MergeStrategy
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mergestrategy-schema
-////////////////////////////////////////////////////////////////////////////////
-
-table MergeStrategyAppend {
-}
-
-table MergeStrategyLedger {
-  primary_key: [string];
-}
-
-table MergeStrategySnapshot {
-  primary_key: [string];
-  compare_columns: [string];
-  observation_column: string;
-  obsv_added: string;
-  obsv_changed: string;
-  obsv_removed: string;
-}
-
-union MergeStrategy {
-  MergeStrategyAppend,
-  MergeStrategyLedger,
-  MergeStrategySnapshot,
-}
-
-////////////////////////////////////////////////////////////////////////////////
 // SetPollingSource
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setpollingsource-schema
 ////////////////////////////////////////////////////////////////////////////////
@@ -489,6 +501,32 @@ table SetLicense {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// SetDataSchema
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setdataschema-schema
+////////////////////////////////////////////////////////////////////////////////
+
+table SetDataSchema {
+  schema: [ubyte];
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// DisablePushSource
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#disablepushsource-schema
+////////////////////////////////////////////////////////////////////////////////
+
+table DisablePushSource {
+  source: string;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// DisablePollingSource
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#disablepollingsource-schema
+////////////////////////////////////////////////////////////////////////////////
+
+table DisablePollingSource {
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // MetadataEvent
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#metadataevent-schema
 ////////////////////////////////////////////////////////////////////////////////
@@ -504,6 +542,10 @@ union MetadataEvent {
   SetAttachments,
   SetInfo,
   SetLicense,
+  SetDataSchema,
+  AddPushSource,
+  DisablePushSource,
+  DisablePollingSource,
 }
 
 ////////////////////////////////////////////////////////////////////////////////

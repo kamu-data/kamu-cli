@@ -151,8 +151,14 @@ where
         _block_cache: &mut Vec<MetadataBlock>,
     ) -> Result<(), AppendError> {
         match &new_block.event {
-            // TODO: ensure only used on Root datasets
+            MetadataEvent::SetDataSchema(_) => {
+                // TODO: Consider schema evolution rules
+                // TODO: Consider what happens with previously defined sources
+                Ok(())
+            }
             MetadataEvent::AddData(e) => {
+                // TODO: ensure only used on Root datasets
+
                 // Validate event is not empty
                 if e.output_data.is_none()
                     && e.output_checkpoint.is_none()
@@ -166,6 +172,7 @@ where
                     .into());
                 }
 
+                let mut prev_schema = None;
                 let mut prev_checkpoint = None;
                 let mut prev_watermark = None;
                 let mut prev_source_state = None;
@@ -179,24 +186,41 @@ where
                 );
                 while let Some((_, block)) = blocks.try_next().await.int_err()? {
                     match block.event {
+                        MetadataEvent::SetDataSchema(e) if prev_schema.is_none() => {
+                            prev_schema = Some(e)
+                        }
                         MetadataEvent::AddData(e) => {
-                            prev_checkpoint = Some(e.output_checkpoint);
-                            prev_source_state = Some(e.source_state);
+                            if prev_checkpoint.is_none() {
+                                prev_checkpoint = Some(e.output_checkpoint);
+                            }
+                            if prev_source_state.is_none() {
+                                prev_source_state = Some(e.source_state);
+                            }
                             if prev_watermark.is_none() {
                                 prev_watermark = Some(e.output_watermark);
                             }
                         }
-                        MetadataEvent::SetWatermark(e) => {
+                        MetadataEvent::SetWatermark(e) if prev_watermark.is_none() => {
                             prev_watermark = Some(Some(e.output_watermark));
                         }
                         _ => (),
                     }
-                    if prev_checkpoint.is_some()
+                    if prev_schema.is_some()
+                        && prev_checkpoint.is_some()
                         && prev_watermark.is_some()
                         && prev_source_state.is_some()
                     {
                         break;
                     }
+                }
+
+                // Validate schema was defined if we're adding data
+                if prev_schema.is_none() && e.output_data.is_some() {
+                    return Err(AppendValidationError::InvalidEvent(InvalidEventError::new(
+                        e.clone(),
+                        "SetDataSchema event must be present before adding data",
+                    ))
+                    .into());
                 }
 
                 let prev_checkpoint = prev_checkpoint.unwrap_or_default();
@@ -245,16 +269,39 @@ where
                     .into());
                 }
 
+                let mut prev_schema = None;
+                let mut prev_query = None;
+
+                // TODO: Generalize this logic
                 // TODO: PERF: Use block cache
-                let prev_query = self
-                    .iter_blocks_interval(new_block.prev_block_hash.as_ref().unwrap(), None, false)
-                    .filter_map_ok(|(_, b)| match b.event {
-                        MetadataEvent::ExecuteQuery(e) => Some(e),
-                        _ => None,
-                    })
-                    .try_first()
-                    .await
-                    .int_err()?;
+                let mut blocks = self.iter_blocks_interval(
+                    new_block.prev_block_hash.as_ref().unwrap(),
+                    None,
+                    false,
+                );
+                while let Some((_, block)) = blocks.try_next().await.int_err()? {
+                    match block.event {
+                        MetadataEvent::SetDataSchema(e) if prev_schema.is_none() => {
+                            prev_schema = Some(e)
+                        }
+                        MetadataEvent::ExecuteQuery(e) if prev_query.is_none() => {
+                            prev_query = Some(e);
+                        }
+                        _ => (),
+                    }
+                    if prev_schema.is_some() && prev_query.is_some() {
+                        break;
+                    }
+                }
+
+                // Validate schema was defined
+                if prev_schema.is_none() {
+                    return Err(AppendValidationError::InvalidEvent(InvalidEventError::new(
+                        e.clone(),
+                        "SetDataSchema event must be present before adding data",
+                    ))
+                    .into());
+                }
 
                 let prev_checkpoint = prev_query
                     .as_ref()
@@ -289,12 +336,71 @@ where
 
                 Ok(())
             }
+            MetadataEvent::SetPollingSource(_) => {
+                // Ensure no active push sources
+                let mut blocks = self.iter_blocks_interval(
+                    new_block.prev_block_hash.as_ref().unwrap(),
+                    None,
+                    false,
+                );
+                while let Some((_, block)) = blocks.try_next().await.int_err()? {
+                    match block.event {
+                        MetadataEvent::AddPushSource(e) => {
+                            return Err(AppendValidationError::InvalidEvent(
+                                InvalidEventError::new(
+                                    e.clone(),
+                                    format!(
+                                        "Cannot add a polling source while some push source '{}' \
+                                         is still active",
+                                        e.source
+                                    ),
+                                ),
+                            )
+                            .into());
+                        }
+                        _ => (),
+                    }
+                }
+                Ok(())
+            }
+            MetadataEvent::DisablePollingSource(_) => {
+                // TODO: Ensure has previously active polling source
+                unimplemented!("Disabling sources is not yet fully supported")
+            }
+            MetadataEvent::AddPushSource(_) => {
+                // Ensure no active polling source
+                let mut blocks = self.iter_blocks_interval(
+                    new_block.prev_block_hash.as_ref().unwrap(),
+                    None,
+                    false,
+                );
+                while let Some((_, block)) = blocks.try_next().await.int_err()? {
+                    match block.event {
+                        MetadataEvent::SetPollingSource(e) => {
+                            return Err(AppendValidationError::InvalidEvent(
+                                InvalidEventError::new(
+                                    e.clone(),
+                                    "Cannot add a push source while polling source is still active",
+                                ),
+                            )
+                            .into());
+                        }
+                        _ => (),
+                    }
+                }
+                Ok(())
+            }
+            MetadataEvent::DisablePushSource(_) => {
+                // TODO: Ensure has previous push source with matching name
+                unimplemented!("Disabling sources is not yet fully supported")
+            }
             MetadataEvent::Seed(_) => Ok(()),
-            MetadataEvent::SetPollingSource(_) => Ok(()),
             MetadataEvent::SetTransform(_) => Ok(()),
             MetadataEvent::SetVocab(_) => Ok(()),
-            // TODO: Ensure is not called on Derivative datasets (in a performant way)
-            MetadataEvent::SetWatermark(_) => Ok(()),
+            MetadataEvent::SetWatermark(_) => {
+                // TODO: Ensure is not called on Derivative datasets (in a performant way)
+                Ok(())
+            }
             MetadataEvent::SetAttachments(_) => Ok(()),
             MetadataEvent::SetInfo(_) => Ok(()),
             MetadataEvent::SetLicense(_) => Ok(()),

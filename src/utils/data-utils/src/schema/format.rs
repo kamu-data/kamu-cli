@@ -9,8 +9,11 @@
 
 use std::io::Write;
 
+use datafusion::arrow::datatypes::Schema;
 use datafusion::parquet::basic::{ConvertedType, LogicalType, TimeUnit, Type as PhysicalType};
 use datafusion::parquet::schema::types::Type;
+
+/////////////////////////////////////////////////////////////////////////////////////////
 
 /// Prints schema in a style of `parquet-schema` output
 pub fn write_schema_parquet(output: &mut dyn Write, schema: &Type) -> Result<(), std::io::Error> {
@@ -18,10 +21,10 @@ pub fn write_schema_parquet(output: &mut dyn Write, schema: &Type) -> Result<(),
     Ok(())
 }
 
-/// Same as [write_schema_parquet] bu outputs into a String
+/// Same as [write_schema_parquet] but outputs into a String
 pub fn format_schema_parquet(schema: &Type) -> String {
     let mut buf = Vec::new();
-    crate::schema::format::write_schema_parquet(&mut buf, &schema).unwrap();
+    write_schema_parquet(&mut buf, &schema).unwrap();
     String::from_utf8(buf).unwrap()
 }
 
@@ -34,6 +37,23 @@ pub fn write_schema_parquet_json(
     let mut writer = ParquetJsonSchemaWriter::new(output);
     writer.write(schema)?;
     Ok(())
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+/// Prints arrow schema to output
+/// TODO: It currently convers schema to Parquet, but we will avoid this in the
+/// future to preserve most descriptive types.
+pub fn write_schema_arrow(output: &mut dyn Write, schema: &Schema) -> Result<(), std::io::Error> {
+    let parquet_schema = crate::schema::convert::arrow_schema_to_parquet_schema(schema);
+    write_schema_parquet(output, &parquet_schema)
+}
+
+/// Same as [write_schema_arrow] but outputs into a String
+pub fn format_schema_arrow(schema: &Schema) -> String {
+    let mut buf = Vec::new();
+    write_schema_arrow(&mut buf, &schema).unwrap();
+    String::from_utf8(buf).unwrap()
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

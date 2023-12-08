@@ -23,8 +23,10 @@ fn get_test_events() -> [(MetadataEvent, &'static str); 6] {
             MetadataEvent::SetPollingSource(SetPollingSource {
                 fetch: FetchStep::FilesGlob(FetchStepFilesGlob {
                     path: "./*.csv".to_owned(),
-                    event_time: Some(EventTimeSource::FromMetadata),
-                    cache: Some(SourceCaching::Forever),
+                    event_time: Some(EventTimeSource::FromMetadata(
+                        EventTimeSourceFromMetadata {},
+                    )),
+                    cache: Some(SourceCaching::Forever(SourceCachingForever {})),
                     order: Some(SourceOrdering::ByName),
                 }),
                 prepare: Some(vec![PrepStep::Decompress(PrepStepDecompress {
@@ -195,6 +197,45 @@ fn test_serializer_stability() {
     }
 }
 
+#[cfg(feature = "arrow")]
+#[test]
+fn serde_set_data_schema() {
+    use arrow::datatypes::*;
+
+    let expected_schema = SchemaRef::new(Schema::new(vec![
+        Field::new("a", DataType::Int64, false),
+        Field::new("b", DataType::Boolean, false),
+    ]));
+
+    let event: MetadataEvent = SetDataSchema::new(&expected_schema).into();
+
+    let expected_block = wrap_into_block(event);
+
+    let buffer = FlatbuffersMetadataBlockSerializer
+        .write_manifest(&expected_block)
+        .unwrap();
+
+    let actual_block = FlatbuffersMetadataBlockDeserializer
+        .read_manifest(&buffer)
+        .unwrap();
+
+    assert_eq!(expected_block, actual_block);
+
+    let hash_actual = format!("{:x}", sha3::Sha3_256::digest(&buffer));
+    let hash_expected = "d2f009192573b1ce449c04a8b1a3866ad0f86bb15808f447481f735cd90d95f0";
+
+    assert_eq!(hash_actual, hash_expected);
+
+    let actual_schema = actual_block
+        .event
+        .as_variant::<SetDataSchema>()
+        .unwrap()
+        .schema_as_arrow()
+        .unwrap();
+
+    assert_eq!(expected_schema, actual_schema);
+}
+
 #[test]
 fn serde_execute_query_response() {
     let examples = [
@@ -209,7 +250,7 @@ fn serde_execute_query_response() {
             message: "boop".to_owned(),
             backtrace: Some("woop".to_owned()),
         }),
-        ExecuteQueryResponse::Progress,
+        ExecuteQueryResponse::Progress(ExecuteQueryResponseProgress {}),
     ];
 
     for expected in examples {

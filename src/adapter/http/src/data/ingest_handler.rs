@@ -16,13 +16,18 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use axum::extract::{Extension, TypedHeader};
+use axum::extract::{Extension, Query, TypedHeader};
 use kamu::domain::*;
 use opendatafabric::DatasetRef;
 
 use crate::api_error::*;
 
 /////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, serde::Deserialize)]
+pub struct IngestParams {
+    source: Option<String>,
+}
 
 // TODO: SEC: Enforce a size limit on payload
 // TODO: In future this handler should be putting the data into a queue (e.g.
@@ -36,6 +41,7 @@ use crate::api_error::*;
 pub async fn dataset_ingest_handler(
     Extension(catalog): Extension<dill::Catalog>,
     Extension(dataset_ref): Extension<DatasetRef>,
+    Query(params): Query<IngestParams>,
     TypedHeader(content_type): TypedHeader<axum::headers::ContentType>,
     body_stream: axum::extract::BodyStream,
 ) -> Result<(), ApiError> {
@@ -45,6 +51,7 @@ pub async fn dataset_ingest_handler(
     match ingest_svc
         .ingest_from_file_stream(
             &dataset_ref,
+            params.source.as_ref().map(|s| s.as_str()),
             data,
             Some(MediaType(content_type.to_string())),
             None,
@@ -54,6 +61,7 @@ pub async fn dataset_ingest_handler(
         // Per note above, we're not including any extra information about the result
         // of the ingest operation at this point to accomodate async execution
         Ok(_) => Ok(()),
+        Err(PushIngestError::SourceNotFound(e)) => Err(ApiError::bad_request(e)),
         Err(PushIngestError::UnsupportedMediaType(_)) => {
             Err(ApiError::new_unsupported_media_type())
         }

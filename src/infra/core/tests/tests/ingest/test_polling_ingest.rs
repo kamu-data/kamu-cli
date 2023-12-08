@@ -125,7 +125,7 @@ async fn test_ingest_polling_datafusion_snapshot() {
                         .unwrap()
                         .as_str()
                         .to_owned(),
-                    event_time: Some(EventTimeSource::FromSystemTime),
+                    event_time: Some(EventTimeSourceFromSystemTime {}.into()),
                     cache: None,
                     headers: None,
                 }))
@@ -301,7 +301,7 @@ async fn test_ingest_polling_datafusion_snapshot() {
         .set(Utc.with_ymd_and_hms(2050, 2, 1, 12, 0, 0).unwrap());
 
     harness.ingest(&dataset_name).await.unwrap();
-    let event = data_helper.get_last_data_block().await.event;
+    let event = data_helper.get_last_block_typed::<AddData>().await.event;
 
     assert_eq!(event.output_data, None);
     assert_eq!(
@@ -329,7 +329,7 @@ async fn test_ingest_polling_datafusion_ledger() {
                         .unwrap()
                         .as_str()
                         .to_owned(),
-                    event_time: Some(EventTimeSource::FromSystemTime),
+                    event_time: Some(EventTimeSourceFromSystemTime {}.into()),
                     cache: None,
                     headers: None,
                 }))
@@ -506,7 +506,7 @@ async fn test_ingest_polling_datafusion_ledger() {
     .unwrap();
 
     harness.ingest(&dataset_name).await.unwrap();
-    let event = data_helper.get_last_data_block().await.event;
+    let event = data_helper.get_last_block_typed::<AddData>().await.event;
 
     assert_eq!(event.output_data, None);
     assert_eq!(
@@ -519,7 +519,7 @@ async fn test_ingest_polling_datafusion_ledger() {
     std::fs::write(&src_path, "").unwrap();
 
     harness.ingest(&dataset_name).await.unwrap();
-    let event = data_helper.get_last_data_block().await.event;
+    let event = data_helper.get_last_block_typed::<AddData>().await.event;
 
     assert_eq!(event.output_data, None);
     assert_eq!(
@@ -547,7 +547,7 @@ async fn test_ingest_polling_datafusion_empty_data() {
                         .unwrap()
                         .as_str()
                         .to_owned(),
-                    event_time: Some(EventTimeSource::FromSystemTime),
+                    event_time: Some(EventTimeSourceFromSystemTime {}.into()),
                     cache: None,
                     headers: None,
                 }))
@@ -584,7 +584,7 @@ async fn test_ingest_polling_datafusion_empty_data() {
     harness.ingest(&dataset_name).await.unwrap();
 
     // Should only containe source state
-    let event = data_helper.get_last_data_block().await.event;
+    let event = data_helper.get_last_block_typed::<AddData>().await.event;
     assert_eq!(event.output_data, None);
     assert_eq!(event.output_watermark, None);
     assert!(event.source_state.is_some());
@@ -608,7 +608,7 @@ async fn test_ingest_polling_datafusion_event_time_as_date() {
                         .unwrap()
                         .as_str()
                         .to_owned(),
-                    event_time: Some(EventTimeSource::FromSystemTime),
+                    event_time: Some(EventTimeSourceFromSystemTime {}.into()),
                     cache: None,
                     headers: None,
                 }))
@@ -717,7 +717,7 @@ async fn test_ingest_polling_datafusion_event_time_of_invalid_type() {
                         .unwrap()
                         .as_str()
                         .to_owned(),
-                    event_time: Some(EventTimeSource::FromSystemTime),
+                    event_time: Some(EventTimeSourceFromSystemTime {}.into()),
                     cache: None,
                     headers: None,
                 }))
@@ -785,7 +785,7 @@ async fn test_ingest_polling_datafusion_bad_column_names_preserve() {
                         .unwrap()
                         .as_str()
                         .to_owned(),
-                    event_time: Some(EventTimeSource::FromSystemTime),
+                    event_time: Some(EventTimeSourceFromSystemTime {}.into()),
                     cache: None,
                     headers: None,
                 }))
@@ -877,7 +877,7 @@ async fn test_ingest_polling_datafusion_bad_column_names_rename() {
                         .unwrap()
                         .as_str()
                         .to_owned(),
-                    event_time: Some(EventTimeSource::FromSystemTime),
+                    event_time: Some(EventTimeSourceFromSystemTime {}.into()),
                     cache: None,
                     headers: None,
                 }))

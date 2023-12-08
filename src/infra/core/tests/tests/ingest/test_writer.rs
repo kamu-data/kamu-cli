@@ -12,6 +12,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use chrono::{DateTime, TimeZone, Utc};
+use datafusion::arrow::datatypes::Schema;
 use datafusion::prelude::*;
 use indoc::indoc;
 use kamu::testing::MetadataFactory;
@@ -32,18 +33,17 @@ use opendatafabric as odf;
 #[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_data_writer_happy_path() {
-    let mut harness = Harness::new(
-        MetadataFactory::set_polling_source()
-            .merge(odf::MergeStrategySnapshot {
-                primary_key: vec!["city".to_string()],
-                compare_columns: None,
-                observation_column: None,
-                obsv_added: None,
-                obsv_changed: None,
-                obsv_removed: None,
-            })
-            .build(),
-    )
+    let mut harness = Harness::new(vec![MetadataFactory::set_polling_source()
+        .merge(odf::MergeStrategySnapshot {
+            primary_key: vec!["city".to_string()],
+            compare_columns: None,
+            observation_column: None,
+            obsv_added: None,
+            obsv_changed: None,
+            obsv_removed: None,
+        })
+        .build()
+        .into()])
     .await;
 
     // Round 1
@@ -81,7 +81,7 @@ async fn test_data_writer_happy_path() {
     );
 
     assert_data_eq(
-        df,
+        df.clone(),
         indoc!(
             r#"
             +--------+----------------------+----------------------+----------+------+------------+
@@ -99,6 +99,18 @@ async fn test_data_writer_happy_path() {
     assert_eq!(
         res.new_block.event.output_watermark.as_ref(),
         Some(&harness.source_event_time)
+    );
+
+    // Check schema block was written automatically
+    let (schema_block_hash, schema_block) = harness.get_last_schema_block().await;
+    assert_eq!(
+        harness.get_last_data_block().await.prev_block_hash.unwrap(),
+        schema_block_hash
+    );
+    let df_schema_arrow: Schema = df.schema().into();
+    assert_eq!(
+        df_schema_arrow,
+        *schema_block.event.schema_as_arrow().unwrap(),
     );
 
     // Round 2
@@ -157,6 +169,9 @@ async fn test_data_writer_happy_path() {
         res.new_block.event.output_watermark.as_ref(),
         Some(&harness.source_event_time)
     );
+
+    // Check schema block was reused
+    assert_eq!(schema_block_hash, harness.get_last_schema_block().await.0);
 
     // Round 3 (nothing to commit)
     let prev_watermark = res.new_block.event.output_watermark.unwrap();
@@ -218,12 +233,196 @@ async fn test_data_writer_happy_path() {
 
 #[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
-async fn test_data_writer_orders_by_event_time() {
-    let mut harness = Harness::new(
-        MetadataFactory::set_polling_source()
-            .merge(odf::MergeStrategy::Append)
-            .build(),
+async fn test_data_writer_rejects_incompatible_schema() {
+    let mut harness = Harness::new(vec![]).await;
+
+    // Round 1
+    harness
+        .write(
+            indoc!(
+                r#"
+                city,population
+                A,1000
+                B,2000
+                C,3000
+                "#
+            ),
+            "city STRING, population BIGINT",
+        )
+        .await
+        .unwrap();
+
+    let df = harness.get_last_data().await;
+
+    assert_schema_eq(
+        df.schema(),
+        indoc!(
+            r#"
+            message arrow_schema {
+              OPTIONAL INT64 offset;
+              REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
+              REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
+              OPTIONAL BYTE_ARRAY city (STRING);
+              OPTIONAL INT64 population;
+            }
+            "#
+        ),
+    );
+
+    assert_data_eq(
+        df.clone(),
+        indoc!(
+            r#"
+            +--------+----------------------+----------------------+------+------------+
+            | offset | system_time          | event_time           | city | population |
+            +--------+----------------------+----------------------+------+------------+
+            | 0      | 2010-01-01T12:00:00Z | 2000-01-01T12:00:00Z | A    | 1000       |
+            | 1      | 2010-01-01T12:00:00Z | 2000-01-01T12:00:00Z | B    | 2000       |
+            | 2      | 2010-01-01T12:00:00Z | 2000-01-01T12:00:00Z | C    | 3000       |
+            +--------+----------------------+----------------------+------+------------+
+            "#
+        ),
     )
+    .await;
+
+    // Round 2 (still ok)
+    harness.set_system_time(Utc.with_ymd_and_hms(2010, 1, 2, 12, 0, 0).unwrap());
+    harness.set_source_event_time(Utc.with_ymd_and_hms(2000, 1, 2, 12, 0, 0).unwrap());
+
+    harness
+        .write(
+            indoc!(
+                r#"
+                city,population
+                D,4000
+                "#
+            ),
+            "city STRING, population BIGINT",
+        )
+        .await
+        .unwrap();
+
+    let df = harness.get_last_data().await;
+
+    assert_schema_eq(
+        df.schema(),
+        indoc!(
+            r#"
+            message arrow_schema {
+              OPTIONAL INT64 offset;
+              REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
+              REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
+              OPTIONAL BYTE_ARRAY city (STRING);
+              OPTIONAL INT64 population;
+            }
+            "#
+        ),
+    );
+
+    assert_data_eq(
+        df,
+        indoc!(
+            r#"
+            +--------+----------------------+----------------------+------+------------+
+            | offset | system_time          | event_time           | city | population |
+            +--------+----------------------+----------------------+------+------------+
+            | 3      | 2010-01-02T12:00:00Z | 2000-01-02T12:00:00Z | D    | 4000       |
+            +--------+----------------------+----------------------+------+------------+
+            "#
+        ),
+    )
+    .await;
+
+    // Round 3 (not ok - schema changed)
+    harness.set_system_time(Utc.with_ymd_and_hms(2010, 1, 3, 12, 0, 0).unwrap());
+    harness.set_source_event_time(Utc.with_ymd_and_hms(2000, 1, 3, 12, 0, 0).unwrap());
+
+    let res = harness
+        .write(
+            indoc!(
+                r#"
+                city,state,population
+                E,X,5000
+                "#
+            ),
+            "city STRING, state STRING, population BIGINT",
+        )
+        .await;
+
+    assert_matches!(res, Err(WriteDataError::BadInputSchema(_)));
+
+    // Round 4 (still not ok after writer reset)
+    harness.reset_writer().await;
+
+    let res = harness
+        .write(
+            indoc!(
+                r#"
+                city,state,population
+                E,X,5000
+                "#
+            ),
+            "city STRING, state STRING, population BIGINT",
+        )
+        .await;
+
+    assert_matches!(res, Err(WriteDataError::BadInputSchema(_)));
+
+    // Round 5 (back to normal)
+    harness
+        .write(
+            indoc!(
+                r#"
+                city,population
+                E,5000
+                "#
+            ),
+            "city STRING, population BIGINT",
+        )
+        .await
+        .unwrap();
+
+    let df = harness.get_last_data().await;
+
+    assert_schema_eq(
+        df.schema(),
+        indoc!(
+            r#"
+            message arrow_schema {
+              OPTIONAL INT64 offset;
+              REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
+              REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
+              OPTIONAL BYTE_ARRAY city (STRING);
+              OPTIONAL INT64 population;
+            }
+            "#
+        ),
+    );
+
+    assert_data_eq(
+        df,
+        indoc!(
+            r#"
+            +--------+----------------------+----------------------+------+------------+
+            | offset | system_time          | event_time           | city | population |
+            +--------+----------------------+----------------------+------+------------+
+            | 4      | 2010-01-03T12:00:00Z | 2000-01-03T12:00:00Z | E    | 5000       |
+            +--------+----------------------+----------------------+------+------------+
+            "#
+        ),
+    )
+    .await;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, ingest, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_data_writer_orders_by_event_time() {
+    let mut harness = Harness::new(vec![MetadataFactory::set_polling_source()
+        .merge(odf::MergeStrategyAppend {})
+        .build()
+        .into()])
     .await;
 
     let res = harness
@@ -289,13 +488,12 @@ async fn test_data_writer_orders_by_event_time() {
 #[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_data_writer_normalizes_timestamps_to_utc_millis() {
-    let mut harness = Harness::new(
-        MetadataFactory::set_polling_source()
-            .merge(odf::MergeStrategyLedger {
-                primary_key: vec!["event_time".to_string(), "city".to_string()],
-            })
-            .build(),
-    )
+    let mut harness = Harness::new(vec![MetadataFactory::set_polling_source()
+        .merge(odf::MergeStrategyLedger {
+            primary_key: vec!["event_time".to_string(), "city".to_string()],
+        })
+        .build()
+        .into()])
     .await;
 
     harness
@@ -355,13 +553,12 @@ async fn test_data_writer_optimal_parquet_encoding() {
     use ::datafusion::parquet::basic::{Compression, Encoding, PageType};
     use ::datafusion::parquet::file::reader::FileReader;
 
-    let mut harness = Harness::new(
-        MetadataFactory::set_polling_source()
-            .merge(odf::MergeStrategyLedger {
-                primary_key: vec!["event_time".to_string(), "city".to_string()],
-            })
-            .build(),
-    )
+    let mut harness = Harness::new(vec![MetadataFactory::set_polling_source()
+        .merge(odf::MergeStrategyLedger {
+            primary_key: vec!["event_time".to_string(), "city".to_string()],
+        })
+        .build()
+        .into()])
     .await;
 
     harness
@@ -415,6 +612,117 @@ async fn test_data_writer_optimal_parquet_encoding() {
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
+// Builder
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_data_writer_builder_scan_no_source() {
+    let harness = Harness::new(vec![odf::SetVocab {
+        event_time_column: Some("foo".to_string()),
+        ..Default::default()
+    }
+    .into()])
+    .await;
+
+    let b = DataWriterDataFusion::builder(harness.dataset.clone(), harness.ctx.clone())
+        .with_metadata_state_scanned(None)
+        .await
+        .unwrap();
+
+    let head = harness
+        .dataset
+        .as_metadata_chain()
+        .get_ref(&BlockRef::Head)
+        .await
+        .unwrap();
+
+    assert_matches!(
+        b.metadata_state().unwrap(),
+        DataWriterMetadataState {
+            head: h,
+            schema: None,
+            source_event: None,
+            merge_strategy: odf::MergeStrategy::Append(_),
+            vocab,
+            data_slices: _,
+            last_offset: None,
+            last_checkpoint: None,
+            last_watermark: None,
+            last_source_state: None,
+        } if *h == head && vocab.event_time_column == "foo"
+
+    );
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_data_writer_builder_scan_polling_source() {
+    let harness = Harness::new(vec![MetadataFactory::set_polling_source()
+        .merge(odf::MergeStrategyLedger {
+            primary_key: vec!["event_time".to_string(), "city".to_string()],
+        })
+        .build()
+        .into()])
+    .await;
+
+    let b = DataWriterDataFusion::builder(harness.dataset.clone(), harness.ctx.clone())
+        .with_metadata_state_scanned(None)
+        .await
+        .unwrap();
+
+    assert_matches!(
+        b.metadata_state().unwrap(),
+        DataWriterMetadataState {
+            head: _,
+            schema: None,
+            source_event: Some(_),
+            merge_strategy: odf::MergeStrategy::Ledger(_),
+            vocab,
+            data_slices: _,
+            last_offset: None,
+            last_checkpoint: None,
+            last_watermark: None,
+            last_source_state: None,
+        } if *vocab == odf::DatasetVocabularyResolvedOwned::default()
+    );
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_data_writer_builder_scan_push_source() {
+    let harness = Harness::new(vec![MetadataFactory::add_push_source()
+        .merge(odf::MergeStrategyLedger {
+            primary_key: vec!["event_time".to_string(), "city".to_string()],
+        })
+        .build()
+        .into()])
+    .await;
+
+    let b = DataWriterDataFusion::builder(harness.dataset.clone(), harness.ctx.clone())
+        .with_metadata_state_scanned(None)
+        .await
+        .unwrap();
+
+    assert_matches!(
+        b.metadata_state().unwrap(),
+        DataWriterMetadataState {
+            head: _,
+            schema: None,
+            source_event: Some(_),
+            merge_strategy: odf::MergeStrategy::Ledger(_),
+            vocab,
+            data_slices: _,
+            last_offset: None,
+            last_checkpoint: None,
+            last_watermark: None,
+            last_source_state: None,
+        } if *vocab == odf::DatasetVocabularyResolvedOwned::default()
+    );
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
 
 struct Harness {
     temp_dir: tempfile::TempDir,
@@ -427,7 +735,7 @@ struct Harness {
 }
 
 impl Harness {
-    async fn new(source: odf::SetPollingSource) -> Self {
+    async fn new(dataset_events: Vec<odf::MetadataEvent>) -> Self {
         let temp_dir = tempfile::tempdir().unwrap();
         let system_time = Utc.with_ymd_and_hms(2010, 1, 1, 12, 0, 0).unwrap();
 
@@ -454,23 +762,26 @@ impl Harness {
             .unwrap()
             .dataset;
 
-        dataset
-            .commit_event(
-                source.into(),
-                CommitOpts {
-                    system_time: Some(system_time.clone()),
-                    ..Default::default()
-                },
-            )
-            .await
-            .unwrap();
+        for event in dataset_events {
+            dataset
+                .commit_event(
+                    event,
+                    CommitOpts {
+                        system_time: Some(system_time.clone()),
+                        ..Default::default()
+                    },
+                )
+                .await
+                .unwrap();
+        }
 
         let ctx = SessionContext::new_with_config(SessionConfig::new().with_target_partitions(1));
 
         let writer = DataWriterDataFusion::builder(dataset.clone(), ctx.clone())
-            .build()
+            .with_metadata_state_scanned(None)
             .await
-            .unwrap();
+            .unwrap()
+            .build();
 
         Self {
             temp_dir,
@@ -488,6 +799,14 @@ impl Harness {
 
     fn set_source_event_time(&mut self, t: DateTime<Utc>) {
         self.source_event_time = t;
+    }
+
+    async fn reset_writer(&mut self) {
+        self.writer = DataWriterDataFusion::builder(self.dataset.clone(), self.ctx.clone())
+            .with_metadata_state_scanned(None)
+            .await
+            .unwrap()
+            .build();
     }
 
     async fn write_opts(
@@ -534,6 +853,24 @@ impl Harness {
 
     async fn write(&mut self, data: &str, schema: &str) -> Result<WriteDataResult, WriteDataError> {
         self.write_opts(data, schema, None).await
+    }
+
+    async fn get_last_schema_block(
+        &self,
+    ) -> (odf::Multihash, odf::MetadataBlockTyped<odf::SetDataSchema>) {
+        use futures::StreamExt;
+
+        let (hash, block) = self
+            .dataset
+            .as_metadata_chain()
+            .iter_blocks()
+            .filter_ok(|(_, b)| b.as_typed::<odf::SetDataSchema>().is_some())
+            .next()
+            .await
+            .unwrap()
+            .unwrap();
+
+        (hash, block.into_typed::<odf::SetDataSchema>().unwrap())
     }
 
     async fn get_last_data_block(&self) -> odf::MetadataBlockTyped<odf::AddData> {

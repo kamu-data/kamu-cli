@@ -15,6 +15,61 @@ use indoc::indoc;
 use opendatafabric::serde::yaml::*;
 use opendatafabric::*;
 
+#[cfg(feature = "arrow")]
+#[test]
+fn serde_set_data_schema() {
+    use arrow::datatypes::*;
+
+    let expected_schema = SchemaRef::new(Schema::new(vec![
+        Field::new("a", DataType::Int64, false),
+        Field::new("b", DataType::Boolean, false),
+    ]));
+
+    let event: MetadataEvent = SetDataSchema::new(&expected_schema).into();
+
+    let expected_block = MetadataBlock {
+        sequence_number: 123,
+        prev_block_hash: Some(Multihash::from_digest_sha3_256(b"prev")),
+        system_time: Utc.with_ymd_and_hms(2020, 1, 1, 12, 0, 0).unwrap(),
+        event,
+    };
+
+    let actual_data = YamlMetadataBlockSerializer
+        .write_manifest(&expected_block)
+        .unwrap();
+
+    let expected_data = indoc!(
+        r#"
+        kind: MetadataBlock
+        version: 2
+        content:
+          systemTime: 2020-01-01T12:00:00Z
+          prevBlockHash: zW1k8aWxnH37Xc62cSJGQASfCTHAtpEH3HdaGB1gv6NSj7P
+          sequenceNumber: 123
+          event:
+            kind: setDataSchema
+            schema: DAAAAAgACAAAAAQACAAAAAQAAAACAAAAQAAAAAQAAADY////GAAAAAwAAAAAAAAGEAAAAAAAAAAEAAQABAAAAAEAAABiAAAAEAAUABAAAAAPAAQAAAAIABAAAAAYAAAAIAAAAAAAAAIcAAAACAAMAAQACwAIAAAAQAAAAAAAAAEAAAAAAQAAAGEAAAA=
+        "#
+    );
+
+    assert_eq!(expected_data, std::str::from_utf8(&actual_data).unwrap());
+
+    let actual_block = YamlMetadataBlockDeserializer
+        .read_manifest(&actual_data)
+        .unwrap();
+
+    assert_eq!(expected_block, actual_block);
+
+    let actual_schema = actual_block
+        .event
+        .as_variant::<SetDataSchema>()
+        .unwrap()
+        .schema_as_arrow()
+        .unwrap();
+
+    assert_eq!(expected_schema, actual_schema);
+}
+
 #[test]
 fn serde_dataset_snapshot_root() {
     let data = indoc!(
@@ -56,7 +111,7 @@ fn serde_dataset_snapshot_root() {
             fetch: FetchStep::Url(FetchStepUrl {
                 url: "ftp://kamu.dev/test.zip".to_owned(),
                 event_time: None,
-                cache: Some(SourceCaching::Forever),
+                cache: Some(SourceCaching::Forever(SourceCachingForever {})),
                 headers: None,
             }),
             prepare: Some(vec![PrepStep::Decompress(PrepStepDecompress {
@@ -386,7 +441,7 @@ fn serde_fetch_step_files_glob() {
     let expected = FetchStep::FilesGlob(FetchStepFilesGlob {
         path: "/opt/x/*.txt".to_owned(),
         event_time: None,
-        cache: Some(SourceCaching::Forever),
+        cache: Some(SourceCaching::Forever(SourceCachingForever {})),
         order: Some(SourceOrdering::ByName),
     });
 

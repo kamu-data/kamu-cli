@@ -415,9 +415,60 @@ impl IngestTask {
         read_result: IngestResponse,
         prev_hash: &Multihash,
     ) -> Result<CommitStepResult, PollingIngestError> {
+        use datafusion::parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
+
+        let mut head = prev_hash.clone();
+
         let data_interval = read_result.data_interval.clone();
         let output_watermark = read_result.output_watermark;
         let source_state = source_state.map(|v| v.to_source_state());
+
+        // Read new schema
+        let new_schema = if let Some(out_data) = &read_result.out_data {
+            let file = std::fs::File::open(out_data.as_path()).int_err()?;
+            let schema = ParquetRecordBatchReaderBuilder::try_new(file)
+                .int_err()?
+                .schema()
+                .clone();
+            Some(schema)
+        } else {
+            None
+        };
+
+        if let Some(prev_schema) = &self.request.schema {
+            // Validate schema
+            if let Some(new_schema) = new_schema {
+                if *prev_schema != new_schema {
+                    return Err(BadInputSchemaError::new(
+                        "Schema of the new slice differs from the schema defined by SetDataSchema \
+                         event",
+                        new_schema.clone(),
+                    )
+                    .into());
+                }
+            }
+        } else {
+            // Set schema upon first ingest
+            if let Some(new_schema) = new_schema {
+                // TODO: make schema commit atomic with data
+                let commit_schema_result = self
+                    .dataset
+                    .commit_event(
+                        SetDataSchema::new(&new_schema).into(),
+                        CommitOpts {
+                            block_ref: &BlockRef::Head,
+                            system_time: Some(self.request.system_time),
+                            prev_block_hash: Some(Some(&head)),
+                            check_object_refs: false,
+                        },
+                    )
+                    .await?;
+
+                // Advance state
+                head = commit_schema_result.new_head;
+                self.request.schema = Some(new_schema);
+            }
+        }
 
         match self
             .dataset
@@ -433,7 +484,7 @@ impl IngestTask {
                 CommitOpts {
                     block_ref: &BlockRef::Head,
                     system_time: Some(self.request.system_time),
-                    prev_block_hash: Some(Some(&prev_hash)),
+                    prev_block_hash: Some(Some(&head)),
                     check_object_refs: false,
                 },
             )

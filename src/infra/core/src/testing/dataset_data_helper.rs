@@ -29,17 +29,40 @@ impl DatasetDataHelper {
         Self { dataset, ctx }
     }
 
-    pub async fn get_last_data_block(&self) -> MetadataBlockTyped<AddData> {
-        use futures::StreamExt;
+    pub async fn get_last_block_typed<T: VariantOf<MetadataEvent>>(&self) -> MetadataBlockTyped<T> {
+        let hash = self
+            .dataset
+            .as_metadata_chain()
+            .get_ref(&BlockRef::Head)
+            .await
+            .unwrap();
+        let block = self
+            .dataset
+            .as_metadata_chain()
+            .get_block(&hash)
+            .await
+            .unwrap();
+        block
+            .into_typed::<T>()
+            .expect("Last block is not a data block")
+    }
 
-        let mut stream = self.dataset.as_metadata_chain().iter_blocks();
-        while let Some(v) = stream.next().await {
-            let (_, b) = v.unwrap();
-            if let Some(b) = b.into_typed::<AddData>() {
-                return b;
-            }
-        }
-        unreachable!()
+    pub async fn get_last_data_block(&self) -> MetadataBlockDataStream {
+        let hash = self
+            .dataset
+            .as_metadata_chain()
+            .get_ref(&BlockRef::Head)
+            .await
+            .unwrap();
+        let block = self
+            .dataset
+            .as_metadata_chain()
+            .get_block(&hash)
+            .await
+            .unwrap();
+        block
+            .into_data_stream_block()
+            .expect("Last block is not a data block")
     }
 
     pub async fn get_last_data_file(&self) -> PathBuf {

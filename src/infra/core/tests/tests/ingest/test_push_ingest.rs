@@ -30,14 +30,7 @@ async fn test_ingest_push_url_stream() {
         .name("foo.bar")
         .kind(DatasetKind::Root)
         .push_event(
-            // TODO: This will be replaced with `AddPushSource` event in future
-            MetadataFactory::set_polling_source()
-                .fetch(FetchStepUrl {
-                    url: "http://localhost".to_string(),
-                    event_time: Some(EventTimeSource::FromSystemTime),
-                    cache: None,
-                    headers: None,
-                })
+            MetadataFactory::add_push_source()
                 .read(ReadStepCsv {
                     header: Some(true),
                     schema: Some(
@@ -47,14 +40,6 @@ async fn test_ingest_push_url_stream() {
                             .collect(),
                     ),
                     ..ReadStepCsv::default()
-                })
-                // TODO: This will be default engine in future
-                .preprocess(TransformSql {
-                    engine: "datafusion".to_string(),
-                    version: None,
-                    query: Some("select * from input".to_string()),
-                    queries: None,
-                    temporal_tables: None,
                 })
                 .merge(MergeStrategyLedger {
                     primary_key: vec!["date".to_string(), "city".to_string()],
@@ -93,6 +78,7 @@ async fn test_ingest_push_url_stream() {
         .push_ingest_svc
         .ingest_from_url(
             &dataset_ref,
+            None,
             url::Url::from_file_path(&src_path).unwrap(),
             None,
             None,
@@ -149,7 +135,7 @@ async fn test_ingest_push_url_stream() {
 
     harness
         .push_ingest_svc
-        .ingest_from_file_stream(&dataset_ref, Box::new(data), None, None)
+        .ingest_from_file_stream(&dataset_ref, None, Box::new(data), None, None)
         .await
         .unwrap();
 
@@ -187,14 +173,7 @@ async fn test_ingest_push_media_type_override() {
         .name("foo.bar")
         .kind(DatasetKind::Root)
         .push_event(
-            // TODO: This will be replaced with `AddPushSource` event in future
-            MetadataFactory::set_polling_source()
-                .fetch(FetchStepUrl {
-                    url: "http://localhost".to_string(),
-                    event_time: Some(EventTimeSource::FromSystemTime),
-                    cache: None,
-                    headers: None,
-                })
+            MetadataFactory::add_push_source()
                 .read(ReadStepNdJson {
                     schema: Some(
                         ["date TIMESTAMP", "city STRING", "population BIGINT"]
@@ -203,14 +182,6 @@ async fn test_ingest_push_media_type_override() {
                             .collect(),
                     ),
                     ..Default::default()
-                })
-                // TODO: This will be default engine in future
-                .preprocess(TransformSql {
-                    engine: "datafusion".to_string(),
-                    version: None,
-                    query: Some("select * from input".to_string()),
-                    queries: None,
-                    temporal_tables: None,
                 })
                 .merge(MergeStrategyLedger {
                     primary_key: vec!["date".to_string(), "city".to_string()],
@@ -246,6 +217,7 @@ async fn test_ingest_push_media_type_override() {
         .push_ingest_svc
         .ingest_from_url(
             &dataset_ref,
+            None,
             url::Url::from_file_path(&src_path).unwrap(),
             Some(MediaType::CSV.to_owned()),
             None,
@@ -294,6 +266,7 @@ async fn test_ingest_push_media_type_override() {
         .push_ingest_svc
         .ingest_from_url(
             &dataset_ref,
+            None,
             url::Url::from_file_path(&src_path).unwrap(),
             Some(MediaType::NDJSON.to_owned()),
             None,
@@ -344,6 +317,7 @@ async fn test_ingest_push_media_type_override() {
         .push_ingest_svc
         .ingest_from_url(
             &dataset_ref,
+            None,
             url::Url::from_file_path(&src_path).unwrap(),
             Some(MediaType::JSON.to_owned()),
             None,

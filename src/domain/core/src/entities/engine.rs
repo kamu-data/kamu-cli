@@ -11,11 +11,12 @@ use std::backtrace::Backtrace;
 use std::path::PathBuf;
 
 use chrono::{DateTime, Utc};
+use datafusion::arrow::datatypes::SchemaRef;
 use internal_error::*;
 use opendatafabric::*;
 use thiserror::Error;
 
-use crate::OwnedFile;
+use crate::{BlockRef, OwnedFile};
 
 ///////////////////////////////////////////////////////////////////////////////
 // Engine
@@ -57,6 +58,8 @@ pub struct IngestRequest {
     pub system_time: DateTime<Utc>,
     /// Event time extracted from source's metadata
     pub event_time: Option<DateTime<Utc>>,
+    /// Expected data schema (if already defined)
+    pub schema: Option<SchemaRef>,
     /// Starting offset to use for new records
     pub next_offset: i64,
     /// Output dataset's vocabulary
@@ -101,10 +104,16 @@ pub struct TransformRequest {
     pub operation_id: String,
     /// Identifies the output dataset
     pub dataset_handle: DatasetHandle,
+    /// Block reference to advance upon commit
+    pub block_ref: BlockRef,
+    /// Current head (for concurrency control)
+    pub head: Multihash,
     /// Transformation that will be applied to produce new data
     pub transform: Transform,
     /// System time to use for new records
     pub system_time: DateTime<Utc>,
+    /// Expected data schema (if already defined)
+    pub schema: Option<SchemaRef>,
     /// Starting offset to use for new records
     pub next_offset: i64,
     /// Defines the input data

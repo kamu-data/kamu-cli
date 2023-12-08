@@ -78,6 +78,8 @@ impl From<kamu_core::auth::DatasetActionUnauthorizedError> for CheckDatasetAcces
 ///
 /// - ensures that original error is preserved as `source` so it can be
 ///   inspected and logged by the tracing middleware
+
+#[derive(Debug)]
 pub enum GqlError {
     Internal(InternalError),
     Gql(async_graphql::Error),

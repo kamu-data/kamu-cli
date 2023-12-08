@@ -53,6 +53,7 @@ async fn test_verify_data_consistency() {
                 .name("foo")
                 .kind(DatasetKind::Root)
                 .push_event(MetadataFactory::set_polling_source().build())
+                .push_event(MetadataFactory::set_data_schema().build())
                 .build(),
         )
         .await
@@ -65,6 +66,7 @@ async fn test_verify_data_consistency() {
                 .name(&dataset_alias.dataset_name)
                 .kind(DatasetKind::Derivative)
                 .push_event(MetadataFactory::set_transform(["foo"]).build())
+                .push_event(MetadataFactory::set_data_schema().build())
                 .build(),
         )
         .await

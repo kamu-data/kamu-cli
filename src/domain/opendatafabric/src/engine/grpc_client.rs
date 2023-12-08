@@ -58,7 +58,7 @@ impl EngineGrpcClient {
                 .int_err()?;
 
             match response {
-                ExecuteQueryResponse::Progress => (),
+                ExecuteQueryResponse::Progress(_progress) => (),
                 ExecuteQueryResponse::Success(success) => return Ok(success),
                 ExecuteQueryResponse::InvalidQuery(error) => return Err(error.into()),
                 ExecuteQueryResponse::InternalError(error) => return Err(error.into()),

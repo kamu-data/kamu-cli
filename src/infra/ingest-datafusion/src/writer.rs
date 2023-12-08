@@ -11,13 +11,14 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use chrono::{DateTime, TimeZone, Utc};
+use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::dataframe::DataFrameWriteOptions;
 use datafusion::parquet::file::properties::WriterProperties;
 use datafusion::prelude::*;
 use internal_error::*;
 use kamu_core::ingest::*;
 use kamu_core::*;
-use odf::AsTypedBlock;
+use odf::{AsTypedBlock, MergeStrategyAppend};
 use opendatafabric as odf;
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -34,15 +35,18 @@ pub struct DataWriterDataFusion {
 }
 
 /// Contains a projection of the metadata needed for [DataWriter] to function
+#[derive(Debug, Clone)]
 pub struct DataWriterMetadataState {
-    head: odf::Multihash,
-    merge_strategy: odf::MergeStrategy,
-    vocab: odf::DatasetVocabularyResolvedOwned,
-    data_slices: Vec<odf::Multihash>,
-    last_offset: Option<i64>,
-    last_checkpoint: Option<odf::Multihash>,
-    last_watermark: Option<DateTime<Utc>>,
-    last_source_state: Option<odf::SourceState>,
+    pub head: odf::Multihash,
+    pub schema: Option<SchemaRef>,
+    pub source_event: Option<odf::MetadataEvent>,
+    pub merge_strategy: odf::MergeStrategy,
+    pub vocab: odf::DatasetVocabularyResolvedOwned,
+    pub data_slices: Vec<odf::Multihash>,
+    pub last_offset: Option<i64>,
+    pub last_checkpoint: Option<odf::Multihash>,
+    pub last_watermark: Option<DateTime<Utc>>,
+    pub last_source_state: Option<odf::SourceState>,
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -81,6 +85,10 @@ impl DataWriterDataFusion {
         &self.meta.vocab
     }
 
+    pub fn source_event(&self) -> Option<&odf::MetadataEvent> {
+        self.meta.source_event.as_ref()
+    }
+
     fn validate_input(&self, df: &DataFrame) -> Result<(), BadInputSchemaError> {
         use datafusion::arrow::datatypes::DataType;
 
@@ -89,12 +97,15 @@ impl DataWriterDataFusion {
             &self.meta.vocab.system_time_column,
         ] {
             if df.schema().has_column_with_unqualified_name(system_column) {
-                return Err(BadInputSchemaError::new(format!(
-                    "Data contains a column that conflicts with the system column name, you \
-                     should either rename the data column or configure the dataset vocabulary to \
-                     use a different name: {}",
-                    system_column
-                )));
+                return Err(BadInputSchemaError::new(
+                    format!(
+                        "Data contains a column that conflicts with the system column name, you \
+                         should either rename the data column or configure the dataset vocabulary \
+                         to use a different name: {}",
+                        system_column
+                    ),
+                    SchemaRef::new(df.schema().into()),
+                ));
             }
         }
 
@@ -109,10 +120,14 @@ impl DataWriterDataFusion {
             match event_time_col.data_type() {
                 DataType::Date32 | DataType::Date64 | DataType::Timestamp(_, _) => {}
                 typ => {
-                    return Err(BadInputSchemaError::new(format!(
-                        "Event time column '{}' should be either Date or Timestamp, but found: {}",
-                        self.meta.vocab.event_time_column, typ
-                    )));
+                    return Err(BadInputSchemaError::new(
+                        format!(
+                            "Event time column '{}' should be either Date or Timestamp, but \
+                             found: {}",
+                            self.meta.vocab.event_time_column, typ
+                        ),
+                        SchemaRef::new(df.schema().into()),
+                    ));
                 }
             }
         }
@@ -295,6 +310,19 @@ impl DataWriterDataFusion {
         Ok(df)
     }
 
+    fn validate_output_schema(&self, new_schema: &SchemaRef) -> Result<(), BadInputSchemaError> {
+        if let Some(prev_schema) = self.meta.schema.as_ref().map(|s| s.as_ref()) {
+            if *prev_schema != *new_schema.as_ref() {
+                return Err(BadInputSchemaError::new(
+                    "Schema of the new slice differs from the schema defined by SetDataSchema \
+                     event",
+                    new_schema.clone(),
+                ));
+            }
+        }
+        Ok(())
+    }
+
     // TODO: Externalize configuration
     fn get_write_properties(&self) -> WriterProperties {
         // TODO: `offset` column is sorted integers so we could use delta encoding, but
@@ -457,6 +485,10 @@ impl DataWriterDataFusion {
 
 #[async_trait::async_trait]
 impl DataWriter for DataWriterDataFusion {
+    async fn output_schema(&self) -> Option<SchemaRef> {
+        self.meta.schema.clone()
+    }
+
     #[tracing::instrument(level = "info", skip_all)]
     async fn write(
         &mut self,
@@ -474,7 +506,7 @@ impl DataWriter for DataWriterDataFusion {
         new_data: Option<DataFrame>,
         opts: WriteDataOpts,
     ) -> Result<StageDataResult, StageDataError> {
-        let (add_data, data_file) = if let Some(new_data) = new_data {
+        let (add_data, output_schema, data_file) = if let Some(new_data) = new_data {
             self.validate_input(&new_data)?;
 
             // Normalize timestamps
@@ -504,6 +536,10 @@ impl DataWriter for DataWriterDataFusion {
 
             tracing::info!(schema = ?df.schema(), "Final output schema");
 
+            // Validate schema matches the declared one
+            let output_schema = SchemaRef::new(df.schema().into());
+            self.validate_output_schema(&output_schema)?;
+
             // Write output
             let data_file = self.write_output(opts.data_staging_path, df).await?;
 
@@ -521,6 +557,7 @@ impl DataWriter for DataWriterDataFusion {
                         output_watermark: prev_watermark,
                         source_state,
                     },
+                    Some(output_schema),
                     None,
                 )
             } else {
@@ -538,6 +575,7 @@ impl DataWriter for DataWriterDataFusion {
                         output_watermark,
                         source_state,
                     },
+                    Some(output_schema),
                     data_file,
                 )
             }
@@ -550,7 +588,7 @@ impl DataWriter for DataWriterDataFusion {
                 source_state: opts.source_state.clone(),
             };
 
-            (add_data, None)
+            (add_data, None, None)
         };
 
         // Do we have anything to commit?
@@ -563,6 +601,7 @@ impl DataWriter for DataWriterDataFusion {
             Ok(StageDataResult {
                 system_time: opts.system_time,
                 add_data,
+                output_schema,
                 data_file,
             })
         }
@@ -570,7 +609,32 @@ impl DataWriter for DataWriterDataFusion {
 
     #[tracing::instrument(level = "info", skip_all)]
     async fn commit(&mut self, staged: StageDataResult) -> Result<WriteDataResult, CommitError> {
-        let commit_result = self
+        let old_head = self.meta.head.clone();
+
+        // Commit schema if it was not previously defined
+        if self.meta.schema.is_none() {
+            if let Some(output_schema) = staged.output_schema {
+                // TODO: Make commit of schema and data atomic
+                let commit_schema_result = self
+                    .dataset
+                    .commit_event(
+                        odf::SetDataSchema::new(&output_schema).into(),
+                        CommitOpts {
+                            block_ref: &self.block_ref,
+                            system_time: Some(staged.system_time),
+                            prev_block_hash: Some(Some(&self.meta.head)),
+                            check_object_refs: false,
+                        },
+                    )
+                    .await?;
+
+                // Update state
+                self.meta.head = commit_schema_result.new_head;
+                self.meta.schema = Some(output_schema);
+            }
+        }
+
+        let commit_data_result = self
             .dataset
             .commit_add_data(
                 staged.add_data,
@@ -589,13 +653,13 @@ impl DataWriter for DataWriterDataFusion {
         let new_block = self
             .dataset
             .as_metadata_chain()
-            .get_block(&commit_result.new_head)
+            .get_block(&commit_data_result.new_head)
             .await
             .int_err()?
             .into_typed::<odf::AddData>()
             .unwrap();
 
-        self.meta.head = commit_result.new_head.clone();
+        self.meta.head = commit_data_result.new_head.clone();
 
         if let Some(output_data) = &new_block.event.output_data {
             self.meta.last_offset = Some(output_data.interval.end);
@@ -614,8 +678,8 @@ impl DataWriter for DataWriterDataFusion {
         self.meta.last_source_state = new_block.event.source_state.clone();
 
         Ok(WriteDataResult {
-            old_head: commit_result.old_head.unwrap(),
-            new_head: commit_result.new_head,
+            old_head,
+            new_head: commit_data_result.new_head,
             new_block,
         })
     }
@@ -646,7 +710,11 @@ impl DataWriterDataFusionBuilder {
         Self { block_ref, ..self }
     }
 
-    /// Allows to specify all needed state for builder to avoid scanning the
+    pub fn metadata_state(&self) -> Option<&DataWriterMetadataState> {
+        self.metadata_state.as_ref()
+    }
+
+    /// Use to specify all needed state for builder to avoid scanning the
     /// metadatachain
     pub fn with_metadata_state(self, metadata_state: DataWriterMetadataState) -> Self {
         Self {
@@ -655,10 +723,18 @@ impl DataWriterDataFusionBuilder {
         }
     }
 
-    // TODO: PERF: Full metadata scan below - this is expensive and should be
-    // improved using skip lists and caching
     /// Scans metadata chain to populate the needed metadata
-    pub async fn with_metadata_state_scanned(self) -> Result<Self, InternalError> {
+    ///
+    /// * `source_name` - name of the push source to use when extracting the
+    ///   metadata needed for writing. Pass `None` for the polling source or to
+    ///   use the first available push source.
+    pub async fn with_metadata_state_scanned(
+        self,
+        source_name: Option<&str>,
+    ) -> Result<Self, ScanMetadataError> {
+        // TODO: PERF: Full metadata scan below - this is expensive and should be
+        // improved using skip lists and caching.
+
         let head = self
             .dataset
             .as_metadata_chain()
@@ -666,7 +742,8 @@ impl DataWriterDataFusionBuilder {
             .await
             .int_err()?;
 
-        let mut merge_strategy = None;
+        let mut schema = None;
+        let mut source_event: Option<odf::MetadataEvent> = None;
         let mut data_slices = Vec::new();
         let mut last_checkpoint = None;
         let mut last_watermark = None;
@@ -683,8 +760,13 @@ impl DataWriterDataFusionBuilder {
 
             while let Some((_, block)) = block_stream.try_next().await.int_err()? {
                 match block.event {
-                    odf::MetadataEvent::AddData(add_data) => {
-                        if let Some(output_data) = &add_data.output_data {
+                    odf::MetadataEvent::SetDataSchema(set_data_schema) => {
+                        if schema.is_none() {
+                            schema = Some(set_data_schema.schema_as_arrow().int_err()?);
+                        }
+                    }
+                    odf::MetadataEvent::AddData(e) => {
+                        if let Some(output_data) = &e.output_data {
                             data_slices.push(output_data.physical_hash.clone());
 
                             if last_offset.is_none() {
@@ -692,32 +774,51 @@ impl DataWriterDataFusionBuilder {
                             }
                         }
                         if last_checkpoint.is_none() {
-                            last_checkpoint =
-                                Some(add_data.output_checkpoint.map(|cp| cp.physical_hash));
+                            last_checkpoint = Some(e.output_checkpoint.map(|cp| cp.physical_hash));
                         }
                         if last_watermark.is_none() {
-                            last_watermark = Some(add_data.output_watermark);
+                            last_watermark = Some(e.output_watermark);
                         }
                         // TODO: Consider multiple sources situation
                         if last_source_state.is_none() {
-                            last_source_state = Some(add_data.source_state);
+                            last_source_state = Some(e.source_state);
                         }
                     }
-                    odf::MetadataEvent::SetWatermark(set_wm) => {
+                    odf::MetadataEvent::SetWatermark(e) => {
                         if last_watermark.is_none() {
-                            last_watermark = Some(Some(set_wm.output_watermark));
+                            last_watermark = Some(Some(e.output_watermark));
                         }
                     }
-                    odf::MetadataEvent::SetPollingSource(src) => {
-                        if merge_strategy.is_none() {
-                            merge_strategy = Some(src.merge);
+                    odf::MetadataEvent::SetPollingSource(e) => {
+                        if source_name.is_some() {
+                            return Err(SourceNotFoundError::new(
+                                source_name,
+                                "Expected a named push source, but found polling source",
+                            )
+                            .into());
+                        }
+                        if source_event.is_none() {
+                            source_event = Some(e.into());
                         }
                     }
-                    odf::MetadataEvent::SetVocab(set_vocab) => {
-                        vocab = Some(set_vocab.into());
+                    odf::MetadataEvent::DisablePollingSource(_) => {
+                        unimplemented!("Disabling sources is not yet fully supported")
                     }
-                    odf::MetadataEvent::Seed(seed) => {
-                        assert_eq!(seed.dataset_kind, odf::DatasetKind::Root);
+                    odf::MetadataEvent::AddPushSource(e) => {
+                        if source_event.is_none() {
+                            if source_name.is_none() || source_name == Some(&e.source) {
+                                source_event = Some(e.into());
+                            }
+                        }
+                    }
+                    odf::MetadataEvent::DisablePushSource(_) => {
+                        unimplemented!("Disabling sources is not yet fully supported")
+                    }
+                    odf::MetadataEvent::SetVocab(e) => {
+                        vocab = Some(e.into());
+                    }
+                    odf::MetadataEvent::Seed(e) => {
+                        assert_eq!(e.dataset_kind, odf::DatasetKind::Root);
                     }
                     odf::MetadataEvent::ExecuteQuery(_) => unreachable!(),
                     odf::MetadataEvent::SetAttachments(_)
@@ -728,9 +829,27 @@ impl DataWriterDataFusionBuilder {
             }
         }
 
+        let merge_strategy = match (&source_event, source_name) {
+            // Source found
+            (Some(e), _) => match e {
+                odf::MetadataEvent::SetPollingSource(e) => Ok(e.merge.clone()),
+                odf::MetadataEvent::AddPushSource(e) => Ok(e.merge.clone()),
+                _ => unreachable!(),
+            },
+            // No source defined - assuming append strategy
+            (None, None) => Ok(odf::MergeStrategy::Append(MergeStrategyAppend {})),
+            // Source expected but not found
+            (None, Some(source)) => Err(SourceNotFoundError::new(
+                Some(source),
+                format!("Source '{}' not found", source),
+            )),
+        }?;
+
         Ok(self.with_metadata_state(DataWriterMetadataState {
             head,
-            merge_strategy: merge_strategy.unwrap(),
+            schema,
+            source_event,
+            merge_strategy,
             vocab: vocab.unwrap_or_default().into(),
             data_slices,
             last_offset,
@@ -740,29 +859,25 @@ impl DataWriterDataFusionBuilder {
         }))
     }
 
-    pub fn metadata_state(&self) -> Option<&DataWriterMetadataState> {
-        self.metadata_state.as_ref()
-    }
-
-    pub async fn build(self) -> Result<DataWriterDataFusion, InternalError> {
-        let this = if self.metadata_state.is_none() {
-            self.with_metadata_state_scanned().await?
-        } else {
-            self
+    pub fn build(self) -> DataWriterDataFusion {
+        let Some(metadata_state) = self.metadata_state else {
+            // TODO: Typestate
+            panic!(
+                "Writer state is undefined - use with_metadata_state_scanned() to initialize it \
+                 from metadata chain or pass it explicitly via with_metadata_state()"
+            )
         };
-
-        let metadata_state = this.metadata_state.unwrap();
 
         let merge_strategy =
             Self::merge_strategy_for(metadata_state.merge_strategy.clone(), &metadata_state.vocab);
 
-        Ok(DataWriterDataFusion::new(
-            this.ctx,
-            this.dataset,
+        DataWriterDataFusion::new(
+            self.ctx,
+            self.dataset,
             merge_strategy,
-            this.block_ref,
+            self.block_ref,
             metadata_state,
-        ))
+        )
     }
 
     fn merge_strategy_for(
@@ -772,14 +887,54 @@ impl DataWriterDataFusionBuilder {
         use crate::merge_strategies::*;
 
         match conf {
-            odf::MergeStrategy::Append => Arc::new(MergeStrategyAppend),
-            odf::MergeStrategy::Ledger(conf) => {
-                Arc::new(MergeStrategyLedger::new(conf.primary_key.clone()))
+            odf::MergeStrategy::Append(_cfg) => Arc::new(MergeStrategyAppend),
+            odf::MergeStrategy::Ledger(cfg) => {
+                Arc::new(MergeStrategyLedger::new(cfg.primary_key.clone()))
             }
             odf::MergeStrategy::Snapshot(cfg) => Arc::new(MergeStrategySnapshot::new(
                 vocab.offset_column.to_string(),
                 cfg.clone(),
             )),
         }
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, thiserror::Error)]
+pub enum ScanMetadataError {
+    #[error(transparent)]
+    SourceNotFound(
+        #[from]
+        #[backtrace]
+        SourceNotFoundError,
+    ),
+    #[error(transparent)]
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
+}
+
+#[derive(Debug, thiserror::Error)]
+#[error("{message}")]
+pub struct SourceNotFoundError {
+    pub source_name: Option<String>,
+    message: String,
+}
+
+impl SourceNotFoundError {
+    pub fn new(source_name: Option<impl Into<String>>, message: impl Into<String>) -> Self {
+        Self {
+            source_name: source_name.map(|v| v.into()),
+            message: message.into(),
+        }
+    }
+}
+
+impl Into<PushSourceNotFoundError> for SourceNotFoundError {
+    fn into(self) -> PushSourceNotFoundError {
+        PushSourceNotFoundError::new(self.source_name)
     }
 }

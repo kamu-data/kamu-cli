@@ -402,11 +402,11 @@ impl FetchService {
         let (first_filename, first_path) = matched_files.pop().unwrap();
 
         let source_event_time = match &fglob.event_time {
-            None | Some(EventTimeSource::FromSystemTime) => Some(system_time.clone()),
+            None | Some(EventTimeSource::FromSystemTime(_)) => Some(system_time.clone()),
             Some(EventTimeSource::FromPath(src)) => {
                 Some(Self::extract_event_time_from_path(&first_filename, &src)?)
             }
-            Some(EventTimeSource::FromMetadata) => {
+            Some(EventTimeSource::FromMetadata(_)) => {
                 return Err(EventTimeSourceError::incompatible(
                     "Files glob source does not support extracting event time fromMetadata, you \
                      should use fromPath instead",
@@ -462,8 +462,8 @@ impl FetchService {
         }
 
         let source_event_time = match event_time_source {
-            None | Some(EventTimeSource::FromMetadata) => Some(mod_time),
-            Some(EventTimeSource::FromSystemTime) => Some(system_time.clone()),
+            None | Some(EventTimeSource::FromMetadata(_)) => Some(mod_time),
+            Some(EventTimeSource::FromSystemTime(_)) => Some(system_time.clone()),
             Some(EventTimeSource::FromPath(_)) => {
                 return Err(EventTimeSourceError::incompatible(
                     "File source does not supports fromPath event time source",
@@ -587,8 +587,8 @@ impl FetchService {
         file.flush().await.int_err()?;
 
         let source_event_time = match event_time_source {
-            None | Some(EventTimeSource::FromMetadata) => last_modified_time,
-            Some(EventTimeSource::FromSystemTime) => Some(system_time.clone()),
+            None | Some(EventTimeSource::FromMetadata(_)) => last_modified_time,
+            Some(EventTimeSource::FromSystemTime(_)) => Some(system_time.clone()),
             Some(EventTimeSource::FromPath(_)) => {
                 return Err(EventTimeSourceError::incompatible(
                     "Url source does not support fromPath event time source",

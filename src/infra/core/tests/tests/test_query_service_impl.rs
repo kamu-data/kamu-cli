@@ -43,12 +43,25 @@ async fn create_test_dataset(catalog: &dill::Catalog, tempdir: &Path) -> Dataset
         .unwrap()
         .dataset;
 
-    // Write data spread over two commits
+    // Write schema
     let tmp_data_path = tempdir.join("data");
     let schema = Arc::new(Schema::new(vec![
         Field::new("offset", DataType::UInt64, false),
         Field::new("blah", DataType::Utf8, false),
     ]));
+
+    dataset
+        .commit_event(
+            MetadataFactory::set_data_schema()
+                .schema(&schema)
+                .build()
+                .into(),
+            CommitOpts::default(),
+        )
+        .await
+        .unwrap();
+
+    // Write data spread over two commits
     let batches = [
         (
             UInt64Array::from(vec![0, 1]),

@@ -50,6 +50,7 @@ async fn test_engine_io_common(
         dataset_repo.clone(),
         dataset_action_authorizer.clone(),
         engine_provisioner.clone(),
+        Arc::new(SystemTimeSourceDefault),
     );
 
     ///////////////////////////////////////////////////////////////////////////

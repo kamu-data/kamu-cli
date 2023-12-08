@@ -71,6 +71,44 @@ impl Into<dtos::AddData> for &dyn AddData {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// AddPushSource
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#addpushsource-schema
+////////////////////////////////////////////////////////////////////////////////
+
+pub trait AddPushSource {
+    fn source(&self) -> &str;
+    fn read(&self) -> ReadStep;
+    fn preprocess(&self) -> Option<Transform>;
+    fn merge(&self) -> MergeStrategy;
+}
+
+impl AddPushSource for dtos::AddPushSource {
+    fn source(&self) -> &str {
+        self.source.as_ref()
+    }
+    fn read(&self) -> ReadStep {
+        (&self.read).into()
+    }
+    fn preprocess(&self) -> Option<Transform> {
+        self.preprocess.as_ref().map(|v| -> Transform { v.into() })
+    }
+    fn merge(&self) -> MergeStrategy {
+        (&self.merge).into()
+    }
+}
+
+impl Into<dtos::AddPushSource> for &dyn AddPushSource {
+    fn into(self) -> dtos::AddPushSource {
+        dtos::AddPushSource {
+            source: self.source().to_owned(),
+            read: self.read().into(),
+            preprocess: self.preprocess().map(|v| v.into()),
+            merge: self.merge().into(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // AttachmentEmbedded
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#attachmentembedded-schema
 ////////////////////////////////////////////////////////////////////////////////
@@ -311,6 +349,44 @@ impl Into<dtos::DatasetVocabulary> for &dyn DatasetVocabulary {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// DisablePollingSource
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#disablepollingsource-schema
+////////////////////////////////////////////////////////////////////////////////
+
+pub trait DisablePollingSource {}
+
+impl DisablePollingSource for dtos::DisablePollingSource {}
+
+impl Into<dtos::DisablePollingSource> for &dyn DisablePollingSource {
+    fn into(self) -> dtos::DisablePollingSource {
+        dtos::DisablePollingSource {}
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// DisablePushSource
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#disablepushsource-schema
+////////////////////////////////////////////////////////////////////////////////
+
+pub trait DisablePushSource {
+    fn source(&self) -> &str;
+}
+
+impl DisablePushSource for dtos::DisablePushSource {
+    fn source(&self) -> &str {
+        self.source.as_ref()
+    }
+}
+
+impl Into<dtos::DisablePushSource> for &dyn DisablePushSource {
+    fn into(self) -> dtos::DisablePushSource {
+        dtos::DisablePushSource {
+            source: self.source().to_owned(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // EnvVar
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#envvar-schema
 ////////////////////////////////////////////////////////////////////////////////
@@ -344,17 +420,17 @@ impl Into<dtos::EnvVar> for &dyn EnvVar {
 ////////////////////////////////////////////////////////////////////////////////
 
 pub enum EventTimeSource<'a> {
-    FromMetadata,
+    FromMetadata(&'a dyn EventTimeSourceFromMetadata),
     FromPath(&'a dyn EventTimeSourceFromPath),
-    FromSystemTime,
+    FromSystemTime(&'a dyn EventTimeSourceFromSystemTime),
 }
 
 impl<'a> From<&'a dtos::EventTimeSource> for EventTimeSource<'a> {
     fn from(other: &'a dtos::EventTimeSource) -> Self {
         match other {
-            dtos::EventTimeSource::FromMetadata => EventTimeSource::FromMetadata,
+            dtos::EventTimeSource::FromMetadata(v) => EventTimeSource::FromMetadata(v),
             dtos::EventTimeSource::FromPath(v) => EventTimeSource::FromPath(v),
-            dtos::EventTimeSource::FromSystemTime => EventTimeSource::FromSystemTime,
+            dtos::EventTimeSource::FromSystemTime(v) => EventTimeSource::FromSystemTime(v),
         }
     }
 }
@@ -362,17 +438,23 @@ impl<'a> From<&'a dtos::EventTimeSource> for EventTimeSource<'a> {
 impl Into<dtos::EventTimeSource> for EventTimeSource<'_> {
     fn into(self) -> dtos::EventTimeSource {
         match self {
-            EventTimeSource::FromMetadata => dtos::EventTimeSource::FromMetadata,
+            EventTimeSource::FromMetadata(v) => dtos::EventTimeSource::FromMetadata(v.into()),
             EventTimeSource::FromPath(v) => dtos::EventTimeSource::FromPath(v.into()),
-            EventTimeSource::FromSystemTime => dtos::EventTimeSource::FromSystemTime,
+            EventTimeSource::FromSystemTime(v) => dtos::EventTimeSource::FromSystemTime(v.into()),
         }
     }
 }
+
+pub trait EventTimeSourceFromMetadata {}
 
 pub trait EventTimeSourceFromPath {
     fn pattern(&self) -> &str;
     fn timestamp_format(&self) -> Option<&str>;
 }
+
+pub trait EventTimeSourceFromSystemTime {}
+
+impl EventTimeSourceFromMetadata for dtos::EventTimeSourceFromMetadata {}
 
 impl EventTimeSourceFromPath for dtos::EventTimeSourceFromPath {
     fn pattern(&self) -> &str {
@@ -385,12 +467,26 @@ impl EventTimeSourceFromPath for dtos::EventTimeSourceFromPath {
     }
 }
 
+impl EventTimeSourceFromSystemTime for dtos::EventTimeSourceFromSystemTime {}
+
+impl Into<dtos::EventTimeSourceFromMetadata> for &dyn EventTimeSourceFromMetadata {
+    fn into(self) -> dtos::EventTimeSourceFromMetadata {
+        dtos::EventTimeSourceFromMetadata {}
+    }
+}
+
 impl Into<dtos::EventTimeSourceFromPath> for &dyn EventTimeSourceFromPath {
     fn into(self) -> dtos::EventTimeSourceFromPath {
         dtos::EventTimeSourceFromPath {
             pattern: self.pattern().to_owned(),
             timestamp_format: self.timestamp_format().map(|v| v.to_owned()),
         }
+    }
+}
+
+impl Into<dtos::EventTimeSourceFromSystemTime> for &dyn EventTimeSourceFromSystemTime {
+    fn into(self) -> dtos::EventTimeSourceFromSystemTime {
+        dtos::EventTimeSourceFromSystemTime {}
     }
 }
 
@@ -576,7 +672,7 @@ impl Into<dtos::ExecuteQueryRequest> for &dyn ExecuteQueryRequest {
 ////////////////////////////////////////////////////////////////////////////////
 
 pub enum ExecuteQueryResponse<'a> {
-    Progress,
+    Progress(&'a dyn ExecuteQueryResponseProgress),
     Success(&'a dyn ExecuteQueryResponseSuccess),
     InvalidQuery(&'a dyn ExecuteQueryResponseInvalidQuery),
     InternalError(&'a dyn ExecuteQueryResponseInternalError),
@@ -585,7 +681,7 @@ pub enum ExecuteQueryResponse<'a> {
 impl<'a> From<&'a dtos::ExecuteQueryResponse> for ExecuteQueryResponse<'a> {
     fn from(other: &'a dtos::ExecuteQueryResponse) -> Self {
         match other {
-            dtos::ExecuteQueryResponse::Progress => ExecuteQueryResponse::Progress,
+            dtos::ExecuteQueryResponse::Progress(v) => ExecuteQueryResponse::Progress(v),
             dtos::ExecuteQueryResponse::Success(v) => ExecuteQueryResponse::Success(v),
             dtos::ExecuteQueryResponse::InvalidQuery(v) => ExecuteQueryResponse::InvalidQuery(v),
             dtos::ExecuteQueryResponse::InternalError(v) => ExecuteQueryResponse::InternalError(v),
@@ -596,7 +692,7 @@ impl<'a> From<&'a dtos::ExecuteQueryResponse> for ExecuteQueryResponse<'a> {
 impl Into<dtos::ExecuteQueryResponse> for ExecuteQueryResponse<'_> {
     fn into(self) -> dtos::ExecuteQueryResponse {
         match self {
-            ExecuteQueryResponse::Progress => dtos::ExecuteQueryResponse::Progress,
+            ExecuteQueryResponse::Progress(v) => dtos::ExecuteQueryResponse::Progress(v.into()),
             ExecuteQueryResponse::Success(v) => dtos::ExecuteQueryResponse::Success(v.into()),
             ExecuteQueryResponse::InvalidQuery(v) => {
                 dtos::ExecuteQueryResponse::InvalidQuery(v.into())
@@ -607,6 +703,8 @@ impl Into<dtos::ExecuteQueryResponse> for ExecuteQueryResponse<'_> {
         }
     }
 }
+
+pub trait ExecuteQueryResponseProgress {}
 
 pub trait ExecuteQueryResponseSuccess {
     fn data_interval(&self) -> Option<&dyn OffsetInterval>;
@@ -621,6 +719,8 @@ pub trait ExecuteQueryResponseInternalError {
     fn message(&self) -> &str;
     fn backtrace(&self) -> Option<&str>;
 }
+
+impl ExecuteQueryResponseProgress for dtos::ExecuteQueryResponseProgress {}
 
 impl ExecuteQueryResponseSuccess for dtos::ExecuteQueryResponseSuccess {
     fn data_interval(&self) -> Option<&dyn OffsetInterval> {
@@ -647,6 +747,12 @@ impl ExecuteQueryResponseInternalError for dtos::ExecuteQueryResponseInternalErr
     }
     fn backtrace(&self) -> Option<&str> {
         self.backtrace.as_ref().map(|v| -> &str { v.as_ref() })
+    }
+}
+
+impl Into<dtos::ExecuteQueryResponseProgress> for &dyn ExecuteQueryResponseProgress {
+    fn into(self) -> dtos::ExecuteQueryResponseProgress {
+        dtos::ExecuteQueryResponseProgress {}
     }
 }
 
@@ -869,7 +975,7 @@ impl Into<dtos::InputSlice> for &dyn InputSlice {
 ////////////////////////////////////////////////////////////////////////////////
 
 pub enum MergeStrategy<'a> {
-    Append,
+    Append(&'a dyn MergeStrategyAppend),
     Ledger(&'a dyn MergeStrategyLedger),
     Snapshot(&'a dyn MergeStrategySnapshot),
 }
@@ -877,7 +983,7 @@ pub enum MergeStrategy<'a> {
 impl<'a> From<&'a dtos::MergeStrategy> for MergeStrategy<'a> {
     fn from(other: &'a dtos::MergeStrategy) -> Self {
         match other {
-            dtos::MergeStrategy::Append => MergeStrategy::Append,
+            dtos::MergeStrategy::Append(v) => MergeStrategy::Append(v),
             dtos::MergeStrategy::Ledger(v) => MergeStrategy::Ledger(v),
             dtos::MergeStrategy::Snapshot(v) => MergeStrategy::Snapshot(v),
         }
@@ -887,12 +993,14 @@ impl<'a> From<&'a dtos::MergeStrategy> for MergeStrategy<'a> {
 impl Into<dtos::MergeStrategy> for MergeStrategy<'_> {
     fn into(self) -> dtos::MergeStrategy {
         match self {
-            MergeStrategy::Append => dtos::MergeStrategy::Append,
+            MergeStrategy::Append(v) => dtos::MergeStrategy::Append(v.into()),
             MergeStrategy::Ledger(v) => dtos::MergeStrategy::Ledger(v.into()),
             MergeStrategy::Snapshot(v) => dtos::MergeStrategy::Snapshot(v.into()),
         }
     }
 }
+
+pub trait MergeStrategyAppend {}
 
 pub trait MergeStrategyLedger {
     fn primary_key(&self) -> Box<dyn Iterator<Item = &str> + '_>;
@@ -906,6 +1014,8 @@ pub trait MergeStrategySnapshot {
     fn obsv_changed(&self) -> Option<&str>;
     fn obsv_removed(&self) -> Option<&str>;
 }
+
+impl MergeStrategyAppend for dtos::MergeStrategyAppend {}
 
 impl MergeStrategyLedger for dtos::MergeStrategyLedger {
     fn primary_key(&self) -> Box<dyn Iterator<Item = &str> + '_> {
@@ -937,6 +1047,12 @@ impl MergeStrategySnapshot for dtos::MergeStrategySnapshot {
     }
     fn obsv_removed(&self) -> Option<&str> {
         self.obsv_removed.as_ref().map(|v| -> &str { v.as_ref() })
+    }
+}
+
+impl Into<dtos::MergeStrategyAppend> for &dyn MergeStrategyAppend {
+    fn into(self) -> dtos::MergeStrategyAppend {
+        dtos::MergeStrategyAppend {}
     }
 }
 
@@ -1017,6 +1133,10 @@ pub enum MetadataEvent<'a> {
     SetAttachments(&'a dyn SetAttachments),
     SetInfo(&'a dyn SetInfo),
     SetLicense(&'a dyn SetLicense),
+    SetDataSchema(&'a dyn SetDataSchema),
+    AddPushSource(&'a dyn AddPushSource),
+    DisablePushSource(&'a dyn DisablePushSource),
+    DisablePollingSource(&'a dyn DisablePollingSource),
 }
 
 impl<'a> From<&'a dtos::MetadataEvent> for MetadataEvent<'a> {
@@ -1032,6 +1152,10 @@ impl<'a> From<&'a dtos::MetadataEvent> for MetadataEvent<'a> {
             dtos::MetadataEvent::SetAttachments(v) => MetadataEvent::SetAttachments(v),
             dtos::MetadataEvent::SetInfo(v) => MetadataEvent::SetInfo(v),
             dtos::MetadataEvent::SetLicense(v) => MetadataEvent::SetLicense(v),
+            dtos::MetadataEvent::SetDataSchema(v) => MetadataEvent::SetDataSchema(v),
+            dtos::MetadataEvent::AddPushSource(v) => MetadataEvent::AddPushSource(v),
+            dtos::MetadataEvent::DisablePushSource(v) => MetadataEvent::DisablePushSource(v),
+            dtos::MetadataEvent::DisablePollingSource(v) => MetadataEvent::DisablePollingSource(v),
         }
     }
 }
@@ -1049,6 +1173,12 @@ impl Into<dtos::MetadataEvent> for MetadataEvent<'_> {
             MetadataEvent::SetAttachments(v) => dtos::MetadataEvent::SetAttachments(v.into()),
             MetadataEvent::SetInfo(v) => dtos::MetadataEvent::SetInfo(v.into()),
             MetadataEvent::SetLicense(v) => dtos::MetadataEvent::SetLicense(v.into()),
+            MetadataEvent::SetDataSchema(v) => dtos::MetadataEvent::SetDataSchema(v.into()),
+            MetadataEvent::AddPushSource(v) => dtos::MetadataEvent::AddPushSource(v.into()),
+            MetadataEvent::DisablePushSource(v) => dtos::MetadataEvent::DisablePushSource(v.into()),
+            MetadataEvent::DisablePollingSource(v) => {
+                dtos::MetadataEvent::DisablePollingSource(v.into())
+            }
         }
     }
 }
@@ -1619,6 +1749,29 @@ impl Into<dtos::SetAttachments> for &dyn SetAttachments {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// SetDataSchema
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setdataschema-schema
+////////////////////////////////////////////////////////////////////////////////
+
+pub trait SetDataSchema {
+    fn schema(&self) -> &[u8];
+}
+
+impl SetDataSchema for dtos::SetDataSchema {
+    fn schema(&self) -> &[u8] {
+        &self.schema
+    }
+}
+
+impl Into<dtos::SetDataSchema> for &dyn SetDataSchema {
+    fn into(self) -> dtos::SetDataSchema {
+        dtos::SetDataSchema {
+            schema: self.schema().to_vec(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // SetInfo
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setinfo-schema
 ////////////////////////////////////////////////////////////////////////////////
@@ -1829,14 +1982,13 @@ impl Into<dtos::SetWatermark> for &dyn SetWatermark {
 ////////////////////////////////////////////////////////////////////////////////
 
 pub enum SourceCaching<'a> {
-    Forever,
-    _Phantom(std::marker::PhantomData<&'a ()>),
+    Forever(&'a dyn SourceCachingForever),
 }
 
 impl<'a> From<&'a dtos::SourceCaching> for SourceCaching<'a> {
     fn from(other: &'a dtos::SourceCaching) -> Self {
         match other {
-            dtos::SourceCaching::Forever => SourceCaching::Forever,
+            dtos::SourceCaching::Forever(v) => SourceCaching::Forever(v),
         }
     }
 }
@@ -1844,9 +1996,18 @@ impl<'a> From<&'a dtos::SourceCaching> for SourceCaching<'a> {
 impl Into<dtos::SourceCaching> for SourceCaching<'_> {
     fn into(self) -> dtos::SourceCaching {
         match self {
-            SourceCaching::Forever => dtos::SourceCaching::Forever,
-            SourceCaching::_Phantom(_) => unreachable!(),
+            SourceCaching::Forever(v) => dtos::SourceCaching::Forever(v.into()),
         }
+    }
+}
+
+pub trait SourceCachingForever {}
+
+impl SourceCachingForever for dtos::SourceCachingForever {}
+
+impl Into<dtos::SourceCachingForever> for &dyn SourceCachingForever {
+    fn into(self) -> dtos::SourceCachingForever {
+        dtos::SourceCachingForever {}
     }
 }
 

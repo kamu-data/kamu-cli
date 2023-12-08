@@ -46,6 +46,7 @@ impl<TServerHarness: ServerSideHarness> SmartPullExistingUpToDateDatasetScenario
                     .name("foo")
                     .kind(DatasetKind::Root)
                     .push_event(MetadataFactory::set_polling_source().build())
+                    .push_event(MetadataFactory::set_data_schema().build())
                     .build(),
             )
             .await

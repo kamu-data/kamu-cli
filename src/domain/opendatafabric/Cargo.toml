@@ -17,6 +17,11 @@ publish = { workspace = true }
 doctest = false
 
 
+[features]
+default = ["arrow"]
+arrow = ["dep:arrow"]
+
+
 [dependencies]
 enum-variants = { workspace = true }
 internal-error = { workspace = true }
@@ -35,9 +40,10 @@ url = "2"
 
 # Crypto
 ed25519-dalek = { version = "2", default-features = false, features = ["std", "fast", "rand_core"] }
-rand = "0.8"  # TODO: Pinned for ed25519-dalek compatibility
+rand = "0.8"
 
 # Serialization
+base64 = "0.21"
 byteorder = "1"
 flatbuffers = "23"
 hex = "0.4"
@@ -48,3 +54,6 @@ serde_yaml = "0.9"
 # gRPC
 prost = "0.12"
 tonic = "0.10"
+
+# Optional
+arrow = { optional = true, version = "48", default-features = false, features = ["ipc"] }

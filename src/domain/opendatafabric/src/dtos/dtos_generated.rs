@@ -41,6 +41,26 @@ pub struct AddData {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// AddPushSource
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#addpushsource-schema
+////////////////////////////////////////////////////////////////////////////////
+
+/// Describes how to ingest data into a root dataset from a certain logical
+/// source.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct AddPushSource {
+    /// Name that identifies this source within this dataset.
+    pub source: String,
+    /// Defines how data is read into structured format.
+    pub read: ReadStep,
+    /// Pre-processing query that shapes the data.
+    pub preprocess: Option<Transform>,
+    /// Determines how newly-ingested data should be merged with existing
+    /// history.
+    pub merge: MergeStrategy,
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // AttachmentEmbedded
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#attachmentembedded-schema
 ////////////////////////////////////////////////////////////////////////////////
@@ -166,6 +186,27 @@ pub struct DatasetVocabulary {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// DisablePollingSource
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#disablepollingsource-schema
+////////////////////////////////////////////////////////////////////////////////
+
+/// Disables the previously defined polling source.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct DisablePollingSource {}
+
+////////////////////////////////////////////////////////////////////////////////
+// DisablePushSource
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#disablepushsource-schema
+////////////////////////////////////////////////////////////////////////////////
+
+/// Disables the previously defined source.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct DisablePushSource {
+    /// Identifier of the source to be disabled.
+    pub source: String,
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // EnvVar
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#envvar-schema
 ////////////////////////////////////////////////////////////////////////////////
@@ -186,12 +227,18 @@ pub struct EnvVar {
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum EventTimeSource {
-    FromMetadata,
+    FromMetadata(EventTimeSourceFromMetadata),
     FromPath(EventTimeSourceFromPath),
-    FromSystemTime,
+    FromSystemTime(EventTimeSourceFromSystemTime),
 }
 
 impl_enum_with_variants!(EventTimeSource);
+
+/// Extracts event time from the source's metadata.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct EventTimeSourceFromMetadata {}
+
+impl_enum_variant!(EventTimeSource::FromMetadata(EventTimeSourceFromMetadata));
 
 /// Extracts event time from the path component of the source.
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -203,6 +250,14 @@ pub struct EventTimeSourceFromPath {
 }
 
 impl_enum_variant!(EventTimeSource::FromPath(EventTimeSourceFromPath));
+
+/// Assigns event time from the system time source.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct EventTimeSourceFromSystemTime {}
+
+impl_enum_variant!(EventTimeSource::FromSystemTime(
+    EventTimeSourceFromSystemTime
+));
 
 ////////////////////////////////////////////////////////////////////////////////
 // ExecuteQuery
@@ -286,13 +341,18 @@ pub struct ExecuteQueryRequest {
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum ExecuteQueryResponse {
-    Progress,
+    Progress(ExecuteQueryResponseProgress),
     Success(ExecuteQueryResponseSuccess),
     InvalidQuery(ExecuteQueryResponseInvalidQuery),
     InternalError(ExecuteQueryResponseInternalError),
 }
 
 impl_enum_with_variants!(ExecuteQueryResponse);
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct ExecuteQueryResponseProgress {}
+
+impl_enum_variant!(ExecuteQueryResponse::Progress(ExecuteQueryResponseProgress));
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct ExecuteQueryResponseSuccess {
@@ -418,12 +478,21 @@ pub struct InputSlice {
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum MergeStrategy {
-    Append,
+    Append(MergeStrategyAppend),
     Ledger(MergeStrategyLedger),
     Snapshot(MergeStrategySnapshot),
 }
 
 impl_enum_with_variants!(MergeStrategy);
+
+/// Append merge strategy.
+///
+/// Under this strategy polled data will be appended in its original form to the
+/// already ingested data without modifications.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct MergeStrategyAppend {}
+
+impl_enum_variant!(MergeStrategy::Append(MergeStrategyAppend));
 
 /// Ledger merge strategy.
 ///
@@ -541,6 +610,10 @@ pub enum MetadataEvent {
     SetAttachments(SetAttachments),
     SetInfo(SetInfo),
     SetLicense(SetLicense),
+    SetDataSchema(SetDataSchema),
+    AddPushSource(AddPushSource),
+    DisablePushSource(DisablePushSource),
+    DisablePollingSource(DisablePollingSource),
 }
 
 impl_enum_with_variants!(MetadataEvent);
@@ -564,6 +637,14 @@ impl_enum_variant!(MetadataEvent::SetAttachments(SetAttachments));
 impl_enum_variant!(MetadataEvent::SetInfo(SetInfo));
 
 impl_enum_variant!(MetadataEvent::SetLicense(SetLicense));
+
+impl_enum_variant!(MetadataEvent::SetDataSchema(SetDataSchema));
+
+impl_enum_variant!(MetadataEvent::AddPushSource(AddPushSource));
+
+impl_enum_variant!(MetadataEvent::DisablePushSource(DisablePushSource));
+
+impl_enum_variant!(MetadataEvent::DisablePollingSource(DisablePollingSource));
 
 ////////////////////////////////////////////////////////////////////////////////
 // OffsetInterval
@@ -855,6 +936,19 @@ pub struct SetAttachments {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// SetDataSchema
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setdataschema-schema
+////////////////////////////////////////////////////////////////////////////////
+
+/// Specifies the complete schema of Data Slices added to the Dataset following
+/// this event.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct SetDataSchema {
+    /// Apache Arrow schema encoded in its native flatbuffers representation.
+    pub schema: Vec<u8>,
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // SetInfo
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setinfo-schema
 ////////////////////////////////////////////////////////////////////////////////
@@ -956,10 +1050,16 @@ pub struct SetWatermark {
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum SourceCaching {
-    Forever,
+    Forever(SourceCachingForever),
 }
 
 impl_enum_with_variants!(SourceCaching);
+
+/// After source was processed once it will never be ingested again.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct SourceCachingForever {}
+
+impl_enum_variant!(SourceCaching::Forever(SourceCachingForever));
 
 ////////////////////////////////////////////////////////////////////////////////
 // SourceState

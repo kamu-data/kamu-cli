@@ -28,6 +28,7 @@ pub trait PushIngestService: Send + Sync {
     async fn ingest_from_url(
         &self,
         dataset_ref: &DatasetRef,
+        source_name: Option<&str>,
         url: url::Url,
         media_type: Option<MediaType>,
         listener: Option<Arc<dyn PushIngestListener>>,
@@ -40,6 +41,7 @@ pub trait PushIngestService: Send + Sync {
     async fn ingest_from_file_stream(
         &self,
         dataset_ref: &DatasetRef,
+        source_name: Option<&str>,
         data: Box<dyn AsyncRead + Send + Unpin>,
         media_type: Option<MediaType>,
         listener: Option<Arc<dyn PushIngestListener>>,
@@ -188,8 +190,32 @@ impl From<auth::DatasetActionUnauthorizedError> for PushIngestError {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Error)]
-#[error("Dataset does not define a push source")]
-pub struct PushSourceNotFoundError;
+pub struct PushSourceNotFoundError {
+    source_name: Option<String>,
+}
+
+impl PushSourceNotFoundError {
+    pub fn new(source_name: Option<impl Into<String>>) -> Self {
+        Self {
+            source_name: source_name.map(|v| v.into()),
+        }
+    }
+}
+
+impl Default for PushSourceNotFoundError {
+    fn default() -> Self {
+        Self { source_name: None }
+    }
+}
+
+impl std::fmt::Display for PushSourceNotFoundError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match &self.source_name {
+            None => write!(f, "Dataset does not define a push source"),
+            Some(s) => write!(f, "Dataset does not define a push source '{}'", s),
+        }
+    }
+}
 
 #[derive(Debug, Error)]
 #[error("Unsupported media type {media_type}")]

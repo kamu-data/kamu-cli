@@ -29,13 +29,14 @@ pub struct IngestCommand {
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
     dataset_ref: DatasetRef,
     files_refs: Vec<String>,
+    source_name: Option<String>,
     stdin: bool,
     recursive: bool,
     input_format: Option<String>,
 }
 
 impl IngestCommand {
-    pub fn new<'s, I, S>(
+    pub fn new<'s, I, S1, S2>(
         data_format_reg: Arc<dyn DataFormatRegistry>,
         dataset_repo: Arc<dyn DatasetRepository>,
         push_ingest_svc: Arc<dyn PushIngestService>,
@@ -43,13 +44,15 @@ impl IngestCommand {
         remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
         dataset_ref: DatasetRef,
         files_refs: I,
+        source_name: Option<S1>,
         stdin: bool,
         recursive: bool,
-        input_format: Option<S>,
+        input_format: Option<S2>,
     ) -> Self
     where
         I: Iterator<Item = &'s str>,
-        S: Into<String>,
+        S1: Into<String>,
+        S2: Into<String>,
     {
         Self {
             data_format_reg,
@@ -59,6 +62,7 @@ impl IngestCommand {
             remote_alias_reg,
             dataset_ref,
             files_refs: files_refs.map(|s| s.to_string()).collect(),
+            source_name: source_name.map(|s| s.into()),
             stdin,
             recursive,
             input_format: input_format.map(|s| s.into()),
@@ -166,6 +170,7 @@ impl Command for IngestCommand {
                 .push_ingest_svc
                 .ingest_from_url(
                     &self.dataset_ref,
+                    self.source_name.as_ref().map(|s| s.as_str()),
                     url,
                     self.get_media_type()?,
                     listener.clone(),

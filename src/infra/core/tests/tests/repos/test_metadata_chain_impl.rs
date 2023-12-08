@@ -55,7 +55,7 @@ async fn test_append_and_get() {
     assert_eq!(chain.get_ref(&BlockRef::Head).await.unwrap(), hash_1);
     assert_eq!(0, block_1.sequence_number);
 
-    let block_2 = MetadataFactory::metadata_block(MetadataFactory::add_data().build())
+    let block_2 = MetadataFactory::metadata_block(MetadataFactory::set_data_schema().build())
         .prev(&hash_1, block_1.sequence_number)
         .build();
 
@@ -187,23 +187,39 @@ async fn test_append_prev_block_sequence_integrity_broken() {
     let tmp_dir = tempfile::tempdir().unwrap();
     let chain = init_chain(tmp_dir.path());
 
-    let block_1 =
-        MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build()).build();
+    let hash = chain
+        .append(
+            MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build())
+                .build(),
+            AppendOpts::default(),
+        )
+        .await
+        .unwrap();
 
-    let hash_1 = chain.append(block_1, AppendOpts::default()).await.unwrap();
+    let hash = chain
+        .append(
+            MetadataFactory::metadata_block(MetadataFactory::set_data_schema().build())
+                .prev(&hash, 0)
+                .build(),
+            AppendOpts::default(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(chain.get_ref(&BlockRef::Head).await.unwrap(), hash);
 
-    assert_eq!(chain.get_ref(&BlockRef::Head).await.unwrap(), hash_1);
-
-    let block_2 =
-        MetadataFactory::metadata_block(MetadataFactory::add_data().interval(0, 9).build())
-            .prev(&hash_1, 0)
-            .build();
-
-    let hash_2 = chain.append(block_2, AppendOpts::default()).await.unwrap();
+    let hash = chain
+        .append(
+            MetadataFactory::metadata_block(MetadataFactory::add_data().interval(0, 9).build())
+                .prev(&hash, 1)
+                .build(),
+            AppendOpts::default(),
+        )
+        .await
+        .unwrap();
 
     let block_too_low =
         MetadataFactory::metadata_block(MetadataFactory::add_data().interval(10, 19).build())
-            .prev(&hash_2, 0 /* should be 1 */)
+            .prev(&hash, 1 /* should be 2 */)
             .build();
 
     assert_matches!(
@@ -215,12 +231,12 @@ async fn test_append_prev_block_sequence_integrity_broken() {
                 next_block_sequence_number
             })
         ))
-        if prev_block_hash.as_ref() == Some(&hash_2) && prev_block_sequence_number == Some(1) && next_block_sequence_number == 1
+        if prev_block_hash.as_ref() == Some(&hash) && prev_block_sequence_number == Some(2) && next_block_sequence_number == 2
     );
 
     let block_too_high =
         MetadataFactory::metadata_block(MetadataFactory::add_data().interval(10, 19).build())
-            .prev(&hash_2, 2 /* should be 1 */)
+            .prev(&hash, 3 /* should be 2 */)
             .build();
 
     assert_matches!(
@@ -232,12 +248,12 @@ async fn test_append_prev_block_sequence_integrity_broken() {
                 next_block_sequence_number
             })
         ))
-        if prev_block_hash.as_ref() == Some(&hash_2) && prev_block_sequence_number == Some(1) && next_block_sequence_number == 3
+        if prev_block_hash.as_ref() == Some(&hash) && prev_block_sequence_number == Some(2) && next_block_sequence_number == 4
     );
 
     let block_just_right =
         MetadataFactory::metadata_block(MetadataFactory::add_data().interval(10, 19).build())
-            .prev(&hash_2, 1)
+            .prev(&hash, 2)
             .build();
 
     let hash_just_right = chain
@@ -256,23 +272,23 @@ async fn test_append_unexpected_ref() {
     let tmp_dir = tempfile::tempdir().unwrap();
     let chain = init_chain(tmp_dir.path());
 
-    let block_1 =
-        MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build()).build();
-    let block_1_sequence_number = block_1.sequence_number;
-
-    let hash_1 = chain.append(block_1, AppendOpts::default()).await.unwrap();
-
-    assert_eq!(chain.get_ref(&BlockRef::Head).await.unwrap(), hash_1);
-
-    let block_2 = MetadataFactory::metadata_block(MetadataFactory::add_data().build())
-        .prev(&hash_1, block_1_sequence_number)
-        .build();
+    let hash = chain
+        .append(
+            MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build())
+                .build(),
+            AppendOpts::default(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(chain.get_ref(&BlockRef::Head).await.unwrap(), hash);
 
     let invalid_hash = Multihash::from_digest_sha3_256(b"does-not-exist");
     assert_matches!(
         chain
             .append(
-                block_2,
+                MetadataFactory::metadata_block(MetadataFactory::set_data_schema().build())
+                    .prev(&hash, 0)
+                    .build(),
                 AppendOpts {
                     check_ref_is: Some(Some(&invalid_hash)),
                     ..Default::default()
@@ -282,7 +298,7 @@ async fn test_append_unexpected_ref() {
         Err(AppendError::RefCASFailed(_))
     );
 
-    assert_eq!(chain.get_ref(&BlockRef::Head).await.unwrap(), hash_1);
+    assert_eq!(chain.get_ref(&BlockRef::Head).await.unwrap(), hash);
 }
 
 #[tokio::test]
@@ -352,10 +368,24 @@ async fn test_append_watermark_non_monotonic() {
     let tmp_dir = tempfile::tempdir().unwrap();
     let chain = init_chain(tmp_dir.path());
 
-    let block =
-        MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build()).build();
+    let hash = chain
+        .append(
+            MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build())
+                .build(),
+            AppendOpts::default(),
+        )
+        .await
+        .unwrap();
 
-    let hash = chain.append(block, AppendOpts::default()).await.unwrap();
+    let hash = chain
+        .append(
+            MetadataFactory::metadata_block(MetadataFactory::set_data_schema().build())
+                .prev(&hash, 0)
+                .build(),
+            AppendOpts::default(),
+        )
+        .await
+        .unwrap();
 
     // output_watermart = None
     let block = MetadataFactory::metadata_block(
@@ -364,7 +394,7 @@ async fn test_append_watermark_non_monotonic() {
             .interval(0, 9)
             .build(),
     )
-    .prev(&hash, 0)
+    .prev(&hash, 1)
     .build();
 
     let hash = chain.append(block, AppendOpts::default()).await.unwrap();
@@ -377,7 +407,7 @@ async fn test_append_watermark_non_monotonic() {
             .watermark(Utc.with_ymd_and_hms(2000, 1, 1, 12, 0, 0).unwrap())
             .build(),
     )
-    .prev(&hash, 1)
+    .prev(&hash, 2)
     .build();
 
     let hash = chain.append(block, AppendOpts::default()).await.unwrap();
@@ -389,7 +419,7 @@ async fn test_append_watermark_non_monotonic() {
             .interval(20, 29)
             .build(),
     )
-    .prev(&hash, 2)
+    .prev(&hash, 3)
     .build();
 
     assert_matches!(
@@ -407,7 +437,7 @@ async fn test_append_watermark_non_monotonic() {
             .watermark(Utc.with_ymd_and_hms(1988, 1, 1, 12, 0, 0).unwrap())
             .build(),
     )
-    .prev(&hash, 2)
+    .prev(&hash, 3)
     .build();
 
     assert_matches!(
@@ -425,7 +455,7 @@ async fn test_append_watermark_non_monotonic() {
             .watermark(Utc.with_ymd_and_hms(2020, 1, 1, 12, 0, 0).unwrap())
             .build(),
     )
-    .prev(&hash, 2)
+    .prev(&hash, 3)
     .build();
 
     chain.append(block, AppendOpts::default()).await.unwrap();
@@ -436,10 +466,24 @@ async fn test_append_add_data_empty_commit() {
     let tmp_dir = tempfile::tempdir().unwrap();
     let chain = init_chain(tmp_dir.path());
 
-    let block =
-        MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build()).build();
+    let hash: MultihashGeneric<32> = chain
+        .append(
+            MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build())
+                .build(),
+            AppendOpts::default(),
+        )
+        .await
+        .unwrap();
 
-    let hash = chain.append(block, AppendOpts::default()).await.unwrap();
+    let hash: MultihashGeneric<32> = chain
+        .append(
+            MetadataFactory::metadata_block(MetadataFactory::set_data_schema().build())
+                .prev(&hash, 0)
+                .build(),
+            AppendOpts::default(),
+        )
+        .await
+        .unwrap();
 
     let add_data = AddDataBuilder::empty()
         .some_output_data()
@@ -447,7 +491,7 @@ async fn test_append_add_data_empty_commit() {
         .some_output_watermark()
         .build();
     let block = MetadataFactory::metadata_block(add_data.clone())
-        .prev(&hash, 0)
+        .prev(&hash, 1)
         .build();
 
     let hash = chain.append(block, AppendOpts::default()).await.unwrap();
@@ -460,7 +504,7 @@ async fn test_append_add_data_empty_commit() {
             .source_state(add_data.source_state)
             .build(),
     )
-    .prev(&hash, 1)
+    .prev(&hash, 2)
     .build();
 
     assert_matches!(
@@ -476,10 +520,24 @@ async fn test_append_execute_query_empty_commit() {
     let tmp_dir = tempfile::tempdir().unwrap();
     let chain = init_chain(tmp_dir.path());
 
-    let block =
-        MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build()).build();
+    let hash: MultihashGeneric<32> = chain
+        .append(
+            MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build())
+                .build(),
+            AppendOpts::default(),
+        )
+        .await
+        .unwrap();
 
-    let hash = chain.append(block, AppendOpts::default()).await.unwrap();
+    let hash: MultihashGeneric<32> = chain
+        .append(
+            MetadataFactory::metadata_block(MetadataFactory::set_data_schema().build())
+                .prev(&hash, 0)
+                .build(),
+            AppendOpts::default(),
+        )
+        .await
+        .unwrap();
 
     let execute_query = MetadataFactory::execute_query()
         .some_output_data()
@@ -487,7 +545,7 @@ async fn test_append_execute_query_empty_commit() {
         .some_output_watermark()
         .build();
     let block = MetadataFactory::metadata_block(execute_query.clone())
-        .prev(&hash, 0)
+        .prev(&hash, 1)
         .build();
 
     let hash = chain.append(block, AppendOpts::default()).await.unwrap();
@@ -499,7 +557,7 @@ async fn test_append_execute_query_empty_commit() {
             .output_watermark(execute_query.output_watermark)
             .build(),
     )
-    .prev(&hash, 1)
+    .prev(&hash, 2)
     .build();
 
     assert_matches!(
@@ -524,17 +582,16 @@ async fn test_iter_blocks() {
         .await
         .unwrap();
 
-    let block_2 =
-        MetadataFactory::metadata_block(MetadataFactory::add_data().interval(0, 9).build())
-            .prev(&hash_1, block_1.sequence_number)
-            .build();
+    let block_2 = MetadataFactory::metadata_block(MetadataFactory::set_data_schema().build())
+        .prev(&hash_1, block_1.sequence_number)
+        .build();
     let hash_2 = chain
         .append(block_2.clone(), AppendOpts::default())
         .await
         .unwrap();
 
     let block_3 =
-        MetadataFactory::metadata_block(MetadataFactory::add_data().interval(10, 19).build())
+        MetadataFactory::metadata_block(MetadataFactory::add_data().interval(0, 9).build())
             .prev(&hash_2, block_2.sequence_number)
             .build();
     let hash_3 = chain
@@ -542,15 +599,25 @@ async fn test_iter_blocks() {
         .await
         .unwrap();
 
+    let block_4 =
+        MetadataFactory::metadata_block(MetadataFactory::add_data().interval(10, 19).build())
+            .prev(&hash_3, block_3.sequence_number)
+            .build();
+    let hash_4 = chain
+        .append(block_4.clone(), AppendOpts::default())
+        .await
+        .unwrap();
+
     // Full range
     let hashed_blocks: Result<Vec<_>, _> = chain
-        .iter_blocks_interval(&hash_3, None, false)
+        .iter_blocks_interval(&hash_4, None, false)
         .collect()
         .await;
 
     assert_eq!(
         hashed_blocks.unwrap(),
         [
+            (hash_4.clone(), block_4.clone()),
             (hash_3.clone(), block_3.clone()),
             (hash_2.clone(), block_2.clone()),
             (hash_1.clone(), block_1.clone())

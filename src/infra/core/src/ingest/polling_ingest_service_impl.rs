@@ -143,10 +143,10 @@ impl PollingIngestServiceImpl {
         let ctx = ingest_common::new_session_context(self.object_store_registry.clone());
 
         let mut data_writer = DataWriterDataFusion::builder(args.dataset.clone(), ctx.clone())
-            .with_metadata_state_scanned()
-            .await?
-            .build()
-            .await?;
+            .with_metadata_state_scanned(None)
+            .await
+            .int_err()?
+            .build();
 
         let mut iteration = 0;
         let mut combined_result = None;
@@ -652,80 +652,32 @@ impl PollingIngestServiceImpl {
         dataset_handle: DatasetHandle,
         dataset: Arc<dyn Dataset>,
     ) -> Result<engine::IngestRequest, InternalError> {
-        // TODO: PERF: Full metadata scan below - this is expensive and should be cached
-        let mut polling_source = None;
-        let mut prev_source_state = None;
-        let mut prev_data_slices = Vec::new();
-        let mut prev_checkpoint = None;
-        let mut prev_watermark = None;
-        let mut vocab = None;
-        let mut next_offset = None;
+        // Reusing builder's state projection logic
+        let writer_builder = DataWriterDataFusion::builder(dataset, SessionContext::new())
+            .with_metadata_state_scanned(None)
+            .await
+            .int_err()?;
 
-        {
-            use futures::stream::TryStreamExt;
-            let mut block_stream = dataset.as_metadata_chain().iter_blocks();
-            while let Some((_, block)) = block_stream.try_next().await.int_err()? {
-                match block.event {
-                    MetadataEvent::AddData(add_data) => {
-                        if let Some(output_data) = &add_data.output_data {
-                            prev_data_slices.push(output_data.physical_hash.clone());
-
-                            if next_offset.is_none() {
-                                next_offset = Some(output_data.interval.end + 1);
-                            }
-                        }
-                        if prev_checkpoint.is_none() {
-                            prev_checkpoint =
-                                Some(add_data.output_checkpoint.map(|cp| cp.physical_hash));
-                        }
-                        if prev_watermark.is_none() {
-                            prev_watermark = Some(add_data.output_watermark);
-                        }
-                        if prev_source_state.is_none() {
-                            // TODO: Should we check that this is polling source?
-                            prev_source_state = Some(add_data.source_state);
-                        }
-                    }
-                    MetadataEvent::SetWatermark(set_wm) => {
-                        if prev_watermark.is_none() {
-                            prev_watermark = Some(Some(set_wm.output_watermark));
-                        }
-                    }
-                    MetadataEvent::SetPollingSource(src) => {
-                        if polling_source.is_none() {
-                            polling_source = Some(src);
-                        }
-                    }
-                    MetadataEvent::SetVocab(set_vocab) => {
-                        vocab = Some(set_vocab.into());
-                    }
-                    MetadataEvent::Seed(_) => {
-                        if next_offset.is_none() {
-                            next_offset = Some(0);
-                        }
-                    }
-                    MetadataEvent::ExecuteQuery(_) => unreachable!(),
-                    MetadataEvent::SetAttachments(_)
-                    | MetadataEvent::SetInfo(_)
-                    | MetadataEvent::SetLicense(_)
-                    | MetadataEvent::SetTransform(_) => (),
-                }
-            }
-        }
+        let state = writer_builder.metadata_state().unwrap().clone();
 
         Ok(engine::IngestRequest {
             operation_id: "".to_string(), // TODO: Will be filled out by IngestTask
             dataset_handle,
-            polling_source: polling_source.unwrap(),
+            polling_source: state.source_event.unwrap().into_variant().unwrap(),
             system_time: self.time_source.now(),
             event_time: None, // TODO: Will be filled out by IngestTask
             input_data_path: PathBuf::new(), // TODO: Will be filled out by IngestTask
-            prev_data_slices,
-            next_offset: next_offset.unwrap_or_default(),
-            vocab: vocab.unwrap_or_default(),
-            prev_checkpoint: prev_checkpoint.unwrap_or_default(),
-            prev_watermark: prev_watermark.unwrap_or_default(),
-            prev_source_state: prev_source_state.clone().unwrap_or_default(),
+            prev_data_slices: state.data_slices,
+            schema: state.schema,
+            next_offset: state.last_offset.map(|off| off + 1).unwrap_or(0),
+            vocab: DatasetVocabulary {
+                offset_column: Some(state.vocab.offset_column.into_owned()),
+                system_time_column: Some(state.vocab.system_time_column.into_owned()),
+                event_time_column: Some(state.vocab.event_time_column.into_owned()),
+            },
+            prev_checkpoint: state.last_checkpoint,
+            prev_watermark: state.last_watermark,
+            prev_source_state: state.last_source_state,
         })
     }
 }

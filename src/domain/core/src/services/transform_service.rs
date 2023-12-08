@@ -105,6 +105,12 @@ pub enum TransformError {
         DatasetNotFoundError,
     ),
     #[error(transparent)]
+    TransformNotDefined(
+        #[from]
+        #[backtrace]
+        TransformNotDefinedError,
+    ),
+    #[error(transparent)]
     EngineProvisioningError(
         #[from]
         #[backtrace]
@@ -135,6 +141,10 @@ pub enum TransformError {
         InternalError,
     ),
 }
+
+#[derive(Debug, thiserror::Error)]
+#[error("Dataset does not define a transform")]
+pub struct TransformNotDefinedError {}
 
 impl From<GetDatasetError> for TransformError {
     fn from(v: GetDatasetError) -> Self {

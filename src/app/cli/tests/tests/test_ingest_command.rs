@@ -24,15 +24,8 @@ async fn test_push_ingest_from_file() {
     kamu.add_dataset(DatasetSnapshot {
         name: "population".try_into().unwrap(),
         kind: DatasetKind::Root,
-        // TODO: In future this will be replaced by AddPushSource event
-        metadata: vec![MetadataEvent::SetPollingSource(SetPollingSource {
-            fetch: FetchStep::Url(FetchStepUrl {
-                url: "http://localhost".to_string(),
-                event_time: None,
-                cache: None,
-                headers: None,
-            }),
-            prepare: None,
+        metadata: vec![AddPushSource {
+            source: "foo".to_string(),
             read: ReadStepNdJson {
                 schema: Some(vec![
                     "event_time TIMESTAMP".to_owned(),
@@ -42,21 +35,12 @@ async fn test_push_ingest_from_file() {
                 ..Default::default()
             }
             .into(),
-            // TODO: Temporary to force ingest to use new DataFusion engine
-            preprocess: Some(
-                TransformSql {
-                    engine: "datafusion".to_string(),
-                    query: Some("select * from input".to_string()),
-                    version: None,
-                    queries: None,
-                    temporal_tables: None,
-                }
-                .into(),
-            ),
+            preprocess: None,
             merge: MergeStrategy::Ledger(MergeStrategyLedger {
                 primary_key: vec!["event_time".to_owned(), "city".to_owned()],
             }),
-        })],
+        }
+        .into()],
     })
     .await
     .unwrap();

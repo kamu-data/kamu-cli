@@ -173,12 +173,16 @@ where
                         increment.seen_checkpoints_size += checkpoint.size as u64;
                     }
                 }
-                MetadataEvent::SetAttachments(_)
+                MetadataEvent::SetDataSchema(_)
+                | MetadataEvent::SetAttachments(_)
                 | MetadataEvent::SetInfo(_)
                 | MetadataEvent::SetLicense(_)
                 | MetadataEvent::SetWatermark(_)
                 | MetadataEvent::SetVocab(_)
-                | MetadataEvent::SetPollingSource(_) => (),
+                | MetadataEvent::SetPollingSource(_)
+                | MetadataEvent::DisablePollingSource(_)
+                | MetadataEvent::AddPushSource(_)
+                | MetadataEvent::DisablePushSource(_) => (),
             }
         }
 

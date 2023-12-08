@@ -25,6 +25,7 @@ async fn test_summary_updates() {
         Err(GetSummaryError::EmptyDataset)
     );
 
+    // ---
     let block_1 = MetadataFactory::metadata_block(
         MetadataFactory::seed(DatasetKind::Root)
             .id_from(b"foo")
@@ -52,19 +53,31 @@ async fn test_summary_updates() {
         }
     );
 
-    let block_2 = MetadataFactory::metadata_block(
+    // ---
+    let block_2 = MetadataFactory::metadata_block(MetadataFactory::set_data_schema().build())
+        .prev(&hash_1, block_1.sequence_number)
+        .build();
+
+    let hash_2 = ds
+        .as_metadata_chain()
+        .append(block_2.clone(), AppendOpts::default())
+        .await
+        .unwrap();
+
+    // ---
+    let block_3 = MetadataFactory::metadata_block(
         MetadataFactory::add_data()
             .interval(0, 9)
             .data_size(16)
             .checkpoint_size(10)
             .build(),
     )
-    .prev(&hash_1, block_1.sequence_number)
+    .prev(&hash_2, block_2.sequence_number)
     .build();
 
-    let hash_2 = ds
+    let hash_3 = ds
         .as_metadata_chain()
-        .append(block_2.clone(), AppendOpts::default())
+        .append(block_3.clone(), AppendOpts::default())
         .await
         .unwrap();
 
@@ -88,14 +101,15 @@ async fn test_summary_updates() {
         }
     );
 
+    // Get updated
     assert_eq!(
         ds.get_summary(GetSummaryOpts::default()).await.unwrap(),
         DatasetSummary {
             id: DatasetID::from_pub_key_ed25519(b"foo"),
             kind: DatasetKind::Root,
-            last_block_hash: hash_2.clone(),
+            last_block_hash: hash_3.clone(),
             dependencies: Vec::new(),
-            last_pulled: Some(block_2.system_time.clone()),
+            last_pulled: Some(block_3.system_time.clone()),
             num_records: 10,
             data_size: 16,
             checkpoints_size: 10,

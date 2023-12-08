@@ -12,6 +12,8 @@
 // See: http://opendatafabric.org/
 ///////////////////////////////////////////////////////////////////////////////
 
+#![allow(unused_variables)]
+
 use chrono::{DateTime, Utc};
 use opendatafabric as odf;
 
@@ -41,6 +43,30 @@ impl From<odf::AddData> for AddData {
             output_checkpoint: v.output_checkpoint.map(Into::into),
             output_watermark: v.output_watermark.map(Into::into),
             source_state: v.source_state.map(Into::into),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// AddPushSource
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#addpushsource-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
+pub struct AddPushSource {
+    pub source: String,
+    pub read: ReadStep,
+    pub preprocess: Option<Transform>,
+    pub merge: MergeStrategy,
+}
+
+impl From<odf::AddPushSource> for AddPushSource {
+    fn from(v: odf::AddPushSource) -> Self {
+        Self {
+            source: v.source.into(),
+            read: v.read.into(),
+            preprocess: v.preprocess.map(Into::into),
+            merge: v.merge.into(),
         }
     }
 }
@@ -234,6 +260,40 @@ impl From<odf::DatasetVocabulary> for DatasetVocabulary {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// DisablePollingSource
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#disablepollingsource-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
+pub struct DisablePollingSource {
+    pub _dummy: Option<String>,
+}
+
+impl From<odf::DisablePollingSource> for DisablePollingSource {
+    fn from(v: odf::DisablePollingSource) -> Self {
+        Self { _dummy: None }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// DisablePushSource
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#disablepushsource-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
+pub struct DisablePushSource {
+    pub source: String,
+}
+
+impl From<odf::DisablePushSource> for DisablePushSource {
+    fn from(v: odf::DisablePushSource) -> Self {
+        Self {
+            source: v.source.into(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // EnvVar
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#envvar-schema
 ////////////////////////////////////////////////////////////////////////////////
@@ -268,13 +328,9 @@ pub enum EventTimeSource {
 impl From<odf::EventTimeSource> for EventTimeSource {
     fn from(v: odf::EventTimeSource) -> Self {
         match v {
-            odf::EventTimeSource::FromMetadata => {
-                Self::FromMetadata(EventTimeSourceFromMetadata { _dummy: None })
-            }
+            odf::EventTimeSource::FromMetadata(v) => Self::FromMetadata(v.into()),
             odf::EventTimeSource::FromPath(v) => Self::FromPath(v.into()),
-            odf::EventTimeSource::FromSystemTime => {
-                Self::FromSystemTime(EventTimeSourceFromSystemTime { _dummy: None })
-            }
+            odf::EventTimeSource::FromSystemTime(v) => Self::FromSystemTime(v.into()),
         }
     }
 }
@@ -282,6 +338,12 @@ impl From<odf::EventTimeSource> for EventTimeSource {
 #[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct EventTimeSourceFromMetadata {
     pub _dummy: Option<String>,
+}
+
+impl From<odf::EventTimeSourceFromMetadata> for EventTimeSourceFromMetadata {
+    fn from(v: odf::EventTimeSourceFromMetadata) -> Self {
+        Self { _dummy: None }
+    }
 }
 
 #[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
@@ -302,6 +364,12 @@ impl From<odf::EventTimeSourceFromPath> for EventTimeSourceFromPath {
 #[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct EventTimeSourceFromSystemTime {
     pub _dummy: Option<String>,
+}
+
+impl From<odf::EventTimeSourceFromSystemTime> for EventTimeSourceFromSystemTime {
+    fn from(v: odf::EventTimeSourceFromSystemTime) -> Self {
+        Self { _dummy: None }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -412,9 +480,7 @@ pub enum ExecuteQueryResponse {
 impl From<odf::ExecuteQueryResponse> for ExecuteQueryResponse {
     fn from(v: odf::ExecuteQueryResponse) -> Self {
         match v {
-            odf::ExecuteQueryResponse::Progress => {
-                Self::Progress(ExecuteQueryResponseProgress { _dummy: None })
-            }
+            odf::ExecuteQueryResponse::Progress(v) => Self::Progress(v.into()),
             odf::ExecuteQueryResponse::Success(v) => Self::Success(v.into()),
             odf::ExecuteQueryResponse::InvalidQuery(v) => Self::InvalidQuery(v.into()),
             odf::ExecuteQueryResponse::InternalError(v) => Self::InternalError(v.into()),
@@ -425,6 +491,12 @@ impl From<odf::ExecuteQueryResponse> for ExecuteQueryResponse {
 #[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct ExecuteQueryResponseProgress {
     pub _dummy: Option<String>,
+}
+
+impl From<odf::ExecuteQueryResponseProgress> for ExecuteQueryResponseProgress {
+    fn from(v: odf::ExecuteQueryResponseProgress) -> Self {
+        Self { _dummy: None }
+    }
 }
 
 #[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
@@ -610,7 +682,7 @@ pub enum MergeStrategy {
 impl From<odf::MergeStrategy> for MergeStrategy {
     fn from(v: odf::MergeStrategy) -> Self {
         match v {
-            odf::MergeStrategy::Append => Self::Append(MergeStrategyAppend { _dummy: None }),
+            odf::MergeStrategy::Append(v) => Self::Append(v.into()),
             odf::MergeStrategy::Ledger(v) => Self::Ledger(v.into()),
             odf::MergeStrategy::Snapshot(v) => Self::Snapshot(v.into()),
         }
@@ -620,6 +692,12 @@ impl From<odf::MergeStrategy> for MergeStrategy {
 #[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct MergeStrategyAppend {
     pub _dummy: Option<String>,
+}
+
+impl From<odf::MergeStrategyAppend> for MergeStrategyAppend {
+    fn from(v: odf::MergeStrategyAppend) -> Self {
+        Self { _dummy: None }
+    }
 }
 
 #[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
@@ -701,6 +779,10 @@ pub enum MetadataEvent {
     SetAttachments(SetAttachments),
     SetInfo(SetInfo),
     SetLicense(SetLicense),
+    SetDataSchema(SetDataSchema),
+    AddPushSource(AddPushSource),
+    DisablePushSource(DisablePushSource),
+    DisablePollingSource(DisablePollingSource),
 }
 
 impl From<odf::MetadataEvent> for MetadataEvent {
@@ -716,6 +798,10 @@ impl From<odf::MetadataEvent> for MetadataEvent {
             odf::MetadataEvent::SetAttachments(v) => Self::SetAttachments(v.into()),
             odf::MetadataEvent::SetInfo(v) => Self::SetInfo(v.into()),
             odf::MetadataEvent::SetLicense(v) => Self::SetLicense(v.into()),
+            odf::MetadataEvent::SetDataSchema(v) => Self::SetDataSchema(v.into()),
+            odf::MetadataEvent::AddPushSource(v) => Self::AddPushSource(v.into()),
+            odf::MetadataEvent::DisablePushSource(v) => Self::DisablePushSource(v.into()),
+            odf::MetadataEvent::DisablePollingSource(v) => Self::DisablePollingSource(v.into()),
         }
     }
 }
@@ -1069,6 +1155,27 @@ impl From<odf::SetAttachments> for SetAttachments {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// SetDataSchema
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setdataschema-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
+pub struct SetDataSchema {
+    pub schema: DataSchema,
+}
+
+impl From<odf::SetDataSchema> for SetDataSchema {
+    fn from(v: odf::SetDataSchema) -> Self {
+        // TODO: Error handling?
+        // TODO: Externalize format decision?
+        let arrow_schema = v.schema_as_arrow().unwrap();
+        let schema =
+            DataSchema::from_arrow_schema(&arrow_schema, DataSchemaFormat::ParquetJson).unwrap();
+        Self { schema }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // SetInfo
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setinfo-schema
 ////////////////////////////////////////////////////////////////////////////////
@@ -1211,7 +1318,7 @@ pub enum SourceCaching {
 impl From<odf::SourceCaching> for SourceCaching {
     fn from(v: odf::SourceCaching) -> Self {
         match v {
-            odf::SourceCaching::Forever => Self::Forever(SourceCachingForever { _dummy: None }),
+            odf::SourceCaching::Forever(v) => Self::Forever(v.into()),
         }
     }
 }
@@ -1219,6 +1326,12 @@ impl From<odf::SourceCaching> for SourceCaching {
 #[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct SourceCachingForever {
     pub _dummy: Option<String>,
+}
+
+impl From<odf::SourceCachingForever> for SourceCachingForever {
+    fn from(v: odf::SourceCachingForever) -> Self {
+        Self { _dummy: None }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////

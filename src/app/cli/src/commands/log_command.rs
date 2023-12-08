@@ -177,6 +177,9 @@ impl AsciiRenderer {
         Ok(())
     }
 
+    // TODO: Replace this with a custom serde serializer - it will be both generic
+    // like yaml, but also will provide us more control over displaying certain
+    // parts of metadata
     fn render_block(
         &self,
         output: &mut impl Write,
@@ -194,6 +197,13 @@ impl AsciiRenderer {
         )?;
 
         match &block.event {
+            MetadataEvent::SetDataSchema(e @ SetDataSchema { schema: _ }) => {
+                let schema = e.schema_as_arrow().unwrap();
+                let schema_str = kamu_data_utils::schema::format::format_schema_arrow(&schema);
+
+                self.render_property(output, 0, "Kind", "SetDataSchema")?;
+                self.render_property(output, 0, "Schema", schema_str)?;
+            }
             MetadataEvent::AddData(AddData {
                 input_checkpoint,
                 output_data,
@@ -321,9 +331,31 @@ impl AsciiRenderer {
                 }
                 self.render_property(output, 0, "WebsiteURL", &e.website_url)?;
             }
-            MetadataEvent::SetPollingSource(_) => {
+            MetadataEvent::SetPollingSource(SetPollingSource {
+                fetch: _,
+                prepare: _,
+                read: _,
+                preprocess: _,
+                merge: _,
+            }) => {
                 self.render_property(output, 0, "Kind", "SetPollingSource")?;
                 self.render_property(output, 0, "Source", "...")?
+            }
+            MetadataEvent::DisablePollingSource(_) => {
+                self.render_property(output, 0, "Kind", "DisablePollingSource")?;
+            }
+            MetadataEvent::AddPushSource(AddPushSource {
+                source: _,
+                read: _,
+                preprocess: _,
+                merge: _,
+            }) => {
+                self.render_property(output, 0, "Kind", "AddPushSource")?;
+                self.render_property(output, 0, "Source", "...")?
+            }
+            MetadataEvent::DisablePushSource(DisablePushSource { source }) => {
+                self.render_property(output, 0, "Kind", "DisablePushSource")?;
+                self.render_property(output, 0, "Source", source)?
             }
             MetadataEvent::SetTransform(_) => {
                 self.render_property(output, 0, "Kind", &"SetTransform")?;
@@ -529,6 +561,7 @@ impl YamlRenderer {
         while let Some((hash, block)) = blocks.try_next().await? {
             buf.clear();
             writeln!(buf, "---")?;
+            writeln!(buf, "# Block: {}", hash)?;
             Self::render_block(&mut buf, &hash, &block)?;
             writeln!(buf)?;
 

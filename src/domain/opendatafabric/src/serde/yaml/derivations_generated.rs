@@ -18,7 +18,7 @@ use ::serde::{Deserialize, Deserializer, Serialize, Serializer};
 use chrono::{DateTime, Utc};
 use serde_with::{serde_as, skip_serializing_none};
 
-use super::formats::{datetime_rfc3339, datetime_rfc3339_opt};
+use super::formats::{base64, datetime_rfc3339, datetime_rfc3339_opt};
 use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -71,6 +71,29 @@ pub struct AddDataDef {
 }
 
 implement_serde_as!(AddData, AddDataDef, "AddDataDef");
+
+////////////////////////////////////////////////////////////////////////////////
+// AddPushSource
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#addpushsource-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[serde_as]
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "AddPushSource")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct AddPushSourceDef {
+    pub source: String,
+    #[serde_as(as = "ReadStepDef")]
+    pub read: ReadStep,
+    #[serde_as(as = "Option<TransformDef>")]
+    #[serde(default)]
+    pub preprocess: Option<Transform>,
+    #[serde_as(as = "MergeStrategyDef")]
+    pub merge: MergeStrategy,
+}
+
+implement_serde_as!(AddPushSource, AddPushSourceDef, "AddPushSourceDef");
 
 ////////////////////////////////////////////////////////////////////////////////
 // AttachmentEmbedded
@@ -236,6 +259,44 @@ implement_serde_as!(
 );
 
 ////////////////////////////////////////////////////////////////////////////////
+// DisablePollingSource
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#disablepollingsource-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[serde_as]
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "DisablePollingSource")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct DisablePollingSourceDef {}
+
+implement_serde_as!(
+    DisablePollingSource,
+    DisablePollingSourceDef,
+    "DisablePollingSourceDef"
+);
+
+////////////////////////////////////////////////////////////////////////////////
+// DisablePushSource
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#disablepushsource-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[serde_as]
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "DisablePushSource")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct DisablePushSourceDef {
+    pub source: String,
+}
+
+implement_serde_as!(
+    DisablePushSource,
+    DisablePushSourceDef,
+    "DisablePushSourceDef"
+);
+
+////////////////////////////////////////////////////////////////////////////////
 // EnvVar
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#envvar-schema
 ////////////////////////////////////////////////////////////////////////////////
@@ -263,19 +324,38 @@ implement_serde_as!(EnvVar, EnvVarDef, "EnvVarDef");
 #[serde(deny_unknown_fields, rename_all = "camelCase", tag = "kind")]
 pub enum EventTimeSourceDef {
     #[serde(rename_all = "camelCase")]
-    FromMetadata,
+    FromMetadata(#[serde_as(as = "EventTimeSourceFromMetadataDef")] EventTimeSourceFromMetadata),
     #[serde(rename_all = "camelCase")]
     FromPath(#[serde_as(as = "EventTimeSourceFromPathDef")] EventTimeSourceFromPath),
     #[serde(rename_all = "camelCase")]
-    FromSystemTime,
+    FromSystemTime(
+        #[serde_as(as = "EventTimeSourceFromSystemTimeDef")] EventTimeSourceFromSystemTime,
+    ),
 }
 
 implement_serde_as!(EventTimeSource, EventTimeSourceDef, "EventTimeSourceDef");
+implement_serde_as!(
+    EventTimeSourceFromMetadata,
+    EventTimeSourceFromMetadataDef,
+    "EventTimeSourceFromMetadataDef"
+);
+implement_serde_as!(
+    EventTimeSourceFromSystemTime,
+    EventTimeSourceFromSystemTimeDef,
+    "EventTimeSourceFromSystemTimeDef"
+);
 implement_serde_as!(
     EventTimeSourceFromPath,
     EventTimeSourceFromPathDef,
     "EventTimeSourceFromPathDef"
 );
+
+#[serde_as]
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "EventTimeSourceFromMetadata")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct EventTimeSourceFromMetadataDef {}
 
 #[serde_as]
 #[skip_serializing_none]
@@ -286,6 +366,13 @@ pub struct EventTimeSourceFromPathDef {
     pub pattern: String,
     pub timestamp_format: Option<String>,
 }
+
+#[serde_as]
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "EventTimeSourceFromSystemTime")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct EventTimeSourceFromSystemTimeDef {}
 
 ////////////////////////////////////////////////////////////////////////////////
 // ExecuteQuery
@@ -389,7 +476,7 @@ implement_serde_as!(
 #[serde(deny_unknown_fields, rename_all = "camelCase", tag = "kind")]
 pub enum ExecuteQueryResponseDef {
     #[serde(rename_all = "camelCase")]
-    Progress,
+    Progress(#[serde_as(as = "ExecuteQueryResponseProgressDef")] ExecuteQueryResponseProgress),
     #[serde(rename_all = "camelCase")]
     Success(#[serde_as(as = "ExecuteQueryResponseSuccessDef")] ExecuteQueryResponseSuccess),
     #[serde(rename_all = "camelCase")]
@@ -408,6 +495,11 @@ implement_serde_as!(
     "ExecuteQueryResponseDef"
 );
 implement_serde_as!(
+    ExecuteQueryResponseProgress,
+    ExecuteQueryResponseProgressDef,
+    "ExecuteQueryResponseProgressDef"
+);
+implement_serde_as!(
     ExecuteQueryResponseSuccess,
     ExecuteQueryResponseSuccessDef,
     "ExecuteQueryResponseSuccessDef"
@@ -422,6 +514,13 @@ implement_serde_as!(
     ExecuteQueryResponseInternalErrorDef,
     "ExecuteQueryResponseInternalErrorDef"
 );
+
+#[serde_as]
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "ExecuteQueryResponseProgress")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct ExecuteQueryResponseProgressDef {}
 
 #[serde_as]
 #[skip_serializing_none]
@@ -580,7 +679,7 @@ implement_serde_as!(InputSlice, InputSliceDef, "InputSliceDef");
 #[serde(deny_unknown_fields, rename_all = "camelCase", tag = "kind")]
 pub enum MergeStrategyDef {
     #[serde(rename_all = "camelCase")]
-    Append,
+    Append(#[serde_as(as = "MergeStrategyAppendDef")] MergeStrategyAppend),
     #[serde(rename_all = "camelCase")]
     Ledger(#[serde_as(as = "MergeStrategyLedgerDef")] MergeStrategyLedger),
     #[serde(rename_all = "camelCase")]
@@ -588,6 +687,11 @@ pub enum MergeStrategyDef {
 }
 
 implement_serde_as!(MergeStrategy, MergeStrategyDef, "MergeStrategyDef");
+implement_serde_as!(
+    MergeStrategyAppend,
+    MergeStrategyAppendDef,
+    "MergeStrategyAppendDef"
+);
 implement_serde_as!(
     MergeStrategyLedger,
     MergeStrategyLedgerDef,
@@ -598,6 +702,13 @@ implement_serde_as!(
     MergeStrategySnapshotDef,
     "MergeStrategySnapshotDef"
 );
+
+#[serde_as]
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "MergeStrategyAppend")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct MergeStrategyAppendDef {}
 
 #[serde_as]
 #[skip_serializing_none]
@@ -673,6 +784,14 @@ pub enum MetadataEventDef {
     SetInfo(#[serde_as(as = "SetInfoDef")] SetInfo),
     #[serde(rename_all = "camelCase")]
     SetLicense(#[serde_as(as = "SetLicenseDef")] SetLicense),
+    #[serde(rename_all = "camelCase")]
+    SetDataSchema(#[serde_as(as = "SetDataSchemaDef")] SetDataSchema),
+    #[serde(rename_all = "camelCase")]
+    AddPushSource(#[serde_as(as = "AddPushSourceDef")] AddPushSource),
+    #[serde(rename_all = "camelCase")]
+    DisablePushSource(#[serde_as(as = "DisablePushSourceDef")] DisablePushSource),
+    #[serde(rename_all = "camelCase")]
+    DisablePollingSource(#[serde_as(as = "DisablePollingSourceDef")] DisablePollingSource),
 }
 
 implement_serde_as!(MetadataEvent, MetadataEventDef, "MetadataEventDef");
@@ -959,6 +1078,23 @@ pub struct SetAttachmentsDef {
 implement_serde_as!(SetAttachments, SetAttachmentsDef, "SetAttachmentsDef");
 
 ////////////////////////////////////////////////////////////////////////////////
+// SetDataSchema
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setdataschema-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[serde_as]
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "SetDataSchema")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct SetDataSchemaDef {
+    #[serde(with = "base64")]
+    pub schema: Vec<u8>,
+}
+
+implement_serde_as!(SetDataSchema, SetDataSchemaDef, "SetDataSchemaDef");
+
+////////////////////////////////////////////////////////////////////////////////
 // SetInfo
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setinfo-schema
 ////////////////////////////////////////////////////////////////////////////////
@@ -1086,10 +1222,22 @@ implement_serde_as!(SetWatermark, SetWatermarkDef, "SetWatermarkDef");
 #[serde(deny_unknown_fields, rename_all = "camelCase", tag = "kind")]
 pub enum SourceCachingDef {
     #[serde(rename_all = "camelCase")]
-    Forever,
+    Forever(#[serde_as(as = "SourceCachingForeverDef")] SourceCachingForever),
 }
 
 implement_serde_as!(SourceCaching, SourceCachingDef, "SourceCachingDef");
+implement_serde_as!(
+    SourceCachingForever,
+    SourceCachingForeverDef,
+    "SourceCachingForeverDef"
+);
+
+#[serde_as]
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "SourceCachingForever")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct SourceCachingForeverDef {}
 
 ////////////////////////////////////////////////////////////////////////////////
 // SourceState

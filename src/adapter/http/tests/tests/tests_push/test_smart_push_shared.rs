@@ -33,7 +33,7 @@ pub(crate) async fn test_smart_push_new_dataset<TServerHarness: ServerSideHarnes
             SyncResult::Updated {
                 old_head: None,
                 new_head: scenario.client_commit_result.new_head,
-                num_blocks: 3
+                num_blocks: 4
             },
             push_result
         );
@@ -161,7 +161,7 @@ pub(crate) async fn test_smart_push_aborted_write_of_new_rewrite_succeeds<
             SyncResult::Updated {
                 old_head: None,
                 new_head: scenario.client_commit_result.new_head,
-                num_blocks: 3
+                num_blocks: 4
             },
             push_result
         );

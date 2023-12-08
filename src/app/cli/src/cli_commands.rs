@@ -119,6 +119,7 @@ pub fn get_command(
                 .get_many("file")
                 .unwrap_or_default()
                 .map(String::as_str),
+            submatches.get_one("source-name").map(String::as_str),
             submatches.get_flag("stdin"),
             submatches.get_flag("recursive"),
             submatches.get_one("input-format").map(String::as_str),

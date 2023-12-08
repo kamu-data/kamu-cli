@@ -16,12 +16,12 @@ use futures::{StreamExt, TryFutureExt, TryStreamExt};
 use kamu_core::engine::*;
 use kamu_core::*;
 use opendatafabric::*;
-use thiserror::Error;
 
 pub struct TransformServiceImpl {
     dataset_repo: Arc<dyn DatasetRepository>,
     dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
     engine_provisioner: Arc<dyn EngineProvisioner>,
+    time_source: Arc<dyn SystemTimeSource>,
 }
 
 #[component(pub)]
@@ -30,11 +30,13 @@ impl TransformServiceImpl {
         dataset_repo: Arc<dyn DatasetRepository>,
         dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
         engine_provisioner: Arc<dyn EngineProvisioner>,
+        time_source: Arc<dyn SystemTimeSource>,
     ) -> Self {
         Self {
             dataset_repo,
             dataset_action_authorizer,
             engine_provisioner,
+            time_source,
         }
     }
 
@@ -47,7 +49,7 @@ impl TransformServiceImpl {
         listener: Arc<dyn TransformListener>,
     ) -> Result<TransformResult, TransformError>
     where
-        CommitFn: FnOnce(ExecuteQueryParams, Option<OwnedFile>, Option<OwnedFile>) -> Fut,
+        CommitFn: FnOnce(TransformRequest, TransformResponse) -> Fut,
         Fut: futures::Future<Output = Result<TransformResult, TransformError>>,
     {
         tracing::info!(?request, "Transform request");
@@ -78,12 +80,9 @@ impl TransformServiceImpl {
         listener: Arc<dyn TransformListener>,
     ) -> Result<TransformResult, TransformError>
     where
-        CommitFn: FnOnce(ExecuteQueryParams, Option<OwnedFile>, Option<OwnedFile>) -> Fut,
+        CommitFn: FnOnce(TransformRequest, TransformResponse) -> Fut,
         Fut: futures::Future<Output = Result<TransformResult, TransformError>>,
     {
-        let input_checkpoint = request.prev_checkpoint.clone();
-        let input_slices = request.inputs.iter().map(|i| i.clone().into()).collect();
-
         let engine = engine_provisioner
             .provision_engine(
                 match request.transform {
@@ -93,23 +92,101 @@ impl TransformServiceImpl {
             )
             .await?;
 
-        let response = engine.transform(request).await?;
+        let response = engine.transform(request.clone()).await?;
         assert_eq!(
             response.data_interval.is_some(),
             response.out_data.is_some()
         );
 
-        commit_fn(
-            ExecuteQueryParams {
-                input_slices,
-                input_checkpoint,
-                output_data: response.data_interval,
-                output_watermark: response.output_watermark,
-            },
-            response.out_data,
-            response.out_checkpoint,
-        )
-        .await
+        commit_fn(request, response).await
+    }
+
+    async fn commit_execute_query(
+        dataset_repo: Arc<dyn DatasetRepository>,
+        mut request: TransformRequest,
+        response: TransformResponse,
+    ) -> Result<TransformResult, TransformError> {
+        use datafusion::parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
+
+        let old_head = request.head.clone();
+
+        let dataset = dataset_repo
+            .get_dataset(&request.dataset_handle.as_local_ref())
+            .await
+            .int_err()?;
+
+        // Read new schema
+        let new_schema = if let Some(out_data) = &response.out_data {
+            let file = std::fs::File::open(out_data.as_path()).int_err()?;
+            let schema = ParquetRecordBatchReaderBuilder::try_new(file)
+                .int_err()?
+                .schema()
+                .clone();
+            Some(schema)
+        } else {
+            None
+        };
+
+        if let Some(prev_schema) = request.schema {
+            // Validate schema
+            if let Some(new_schema) = new_schema {
+                if prev_schema != new_schema {
+                    return Err(BadInputSchemaError::new(
+                        "Schema of the new slice differs from the schema defined by SetDataSchema \
+                         event - this indicates a compatibility breakage in the engine output",
+                        new_schema.clone(),
+                    )
+                    .int_err()
+                    .into());
+                }
+            }
+        } else {
+            // Set schema upon first transform
+            if let Some(new_schema) = new_schema {
+                // TODO: make schema commit atomic with data
+                let commit_schema_result = dataset
+                    .commit_event(
+                        SetDataSchema::new(&new_schema).into(),
+                        CommitOpts {
+                            block_ref: &request.block_ref,
+                            system_time: Some(request.system_time),
+                            prev_block_hash: Some(Some(&request.head)),
+                            check_object_refs: false,
+                        },
+                    )
+                    .await?;
+
+                // Advance head
+                request.head = commit_schema_result.new_head;
+            }
+        }
+
+        let params = ExecuteQueryParams {
+            input_slices: request.inputs.iter().map(|i| i.clone().into()).collect(),
+            input_checkpoint: request.prev_checkpoint,
+            output_data: response.data_interval,
+            output_watermark: response.output_watermark,
+        };
+
+        let commit_result = dataset
+            .commit_execute_query(
+                params,
+                response.out_data,
+                response.out_checkpoint,
+                CommitOpts {
+                    block_ref: &request.block_ref,
+                    system_time: Some(request.system_time),
+                    prev_block_hash: Some(Some(&request.head)),
+                    check_object_refs: true,
+                },
+            )
+            .await?;
+
+        Ok(TransformResult::Updated {
+            old_head,
+            new_head: commit_result.new_head,
+            num_blocks: 1,
+        })
     }
 
     // TODO: PERF: Avoid multiple passes over metadata chain
@@ -118,37 +195,83 @@ impl TransformServiceImpl {
         &self,
         dataset_handle: &DatasetHandle,
         system_time: DateTime<Utc>,
-    ) -> Result<Option<TransformRequest>, GetNextOperationError> {
+    ) -> Result<Option<TransformRequest>, TransformError> {
         let dataset = self
             .dataset_repo
             .get_dataset(&dataset_handle.as_local_ref())
             .await
             .int_err()?;
+
         let output_chain = dataset.as_metadata_chain();
 
-        // TODO: limit traversal depth
-        let mut sources: Vec<_> = output_chain
-            .iter_blocks()
-            .try_filter_map(|(_, b)| async move {
-                match b.event {
-                    MetadataEvent::SetTransform(st) => Ok(Some(st)),
-                    MetadataEvent::SetPollingSource(_) => Err("Transform called on \
-                                                               non-derivative dataset"
-                        .int_err()
-                        .into()),
-                    _ => Ok(None),
-                }
-            })
-            .try_collect()
-            .await
-            .int_err()?;
+        // TODO: externalize
+        let block_ref = BlockRef::Head;
+        let head = output_chain.get_ref(&block_ref).await.int_err()?;
 
-        // TODO: source could've changed several times
-        if sources.len() > 1 {
-            unimplemented!("Transform evolution is not yet supported");
+        let mut source = None;
+        let mut schema = None;
+        let mut vocab = None;
+        let mut prev_checkpoint = None;
+        let mut last_offset = None;
+
+        // TODO: PERF: Search for source, vocab, and data schema result in full scan
+        {
+            let mut block_stream = output_chain.iter_blocks_interval(&head, None, false);
+            while let Some((_, block)) = block_stream.try_next().await.int_err()? {
+                match block.event {
+                    MetadataEvent::SetVocab(e) => {
+                        if vocab.is_none() {
+                            vocab = Some(e)
+                        }
+                    }
+                    MetadataEvent::SetTransform(e) => {
+                        if source.is_none() {
+                            source = Some(e);
+                        } else {
+                            unimplemented!("Transform evolution is not yet supported");
+                        }
+                    }
+                    MetadataEvent::SetDataSchema(e) => {
+                        if schema.is_none() {
+                            schema = Some(e.schema_as_arrow().int_err()?)
+                        }
+                    }
+                    MetadataEvent::ExecuteQuery(e) => {
+                        if prev_checkpoint.is_none() {
+                            prev_checkpoint = Some(e.output_checkpoint.map(|cp| cp.physical_hash));
+                        }
+                        if last_offset.is_none() {
+                            last_offset = e.output_data.map(|d| d.interval.end);
+                        }
+                    }
+                    MetadataEvent::Seed(_)
+                    | MetadataEvent::SetWatermark(_)
+                    | MetadataEvent::SetAttachments(_)
+                    | MetadataEvent::SetInfo(_)
+                    | MetadataEvent::SetLicense(_) => {}
+                    MetadataEvent::AddData(_)
+                    | MetadataEvent::SetPollingSource(_)
+                    | MetadataEvent::AddPushSource(_)
+                    | MetadataEvent::DisablePushSource(_)
+                    | MetadataEvent::DisablePollingSource(_) => {
+                        unreachable!()
+                    }
+                }
+
+                if source.is_some()
+                    && schema.is_some()
+                    && vocab.is_some()
+                    && prev_checkpoint.is_some()
+                    && last_offset.is_some()
+                {
+                    break;
+                }
+            }
         }
 
-        let source = sources.pop().unwrap();
+        let Some(source) = source else {
+            return Err(TransformNotDefinedError {}.into());
+        };
         tracing::debug!(?source, "Transforming using source");
 
         // Check if all inputs are non-empty
@@ -166,11 +289,7 @@ impl TransformServiceImpl {
         let inputs: Vec<_> = futures::stream::iter(&source.inputs)
             .then(|input| self.get_transform_input(input, output_chain))
             .try_collect()
-            .await
-            .map_err(|e| match e {
-                TransformInputError::Access(e) => GetNextOperationError::Access(e),
-                TransformInputError::Internal(e) => GetNextOperationError::Internal(e),
-            })?;
+            .await?;
 
         // Nothing to do?
         if inputs
@@ -180,35 +299,18 @@ impl TransformServiceImpl {
             return Ok(None);
         }
 
-        let vocab = self.get_vocab(&dataset_handle.as_local_ref()).await?;
-
-        let prev_checkpoint = output_chain
-            .iter_blocks()
-            .filter_map_ok(|(_, b)| b.event.into_variant::<ExecuteQuery>())
-            .try_first()
-            .await
-            .int_err()?
-            .and_then(|b| b.output_checkpoint)
-            .map(|cp| cp.physical_hash);
-
-        let last_offset = output_chain
-            .iter_blocks()
-            .filter_map_ok(|(_, b)| b.event.into_variant::<ExecuteQuery>())
-            .filter_map_ok(|eq| eq.output_data)
-            .map_ok(|s| s.interval.end)
-            .try_first()
-            .await
-            .int_err()?;
-
         Ok(Some(TransformRequest {
             operation_id: self.next_operation_id(),
             dataset_handle: dataset_handle.clone(),
+            block_ref,
+            head,
             transform: source.transform,
             system_time,
+            schema,
             next_offset: last_offset.map(|v| v + 1).unwrap_or(0),
-            vocab,
+            vocab: vocab.unwrap_or_default().into(),
             inputs,
-            prev_checkpoint,
+            prev_checkpoint: prev_checkpoint.unwrap_or(None),
         }))
     }
 
@@ -240,12 +342,12 @@ impl TransformServiceImpl {
             .is_none())
     }
 
-    // TODO: Avoid iterating through output chain multiple times
+    // TODO: PERF: Avoid iterating through output chain multiple times
     async fn get_transform_input(
         &self,
         transform_input: &TransformInput,
         output_chain: &dyn MetadataChain,
-    ) -> Result<TransformRequestInput, TransformInputError> {
+    ) -> Result<TransformRequestInput, TransformError> {
         let dataset_id = transform_input.id.as_ref().unwrap();
         let dataset_handle = self
             .dataset_repo
@@ -344,7 +446,7 @@ impl TransformServiceImpl {
         alias: String,
         blocks_hint: Option<Vec<(Multihash, MetadataBlock)>>,
         vocab_hint: Option<DatasetVocabulary>,
-    ) -> Result<TransformRequestInput, TransformInputError> {
+    ) -> Result<TransformRequestInput, TransformError> {
         let dataset_handle = self
             .dataset_repo
             .resolve_dataset_ref(&input_slice.dataset_id.as_local_ref())
@@ -481,13 +583,14 @@ impl TransformServiceImpl {
 
         let mut source = None;
         let mut vocab = None;
+        let mut schema = None;
         let mut blocks = Vec::new();
         let mut finished_range = false;
 
         {
             let mut block_stream = metadata_chain.iter_blocks_interval(&head, None, false);
 
-            // TODO: This can be simplified
+            // TODO: PERF: Search for source, vocab, and data schema result in full scan
             while let Some((block_hash, block)) = block_stream.try_next().await? {
                 match block.event {
                     MetadataEvent::SetTransform(st) => {
@@ -505,12 +608,21 @@ impl TransformServiceImpl {
                             vocab = Some(sv.into())
                         }
                     }
+                    MetadataEvent::SetDataSchema(e) => {
+                        if schema.is_none() {
+                            schema = Some(e.schema_as_arrow().int_err()?)
+                        }
+                    }
                     MetadataEvent::ExecuteQuery(_) => {
                         if !finished_range {
                             blocks.push((block_hash.clone(), block));
                         }
                     }
-                    MetadataEvent::AddData(_) | MetadataEvent::SetPollingSource(_) => {
+                    MetadataEvent::AddData(_)
+                    | MetadataEvent::SetPollingSource(_)
+                    | MetadataEvent::DisablePollingSource(_)
+                    | MetadataEvent::AddPushSource(_)
+                    | MetadataEvent::DisablePushSource(_) => {
                         unreachable!()
                     }
                     MetadataEvent::Seed(_)
@@ -584,23 +696,28 @@ impl TransformServiceImpl {
                 .try_collect()
                 .await
                 .map_err(|e| match e {
-                    TransformInputError::Access(e) => VerificationError::Access(e),
-                    TransformInputError::Internal(e) => VerificationError::Internal(e),
+                    TransformError::Access(e) => VerificationError::Access(e),
+                    TransformError::Internal(e) => VerificationError::Internal(e),
+                    _ => VerificationError::Internal(e.int_err()),
                 })?;
 
             let step = VerificationStep {
                 request: TransformRequest {
                     operation_id: self.next_operation_id(),
                     dataset_handle: dataset_handle.clone(),
+                    block_ref: BlockRef::Head,
+                    head: block_t.prev_block_hash.unwrap().clone(),
                     transform: source.transform.clone(),
                     system_time: block.system_time,
+                    schema: schema.clone(),
                     next_offset: block_t
                         .event
                         .output_data
                         .as_ref()
                         .map(|s| s.interval.start)
-                        .unwrap_or(0), /* TODO: Assuming offset does not matter if block is
-                                        * not supposed to produce data */
+                        // TODO: Assuming offset does not matter if block is not supposed to produce
+                        // data
+                        .unwrap_or(0),
                     inputs,
                     vocab: vocab.clone().unwrap_or_default(),
                     prev_checkpoint: block_t.event.input_checkpoint.clone(),
@@ -631,45 +748,16 @@ impl TransformServiceImpl {
         // TODO: There might be more operations to do
         // TODO: Inject time source
         let next_operation = self
-            .get_next_operation(&dataset_handle, Utc::now())
-            .await
-            .map_err(|e| match e {
-                GetNextOperationError::Access(e) => TransformError::Access(e),
-                GetNextOperationError::Internal(e) => TransformError::Internal(e),
-            })?;
+            .get_next_operation(&dataset_handle, self.time_source.now())
+            .await?;
+
         if let Some(operation) = next_operation {
-            let dataset = self
-                .dataset_repo
-                .get_dataset(&dataset_handle.as_local_ref())
-                .await?;
-            let meta_chain = dataset.as_metadata_chain();
-
-            let system_time = operation.system_time.clone();
-            let head = meta_chain.get_ref(&BlockRef::Head).await.int_err()?;
-
+            let dataset_repo = self.dataset_repo.clone();
             Self::do_transform(
                 self.engine_provisioner.clone(),
                 operation,
-                move |execute_query, new_data, new_checkpoint| async move {
-                    let commit_result = dataset
-                        .commit_execute_query(
-                            execute_query,
-                            new_data,
-                            new_checkpoint,
-                            CommitOpts {
-                                block_ref: &BlockRef::Head,
-                                system_time: Some(system_time),
-                                prev_block_hash: Some(Some(&head)),
-                                check_object_refs: true,
-                            },
-                        )
-                        .await?;
-
-                    Ok(TransformResult::Updated {
-                        old_head: commit_result.old_head.unwrap(),
-                        new_head: commit_result.new_head,
-                        num_blocks: 1,
-                    })
+                |request, response| async move {
+                    Self::commit_execute_query(dataset_repo, request, response).await
                 },
                 listener,
             )
@@ -786,10 +874,21 @@ impl TransformService for TransformServiceImpl {
             Self::do_transform(
                 self.engine_provisioner.clone(),
                 request,
-                |execute_query, data, checkpoint| async move {
-                    // We commit and expect outputs to be cleaned up automatically on drop
+                |request, response| async move {
+                    let params = ExecuteQueryParams {
+                        input_slices: request.inputs.iter().map(|i| i.clone().into()).collect(),
+                        input_checkpoint: request.prev_checkpoint,
+                        output_data: response.data_interval,
+                        output_watermark: response.output_watermark,
+                    };
+
+                    // We expect outputs to be cleaned up automatically on drop
                     let new_event = ds
-                        .prepare_execute_query(execute_query, data.as_ref(), checkpoint.as_ref())
+                        .prepare_execute_query(
+                            params,
+                            response.out_data.as_ref(),
+                            response.out_checkpoint.as_ref(),
+                        )
                         .await?;
 
                     *out_event = Some(new_event);
@@ -862,51 +961,6 @@ pub struct VerificationStep {
     pub request: TransformRequest,
     pub expected_block: MetadataBlock,
     pub expected_hash: Multihash,
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Error)]
-pub enum GetNextOperationError {
-    #[error(transparent)]
-    Access(
-        #[from]
-        #[backtrace]
-        AccessError,
-    ),
-    #[error(transparent)]
-    Internal(
-        #[from]
-        #[backtrace]
-        InternalError,
-    ),
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Error)]
-enum TransformInputError {
-    #[error(transparent)]
-    Access(
-        #[from]
-        #[backtrace]
-        AccessError,
-    ),
-    #[error(transparent)]
-    Internal(
-        #[from]
-        #[backtrace]
-        InternalError,
-    ),
-}
-
-impl From<auth::DatasetActionUnauthorizedError> for TransformInputError {
-    fn from(v: auth::DatasetActionUnauthorizedError) -> Self {
-        match v {
-            auth::DatasetActionUnauthorizedError::Access(e) => Self::Access(e),
-            auth::DatasetActionUnauthorizedError::Internal(e) => Self::Internal(e),
-        }
-    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

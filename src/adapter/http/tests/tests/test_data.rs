@@ -57,15 +57,8 @@ async fn test_data_push_ingest_handler() {
             DatasetSnapshot {
                 name: "population".try_into().unwrap(),
                 kind: DatasetKind::Root,
-                // TODO: In future this will be replaced by AddPushSource event
-                metadata: vec![MetadataEvent::SetPollingSource(SetPollingSource {
-                    fetch: FetchStep::Url(FetchStepUrl {
-                        url: "http://localhost".to_string(),
-                        event_time: None,
-                        cache: None,
-                        headers: None,
-                    }),
-                    prepare: None,
+                metadata: vec![AddPushSource {
+                    source: "device1".to_string(),
                     read: ReadStepNdJson {
                         schema: Some(vec![
                             "event_time TIMESTAMP".to_owned(),
@@ -75,21 +68,12 @@ async fn test_data_push_ingest_handler() {
                         ..Default::default()
                     }
                     .into(),
-                    // TODO: Temporary to force ingest to use new DataFusion engine
-                    preprocess: Some(
-                        TransformSql {
-                            engine: "datafusion".to_string(),
-                            query: Some("select * from input".to_string()),
-                            version: None,
-                            queries: None,
-                            temporal_tables: None,
-                        }
-                        .into(),
-                    ),
+                    preprocess: None,
                     merge: MergeStrategy::Ledger(MergeStrategyLedger {
                         primary_key: vec!["event_time".to_owned(), "city".to_owned()],
                     }),
-                })],
+                }
+                .into()],
             },
         )
         .await
@@ -99,13 +83,15 @@ async fn test_data_push_ingest_handler() {
         server_harness.dataset_url_with_scheme(&create_result.dataset_handle.alias, "http");
 
     let client = async move {
+        let cl: reqwest::Client = reqwest::Client::new();
+        let dataset_helper = DatasetDataHelper::new(create_result.dataset);
         let ingest_url = format!("{}/ingest", dataset_url);
         tracing::info!(%ingest_url, "Client request");
 
-        let cl = reqwest::Client::new();
+        // OK - default push source
         let res = cl
             .execute(
-                cl.post(ingest_url)
+                cl.post(&ingest_url)
                     .json(&json!(
                         [
                             {
@@ -127,7 +113,7 @@ async fn test_data_push_ingest_handler() {
             .unwrap();
         assert_eq!(res.status(), http::StatusCode::OK);
 
-        DatasetDataHelper::new(create_result.dataset)
+        dataset_helper
             .assert_last_data_eq(
                 indoc!(
                     r#"
@@ -147,6 +133,111 @@ async fn test_data_push_ingest_handler() {
                     +--------+----------------------+----------------------+------+------------+
                     | 0      | 2050-01-01T12:00:00Z | 2020-01-01T00:00:00Z | A    | 100        |
                     | 1      | 2050-01-01T12:00:00Z | 2020-01-02T00:00:00Z | B    | 200        |
+                    +--------+----------------------+----------------------+------+------------+
+                    "#
+                ),
+            )
+            .await;
+
+        // OK - explicit source
+        let res = cl
+            .execute(
+                cl.post(&ingest_url)
+                    .query(&[("source", "device1")])
+                    .json(&json!(
+                        [
+                            {
+                                "event_time": "2020-01-03T00:00:00",
+                                "city": "C",
+                                "population": 300,
+                            }
+                        ]
+                    ))
+                    .build()
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), http::StatusCode::OK);
+
+        dataset_helper
+            .assert_last_data_eq(
+                indoc!(
+                    r#"
+                    message arrow_schema {
+                      OPTIONAL INT64 offset;
+                      REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
+                      OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
+                      OPTIONAL BYTE_ARRAY city (STRING);
+                      OPTIONAL INT64 population;
+                    }
+                   "#
+                ),
+                indoc!(
+                    r#"
+                    +--------+----------------------+----------------------+------+------------+
+                    | offset | system_time          | event_time           | city | population |
+                    +--------+----------------------+----------------------+------+------------+
+                    | 2      | 2050-01-01T12:00:00Z | 2020-01-03T00:00:00Z | C    | 300        |
+                    +--------+----------------------+----------------------+------+------------+
+                    "#
+                ),
+            )
+            .await;
+
+        // ERR - invalid source
+        let res = cl
+            .execute(
+                cl.post(&ingest_url)
+                    .query(&[("source", "device2")])
+                    .json(&json!(
+                        [
+                            {
+                                "event_time": "2020-01-04T00:00:00",
+                                "city": "D",
+                                "population": 400,
+                            }
+                        ]
+                    ))
+                    .build()
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), http::StatusCode::BAD_REQUEST);
+
+        // OK - transcoding from CSV
+        let res = cl
+            .execute(
+                cl.post(&ingest_url)
+                    .header("Content-Type", "text/csv")
+                    .body("2020-01-04T00:00:00,D,400")
+                    .build()
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), http::StatusCode::OK);
+
+        dataset_helper
+            .assert_last_data_eq(
+                indoc!(
+                    r#"
+                    message arrow_schema {
+                      OPTIONAL INT64 offset;
+                      REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
+                      OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
+                      OPTIONAL BYTE_ARRAY city (STRING);
+                      OPTIONAL INT64 population;
+                    }
+                   "#
+                ),
+                indoc!(
+                    r#"
+                    +--------+----------------------+----------------------+------+------------+
+                    | offset | system_time          | event_time           | city | population |
+                    +--------+----------------------+----------------------+------+------------+
+                    | 3      | 2050-01-01T12:00:00Z | 2020-01-04T00:00:00Z | D    | 400        |
                     +--------+----------------------+----------------------+------+------------+
                     "#
                 ),

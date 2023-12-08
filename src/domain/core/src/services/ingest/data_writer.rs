@@ -11,6 +11,7 @@ use std::backtrace::Backtrace;
 use std::path::PathBuf;
 
 use chrono::{DateTime, Utc};
+use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::prelude::*;
 use internal_error::*;
 use opendatafabric as odf;
@@ -25,6 +26,10 @@ use crate::{AddDataParams, CommitError, OwnedFile};
 /// to commit data into a dataset in bitemporal ledger form.
 #[async_trait::async_trait]
 pub trait DataWriter {
+    /// Returns final output schema of a data slice writer will be appending to
+    /// the dataset, if schema was previously defined.
+    async fn output_schema(&self) -> Option<SchemaRef>;
+
     // TODO: Avoid using Option<> and create empty DataFrame instead.
     // This would require us always knowing what the schema of data is (e.g. before
     // the first ingest run).
@@ -72,10 +77,12 @@ pub struct WriteDataResult {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+/// Do not create directly, only use with [DataWriter::stage].
 #[derive(Debug)]
 pub struct StageDataResult {
     pub system_time: DateTime<Utc>,
     pub add_data: AddDataParams,
+    pub output_schema: Option<SchemaRef>,
     pub data_file: Option<OwnedFile>,
 }
 
@@ -130,18 +137,33 @@ pub enum StageDataError {
 ///////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, thiserror::Error)]
-#[error("Bad input schema: {message}")]
 pub struct BadInputSchemaError {
+    schema: SchemaRef,
     message: String,
     backtrace: Backtrace,
 }
 
 impl BadInputSchemaError {
-    pub fn new(message: impl Into<String>) -> Self {
+    pub fn new(message: impl Into<String>, schema: SchemaRef) -> Self {
         Self {
+            schema,
             message: message.into(),
             backtrace: Backtrace::capture(),
         }
+    }
+}
+
+impl std::fmt::Display for BadInputSchemaError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "Bad input schema: {}", self.message)?;
+        let parquet_schema =
+            datafusion::parquet::arrow::arrow_to_parquet_schema(&self.schema).unwrap();
+
+        let mut buf = Vec::new();
+        datafusion::parquet::schema::printer::print_schema(&mut buf, parquet_schema.root_schema());
+        let schema = String::from_utf8(buf).unwrap();
+
+        writeln!(f, "{}", schema)
     }
 }
 

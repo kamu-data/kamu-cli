@@ -48,6 +48,7 @@ impl TransformTestHarness {
             dataset_repo.clone(),
             dataset_action_authorizer.clone(),
             engine_provisioner,
+            Arc::new(SystemTimeSourceDefault),
         );
 
         Self {
@@ -69,7 +70,7 @@ impl TransformTestHarness {
         let snap = MetadataFactory::dataset_snapshot()
             .name(name)
             .kind(DatasetKind::Root)
-            .push_event(MetadataFactory::set_polling_source().build())
+            .push_event(MetadataFactory::set_data_schema().build())
             .build();
 
         let create_result = self
@@ -92,6 +93,7 @@ impl TransformTestHarness {
             .name(name)
             .kind(DatasetKind::Derivative)
             .push_event(transform.clone())
+            .push_event(MetadataFactory::set_data_schema().build())
             .build();
 
         let create_result = self
@@ -293,10 +295,10 @@ async fn test_get_verification_plan_one_to_one() {
         .unwrap();
 
     let root_head_seed = root_create_result.head;
-    let root_head_src = root_create_result
+    let root_head_schema = root_create_result
         .dataset
         .commit_event(
-            MetadataEvent::SetPollingSource(MetadataFactory::set_polling_source().build()),
+            MetadataFactory::set_data_schema().build().into(),
             CommitOpts {
                 system_time: Some(t0),
                 ..CommitOpts::default()
@@ -326,14 +328,26 @@ async fn test_get_verification_plan_one_to_one() {
         .await
         .unwrap();
 
-    let deriv_head_src = deriv_create_result
+    deriv_create_result
         .dataset
         .commit_event(
-            MetadataEvent::SetTransform(
-                MetadataFactory::set_transform([&root_alias.dataset_name])
-                    .input_ids_from_names()
-                    .build(),
-            ),
+            MetadataFactory::set_transform([&root_alias.dataset_name])
+                .input_ids_from_names()
+                .build()
+                .into(),
+            CommitOpts {
+                system_time: Some(t0),
+                ..CommitOpts::default()
+            },
+        )
+        .await
+        .unwrap()
+        .new_head;
+
+    let deriv_head_schema = deriv_create_result
+        .dataset
+        .commit_event(
+            MetadataFactory::set_data_schema().build().into(),
             CommitOpts {
                 system_time: Some(t0),
                 ..CommitOpts::default()
@@ -344,7 +358,7 @@ async fn test_get_verification_plan_one_to_one() {
         .new_head;
 
     let deriv_hdl = deriv_create_result.dataset_handle;
-    let deriv_initial_sequence_number = 1;
+    let deriv_initial_sequence_number = 2;
 
     // T1: Root data added
     let t1 = Utc.with_ymd_and_hms(2020, 1, 1, 12, 0, 0).unwrap();
@@ -364,7 +378,7 @@ async fn test_get_verification_plan_one_to_one() {
                 source_state: None,
             })
             .system_time(t1)
-            .prev(&root_head_src, root_initial_sequence_number)
+            .prev(&root_head_schema, root_initial_sequence_number)
             .build(),
         )
         .await;
@@ -410,7 +424,7 @@ async fn test_get_verification_plan_one_to_one() {
                 output_watermark: Some(t0),
             })
             .system_time(t2)
-            .prev(&deriv_head_src, deriv_initial_sequence_number)
+            .prev(&deriv_head_schema, deriv_initial_sequence_number)
             .build(),
         )
         .await;

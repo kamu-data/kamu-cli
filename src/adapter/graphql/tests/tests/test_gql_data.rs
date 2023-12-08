@@ -55,15 +55,28 @@ async fn create_test_dataset(catalog: &dill::Catalog, tempdir: &Path) {
         .unwrap()
         .dataset;
 
-    let tmp_data_path = tempdir.join("data");
     let schema = Arc::new(Schema::new(vec![
         Field::new("offset", DataType::UInt64, false),
         Field::new("blah", DataType::Utf8, false),
     ]));
+
+    dataset
+        .commit_event(
+            MetadataFactory::set_data_schema()
+                .schema(&schema)
+                .build()
+                .into(),
+            CommitOpts::default(),
+        )
+        .await
+        .unwrap();
+
     let a: Arc<dyn Array> = Arc::new(UInt64Array::from(vec![0, 1, 2]));
     let b: Arc<dyn Array> = Arc::new(StringArray::from(vec!["a", "b", "c"]));
     let record_batch =
         RecordBatch::try_new(Arc::clone(&schema), vec![Arc::clone(&a), Arc::clone(&b)]).unwrap();
+
+    let tmp_data_path = tempdir.join("data");
     ParquetWriterHelper::from_record_batch(&tmp_data_path, &record_batch).unwrap();
 
     dataset

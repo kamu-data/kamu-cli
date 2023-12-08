@@ -34,7 +34,15 @@ async fn init_v0_workspace(workspace_path: &Path) {
     // Metadata & refs
     dataset
         .commit_event(
-            MetadataEvent::Seed(MetadataFactory::seed(DatasetKind::Root).build()),
+            MetadataFactory::seed(DatasetKind::Root).build().into(),
+            CommitOpts::default(),
+        )
+        .await
+        .unwrap();
+
+    dataset
+        .commit_event(
+            MetadataFactory::set_data_schema().build().into(),
             CommitOpts::default(),
         )
         .await

@@ -204,7 +204,7 @@ async fn do_test_sync(
     let snapshot = MetadataFactory::dataset_snapshot()
         .name(&dataset_alias.dataset_name)
         .kind(DatasetKind::Root)
-        .push_event(MetadataFactory::set_polling_source().build())
+        .push_event(MetadataFactory::set_data_schema().build())
         .build();
 
     let b1 = dataset_repo

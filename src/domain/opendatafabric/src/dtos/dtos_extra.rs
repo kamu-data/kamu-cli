@@ -22,9 +22,19 @@ impl DatasetVocabulary {
     }
 }
 
+impl Default for SetVocab {
+    fn default() -> Self {
+        Self {
+            offset_column: None,
+            system_time_column: None,
+            event_time_column: None,
+        }
+    }
+}
+
 impl Default for DatasetVocabulary {
     fn default() -> Self {
-        DatasetVocabulary {
+        Self {
             offset_column: None,
             system_time_column: None,
             event_time_column: None,
@@ -44,6 +54,7 @@ impl From<SetVocab> for DatasetVocabulary {
 
 ////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DatasetVocabularyResolved<'a> {
     /// Name of the system time column.
     pub system_time_column: Cow<'a, str>,
@@ -301,5 +312,26 @@ impl Display for ExecuteQueryResponseInternalError {
             write!(f, "\n\n--- Engine Backtrace ---\n{}", bt)?;
         }
         Ok(())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// SetDataSchema
+////////////////////////////////////////////////////////////////////////////////
+
+impl SetDataSchema {
+    #[cfg(feature = "arrow")]
+    pub fn new(schema: &arrow::datatypes::Schema) -> Self {
+        let (mut buf, head) = arrow::ipc::convert::schema_to_fb(schema).collapse();
+        buf.drain(0..head);
+        Self { schema: buf }
+    }
+
+    #[cfg(feature = "arrow")]
+    pub fn schema_as_arrow(&self) -> Result<arrow::datatypes::SchemaRef, crate::serde::Error> {
+        let schema_proxy = flatbuffers::root::<arrow::ipc::gen::Schema::Schema>(&self.schema)
+            .map_err(|e| crate::serde::Error::serde(e))?;
+        let schema = arrow::ipc::convert::fb_to_schema(schema_proxy);
+        Ok(arrow::datatypes::SchemaRef::new(schema))
     }
 }

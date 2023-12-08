@@ -57,6 +57,7 @@ impl PushIngestServiceImpl {
     async fn do_ingest(
         &self,
         dataset_ref: &DatasetRef,
+        source_name: Option<&str>,
         source: DataSource,
         media_type: Option<MediaType>,
         listener: Arc<dyn PushIngestListener>,
@@ -72,31 +73,30 @@ impl PushIngestServiceImpl {
             .get_dataset(&dataset_handle.as_local_ref())
             .await?;
 
-        // TODO: Temporarily relying on SetPollingSource event
-        let Some(polling_source) = dataset
-            .as_metadata_chain()
-            .last_of_type::<SetPollingSource>()
-            .await
-            .int_err()?
-            .map(|(_, b)| b.event)
-        else {
-            let err = PushIngestError::SourceNotFound(PushSourceNotFoundError);
-            listener.begin();
-            listener.error(&err);
-            return Err(err);
-        };
-
         let operation_id = ingest_common::next_operation_id();
         let operation_dir = self.run_info_dir.join(format!("ingest-{}", operation_id));
         std::fs::create_dir_all(&operation_dir).int_err()?;
 
         let ctx: SessionContext =
             ingest_common::new_session_context(self.object_store_registry.clone());
-        let data_writer = DataWriterDataFusion::builder(dataset.clone(), ctx.clone())
-            .with_metadata_state_scanned()
-            .await?
-            .build()
-            .await?;
+
+        let data_writer = match DataWriterDataFusion::builder(dataset.clone(), ctx.clone())
+            .with_metadata_state_scanned(source_name)
+            .await
+        {
+            Ok(b) => Ok(b.build()),
+            Err(ScanMetadataError::SourceNotFound(err)) => {
+                Err(PushIngestError::SourceNotFound(err.into()))
+            }
+            Err(ScanMetadataError::Internal(err)) => Err(PushIngestError::Internal(err)),
+        }?;
+
+        let push_source = match data_writer.source_event() {
+            Some(MetadataEvent::AddPushSource(e)) => Ok(e.clone()),
+            _ => Err(PushIngestError::SourceNotFound(
+                PushSourceNotFoundError::new(source_name),
+            )),
+        }?;
 
         let args = PushIngestArgs {
             operation_id,
@@ -106,7 +106,7 @@ impl PushIngestServiceImpl {
             listener,
             ctx,
             data_writer,
-            polling_source,
+            push_source,
         };
 
         let listener = args.listener.clone();
@@ -144,7 +144,7 @@ impl PushIngestServiceImpl {
         let input_data_path = self.maybe_fetch(source, &args).await?;
 
         let df = if let Some(df) = self.read(&input_data_path, &args).await? {
-            if let Some(transform) = args.polling_source.preprocess.clone() {
+            if let Some(transform) = args.push_source.preprocess.clone() {
                 Some(ingest_common::preprocess(&args.ctx, transform, df).await?)
             } else {
                 Some(df)
@@ -261,7 +261,7 @@ impl PushIngestServiceImpl {
         let conf = if let Some(media_type) = &args.media_type {
             let conf = self
                 .data_format_registry
-                .get_compatible_read_config(args.polling_source.read.clone(), media_type)?;
+                .get_compatible_read_config(args.push_source.read.clone(), media_type)?;
 
             tracing::debug!(
                 ?conf,
@@ -269,7 +269,7 @@ impl PushIngestServiceImpl {
             );
             conf
         } else {
-            args.polling_source.read.clone()
+            args.push_source.read.clone()
         };
 
         let temp_path = args.operation_dir.join("reader.tmp");
@@ -319,28 +319,42 @@ impl PushIngestService for PushIngestServiceImpl {
     async fn ingest_from_url(
         &self,
         dataset_ref: &DatasetRef,
+        source_name: Option<&str>,
         url: url::Url,
         media_type: Option<MediaType>,
         listener: Option<Arc<dyn PushIngestListener>>,
     ) -> Result<PushIngestResult, PushIngestError> {
         let listener = listener.unwrap_or_else(|| Arc::new(NullPushIngestListener));
 
-        self.do_ingest(dataset_ref, DataSource::Url(url), media_type, listener)
-            .await
+        self.do_ingest(
+            dataset_ref,
+            source_name,
+            DataSource::Url(url),
+            media_type,
+            listener,
+        )
+        .await
     }
 
     #[tracing::instrument(level = "info", skip_all, fields(%dataset_ref, ?media_type))]
     async fn ingest_from_file_stream(
         &self,
         dataset_ref: &DatasetRef,
+        source_name: Option<&str>,
         data: Box<dyn AsyncRead + Send + Unpin>,
         media_type: Option<MediaType>,
         listener: Option<Arc<dyn PushIngestListener>>,
     ) -> Result<PushIngestResult, PushIngestError> {
         let listener = listener.unwrap_or_else(|| Arc::new(NullPushIngestListener));
 
-        self.do_ingest(dataset_ref, DataSource::Stream(data), media_type, listener)
-            .await
+        self.do_ingest(
+            dataset_ref,
+            source_name,
+            DataSource::Stream(data),
+            media_type,
+            listener,
+        )
+        .await
     }
 }
 
@@ -352,7 +366,7 @@ struct PushIngestArgs {
     listener: Arc<dyn PushIngestListener>,
     ctx: SessionContext,
     data_writer: DataWriterDataFusion,
-    polling_source: SetPollingSource,
+    push_source: AddPushSource,
 }
 
 enum DataSource {

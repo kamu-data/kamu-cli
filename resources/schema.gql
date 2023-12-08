@@ -51,6 +51,13 @@ type AddData {
 	sourceState: SourceState
 }
 
+type AddPushSource {
+	source: String!
+	read: ReadStep!
+	preprocess: Transform
+	merge: MergeStrategy!
+}
+
 type AttachmentEmbedded {
 	path: String!
 	content: String!
@@ -430,6 +437,14 @@ type DeleteResultSuccess implements DeleteResult {
 	message: String!
 }
 
+type DisablePollingSource {
+	dummy: String
+}
+
+type DisablePushSource {
+	source: String!
+}
+
 """
 Describes
 """
@@ -591,7 +606,7 @@ type MetadataChainMut {
 	commitEvent(event: String!, eventFormat: MetadataManifestFormat!): CommitResult!
 }
 
-union MetadataEvent = AddData | ExecuteQuery | Seed | SetPollingSource | SetTransform | SetVocab | SetWatermark | SetAttachments | SetInfo | SetLicense
+union MetadataEvent = AddData | ExecuteQuery | Seed | SetPollingSource | SetTransform | SetVocab | SetWatermark | SetAttachments | SetInfo | SetLicense | SetDataSchema | AddPushSource | DisablePushSource | DisablePollingSource
 
 enum MetadataManifestFormat {
 	YAML
@@ -841,6 +856,10 @@ type Seed {
 
 type SetAttachments {
 	attachments: Attachments!
+}
+
+type SetDataSchema {
+	schema: DataSchema!
 }
 
 type SetInfo {

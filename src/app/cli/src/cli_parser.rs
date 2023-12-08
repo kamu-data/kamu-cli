@@ -338,6 +338,10 @@ pub fn cli() -> Command {
                             .index(2)
                             .value_name("FILE")
                             .help("Data file(s) to ingest"),
+                        Arg::new("source-name")
+                            .long("source-name")
+                            .value_name("SRC")
+                            .help("Name of the push source to use for ingestion"),
                         Arg::new("stdin")
                             .long("stdin")
                             .action(ArgAction::SetTrue)

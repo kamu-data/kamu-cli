@@ -102,7 +102,11 @@ pub async fn prepare_dataset_transfer_estimate(
                 }
             }
             MetadataEvent::Seed(_)
+            | MetadataEvent::SetDataSchema(_)
             | MetadataEvent::SetPollingSource(_)
+            | MetadataEvent::DisablePollingSource(_)
+            | MetadataEvent::AddPushSource(_)
+            | MetadataEvent::DisablePushSource(_)
             | MetadataEvent::SetTransform(_)
             | MetadataEvent::SetVocab(_)
             | MetadataEvent::SetWatermark(_)
@@ -405,7 +409,11 @@ async fn collect_object_references_from_block(
         }
 
         MetadataEvent::Seed(_)
+        | MetadataEvent::SetDataSchema(_)
         | MetadataEvent::SetPollingSource(_)
+        | MetadataEvent::DisablePollingSource(_)
+        | MetadataEvent::AddPushSource(_)
+        | MetadataEvent::DisablePushSource(_)
         | MetadataEvent::SetTransform(_)
         | MetadataEvent::SetVocab(_)
         | MetadataEvent::SetWatermark(_)

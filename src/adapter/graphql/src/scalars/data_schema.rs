@@ -19,13 +19,22 @@ pub enum DataSchemaFormat {
     ParquetJson,
 }
 
-#[derive(SimpleObject)]
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct DataSchema {
     pub format: DataSchemaFormat,
     pub content: String,
 }
 
 impl DataSchema {
+    pub fn from_arrow_schema(
+        schema: &datafusion::arrow::datatypes::Schema,
+        format: DataSchemaFormat,
+    ) -> Result<DataSchema> {
+        let parquet_schema =
+            kamu_data_utils::schema::convert::arrow_schema_to_parquet_schema(schema);
+        Self::from_parquet_schema(parquet_schema.as_ref(), format)
+    }
+
     pub fn from_data_frame_schema(
         schema: &datafusion::common::DFSchema,
         format: DataSchemaFormat,

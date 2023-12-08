@@ -19,7 +19,7 @@ doctest = false
 
 [dependencies]
 internal-error = { workspace = true }
-opendatafabric = { workspace = true }
+opendatafabric = { workspace = true, features = ["arrow"] }
 kamu-core = { workspace = true }
 kamu-data-utils = { workspace = true }
 

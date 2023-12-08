@@ -11,12 +11,11 @@ use std::assert_matches::assert_matches;
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use chrono::{TimeZone, Utc};
 use container_runtime::ContainerRuntime;
 use datafusion::arrow::record_batch::RecordBatch;
-use datafusion::parquet::record::RowAccessor;
 use futures::StreamExt;
 use indoc::indoc;
-use itertools::Itertools;
 use kamu::domain::*;
 use kamu::testing::*;
 use kamu::*;
@@ -57,28 +56,6 @@ impl DatasetHelper {
                 .await,
         )
         .unwrap()
-    }
-
-    async fn get_data_of_block(&self, block_hash: &Multihash) -> ParquetReaderHelper {
-        let block = self
-            .dataset
-            .as_metadata_chain()
-            .get_block(block_hash)
-            .await
-            .unwrap();
-
-        let data_path = self
-            .data_slice_path(
-                block
-                    .as_data_stream_block()
-                    .unwrap()
-                    .event
-                    .output_data
-                    .unwrap(),
-            )
-            .await;
-
-        ParquetReaderHelper::open(&data_path)
     }
 
     async fn rewrite_last_data_block_with_different_encoding(
@@ -252,6 +229,10 @@ async fn test_transform_common(transform: Transform) {
 
     let dataset_action_authorizer = Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new());
 
+    let time_source = Arc::new(SystemTimeSourceStub::new_set(
+        Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap(),
+    ));
+
     let ingest_svc = PollingIngestServiceImpl::new(
         dataset_repo.clone(),
         dataset_action_authorizer.clone(),
@@ -263,13 +244,14 @@ async fn test_transform_common(transform: Transform) {
         Arc::new(ContainerRuntime::default()),
         run_info_dir,
         cache_dir,
-        Arc::new(SystemTimeSourceDefault),
+        time_source.clone(),
     );
 
     let transform_svc = TransformServiceImpl::new(
         dataset_repo.clone(),
         dataset_action_authorizer.clone(),
         engine_provisioner.clone(),
+        time_source.clone(),
     );
 
     ///////////////////////////////////////////////////////////////////////////
@@ -294,16 +276,15 @@ async fn test_transform_common(transform: Transform) {
         .name("root")
         .kind(DatasetKind::Root)
         .push_event(
+            // TODO: Simplify using push sources
             MetadataFactory::set_polling_source()
                 .fetch_file(&src_path)
                 .read(ReadStep::Csv(ReadStepCsv {
                     header: Some(true),
-                    schema: Some(
-                        ["city STRING", "population INT"]
-                            .iter()
-                            .map(|s| s.to_string())
-                            .collect(),
-                    ),
+                    schema: Some(vec![
+                        "city STRING".to_string(),
+                        "population INT".to_string(),
+                    ]),
                     ..ReadStepCsv::default()
                 }))
                 // TODO: Temporary no-op to make ingest use experimental DataFusion engine
@@ -356,51 +337,33 @@ async fn test_transform_common(transform: Transform) {
         .unwrap()
         .dataset;
 
-    let deriv_helper = DatasetHelper::new(dataset, tempdir.path());
+    let deriv_helper = DatasetHelper::new(dataset.clone(), tempdir.path());
+    let deriv_data_helper = DatasetDataHelper::new(dataset);
 
-    let block_hash = match transform_svc
+    time_source.set(Utc.with_ymd_and_hms(2050, 1, 2, 12, 0, 0).unwrap());
+
+    let res = transform_svc
         .transform(&deriv_alias.as_local_ref(), None)
         .await
-        .unwrap()
-    {
-        TransformResult::Updated { new_head, .. } => new_head,
-        v @ _ => panic!("Unexpected result: {:?}", v),
-    };
+        .unwrap();
+    assert_matches!(res, TransformResult::Updated { .. });
 
-    assert_eq!(deriv_helper.block_count().await, 3);
+    // First transform writes two blocks: SetDataSchema, ExecuteQuery
+    assert_eq!(deriv_helper.block_count().await, 4);
 
-    let parquet_reader = deriv_helper.get_data_of_block(&block_hash).await;
-
-    assert_eq!(
-        parquet_reader.get_column_names(),
-        [
-            "offset",
-            "system_time",
-            "event_time",
-            "city",
-            "population_x10"
-        ]
-    );
-
-    assert_eq!(
-        parquet_reader
-            .get_row_iter()
-            .map(|r| r.unwrap())
-            .map(|r| {
-                (
-                    r.get_long(0).unwrap().clone(),
-                    r.get_string(3).unwrap().clone(),
-                    r.get_int(4).unwrap(),
-                )
-            })
-            .sorted()
-            .collect::<Vec<_>>(),
-        [
-            (0, "A".to_owned(), 10000),
-            (1, "B".to_owned(), 20000),
-            (2, "C".to_owned(), 30000)
-        ]
-    );
+    deriv_data_helper
+        .assert_last_data_records_eq(indoc!(
+            r#"
+            +--------+----------------------+----------------------+------+----------------+
+            | offset | system_time          | event_time           | city | population_x10 |
+            +--------+----------------------+----------------------+------+----------------+
+            | 0      | 2050-01-02T12:00:00Z | 2050-01-01T12:00:00Z | A    | 10000          |
+            | 1      | 2050-01-02T12:00:00Z | 2050-01-01T12:00:00Z | B    | 20000          |
+            | 2      | 2050-01-02T12:00:00Z | 2050-01-01T12:00:00Z | C    | 30000          |
+            +--------+----------------------+----------------------+------+----------------+
+            "#
+        ))
+        .await;
 
     ///////////////////////////////////////////////////////////////////////////
     // Round 2
@@ -427,32 +390,29 @@ async fn test_transform_common(transform: Transform) {
         .await
         .unwrap();
 
-    let block_hash = match transform_svc
+    time_source.set(Utc.with_ymd_and_hms(2050, 1, 3, 12, 0, 0).unwrap());
+
+    let res = transform_svc
         .transform(&deriv_alias.as_local_ref(), None)
         .await
-        .unwrap()
-    {
-        TransformResult::Updated { new_head, .. } => new_head,
-        v @ _ => panic!("Unexpected result: {:?}", v),
-    };
+        .unwrap();
+    assert_matches!(res, TransformResult::Updated { .. });
 
-    let parquet_reader = deriv_helper.get_data_of_block(&block_hash).await;
+    // Only one block written this time
+    assert_eq!(deriv_helper.block_count().await, 5);
 
-    assert_eq!(
-        parquet_reader
-            .get_row_iter()
-            .map(|r| r.unwrap())
-            .map(|r| {
-                (
-                    r.get_long(0).unwrap().clone(),
-                    r.get_string(3).unwrap().clone(),
-                    r.get_int(4).unwrap(),
-                )
-            })
-            .sorted()
-            .collect::<Vec<_>>(),
-        [(3, "D".to_owned(), 40000), (4, "E".to_owned(), 50000),]
-    );
+    deriv_data_helper
+        .assert_last_data_records_eq(indoc!(
+            r#"
+            +--------+----------------------+----------------------+------+----------------+
+            | offset | system_time          | event_time           | city | population_x10 |
+            +--------+----------------------+----------------------+------+----------------+
+            | 3      | 2050-01-03T12:00:00Z | 2050-01-02T12:00:00Z | D    | 40000          |
+            | 4      | 2050-01-03T12:00:00Z | 2050-01-02T12:00:00Z | E    | 50000          |
+            +--------+----------------------+----------------------+------+----------------+
+            "#
+        ))
+        .await;
 
     ///////////////////////////////////////////////////////////////////////////
     // Verify - equivalent data with different encoding

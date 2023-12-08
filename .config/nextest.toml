@@ -1,3 +1,6 @@
+[profile.default]
+fail-fast = false
+
 [test-groups]
 setup = { max-threads = 1 }  # Serialize the setup steps
 containerized = { max-threads = 8 }  # Don't use too much memory

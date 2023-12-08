@@ -407,7 +407,7 @@ impl SparkEngine {
             tracing::info!(?response, "Read response");
 
             match response {
-                ExecuteQueryResponse::Progress => unreachable!(),
+                ExecuteQueryResponse::Progress(_) => unreachable!(),
                 ExecuteQueryResponse::Success(s) => Ok(s),
                 ExecuteQueryResponse::InvalidQuery(e) => {
                     Err(EngineError::invalid_query(e.message, run_info.log_files()))
