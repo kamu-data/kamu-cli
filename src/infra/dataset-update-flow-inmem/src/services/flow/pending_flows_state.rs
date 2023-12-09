@@ -25,25 +25,35 @@ pub(crate) struct PendingFlowsState {
 }
 
 impl PendingFlowsState {
-    pub fn add_dataset_pending_flow(
-        &mut self,
-        dataset_id: DatasetID,
-        flow_type: DatasetFlowType,
-        flow_id: FlowID,
-    ) {
-        self.pending_dataset_flows
-            .insert(OwnedDatasetFlowKey::new(dataset_id, flow_type), flow_id);
-    }
-
-    pub fn add_system_pending_flow(&mut self, flow_type: SystemFlowType, flow_id: FlowID) {
-        self.pending_system_flows.insert(flow_type, flow_id);
+    pub fn add_pending_flow(&mut self, flow_key: FlowKey, flow_id: FlowID) {
+        match flow_key {
+            FlowKey::Dataset(flow_key) => {
+                self.pending_dataset_flows.insert(
+                    OwnedDatasetFlowKey::new(flow_key.dataset_id, flow_key.flow_type),
+                    flow_id,
+                );
+            }
+            FlowKey::System(flow_key) => {
+                self.pending_system_flows
+                    .insert(flow_key.flow_type, flow_id);
+            }
+        }
     }
 
     pub fn track_flow_task(&mut self, flow_id: FlowID, task_id: TaskID) {
         self.pending_flows_by_tasks.insert(task_id, flow_id);
     }
 
-    pub fn drop_dataset_flow(
+    pub fn drop_pending_flow(&mut self, flow_key: &FlowKey) -> Option<FlowID> {
+        match flow_key {
+            FlowKey::Dataset(flow_key) => {
+                self.drop_dataset_pending_flow(&flow_key.dataset_id, flow_key.flow_type)
+            }
+            FlowKey::System(flow_key) => self.pending_system_flows.remove(&flow_key.flow_type),
+        }
+    }
+
+    pub fn drop_dataset_pending_flow(
         &mut self,
         dataset_id: &DatasetID,
         flow_type: DatasetFlowType,
@@ -52,26 +62,23 @@ impl PendingFlowsState {
             .remove(BorrowedDatasetFlowKey::new(dataset_id, flow_type).as_trait())
     }
 
-    pub fn drop_system_flow(&mut self, flow_type: SystemFlowType) -> Option<FlowID> {
-        self.pending_system_flows.remove(&flow_type)
-    }
-
     pub fn untrack_flow_by_task(&mut self, task_id: TaskID) {
         self.pending_flows_by_tasks.remove(&task_id);
     }
 
-    pub fn try_get_dataset_pending_flow(
-        &self,
-        dataset_id: &DatasetID,
-        flow_type: DatasetFlowType,
-    ) -> Option<FlowID> {
-        self.pending_dataset_flows
-            .get(BorrowedDatasetFlowKey::new(&dataset_id, flow_type).as_trait())
-            .cloned()
-    }
-
-    pub fn try_get_system_pending_flow(&self, flow_type: SystemFlowType) -> Option<FlowID> {
-        self.pending_system_flows.get(&flow_type).cloned()
+    pub fn try_get_pending_flow(&self, flow_key: &FlowKey) -> Option<FlowID> {
+        match flow_key {
+            FlowKey::Dataset(flow_key) => self
+                .pending_dataset_flows
+                .get(
+                    BorrowedDatasetFlowKey::new(&flow_key.dataset_id, flow_key.flow_type)
+                        .as_trait(),
+                )
+                .cloned(),
+            FlowKey::System(flow_key) => {
+                self.pending_system_flows.get(&flow_key.flow_type).cloned()
+            }
+        }
     }
 
     pub fn try_get_flow_id_by_task(&self, task_id: TaskID) -> Option<FlowID> {

@@ -13,7 +13,7 @@ use kamu_core::DatasetNotFoundError;
 use opendatafabric::{AccountID, AccountName, DatasetID};
 use tokio_stream::Stream;
 
-use crate::{DatasetFlowType, FlowID, FlowState, SystemFlowType};
+use crate::{DatasetFlowType, FlowID, FlowKey, FlowState, SystemFlowType};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -22,19 +22,10 @@ pub trait FlowService: Sync + Send {
     /// Runs the update main loop
     async fn run(&self) -> Result<(), InternalError>;
 
-    /// Creates a new manual dataset flow request
-    async fn request_manual_dataset_flow(
+    /// Creates a new manual flow request
+    async fn request_manual_flow(
         &self,
-        dataset_id: DatasetID,
-        flow_type: DatasetFlowType,
-        initiator_account_id: AccountID,
-        initiator_account_name: AccountName,
-    ) -> Result<FlowState, RequestFlowError>;
-
-    /// Creates a new manual system flow request
-    async fn request_manual_system_flow(
-        &self,
-        flow_type: SystemFlowType,
+        flow_key: FlowKey,
         initiator_account_id: AccountID,
         initiator_account_name: AccountName,
     ) -> Result<FlowState, RequestFlowError>;

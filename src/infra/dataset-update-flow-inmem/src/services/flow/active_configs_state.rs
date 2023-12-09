@@ -51,24 +51,34 @@ impl ActiveConfigsState {
         }
     }
 
-    pub fn drop_dataset_flow_config(&mut self, dataset_id: &DatasetID, flow_type: DatasetFlowType) {
+    pub fn drop_flow_config(&mut self, flow_key: &FlowKey) {
+        match flow_key {
+            FlowKey::Dataset(flow_key) => {
+                self.drop_dataset_flow_config(&flow_key.dataset_id, flow_key.flow_type);
+            }
+            FlowKey::System(flow_key) => {
+                self.system_schedules.remove(&flow_key.flow_type);
+            }
+        }
+    }
+
+    fn drop_dataset_flow_config(&mut self, dataset_id: &DatasetID, flow_type: DatasetFlowType) {
         let key = BorrowedDatasetFlowKey::new(dataset_id, flow_type);
         self.dataset_schedules.remove(key.as_trait());
         self.dataset_start_conditions.remove(key.as_trait());
     }
 
-    pub fn drop_system_flow_config(&mut self, flow_type: SystemFlowType) {
-        self.system_schedules.remove(&flow_type);
-    }
-
-    pub fn try_get_dataset_schedule(
-        &self,
-        dataset_id: &DatasetID,
-        flow_type: DatasetFlowType,
-    ) -> Option<Schedule> {
-        self.dataset_schedules
-            .get(BorrowedDatasetFlowKey::new(&dataset_id, flow_type).as_trait())
-            .cloned()
+    pub fn try_get_flow_schedule(&self, flow_key: &FlowKey) -> Option<Schedule> {
+        match flow_key {
+            FlowKey::Dataset(flow_key) => self
+                .dataset_schedules
+                .get(
+                    BorrowedDatasetFlowKey::new(&flow_key.dataset_id, flow_key.flow_type)
+                        .as_trait(),
+                )
+                .cloned(),
+            FlowKey::System(flow_key) => self.system_schedules.get(&flow_key.flow_type).cloned(),
+        }
     }
 
     pub fn try_get_dataset_start_condition(
@@ -79,10 +89,6 @@ impl ActiveConfigsState {
         self.dataset_start_conditions
             .get(BorrowedDatasetFlowKey::new(&dataset_id, flow_type).as_trait())
             .cloned()
-    }
-
-    pub fn try_get_system_schedule(&self, flow_type: SystemFlowType) -> Option<Schedule> {
-        self.system_schedules.get(&flow_type).cloned()
     }
 }
 
