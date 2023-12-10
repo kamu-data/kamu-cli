@@ -568,7 +568,7 @@ async fn test_append_execute_query_empty_commit() {
     );
 }
 
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn test_append_add_data_must_be_preceeded_by_schema() {
     let tmp_dir = tempfile::tempdir().unwrap();
     let chain = init_chain(tmp_dir.path());
@@ -586,39 +586,38 @@ async fn test_append_add_data_must_be_preceeded_by_schema() {
     // pull only source state has been set)
     let hash = chain
         .append(
-            MetadataFactory::metadata_block(AddDataBuilder::empty().some_source_state().build())
-                .prev(&hash, 0)
-                .build(),
+            MetadataFactory::metadata_block(
+                MetadataFactory::add_data().some_source_state().build(),
+            )
+            .prev(&hash, 0)
+            .build(),
             AppendOpts::default(),
         )
         .await
         .unwrap();
 
-    // Rejects one with data
-    assert_matches!(
-        chain
-            .append(
-                MetadataFactory::metadata_block(
-                    MetadataFactory::add_data()
-                        .some_output_data()
-                        .some_source_state()
-                        .build()
-                )
-                .prev(&hash, 1)
-                .build(),
-                AppendOpts::default()
+    // TODO: Should rejects one with data when schema is not set yet
+    // https://github.com/kamu-data/kamu-cli/issues/314
+    let hash = chain
+        .append(
+            MetadataFactory::metadata_block(
+                MetadataFactory::add_data()
+                    .some_output_data_with_offset(0, 9)
+                    .some_source_state()
+                    .build(),
             )
-            .await,
-        Err(AppendError::InvalidBlock(
-            AppendValidationError::InvalidEvent(_)
-        ))
-    );
+            .prev(&hash, 1)
+            .build(),
+            AppendOpts::default(),
+        )
+        .await
+        .unwrap();
 
     // Schema is now set
     let hash = chain
         .append(
             MetadataFactory::metadata_block(MetadataFactory::set_data_schema().build())
-                .prev(&hash, 1)
+                .prev(&hash, 2)
                 .build(),
             AppendOpts::default(),
         )
@@ -630,11 +629,11 @@ async fn test_append_add_data_must_be_preceeded_by_schema() {
         .append(
             MetadataFactory::metadata_block(
                 MetadataFactory::add_data()
-                    .some_output_data()
+                    .some_output_data_with_offset(10, 19)
                     .some_source_state()
                     .build(),
             )
-            .prev(&hash, 2)
+            .prev(&hash, 3)
             .build(),
             AppendOpts::default(),
         )
@@ -642,7 +641,7 @@ async fn test_append_add_data_must_be_preceeded_by_schema() {
         .unwrap();
 }
 
-#[tokio::test]
+#[test_log::test(tokio::test)]
 async fn test_append_execute_query_must_be_preceeded_by_schema() {
     let tmp_dir = tempfile::tempdir().unwrap();
     let chain = init_chain(tmp_dir.path());
@@ -676,31 +675,32 @@ async fn test_append_execute_query_must_be_preceeded_by_schema() {
         .await
         .unwrap();
 
-    // Rejects one with data
-    assert_matches!(
-        chain
-            .append(
-                MetadataFactory::metadata_block(
-                    MetadataFactory::execute_query()
-                        .some_output_checkpoint()
-                        .some_output_data()
-                        .build()
-                )
-                .prev(&hash, 1)
-                .build(),
-                AppendOpts::default()
+    // TODO: Should rejects one with data when schema is not set yet
+    // https://github.com/kamu-data/kamu-cli/issues/314
+    let hash = chain
+        .append(
+            MetadataFactory::metadata_block(
+                MetadataFactory::execute_query()
+                    .input_checkpoint(Some(Multihash::from_digest_sha3_256(b"foo")))
+                    .output_checkpoint(Some(Checkpoint {
+                        physical_hash: Multihash::from_digest_sha3_256(b"bar"),
+                        size: 1,
+                    }))
+                    .some_output_data_with_offset(0, 9)
+                    .build(),
             )
-            .await,
-        Err(AppendError::InvalidBlock(
-            AppendValidationError::InvalidEvent(_)
-        ))
-    );
+            .prev(&hash, 1)
+            .build(),
+            AppendOpts::default(),
+        )
+        .await
+        .unwrap();
 
     // Schema is now set
     let hash = chain
         .append(
             MetadataFactory::metadata_block(MetadataFactory::set_data_schema().build())
-                .prev(&hash, 1)
+                .prev(&hash, 2)
                 .build(),
             AppendOpts::default(),
         )
@@ -712,15 +712,12 @@ async fn test_append_execute_query_must_be_preceeded_by_schema() {
         .append(
             MetadataFactory::metadata_block(
                 MetadataFactory::execute_query()
-                    .input_checkpoint(Some(Multihash::from_digest_sha3_256(b"foo")))
-                    .output_checkpoint(Some(Checkpoint {
-                        physical_hash: Multihash::from_digest_sha3_256(b"bar"),
-                        size: 1,
-                    }))
-                    .some_output_data()
+                    .input_checkpoint(Some(Multihash::from_digest_sha3_256(b"bar")))
+                    .some_output_checkpoint()
+                    .some_output_data_with_offset(10, 19)
                     .build(),
             )
-            .prev(&hash, 2)
+            .prev(&hash, 3)
             .build(),
             AppendOpts::default(),
         )

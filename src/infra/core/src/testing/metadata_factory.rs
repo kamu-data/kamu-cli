@@ -473,7 +473,7 @@ impl AddDataBuilder {
     }
 
     pub fn new() -> Self {
-        Self::empty().some_output_data()
+        Self::empty()
     }
 
     pub fn some_input_checkpoint(mut self) -> Self {
@@ -488,12 +488,16 @@ impl AddDataBuilder {
         self
     }
 
-    pub fn some_output_data(mut self) -> Self {
+    pub fn some_output_data(self) -> Self {
+        self.some_output_data_with_offset(0, 9)
+    }
+
+    pub fn some_output_data_with_offset(mut self, start: i64, end: i64) -> Self {
         if self.v.output_data.is_none() {
             self.v.output_data = Some(DataSlice {
                 logical_hash: Multihash::from_digest_sha3_256(b"foo"),
                 physical_hash: Multihash::from_digest_sha3_256(b"bar"),
-                interval: OffsetInterval { start: 0, end: 9 },
+                interval: OffsetInterval { start, end },
                 size: 0,
             });
         }
@@ -609,12 +613,16 @@ impl ExecuteQueryBuilder {
         self
     }
 
-    pub fn some_output_data(mut self) -> Self {
+    pub fn some_output_data(self) -> Self {
+        self.some_output_data_with_offset(0, 9)
+    }
+
+    pub fn some_output_data_with_offset(mut self, start: i64, end: i64) -> Self {
         if self.v.output_data.is_none() {
             self.v.output_data = Some(DataSlice {
                 logical_hash: Multihash::from_digest_sha3_256(b"foo"),
                 physical_hash: Multihash::from_digest_sha3_256(b"bar"),
-                interval: OffsetInterval { start: 0, end: 9 },
+                interval: OffsetInterval { start, end },
                 size: 0,
             });
         }

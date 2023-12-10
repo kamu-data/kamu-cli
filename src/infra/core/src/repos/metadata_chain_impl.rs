@@ -214,6 +214,9 @@ where
                     }
                 }
 
+                // TODO: Introduce as a breaking change
+                // https://github.com/kamu-data/kamu-cli/issues/314
+                /*
                 // Validate schema was defined if we're adding data
                 if prev_schema.is_none() && e.output_data.is_some() {
                     return Err(AppendValidationError::InvalidEvent(InvalidEventError::new(
@@ -222,6 +225,7 @@ where
                     ))
                     .into());
                 }
+                */
 
                 let prev_checkpoint = prev_checkpoint.unwrap_or_default();
                 let prev_watermark = prev_watermark.unwrap_or_default();
@@ -294,6 +298,9 @@ where
                     }
                 }
 
+                // TODO: Introduce as a breaking change
+                // https://github.com/kamu-data/kamu-cli/issues/314
+                /*
                 // Validate schema was defined if we're adding data
                 if prev_schema.is_none() && e.output_data.is_some() {
                     return Err(AppendValidationError::InvalidEvent(InvalidEventError::new(
@@ -302,6 +309,7 @@ where
                     ))
                     .into());
                 }
+                */
 
                 let prev_checkpoint = prev_query
                     .as_ref()
@@ -442,11 +450,11 @@ where
         new_block: &MetadataBlock,
         _block_cache: &mut Vec<MetadataBlock>,
     ) -> Result<(), AppendError> {
-        if let Some(new_block) = new_block.as_data_stream_block() {
-            if let Some(new_data) = new_block.event.output_data {
+        if let Some(data_block) = new_block.as_data_stream_block() {
+            if let Some(new_data) = data_block.event.output_data {
                 // TODO: PERF: Use block cache
                 let prev_data = self
-                    .iter_blocks_interval(new_block.prev_block_hash.unwrap(), None, false)
+                    .iter_blocks_interval(data_block.prev_block_hash.unwrap(), None, false)
                     .filter_data_stream_blocks()
                     .filter_map_ok(|(_, b)| b.event.output_data)
                     .try_first()
@@ -456,20 +464,18 @@ where
                 let last_offset = prev_data.map(|v| v.interval.end).unwrap_or(-1);
 
                 if new_data.interval.start != last_offset + 1 {
-                    tracing::warn!(
-                        "Expected offset interval to start at {} but got {:?}",
-                        last_offset + 1,
-                        new_data.interval
-                    );
-                    return Err(AppendValidationError::OffsetsAreNotSequential.into());
+                    return Err(AppendValidationError::OffsetsAreNotSequential(
+                        OffsetsNotSequentialError::new(last_offset, new_data.interval.start),
+                    )
+                    .into());
                 }
 
                 if new_data.interval.end < new_data.interval.start {
-                    tracing::debug!(
-                        "Expected valid offset interval but got {:?}",
-                        new_data.interval
-                    );
-                    return Err(AppendValidationError::OffsetsAreNotSequential.into());
+                    return Err(AppendValidationError::InvalidEvent(InvalidEventError::new(
+                        new_block.event.clone(),
+                        "Invalid offset interval",
+                    ))
+                    .into());
                 }
             }
         }

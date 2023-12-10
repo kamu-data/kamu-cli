@@ -476,8 +476,8 @@ pub enum AppendValidationError {
     SystemTimeIsNotMonotonic,
     #[error("Watermark has to be monotonically increasing")]
     WatermarkIsNotMonotonic,
-    #[error("Data offsets have to be sequential")]
-    OffsetsAreNotSequential,
+    #[error(transparent)]
+    OffsetsAreNotSequential(#[from] OffsetsNotSequentialError),
     #[error(transparent)]
     InvalidEvent(#[from] InvalidEventError),
     #[error(transparent)]
@@ -547,6 +547,34 @@ impl Display for SequenceIntegrityError {
                 self.next_block_sequence_number
             )
         }
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, PartialEq, Eq, Debug)]
+pub struct OffsetsNotSequentialError {
+    pub last_offset: i64,
+    pub new_offset: i64,
+}
+
+impl OffsetsNotSequentialError {
+    pub fn new(last_offset: i64, new_offset: i64) -> Self {
+        Self {
+            last_offset,
+            new_offset,
+        }
+    }
+}
+
+impl Display for OffsetsNotSequentialError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Expected offset interval to start at {} but got {}",
+            self.last_offset + 1,
+            self.new_offset,
+        )
     }
 }
 
