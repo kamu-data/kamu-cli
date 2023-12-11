@@ -11,7 +11,7 @@ use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 
 use dill::*;
-use kamu_dataset_update_flow::*;
+use kamu_flow_system::*;
 use opendatafabric::DatasetID;
 
 use crate::dataset_flow_key::{BorrowedDatasetFlowKey, OwnedDatasetFlowKey};

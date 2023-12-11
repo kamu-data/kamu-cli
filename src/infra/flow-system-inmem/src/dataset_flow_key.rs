@@ -10,7 +10,7 @@
 use std::borrow::Borrow;
 use std::hash::{Hash, Hasher};
 
-use kamu_dataset_update_flow::DatasetFlowType;
+use kamu_flow_system::DatasetFlowType;
 use opendatafabric::DatasetID;
 
 /////////////////////////////////////////////////////////////////////////////////////////

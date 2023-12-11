@@ -1,6 +1,6 @@
 [package]
-name = "kamu-dataset-update-flow-inmem"
-description = "In-memory implementation of the flow that handles automatic and manual dataset update"
+name = "kamu-flow-system-inmem"
+description = "In-memory implementation of the flows management for scheduled dataset and system activities"
 version = { workspace = true }
 homepage = { workspace = true }
 repository = { workspace = true }
@@ -21,7 +21,7 @@ doctest = false
 opendatafabric = { workspace = true }
 kamu-core = { workspace = true }
 kamu-task-system = { workspace = true }
-kamu-dataset-update-flow = { workspace = true }
+kamu-flow-system = { workspace = true }
 event-bus = { workspace = true }
 
 async-stream = "0.3"

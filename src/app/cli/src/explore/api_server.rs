@@ -12,7 +12,7 @@ use std::sync::Arc;
 
 use dill::Catalog;
 use internal_error::*;
-use kamu_dataset_update_flow_inmem::domain::FlowService;
+use kamu_flow_system_inmem::domain::FlowService;
 use kamu_task_system_inmem::domain::TaskExecutor;
 
 /////////////////////////////////////////////////////////////////////////////////////////

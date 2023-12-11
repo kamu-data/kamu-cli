@@ -3292,7 +3292,7 @@ dependencies = [
  "kamu",
  "kamu-core",
  "kamu-data-utils",
- "kamu-dataset-update-flow",
+ "kamu-flow-system",
  "kamu-task-system",
  "mockall",
  "opendatafabric",
@@ -3415,7 +3415,7 @@ dependencies = [
  "kamu-adapter-http",
  "kamu-adapter-oauth",
  "kamu-data-utils",
- "kamu-dataset-update-flow-inmem",
+ "kamu-flow-system-inmem",
  "kamu-task-system-inmem",
  "libc",
  "merge",
@@ -3507,7 +3507,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "kamu-dataset-update-flow"
+name = "kamu-flow-system"
 version = "0.146.1"
 dependencies = [
  "async-trait",
@@ -3527,7 +3527,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "kamu-dataset-update-flow-inmem"
+name = "kamu-flow-system-inmem"
 version = "0.146.1"
 dependencies = [
  "async-stream",
@@ -3538,7 +3538,7 @@ dependencies = [
  "event-bus",
  "futures",
  "kamu-core",
- "kamu-dataset-update-flow",
+ "kamu-flow-system",
  "kamu-task-system",
  "mockall",
  "opendatafabric",

@@ -1,6 +1,6 @@
 [package]
-name = "kamu-dataset-update-flow"
-description = "Domain model of a dataset update flow that handles automatic and manual dataset updates"
+name = "kamu-flow-system"
+description = "Domain model of the flows management for scheduled dataset and system activities"
 version = { workspace = true }
 homepage = { workspace = true }
 repository = { workspace = true }

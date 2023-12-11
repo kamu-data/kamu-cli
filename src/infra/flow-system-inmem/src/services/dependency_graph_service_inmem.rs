@@ -13,7 +13,7 @@ use std::sync::{Arc, Mutex};
 use dill::*;
 use event_bus::AsyncEventHandler;
 use kamu_core::events::DatasetEventDeleted;
-use kamu_dataset_update_flow::*;
+use kamu_flow_system::*;
 use opendatafabric::DatasetID;
 use petgraph::stable_graph::{NodeIndex, StableDiGraph};
 

@@ -9,7 +9,7 @@
 
 use std::collections::HashMap;
 
-use kamu_dataset_update_flow::*;
+use kamu_flow_system::*;
 use kamu_task_system::*;
 use opendatafabric::DatasetID;
 

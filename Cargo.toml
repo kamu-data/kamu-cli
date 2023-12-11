@@ -14,12 +14,12 @@ members = [
     "src/domain/opendatafabric",
     "src/domain/core",
     "src/domain/task-system",
-    "src/domain/dataset-update-flow",
+    "src/domain/flow-system",
     # Infra
     "src/infra/core",
     "src/infra/ingest-datafusion",
     "src/infra/task-system-inmem",
-    "src/infra/dataset-update-flow-inmem",
+    "src/infra/flow-system-inmem",
     # Adapters
     "src/adapter/auth-oso",
     "src/adapter/flight-sql",
@@ -46,12 +46,12 @@ tracing-perfetto = { version = "0.146.1", path = "src/utils/tracing-perfetto", d
 opendatafabric = { version = "0.146.1", path = "src/domain/opendatafabric", default-features = false }
 kamu-core = { version = "0.146.1", path = "src/domain/core", default-features = false }
 kamu-task-system = { version = "0.146.1", path = "src/domain/task-system", default-features = false }
-kamu-dataset-update-flow = { version = "0.146.1", path = "src/domain/dataset-update-flow", default-features = false }
+kamu-flow-system = { version = "0.146.1", path = "src/domain/flow-system", default-features = false }
 # Infra
 kamu = { version = "0.146.1", path = "src/infra/core", default-features = false }
 kamu-ingest-datafusion = { version = "0.146.1", path = "src/infra/ingest-datafusion", default-features = false }
 kamu-task-system-inmem = { version = "0.146.1", path = "src/infra/task-system-inmem", default-features = false }
-kamu-dataset-update-flow-inmem = { version = "0.146.1", path = "src/infra/dataset-update-flow-inmem", default-features = false }
+kamu-flow-system-inmem = { version = "0.146.1", path = "src/infra/flow-system-inmem", default-features = false }
 # Adapters
 kamu-adapter-auth-oso = { version = "0.146.1", path = "src/adapter/auth-oso", default-features = false }
 kamu-adapter-flight-sql = { version = "0.146.1", path = "src/adapter/flight-sql", default-features = false }

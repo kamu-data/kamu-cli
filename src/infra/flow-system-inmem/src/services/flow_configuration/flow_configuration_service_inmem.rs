@@ -14,7 +14,7 @@ use event_bus::{AsyncEventHandler, EventBus};
 use futures::StreamExt;
 use kamu_core::events::DatasetEventDeleted;
 use kamu_core::SystemTimeSource;
-use kamu_dataset_update_flow::*;
+use kamu_flow_system::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 

@@ -12,7 +12,7 @@ use std::collections::{BinaryHeap, HashMap};
 
 use chrono::{DateTime, Utc};
 use kamu_core::InternalError;
-use kamu_dataset_update_flow::FlowID;
+use kamu_flow_system::FlowID;
 use thiserror::Error;
 
 /////////////////////////////////////////////////////////////////////////////////////////

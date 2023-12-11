@@ -12,7 +12,7 @@
 #![feature(async_closure)]
 
 // Re-exports
-pub use kamu_dataset_update_flow as domain;
+pub use kamu_flow_system as domain;
 
 mod dataset_flow_key;
 mod repos;

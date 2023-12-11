@@ -17,7 +17,7 @@ use event_bus::AsyncEventHandler;
 use futures::TryStreamExt;
 use kamu_core::events::DatasetEventDeleted;
 use kamu_core::{InternalError, SystemTimeSource};
-use kamu_dataset_update_flow::*;
+use kamu_flow_system::*;
 use kamu_task_system::*;
 use opendatafabric::{AccountID, AccountName, DatasetID};
 use tokio_stream::StreamExt;
