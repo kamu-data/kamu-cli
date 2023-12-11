@@ -96,7 +96,7 @@ impl FlowServiceInMemory {
             .filter(|res| res.is_err())
             .map(|e| e.err().unwrap())
             .for_each(|e: InternalError| {
-                tracing::error!("Scheduling flow failed: {:?}", e);
+                tracing::error!(error=?e, "Scheduling flow failed");
             });
     }
 
