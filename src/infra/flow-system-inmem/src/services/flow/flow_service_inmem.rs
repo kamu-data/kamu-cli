@@ -477,7 +477,7 @@ impl FlowService for FlowServiceInMemory {
 
     /// Returns states of flows of certian type associated with a given dataset
     /// ordered by creation time from newest to oldest
-    fn list_specific_flows_by_dataset(
+    fn list_flows_by_dataset_of_type(
         &self,
         dataset_id: &DatasetID,
         flow_type: DatasetFlowType,
@@ -501,7 +501,7 @@ impl FlowService for FlowServiceInMemory {
 
     /// Returns states of system flows of certian type
     /// ordered by creation time from newest to oldest
-    fn list_specific_system_flows(
+    fn list_system_flows_of_type(
         &self,
         flow_type: SystemFlowType,
     ) -> Result<FlowStateStream, ListSystemFlowsError> {
@@ -563,7 +563,7 @@ impl FlowService for FlowServiceInMemory {
 
     /// Returns state of the latest flow of certain type created for the given
     /// dataset
-    async fn get_last_specific_flow_by_dataset(
+    async fn get_last_flow_by_dataset_of_type(
         &self,
         dataset_id: &DatasetID,
         flow_type: DatasetFlowType,
@@ -579,7 +579,7 @@ impl FlowService for FlowServiceInMemory {
     }
 
     /// Returns state of the latest system flow of certain type
-    async fn get_last_specific_system_flow(
+    async fn get_last_system_flow_of_type(
         &self,
         flow_type: SystemFlowType,
     ) -> Result<Option<FlowState>, GetLastSystemtFlowError> {
