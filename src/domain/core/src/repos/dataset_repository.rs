@@ -100,6 +100,12 @@ pub trait DatasetRepositoryExt: DatasetRepository {
         dataset_ref: &DatasetRef,
     ) -> Result<Option<Arc<dyn Dataset>>, InternalError>;
 
+    async fn create_dataset_from_seed(
+        &self,
+        dataset_alias: &DatasetAlias,
+        seed: Seed,
+    ) -> Result<CreateDatasetResult, CreateDatasetError>;
+
     async fn create_dataset_from_snapshot(
         &self,
         account_name: Option<AccountName>,
@@ -144,6 +150,26 @@ where
             Err(GetDatasetError::NotFound(_)) => Ok(None),
             Err(GetDatasetError::Internal(e)) => Err(e),
         }
+    }
+
+    async fn create_dataset_from_seed(
+        &self,
+        dataset_alias: &DatasetAlias,
+        seed: Seed,
+    ) -> Result<CreateDatasetResult, CreateDatasetError> {
+        // TODO: Externalize time
+        let system_time = Utc::now();
+
+        self.create_dataset(
+            dataset_alias,
+            MetadataBlockTyped {
+                system_time,
+                prev_block_hash: None,
+                event: seed,
+                sequence_number: 0,
+            },
+        )
+        .await
     }
 
     async fn create_dataset_from_snapshot(
