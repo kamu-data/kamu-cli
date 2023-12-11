@@ -16,8 +16,8 @@ pub enum DatasetFlowType {
 }
 
 impl DatasetFlowType {
-    pub fn iterator() -> impl Iterator<Item = DatasetFlowType> {
-        [Self::Update, Self::Compacting].iter().copied()
+    pub fn all() -> &'static [DatasetFlowType] {
+        &[Self::Update, Self::Compacting]
     }
 }
 

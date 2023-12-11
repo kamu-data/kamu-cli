@@ -101,13 +101,13 @@ impl FlowServiceInMemory {
     }
 
     async fn initialize_auto_polling_flows_from_configurations(&self) -> Result<(), InternalError> {
-        for dataset_flow_type in DatasetFlowType::iterator() {
-            self.initialize_enabled_dataset_configurations(dataset_flow_type)
+        for dataset_flow_type in DatasetFlowType::all() {
+            self.initialize_enabled_dataset_configurations(*dataset_flow_type)
                 .await?;
         }
 
-        for system_flow_type in SystemFlowType::iterator() {
-            self.initialize_system_flow_configuration(system_flow_type)
+        for system_flow_type in SystemFlowType::all() {
+            self.initialize_system_flow_configuration(*system_flow_type)
                 .await?;
         }
 
@@ -710,10 +710,10 @@ impl AsyncEventHandler<DatasetEventDeleted> for FlowServiceInMemory {
         let mut state = self.state.lock().unwrap();
         state.active_configs.drop_dataset_configs(&event.dataset_id);
 
-        for flow_type in DatasetFlowType::iterator() {
+        for flow_type in DatasetFlowType::all() {
             if let Some(flow_id) = state
                 .pending_flows
-                .drop_dataset_pending_flow(&event.dataset_id, flow_type)
+                .drop_dataset_pending_flow(&event.dataset_id, *flow_type)
             {
                 state.time_wheel.cancel_flow_activation(flow_id).int_err()?;
             }

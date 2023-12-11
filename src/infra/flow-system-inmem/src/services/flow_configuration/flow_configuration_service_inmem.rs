@@ -142,9 +142,9 @@ impl FlowConfigurationService for FlowConfigurationServiceInMemory {
 #[async_trait::async_trait]
 impl AsyncEventHandler<DatasetEventDeleted> for FlowConfigurationServiceInMemory {
     async fn handle(&self, event: &DatasetEventDeleted) -> Result<(), InternalError> {
-        for flow_type in DatasetFlowType::iterator() {
+        for flow_type in DatasetFlowType::all() {
             let maybe_flow_configuration = FlowConfiguration::try_load(
-                FlowKey::Dataset(FlowKeyDataset::new(event.dataset_id.clone(), flow_type)),
+                FlowKey::Dataset(FlowKeyDataset::new(event.dataset_id.clone(), *flow_type)),
                 self.event_store.as_ref(),
             )
             .await

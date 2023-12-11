@@ -15,8 +15,8 @@ pub enum SystemFlowType {
 }
 
 impl SystemFlowType {
-    pub fn iterator() -> impl Iterator<Item = SystemFlowType> {
-        [Self::GC].iter().copied()
+    pub fn all() -> &'static [SystemFlowType] {
+        &[Self::GC]
     }
 }
 

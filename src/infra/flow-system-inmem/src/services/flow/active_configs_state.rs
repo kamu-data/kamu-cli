@@ -46,8 +46,8 @@ impl ActiveConfigsState {
     }
 
     pub fn drop_dataset_configs(&mut self, dataset_id: &DatasetID) {
-        for flow_type in DatasetFlowType::iterator() {
-            self.drop_dataset_flow_config(dataset_id, flow_type);
+        for flow_type in DatasetFlowType::all() {
+            self.drop_dataset_flow_config(dataset_id, *flow_type);
         }
     }
 
