@@ -25,8 +25,9 @@ use crate::api_error::*;
 /////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct IngestParams {
-    source: Option<String>,
+    source_name: Option<String>,
 }
 
 // TODO: SEC: Enforce a size limit on payload
@@ -51,7 +52,7 @@ pub async fn dataset_ingest_handler(
     match ingest_svc
         .ingest_from_file_stream(
             &dataset_ref,
-            params.source.as_ref().map(|s| s.as_str()),
+            params.source_name.as_deref(),
             data,
             Some(MediaType(content_type.to_string())),
             None,

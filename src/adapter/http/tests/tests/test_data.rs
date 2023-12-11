@@ -162,7 +162,7 @@ async fn test_data_push_ingest_handler() {
         let res = cl
             .execute(
                 cl.post(&ingest_url)
-                    .query(&[("source", "device1")])
+                    .query(&[("sourceName", "device1")])
                     .json(&json!(
                         [
                             {
@@ -208,7 +208,7 @@ async fn test_data_push_ingest_handler() {
         let res = cl
             .execute(
                 cl.post(&ingest_url)
-                    .query(&[("source", "device2")])
+                    .query(&[("sourceName", "device2")])
                     .json(&json!(
                         [
                             {
