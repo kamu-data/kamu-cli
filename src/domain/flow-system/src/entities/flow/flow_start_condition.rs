@@ -28,8 +28,7 @@ pub struct FlowStartConditionThrottling {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct FlowStartConditionBatching {
-    pub available_records: usize,
-    pub threshold_recods: usize,
+    pub threshold_new_records: usize,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
