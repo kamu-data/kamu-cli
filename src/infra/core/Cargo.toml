@@ -85,6 +85,7 @@ jsonwebtoken = "9"
 libc = "0.2"  # Signal names
 mockall = "0.11"
 pin-project = "1"
+petgraph = { version = "0.6.4", default-features = false }
 rand = "0.8"
 regex = "1"
 strum = "0.25"  # Enum from string

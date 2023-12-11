@@ -225,7 +225,7 @@ pub fn configure_base_catalog(
     b.add::<kamu_task_system_inmem::TaskSystemEventStoreInMemory>();
 
     // TODO: initialize graph dependencies when starting API server
-    b.add::<kamu_flow_system_inmem::DependencyGraphServiceInMemory>();
+    b.add::<DependencyGraphServiceInMemory>();
 
     b.add::<kamu_flow_system_inmem::FlowConfigurationServiceInMemory>();
     b.add::<kamu_flow_system_inmem::FlowServiceInMemory>();

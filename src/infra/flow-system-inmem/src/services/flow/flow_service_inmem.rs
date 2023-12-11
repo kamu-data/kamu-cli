@@ -16,7 +16,7 @@ use dill::*;
 use event_bus::AsyncEventHandler;
 use futures::TryStreamExt;
 use kamu_core::events::DatasetEventDeleted;
-use kamu_core::{InternalError, SystemTimeSource};
+use kamu_core::{DependencyGraphService, InternalError, SystemTimeSource};
 use kamu_flow_system::*;
 use kamu_task_system::*;
 use opendatafabric::{AccountID, AccountName, DatasetID};

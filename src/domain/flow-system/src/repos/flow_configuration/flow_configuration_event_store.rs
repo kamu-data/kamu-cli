@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use event_sourcing::EventStore;
+use kamu_core::DatasetIDStream;
 
 use crate::*;
 

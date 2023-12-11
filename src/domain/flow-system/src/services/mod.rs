@@ -10,8 +10,5 @@
 mod flow;
 mod flow_configuration;
 
-mod dependency_graph_service;
-
-pub use dependency_graph_service::*;
 pub use flow::*;
 pub use flow_configuration::*;

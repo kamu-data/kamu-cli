@@ -10,6 +10,7 @@
 use std::collections::HashSet;
 
 use dill::*;
+use kamu_core::DatasetIDStream;
 use kamu_flow_system::*;
 use opendatafabric::DatasetID;
 
