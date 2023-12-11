@@ -83,7 +83,7 @@ implement_serde_as!(AddData, AddDataDef, "AddDataDef");
 #[serde(remote = "AddPushSource")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct AddPushSourceDef {
-    pub source: String,
+    pub source_name: Option<String>,
     #[serde_as(as = "ReadStepDef")]
     pub read: ReadStep,
     #[serde_as(as = "Option<TransformDef>")]
@@ -287,7 +287,7 @@ implement_serde_as!(
 #[serde(remote = "DisablePushSource")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct DisablePushSourceDef {
-    pub source: String,
+    pub source_name: Option<String>,
 }
 
 implement_serde_as!(

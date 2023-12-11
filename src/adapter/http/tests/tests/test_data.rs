@@ -57,23 +57,42 @@ async fn test_data_push_ingest_handler() {
             DatasetSnapshot {
                 name: "population".try_into().unwrap(),
                 kind: DatasetKind::Root,
-                metadata: vec![AddPushSource {
-                    source: "device1".to_string(),
-                    read: ReadStepNdJson {
-                        schema: Some(vec![
-                            "event_time TIMESTAMP".to_owned(),
-                            "city STRING".to_owned(),
-                            "population BIGINT".to_owned(),
-                        ]),
-                        ..Default::default()
+                metadata: vec![
+                    AddPushSource {
+                        source_name: None, // Default source
+                        read: ReadStepNdJson {
+                            schema: Some(vec![
+                                "event_time TIMESTAMP".to_owned(),
+                                "city STRING".to_owned(),
+                                "population BIGINT".to_owned(),
+                            ]),
+                            ..Default::default()
+                        }
+                        .into(),
+                        preprocess: None,
+                        merge: MergeStrategy::Ledger(MergeStrategyLedger {
+                            primary_key: vec!["event_time".to_owned(), "city".to_owned()],
+                        }),
                     }
                     .into(),
-                    preprocess: None,
-                    merge: MergeStrategy::Ledger(MergeStrategyLedger {
-                        primary_key: vec!["event_time".to_owned(), "city".to_owned()],
-                    }),
-                }
-                .into()],
+                    AddPushSource {
+                        source_name: Some("device1".to_string()),
+                        read: ReadStepNdJson {
+                            schema: Some(vec![
+                                "event_time TIMESTAMP".to_owned(),
+                                "city STRING".to_owned(),
+                                "population BIGINT".to_owned(),
+                            ]),
+                            ..Default::default()
+                        }
+                        .into(),
+                        preprocess: None,
+                        merge: MergeStrategy::Ledger(MergeStrategyLedger {
+                            primary_key: vec!["event_time".to_owned(), "city".to_owned()],
+                        }),
+                    }
+                    .into(),
+                ],
             },
         )
         .await
@@ -88,7 +107,7 @@ async fn test_data_push_ingest_handler() {
         let ingest_url = format!("{}/ingest", dataset_url);
         tracing::info!(%ingest_url, "Client request");
 
-        // OK - default push source
+        // OK - uses default push source
         let res = cl
             .execute(
                 cl.post(&ingest_url)
@@ -139,7 +158,7 @@ async fn test_data_push_ingest_handler() {
             )
             .await;
 
-        // OK - explicit source
+        // OK - uses named source
         let res = cl
             .execute(
                 cl.post(&ingest_url)

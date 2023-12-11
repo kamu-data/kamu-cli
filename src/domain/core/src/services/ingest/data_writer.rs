@@ -26,10 +26,6 @@ use crate::{AddDataParams, CommitError, OwnedFile};
 /// to commit data into a dataset in bitemporal ledger form.
 #[async_trait::async_trait]
 pub trait DataWriter {
-    /// Returns final output schema of a data slice writer will be appending to
-    /// the dataset, if schema was previously defined.
-    async fn output_schema(&self) -> Option<SchemaRef>;
-
     // TODO: Avoid using Option<> and create empty DataFrame instead.
     // This would require us always knowing what the schema of data is (e.g. before
     // the first ingest run).

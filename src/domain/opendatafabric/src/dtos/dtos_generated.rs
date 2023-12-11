@@ -49,8 +49,8 @@ pub struct AddData {
 /// source.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct AddPushSource {
-    /// Name that identifies this source within this dataset.
-    pub source: String,
+    /// Identifies the source within this dataset.
+    pub source_name: Option<String>,
     /// Defines how data is read into structured format.
     pub read: ReadStep,
     /// Pre-processing query that shapes the data.
@@ -202,8 +202,8 @@ pub struct DisablePollingSource {}
 /// Disables the previously defined source.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct DisablePushSource {
-    /// Identifier of the source to be disabled.
-    pub source: String,
+    /// Identifies the source to be disabled.
+    pub source_name: Option<String>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////

@@ -485,10 +485,6 @@ impl DataWriterDataFusion {
 
 #[async_trait::async_trait]
 impl DataWriter for DataWriterDataFusion {
-    async fn output_schema(&self) -> Option<SchemaRef> {
-        self.meta.schema.clone()
-    }
-
     #[tracing::instrument(level = "info", skip_all)]
     async fn write(
         &mut self,
@@ -726,8 +722,7 @@ impl DataWriterDataFusionBuilder {
     /// Scans metadata chain to populate the needed metadata
     ///
     /// * `source_name` - name of the push source to use when extracting the
-    ///   metadata needed for writing. Pass `None` for the polling source or to
-    ///   use the first available push source.
+    ///   metadata needed for writing.
     pub async fn with_metadata_state_scanned(
         self,
         source_name: Option<&str>,
@@ -806,7 +801,7 @@ impl DataWriterDataFusionBuilder {
                     }
                     odf::MetadataEvent::AddPushSource(e) => {
                         if source_event.is_none() {
-                            if source_name.is_none() || source_name == Some(&e.source) {
+                            if source_name == e.source_name.as_deref() {
                                 source_event = Some(e.into());
                             }
                         }

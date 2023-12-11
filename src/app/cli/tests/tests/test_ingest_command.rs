@@ -25,7 +25,7 @@ async fn test_push_ingest_from_file() {
         name: "population".try_into().unwrap(),
         kind: DatasetKind::Root,
         metadata: vec![AddPushSource {
-            source: "foo".to_string(),
+            source_name: None,
             read: ReadStepNdJson {
                 schema: Some(vec![
                     "event_time TIMESTAMP".to_owned(),

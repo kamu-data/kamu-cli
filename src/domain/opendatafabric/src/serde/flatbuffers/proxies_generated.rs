@@ -5145,7 +5145,7 @@ impl<'a> flatbuffers::Follow<'a> for AddPushSource<'a> {
 }
 
 impl<'a> AddPushSource<'a> {
-    pub const VT_SOURCE: flatbuffers::VOffsetT = 4;
+    pub const VT_SOURCE_NAME: flatbuffers::VOffsetT = 4;
     pub const VT_READ_TYPE: flatbuffers::VOffsetT = 6;
     pub const VT_READ: flatbuffers::VOffsetT = 8;
     pub const VT_PREPROCESS_TYPE: flatbuffers::VOffsetT = 10;
@@ -5172,8 +5172,8 @@ impl<'a> AddPushSource<'a> {
         if let Some(x) = args.read {
             builder.add_read(x);
         }
-        if let Some(x) = args.source {
-            builder.add_source(x);
+        if let Some(x) = args.source_name {
+            builder.add_source_name(x);
         }
         builder.add_merge_type(args.merge_type);
         builder.add_preprocess_type(args.preprocess_type);
@@ -5182,13 +5182,13 @@ impl<'a> AddPushSource<'a> {
     }
 
     #[inline]
-    pub fn source(&self) -> Option<&'a str> {
+    pub fn source_name(&self) -> Option<&'a str> {
         // Safety:
         // Created from valid Table for this object
         // which contains a valid value in this slot
         unsafe {
             self._tab
-                .get::<flatbuffers::ForwardsUOffset<&str>>(AddPushSource::VT_SOURCE, None)
+                .get::<flatbuffers::ForwardsUOffset<&str>>(AddPushSource::VT_SOURCE_NAME, None)
         }
     }
     #[inline]
@@ -5452,7 +5452,7 @@ impl flatbuffers::Verifiable for AddPushSource<'_> {
     ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
         use self::flatbuffers::Verifiable;
         v.visit_table(pos)?
-     .visit_field::<flatbuffers::ForwardsUOffset<&str>>("source", Self::VT_SOURCE, false)?
+     .visit_field::<flatbuffers::ForwardsUOffset<&str>>("source_name", Self::VT_SOURCE_NAME, false)?
      .visit_union::<ReadStep, _>("read_type", Self::VT_READ_TYPE, "read", Self::VT_READ, false, |key, v, pos| {
         match key {
           ReadStep::ReadStepCsv => v.verify_union_variant::<flatbuffers::ForwardsUOffset<ReadStepCsv>>("ReadStep::ReadStepCsv", pos),
@@ -5485,7 +5485,7 @@ impl flatbuffers::Verifiable for AddPushSource<'_> {
     }
 }
 pub struct AddPushSourceArgs<'a> {
-    pub source: Option<flatbuffers::WIPOffset<&'a str>>,
+    pub source_name: Option<flatbuffers::WIPOffset<&'a str>>,
     pub read_type: ReadStep,
     pub read: Option<flatbuffers::WIPOffset<flatbuffers::UnionWIPOffset>>,
     pub preprocess_type: Transform,
@@ -5497,7 +5497,7 @@ impl<'a> Default for AddPushSourceArgs<'a> {
     #[inline]
     fn default() -> Self {
         AddPushSourceArgs {
-            source: None,
+            source_name: None,
             read_type: ReadStep::NONE,
             read: None,
             preprocess_type: Transform::NONE,
@@ -5514,9 +5514,11 @@ pub struct AddPushSourceBuilder<'a: 'b, 'b> {
 }
 impl<'a: 'b, 'b> AddPushSourceBuilder<'a, 'b> {
     #[inline]
-    pub fn add_source(&mut self, source: flatbuffers::WIPOffset<&'b str>) {
-        self.fbb_
-            .push_slot_always::<flatbuffers::WIPOffset<_>>(AddPushSource::VT_SOURCE, source);
+    pub fn add_source_name(&mut self, source_name: flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
+            AddPushSource::VT_SOURCE_NAME,
+            source_name,
+        );
     }
     #[inline]
     pub fn add_read_type(&mut self, read_type: ReadStep) {
@@ -5577,7 +5579,7 @@ impl<'a: 'b, 'b> AddPushSourceBuilder<'a, 'b> {
 impl core::fmt::Debug for AddPushSource<'_> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let mut ds = f.debug_struct("AddPushSource");
-        ds.field("source", &self.source());
+        ds.field("source_name", &self.source_name());
         ds.field("read_type", &self.read_type());
         match self.read_type() {
             ReadStep::ReadStepCsv => {
@@ -10767,7 +10769,7 @@ impl<'a> flatbuffers::Follow<'a> for DisablePushSource<'a> {
 }
 
 impl<'a> DisablePushSource<'a> {
-    pub const VT_SOURCE: flatbuffers::VOffsetT = 4;
+    pub const VT_SOURCE_NAME: flatbuffers::VOffsetT = 4;
 
     #[inline]
     pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
@@ -10779,20 +10781,20 @@ impl<'a> DisablePushSource<'a> {
         args: &'args DisablePushSourceArgs<'args>,
     ) -> flatbuffers::WIPOffset<DisablePushSource<'bldr>> {
         let mut builder = DisablePushSourceBuilder::new(_fbb);
-        if let Some(x) = args.source {
-            builder.add_source(x);
+        if let Some(x) = args.source_name {
+            builder.add_source_name(x);
         }
         builder.finish()
     }
 
     #[inline]
-    pub fn source(&self) -> Option<&'a str> {
+    pub fn source_name(&self) -> Option<&'a str> {
         // Safety:
         // Created from valid Table for this object
         // which contains a valid value in this slot
         unsafe {
             self._tab
-                .get::<flatbuffers::ForwardsUOffset<&str>>(DisablePushSource::VT_SOURCE, None)
+                .get::<flatbuffers::ForwardsUOffset<&str>>(DisablePushSource::VT_SOURCE_NAME, None)
         }
     }
 }
@@ -10805,18 +10807,22 @@ impl flatbuffers::Verifiable for DisablePushSource<'_> {
     ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
         use self::flatbuffers::Verifiable;
         v.visit_table(pos)?
-            .visit_field::<flatbuffers::ForwardsUOffset<&str>>("source", Self::VT_SOURCE, false)?
+            .visit_field::<flatbuffers::ForwardsUOffset<&str>>(
+                "source_name",
+                Self::VT_SOURCE_NAME,
+                false,
+            )?
             .finish();
         Ok(())
     }
 }
 pub struct DisablePushSourceArgs<'a> {
-    pub source: Option<flatbuffers::WIPOffset<&'a str>>,
+    pub source_name: Option<flatbuffers::WIPOffset<&'a str>>,
 }
 impl<'a> Default for DisablePushSourceArgs<'a> {
     #[inline]
     fn default() -> Self {
-        DisablePushSourceArgs { source: None }
+        DisablePushSourceArgs { source_name: None }
     }
 }
 
@@ -10826,9 +10832,11 @@ pub struct DisablePushSourceBuilder<'a: 'b, 'b> {
 }
 impl<'a: 'b, 'b> DisablePushSourceBuilder<'a, 'b> {
     #[inline]
-    pub fn add_source(&mut self, source: flatbuffers::WIPOffset<&'b str>) {
-        self.fbb_
-            .push_slot_always::<flatbuffers::WIPOffset<_>>(DisablePushSource::VT_SOURCE, source);
+    pub fn add_source_name(&mut self, source_name: flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
+            DisablePushSource::VT_SOURCE_NAME,
+            source_name,
+        );
     }
     #[inline]
     pub fn new(
@@ -10850,7 +10858,7 @@ impl<'a: 'b, 'b> DisablePushSourceBuilder<'a, 'b> {
 impl core::fmt::Debug for DisablePushSource<'_> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let mut ds = f.debug_struct("DisablePushSource");
-        ds.field("source", &self.source());
+        ds.field("source_name", &self.source_name());
         ds.finish()
     }
 }

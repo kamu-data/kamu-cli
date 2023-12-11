@@ -76,15 +76,15 @@ impl Into<dtos::AddData> for &dyn AddData {
 ////////////////////////////////////////////////////////////////////////////////
 
 pub trait AddPushSource {
-    fn source(&self) -> &str;
+    fn source_name(&self) -> Option<&str>;
     fn read(&self) -> ReadStep;
     fn preprocess(&self) -> Option<Transform>;
     fn merge(&self) -> MergeStrategy;
 }
 
 impl AddPushSource for dtos::AddPushSource {
-    fn source(&self) -> &str {
-        self.source.as_ref()
+    fn source_name(&self) -> Option<&str> {
+        self.source_name.as_ref().map(|v| -> &str { v.as_ref() })
     }
     fn read(&self) -> ReadStep {
         (&self.read).into()
@@ -100,7 +100,7 @@ impl AddPushSource for dtos::AddPushSource {
 impl Into<dtos::AddPushSource> for &dyn AddPushSource {
     fn into(self) -> dtos::AddPushSource {
         dtos::AddPushSource {
-            source: self.source().to_owned(),
+            source_name: self.source_name().map(|v| v.to_owned()),
             read: self.read().into(),
             preprocess: self.preprocess().map(|v| v.into()),
             merge: self.merge().into(),
@@ -369,19 +369,19 @@ impl Into<dtos::DisablePollingSource> for &dyn DisablePollingSource {
 ////////////////////////////////////////////////////////////////////////////////
 
 pub trait DisablePushSource {
-    fn source(&self) -> &str;
+    fn source_name(&self) -> Option<&str>;
 }
 
 impl DisablePushSource for dtos::DisablePushSource {
-    fn source(&self) -> &str {
-        self.source.as_ref()
+    fn source_name(&self) -> Option<&str> {
+        self.source_name.as_ref().map(|v| -> &str { v.as_ref() })
     }
 }
 
 impl Into<dtos::DisablePushSource> for &dyn DisablePushSource {
     fn into(self) -> dtos::DisablePushSource {
         dtos::DisablePushSource {
-            source: self.source().to_owned(),
+            source_name: self.source_name().map(|v| v.to_owned()),
         }
     }
 }

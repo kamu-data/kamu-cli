@@ -100,12 +100,12 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::AddPushSource {
     type OffsetT = WIPOffset<fb::AddPushSource<'fb>>;
 
     fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
-        let source_offset = { fb.create_string(&self.source) };
+        let source_name_offset = self.source_name.as_ref().map(|v| fb.create_string(&v));
         let read_offset = { self.read.serialize(fb) };
         let preprocess_offset = self.preprocess.as_ref().map(|v| v.serialize(fb));
         let merge_offset = { self.merge.serialize(fb) };
         let mut builder = fb::AddPushSourceBuilder::new(fb);
-        builder.add_source(source_offset);
+        source_name_offset.map(|off| builder.add_source_name(off));
         builder.add_read_type(read_offset.0);
         builder.add_read(read_offset.1);
         preprocess_offset.map(|(e, off)| {
@@ -121,7 +121,7 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::AddPushSource {
 impl<'fb> FlatbuffersDeserializable<fb::AddPushSource<'fb>> for odf::AddPushSource {
     fn deserialize(proxy: fb::AddPushSource<'fb>) -> Self {
         odf::AddPushSource {
-            source: proxy.source().map(|v| v.to_owned()).unwrap(),
+            source_name: proxy.source_name().map(|v| v.to_owned()),
             read: proxy
                 .read()
                 .map(|v| odf::ReadStep::deserialize(v, proxy.read_type()))
@@ -417,9 +417,9 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::DisablePushSource {
     type OffsetT = WIPOffset<fb::DisablePushSource<'fb>>;
 
     fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
-        let source_offset = { fb.create_string(&self.source) };
+        let source_name_offset = self.source_name.as_ref().map(|v| fb.create_string(&v));
         let mut builder = fb::DisablePushSourceBuilder::new(fb);
-        builder.add_source(source_offset);
+        source_name_offset.map(|off| builder.add_source_name(off));
         builder.finish()
     }
 }
@@ -427,7 +427,7 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::DisablePushSource {
 impl<'fb> FlatbuffersDeserializable<fb::DisablePushSource<'fb>> for odf::DisablePushSource {
     fn deserialize(proxy: fb::DisablePushSource<'fb>) -> Self {
         odf::DisablePushSource {
-            source: proxy.source().map(|v| v.to_owned()).unwrap(),
+            source_name: proxy.source_name().map(|v| v.to_owned()),
         }
     }
 }

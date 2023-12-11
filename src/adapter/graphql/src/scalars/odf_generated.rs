@@ -54,7 +54,7 @@ impl From<odf::AddData> for AddData {
 
 #[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct AddPushSource {
-    pub source: String,
+    pub source_name: Option<String>,
     pub read: ReadStep,
     pub preprocess: Option<Transform>,
     pub merge: MergeStrategy,
@@ -63,7 +63,7 @@ pub struct AddPushSource {
 impl From<odf::AddPushSource> for AddPushSource {
     fn from(v: odf::AddPushSource) -> Self {
         Self {
-            source: v.source.into(),
+            source_name: v.source_name.map(Into::into),
             read: v.read.into(),
             preprocess: v.preprocess.map(Into::into),
             merge: v.merge.into(),
@@ -282,13 +282,13 @@ impl From<odf::DisablePollingSource> for DisablePollingSource {
 
 #[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct DisablePushSource {
-    pub source: String,
+    pub source_name: Option<String>,
 }
 
 impl From<odf::DisablePushSource> for DisablePushSource {
     fn from(v: odf::DisablePushSource) -> Self {
         Self {
-            source: v.source.into(),
+            source_name: v.source_name.map(Into::into),
         }
     }
 }

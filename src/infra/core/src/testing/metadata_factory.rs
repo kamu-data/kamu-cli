@@ -281,7 +281,7 @@ impl AddPushSourceBuilder {
     fn new() -> Self {
         Self {
             v: AddPushSource {
-                source: "source_1".to_string(),
+                source_name: None,
                 read: ReadStepNdJson {
                     schema: None,
                     ..Default::default()
@@ -293,9 +293,9 @@ impl AddPushSourceBuilder {
         }
     }
 
-    pub fn source(mut self, name: impl Into<String>) -> Self {
+    pub fn source_name(mut self, name: impl Into<String>) -> Self {
         self.v = AddPushSource {
-            source: name.into(),
+            source_name: Some(name.into()),
             ..self.v
         };
         self

@@ -357,11 +357,8 @@ where
                             return Err(AppendValidationError::InvalidEvent(
                                 InvalidEventError::new(
                                     e.clone(),
-                                    format!(
-                                        "Cannot add a polling source while some push source '{}' \
-                                         is still active",
-                                        e.source
-                                    ),
+                                    "Cannot add a polling source while some push sources are \
+                                     still active",
                                 ),
                             )
                             .into());
