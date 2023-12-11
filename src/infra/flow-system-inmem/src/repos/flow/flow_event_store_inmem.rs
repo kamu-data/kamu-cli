@@ -14,7 +14,7 @@ use dill::*;
 use kamu_flow_system::*;
 use opendatafabric::DatasetID;
 
-use crate::dataset_flow_key::{BorrowedDatasetFlowKey, OwnedDatasetFlowKey};
+use crate::dataset_flow_key::BorrowedFlowKeyDataset;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -27,7 +27,7 @@ pub struct FlowEventStoreInMem {
 #[derive(Default)]
 struct State {
     events: Vec<FlowEvent>,
-    typed_flows_by_dataset: HashMap<OwnedDatasetFlowKey, Vec<FlowID>>,
+    typed_flows_by_dataset: HashMap<FlowKeyDataset, Vec<FlowID>>,
     all_flows_by_dataset: HashMap<DatasetID, Vec<FlowID>>,
     system_flows_by_type: HashMap<SystemFlowType, Vec<FlowID>>,
     all_system_flows: Vec<FlowID>,
@@ -77,9 +77,7 @@ impl FlowEventStoreInMem {
         if let FlowEvent::Initiated(e) = &event {
             match &e.flow_key {
                 FlowKey::Dataset(flow_key) => {
-                    let typed_entries = match state.typed_flows_by_dataset.entry(
-                        OwnedDatasetFlowKey::new(flow_key.dataset_id.clone(), flow_key.flow_type),
-                    ) {
+                    let typed_entries = match state.typed_flows_by_dataset.entry(flow_key.clone()) {
                         Entry::Occupied(v) => v.into_mut(),
                         Entry::Vacant(v) => v.insert(Vec::default()),
                     };
@@ -154,7 +152,7 @@ impl FlowEventStore for FlowEventStoreInMem {
         let state = self.inner.as_state();
         let g = state.lock().unwrap();
         g.typed_flows_by_dataset
-            .get(BorrowedDatasetFlowKey::new(&dataset_id, flow_type).as_trait())
+            .get(BorrowedFlowKeyDataset::new(&dataset_id, flow_type).as_trait())
             .and_then(|flows| flows.last().cloned())
     }
 
@@ -175,7 +173,7 @@ impl FlowEventStore for FlowEventStoreInMem {
 
         // TODO: This should be a buffered stream so we don't lock per record
         Box::pin(async_stream::try_stream! {
-            let borrowed_key = BorrowedDatasetFlowKey::new(&dataset_id, flow_type);
+            let borrowed_key = BorrowedFlowKeyDataset::new(&dataset_id, flow_type);
 
             let mut pos = {
                 let state = self.inner.as_state();

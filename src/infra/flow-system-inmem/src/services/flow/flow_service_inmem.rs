@@ -171,11 +171,9 @@ impl FlowServiceInMemory {
                 }
 
                 let mut state = self.state.lock().unwrap();
-                state.active_configs.add_dataset_flow_config(
-                    &dataset_flow_key.dataset_id,
-                    dataset_flow_key.flow_type,
-                    rule,
-                );
+                state
+                    .active_configs
+                    .add_dataset_flow_config(&dataset_flow_key, rule);
             }
             FlowKey::System(system_flow_key) => {
                 if let FlowConfigurationRule::Schedule(schedule) = &rule {

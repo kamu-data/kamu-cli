@@ -19,7 +19,7 @@ use crate::dataset_flow_key::*;
 
 #[derive(Default)]
 pub(crate) struct PendingFlowsState {
-    pending_dataset_flows: HashMap<OwnedDatasetFlowKey, FlowID>,
+    pending_dataset_flows: HashMap<FlowKeyDataset, FlowID>,
     pending_system_flows: HashMap<SystemFlowType, FlowID>,
     pending_flows_by_tasks: HashMap<TaskID, FlowID>,
 }
@@ -28,10 +28,7 @@ impl PendingFlowsState {
     pub fn add_pending_flow(&mut self, flow_key: FlowKey, flow_id: FlowID) {
         match flow_key {
             FlowKey::Dataset(flow_key) => {
-                self.pending_dataset_flows.insert(
-                    OwnedDatasetFlowKey::new(flow_key.dataset_id, flow_key.flow_type),
-                    flow_id,
-                );
+                self.pending_dataset_flows.insert(flow_key, flow_id);
             }
             FlowKey::System(flow_key) => {
                 self.pending_system_flows
@@ -59,7 +56,7 @@ impl PendingFlowsState {
         flow_type: DatasetFlowType,
     ) -> Option<FlowID> {
         self.pending_dataset_flows
-            .remove(BorrowedDatasetFlowKey::new(dataset_id, flow_type).as_trait())
+            .remove(BorrowedFlowKeyDataset::new(dataset_id, flow_type).as_trait())
     }
 
     pub fn untrack_flow_by_task(&mut self, task_id: TaskID) {
@@ -71,7 +68,7 @@ impl PendingFlowsState {
             FlowKey::Dataset(flow_key) => self
                 .pending_dataset_flows
                 .get(
-                    BorrowedDatasetFlowKey::new(&flow_key.dataset_id, flow_key.flow_type)
+                    BorrowedFlowKeyDataset::new(&flow_key.dataset_id, flow_key.flow_type)
                         .as_trait(),
                 )
                 .cloned(),

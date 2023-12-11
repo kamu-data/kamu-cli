@@ -10,35 +10,18 @@
 use std::borrow::Borrow;
 use std::hash::{Hash, Hasher};
 
-use kamu_flow_system::DatasetFlowType;
+use kamu_flow_system::{DatasetFlowType, FlowKeyDataset};
 use opendatafabric::DatasetID;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Eq, PartialEq, Hash, Clone)]
-pub(crate) struct OwnedDatasetFlowKey {
-    dataset_id: DatasetID,
-    flow_type: DatasetFlowType,
-}
-
-impl OwnedDatasetFlowKey {
-    pub fn new(dataset_id: DatasetID, flow_type: DatasetFlowType) -> Self {
-        Self {
-            dataset_id,
-            flow_type,
-        }
-    }
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
 #[derive(Copy, Clone, Hash, PartialEq, Eq)]
-pub(crate) struct BorrowedDatasetFlowKey<'a> {
+pub(crate) struct BorrowedFlowKeyDataset<'a> {
     dataset_id: &'a DatasetID,
     flow_type: DatasetFlowType,
 }
 
-impl<'a> BorrowedDatasetFlowKey<'a> {
+impl<'a> BorrowedFlowKeyDataset<'a> {
     pub fn new(dataset_id: &'a DatasetID, flow_type: DatasetFlowType) -> Self {
         Self {
             dataset_id,
@@ -46,47 +29,47 @@ impl<'a> BorrowedDatasetFlowKey<'a> {
         }
     }
 
-    pub fn as_trait(&self) -> &dyn BorrowedDatasetFlowKeyHelper {
-        self as &dyn BorrowedDatasetFlowKeyHelper
+    pub fn as_trait(&self) -> &dyn BorrowedFlowKeyDatasetHelper {
+        self as &dyn BorrowedFlowKeyDatasetHelper
     }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) trait BorrowedDatasetFlowKeyHelper {
-    fn borrowed_key(&self) -> BorrowedDatasetFlowKey;
+pub(crate) trait BorrowedFlowKeyDatasetHelper {
+    fn borrowed_key(&self) -> BorrowedFlowKeyDataset;
 }
 
-impl BorrowedDatasetFlowKeyHelper for OwnedDatasetFlowKey {
-    fn borrowed_key(&self) -> BorrowedDatasetFlowKey {
-        BorrowedDatasetFlowKey {
+impl BorrowedFlowKeyDatasetHelper for FlowKeyDataset {
+    fn borrowed_key(&self) -> BorrowedFlowKeyDataset {
+        BorrowedFlowKeyDataset {
             dataset_id: &self.dataset_id,
             flow_type: self.flow_type,
         }
     }
 }
 
-impl BorrowedDatasetFlowKeyHelper for BorrowedDatasetFlowKey<'_> {
-    fn borrowed_key(&self) -> BorrowedDatasetFlowKey {
+impl BorrowedFlowKeyDatasetHelper for BorrowedFlowKeyDataset<'_> {
+    fn borrowed_key(&self) -> BorrowedFlowKeyDataset {
         *self
     }
 }
 
-impl<'a> Borrow<dyn BorrowedDatasetFlowKeyHelper + 'a> for OwnedDatasetFlowKey {
-    fn borrow(&self) -> &(dyn BorrowedDatasetFlowKeyHelper + 'a) {
+impl<'a> Borrow<dyn BorrowedFlowKeyDatasetHelper + 'a> for FlowKeyDataset {
+    fn borrow(&self) -> &(dyn BorrowedFlowKeyDatasetHelper + 'a) {
         self
     }
 }
 
-impl Eq for (dyn BorrowedDatasetFlowKeyHelper + '_) {}
+impl Eq for (dyn BorrowedFlowKeyDatasetHelper + '_) {}
 
-impl PartialEq for (dyn BorrowedDatasetFlowKeyHelper + '_) {
-    fn eq(&self, other: &dyn BorrowedDatasetFlowKeyHelper) -> bool {
+impl PartialEq for (dyn BorrowedFlowKeyDatasetHelper + '_) {
+    fn eq(&self, other: &dyn BorrowedFlowKeyDatasetHelper) -> bool {
         self.borrowed_key().eq(&other.borrowed_key())
     }
 }
 
-impl<'a> Hash for (dyn BorrowedDatasetFlowKeyHelper + 'a) {
+impl<'a> Hash for (dyn BorrowedFlowKeyDatasetHelper + 'a) {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.borrowed_key().hash(state)
     }
