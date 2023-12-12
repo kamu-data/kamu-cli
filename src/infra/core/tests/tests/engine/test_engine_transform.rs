@@ -239,6 +239,7 @@ async fn test_transform_common(transform: Transform) {
     let catalog = dill::CatalogBuilder::new()
         .add::<EventBus>()
         .add::<kamu_core::auth::AlwaysHappyDatasetActionAuthorizer>()
+        .add::<kamu::DependencyGraphServiceInMemory>()
         .add_value(CurrentAccountSubject::new_test())
         .add_builder(
             DatasetRepositoryLocalFs::builder()

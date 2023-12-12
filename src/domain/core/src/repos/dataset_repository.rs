@@ -72,11 +72,6 @@ pub trait DatasetRepository: DatasetRegistry + Sync + Send {
     ) -> Result<(), RenameDatasetError>;
 
     async fn delete_dataset(&self, dataset_ref: &DatasetRef) -> Result<(), DeleteDatasetError>;
-
-    fn get_downstream_dependencies<'s>(
-        &'s self,
-        dataset_ref: &'s DatasetRef,
-    ) -> DatasetHandleStream<'s>;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

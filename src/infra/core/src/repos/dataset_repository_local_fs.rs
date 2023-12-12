@@ -14,7 +14,6 @@ use async_trait::async_trait;
 use dill::*;
 use domain::auth::{DatasetAction, DatasetActionAuthorizer, DEFAULT_ACCOUNT_NAME};
 use event_bus::EventBus;
-use futures::TryStreamExt;
 use kamu_core::*;
 use opendatafabric::*;
 use url::Url;
@@ -26,6 +25,7 @@ use crate::*;
 pub struct DatasetRepositoryLocalFs {
     storage_strategy: Box<dyn DatasetStorageStrategy>,
     dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
+    dependency_graph_service: Arc<dyn DependencyGraphService>,
     event_bus: Arc<EventBus>,
     thrash_lock: tokio::sync::Mutex<()>,
 }
@@ -38,6 +38,7 @@ impl DatasetRepositoryLocalFs {
         root: PathBuf,
         current_account_subject: Arc<CurrentAccountSubject>,
         dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
+        dependency_graph_service: Arc<dyn DependencyGraphService>,
         event_bus: Arc<EventBus>,
         multi_tenant: bool,
     ) -> Self {
@@ -51,6 +52,7 @@ impl DatasetRepositoryLocalFs {
                 Box::new(DatasetSingleTenantStorageStrategy::new(root))
             },
             dataset_action_authorizer,
+            dependency_graph_service,
             event_bus,
             thrash_lock: tokio::sync::Mutex::new(()),
         }
@@ -60,6 +62,7 @@ impl DatasetRepositoryLocalFs {
         root: impl Into<PathBuf>,
         current_account_subject: Arc<CurrentAccountSubject>,
         dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
+        dependency_graph_service: Arc<dyn DependencyGraphService>,
         event_bus: Arc<EventBus>,
         multi_tenant: bool,
     ) -> Result<Self, std::io::Error> {
@@ -69,6 +72,7 @@ impl DatasetRepositoryLocalFs {
             root,
             current_account_subject,
             dataset_action_authorizer,
+            dependency_graph_service,
             event_bus,
             multi_tenant,
         ))
@@ -263,6 +267,12 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
             "Created new dataset",
         );
 
+        self.event_bus
+            .dispatch_event(events::DatasetEventCreated {
+                dataset_id: dataset_handle.id.clone(),
+            })
+            .await?;
+
         Ok(CreateDatasetResult {
             dataset_handle,
             dataset: Arc::new(dataset),
@@ -313,11 +323,25 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
             Err(GetDatasetError::Internal(e)) => Err(DeleteDatasetError::Internal(e)),
         }?;
 
-        let children: Vec<_> = get_downstream_dependencies_impl(self, dataset_ref)
-            .try_collect()
-            .await?;
+        use tokio_stream::StreamExt;
+        let downstream_dataset_ids: Vec<_> = self
+            .dependency_graph_service
+            .get_downstream_dependencies(&dataset_handle.id)
+            .await
+            .int_err()?
+            .collect()
+            .await;
 
-        if !children.is_empty() {
+        if !downstream_dataset_ids.is_empty() {
+            let mut children = Vec::with_capacity(downstream_dataset_ids.len());
+            for downstream_dataset_id in downstream_dataset_ids {
+                let hdl = self
+                    .resolve_dataset_ref(&downstream_dataset_id.as_local_ref())
+                    .await
+                    .int_err()?;
+                children.push(hdl);
+            }
+
             return Err(DanglingReferenceError {
                 dataset_handle,
                 children,
@@ -350,13 +374,6 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
             .await?;
 
         Ok(())
-    }
-
-    fn get_downstream_dependencies<'s>(
-        &'s self,
-        dataset_ref: &'s DatasetRef,
-    ) -> DatasetHandleStream<'s> {
-        Box::pin(get_downstream_dependencies_impl(self, dataset_ref))
     }
 }
 

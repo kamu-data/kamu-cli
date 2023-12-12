@@ -17,7 +17,7 @@ use dill::Component;
 use event_bus::EventBus;
 use indoc::indoc;
 use kamu::testing::MetadataFactory;
-use kamu::DatasetRepositoryLocalFs;
+use kamu::{DatasetRepositoryLocalFs, DependencyGraphServiceInMemory};
 use kamu_core::*;
 use kamu_data_utils::testing::{assert_data_eq, assert_schema_eq};
 use kamu_ingest_datafusion::*;
@@ -435,6 +435,7 @@ impl Harness {
 
         let catalog = dill::CatalogBuilder::new()
             .add::<EventBus>()
+            .add::<DependencyGraphServiceInMemory>()
             .add::<kamu_core::auth::AlwaysHappyDatasetActionAuthorizer>()
             .add_value(CurrentAccountSubject::new_test())
             .add_builder(

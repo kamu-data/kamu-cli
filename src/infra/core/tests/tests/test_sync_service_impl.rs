@@ -151,6 +151,7 @@ async fn do_test_sync(
 
     let catalog = dill::CatalogBuilder::new()
         .add::<EventBus>()
+        .add::<DependencyGraphServiceInMemory>()
         .add_value(ipfs_gateway)
         .add_value(ipfs_client)
         .add_value(CurrentAccountSubject::new_test())

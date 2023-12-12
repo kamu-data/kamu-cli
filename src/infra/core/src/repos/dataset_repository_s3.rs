@@ -12,13 +12,12 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use dill::*;
 use event_bus::EventBus;
-use futures::TryStreamExt;
 use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer, DEFAULT_ACCOUNT_NAME};
 use kamu_core::*;
 use opendatafabric::*;
 use url::Url;
 
-use super::{get_downstream_dependencies_impl, DatasetFactoryImpl};
+use super::DatasetFactoryImpl;
 use crate::utils::s3_context::S3Context;
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -28,6 +27,7 @@ pub struct DatasetRepositoryS3 {
     s3_context: S3Context,
     current_account_subject: Arc<CurrentAccountSubject>,
     dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
+    dependency_graph_service: Arc<dyn DependencyGraphService>,
     event_bus: Arc<EventBus>,
     multi_tenant: bool,
 }
@@ -39,6 +39,7 @@ impl DatasetRepositoryS3 {
         s3_context: S3Context,
         current_account_subject: Arc<CurrentAccountSubject>,
         dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
+        dependency_graph_service: Arc<dyn DependencyGraphService>,
         event_bus: Arc<EventBus>,
         multi_tenant: bool,
     ) -> Self {
@@ -46,6 +47,7 @@ impl DatasetRepositoryS3 {
             s3_context,
             current_account_subject,
             dataset_action_authorizer,
+            dependency_graph_service,
             event_bus,
             multi_tenant,
         }
@@ -299,6 +301,12 @@ impl DatasetRepository for DatasetRepositoryS3 {
 
         let dataset_handle = DatasetHandle::new(dataset_id, dataset_alias.clone());
 
+        self.event_bus
+            .dispatch_event(events::DatasetEventCreated {
+                dataset_id: dataset_handle.id.clone(),
+            })
+            .await?;
+        
         tracing::info!(
             id = %dataset_handle.id,
             alias = %dataset_handle.alias,
@@ -354,11 +362,25 @@ impl DatasetRepository for DatasetRepositoryS3 {
             Err(GetDatasetError::Internal(e)) => return Err(DeleteDatasetError::Internal(e)),
         };
 
-        let children: Vec<_> = get_downstream_dependencies_impl(self, dataset_ref)
-            .try_collect()
-            .await?;
+        use tokio_stream::StreamExt;
+        let downstream_dataset_ids: Vec<_> = self
+            .dependency_graph_service
+            .get_downstream_dependencies(&dataset_handle.id)
+            .await
+            .int_err()?
+            .collect()
+            .await;
 
-        if !children.is_empty() {
+        if !downstream_dataset_ids.is_empty() {
+            let mut children = Vec::with_capacity(downstream_dataset_ids.len());
+            for downstream_dataset_id in downstream_dataset_ids {
+                let hdl = self
+                    .resolve_dataset_ref(&downstream_dataset_id.as_local_ref())
+                    .await
+                    .int_err()?;
+                children.push(hdl);
+            }
+
             return Err(DanglingReferenceError {
                 dataset_handle,
                 children,
@@ -381,13 +403,6 @@ impl DatasetRepository for DatasetRepositoryS3 {
             .await?;
 
         Ok(())
-    }
-
-    fn get_downstream_dependencies<'s>(
-        &'s self,
-        dataset_ref: &'s DatasetRef,
-    ) -> DatasetHandleStream<'s> {
-        Box::pin(get_downstream_dependencies_impl(self, dataset_ref))
     }
 }
 

@@ -114,6 +114,7 @@ impl ResetTestHarness {
 
         let catalog = dill::CatalogBuilder::new()
             .add::<EventBus>()
+            .add::<DependencyGraphServiceInMemory>()
             .add_value(CurrentAccountSubject::new_test())
             .add_value(MockDatasetActionAuthorizer::new().expect_check_write_a_dataset(1))
             .bind::<dyn auth::DatasetActionAuthorizer, MockDatasetActionAuthorizer>()

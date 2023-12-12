@@ -68,6 +68,7 @@ impl Kamu {
     pub async fn get_last_data_slice(&self, dataset_name: &DatasetName) -> ParquetReaderHelper {
         let catalog = dill::CatalogBuilder::new()
             .add::<EventBus>()
+            .add::<DependencyGraphServiceInMemory>()
             .add_value(self.current_account.to_current_account_subject())
             .add::<domain::auth::AlwaysHappyDatasetActionAuthorizer>()
             .add_builder(
@@ -133,6 +134,7 @@ impl Kamu {
 
         let catalog = dill::CatalogBuilder::new()
             .add::<EventBus>()
+            .add::<DependencyGraphServiceInMemory>()
             .add_value(self.current_account.to_current_account_subject())
             .add::<domain::auth::AlwaysHappyDatasetActionAuthorizer>()
             .add_builder(

@@ -239,6 +239,7 @@ async fn test_engine_io_local_file_mount() {
     let catalog = dill::CatalogBuilder::new()
         .add::<EventBus>()
         .add::<kamu_core::auth::AlwaysHappyDatasetActionAuthorizer>()
+        .add::<kamu::DependencyGraphServiceInMemory>()
         .add_value(CurrentAccountSubject::new_test())
         .add_builder(
             DatasetRepositoryLocalFs::builder()
@@ -280,6 +281,7 @@ async fn test_engine_io_s3_to_local_file_mount_proxy() {
     let catalog = dill::CatalogBuilder::new()
         .add::<EventBus>()
         .add::<kamu_core::auth::AlwaysHappyDatasetActionAuthorizer>()
+        .add::<kamu::DependencyGraphServiceInMemory>()
         .add_value(CurrentAccountSubject::new_test())
         .add_builder(
             DatasetRepositoryS3::builder()

@@ -23,7 +23,7 @@ use kamu::domain::{
     ResultIntoInternal,
 };
 use kamu::testing::{MetadataFactory, MockDatasetActionAuthorizer};
-use kamu::DatasetRepositoryLocalFs;
+use kamu::{DatasetRepositoryLocalFs, DependencyGraphServiceInMemory};
 use mockall::predicate::{eq, function};
 use opendatafabric::{DatasetAlias, DatasetHandle, DatasetKind, DatasetName, DatasetRef};
 use url::Url;
@@ -214,6 +214,7 @@ impl ServerHarness {
 
         let mut catalog_builder = dill::CatalogBuilder::new();
         catalog_builder.add::<EventBus>();
+        catalog_builder.add::<DependencyGraphServiceInMemory>();
         catalog_builder.add_value(
             kamu::testing::MockAuthenticationService::resolving_token(kamu::domain::auth::DUMMY_ACCESS_TOKEN, kamu::domain::auth::AccountInfo::dummy())
         )

@@ -12,6 +12,8 @@ use opendatafabric::DatasetID;
 use thiserror::Error;
 use tokio_stream::Stream;
 
+use crate::DatasetRepository;
+
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
@@ -22,23 +24,29 @@ pub trait DependencyGraphService: Sync + Send {
         dataset_id: &DatasetID,
     ) -> Result<DatasetIDStream, GetDownstreamDependenciesError>;
 
-    /// Tracks a dependency between upstream and downstream dataset
-    ///
-    /// TODO: connect to event bus
-    async fn add_dependency(
+    /// Iterates over 1st level of dataset's upstream dependencies
+    async fn get_upstream_dependencies(
         &self,
-        dataset_upstream_id: &DatasetID,
-        dataset_downstream_id: &DatasetID,
-    ) -> Result<(), AddDependencyError>;
+        dataset_id: &DatasetID,
+    ) -> Result<DatasetIDStream, GetUpstreamDependenciesError>;
+}
 
-    /// Removes tracked dependency between updstream and downstream dataset
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait::async_trait]
+pub trait DependencyGraphServiceInitializer: Send + Sync {
+    /// Runs full scan of the dataset dependencies, and builds the initial
+    /// graph. Note: passing dataset repository as an argument, as it
+    /// requires system `CurrentAccountSubject``.
     ///
-    /// TODO: connect to event bus
-    async fn remove_dependency(
+    /// If scanning has already succeedded, the request is ignored, unless
+    /// `force` flag is specified.
+    /// It's an error to execute multiple full scans in parallel.
+    async fn full_scan(
         &self,
-        dataset_upstream_id: &DatasetID,
-        dataset_downstream_id: &DatasetID,
-    ) -> Result<(), RemoveDependencyError>;
+        dataset_repo: &dyn DatasetRepository,
+        force: bool,
+    ) -> Result<(), DependenciesScanError>;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -48,33 +56,41 @@ pub type DatasetIDStream<'a> = std::pin::Pin<Box<dyn Stream<Item = DatasetID> + 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
+pub enum DependenciesScanError {
+    #[error(transparent)]
+    AlreadyScanning(#[from] DependenciesAlreadyScanningError),
+
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+
+#[derive(Error, Debug)]
 pub enum GetDownstreamDependenciesError {
+    #[error(transparent)]
+    NotScanned(DependenciesNotScannedError),
+
     #[error(transparent)]
     DatasetNotFound(#[from] DatasetNodeNotFoundError),
 }
 
 #[derive(Error, Debug)]
-pub enum AddDependencyError {
+pub enum GetUpstreamDependenciesError {
     #[error(transparent)]
-    Internal(#[from] InternalError),
-}
+    NotScanned(DependenciesNotScannedError),
 
-#[derive(Error, Debug)]
-pub enum RemoveDependencyError {
     #[error(transparent)]
-    Internal(#[from] InternalError),
-    #[error(transparent)]
-    NotFound(#[from] DependencyEdgeNotFoundError),
+    DatasetNotFound(#[from] DatasetNodeNotFoundError),
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
-#[error("Dependency between {dataset_upstream_id} and {dataset_downstream_id} not found")]
-pub struct DependencyEdgeNotFoundError {
-    pub dataset_upstream_id: DatasetID,
-    pub dataset_downstream_id: DatasetID,
-}
+#[error("No dependencies data initialized")]
+pub struct DependenciesNotScannedError {}
+
+#[derive(Error, Debug)]
+#[error("Dependencies are already being scanned at the moment")]
+pub struct DependenciesAlreadyScanningError {}
 
 #[derive(Error, Debug)]
 #[error("Dataset {dataset_id} not found")]

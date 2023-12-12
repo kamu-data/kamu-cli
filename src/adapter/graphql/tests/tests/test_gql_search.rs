@@ -21,6 +21,7 @@ async fn query() {
 
     let cat = dill::CatalogBuilder::new()
         .add::<EventBus>()
+        .add::<DependencyGraphServiceInMemory>()
         .add_value(CurrentAccountSubject::new_test())
         .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
         .add_builder(

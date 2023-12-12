@@ -13,7 +13,7 @@ use event_bus::EventBus;
 use kamu::domain::{auth, CurrentAccountSubject};
 use kamu::testing::{LocalS3Server, MockDatasetActionAuthorizer};
 use kamu::utils::s3_context::S3Context;
-use kamu::DatasetRepositoryS3;
+use kamu::{DatasetRepositoryS3, DependencyGraphServiceInMemory};
 use opendatafabric::AccountName;
 
 use super::test_dataset_repository_shared;
@@ -34,6 +34,7 @@ async fn s3_repo(
         s3_context,
         Arc::new(CurrentAccountSubject::new_test()),
         dataset_action_authorizer,
+        Arc::new(DependencyGraphServiceInMemory::new()),
         event_bus,
         multi_tenant,
     )

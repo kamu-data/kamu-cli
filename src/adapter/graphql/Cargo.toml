@@ -36,6 +36,7 @@ indoc = "2"
 serde = "1"
 serde_json = "1"
 tokio = { version = "1", default-features = false, features = [] }
+tokio-stream = { version = "0.1", default-features = false }
 tracing = "0.1"
 thiserror = { version = "1", default-features = false }
 

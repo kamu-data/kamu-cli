@@ -544,6 +544,7 @@ impl GraphQLDatasetsHarness {
 
         let base_catalog = dill::CatalogBuilder::new()
             .add::<EventBus>()
+            .add::<DependencyGraphServiceInMemory>()
             .add_builder(
                 DatasetRepositoryLocalFs::builder()
                     .with_root(datasets_dir)

@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use chrono::prelude::*;
-use futures::TryStreamExt;
 use kamu_core::{self as domain, MetadataChainExt, TryStreamExtExt};
 use opendatafabric as odf;
 use opendatafabric::{AsTypedBlock, VariantOf};
@@ -93,39 +92,59 @@ impl DatasetMetadata {
 
     /// Current upstream dependencies of a dataset
     async fn current_upstream_dependencies(&self, ctx: &Context<'_>) -> Result<Vec<Dataset>> {
-        let dataset_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
+        let dependency_graph_service =
+            from_catalog::<dyn domain::DependencyGraphService>(ctx).unwrap();
 
-        let dataset = self.get_dataset(ctx).await?;
-        let summary = dataset
-            .get_summary(domain::GetSummaryOpts::default())
+        use tokio_stream::StreamExt;
+        let upstream_dataset_ids: Vec<_> = dependency_graph_service
+            .get_upstream_dependencies(&self.dataset_handle.id)
             .await
-            .int_err()?;
+            .int_err()?
+            .collect()
+            .await;
 
-        let mut dependencies: Vec<_> = Vec::new();
-        for input in summary.dependencies.into_iter() {
-            let dataset_id = input.id.unwrap().clone();
-            let dataset_handle = dataset_repo
-                .resolve_dataset_ref(&dataset_id.as_local_ref())
+        let dataset_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
+        let mut upstream = Vec::with_capacity(upstream_dataset_ids.len());
+        for upstream_dataset_id in upstream_dataset_ids {
+            let hdl = dataset_repo
+                .resolve_dataset_ref(&upstream_dataset_id.as_local_ref())
                 .await
                 .int_err()?;
-            dependencies.push(Dataset::new(
-                Account::from_dataset_alias(ctx, &dataset_handle.alias),
-                dataset_handle,
+            upstream.push(Dataset::new(
+                Account::from_dataset_alias(ctx, &hdl.alias),
+                hdl,
             ));
         }
-        Ok(dependencies)
+
+        Ok(upstream)
     }
 
     // TODO: Convert to collection
     /// Current downstream dependencies of a dataset
     async fn current_downstream_dependencies(&self, ctx: &Context<'_>) -> Result<Vec<Dataset>> {
-        let dataset_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
+        let dependency_graph_service =
+            from_catalog::<dyn domain::DependencyGraphService>(ctx).unwrap();
 
-        let downstream: Vec<_> = dataset_repo
-            .get_downstream_dependencies(&self.dataset_handle.as_local_ref())
-            .map_ok(|hdl| Dataset::new(Account::from_dataset_alias(ctx, &hdl.alias), hdl))
-            .try_collect()
-            .await?;
+        use tokio_stream::StreamExt;
+        let downstream_dataset_ids: Vec<_> = dependency_graph_service
+            .get_downstream_dependencies(&self.dataset_handle.id)
+            .await
+            .int_err()?
+            .collect()
+            .await;
+
+        let dataset_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
+        let mut downstream = Vec::with_capacity(downstream_dataset_ids.len());
+        for downstream_dataset_id in downstream_dataset_ids {
+            let hdl = dataset_repo
+                .resolve_dataset_ref(&downstream_dataset_id.as_local_ref())
+                .await
+                .int_err()?;
+            downstream.push(Dataset::new(
+                Account::from_dataset_alias(ctx, &hdl.alias),
+                hdl,
+            ));
+        }
 
         Ok(downstream)
     }

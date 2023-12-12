@@ -13,10 +13,11 @@ use std::sync::{Arc, Mutex};
 use dill::*;
 use event_bus::AsyncEventHandler;
 use internal_error::InternalError;
-use kamu_core::events::DatasetEventDeleted;
+use kamu_core::events::{DatasetEventCreated, DatasetEventDeleted};
 use kamu_core::*;
 use opendatafabric::DatasetID;
 use petgraph::stable_graph::{NodeIndex, StableDiGraph};
+use petgraph::Direction;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -26,16 +27,38 @@ pub struct DependencyGraphServiceInMemory {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Default)]
 struct State {
     datasets_graph: StableDiGraph<DatasetID, ()>,
     dataset_node_indices: HashMap<DatasetID, NodeIndex>,
+    status: DependenciesGraphStatus,
+}
+
+enum DependenciesGraphStatus {
+    NotScanned,
+    Scanning,
+    Scanned,
+}
+
+impl Default for DependenciesGraphStatus {
+    fn default() -> Self {
+        Self::NotScanned
+    }
 }
 
 impl State {
-    pub fn new() -> Self {
-        Self {
-            datasets_graph: StableDiGraph::default(),
-            dataset_node_indices: HashMap::new(),
+    fn reset(&mut self) {
+        self.datasets_graph.clear();
+        self.dataset_node_indices.clear();
+        self.status = DependenciesGraphStatus::NotScanned;
+    }
+
+    fn ensure_scanned(&self) -> Result<(), DependenciesNotScannedError> {
+        match self.status {
+            DependenciesGraphStatus::NotScanned | DependenciesGraphStatus::Scanning => {
+                Err(DependenciesNotScannedError {})
+            }
+            DependenciesGraphStatus::Scanned => Ok(()),
         }
     }
 
@@ -54,7 +77,12 @@ impl State {
     fn get_or_create_dataset_node(&mut self, dataset_id: &DatasetID) -> NodeIndex {
         match self.dataset_node_indices.get(dataset_id) {
             Some(index) => index.to_owned(),
-            None => self.datasets_graph.add_node(dataset_id.clone()),
+            None => {
+                let node_index = self.datasets_graph.add_node(dataset_id.clone());
+                self.dataset_node_indices
+                    .insert(dataset_id.clone(), node_index);
+                node_index
+            }
         }
     }
 }
@@ -63,12 +91,49 @@ impl State {
 
 #[component(pub)]
 #[interface(dyn DependencyGraphService)]
+#[interface(dyn DependencyGraphServiceInitializer)]
+#[interface(dyn AsyncEventHandler<DatasetEventCreated>)]
 #[interface(dyn AsyncEventHandler<DatasetEventDeleted>)]
 #[scope(Singleton)]
 impl DependencyGraphServiceInMemory {
     pub fn new() -> Self {
         Self {
-            state: Arc::new(Mutex::new(State::new())),
+            state: Arc::new(Mutex::new(State::default())),
+        }
+    }
+
+    /// Tracks a dependency between upstream and downstream dataset
+    fn add_dependency(&self, dataset_upstream_id: &DatasetID, dataset_downstream_id: &DatasetID) {
+        tracing::debug!(downstream=%dataset_downstream_id, upstream=%dataset_upstream_id, "Adding dataset dependency");
+
+        let mut state = self.state.lock().unwrap();
+
+        let upstream_node_index = state.get_or_create_dataset_node(dataset_upstream_id);
+        let downstream_node_index = state.get_or_create_dataset_node(dataset_downstream_id);
+        state
+            .datasets_graph
+            .update_edge(upstream_node_index, downstream_node_index, ());
+    }
+
+    /// Removes tracked dependency between updstream and downstream dataset
+    fn _remove_dependency(
+        &self,
+        dataset_upstream_id: &DatasetID,
+        dataset_downstream_id: &DatasetID,
+    ) {
+        tracing::debug!(downstream=%dataset_downstream_id, upstream=%dataset_upstream_id, "Removing dataset dependency");
+
+        let mut state = self.state.lock().unwrap();
+
+        let upstream_node_index = state.get_or_create_dataset_node(dataset_upstream_id);
+        let downstream_node_index = state.get_or_create_dataset_node(dataset_downstream_id);
+
+        // Idempotent DELETE - ignore, if not found
+        if let Some(edge_index) = state
+            .datasets_graph
+            .find_edge(upstream_node_index, downstream_node_index)
+        {
+            state.datasets_graph.remove_edge(edge_index);
         }
     }
 }
@@ -84,6 +149,9 @@ impl DependencyGraphService for DependencyGraphServiceInMemory {
     ) -> Result<DatasetIDStream, GetDownstreamDependenciesError> {
         let downstream_node_datasets: Vec<_> = {
             let state = self.state.lock().unwrap();
+            state
+                .ensure_scanned()
+                .map_err(|e| GetDownstreamDependenciesError::NotScanned(e))?;
 
             let node_index = state
                 .get_dataset_node(dataset_id)
@@ -91,7 +159,7 @@ impl DependencyGraphService for DependencyGraphServiceInMemory {
 
             state
                 .datasets_graph
-                .neighbors(node_index)
+                .neighbors_directed(node_index, Direction::Outgoing)
                 .map(|node_index| {
                     state
                         .datasets_graph
@@ -105,52 +173,105 @@ impl DependencyGraphService for DependencyGraphServiceInMemory {
         Ok(Box::pin(tokio_stream::iter(downstream_node_datasets)))
     }
 
-    /// Tracks a dependency between upstream and downstream dataset
-    ///
-    /// TODO: connect to event bus
-    async fn add_dependency(
+    /// Iterates over 1st level of dataset's upstream dependencies
+    async fn get_upstream_dependencies(
         &self,
-        dataset_upstream_id: &DatasetID,
-        dataset_downstream_id: &DatasetID,
-    ) -> Result<(), AddDependencyError> {
-        let mut state = self.state.lock().unwrap();
+        dataset_id: &DatasetID,
+    ) -> Result<DatasetIDStream, GetUpstreamDependenciesError> {
+        let upstream_node_datasets: Vec<_> = {
+            let state = self.state.lock().unwrap();
+            state
+                .ensure_scanned()
+                .map_err(|e| GetUpstreamDependenciesError::NotScanned(e))?;
 
-        let upstream_node_index = state.get_or_create_dataset_node(dataset_upstream_id);
-        let downstream_node_index = state.get_or_create_dataset_node(dataset_downstream_id);
-        state
-            .datasets_graph
-            .update_edge(upstream_node_index, downstream_node_index, ());
+            let node_index = state
+                .get_dataset_node(dataset_id)
+                .map_err(|e| GetUpstreamDependenciesError::DatasetNotFound(e))?;
+
+            state
+                .datasets_graph
+                .neighbors_directed(node_index, Direction::Incoming)
+                .map(|node_index| {
+                    state
+                        .datasets_graph
+                        .node_weight(node_index)
+                        .unwrap()
+                        .clone()
+                })
+                .collect()
+        };
+
+        Ok(Box::pin(tokio_stream::iter(upstream_node_datasets)))
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait::async_trait]
+impl DependencyGraphServiceInitializer for DependencyGraphServiceInMemory {
+    async fn full_scan(
+        &self,
+        dataset_repo: &dyn DatasetRepository,
+        force: bool,
+    ) -> Result<(), DependenciesScanError> {
+        use tokio_stream::StreamExt;
+
+        {
+            let mut state = self.state.lock().unwrap();
+            match &state.status {
+                DependenciesGraphStatus::NotScanned => {
+                    state.status = DependenciesGraphStatus::Scanning;
+                }
+                DependenciesGraphStatus::Scanning => {
+                    return Err(DependenciesScanError::AlreadyScanning(
+                        DependenciesAlreadyScanningError {},
+                    ))
+                }
+                DependenciesGraphStatus::Scanned => {
+                    if force {
+                        state.reset();
+                        state.status = DependenciesGraphStatus::Scanning;
+                    } else {
+                        return Ok(());
+                    }
+                }
+            }
+        }
+
+        let mut datasets_stream = dataset_repo.get_all_datasets();
+        while let Some(Ok(dataset_handle)) = datasets_stream.next().await {
+            tracing::debug!(dataset=%dataset_handle, "Scanning dataset dependencies");
+
+            let summary = dataset_repo
+                .get_dataset(&dataset_handle.as_local_ref())
+                .await
+                .int_err()?
+                .get_summary(GetSummaryOpts::default())
+                .await
+                .int_err()?;
+
+            for input_dataset in summary.dependencies.iter() {
+                if let Some(input_id) = &input_dataset.id {
+                    self.add_dependency(input_id, &dataset_handle.id);
+                }
+            }
+        }
+
+        let mut state = self.state.lock().unwrap();
+        state.status = DependenciesGraphStatus::Scanned;
 
         Ok(())
     }
+}
 
-    /// Removes tracked dependency between updstream and downstream dataset
-    ///
-    /// TODO: connect to event bus
-    async fn remove_dependency(
-        &self,
-        dataset_upstream_id: &DatasetID,
-        dataset_downstream_id: &DatasetID,
-    ) -> Result<(), RemoveDependencyError> {
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait::async_trait]
+impl AsyncEventHandler<DatasetEventCreated> for DependencyGraphServiceInMemory {
+    async fn handle(&self, event: &DatasetEventCreated) -> Result<(), InternalError> {
         let mut state = self.state.lock().unwrap();
-
-        let upstream_node_index = state.get_or_create_dataset_node(dataset_upstream_id);
-        let downstream_node_index = state.get_or_create_dataset_node(dataset_downstream_id);
-
-        if let Some(edge_index) = state
-            .datasets_graph
-            .find_edge(upstream_node_index, downstream_node_index)
-        {
-            state.datasets_graph.remove_edge(edge_index);
-            Ok(())
-        } else {
-            Err(RemoveDependencyError::NotFound(
-                DependencyEdgeNotFoundError {
-                    dataset_upstream_id: dataset_upstream_id.clone(),
-                    dataset_downstream_id: dataset_downstream_id.clone(),
-                },
-            ))
-        }
+        state.get_or_create_dataset_node(&event.dataset_id);
+        Ok(())
     }
 }
 

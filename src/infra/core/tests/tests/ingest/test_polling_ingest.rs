@@ -1029,6 +1029,7 @@ impl IngestTestHarness {
 
         let catalog = dill::CatalogBuilder::new()
             .add::<EventBus>()
+            .add::<DependencyGraphServiceInMemory>()
             .add_value(CurrentAccountSubject::new_test())
             .add_value(dataset_action_authorizer)
             .bind::<dyn auth::DatasetActionAuthorizer, TDatasetAuthorizer>()

@@ -29,6 +29,7 @@ async fn metadata_chain_append_event() {
 
     let base_catalog = dill::CatalogBuilder::new()
         .add::<EventBus>()
+        .add::<DependencyGraphServiceInMemory>()
         .add_builder(
             DatasetRepositoryLocalFs::builder()
                 .with_root(tempdir.path().join("datasets"))
@@ -125,6 +126,7 @@ async fn metadata_update_readme_new() {
 
     let base_catalog = dill::CatalogBuilder::new()
         .add::<EventBus>()
+        .add::<DependencyGraphServiceInMemory>()
         .add_builder(
             DatasetRepositoryLocalFs::builder()
                 .with_root(tempdir.path().join("datasets"))

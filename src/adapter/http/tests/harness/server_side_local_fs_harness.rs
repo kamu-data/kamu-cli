@@ -23,7 +23,7 @@ use kamu::domain::{
     SystemTimeSourceStub,
 };
 use kamu::testing::MockAuthenticationService;
-use kamu::{DatasetLayout, DatasetRepositoryLocalFs};
+use kamu::{DatasetLayout, DatasetRepositoryLocalFs, DependencyGraphServiceInMemory};
 use opendatafabric::{AccountName, DatasetAlias, DatasetHandle};
 use tempfile::TempDir;
 use url::Url;
@@ -66,6 +66,7 @@ impl ServerSideLocalFsHarness {
             .add::<EventBus>()
             .add_value(time_source.clone())
             .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
+            .add::<DependencyGraphServiceInMemory>()
             .add_builder(
                 DatasetRepositoryLocalFs::builder()
                     .with_root(datasets_dir)

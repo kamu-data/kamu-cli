@@ -14,7 +14,7 @@ use std::sync::Arc;
 use dill::Component;
 use event_bus::EventBus;
 use kamu::testing::MetadataFactory;
-use kamu::DatasetRepositoryLocalFs;
+use kamu::{DatasetRepositoryLocalFs, DependencyGraphServiceInMemory};
 use kamu_adapter_auth_oso::{KamuAuthOso, OsoDatasetAuthorizer};
 use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer, DatasetActionUnauthorizedError};
 use kamu_core::{AccessError, CurrentAccountSubject, DatasetRepository};
@@ -111,6 +111,7 @@ impl DatasetAuthorizerHarness {
             )))
             .add::<KamuAuthOso>()
             .add::<OsoDatasetAuthorizer>()
+            .add::<DependencyGraphServiceInMemory>()
             .add_builder(
                 DatasetRepositoryLocalFs::builder()
                     .with_root(datasets_dir)

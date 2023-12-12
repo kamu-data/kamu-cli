@@ -55,6 +55,8 @@ impl ClientSideHarness {
 
         b.add::<EventBus>();
 
+        b.add::<DependencyGraphServiceInMemory>();
+
         b.add_value(CurrentAccountSubject::logged(AccountName::new_unchecked(
             CLIENT_ACCOUNT_NAME,
         )));

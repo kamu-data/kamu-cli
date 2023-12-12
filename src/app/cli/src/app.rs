@@ -106,6 +106,7 @@ pub async fn run(
             } else if current_account.is_explicit() && !workspace_svc.is_multi_tenant_workspace() {
                 Err(CLIError::usage_error_from(NotInMultiTenantWorkspace))
             } else {
+                run_startup_jobs(&cli_catalog).await?;
                 command.run().await
             }
         }
@@ -138,6 +139,22 @@ pub async fn run(
     }
 
     result
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+async fn run_startup_jobs(cli_catalog: &Catalog) -> Result<(), CLIError> {
+    // Run initial scanning of dataset dependencies
+    let dataset_repo = cli_catalog.get_one::<dyn DatasetRepository>().unwrap();
+    let dataset_graph_service_initializer = cli_catalog
+        .get_one::<dyn DependencyGraphServiceInitializer>()
+        .unwrap();
+    dataset_graph_service_initializer
+        .full_scan(dataset_repo.as_ref(), false)
+        .await
+        .map_err(|e| CLIError::critical(e))?;
+
+    Ok(())
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

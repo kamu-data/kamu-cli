@@ -24,7 +24,7 @@ use kamu::domain::{
 };
 use kamu::testing::{LocalS3Server, MockAuthenticationService};
 use kamu::utils::s3_context::S3Context;
-use kamu::{DatasetLayout, DatasetRepositoryS3};
+use kamu::{DatasetLayout, DatasetRepositoryS3, DependencyGraphServiceInMemory};
 use opendatafabric::{AccountName, DatasetAlias, DatasetHandle};
 use url::Url;
 
@@ -61,6 +61,7 @@ impl ServerSideS3Harness {
             .add_value(time_source.clone())
             .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
             .add::<EventBus>()
+            .add::<DependencyGraphServiceInMemory>()
             .add_builder(
                 DatasetRepositoryS3::builder()
                     .with_s3_context(s3_context)

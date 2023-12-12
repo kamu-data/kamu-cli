@@ -25,6 +25,7 @@ use opendatafabric::*;
 async fn create_catalog_with_local_workspace(tempdir: &Path) -> dill::Catalog {
     dill::CatalogBuilder::new()
         .add::<EventBus>()
+        .add::<DependencyGraphServiceInMemory>()
         .add_builder(
             DatasetRepositoryLocalFs::builder()
                 .with_root(tempdir.join("datasets"))

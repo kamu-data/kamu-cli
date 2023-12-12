@@ -28,6 +28,7 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
 
     let catalog = dill::CatalogBuilder::new()
         .add::<EventBus>()
+        .add::<DependencyGraphServiceInMemory>()
         .add_value(CurrentAccountSubject::new_test())
         .add_builder(
             DatasetRepositoryLocalFs::builder()

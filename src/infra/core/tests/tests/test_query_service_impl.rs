@@ -97,6 +97,7 @@ async fn create_catalog_with_local_workspace(
 ) -> dill::Catalog {
     dill::CatalogBuilder::new()
         .add::<EventBus>()
+        .add::<DependencyGraphServiceInMemory>()
         .add_builder(
             DatasetRepositoryLocalFs::builder()
                 .with_root(tempdir.join("datasets"))
@@ -123,6 +124,7 @@ async fn create_catalog_with_s3_workspace(
 
     dill::CatalogBuilder::new()
         .add::<EventBus>()
+        .add::<DependencyGraphServiceInMemory>()
         .add_builder(
             DatasetRepositoryS3::builder()
                 .with_s3_context(s3_context.clone())
