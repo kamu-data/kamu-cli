@@ -7,13 +7,17 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
 
 use dill::*;
 use event_bus::AsyncEventHandler;
 use internal_error::InternalError;
-use kamu_core::events::{DatasetEventCreated, DatasetEventDeleted};
+use kamu_core::events::{
+    DatasetEventCreated,
+    DatasetEventDeleted,
+    DatasetEventDependenciesUpdated,
+};
 use kamu_core::*;
 use opendatafabric::DatasetID;
 use petgraph::stable_graph::{NodeIndex, StableDiGraph};
@@ -94,6 +98,7 @@ impl State {
 #[interface(dyn DependencyGraphServiceInitializer)]
 #[interface(dyn AsyncEventHandler<DatasetEventCreated>)]
 #[interface(dyn AsyncEventHandler<DatasetEventDeleted>)]
+#[interface(dyn AsyncEventHandler<DatasetEventDependenciesUpdated>)]
 #[scope(Singleton)]
 impl DependencyGraphServiceInMemory {
     pub fn new() -> Self {
@@ -103,10 +108,13 @@ impl DependencyGraphServiceInMemory {
     }
 
     /// Tracks a dependency between upstream and downstream dataset
-    fn add_dependency(&self, dataset_upstream_id: &DatasetID, dataset_downstream_id: &DatasetID) {
+    fn add_dependency(
+        &self,
+        state: &mut State,
+        dataset_upstream_id: &DatasetID,
+        dataset_downstream_id: &DatasetID,
+    ) {
         tracing::debug!(downstream=%dataset_downstream_id, upstream=%dataset_upstream_id, "Adding dataset dependency");
-
-        let mut state = self.state.lock().unwrap();
 
         let upstream_node_index = state.get_or_create_dataset_node(dataset_upstream_id);
         let downstream_node_index = state.get_or_create_dataset_node(dataset_downstream_id);
@@ -116,14 +124,13 @@ impl DependencyGraphServiceInMemory {
     }
 
     /// Removes tracked dependency between updstream and downstream dataset
-    fn _remove_dependency(
+    fn remove_dependency(
         &self,
+        state: &mut State,
         dataset_upstream_id: &DatasetID,
         dataset_downstream_id: &DatasetID,
     ) {
         tracing::debug!(downstream=%dataset_downstream_id, upstream=%dataset_upstream_id, "Removing dataset dependency");
-
-        let mut state = self.state.lock().unwrap();
 
         let upstream_node_index = state.get_or_create_dataset_node(dataset_upstream_id);
         let downstream_node_index = state.get_or_create_dataset_node(dataset_downstream_id);
@@ -250,9 +257,10 @@ impl DependencyGraphServiceInitializer for DependencyGraphServiceInMemory {
                 .await
                 .int_err()?;
 
+            let mut state = self.state.lock().unwrap();
             for input_dataset in summary.dependencies.iter() {
                 if let Some(input_id) = &input_dataset.id {
-                    self.add_dependency(input_id, &dataset_handle.id);
+                    self.add_dependency(&mut state, input_id, &dataset_handle.id);
                 }
             }
         }
@@ -288,6 +296,44 @@ impl AsyncEventHandler<DatasetEventDeleted> for DependencyGraphServiceInMemory {
 
         state.datasets_graph.remove_node(node_index);
         state.dataset_node_indices.remove(&event.dataset_id);
+
+        Ok(())
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait::async_trait]
+impl AsyncEventHandler<DatasetEventDependenciesUpdated> for DependencyGraphServiceInMemory {
+    async fn handle(&self, event: &DatasetEventDependenciesUpdated) -> Result<(), InternalError> {
+        let mut state = self.state.lock().unwrap();
+
+        let node_index = state
+            .get_dataset_node(&event.dataset_id)
+            .map_err(|e| e.int_err())?;
+
+        let existing_upstream_ids: HashSet<_> = state
+            .datasets_graph
+            .neighbors_directed(node_index, Direction::Incoming)
+            .map(|node_index| {
+                state
+                    .datasets_graph
+                    .node_weight(node_index)
+                    .unwrap()
+                    .clone()
+            })
+            .collect();
+
+        let new_upstream_ids: HashSet<_> =
+            HashSet::from_iter(event.new_upstream_ids.iter().cloned());
+
+        for obsolete_upstream_id in existing_upstream_ids.difference(&new_upstream_ids) {
+            self.remove_dependency(&mut state, obsolete_upstream_id, &event.dataset_id)
+        }
+
+        for added_id in new_upstream_ids.difference(&existing_upstream_ids) {
+            self.add_dependency(&mut state, added_id, &event.dataset_id);
+        }
 
         Ok(())
     }

@@ -7,6 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use domain::events::DatasetEventDependenciesUpdated;
+use domain::DatasetRepository;
+use event_bus::EventBus;
 use kamu_core::{self as domain};
 use opendatafabric as odf;
 
@@ -80,6 +83,35 @@ impl MetadataChainMut {
             }
         };
 
+        use domain::DatasetRepositoryExt;
+        let dataset_repo = from_catalog::<dyn DatasetRepository>(ctx).unwrap();
+
+        let mut new_upstream_ids: Vec<opendatafabric::DatasetID> = vec![];
+
+        if let opendatafabric::MetadataEvent::SetTransform(transform) = &event {
+            for new_input in transform.inputs.iter() {
+                if let Some(id) = &new_input.id {
+                    new_upstream_ids.push(id.clone());
+                } else if let Some(dataset_ref_any) = &new_input.dataset_ref {
+                    let maybe_hdl = dataset_repo
+                        .try_resolve_dataset_ref_any(dataset_ref_any)
+                        .await
+                        .int_err()?;
+                    if let Some(hdl) = maybe_hdl {
+                        new_upstream_ids.push(hdl.id);
+                    }
+                } else {
+                    let local_ref = opendatafabric::DatasetAlias::new(None, new_input.name.clone())
+                        .as_local_ref();
+                    let hdl = dataset_repo
+                        .resolve_dataset_ref(&local_ref)
+                        .await
+                        .int_err()?;
+                    new_upstream_ids.push(hdl.id);
+                }
+            }
+        }
+
         let dataset = self.get_dataset(ctx).await?;
 
         let result = match dataset
@@ -102,6 +134,18 @@ impl MetadataChainMut {
             }
             Err(e @ domain::CommitError::Internal(_)) => return Err(e.int_err().into()),
         };
+
+        // TODO: encapsulate this inside dataset/chain
+        if !new_upstream_ids.is_empty() {
+            let event_bus = from_catalog::<EventBus>(ctx).unwrap();
+            event_bus
+                .dispatch_event(DatasetEventDependenciesUpdated {
+                    dataset_id: self.dataset_handle.id.clone(),
+                    new_upstream_ids,
+                })
+                .await
+                .int_err()?;
+        }
 
         Ok(result)
     }

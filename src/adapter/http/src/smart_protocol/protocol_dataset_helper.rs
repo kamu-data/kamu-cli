@@ -190,16 +190,51 @@ pub async fn decode_metadata_batch(
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+pub struct AppendMetadataResponse {
+    pub new_upstream_ids: Vec<opendatafabric::DatasetID>,
+}
+
 pub async fn dataset_append_metadata(
     dataset: &dyn Dataset,
+    dataset_repo: &dyn DatasetRepository,
     metadata: VecDeque<(Multihash, MetadataBlock)>,
-) -> Result<(), AppendError> {
+) -> Result<AppendMetadataResponse, AppendError> {
     let old_head = metadata.front().unwrap().1.prev_block_hash.clone();
     let new_head = metadata.back().unwrap().0.clone();
 
     let metadata_chain = dataset.as_metadata_chain();
+
+    let mut new_upstream_ids: Vec<opendatafabric::DatasetID> = vec![];
+
     for (hash, block) in metadata {
         tracing::debug!(sequence_numer = %block.sequence_number, hash = %hash, "Appending block");
+
+        if let opendatafabric::MetadataEvent::SetTransform(transform) = &block.event {
+            // Collect only the latest upstream dataset IDs
+            new_upstream_ids.clear();
+            for new_input in transform.inputs.iter() {
+                if let Some(id) = &new_input.id {
+                    new_upstream_ids.push(id.clone());
+                } else if let Some(dataset_ref_any) = &new_input.dataset_ref {
+                    let maybe_hdl = dataset_repo
+                        .try_resolve_dataset_ref_any(dataset_ref_any)
+                        .await
+                        .int_err()?;
+                    if let Some(hdl) = maybe_hdl {
+                        new_upstream_ids.push(hdl.id);
+                    }
+                } else {
+                    let local_ref = opendatafabric::DatasetAlias::new(None, new_input.name.clone())
+                        .as_local_ref();
+                    let hdl = dataset_repo
+                        .resolve_dataset_ref(&local_ref)
+                        .await
+                        .int_err()?;
+                    new_upstream_ids.push(hdl.id);
+                }
+            }
+        }
+
         metadata_chain
             .append(
                 block,
@@ -223,7 +258,7 @@ pub async fn dataset_append_metadata(
         )
         .await?;
 
-    Ok(())
+    Ok(AppendMetadataResponse { new_upstream_ids })
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

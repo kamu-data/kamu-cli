@@ -18,6 +18,7 @@ use opendatafabric::*;
 use url::Url;
 
 use super::DatasetFactoryImpl;
+use crate::create_dataset_from_snapshot_impl;
 use crate::utils::s3_context::S3Context;
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -306,7 +307,7 @@ impl DatasetRepository for DatasetRepositoryS3 {
                 dataset_id: dataset_handle.id.clone(),
             })
             .await?;
-        
+
         tracing::info!(
             id = %dataset_handle.id,
             alias = %dataset_handle.alias,
@@ -319,6 +320,15 @@ impl DatasetRepository for DatasetRepositoryS3 {
             dataset: Arc::new(dataset),
             head,
         })
+    }
+
+    async fn create_dataset_from_snapshot(
+        &self,
+        account_name: Option<AccountName>,
+        snapshot: DatasetSnapshot,
+    ) -> Result<CreateDatasetResult, CreateDatasetFromSnapshotError> {
+        create_dataset_from_snapshot_impl(self, self.event_bus.as_ref(), account_name, snapshot)
+            .await
     }
 
     async fn rename_dataset(

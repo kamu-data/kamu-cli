@@ -377,6 +377,7 @@ async fn dataset_rename_name_collision() {
 #[test_log::test(tokio::test)]
 async fn dataset_delete_success() {
     let harness = GraphQLDatasetsHarness::new();
+    harness.init_dependencies_graph().await;
 
     let foo_result = harness
         .create_root_dataset(DatasetName::new_unchecked("foo"))
@@ -426,6 +427,7 @@ async fn dataset_delete_success() {
 #[test_log::test(tokio::test)]
 async fn dataset_delete_dangling_ref() {
     let harness = GraphQLDatasetsHarness::new();
+    harness.init_dependencies_graph().await;
 
     let foo_result = harness
         .create_root_dataset(DatasetName::new_unchecked("foo"))
@@ -531,7 +533,7 @@ async fn dataset_view_permissions() {
 
 struct GraphQLDatasetsHarness {
     _tempdir: tempfile::TempDir,
-    _base_catalog: dill::Catalog,
+    base_catalog: dill::Catalog,
     catalog_authorized: dill::Catalog,
     catalog_anonymous: dill::Catalog,
 }
@@ -560,10 +562,25 @@ impl GraphQLDatasetsHarness {
 
         Self {
             _tempdir: tempdir,
-            _base_catalog: base_catalog,
+            base_catalog,
             catalog_anonymous,
             catalog_authorized,
         }
+    }
+
+    pub async fn init_dependencies_graph(&self) {
+        let dataset_repo = self
+            .catalog_authorized
+            .get_one::<dyn DatasetRepository>()
+            .unwrap();
+        let dependency_graph_initializer = self
+            .base_catalog
+            .get_one::<dyn DependencyGraphServiceInitializer>()
+            .unwrap();
+        dependency_graph_initializer
+            .full_scan(dataset_repo.as_ref(), false)
+            .await
+            .unwrap();
     }
 
     pub async fn create_root_dataset(&self, name: DatasetName) -> CreateDatasetResult {

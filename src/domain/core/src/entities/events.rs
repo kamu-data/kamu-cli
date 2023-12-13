@@ -15,6 +15,7 @@ use opendatafabric::DatasetID;
 pub enum DatasetEvent {
     Created(DatasetEventCreated),
     Deleted(DatasetEventDeleted),
+    DependenciesUpdated(DatasetEventDependenciesUpdated),
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -29,6 +30,14 @@ pub struct DatasetEventCreated {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DatasetEventDeleted {
     pub dataset_id: DatasetID,
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DatasetEventDependenciesUpdated {
+    pub dataset_id: DatasetID,
+    pub new_upstream_ids: Vec<DatasetID>,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

@@ -12,7 +12,6 @@ use std::pin::Pin;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use chrono::Utc;
 use internal_error::InternalError;
 use opendatafabric::*;
 use thiserror::Error;
@@ -65,6 +64,12 @@ pub trait DatasetRepository: DatasetRegistry + Sync + Send {
         seed_block: MetadataBlockTyped<Seed>,
     ) -> Result<CreateDatasetResult, CreateDatasetError>;
 
+    async fn create_dataset_from_snapshot(
+        &self,
+        account_name: Option<AccountName>,
+        mut snapshot: DatasetSnapshot,
+    ) -> Result<CreateDatasetResult, CreateDatasetFromSnapshotError>;
+
     async fn rename_dataset(
         &self,
         dataset_ref: &DatasetRef,
@@ -90,16 +95,15 @@ pub trait DatasetRepositoryExt: DatasetRepository {
         dataset_ref: &DatasetRef,
     ) -> Result<Option<DatasetHandle>, InternalError>;
 
+    async fn try_resolve_dataset_ref_any(
+        &self,
+        dataset_ref_any: &DatasetRefAny,
+    ) -> Result<Option<DatasetHandle>, InternalError>;
+
     async fn try_get_dataset(
         &self,
         dataset_ref: &DatasetRef,
     ) -> Result<Option<Arc<dyn Dataset>>, InternalError>;
-
-    async fn create_dataset_from_snapshot(
-        &self,
-        account_name: Option<AccountName>,
-        mut snapshot: DatasetSnapshot,
-    ) -> Result<CreateDatasetResult, CreateDatasetFromSnapshotError>;
 
     async fn create_datasets_from_snapshots(
         &self,
@@ -130,6 +134,20 @@ where
         }
     }
 
+    async fn try_resolve_dataset_ref_any(
+        &self,
+        dataset_ref_any: &DatasetRefAny,
+    ) -> Result<Option<DatasetHandle>, InternalError> {
+        let local_ref = match dataset_ref_any.as_local_ref(|_| !self.is_multi_tenant()) {
+            Ok(local_ref) => local_ref,
+            Err(_) => {
+                unimplemented!("Deriving from remote dataset is not supported yet");
+            }
+        };
+
+        self.try_resolve_dataset_ref(&local_ref).await
+    }
+
     async fn try_get_dataset(
         &self,
         dataset_ref: &DatasetRef,
@@ -139,119 +157,6 @@ where
             Err(GetDatasetError::NotFound(_)) => Ok(None),
             Err(GetDatasetError::Internal(e)) => Err(e),
         }
-    }
-
-    async fn create_dataset_from_snapshot(
-        &self,
-        account_name: Option<AccountName>,
-        mut snapshot: DatasetSnapshot,
-    ) -> Result<CreateDatasetResult, CreateDatasetFromSnapshotError> {
-        // Validate / resolve events
-        for event in snapshot.metadata.iter_mut() {
-            match event {
-                MetadataEvent::Seed(_) => Err(InvalidSnapshotError {
-                    reason: "Seed event is generated and cannot be specified explicitly".to_owned(),
-                }
-                .into()),
-                MetadataEvent::SetPollingSource(_) => {
-                    if snapshot.kind != DatasetKind::Root {
-                        Err(InvalidSnapshotError {
-                            reason: "SetPollingSource is only allowed on root datasets".to_owned(),
-                        }
-                        .into())
-                    } else {
-                        Ok(())
-                    }
-                }
-                MetadataEvent::SetTransform(e) => {
-                    if snapshot.kind != DatasetKind::Derivative {
-                        Err(InvalidSnapshotError {
-                            reason: "SetTransform is only allowed on derivative datasets"
-                                .to_owned(),
-                        }
-                        .into())
-                    } else {
-                        resolve_transform_inputs(self, &snapshot.name, &mut e.inputs).await
-                    }
-                }
-                MetadataEvent::SetAttachments(_)
-                | MetadataEvent::SetInfo(_)
-                | MetadataEvent::SetLicense(_)
-                | MetadataEvent::SetVocab(_) => Ok(()),
-                MetadataEvent::AddData(_)
-                | MetadataEvent::ExecuteQuery(_)
-                | MetadataEvent::SetWatermark(_) => Err(InvalidSnapshotError {
-                    reason: format!(
-                        "Event is not allowed to appear in a DatasetSnapshot: {:?}",
-                        event
-                    ),
-                }
-                .into()),
-            }?;
-        }
-
-        // We are generating a key pair and deriving a dataset ID from it.
-        // The key pair is discarded for now, but in future can be used for
-        // proof of control over dataset and metadata signing.
-        let (_keypair, dataset_id) = DatasetID::from_new_keypair_ed25519();
-
-        let system_time = Utc::now();
-
-        let create_result = self
-            .create_dataset(
-                &DatasetAlias::new(account_name, snapshot.name),
-                MetadataBlockTyped {
-                    system_time,
-                    prev_block_hash: None,
-                    event: Seed {
-                        dataset_id,
-                        dataset_kind: snapshot.kind,
-                    },
-                    sequence_number: 0,
-                },
-            )
-            .await?;
-
-        let chain = create_result.dataset.as_metadata_chain();
-        let mut head = create_result.head.clone();
-        let mut sequence_number = 1;
-
-        for event in snapshot.metadata {
-            head = chain
-                .append(
-                    MetadataBlock {
-                        system_time,
-                        prev_block_hash: Some(head),
-                        event,
-                        sequence_number,
-                    },
-                    AppendOpts {
-                        update_ref: None,
-                        ..AppendOpts::default()
-                    },
-                )
-                .await
-                .int_err()?;
-
-            sequence_number += 1;
-        }
-
-        chain
-            .set_ref(
-                &BlockRef::Head,
-                &head,
-                SetRefOpts {
-                    validate_block_present: false,
-                    check_ref_is: Some(Some(&create_result.head)),
-                },
-            )
-            .await
-            .int_err()?;
-
-        Ok(CreateDatasetResult {
-            head,
-            ..create_result
-        })
     }
 
     async fn create_datasets_from_snapshots(
@@ -274,64 +179,6 @@ where
         }
         ret
     }
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-async fn resolve_transform_inputs<T>(
-    repo: &T,
-    dataset_name: &DatasetName,
-    inputs: &mut Vec<TransformInput>,
-) -> Result<(), CreateDatasetFromSnapshotError>
-where
-    T: DatasetRepository,
-    T: ?Sized,
-{
-    for input in inputs.iter_mut() {
-        if let Some(input_id) = &input.id {
-            // Input is referenced by ID - in this case we allow any name
-            match repo.resolve_dataset_ref(&input_id.as_local_ref()).await {
-                Ok(_) => Ok(()),
-                Err(GetDatasetError::NotFound(_)) => Err(
-                    CreateDatasetFromSnapshotError::MissingInputs(MissingInputsError {
-                        dataset_ref: dataset_name.into(),
-                        missing_inputs: vec![input_id.as_local_ref()],
-                    }),
-                ),
-                Err(GetDatasetError::Internal(e)) => Err(e.into()),
-            }?;
-        } else {
-            // When ID is not specified we try resolving it by name or a reference
-
-            // When reference is available, it dominates
-            let input_local_ref = if let Some(dataset_ref) = &input.dataset_ref {
-                match dataset_ref.as_local_ref(|_| !repo.is_multi_tenant()) {
-                    Ok(local_ref) => local_ref,
-                    Err(_) => {
-                        unimplemented!("Deriving from remote dataset is not supported yet");
-                    }
-                }
-            } else {
-                // Derive reference purely from a name assuming a default account
-                let input_alias = DatasetAlias::new(None, input.name.clone());
-                input_alias.as_local_ref()
-            };
-
-            let hdl = match repo.resolve_dataset_ref(&input_local_ref).await {
-                Ok(hdl) => Ok(hdl),
-                Err(GetDatasetError::NotFound(_)) => Err(
-                    CreateDatasetFromSnapshotError::MissingInputs(MissingInputsError {
-                        dataset_ref: dataset_name.into(),
-                        missing_inputs: vec![input_local_ref],
-                    }),
-                ),
-                Err(GetDatasetError::Internal(e)) => Err(e.into()),
-            }?;
-
-            input.id = Some(hdl.id);
-        }
-    }
-    Ok(())
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

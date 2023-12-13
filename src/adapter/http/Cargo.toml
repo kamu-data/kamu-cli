@@ -21,6 +21,7 @@ doctest = false
 opendatafabric = { workspace = true }
 # TODO: Adapters should depend only on kamu-domain crate and be implementation-agnostic
 kamu = { workspace = true }
+event-bus = { workspace = true }
 
 axum = { version = "0.6", features = ["ws", "headers"] }
 axum-extra = { version = "0.8", features = ["async-read-body"] }

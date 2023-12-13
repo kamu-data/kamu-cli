@@ -280,6 +280,15 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
         })
     }
 
+    async fn create_dataset_from_snapshot(
+        &self,
+        account_name: Option<AccountName>,
+        snapshot: DatasetSnapshot,
+    ) -> Result<CreateDatasetResult, CreateDatasetFromSnapshotError> {
+        create_dataset_from_snapshot_impl(self, self.event_bus.as_ref(), account_name, snapshot)
+            .await
+    }
+
     async fn rename_dataset(
         &self,
         dataset_ref: &DatasetRef,
