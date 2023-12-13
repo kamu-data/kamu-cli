@@ -136,10 +136,16 @@ rustflags = ["-C", "link-arg=-fuse-ld=mold"]
 To build the tool with embedded Web UI you will need to clone and build [kamu-web-ui](https://github.com/kamu-data/kamu-web-ui) repo or use pre-built release. Now build the tool while enabling the optional feature and passing the location of the web root directory:
 
 ```shell
-KAMU_WEB_UI_DIR=`pwd`/../kamu-web-ui/dist/kamu-platform/ cargo build --features kamu-cli/web-ui
+KAMU_WEB_UI_DIR=../../../../kamu-web-ui/dist/kamu-platform/ cargo build --features kamu-cli/web-ui
 ```
 
-Note: `KAMU_WEB_UI_DIR` requires absolute path
+Note: we assume that `kamu-web-ui` repository directory will be at the same level as `kamu-cli`, for example:
+```
+.
+└── kamu-data
+    ├── kamu-cli
+    └── kamu-web-ui
+```
 
 Note: in debug mode the directory content is not actually being embedded into the executable but accessed from the specified directory.
 
