@@ -42,15 +42,15 @@ Prerequisites:
   * Prerequisites:
     * `cargo install cargo-update` - to easily keep your tools up-to-date
     * `cargo install cargo-binstall` - to install binaries without compiling
-    * `cargo binstall cargo-binstall --force` - make future updates of `binstall` to use precompiled version
+    * `cargo binstall cargo-binstall --force -y` - make future updates of `binstall` to use precompiled version
   * Recommended:
-    * `cargo binstall cargo-nextest` - advanced test runner
-    * `cargo binstall bunyan` - for pretty-printing the JSON logs
-    * `cargo binstall cargo-llvm-cov` - for test coverage
+    * `cargo binstall cargo-nextest -y` - advanced test runner
+    * `cargo binstall bunyan -y` - for pretty-printing the JSON logs
+    * `cargo binstall cargo-llvm-cov -y` - for test coverage
   * Optional - if you will be doing releases:
-    * `cargo binstall cargo-edit` - for setting crate versions during release
-    * `cargo binstall cargo-update` - for keeping up with major dependency updates
-    * `cargo binstall cargo-deny` - for linting dependencies
+    * `cargo binstall cargo-edit -y` - for setting crate versions during release
+    * `cargo binstall cargo-update -y` - for keeping up with major dependency updates
+    * `cargo binstall cargo-deny -y` - for linting dependencies
   * To keep all these cargo tools up-to-date use `cargo install-update -a`
 
 Clone the repository:
