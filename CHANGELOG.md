@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.147.0] - 2023-12-13
+### Changed
+- Updates to support open-data-fabric/open-data-fabric#63
+- Metadata chain will complain about `AddData` or `ExecuteQuery` events if there is no `SetDataSchema` event
+- Push ingest no longer piggy-backs on `SetPollingSource` - it requires `AddPushSource` event to be present
+- `DatasetWriter` will now validate that schema of the new data block matches the schema in `SetDataSchema` to prevent schema drift
+### Added
+- Name of the push source can optionally be specified in CLI command and REST API
+
 ## [0.146.1] - 2023-11-27
 ### Added
 - New dataset permission for UI: `canSchedule`
