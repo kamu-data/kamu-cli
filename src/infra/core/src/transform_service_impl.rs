@@ -131,9 +131,10 @@ impl TransformServiceImpl {
             // Validate schema
             if let Some(new_schema) = new_schema {
                 if prev_schema != new_schema {
-                    return Err(BadInputSchemaError::new(
+                    return Err(IncompatibleSchemaError::new(
                         "Schema of the new slice differs from the schema defined by SetDataSchema \
                          event - this indicates a compatibility breakage in the engine output",
+                        prev_schema.clone(),
                         new_schema.clone(),
                     )
                     .int_err()

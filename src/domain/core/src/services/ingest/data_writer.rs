@@ -90,6 +90,9 @@ pub enum WriteDataError {
     BadInputSchema(#[from] BadInputSchemaError),
 
     #[error(transparent)]
+    IncompatibleSchema(#[from] IncompatibleSchemaError),
+
+    #[error(transparent)]
     MergeError(#[from] MergeError),
 
     #[error(transparent)]
@@ -106,6 +109,7 @@ impl From<StageDataError> for WriteDataError {
     fn from(value: StageDataError) -> Self {
         match value {
             StageDataError::BadInputSchema(v) => WriteDataError::BadInputSchema(v),
+            StageDataError::IncompatibleSchema(v) => WriteDataError::IncompatibleSchema(v),
             StageDataError::MergeError(v) => WriteDataError::MergeError(v),
             StageDataError::EmptyCommit(v) => WriteDataError::EmptyCommit(v),
             StageDataError::Internal(v) => WriteDataError::Internal(v),
@@ -121,6 +125,9 @@ pub enum StageDataError {
     BadInputSchema(#[from] BadInputSchemaError),
 
     #[error(transparent)]
+    IncompatibleSchema(#[from] IncompatibleSchemaError),
+
+    #[error(transparent)]
     MergeError(#[from] MergeError),
 
     #[error(transparent)]
@@ -134,7 +141,7 @@ pub enum StageDataError {
 
 #[derive(Debug, thiserror::Error)]
 pub struct BadInputSchemaError {
-    schema: SchemaRef,
+    pub schema: SchemaRef,
     message: String,
     backtrace: Backtrace,
 }
@@ -151,18 +158,62 @@ impl BadInputSchemaError {
 
 impl std::fmt::Display for BadInputSchemaError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "Bad input schema: {}", self.message)?;
-        let parquet_schema =
-            datafusion::parquet::arrow::arrow_to_parquet_schema(&self.schema).unwrap();
+        writeln!(
+            f,
+            "Bad input schema: {}\n{}",
+            self.message,
+            FmtSchema(&self.schema)
+        )?;
+        Ok(())
+    }
+}
 
-        let mut buf = Vec::new();
-        datafusion::parquet::schema::printer::print_schema(&mut buf, parquet_schema.root_schema());
-        let schema = String::from_utf8(buf).unwrap();
+///////////////////////////////////////////////////////////////////////////////
 
-        writeln!(f, "{}", schema)
+#[derive(Debug, thiserror::Error)]
+pub struct IncompatibleSchemaError {
+    pub prev_schema: SchemaRef,
+    pub new_schema: SchemaRef,
+    message: String,
+    backtrace: Backtrace,
+}
+
+impl IncompatibleSchemaError {
+    pub fn new(message: impl Into<String>, prev_schema: SchemaRef, new_schema: SchemaRef) -> Self {
+        Self {
+            prev_schema,
+            new_schema,
+            message: message.into(),
+            backtrace: Backtrace::capture(),
+        }
+    }
+}
+
+impl std::fmt::Display for IncompatibleSchemaError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "Incompatible schema: {}", self.message)?;
+        writeln!(f, "Dataset schema:\n{}", FmtSchema(&self.prev_schema))?;
+        writeln!(f, "New slice schema:\n{}", FmtSchema(&self.new_schema))?;
+        Ok(())
     }
 }
 
 #[derive(Debug, thiserror::Error)]
 #[error("Nothing to commit")]
 pub struct EmptyCommitError {}
+
+///////////////////////////////////////////////////////////////////////////////
+
+struct FmtSchema<'a>(&'a SchemaRef);
+
+impl<'a> std::fmt::Display for FmtSchema<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let parquet_schema = datafusion::parquet::arrow::arrow_to_parquet_schema(&self.0).unwrap();
+
+        let mut buf = Vec::new();
+        datafusion::parquet::schema::printer::print_schema(&mut buf, parquet_schema.root_schema());
+        let schema = String::from_utf8(buf).unwrap();
+
+        write!(f, "{}", schema)
+    }
+}

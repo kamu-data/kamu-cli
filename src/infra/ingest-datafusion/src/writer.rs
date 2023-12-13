@@ -310,12 +310,16 @@ impl DataWriterDataFusion {
         Ok(df)
     }
 
-    fn validate_output_schema(&self, new_schema: &SchemaRef) -> Result<(), BadInputSchemaError> {
-        if let Some(prev_schema) = self.meta.schema.as_ref().map(|s| s.as_ref()) {
-            if *prev_schema != *new_schema.as_ref() {
-                return Err(BadInputSchemaError::new(
+    fn validate_output_schema(
+        &self,
+        new_schema: &SchemaRef,
+    ) -> Result<(), IncompatibleSchemaError> {
+        if let Some(prev_schema) = self.meta.schema.as_ref() {
+            if *prev_schema.as_ref() != *new_schema.as_ref() {
+                return Err(IncompatibleSchemaError::new(
                     "Schema of the new slice differs from the schema defined by SetDataSchema \
                      event",
+                    prev_schema.clone(),
                     new_schema.clone(),
                 ));
             }

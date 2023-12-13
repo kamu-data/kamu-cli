@@ -141,6 +141,13 @@ pub enum PushIngestError {
     ),
 
     #[error(transparent)]
+    IncompatibleSchema(
+        #[from]
+        #[backtrace]
+        IncompatibleSchemaError,
+    ),
+
+    #[error(transparent)]
     MergeError(
         #[from]
         #[backtrace]
@@ -211,7 +218,11 @@ impl Default for PushSourceNotFoundError {
 impl std::fmt::Display for PushSourceNotFoundError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self.source_name {
-            None => write!(f, "Dataset does not define a push source"),
+            None => write!(
+                f,
+                "Dataset does not define a default push source, consider specifying the source \
+                 name"
+            ),
             Some(s) => write!(f, "Dataset does not define a push source '{}'", s),
         }
     }

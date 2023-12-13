@@ -631,7 +631,6 @@ async fn test_fetch_files_glob() {
 // Container
 ///////////////////////////////////////////////////////////////////////////////
 
-#[ignore]
 #[test_group::group(containerized)]
 #[test_log::test(tokio::test)]
 async fn test_fetch_container_ok() {

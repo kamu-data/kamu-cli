@@ -185,6 +185,7 @@ impl PushIngestServiceImpl {
                 })
             }
             Err(StageDataError::BadInputSchema(e)) => Err(e.into()),
+            Err(StageDataError::IncompatibleSchema(e)) => Err(e.into()),
             Err(StageDataError::MergeError(e)) => Err(e.into()),
             Err(StageDataError::EmptyCommit(_)) => Ok(PushIngestResult::UpToDate),
             Err(StageDataError::Internal(e)) => Err(e.into()),

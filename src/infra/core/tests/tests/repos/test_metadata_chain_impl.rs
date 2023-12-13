@@ -569,6 +569,53 @@ async fn test_append_execute_query_empty_commit() {
 }
 
 #[test_log::test(tokio::test)]
+async fn test_append_add_push_source_requires_explicit_schema() {
+    let tmp_dir = tempfile::tempdir().unwrap();
+    let chain = init_chain(tmp_dir.path());
+
+    let hash = chain
+        .append(
+            MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build())
+                .build(),
+            AppendOpts::default(),
+        )
+        .await
+        .unwrap();
+
+    let res = chain
+        .append(
+            MetadataFactory::metadata_block(MetadataFactory::add_push_source().build())
+                .prev(&hash, 0)
+                .build(),
+            AppendOpts::default(),
+        )
+        .await;
+    assert_matches!(
+        res,
+        Err(AppendError::InvalidBlock(
+            AppendValidationError::InvalidEvent(_)
+        ))
+    );
+
+    chain
+        .append(
+            MetadataFactory::metadata_block(
+                MetadataFactory::add_push_source()
+                    .read(ReadStepNdJson {
+                        schema: Some(vec!["a STRING".to_string(), "b STRING".to_string()]),
+                        ..Default::default()
+                    })
+                    .build(),
+            )
+            .prev(&hash, 0)
+            .build(),
+            AppendOpts::default(),
+        )
+        .await
+        .unwrap();
+}
+
+#[test_log::test(tokio::test)]
 async fn test_append_add_data_must_be_preceeded_by_schema() {
     let tmp_dir = tempfile::tempdir().unwrap();
     let chain = init_chain(tmp_dir.path());

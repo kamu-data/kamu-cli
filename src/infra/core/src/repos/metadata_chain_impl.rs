@@ -372,7 +372,15 @@ where
                 // TODO: Ensure has previously active polling source
                 unimplemented!("Disabling sources is not yet fully supported")
             }
-            MetadataEvent::AddPushSource(_) => {
+            MetadataEvent::AddPushSource(e) => {
+                // Ensure specifies the schema
+                if e.read.schema().is_none() {
+                    return Err(AppendValidationError::InvalidEvent(InvalidEventError::new(
+                        e.clone(),
+                        "Push sources must specify the read schema explicitly",
+                    ))
+                    .into());
+                }
                 // Ensure no active polling source
                 let mut blocks = self.iter_blocks_interval(
                     new_block.prev_block_hash.as_ref().unwrap(),

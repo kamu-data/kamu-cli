@@ -349,7 +349,7 @@ async fn test_data_writer_rejects_incompatible_schema() {
         )
         .await;
 
-    assert_matches!(res, Err(WriteDataError::BadInputSchema(_)));
+    assert_matches!(res, Err(WriteDataError::IncompatibleSchema(_)));
 
     // Round 4 (still not ok after writer reset)
     harness.reset_writer().await;
@@ -366,7 +366,7 @@ async fn test_data_writer_rejects_incompatible_schema() {
         )
         .await;
 
-    assert_matches!(res, Err(WriteDataError::BadInputSchema(_)));
+    assert_matches!(res, Err(WriteDataError::IncompatibleSchema(_)));
 
     // Round 5 (back to normal)
     harness
@@ -693,6 +693,14 @@ async fn test_data_writer_builder_scan_polling_source() {
 #[test_log::test(tokio::test)]
 async fn test_data_writer_builder_scan_push_source() {
     let harness = Harness::new(vec![MetadataFactory::add_push_source()
+        .read(odf::ReadStepNdJson {
+            schema: Some(vec![
+                "event_time".to_string(),
+                "city".to_string(),
+                "population".to_string(),
+            ]),
+            ..Default::default()
+        })
         .merge(odf::MergeStrategyLedger {
             primary_key: vec!["event_time".to_string(), "city".to_string()],
         })

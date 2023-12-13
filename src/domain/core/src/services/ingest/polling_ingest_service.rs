@@ -233,6 +233,13 @@ pub enum PollingIngestError {
     ),
 
     #[error(transparent)]
+    IncompatibleSchema(
+        #[from]
+        #[backtrace]
+        IncompatibleSchemaError,
+    ),
+
+    #[error(transparent)]
     MergeError(
         #[from]
         #[backtrace]
