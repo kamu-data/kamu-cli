@@ -7,17 +7,27 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use internal_error::InternalError;
+use std::pin::Pin;
+use std::sync::Arc;
+
+use internal_error::{InternalError, ResultIntoInternal};
 use opendatafabric::DatasetID;
 use thiserror::Error;
 use tokio_stream::Stream;
 
-use crate::DatasetRepository;
+use crate::{DatasetRepository, GetSummaryOpts};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 pub trait DependencyGraphService: Sync + Send {
+    /// Forces initialization of graph data, if it wasn't initialized already.
+    /// Ignored if called multiple times
+    async fn eager_initialization(
+        &self,
+        initializer: &DependencyGraphServiceInitializer,
+    ) -> Result<(), InternalError>;
+
     /// Iterates over 1st level of dataset's downstream dependencies
     async fn get_downstream_dependencies(
         &self,
@@ -33,41 +43,59 @@ pub trait DependencyGraphService: Sync + Send {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[async_trait::async_trait]
-pub trait DependencyGraphServiceInitializer: Send + Sync {
-    /// Runs full scan of the dataset dependencies, and builds the initial
-    /// graph. Note: passing dataset repository as an argument, as it
-    /// requires system `CurrentAccountSubject``.
-    ///
-    /// If scanning has already succeedded, the request is ignored, unless
-    /// `force` flag is specified.
-    /// It's an error to execute multiple full scans in parallel.
-    async fn full_scan(
-        &self,
-        dataset_repo: &dyn DatasetRepository,
-        force: bool,
-    ) -> Result<(), DependenciesScanError>;
+#[dill::component(pub)]
+pub struct DependencyGraphServiceInitializer {
+    dataset_repo: Arc<dyn DatasetRepository>,
+}
+
+impl DependencyGraphServiceInitializer {
+    pub fn new(dataset_repo: Arc<dyn DatasetRepository>) -> Self {
+        Self { dataset_repo }
+    }
+
+    pub fn browse_dependencies_of_all_datasets(&self) -> DatasetDependenciesIDStream {
+        use tokio_stream::StreamExt;
+
+        Box::pin(async_stream::try_stream! {
+            let mut datasets_stream = self.dataset_repo.get_all_datasets();
+            while let Some(Ok(dataset_handle)) = datasets_stream.next().await {
+                tracing::debug!(dataset=%dataset_handle, "Scanning dataset dependencies");
+
+                let summary = self
+                    .dataset_repo
+                    .get_dataset(&dataset_handle.as_local_ref())
+                    .await
+                    .int_err()?
+                    .get_summary(GetSummaryOpts::default())
+                    .await
+                    .int_err()?;
+
+                let mut upstream_dataset_ids = Vec::new();
+                for transform_input in summary.dependencies.iter() {
+                    if let Some(input_id) = &transform_input.id {
+                        upstream_dataset_ids.push(input_id.clone());
+                    }
+                }
+
+                yield (dataset_handle.id, upstream_dataset_ids);
+            }
+        })
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub type DatasetIDStream<'a> = std::pin::Pin<Box<dyn Stream<Item = DatasetID> + Send + 'a>>;
 
+pub type DatasetDependenciesIDStream<'a> =
+    Pin<Box<dyn Stream<Item = Result<(DatasetID, Vec<DatasetID>), InternalError>> + Send + 'a>>;
+
 /////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Error, Debug)]
-pub enum DependenciesScanError {
-    #[error(transparent)]
-    AlreadyScanning(#[from] DependenciesAlreadyScanningError),
-
-    #[error(transparent)]
-    Internal(#[from] InternalError),
-}
 
 #[derive(Error, Debug)]
 pub enum GetDownstreamDependenciesError {
     #[error(transparent)]
-    NotScanned(DependenciesNotScannedError),
+    Internal(InternalError),
 
     #[error(transparent)]
     DatasetNotFound(#[from] DatasetNodeNotFoundError),
@@ -76,21 +104,13 @@ pub enum GetDownstreamDependenciesError {
 #[derive(Error, Debug)]
 pub enum GetUpstreamDependenciesError {
     #[error(transparent)]
-    NotScanned(DependenciesNotScannedError),
+    Internal(InternalError),
 
     #[error(transparent)]
     DatasetNotFound(#[from] DatasetNodeNotFoundError),
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Error, Debug)]
-#[error("No dependencies data initialized")]
-pub struct DependenciesNotScannedError {}
-
-#[derive(Error, Debug)]
-#[error("Dependencies are already being scanned at the moment")]
-pub struct DependenciesAlreadyScanningError {}
 
 #[derive(Error, Debug)]
 #[error("Dataset {dataset_id} not found")]

@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::collections::{HashMap, HashSet};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use dill::*;
 use event_bus::AsyncEventHandler;
@@ -26,7 +26,8 @@ use petgraph::Direction;
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct DependencyGraphServiceInMemory {
-    state: Arc<Mutex<State>>,
+    initializer: Option<Arc<DependencyGraphServiceInitializer>>,
+    state: Arc<tokio::sync::Mutex<State>>,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -35,37 +36,10 @@ pub struct DependencyGraphServiceInMemory {
 struct State {
     datasets_graph: StableDiGraph<DatasetID, ()>,
     dataset_node_indices: HashMap<DatasetID, NodeIndex>,
-    status: DependenciesGraphStatus,
-}
-
-enum DependenciesGraphStatus {
-    NotScanned,
-    Scanning,
-    Scanned,
-}
-
-impl Default for DependenciesGraphStatus {
-    fn default() -> Self {
-        Self::NotScanned
-    }
+    initially_scanned: bool,
 }
 
 impl State {
-    fn reset(&mut self) {
-        self.datasets_graph.clear();
-        self.dataset_node_indices.clear();
-        self.status = DependenciesGraphStatus::NotScanned;
-    }
-
-    fn ensure_scanned(&self) -> Result<(), DependenciesNotScannedError> {
-        match self.status {
-            DependenciesGraphStatus::NotScanned | DependenciesGraphStatus::Scanning => {
-                Err(DependenciesNotScannedError {})
-            }
-            DependenciesGraphStatus::Scanned => Ok(()),
-        }
-    }
-
     fn get_dataset_node(
         &self,
         dataset_id: &DatasetID,
@@ -95,16 +69,62 @@ impl State {
 
 #[component(pub)]
 #[interface(dyn DependencyGraphService)]
-#[interface(dyn DependencyGraphServiceInitializer)]
 #[interface(dyn AsyncEventHandler<DatasetEventCreated>)]
 #[interface(dyn AsyncEventHandler<DatasetEventDeleted>)]
 #[interface(dyn AsyncEventHandler<DatasetEventDependenciesUpdated>)]
 #[scope(Singleton)]
 impl DependencyGraphServiceInMemory {
-    pub fn new() -> Self {
+    pub fn new(initializer: Option<Arc<DependencyGraphServiceInitializer>>) -> Self {
         Self {
-            state: Arc::new(Mutex::new(State::default())),
+            initializer,
+            state: Arc::new(tokio::sync::Mutex::new(State::default())),
         }
+    }
+
+    async fn ensure_datasets_initially_scanned(&self) -> Result<(), InternalError> {
+        let mut state = self.state.lock().await;
+        if state.initially_scanned {
+            return Ok(());
+        }
+
+        self.ensure_datasets_initially_scanned_with(
+            &mut state,
+            self.initializer
+                .as_ref()
+                .expect("Dependencies graph initializer not present"),
+        )
+        .await
+    }
+
+    async fn ensure_datasets_initially_scanned_with(
+        &self,
+        state: &mut State,
+        initializer: &DependencyGraphServiceInitializer,
+    ) -> Result<(), InternalError> {
+        if state.initially_scanned {
+            return Ok(());
+        }
+
+        tracing::debug!("Started initializing dependencies graph lazily");
+
+        use tokio_stream::StreamExt;
+
+        let mut dependencies_stream = initializer.browse_dependencies_of_all_datasets();
+        while let Some(Ok((dataset_id, upstream_dataset_ids))) = dependencies_stream.next().await {
+            for upstream_dataset_id in upstream_dataset_ids {
+                self.add_dependency(state, &upstream_dataset_id, &dataset_id);
+            }
+        }
+
+        state.initially_scanned = true;
+
+        tracing::debug!(
+            num_nodes = % state.datasets_graph.node_count(),
+            num_edges = % state.datasets_graph.edge_count(),
+            "Finished initializing dependencies graph lazily",
+        );
+
+        Ok(())
     }
 
     /// Tracks a dependency between upstream and downstream dataset
@@ -149,16 +169,29 @@ impl DependencyGraphServiceInMemory {
 
 #[async_trait::async_trait]
 impl DependencyGraphService for DependencyGraphServiceInMemory {
+    /// Forces initialization of graph data, if it wasn't initialized already.
+    /// Ignored if called multiple times
+    async fn eager_initialization(
+        &self,
+        initializer: &DependencyGraphServiceInitializer,
+    ) -> Result<(), InternalError> {
+        let mut state = self.state.lock().await;
+        self.ensure_datasets_initially_scanned_with(&mut state, initializer)
+            .await
+    }
+
     /// Iterates over 1st level of dataset's downstream dependencies
     async fn get_downstream_dependencies(
         &self,
         dataset_id: &DatasetID,
     ) -> Result<DatasetIDStream, GetDownstreamDependenciesError> {
+        self.ensure_datasets_initially_scanned()
+            .await
+            .int_err()
+            .map_err(|e| GetDownstreamDependenciesError::Internal(e))?;
+
         let downstream_node_datasets: Vec<_> = {
-            let state = self.state.lock().unwrap();
-            state
-                .ensure_scanned()
-                .map_err(|e| GetDownstreamDependenciesError::NotScanned(e))?;
+            let state = self.state.lock().await;
 
             let node_index = state
                 .get_dataset_node(dataset_id)
@@ -185,11 +218,13 @@ impl DependencyGraphService for DependencyGraphServiceInMemory {
         &self,
         dataset_id: &DatasetID,
     ) -> Result<DatasetIDStream, GetUpstreamDependenciesError> {
+        self.ensure_datasets_initially_scanned()
+            .await
+            .int_err()
+            .map_err(|e| GetUpstreamDependenciesError::Internal(e))?;
+
         let upstream_node_datasets: Vec<_> = {
-            let state = self.state.lock().unwrap();
-            state
-                .ensure_scanned()
-                .map_err(|e| GetUpstreamDependenciesError::NotScanned(e))?;
+            let state = self.state.lock().await;
 
             let node_index = state
                 .get_dataset_node(dataset_id)
@@ -215,69 +250,9 @@ impl DependencyGraphService for DependencyGraphServiceInMemory {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl DependencyGraphServiceInitializer for DependencyGraphServiceInMemory {
-    async fn full_scan(
-        &self,
-        dataset_repo: &dyn DatasetRepository,
-        force: bool,
-    ) -> Result<(), DependenciesScanError> {
-        use tokio_stream::StreamExt;
-
-        {
-            let mut state = self.state.lock().unwrap();
-            match &state.status {
-                DependenciesGraphStatus::NotScanned => {
-                    state.status = DependenciesGraphStatus::Scanning;
-                }
-                DependenciesGraphStatus::Scanning => {
-                    return Err(DependenciesScanError::AlreadyScanning(
-                        DependenciesAlreadyScanningError {},
-                    ))
-                }
-                DependenciesGraphStatus::Scanned => {
-                    if force {
-                        state.reset();
-                        state.status = DependenciesGraphStatus::Scanning;
-                    } else {
-                        return Ok(());
-                    }
-                }
-            }
-        }
-
-        let mut datasets_stream = dataset_repo.get_all_datasets();
-        while let Some(Ok(dataset_handle)) = datasets_stream.next().await {
-            tracing::debug!(dataset=%dataset_handle, "Scanning dataset dependencies");
-
-            let summary = dataset_repo
-                .get_dataset(&dataset_handle.as_local_ref())
-                .await
-                .int_err()?
-                .get_summary(GetSummaryOpts::default())
-                .await
-                .int_err()?;
-
-            let mut state = self.state.lock().unwrap();
-            for input_dataset in summary.dependencies.iter() {
-                if let Some(input_id) = &input_dataset.id {
-                    self.add_dependency(&mut state, input_id, &dataset_handle.id);
-                }
-            }
-        }
-
-        let mut state = self.state.lock().unwrap();
-        state.status = DependenciesGraphStatus::Scanned;
-
-        Ok(())
-    }
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-#[async_trait::async_trait]
 impl AsyncEventHandler<DatasetEventCreated> for DependencyGraphServiceInMemory {
     async fn handle(&self, event: &DatasetEventCreated) -> Result<(), InternalError> {
-        let mut state = self.state.lock().unwrap();
+        let mut state = self.state.lock().await;
         state.get_or_create_dataset_node(&event.dataset_id);
         Ok(())
     }
@@ -288,7 +263,7 @@ impl AsyncEventHandler<DatasetEventCreated> for DependencyGraphServiceInMemory {
 #[async_trait::async_trait]
 impl AsyncEventHandler<DatasetEventDeleted> for DependencyGraphServiceInMemory {
     async fn handle(&self, event: &DatasetEventDeleted) -> Result<(), InternalError> {
-        let mut state = self.state.lock().unwrap();
+        let mut state = self.state.lock().await;
 
         let node_index = state
             .get_dataset_node(&event.dataset_id)
@@ -306,7 +281,7 @@ impl AsyncEventHandler<DatasetEventDeleted> for DependencyGraphServiceInMemory {
 #[async_trait::async_trait]
 impl AsyncEventHandler<DatasetEventDependenciesUpdated> for DependencyGraphServiceInMemory {
     async fn handle(&self, event: &DatasetEventDependenciesUpdated) -> Result<(), InternalError> {
-        let mut state = self.state.lock().unwrap();
+        let mut state = self.state.lock().await;
 
         let node_index = state
             .get_dataset_node(&event.dataset_id)

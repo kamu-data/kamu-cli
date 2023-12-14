@@ -10,7 +10,13 @@
 use std::sync::Arc;
 
 use dill::Component;
-use domain::{auth, CurrentAccountSubject, DatasetRepository, DependencyGraphServiceInitializer};
+use domain::{
+    auth,
+    CurrentAccountSubject,
+    DatasetRepository,
+    DependencyGraphService,
+    DependencyGraphServiceInitializer,
+};
 use event_bus::EventBus;
 use kamu::testing::MockDatasetActionAuthorizer;
 use kamu::*;
@@ -22,7 +28,7 @@ use super::test_dataset_repository_shared;
 /////////////////////////////////////////////////////////////////////////////////////////
 
 struct LocalFsRepoHarness {
-    _catalog: dill::Catalog,
+    catalog: dill::Catalog,
     dataset_repo: Arc<dyn DatasetRepository>,
 }
 
@@ -46,20 +52,25 @@ impl LocalFsRepoHarness {
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
             .build();
 
-        let dependency_graph_initializer = catalog
-            .get_one::<dyn DependencyGraphServiceInitializer>()
-            .unwrap();
-        let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
-
-        dependency_graph_initializer
-            .full_scan(dataset_repo.as_ref(), false)
-            .await
-            .unwrap();
+        let dataset_repo = catalog.get_one().unwrap();
 
         Self {
-            _catalog: catalog,
+            catalog,
             dataset_repo,
         }
+    }
+
+    pub async fn dependencies_eager_initialization(&self) {
+        let dependency_graph_service = self
+            .catalog
+            .get_one::<dyn DependencyGraphService>()
+            .unwrap();
+        dependency_graph_service
+            .eager_initialization(&DependencyGraphServiceInitializer::new(
+                self.dataset_repo.clone(),
+            ))
+            .await
+            .unwrap();
     }
 }
 
@@ -231,6 +242,7 @@ async fn test_delete_dataset() {
         false,
     )
     .await;
+    harness.dependencies_eager_initialization().await;
 
     test_dataset_repository_shared::test_delete_dataset(harness.dataset_repo.as_ref(), None).await;
 }
@@ -246,6 +258,7 @@ async fn test_delete_dataset_multi_tenant() {
         true,
     )
     .await;
+    harness.dependencies_eager_initialization().await;
 
     test_dataset_repository_shared::test_delete_dataset(
         harness.dataset_repo.as_ref(),
@@ -261,6 +274,7 @@ async fn test_delete_unauthorized() {
     let tempdir = tempfile::tempdir().unwrap();
     let harness =
         LocalFsRepoHarness::create(&tempdir, MockDatasetActionAuthorizer::denying(), true).await;
+    harness.dependencies_eager_initialization().await;
 
     test_dataset_repository_shared::test_delete_dataset_unauthroized(
         harness.dataset_repo.as_ref(),

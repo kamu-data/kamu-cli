@@ -573,12 +573,12 @@ impl GraphQLDatasetsHarness {
             .catalog_authorized
             .get_one::<dyn DatasetRepository>()
             .unwrap();
-        let dependency_graph_initializer = self
+        let dependency_graph_service = self
             .base_catalog
-            .get_one::<dyn DependencyGraphServiceInitializer>()
+            .get_one::<dyn DependencyGraphService>()
             .unwrap();
-        dependency_graph_initializer
-            .full_scan(dataset_repo.as_ref(), false)
+        dependency_graph_service
+            .eager_initialization(&DependencyGraphServiceInitializer::new(dataset_repo))
             .await
             .unwrap();
     }

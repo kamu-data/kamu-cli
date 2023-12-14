@@ -15,7 +15,7 @@ use kamu::domain::{auth, CurrentAccountSubject};
 use kamu::testing::{LocalS3Server, MockDatasetActionAuthorizer};
 use kamu::utils::s3_context::S3Context;
 use kamu::{DatasetRepositoryS3, DependencyGraphServiceInMemory};
-use kamu_core::{DatasetRepository, DependencyGraphServiceInitializer};
+use kamu_core::{DatasetRepository, DependencyGraphService, DependencyGraphServiceInitializer};
 use opendatafabric::AccountName;
 
 use super::test_dataset_repository_shared;
@@ -23,7 +23,7 @@ use super::test_dataset_repository_shared;
 /////////////////////////////////////////////////////////////////////////////////////////
 
 struct S3RepoHarness {
-    _catalog: dill::Catalog,
+    catalog: dill::Catalog,
     dataset_repo: Arc<dyn DatasetRepository>,
 }
 
@@ -49,20 +49,25 @@ impl S3RepoHarness {
             .bind::<dyn DatasetRepository, DatasetRepositoryS3>()
             .build();
 
-        let dependency_graph_initializer = catalog
-            .get_one::<dyn DependencyGraphServiceInitializer>()
-            .unwrap();
-        let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
-
-        dependency_graph_initializer
-            .full_scan(dataset_repo.as_ref(), false)
-            .await
-            .unwrap();
+        let dataset_repo = catalog.get_one().unwrap();
 
         Self {
-            _catalog: catalog,
+            catalog,
             dataset_repo,
         }
+    }
+
+    pub async fn dependencies_eager_initialization(&self) {
+        let dependency_graph_service = self
+            .catalog
+            .get_one::<dyn DependencyGraphService>()
+            .unwrap();
+        dependency_graph_service
+            .eager_initialization(&DependencyGraphServiceInitializer::new(
+                self.dataset_repo.clone(),
+            ))
+            .await
+            .unwrap();
     }
 }
 
@@ -220,6 +225,7 @@ async fn test_delete_dataset() {
     let s3 = LocalS3Server::new().await;
     let harness =
         S3RepoHarness::create(&s3, auth::AlwaysHappyDatasetActionAuthorizer::new(), false).await;
+    harness.dependencies_eager_initialization().await;
 
     test_dataset_repository_shared::test_delete_dataset(harness.dataset_repo.as_ref(), None).await;
 }
@@ -232,6 +238,7 @@ async fn test_delete_dataset_multi_tenant() {
     let s3 = LocalS3Server::new().await;
     let harness =
         S3RepoHarness::create(&s3, auth::AlwaysHappyDatasetActionAuthorizer::new(), true).await;
+    harness.dependencies_eager_initialization().await;
 
     test_dataset_repository_shared::test_delete_dataset(
         harness.dataset_repo.as_ref(),
@@ -247,6 +254,7 @@ async fn test_delete_dataset_multi_tenant() {
 async fn test_delete_unauthorized() {
     let s3: LocalS3Server = LocalS3Server::new().await;
     let harness = S3RepoHarness::create(&s3, MockDatasetActionAuthorizer::denying(), true).await;
+    harness.dependencies_eager_initialization().await;
 
     test_dataset_repository_shared::test_delete_dataset_unauthroized(
         harness.dataset_repo.as_ref(),

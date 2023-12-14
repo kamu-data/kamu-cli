@@ -60,8 +60,16 @@ pub async fn run(
 
     // Configure application
     let (guards, base_catalog, cli_catalog, output_config) = {
+        let dependencies_graph_initializer = prepare_dependencies_graph_initializer(
+            &workspace_layout,
+            workspace_svc.is_multi_tenant_workspace(),
+            current_account.to_current_account_subject(),
+        );
+
         let mut base_catalog_builder =
             configure_base_catalog(&workspace_layout, workspace_svc.is_multi_tenant_workspace());
+
+        base_catalog_builder.add_value(dependencies_graph_initializer);
 
         let output_config = configure_output_format(&matches, &workspace_svc);
         base_catalog_builder.add_value(output_config.clone());
@@ -106,7 +114,6 @@ pub async fn run(
             } else if current_account.is_explicit() && !workspace_svc.is_multi_tenant_workspace() {
                 Err(CLIError::usage_error_from(NotInMultiTenantWorkspace))
             } else {
-                run_startup_jobs(&cli_catalog).await?;
                 command.run().await
             }
         }
@@ -142,24 +149,35 @@ pub async fn run(
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
-
-async fn run_startup_jobs(cli_catalog: &Catalog) -> Result<(), CLIError> {
-    // Run initial scanning of dataset dependencies
-    let dataset_repo = cli_catalog.get_one::<dyn DatasetRepository>().unwrap();
-    let dataset_graph_service_initializer = cli_catalog
-        .get_one::<dyn DependencyGraphServiceInitializer>()
-        .unwrap();
-    dataset_graph_service_initializer
-        .full_scan(dataset_repo.as_ref(), false)
-        .await
-        .map_err(|e| CLIError::critical(e))?;
-
-    Ok(())
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
 // Catalog
 /////////////////////////////////////////////////////////////////////////////////////////
+
+pub fn prepare_dependencies_graph_initializer(
+    workspace_layout: &WorkspaceLayout,
+    multi_tenant_workspace: bool,
+    current_account_subject: CurrentAccountSubject,
+) -> DependencyGraphServiceInitializer {
+    // Construct a special catalog just to create 1 object, but with a repository
+    // bound to CLI user. It also should be authorized to access any dataset.
+
+    let special_catalog_for_graph = CatalogBuilder::new()
+        .add::<event_bus::EventBus>()
+        .add_builder(
+            DatasetRepositoryLocalFs::builder()
+                .with_root(workspace_layout.datasets_dir.clone())
+                .with_multi_tenant(multi_tenant_workspace),
+        )
+        .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+        .add_value(current_account_subject)
+        .add::<kamu::domain::auth::AlwaysHappyDatasetActionAuthorizer>()
+        .add::<kamu::DependencyGraphServiceInMemory>()
+        // Don't add it's own initializer, leave optional dependency uninitialized
+        .build();
+
+    let dataset_repo = special_catalog_for_graph.get_one().unwrap();
+
+    DependencyGraphServiceInitializer::new(dataset_repo)
+}
 
 // Public only for tests
 pub fn configure_base_catalog(
