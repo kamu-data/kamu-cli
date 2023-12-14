@@ -62,7 +62,7 @@ impl DatasetRepositoryS3 {
             .s3_context
             .sub_context(&format!("{}/", &dataset_id.cid.to_string()));
 
-        DatasetFactoryImpl::get_s3_from_context(s3_context).await
+        DatasetFactoryImpl::get_s3_from_context(s3_context, self.event_bus.clone()).await
     }
 
     async fn delete_dataset_s3_objects(&self, dataset_id: &DatasetID) -> Result<(), InternalError> {

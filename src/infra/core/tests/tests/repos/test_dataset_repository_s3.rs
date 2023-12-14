@@ -14,8 +14,12 @@ use event_bus::EventBus;
 use kamu::domain::{auth, CurrentAccountSubject};
 use kamu::testing::{LocalS3Server, MockDatasetActionAuthorizer};
 use kamu::utils::s3_context::S3Context;
-use kamu::{DatasetRepositoryS3, DependencyGraphServiceInMemory};
-use kamu_core::{DatasetRepository, DependencyGraphService, DependencyGraphServiceInitializer};
+use kamu::{
+    DatasetRepositoryS3,
+    DependencyGraphRepositoryInMemory,
+    DependencyGraphServiceInMemory,
+};
+use kamu_core::{DatasetRepository, DependencyGraphService};
 use opendatafabric::AccountName;
 
 use super::test_dataset_repository_shared;
@@ -63,7 +67,7 @@ impl S3RepoHarness {
             .get_one::<dyn DependencyGraphService>()
             .unwrap();
         dependency_graph_service
-            .eager_initialization(&DependencyGraphServiceInitializer::new(
+            .eager_initialization(&DependencyGraphRepositoryInMemory::new(
                 self.dataset_repo.clone(),
             ))
             .await

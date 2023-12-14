@@ -60,7 +60,7 @@ pub async fn run(
 
     // Configure application
     let (guards, base_catalog, cli_catalog, output_config) = {
-        let dependencies_graph_initializer = prepare_dependencies_graph_initializer(
+        let dependencies_graph_repository = prepare_dependencies_graph_repository(
             &workspace_layout,
             workspace_svc.is_multi_tenant_workspace(),
             current_account.to_current_account_subject(),
@@ -69,7 +69,9 @@ pub async fn run(
         let mut base_catalog_builder =
             configure_base_catalog(&workspace_layout, workspace_svc.is_multi_tenant_workspace());
 
-        base_catalog_builder.add_value(dependencies_graph_initializer);
+        base_catalog_builder
+            .add_value(dependencies_graph_repository)
+            .bind::<dyn domain::DependencyGraphRepository, DependencyGraphRepositoryInMemory>();
 
         let output_config = configure_output_format(&matches, &workspace_svc);
         base_catalog_builder.add_value(output_config.clone());
@@ -152,11 +154,11 @@ pub async fn run(
 // Catalog
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn prepare_dependencies_graph_initializer(
+pub fn prepare_dependencies_graph_repository(
     workspace_layout: &WorkspaceLayout,
     multi_tenant_workspace: bool,
     current_account_subject: CurrentAccountSubject,
-) -> DependencyGraphServiceInitializer {
+) -> DependencyGraphRepositoryInMemory {
     // Construct a special catalog just to create 1 object, but with a repository
     // bound to CLI user. It also should be authorized to access any dataset.
 
@@ -176,7 +178,7 @@ pub fn prepare_dependencies_graph_initializer(
 
     let dataset_repo = special_catalog_for_graph.get_one().unwrap();
 
-    DependencyGraphServiceInitializer::new(dataset_repo)
+    DependencyGraphRepositoryInMemory::new(dataset_repo)
 }
 
 // Public only for tests

@@ -47,9 +47,13 @@ impl DatasetRepositoryLocalFs {
                 Box::new(DatasetMultiTenantStorageStrategy::new(
                     root,
                     current_account_subject,
+                    event_bus.clone(),
                 ))
             } else {
-                Box::new(DatasetSingleTenantStorageStrategy::new(root))
+                Box::new(DatasetSingleTenantStorageStrategy::new(
+                    root,
+                    event_bus.clone(),
+                ))
             },
             dataset_action_authorizer,
             dependency_graph_service,
@@ -84,7 +88,10 @@ impl DatasetRepositoryLocalFs {
         dataset_handle: &DatasetHandle,
     ) -> Result<impl Dataset, InternalError> {
         let layout = DatasetLayout::new(self.storage_strategy.get_dataset_path(&dataset_handle));
-        Ok(DatasetFactoryImpl::get_local_fs(layout))
+        Ok(DatasetFactoryImpl::get_local_fs(
+            layout,
+            self.event_bus.clone(),
+        ))
     }
 
     // TODO: Used only for testing, but should be removed it in future to discourage
@@ -231,7 +238,7 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
 
         let layout = DatasetLayout::create(&dataset_path).int_err()?;
 
-        let dataset = DatasetFactoryImpl::get_local_fs(layout);
+        let dataset = DatasetFactoryImpl::get_local_fs(layout, self.event_bus.clone());
 
         // There are three possiblities at this point:
         // - Dataset did not exist before - continue normally
@@ -441,11 +448,15 @@ enum ResolveDatasetError {
 
 struct DatasetSingleTenantStorageStrategy {
     root: PathBuf,
+    event_bus: Arc<EventBus>,
 }
 
 impl DatasetSingleTenantStorageStrategy {
-    pub fn new(root: impl Into<PathBuf>) -> Self {
-        Self { root: root.into() }
+    pub fn new(root: impl Into<PathBuf>, event_bus: Arc<EventBus>) -> Self {
+        Self {
+            root: root.into(),
+            event_bus,
+        }
     }
 
     fn dataset_name<'a>(&self, dataset_alias: &'a DatasetAlias) -> &'a DatasetName {
@@ -463,7 +474,7 @@ impl DatasetSingleTenantStorageStrategy {
         dataset_alias: &DatasetAlias,
     ) -> Result<DatasetSummary, ResolveDatasetError> {
         let layout = DatasetLayout::new(dataset_path);
-        let dataset = DatasetFactoryImpl::get_local_fs(layout);
+        let dataset = DatasetFactoryImpl::get_local_fs(layout, self.event_bus.clone());
         dataset
             .get_summary(GetSummaryOpts::default())
             .await
@@ -603,16 +614,19 @@ impl DatasetStorageStrategy for DatasetSingleTenantStorageStrategy {
 struct DatasetMultiTenantStorageStrategy {
     root: PathBuf,
     current_account_subject: Arc<CurrentAccountSubject>,
+    event_bus: Arc<EventBus>,
 }
 
 impl DatasetMultiTenantStorageStrategy {
     pub fn new(
         root: impl Into<PathBuf>,
         current_account_subject: Arc<CurrentAccountSubject>,
+        event_bus: Arc<EventBus>,
     ) -> Self {
         Self {
             root: root.into(),
             current_account_subject,
+            event_bus,
         }
     }
 
@@ -636,7 +650,7 @@ impl DatasetMultiTenantStorageStrategy {
         dataset_id: &DatasetID,
     ) -> Result<DatasetAlias, ResolveDatasetError> {
         let layout = DatasetLayout::new(dataset_path);
-        let dataset = DatasetFactoryImpl::get_local_fs(layout);
+        let dataset = DatasetFactoryImpl::get_local_fs(layout, self.event_bus.clone());
         match dataset.as_info_repo().get("alias").await {
             Ok(bytes) => {
                 let dataset_alias_str = std::str::from_utf8(&bytes[..]).int_err()?.trim();
@@ -863,7 +877,7 @@ impl DatasetStorageStrategy for DatasetMultiTenantStorageStrategy {
     ) -> Result<(), InternalError> {
         let dataset_path = self.get_dataset_path(dataset_handle);
         let layout = DatasetLayout::new(dataset_path);
-        let dataset = DatasetFactoryImpl::get_local_fs(layout);
+        let dataset = DatasetFactoryImpl::get_local_fs(layout, self.event_bus.clone());
 
         let new_alias =
             DatasetAlias::new(dataset_handle.alias.account_name.clone(), new_name.clone());

@@ -321,7 +321,7 @@ impl AxumServerPushProtocolInstance {
 
         if new_blocks.len() > 0 {
             let dataset = self.dataset.as_ref().unwrap().as_ref();
-            let response = dataset_append_metadata(dataset, self.dataset_repo.as_ref(), new_blocks)
+            let response = dataset_append_metadata(dataset, new_blocks)
                 .await
                 .map_err(|e| {
                     tracing::debug!("Appending dataset metadata failed with error: {}", e);

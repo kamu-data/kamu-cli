@@ -26,7 +26,7 @@ use petgraph::Direction;
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct DependencyGraphServiceInMemory {
-    initializer: Option<Arc<DependencyGraphServiceInitializer>>,
+    repository: Option<Arc<dyn DependencyGraphRepository>>,
     state: Arc<tokio::sync::Mutex<State>>,
 }
 
@@ -74,9 +74,9 @@ impl State {
 #[interface(dyn AsyncEventHandler<DatasetEventDependenciesUpdated>)]
 #[scope(Singleton)]
 impl DependencyGraphServiceInMemory {
-    pub fn new(initializer: Option<Arc<DependencyGraphServiceInitializer>>) -> Self {
+    pub fn new(repository: Option<Arc<dyn DependencyGraphRepository>>) -> Self {
         Self {
-            initializer,
+            repository,
             state: Arc::new(tokio::sync::Mutex::new(State::default())),
         }
     }
@@ -89,9 +89,10 @@ impl DependencyGraphServiceInMemory {
 
         self.ensure_datasets_initially_scanned_with(
             &mut state,
-            self.initializer
+            self.repository
                 .as_ref()
-                .expect("Dependencies graph initializer not present"),
+                .expect("Dependencies graph repository not present")
+                .as_ref(),
         )
         .await
     }
@@ -99,7 +100,7 @@ impl DependencyGraphServiceInMemory {
     async fn ensure_datasets_initially_scanned_with(
         &self,
         state: &mut State,
-        initializer: &DependencyGraphServiceInitializer,
+        repository: &dyn DependencyGraphRepository,
     ) -> Result<(), InternalError> {
         if state.initially_scanned {
             return Ok(());
@@ -109,11 +110,9 @@ impl DependencyGraphServiceInMemory {
 
         use tokio_stream::StreamExt;
 
-        let mut dependencies_stream = initializer.browse_dependencies_of_all_datasets();
-        while let Some(Ok((dataset_id, upstream_dataset_ids))) = dependencies_stream.next().await {
-            for upstream_dataset_id in upstream_dataset_ids {
-                self.add_dependency(state, &upstream_dataset_id, &dataset_id);
-            }
+        let mut dependencies_stream = repository.list_dependencies_of_all_datasets();
+        while let Some(Ok((dataset_id, upstream_dataset_id))) = dependencies_stream.next().await {
+            self.add_dependency(state, &upstream_dataset_id, &dataset_id);
         }
 
         state.initially_scanned = true;
@@ -173,10 +172,10 @@ impl DependencyGraphService for DependencyGraphServiceInMemory {
     /// Ignored if called multiple times
     async fn eager_initialization(
         &self,
-        initializer: &DependencyGraphServiceInitializer,
+        repository: &dyn DependencyGraphRepository,
     ) -> Result<(), InternalError> {
         let mut state = self.state.lock().await;
-        self.ensure_datasets_initially_scanned_with(&mut state, initializer)
+        self.ensure_datasets_initially_scanned_with(&mut state, repository)
             .await
     }
 

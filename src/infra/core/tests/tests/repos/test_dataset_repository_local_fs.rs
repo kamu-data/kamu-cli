@@ -10,13 +10,7 @@
 use std::sync::Arc;
 
 use dill::Component;
-use domain::{
-    auth,
-    CurrentAccountSubject,
-    DatasetRepository,
-    DependencyGraphService,
-    DependencyGraphServiceInitializer,
-};
+use domain::{auth, CurrentAccountSubject, DatasetRepository, DependencyGraphService};
 use event_bus::EventBus;
 use kamu::testing::MockDatasetActionAuthorizer;
 use kamu::*;
@@ -66,7 +60,7 @@ impl LocalFsRepoHarness {
             .get_one::<dyn DependencyGraphService>()
             .unwrap();
         dependency_graph_service
-            .eager_initialization(&DependencyGraphServiceInitializer::new(
+            .eager_initialization(&DependencyGraphRepositoryInMemory::new(
                 self.dataset_repo.clone(),
             ))
             .await

@@ -95,11 +95,6 @@ pub trait DatasetRepositoryExt: DatasetRepository {
         dataset_ref: &DatasetRef,
     ) -> Result<Option<DatasetHandle>, InternalError>;
 
-    async fn try_resolve_dataset_ref_any(
-        &self,
-        dataset_ref_any: &DatasetRefAny,
-    ) -> Result<Option<DatasetHandle>, InternalError>;
-
     async fn try_get_dataset(
         &self,
         dataset_ref: &DatasetRef,
@@ -132,20 +127,6 @@ where
             Err(GetDatasetError::NotFound(_)) => Ok(None),
             Err(GetDatasetError::Internal(e)) => Err(e),
         }
-    }
-
-    async fn try_resolve_dataset_ref_any(
-        &self,
-        dataset_ref_any: &DatasetRefAny,
-    ) -> Result<Option<DatasetHandle>, InternalError> {
-        let local_ref = match dataset_ref_any.as_local_ref(|_| !self.is_multi_tenant()) {
-            Ok(local_ref) => local_ref,
-            Err(_) => {
-                unimplemented!("Deriving from remote dataset is not supported yet");
-            }
-        };
-
-        self.try_resolve_dataset_ref(&local_ref).await
     }
 
     async fn try_get_dataset(

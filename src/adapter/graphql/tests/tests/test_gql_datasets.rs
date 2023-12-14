@@ -578,7 +578,7 @@ impl GraphQLDatasetsHarness {
             .get_one::<dyn DependencyGraphService>()
             .unwrap();
         dependency_graph_service
-            .eager_initialization(&DependencyGraphServiceInitializer::new(dataset_repo))
+            .eager_initialization(&DependencyGraphRepositoryInMemory::new(dataset_repo))
             .await
             .unwrap();
     }

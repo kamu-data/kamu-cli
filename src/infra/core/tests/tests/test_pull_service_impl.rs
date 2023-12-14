@@ -155,12 +155,13 @@ async fn create_graph(
 
 // TODO: Rewrite this abomination
 async fn create_graph_in_repository(
+    event_bus: Arc<EventBus>,
     repo_path: &Path,
     datasets: Vec<(DatasetAlias, Vec<DatasetAlias>)>,
 ) {
     for (dataset_alias, deps) in datasets {
         let layout = DatasetLayout::create(repo_path.join(&dataset_alias.dataset_name)).unwrap();
-        let ds = DatasetFactoryImpl::get_local_fs(layout);
+        let ds = DatasetFactoryImpl::get_local_fs(layout, event_bus.clone());
         let chain = ds.as_metadata_chain();
 
         if deps.is_empty() {
@@ -222,13 +223,14 @@ async fn create_graph_in_repository(
 // dir and syncing it into the main workspace. TODO: Add simpler way to import
 // remote dataset
 async fn create_graph_remote(
+    event_bus: Arc<EventBus>,
     dataset_repo: Arc<dyn DatasetRepository>,
     reg: Arc<RemoteRepositoryRegistryImpl>,
     datasets: Vec<(DatasetAlias, Vec<DatasetAlias>)>,
     to_import: Vec<DatasetAlias>,
 ) {
     let tmp_repo_dir = tempfile::tempdir().unwrap();
-    create_graph_in_repository(tmp_repo_dir.path(), datasets).await;
+    create_graph_in_repository(event_bus.clone(), tmp_repo_dir.path(), datasets).await;
 
     let tmp_repo_name = RepoName::new_unchecked("tmp");
 
@@ -245,6 +247,7 @@ async fn create_graph_remote(
         Arc::new(DatasetFactoryImpl::new(
             IpfsGateway::default(),
             Arc::new(auth::DummyOdfServerAccessTokenResolver::new()),
+            event_bus,
         )),
         Arc::new(DummySmartTransferProtocolClient::new()),
         Arc::new(kamu::utils::ipfs_wrapper::IpfsClient::default()),
@@ -432,6 +435,7 @@ async fn test_pull_batching_complex_with_remote() {
     // C --------/   /
     // D -----------/
     create_graph_remote(
+        harness.event_bus.clone(),
         harness.dataset_repo.clone(),
         harness.remote_repo_reg.clone(),
         vec![
@@ -901,6 +905,7 @@ struct PullTestHarness {
     remote_repo_reg: Arc<RemoteRepositoryRegistryImpl>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
     pull_svc: Arc<dyn PullService>,
+    event_bus: Arc<EventBus>,
 }
 
 impl PullTestHarness {
@@ -950,6 +955,7 @@ impl PullTestHarness {
         let remote_repo_reg = catalog.get_one::<RemoteRepositoryRegistryImpl>().unwrap();
         let remote_alias_reg = catalog.get_one::<dyn RemoteAliasesRegistry>().unwrap();
         let pull_svc = catalog.get_one::<dyn PullService>().unwrap();
+        let event_bus = catalog.get_one::<EventBus>().unwrap();
 
         Self {
             calls,
@@ -957,6 +963,7 @@ impl PullTestHarness {
             remote_repo_reg,
             remote_alias_reg,
             pull_svc,
+            event_bus,
         }
     }
 

@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
-use std::sync::Arc;
 
 use ::serde::Deserialize;
 use axum::extract::{FromRequestParts, Path};
@@ -112,9 +111,15 @@ where
 /////////////////////////////////////////////////////////////////////////////////////////
 
 async fn setup_client(dataset_url: url::Url, head_expected: Multihash) {
+    let catalog = dill::CatalogBuilder::new()
+        .add::<EventBus>()
+        .add::<auth::DummyOdfServerAccessTokenResolver>()
+        .build();
+
     let dataset = DatasetFactoryImpl::new(
         IpfsGateway::default(),
-        Arc::new(auth::DummyOdfServerAccessTokenResolver::new()),
+        catalog.get_one().unwrap(),
+        catalog.get_one().unwrap(),
     )
     .get_dataset(&dataset_url, false)
     .await

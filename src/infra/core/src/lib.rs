@@ -25,6 +25,7 @@ pub mod utils;
 
 mod dataset_config;
 mod dataset_layout;
+mod dependency_graph_repository_inmem;
 mod dependency_graph_service_inmem;
 mod provenance_service_impl;
 mod pull_service_impl;
@@ -42,6 +43,7 @@ mod verification_service_impl;
 pub use auth::*;
 pub use dataset_config::*;
 pub use dataset_layout::*;
+pub use dependency_graph_repository_inmem::*;
 pub use dependency_graph_service_inmem::*;
 pub use engine::*;
 pub use ingest::*;

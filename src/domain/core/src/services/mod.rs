@@ -10,6 +10,7 @@
 // Re-exports
 pub use container_runtime::{NullPullImageListener, PullImageListener};
 
+pub mod dependency_graph_repository;
 pub mod dependency_graph_service;
 pub mod engine_provisioner;
 pub mod ingest;
@@ -27,6 +28,7 @@ pub mod sync_service;
 pub mod transform_service;
 pub mod verification_service;
 
+pub use dependency_graph_repository::*;
 pub use dependency_graph_service::*;
 pub use engine_provisioner::*;
 pub use ingest::*;

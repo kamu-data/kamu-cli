@@ -38,7 +38,6 @@ use crate::ws_common::{self, ReadMessageError, WriteMessageError};
 
 pub struct WsSmartTransferProtocolClient {
     event_bus: Arc<EventBus>,
-    dataset_repo: Arc<dyn DatasetRepository>,
     dataset_credential_resolver: Arc<dyn auth::OdfServerAccessTokenResolver>,
 }
 
@@ -49,12 +48,10 @@ pub struct WsSmartTransferProtocolClient {
 impl WsSmartTransferProtocolClient {
     pub fn new(
         event_bus: Arc<EventBus>,
-        dataset_repo: Arc<dyn DatasetRepository>,
         dataset_credential_resolver: Arc<dyn auth::OdfServerAccessTokenResolver>,
     ) -> Self {
         Self {
             event_bus,
-            dataset_repo,
             dataset_credential_resolver,
         }
     }
@@ -605,13 +602,12 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
                     .await?;
             }
 
-            let response =
-                dataset_append_metadata(dst.as_ref(), self.dataset_repo.as_ref(), new_blocks)
-                    .await
-                    .map_err(|e| {
-                        tracing::debug!("Appending dataset metadata failed with error: {}", e);
-                        SyncError::Internal(e.int_err())
-                    })?;
+            let response = dataset_append_metadata(dst.as_ref(), new_blocks)
+                .await
+                .map_err(|e| {
+                    tracing::debug!("Appending dataset metadata failed with error: {}", e);
+                    SyncError::Internal(e.int_err())
+                })?;
 
             // TODO: encapsulate this inside dataset/chain
             if !response.new_upstream_ids.is_empty() {
