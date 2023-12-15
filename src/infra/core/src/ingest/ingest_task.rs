@@ -317,19 +317,20 @@ impl IngestTask {
         match fetch_result {
             FetchResult::UpToDate => Ok(FetchStepResult::UpToDate),
             FetchResult::Updated(upd) => {
-                let data = if let Some(path) = upd.zero_copy_path {
-                    SavepointData::Ref { path }
-                } else {
-                    SavepointData::Owned {
-                        cache_key: data_cache_key,
-                    }
-                };
+                if let Some(path) = upd.zero_copy_path {
+                    // Copy file into cache even if it's on the local FS to avoid issues with
+                    // mounted volumes.
+                    // See: https://github.com/kamu-data/kamu-cli/issues/374
+                    tokio::fs::copy(path, &target_path).await.int_err()?;
+                }
 
                 let savepoint = FetchSavepoint {
                     created_at: self.request.system_time.clone(),
                     source_state: upd.source_state,
                     source_event_time: upd.source_event_time,
-                    data,
+                    data: SavepointData::Owned {
+                        cache_key: data_cache_key,
+                    },
                     has_more: upd.has_more,
                 };
                 self.write_fetch_savepoint(&savepoint_path, &savepoint)?;
