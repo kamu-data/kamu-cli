@@ -7,12 +7,17 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use kamu::domain::*;
 
 use crate::{WorkspaceConfig, WorkspaceLayout, WorkspaceVersion};
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+const KAMU_WORKSPACE_DIR_NAME: &str = ".kamu";
+const ENV_VAR_KAMU_WORKSPACE: &str = "KAMU_WORKSPACE";
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -42,17 +47,29 @@ impl WorkspaceService {
         }
     }
 
+    fn try_read_workspace_from_env(cwd: &PathBuf) -> Option<WorkspaceLayout> {
+        std::env::var_os(ENV_VAR_KAMU_WORKSPACE)
+            .map(|workspace| cwd.join(workspace).join(KAMU_WORKSPACE_DIR_NAME))
+            .map(WorkspaceLayout::new)
+    }
+
     pub fn find_workspace() -> WorkspaceLayout {
         let cwd = Path::new(".").canonicalize().unwrap();
+
+        if let Some(ws) = Self::try_read_workspace_from_env(&cwd) {
+            return ws;
+        }
+
         if let Some(ws) = Self::find_workspace_rec(&cwd) {
             ws
         } else {
-            WorkspaceLayout::new(cwd.join(".kamu"))
+            WorkspaceLayout::new(cwd.join(KAMU_WORKSPACE_DIR_NAME))
         }
     }
 
     fn find_workspace_rec(p: &Path) -> Option<WorkspaceLayout> {
-        let root_dir = p.join(".kamu");
+        let root_dir = p.join(KAMU_WORKSPACE_DIR_NAME);
+
         if root_dir.exists() {
             Some(WorkspaceLayout::new(root_dir))
         } else if let Some(parent) = p.parent() {
