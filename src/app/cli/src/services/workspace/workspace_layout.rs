@@ -84,7 +84,7 @@ pub enum WorkspaceVersion {
     V2_DatasetConfig,
     // Added a `createdAt` field to fetch savepoints
     V3_SavepointCreatedAt,
-    // Added a zero-copy ingest for loca FS files that affected the savepoint schema
+    // Added a zero-copy ingest for local FS files that affected the savepoint schema
     V4_SavepointZeroCopy,
     Unknown(u32),
 }

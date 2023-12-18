@@ -208,6 +208,7 @@ impl FetchService {
 
         let new_etag_path = out_dir.join("new-etag");
         let new_last_modified_path = out_dir.join("new-last-modified");
+        let new_has_more_data_path = out_dir.join("new-has-more-data");
 
         let (prev_etag, prev_last_modified) = match prev_source_state {
             None => (String::new(), String::new()),
@@ -230,6 +231,10 @@ impl FetchService {
                 (
                     "ODF_NEW_LAST_MODIFIED_PATH",
                     "/opt/odf/out/new-last-modified".to_owned(),
+                ),
+                (
+                    "ODF_NEW_HAS_MORE_DATA_PATH",
+                    "/opt/odf/out/new-has-more-data".to_owned(),
                 ),
             ])
             .volume((&out_dir, "/opt/odf/out"))
@@ -255,7 +260,7 @@ impl FetchService {
             }
         }
 
-        // Spawh container
+        // Spawn container
         let mut container = container_builder.spawn().int_err()?;
 
         // Handle output in a task
@@ -329,6 +334,8 @@ impl FetchService {
             None
         };
 
+        let has_more = new_has_more_data_path.exists();
+
         if target_path.metadata().int_err()?.len() == 0
             && prev_source_state == source_state.as_ref()
         {
@@ -337,7 +344,7 @@ impl FetchService {
             Ok(FetchResult::Updated(FetchResultUpdated {
                 source_state,
                 source_event_time: None,
-                has_more: false,
+                has_more,
                 zero_copy_path: None,
             }))
         }
