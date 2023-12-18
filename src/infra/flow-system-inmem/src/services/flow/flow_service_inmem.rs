@@ -72,6 +72,7 @@ impl FlowServiceInMemory {
         }
     }
 
+    #[tracing::instrument(level = "debug", skip_all)]
     async fn run_current_timeslot(&self) {
         let planned_flows: Vec<_> = {
             let mut state = self.state.lock().unwrap();
@@ -100,6 +101,7 @@ impl FlowServiceInMemory {
             });
     }
 
+    #[tracing::instrument(level = "debug", skip_all)]
     async fn initialize_auto_polling_flows_from_configurations(&self) -> Result<(), InternalError> {
         for dataset_flow_type in DatasetFlowType::all() {
             self.initialize_enabled_dataset_configurations(*dataset_flow_type)
@@ -114,6 +116,7 @@ impl FlowServiceInMemory {
         Ok(())
     }
 
+    #[tracing::instrument(level = "trace", skip_all, fields(flow_type))]
     async fn initialize_enabled_dataset_configurations(
         &self,
         flow_type: DatasetFlowType,
@@ -138,6 +141,7 @@ impl FlowServiceInMemory {
         Ok(())
     }
 
+    #[tracing::instrument(level = "trace", skip_all, fields(flow_type))]
     async fn initialize_system_flow_configuration(
         &self,
         flow_type: SystemFlowType,
@@ -159,6 +163,7 @@ impl FlowServiceInMemory {
         Ok(())
     }
 
+    #[tracing::instrument(level = "trace", skip_all, fields(?flow_key, ?rule))]
     async fn activate_flow_configuration(
         &self,
         flow_key: FlowKey,
@@ -192,6 +197,7 @@ impl FlowServiceInMemory {
         Ok(())
     }
 
+    #[tracing::instrument(level = "trace", skip_all, fields(?flow_key))]
     async fn try_enqueue_auto_polling_flow_if_enabled(
         &self,
         flow_key: &FlowKey,
@@ -211,6 +217,7 @@ impl FlowServiceInMemory {
         Ok(())
     }
 
+    #[tracing::instrument(level = "trace", skip_all, fields(?flow_key, ?schedule))]
     async fn enqueue_auto_polling_flow(
         &self,
         flow_key: &FlowKey,
@@ -239,6 +246,7 @@ impl FlowServiceInMemory {
         }
     }
 
+    #[tracing::instrument(level = "trace", skip_all, fields(%dataset_id, ?flow_type, %flow_id))]
     async fn enqueue_dependent_dataset_flows(
         &self,
         dataset_id: &DatasetID,
@@ -327,6 +335,7 @@ impl FlowServiceInMemory {
         state.pending_flows.try_get_pending_flow(flow_key)
     }
 
+    #[tracing::instrument(level = "trace", skip_all, fields(?flow_key, ?trigger))]
     async fn make_new_flow(
         &self,
         flow_key: FlowKey,
@@ -347,6 +356,7 @@ impl FlowServiceInMemory {
         Ok(flow)
     }
 
+    #[tracing::instrument(level = "trace", skip_all, fields(%flow_id, ?trigger))]
     async fn merge_secondary_flow_trigger(
         &self,
         flow_id: FlowID,
@@ -361,6 +371,7 @@ impl FlowServiceInMemory {
         Ok(flow.into())
     }
 
+    #[tracing::instrument(level = "trace", skip_all, fields(%flow_id, %activation_time))]
     fn enqueue_flow(
         &self,
         flow_id: FlowID,
@@ -374,6 +385,7 @@ impl FlowServiceInMemory {
         Ok(())
     }
 
+    #[tracing::instrument(level = "trace", skip_all, fields(flow_id = %flow.flow_id))]
     async fn schedule_flow_task(&self, flow: &mut Flow) -> Result<(), InternalError> {
         let logical_plan = match &flow.flow_key {
             FlowKey::Dataset(flow_key) => match flow_key.flow_type {
@@ -420,12 +432,16 @@ impl FlowServiceInMemory {
 #[async_trait::async_trait]
 impl FlowService for FlowServiceInMemory {
     /// Runs the update main loop
+    #[tracing::instrument(level = "info", skip_all)]
     async fn run(&self) -> Result<(), InternalError> {
         // Initial scheduling
         self.initialize_auto_polling_flows_from_configurations()
             .await?;
 
         // Main scanning loop
+        let main_loop_span = tracing::debug_span!("FlowService main loop");
+        let _ = main_loop_span.enter();
+
         loop {
             // Do we have a timeslot scheduled?
             let maybe_nearest_activation_time = {
@@ -447,6 +463,11 @@ impl FlowService for FlowServiceInMemory {
     }
 
     /// Triggers the specified flow manually, unless it's already waiting
+    #[tracing::instrument(
+        level = "debug",
+        skip_all,
+        fields(?flow_key, %initiator_account_id, %initiator_account_name)
+    )]
     async fn trigger_manual_flow(
         &self,
         flow_key: FlowKey,
@@ -477,6 +498,7 @@ impl FlowService for FlowServiceInMemory {
 
     /// Returns states of flows of certian type associated with a given dataset
     /// ordered by creation time from newest to oldest
+    #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id, ?flow_type))]
     fn list_flows_by_dataset_of_type(
         &self,
         dataset_id: &DatasetID,
@@ -501,6 +523,7 @@ impl FlowService for FlowServiceInMemory {
 
     /// Returns states of system flows of certian type
     /// ordered by creation time from newest to oldest
+    #[tracing::instrument(level = "debug", skip_all, fields(?flow_type))]
     fn list_system_flows_of_type(
         &self,
         flow_type: SystemFlowType,
@@ -522,6 +545,7 @@ impl FlowService for FlowServiceInMemory {
 
     /// Returns states of flows of any type associated with a given dataset
     /// ordered by creation time from newest to oldest
+    #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id))]
     fn list_all_flows_by_dataset(
         &self,
         dataset_id: &DatasetID,
@@ -545,6 +569,7 @@ impl FlowService for FlowServiceInMemory {
 
     /// Returns states of system flows of any type
     /// ordered by creation time from newest to oldest
+    #[tracing::instrument(level = "debug", skip_all)]
     fn list_all_system_flows(&self) -> Result<FlowStateStream, ListSystemFlowsError> {
         Ok(Box::pin(async_stream::try_stream! {
             let all_flows: Vec<_> = self
@@ -563,6 +588,7 @@ impl FlowService for FlowServiceInMemory {
 
     /// Returns state of the latest flow of certain type created for the given
     /// dataset
+    #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id, ?flow_type))]
     async fn get_last_flow_by_dataset_of_type(
         &self,
         dataset_id: &DatasetID,
@@ -579,6 +605,7 @@ impl FlowService for FlowServiceInMemory {
     }
 
     /// Returns state of the latest system flow of certain type
+    #[tracing::instrument(level = "debug", skip_all, fields(?flow_type))]
     async fn get_last_system_flow_of_type(
         &self,
         flow_type: SystemFlowType,
@@ -594,12 +621,18 @@ impl FlowService for FlowServiceInMemory {
     }
 
     /// Returns current state of a given flow
+    #[tracing::instrument(level = "debug", skip_all, fields(%flow_id))]
     async fn get_flow(&self, flow_id: FlowID) -> Result<FlowState, GetFlowError> {
         let flow = Flow::load(flow_id, self.flow_event_store.as_ref()).await?;
         Ok(flow.into())
     }
 
     /// Attempts to cancel the given flow
+    #[tracing::instrument(
+        level = "debug",
+        skip_all,
+        fields(%flow_id, %by_account_id, %by_account_name)
+    )]
     async fn cancel_flow(
         &self,
         flow_id: FlowID,
@@ -632,6 +665,7 @@ impl FlowService for FlowServiceInMemory {
 
 #[async_trait::async_trait]
 impl AsyncEventHandler<TaskEventFinished> for FlowServiceInMemory {
+    #[tracing::instrument(level = "debug", skip_all, fields(?event))]
     async fn handle(&self, event: &TaskEventFinished) -> Result<(), InternalError> {
         // Is this a task associated with flows?
         let maybe_flow_id = self
@@ -688,6 +722,7 @@ impl AsyncEventHandler<TaskEventFinished> for FlowServiceInMemory {
 
 #[async_trait::async_trait]
 impl AsyncEventHandler<FlowConfigurationEventModified> for FlowServiceInMemory {
+    #[tracing::instrument(level = "debug", skip_all, fields(?event))]
     async fn handle(&self, event: &FlowConfigurationEventModified) -> Result<(), InternalError> {
         if event.paused {
             let mut state = self.state.lock().unwrap();
@@ -706,6 +741,7 @@ impl AsyncEventHandler<FlowConfigurationEventModified> for FlowServiceInMemory {
 
 #[async_trait::async_trait]
 impl AsyncEventHandler<DatasetEventDeleted> for FlowServiceInMemory {
+    #[tracing::instrument(level = "debug", skip_all, fields(?event))]
     async fn handle(&self, event: &DatasetEventDeleted) -> Result<(), InternalError> {
         let mut state = self.state.lock().unwrap();
         state.active_configs.drop_dataset_configs(&event.dataset_id);

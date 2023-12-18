@@ -26,13 +26,15 @@ impl DependencyGraphRepositoryInMemory {
 }
 
 impl DependencyGraphRepository for DependencyGraphRepositoryInMemory {
+    #[tracing::instrument(level = "debug", skip_all)]
     fn list_dependencies_of_all_datasets(&self) -> DatasetDependenciesIDStream {
         use tokio_stream::StreamExt;
 
         Box::pin(async_stream::try_stream! {
             let mut datasets_stream = self.dataset_repo.get_all_datasets();
             while let Some(Ok(dataset_handle)) = datasets_stream.next().await {
-                tracing::debug!(dataset=%dataset_handle, "Scanning dataset dependencies");
+                let dataset_span = tracing::debug_span!("Scanning dataset dependencies", dataset=%dataset_handle);
+                let _ = dataset_span.enter();
 
                 let summary = self
                     .dataset_repo

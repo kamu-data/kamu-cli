@@ -63,7 +63,7 @@ impl FlowConfigurationServiceInMemory {
 impl FlowConfigurationService for FlowConfigurationServiceInMemory {
     /// Find current schedule, which may or may not be associated with the given
     /// dataset
-    #[tracing::instrument(level = "info", skip_all)]
+    #[tracing::instrument(level = "info", skip_all, fields(?flow_key))]
     async fn find_configuration(
         &self,
         flow_key: FlowKey,
@@ -74,7 +74,7 @@ impl FlowConfigurationService for FlowConfigurationServiceInMemory {
     }
 
     /// Set or modify dataset update schedule
-    #[tracing::instrument(level = "info", skip_all)]
+    #[tracing::instrument(level = "info", skip_all, fields(?flow_key, %paused, ?rule))]
     async fn set_configuration(
         &self,
         flow_key: FlowKey,
@@ -120,6 +120,7 @@ impl FlowConfigurationService for FlowConfigurationServiceInMemory {
     }
 
     /// Lists dataset flow configurations, which are currently enabled
+    #[tracing::instrument(level = "debug", skip_all, fields(?flow_type))]
     fn list_enabled_dataset_flow_configurations(
         &self,
         flow_type: DatasetFlowType,
@@ -141,6 +142,7 @@ impl FlowConfigurationService for FlowConfigurationServiceInMemory {
 
 #[async_trait::async_trait]
 impl AsyncEventHandler<DatasetEventDeleted> for FlowConfigurationServiceInMemory {
+    #[tracing::instrument(level = "debug", skip_all, fields(?event))]
     async fn handle(&self, event: &DatasetEventDeleted) -> Result<(), InternalError> {
         for flow_type in DatasetFlowType::all() {
             let maybe_flow_configuration = FlowConfiguration::try_load(

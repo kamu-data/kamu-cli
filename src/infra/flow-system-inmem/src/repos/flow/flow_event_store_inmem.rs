@@ -111,14 +111,17 @@ impl FlowEventStoreInMem {
 
 #[async_trait::async_trait]
 impl EventStore<FlowState> for FlowEventStoreInMem {
+    #[tracing::instrument(level = "debug", skip_all)]
     async fn len(&self) -> Result<usize, InternalError> {
         self.inner.len().await
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(%query, ?opts))]
     fn get_events<'a>(&'a self, query: &FlowID, opts: GetEventsOpts) -> EventStream<'a, FlowEvent> {
         self.inner.get_events(query, opts)
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(%query, num_events = events.len()))]
     async fn save_events(
         &self,
         query: &FlowID,
@@ -140,10 +143,12 @@ impl EventStore<FlowState> for FlowEventStoreInMem {
 
 #[async_trait::async_trait]
 impl FlowEventStore for FlowEventStoreInMem {
+    #[tracing::instrument(level = "debug", skip_all)]
     fn new_flow_id(&self) -> FlowID {
         self.inner.as_state().lock().unwrap().next_flow_id()
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id, ?flow_type))]
     fn get_last_dataset_flow_of_type(
         &self,
         dataset_id: &DatasetID,
@@ -156,6 +161,7 @@ impl FlowEventStore for FlowEventStoreInMem {
             .and_then(|flows| flows.last().cloned())
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(?flow_type))]
     fn get_last_system_flow_of_type(&self, flow_type: SystemFlowType) -> Option<FlowID> {
         let state = self.inner.as_state();
         let g = state.lock().unwrap();
@@ -164,6 +170,7 @@ impl FlowEventStore for FlowEventStoreInMem {
             .and_then(|flows| flows.last().cloned())
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id, ?flow_type))]
     fn get_flows_by_dataset_of_type<'a>(
         &'a self,
         dataset_id: &DatasetID,
@@ -206,6 +213,7 @@ impl FlowEventStore for FlowEventStoreInMem {
         })
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(?flow_type))]
     fn get_system_flows_of_type<'a>(&'a self, flow_type: SystemFlowType) -> FlowIDStream<'a> {
         let mut pos = {
             let state = self.inner.as_state();
@@ -243,6 +251,7 @@ impl FlowEventStore for FlowEventStoreInMem {
         })
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id))]
     fn get_all_flows_by_dataset<'a>(&'a self, dataset_id: &DatasetID) -> FlowIDStream<'a> {
         let dataset_id = dataset_id.clone();
 
@@ -279,6 +288,7 @@ impl FlowEventStore for FlowEventStoreInMem {
         })
     }
 
+    #[tracing::instrument(level = "debug", skip_all)]
     fn get_all_system_flows<'a>(&'a self) -> FlowIDStream<'a> {
         // TODO: This should be a buffered stream so we don't lock per record
         Box::pin(async_stream::try_stream! {

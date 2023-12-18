@@ -122,6 +122,7 @@ impl DependencyGraphServiceInMemory {
     }
 
     /// Tracks a dependency between upstream and downstream dataset
+    #[tracing::instrument(level = "trace", skip_all, fields(%dataset_upstream_id, %dataset_downstream_id))]
     fn add_dependency(
         &self,
         state: &mut State,
@@ -138,6 +139,7 @@ impl DependencyGraphServiceInMemory {
     }
 
     /// Removes tracked dependency between updstream and downstream dataset
+    #[tracing::instrument(level = "trace", skip_all, fields(%dataset_upstream_id, %dataset_downstream_id))]
     fn remove_dependency(
         &self,
         state: &mut State,
@@ -165,6 +167,7 @@ impl DependencyGraphServiceInMemory {
 impl DependencyGraphService for DependencyGraphServiceInMemory {
     /// Forces initialization of graph data, if it wasn't initialized already.
     /// Ignored if called multiple times
+    #[tracing::instrument(level = "debug", skip_all)]
     async fn eager_initialization(
         &self,
         repository: &dyn DependencyGraphRepository,
@@ -179,6 +182,7 @@ impl DependencyGraphService for DependencyGraphServiceInMemory {
     }
 
     /// Iterates over 1st level of dataset's downstream dependencies
+    #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id))]
     async fn get_downstream_dependencies(
         &self,
         dataset_id: &DatasetID,
@@ -212,6 +216,7 @@ impl DependencyGraphService for DependencyGraphServiceInMemory {
     }
 
     /// Iterates over 1st level of dataset's upstream dependencies
+    #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id))]
     async fn get_upstream_dependencies(
         &self,
         dataset_id: &DatasetID,
@@ -249,6 +254,7 @@ impl DependencyGraphService for DependencyGraphServiceInMemory {
 
 #[async_trait::async_trait]
 impl AsyncEventHandler<DatasetEventCreated> for DependencyGraphServiceInMemory {
+    #[tracing::instrument(level = "debug", skip_all, fields(?event))]
     async fn handle(&self, event: &DatasetEventCreated) -> Result<(), InternalError> {
         let mut state = self.state.lock().await;
         state.get_or_create_dataset_node(&event.dataset_id);
@@ -260,6 +266,7 @@ impl AsyncEventHandler<DatasetEventCreated> for DependencyGraphServiceInMemory {
 
 #[async_trait::async_trait]
 impl AsyncEventHandler<DatasetEventDeleted> for DependencyGraphServiceInMemory {
+    #[tracing::instrument(level = "debug", skip_all, fields(?event))]
     async fn handle(&self, event: &DatasetEventDeleted) -> Result<(), InternalError> {
         let mut state = self.state.lock().await;
 
@@ -278,6 +285,7 @@ impl AsyncEventHandler<DatasetEventDeleted> for DependencyGraphServiceInMemory {
 
 #[async_trait::async_trait]
 impl AsyncEventHandler<DatasetEventDependenciesUpdated> for DependencyGraphServiceInMemory {
+    #[tracing::instrument(level = "debug", skip_all, fields(?event))]
     async fn handle(&self, event: &DatasetEventDependenciesUpdated) -> Result<(), InternalError> {
         let mut state = self.state.lock().await;
 

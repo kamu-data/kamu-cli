@@ -59,10 +59,12 @@ impl FlowConfigurationEventStoreInMem {
 
 #[async_trait::async_trait]
 impl EventStore<FlowConfigurationState> for FlowConfigurationEventStoreInMem {
+    #[tracing::instrument(level = "debug", skip_all)]
     async fn len(&self) -> Result<usize, InternalError> {
         self.inner.len().await
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(?query, ?opts))]
     fn get_events<'a>(
         &'a self,
         query: &FlowKey,
@@ -71,6 +73,7 @@ impl EventStore<FlowConfigurationState> for FlowConfigurationEventStoreInMem {
         self.inner.get_events(query, opts)
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(?query, num_events = events.len()))]
     async fn save_events(
         &self,
         query: &FlowKey,
@@ -89,6 +92,7 @@ impl EventStore<FlowConfigurationState> for FlowConfigurationEventStoreInMem {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 impl FlowConfigurationEventStore for FlowConfigurationEventStoreInMem {
+    #[tracing::instrument(level = "debug", skip_all)]
     fn list_all_dataset_ids<'a>(&'a self) -> DatasetIDStream<'a> {
         // TODO: re-consider performance impact
         Box::pin(tokio_stream::iter(
