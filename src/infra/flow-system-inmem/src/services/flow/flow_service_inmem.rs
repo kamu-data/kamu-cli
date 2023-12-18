@@ -246,7 +246,7 @@ impl FlowServiceInMemory {
         flow_id: FlowID,
     ) -> Result<(), InternalError> {
         // Note: this is applicable to dataset updates only
-        assert_eq!(flow_type, DatasetFlowType::Update);
+        assert!(flow_type.is_dataset_update());
 
         // Extract list of downstream 1 level datasets
         let dependent_dataset_ids: Vec<_> = self
@@ -377,9 +377,11 @@ impl FlowServiceInMemory {
     async fn schedule_flow_task(&self, flow: &mut Flow) -> Result<(), InternalError> {
         let logical_plan = match &flow.flow_key {
             FlowKey::Dataset(flow_key) => match flow_key.flow_type {
-                DatasetFlowType::Update => LogicalPlan::UpdateDataset(UpdateDataset {
-                    dataset_id: flow_key.dataset_id.clone(),
-                }),
+                DatasetFlowType::Ingest | DatasetFlowType::ExecuteQuery => {
+                    LogicalPlan::UpdateDataset(UpdateDataset {
+                        dataset_id: flow_key.dataset_id.clone(),
+                    })
+                }
                 DatasetFlowType::Compaction => unimplemented!(),
             },
             FlowKey::System(flow_key) => {
@@ -651,7 +653,7 @@ impl AsyncEventHandler<TaskEventFinished> for FlowServiceInMemory {
             //  - enqueue updates of dependent datasets
             if event.outcome == TaskOutcome::Success {
                 if let FlowKey::Dataset(flow_key) = &flow.flow_key
-                    && flow_key.flow_type == DatasetFlowType::Update
+                    && flow_key.flow_type.is_dataset_update()
                 {
                     self.enqueue_dependent_dataset_flows(
                         &flow_key.dataset_id,

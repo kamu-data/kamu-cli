@@ -11,13 +11,18 @@
 
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq)]
 pub enum DatasetFlowType {
-    Update,
+    Ingest,
+    ExecuteQuery,
     Compaction,
 }
 
 impl DatasetFlowType {
     pub fn all() -> &'static [DatasetFlowType] {
-        &[Self::Update, Self::Compaction]
+        &[Self::Ingest, Self::ExecuteQuery, Self::Compaction]
+    }
+
+    pub fn is_dataset_update(&self) -> bool {
+        *self == DatasetFlowType::Ingest || *self == DatasetFlowType::ExecuteQuery
     }
 }
 
