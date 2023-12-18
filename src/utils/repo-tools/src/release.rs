@@ -51,7 +51,7 @@ fn main() {
             ..current_version.clone()
         }
     } else {
-        panic!("Specivy a --version or --minor flag");
+        panic!("Specify a --version or --minor flag");
     };
 
     eprintln!("New version: {}", new_version);
