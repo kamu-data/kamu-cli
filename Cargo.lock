@@ -1480,7 +1480,7 @@ checksum = "f7144d30dcf0fafbce74250a3963025d8d52177934239851c917d29f1df280c2"
 
 [[package]]
 name = "container-runtime"
-version = "0.147.1"
+version = "0.147.2"
 dependencies = [
  "async-trait",
  "cfg-if",
@@ -2274,7 +2274,7 @@ dependencies = [
 
 [[package]]
 name = "enum-variants"
-version = "0.147.1"
+version = "0.147.2"
 
 [[package]]
 name = "env_logger"
@@ -2307,7 +2307,7 @@ dependencies = [
 
 [[package]]
 name = "event-sourcing"
-version = "0.147.1"
+version = "0.147.2"
 dependencies = [
  "async-trait",
  "chrono",
@@ -2322,7 +2322,7 @@ dependencies = [
 
 [[package]]
 name = "event-sourcing-macros"
-version = "0.147.1"
+version = "0.147.2"
 dependencies = [
  "quote",
  "syn 2.0.41",
@@ -3013,7 +3013,7 @@ checksum = "8bb03732005da905c88227371639bf1ad885cc712789c011c31c5fb3ab3ccf02"
 
 [[package]]
 name = "internal-error"
-version = "0.147.1"
+version = "0.147.2"
 dependencies = [
  "test-log",
  "thiserror",
@@ -3129,7 +3129,7 @@ dependencies = [
 
 [[package]]
 name = "kamu"
-version = "0.147.1"
+version = "0.147.2"
 dependencies = [
  "async-recursion",
  "async-stream",
@@ -3202,7 +3202,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-adapter-auth-oso"
-version = "0.147.1"
+version = "0.147.2"
 dependencies = [
  "async-trait",
  "dill",
@@ -3222,7 +3222,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-adapter-flight-sql"
-version = "0.147.1"
+version = "0.147.2"
 dependencies = [
  "arrow-flight",
  "async-trait",
@@ -3246,7 +3246,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-adapter-graphql"
-version = "0.147.1"
+version = "0.147.2"
 dependencies = [
  "async-graphql",
  "async-trait",
@@ -3276,7 +3276,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-adapter-http"
-version = "0.147.1"
+version = "0.147.2"
 dependencies = [
  "async-trait",
  "axum",
@@ -3319,7 +3319,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-adapter-oauth"
-version = "0.147.1"
+version = "0.147.2"
 dependencies = [
  "async-trait",
  "dill",
@@ -3342,7 +3342,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-cli"
-version = "0.147.1"
+version = "0.147.2"
 dependencies = [
  "arrow-flight",
  "async-graphql",
@@ -3425,7 +3425,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-core"
-version = "0.147.1"
+version = "0.147.2"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -3452,7 +3452,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-data-utils"
-version = "0.147.1"
+version = "0.147.2"
 dependencies = [
  "arrow-digest",
  "async-trait",
@@ -3472,7 +3472,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-ingest-datafusion"
-version = "0.147.1"
+version = "0.147.2"
 dependencies = [
  "async-trait",
  "chrono",
@@ -3510,7 +3510,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-repo-tools"
-version = "0.147.1"
+version = "0.147.2"
 dependencies = [
  "chrono",
  "clap",
@@ -3524,7 +3524,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-task-system"
-version = "0.147.1"
+version = "0.147.2"
 dependencies = [
  "async-trait",
  "chrono",
@@ -3543,7 +3543,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-task-system-inmem"
-version = "0.147.1"
+version = "0.147.2"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -4194,7 +4194,7 @@ checksum = "0ab1bc2a289d34bd04a330323ac98a1b4bc82c9d9fcb1e66b63caa84da26b575"
 
 [[package]]
 name = "opendatafabric"
-version = "0.147.1"
+version = "0.147.2"
 dependencies = [
  "arrow",
  "base64 0.21.5",
@@ -6223,7 +6223,7 @@ dependencies = [
 
 [[package]]
 name = "tracing-perfetto"
-version = "0.147.1"
+version = "0.147.2"
 dependencies = [
  "env_logger",
  "serde",
