@@ -25,3 +25,9 @@ dill = "0.8"
 futures = "0.3"
 
 [dev-dependencies]
+env_logger = "0.10"
+test-group = { version = "1" }
+test-log = { version = "0.2", features = ["trace"] }
+tokio = { version = "1", default-features = false, features=["rt", "macros"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+thiserror = { version = "1", default-features = false }

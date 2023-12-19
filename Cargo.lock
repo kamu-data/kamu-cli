@@ -2311,8 +2311,14 @@ version = "0.148.0"
 dependencies = [
  "async-trait",
  "dill",
+ "env_logger",
  "futures",
  "internal-error",
+ "test-group",
+ "test-log",
+ "thiserror",
+ "tokio",
+ "tracing-subscriber",
 ]
 
 [[package]]
