@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::HashMap;
 use std::path::Path;
 
 use chrono::{DateTime, Utc};
@@ -417,6 +418,15 @@ impl SetTransformBuilder {
     pub fn input_ids_from_names(mut self) -> Self {
         for input in self.v.inputs.iter_mut() {
             input.id = Some(DatasetID::from_pub_key_ed25519(input.name.as_bytes()));
+        }
+        self
+    }
+
+    pub fn set_dataset_ids(mut self, mut ids: HashMap<DatasetName, DatasetID>) -> Self {
+        for input in self.v.inputs.iter_mut() {
+            if let Some(input_id) = ids.remove(&input.name) {
+                input.id = Some(input_id)
+            }
         }
         self
     }
