@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.147.2] - 2023-12-19
+### Fixed
+- Cargo.lock file update to address [RUSTSEC-2023-0074](https://rustsec.org/advisories/RUSTSEC-2023-0074)
+
 ## [0.147.1] - 2023-12-15
 ### Fixed
 - Legacy Spark ingest was failing to start a container when fetch source is pointing at a local FS file with a relative path
