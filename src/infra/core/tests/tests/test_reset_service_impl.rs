@@ -69,7 +69,7 @@ async fn test_reset_dataset_to_non_existing_block_fails() {
     let test_case = harness.a_chain_with_2_blocks().await;
 
     let a_hash_not_present_in_chain =
-        Multihash::from_multibase_str("zW1a3CNT52HXiJNniLkWMeev3CPRy9QiNRMWGyTrVNg4hY8").unwrap();
+        Multihash::from_multibase("zW1a3CNT52HXiJNniLkWMeev3CPRy9QiNRMWGyTrVNg4hY8").unwrap();
 
     let result = harness
         .reset_svc

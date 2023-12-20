@@ -45,7 +45,8 @@ where
     }
 
     fn get_key(&self, hash: &Multihash) -> String {
-        self.s3_context.get_key(hash.to_multibase_string().as_str())
+        self.s3_context
+            .get_key(&hash.as_multibase().to_stack_string())
     }
 
     fn into_header_map<'a>(iter: impl Iterator<Item = (&'a str, &'a str)>) -> http::HeaderMap {
@@ -148,7 +149,7 @@ where
         .unwrap();
 
         context_url
-            .join(hash.to_multibase_string().as_str())
+            .join(&hash.as_multibase().to_stack_string())
             .unwrap()
     }
 

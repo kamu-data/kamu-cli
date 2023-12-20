@@ -39,7 +39,7 @@ impl Deref for Multihash {
 impl ScalarType for Multihash {
     fn parse(value: Value) -> InputValueResult<Self> {
         if let Value::String(value) = &value {
-            let sha = odf::Multihash::from_multibase_str(value.as_str())?;
+            let sha = odf::Multihash::from_multibase(value.as_str())?;
             Ok(sha.into())
         } else {
             Err(InputValueError::expected_type(value))

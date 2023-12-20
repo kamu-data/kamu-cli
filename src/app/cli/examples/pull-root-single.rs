@@ -107,7 +107,7 @@ impl PullService for TestPullService {
         listener: Option<Arc<dyn PullMultiListener>>,
     ) -> Result<Vec<PullResponse>, InternalError> {
         let hdl = DatasetHandle::new(
-            DatasetID::from_pub_key_ed25519(b"org.geonames.cities"),
+            DatasetID::new_seeded_ed25519(b"org.geonames.cities"),
             "org.geonames.cities".try_into().unwrap(),
         );
 

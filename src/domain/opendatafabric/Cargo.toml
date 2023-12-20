@@ -25,17 +25,14 @@ arrow = ["dep:arrow"]
 [dependencies]
 enum-variants = { workspace = true }
 internal-error = { workspace = true }
+multiformats = { workspace = true }
 
 chrono = { version = "0.4", features = ["serde"] }
+digest = "0.10"
 indoc = "2"
 futures-core = "0.3"
 thiserror = { version = "1", default-features = false }
-
-# Multiformats
-bs58 = "0.5"  # base58 codec
-digest = "0.10"
 sha3 = "0.10"
-unsigned-varint = "0.8"
 url = "2"
 
 # Crypto

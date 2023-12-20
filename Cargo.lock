@@ -1197,9 +1197,6 @@ name = "bs58"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f5353f36341f7451062466f0b755b96ac3a9547e4d7f6b70d603fc721a7d7896"
-dependencies = [
- "tinyvec",
-]
 
 [[package]]
 name = "bumpalo"
@@ -4059,6 +4056,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "multiformats"
+version = "0.152.0"
+dependencies = [
+ "bs58",
+ "digest",
+ "ed25519-dalek",
+ "hex",
+ "rand",
+ "serde",
+ "sha3",
+ "thiserror",
+ "unsigned-varint",
+]
+
+[[package]]
 name = "multimap"
 version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4305,7 +4317,6 @@ version = "0.152.0"
 dependencies = [
  "arrow",
  "base64 0.21.6",
- "bs58",
  "byteorder",
  "chrono",
  "digest",
@@ -4316,6 +4327,7 @@ dependencies = [
  "hex",
  "indoc 2.0.4",
  "internal-error",
+ "multiformats",
  "prost",
  "rand",
  "serde",
@@ -4324,7 +4336,6 @@ dependencies = [
  "sha3",
  "thiserror",
  "tonic",
- "unsigned-varint",
  "url",
 ]
 

@@ -119,7 +119,7 @@ async fn test_object_url_local_fs() {
         } if
             object_type == messages::ObjectType::DataSlice &&
             physical_hash == test_case.data_slice_object().physical_hash &&
-            download_from_url == test_case.dataset_url.join(format!("data/{}", physical_hash.to_multibase_string()).as_str()).unwrap() &&
+            download_from_url == test_case.dataset_url.join(format!("data/{}", physical_hash.as_multibase()).as_str()).unwrap() &&
             download_from_headers == vec![
                 messages::HeaderRow {
                     name: http::header::AUTHORIZATION.to_string(),
@@ -145,7 +145,7 @@ async fn test_object_url_local_fs() {
         } if
             object_type == messages::ObjectType::Checkpoint &&
             physical_hash == test_case.checkpoint_object().physical_hash &&
-            download_from_url == test_case.dataset_url.join(format!("checkpoints/{}", physical_hash.to_multibase_string()).as_str()).unwrap() &&
+            download_from_url == test_case.dataset_url.join(format!("checkpoints/{}", physical_hash.as_multibase()).as_str()).unwrap() &&
             download_from_headers == vec![
                 messages::HeaderRow {
                     name: http::header::AUTHORIZATION.to_string(),
@@ -196,7 +196,7 @@ async fn test_object_url_local_fs() {
             })
         } if
             object_type == messages::ObjectType::DataSlice &&
-            upload_to_url == test_case.dataset_url.join(format!("data/{}", physical_hash.to_multibase_string()).as_str()).unwrap() &&
+            upload_to_url == test_case.dataset_url.join(format!("data/{}", physical_hash.as_multibase()).as_str()).unwrap() &&
             upload_to_headers == vec![
                 messages::HeaderRow {
                     name: http::header::AUTHORIZATION.to_string(),
@@ -221,7 +221,7 @@ async fn test_object_url_local_fs() {
             })
         } if
             object_type == messages::ObjectType::Checkpoint &&
-            upload_to_url == test_case.dataset_url.join(format!("checkpoints/{}", physical_hash.to_multibase_string()).as_str()).unwrap() &&
+            upload_to_url == test_case.dataset_url.join(format!("checkpoints/{}", physical_hash.as_multibase()).as_str()).unwrap() &&
             upload_to_headers == vec![
                 messages::HeaderRow {
                     name: http::header::AUTHORIZATION.to_string(),
@@ -327,8 +327,8 @@ async fn test_pull_object_url_s3() {
             download_from_url.path() == format!(
                 "/{}/{}/data/{}",
                 TEST_BUCKET_NAME,
-                test_case.dataset_id.cid,
-                physical_hash.to_multibase_string()
+                test_case.dataset_id.as_multibase(),
+                physical_hash.as_multibase()
             ).as_str() &&
             download_from_headers == vec![]
     );
@@ -353,8 +353,8 @@ async fn test_pull_object_url_s3() {
             download_from_url.path() == format!(
                 "/{}/{}/checkpoints/{}",
                 TEST_BUCKET_NAME,
-                test_case.dataset_id.cid,
-                physical_hash.to_multibase_string()
+                test_case.dataset_id.as_multibase(),
+                physical_hash.as_multibase()
             )
             .as_str() &&
             download_from_headers == vec![]
@@ -405,8 +405,8 @@ async fn test_pull_object_url_s3() {
             upload_to_url.path() == format!(
                 "/{}/{}/data/{}",
                 TEST_BUCKET_NAME,
-                test_case.dataset_id.cid,
-                physical_hash.to_multibase_string()
+                test_case.dataset_id.as_multibase(),
+                physical_hash.as_multibase()
             ).as_str() &&
             upload_to_headers == vec![]
     );
@@ -430,8 +430,8 @@ async fn test_pull_object_url_s3() {
             upload_to_url.path() == format!(
                 "/{}/{}/checkpoints/{}",
                 TEST_BUCKET_NAME,
-                test_case.dataset_id.cid,
-                physical_hash.to_multibase_string()
+                test_case.dataset_id.as_multibase(),
+                physical_hash.as_multibase()
             )
             .as_str() &&
             upload_to_headers == vec![]

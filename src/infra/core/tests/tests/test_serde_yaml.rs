@@ -22,9 +22,9 @@ fn serde_dataset_summary() {
     kind: DatasetSummary
     version: 1
     content:
-      id: did:odf:z4k88e8rX1oHBg1rS4kJb3KKj7xxBQRcCxRChnDA8KsXywfSBdh
+      id: did:odf:fed01626f6f21b8373800626f6f21b837380020f6f606070000008d6edc2eb877e8cc
       kind: root
-      lastBlockHash: zW1mJtUjH235JZ4BBpJBousTNHaDXer4r4QzSdsqTfKENrr
+      lastBlockHash: f1620b039179a8a4ce2c252aa6f2f25798251c19b75fc1508d9d511a191e0487d64a7
       dependencies:
       - name: foo
       - name: bar
@@ -40,9 +40,9 @@ fn serde_dataset_summary() {
         kind: "DatasetSummary".to_owned(),
         version: 1,
         content: DatasetSummary {
-            id: DatasetID::from_pub_key_ed25519(b"boop"),
+            id: DatasetID::new_seeded_ed25519(b"boop"),
             kind: DatasetKind::Root,
-            last_block_hash: Multihash::from_multibase_str(
+            last_block_hash: Multihash::from_multibase(
                 "zW1mJtUjH235JZ4BBpJBousTNHaDXer4r4QzSdsqTfKENrr",
             )
             .unwrap(),
@@ -76,9 +76,9 @@ fn serde_dataset_summary_with_refs() {
     kind: DatasetSummary
     version: 1
     content:
-      id: did:odf:z4k88e8rX1oHBg1rS4kJb3KKj7xxBQRcCxRChnDA8KsXywfSBdh
+      id: did:odf:fed01626f6f21b8373800626f6f21b837380020f6f606070000008d6edc2eb877e8cc
       kind: root
-      lastBlockHash: zW1mJtUjH235JZ4BBpJBousTNHaDXer4r4QzSdsqTfKENrr
+      lastBlockHash: f1620b039179a8a4ce2c252aa6f2f25798251c19b75fc1508d9d511a191e0487d64a7
       dependencies:
       - name: foo
         datasetRef: me/foo
@@ -96,9 +96,9 @@ fn serde_dataset_summary_with_refs() {
         kind: "DatasetSummary".to_owned(),
         version: 1,
         content: DatasetSummary {
-            id: DatasetID::from_pub_key_ed25519(b"boop"),
+            id: DatasetID::new_seeded_ed25519(b"boop"),
             kind: DatasetKind::Root,
-            last_block_hash: Multihash::from_multibase_str(
+            last_block_hash: Multihash::from_multibase(
                 "zW1mJtUjH235JZ4BBpJBousTNHaDXer4r4QzSdsqTfKENrr",
             )
             .unwrap(),

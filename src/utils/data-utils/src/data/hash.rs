@@ -40,7 +40,7 @@ pub fn get_parquet_logical_hash(
     }
 
     let digest = hasher.finalize();
-    Ok(Multihash::new(Multicodec::Arrow0_Sha3_256, &digest))
+    Ok(Multihash::new(Multicodec::Arrow0_Sha3_256, &digest).unwrap())
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -63,7 +63,7 @@ pub fn get_file_physical_hash(file_path: &Path) -> Result<Multihash, std::io::Er
         hasher.update(&buffer[..count]);
     }
 
-    Ok(Multihash::new(Multicodec::Sha3_256, &hasher.finalize()))
+    Ok(Multihash::new(Multicodec::Sha3_256, &hasher.finalize()).unwrap())
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
