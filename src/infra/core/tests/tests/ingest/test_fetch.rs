@@ -16,6 +16,7 @@ use container_runtime::ContainerRuntime;
 use indoc::indoc;
 use kamu::domain::*;
 use kamu::ingest::*;
+use kamu::utils::docker_images::BUSYBOX;
 use opendatafabric::*;
 use url::Url;
 
@@ -685,6 +686,42 @@ async fn test_fetch_container_ok() {
             total_bytes: TotalBytes::Unknown,
         })
     );
+}
+
+#[test_group::group(containerized)]
+#[test_log::test(tokio::test)]
+async fn test_fetch_container_batch_size_default() {
+    let temp_dir = tempfile::tempdir().unwrap();
+    let target_path = temp_dir.path().join("fetched.bin");
+
+    let fetch_svc = FetchService::new(
+        Arc::new(ContainerRuntime::default()),
+        temp_dir.path().join("run"),
+    );
+    let fetch_step = FetchStep::Container(FetchStepContainer {
+        image: BUSYBOX.to_owned(),
+        command: Some(vec!["sh".to_owned()]),
+        args: Some(vec![
+            "-c".to_owned(),
+            format!("env | grep -q {ODF_BATCH_SIZE}={ODF_BATCH_SIZE_DEFAULT}"),
+        ]),
+        env: None,
+    });
+    let listener = Arc::new(TestListener::new());
+
+    let res = fetch_svc
+        .fetch(
+            "1",
+            &fetch_step,
+            None,
+            &target_path,
+            &Utc::now(),
+            Some(listener.clone()),
+        )
+        .await
+        .unwrap();
+
+    assert_matches!(res, FetchResult::UpToDate);
 }
 
 ///////////////////////////////////////////////////////////////////////////////

@@ -18,6 +18,7 @@ pub const JUPYTER: &'static str = "ghcr.io/kamu-data/jupyter:0.5.2";
 // Test Images
 pub const HTTPD: &'static str = "docker.io/httpd:2.4";
 pub const MINIO: &'static str = "docker.io/minio/minio:RELEASE.2021-08-31T05-46-54Z";
+pub const BUSYBOX: &'static str = "docker.io/busybox:latest";
 
 #[cfg(feature = "ftp")]
 pub const FTP: &'static str = "docker.io/bogem/ftp";
