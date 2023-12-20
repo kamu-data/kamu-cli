@@ -224,19 +224,6 @@ impl FetchService {
             .run_attached(&fetch.image)
             .container_name(format!("kamu-fetch-{}", operation_id))
             .args(fetch.args.clone().unwrap_or_default())
-            .environment_vars([
-                ("ODF_ETAG", prev_etag),
-                ("ODF_LAST_MODIFIED", prev_last_modified),
-                ("ODF_NEW_ETAG_PATH", "/opt/odf/out/new-etag".to_owned()),
-                (
-                    "ODF_NEW_LAST_MODIFIED_PATH",
-                    "/opt/odf/out/new-last-modified".to_owned(),
-                ),
-                (
-                    "ODF_NEW_HAS_MORE_DATA_PATH",
-                    "/opt/odf/out/new-has-more-data".to_owned(),
-                ),
-            ])
             .volume((&out_dir, "/opt/odf/out"))
             .stdout(Stdio::piped())
             .stderr(stderr_file);
@@ -259,6 +246,21 @@ impl FetchService {
                 }
             }
         }
+
+        container_builder = container_builder.environment_vars([
+            ("ODF_ETAG", prev_etag),
+            ("ODF_LAST_MODIFIED", prev_last_modified),
+            ("ODF_NEW_ETAG_PATH", "/opt/odf/out/new-etag".to_owned()),
+            (
+                "ODF_NEW_LAST_MODIFIED_PATH",
+                "/opt/odf/out/new-last-modified".to_owned(),
+            ),
+            (
+                "ODF_NEW_HAS_MORE_DATA_PATH",
+                "/opt/odf/out/new-has-more-data".to_owned(),
+            ),
+            (ODF_BATCH_SIZE, batch_size.to_string()),
+        ]);
 
         // Spawn container
         let mut container = container_builder.spawn().int_err()?;
