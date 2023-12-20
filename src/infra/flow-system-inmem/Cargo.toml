@@ -19,6 +19,7 @@ doctest = false
 
 [dependencies]
 opendatafabric = { workspace = true }
+kamu = { workspace = true }
 kamu-core = { workspace = true }
 kamu-task-system = { workspace = true }
 kamu-flow-system = { workspace = true }
@@ -43,6 +44,7 @@ serde_with = { version = "3", default-features = false }
 [dev-dependencies]
 env_logger = "0.10"
 mockall = "0.11"
+tempfile = "3"
 test-log = { version = "0.2", features = ["trace"] }
 tokio = { version = "1", default-features = false, features=["rt", "macros"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }

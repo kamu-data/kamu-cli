@@ -11,7 +11,7 @@ use event_sourcing::TryLoadError;
 use internal_error::{ErrorIntoInternal, InternalError};
 use tokio_stream::Stream;
 
-use crate::{DatasetFlowType, FlowConfigurationRule, FlowConfigurationState, FlowKey};
+use crate::{FlowConfigurationRule, FlowConfigurationState, FlowKey};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -31,11 +31,8 @@ pub trait FlowConfigurationService: Sync + Send {
         rule: FlowConfigurationRule,
     ) -> Result<FlowConfigurationState, SetFlowConfigurationError>;
 
-    /// Lists dataset flow configurations, which are currently enabled
-    fn list_enabled_dataset_flow_configurations(
-        &self,
-        flow_type: DatasetFlowType,
-    ) -> FlowConfigurationStateStream;
+    /// Lists all flow configurations, which are currently enabled
+    fn list_enabled_configurations(&self) -> FlowConfigurationStateStream;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

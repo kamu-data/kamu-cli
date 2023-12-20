@@ -103,60 +103,15 @@ impl FlowServiceInMemory {
 
     #[tracing::instrument(level = "debug", skip_all)]
     async fn initialize_auto_polling_flows_from_configurations(&self) -> Result<(), InternalError> {
-        for dataset_flow_type in DatasetFlowType::all() {
-            self.initialize_enabled_dataset_configurations(*dataset_flow_type)
-                .await?;
-        }
-
-        for system_flow_type in SystemFlowType::all() {
-            self.initialize_system_flow_configuration(*system_flow_type)
-                .await?;
-        }
-
-        Ok(())
-    }
-
-    #[tracing::instrument(level = "trace", skip_all, fields(flow_type))]
-    async fn initialize_enabled_dataset_configurations(
-        &self,
-        flow_type: DatasetFlowType,
-    ) -> Result<(), InternalError> {
         let enabled_configurations: Vec<_> = self
             .flow_configuration_service
-            .list_enabled_dataset_flow_configurations(flow_type)
+            .list_enabled_configurations()
             .try_collect()
             .await
             .int_err()?;
 
         for enabled_config in enabled_configurations {
-            match &enabled_config.flow_key {
-                FlowKey::Dataset(_) => {
-                    self.activate_flow_configuration(enabled_config.flow_key, enabled_config.rule)
-                        .await?;
-                }
-                FlowKey::System(_) => unreachable!(),
-            }
-        }
-
-        Ok(())
-    }
-
-    #[tracing::instrument(level = "trace", skip_all, fields(flow_type))]
-    async fn initialize_system_flow_configuration(
-        &self,
-        flow_type: SystemFlowType,
-    ) -> Result<(), InternalError> {
-        let maybe_system_flow_config = self
-            .flow_configuration_service
-            .find_configuration(FlowKey::System(FlowKeySystem::new(flow_type)))
-            .await
-            .map_err(|e| match e {
-                FindFlowConfigurationError::Internal(e) => e,
-            })?;
-
-        if let Some(system_flow_config) = maybe_system_flow_config {
-            let flow_key = FlowKey::System(FlowKeySystem::new(flow_type));
-            self.activate_flow_configuration(flow_key, system_flow_config.rule)
+            self.activate_flow_configuration(enabled_config.flow_key, enabled_config.rule)
                 .await?;
         }
 
@@ -281,8 +236,7 @@ impl FlowServiceInMemory {
                     input_flow_id: flow_id,
                 });
 
-                let flow_key =
-                    FlowKey::Dataset(FlowKeyDataset::new(dependent_dataset_id.clone(), flow_type));
+                let flow_key = FlowKeyDataset::new(dependent_dataset_id.clone(), flow_type).into();
                 match self.find_pending_flow(&flow_key) {
                     // If flow is already pending for this dataset, simply merge triggers
                     Some(dependent_flow_id) => {

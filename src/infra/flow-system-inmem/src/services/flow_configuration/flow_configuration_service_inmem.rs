@@ -119,19 +119,25 @@ impl FlowConfigurationService for FlowConfigurationServiceInMemory {
         }
     }
 
-    /// Lists dataset flow configurations, which are currently enabled
-    #[tracing::instrument(level = "debug", skip_all, fields(?flow_type))]
-    fn list_enabled_dataset_flow_configurations(
-        &self,
-        flow_type: DatasetFlowType,
-    ) -> FlowConfigurationStateStream {
+    /// Lists all enabled configurations
+    fn list_enabled_configurations(&self) -> FlowConfigurationStateStream {
         // Note: terribly ineffecient - walks over events multiple times
         Box::pin(async_stream::try_stream! {
-            let dataset_ids: Vec<_> = self.event_store.list_all_dataset_ids().collect().await;
-            for dataset_id in dataset_ids {
-                let maybe_flow_configuration = FlowConfiguration::try_load(FlowKey::Dataset(FlowKeyDataset::new(dataset_id, flow_type)), self.event_store.as_ref()).await.int_err()?;
+            for system_flow_type in SystemFlowType::all() {
+                let flow_key = (*system_flow_type).into();
+                let maybe_flow_configuration = FlowConfiguration::try_load(flow_key, self.event_store.as_ref()).await.int_err()?;
                 if let Some(flow_configuration) = maybe_flow_configuration && flow_configuration.is_active() {
                     yield flow_configuration.into();
+                }
+            }
+
+            let dataset_ids: Vec<_> = self.event_store.list_all_dataset_ids().collect().await;
+            for dataset_id in dataset_ids {
+                for dataset_flow_type in DatasetFlowType::all() {
+                    let maybe_flow_configuration = FlowConfiguration::try_load(FlowKeyDataset::new(dataset_id.clone(), *dataset_flow_type).into(), self.event_store.as_ref()).await.int_err()?;
+                    if let Some(flow_configuration) = maybe_flow_configuration && flow_configuration.is_active() {
+                        yield flow_configuration.into();
+                    }
                 }
             }
         })
@@ -146,7 +152,7 @@ impl AsyncEventHandler<DatasetEventDeleted> for FlowConfigurationServiceInMemory
     async fn handle(&self, event: &DatasetEventDeleted) -> Result<(), InternalError> {
         for flow_type in DatasetFlowType::all() {
             let maybe_flow_configuration = FlowConfiguration::try_load(
-                FlowKey::Dataset(FlowKeyDataset::new(event.dataset_id.clone(), *flow_type)),
+                FlowKeyDataset::new(event.dataset_id.clone(), *flow_type).into(),
                 self.event_store.as_ref(),
             )
             .await
