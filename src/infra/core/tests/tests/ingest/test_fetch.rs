@@ -784,6 +784,80 @@ async fn test_fetch_container_batch_size_invalid_format() {
     );
 }
 
+#[test_group::group(containerized)]
+#[test_log::test(tokio::test)]
+async fn test_fetch_container_has_more_no_data() {
+    let temp_dir = tempfile::tempdir().unwrap();
+    let target_path = temp_dir.path().join("fetched.bin");
+
+    let fetch_svc = FetchService::new(
+        Arc::new(ContainerRuntime::default()),
+        temp_dir.path().join("run"),
+    );
+    let fetch_step = FetchStep::Container(FetchStepContainer {
+        image: BUSYBOX.to_owned(),
+        command: Some(vec!["true".to_owned()]),
+        args: None,
+        env: None,
+    });
+    let empty_prev_source_state = None;
+
+    let res = fetch_svc
+        .fetch(
+            "1",
+            &fetch_step,
+            empty_prev_source_state.as_ref(),
+            &target_path,
+            &Utc::now(),
+            None,
+        )
+        .await
+        .unwrap();
+
+    assert_matches!(res, FetchResult::UpToDate);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// Utils: constants
+///////////////////////////////////////////////////////////////////////////////
+
+const HAS_MORE_TESTER_SCRIPT: &str = indoc! {r#"
+    #!/usr/bin/env sh
+
+    set -euo pipefail
+
+    if [[ -n "${DEBUG:-}" ]]; then
+      set -x
+    fi
+
+    ROWS_COUNT=100
+    BATCH_SIZE="${ODF_BATCH_SIZE}"
+    ETAG="${ODF_ETAG:-$ROWS_COUNT}"
+
+    simulate_set_new_etag() {
+      echo $1 > "${ODF_NEW_ETAG_PATH}"
+    }
+
+    simulate_data_output() {
+      echo "city,population"
+      echo "A,1000"
+      echo "B,2000"
+      echo "C,3000"
+    }
+
+    simulate_has_more_data() {
+      touch "${ODF_NEW_HAS_MORE_DATA_PATH}"
+    }
+
+    NEW_ETAG=$(expr ${ETAG} + ${BATCH_SIZE})
+
+    if [ "${NEW_ETAG}" -lt "${ROWS_COUNT}" ]; then
+      simulate_set_new_etag "${NEW_ETAG}"
+      simulate_has_more_data
+      simulate_data_output
+    fi
+"#};
+
 ///////////////////////////////////////////////////////////////////////////////
 // Utils: Listener
 ///////////////////////////////////////////////////////////////////////////////
