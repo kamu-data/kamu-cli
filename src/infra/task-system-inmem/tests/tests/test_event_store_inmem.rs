@@ -26,7 +26,7 @@ async fn test_event_store_empty() {
     assert_eq!(events, []);
 
     let tasks: Vec<_> = event_store
-        .get_tasks_by_dataset(&DatasetID::from_pub_key_ed25519(b"foo"))
+        .get_tasks_by_dataset(&DatasetID::new_seeded_ed25519(b"foo"))
         .try_collect()
         .await
         .unwrap();
@@ -40,7 +40,7 @@ async fn test_event_store_get_streams() {
 
     let task_id_1 = TaskID::new(123);
     let task_id_2 = TaskID::new(321);
-    let dataset_id = DatasetID::from_pub_key_ed25519(b"foo");
+    let dataset_id = DatasetID::new_seeded_ed25519(b"foo");
 
     let event_1 = TaskEventCreated {
         event_time: Utc::now(),

@@ -103,7 +103,7 @@ pub async fn create_dataset_from_snapshot_impl(
     // We are generating a key pair and deriving a dataset ID from it.
     // The key pair is discarded for now, but in future can be used for
     // proof of control over dataset and metadata signing.
-    let (_keypair, dataset_id) = DatasetID::from_new_keypair_ed25519();
+    let (_keypair, dataset_id) = DatasetID::new_generated_ed25519();
 
     let system_time = Utc::now();
 

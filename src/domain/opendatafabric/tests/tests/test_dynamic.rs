@@ -22,12 +22,12 @@ fn load() -> MetadataBlock {
         event: MetadataEvent::SetTransform(SetTransform {
             inputs: vec![
                 TransformInput {
-                    id: Some(DatasetID::from_pub_key_ed25519(b"input1")),
+                    id: Some(DatasetID::new_seeded_ed25519(b"input1")),
                     name: DatasetName::try_from("input1").unwrap(),
                     dataset_ref: None,
                 },
                 TransformInput {
-                    id: Some(DatasetID::from_pub_key_ed25519(b"input2")),
+                    id: Some(DatasetID::new_seeded_ed25519(b"input2")),
                     name: DatasetName::try_from("input2").unwrap(),
                     dataset_ref: Some(DatasetRefAny::try_from("kamu/input2").unwrap()),
                 },
@@ -65,12 +65,12 @@ fn test_accessors() {
         inputs,
         vec![
             TransformInput {
-                id: Some(DatasetID::from_pub_key_ed25519(b"input1")),
+                id: Some(DatasetID::new_seeded_ed25519(b"input1")),
                 name: DatasetName::try_from("input1").unwrap(),
                 dataset_ref: None,
             },
             TransformInput {
-                id: Some(DatasetID::from_pub_key_ed25519(b"input2")),
+                id: Some(DatasetID::new_seeded_ed25519(b"input2")),
                 name: DatasetName::try_from("input2").unwrap(),
                 dataset_ref: Some(DatasetRefAny::AmbiguousAlias(
                     Arc::from("kamu"),

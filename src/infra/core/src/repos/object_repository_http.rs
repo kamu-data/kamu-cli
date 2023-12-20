@@ -56,7 +56,10 @@ impl ObjectRepository for ObjectRepositoryHttp {
     }
 
     async fn contains(&self, hash: &Multihash) -> Result<bool, ContainsError> {
-        let url = self.base_url.join(&hash.to_multibase_string()).int_err()?;
+        let url = self
+            .base_url
+            .join(&hash.as_multibase().to_stack_string())
+            .int_err()?;
 
         tracing::debug!(%url, "Checking for object");
 
@@ -86,7 +89,10 @@ impl ObjectRepository for ObjectRepositoryHttp {
     }
 
     async fn get_bytes(&self, hash: &Multihash) -> Result<Bytes, GetError> {
-        let url = self.base_url.join(&hash.to_multibase_string()).int_err()?;
+        let url = self
+            .base_url
+            .join(&hash.as_multibase().to_stack_string())
+            .int_err()?;
 
         tracing::debug!(%url, "Reading object");
 
@@ -120,7 +126,10 @@ impl ObjectRepository for ObjectRepositoryHttp {
     }
 
     async fn get_stream(&self, hash: &Multihash) -> Result<Box<AsyncReadObj>, GetError> {
-        let url = self.base_url.join(&hash.to_multibase_string()).int_err()?;
+        let url = self
+            .base_url
+            .join(&hash.as_multibase().to_stack_string())
+            .int_err()?;
 
         tracing::debug!(%url, "Reading object stream");
 
@@ -161,7 +170,9 @@ impl ObjectRepository for ObjectRepositoryHttp {
     }
 
     async fn get_internal_url(&self, hash: &Multihash) -> Url {
-        self.base_url.join(&hash.to_multibase_string()).unwrap()
+        self.base_url
+            .join(&hash.as_multibase().to_stack_string())
+            .unwrap()
     }
 
     async fn get_external_download_url(
@@ -169,7 +180,7 @@ impl ObjectRepository for ObjectRepositoryHttp {
         hash: &Multihash,
         _opts: ExternalTransferOpts,
     ) -> Result<GetExternalUrlResult, GetExternalUrlError> {
-        match self.base_url.join(&hash.to_multibase_string()) {
+        match self.base_url.join(&hash.as_multibase().to_stack_string()) {
             Ok(url) => Ok(GetExternalUrlResult {
                 url,
                 header_map: self.header_map.clone(),

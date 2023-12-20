@@ -303,7 +303,11 @@ impl PushIngestListener for PushIngestProgress {
                     .finish_with_message(Self::spinner_message(
                         &self.dataset_handle,
                         PollingIngestStage::Commit as u32,
-                        console::style(format!("Committed new block {}", new_head.short())).green(),
+                        console::style(format!(
+                            "Committed new block {}",
+                            new_head.as_multibase().short()
+                        ))
+                        .green(),
                     ));
             }
         };

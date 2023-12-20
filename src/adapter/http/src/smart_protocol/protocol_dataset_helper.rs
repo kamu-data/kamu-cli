@@ -156,7 +156,11 @@ pub async fn prepare_dataset_metadata_batch(
         header.set_size(block_bytes.len() as u64);
 
         tarball_builder
-            .append_data(&mut header, hash.to_multibase_string(), block_data)
+            .append_data(
+                &mut header,
+                hash.as_multibase().to_stack_string(),
+                block_data,
+            )
             .int_err()?;
     }
 
@@ -282,7 +286,7 @@ async fn unpack_dataset_metadata_batch(objects_batch: ObjectsBatch) -> Vec<(Mult
             entry.read(buf.as_mut_slice()).unwrap();
 
             let path = entry.path().unwrap().to_owned();
-            let hash = Multihash::from_multibase_str(path.to_str().unwrap()).unwrap();
+            let hash = Multihash::from_multibase(path.to_str().unwrap()).unwrap();
 
             (hash, buf)
         })
@@ -530,7 +534,12 @@ fn get_simple_transfer_protocol_url(
     dataset_url
         .join(path_suffix)
         .unwrap()
-        .join(object_file_ref.physical_hash.to_multibase_string().as_str())
+        .join(
+            &object_file_ref
+                .physical_hash
+                .as_multibase()
+                .to_stack_string(),
+        )
         .unwrap()
 }
 

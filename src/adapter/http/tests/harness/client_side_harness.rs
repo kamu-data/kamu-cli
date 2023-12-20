@@ -144,7 +144,7 @@ impl ClientSideHarness {
         let root_path = if self.options.multi_tenant {
             self.internal_datasets_folder_path()
                 .join(CLIENT_ACCOUNT_NAME)
-                .join(dataset_id.cid.to_string())
+                .join(dataset_id.as_multibase().to_stack_string())
         } else {
             self.internal_datasets_folder_path().join(dataset_name)
         };

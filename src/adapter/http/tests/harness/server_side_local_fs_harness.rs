@@ -154,7 +154,7 @@ impl ServerSideHarness for ServerSideLocalFsHarness {
                         panic!("Account name not specified in alias");
                     },
                 )
-                .join(dataset_handle.id.cid.to_string())
+                .join(dataset_handle.id.as_multibase().to_stack_string())
         } else {
             self.internal_datasets_folder_path()
                 .join(dataset_handle.alias.dataset_name.clone())

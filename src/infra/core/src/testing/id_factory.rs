@@ -20,7 +20,7 @@ impl IDFactory {
     pub fn dataset_id() -> DatasetID {
         let name = Self::dataset_name();
         let digest = sha3::Sha3_256::digest(name.as_bytes());
-        DatasetID::from_pub_key_ed25519(&digest)
+        DatasetID::new_seeded_ed25519(&digest)
     }
 
     pub fn dataset_name() -> DatasetName {

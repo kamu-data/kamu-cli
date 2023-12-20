@@ -74,7 +74,7 @@ async fn test_task_get_existing() {
         status: TaskStatus::Finished(TaskOutcome::Success),
         cancellation_requested: false,
         logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
-            dataset_id: DatasetID::from_pub_key_ed25519(b"foo"),
+            dataset_id: DatasetID::new_seeded_ed25519(b"foo"),
         }),
         created_at: Utc::now(),
         ran_at: None,
@@ -131,7 +131,7 @@ async fn test_task_get_existing() {
 
 #[test_log::test(tokio::test)]
 async fn test_task_list_by_dataset() {
-    let dataset_id = DatasetID::from_pub_key_ed25519(b"foo");
+    let dataset_id = DatasetID::new_seeded_ed25519(b"foo");
 
     let returned_task = TaskState {
         task_id: TaskID::new(123),
@@ -212,7 +212,7 @@ async fn test_task_list_by_dataset() {
 
 #[test_log::test(tokio::test)]
 async fn test_task_create_update_dataset() {
-    let dataset_id = DatasetID::from_pub_key_ed25519(b"foo");
+    let dataset_id = DatasetID::new_seeded_ed25519(b"foo");
 
     let expected_logical_plan = LogicalPlan::UpdateDataset(UpdateDataset {
         dataset_id: dataset_id.clone(),
@@ -280,7 +280,7 @@ async fn test_task_create_update_dataset() {
 
 #[test_log::test(tokio::test)]
 async fn test_task_create_probe() {
-    let dataset_id = DatasetID::from_pub_key_ed25519(b"foo");
+    let dataset_id = DatasetID::new_seeded_ed25519(b"foo");
 
     let expected_logical_plan = LogicalPlan::Probe(Probe {
         dataset_id: Some(dataset_id.clone()),

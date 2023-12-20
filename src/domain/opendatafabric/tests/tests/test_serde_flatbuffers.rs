@@ -97,12 +97,12 @@ fn get_test_events() -> [(MetadataEvent, &'static str); 6] {
             MetadataEvent::SetTransform(SetTransform {
                 inputs: vec![
                     TransformInput {
-                        id: Some(DatasetID::from_pub_key_ed25519(b"input1")),
+                        id: Some(DatasetID::new_seeded_ed25519(b"input1")),
                         name: DatasetName::try_from("input1").unwrap(),
                         dataset_ref: None,
                     },
                     TransformInput {
-                        id: Some(DatasetID::from_pub_key_ed25519(b"input2")),
+                        id: Some(DatasetID::new_seeded_ed25519(b"input2")),
                         name: DatasetName::try_from("input2").unwrap(),
                         dataset_ref: None,
                     },
@@ -115,13 +115,13 @@ fn get_test_events() -> [(MetadataEvent, &'static str); 6] {
                     temporal_tables: None,
                 }),
             }),
-            "36e2d65bf87dc36bcf391d8301bd5004244c0bc389c3aeb6e2e38fa1c73ed0e3",
+            "e634a72f9a9a314a64afb26fd0d34012a08c7d47402dfbc78afa78edac978777",
         ),
         (
             MetadataEvent::ExecuteQuery(ExecuteQuery {
                 input_slices: vec![
                     InputSlice {
-                        dataset_id: DatasetID::from_pub_key_ed25519(b"input1"),
+                        dataset_id: DatasetID::new_seeded_ed25519(b"input1"),
                         block_interval: Some(BlockInterval {
                             start: Multihash::from_digest_sha3_256(b"a"),
                             end: Multihash::from_digest_sha3_256(b"b"),
@@ -129,7 +129,7 @@ fn get_test_events() -> [(MetadataEvent, &'static str); 6] {
                         data_interval: Some(OffsetInterval { start: 10, end: 20 }),
                     },
                     InputSlice {
-                        dataset_id: DatasetID::from_pub_key_ed25519(b"input2"),
+                        dataset_id: DatasetID::new_seeded_ed25519(b"input2"),
                         block_interval: Some(BlockInterval {
                             start: Multihash::from_digest_sha3_256(b"a"),
                             end: Multihash::from_digest_sha3_256(b"b"),
@@ -147,7 +147,7 @@ fn get_test_events() -> [(MetadataEvent, &'static str); 6] {
                 output_checkpoint: None,
                 output_watermark: Some(Utc.with_ymd_and_hms(2020, 1, 1, 12, 0, 0).unwrap()),
             }),
-            "74817d74427ddb0abf3735f069e24c4c4a52249d7dc8cf6d188a3141328fb40a",
+            "6b9715492945e2c69a335a1cb292ccad9d3f856e6c202ca0e8335ca9e45dd9ca",
         ),
     ]
 }
