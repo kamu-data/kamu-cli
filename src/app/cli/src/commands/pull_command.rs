@@ -509,7 +509,11 @@ impl PollingIngestListener for PrettyIngestProgress {
                     .finish_with_message(Self::spinner_message(
                         &self.dataset_handle,
                         PollingIngestStage::Commit as u32,
-                        console::style(format!("Committed new block {}", new_head.short())).green(),
+                        console::style(format!(
+                            "Committed new block {}",
+                            new_head.as_multibase().short()
+                        ))
+                        .green(),
                     ));
             }
         };
@@ -637,7 +641,11 @@ impl TransformListener for PrettyTransformProgress {
                 old_head: _,
                 ref new_head,
                 num_blocks: _,
-            } => console::style(format!("Committed new block {}", new_head.short())).green(),
+            } => console::style(format!(
+                "Committed new block {}",
+                new_head.as_multibase().short()
+            ))
+            .green(),
         };
         self.curr_progress
             .lock()
@@ -858,7 +866,7 @@ impl SyncListener for PrettySyncProgress {
                 num_blocks,
             } => console::style(format!(
                 "Updated to {} ({} block(s))",
-                new_head.short(),
+                new_head.as_multibase().short(),
                 num_blocks
             ))
             .green(),

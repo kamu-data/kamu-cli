@@ -703,7 +703,7 @@ impl DatasetMultiTenantStorageStrategy {
                 let dataset_file_name = String::from(dataset_dir_entry.file_name().to_str().unwrap());
 
                 let dataset_id =
-                    DatasetID::from_did_string(format!("did:odf:{}", dataset_file_name).as_str())
+                    DatasetID::from_did_str(format!("did:odf:{}", dataset_file_name).as_str())
                         .int_err()?;
 
                 let dataset_path = dataset_dir_entry.path();
@@ -736,7 +736,7 @@ impl DatasetStorageStrategy for DatasetMultiTenantStorageStrategy {
 
         self.root
             .join(account_name)
-            .join(dataset_handle.id.cid.to_string())
+            .join(dataset_handle.id.as_multibase().to_stack_string())
     }
 
     fn get_all_datasets<'s>(&'s self) -> DatasetHandleStream<'s> {
@@ -803,7 +803,7 @@ impl DatasetStorageStrategy for DatasetMultiTenantStorageStrategy {
                     String::from(dataset_dir_entry.file_name().to_str().unwrap());
 
                 let dataset_id =
-                    DatasetID::from_did_string(format!("did:odf:{}", dataset_file_name).as_str())
+                    DatasetID::from_did_str(format!("did:odf:{}", dataset_file_name).as_str())
                         .int_err()?;
 
                 let dataset_path = dataset_dir_entry.path();
@@ -831,7 +831,7 @@ impl DatasetStorageStrategy for DatasetMultiTenantStorageStrategy {
         &self,
         dataset_id: &DatasetID,
     ) -> Result<DatasetHandle, ResolveDatasetError> {
-        let id_as_string = dataset_id.cid.to_string();
+        let id_as_string = dataset_id.as_multibase().to_stack_string();
         let read_account_dir = std::fs::read_dir(&self.root).int_err()?;
 
         for r_account_dir in read_account_dir {
@@ -843,7 +843,7 @@ impl DatasetStorageStrategy for DatasetMultiTenantStorageStrategy {
             }
 
             let account_name = AccountName::try_from(&account_dir_entry.file_name()).int_err()?;
-            let dataset_path = account_dir_entry.path().join(id_as_string.clone());
+            let dataset_path = account_dir_entry.path().join(&id_as_string);
             if dataset_path.exists() {
                 let dataset_alias = self
                     .attempt_resolving_dataset_alias_via_path(

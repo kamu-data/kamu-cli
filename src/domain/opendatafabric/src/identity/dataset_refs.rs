@@ -12,10 +12,9 @@ use std::sync::Arc;
 
 use url::Url;
 
-use super::dataset_handles::*;
-use super::dataset_identity::*;
 use super::grammar::Grammar;
-use crate::formats::InvalidValue;
+use super::*;
+use crate::formats::ParseError;
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -104,10 +103,10 @@ impl DatasetRef {
 }
 
 impl std::str::FromStr for DatasetRef {
-    type Err = InvalidValue<Self>;
+    type Err = ParseError<Self>;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match DatasetID::from_str(s) {
+        match DatasetID::from_did_str(s) {
             Ok(id) => Ok(Self::ID(id)),
             Err(_) => match DatasetAlias::from_str(s) {
                 Ok(alias) => Ok(Self::Alias(alias)),
@@ -119,12 +118,12 @@ impl std::str::FromStr for DatasetRef {
 
 super::dataset_identity::impl_try_from_str!(DatasetRef);
 
-crate::formats::impl_invalid_value!(DatasetRef);
+super::dataset_identity::impl_parse_error!(DatasetRef);
 
 impl fmt::Display for DatasetRef {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::ID(v) => write!(f, "{}", v),
+            Self::ID(v) => write!(f, "{}", v.as_did_str()),
             Self::Alias(v) => write!(f, "{}", v),
             Self::Handle(v) => write!(f, "{}", v),
         }
@@ -264,11 +263,11 @@ impl DatasetRefRemote {
 }
 
 impl std::str::FromStr for DatasetRefRemote {
-    type Err = InvalidValue<DatasetRefRemote>;
+    type Err = ParseError<DatasetRefRemote>;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match Grammar::match_remote_dataset_id(s) {
-            Some((repo, id, "")) => match DatasetID::from_str(id) {
+            Some((repo, id, "")) => match DatasetID::from_did_str(id) {
                 Ok(id) => Ok(Self::ID(repo.map(RepoName::new_unchecked), id)),
                 Err(_) => Err(Self::Err::new(s)),
             },
@@ -288,13 +287,13 @@ impl std::str::FromStr for DatasetRefRemote {
 
 super::dataset_identity::impl_try_from_str!(DatasetRefRemote);
 
-crate::formats::impl_invalid_value!(DatasetRefRemote);
+super::dataset_identity::impl_parse_error!(DatasetRefRemote);
 
 impl fmt::Display for DatasetRefRemote {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            DatasetRefRemote::ID(None, id) => write!(f, "{}", id),
-            DatasetRefRemote::ID(Some(repo), id) => write!(f, "{}/{}", repo, id),
+            DatasetRefRemote::ID(None, id) => write!(f, "{}", id.as_did_str()),
+            DatasetRefRemote::ID(Some(repo), id) => write!(f, "{}/{}", repo, id.as_did_str()),
             DatasetRefRemote::Alias(v) => write!(f, "{}", v),
             DatasetRefRemote::Url(v) => write!(f, "{}", v),
             DatasetRefRemote::Handle(v) => write!(f, "{}", v),
@@ -483,8 +482,8 @@ impl DatasetRefAny {
 impl fmt::Display for DatasetRefAny {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::ID(None, id) => write!(f, "{}", id),
-            Self::ID(Some(repo), id) => write!(f, "{}/{}", repo, id),
+            Self::ID(None, id) => write!(f, "{}", id.as_did_str()),
+            Self::ID(Some(repo), id) => write!(f, "{}/{}", repo, id.as_did_str()),
             Self::LocalAlias(None, name) => write!(f, "{}", name),
             Self::LocalAlias(Some(account), name) => write!(f, "{}/{}", account, name),
             Self::RemoteAlias(repo, None, name) => write!(f, "{}/{}", repo, name),
@@ -502,11 +501,11 @@ impl fmt::Display for DatasetRefAny {
 }
 
 impl std::str::FromStr for DatasetRefAny {
-    type Err = InvalidValue<DatasetRefAny>;
+    type Err = ParseError<DatasetRefAny>;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match Grammar::match_remote_dataset_id(s) {
-            Some((repo, id, "")) => match DatasetID::from_str(id) {
+            Some((repo, id, "")) => match DatasetID::from_did_str(id) {
                 Ok(id) => Ok(Self::ID(repo.map(RepoName::new_unchecked), id)),
                 Err(_) => Err(Self::Err::new(s)),
             },
@@ -542,7 +541,7 @@ impl std::str::FromStr for DatasetRefAny {
 
 super::dataset_identity::impl_try_from_str!(DatasetRefAny);
 
-crate::formats::impl_invalid_value!(DatasetRefAny);
+super::dataset_identity::impl_parse_error!(DatasetRefAny);
 
 impl_serde!(DatasetRefAny, DatasetRefAnySerdeVisitor);
 

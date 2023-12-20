@@ -268,7 +268,11 @@ impl VerificationProgress {
         };
 
         let dataset = if let Some(block) = block {
-            format!("({} @ {})", self.dataset_handle.alias, block.short())
+            format!(
+                "({} @ {})",
+                self.dataset_handle.alias,
+                block.as_multibase().short()
+            )
         } else {
             format!("({})", self.dataset_handle.alias)
         };

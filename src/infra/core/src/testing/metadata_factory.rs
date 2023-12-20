@@ -100,19 +100,19 @@ impl SeedBuilder {
     fn new(kind: DatasetKind) -> Self {
         Self {
             v: Seed {
-                dataset_id: DatasetID::from_pub_key_ed25519(b""),
+                dataset_id: DatasetID::new_seeded_ed25519(b""),
                 dataset_kind: kind,
             },
         }
     }
 
     pub fn id_random(mut self) -> Self {
-        self.v.dataset_id = DatasetID::from_new_keypair_ed25519().1;
+        self.v.dataset_id = DatasetID::new_generated_ed25519().1;
         self
     }
 
     pub fn id_from<B: AsRef<[u8]>>(mut self, key: B) -> Self {
-        self.v.dataset_id = DatasetID::from_pub_key_ed25519(key.as_ref());
+        self.v.dataset_id = DatasetID::new_seeded_ed25519(key.as_ref());
         self
     }
 
@@ -417,7 +417,7 @@ impl SetTransformBuilder {
 
     pub fn input_ids_from_names(mut self) -> Self {
         for input in self.v.inputs.iter_mut() {
-            input.id = Some(DatasetID::from_pub_key_ed25519(input.name.as_bytes()));
+            input.id = Some(DatasetID::new_seeded_ed25519(input.name.as_bytes()));
         }
         self
     }

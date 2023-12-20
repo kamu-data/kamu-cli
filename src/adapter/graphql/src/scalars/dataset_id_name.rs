@@ -35,7 +35,7 @@ impl From<DatasetID> for odf::DatasetID {
 
 impl From<DatasetID> for String {
     fn from(val: DatasetID) -> Self {
-        val.0.to_did_string()
+        val.0.as_did_str().to_string()
     }
 }
 
@@ -50,7 +50,7 @@ impl Deref for DatasetID {
 impl ScalarType for DatasetID {
     fn parse(value: Value) -> InputValueResult<Self> {
         if let Value::String(value) = &value {
-            let val = odf::DatasetID::try_from(value.as_str())?;
+            let val = odf::DatasetID::from_did_str(value.as_str())?;
             Ok(val.into())
         } else {
             Err(InputValueError::expected_type(value))

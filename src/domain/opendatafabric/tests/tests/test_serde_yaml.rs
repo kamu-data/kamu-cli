@@ -44,7 +44,7 @@ fn serde_set_data_schema() {
         version: 2
         content:
           systemTime: 2020-01-01T12:00:00Z
-          prevBlockHash: zW1k8aWxnH37Xc62cSJGQASfCTHAtpEH3HdaGB1gv6NSj7P
+          prevBlockHash: f16209eb949bd8ff0bb1d827f11809aebc6bd0d5955c7f368469a913c70d196620272
           sequenceNumber: 123
           event:
             kind: setDataSchema
@@ -305,30 +305,33 @@ fn serde_metadata_block() {
         version: 2
         content:
           systemTime: 2020-01-01T12:00:00Z
-          prevBlockHash: zW1k8aWxnH37Xc62cSJGQASfCTHAtpEH3HdaGB1gv6NSj7P
+          prevBlockHash: f16209eb949bd8ff0bb1d827f11809aebc6bd0d5955c7f368469a913c70d196620272
           sequenceNumber: 127
           event:
             kind: executeQuery
             inputSlices:
-            - datasetID: did:odf:z4k88e8oT6CUiFQSbmHPViLQGHoX8x5Fquj9WvvPdSCvzTRWGfJ
+            - datasetID: \
+         did:odf:fed01816ef0a9abe93aba816ef0a9abe93aba90e6065747170300c0d3d30c2cd8d7a4
               blockInterval:
-                start: zW1i4mki3rvFyZZ3DyKnT8WbqwykmSNj2adNfjZtGKrodD4
-                end: zW1mJtUjH235JZ4BBpJBousTNHaDXer4r4QzSdsqTfKENrr
+                start: f162080084bf2fba02475726feb2cab2d8215eab14bc6bdd8bfb2c8151257032ecd8b
+                end: f1620b039179a8a4ce2c252aa6f2f25798251c19b75fc1508d9d511a191e0487d64a7
               dataInterval:
                 start: 10
                 end: 20
-            - datasetID: did:odf:z4k88e8kjvUAfcpgRSvrTL7XmEmrQfvHaYqo11wtT1JewT16nSc
+            - datasetID: \
+         did:odf:fed01826ef0a9abea3a3a826ef0a9abea3a3a90e6065747270300c1d3b30a2cd9d724
               blockInterval:
-                start: zW1i4mki3rvFyZZ3DyKnT8WbqwykmSNj2adNfjZtGKrodD4
-                end: zW1mJtUjH235JZ4BBpJBousTNHaDXer4r4QzSdsqTfKENrr
+                start: f162080084bf2fba02475726feb2cab2d8215eab14bc6bdd8bfb2c8151257032ecd8b
+                end: f1620b039179a8a4ce2c252aa6f2f25798251c19b75fc1508d9d511a191e0487d64a7
             outputData:
-              logicalHash: zW1hSqbjSkaj1wY6EEWY7h1M1rRMo5uCLPSc5EHD4rjFxcg
-              physicalHash: zW1oExmNvSZ5wSiv7q4LmiRFDNe9U7WerQsbP5EUvyKmypG
+              logicalHash: f162076d3bc41c9f588f7fcd0d5bf4718f8f84b1c41b20882703100b9eb9413807c01
+              physicalHash: f1620cceefd7e0545bcf8b6d19f3b5750c8a3ee8350418877bc6fb12e32de28137355
               interval:
                 start: 10
                 end: 20
               size: 10
-            outputWatermark: 2020-01-01T12:00:00Z\n"
+            outputWatermark: 2020-01-01T12:00:00Z
+        "
     );
 
     let expected = MetadataBlock {
@@ -337,7 +340,7 @@ fn serde_metadata_block() {
         event: MetadataEvent::ExecuteQuery(ExecuteQuery {
             input_slices: vec![
                 InputSlice {
-                    dataset_id: DatasetID::from_pub_key_ed25519(b"input1"),
+                    dataset_id: DatasetID::new_seeded_ed25519(b"input1"),
                     block_interval: Some(BlockInterval {
                         start: Multihash::from_digest_sha3_256(b"a"),
                         end: Multihash::from_digest_sha3_256(b"b"),
@@ -345,7 +348,7 @@ fn serde_metadata_block() {
                     data_interval: Some(OffsetInterval { start: 10, end: 20 }),
                 },
                 InputSlice {
-                    dataset_id: DatasetID::from_pub_key_ed25519(b"input2"),
+                    dataset_id: DatasetID::new_seeded_ed25519(b"input2"),
                     block_interval: Some(BlockInterval {
                         start: Multihash::from_digest_sha3_256(b"a"),
                         end: Multihash::from_digest_sha3_256(b"b"),
@@ -407,7 +410,8 @@ fn serde_metadata_block_obsolete_version() {
             start: 10
             end: 20
           size: 10
-        outputWatermark: 2020-01-01T12:00:00Z\n"
+        outputWatermark: 2020-01-01T12:00:00Z
+        "
     );
 
     let expected_error = Error::UnsupportedVersion(UnsupportedVersionError {
@@ -455,7 +459,8 @@ fn serde_fetch_step_files_glob() {
             path: /opt/x/*.txt
             cache:
               kind: forever
-            order: byName\n"
+            order: byName
+            "
         )
     );
 }
@@ -509,7 +514,8 @@ fn serde_transform() {
             temporalTables:
             - name: foo
               primaryKey:
-              - id\n"
+              - id
+            "
         )
     );
 }

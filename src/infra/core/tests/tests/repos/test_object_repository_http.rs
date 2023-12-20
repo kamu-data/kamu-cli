@@ -51,13 +51,17 @@ async fn test_bytes() {
     assert_matches!(repo.get_bytes(&hash_foo).await, Err(GetError::NotFound(_)),);
 
     std::fs::write(
-        tmp_repo_dir.path().join(hash_foo.to_multibase_string()),
+        tmp_repo_dir
+            .path()
+            .join(hash_foo.as_multibase().to_stack_string()),
         b"foo",
     )
     .unwrap();
 
     std::fs::write(
-        tmp_repo_dir.path().join(hash_bar.to_multibase_string()),
+        tmp_repo_dir
+            .path()
+            .join(hash_bar.as_multibase().to_stack_string()),
         b"bar",
     )
     .unwrap();
@@ -84,7 +88,9 @@ async fn test_stream() {
     );
 
     std::fs::write(
-        tmp_repo_dir.path().join(hash_foobar.to_multibase_string()),
+        tmp_repo_dir
+            .path()
+            .join(hash_foobar.as_multibase().to_stack_string()),
         b"foobar",
     )
     .unwrap();

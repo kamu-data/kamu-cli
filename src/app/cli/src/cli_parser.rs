@@ -1369,7 +1369,7 @@ fn value_parse_repo_name(s: &str) -> Result<RepoName, String> {
 }
 
 fn value_parse_multihash(s: &str) -> Result<Multihash, String> {
-    match Multihash::try_from(s) {
+    match Multihash::from_multibase(s) {
         Ok(v) => Ok(v),
         Err(_) => Err(format!("Block hash must be a valid multihash string")),
     }
