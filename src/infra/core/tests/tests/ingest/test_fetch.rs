@@ -724,6 +724,46 @@ async fn test_fetch_container_batch_size_default() {
     assert_matches!(res, FetchResult::UpToDate);
 }
 
+#[test_group::group(containerized)]
+#[test_log::test(tokio::test)]
+async fn test_fetch_container_batch_size_set() {
+    let temp_dir = tempfile::tempdir().unwrap();
+    let target_path = temp_dir.path().join("fetched.bin");
+
+    let fetch_svc = FetchService::new(
+        Arc::new(ContainerRuntime::default()),
+        temp_dir.path().join("run"),
+    );
+    let custom_batch_size = 40_000;
+    let fetch_step = FetchStep::Container(FetchStepContainer {
+        image: BUSYBOX.to_owned(),
+        command: Some(vec!["sh".to_owned()]),
+        args: Some(vec![
+            "-c".to_owned(),
+            format!("env | grep -q {ODF_BATCH_SIZE}={custom_batch_size}"),
+        ]),
+        env: Some(vec![EnvVar {
+            name: ODF_BATCH_SIZE.to_owned(),
+            value: Some(custom_batch_size.to_string()),
+        }]),
+    });
+    let listener = Arc::new(TestListener::new());
+
+    let res = fetch_svc
+        .fetch(
+            "1",
+            &fetch_step,
+            None,
+            &target_path,
+            &Utc::now(),
+            Some(listener.clone()),
+        )
+        .await
+        .unwrap();
+
+    assert_matches!(res, FetchResult::UpToDate);
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 // Utils: Listener
 ///////////////////////////////////////////////////////////////////////////////
