@@ -239,26 +239,27 @@ impl FetchService {
 
         let mut batch_size = ODF_BATCH_SIZE_DEFAULT;
 
-        if let Some(env) = &fetch.env {
-            for env_var in env {
-                if let Some(value) = &env_var.value {
-                    if env_var.name == ODF_BATCH_SIZE {
-                        batch_size = value
-                            .parse()
-                            .map_err(|_| InvalidIngestParameterFormat::new(&env_var.name, value))?;
-
-                        continue;
-                    }
-
-                    container_builder = container_builder.environment_var(&env_var.name, value);
+        if let Some(env_vars) = &fetch.env {
+            for EnvVar { name, value } in env_vars {
+                let value = if let Some(value) = value {
+                    Cow::from(value)
                 } else {
-                    // TODO: This is insecure
-                    let value = match std::env::var(&env_var.name) {
-                        Ok(value) => Ok(value),
-                        Err(_) => Err(IngestParameterNotFound::new(&env_var.name)),
-                    }?;
-                    container_builder = container_builder.environment_var(&env_var.name, value);
+                    // TODO: This is insecure: passthrough envvars
+                    let value =
+                        std::env::var(name).map_err(|_| IngestParameterNotFound::new(name))?;
+
+                    Cow::from(value)
+                };
+
+                if name == ODF_BATCH_SIZE {
+                    batch_size = value
+                        .parse()
+                        .map_err(|_| InvalidIngestParameterFormat::new(name, value))?;
+
+                    continue;
                 }
+
+                container_builder = container_builder.environment_var(name, value);
             }
         }
 
