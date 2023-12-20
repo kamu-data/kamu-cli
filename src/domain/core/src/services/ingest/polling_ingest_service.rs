@@ -158,6 +158,22 @@ impl IngestParameterNotFound {
     }
 }
 
+#[derive(Error, Debug)]
+#[error("Invalid environment variable {name} format '{value}'")]
+pub struct InvalidIngestParameterFormat {
+    pub name: String,
+    pub value: String,
+}
+
+impl InvalidIngestParameterFormat {
+    pub fn new(name: impl Into<String>, value: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            value: value.into(),
+        }
+    }
+}
+
 // TODO: Revisit error granularity
 #[derive(Debug, Error)]
 pub enum PollingIngestError {
@@ -264,6 +280,13 @@ pub enum PollingIngestError {
         #[from]
         #[backtrace]
         AccessError,
+    ),
+
+    #[error(transparent)]
+    InvalidParameterFormat(
+        #[from]
+        #[backtrace]
+        InvalidIngestParameterFormat,
     ),
 
     #[error(transparent)]
