@@ -237,9 +237,19 @@ impl FetchService {
             container_builder = container_builder.entry_point(command.join(" "));
         }
 
+        let mut batch_size = ODF_BATCH_SIZE_DEFAULT;
+
         if let Some(env) = &fetch.env {
             for env_var in env {
                 if let Some(value) = &env_var.value {
+                    if env_var.name == ODF_BATCH_SIZE {
+                        batch_size = value
+                            .parse()
+                            .map_err(|_| InvalidIngestParameterFormat::new(&env_var.name, value))?;
+
+                        continue;
+                    }
+
                     container_builder = container_builder.environment_var(&env_var.name, value);
                 } else {
                     // TODO: This is insecure
