@@ -43,12 +43,12 @@ where
             Err(GetNamedError::Internal(e)) => Err(GetRefError::Internal(e)),
         }?;
         let text = std::str::from_utf8(&data[..]).int_err()?;
-        let hash = Multihash::from_multibase_str(&text).int_err()?;
+        let hash = Multihash::from_multibase(&text).int_err()?;
         Ok(hash)
     }
 
     async fn set(&self, r: &BlockRef, hash: &Multihash) -> Result<(), SetRefError> {
-        let multibase = hash.to_multibase_string();
+        let multibase = hash.as_multibase().to_stack_string();
         match self.repo.set(&r.as_str(), multibase.as_bytes()).await {
             Ok(()) => Ok(()),
             Err(SetNamedError::Access(e)) => Err(SetRefError::Access(e)),

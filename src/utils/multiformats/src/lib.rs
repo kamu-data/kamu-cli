@@ -7,7 +7,19 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod did_odf;
+#![feature(error_generic_member_access)]
 
-pub use did_odf::*;
-pub use multiformats::*;
+mod did_key;
+mod errors;
+mod multibase;
+mod multicodec;
+mod multihash;
+pub mod stack_string;
+
+pub use did_key::*;
+pub use errors::*;
+pub use multibase::*;
+pub use multicodec::*;
+pub use multihash::*;
+
+pub(crate) const MAX_VARINT_LEN: usize = 4;

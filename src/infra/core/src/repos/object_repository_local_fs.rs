@@ -51,7 +51,7 @@ where
     }
 
     fn get_path(&self, hash: &Multihash) -> PathBuf {
-        self.root.join(hash.to_multibase_string())
+        self.root.join(hash.as_multibase().to_stack_string())
     }
 
     // TODO: We should newtype Path and ensure repositoris are created for
@@ -97,10 +97,7 @@ where
 
         file.flush().await?;
 
-        Ok(Multihash::new(
-            Multicodec::try_from(C).unwrap(),
-            &digest.finalize(),
-        ))
+        Ok(Multihash::new(Multicodec::try_from(C).unwrap(), &digest.finalize()).unwrap())
     }
 }
 

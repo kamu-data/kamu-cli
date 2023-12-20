@@ -235,9 +235,7 @@ impl IngestTask {
 
         let hash = Multihash::from_digest_sha3_256(fb.finished_data());
 
-        Ok(self
-            .cache_dir
-            .join(format!("fetch-savepoint-{}", hash.to_multibase_string())))
+        Ok(self.cache_dir.join(format!("fetch-savepoint-{}", hash)))
     }
 
     fn read_fetch_savepoint(

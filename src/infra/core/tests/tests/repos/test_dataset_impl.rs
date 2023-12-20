@@ -45,7 +45,7 @@ async fn test_summary_updates() {
     assert_eq!(
         ds.get_summary(GetSummaryOpts::default()).await.unwrap(),
         DatasetSummary {
-            id: DatasetID::from_pub_key_ed25519(b"foo"),
+            id: DatasetID::new_seeded_ed25519(b"foo"),
             kind: DatasetKind::Root,
             last_block_hash: hash_1.clone(),
             dependencies: Vec::new(),
@@ -93,7 +93,7 @@ async fn test_summary_updates() {
         .await
         .unwrap(),
         DatasetSummary {
-            id: DatasetID::from_pub_key_ed25519(b"foo"),
+            id: DatasetID::new_seeded_ed25519(b"foo"),
             kind: DatasetKind::Root,
             last_block_hash: hash_1.clone(),
             dependencies: Vec::new(),
@@ -108,7 +108,7 @@ async fn test_summary_updates() {
     assert_eq!(
         ds.get_summary(GetSummaryOpts::default()).await.unwrap(),
         DatasetSummary {
-            id: DatasetID::from_pub_key_ed25519(b"foo"),
+            id: DatasetID::new_seeded_ed25519(b"foo"),
             kind: DatasetKind::Root,
             last_block_hash: hash_3.clone(),
             dependencies: Vec::new(),

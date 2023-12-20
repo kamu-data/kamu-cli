@@ -58,7 +58,7 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::AddData {
         let input_checkpoint_offset = self
             .input_checkpoint
             .as_ref()
-            .map(|v| fb.create_vector(&v.to_bytes()));
+            .map(|v| fb.create_vector(&v.as_bytes().as_slice()));
         let output_data_offset = self.output_data.as_ref().map(|v| v.serialize(fb));
         let output_checkpoint_offset = self.output_checkpoint.as_ref().map(|v| v.serialize(fb));
         let source_state_offset = self.source_state.as_ref().map(|v| v.serialize(fb));
@@ -234,8 +234,8 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::BlockInterval {
     type OffsetT = WIPOffset<fb::BlockInterval<'fb>>;
 
     fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
-        let start_offset = { fb.create_vector(&self.start.to_bytes()) };
-        let end_offset = { fb.create_vector(&self.end.to_bytes()) };
+        let start_offset = { fb.create_vector(&self.start.as_bytes().as_slice()) };
+        let end_offset = { fb.create_vector(&self.end.as_bytes().as_slice()) };
         let mut builder = fb::BlockIntervalBuilder::new(fb);
         builder.add_start(start_offset);
         builder.add_end(end_offset);
@@ -267,7 +267,7 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::Checkpoint {
     type OffsetT = WIPOffset<fb::Checkpoint<'fb>>;
 
     fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
-        let physical_hash_offset = { fb.create_vector(&self.physical_hash.to_bytes()) };
+        let physical_hash_offset = { fb.create_vector(&self.physical_hash.as_bytes().as_slice()) };
         let mut builder = fb::CheckpointBuilder::new(fb);
         builder.add_physical_hash(physical_hash_offset);
         builder.add_size_(self.size);
@@ -296,8 +296,8 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::DataSlice {
     type OffsetT = WIPOffset<fb::DataSlice<'fb>>;
 
     fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
-        let logical_hash_offset = { fb.create_vector(&self.logical_hash.to_bytes()) };
-        let physical_hash_offset = { fb.create_vector(&self.physical_hash.to_bytes()) };
+        let logical_hash_offset = { fb.create_vector(&self.logical_hash.as_bytes().as_slice()) };
+        let physical_hash_offset = { fb.create_vector(&self.physical_hash.as_bytes().as_slice()) };
         let interval_offset = { self.interval.serialize(fb) };
         let mut builder = fb::DataSliceBuilder::new(fb);
         builder.add_logical_hash(logical_hash_offset);
@@ -585,7 +585,7 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::ExecuteQuery {
         let input_checkpoint_offset = self
             .input_checkpoint
             .as_ref()
-            .map(|v| fb.create_vector(&v.to_bytes()));
+            .map(|v| fb.create_vector(v.as_bytes().as_slice()));
         let output_data_offset = self.output_data.as_ref().map(|v| v.serialize(fb));
         let output_checkpoint_offset = self.output_checkpoint.as_ref().map(|v| v.serialize(fb));
         let mut builder = fb::ExecuteQueryBuilder::new(fb);
@@ -627,7 +627,7 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::ExecuteQueryInput {
     type OffsetT = WIPOffset<fb::ExecuteQueryInput<'fb>>;
 
     fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
-        let dataset_id_offset = { fb.create_vector(&self.dataset_id.to_bytes()) };
+        let dataset_id_offset = { fb.create_vector(&self.dataset_id.as_bytes().as_slice()) };
         let dataset_name_offset = { fb.create_string(&self.dataset_name) };
         let vocab_offset = { self.vocab.serialize(fb) };
         let data_interval_offset = self.data_interval.as_ref().map(|v| v.serialize(fb));
@@ -700,7 +700,7 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::ExecuteQueryRequest {
     type OffsetT = WIPOffset<fb::ExecuteQueryRequest<'fb>>;
 
     fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
-        let dataset_id_offset = { fb.create_vector(&self.dataset_id.to_bytes()) };
+        let dataset_id_offset = { fb.create_vector(&self.dataset_id.as_bytes().as_slice()) };
         let dataset_name_offset = { fb.create_string(&self.dataset_name) };
         let vocab_offset = { self.vocab.serialize(fb) };
         let transform_offset = { self.transform.serialize(fb) };
@@ -1126,7 +1126,7 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::InputSlice {
     type OffsetT = WIPOffset<fb::InputSlice<'fb>>;
 
     fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
-        let dataset_id_offset = { fb.create_vector(&self.dataset_id.to_bytes()) };
+        let dataset_id_offset = { fb.create_vector(&self.dataset_id.as_bytes().as_slice()) };
         let block_interval_offset = self.block_interval.as_ref().map(|v| v.serialize(fb));
         let data_interval_offset = self.data_interval.as_ref().map(|v| v.serialize(fb));
         let mut builder = fb::InputSliceBuilder::new(fb);
@@ -1312,7 +1312,7 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::MetadataBlock {
         let prev_block_hash_offset = self
             .prev_block_hash
             .as_ref()
-            .map(|v| fb.create_vector(&v.to_bytes()));
+            .map(|v| fb.create_vector(&v.as_bytes().as_slice()));
         let event_offset = { self.event.serialize(fb) };
         let mut builder = fb::MetadataBlockBuilder::new(fb);
         builder.add_system_time(&datetime_to_fb(&self.system_time));
@@ -2021,7 +2021,7 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::Seed {
     type OffsetT = WIPOffset<fb::Seed<'fb>>;
 
     fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
-        let dataset_id_offset = { fb.create_vector(&self.dataset_id.to_bytes()) };
+        let dataset_id_offset = { fb.create_vector(&self.dataset_id.as_bytes().as_slice()) };
         let mut builder = fb::SeedBuilder::new(fb);
         builder.add_dataset_id(dataset_id_offset);
         builder.add_dataset_kind(self.dataset_kind.into());
@@ -2554,7 +2554,10 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::TransformInput {
     type OffsetT = WIPOffset<fb::TransformInput<'fb>>;
 
     fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
-        let id_offset = self.id.as_ref().map(|v| fb.create_vector(&v.to_bytes()));
+        let id_offset = self
+            .id
+            .as_ref()
+            .map(|v| fb.create_vector(&v.as_bytes().as_slice()));
         let name_offset = { fb.create_string(&self.name) };
         let dataset_ref_offset = self
             .dataset_ref

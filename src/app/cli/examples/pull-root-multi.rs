@@ -215,7 +215,7 @@ impl PullService for TestPullService {
         .into_iter()
         .map(|s| {
             DatasetHandle::new(
-                DatasetID::from_pub_key_ed25519(s.as_bytes()),
+                DatasetID::new_seeded_ed25519(s.as_bytes()),
                 s.try_into().unwrap(),
             )
         })
@@ -235,7 +235,7 @@ impl PullService for TestPullService {
                 .into_iter()
                 .map(|s| {
                     DatasetHandle::new(
-                        DatasetID::from_pub_key_ed25519(s.as_bytes()),
+                        DatasetID::new_seeded_ed25519(s.as_bytes()),
                         s.try_into().unwrap(),
                     )
                 })

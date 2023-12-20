@@ -138,7 +138,7 @@ impl ServerSideHarness for ServerSideS3Harness {
     fn dataset_layout(&self, dataset_handle: &DatasetHandle) -> DatasetLayout {
         DatasetLayout::new(
             self.internal_bucket_folder_path()
-                .join(dataset_handle.id.cid.to_string())
+                .join(dataset_handle.id.as_multibase().to_stack_string())
                 .as_path(),
         )
     }

@@ -60,13 +60,15 @@ impl DatasetRepositoryS3 {
     ) -> Result<impl Dataset, InternalError> {
         let s3_context = self
             .s3_context
-            .sub_context(&format!("{}/", &dataset_id.cid.to_string()));
+            .sub_context(&format!("{}/", &dataset_id.as_multibase()));
 
         DatasetFactoryImpl::get_s3_from_context(s3_context, self.event_bus.clone()).await
     }
 
     async fn delete_dataset_s3_objects(&self, dataset_id: &DatasetID) -> Result<(), InternalError> {
-        let dataset_key_prefix = self.s3_context.get_key(&dataset_id.cid.to_string());
+        let dataset_key_prefix = self
+            .s3_context
+            .get_key(&dataset_id.as_multibase().to_stack_string());
         self.s3_context.recursive_delete(dataset_key_prefix).await
     }
 
@@ -106,7 +108,7 @@ impl DatasetRepositoryS3 {
                     prefix.pop();
                 }
 
-                if let Ok(id) = DatasetID::try_from(format!("did:odf:{}", prefix)) {
+                if let Ok(id) = DatasetID::from_multibase_string(&prefix) {
                     let dataset = self.get_dataset_impl(&id).await?;
                     let dataset_alias = self.resolve_dataset_alias(&dataset).await?;
                     if alias_filter(&dataset_alias) {
@@ -178,7 +180,7 @@ impl DatasetRepository for DatasetRepositoryS3 {
             DatasetRef::ID(id) => {
                 if self
                     .s3_context
-                    .bucket_path_exists(&id.cid.to_string())
+                    .bucket_path_exists(&id.as_multibase().to_stack_string().as_str())
                     .await?
                 {
                     let dataset = self.get_dataset_impl(id).await?;
