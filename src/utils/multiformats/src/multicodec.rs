@@ -7,10 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use thiserror::Error;
-
-use super::InvalidValue;
-
 ///////////////////////////////////////////////////////////////////////////////
 
 #[repr(u32)]
@@ -18,6 +14,7 @@ use super::InvalidValue;
 #[allow(non_camel_case_types)]
 pub enum Multicodec {
     CIDv1 = 0x01,
+    Sha2_256 = 0x12,
     Sha3_256 = 0x16,
     Ed25519Pub = 0xed,
     // -- Private use area --
@@ -33,44 +30,53 @@ pub enum Multicodec {
 
 // TODO: use num-derive
 impl TryFrom<u32> for Multicodec {
-    type Error = MulticodecError;
+    type Error = MulticodecUnsupportedCode;
 
     fn try_from(value: u32) -> Result<Self, Self::Error> {
         match value {
             0x01 => Ok(Multicodec::CIDv1),
+            0x12 => Ok(Multicodec::Sha2_256),
             0x16 => Ok(Multicodec::Sha3_256),
             0xed => Ok(Multicodec::Ed25519Pub),
             0x300016 => Ok(Multicodec::Arrow0_Sha3_256),
             0x400000 => Ok(Multicodec::ODFMetadataBlock),
             0x400001 => Ok(Multicodec::ODFDatasetSnapshot),
-            _ => Err(MulticodecError::UnsupportedCode(value)),
+            _ => Err(MulticodecUnsupportedCode(value)),
         }
     }
 }
 
 impl std::str::FromStr for Multicodec {
-    type Err = InvalidValue<Multicodec>;
+    type Err = MulticodecUnsupportedName;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         // Align with official multicodec names: https://github.com/multiformats/multicodec
         match s {
             "cidv1" => Ok(Multicodec::CIDv1),
+            "sha2-256" => Ok(Multicodec::Sha2_256),
             "sha3-256" => Ok(Multicodec::Sha3_256),
             "ed25519-pub" => Ok(Multicodec::Ed25519Pub),
             "arrow0-sha3-256" => Ok(Multicodec::Arrow0_Sha3_256),
             "odf-metadata-block" => Ok(Multicodec::ODFMetadataBlock),
             "odf-dataset-snapshot" => Ok(Multicodec::ODFDatasetSnapshot),
-            _ => Err(InvalidValue::new(s)),
+            _ => Err(MulticodecUnsupportedName(s.into())),
         }
     }
 }
 
-crate::identity::impl_try_from_str!(Multicodec);
+impl TryFrom<&str> for Multicodec {
+    type Error = MulticodecUnsupportedName;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        str::parse(value)
+    }
+}
 
 impl std::fmt::Display for Multicodec {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = match self {
             Multicodec::CIDv1 => "cidv1",
+            Multicodec::Sha2_256 => "sha2-256",
             Multicodec::Sha3_256 => "sha3-256",
             Multicodec::Ed25519Pub => "ed25519-pub",
             Multicodec::Arrow0_Sha3_256 => "arrow0-sha3-256",
@@ -83,13 +89,13 @@ impl std::fmt::Display for Multicodec {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-super::impl_invalid_value!(Multicodec);
+#[derive(thiserror::Error, Debug)]
+#[error("Unsupported multicodec code '{0:#x}'")]
+pub struct MulticodecUnsupportedCode(u32);
 
-#[derive(Error, Debug)]
-pub enum MulticodecError {
-    #[error("Unsupported code: {0}")]
-    UnsupportedCode(u32),
-}
+#[derive(thiserror::Error, Debug)]
+#[error("Unsupported multicodec name '{0}'")]
+pub struct MulticodecUnsupportedName(String);
 
 ///////////////////////////////////////////////////////////////////////////////
 

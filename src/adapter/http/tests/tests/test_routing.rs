@@ -172,7 +172,7 @@ async fn test_routing_dataset_id() {
     let dataset_url = url::Url::parse(&format!(
         "http://{}/{}/",
         server.local_addr(),
-        repo.created_dataset.dataset_handle.id.to_did_string()
+        repo.created_dataset.dataset_handle.id.as_did_str()
     ))
     .unwrap();
 

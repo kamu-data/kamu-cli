@@ -7,7 +7,5 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod did_odf;
-
-pub use did_odf::*;
-pub use multiformats::*;
+mod test_did_key;
+mod test_multihash;

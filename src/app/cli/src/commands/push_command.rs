@@ -367,7 +367,7 @@ impl SyncListener for PrettySyncProgress {
                 num_blocks,
             } => console::style(format!(
                 "Updated repository to {} ({} block(s))",
-                new_head.short(),
+                new_head.as_multibase().short(),
                 num_blocks
             ))
             .green(),

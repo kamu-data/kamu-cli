@@ -269,8 +269,8 @@ impl Command for ListCommand {
                     }
                 }
 
-                id.push(hdl.id.to_did_string());
-                head.push(current_head.to_multibase_string());
+                id.push(hdl.id.as_did_str().to_string());
+                head.push(current_head.as_multibase().to_string());
                 blocks.push(num_blocks);
                 watermark.push(last_watermark.map(|t| t.timestamp_micros()));
             }
