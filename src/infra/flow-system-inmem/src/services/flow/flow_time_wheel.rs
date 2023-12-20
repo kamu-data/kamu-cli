@@ -148,3 +148,110 @@ pub(crate) struct TimeWheelFlowNotPlannedError {
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(test)]
+mod tests {
+    use chrono::Duration;
+
+    use super::*;
+
+    const FLOW_ID_1: u64 = 115;
+    const FLOW_ID_2: u64 = 116;
+    const FLOW_ID_3: u64 = 117;
+    const FLOW_ID_4: u64 = 118;
+    const FLOW_ID_5: u64 = 119;
+
+    #[test]
+    fn test_sequential_scheduling() {
+        let mut timewheel = FlowTimeWheel::default();
+        assert!(timewheel.nearest_activation_moment().is_none());
+
+        let now = Utc::now();
+        let moment_1 = now + Duration::seconds(10);
+        let moment_2 = now + Duration::seconds(20);
+        let moment_3 = now + Duration::seconds(30);
+
+        schedule_flow(&mut timewheel, moment_1, FLOW_ID_1);
+        schedule_flow(&mut timewheel, moment_1, FLOW_ID_2);
+        schedule_flow(&mut timewheel, moment_2, FLOW_ID_3);
+        schedule_flow(&mut timewheel, moment_3, FLOW_ID_4);
+        schedule_flow(&mut timewheel, moment_3, FLOW_ID_5);
+
+        check_next_time_slot(&mut timewheel, moment_1, &[FLOW_ID_1, FLOW_ID_2]);
+        check_next_time_slot(&mut timewheel, moment_2, &[FLOW_ID_3]);
+        check_next_time_slot(&mut timewheel, moment_3, &[FLOW_ID_4, FLOW_ID_5]);
+    }
+
+    #[test]
+    fn test_random_order_scheduling() {
+        let mut timewheel = FlowTimeWheel::default();
+        assert!(timewheel.nearest_activation_moment().is_none());
+
+        let now = Utc::now();
+        let moment_1 = now + Duration::seconds(10);
+        let moment_2 = now + Duration::seconds(20);
+        let moment_3 = now + Duration::seconds(30);
+
+        schedule_flow(&mut timewheel, moment_2, FLOW_ID_3);
+        schedule_flow(&mut timewheel, moment_3, FLOW_ID_5);
+        schedule_flow(&mut timewheel, moment_1, FLOW_ID_1);
+        schedule_flow(&mut timewheel, moment_3, FLOW_ID_4);
+        schedule_flow(&mut timewheel, moment_1, FLOW_ID_2);
+
+        check_next_time_slot(&mut timewheel, moment_1, &[FLOW_ID_1, FLOW_ID_2]);
+        check_next_time_slot(&mut timewheel, moment_2, &[FLOW_ID_3]);
+        check_next_time_slot(&mut timewheel, moment_3, &[FLOW_ID_4, FLOW_ID_5]);
+    }
+
+    #[test]
+    fn test_cancellations() {
+        let mut timewheel = FlowTimeWheel::default();
+        assert!(timewheel.nearest_activation_moment().is_none());
+
+        let now = Utc::now();
+        let moment_1 = now + Duration::seconds(10);
+        let moment_2 = now + Duration::seconds(20);
+        let moment_3 = now + Duration::seconds(30);
+
+        schedule_flow(&mut timewheel, moment_1, FLOW_ID_1);
+        schedule_flow(&mut timewheel, moment_1, FLOW_ID_2);
+        schedule_flow(&mut timewheel, moment_2, FLOW_ID_3);
+        schedule_flow(&mut timewheel, moment_3, FLOW_ID_4);
+        schedule_flow(&mut timewheel, moment_3, FLOW_ID_5);
+
+        timewheel
+            .cancel_flow_activation(FlowID::new(FLOW_ID_1))
+            .unwrap();
+        timewheel
+            .cancel_flow_activation(FlowID::new(FLOW_ID_3))
+            .unwrap();
+        timewheel
+            .cancel_flow_activation(FlowID::new(FLOW_ID_5))
+            .unwrap();
+
+        check_next_time_slot(&mut timewheel, moment_1, &[FLOW_ID_2]);
+        check_next_time_slot(&mut timewheel, moment_3, &[FLOW_ID_4]);
+        assert!(timewheel.nearest_activation_moment().is_none());
+    }
+
+    fn schedule_flow(timewheel: &mut FlowTimeWheel, moment: DateTime<Utc>, flow_id: u64) {
+        timewheel.activate_at(moment, FlowID::new(flow_id)).unwrap();
+    }
+
+    fn check_next_time_slot(
+        timewheel: &mut FlowTimeWheel,
+        moment: DateTime<Utc>,
+        flow_ids: &[u64],
+    ) {
+        assert_eq!(timewheel.nearest_activation_moment().unwrap(), moment);
+        assert_eq!(
+            timewheel.take_nearest_planned_flows(),
+            flow_ids
+                .iter()
+                .map(|id| FlowID::new(*id))
+                .collect::<Vec<_>>()
+        );
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
