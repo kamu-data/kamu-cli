@@ -773,6 +773,25 @@ impl TransformServiceImpl {
 
 #[async_trait::async_trait]
 impl TransformService for TransformServiceImpl {
+    #[tracing::instrument(level = "info", skip_all, fields(%dataset_ref))]
+    async fn get_active_transform(
+        &self,
+        dataset_ref: &DatasetRef,
+    ) -> Result<Option<(Multihash, MetadataBlockTyped<SetTransform>)>, GetDatasetError> {
+        let dataset = self.dataset_repo.get_dataset(dataset_ref).await?;
+
+        // TODO: Support tranform evolution
+        let source = dataset
+            .as_metadata_chain()
+            .iter_blocks()
+            .filter_map_ok(|(h, b)| b.into_typed::<SetTransform>().map(|b| (h, b)))
+            .try_first()
+            .await
+            .int_err()?;
+
+        Ok(source)
+    }
+
     async fn transform(
         &self,
         dataset_ref: &DatasetRef,

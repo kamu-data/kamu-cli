@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Added `KAMU_WORKSPACE` env var to handle custom workspace path if needed
 
+## [0.148.0] - 2023-12-20
+### Added
+- GQL `currentPushSources` endpoint
+### Changed
+- GQL `currentSource` endpoint was deprecated in favor of new `currentPollingSource` endpoint
+
 ## [0.147.2] - 2023-12-19
 ### Fixed
 - Cargo.lock file update to address [RUSTSEC-2023-0074](https://rustsec.org/advisories/RUSTSEC-2023-0074)

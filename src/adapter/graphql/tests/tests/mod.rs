@@ -12,6 +12,7 @@ mod test_auth;
 mod test_error_handling;
 mod test_gql_data;
 mod test_gql_datasets;
+mod test_gql_metadata;
 mod test_gql_metadata_chain;
 mod test_gql_search;
 mod test_guards;

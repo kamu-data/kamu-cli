@@ -309,6 +309,16 @@ impl AddPushSourceBuilder {
         self
     }
 
+    pub fn some_read(self) -> Self {
+        self.read(ReadStepNdJson {
+            schema: Some(vec![
+                "city STRING".to_string(),
+                "population BIGINT".to_string(),
+            ]),
+            ..Default::default()
+        })
+    }
+
     pub fn preprocess(mut self, preprocess_step: impl Into<Transform>) -> Self {
         self.v = AddPushSource {
             preprocess: Some(preprocess_step.into()),

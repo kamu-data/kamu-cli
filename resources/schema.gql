@@ -315,9 +315,17 @@ type DatasetMetadata {
 	"""
 	currentDownstreamDependencies: [Dataset!]!
 	"""
-	Current source used by the root dataset
+	Deprecated - use `current_polling_source` instead
 	"""
 	currentSource: SetPollingSource
+	"""
+	Current polling source used by the root dataset
+	"""
+	currentPollingSource: SetPollingSource
+	"""
+	Current polling source used by the root dataset
+	"""
+	currentPushSources: [AddPushSource!]!
 	"""
 	Current transformation used by the derivative dataset
 	"""

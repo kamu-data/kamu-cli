@@ -22,6 +22,12 @@ use crate::*;
 
 #[async_trait::async_trait]
 pub trait TransformService: Send + Sync {
+    /// Returns an active transform, if any
+    async fn get_active_transform(
+        &self,
+        dataset_ref: &DatasetRef,
+    ) -> Result<Option<(Multihash, MetadataBlockTyped<SetTransform>)>, GetDatasetError>;
+
     async fn transform(
         &self,
         dataset_ref: &DatasetRef,

@@ -1094,6 +1094,13 @@ impl TestIngestService {
 // TODO: Replace with a mock
 #[async_trait::async_trait]
 impl PollingIngestService for TestIngestService {
+    async fn get_active_polling_source(
+        &self,
+        _dataset_ref: &DatasetRef,
+    ) -> Result<Option<(Multihash, MetadataBlockTyped<SetPollingSource>)>, GetDatasetError> {
+        unimplemented!()
+    }
+
     async fn ingest(
         &self,
         _dataset_ref: &DatasetRef,
@@ -1140,6 +1147,13 @@ impl TestTransformService {
 
 #[async_trait::async_trait]
 impl TransformService for TestTransformService {
+    async fn get_active_transform(
+        &self,
+        _dataset_ref: &DatasetRef,
+    ) -> Result<Option<(Multihash, MetadataBlockTyped<SetTransform>)>, GetDatasetError> {
+        unimplemented!()
+    }
+
     async fn transform(
         &self,
         _dataset_ref: &DatasetRef,

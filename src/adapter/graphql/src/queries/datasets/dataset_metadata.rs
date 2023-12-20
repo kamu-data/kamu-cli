@@ -130,20 +130,48 @@ impl DatasetMetadata {
         Ok(downstream)
     }
 
-    /// Current source used by the root dataset
+    /// Deprecated - use `current_polling_source` instead
     async fn current_source(&self, ctx: &Context<'_>) -> Result<Option<SetPollingSource>> {
-        Ok(self
-            .get_last_block_of_type::<odf::SetPollingSource>(ctx)
-            .await?
-            .map(|t| t.event.into()))
+        self.current_polling_source(ctx).await
+    }
+
+    /// Current polling source used by the root dataset
+    async fn current_polling_source(&self, ctx: &Context<'_>) -> Result<Option<SetPollingSource>> {
+        let polling_ingest_svc = from_catalog::<dyn domain::PollingIngestService>(ctx).unwrap();
+
+        let source = polling_ingest_svc
+            .get_active_polling_source(&self.dataset_handle.as_local_ref())
+            .await
+            .int_err()?;
+
+        Ok(source.map(|(_hash, block)| block.event.into()))
+    }
+
+    /// Current polling source used by the root dataset
+    async fn current_push_sources(&self, ctx: &Context<'_>) -> Result<Vec<AddPushSource>> {
+        let push_ingest_svc = from_catalog::<dyn domain::PushIngestService>(ctx).unwrap();
+
+        let push_sources = push_ingest_svc
+            .get_active_push_sources(&self.dataset_handle.as_local_ref())
+            .await
+            .int_err()?;
+
+        Ok(push_sources
+            .into_iter()
+            .map(|(_hash, block)| block.event.into())
+            .collect())
     }
 
     /// Current transformation used by the derivative dataset
     async fn current_transform(&self, ctx: &Context<'_>) -> Result<Option<SetTransform>> {
-        Ok(self
-            .get_last_block_of_type::<odf::SetTransform>(ctx)
-            .await?
-            .map(|t| t.event.into()))
+        let transform_svc = from_catalog::<dyn domain::TransformService>(ctx).unwrap();
+
+        let source = transform_svc
+            .get_active_transform(&self.dataset_handle.as_local_ref())
+            .await
+            .int_err()?;
+
+        Ok(source.map(|(_hash, block)| block.event.into()))
     }
 
     /// Current descriptive information about the dataset
