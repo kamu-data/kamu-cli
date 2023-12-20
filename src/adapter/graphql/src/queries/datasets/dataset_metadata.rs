@@ -147,7 +147,7 @@ impl DatasetMetadata {
         Ok(source.map(|(_hash, block)| block.event.into()))
     }
 
-    /// Current polling source used by the root dataset
+    /// Current push sources used by the root dataset
     async fn current_push_sources(&self, ctx: &Context<'_>) -> Result<Vec<AddPushSource>> {
         let push_ingest_svc = from_catalog::<dyn domain::PushIngestService>(ctx).unwrap();
 

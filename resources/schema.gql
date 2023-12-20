@@ -323,7 +323,7 @@ type DatasetMetadata {
 	"""
 	currentPollingSource: SetPollingSource
 	"""
-	Current polling source used by the root dataset
+	Current push sources used by the root dataset
 	"""
 	currentPushSources: [AddPushSource!]!
 	"""
