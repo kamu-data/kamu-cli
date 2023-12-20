@@ -23,6 +23,11 @@ use super::*;
 
 ////////////////////////////////////////////////////////////////////////////////
 
+pub const ODF_BATCH_SIZE: &str = "ODF_BATCH_SIZE";
+pub const ODF_BATCH_SIZE_DEFAULT: u32 = 10_000;
+
+////////////////////////////////////////////////////////////////////////////////
+
 pub struct FetchService {
     container_runtime: Arc<ContainerRuntime>,
     container_log_dir: PathBuf,
