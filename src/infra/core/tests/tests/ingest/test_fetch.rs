@@ -52,18 +52,7 @@ async fn test_fetch_url_file() {
     );
     assert!(!target_path.exists());
 
-    std::fs::write(
-        &src_path,
-        indoc!(
-            "
-            city,population
-            A,1000
-            B,2000
-            C,3000
-            "
-        ),
-    )
-    .unwrap();
+    std::fs::write(&src_path, CSV_BATCH_OUTPUT).unwrap();
 
     // Normal fetch
     let res = fetch_svc
@@ -175,15 +164,7 @@ async fn test_fetch_url_http_ok() {
     let src_path = server_dir.join("data.csv");
     let target_path = tempdir.path().join("fetched.bin");
 
-    let content = indoc!(
-        "
-        city,population
-        A,1000
-        B,2000
-        C,3000
-        "
-    );
-    std::fs::write(&src_path, content).unwrap();
+    std::fs::write(&src_path, CSV_BATCH_OUTPUT).unwrap();
 
     let http_server = crate::utils::HttpServer::new(&server_dir).await;
 
@@ -220,7 +201,10 @@ async fn test_fetch_url_http_ok() {
     assert_matches!(&update.source_state, Some(PollingSourceState::ETag(_)));
     assert!(!update.has_more);
     assert!(target_path.exists());
-    assert_eq!(std::fs::read_to_string(&target_path).unwrap(), content);
+    assert_eq!(
+        std::fs::read_to_string(&target_path).unwrap(),
+        CSV_BATCH_OUTPUT
+    );
     assert_eq!(
         listener.get_last_progress(),
         Some(FetchProgress {
@@ -288,15 +272,7 @@ async fn test_fetch_url_http_env_interpolation() {
     let src_path = server_dir.join("data.csv");
     let target_path = tempdir.path().join("fetched.bin");
 
-    let content = indoc!(
-        "
-        city,population
-        A,1000
-        B,2000
-        C,3000
-        "
-    );
-    std::fs::write(&src_path, content).unwrap();
+    std::fs::write(&src_path, CSV_BATCH_OUTPUT).unwrap();
 
     let http_server = crate::utils::HttpServer::new(&server_dir).await;
 
@@ -346,7 +322,10 @@ async fn test_fetch_url_http_env_interpolation() {
 
     assert_matches!(res, FetchResult::Updated(_));
     assert!(target_path.exists());
-    assert_eq!(std::fs::read_to_string(&target_path).unwrap(), content);
+    assert_eq!(
+        std::fs::read_to_string(&target_path).unwrap(),
+        CSV_BATCH_OUTPUT
+    );
     assert_eq!(
         listener.get_last_progress(),
         Some(FetchProgress {
@@ -371,15 +350,7 @@ async fn test_fetch_url_ftp_ok() {
     let src_path = server_dir.join("data.csv");
     let target_path = tempdir.path().join("fetched.bin");
 
-    let content = indoc!(
-        "
-        city,population
-        A,1000
-        B,2000
-        C,3000
-        "
-    );
-    std::fs::write(&src_path, content).unwrap();
+    std::fs::write(&src_path, CSV_BATCH_OUTPUT).unwrap();
 
     let ftp_server = crate::utils::FtpServer::new(&server_dir).await;
 
@@ -410,7 +381,10 @@ async fn test_fetch_url_ftp_ok() {
 
     assert_matches!(res, FetchResult::Updated(_));
     assert!(target_path.exists());
-    assert_eq!(std::fs::read_to_string(&target_path).unwrap(), content);
+    assert_eq!(
+        std::fs::read_to_string(&target_path).unwrap(),
+        CSV_BATCH_OUTPUT
+    );
     assert_eq!(
         listener.get_last_progress(),
         Some(FetchProgress {
@@ -460,18 +434,7 @@ async fn test_fetch_files_glob() {
     );
     assert!(!target_path.exists());
 
-    std::fs::write(
-        &src_path_1,
-        indoc!(
-            "
-            city,population
-            A,1000
-            B,2000
-            C,3000
-            "
-        ),
-    )
-    .unwrap();
+    std::fs::write(&src_path_1, CSV_BATCH_OUTPUT).unwrap();
 
     // Normal fetch
     let res = fetch_svc
@@ -524,18 +487,7 @@ async fn test_fetch_files_glob() {
     // Doesn't consider files with names lexicographically "less" than last
     // fetched
     let src_path_0 = tempdir.path().join("data-2020-01-01.csv");
-    std::fs::write(
-        &src_path_0,
-        indoc!(
-            "
-            city,population
-            A,100
-            B,200
-            C,300
-            "
-        ),
-    )
-    .unwrap();
+    std::fs::write(&src_path_0, CSV_BATCH_OUTPUT).unwrap();
 
     let res4 = fetch_svc
         .fetch(
@@ -639,15 +591,6 @@ async fn test_fetch_container_ok() {
     let tempdir = tempfile::tempdir().unwrap();
     let target_path = tempdir.path().join("fetched.bin");
 
-    let content = indoc!(
-        "
-        city,population
-        A,1000
-        B,2000
-        C,3000
-        "
-    );
-
     let fetch_step = FetchStep::Container(FetchStepContainer {
         image: crate::utils::HttpServer::IMAGE.to_owned(),
         command: Some(vec!["/bin/bash".to_owned()]),
@@ -678,7 +621,10 @@ async fn test_fetch_container_ok() {
 
     assert_matches!(res, FetchResult::Updated(_));
     assert!(target_path.exists());
-    assert_eq!(std::fs::read_to_string(&target_path).unwrap(), content);
+    assert_eq!(
+        std::fs::read_to_string(&target_path).unwrap(),
+        CSV_BATCH_OUTPUT
+    );
     assert_eq!(
         listener.get_last_progress(),
         Some(FetchProgress {
@@ -807,6 +753,8 @@ async fn test_fetch_container_has_more_no_data() {
         .unwrap();
 
     assert_matches!(res, FetchResult::UpToDate);
+    assert!(target_path.exists());
+    assert_eq!(std::fs::read_to_string(&target_path).unwrap(), "");
 }
 
 #[test_group::group(containerized)]
@@ -849,6 +797,11 @@ async fn test_fetch_container_has_more_data_is_less_than_a_batch() {
             ..
         }) if expected_etag == "100"
     );
+    assert!(target_path.exists());
+    assert_eq!(
+        std::fs::read_to_string(&target_path).unwrap(),
+        CSV_BATCH_OUTPUT
+    );
 }
 
 #[test_group::group(containerized)]
@@ -888,6 +841,11 @@ async fn test_fetch_container_has_more_data_is_more_than_a_batch() {
                 ..
             }) if expected_etag == "40"
         );
+        assert!(target_path.exists());
+        assert_eq!(
+            std::fs::read_to_string(&target_path).unwrap(),
+            CSV_BATCH_OUTPUT
+        );
 
         match res_1 {
             FetchResult::Updated(x) => x.source_state,
@@ -924,6 +882,11 @@ async fn test_fetch_container_has_more_data_is_more_than_a_batch() {
                 has_more: true,
                 ..
             }) if expected_etag == "80"
+        );
+        assert!(target_path.exists());
+        assert_eq!(
+            std::fs::read_to_string(&target_path).unwrap(),
+            CSV_BATCH_OUTPUT
         );
 
         match res_2 {
@@ -962,6 +925,11 @@ async fn test_fetch_container_has_more_data_is_more_than_a_batch() {
                 ..
             }) if expected_etag == "100"
         );
+        assert!(target_path.exists());
+        assert_eq!(
+            std::fs::read_to_string(&target_path).unwrap(),
+            CSV_BATCH_OUTPUT
+        );
     }
 }
 
@@ -969,6 +937,14 @@ async fn test_fetch_container_has_more_data_is_more_than_a_batch() {
 // Utils: constants
 ///////////////////////////////////////////////////////////////////////////////
 
+const CSV_BATCH_OUTPUT: &str = indoc!(
+    "
+    city,population
+    A,1000
+    B,2000
+    C,3000
+    "
+);
 const HAS_MORE_TESTER_SCRIPT: &str = indoc! {r#"
     #!/usr/bin/env sh
 
