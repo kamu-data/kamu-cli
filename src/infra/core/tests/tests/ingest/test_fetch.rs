@@ -812,16 +812,29 @@ async fn test_fetch_container_has_more_data_is_more_than_a_batch() {
         temp_dir.path().join("run"),
     );
     let custom_batch_size = 40;
+    let env_100_rows_count = EnvVar {
+        name: "ROWS_COUNT".to_owned(),
+        value: Some(100.to_string()),
+    };
 
+    /* 1) Ingest the first 40 rows
+                            +
+             Read before :  0
+                          ---
+                           40 / 100
+    */
     let prev_source_state = {
         let fetch_step_1 = FetchStep::Container(FetchStepContainer {
             image: BUSYBOX.to_owned(),
             command: Some(vec!["sh".to_owned()]),
             args: Some(vec!["-c".to_owned(), HAS_MORE_TESTER_SCRIPT.to_owned()]),
-            env: Some(vec![EnvVar {
-                name: ODF_BATCH_SIZE.to_owned(),
-                value: Some(custom_batch_size.to_string()),
-            }]),
+            env: Some(vec![
+                EnvVar {
+                    name: ODF_BATCH_SIZE.to_owned(),
+                    value: Some(custom_batch_size.to_string()),
+                },
+                env_100_rows_count.clone(),
+            ]),
         });
 
         let res_1 = fetch_svc
@@ -849,15 +862,25 @@ async fn test_fetch_container_has_more_data_is_more_than_a_batch() {
             _ => unreachable!(),
         }
     };
+
+    /* 2) Ingest the second 40 rows
+                             +
+             Read before :  40
+                           ---
+                            80 / 100
+    */
     let prev_source_state = {
         let fetch_step_2 = FetchStep::Container(FetchStepContainer {
             image: BUSYBOX.to_owned(),
             command: Some(vec!["sh".to_owned()]),
             args: Some(vec!["-c".to_owned(), HAS_MORE_TESTER_SCRIPT.to_owned()]),
-            env: Some(vec![EnvVar {
-                name: ODF_BATCH_SIZE.to_owned(),
-                value: Some(custom_batch_size.to_string()),
-            }]),
+            env: Some(vec![
+                EnvVar {
+                    name: ODF_BATCH_SIZE.to_owned(),
+                    value: Some(custom_batch_size.to_string()),
+                },
+                env_100_rows_count.clone(),
+            ]),
         });
 
         let res_2 = fetch_svc
@@ -891,15 +914,25 @@ async fn test_fetch_container_has_more_data_is_more_than_a_batch() {
             _ => unreachable!(),
         }
     };
-    {
+
+    /* 3) Try to ingest the last 40 rows, but have only 20 ones
+                                                         +
+                                         Read before :  80
+                                                       ---
+                                                       100 / 100
+    */
+    let prev_source_state = {
         let fetch_step_3 = FetchStep::Container(FetchStepContainer {
             image: BUSYBOX.to_owned(),
             command: Some(vec!["sh".to_owned()]),
             args: Some(vec!["-c".to_owned(), HAS_MORE_TESTER_SCRIPT.to_owned()]),
-            env: Some(vec![EnvVar {
-                name: ODF_BATCH_SIZE.to_owned(),
-                value: Some(custom_batch_size.to_string()),
-            }]),
+            env: Some(vec![
+                EnvVar {
+                    name: ODF_BATCH_SIZE.to_owned(),
+                    value: Some(custom_batch_size.to_string()),
+                },
+                env_100_rows_count.clone(),
+            ]),
         });
 
         let res_3 = fetch_svc
@@ -915,7 +948,7 @@ async fn test_fetch_container_has_more_data_is_more_than_a_batch() {
             .unwrap();
 
         assert_matches!(
-            res_3,
+            &res_3,
             FetchResult::Updated(FetchResultUpdated {
                 source_state: Some(PollingSourceState::ETag(expected_etag)),
                 has_more: false,
@@ -927,6 +960,44 @@ async fn test_fetch_container_has_more_data_is_more_than_a_batch() {
             std::fs::read_to_string(&target_path).unwrap(),
             CSV_BATCH_OUTPUT
         );
+
+        match res_3 {
+            FetchResult::Updated(x) => x.source_state,
+            _ => unreachable!(),
+        }
+    };
+
+    // 4) Try to ingest the next 40 rows from the exhausted source, but have no new
+    //    data
+    {
+        let fetch_step_4 = FetchStep::Container(FetchStepContainer {
+            image: BUSYBOX.to_owned(),
+            command: Some(vec!["sh".to_owned()]),
+            args: Some(vec!["-c".to_owned(), HAS_MORE_TESTER_SCRIPT.to_owned()]),
+            env: Some(vec![
+                EnvVar {
+                    name: ODF_BATCH_SIZE.to_owned(),
+                    value: Some(custom_batch_size.to_string()),
+                },
+                env_100_rows_count,
+            ]),
+        });
+
+        let res_4 = fetch_svc
+            .fetch(
+                "4",
+                &fetch_step_4,
+                prev_source_state.as_ref(),
+                &target_path,
+                &Utc::now(),
+                None,
+            )
+            .await
+            .unwrap();
+
+        assert_matches!(res_4, FetchResult::UpToDate);
+        assert!(target_path.exists());
+        assert_eq!(std::fs::read_to_string(&target_path).unwrap(), "");
     }
 }
 
@@ -951,7 +1022,6 @@ const HAS_MORE_TESTER_SCRIPT: &str = indoc! {r#"
       set -x
     fi
 
-    ROWS_COUNT=100
     BATCH_SIZE="${ODF_BATCH_SIZE}"
     ETAG="${ODF_ETAG:-0}"
 
@@ -970,18 +1040,19 @@ const HAS_MORE_TESTER_SCRIPT: &str = indoc! {r#"
       touch "${ODF_NEW_HAS_MORE_DATA_PATH}"
     }
 
-    if [[ "${ETAG}" -lt "${ROWS_COUNT}" ]]; then
-      NEW_ETAG=$((${ETAG} + ${BATCH_SIZE}))
-      HAS_MORE_DATA=$((${NEW_ETAG} < ${ROWS_COUNT}))
-      NEW_ETAG=$((${HAS_MORE_DATA} ? ${NEW_ETAG} : ${ROWS_COUNT}))
+    NEW_ETAG=$((${ETAG} + ${BATCH_SIZE}))
+    HAS_MORE_DATA=$((${NEW_ETAG} < ${ROWS_COUNT}))
+    NEW_ETAG=$((${HAS_MORE_DATA} ? ${NEW_ETAG} : ${ROWS_COUNT}))
 
+    if [[ "${ETAG}" -lt "${ROWS_COUNT}" ]]; then
       if [[ "${HAS_MORE_DATA}" == "1" ]]; then
         simulate_has_more_data
       fi
 
-      simulate_set_new_etag "${NEW_ETAG}"
       simulate_data_output
     fi
+
+    simulate_set_new_etag "${NEW_ETAG}"
 "#};
 
 ///////////////////////////////////////////////////////////////////////////////
