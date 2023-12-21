@@ -800,17 +800,9 @@ async fn test_fetch_container_has_more_no_data() {
         args: None,
         env: None,
     });
-    let empty_prev_source_state = None;
 
     let res = fetch_svc
-        .fetch(
-            "1",
-            &fetch_step,
-            empty_prev_source_state.as_ref(),
-            &target_path,
-            &Utc::now(),
-            None,
-        )
+        .fetch("1", &fetch_step, None, &target_path, &Utc::now(), None)
         .await
         .unwrap();
 
@@ -857,6 +849,120 @@ async fn test_fetch_container_has_more_data_is_less_than_a_batch() {
             ..
         }) if expected_etag == "100"
     );
+}
+
+#[test_group::group(containerized)]
+#[test_log::test(tokio::test)]
+async fn test_fetch_container_has_more_data_is_more_than_a_batch() {
+    let temp_dir = tempfile::tempdir().unwrap();
+    let target_path = temp_dir.path().join("fetched.bin");
+
+    let fetch_svc = FetchService::new(
+        Arc::new(ContainerRuntime::default()),
+        temp_dir.path().join("run"),
+    );
+    let custom_batch_size = 40;
+
+    let prev_source_state = {
+        let fetch_step_1 = FetchStep::Container(FetchStepContainer {
+            image: BUSYBOX.to_owned(),
+            command: Some(vec!["sh".to_owned()]),
+            args: Some(vec!["-c".to_owned(), HAS_MORE_TESTER_SCRIPT.to_owned()]),
+            env: Some(vec![EnvVar {
+                name: ODF_BATCH_SIZE.to_owned(),
+                value: Some(custom_batch_size.to_string()),
+            }]),
+        });
+
+        let res_1 = fetch_svc
+            .fetch("1", &fetch_step_1, None, &target_path, &Utc::now(), None)
+            .await
+            .unwrap();
+
+        assert!(target_path.exists());
+        assert_matches!(
+            &res_1,
+            FetchResult::Updated(FetchResultUpdated {
+                source_state: Some(PollingSourceState::ETag(expected_etag)),
+                has_more: true,
+                ..
+            }) if expected_etag == "40"
+        );
+
+        match res_1 {
+            FetchResult::Updated(x) => x.source_state,
+            _ => unreachable!(),
+        }
+    };
+    let prev_source_state = {
+        let fetch_step_2 = FetchStep::Container(FetchStepContainer {
+            image: BUSYBOX.to_owned(),
+            command: Some(vec!["sh".to_owned()]),
+            args: Some(vec!["-c".to_owned(), HAS_MORE_TESTER_SCRIPT.to_owned()]),
+            env: Some(vec![EnvVar {
+                name: ODF_BATCH_SIZE.to_owned(),
+                value: Some(custom_batch_size.to_string()),
+            }]),
+        });
+
+        let res_2 = fetch_svc
+            .fetch(
+                "2",
+                &fetch_step_2,
+                prev_source_state.as_ref(),
+                &target_path,
+                &Utc::now(),
+                None,
+            )
+            .await
+            .unwrap();
+
+        assert_matches!(
+            &res_2,
+            FetchResult::Updated(FetchResultUpdated {
+                source_state: Some(PollingSourceState::ETag(expected_etag)),
+                has_more: true,
+                ..
+            }) if expected_etag == "80"
+        );
+
+        match res_2 {
+            FetchResult::Updated(x) => x.source_state,
+            _ => unreachable!(),
+        }
+    };
+    {
+        let fetch_step_3 = FetchStep::Container(FetchStepContainer {
+            image: BUSYBOX.to_owned(),
+            command: Some(vec!["sh".to_owned()]),
+            args: Some(vec!["-c".to_owned(), HAS_MORE_TESTER_SCRIPT.to_owned()]),
+            env: Some(vec![EnvVar {
+                name: ODF_BATCH_SIZE.to_owned(),
+                value: Some(custom_batch_size.to_string()),
+            }]),
+        });
+
+        let res_3 = fetch_svc
+            .fetch(
+                "3",
+                &fetch_step_3,
+                prev_source_state.as_ref(),
+                &target_path,
+                &Utc::now(),
+                None,
+            )
+            .await
+            .unwrap();
+
+        assert_matches!(
+            res_3,
+            FetchResult::Updated(FetchResultUpdated {
+                source_state: Some(PollingSourceState::ETag(expected_etag)),
+                has_more: false,
+                ..
+            }) if expected_etag == "100"
+        );
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
