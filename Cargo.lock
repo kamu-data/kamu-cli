@@ -3531,6 +3531,7 @@ dependencies = [
  "kamu-core",
  "kamu-flow-system",
  "kamu-task-system",
+ "kamu-task-system-inmem",
  "mockall",
  "opendatafabric",
  "serde",

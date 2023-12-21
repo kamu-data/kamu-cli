@@ -20,7 +20,7 @@ use crate::{DatasetFlowType, FlowID, FlowKey, FlowState, SystemFlowType};
 #[async_trait::async_trait]
 pub trait FlowService: Sync + Send {
     /// Runs the update main loop
-    async fn run(&self) -> Result<(), InternalError>;
+    async fn run(&self, run_config: FlowServiceRunConfig) -> Result<(), InternalError>;
 
     /// Triggers the specified flow manually, unless it's already waiting
     async fn trigger_manual_flow(
@@ -52,9 +52,9 @@ pub trait FlowService: Sync + Send {
         dataset_id: &DatasetID,
     ) -> Result<FlowStateStream, ListFlowsByDatasetError>;
 
-    /// Returns states of system flows of any type
-    /// ordered by creation time from newest to oldest
-    fn list_all_system_flows(&self) -> Result<FlowStateStream, ListSystemFlowsError>;
+    /// Returns state of all flows, whether they are system-level or
+    /// dataset-bound, ordered by creation time from newest to oldest
+    fn list_all_flows(&self) -> Result<FlowStateStream, ListSystemFlowsError>;
 
     /// Returns state of the latest flow of certain type created for the given
     /// dataset
@@ -168,6 +168,19 @@ impl From<LoadError<FlowState>> for CancelFlowError {
             LoadError::ProjectionError(err) => Self::Internal(err.int_err()),
             LoadError::Internal(err) => Self::Internal(err),
         }
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug)]
+pub struct FlowServiceRunConfig {
+    pub awaiting_step: std::time::Duration,
+}
+
+impl FlowServiceRunConfig {
+    pub fn new(awaiting_step: std::time::Duration) -> Self {
+        Self { awaiting_step }
     }
 }
 

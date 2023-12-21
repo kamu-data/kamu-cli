@@ -12,6 +12,7 @@ mod flow_id;
 mod flow_outcome;
 mod flow_start_condition;
 mod flow_state;
+mod flow_status;
 mod flow_trigger;
 
 pub use flow_event::*;
@@ -19,4 +20,5 @@ pub use flow_id::*;
 pub use flow_outcome::*;
 pub use flow_start_condition::*;
 pub use flow_state::*;
+pub use flow_status::*;
 pub use flow_trigger::*;

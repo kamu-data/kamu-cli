@@ -45,9 +45,9 @@ pub trait FlowEventStore: EventStore<FlowState> {
     /// in reverse chronological order based on creation time
     fn get_all_flows_by_dataset<'a>(&'a self, dataset_id: &DatasetID) -> FlowIDStream<'a>;
 
-    /// Returns the system flows of any type in reverse chronological order
+    /// Returns the flows of any type in reverse chronological order
     /// based on creation time
-    fn get_all_system_flows<'a>(&'a self) -> FlowIDStream<'a>;
+    fn get_all_flows<'a>(&'a self) -> FlowIDStream<'a>;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

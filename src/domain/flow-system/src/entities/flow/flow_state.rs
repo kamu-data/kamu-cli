@@ -40,6 +40,21 @@ impl FlowState {
     pub fn can_cancel(&self) -> bool {
         !self.outcome.is_some() && self.task_ids.is_empty() && self.cancelled_at.is_none()
     }
+
+    /// Computes status
+    pub fn status(&self) -> FlowStatus {
+        if self.cancelled_at.is_some() {
+            FlowStatus::Cancelled
+        } else if self.outcome.is_some() {
+            FlowStatus::Finished
+        } else if !self.task_ids.is_empty() {
+            FlowStatus::Scheduled
+        } else if self.activate_at.is_some() {
+            FlowStatus::Queued
+        } else {
+            FlowStatus::Draft
+        }
+    }
 }
 
 impl Projection for FlowState {

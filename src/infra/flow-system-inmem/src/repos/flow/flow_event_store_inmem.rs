@@ -30,7 +30,7 @@ struct State {
     typed_flows_by_dataset: HashMap<FlowKeyDataset, Vec<FlowID>>,
     all_flows_by_dataset: HashMap<DatasetID, Vec<FlowID>>,
     system_flows_by_type: HashMap<SystemFlowType, Vec<FlowID>>,
-    all_system_flows: Vec<FlowID>,
+    all_flows: Vec<FlowID>,
     last_flow_id: Option<FlowID>,
 }
 
@@ -83,14 +83,14 @@ impl FlowEventStoreInMem {
                     };
                     typed_entries.push(event.flow_id());
 
-                    let all_entries = match state
+                    let all_dataset_entries = match state
                         .all_flows_by_dataset
                         .entry(flow_key.dataset_id.clone())
                     {
                         Entry::Occupied(v) => v.into_mut(),
                         Entry::Vacant(v) => v.insert(Vec::default()),
                     };
-                    all_entries.push(event.flow_id());
+                    all_dataset_entries.push(event.flow_id());
                 }
 
                 FlowKey::System(flow_key) => {
@@ -99,10 +99,10 @@ impl FlowEventStoreInMem {
                         Entry::Vacant(v) => v.insert(Vec::default()),
                     };
                     entries.push(event.flow_id());
-
-                    state.all_system_flows.push(event.flow_id());
                 }
             }
+
+            state.all_flows.push(event.flow_id());
         }
     }
 }
@@ -289,13 +289,13 @@ impl FlowEventStore for FlowEventStoreInMem {
     }
 
     #[tracing::instrument(level = "debug", skip_all)]
-    fn get_all_system_flows<'a>(&'a self) -> FlowIDStream<'a> {
+    fn get_all_flows<'a>(&'a self) -> FlowIDStream<'a> {
         // TODO: This should be a buffered stream so we don't lock per record
         Box::pin(async_stream::try_stream! {
             let mut pos = {
                 let state = self.inner.as_state();
                 let g = state.lock().unwrap();
-                g.all_system_flows.len()
+                g.all_flows.len()
             };
 
             loop {
@@ -308,7 +308,7 @@ impl FlowEventStore for FlowEventStoreInMem {
                 let next = {
                     let state = self.inner.as_state();
                     let g = state.lock().unwrap();
-                    g.all_system_flows.get(pos).cloned()
+                    g.all_flows.get(pos).cloned()
                 };
 
                 let flow_id = match next {

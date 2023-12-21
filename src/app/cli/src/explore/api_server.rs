@@ -12,7 +12,7 @@ use std::sync::Arc;
 
 use dill::Catalog;
 use internal_error::*;
-use kamu_flow_system_inmem::domain::FlowService;
+use kamu_flow_system_inmem::domain::{FlowService, FlowServiceRunConfig};
 use kamu_task_system_inmem::domain::TaskExecutor;
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -97,10 +97,12 @@ impl APIServer {
     }
 
     pub async fn run(self) -> Result<(), InternalError> {
+        let flow_service_run_config = FlowServiceRunConfig::new(std::time::Duration::from_secs(1));
+
         tokio::select! {
             res = self.server => { res.int_err() },
             res = self.task_executor.run() => { res.int_err() },
-            res = self.flow_service.run() => { res.int_err() }
+            res = self.flow_service.run(flow_service_run_config) => { res.int_err() }
         }
     }
 }

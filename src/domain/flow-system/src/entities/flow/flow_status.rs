@@ -7,5 +7,15 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod test_flow_configuration_service_inmem;
-mod test_flow_service_inmem;
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FlowStatus {
+    Draft,
+    Queued,
+    Scheduled,
+    Finished,
+    Cancelled,
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////

@@ -13,7 +13,7 @@ use std::sync::{Arc, Mutex};
 
 use chrono::{DateTime, Utc};
 use dill::*;
-use event_bus::AsyncEventHandler;
+use event_bus::{AsyncEventHandler, EventBus};
 use futures::TryStreamExt;
 use kamu_core::events::DatasetEventDeleted;
 use kamu_core::{DependencyGraphService, InternalError, SystemTimeSource};
@@ -30,6 +30,7 @@ use super::pending_flows_state::PendingFlowsState;
 
 pub struct FlowServiceInMemory {
     state: Arc<Mutex<State>>,
+    event_bus: Arc<EventBus>,
     flow_event_store: Arc<dyn FlowEventStore>,
     time_source: Arc<dyn SystemTimeSource>,
     task_scheduler: Arc<dyn TaskScheduler>,
@@ -56,6 +57,7 @@ struct State {
 #[scope(Singleton)]
 impl FlowServiceInMemory {
     pub fn new(
+        event_bus: Arc<EventBus>,
         flow_event_store: Arc<dyn FlowEventStore>,
         time_source: Arc<dyn SystemTimeSource>,
         task_scheduler: Arc<dyn TaskScheduler>,
@@ -64,6 +66,7 @@ impl FlowServiceInMemory {
     ) -> Self {
         Self {
             state: Arc::new(Mutex::new(State::default())),
+            event_bus,
             flow_event_store,
             time_source,
             task_scheduler,
@@ -387,10 +390,18 @@ impl FlowServiceInMemory {
 impl FlowService for FlowServiceInMemory {
     /// Runs the update main loop
     #[tracing::instrument(level = "info", skip_all)]
-    async fn run(&self) -> Result<(), InternalError> {
+    async fn run(&self, run_config: FlowServiceRunConfig) -> Result<(), InternalError> {
         // Initial scheduling
         self.initialize_auto_polling_flows_from_configurations()
             .await?;
+
+        // Publish progress event
+        self.event_bus
+            .dispatch_event(FlowServiceEventConfigurationLoaded {
+                event_time: self.time_source.now(),
+            })
+            .await
+            .int_err()?;
 
         // Main scanning loop
         let main_loop_span = tracing::debug_span!("FlowService main loop");
@@ -404,14 +415,23 @@ impl FlowService for FlowServiceInMemory {
             };
 
             // Is it time to execute it yet?
+            let current_time = self.time_source.now();
             if let Some(nearest_activation_time) = maybe_nearest_activation_time
-                && nearest_activation_time <= self.time_source.now()
+                && nearest_activation_time <= current_time
             {
                 // Run scheduling for current time slot. Should not throw any errors
                 self.run_current_timeslot().await;
+
+                // Publish progress event
+                self.event_bus
+                    .dispatch_event(FlowServiceEventExecutedTimeSlot {
+                        event_time: current_time,
+                    })
+                    .await
+                    .int_err()?;
             }
 
-            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+            tokio::time::sleep(run_config.awaiting_step).await;
             continue;
         }
     }
@@ -521,14 +541,14 @@ impl FlowService for FlowServiceInMemory {
         }))
     }
 
-    /// Returns states of system flows of any type
-    /// ordered by creation time from newest to oldest
+    /// Returns state of all flows, whether they are system-level or
+    /// dataset-bound, ordered by creation time from newest to oldest
     #[tracing::instrument(level = "debug", skip_all)]
-    fn list_all_system_flows(&self) -> Result<FlowStateStream, ListSystemFlowsError> {
+    fn list_all_flows(&self) -> Result<FlowStateStream, ListSystemFlowsError> {
         Ok(Box::pin(async_stream::try_stream! {
             let all_flows: Vec<_> = self
                 .flow_event_store
-                .get_all_system_flows()
+                .get_all_flows()
                 .try_collect()
                 .await?;
 

@@ -42,6 +42,8 @@ serde_with = { version = "3", default-features = false }
 
 
 [dev-dependencies]
+kamu-task-system-inmem = { workspace = true }
+
 env_logger = "0.10"
 mockall = "0.11"
 tempfile = "3"
