@@ -592,12 +592,9 @@ async fn test_fetch_container_ok() {
     let target_path = tempdir.path().join("fetched.bin");
 
     let fetch_step = FetchStep::Container(FetchStepContainer {
-        image: crate::utils::HttpServer::IMAGE.to_owned(),
-        command: Some(vec!["/bin/bash".to_owned()]),
-        args: Some(vec![
-            "-c".to_owned(),
-            "printf \"city,population\nA,1000\nB,2000\nC,3000\n\"".to_owned(),
-        ]),
+        image: BUSYBOX.to_owned(),
+        command: Some(vec!["printf".to_owned()]),
+        args: Some(vec![CSV_BATCH_OUTPUT.to_owned()]),
         env: None,
     });
 
