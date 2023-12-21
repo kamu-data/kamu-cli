@@ -20,7 +20,7 @@ use crate::{DatasetFlowType, FlowID, FlowKey, FlowState, SystemFlowType};
 #[async_trait::async_trait]
 pub trait FlowService: Sync + Send {
     /// Runs the update main loop
-    async fn run(&self, run_config: FlowServiceRunConfig) -> Result<(), InternalError>;
+    async fn run(&self) -> Result<(), InternalError>;
 
     /// Triggers the specified flow manually, unless it's already waiting
     async fn trigger_manual_flow(
@@ -175,11 +175,11 @@ impl From<LoadError<FlowState>> for CancelFlowError {
 
 #[derive(Debug)]
 pub struct FlowServiceRunConfig {
-    pub awaiting_step: std::time::Duration,
+    pub awaiting_step: chrono::Duration,
 }
 
 impl FlowServiceRunConfig {
-    pub fn new(awaiting_step: std::time::Duration) -> Self {
+    pub fn new(awaiting_step: chrono::Duration) -> Self {
         Self { awaiting_step }
     }
 }

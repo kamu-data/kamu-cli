@@ -11,7 +11,7 @@
 
 use std::sync::{Arc, Mutex};
 
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, DurationRound, Utc};
 use dill::*;
 use event_bus::{AsyncEventHandler, EventBus};
 use futures::TryStreamExt;
@@ -30,6 +30,7 @@ use super::pending_flows_state::PendingFlowsState;
 
 pub struct FlowServiceInMemory {
     state: Arc<Mutex<State>>,
+    run_config: Arc<FlowServiceRunConfig>,
     event_bus: Arc<EventBus>,
     flow_event_store: Arc<dyn FlowEventStore>,
     time_source: Arc<dyn SystemTimeSource>,
@@ -57,6 +58,7 @@ struct State {
 #[scope(Singleton)]
 impl FlowServiceInMemory {
     pub fn new(
+        run_config: Arc<FlowServiceRunConfig>,
         event_bus: Arc<EventBus>,
         flow_event_store: Arc<dyn FlowEventStore>,
         time_source: Arc<dyn SystemTimeSource>,
@@ -66,6 +68,7 @@ impl FlowServiceInMemory {
     ) -> Self {
         Self {
             state: Arc::new(Mutex::new(State::default())),
+            run_config,
             event_bus,
             flow_event_store,
             time_source,
@@ -73,6 +76,13 @@ impl FlowServiceInMemory {
             flow_configuration_service,
             dependency_graph_service,
         }
+    }
+
+    fn round_time(&self, time: DateTime<Utc>) -> Result<DateTime<Utc>, InternalError> {
+        let rounded_time = time
+            .duration_round(self.run_config.awaiting_step)
+            .int_err()?;
+        Ok(rounded_time)
     }
 
     #[tracing::instrument(level = "debug", skip_all)]
@@ -105,7 +115,10 @@ impl FlowServiceInMemory {
     }
 
     #[tracing::instrument(level = "debug", skip_all)]
-    async fn initialize_auto_polling_flows_from_configurations(&self) -> Result<(), InternalError> {
+    async fn initialize_auto_polling_flows_from_configurations(
+        &self,
+        start_time: DateTime<Utc>,
+    ) -> Result<(), InternalError> {
         let enabled_configurations: Vec<_> = self
             .flow_configuration_service
             .list_enabled_configurations()
@@ -114,8 +127,12 @@ impl FlowServiceInMemory {
             .int_err()?;
 
         for enabled_config in enabled_configurations {
-            self.activate_flow_configuration(enabled_config.flow_key, enabled_config.rule)
-                .await?;
+            self.activate_flow_configuration(
+                start_time,
+                enabled_config.flow_key,
+                enabled_config.rule,
+            )
+            .await?;
         }
 
         Ok(())
@@ -124,13 +141,15 @@ impl FlowServiceInMemory {
     #[tracing::instrument(level = "trace", skip_all, fields(?flow_key, ?rule))]
     async fn activate_flow_configuration(
         &self,
+        start_time: DateTime<Utc>,
         flow_key: FlowKey,
         rule: FlowConfigurationRule,
     ) -> Result<(), InternalError> {
         match &flow_key {
             FlowKey::Dataset(dataset_flow_key) => {
                 if let FlowConfigurationRule::Schedule(schedule) = &rule {
-                    self.enqueue_auto_polling_flow(&flow_key, schedule).await?;
+                    self.enqueue_auto_polling_flow(start_time, &flow_key, schedule)
+                        .await?;
                 }
 
                 let mut state = self.state.lock().unwrap();
@@ -140,7 +159,8 @@ impl FlowServiceInMemory {
             }
             FlowKey::System(system_flow_key) => {
                 if let FlowConfigurationRule::Schedule(schedule) = &rule {
-                    self.enqueue_auto_polling_flow(&flow_key, schedule).await?;
+                    self.enqueue_auto_polling_flow(start_time, &flow_key, schedule)
+                        .await?;
 
                     let mut state = self.state.lock().unwrap();
                     state
@@ -158,6 +178,7 @@ impl FlowServiceInMemory {
     #[tracing::instrument(level = "trace", skip_all, fields(?flow_key))]
     async fn try_enqueue_auto_polling_flow_if_enabled(
         &self,
+        start_time: DateTime<Utc>,
         flow_key: &FlowKey,
     ) -> Result<(), InternalError> {
         let maybe_active_schedule = self
@@ -168,7 +189,7 @@ impl FlowServiceInMemory {
             .try_get_flow_schedule(flow_key);
 
         if let Some(active_schedule) = maybe_active_schedule {
-            self.enqueue_auto_polling_flow(flow_key, &active_schedule)
+            self.enqueue_auto_polling_flow(start_time, flow_key, &active_schedule)
                 .await?;
         }
 
@@ -178,6 +199,7 @@ impl FlowServiceInMemory {
     #[tracing::instrument(level = "trace", skip_all, fields(?flow_key, ?schedule))]
     async fn enqueue_auto_polling_flow(
         &self,
+        start_time: DateTime<Utc>,
         flow_key: &FlowKey,
         schedule: &Schedule,
     ) -> Result<FlowState, InternalError> {
@@ -191,7 +213,7 @@ impl FlowServiceInMemory {
             None => {
                 let mut flow = self.make_new_flow(flow_key.clone(), trigger).await?;
 
-                let next_activation_time = schedule.next_activation_time(self.time_source.now());
+                let next_activation_time = schedule.next_activation_time(start_time);
                 self.enqueue_flow(flow.flow_id, next_activation_time)?;
 
                 flow.activate_at_time(self.time_source.now(), next_activation_time)
@@ -207,6 +229,7 @@ impl FlowServiceInMemory {
     #[tracing::instrument(level = "trace", skip_all, fields(%dataset_id, ?flow_type, %flow_id))]
     async fn enqueue_dependent_dataset_flows(
         &self,
+        start_time: DateTime<Utc>,
         dataset_id: &DatasetID,
         flow_type: DatasetFlowType,
         flow_id: FlowID,
@@ -259,15 +282,14 @@ impl FlowServiceInMemory {
                         if let Some(throttling_period) = start_condition.throttling_period {
                             // TODO: throttle not from NOW,
                             //  but from last flow of the dependent daataset
-                            let now = self.time_source.now();
                             self.enqueue_flow(
                                 dependent_dataset_flow.flow_id,
-                                now + throttling_period,
+                                start_time + throttling_period,
                             )?;
 
                             dependent_dataset_flow
                                 .define_start_condition(
-                                    now,
+                                    self.time_source.now(),
                                     FlowStartCondition::Throttling(FlowStartConditionThrottling {
                                         interval: throttling_period,
                                     }),
@@ -390,15 +412,16 @@ impl FlowServiceInMemory {
 impl FlowService for FlowServiceInMemory {
     /// Runs the update main loop
     #[tracing::instrument(level = "info", skip_all)]
-    async fn run(&self, run_config: FlowServiceRunConfig) -> Result<(), InternalError> {
+    async fn run(&self) -> Result<(), InternalError> {
         // Initial scheduling
-        self.initialize_auto_polling_flows_from_configurations()
+        let start_time = self.round_time(self.time_source.now())?;
+        self.initialize_auto_polling_flows_from_configurations(start_time)
             .await?;
 
         // Publish progress event
         self.event_bus
             .dispatch_event(FlowServiceEventConfigurationLoaded {
-                event_time: self.time_source.now(),
+                event_time: start_time,
             })
             .await
             .int_err()?;
@@ -406,6 +429,7 @@ impl FlowService for FlowServiceInMemory {
         // Main scanning loop
         let main_loop_span = tracing::debug_span!("FlowService main loop");
         let _ = main_loop_span.enter();
+        let std_awaiting_step = self.run_config.awaiting_step.to_std().int_err()?;
 
         loop {
             // Do we have a timeslot scheduled?
@@ -425,13 +449,13 @@ impl FlowService for FlowServiceInMemory {
                 // Publish progress event
                 self.event_bus
                     .dispatch_event(FlowServiceEventExecutedTimeSlot {
-                        event_time: current_time,
+                        event_time: nearest_activation_time,
                     })
                     .await
                     .int_err()?;
             }
 
-            tokio::time::sleep(run_config.awaiting_step).await;
+            tokio::time::sleep(std_awaiting_step).await;
             continue;
         }
     }
@@ -664,6 +688,7 @@ impl AsyncEventHandler<TaskEventFinished> for FlowServiceInMemory {
                     && flow_key.flow_type.is_dataset_update()
                 {
                     self.enqueue_dependent_dataset_flows(
+                        self.round_time(event.event_time)?,
                         &flow_key.dataset_id,
                         flow_key.flow_type,
                         flow.flow_id,
@@ -681,7 +706,7 @@ impl AsyncEventHandler<TaskEventFinished> for FlowServiceInMemory {
             // In case of success:
             //  - enqueue next auto-polling flow cycle
             if event.outcome == TaskOutcome::Success {
-                self.try_enqueue_auto_polling_flow_if_enabled(&flow.flow_key)
+                self.try_enqueue_auto_polling_flow_if_enabled(event.event_time, &flow.flow_key)
                     .await?;
             }
 
@@ -703,8 +728,12 @@ impl AsyncEventHandler<FlowConfigurationEventModified> for FlowServiceInMemory {
             state.active_configs.drop_flow_config(&event.flow_key);
             // TODO: should we unqueue pending flows / abort scheduled tasks?
         } else {
-            self.activate_flow_configuration(event.flow_key.clone(), event.rule.clone())
-                .await?
+            self.activate_flow_configuration(
+                self.round_time(event.event_time)?,
+                event.flow_key.clone(),
+                event.rule.clone(),
+            )
+            .await?
         }
 
         Ok(())

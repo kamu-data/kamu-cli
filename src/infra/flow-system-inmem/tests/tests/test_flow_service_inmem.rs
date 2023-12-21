@@ -47,11 +47,9 @@ async fn test_read_initial_config() {
         )
         .await;
 
-    let config = FlowServiceRunConfig::new(std::time::Duration::from_millis(5));
-
     let _ = tokio::select! {
-        res = harness.flow_service.run(config) => res.int_err(),
-        _ = tokio::time::sleep(std::time::Duration::from_millis(50)) => Ok(()),
+        res = harness.flow_service.run() => res.int_err(),
+        _ = tokio::time::sleep(std::time::Duration::from_millis(60)) => Ok(()),
     }
     .unwrap();
 
@@ -64,13 +62,12 @@ async fn test_read_initial_config() {
     assert_eq!(3, state.snapshots.len());
 
     let start_moment = state.snapshots[0].0;
-    let foo_scheduled_moment = state.snapshots[1].0;
-    let bar_scheduled_moment = state.snapshots[2].0;
+    let foo_moment = state.snapshots[1].0;
+    let bar_moment = state.snapshots[2].0;
 
-    assert!(start_moment < foo_scheduled_moment && foo_scheduled_moment < bar_scheduled_moment);
-    assert!((foo_scheduled_moment - start_moment) >= Duration::milliseconds(30));
-    assert!((foo_scheduled_moment - start_moment) < Duration::milliseconds(45));
-    assert!((bar_scheduled_moment - start_moment) >= Duration::milliseconds(45));
+    assert!(start_moment < foo_moment && foo_moment < bar_moment);
+    assert_eq!((foo_moment - start_moment), Duration::milliseconds(30));
+    assert_eq!((bar_moment - start_moment), Duration::milliseconds(45));
 
     let flow_test_checks = [
         // Snapshot 0: after initial queueing
@@ -258,6 +255,7 @@ impl FlowHarness {
 
         let catalog = dill::CatalogBuilder::new()
             .add::<EventBus>()
+            .add_value(FlowServiceRunConfig::new(Duration::milliseconds(5)))
             .add::<FlowServiceInMemory>()
             .add::<FlowEventStoreInMem>()
             .add::<FlowConfigurationServiceInMemory>()
