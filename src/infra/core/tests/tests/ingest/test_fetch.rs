@@ -817,6 +817,48 @@ async fn test_fetch_container_has_more_no_data() {
     assert_matches!(res, FetchResult::UpToDate);
 }
 
+#[test_group::group(containerized)]
+#[test_log::test(tokio::test)]
+async fn test_fetch_container_has_more_data_is_less_than_a_batch() {
+    let temp_dir = tempfile::tempdir().unwrap();
+    let target_path = temp_dir.path().join("fetched.bin");
+
+    let fetch_svc = FetchService::new(
+        Arc::new(ContainerRuntime::default()),
+        temp_dir.path().join("run"),
+    );
+    let custom_batch_size = 150;
+    let fetch_step = FetchStep::Container(FetchStepContainer {
+        image: BUSYBOX.to_owned(),
+        command: Some(vec!["sh".to_owned()]),
+        args: Some(vec!["-c".to_owned(), HAS_MORE_TESTER_SCRIPT.to_owned()]),
+        env: Some(vec![
+            EnvVar {
+                name: ODF_BATCH_SIZE.to_owned(),
+                value: Some(custom_batch_size.to_string()),
+            },
+            EnvVar {
+                name: "ROWS_COUNT".to_owned(),
+                value: Some(100.to_string()),
+            },
+        ]),
+    });
+
+    let res = fetch_svc
+        .fetch("1", &fetch_step, None, &target_path, &Utc::now(), None)
+        .await
+        .unwrap();
+
+    assert_matches!(
+        res,
+        FetchResult::Updated(FetchResultUpdated {
+            source_state: Some(PollingSourceState::ETag(expected_etag)),
+            has_more: false,
+            ..
+        }) if expected_etag == "100"
+    );
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 // Utils: constants
 ///////////////////////////////////////////////////////////////////////////////
@@ -832,10 +874,10 @@ const HAS_MORE_TESTER_SCRIPT: &str = indoc! {r#"
 
     ROWS_COUNT=100
     BATCH_SIZE="${ODF_BATCH_SIZE}"
-    ETAG="${ODF_ETAG:-$ROWS_COUNT}"
+    ETAG="${ODF_ETAG:-0}"
 
     simulate_set_new_etag() {
-      echo $1 > "${ODF_NEW_ETAG_PATH}"
+      printf $1 > "${ODF_NEW_ETAG_PATH}"
     }
 
     simulate_data_output() {
@@ -849,11 +891,16 @@ const HAS_MORE_TESTER_SCRIPT: &str = indoc! {r#"
       touch "${ODF_NEW_HAS_MORE_DATA_PATH}"
     }
 
-    NEW_ETAG=$(expr ${ETAG} + ${BATCH_SIZE})
+    if [[ "${ETAG}" -lt "${ROWS_COUNT}" ]]; then
+      NEW_ETAG=$((${ETAG} + ${BATCH_SIZE}))
+      HAS_MORE_DATA=$((${NEW_ETAG} < ${ROWS_COUNT}))
+      NEW_ETAG=$((${HAS_MORE_DATA} ? ${NEW_ETAG} : ${ROWS_COUNT}))
 
-    if [ "${NEW_ETAG}" -lt "${ROWS_COUNT}" ]; then
+      if [[ "${HAS_MORE_DATA}" == "1" ]]; then
+        simulate_has_more_data
+      fi
+
       simulate_set_new_etag "${NEW_ETAG}"
-      simulate_has_more_data
       simulate_data_output
     fi
 "#};
