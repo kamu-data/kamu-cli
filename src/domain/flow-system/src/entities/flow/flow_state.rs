@@ -15,10 +15,6 @@ use crate::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-const MAX_RETRY_TASKS: usize = 3;
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FlowState {
     /// Unique flow identifier
@@ -125,10 +121,7 @@ impl Projection for FlowState {
                         flow_id: _,
                         task_id,
                     }) => {
-                        if s.outcome.is_some()
-                            || s.activate_at.is_none()
-                            || s.task_ids.len() >= MAX_RETRY_TASKS
-                        {
+                        if s.outcome.is_some() || s.activate_at.is_none() {
                             Err(ProjectionError::new(Some(s), event))
                         } else {
                             let mut task_ids = s.task_ids.clone();
@@ -143,7 +136,7 @@ impl Projection for FlowState {
                         task_id,
                         task_outcome,
                     }) => {
-                        if s.task_ids.contains(task_id) {
+                        if !s.task_ids.contains(task_id) {
                             Err(ProjectionError::new(Some(s), event))
                         } else if s.outcome.is_some() {
                             // Ignore for idempotence motivation
@@ -159,16 +152,11 @@ impl Projection for FlowState {
                                     terminated_at: Some(event_time.clone()),
                                     ..s
                                 }),
-                                TaskOutcome::Failed => {
-                                    if s.task_ids.len() == MAX_RETRY_TASKS {
-                                        Ok(FlowState {
-                                            outcome: Some(FlowOutcome::Failed),
-                                            ..s
-                                        })
-                                    } else {
-                                        Ok(s)
-                                    }
-                                }
+                                // TODO: support retries
+                                TaskOutcome::Failed => Ok(FlowState {
+                                    outcome: Some(FlowOutcome::Failed),
+                                    ..s
+                                }),
                             }
                         }
                     }

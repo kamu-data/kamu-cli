@@ -18,6 +18,7 @@ use kamu::*;
 use kamu_core::*;
 use kamu_flow_system::*;
 use kamu_flow_system_inmem::*;
+use kamu_task_system::*;
 use kamu_task_system_inmem::{TaskSchedulerInMemory, TaskSystemEventStoreInMemory};
 use opendatafabric::*;
 
@@ -480,12 +481,219 @@ async fn test_dataset_deleted() {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_log::test(tokio::test)]
+async fn test_task_completions() {
+    let harness = FlowHarness::new();
+
+    let foo_id = harness.create_root_dataset("foo").await;
+    let bar_id = harness.create_root_dataset("bar").await;
+    let baz_id = harness.create_root_dataset("baz").await;
+
+    for dataset_id in [&foo_id, &bar_id, &baz_id] {
+        harness
+            .set_dataset_flow_schedule(
+                Utc::now(),
+                dataset_id.clone(),
+                DatasetFlowType::Ingest,
+                Duration::milliseconds(30).into(),
+            )
+            .await;
+    }
+
+    // Enforce dependency graph initialization
+    harness.eager_dependencies_graph_init().await;
+
+    // Remember start time
+    let start_time = Utc::now()
+        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
+        .unwrap();
+
+    // Flow listener will collect snapshots at important moments of time
+    let test_flow_listener = harness.catalog.get_one::<TestFlowSystemListener>().unwrap();
+
+    // Obtain access to event bus
+    let event_bus = harness.catalog.get_one::<EventBus>().unwrap();
+
+    // Run scheduler concurrently with manual triggers script
+    let _ = tokio::select! {
+        res = harness.flow_service.run(start_time) => res.int_err(),
+        _ = async {
+            // Each of 3 datasets should be scheduled after this time
+            let mut next_time = start_time + Duration::milliseconds(50);
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+
+            // Plan different task execution outcomes for each dataset
+            let mut planned_outcomes = HashMap::new();
+            planned_outcomes.insert(&foo_id, TaskOutcome::Success);
+            planned_outcomes.insert(&bar_id, TaskOutcome::Failed);
+            planned_outcomes.insert(&baz_id, TaskOutcome::Cancelled);
+
+            // Determine which task state belongs to which dataset
+            let scheduled_tasks = harness.take_scheduled_tasks().await;
+            let mut scheduled_tasks_by_dataset_id = HashMap::new();
+            for scheduled_task in scheduled_tasks {
+                let task_dataset_id = match &scheduled_task.logical_plan {
+                    LogicalPlan::UpdateDataset(lp) => lp.dataset_id.clone(),
+                    _ => unreachable!()
+                };
+                scheduled_tasks_by_dataset_id.insert(task_dataset_id, scheduled_task);
+            };
+
+            // Send task finished event for each dataset with certain interval
+            for dataset_id in [&foo_id, &bar_id, &baz_id] {
+                let dataset_task = scheduled_tasks_by_dataset_id.get(dataset_id).unwrap();
+                event_bus.dispatch_event(TaskEventFinished {
+                    event_time: next_time,
+                    task_id: dataset_task.task_id,
+                    outcome: *(planned_outcomes.get(dataset_id).unwrap())
+                }).await.unwrap();
+                tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+                next_time += Duration::milliseconds(10);
+            }
+
+            // Let the succeeded dataset to schedule another update. 30s + 20s max waiting
+            tokio::time::sleep(std::time::Duration::from_millis(60)).await;
+
+         } => Ok(()),
+    }
+    .unwrap();
+
+    let state = test_flow_listener.state.lock().unwrap();
+    assert_eq!(6, state.snapshots.len());
+
+    let start_moment = state.snapshots[0].0;
+    let schedule_moment = state.snapshots[1].0;
+    let finish_foo_moment = state.snapshots[2].0;
+    let finish_bar_moment = state.snapshots[3].0;
+    let finish_baz_moment = state.snapshots[4].0;
+    let reschedule_foo_moment = state.snapshots[5].0;
+
+    assert_eq!(start_moment, start_time);
+    assert_eq!((schedule_moment - start_moment), Duration::milliseconds(30));
+    assert_eq!(
+        (finish_foo_moment - start_moment),
+        Duration::milliseconds(50)
+    );
+    assert_eq!(
+        (finish_bar_moment - start_moment),
+        Duration::milliseconds(60)
+    );
+    assert_eq!(
+        (finish_baz_moment - start_moment),
+        Duration::milliseconds(70)
+    );
+    assert_eq!(
+        (reschedule_foo_moment - start_moment),
+        Duration::milliseconds(80)
+    );
+
+    let foo_flow_key: FlowKey = FlowKeyDataset::new(foo_id.clone(), DatasetFlowType::Ingest).into();
+    let bar_flow_key: FlowKey = FlowKeyDataset::new(bar_id.clone(), DatasetFlowType::Ingest).into();
+    let baz_flow_key: FlowKey = FlowKeyDataset::new(baz_id.clone(), DatasetFlowType::Ingest).into();
+
+    assert_flow_test_checks(&[
+        // Snapshot 0: after initial queueing
+        FlowTestCheck {
+            snapshot: &state.snapshots[0].1,
+            patterns: vec![
+                (&foo_flow_key, FlowStatus::Queued, None),
+                (&bar_flow_key, FlowStatus::Queued, None),
+                (&baz_flow_key, FlowStatus::Queued, None),
+            ],
+        },
+        // Snapshot 1: all 3 are scheduled
+        FlowTestCheck {
+            snapshot: &state.snapshots[1].1,
+            patterns: vec![
+                (&foo_flow_key, FlowStatus::Scheduled, None),
+                (&bar_flow_key, FlowStatus::Scheduled, None),
+                (&baz_flow_key, FlowStatus::Scheduled, None),
+            ],
+        },
+        // Snapshot 2: "foo" finished, enqueued for round 2
+        FlowTestCheck {
+            snapshot: &state.snapshots[2].1,
+            patterns: vec![
+                (&foo_flow_key, FlowStatus::Queued, None),
+                (
+                    &foo_flow_key,
+                    FlowStatus::Finished,
+                    Some(FlowOutcome::Success),
+                ),
+                (&bar_flow_key, FlowStatus::Scheduled, None),
+                (&baz_flow_key, FlowStatus::Scheduled, None),
+            ],
+        },
+        // Snapshot 3: "bar" finished with Fail
+        FlowTestCheck {
+            snapshot: &state.snapshots[3].1,
+            patterns: vec![
+                (&foo_flow_key, FlowStatus::Queued, None),
+                (
+                    &foo_flow_key,
+                    FlowStatus::Finished,
+                    Some(FlowOutcome::Success),
+                ),
+                (
+                    &bar_flow_key,
+                    FlowStatus::Finished,
+                    Some(FlowOutcome::Failed),
+                ),
+                (&baz_flow_key, FlowStatus::Scheduled, None),
+            ],
+        },
+        // Snapshot 4: "baz" finished with Cancel
+        FlowTestCheck {
+            snapshot: &state.snapshots[4].1,
+            patterns: vec![
+                (&foo_flow_key, FlowStatus::Queued, None),
+                (
+                    &foo_flow_key,
+                    FlowStatus::Finished,
+                    Some(FlowOutcome::Success),
+                ),
+                (
+                    &bar_flow_key,
+                    FlowStatus::Finished,
+                    Some(FlowOutcome::Failed),
+                ),
+                (
+                    &baz_flow_key,
+                    FlowStatus::Finished,
+                    Some(FlowOutcome::Cancelled),
+                ),
+            ],
+        },
+        // Snapshot 5: "foo" scheduled, round 2
+        FlowTestCheck {
+            snapshot: &state.snapshots[5].1,
+            patterns: vec![
+                (&foo_flow_key, FlowStatus::Scheduled, None),
+                (
+                    &foo_flow_key,
+                    FlowStatus::Finished,
+                    Some(FlowOutcome::Success),
+                ),
+                (
+                    &bar_flow_key,
+                    FlowStatus::Finished,
+                    Some(FlowOutcome::Failed),
+                ),
+                (
+                    &baz_flow_key,
+                    FlowStatus::Finished,
+                    Some(FlowOutcome::Cancelled),
+                ),
+            ],
+        },
+    ]);
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
 // TODO:
-//  - completing task with: success/failure/cancel
-//  - scheduling next auto-trigger when task completes
 //  - scheduling derived datasets after parent dataset succeeds
 //  - cancelling queued/scheduled flow (at flow level, not at task level)
-//  - flow config paused/resumed/modified when already queued/scheduled
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -534,8 +742,7 @@ struct TestFlowSystemListenerState {
 
 #[component(pub)]
 #[scope(Singleton)]
-#[interface(dyn AsyncEventHandler<FlowServiceEventConfigurationLoaded>)]
-#[interface(dyn AsyncEventHandler<FlowServiceEventExecutedTimeSlot>)]
+#[interface(dyn AsyncEventHandler<FlowServiceEvent>)]
 impl TestFlowSystemListener {
     fn new(flow_service: Arc<dyn FlowService>) -> Self {
         Self {
@@ -568,20 +775,9 @@ impl TestFlowSystemListener {
 }
 
 #[async_trait::async_trait]
-impl AsyncEventHandler<FlowServiceEventConfigurationLoaded> for TestFlowSystemListener {
-    async fn handle(
-        &self,
-        event: &FlowServiceEventConfigurationLoaded,
-    ) -> Result<(), InternalError> {
-        self.snapshot_flows(event.event_time).await;
-        Ok(())
-    }
-}
-
-#[async_trait::async_trait]
-impl AsyncEventHandler<FlowServiceEventExecutedTimeSlot> for TestFlowSystemListener {
-    async fn handle(&self, event: &FlowServiceEventExecutedTimeSlot) -> Result<(), InternalError> {
-        self.snapshot_flows(event.event_time).await;
+impl AsyncEventHandler<FlowServiceEvent> for TestFlowSystemListener {
+    async fn handle(&self, event: &FlowServiceEvent) -> Result<(), InternalError> {
+        self.snapshot_flows(event.event_time()).await;
         Ok(())
     }
 }
@@ -598,6 +794,7 @@ struct FlowHarness {
     dataset_repo: Arc<dyn DatasetRepository>,
     flow_configuration_service: Arc<dyn FlowConfigurationService>,
     flow_service: Arc<dyn FlowService>,
+    task_scheduler: Arc<dyn TaskScheduler>,
 }
 
 impl FlowHarness {
@@ -633,6 +830,7 @@ impl FlowHarness {
         let flow_service = catalog.get_one::<dyn FlowService>().unwrap();
         let flow_configuration_service = catalog.get_one::<dyn FlowConfigurationService>().unwrap();
         let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
+        let task_scheduler = catalog.get_one::<dyn TaskScheduler>().unwrap();
 
         Self {
             _tmp_dir: tmp_dir,
@@ -640,6 +838,7 @@ impl FlowHarness {
             flow_service,
             flow_configuration_service,
             dataset_repo,
+            task_scheduler,
         }
     }
 
@@ -660,9 +859,7 @@ impl FlowHarness {
         result.dataset_handle.id
     }
 
-    async fn delete_dataset(&self, dataset_id: &DatasetID) {
-        // Eagerly push dependency graph initialization before deletes.
-        // It's ignored, if requested 2nd time
+    async fn eager_dependencies_graph_init(&self) {
         let dependency_graph_service = self
             .catalog
             .get_one::<dyn DependencyGraphService>()
@@ -673,6 +870,12 @@ impl FlowHarness {
             .eager_initialization(&dependency_graph_repository)
             .await
             .unwrap();
+    }
+
+    async fn delete_dataset(&self, dataset_id: &DatasetID) {
+        // Eagerly push dependency graph initialization before deletes.
+        // It's ignored, if requested 2nd time
+        self.eager_dependencies_graph_init().await;
 
         // Do the actual deletion
         self.dataset_repo
@@ -749,6 +952,15 @@ impl FlowHarness {
             )
             .await
             .unwrap();
+    }
+
+    async fn take_scheduled_tasks(&self) -> Vec<TaskState> {
+        let mut task_states: Vec<_> = Vec::new();
+        while let Some(task_id) = self.task_scheduler.try_take().await.unwrap() {
+            let task_state = self.task_scheduler.get_task(task_id).await.unwrap();
+            task_states.push(task_state);
+        }
+        task_states
     }
 }
 

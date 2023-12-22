@@ -15,6 +15,17 @@ use chrono::{DateTime, Utc};
 pub enum FlowServiceEvent {
     ConfigurationLoaded(FlowServiceEventConfigurationLoaded),
     ExecutedTimeSlot(FlowServiceEventExecutedTimeSlot),
+    FlowFinished(FlowServiceEventFlowFinished),
+}
+
+impl FlowServiceEvent {
+    pub fn event_time(&self) -> DateTime<Utc> {
+        match self {
+            FlowServiceEvent::ConfigurationLoaded(e) => e.event_time,
+            FlowServiceEvent::ExecutedTimeSlot(e) => e.event_time,
+            FlowServiceEvent::FlowFinished(e) => e.event_time,
+        }
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -28,6 +39,13 @@ pub struct FlowServiceEventConfigurationLoaded {
 
 #[derive(Debug, Clone)]
 pub struct FlowServiceEventExecutedTimeSlot {
+    pub event_time: DateTime<Utc>,
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone)]
+pub struct FlowServiceEventFlowFinished {
     pub event_time: DateTime<Utc>,
 }
 

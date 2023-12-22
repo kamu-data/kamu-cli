@@ -433,9 +433,11 @@ impl FlowService for FlowServiceInMemory {
 
         // Publish progress event
         self.event_bus
-            .dispatch_event(FlowServiceEventConfigurationLoaded {
-                event_time: start_time,
-            })
+            .dispatch_event(FlowServiceEvent::ConfigurationLoaded(
+                FlowServiceEventConfigurationLoaded {
+                    event_time: start_time,
+                },
+            ))
             .await
             .int_err()?;
 
@@ -461,9 +463,11 @@ impl FlowService for FlowServiceInMemory {
 
                 // Publish progress event
                 self.event_bus
-                    .dispatch_event(FlowServiceEventExecutedTimeSlot {
-                        event_time: nearest_activation_time,
-                    })
+                    .dispatch_event(FlowServiceEvent::ExecutedTimeSlot(
+                        FlowServiceEventExecutedTimeSlot {
+                            event_time: nearest_activation_time,
+                        },
+                    ))
                     .await
                     .int_err()?;
             }
@@ -701,6 +705,8 @@ impl AsyncEventHandler<TaskEventFinished> for FlowServiceInMemory {
                 .int_err()?;
             flow.save(self.flow_event_store.as_ref()).await.int_err()?;
 
+            let finish_time = self.round_time(event.event_time)?;
+
             // In case of success:
             //  - enqueue updates of dependent datasets
             if event.outcome == TaskOutcome::Success {
@@ -708,7 +714,7 @@ impl AsyncEventHandler<TaskEventFinished> for FlowServiceInMemory {
                     && flow_key.flow_type.is_dataset_update()
                 {
                     self.enqueue_dependent_dataset_flows(
-                        self.round_time(event.event_time)?,
+                        finish_time,
                         &flow_key.dataset_id,
                         flow_key.flow_type,
                         flow.flow_id,
@@ -726,9 +732,19 @@ impl AsyncEventHandler<TaskEventFinished> for FlowServiceInMemory {
             // In case of success:
             //  - enqueue next auto-polling flow cycle
             if event.outcome == TaskOutcome::Success {
-                self.try_enqueue_auto_polling_flow_if_enabled(event.event_time, &flow.flow_key)
+                self.try_enqueue_auto_polling_flow_if_enabled(finish_time, &flow.flow_key)
                     .await?;
             }
+
+            // Publish progress event
+            self.event_bus
+                .dispatch_event(FlowServiceEvent::FlowFinished(
+                    FlowServiceEventFlowFinished {
+                        event_time: finish_time,
+                    },
+                ))
+                .await
+                .int_err()?;
 
             // TODO: retry logic in case of failed outcome
         }
