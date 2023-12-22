@@ -9,6 +9,7 @@
 
 use std::sync::Arc;
 
+use chrono::{DateTime, Utc};
 use dill::*;
 use event_bus::{AsyncEventHandler, EventBus};
 use futures::StreamExt;
@@ -46,11 +47,12 @@ impl FlowConfigurationServiceInMemory {
     async fn publish_flow_configuration_modified(
         &self,
         state: &FlowConfigurationState,
+        request_time: DateTime<Utc>,
     ) -> Result<(), InternalError> {
         let event = FlowConfigurationEventModified {
-            event_time: self.time_source.now(),
+            event_time: request_time,
             flow_key: state.flow_key.clone(),
-            paused: state.is_active(),
+            paused: !state.is_active(),
             rule: state.rule.clone(),
         };
         self.event_bus.dispatch_event(event).await
@@ -77,6 +79,7 @@ impl FlowConfigurationService for FlowConfigurationServiceInMemory {
     #[tracing::instrument(level = "info", skip_all, fields(?flow_key, %paused, ?rule))]
     async fn set_configuration(
         &self,
+        request_time: DateTime<Utc>,
         flow_key: FlowKey,
         paused: bool,
         rule: FlowConfigurationRule,
@@ -96,7 +99,7 @@ impl FlowConfigurationService for FlowConfigurationServiceInMemory {
                     .await
                     .int_err()?;
 
-                self.publish_flow_configuration_modified(&flow_configuration)
+                self.publish_flow_configuration_modified(&flow_configuration, request_time)
                     .await?;
 
                 Ok(flow_configuration.into())
@@ -111,7 +114,7 @@ impl FlowConfigurationService for FlowConfigurationServiceInMemory {
                     .await
                     .int_err()?;
 
-                self.publish_flow_configuration_modified(&flow_configuration)
+                self.publish_flow_configuration_modified(&flow_configuration, request_time)
                     .await?;
 
                 Ok(flow_configuration.into())

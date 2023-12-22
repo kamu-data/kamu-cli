@@ -46,6 +46,7 @@ struct State {
     active_configs: ActiveConfigsState,
     pending_flows: PendingFlowsState,
     time_wheel: FlowTimeWheel,
+    running: bool,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -404,6 +405,15 @@ impl FlowServiceInMemory {
 
         Ok(())
     }
+
+    async fn abort_flow(&self, flow_id: FlowID) -> Result<(), InternalError> {
+        let mut flow = Flow::load(flow_id, self.flow_event_store.as_ref())
+            .await
+            .int_err()?;
+        flow.abort(self.time_source.now()).int_err()?;
+        flow.save(self.flow_event_store.as_ref()).await.int_err()?;
+        Ok(())
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -413,6 +423,9 @@ impl FlowService for FlowServiceInMemory {
     /// Runs the update main loop
     #[tracing::instrument(level = "info", skip_all)]
     async fn run(&self, planned_start_time: DateTime<Utc>) -> Result<(), InternalError> {
+        // Mark running started
+        self.state.lock().unwrap().running = true;
+
         // Initial scheduling
         let start_time = self.round_time(planned_start_time)?;
         self.initialize_auto_polling_flows_from_configurations(start_time)
@@ -671,12 +684,14 @@ impl AsyncEventHandler<TaskEventFinished> for FlowServiceInMemory {
     #[tracing::instrument(level = "debug", skip_all, fields(?event))]
     async fn handle(&self, event: &TaskEventFinished) -> Result<(), InternalError> {
         // Is this a task associated with flows?
-        let maybe_flow_id = self
-            .state
-            .lock()
-            .unwrap()
-            .pending_flows
-            .try_get_flow_id_by_task(event.task_id);
+        let maybe_flow_id = {
+            let state = self.state.lock().unwrap();
+            if !state.running {
+                // Abort if running hasn't started yet
+                return Ok(());
+            }
+            state.pending_flows.try_get_flow_id_by_task(event.task_id)
+        };
 
         if let Some(flow_id) = maybe_flow_id {
             let mut flow = Flow::load(flow_id, self.flow_event_store.as_ref())
@@ -729,12 +744,41 @@ impl AsyncEventHandler<FlowConfigurationEventModified> for FlowServiceInMemory {
     #[tracing::instrument(level = "debug", skip_all, fields(?event))]
     async fn handle(&self, event: &FlowConfigurationEventModified) -> Result<(), InternalError> {
         if event.paused {
-            let mut state = self.state.lock().unwrap();
-            state.active_configs.drop_flow_config(&event.flow_key);
-            // TODO: should we unqueue pending flows / abort scheduled tasks?
+            let maybe_pending_flow_id = {
+                let mut state = self.state.lock().unwrap();
+                if !state.running {
+                    // Abort if running hasn't started yet
+                    return Ok(());
+                };
+
+                state.active_configs.drop_flow_config(&event.flow_key);
+                let maybe_pending_flow_id = state.pending_flows.drop_pending_flow(&event.flow_key);
+                if let Some(flow_id) = &maybe_pending_flow_id {
+                    state
+                        .time_wheel
+                        .cancel_flow_activation(*flow_id)
+                        .int_err()?;
+                }
+                maybe_pending_flow_id
+            };
+
+            if let Some(flow_id) = maybe_pending_flow_id {
+                self.abort_flow(flow_id).await?;
+            }
+
+            // TODO: should we abort scheduled tasks?
         } else {
+            {
+                let state = self.state.lock().unwrap();
+                if !state.running {
+                    // Abort if running hasn't started yet
+                    return Ok(());
+                };
+            }
+
+            let activation_time = self.round_time(event.event_time)?;
             self.activate_flow_configuration(
-                self.round_time(event.event_time)?,
+                activation_time,
                 event.flow_key.clone(),
                 event.rule.clone(),
             )
@@ -753,6 +797,11 @@ impl AsyncEventHandler<DatasetEventDeleted> for FlowServiceInMemory {
     async fn handle(&self, event: &DatasetEventDeleted) -> Result<(), InternalError> {
         let flow_ids_2_abort = {
             let mut state = self.state.lock().unwrap();
+            if !state.running {
+                // Abort if running hasn't started yet
+                return Ok(());
+            };
+
             state.active_configs.drop_dataset_configs(&event.dataset_id);
 
             // For every possible dataset flow:

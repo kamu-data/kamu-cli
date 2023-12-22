@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::assert_matches::assert_matches;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
@@ -19,7 +18,6 @@ use kamu::*;
 use kamu_core::*;
 use kamu_flow_system::*;
 use kamu_flow_system_inmem::*;
-use kamu_task_system::*;
 use kamu_task_system_inmem::{TaskSchedulerInMemory, TaskSystemEventStoreInMemory};
 use opendatafabric::*;
 
@@ -32,18 +30,20 @@ async fn test_read_initial_config_and_queue_properly() {
     let foo_id = harness.create_root_dataset("foo").await;
     harness
         .set_dataset_flow_schedule(
+            Utc::now(),
             foo_id.clone(),
             DatasetFlowType::Ingest,
-            Duration::milliseconds(30).into(),
+            Duration::milliseconds(60).into(),
         )
         .await;
 
     let bar_id = harness.create_root_dataset("bar").await;
     harness
         .set_dataset_flow_schedule(
+            Utc::now(),
             bar_id.clone(),
             DatasetFlowType::Ingest,
-            Duration::milliseconds(45).into(),
+            Duration::milliseconds(90).into(),
         )
         .await;
 
@@ -55,7 +55,7 @@ async fn test_read_initial_config_and_queue_properly() {
     // Run scheduler concurrently with manual triggers script
     let _ = tokio::select! {
         res = harness.flow_service.run(start_time) => res.int_err(),
-        _ = tokio::time::sleep(std::time::Duration::from_millis(60)) => Ok(()),
+        _ = tokio::time::sleep(std::time::Duration::from_millis(120)) => Ok(()),
     }
     .unwrap();
 
@@ -72,8 +72,8 @@ async fn test_read_initial_config_and_queue_properly() {
     let bar_moment = state.snapshots[2].0;
 
     assert_eq!(start_time, start_moment);
-    assert_eq!((foo_moment - start_moment), Duration::milliseconds(30)); // planned time for "foo"
-    assert_eq!((bar_moment - start_moment), Duration::milliseconds(45)); // planned time for "bar"
+    assert_eq!((foo_moment - start_moment), Duration::milliseconds(60)); // planned time for "foo"
+    assert_eq!((bar_moment - start_moment), Duration::milliseconds(90)); // planned time for "bar"
 
     assert_flow_test_checks(&[
         // Snapshot 0: after initial queueing
@@ -101,39 +101,6 @@ async fn test_read_initial_config_and_queue_properly() {
             ],
         },
     ]);
-
-    let task_ids = harness.snapshot_all_current_task_ids().await;
-    assert_eq!(task_ids.len(), 2);
-
-    let task_test_checks = [
-        TaskTestCheck {
-            task_id: task_ids[0],
-            flow_key: &foo_flow_key,
-            dataset_id: &foo_id,
-        },
-        TaskTestCheck {
-            task_id: task_ids[1],
-            flow_key: &bar_flow_key,
-            dataset_id: &bar_id,
-        },
-    ];
-
-    for test_check in task_test_checks {
-        let task = harness
-            .task_scheduler
-            .get_task(test_check.task_id)
-            .await
-            .unwrap();
-        let flow_final_state = state
-            .snapshots
-            .last()
-            .unwrap()
-            .1
-            .get(test_check.flow_key)
-            .unwrap();
-        let flow_task_id = *flow_final_state.task_ids.first().unwrap();
-        expect_running_dataset_update_task(&task, test_check.dataset_id, flow_task_id);
-    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -148,9 +115,10 @@ async fn test_manual_trigger() {
     // Note: only "foo" has auto-schedule, "bar" hasn't
     harness
         .set_dataset_flow_schedule(
+            Utc::now(),
             foo_id.clone(),
             DatasetFlowType::Ingest,
-            Duration::milliseconds(30).into(),
+            Duration::milliseconds(60).into(),
         )
         .await;
 
@@ -167,8 +135,8 @@ async fn test_manual_trigger() {
         res = harness.flow_service.run(start_time) => res.int_err(),
         _ = async {
             // Sleep < "foo" period
-            tokio::time::sleep(std::time::Duration::from_millis(18)).await;
-            let new_time = start_time + Duration::milliseconds(18);
+            tokio::time::sleep(std::time::Duration::from_millis(40)).await;
+            let new_time = start_time + Duration::milliseconds(40);
             harness.trigger_manual_flow(new_time, foo_flow_key.clone()).await; // "foo" pending already
             harness.trigger_manual_flow(new_time, bar_flow_key.clone()).await; // "bar" not queued, starts soon
 
@@ -195,8 +163,8 @@ async fn test_manual_trigger() {
     let foo_moment = state.snapshots[2].0;
 
     assert_eq!(start_moment, start_time);
-    assert_eq!((bar_moment - start_moment), Duration::milliseconds(20)); // next slot after 18ms trigger with 5ms align
-    assert_eq!((foo_moment - start_moment), Duration::milliseconds(30)); // 30ms as planned
+    assert_eq!((bar_moment - start_moment), Duration::milliseconds(40)); // next slot after 40ms trigger with 10ms align
+    assert_eq!((foo_moment - start_moment), Duration::milliseconds(60)); // 60ms as planned
 
     assert_flow_test_checks(&[
         // Snapshot 0: after initial queueing, no "bar", only "foo"
@@ -226,6 +194,166 @@ async fn test_manual_trigger() {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_dataset_flow_configuration_paused_resumed_modified() {
+    let harness = FlowHarness::new();
+
+    let foo_id = harness.create_root_dataset("foo").await;
+    let bar_id: DatasetID = harness.create_root_dataset("bar").await;
+    harness
+        .set_dataset_flow_schedule(
+            Utc::now(),
+            foo_id.clone(),
+            DatasetFlowType::Ingest,
+            Duration::milliseconds(50).into(),
+        )
+        .await;
+    harness
+        .set_dataset_flow_schedule(
+            Utc::now(),
+            bar_id.clone(),
+            DatasetFlowType::Ingest,
+            Duration::milliseconds(40).into(),
+        )
+        .await;
+
+    let foo_flow_key: FlowKey = FlowKeyDataset::new(foo_id.clone(), DatasetFlowType::Ingest).into();
+    let bar_flow_key: FlowKey = FlowKeyDataset::new(bar_id.clone(), DatasetFlowType::Ingest).into();
+
+    let test_flow_listener = harness.catalog.get_one::<TestFlowSystemListener>().unwrap();
+
+    // Remember start time
+    let start_time = Utc::now()
+        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
+        .unwrap();
+
+    // Run scheduler concurrently with manual triggers script
+    let _ = tokio::select! {
+        res = harness.flow_service.run(start_time) => res.int_err(),
+        _ = async {
+            // Sleep < "foo"/"bar" period
+            tokio::time::sleep(std::time::Duration::from_millis(25)).await;
+            harness.pause_dataset_flow(start_time + Duration::milliseconds(25), foo_id.clone(), DatasetFlowType::Ingest).await;
+            harness.pause_dataset_flow(start_time + Duration::milliseconds(25), bar_id.clone(), DatasetFlowType::Ingest).await;
+            test_flow_listener
+                .snapshot_flows(start_time + Duration::milliseconds(25))
+                .await;
+
+            // Wake up after initially planned "bar" and "foo" scheduling
+            tokio::time::sleep(std::time::Duration::from_millis(30)).await;
+            harness.resume_dataset_flow(start_time + Duration::milliseconds(55), foo_id.clone(), DatasetFlowType::Ingest).await;
+            harness.set_dataset_flow_schedule(start_time + Duration::milliseconds(55), bar_id.clone(), DatasetFlowType::Ingest, Duration::milliseconds(30).into()).await;
+
+            test_flow_listener
+                .snapshot_flows(start_time + Duration::milliseconds(55))
+                .await;
+
+            // "foo" will get rescheduled in 50 ms, "bar" in 30ms, leave extra for stabilization
+            tokio::time::sleep(std::time::Duration::from_millis(70)).await;
+
+         } => Ok(()),
+    }
+    .unwrap();
+
+    let state = test_flow_listener.state.lock().unwrap();
+    assert_eq!(5, state.snapshots.len());
+
+    let start_moment = state.snapshots[0].0;
+    let pause_moment = state.snapshots[1].0;
+    let resume_moment = state.snapshots[2].0;
+    let bar_sch_moment = state.snapshots[3].0;
+    let foo_sch_moment = state.snapshots[4].0;
+
+    assert_eq!(start_moment, start_time);
+    assert_eq!((pause_moment - start_moment), Duration::milliseconds(25));
+    assert_eq!((resume_moment - start_moment), Duration::milliseconds(55));
+    assert_eq!((bar_sch_moment - start_moment), Duration::milliseconds(90));
+    assert_eq!((foo_sch_moment - start_moment), Duration::milliseconds(110));
+
+    assert_flow_test_checks(&[
+        // Snapshot 0: after initial queueing
+        FlowTestCheck {
+            snapshot: &state.snapshots[0].1,
+            patterns: vec![
+                (&foo_flow_key, FlowStatus::Queued, None),
+                (&bar_flow_key, FlowStatus::Queued, None),
+            ],
+        },
+        // Snapshot 1: "foo" paused, "bar" paused
+        FlowTestCheck {
+            snapshot: &state.snapshots[1].1,
+            patterns: vec![
+                (
+                    &foo_flow_key,
+                    FlowStatus::Finished,
+                    Some(FlowOutcome::Aborted),
+                ),
+                (
+                    &bar_flow_key,
+                    FlowStatus::Finished,
+                    Some(FlowOutcome::Aborted),
+                ),
+            ],
+        },
+        // Snapshot 2: "foo" resumed, "bar" resumed
+        FlowTestCheck {
+            snapshot: &state.snapshots[2].1,
+            patterns: vec![
+                (&foo_flow_key, FlowStatus::Queued, None),
+                (&bar_flow_key, FlowStatus::Queued, None),
+                (
+                    &foo_flow_key,
+                    FlowStatus::Finished,
+                    Some(FlowOutcome::Aborted),
+                ),
+                (
+                    &bar_flow_key,
+                    FlowStatus::Finished,
+                    Some(FlowOutcome::Aborted),
+                ),
+            ],
+        },
+        // Snapshot 3: "bar" scheduled
+        FlowTestCheck {
+            snapshot: &state.snapshots[3].1,
+            patterns: vec![
+                (&foo_flow_key, FlowStatus::Queued, None),
+                (&bar_flow_key, FlowStatus::Scheduled, None),
+                (
+                    &foo_flow_key,
+                    FlowStatus::Finished,
+                    Some(FlowOutcome::Aborted),
+                ),
+                (
+                    &bar_flow_key,
+                    FlowStatus::Finished,
+                    Some(FlowOutcome::Aborted),
+                ),
+            ],
+        },
+        // Snapshot 4: "foo" scheduled
+        FlowTestCheck {
+            snapshot: &state.snapshots[4].1,
+            patterns: vec![
+                (&foo_flow_key, FlowStatus::Scheduled, None),
+                (&bar_flow_key, FlowStatus::Scheduled, None),
+                (
+                    &foo_flow_key,
+                    FlowStatus::Finished,
+                    Some(FlowOutcome::Aborted),
+                ),
+                (
+                    &bar_flow_key,
+                    FlowStatus::Finished,
+                    Some(FlowOutcome::Aborted),
+                ),
+            ],
+        },
+    ]);
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_dataset_deleted() {
     let harness = FlowHarness::new();
 
@@ -234,16 +362,18 @@ async fn test_dataset_deleted() {
 
     harness
         .set_dataset_flow_schedule(
+            Utc::now(),
             foo_id.clone(),
             DatasetFlowType::Ingest,
-            Duration::milliseconds(30).into(),
+            Duration::milliseconds(50).into(),
         )
         .await;
     harness
         .set_dataset_flow_schedule(
+            Utc::now(),
             bar_id.clone(),
             DatasetFlowType::Ingest,
-            Duration::milliseconds(40).into(),
+            Duration::milliseconds(70).into(),
         )
         .await;
 
@@ -263,17 +393,17 @@ async fn test_dataset_deleted() {
         res = harness.flow_service.run(start_time) => res.int_err(),
         _ = async {
             // Sleep < "foo" period
-            tokio::time::sleep(std::time::Duration::from_millis(15)).await;
+            tokio::time::sleep(std::time::Duration::from_millis(25)).await;
             harness.delete_dataset(&foo_id).await;
             test_flow_listener
-                .snapshot_flows(start_time + Duration::milliseconds(15))
+                .snapshot_flows(start_time + Duration::milliseconds(25))
                 .await;
 
             // Wake up after bar scheduling
-            tokio::time::sleep(std::time::Duration::from_millis(38)).await;
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
             harness.delete_dataset(&bar_id).await;
             test_flow_listener
-                .snapshot_flows(start_time + Duration::milliseconds(55))
+                .snapshot_flows(start_time + Duration::milliseconds(75))
                 .await;
 
             // Make sure nothing got scheduled in near time
@@ -292,9 +422,9 @@ async fn test_dataset_deleted() {
     let bar_del_moment = state.snapshots[3].0;
 
     assert_eq!(start_moment, start_time);
-    assert_eq!((foo_del_moment - start_moment), Duration::milliseconds(15));
-    assert_eq!((bar_sch_moment - start_moment), Duration::milliseconds(40));
-    assert_eq!((bar_del_moment - start_moment), Duration::milliseconds(55));
+    assert_eq!((foo_del_moment - start_moment), Duration::milliseconds(25));
+    assert_eq!((bar_sch_moment - start_moment), Duration::milliseconds(70));
+    assert_eq!((bar_del_moment - start_moment), Duration::milliseconds(75));
 
     assert_flow_test_checks(&[
         // Snapshot 0: after initial queueing
@@ -360,49 +490,34 @@ async fn test_dataset_deleted() {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 struct FlowTestCheck<'a> {
-    snapshot: &'a HashMap<FlowKey, FlowState>,
+    snapshot: &'a HashMap<FlowKey, Vec<FlowState>>,
     patterns: Vec<(&'a FlowKey, FlowStatus, Option<FlowOutcome>)>,
 }
 
 fn assert_flow_test_checks<'a>(flow_test_checks: &[FlowTestCheck<'a>]) {
     for test_check in flow_test_checks {
-        assert_eq!(test_check.snapshot.len(), test_check.patterns.len());
+        let mut pattern_idx_per_key = HashMap::new();
+
+        let snapshot_total_flows: usize = test_check.snapshot.values().map(|v| v.len()).sum();
+        assert_eq!(snapshot_total_flows, test_check.patterns.len());
+
         for pattern in test_check.patterns.iter() {
-            let flow_state = test_check.snapshot.get(pattern.0).unwrap();
+            let flow_states = test_check.snapshot.get(pattern.0).unwrap();
+
+            let index = if let Some(index) = pattern_idx_per_key.get_mut(pattern.0) {
+                *index += 1;
+                *index
+            } else {
+                pattern_idx_per_key.insert(pattern.0, 0);
+                0
+            };
+
+            let flow_state = flow_states.get(index).unwrap();
+
             assert_eq!(flow_state.status(), pattern.1);
             assert_eq!(flow_state.outcome, pattern.2);
         }
     }
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-struct TaskTestCheck<'a> {
-    task_id: TaskID,
-    flow_key: &'a FlowKey,
-    dataset_id: &'a DatasetID,
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-fn expect_running_dataset_update_task(
-    task_state: &TaskState,
-    dataset_id: &DatasetID,
-    expected_task_id: TaskID,
-) {
-    assert_matches!(
-        task_state,
-        TaskState {
-            task_id,
-            status: TaskStatus::Running,
-            logical_plan: LogicalPlan::UpdateDataset(UpdateDataset { dataset_id: actual_dataset_id }),
-            cancellation_requested: false,
-            created_at: _,
-            ran_at: _,
-            cancellation_requested_at: _,
-            finished_at: _,
-        } if actual_dataset_id == dataset_id && *task_id == expected_task_id
-    );
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -414,7 +529,7 @@ struct TestFlowSystemListener {
 
 #[derive(Default)]
 struct TestFlowSystemListenerState {
-    snapshots: Vec<(DateTime<Utc>, HashMap<FlowKey, FlowState>)>,
+    snapshots: Vec<(DateTime<Utc>, HashMap<FlowKey, Vec<FlowState>>)>,
 }
 
 #[component(pub)]
@@ -439,9 +554,12 @@ impl TestFlowSystemListener {
             .await
             .unwrap();
 
-        let mut flow_states_map = HashMap::new();
+        let mut flow_states_map: HashMap<FlowKey, Vec<FlowState>> = HashMap::new();
         for flow in flows {
-            flow_states_map.insert(flow.flow_key.clone(), flow);
+            flow_states_map
+                .entry(flow.flow_key.clone())
+                .and_modify(|flows| flows.push(flow.clone()))
+                .or_insert(vec![flow]);
         }
 
         let mut state = self.state.lock().unwrap();
@@ -470,7 +588,7 @@ impl AsyncEventHandler<FlowServiceEventExecutedTimeSlot> for TestFlowSystemListe
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-const SCHEDULING_ALIGNMENT_MS: i64 = 5;
+const SCHEDULING_ALIGNMENT_MS: i64 = 10;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -480,7 +598,6 @@ struct FlowHarness {
     dataset_repo: Arc<dyn DatasetRepository>,
     flow_configuration_service: Arc<dyn FlowConfigurationService>,
     flow_service: Arc<dyn FlowService>,
-    task_scheduler: Arc<dyn TaskScheduler>,
 }
 
 impl FlowHarness {
@@ -516,7 +633,6 @@ impl FlowHarness {
         let flow_service = catalog.get_one::<dyn FlowService>().unwrap();
         let flow_configuration_service = catalog.get_one::<dyn FlowConfigurationService>().unwrap();
         let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
-        let task_scheduler = catalog.get_one::<dyn TaskScheduler>().unwrap();
 
         Self {
             _tmp_dir: tmp_dir,
@@ -524,7 +640,6 @@ impl FlowHarness {
             flow_service,
             flow_configuration_service,
             dataset_repo,
-            task_scheduler,
         }
     }
 
@@ -568,12 +683,14 @@ impl FlowHarness {
 
     async fn set_dataset_flow_schedule(
         &self,
+        request_time: DateTime<Utc>,
         dataset_id: DatasetID,
         dataset_flow_type: DatasetFlowType,
         schedule: Schedule,
     ) {
         self.flow_configuration_service
             .set_configuration(
+                request_time,
                 FlowKeyDataset::new(dataset_id, dataset_flow_type).into(),
                 false,
                 FlowConfigurationRule::Schedule(schedule),
@@ -582,12 +699,44 @@ impl FlowHarness {
             .unwrap();
     }
 
-    async fn snapshot_all_current_task_ids(&self) -> Vec<TaskID> {
-        let mut task_ids = Vec::new();
-        while let Some(task_id) = self.task_scheduler.try_take().await.unwrap() {
-            task_ids.push(task_id);
-        }
-        task_ids
+    async fn pause_dataset_flow(
+        &self,
+        request_time: DateTime<Utc>,
+        dataset_id: DatasetID,
+        dataset_flow_type: DatasetFlowType,
+    ) {
+        let flow_key: FlowKey = FlowKeyDataset::new(dataset_id, dataset_flow_type).into();
+        let current_config = self
+            .flow_configuration_service
+            .find_configuration(flow_key.clone())
+            .await
+            .unwrap()
+            .unwrap();
+
+        self.flow_configuration_service
+            .set_configuration(request_time, flow_key, true, current_config.rule)
+            .await
+            .unwrap();
+    }
+
+    async fn resume_dataset_flow(
+        &self,
+        request_time: DateTime<Utc>,
+        dataset_id: DatasetID,
+        dataset_flow_type: DatasetFlowType,
+    ) {
+        let flow_key: FlowKey = FlowKeyDataset::new(dataset_id, dataset_flow_type).into();
+        let current_config = self
+            .flow_configuration_service
+            .find_configuration(flow_key.clone())
+            .await
+            .unwrap()
+            .unwrap();
+
+        self.flow_configuration_service
+            .set_configuration(request_time, flow_key, false, current_config.rule)
+            .await
+            .unwrap();
     }
 
     async fn trigger_manual_flow(&self, trigger_time: DateTime<Utc>, flow_key: FlowKey) {

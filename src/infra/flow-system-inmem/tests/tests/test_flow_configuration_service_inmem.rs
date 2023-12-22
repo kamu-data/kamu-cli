@@ -11,7 +11,7 @@ use std::assert_matches::assert_matches;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use chrono::Duration;
+use chrono::{Duration, Utc};
 use event_bus::EventBus;
 use futures::TryStreamExt;
 use kamu::testing::MetadataFactory;
@@ -315,6 +315,7 @@ impl FlowConfigurationHarness {
     async fn set_system_flow_schedule(&self, system_flow_type: SystemFlowType, schedule: Schedule) {
         self.flow_configuration_service
             .set_configuration(
+                Utc::now(),
                 system_flow_type.into(),
                 false,
                 FlowConfigurationRule::Schedule(schedule),
@@ -331,6 +332,7 @@ impl FlowConfigurationHarness {
     ) {
         self.flow_configuration_service
             .set_configuration(
+                Utc::now(),
                 FlowKeyDataset::new(dataset_id, dataset_flow_type).into(),
                 false,
                 FlowConfigurationRule::Schedule(schedule),
@@ -382,7 +384,7 @@ impl FlowConfigurationHarness {
             .unwrap();
 
         self.flow_configuration_service
-            .set_configuration(flow_key, true, current_config.rule)
+            .set_configuration(Utc::now(), flow_key, true, current_config.rule)
             .await
             .unwrap();
     }
@@ -397,7 +399,7 @@ impl FlowConfigurationHarness {
             .unwrap();
 
         self.flow_configuration_service
-            .set_configuration(flow_key, false, current_config.rule)
+            .set_configuration(Utc::now(), flow_key, false, current_config.rule)
             .await
             .unwrap();
     }

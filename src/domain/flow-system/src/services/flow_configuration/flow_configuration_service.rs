@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use chrono::{DateTime, Utc};
 use event_sourcing::TryLoadError;
 use internal_error::{ErrorIntoInternal, InternalError};
 use tokio_stream::Stream;
@@ -26,6 +27,7 @@ pub trait FlowConfigurationService: Sync + Send {
     /// Set or modify flow configuration
     async fn set_configuration(
         &self,
+        request_time: DateTime<Utc>,
         flow_key: FlowKey,
         paused: bool,
         rule: FlowConfigurationRule,
