@@ -283,10 +283,12 @@ impl FlowServiceInMemory {
                         if let Some(throttling_period) = start_condition.throttling_period {
                             // TODO: throttle not from NOW,
                             //  but from last flow of the dependent daataset
-                            self.enqueue_flow(
-                                dependent_dataset_flow.flow_id,
-                                start_time + throttling_period,
-                            )?;
+                            let activation_time = start_time + throttling_period;
+                            self.enqueue_flow(dependent_dataset_flow.flow_id, activation_time)?;
+
+                            dependent_dataset_flow
+                                .activate_at_time(self.time_source.now(), activation_time)
+                                .int_err()?;
 
                             dependent_dataset_flow
                                 .define_start_condition(
@@ -295,6 +297,12 @@ impl FlowServiceInMemory {
                                         interval: throttling_period,
                                     }),
                                 )
+                                .int_err()?;
+                        } else {
+                            self.enqueue_flow(dependent_dataset_flow.flow_id, start_time)?;
+
+                            dependent_dataset_flow
+                                .activate_at_time(self.time_source.now(), start_time)
                                 .int_err()?;
                         }
 

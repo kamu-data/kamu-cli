@@ -482,7 +482,7 @@ async fn test_dataset_deleted() {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_task_completions() {
+async fn test_task_completions_trigger_next_loop_on_success() {
     let harness = FlowHarness::new();
 
     let foo_id = harness.create_root_dataset("foo").await;
@@ -495,7 +495,7 @@ async fn test_task_completions() {
                 Utc::now(),
                 dataset_id.clone(),
                 DatasetFlowType::Ingest,
-                Duration::milliseconds(30).into(),
+                Duration::milliseconds(40).into(),
             )
             .await;
     }
@@ -519,8 +519,8 @@ async fn test_task_completions() {
         res = harness.flow_service.run(start_time) => res.int_err(),
         _ = async {
             // Each of 3 datasets should be scheduled after this time
-            let mut next_time = start_time + Duration::milliseconds(50);
-            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+            let mut next_time = start_time + Duration::milliseconds(60);
+            tokio::time::sleep(std::time::Duration::from_millis(60)).await;
 
             // Plan different task execution outcomes for each dataset
             let mut planned_outcomes = HashMap::new();
@@ -551,8 +551,8 @@ async fn test_task_completions() {
                 next_time += Duration::milliseconds(10);
             }
 
-            // Let the succeeded dataset to schedule another update. 30s + 20s max waiting
-            tokio::time::sleep(std::time::Duration::from_millis(60)).await;
+            // Let the succeeded dataset to schedule another update. 40s + 20s max waiting
+            tokio::time::sleep(std::time::Duration::from_millis(70)).await;
 
          } => Ok(()),
     }
@@ -569,22 +569,22 @@ async fn test_task_completions() {
     let reschedule_foo_moment = state.snapshots[5].0;
 
     assert_eq!(start_moment, start_time);
-    assert_eq!((schedule_moment - start_moment), Duration::milliseconds(30));
+    assert_eq!((schedule_moment - start_moment), Duration::milliseconds(40));
     assert_eq!(
         (finish_foo_moment - start_moment),
-        Duration::milliseconds(50)
-    );
-    assert_eq!(
-        (finish_bar_moment - start_moment),
         Duration::milliseconds(60)
     );
     assert_eq!(
-        (finish_baz_moment - start_moment),
+        (finish_bar_moment - start_moment),
         Duration::milliseconds(70)
     );
     assert_eq!(
-        (reschedule_foo_moment - start_moment),
+        (finish_baz_moment - start_moment),
         Duration::milliseconds(80)
+    );
+    assert_eq!(
+        (reschedule_foo_moment - start_moment),
+        Duration::milliseconds(100)
     );
 
     let foo_flow_key: FlowKey = FlowKeyDataset::new(foo_id.clone(), DatasetFlowType::Ingest).into();
@@ -691,8 +691,176 @@ async fn test_task_completions() {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-// TODO:
-//  - scheduling derived datasets after parent dataset succeeds
+#[test_log::test(tokio::test)]
+async fn test_update_success_triggers_update_of_derived_datasets() {
+    let harness = FlowHarness::new();
+
+    let foo_id = harness.create_root_dataset("foo").await;
+    let bar_id = harness
+        .create_derived_dataset("bar", vec![foo_id.clone()])
+        .await;
+    let baz_id = harness
+        .create_derived_dataset("baz", vec![foo_id.clone()])
+        .await;
+
+    harness
+        .set_dataset_flow_schedule(
+            Utc::now(),
+            foo_id.clone(),
+            DatasetFlowType::Ingest,
+            Duration::milliseconds(30).into(),
+        )
+        .await;
+
+    for dataset_id in [&bar_id, &baz_id] {
+        harness
+            .set_dataset_flow_start_condition(
+                Utc::now(),
+                dataset_id.clone(),
+                DatasetFlowType::Ingest,
+                StartConditionConfiguration {
+                    throttling_period: None,
+                    minimal_data_batch: None,
+                },
+            )
+            .await;
+    }
+
+    // Enforce dependency graph initialization
+    harness.eager_dependencies_graph_init().await;
+
+    // Remember start time
+    let start_time = Utc::now()
+        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
+        .unwrap();
+
+    // Flow listener will collect snapshots at important moments of time
+    let test_flow_listener = harness.catalog.get_one::<TestFlowSystemListener>().unwrap();
+
+    // Obtain access to event bus
+    let event_bus = harness.catalog.get_one::<EventBus>().unwrap();
+
+    // Run scheduler concurrently with manual triggers script
+    let _ = tokio::select! {
+        res = harness.flow_service.run(start_time) => res.int_err(),
+        _ = async {
+            // "foo" is definitely schedule now
+            let next_time = start_time + Duration::milliseconds(50);
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+
+            // Extract dataset tasks
+            let scheduled_tasks = harness.take_scheduled_tasks().await;
+            assert_eq!(1, scheduled_tasks.len());
+            let task_dataset_id = match &scheduled_tasks[0].logical_plan {
+                LogicalPlan::UpdateDataset(lp) => lp.dataset_id.clone(),
+                _ => unreachable!()
+            };
+            assert_eq!(task_dataset_id, foo_id);
+
+            // Send finished for this task
+            event_bus.dispatch_event(TaskEventFinished {
+                event_time: next_time,
+                task_id: scheduled_tasks[0].task_id,
+                outcome: TaskOutcome::Success,
+            }).await.unwrap();
+
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+
+        } => Ok(())
+    };
+
+    let state = test_flow_listener.state.lock().unwrap();
+    assert_eq!(5, state.snapshots.len());
+
+    let start_moment = state.snapshots[0].0;
+    let schedule_foo_moment = state.snapshots[1].0;
+    let finish_foo_moment = state.snapshots[2].0;
+    let schedule_bar_baz_moment = state.snapshots[3].0;
+    let reschedule_foo_moment = state.snapshots[4].0;
+
+    assert_eq!(start_moment, start_time);
+    assert_eq!(
+        (schedule_foo_moment - start_moment),
+        Duration::milliseconds(30)
+    );
+    assert_eq!(
+        (finish_foo_moment - start_moment),
+        Duration::milliseconds(50)
+    );
+    assert_eq!(
+        (schedule_bar_baz_moment - start_moment),
+        Duration::milliseconds(50)
+    );
+    assert_eq!(
+        (reschedule_foo_moment - start_moment),
+        Duration::milliseconds(80)
+    );
+
+    let foo_flow_key: FlowKey = FlowKeyDataset::new(foo_id.clone(), DatasetFlowType::Ingest).into();
+    let bar_flow_key: FlowKey = FlowKeyDataset::new(bar_id.clone(), DatasetFlowType::Ingest).into();
+    let baz_flow_key: FlowKey = FlowKeyDataset::new(baz_id.clone(), DatasetFlowType::Ingest).into();
+
+    assert_flow_test_checks(&[
+        // Snapshot 0: after initial queueing
+        FlowTestCheck {
+            snapshot: &state.snapshots[0].1,
+            patterns: vec![(&foo_flow_key, FlowStatus::Queued, None)],
+        },
+        // Snapshot 1: "foo" scheduled
+        FlowTestCheck {
+            snapshot: &state.snapshots[1].1,
+            patterns: vec![(&foo_flow_key, FlowStatus::Scheduled, None)],
+        },
+        // Snapshot 2: "foo" finished
+        FlowTestCheck {
+            snapshot: &state.snapshots[2].1,
+            patterns: vec![
+                (&foo_flow_key, FlowStatus::Queued, None),
+                (
+                    &foo_flow_key,
+                    FlowStatus::Finished,
+                    Some(FlowOutcome::Success),
+                ),
+                (&bar_flow_key, FlowStatus::Queued, None),
+                (&baz_flow_key, FlowStatus::Queued, None),
+            ],
+        },
+        // Snapshot 3: "bar" & "baz" scheduled
+        FlowTestCheck {
+            snapshot: &state.snapshots[3].1,
+            patterns: vec![
+                (&foo_flow_key, FlowStatus::Queued, None),
+                (
+                    &foo_flow_key,
+                    FlowStatus::Finished,
+                    Some(FlowOutcome::Success),
+                ),
+                (&bar_flow_key, FlowStatus::Scheduled, None),
+                (&baz_flow_key, FlowStatus::Scheduled, None),
+            ],
+        },
+        // Snapshot 4: "foo" rescheduled
+        FlowTestCheck {
+            snapshot: &state.snapshots[4].1,
+            patterns: vec![
+                (&foo_flow_key, FlowStatus::Scheduled, None),
+                (
+                    &foo_flow_key,
+                    FlowStatus::Finished,
+                    Some(FlowOutcome::Success),
+                ),
+                (&bar_flow_key, FlowStatus::Scheduled, None),
+                (&baz_flow_key, FlowStatus::Scheduled, None),
+            ],
+        },
+    ]);
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+// TODO next:
+//  - derived more than 1 level
+//  - throttling derived
 //  - cancelling queued/scheduled flow (at flow level, not at task level)
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -859,6 +1027,36 @@ impl FlowHarness {
         result.dataset_handle.id
     }
 
+    async fn create_derived_dataset(
+        &self,
+        dataset_name: &str,
+        input_ids: Vec<DatasetID>,
+    ) -> DatasetID {
+        let mut input_aliases = Vec::new();
+        for input_id in input_ids {
+            let input_hdl = self
+                .dataset_repo
+                .resolve_dataset_ref(&input_id.as_local_ref())
+                .await
+                .unwrap();
+            input_aliases.push(input_hdl.alias);
+        }
+
+        let create_result = self
+            .dataset_repo
+            .create_dataset_from_snapshot(
+                None,
+                MetadataFactory::dataset_snapshot()
+                    .name(DatasetName::new_unchecked(dataset_name))
+                    .kind(DatasetKind::Derivative)
+                    .push_event(MetadataFactory::set_transform_aliases(input_aliases).build())
+                    .build(),
+            )
+            .await
+            .unwrap();
+        create_result.dataset_handle.id
+    }
+
     async fn eager_dependencies_graph_init(&self) {
         let dependency_graph_service = self
             .catalog
@@ -897,6 +1095,24 @@ impl FlowHarness {
                 FlowKeyDataset::new(dataset_id, dataset_flow_type).into(),
                 false,
                 FlowConfigurationRule::Schedule(schedule),
+            )
+            .await
+            .unwrap();
+    }
+
+    async fn set_dataset_flow_start_condition(
+        &self,
+        request_time: DateTime<Utc>,
+        dataset_id: DatasetID,
+        dataset_flow_type: DatasetFlowType,
+        start_condition: StartConditionConfiguration,
+    ) {
+        self.flow_configuration_service
+            .set_configuration(
+                request_time,
+                FlowKeyDataset::new(dataset_id, dataset_flow_type).into(),
+                false,
+                FlowConfigurationRule::StartCondition(start_condition),
             )
             .await
             .unwrap();
