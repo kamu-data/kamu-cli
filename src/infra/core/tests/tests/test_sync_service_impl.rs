@@ -20,64 +20,7 @@ use kamu::*;
 use opendatafabric::*;
 use url::Url;
 
-use crate::utils::{DummySmartTransferProtocolClient, HttpFileServer, IpfsDaemon};
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-async fn append_random_data(
-    dataset_repo: &dyn DatasetRepository,
-    dataset_ref: impl Into<DatasetRef>,
-) -> Multihash {
-    let tmp_dir = tempfile::tempdir().unwrap();
-
-    let ds = dataset_repo.get_dataset(&dataset_ref.into()).await.unwrap();
-
-    let prev_data = ds
-        .as_metadata_chain()
-        .iter_blocks()
-        .filter_map_ok(|(_, b)| match b.event {
-            MetadataEvent::AddData(e) => Some(e),
-            _ => None,
-        })
-        .try_first()
-        .await
-        .unwrap();
-
-    let data_path = tmp_dir.path().join("data");
-    let checkpoint_path = tmp_dir.path().join("checkpoint");
-    ParquetWriterHelper::from_sample_data(&data_path).unwrap();
-    create_random_file(&checkpoint_path).await;
-
-    let input_checkpoint = prev_data
-        .as_ref()
-        .and_then(|e| e.output_checkpoint.as_ref())
-        .map(|c| c.physical_hash.clone());
-
-    let prev_offset = prev_data
-        .as_ref()
-        .and_then(|e| e.output_data.as_ref())
-        .map(|d| d.interval.end)
-        .unwrap_or(-1);
-    let data_interval = OffsetInterval {
-        start: prev_offset + 1,
-        end: prev_offset + 10,
-    };
-
-    ds.commit_add_data(
-        AddDataParams {
-            input_checkpoint,
-            output_data: Some(data_interval),
-            output_watermark: None,
-            source_state: None,
-        },
-        Some(OwnedFile::new(data_path)),
-        Some(OwnedFile::new(checkpoint_path)),
-        CommitOpts::default(),
-    )
-    .await
-    .unwrap()
-    .new_head
-}
+use crate::utils::IpfsDaemon;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -89,18 +32,6 @@ async fn assert_in_sync(
     let lhs_layout = dataset_repo.get_dataset_layout(&lhs.into()).await.unwrap();
     let rhs_layout = dataset_repo.get_dataset_layout(&rhs.into()).await.unwrap();
     DatasetTestHelper::assert_datasets_in_sync(&lhs_layout, &rhs_layout);
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-async fn create_random_file(path: &Path) -> usize {
-    use rand::RngCore;
-
-    let mut data = [0u8; 32];
-    rand::thread_rng().fill_bytes(&mut data);
-
-    std::fs::write(path, data).unwrap();
-    data.len()
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -246,9 +177,9 @@ async fn do_test_sync(
     assert_in_sync(&dataset_repo, &dataset_alias, &dataset_alias_2).await;
 
     // Subsequent sync ////////////////////////////////////////////////////////
-    let _b2 = append_random_data(dataset_repo.as_ref(), &dataset_alias).await;
+    let _b2 = DatasetTestHelper::append_random_data(dataset_repo.as_ref(), &dataset_alias).await;
 
-    let b3 = append_random_data(dataset_repo.as_ref(), &dataset_alias).await;
+    let b3 = DatasetTestHelper::append_random_data(dataset_repo.as_ref(), &dataset_alias).await;
 
     assert_matches!(
         sync_svc.sync(&pull_ref.as_any_ref(), &dataset_alias.as_any_ref(), SyncOptions::default(), None).await,
@@ -306,7 +237,8 @@ async fn do_test_sync(
     // Datasets out-of-sync on push //////////////////////////////////////////////
 
     // Push a new block into dataset_2 (which we were pulling into before)
-    let exta_head = append_random_data(dataset_repo.as_ref(), &dataset_alias_2).await;
+    let exta_head =
+        DatasetTestHelper::append_random_data(dataset_repo.as_ref(), &dataset_alias_2).await;
 
     assert_matches!(
         sync_svc.sync(&dataset_alias_2.as_any_ref(), &push_ref.as_any_ref(), SyncOptions::default(), None).await,
@@ -374,11 +306,12 @@ async fn do_test_sync(
 
     // Datasets complex divergence //////////////////////////////////////////////
 
-    let _b4 = append_random_data(dataset_repo.as_ref(), &dataset_alias).await;
+    let _b4 = DatasetTestHelper::append_random_data(dataset_repo.as_ref(), &dataset_alias).await;
 
-    let b5 = append_random_data(dataset_repo.as_ref(), &dataset_alias).await;
+    let b5 = DatasetTestHelper::append_random_data(dataset_repo.as_ref(), &dataset_alias).await;
 
-    let b4_alt = append_random_data(dataset_repo.as_ref(), &dataset_alias_2).await;
+    let b4_alt =
+        DatasetTestHelper::append_random_data(dataset_repo.as_ref(), &dataset_alias_2).await;
 
     assert_matches!(
         sync_svc.sync(&dataset_alias.as_any_ref(), &push_ref.as_any_ref(), SyncOptions::default(), None).await,

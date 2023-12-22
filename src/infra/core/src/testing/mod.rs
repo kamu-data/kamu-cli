@@ -9,6 +9,8 @@
 
 mod dataset_data_helper;
 mod dataset_test_helper;
+mod dummy_smart_transfer_protocol_client;
+mod http_file_server;
 mod id_factory;
 mod metadata_factory;
 mod minio_server;
@@ -20,6 +22,8 @@ mod parquet_writer_helper;
 
 pub use dataset_data_helper::*;
 pub use dataset_test_helper::*;
+pub use dummy_smart_transfer_protocol_client::*;
+pub use http_file_server::*;
 pub use id_factory::*;
 pub use metadata_factory::*;
 pub use minio_server::*;

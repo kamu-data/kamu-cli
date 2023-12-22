@@ -10,10 +10,8 @@
 use std::assert_matches::assert_matches;
 
 use kamu::domain::*;
-use kamu::testing::LocalS3Server;
+use kamu::testing::{HttpFileServer, LocalS3Server};
 use kamu::*;
-
-use crate::utils::HttpFileServer;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 

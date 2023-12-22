@@ -3161,6 +3161,7 @@ dependencies = [
  "cfg-if",
  "chrono",
  "container-runtime",
+ "criterion",
  "curl",
  "curl-sys",
  "dashmap",

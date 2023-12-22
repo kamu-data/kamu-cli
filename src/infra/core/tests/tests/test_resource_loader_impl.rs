@@ -15,8 +15,6 @@ use kamu::ResourceLoaderImpl;
 use opendatafabric::serde::yaml::*;
 use opendatafabric::*;
 
-use crate::utils::HttpFileServer;
-
 fn create_test_snapshot(path: &Path) -> DatasetSnapshot {
     let snapshot = MetadataFactory::dataset_snapshot().name("test").build();
     let buffer = YamlDatasetSnapshotSerializer
