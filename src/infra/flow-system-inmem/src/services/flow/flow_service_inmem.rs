@@ -484,10 +484,14 @@ impl FlowService for FlowServiceInMemory {
                 .await
                 .map_err(|e| RequestFlowError::Internal(e)),
 
-            // Otherwise, initiate a new flow and schedule immediate task
+            // Otherwise, initiate a new flow and activate it at the nearest scheduler slot
             None => {
                 let mut flow = self.make_new_flow(flow_key, trigger).await?;
-                self.schedule_flow_task(&mut flow).await?;
+                let activation_time = self.round_time(self.time_source.now())?;
+                self.enqueue_flow(flow.flow_id, activation_time)?;
+
+                flow.activate_at_time(self.time_source.now(), activation_time)
+                    .int_err()?;
                 flow.save(self.flow_event_store.as_ref()).await.int_err()?;
                 Ok(flow.into())
             }
