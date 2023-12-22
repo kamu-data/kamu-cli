@@ -751,16 +751,34 @@ impl AsyncEventHandler<FlowConfigurationEventModified> for FlowServiceInMemory {
 impl AsyncEventHandler<DatasetEventDeleted> for FlowServiceInMemory {
     #[tracing::instrument(level = "debug", skip_all, fields(?event))]
     async fn handle(&self, event: &DatasetEventDeleted) -> Result<(), InternalError> {
-        let mut state = self.state.lock().unwrap();
-        state.active_configs.drop_dataset_configs(&event.dataset_id);
+        let flow_ids_2_abort = {
+            let mut state = self.state.lock().unwrap();
+            state.active_configs.drop_dataset_configs(&event.dataset_id);
 
-        for flow_type in DatasetFlowType::all() {
-            if let Some(flow_id) = state
-                .pending_flows
-                .drop_dataset_pending_flow(&event.dataset_id, *flow_type)
-            {
-                state.time_wheel.cancel_flow_activation(flow_id).int_err()?;
+            // For every possible dataset flow:
+            //  - drop it from pending state
+            //  - drop queued activations
+            //  - collect ID of aborted flow
+            let mut flow_ids_2_abort: Vec<_> = Vec::new();
+            for flow_type in DatasetFlowType::all() {
+                if let Some(flow_id) = state
+                    .pending_flows
+                    .drop_dataset_pending_flow(&event.dataset_id, *flow_type)
+                {
+                    flow_ids_2_abort.push(flow_id);
+                    state.time_wheel.cancel_flow_activation(flow_id).int_err()?;
+                }
             }
+            flow_ids_2_abort
+        };
+
+        // Abort matched flows
+        for flow_id in flow_ids_2_abort {
+            let mut flow = Flow::load(flow_id, self.flow_event_store.as_ref())
+                .await
+                .int_err()?;
+            flow.abort(self.time_source.now()).int_err()?;
+            flow.save(self.flow_event_store.as_ref()).await.int_err()?;
         }
 
         // Not deleting task->update association, it should be safe.

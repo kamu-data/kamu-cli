@@ -17,6 +17,8 @@ pub enum FlowOutcome {
     Failed,
     /// Update was cancelled by a user
     Cancelled,
+    /// Update was aborted by system by force
+    Aborted,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

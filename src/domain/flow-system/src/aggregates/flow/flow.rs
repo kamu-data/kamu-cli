@@ -133,6 +133,15 @@ impl Flow {
         };
         self.apply(event)
     }
+
+    /// Abort flow
+    pub fn abort(&mut self, now: DateTime<Utc>) -> Result<(), ProjectionError<FlowState>> {
+        let event = FlowEventAborted {
+            event_time: now,
+            flow_id: self.flow_id,
+        };
+        self.apply(event)
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

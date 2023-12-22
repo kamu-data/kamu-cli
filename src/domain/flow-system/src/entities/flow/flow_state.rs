@@ -31,21 +31,19 @@ pub struct FlowState {
     pub task_ids: Vec<TaskID>,
     /// Flow outcome
     pub outcome: Option<FlowOutcome>,
-    /// Cancellation time
-    pub cancelled_at: Option<DateTime<Utc>>,
+    /// Termiation time (cancel or abort)
+    pub terminated_at: Option<DateTime<Utc>>,
 }
 
 impl FlowState {
     /// Checks if flow may be cancelled
     pub fn can_cancel(&self) -> bool {
-        !self.outcome.is_some() && self.task_ids.is_empty() && self.cancelled_at.is_none()
+        !self.outcome.is_some() && self.task_ids.is_empty() && self.terminated_at.is_none()
     }
 
     /// Computes status
     pub fn status(&self) -> FlowStatus {
-        if self.cancelled_at.is_some() {
-            FlowStatus::Cancelled
-        } else if self.outcome.is_some() {
+        if self.outcome.is_some() {
             FlowStatus::Finished
         } else if !self.task_ids.is_empty() {
             FlowStatus::Scheduled
@@ -77,7 +75,7 @@ impl Projection for FlowState {
                     activate_at: None,
                     task_ids: vec![],
                     outcome: None,
-                    cancelled_at: None,
+                    terminated_at: None,
                 }),
                 _ => Err(ProjectionError::new(None, event)),
             },
@@ -145,8 +143,11 @@ impl Projection for FlowState {
                         task_id,
                         task_outcome,
                     }) => {
-                        if s.outcome.is_some() || !s.task_ids.contains(task_id) {
+                        if s.task_ids.contains(task_id) {
                             Err(ProjectionError::new(Some(s), event))
+                        } else if s.outcome.is_some() {
+                            // Ignore for idempotence motivation
+                            Ok(s)
                         } else {
                             match task_outcome {
                                 TaskOutcome::Success => Ok(FlowState {
@@ -155,7 +156,7 @@ impl Projection for FlowState {
                                 }),
                                 TaskOutcome::Cancelled => Ok(FlowState {
                                     outcome: Some(FlowOutcome::Cancelled),
-                                    cancelled_at: Some(event_time.clone()),
+                                    terminated_at: Some(event_time.clone()),
                                     ..s
                                 }),
                                 TaskOutcome::Failed => {
@@ -182,7 +183,22 @@ impl Projection for FlowState {
                         } else {
                             Ok(FlowState {
                                 outcome: Some(FlowOutcome::Cancelled),
-                                cancelled_at: Some(event_time.clone()),
+                                terminated_at: Some(event_time.clone()),
+                                ..s
+                            })
+                        }
+                    }
+                    E::Aborted(FlowEventAborted {
+                        event_time,
+                        flow_id: _,
+                    }) => {
+                        if s.outcome.is_some() {
+                            // Ignore for idempotence reasons
+                            Ok(s)
+                        } else {
+                            Ok(FlowState {
+                                outcome: Some(FlowOutcome::Aborted),
+                                terminated_at: Some(event_time.clone()),
                                 ..s
                             })
                         }
