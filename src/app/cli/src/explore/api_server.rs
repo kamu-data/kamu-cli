@@ -12,6 +12,7 @@ use std::sync::Arc;
 
 use dill::Catalog;
 use internal_error::*;
+use kamu::domain::SystemTimeSource;
 use kamu_flow_system_inmem::domain::FlowService;
 use kamu_task_system_inmem::domain::TaskExecutor;
 
@@ -24,6 +25,7 @@ pub struct APIServer {
     >,
     task_executor: Arc<dyn TaskExecutor>,
     flow_service: Arc<dyn FlowService>,
+    time_source: Arc<dyn SystemTimeSource>,
 }
 
 impl APIServer {
@@ -38,6 +40,8 @@ impl APIServer {
         let task_executor = base_catalog.get_one().unwrap();
 
         let flow_service = base_catalog.get_one().unwrap();
+
+        let time_source = base_catalog.get_one().unwrap();
 
         let gql_schema = kamu_adapter_graphql::schema();
 
@@ -89,6 +93,7 @@ impl APIServer {
             server,
             task_executor,
             flow_service,
+            time_source,
         }
     }
 
@@ -100,7 +105,7 @@ impl APIServer {
         tokio::select! {
             res = self.server => { res.int_err() },
             res = self.task_executor.run() => { res.int_err() },
-            res = self.flow_service.run() => { res.int_err() }
+            res = self.flow_service.run(self.time_source.now()) => { res.int_err() }
         }
     }
 }

@@ -412,9 +412,9 @@ impl FlowServiceInMemory {
 impl FlowService for FlowServiceInMemory {
     /// Runs the update main loop
     #[tracing::instrument(level = "info", skip_all)]
-    async fn run(&self) -> Result<(), InternalError> {
+    async fn run(&self, planned_start_time: DateTime<Utc>) -> Result<(), InternalError> {
         // Initial scheduling
-        let start_time = self.round_time(self.time_source.now())?;
+        let start_time = self.round_time(planned_start_time)?;
         self.initialize_auto_polling_flows_from_configurations(start_time)
             .await?;
 
@@ -468,6 +468,7 @@ impl FlowService for FlowServiceInMemory {
     )]
     async fn trigger_manual_flow(
         &self,
+        trigger_time: DateTime<Utc>,
         flow_key: FlowKey,
         initiator_account_id: AccountID,
         initiator_account_name: AccountName,
@@ -487,7 +488,7 @@ impl FlowService for FlowServiceInMemory {
             // Otherwise, initiate a new flow and activate it at the nearest scheduler slot
             None => {
                 let mut flow = self.make_new_flow(flow_key, trigger).await?;
-                let activation_time = self.round_time(self.time_source.now())?;
+                let activation_time = self.round_time(trigger_time)?;
                 self.enqueue_flow(flow.flow_id, activation_time)?;
 
                 flow.activate_at_time(self.time_source.now(), activation_time)

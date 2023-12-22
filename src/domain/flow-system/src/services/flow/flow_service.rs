@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use chrono::{DateTime, Utc};
 use event_sourcing::LoadError;
 use internal_error::{ErrorIntoInternal, InternalError};
 use kamu_core::DatasetNotFoundError;
@@ -20,11 +21,12 @@ use crate::{DatasetFlowType, FlowID, FlowKey, FlowState, SystemFlowType};
 #[async_trait::async_trait]
 pub trait FlowService: Sync + Send {
     /// Runs the update main loop
-    async fn run(&self) -> Result<(), InternalError>;
+    async fn run(&self, planned_start_time: DateTime<Utc>) -> Result<(), InternalError>;
 
     /// Triggers the specified flow manually, unless it's already waiting
     async fn trigger_manual_flow(
         &self,
+        trigger_time: DateTime<Utc>,
         flow_key: FlowKey,
         initiator_account_id: AccountID,
         initiator_account_name: AccountName,

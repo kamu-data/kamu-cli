@@ -11,7 +11,7 @@ use std::assert_matches::assert_matches;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-use chrono::{DateTime, Duration, Utc};
+use chrono::{DateTime, Duration, DurationRound, Utc};
 use dill::*;
 use event_bus::{AsyncEventHandler, EventBus};
 use kamu::testing::MetadataFactory;
@@ -47,8 +47,14 @@ async fn test_read_initial_config_and_queue_properly() {
         )
         .await;
 
+    // Remember start time
+    let start_time = Utc::now()
+        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
+        .unwrap();
+
+    // Run scheduler concurrently with manual triggers script
     let _ = tokio::select! {
-        res = harness.flow_service.run() => res.int_err(),
+        res = harness.flow_service.run(start_time) => res.int_err(),
         _ = tokio::time::sleep(std::time::Duration::from_millis(60)) => Ok(()),
     }
     .unwrap();
@@ -65,7 +71,7 @@ async fn test_read_initial_config_and_queue_properly() {
     let foo_moment = state.snapshots[1].0;
     let bar_moment = state.snapshots[2].0;
 
-    assert!(start_moment < foo_moment && foo_moment < bar_moment);
+    assert_eq!(start_time, start_moment);
     assert_eq!((foo_moment - start_moment), Duration::milliseconds(30)); // planned time for "foo"
     assert_eq!((bar_moment - start_moment), Duration::milliseconds(45)); // planned time for "bar"
 
@@ -151,18 +157,26 @@ async fn test_manual_trigger() {
     let foo_flow_key: FlowKey = FlowKeyDataset::new(foo_id.clone(), DatasetFlowType::Ingest).into();
     let bar_flow_key: FlowKey = FlowKeyDataset::new(bar_id.clone(), DatasetFlowType::Ingest).into();
 
+    // Remember start time
+    let start_time = Utc::now()
+        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
+        .unwrap();
+
+    // Run scheduler concurrently with manual triggers script
     let _ = tokio::select! {
-        res = harness.flow_service.run() => res.int_err(),
+        res = harness.flow_service.run(start_time) => res.int_err(),
         _ = async {
             // Sleep < "foo" period
             tokio::time::sleep(std::time::Duration::from_millis(18)).await;
-            harness.trigger_manual_flow(foo_flow_key.clone()).await; // "foo" pending already
-            harness.trigger_manual_flow(bar_flow_key.clone()).await; // "bar" not queued, starts soon
+            let new_time = start_time + Duration::milliseconds(18);
+            harness.trigger_manual_flow(new_time, foo_flow_key.clone()).await; // "foo" pending already
+            harness.trigger_manual_flow(new_time, bar_flow_key.clone()).await; // "bar" not queued, starts soon
 
             // Wake up after foo scheduling
             tokio::time::sleep(std::time::Duration::from_millis(20)).await;
-            harness.trigger_manual_flow(foo_flow_key.clone()).await; // "foo" pending already, even running
-            harness.trigger_manual_flow(bar_flow_key.clone()).await; // "bar" pending already, event running
+            let new_time = new_time + Duration::milliseconds(20);
+            harness.trigger_manual_flow(new_time, foo_flow_key.clone()).await; // "foo" pending already, even running
+            harness.trigger_manual_flow(new_time, bar_flow_key.clone()).await; // "bar" pending already, event running
 
             // Make sure nothing got scheduled in near time
             tokio::time::sleep(std::time::Duration::from_millis(10)).await;
@@ -180,6 +194,7 @@ async fn test_manual_trigger() {
     let bar_moment = state.snapshots[1].0;
     let foo_moment = state.snapshots[2].0;
 
+    assert_eq!(start_moment, start_time);
     assert_eq!((bar_moment - start_moment), Duration::milliseconds(20)); // next slot after 18ms trigger with 5ms align
     assert_eq!((foo_moment - start_moment), Duration::milliseconds(30)); // 30ms as planned
 
@@ -330,6 +345,10 @@ impl AsyncEventHandler<FlowServiceEventExecutedTimeSlot> for TestFlowSystemListe
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+const SCHEDULING_ALIGNMENT_MS: i64 = 5;
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
 struct FlowHarness {
     _tmp_dir: tempfile::TempDir,
     catalog: dill::Catalog,
@@ -347,7 +366,9 @@ impl FlowHarness {
 
         let catalog = dill::CatalogBuilder::new()
             .add::<EventBus>()
-            .add_value(FlowServiceRunConfig::new(Duration::milliseconds(5)))
+            .add_value(FlowServiceRunConfig::new(Duration::milliseconds(
+                SCHEDULING_ALIGNMENT_MS,
+            )))
             .add::<FlowServiceInMemory>()
             .add::<FlowEventStoreInMem>()
             .add::<FlowConfigurationServiceInMemory>()
@@ -423,9 +444,10 @@ impl FlowHarness {
         task_ids
     }
 
-    async fn trigger_manual_flow(&self, flow_key: FlowKey) {
+    async fn trigger_manual_flow(&self, trigger_time: DateTime<Utc>, flow_key: FlowKey) {
         self.flow_service
             .trigger_manual_flow(
+                trigger_time,
                 flow_key,
                 FAKE_ACCOUNT_ID.to_string(),
                 AccountName::new_unchecked(auth::DEFAULT_ACCOUNT_NAME),
