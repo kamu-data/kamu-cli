@@ -27,6 +27,7 @@ pub struct ObjectStoreRegistryImpl {
 }
 
 #[dill::component(pub)]
+#[dill::interface(dyn ObjectStoreRegistry)]
 #[dill::scope(dill::Singleton)]
 impl ObjectStoreRegistryImpl {
     pub fn new(builders: Vec<Arc<dyn ObjectStoreBuilder>>) -> Self {

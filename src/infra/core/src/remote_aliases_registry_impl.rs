@@ -26,6 +26,7 @@ pub struct RemoteAliasesRegistryImpl {
 ////////////////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
+#[interface(dyn RemoteAliasesRegistry)]
 impl RemoteAliasesRegistryImpl {
     pub fn new(dataset_repo: Arc<dyn DatasetRepository>) -> Self {
         Self { dataset_repo }

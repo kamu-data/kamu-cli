@@ -10,12 +10,15 @@
 use std::collections::VecDeque;
 use std::sync::Arc;
 
+use event_bus::EventBus;
+use kamu::domain::events::DatasetEventDependenciesUpdated;
 use kamu::domain::{
     BlockRef,
     CorruptedSourceError,
     Dataset,
     DatasetRepository,
     ErrorIntoInternal,
+    GetSummaryOpts,
     ResultIntoInternal,
 };
 use opendatafabric::{AsTypedBlock, DatasetRef, MetadataBlock, Multihash};
@@ -36,6 +39,7 @@ const MIN_UPLOAD_PROGRESS_PING_DELAY_SEC: u64 = 10;
 
 pub struct AxumServerPushProtocolInstance {
     socket: axum::extract::ws::WebSocket,
+    event_bus: Arc<EventBus>,
     dataset_repo: Arc<dyn DatasetRepository>,
     dataset_ref: DatasetRef,
     dataset: Option<Arc<dyn Dataset>>,
@@ -46,6 +50,7 @@ pub struct AxumServerPushProtocolInstance {
 impl AxumServerPushProtocolInstance {
     pub fn new(
         socket: axum::extract::ws::WebSocket,
+        event_bus: Arc<EventBus>,
         dataset_repo: Arc<dyn DatasetRepository>,
         dataset_ref: DatasetRef,
         dataset: Option<Arc<dyn Dataset>>,
@@ -54,6 +59,7 @@ impl AxumServerPushProtocolInstance {
     ) -> Self {
         Self {
             socket,
+            event_bus,
             dataset_repo,
             dataset_ref,
             dataset,
@@ -314,12 +320,29 @@ impl AxumServerPushProtocolInstance {
         tracing::debug!("Push client sent a complete request. Commiting the dataset");
 
         if new_blocks.len() > 0 {
-            dataset_append_metadata(self.dataset.as_ref().unwrap().as_ref(), new_blocks)
+            let dataset = self.dataset.as_ref().unwrap().as_ref();
+            let response = dataset_append_metadata(dataset, new_blocks)
                 .await
                 .map_err(|e| {
                     tracing::debug!("Appending dataset metadata failed with error: {}", e);
                     PushServerError::Internal(e.int_err())
                 })?;
+
+            // TODO: encapsulate this inside dataset/chain
+            if !response.new_upstream_ids.is_empty() {
+                let summary = dataset
+                    .get_summary(GetSummaryOpts::default())
+                    .await
+                    .int_err()?;
+
+                self.event_bus
+                    .dispatch_event(DatasetEventDependenciesUpdated {
+                        dataset_id: summary.id.clone(),
+                        new_upstream_ids: response.new_upstream_ids,
+                    })
+                    .await
+                    .int_err()?;
+            }
         }
 
         tracing::debug!("Sending completion confirmation");

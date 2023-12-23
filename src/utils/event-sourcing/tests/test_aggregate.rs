@@ -17,6 +17,12 @@ enum CalcEvents {
     Sub(i32),
 }
 
+impl ProjectionEvent<()> for CalcEvents {
+    fn matches_query(&self, _: &()) -> bool {
+        true
+    }
+}
+
 #[derive(Debug, Clone)]
 struct CalcState(i32);
 

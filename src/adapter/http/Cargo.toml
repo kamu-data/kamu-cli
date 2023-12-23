@@ -21,13 +21,14 @@ doctest = false
 opendatafabric = { workspace = true }
 # TODO: Adapters should depend only on kamu-domain crate and be implementation-agnostic
 kamu = { workspace = true }
+event-bus = { workspace = true }
 
 axum = { version = "0.6", features = ["ws", "headers"] }
 axum-extra = { version = "0.8", features = ["async-read-body"] }
 async-trait = "0.1"
 bytes = "1"
 chrono = { version = "0.4", features = ["serde"] }
-dill = "0.7"
+dill = "0.8"
 flate2 = "1"                                                           # GZip decoder
 futures = "0.3"
 http = "0.2"
@@ -48,6 +49,7 @@ url = { version = "2", features = ["serde"] }
 
 [dev-dependencies]
 container-runtime = { workspace = true }
+event-bus = { workspace = true }
 
 env_logger = "0.10"
 fs_extra = "1.3"                                                    # Recursive folder copy

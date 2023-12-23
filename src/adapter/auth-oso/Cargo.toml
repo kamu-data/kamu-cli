@@ -21,7 +21,7 @@ opendatafabric = { workspace = true }
 kamu-core = { workspace = true }
 
 async-trait = "0.1"
-dill = "0.7"
+dill = "0.8"
 
 # Authorization
 oso = "0.27"
@@ -29,6 +29,7 @@ oso-derive = "0.27"
 
 [dev-dependencies]
 kamu = { workspace = true }
+event-bus = { workspace = true }
 
 env_logger = "0.10"
 tempfile = "3"

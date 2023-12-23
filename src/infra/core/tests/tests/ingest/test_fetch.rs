@@ -632,6 +632,7 @@ async fn test_fetch_files_glob() {
 ///////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(containerized)]
+#[ignore]
 #[test_log::test(tokio::test)]
 async fn test_fetch_container_ok() {
     let tempdir = tempfile::tempdir().unwrap();

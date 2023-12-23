@@ -131,11 +131,8 @@ fn make_catalog() -> dill::Catalog {
 
     dill::CatalogBuilder::new()
         .add::<DummyAuthenticationProviderA>()
-        .bind::<dyn AuthenticationProvider, DummyAuthenticationProviderA>()
         .add::<DummyAuthenticationProviderB>()
-        .bind::<dyn AuthenticationProvider, DummyAuthenticationProviderB>()
         .add::<AuthenticationServiceImpl>()
-        .bind::<dyn AuthenticationService, AuthenticationServiceImpl>()
         .add_value(SystemTimeSourceStub::new_set(Utc::now()))
         .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
         .build()
@@ -147,6 +144,7 @@ struct DummyAuthenticationProviderA {}
 struct DummyAuthenticationProviderB {}
 
 #[dill::component(pub)]
+#[dill::interface(dyn AuthenticationProvider)]
 impl DummyAuthenticationProviderA {
     fn new() -> Self {
         Self {}
@@ -154,6 +152,7 @@ impl DummyAuthenticationProviderA {
 }
 
 #[dill::component(pub)]
+#[dill::interface(dyn AuthenticationProvider)]
 impl DummyAuthenticationProviderB {
     fn new() -> Self {
         Self {}

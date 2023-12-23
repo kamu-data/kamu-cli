@@ -20,7 +20,7 @@ doctest = false
 [dependencies]
 async-trait = "0.1"
 cfg-if = "1"
-dill = "0.7"
+dill = "0.8"
 libc = "0.2"
 rand = "0.8"
 regex = "1"

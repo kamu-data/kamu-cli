@@ -14,6 +14,8 @@ use std::sync::Arc;
 use chrono::{TimeZone, Utc};
 use container_runtime::ContainerRuntime;
 use datafusion::arrow::record_batch::RecordBatch;
+use dill::Component;
+use event_bus::EventBus;
 use futures::StreamExt;
 use indoc::indoc;
 use kamu::domain::*;
@@ -211,48 +213,46 @@ async fn test_transform_common(transform: Transform) {
     std::fs::create_dir(&run_info_dir).unwrap();
     std::fs::create_dir(&cache_dir).unwrap();
 
-    let dataset_repo = Arc::new(
-        DatasetRepositoryLocalFs::create(
-            tempdir.path().join("datasets"),
-            Arc::new(CurrentAccountSubject::new_test()),
-            Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new()),
-            false,
+    let catalog = dill::CatalogBuilder::new()
+        .add::<EventBus>()
+        .add::<kamu_core::auth::AlwaysHappyDatasetActionAuthorizer>()
+        .add::<kamu::DependencyGraphServiceInMemory>()
+        .add_value(CurrentAccountSubject::new_test())
+        .add_builder(
+            DatasetRepositoryLocalFs::builder()
+                .with_root(tempdir.path().join("datasets"))
+                .with_multi_tenant(false),
         )
-        .unwrap(),
-    );
-    let engine_provisioner = Arc::new(EngineProvisionerLocal::new(
-        EngineProvisionerLocalConfig::default(),
-        ContainerRuntime::default(),
-        dataset_repo.clone(),
-        run_info_dir.clone(),
-    ));
-
-    let dataset_action_authorizer = Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new());
-
-    let time_source = Arc::new(SystemTimeSourceStub::new_set(
-        Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap(),
-    ));
-
-    let ingest_svc = PollingIngestServiceImpl::new(
-        dataset_repo.clone(),
-        dataset_action_authorizer.clone(),
-        engine_provisioner.clone(),
-        Arc::new(ObjectStoreRegistryImpl::new(vec![Arc::new(
+        .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+        .add_builder(
+            EngineProvisionerLocal::builder()
+                .with_config(EngineProvisionerLocalConfig::default())
+                .with_container_runtime(ContainerRuntime::default())
+                .with_run_info_dir(run_info_dir.clone()),
+        )
+        .bind::<dyn EngineProvisioner, EngineProvisionerLocal>()
+        .add_value(ObjectStoreRegistryImpl::new(vec![Arc::new(
             ObjectStoreBuilderLocalFs::new(),
-        )])),
-        Arc::new(DataFormatRegistryImpl::new()),
-        Arc::new(ContainerRuntime::default()),
-        run_info_dir,
-        cache_dir,
-        time_source.clone(),
-    );
+        )]))
+        .bind::<dyn ObjectStoreRegistry, ObjectStoreRegistryImpl>()
+        .add_builder(
+            PollingIngestServiceImpl::builder()
+                .with_cache_dir(cache_dir)
+                .with_run_info_dir(run_info_dir)
+                .with_container_runtime(Arc::new(ContainerRuntime::default()))
+                .with_data_format_registry(Arc::new(DataFormatRegistryImpl::new())),
+        )
+        .bind::<dyn PollingIngestService, PollingIngestServiceImpl>()
+        .add::<TransformServiceImpl>()
+        .add_value(SystemTimeSourceStub::new_set(
+            Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap(),
+        ))
+        .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
+        .build();
 
-    let transform_svc = TransformServiceImpl::new(
-        dataset_repo.clone(),
-        dataset_action_authorizer.clone(),
-        engine_provisioner.clone(),
-        time_source.clone(),
-    );
+    let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
+    let ingest_svc = catalog.get_one::<dyn PollingIngestService>().unwrap();
+    let transform_svc = catalog.get_one::<dyn TransformService>().unwrap();
 
     ///////////////////////////////////////////////////////////////////////////
     // Root setup
@@ -340,6 +340,7 @@ async fn test_transform_common(transform: Transform) {
     let deriv_helper = DatasetHelper::new(dataset.clone(), tempdir.path());
     let deriv_data_helper = DatasetDataHelper::new(dataset);
 
+    let time_source = catalog.get_one::<SystemTimeSourceStub>().unwrap();
     time_source.set(Utc.with_ymd_and_hms(2050, 1, 2, 12, 0, 0).unwrap());
 
     let res = transform_svc

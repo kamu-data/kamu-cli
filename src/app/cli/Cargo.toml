@@ -33,10 +33,12 @@ ftp = ["kamu/ftp"]
 # Kamu
 internal-error = { workspace = true }
 container-runtime = { workspace = true }
+event-bus = { workspace = true }
 kamu-data-utils = { workspace = true }
 opendatafabric = { workspace = true }
 kamu = { workspace = true }
 kamu-task-system-inmem = { workspace = true }
+kamu-flow-system-inmem = { workspace = true }
 kamu-adapter-auth-oso = { workspace = true }
 kamu-adapter-flight-sql = { workspace = true }
 kamu-adapter-graphql = { workspace = true }
@@ -96,7 +98,7 @@ async-trait = "0.1"
 chrono = "0.4"
 cfg-if = "1"  # Conditional compilation
 datafusion = "33"
-dill = "0.7"
+dill = "0.8"
 dirs = "5"
 fs_extra = "1.3"
 futures = "0.3"

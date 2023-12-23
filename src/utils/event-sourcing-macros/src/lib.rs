@@ -72,6 +72,15 @@ pub fn derive_aggregate(tokens: proc_macro::TokenStream) -> proc_macro::TokenStr
             }
 
             #[inline]
+            pub async fn try_load(
+                query: <#proj_type as ::event_sourcing::Projection>::Query,
+                event_store: &#store_type,
+            ) -> Result<Option<Self>, TryLoadError<#proj_type>> {
+                let maybe_agg = ::event_sourcing::Aggregate::try_load(query, event_store).await?;
+                Ok(maybe_agg.map(|agg| Self(agg)))
+            }
+
+            #[inline]
             pub async fn load_ext(
                 query: <#proj_type as ::event_sourcing::Projection>::Query,
                 event_store: &#store_type,

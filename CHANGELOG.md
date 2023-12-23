@@ -4,9 +4,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [0.149.0] - 2023-12-23
 ### Added
 - Added `KAMU_WORKSPACE` env var to handle custom workspace path if needed
+- Added `event-bus` crate: an utility component based on Observer design pattern,
+  which allows event producers and event consumers not to know about each other
+- Applied `event-bus` component to inform consumers of dataset removal, dependency changes,
+  task completions
+- Added in-memory dataset dependency graph instead of continous rescanning of all datasets:
+   - the initial dependencies are computed on demand on first request 
+   - using `petgraph` project to represent dataset dependencies in the form of directed acyclic graph
+   - further events like new/removed dependency or dataset removal update the graph
+   - simplified GraphQL APIs and dataset removal check using new dependency graph
+- Added prototype of flow management system:
+   - flows are automatically launched activities, which are either dataset related or represent system process
+   - flows can have a schedule configuration, using time delta or CRON expressions
+   - flows system manages activation of flows according to the dynamically changing configuration
+   - flows system manages triggering of dependent dataset flows, when their inputs have events
+   - derived flows may have throttling settings
+### Changed
+- Integrated latest `dill=0.8` version, which removes a need in registering simple dependency binds
+- Using new `dill=0.8` to organize bindings of structs to implemented traits via declarative attributes
 
 ## [0.148.0] - 2023-12-20
 ### Added

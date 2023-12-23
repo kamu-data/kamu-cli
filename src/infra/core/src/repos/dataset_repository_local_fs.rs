@@ -13,7 +13,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use dill::*;
 use domain::auth::{DatasetAction, DatasetActionAuthorizer, DEFAULT_ACCOUNT_NAME};
-use futures::TryStreamExt;
+use event_bus::EventBus;
 use kamu_core::*;
 use opendatafabric::*;
 use url::Url;
@@ -25,6 +25,8 @@ use crate::*;
 pub struct DatasetRepositoryLocalFs {
     storage_strategy: Box<dyn DatasetStorageStrategy>,
     dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
+    dependency_graph_service: Arc<dyn DependencyGraphService>,
+    event_bus: Arc<EventBus>,
     thrash_lock: tokio::sync::Mutex<()>,
 }
 
@@ -36,6 +38,8 @@ impl DatasetRepositoryLocalFs {
         root: PathBuf,
         current_account_subject: Arc<CurrentAccountSubject>,
         dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
+        dependency_graph_service: Arc<dyn DependencyGraphService>,
+        event_bus: Arc<EventBus>,
         multi_tenant: bool,
     ) -> Self {
         Self {
@@ -43,11 +47,17 @@ impl DatasetRepositoryLocalFs {
                 Box::new(DatasetMultiTenantStorageStrategy::new(
                     root,
                     current_account_subject,
+                    event_bus.clone(),
                 ))
             } else {
-                Box::new(DatasetSingleTenantStorageStrategy::new(root))
+                Box::new(DatasetSingleTenantStorageStrategy::new(
+                    root,
+                    event_bus.clone(),
+                ))
             },
             dataset_action_authorizer,
+            dependency_graph_service,
+            event_bus,
             thrash_lock: tokio::sync::Mutex::new(()),
         }
     }
@@ -56,6 +66,8 @@ impl DatasetRepositoryLocalFs {
         root: impl Into<PathBuf>,
         current_account_subject: Arc<CurrentAccountSubject>,
         dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
+        dependency_graph_service: Arc<dyn DependencyGraphService>,
+        event_bus: Arc<EventBus>,
         multi_tenant: bool,
     ) -> Result<Self, std::io::Error> {
         let root = root.into();
@@ -64,6 +76,8 @@ impl DatasetRepositoryLocalFs {
             root,
             current_account_subject,
             dataset_action_authorizer,
+            dependency_graph_service,
+            event_bus,
             multi_tenant,
         ))
     }
@@ -74,7 +88,10 @@ impl DatasetRepositoryLocalFs {
         dataset_handle: &DatasetHandle,
     ) -> Result<impl Dataset, InternalError> {
         let layout = DatasetLayout::new(self.storage_strategy.get_dataset_path(&dataset_handle));
-        Ok(DatasetFactoryImpl::get_local_fs(layout))
+        Ok(DatasetFactoryImpl::get_local_fs(
+            layout,
+            self.event_bus.clone(),
+        ))
     }
 
     // TODO: Used only for testing, but should be removed it in future to discourage
@@ -221,7 +238,7 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
 
         let layout = DatasetLayout::create(&dataset_path).int_err()?;
 
-        let dataset = DatasetFactoryImpl::get_local_fs(layout);
+        let dataset = DatasetFactoryImpl::get_local_fs(layout, self.event_bus.clone());
 
         // There are three possiblities at this point:
         // - Dataset did not exist before - continue normally
@@ -257,11 +274,26 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
             "Created new dataset",
         );
 
+        self.event_bus
+            .dispatch_event(events::DatasetEventCreated {
+                dataset_id: dataset_handle.id.clone(),
+            })
+            .await?;
+
         Ok(CreateDatasetResult {
             dataset_handle,
             dataset: Arc::new(dataset),
             head,
         })
+    }
+
+    async fn create_dataset_from_snapshot(
+        &self,
+        account_name: Option<AccountName>,
+        snapshot: DatasetSnapshot,
+    ) -> Result<CreateDatasetResult, CreateDatasetFromSnapshotError> {
+        create_dataset_from_snapshot_impl(self, self.event_bus.as_ref(), account_name, snapshot)
+            .await
     }
 
     async fn rename_dataset(
@@ -307,11 +339,25 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
             Err(GetDatasetError::Internal(e)) => Err(DeleteDatasetError::Internal(e)),
         }?;
 
-        let children: Vec<_> = get_downstream_dependencies_impl(self, dataset_ref)
-            .try_collect()
-            .await?;
+        use tokio_stream::StreamExt;
+        let downstream_dataset_ids: Vec<_> = self
+            .dependency_graph_service
+            .get_downstream_dependencies(&dataset_handle.id)
+            .await
+            .int_err()?
+            .collect()
+            .await;
 
-        if !children.is_empty() {
+        if !downstream_dataset_ids.is_empty() {
+            let mut children = Vec::with_capacity(downstream_dataset_ids.len());
+            for downstream_dataset_id in downstream_dataset_ids {
+                let hdl = self
+                    .resolve_dataset_ref(&downstream_dataset_id.as_local_ref())
+                    .await
+                    .int_err()?;
+                children.push(hdl);
+            }
+
             return Err(DanglingReferenceError {
                 dataset_handle,
                 children,
@@ -336,14 +382,14 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
 
         let dataset_dir = self.storage_strategy.get_dataset_path(&dataset_handle);
         tokio::fs::remove_dir_all(dataset_dir).await.int_err()?;
-        Ok(())
-    }
 
-    fn get_downstream_dependencies<'s>(
-        &'s self,
-        dataset_ref: &'s DatasetRef,
-    ) -> DatasetHandleStream<'s> {
-        Box::pin(get_downstream_dependencies_impl(self, dataset_ref))
+        self.event_bus
+            .dispatch_event(events::DatasetEventDeleted {
+                dataset_id: dataset_handle.id,
+            })
+            .await?;
+
+        Ok(())
     }
 }
 
@@ -402,11 +448,15 @@ enum ResolveDatasetError {
 
 struct DatasetSingleTenantStorageStrategy {
     root: PathBuf,
+    event_bus: Arc<EventBus>,
 }
 
 impl DatasetSingleTenantStorageStrategy {
-    pub fn new(root: impl Into<PathBuf>) -> Self {
-        Self { root: root.into() }
+    pub fn new(root: impl Into<PathBuf>, event_bus: Arc<EventBus>) -> Self {
+        Self {
+            root: root.into(),
+            event_bus,
+        }
     }
 
     fn dataset_name<'a>(&self, dataset_alias: &'a DatasetAlias) -> &'a DatasetName {
@@ -424,7 +474,7 @@ impl DatasetSingleTenantStorageStrategy {
         dataset_alias: &DatasetAlias,
     ) -> Result<DatasetSummary, ResolveDatasetError> {
         let layout = DatasetLayout::new(dataset_path);
-        let dataset = DatasetFactoryImpl::get_local_fs(layout);
+        let dataset = DatasetFactoryImpl::get_local_fs(layout, self.event_bus.clone());
         dataset
             .get_summary(GetSummaryOpts::default())
             .await
@@ -564,16 +614,19 @@ impl DatasetStorageStrategy for DatasetSingleTenantStorageStrategy {
 struct DatasetMultiTenantStorageStrategy {
     root: PathBuf,
     current_account_subject: Arc<CurrentAccountSubject>,
+    event_bus: Arc<EventBus>,
 }
 
 impl DatasetMultiTenantStorageStrategy {
     pub fn new(
         root: impl Into<PathBuf>,
         current_account_subject: Arc<CurrentAccountSubject>,
+        event_bus: Arc<EventBus>,
     ) -> Self {
         Self {
             root: root.into(),
             current_account_subject,
+            event_bus,
         }
     }
 
@@ -597,7 +650,7 @@ impl DatasetMultiTenantStorageStrategy {
         dataset_id: &DatasetID,
     ) -> Result<DatasetAlias, ResolveDatasetError> {
         let layout = DatasetLayout::new(dataset_path);
-        let dataset = DatasetFactoryImpl::get_local_fs(layout);
+        let dataset = DatasetFactoryImpl::get_local_fs(layout, self.event_bus.clone());
         match dataset.as_info_repo().get("alias").await {
             Ok(bytes) => {
                 let dataset_alias_str = std::str::from_utf8(&bytes[..]).int_err()?.trim();
@@ -824,7 +877,7 @@ impl DatasetStorageStrategy for DatasetMultiTenantStorageStrategy {
     ) -> Result<(), InternalError> {
         let dataset_path = self.get_dataset_path(dataset_handle);
         let layout = DatasetLayout::new(dataset_path);
-        let dataset = DatasetFactoryImpl::get_local_fs(layout);
+        let dataset = DatasetFactoryImpl::get_local_fs(layout, self.event_bus.clone());
 
         let new_alias =
             DatasetAlias::new(dataset_handle.alias.account_name.clone(), new_name.clone());

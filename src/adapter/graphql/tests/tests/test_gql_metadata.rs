@@ -9,6 +9,7 @@
 
 use async_graphql::*;
 use dill::*;
+use event_bus::EventBus;
 use indoc::indoc;
 use kamu::testing::MetadataFactory;
 use kamu::*;
@@ -24,6 +25,7 @@ async fn test_current_push_sources() {
     let tempdir = tempfile::tempdir().unwrap();
 
     let base_catalog = CatalogBuilder::new()
+        .add::<EventBus>()
         .add_builder(
             DatasetRepositoryLocalFs::builder()
                 .with_root(tempdir.path().join("datasets"))
@@ -33,13 +35,10 @@ async fn test_current_push_sources() {
         .add_builder(PushIngestServiceImpl::builder().with_run_info_dir(tempdir.path().join("run")))
         .bind::<dyn PushIngestService, PushIngestServiceImpl>()
         .add::<SystemTimeSourceDefault>()
-        .bind::<dyn SystemTimeSource, SystemTimeSourceDefault>()
         .add::<ObjectStoreRegistryImpl>()
-        .bind::<dyn ObjectStoreRegistry, ObjectStoreRegistryImpl>()
         .add::<DataFormatRegistryImpl>()
-        .bind::<dyn DataFormatRegistry, DataFormatRegistryImpl>()
         .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
-        .bind::<dyn auth::DatasetActionAuthorizer, auth::AlwaysHappyDatasetActionAuthorizer>()
+        .add::<DependencyGraphServiceInMemory>()
         .build();
 
     // Init dataset with no sources

@@ -11,7 +11,7 @@ use std::collections::HashSet;
 use std::str::FromStr;
 use std::sync::Arc;
 
-use dill::component;
+use dill::*;
 use kamu_core::auth::*;
 use kamu_core::{AccessError, CurrentAccountSubject, ErrorIntoInternal};
 use opendatafabric::DatasetHandle;
@@ -31,6 +31,7 @@ pub struct OsoDatasetAuthorizer {
 ///////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
+#[interface(dyn DatasetActionAuthorizer)]
 impl OsoDatasetAuthorizer {
     pub fn new(
         kamu_auth_oso: Arc<KamuAuthOso>,

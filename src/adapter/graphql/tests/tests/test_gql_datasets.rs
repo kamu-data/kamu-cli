@@ -8,6 +8,8 @@
 // by the Apache License, Version 2.0.
 
 use async_graphql::*;
+use dill::Component;
+use event_bus::EventBus;
 use indoc::indoc;
 use kamu::testing::MetadataFactory;
 use kamu::*;
@@ -375,6 +377,7 @@ async fn dataset_rename_name_collision() {
 #[test_log::test(tokio::test)]
 async fn dataset_delete_success() {
     let harness = GraphQLDatasetsHarness::new();
+    harness.init_dependencies_graph().await;
 
     let foo_result = harness
         .create_root_dataset(DatasetName::new_unchecked("foo"))
@@ -424,6 +427,7 @@ async fn dataset_delete_success() {
 #[test_log::test(tokio::test)]
 async fn dataset_delete_dangling_ref() {
     let harness = GraphQLDatasetsHarness::new();
+    harness.init_dependencies_graph().await;
 
     let foo_result = harness
         .create_root_dataset(DatasetName::new_unchecked("foo"))
@@ -529,7 +533,7 @@ async fn dataset_view_permissions() {
 
 struct GraphQLDatasetsHarness {
     _tempdir: tempfile::TempDir,
-    _base_catalog: dill::Catalog,
+    base_catalog: dill::Catalog,
     catalog_authorized: dill::Catalog,
     catalog_anonymous: dill::Catalog,
 }
@@ -541,8 +545,10 @@ impl GraphQLDatasetsHarness {
         std::fs::create_dir(&datasets_dir).unwrap();
 
         let base_catalog = dill::CatalogBuilder::new()
+            .add::<EventBus>()
+            .add::<DependencyGraphServiceInMemory>()
             .add_builder(
-                dill::builder_for::<DatasetRepositoryLocalFs>()
+                DatasetRepositoryLocalFs::builder()
                     .with_root(datasets_dir)
                     .with_multi_tenant(false),
             )
@@ -550,17 +556,31 @@ impl GraphQLDatasetsHarness {
             .add_value(kamu::testing::MockAuthenticationService::built_in())
             .bind::<dyn auth::AuthenticationService, kamu::testing::MockAuthenticationService>()
             .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
-            .bind::<dyn auth::DatasetActionAuthorizer, auth::AlwaysHappyDatasetActionAuthorizer>()
             .build();
 
         let (catalog_anonymous, catalog_authorized) = authentication_catalogs(&base_catalog);
 
         Self {
             _tempdir: tempdir,
-            _base_catalog: base_catalog,
+            base_catalog,
             catalog_anonymous,
             catalog_authorized,
         }
+    }
+
+    pub async fn init_dependencies_graph(&self) {
+        let dataset_repo = self
+            .catalog_authorized
+            .get_one::<dyn DatasetRepository>()
+            .unwrap();
+        let dependency_graph_service = self
+            .base_catalog
+            .get_one::<dyn DependencyGraphService>()
+            .unwrap();
+        dependency_graph_service
+            .eager_initialization(&DependencyGraphRepositoryInMemory::new(dataset_repo))
+            .await
+            .unwrap();
     }
 
     pub async fn create_root_dataset(&self, name: DatasetName) -> CreateDatasetResult {

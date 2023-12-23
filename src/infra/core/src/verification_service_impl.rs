@@ -24,6 +24,7 @@ pub struct VerificationServiceImpl {
 }
 
 #[component(pub)]
+#[interface(dyn VerificationService)]
 impl VerificationServiceImpl {
     pub fn new(
         dataset_repo: Arc<dyn DatasetRepository>,

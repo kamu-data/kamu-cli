@@ -35,6 +35,7 @@ pub struct SyncServiceImpl {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
+#[interface(dyn SyncService)]
 impl SyncServiceImpl {
     pub fn new(
         remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,

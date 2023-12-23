@@ -1,0 +1,52 @@
+[package]
+name = "kamu-flow-system-inmem"
+description = "In-memory implementation of the flows management for scheduled dataset and system activities"
+version = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+authors = { workspace = true }
+readme = { workspace = true }
+license-file = { workspace = true }
+keywords = { workspace = true }
+include = { workspace = true }
+edition = { workspace = true }
+publish = { workspace = true }
+
+
+[lib]
+doctest = false
+
+
+[dependencies]
+opendatafabric = { workspace = true }
+kamu = { workspace = true }
+kamu-core = { workspace = true }
+kamu-task-system = { workspace = true }
+kamu-flow-system = { workspace = true }
+event-bus = { workspace = true }
+
+async-stream = "0.3"
+async-trait = { version = "0.1", default-features = false }
+chrono = { version = "0.4", default-features = false }
+dill = "0.8"
+futures = "0.3"
+thiserror = { version = "1", default-features = false }
+tokio = { version = "1", default-features = false, features=[] }
+tokio-stream = { version = "0.1", default-features = false }
+tracing = { version = "0.1", default-features = false }
+url = { version = "2", default-features = false, features = ["serde"] }
+
+# TODO: Make serde optional
+serde = { version = "1", default-features = false, features = ["derive"] }
+serde_with = { version = "3", default-features = false }
+
+
+[dev-dependencies]
+kamu-task-system-inmem = { workspace = true }
+
+env_logger = "0.10"
+mockall = "0.11"
+tempfile = "3"
+test-log = { version = "0.2", features = ["trace"] }
+tokio = { version = "1", default-features = false, features=["rt", "macros"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }

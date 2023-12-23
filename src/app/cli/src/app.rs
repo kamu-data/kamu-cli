@@ -13,7 +13,6 @@ use std::sync::Arc;
 use container_runtime::{ContainerRuntime, ContainerRuntimeConfig};
 use dill::*;
 use kamu::domain::*;
-use kamu::utils::smart_transfer_protocol::SmartTransferProtocolClient;
 use kamu::*;
 
 use crate::error::*;
@@ -61,8 +60,18 @@ pub async fn run(
 
     // Configure application
     let (guards, base_catalog, cli_catalog, output_config) = {
+        let dependencies_graph_repository = prepare_dependencies_graph_repository(
+            &workspace_layout,
+            workspace_svc.is_multi_tenant_workspace(),
+            current_account.to_current_account_subject(),
+        );
+
         let mut base_catalog_builder =
             configure_base_catalog(&workspace_layout, workspace_svc.is_multi_tenant_workspace());
+
+        base_catalog_builder
+            .add_value(dependencies_graph_repository)
+            .bind::<dyn domain::DependencyGraphRepository, DependencyGraphRepositoryInMemory>();
 
         let output_config = configure_output_format(&matches, &workspace_svc);
         base_catalog_builder.add_value(output_config.clone());
@@ -145,6 +154,33 @@ pub async fn run(
 // Catalog
 /////////////////////////////////////////////////////////////////////////////////////////
 
+pub fn prepare_dependencies_graph_repository(
+    workspace_layout: &WorkspaceLayout,
+    multi_tenant_workspace: bool,
+    current_account_subject: CurrentAccountSubject,
+) -> DependencyGraphRepositoryInMemory {
+    // Construct a special catalog just to create 1 object, but with a repository
+    // bound to CLI user. It also should be authorized to access any dataset.
+
+    let special_catalog_for_graph = CatalogBuilder::new()
+        .add::<event_bus::EventBus>()
+        .add_builder(
+            DatasetRepositoryLocalFs::builder()
+                .with_root(workspace_layout.datasets_dir.clone())
+                .with_multi_tenant(multi_tenant_workspace),
+        )
+        .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+        .add_value(current_account_subject)
+        .add::<kamu::domain::auth::AlwaysHappyDatasetActionAuthorizer>()
+        .add::<kamu::DependencyGraphServiceInMemory>()
+        // Don't add it's own initializer, leave optional dependency uninitialized
+        .build();
+
+    let dataset_repo = special_catalog_for_graph.get_one().unwrap();
+
+    DependencyGraphRepositoryInMemory::new(dataset_repo)
+}
+
 // Public only for tests
 pub fn configure_base_catalog(
     workspace_layout: &WorkspaceLayout,
@@ -155,112 +191,99 @@ pub fn configure_base_catalog(
     b.add::<ContainerRuntime>();
 
     b.add::<SystemTimeSourceDefault>();
-    b.bind::<dyn SystemTimeSource, SystemTimeSourceDefault>();
+
+    b.add::<event_bus::EventBus>();
 
     b.add_builder(
-        builder_for::<DatasetRepositoryLocalFs>()
+        DatasetRepositoryLocalFs::builder()
             .with_root(workspace_layout.datasets_dir.clone())
             .with_multi_tenant(multi_tenant_workspace),
     );
     b.bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>();
 
     b.add::<DatasetFactoryImpl>();
-    b.bind::<dyn DatasetFactory, DatasetFactoryImpl>();
 
     b.add_builder(
-        builder_for::<RemoteRepositoryRegistryImpl>()
-            .with_repos_dir(workspace_layout.repos_dir.clone()),
+        RemoteRepositoryRegistryImpl::builder().with_repos_dir(workspace_layout.repos_dir.clone()),
     );
     b.bind::<dyn RemoteRepositoryRegistry, RemoteRepositoryRegistryImpl>();
 
     b.add::<RemoteAliasesRegistryImpl>();
-    b.bind::<dyn RemoteAliasesRegistry, RemoteAliasesRegistryImpl>();
 
     b.add::<ResourceLoaderImpl>();
-    b.bind::<dyn ResourceLoader, ResourceLoaderImpl>();
 
     b.add::<DataFormatRegistryImpl>();
-    b.bind::<dyn DataFormatRegistry, DataFormatRegistryImpl>();
 
     b.add_builder(
-        builder_for::<PollingIngestServiceImpl>()
+        PollingIngestServiceImpl::builder()
             .with_run_info_dir(workspace_layout.run_info_dir.clone())
             .with_cache_dir(workspace_layout.cache_dir.clone()),
     );
     b.bind::<dyn PollingIngestService, PollingIngestServiceImpl>();
 
     b.add_builder(
-        builder_for::<PushIngestServiceImpl>()
-            .with_run_info_dir(workspace_layout.run_info_dir.clone()),
+        PushIngestServiceImpl::builder().with_run_info_dir(workspace_layout.run_info_dir.clone()),
     );
     b.bind::<dyn PushIngestService, PushIngestServiceImpl>();
 
     b.add::<TransformServiceImpl>();
-    b.bind::<dyn TransformService, TransformServiceImpl>();
 
     b.add::<VerificationServiceImpl>();
-    b.bind::<dyn VerificationService, VerificationServiceImpl>();
 
     b.add::<SearchServiceImpl>();
-    b.bind::<dyn SearchService, SearchServiceImpl>();
 
     b.add::<SyncServiceImpl>();
-    b.bind::<dyn SyncService, SyncServiceImpl>();
 
     b.add::<PullServiceImpl>();
-    b.bind::<dyn PullService, PullServiceImpl>();
 
     b.add::<PushServiceImpl>();
-    b.bind::<dyn PushService, PushServiceImpl>();
 
     b.add::<ResetServiceImpl>();
-    b.bind::<dyn ResetService, ResetServiceImpl>();
 
     b.add::<ProvenanceServiceImpl>();
-    b.bind::<dyn ProvenanceService, ProvenanceServiceImpl>();
 
     b.add::<QueryServiceImpl>();
-    b.bind::<dyn QueryService, QueryServiceImpl>();
 
     b.add::<ObjectStoreRegistryImpl>();
-    b.bind::<dyn ObjectStoreRegistry, ObjectStoreRegistryImpl>();
 
-    b.add_value(ObjectStoreBuilderLocalFs::new());
-    b.bind::<dyn ObjectStoreBuilder, ObjectStoreBuilderLocalFs>();
+    b.add::<ObjectStoreBuilderLocalFs>();
 
     b.add_builder(
-        builder_for::<EngineProvisionerLocal>()
-            .with_run_info_dir(workspace_layout.run_info_dir.clone()),
+        EngineProvisionerLocal::builder().with_run_info_dir(workspace_layout.run_info_dir.clone()),
     );
     b.bind::<dyn EngineProvisioner, EngineProvisionerLocal>();
 
     b.add::<kamu_adapter_http::SmartTransferProtocolClientWs>();
-    b.bind::<dyn SmartTransferProtocolClient, kamu_adapter_http::SmartTransferProtocolClientWs>();
 
     b.add::<kamu_task_system_inmem::TaskSchedulerInMemory>();
-    b.bind::<dyn kamu_task_system_inmem::domain::TaskScheduler, kamu_task_system_inmem::TaskSchedulerInMemory>();
 
     b.add::<kamu_task_system_inmem::TaskExecutorInMemory>();
-    b.bind::<dyn kamu_task_system_inmem::domain::TaskExecutor, kamu_task_system_inmem::TaskExecutorInMemory>();
 
     b.add::<kamu_task_system_inmem::TaskSystemEventStoreInMemory>();
-    b.bind::<dyn kamu_task_system_inmem::domain::TaskSystemEventStore, kamu_task_system_inmem::TaskSystemEventStoreInMemory>();
+
+    // TODO: initialize graph dependencies when starting API server
+    b.add::<DependencyGraphServiceInMemory>();
+
+    b.add::<kamu_flow_system_inmem::FlowConfigurationServiceInMemory>();
+    b.add::<kamu_flow_system_inmem::FlowServiceInMemory>();
+    b.add_value(kamu_flow_system_inmem::domain::FlowServiceRunConfig::new(
+        chrono::Duration::seconds(1),
+    ));
+
+    b.add::<kamu_flow_system_inmem::FlowEventStoreInMem>();
+    b.add::<kamu_flow_system_inmem::FlowConfigurationEventStoreInMem>();
 
     b.add::<accounts::AccountService>();
-    b.bind::<dyn auth::AuthenticationProvider, accounts::AccountService>();
 
     // No Github login possible for single-tenant workspace
     if multi_tenant_workspace {
         b.add::<kamu_adapter_oauth::OAuthGithub>();
-        b.bind::<dyn domain::auth::AuthenticationProvider, kamu_adapter_oauth::OAuthGithub>();
     }
 
     b.add::<AuthenticationServiceImpl>();
-    b.bind::<dyn domain::auth::AuthenticationService, AuthenticationServiceImpl>();
 
     b.add::<kamu_adapter_auth_oso::KamuAuthOso>();
     b.add::<kamu_adapter_auth_oso::OsoDatasetAuthorizer>();
-    b.bind::<dyn domain::auth::DatasetActionAuthorizer, kamu_adapter_auth_oso::OsoDatasetAuthorizer>();
 
     b
 }
@@ -274,10 +297,8 @@ pub fn configure_cli_catalog(base_catalog: &Catalog) -> CatalogBuilder {
     b.add::<WorkspaceService>();
 
     b.add::<odf_server::AccessTokenRegistryService>();
-    b.bind::<dyn auth::OdfServerAccessTokenResolver, odf_server::AccessTokenRegistryService>();
     b.add::<odf_server::LoginService>();
     b.add::<odf_server::CLIAccessTokenStore>();
-    b.bind::<dyn odf_server::AccessTokenStore, odf_server::CLIAccessTokenStore>();
 
     b
 }

@@ -10,28 +10,50 @@
 use std::sync::Arc;
 
 use dill::*;
-use kamu_core::{PullOptions, PullService};
+use event_bus::EventBus;
+use kamu_core::{PullOptions, PullService, SystemTimeSource};
 use kamu_task_system::*;
 
 pub struct TaskExecutorInMemory {
     task_sched: Arc<dyn TaskScheduler>,
     event_store: Arc<dyn TaskSystemEventStore>,
+    event_bus: Arc<EventBus>,
+    time_source: Arc<dyn SystemTimeSource>,
     catalog: Catalog,
 }
 
 #[component(pub)]
+#[interface(dyn TaskExecutor)]
 #[scope(Singleton)]
 impl TaskExecutorInMemory {
     pub fn new(
         task_sched: Arc<dyn TaskScheduler>,
         event_store: Arc<dyn TaskSystemEventStore>,
+        event_bus: Arc<EventBus>,
+        time_source: Arc<dyn SystemTimeSource>,
         catalog: Catalog,
     ) -> Self {
         Self {
             task_sched,
             event_store,
+            event_bus,
+            time_source,
             catalog,
         }
+    }
+
+    async fn publish_task_finished(
+        &self,
+        task_id: TaskID,
+        outcome: TaskOutcome,
+    ) -> Result<(), InternalError> {
+        self.event_bus
+            .dispatch_event(TaskEventFinished {
+                event_time: self.time_source.now(),
+                task_id,
+                outcome,
+            })
+            .await
     }
 }
 
@@ -51,10 +73,9 @@ impl TaskExecutor for TaskExecutorInMemory {
                 "Executing task",
             );
 
-            let pull_svc = self.catalog.get_one::<dyn PullService>().int_err()?;
-
             let outcome = match &task.logical_plan {
                 LogicalPlan::UpdateDataset(upd) => {
+                    let pull_svc = self.catalog.get_one::<dyn PullService>().int_err()?;
                     let res = pull_svc
                         .pull(&upd.dataset_id.as_any_ref(), PullOptions::default(), None)
                         .await;
@@ -85,8 +106,10 @@ impl TaskExecutor for TaskExecutorInMemory {
 
             // Refresh the task in case it was updated concurrently (e.g. late cancellation)
             task.update(self.event_store.as_ref()).await.int_err()?;
-            task.finish(outcome).int_err()?;
+            task.finish(self.time_source.now(), outcome).int_err()?;
             task.save(self.event_store.as_ref()).await.int_err()?;
+
+            self.publish_task_finished(task.task_id, outcome).await?;
         }
     }
 }

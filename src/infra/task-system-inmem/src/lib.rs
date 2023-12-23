@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 #![feature(error_generic_member_access)]
+#![feature(hash_set_entry)]
 
 // Re-exports
 pub use kamu_task_system as domain;

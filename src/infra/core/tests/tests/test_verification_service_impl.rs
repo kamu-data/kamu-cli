@@ -13,6 +13,8 @@ use std::sync::{Arc, Mutex};
 use datafusion::arrow::array::{Array, Int32Array, StringArray};
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use datafusion::arrow::record_batch::RecordBatch;
+use dill::Component;
+use event_bus::EventBus;
 use kamu::domain::*;
 use kamu::testing::{MetadataFactory, MockDatasetActionAuthorizer, ParquetWriterHelper};
 use kamu::*;
@@ -26,25 +28,27 @@ async fn test_verify_data_consistency() {
 
     let dataset_alias = DatasetAlias::new(None, DatasetName::new_unchecked("bar"));
 
-    let dataset_authorizer = Arc::new(
-        MockDatasetActionAuthorizer::new().expect_check_read_dataset(dataset_alias.clone(), 3),
-    );
-
-    let dataset_repo = Arc::new(
-        DatasetRepositoryLocalFs::create(
-            tempdir.path().join("datasets"),
-            Arc::new(CurrentAccountSubject::new_test()),
-            dataset_authorizer.clone(),
-            false,
+    let catalog = dill::CatalogBuilder::new()
+        .add::<EventBus>()
+        .add::<DependencyGraphServiceInMemory>()
+        .add_value(CurrentAccountSubject::new_test())
+        .add_value(
+            MockDatasetActionAuthorizer::new().expect_check_read_dataset(dataset_alias.clone(), 3),
         )
-        .unwrap(),
-    );
+        .bind::<dyn auth::DatasetActionAuthorizer, MockDatasetActionAuthorizer>()
+        .add_builder(
+            DatasetRepositoryLocalFs::builder()
+                .with_root(tempdir.path().join("datasets"))
+                .with_multi_tenant(false),
+        )
+        .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+        .add_value(TestTransformService::new(Arc::new(Mutex::new(Vec::new()))))
+        .bind::<dyn TransformService, TestTransformService>()
+        .add::<VerificationServiceImpl>()
+        .build();
 
-    let verification_svc = Arc::new(VerificationServiceImpl::new(
-        dataset_repo.clone(),
-        dataset_authorizer.clone(),
-        Arc::new(TestTransformService::new(Arc::new(Mutex::new(Vec::new())))),
-    ));
+    let verification_svc = catalog.get_one::<dyn VerificationService>().unwrap();
+    let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
 
     dataset_repo
         .create_dataset_from_snapshot(

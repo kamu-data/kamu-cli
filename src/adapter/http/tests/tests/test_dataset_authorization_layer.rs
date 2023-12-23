@@ -12,6 +12,8 @@
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::str::FromStr;
 
+use dill::Component;
+use event_bus::EventBus;
 use kamu::domain::auth::DatasetAction;
 use kamu::domain::{
     AnonymousAccountReason,
@@ -21,7 +23,7 @@ use kamu::domain::{
     ResultIntoInternal,
 };
 use kamu::testing::{MetadataFactory, MockDatasetActionAuthorizer};
-use kamu::DatasetRepositoryLocalFs;
+use kamu::{DatasetRepositoryLocalFs, DependencyGraphServiceInMemory};
 use mockall::predicate::{eq, function};
 use opendatafabric::{DatasetAlias, DatasetHandle, DatasetKind, DatasetName, DatasetRef};
 use url::Url;
@@ -211,6 +213,8 @@ impl ServerHarness {
         let temp_dir = tempfile::TempDir::new().unwrap();
 
         let mut catalog_builder = dill::CatalogBuilder::new();
+        catalog_builder.add::<EventBus>();
+        catalog_builder.add::<DependencyGraphServiceInMemory>();
         catalog_builder.add_value(
             kamu::testing::MockAuthenticationService::resolving_token(kamu::domain::auth::DUMMY_ACCESS_TOKEN, kamu::domain::auth::AccountInfo::dummy())
         )
@@ -221,7 +225,7 @@ impl ServerHarness {
         catalog_builder.add_value(current_account_subject);
         catalog_builder
             .add_builder(
-                dill::builder_for::<DatasetRepositoryLocalFs>()
+                DatasetRepositoryLocalFs::builder()
                     .with_multi_tenant(false)
                     .with_root(temp_dir.path().join("datasets")),
             )

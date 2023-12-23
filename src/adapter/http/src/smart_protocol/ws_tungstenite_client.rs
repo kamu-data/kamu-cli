@@ -10,8 +10,10 @@
 use std::sync::atomic::{AtomicI32, Ordering};
 use std::sync::Arc;
 
-use dill::component;
+use dill::*;
+use event_bus::EventBus;
 use futures::SinkExt;
+use kamu::domain::events::DatasetEventDependenciesUpdated;
 use kamu::domain::*;
 use kamu::utils::smart_transfer_protocol::{
     DatasetFactoryFn,
@@ -35,15 +37,21 @@ use crate::ws_common::{self, ReadMessageError, WriteMessageError};
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct WsSmartTransferProtocolClient {
+    event_bus: Arc<EventBus>,
     dataset_credential_resolver: Arc<dyn auth::OdfServerAccessTokenResolver>,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
+#[interface(dyn SmartTransferProtocolClient)]
 impl WsSmartTransferProtocolClient {
-    pub fn new(dataset_credential_resolver: Arc<dyn auth::OdfServerAccessTokenResolver>) -> Self {
+    pub fn new(
+        event_bus: Arc<EventBus>,
+        dataset_credential_resolver: Arc<dyn auth::OdfServerAccessTokenResolver>,
+    ) -> Self {
         Self {
+            event_bus,
             dataset_credential_resolver,
         }
     }
@@ -594,12 +602,25 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
                     .await?;
             }
 
-            dataset_append_metadata(dst.as_ref(), new_blocks)
+            let response = dataset_append_metadata(dst.as_ref(), new_blocks)
                 .await
                 .map_err(|e| {
                     tracing::debug!("Appending dataset metadata failed with error: {}", e);
                     SyncError::Internal(e.int_err())
                 })?;
+
+            // TODO: encapsulate this inside dataset/chain
+            if !response.new_upstream_ids.is_empty() {
+                let summary = dst.get_summary(GetSummaryOpts::default()).await.int_err()?;
+
+                self.event_bus
+                    .dispatch_event(DatasetEventDependenciesUpdated {
+                        dataset_id: summary.id.clone(),
+                        new_upstream_ids: response.new_upstream_ids,
+                    })
+                    .await
+                    .int_err()?;
+            }
 
             let new_dst_head = dst
                 .as_metadata_chain()

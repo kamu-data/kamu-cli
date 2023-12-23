@@ -9,6 +9,7 @@
 
 use std::assert_matches::assert_matches;
 
+use chrono::Utc;
 use kamu_task_system_inmem::domain::*;
 use kamu_task_system_inmem::*;
 
@@ -16,7 +17,11 @@ use kamu_task_system_inmem::*;
 async fn test_task_agg_create_new() {
     let event_store = TaskSystemEventStoreInMemory::new();
 
-    let mut task = Task::new(event_store.new_task_id(), Probe::default().into());
+    let mut task = Task::new(
+        Utc::now(),
+        event_store.new_task_id(),
+        Probe::default().into(),
+    );
 
     assert_eq!(event_store.len().await.unwrap(), 0);
 
@@ -36,17 +41,17 @@ async fn test_task_save_load_update() {
     let event_store = TaskSystemEventStoreInMemory::new();
     let task_id = event_store.new_task_id();
 
-    let mut task = Task::new(task_id, Probe::default().into());
+    let mut task = Task::new(Utc::now(), task_id, Probe::default().into());
     task.save(&event_store).await.unwrap();
 
-    task.run().unwrap();
-    task.cancel().unwrap();
+    task.run(Utc::now()).unwrap();
+    task.cancel(Utc::now()).unwrap();
 
     task.save(&event_store).await.unwrap();
     let cancel_event = *task.last_stored_event().unwrap();
     assert_eq!(event_store.len().await.unwrap(), 3);
 
-    task.finish(TaskOutcome::Cancelled).unwrap();
+    task.finish(Utc::now(), TaskOutcome::Cancelled).unwrap();
 
     task.save(&event_store).await.unwrap();
     assert_eq!(event_store.len().await.unwrap(), 4);
@@ -77,8 +82,12 @@ async fn test_task_save_load_update() {
 async fn test_task_agg_illegal_transition() {
     let event_store = TaskSystemEventStoreInMemory::new();
 
-    let mut task = Task::new(event_store.new_task_id(), Probe::default().into());
-    task.finish(TaskOutcome::Cancelled).unwrap();
+    let mut task = Task::new(
+        Utc::now(),
+        event_store.new_task_id(),
+        Probe::default().into(),
+    );
+    task.finish(Utc::now(), TaskOutcome::Cancelled).unwrap();
 
-    assert_matches!(task.run(), Err(ProjectionError { .. }));
+    assert_matches!(task.run(Utc::now(),), Err(ProjectionError { .. }));
 }

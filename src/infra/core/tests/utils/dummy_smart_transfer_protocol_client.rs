@@ -15,6 +15,8 @@ use kamu::utils::smart_transfer_protocol::{ObjectTransferOptions, SmartTransferP
 use opendatafabric::Multihash;
 use url::Url;
 
+#[dill::component]
+#[dill::interface(dyn SmartTransferProtocolClient)]
 pub struct DummySmartTransferProtocolClient {}
 
 impl DummySmartTransferProtocolClient {

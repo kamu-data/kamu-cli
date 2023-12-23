@@ -12,7 +12,8 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
 
-use dill::builder_for;
+use dill::Component;
+use event_bus::EventBus;
 use kamu::domain::{
     auth,
     DatasetRepository,
@@ -22,7 +23,7 @@ use kamu::domain::{
     SystemTimeSourceStub,
 };
 use kamu::testing::MockAuthenticationService;
-use kamu::{DatasetLayout, DatasetRepositoryLocalFs};
+use kamu::{DatasetLayout, DatasetRepositoryLocalFs, DependencyGraphServiceInMemory};
 use opendatafabric::{AccountName, DatasetAlias, DatasetHandle};
 use tempfile::TempDir;
 use url::Url;
@@ -62,10 +63,12 @@ impl ServerSideLocalFsHarness {
         let time_source = SystemTimeSourceStub::new();
 
         base_catalog_builder
+            .add::<EventBus>()
             .add_value(time_source.clone())
             .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
+            .add::<DependencyGraphServiceInMemory>()
             .add_builder(
-                builder_for::<DatasetRepositoryLocalFs>()
+                DatasetRepositoryLocalFs::builder()
                     .with_root(datasets_dir)
                     .with_multi_tenant(options.multi_tenant),
             )

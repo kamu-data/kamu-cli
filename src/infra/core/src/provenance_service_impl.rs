@@ -24,6 +24,7 @@ pub struct ProvenanceServiceImpl {
 }
 
 #[component(pub)]
+#[interface(dyn ProvenanceService)]
 impl ProvenanceServiceImpl {
     pub fn new(
         dataset_repo: Arc<dyn DatasetRepository>,

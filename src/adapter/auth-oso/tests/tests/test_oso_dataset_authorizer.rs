@@ -11,8 +11,10 @@ use std::assert_matches::assert_matches;
 use std::collections::HashSet;
 use std::sync::Arc;
 
+use dill::Component;
+use event_bus::EventBus;
 use kamu::testing::MetadataFactory;
-use kamu::DatasetRepositoryLocalFs;
+use kamu::{DatasetRepositoryLocalFs, DependencyGraphServiceInMemory};
 use kamu_adapter_auth_oso::{KamuAuthOso, OsoDatasetAuthorizer};
 use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer, DatasetActionUnauthorizedError};
 use kamu_core::{AccessError, CurrentAccountSubject, DatasetRepository};
@@ -93,7 +95,7 @@ async fn test_guest_can_read_but_not_write() {
 pub struct DatasetAuthorizerHarness {
     tempdir: TempDir,
     dataset_repository: Arc<dyn DatasetRepository>,
-    dataset_authorizer: Arc<OsoDatasetAuthorizer>,
+    dataset_authorizer: Arc<dyn DatasetActionAuthorizer>,
 }
 
 impl DatasetAuthorizerHarness {
@@ -102,21 +104,24 @@ impl DatasetAuthorizerHarness {
         let datasets_dir = tempdir.path().join("datasets");
         std::fs::create_dir(&datasets_dir).unwrap();
 
-        let current_account_subject = Arc::new(CurrentAccountSubject::logged(
-            AccountName::new_unchecked(current_account_name),
-        ));
+        let catalog = dill::CatalogBuilder::new()
+            .add::<EventBus>()
+            .add_value(CurrentAccountSubject::logged(AccountName::new_unchecked(
+                current_account_name,
+            )))
+            .add::<KamuAuthOso>()
+            .add::<OsoDatasetAuthorizer>()
+            .add::<DependencyGraphServiceInMemory>()
+            .add_builder(
+                DatasetRepositoryLocalFs::builder()
+                    .with_root(datasets_dir)
+                    .with_multi_tenant(true),
+            )
+            .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+            .build();
 
-        let dataset_authorizer = Arc::new(OsoDatasetAuthorizer::new(
-            Arc::new(KamuAuthOso::new()),
-            current_account_subject.clone(),
-        ));
-
-        let dataset_repository = Arc::new(DatasetRepositoryLocalFs::new(
-            datasets_dir,
-            current_account_subject.clone(),
-            dataset_authorizer.clone(),
-            true,
-        ));
+        let dataset_repository = catalog.get_one::<dyn DatasetRepository>().unwrap();
+        let dataset_authorizer = catalog.get_one::<dyn DatasetActionAuthorizer>().unwrap();
 
         Self {
             tempdir,

@@ -8,13 +8,13 @@
 // by the Apache License, Version 2.0.
 
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
-use std::sync::Arc;
 
 use ::serde::Deserialize;
 use axum::extract::{FromRequestParts, Path};
 use axum::routing::IntoMakeService;
 use axum::Router;
-use dill::builder_for;
+use dill::Component;
+use event_bus::EventBus;
 use hyper::server::conn::AddrIncoming;
 use kamu::domain::*;
 use kamu::testing::*;
@@ -38,15 +38,16 @@ async fn setup_repo() -> RepoFixture {
     std::fs::create_dir(&datasets_dir).unwrap();
 
     let catalog = dill::CatalogBuilder::new()
+        .add::<EventBus>()
+        .add::<DependencyGraphServiceInMemory>()
         .add_builder(
-            builder_for::<DatasetRepositoryLocalFs>()
+            DatasetRepositoryLocalFs::builder()
                 .with_root(datasets_dir)
                 .with_multi_tenant(false),
         )
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
         .add_value(CurrentAccountSubject::new_test())
         .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
-        .bind::<dyn auth::DatasetActionAuthorizer, auth::AlwaysHappyDatasetActionAuthorizer>()
         .build();
 
     let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
@@ -110,9 +111,15 @@ where
 /////////////////////////////////////////////////////////////////////////////////////////
 
 async fn setup_client(dataset_url: url::Url, head_expected: Multihash) {
+    let catalog = dill::CatalogBuilder::new()
+        .add::<EventBus>()
+        .add::<auth::DummyOdfServerAccessTokenResolver>()
+        .build();
+
     let dataset = DatasetFactoryImpl::new(
         IpfsGateway::default(),
-        Arc::new(auth::DummyOdfServerAccessTokenResolver::new()),
+        catalog.get_one().unwrap(),
+        catalog.get_one().unwrap(),
     )
     .get_dataset(&dataset_url, false)
     .await
