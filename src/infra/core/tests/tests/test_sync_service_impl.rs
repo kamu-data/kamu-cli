@@ -177,9 +177,11 @@ async fn do_test_sync(
     assert_in_sync(&dataset_repo, &dataset_alias, &dataset_alias_2).await;
 
     // Subsequent sync ////////////////////////////////////////////////////////
-    let _b2 = DatasetTestHelper::append_random_data(dataset_repo.as_ref(), &dataset_alias).await;
+    let _b2 =
+        DatasetTestHelper::append_random_data(dataset_repo.as_ref(), &dataset_alias, false).await;
 
-    let b3 = DatasetTestHelper::append_random_data(dataset_repo.as_ref(), &dataset_alias).await;
+    let b3 =
+        DatasetTestHelper::append_random_data(dataset_repo.as_ref(), &dataset_alias, false).await;
 
     assert_matches!(
         sync_svc.sync(&pull_ref.as_any_ref(), &dataset_alias.as_any_ref(), SyncOptions::default(), None).await,
@@ -238,7 +240,7 @@ async fn do_test_sync(
 
     // Push a new block into dataset_2 (which we were pulling into before)
     let exta_head =
-        DatasetTestHelper::append_random_data(dataset_repo.as_ref(), &dataset_alias_2).await;
+        DatasetTestHelper::append_random_data(dataset_repo.as_ref(), &dataset_alias_2, false).await;
 
     assert_matches!(
         sync_svc.sync(&dataset_alias_2.as_any_ref(), &push_ref.as_any_ref(), SyncOptions::default(), None).await,
@@ -306,12 +308,14 @@ async fn do_test_sync(
 
     // Datasets complex divergence //////////////////////////////////////////////
 
-    let _b4 = DatasetTestHelper::append_random_data(dataset_repo.as_ref(), &dataset_alias).await;
+    let _b4 =
+        DatasetTestHelper::append_random_data(dataset_repo.as_ref(), &dataset_alias, false).await;
 
-    let b5 = DatasetTestHelper::append_random_data(dataset_repo.as_ref(), &dataset_alias).await;
+    let b5 =
+        DatasetTestHelper::append_random_data(dataset_repo.as_ref(), &dataset_alias, false).await;
 
     let b4_alt =
-        DatasetTestHelper::append_random_data(dataset_repo.as_ref(), &dataset_alias_2).await;
+        DatasetTestHelper::append_random_data(dataset_repo.as_ref(), &dataset_alias_2, false).await;
 
     assert_matches!(
         sync_svc.sync(&dataset_alias.as_any_ref(), &push_ref.as_any_ref(), SyncOptions::default(), None).await,

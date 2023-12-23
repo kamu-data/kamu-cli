@@ -82,7 +82,8 @@ async fn setup_dataset(
 
     // Generate initial 70 blocks in dataset
     for _ in 1..70 {
-        let _ = DatasetTestHelper::append_random_data(dataset_repo.as_ref(), &*dataset_alias).await;
+        let _ = DatasetTestHelper::append_random_data(dataset_repo.as_ref(), &*dataset_alias, true)
+            .await;
     }
 
     (Arc::new(sync_svc), dataset_repo)
@@ -116,7 +117,8 @@ async fn do_test_sync(
     // Generate additional 70 blocks in dataset to make sure next iteration will be
     // the same as previos
     for _ in 1..70 {
-        let _ = DatasetTestHelper::append_random_data(dataset_repo.as_ref(), &*dataset_alias).await;
+        let _ = DatasetTestHelper::append_random_data(dataset_repo.as_ref(), &*dataset_alias, true)
+            .await;
     }
 }
 
