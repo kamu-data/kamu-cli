@@ -12,6 +12,8 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use criterion::{criterion_group, criterion_main, Criterion};
+use dill::*;
+use event_bus::EventBus;
 use kamu::domain::*;
 use kamu::testing::{
     DatasetTestHelper,
@@ -23,6 +25,7 @@ use kamu::utils::ipfs_wrapper::IpfsClient;
 use kamu::{
     DatasetFactoryImpl,
     DatasetRepositoryLocalFs,
+    DependencyGraphServiceInMemory,
     IpfsGateway,
     RemoteRepositoryRegistryImpl,
     SyncServiceImpl,
@@ -36,36 +39,34 @@ async fn setup_dataset(
     tmp_workspace_dir: &Path,
     dataset_alias: Arc<DatasetAlias>,
     ipfs: Option<(IpfsGateway, IpfsClient)>,
-) -> (Arc<SyncServiceImpl>, Arc<DatasetRepositoryLocalFs>) {
+) -> (Arc<dyn SyncService>, Arc<DatasetRepositoryLocalFs>) {
     let (ipfs_gateway, ipfs_client) = ipfs.unwrap_or_default();
 
-    let dataset_authorizer = Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new());
-
-    let dataset_repo = Arc::new(
-        DatasetRepositoryLocalFs::create(
-            tmp_workspace_dir.join("datasets"),
-            Arc::new(CurrentAccountSubject::new_test()),
-            dataset_authorizer.clone() as Arc<dyn auth::DatasetActionAuthorizer>,
-            false,
+    let catalog = dill::CatalogBuilder::new()
+        .add::<EventBus>()
+        .add::<DependencyGraphServiceInMemory>()
+        .add_value(ipfs_gateway)
+        .add_value(ipfs_client)
+        .add_value(CurrentAccountSubject::new_test())
+        .add_builder(
+            DatasetRepositoryLocalFs::builder()
+                .with_root(tmp_workspace_dir.join("datasets"))
+                .with_multi_tenant(false),
         )
-        .unwrap(),
-    );
+        .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+        .add_builder(
+            RemoteRepositoryRegistryImpl::builder().with_repos_dir(tmp_workspace_dir.join("repos")),
+        )
+        .bind::<dyn RemoteRepositoryRegistry, RemoteRepositoryRegistryImpl>()
+        .add::<auth::DummyOdfServerAccessTokenResolver>()
+        .add::<DatasetFactoryImpl>()
+        .add::<SyncServiceImpl>()
+        .add::<DummySmartTransferProtocolClient>()
+        .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
+        .build();
 
-    let remote_repo_reg =
-        Arc::new(RemoteRepositoryRegistryImpl::create(tmp_workspace_dir.join("repos")).unwrap());
-    let dataset_factory = Arc::new(DatasetFactoryImpl::new(
-        ipfs_gateway,
-        Arc::new(auth::DummyOdfServerAccessTokenResolver::new()),
-    ));
-
-    let sync_svc = SyncServiceImpl::new(
-        remote_repo_reg.clone(),
-        dataset_repo.clone(),
-        dataset_authorizer.clone(),
-        dataset_factory,
-        Arc::new(DummySmartTransferProtocolClient::new()),
-        Arc::new(ipfs_client),
-    );
+    let sync_svc = catalog.get_one::<dyn SyncService>().unwrap();
+    let dataset_repo = catalog.get_one::<DatasetRepositoryLocalFs>().unwrap();
 
     // Add dataset
     let snapshot = MetadataFactory::dataset_snapshot()
@@ -86,11 +87,11 @@ async fn setup_dataset(
             .await;
     }
 
-    (Arc::new(sync_svc), dataset_repo)
+    (sync_svc, dataset_repo)
 }
 
 async fn do_test_sync(
-    sync_svc: Arc<SyncServiceImpl>,
+    sync_svc: Arc<dyn SyncService>,
     dataset_alias: Arc<DatasetAlias>,
     pull_repo_url: &DatasetRefRemote,
     push_repo_url: &DatasetRefRemote,

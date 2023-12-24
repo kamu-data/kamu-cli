@@ -13,11 +13,11 @@ use kamu_core::{Dataset, SyncError, SyncListener, SyncResult};
 use opendatafabric::Multihash;
 use url::Url;
 
-#[dill::component]
-#[dill::interface(dyn SmartTransferProtocolClient)]
 use crate::utils::simple_transfer_protocol::DatasetFactoryFn;
 use crate::utils::smart_transfer_protocol::{ObjectTransferOptions, SmartTransferProtocolClient};
 
+#[dill::component]
+#[dill::interface(dyn SmartTransferProtocolClient)]
 pub struct DummySmartTransferProtocolClient {}
 
 impl DummySmartTransferProtocolClient {
