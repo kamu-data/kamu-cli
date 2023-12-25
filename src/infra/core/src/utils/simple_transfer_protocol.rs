@@ -47,7 +47,6 @@ impl Default for SimpleProtocolTransferOptions {
                     .unwrap_or(DEFAULT_SIMPLE_PROTOCOL_MAX_PARALLEL_TRANSFERS),
                 _ => DEFAULT_SIMPLE_PROTOCOL_MAX_PARALLEL_TRANSFERS,
             };
-        // Use number of allowed cuncurrent file transfers. Default value is 10
         Self {
             max_parallel_transfers,
         }
@@ -240,7 +239,7 @@ impl SimpleTransferProtocol {
         }
     }
 
-    async fn downlaod_block_data<'a>(
+    async fn download_block_data<'a>(
         &'a self,
         src: &'a dyn Dataset,
         dst: &'a dyn Dataset,
@@ -307,7 +306,7 @@ impl SimpleTransferProtocol {
         Ok(())
     }
 
-    async fn downlaod_block_checkpoints<'a>(
+    async fn download_block_checkpoints<'a>(
         &'a self,
         src: &'a dyn Dataset,
         dst: &'a dyn Dataset,
@@ -414,7 +413,7 @@ impl SimpleTransferProtocol {
         blocks.iter().rev().for_each(|(_, b)| {
             if let Some(block_stream) = b.as_data_stream_block() {
                 if let Some(data_slice) = block_stream.event.output_data {
-                    block_download_tasks.push(Box::pin(self.downlaod_block_data(
+                    block_download_tasks.push(Box::pin(self.download_block_data(
                         src,
                         dst,
                         data_slice,
@@ -427,7 +426,7 @@ impl SimpleTransferProtocol {
                         as Pin<Box<dyn Future<Output = Result<(), SyncError>> + Send>>)
                 }
                 if let Some(checkpoint) = block_stream.event.output_checkpoint {
-                    block_download_tasks.push(Box::pin(self.downlaod_block_checkpoints(
+                    block_download_tasks.push(Box::pin(self.download_block_checkpoints(
                         src,
                         dst,
                         checkpoint,
@@ -440,11 +439,12 @@ impl SimpleTransferProtocol {
         });
 
         stream::iter(block_download_tasks)
-            .for_each_concurrent(
+            .map(Ok)
+            .try_for_each_concurrent(
                 SimpleProtocolTransferOptions::default().max_parallel_transfers,
-                |future| async move { future.await.unwrap() },
+                |future| async move { future.await },
             )
-            .await;
+            .await?;
 
         // Commit blocks
         for (hash, block) in blocks.into_iter().rev() {

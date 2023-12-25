@@ -71,7 +71,7 @@ async fn do_test_sync(
 
     let dataset_authorizer = construct_authorizer(
         AuthorizationExpectations {
-            d1_reads: 7,
+            d1_reads: 8,
             d2_reads: 2,
             d1_writes: 1,
             d2_writes: 4,
@@ -330,6 +330,58 @@ async fn do_test_sync(
         sync_svc.sync(&dataset_alias_2.as_any_ref(), &push_ref.as_any_ref(), SyncOptions::default(), None).await,
         Err(SyncError::DatasetsDiverged(DatasetsDivergedError { src_head, dst_head, uncommon_blocks_in_src, uncommon_blocks_in_dst }))
         if src_head == b4_alt && dst_head == b5 && uncommon_blocks_in_src == 1 && uncommon_blocks_in_dst == 2
+    );
+
+    // Datasets corrupted transfer flow /////////////////////////////////////////
+
+    let _b6 =
+        DatasetTestHelper::append_random_data(dataset_repo.as_ref(), &dataset_alias, false).await;
+
+    let dir_files = std::fs::read_dir(tmp_workspace_dir.join("datasets/foo/checkpoints")).unwrap();
+    for file_info in dir_files {
+        std::fs::remove_file(file_info.unwrap().path()).unwrap();
+    }
+
+    for _i in 0..15 {
+        let _: MultihashGeneric<32> =
+            DatasetTestHelper::append_random_data(dataset_repo.as_ref(), &dataset_alias, false)
+                .await;
+    }
+
+    let head_before_sync = dataset_repo
+        .get_dataset(&dataset_alias.as_local_ref())
+        .await
+        .unwrap()
+        .as_metadata_chain()
+        .get_ref(&BlockRef::Head)
+        .await
+        .unwrap();
+
+    assert_matches!(
+        sync_svc
+        .sync(
+            &dataset_alias.as_any_ref(),
+            &push_ref.as_any_ref(),
+            SyncOptions::default(),
+            None,
+        )
+        .await,
+        Err(SyncError::Corrupted(CorruptedSourceError {
+            message,
+            source: _
+        })) if message == "Source checkpoint file is missing".to_string()
+    );
+
+    assert_eq!(
+        dataset_repo
+            .get_dataset(&dataset_alias.as_local_ref())
+            .await
+            .unwrap()
+            .as_metadata_chain()
+            .get_ref(&BlockRef::Head)
+            .await
+            .unwrap(),
+        head_before_sync,
     );
 }
 
