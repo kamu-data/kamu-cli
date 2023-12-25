@@ -19,7 +19,7 @@ use chrono::{DateTime, Utc};
 use crate::dtos;
 use crate::dtos::{CompressionFormat, DatasetKind, SourceOrdering};
 use crate::formats::*;
-use crate::identity::{DatasetID, DatasetName, DatasetRefAny};
+use crate::identity::{DatasetAlias, DatasetID, DatasetName, DatasetRefAny};
 
 ////////////////////////////////////////////////////////////////////////////////
 // AddData
@@ -27,32 +27,34 @@ use crate::identity::{DatasetID, DatasetName, DatasetRefAny};
 ////////////////////////////////////////////////////////////////////////////////
 
 pub trait AddData {
-    fn input_checkpoint(&self) -> Option<&Multihash>;
-    fn output_data(&self) -> Option<&dyn DataSlice>;
-    fn output_checkpoint(&self) -> Option<&dyn Checkpoint>;
-    fn output_watermark(&self) -> Option<DateTime<Utc>>;
-    fn source_state(&self) -> Option<&dyn SourceState>;
+    fn prev_checkpoint(&self) -> Option<&Multihash>;
+    fn prev_offset(&self) -> Option<u64>;
+    fn new_data(&self) -> Option<&dyn DataSlice>;
+    fn new_checkpoint(&self) -> Option<&dyn Checkpoint>;
+    fn new_watermark(&self) -> Option<DateTime<Utc>>;
+    fn new_source_state(&self) -> Option<&dyn SourceState>;
 }
 
 impl AddData for dtos::AddData {
-    fn input_checkpoint(&self) -> Option<&Multihash> {
-        self.input_checkpoint.as_ref().map(|v| -> &Multihash { v })
+    fn prev_checkpoint(&self) -> Option<&Multihash> {
+        self.prev_checkpoint.as_ref().map(|v| -> &Multihash { v })
     }
-    fn output_data(&self) -> Option<&dyn DataSlice> {
-        self.output_data.as_ref().map(|v| -> &dyn DataSlice { v })
+    fn prev_offset(&self) -> Option<u64> {
+        self.prev_offset.as_ref().map(|v| -> u64 { *v })
     }
-    fn output_checkpoint(&self) -> Option<&dyn Checkpoint> {
-        self.output_checkpoint
+    fn new_data(&self) -> Option<&dyn DataSlice> {
+        self.new_data.as_ref().map(|v| -> &dyn DataSlice { v })
+    }
+    fn new_checkpoint(&self) -> Option<&dyn Checkpoint> {
+        self.new_checkpoint
             .as_ref()
             .map(|v| -> &dyn Checkpoint { v })
     }
-    fn output_watermark(&self) -> Option<DateTime<Utc>> {
-        self.output_watermark
-            .as_ref()
-            .map(|v| -> DateTime<Utc> { *v })
+    fn new_watermark(&self) -> Option<DateTime<Utc>> {
+        self.new_watermark.as_ref().map(|v| -> DateTime<Utc> { *v })
     }
-    fn source_state(&self) -> Option<&dyn SourceState> {
-        self.source_state
+    fn new_source_state(&self) -> Option<&dyn SourceState> {
+        self.new_source_state
             .as_ref()
             .map(|v| -> &dyn SourceState { v })
     }
@@ -61,11 +63,12 @@ impl AddData for dtos::AddData {
 impl Into<dtos::AddData> for &dyn AddData {
     fn into(self) -> dtos::AddData {
         dtos::AddData {
-            input_checkpoint: self.input_checkpoint().map(|v| v.clone()),
-            output_data: self.output_data().map(|v| v.into()),
-            output_checkpoint: self.output_checkpoint().map(|v| v.into()),
-            output_watermark: self.output_watermark().map(|v| v),
-            source_state: self.source_state().map(|v| v.into()),
+            prev_checkpoint: self.prev_checkpoint().map(|v| v.clone()),
+            prev_offset: self.prev_offset().map(|v| v),
+            new_data: self.new_data().map(|v| v.into()),
+            new_checkpoint: self.new_checkpoint().map(|v| v.into()),
+            new_watermark: self.new_watermark().map(|v| v),
+            new_source_state: self.new_source_state().map(|v| v.into()),
         }
     }
 }
@@ -180,48 +183,20 @@ impl Into<dtos::AttachmentsEmbedded> for &dyn AttachmentsEmbedded {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// BlockInterval
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#blockinterval-schema
-////////////////////////////////////////////////////////////////////////////////
-
-pub trait BlockInterval {
-    fn start(&self) -> &Multihash;
-    fn end(&self) -> &Multihash;
-}
-
-impl BlockInterval for dtos::BlockInterval {
-    fn start(&self) -> &Multihash {
-        &self.start
-    }
-    fn end(&self) -> &Multihash {
-        &self.end
-    }
-}
-
-impl Into<dtos::BlockInterval> for &dyn BlockInterval {
-    fn into(self) -> dtos::BlockInterval {
-        dtos::BlockInterval {
-            start: self.start().clone(),
-            end: self.end().clone(),
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////
 // Checkpoint
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#checkpoint-schema
 ////////////////////////////////////////////////////////////////////////////////
 
 pub trait Checkpoint {
     fn physical_hash(&self) -> &Multihash;
-    fn size(&self) -> i64;
+    fn size(&self) -> u64;
 }
 
 impl Checkpoint for dtos::Checkpoint {
     fn physical_hash(&self) -> &Multihash {
         &self.physical_hash
     }
-    fn size(&self) -> i64 {
+    fn size(&self) -> u64 {
         self.size
     }
 }
@@ -243,8 +218,8 @@ impl Into<dtos::Checkpoint> for &dyn Checkpoint {
 pub trait DataSlice {
     fn logical_hash(&self) -> &Multihash;
     fn physical_hash(&self) -> &Multihash;
-    fn interval(&self) -> &dyn OffsetInterval;
-    fn size(&self) -> i64;
+    fn offset_interval(&self) -> &dyn OffsetInterval;
+    fn size(&self) -> u64;
 }
 
 impl DataSlice for dtos::DataSlice {
@@ -254,10 +229,10 @@ impl DataSlice for dtos::DataSlice {
     fn physical_hash(&self) -> &Multihash {
         &self.physical_hash
     }
-    fn interval(&self) -> &dyn OffsetInterval {
-        &self.interval
+    fn offset_interval(&self) -> &dyn OffsetInterval {
+        &self.offset_interval
     }
-    fn size(&self) -> i64 {
+    fn size(&self) -> u64 {
         self.size
     }
 }
@@ -267,7 +242,7 @@ impl Into<dtos::DataSlice> for &dyn DataSlice {
         dtos::DataSlice {
             logical_hash: self.logical_hash().clone(),
             physical_hash: self.physical_hash().clone(),
-            interval: self.interval().into(),
+            offset_interval: self.offset_interval().into(),
             size: self.size(),
         }
     }
@@ -496,43 +471,50 @@ impl Into<dtos::EventTimeSourceFromSystemTime> for &dyn EventTimeSourceFromSyste
 ////////////////////////////////////////////////////////////////////////////////
 
 pub trait ExecuteQuery {
-    fn input_slices(&self) -> Box<dyn Iterator<Item = &dyn InputSlice> + '_>;
-    fn input_checkpoint(&self) -> Option<&Multihash>;
-    fn output_data(&self) -> Option<&dyn DataSlice>;
-    fn output_checkpoint(&self) -> Option<&dyn Checkpoint>;
-    fn output_watermark(&self) -> Option<DateTime<Utc>>;
+    fn query_inputs(&self) -> Box<dyn Iterator<Item = &dyn ExecuteQueryInput> + '_>;
+    fn prev_checkpoint(&self) -> Option<&Multihash>;
+    fn prev_offset(&self) -> Option<u64>;
+    fn new_data(&self) -> Option<&dyn DataSlice>;
+    fn new_checkpoint(&self) -> Option<&dyn Checkpoint>;
+    fn new_watermark(&self) -> Option<DateTime<Utc>>;
 }
 
 impl ExecuteQuery for dtos::ExecuteQuery {
-    fn input_slices(&self) -> Box<dyn Iterator<Item = &dyn InputSlice> + '_> {
-        Box::new(self.input_slices.iter().map(|i| -> &dyn InputSlice { i }))
+    fn query_inputs(&self) -> Box<dyn Iterator<Item = &dyn ExecuteQueryInput> + '_> {
+        Box::new(
+            self.query_inputs
+                .iter()
+                .map(|i| -> &dyn ExecuteQueryInput { i }),
+        )
     }
-    fn input_checkpoint(&self) -> Option<&Multihash> {
-        self.input_checkpoint.as_ref().map(|v| -> &Multihash { v })
+    fn prev_checkpoint(&self) -> Option<&Multihash> {
+        self.prev_checkpoint.as_ref().map(|v| -> &Multihash { v })
     }
-    fn output_data(&self) -> Option<&dyn DataSlice> {
-        self.output_data.as_ref().map(|v| -> &dyn DataSlice { v })
+    fn prev_offset(&self) -> Option<u64> {
+        self.prev_offset.as_ref().map(|v| -> u64 { *v })
     }
-    fn output_checkpoint(&self) -> Option<&dyn Checkpoint> {
-        self.output_checkpoint
+    fn new_data(&self) -> Option<&dyn DataSlice> {
+        self.new_data.as_ref().map(|v| -> &dyn DataSlice { v })
+    }
+    fn new_checkpoint(&self) -> Option<&dyn Checkpoint> {
+        self.new_checkpoint
             .as_ref()
             .map(|v| -> &dyn Checkpoint { v })
     }
-    fn output_watermark(&self) -> Option<DateTime<Utc>> {
-        self.output_watermark
-            .as_ref()
-            .map(|v| -> DateTime<Utc> { *v })
+    fn new_watermark(&self) -> Option<DateTime<Utc>> {
+        self.new_watermark.as_ref().map(|v| -> DateTime<Utc> { *v })
     }
 }
 
 impl Into<dtos::ExecuteQuery> for &dyn ExecuteQuery {
     fn into(self) -> dtos::ExecuteQuery {
         dtos::ExecuteQuery {
-            input_slices: self.input_slices().map(|i| i.into()).collect(),
-            input_checkpoint: self.input_checkpoint().map(|v| v.clone()),
-            output_data: self.output_data().map(|v| v.into()),
-            output_checkpoint: self.output_checkpoint().map(|v| v.into()),
-            output_watermark: self.output_watermark().map(|v| v),
+            query_inputs: self.query_inputs().map(|i| i.into()).collect(),
+            prev_checkpoint: self.prev_checkpoint().map(|v| v.clone()),
+            prev_offset: self.prev_offset().map(|v| v),
+            new_data: self.new_data().map(|v| v.into()),
+            new_checkpoint: self.new_checkpoint().map(|v| v.into()),
+            new_watermark: self.new_watermark().map(|v| v),
         }
     }
 }
@@ -544,26 +526,147 @@ impl Into<dtos::ExecuteQuery> for &dyn ExecuteQuery {
 
 pub trait ExecuteQueryInput {
     fn dataset_id(&self) -> &DatasetID;
-    fn dataset_name(&self) -> &DatasetName;
-    fn vocab(&self) -> &dyn DatasetVocabulary;
-    fn data_interval(&self) -> Option<&dyn OffsetInterval>;
-    fn data_paths(&self) -> Box<dyn Iterator<Item = &Path> + '_>;
-    fn schema_file(&self) -> &Path;
-    fn explicit_watermarks(&self) -> Box<dyn Iterator<Item = &dyn Watermark> + '_>;
+    fn prev_block_hash(&self) -> Option<&Multihash>;
+    fn new_block_hash(&self) -> Option<&Multihash>;
+    fn prev_offset(&self) -> Option<u64>;
+    fn new_offset(&self) -> Option<u64>;
 }
 
 impl ExecuteQueryInput for dtos::ExecuteQueryInput {
     fn dataset_id(&self) -> &DatasetID {
         &self.dataset_id
     }
-    fn dataset_name(&self) -> &DatasetName {
-        &self.dataset_name
+    fn prev_block_hash(&self) -> Option<&Multihash> {
+        self.prev_block_hash.as_ref().map(|v| -> &Multihash { v })
+    }
+    fn new_block_hash(&self) -> Option<&Multihash> {
+        self.new_block_hash.as_ref().map(|v| -> &Multihash { v })
+    }
+    fn prev_offset(&self) -> Option<u64> {
+        self.prev_offset.as_ref().map(|v| -> u64 { *v })
+    }
+    fn new_offset(&self) -> Option<u64> {
+        self.new_offset.as_ref().map(|v| -> u64 { *v })
+    }
+}
+
+impl Into<dtos::ExecuteQueryInput> for &dyn ExecuteQueryInput {
+    fn into(self) -> dtos::ExecuteQueryInput {
+        dtos::ExecuteQueryInput {
+            dataset_id: self.dataset_id().clone(),
+            prev_block_hash: self.prev_block_hash().map(|v| v.clone()),
+            new_block_hash: self.new_block_hash().map(|v| v.clone()),
+            prev_offset: self.prev_offset().map(|v| v),
+            new_offset: self.new_offset().map(|v| v),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// ExecuteQueryRequest
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#executequeryrequest-schema
+////////////////////////////////////////////////////////////////////////////////
+
+pub trait ExecuteQueryRequest {
+    fn dataset_id(&self) -> &DatasetID;
+    fn dataset_alias(&self) -> &DatasetAlias;
+    fn system_time(&self) -> DateTime<Utc>;
+    fn vocab(&self) -> &dyn DatasetVocabulary;
+    fn transform(&self) -> Transform;
+    fn query_inputs(&self) -> Box<dyn Iterator<Item = &dyn ExecuteQueryRequestInput> + '_>;
+    fn next_offset(&self) -> u64;
+    fn prev_checkpoint_path(&self) -> Option<&Path>;
+    fn new_checkpoint_path(&self) -> &Path;
+    fn new_data_path(&self) -> &Path;
+}
+
+impl ExecuteQueryRequest for dtos::ExecuteQueryRequest {
+    fn dataset_id(&self) -> &DatasetID {
+        &self.dataset_id
+    }
+    fn dataset_alias(&self) -> &DatasetAlias {
+        &self.dataset_alias
+    }
+    fn system_time(&self) -> DateTime<Utc> {
+        self.system_time
     }
     fn vocab(&self) -> &dyn DatasetVocabulary {
         &self.vocab
     }
-    fn data_interval(&self) -> Option<&dyn OffsetInterval> {
-        self.data_interval
+    fn transform(&self) -> Transform {
+        (&self.transform).into()
+    }
+    fn query_inputs(&self) -> Box<dyn Iterator<Item = &dyn ExecuteQueryRequestInput> + '_> {
+        Box::new(
+            self.query_inputs
+                .iter()
+                .map(|i| -> &dyn ExecuteQueryRequestInput { i }),
+        )
+    }
+    fn next_offset(&self) -> u64 {
+        self.next_offset
+    }
+    fn prev_checkpoint_path(&self) -> Option<&Path> {
+        self.prev_checkpoint_path
+            .as_ref()
+            .map(|v| -> &Path { v.as_ref() })
+    }
+    fn new_checkpoint_path(&self) -> &Path {
+        self.new_checkpoint_path.as_ref()
+    }
+    fn new_data_path(&self) -> &Path {
+        self.new_data_path.as_ref()
+    }
+}
+
+impl Into<dtos::ExecuteQueryRequest> for &dyn ExecuteQueryRequest {
+    fn into(self) -> dtos::ExecuteQueryRequest {
+        dtos::ExecuteQueryRequest {
+            dataset_id: self.dataset_id().clone(),
+            dataset_alias: self.dataset_alias().to_owned(),
+            system_time: self.system_time(),
+            vocab: self.vocab().into(),
+            transform: self.transform().into(),
+            query_inputs: self.query_inputs().map(|i| i.into()).collect(),
+            next_offset: self.next_offset(),
+            prev_checkpoint_path: self.prev_checkpoint_path().map(|v| v.to_owned()),
+            new_checkpoint_path: self.new_checkpoint_path().to_owned(),
+            new_data_path: self.new_data_path().to_owned(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// ExecuteQueryRequestInput
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#executequeryrequestinput-schema
+////////////////////////////////////////////////////////////////////////////////
+
+pub trait ExecuteQueryRequestInput {
+    fn dataset_id(&self) -> &DatasetID;
+    fn dataset_alias(&self) -> &DatasetAlias;
+    fn query_alias(&self) -> &str;
+    fn vocab(&self) -> &dyn DatasetVocabulary;
+    fn offset_interval(&self) -> Option<&dyn OffsetInterval>;
+    fn data_paths(&self) -> Box<dyn Iterator<Item = &Path> + '_>;
+    fn schema_file(&self) -> &Path;
+    fn explicit_watermarks(&self) -> Box<dyn Iterator<Item = &dyn Watermark> + '_>;
+}
+
+impl ExecuteQueryRequestInput for dtos::ExecuteQueryRequestInput {
+    fn dataset_id(&self) -> &DatasetID {
+        &self.dataset_id
+    }
+    fn dataset_alias(&self) -> &DatasetAlias {
+        &self.dataset_alias
+    }
+    fn query_alias(&self) -> &str {
+        self.query_alias.as_ref()
+    }
+    fn vocab(&self) -> &dyn DatasetVocabulary {
+        &self.vocab
+    }
+    fn offset_interval(&self) -> Option<&dyn OffsetInterval> {
+        self.offset_interval
             .as_ref()
             .map(|v| -> &dyn OffsetInterval { v })
     }
@@ -582,86 +685,17 @@ impl ExecuteQueryInput for dtos::ExecuteQueryInput {
     }
 }
 
-impl Into<dtos::ExecuteQueryInput> for &dyn ExecuteQueryInput {
-    fn into(self) -> dtos::ExecuteQueryInput {
-        dtos::ExecuteQueryInput {
+impl Into<dtos::ExecuteQueryRequestInput> for &dyn ExecuteQueryRequestInput {
+    fn into(self) -> dtos::ExecuteQueryRequestInput {
+        dtos::ExecuteQueryRequestInput {
             dataset_id: self.dataset_id().clone(),
-            dataset_name: self.dataset_name().to_owned(),
+            dataset_alias: self.dataset_alias().to_owned(),
+            query_alias: self.query_alias().to_owned(),
             vocab: self.vocab().into(),
-            data_interval: self.data_interval().map(|v| v.into()),
+            offset_interval: self.offset_interval().map(|v| v.into()),
             data_paths: self.data_paths().map(|i| i.to_owned()).collect(),
             schema_file: self.schema_file().to_owned(),
             explicit_watermarks: self.explicit_watermarks().map(|i| i.into()).collect(),
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// ExecuteQueryRequest
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#executequeryrequest-schema
-////////////////////////////////////////////////////////////////////////////////
-
-pub trait ExecuteQueryRequest {
-    fn dataset_id(&self) -> &DatasetID;
-    fn dataset_name(&self) -> &DatasetName;
-    fn system_time(&self) -> DateTime<Utc>;
-    fn offset(&self) -> i64;
-    fn vocab(&self) -> &dyn DatasetVocabulary;
-    fn transform(&self) -> Transform;
-    fn inputs(&self) -> Box<dyn Iterator<Item = &dyn ExecuteQueryInput> + '_>;
-    fn prev_checkpoint_path(&self) -> Option<&Path>;
-    fn new_checkpoint_path(&self) -> &Path;
-    fn out_data_path(&self) -> &Path;
-}
-
-impl ExecuteQueryRequest for dtos::ExecuteQueryRequest {
-    fn dataset_id(&self) -> &DatasetID {
-        &self.dataset_id
-    }
-    fn dataset_name(&self) -> &DatasetName {
-        &self.dataset_name
-    }
-    fn system_time(&self) -> DateTime<Utc> {
-        self.system_time
-    }
-    fn offset(&self) -> i64 {
-        self.offset
-    }
-    fn vocab(&self) -> &dyn DatasetVocabulary {
-        &self.vocab
-    }
-    fn transform(&self) -> Transform {
-        (&self.transform).into()
-    }
-    fn inputs(&self) -> Box<dyn Iterator<Item = &dyn ExecuteQueryInput> + '_> {
-        Box::new(self.inputs.iter().map(|i| -> &dyn ExecuteQueryInput { i }))
-    }
-    fn prev_checkpoint_path(&self) -> Option<&Path> {
-        self.prev_checkpoint_path
-            .as_ref()
-            .map(|v| -> &Path { v.as_ref() })
-    }
-    fn new_checkpoint_path(&self) -> &Path {
-        self.new_checkpoint_path.as_ref()
-    }
-    fn out_data_path(&self) -> &Path {
-        self.out_data_path.as_ref()
-    }
-}
-
-impl Into<dtos::ExecuteQueryRequest> for &dyn ExecuteQueryRequest {
-    fn into(self) -> dtos::ExecuteQueryRequest {
-        dtos::ExecuteQueryRequest {
-            dataset_id: self.dataset_id().clone(),
-            dataset_name: self.dataset_name().to_owned(),
-            system_time: self.system_time(),
-            offset: self.offset(),
-            vocab: self.vocab().into(),
-            transform: self.transform().into(),
-            inputs: self.inputs().map(|i| i.into()).collect(),
-            prev_checkpoint_path: self.prev_checkpoint_path().map(|v| v.to_owned()),
-            new_checkpoint_path: self.new_checkpoint_path().to_owned(),
-            out_data_path: self.out_data_path().to_owned(),
         }
     }
 }
@@ -707,8 +741,8 @@ impl Into<dtos::ExecuteQueryResponse> for ExecuteQueryResponse<'_> {
 pub trait ExecuteQueryResponseProgress {}
 
 pub trait ExecuteQueryResponseSuccess {
-    fn data_interval(&self) -> Option<&dyn OffsetInterval>;
-    fn output_watermark(&self) -> Option<DateTime<Utc>>;
+    fn offset_interval(&self) -> Option<&dyn OffsetInterval>;
+    fn new_watermark(&self) -> Option<DateTime<Utc>>;
 }
 
 pub trait ExecuteQueryResponseInvalidQuery {
@@ -723,15 +757,13 @@ pub trait ExecuteQueryResponseInternalError {
 impl ExecuteQueryResponseProgress for dtos::ExecuteQueryResponseProgress {}
 
 impl ExecuteQueryResponseSuccess for dtos::ExecuteQueryResponseSuccess {
-    fn data_interval(&self) -> Option<&dyn OffsetInterval> {
-        self.data_interval
+    fn offset_interval(&self) -> Option<&dyn OffsetInterval> {
+        self.offset_interval
             .as_ref()
             .map(|v| -> &dyn OffsetInterval { v })
     }
-    fn output_watermark(&self) -> Option<DateTime<Utc>> {
-        self.output_watermark
-            .as_ref()
-            .map(|v| -> DateTime<Utc> { *v })
+    fn new_watermark(&self) -> Option<DateTime<Utc>> {
+        self.new_watermark.as_ref().map(|v| -> DateTime<Utc> { *v })
     }
 }
 
@@ -759,8 +791,8 @@ impl Into<dtos::ExecuteQueryResponseProgress> for &dyn ExecuteQueryResponseProgr
 impl Into<dtos::ExecuteQueryResponseSuccess> for &dyn ExecuteQueryResponseSuccess {
     fn into(self) -> dtos::ExecuteQueryResponseSuccess {
         dtos::ExecuteQueryResponseSuccess {
-            data_interval: self.data_interval().map(|v| v.into()),
-            output_watermark: self.output_watermark().map(|v| v),
+            offset_interval: self.offset_interval().map(|v| v.into()),
+            new_watermark: self.new_watermark().map(|v| v),
         }
     }
 }
@@ -933,43 +965,6 @@ impl Into<dtos::FetchStepContainer> for &dyn FetchStepContainer {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// InputSlice
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#inputslice-schema
-////////////////////////////////////////////////////////////////////////////////
-
-pub trait InputSlice {
-    fn dataset_id(&self) -> &DatasetID;
-    fn block_interval(&self) -> Option<&dyn BlockInterval>;
-    fn data_interval(&self) -> Option<&dyn OffsetInterval>;
-}
-
-impl InputSlice for dtos::InputSlice {
-    fn dataset_id(&self) -> &DatasetID {
-        &self.dataset_id
-    }
-    fn block_interval(&self) -> Option<&dyn BlockInterval> {
-        self.block_interval
-            .as_ref()
-            .map(|v| -> &dyn BlockInterval { v })
-    }
-    fn data_interval(&self) -> Option<&dyn OffsetInterval> {
-        self.data_interval
-            .as_ref()
-            .map(|v| -> &dyn OffsetInterval { v })
-    }
-}
-
-impl Into<dtos::InputSlice> for &dyn InputSlice {
-    fn into(self) -> dtos::InputSlice {
-        dtos::InputSlice {
-            dataset_id: self.dataset_id().clone(),
-            block_interval: self.block_interval().map(|v| v.into()),
-            data_interval: self.data_interval().map(|v| v.into()),
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////
 // MergeStrategy
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mergestrategy-schema
 ////////////////////////////////////////////////////////////////////////////////
@@ -1087,7 +1082,7 @@ impl Into<dtos::MergeStrategySnapshot> for &dyn MergeStrategySnapshot {
 pub trait MetadataBlock {
     fn system_time(&self) -> DateTime<Utc>;
     fn prev_block_hash(&self) -> Option<&Multihash>;
-    fn sequence_number(&self) -> i32;
+    fn sequence_number(&self) -> u64;
     fn event(&self) -> MetadataEvent;
 }
 
@@ -1098,7 +1093,7 @@ impl MetadataBlock for dtos::MetadataBlock {
     fn prev_block_hash(&self) -> Option<&Multihash> {
         self.prev_block_hash.as_ref().map(|v| -> &Multihash { v })
     }
-    fn sequence_number(&self) -> i32 {
+    fn sequence_number(&self) -> u64 {
         self.sequence_number
     }
     fn event(&self) -> MetadataEvent {
@@ -1189,15 +1184,15 @@ impl Into<dtos::MetadataEvent> for MetadataEvent<'_> {
 ////////////////////////////////////////////////////////////////////////////////
 
 pub trait OffsetInterval {
-    fn start(&self) -> i64;
-    fn end(&self) -> i64;
+    fn start(&self) -> u64;
+    fn end(&self) -> u64;
 }
 
 impl OffsetInterval for dtos::OffsetInterval {
-    fn start(&self) -> i64 {
+    fn start(&self) -> u64 {
         self.start
     }
-    fn end(&self) -> i64 {
+    fn end(&self) -> u64 {
         self.end
     }
 }
@@ -1287,7 +1282,6 @@ impl Into<dtos::PrepStepPipe> for &dyn PrepStepPipe {
 
 pub enum ReadStep<'a> {
     Csv(&'a dyn ReadStepCsv),
-    JsonLines(&'a dyn ReadStepJsonLines),
     GeoJson(&'a dyn ReadStepGeoJson),
     EsriShapefile(&'a dyn ReadStepEsriShapefile),
     Parquet(&'a dyn ReadStepParquet),
@@ -1300,7 +1294,6 @@ impl<'a> From<&'a dtos::ReadStep> for ReadStep<'a> {
     fn from(other: &'a dtos::ReadStep) -> Self {
         match other {
             dtos::ReadStep::Csv(v) => ReadStep::Csv(v),
-            dtos::ReadStep::JsonLines(v) => ReadStep::JsonLines(v),
             dtos::ReadStep::GeoJson(v) => ReadStep::GeoJson(v),
             dtos::ReadStep::EsriShapefile(v) => ReadStep::EsriShapefile(v),
             dtos::ReadStep::Parquet(v) => ReadStep::Parquet(v),
@@ -1315,7 +1308,6 @@ impl Into<dtos::ReadStep> for ReadStep<'_> {
     fn into(self) -> dtos::ReadStep {
         match self {
             ReadStep::Csv(v) => dtos::ReadStep::Csv(v.into()),
-            ReadStep::JsonLines(v) => dtos::ReadStep::JsonLines(v.into()),
             ReadStep::GeoJson(v) => dtos::ReadStep::GeoJson(v.into()),
             ReadStep::EsriShapefile(v) => dtos::ReadStep::EsriShapefile(v.into()),
             ReadStep::Parquet(v) => dtos::ReadStep::Parquet(v.into()),
@@ -1332,28 +1324,10 @@ pub trait ReadStepCsv {
     fn encoding(&self) -> Option<&str>;
     fn quote(&self) -> Option<&str>;
     fn escape(&self) -> Option<&str>;
-    fn comment(&self) -> Option<&str>;
     fn header(&self) -> Option<bool>;
-    fn enforce_schema(&self) -> Option<bool>;
     fn infer_schema(&self) -> Option<bool>;
-    fn ignore_leading_white_space(&self) -> Option<bool>;
-    fn ignore_trailing_white_space(&self) -> Option<bool>;
     fn null_value(&self) -> Option<&str>;
-    fn empty_value(&self) -> Option<&str>;
-    fn nan_value(&self) -> Option<&str>;
-    fn positive_inf(&self) -> Option<&str>;
-    fn negative_inf(&self) -> Option<&str>;
     fn date_format(&self) -> Option<&str>;
-    fn timestamp_format(&self) -> Option<&str>;
-    fn multi_line(&self) -> Option<bool>;
-}
-
-pub trait ReadStepJsonLines {
-    fn schema(&self) -> Option<Box<dyn Iterator<Item = &str> + '_>>;
-    fn date_format(&self) -> Option<&str>;
-    fn encoding(&self) -> Option<&str>;
-    fn multi_line(&self) -> Option<bool>;
-    fn primitives_as_string(&self) -> Option<bool>;
     fn timestamp_format(&self) -> Option<&str>;
 }
 
@@ -1409,75 +1383,17 @@ impl ReadStepCsv for dtos::ReadStepCsv {
     fn escape(&self) -> Option<&str> {
         self.escape.as_ref().map(|v| -> &str { v.as_ref() })
     }
-    fn comment(&self) -> Option<&str> {
-        self.comment.as_ref().map(|v| -> &str { v.as_ref() })
-    }
     fn header(&self) -> Option<bool> {
         self.header.as_ref().map(|v| -> bool { *v })
-    }
-    fn enforce_schema(&self) -> Option<bool> {
-        self.enforce_schema.as_ref().map(|v| -> bool { *v })
     }
     fn infer_schema(&self) -> Option<bool> {
         self.infer_schema.as_ref().map(|v| -> bool { *v })
     }
-    fn ignore_leading_white_space(&self) -> Option<bool> {
-        self.ignore_leading_white_space
-            .as_ref()
-            .map(|v| -> bool { *v })
-    }
-    fn ignore_trailing_white_space(&self) -> Option<bool> {
-        self.ignore_trailing_white_space
-            .as_ref()
-            .map(|v| -> bool { *v })
-    }
     fn null_value(&self) -> Option<&str> {
         self.null_value.as_ref().map(|v| -> &str { v.as_ref() })
     }
-    fn empty_value(&self) -> Option<&str> {
-        self.empty_value.as_ref().map(|v| -> &str { v.as_ref() })
-    }
-    fn nan_value(&self) -> Option<&str> {
-        self.nan_value.as_ref().map(|v| -> &str { v.as_ref() })
-    }
-    fn positive_inf(&self) -> Option<&str> {
-        self.positive_inf.as_ref().map(|v| -> &str { v.as_ref() })
-    }
-    fn negative_inf(&self) -> Option<&str> {
-        self.negative_inf.as_ref().map(|v| -> &str { v.as_ref() })
-    }
     fn date_format(&self) -> Option<&str> {
         self.date_format.as_ref().map(|v| -> &str { v.as_ref() })
-    }
-    fn timestamp_format(&self) -> Option<&str> {
-        self.timestamp_format
-            .as_ref()
-            .map(|v| -> &str { v.as_ref() })
-    }
-    fn multi_line(&self) -> Option<bool> {
-        self.multi_line.as_ref().map(|v| -> bool { *v })
-    }
-}
-
-impl ReadStepJsonLines for dtos::ReadStepJsonLines {
-    fn schema(&self) -> Option<Box<dyn Iterator<Item = &str> + '_>> {
-        self.schema
-            .as_ref()
-            .map(|v| -> Box<dyn Iterator<Item = &str> + '_> {
-                Box::new(v.iter().map(|i| -> &str { i.as_ref() }))
-            })
-    }
-    fn date_format(&self) -> Option<&str> {
-        self.date_format.as_ref().map(|v| -> &str { v.as_ref() })
-    }
-    fn encoding(&self) -> Option<&str> {
-        self.encoding.as_ref().map(|v| -> &str { v.as_ref() })
-    }
-    fn multi_line(&self) -> Option<bool> {
-        self.multi_line.as_ref().map(|v| -> bool { *v })
-    }
-    fn primitives_as_string(&self) -> Option<bool> {
-        self.primitives_as_string.as_ref().map(|v| -> bool { *v })
     }
     fn timestamp_format(&self) -> Option<&str> {
         self.timestamp_format
@@ -1582,32 +1498,10 @@ impl Into<dtos::ReadStepCsv> for &dyn ReadStepCsv {
             encoding: self.encoding().map(|v| v.to_owned()),
             quote: self.quote().map(|v| v.to_owned()),
             escape: self.escape().map(|v| v.to_owned()),
-            comment: self.comment().map(|v| v.to_owned()),
             header: self.header().map(|v| v),
-            enforce_schema: self.enforce_schema().map(|v| v),
             infer_schema: self.infer_schema().map(|v| v),
-            ignore_leading_white_space: self.ignore_leading_white_space().map(|v| v),
-            ignore_trailing_white_space: self.ignore_trailing_white_space().map(|v| v),
             null_value: self.null_value().map(|v| v.to_owned()),
-            empty_value: self.empty_value().map(|v| v.to_owned()),
-            nan_value: self.nan_value().map(|v| v.to_owned()),
-            positive_inf: self.positive_inf().map(|v| v.to_owned()),
-            negative_inf: self.negative_inf().map(|v| v.to_owned()),
             date_format: self.date_format().map(|v| v.to_owned()),
-            timestamp_format: self.timestamp_format().map(|v| v.to_owned()),
-            multi_line: self.multi_line().map(|v| v),
-        }
-    }
-}
-
-impl Into<dtos::ReadStepJsonLines> for &dyn ReadStepJsonLines {
-    fn into(self) -> dtos::ReadStepJsonLines {
-        dtos::ReadStepJsonLines {
-            schema: self.schema().map(|v| v.map(|i| i.to_owned()).collect()),
-            date_format: self.date_format().map(|v| v.to_owned()),
-            encoding: self.encoding().map(|v| v.to_owned()),
-            multi_line: self.multi_line().map(|v| v),
-            primitives_as_string: self.primitives_as_string().map(|v| v),
             timestamp_format: self.timestamp_format().map(|v| v.to_owned()),
         }
     }
@@ -2017,17 +1911,17 @@ impl Into<dtos::SourceCachingForever> for &dyn SourceCachingForever {
 ////////////////////////////////////////////////////////////////////////////////
 
 pub trait SourceState {
+    fn source_name(&self) -> Option<&str>;
     fn kind(&self) -> &str;
-    fn source(&self) -> &str;
     fn value(&self) -> &str;
 }
 
 impl SourceState for dtos::SourceState {
+    fn source_name(&self) -> Option<&str> {
+        self.source_name.as_ref().map(|v| -> &str { v.as_ref() })
+    }
     fn kind(&self) -> &str {
         self.kind.as_ref()
-    }
-    fn source(&self) -> &str {
-        self.source.as_ref()
     }
     fn value(&self) -> &str {
         self.value.as_ref()
@@ -2037,8 +1931,8 @@ impl SourceState for dtos::SourceState {
 impl Into<dtos::SourceState> for &dyn SourceState {
     fn into(self) -> dtos::SourceState {
         dtos::SourceState {
+            source_name: self.source_name().map(|v| v.to_owned()),
             kind: self.kind().to_owned(),
-            source: self.source().to_owned(),
             value: self.value().to_owned(),
         }
     }
@@ -2179,29 +2073,24 @@ impl Into<dtos::TransformSql> for &dyn TransformSql {
 ////////////////////////////////////////////////////////////////////////////////
 
 pub trait TransformInput {
-    fn id(&self) -> Option<&DatasetID>;
-    fn name(&self) -> &DatasetName;
-    fn dataset_ref(&self) -> Option<&DatasetRefAny>;
+    fn dataset_ref(&self) -> &DatasetRefAny;
+    fn alias(&self) -> Option<&str>;
 }
 
 impl TransformInput for dtos::TransformInput {
-    fn id(&self) -> Option<&DatasetID> {
-        self.id.as_ref().map(|v| -> &DatasetID { v })
+    fn dataset_ref(&self) -> &DatasetRefAny {
+        &self.dataset_ref
     }
-    fn name(&self) -> &DatasetName {
-        &self.name
-    }
-    fn dataset_ref(&self) -> Option<&DatasetRefAny> {
-        self.dataset_ref.as_ref().map(|v| -> &DatasetRefAny { v })
+    fn alias(&self) -> Option<&str> {
+        self.alias.as_ref().map(|v| -> &str { v.as_ref() })
     }
 }
 
 impl Into<dtos::TransformInput> for &dyn TransformInput {
     fn into(self) -> dtos::TransformInput {
         dtos::TransformInput {
-            id: self.id().map(|v| v.clone()),
-            name: self.name().to_owned(),
-            dataset_ref: self.dataset_ref().map(|v| v.to_owned()),
+            dataset_ref: self.dataset_ref().to_owned(),
+            alias: self.alias().map(|v| v.to_owned()),
         }
     }
 }

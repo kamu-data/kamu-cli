@@ -18,7 +18,7 @@ use chrono::{DateTime, Utc};
 use enum_variants::*;
 
 use crate::formats::Multihash;
-use crate::identity::{DatasetID, DatasetName, DatasetRefAny};
+use crate::identity::{DatasetAlias, DatasetID, DatasetName, DatasetRefAny};
 
 ////////////////////////////////////////////////////////////////////////////////
 // AddData
@@ -29,15 +29,27 @@ use crate::identity::{DatasetID, DatasetName, DatasetRefAny};
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct AddData {
     /// Hash of the checkpoint file used to restore ingestion state, if any.
-    pub input_checkpoint: Option<Multihash>,
+    pub prev_checkpoint: Option<Multihash>,
+    /// Last offset of the previous data slice, if any. Must be equal to the
+    /// last non-empty `newData.offsetInterval.end`.
+    pub prev_offset: Option<u64>,
     /// Describes output data written during this transaction, if any.
-    pub output_data: Option<DataSlice>,
-    /// Describes checkpoint written during this transaction, if any.
-    pub output_checkpoint: Option<Checkpoint>,
-    /// Last watermark of the output data stream, if changed.
-    pub output_watermark: Option<DateTime<Utc>>,
+    pub new_data: Option<DataSlice>,
+    /// Describes checkpoint written during this transaction, if any. If an
+    /// engine operation resulted in no updates to the checkpoint, but
+    /// checkpoint is still relevant for subsequent runs - a hash of the
+    /// previous checkpoint should be specified.
+    pub new_checkpoint: Option<Checkpoint>,
+    /// Last watermark of the output data stream, if any. Initial blocks may not
+    /// have watermarks, but once watermark is set - all subsequent blocks
+    /// should either carry the same watermark or specify a new (greater) one.
+    /// Thus, watermarks are monotonically non-decreasing.
+    pub new_watermark: Option<DateTime<Utc>>,
     /// The state of the source the data was added from to allow fast resuming.
-    pub source_state: Option<SourceState>,
+    /// If the state did not change but is still relevant for subsequent runs it
+    /// should be carried, i.e. only the last state per source is considered
+    /// when resuming.
+    pub new_source_state: Option<SourceState>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -95,21 +107,6 @@ pub struct AttachmentsEmbedded {
 impl_enum_variant!(Attachments::Embedded(AttachmentsEmbedded));
 
 ////////////////////////////////////////////////////////////////////////////////
-// BlockInterval
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#blockinterval-schema
-////////////////////////////////////////////////////////////////////////////////
-
-/// Describes a range of metadata blocks as an arithmetic interval of block
-/// hashes
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub struct BlockInterval {
-    /// Start of the closed interval [start; end]
-    pub start: Multihash,
-    /// End of the closed interval [start; end]
-    pub end: Multihash,
-}
-
-////////////////////////////////////////////////////////////////////////////////
 // Checkpoint
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#checkpoint-schema
 ////////////////////////////////////////////////////////////////////////////////
@@ -117,10 +114,10 @@ pub struct BlockInterval {
 /// Describes a checkpoint produced by an engine
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Checkpoint {
-    /// Hash sum of the checkpoint file
+    /// Hash sum of the checkpoint file.
     pub physical_hash: Multihash,
-    /// Size of checkpoint file in bytes
-    pub size: i64,
+    /// Size of checkpoint file in bytes.
+    pub size: u64,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -131,14 +128,14 @@ pub struct Checkpoint {
 /// Describes a slice of data added to a dataset or produced via transformation
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct DataSlice {
-    /// Logical hash sum of the data in this slice
+    /// Logical hash sum of the data in this slice.
     pub logical_hash: Multihash,
-    /// Hash sum of the data part file
+    /// Hash sum of the data part file.
     pub physical_hash: Multihash,
-    /// Data slice produced by the transaction
-    pub interval: OffsetInterval,
-    /// Size of data file in bytes
-    pub size: i64,
+    /// Data slice produced by the transaction.
+    pub offset_interval: OffsetInterval,
+    /// Size of data file in bytes.
+    pub size: u64,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -157,7 +154,7 @@ pub enum DatasetKind {
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datasetsnapshot-schema
 ////////////////////////////////////////////////////////////////////////////////
 
-/// Represents a snapshot of the dataset definition in a single point in time.
+/// Represents a projection of the dataset metadata at a single point in time.
 /// This type is typically used for defining new datasets and changing the
 /// existing ones.
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -166,6 +163,9 @@ pub struct DatasetSnapshot {
     pub name: DatasetName,
     /// Type of the dataset.
     pub kind: DatasetKind,
+    /// An array of metadata events that will be used to populate the chain.
+    /// Here you can define polling and push sources, set licenses, add
+    /// attachments etc.
     pub metadata: Vec<MetadataEvent>,
 }
 
@@ -268,17 +268,26 @@ impl_enum_variant!(EventTimeSource::FromSystemTime(
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct ExecuteQuery {
     /// Defines inputs used in this transaction. Slices corresponding to every
-    /// input must be present.
-    pub input_slices: Vec<InputSlice>,
+    /// input dataset must be present.
+    pub query_inputs: Vec<ExecuteQueryInput>,
     /// Hash of the checkpoint file used to restore transformation state, if
     /// any.
-    pub input_checkpoint: Option<Multihash>,
+    pub prev_checkpoint: Option<Multihash>,
+    /// Last offset of the previous data slice, if any. Must be equal to the
+    /// last non-empty `newData.offsetInterval.end`.
+    pub prev_offset: Option<u64>,
     /// Describes output data written during this transaction, if any.
-    pub output_data: Option<DataSlice>,
-    /// Describes checkpoint written during this transaction, if any.
-    pub output_checkpoint: Option<Checkpoint>,
-    /// Last watermark of the output data stream.
-    pub output_watermark: Option<DateTime<Utc>>,
+    pub new_data: Option<DataSlice>,
+    /// Describes checkpoint written during this transaction, if any. If an
+    /// engine operation resulted in no updates to the checkpoint, but
+    /// checkpoint is still relevant for subsequent runs - a hash of the
+    /// previous checkpoint should be specified.
+    pub new_checkpoint: Option<Checkpoint>,
+    /// Last watermark of the output data stream, if any. Initial blocks may not
+    /// have watermarks, but once watermark is set - all subsequent blocks
+    /// should either carry the same watermark or specify a new (greater) one.
+    /// Thus, watermarks are monotonically non-decreasing.
+    pub new_watermark: Option<DateTime<Utc>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -286,22 +295,33 @@ pub struct ExecuteQuery {
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#executequeryinput-schema
 ////////////////////////////////////////////////////////////////////////////////
 
-/// Sent as part of the execute query requst to describe the input
+/// Describes a slice of the input dataset used during a transformation
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct ExecuteQueryInput {
-    /// Unique identifier of the dataset.
+    /// Input dataset identifier.
     pub dataset_id: DatasetID,
-    /// An alias of this input to be used in queries.
-    pub dataset_name: DatasetName,
-    pub vocab: DatasetVocabulary,
-    /// Data that went into this transaction.
-    pub data_interval: Option<OffsetInterval>,
-    /// TODO: This will be removed when coordinator will be slicing data for the
-    /// engine
-    pub data_paths: Vec<PathBuf>,
-    /// TODO: replace with actual DDL or Parquet schema
-    pub schema_file: PathBuf,
-    pub explicit_watermarks: Vec<Watermark>,
+    /// Last block of the input dataset that was previously incorporated into
+    /// the derivative transformation, if any. Must be equal to the last
+    /// non-empty `newBlockHash`. Together with `newBlockHash` defines a
+    /// half-open `(prevBlockHash, newBlockHash]` interval of blocks that will
+    /// be considered in this transaction.
+    pub prev_block_hash: Option<Multihash>,
+    /// Hash of the last block that will be incorporated into the derivative
+    /// transformation. When present, defines a half-open `(prevBlockHash,
+    /// newBlockHash]` interval of blocks that will be considered in this
+    /// transaction.
+    pub new_block_hash: Option<Multihash>,
+    /// Last data record offset in the input dataset that was previously
+    /// incorporated into the derivative transformation, if any. Must be equal
+    /// to the last non-empty `newOffset`. Together with `newOffset` defines a
+    /// half-open `(prevOffset, newOffset]` interval of data records that will
+    /// be considered in this transaction.
+    pub prev_offset: Option<u64>,
+    /// Offset of the last data record that will be incorporated into the
+    /// derivative transformation, if any. When present, defines a half-open
+    /// `(prevOffset, newOffset]` interval of data records that will be
+    /// considered in this transaction.
+    pub new_offset: Option<u64>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -313,25 +333,54 @@ pub struct ExecuteQueryInput {
 /// transformation
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct ExecuteQueryRequest {
-    /// Unique identifier of the output dataset
+    /// Unique identifier of the output dataset.
     pub dataset_id: DatasetID,
-    /// Alias of the output dataset
-    pub dataset_name: DatasetName,
-    /// System time to use for new records
+    /// Alias of the output dataset, for logging purposes only.
+    pub dataset_alias: DatasetAlias,
+    /// System time to use for new records.
     pub system_time: DateTime<Utc>,
-    /// Starting offset to use for new records
-    pub offset: i64,
     pub vocab: DatasetVocabulary,
-    /// Transformation that will be applied to produce new data
+    /// Transformation that will be applied to produce new data.
     pub transform: Transform,
-    /// Defines the input data
-    pub inputs: Vec<ExecuteQueryInput>,
-    /// TODO: This is temporary
+    /// Defines inputs used in this transaction. Slices corresponding to every
+    /// input dataset must be present.
+    pub query_inputs: Vec<ExecuteQueryRequestInput>,
+    /// Starting offset to use for new data records.
+    pub next_offset: u64,
+    /// TODO: This will be removed when coordinator will be speaking to engines
+    /// purely through Arrow.
     pub prev_checkpoint_path: Option<PathBuf>,
-    /// TODO: This is temporary
+    /// TODO: This will be removed when coordinator will be speaking to engines
+    /// purely through Arrow.
     pub new_checkpoint_path: PathBuf,
-    /// TODO: This is temporary
-    pub out_data_path: PathBuf,
+    /// TODO: This will be removed when coordinator will be speaking to engines
+    /// purely through Arrow.
+    pub new_data_path: PathBuf,
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// ExecuteQueryRequestInput
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#executequeryrequestinput-schema
+////////////////////////////////////////////////////////////////////////////////
+
+/// Sent as part of the execute query requst to describe the input
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct ExecuteQueryRequestInput {
+    /// Unique identifier of the dataset.
+    pub dataset_id: DatasetID,
+    /// Alias of the output dataset, for logging purposes only.
+    pub dataset_alias: DatasetAlias,
+    /// An alias of this input to be used in queries.
+    pub query_alias: String,
+    pub vocab: DatasetVocabulary,
+    /// Subset of data that goes into this transaction.
+    pub offset_interval: Option<OffsetInterval>,
+    /// TODO: This will be removed when coordinator will be slicing data for the
+    /// engine.
+    pub data_paths: Vec<PathBuf>,
+    /// TODO: replace with actual DDL or Parquet schema.
+    pub schema_file: PathBuf,
+    pub explicit_watermarks: Vec<Watermark>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -356,10 +405,10 @@ impl_enum_variant!(ExecuteQueryResponse::Progress(ExecuteQueryResponseProgress))
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct ExecuteQueryResponseSuccess {
-    /// Data slice produced by the transaction (if any)
-    pub data_interval: Option<OffsetInterval>,
-    /// Watermark advanced by the transaction (uf any).
-    pub output_watermark: Option<DateTime<Utc>>,
+    /// Data slice produced by the transaction, if any.
+    pub offset_interval: Option<OffsetInterval>,
+    /// Watermark advanced by the transaction, if any.
+    pub new_watermark: Option<DateTime<Utc>>,
 }
 
 impl_enum_variant!(ExecuteQueryResponse::Success(ExecuteQueryResponseSuccess));
@@ -453,22 +502,6 @@ impl_enum_variant!(FetchStep::Container(FetchStepContainer));
 pub enum SourceOrdering {
     ByEventTime,
     ByName,
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// InputSlice
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#inputslice-schema
-////////////////////////////////////////////////////////////////////////////////
-
-/// Describes a slice of input data used during a transformation
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub struct InputSlice {
-    /// Input dataset identifier
-    pub dataset_id: DatasetID,
-    /// Blocks that went into this transaction
-    pub block_interval: Option<BlockInterval>,
-    /// Data that went into this transaction
-    pub data_interval: Option<OffsetInterval>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -587,8 +620,8 @@ pub struct MetadataBlock {
     pub system_time: DateTime<Utc>,
     /// Hash sum of the preceding block.
     pub prev_block_hash: Option<Multihash>,
-    /// Block sequence number starting from tail to head.
-    pub sequence_number: i32,
+    /// Block sequence number, starting from zero at the seed block.
+    pub sequence_number: u64,
     /// Event data.
     pub event: MetadataEvent,
 }
@@ -651,13 +684,13 @@ impl_enum_variant!(MetadataEvent::DisablePollingSource(DisablePollingSource));
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#offsetinterval-schema
 ////////////////////////////////////////////////////////////////////////////////
 
-/// Describes a range of data as an arithmetic interval of offsets
+/// Describes a range of data as a closed arithmetic interval of offsets
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct OffsetInterval {
-    /// Start of the closed interval [start; end]
-    pub start: i64,
-    /// End of the closed interval [start; end]
-    pub end: i64,
+    /// Start of the closed interval [start; end].
+    pub start: u64,
+    /// End of the closed interval [start; end].
+    pub end: u64,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -708,7 +741,6 @@ pub enum CompressionFormat {
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum ReadStep {
     Csv(ReadStepCsv),
-    JsonLines(ReadStepJsonLines),
     GeoJson(ReadStepGeoJson),
     EsriShapefile(ReadStepEsriShapefile),
     Parquet(ReadStepParquet),
@@ -736,35 +768,13 @@ pub struct ReadStepCsv {
     /// Sets a single character used for escaping quotes inside an already
     /// quoted value.
     pub escape: Option<String>,
-    /// Sets a single character used for skipping lines beginning with this
-    /// character.
-    pub comment: Option<String>,
     /// Use the first line as names of columns.
     pub header: Option<bool>,
-    /// If it is set to true, the specified or inferred schema will be forcibly
-    /// applied to datasource files, and headers in CSV files will be ignored.
-    /// If the option is set to false, the schema will be validated against all
-    /// headers in CSV files in the case when the header option is set to true.
-    pub enforce_schema: Option<bool>,
     /// Infers the input schema automatically from data. It requires one extra
     /// pass over the data.
     pub infer_schema: Option<bool>,
-    /// A flag indicating whether or not leading whitespaces from values being
-    /// read should be skipped.
-    pub ignore_leading_white_space: Option<bool>,
-    /// A flag indicating whether or not trailing whitespaces from values being
-    /// read should be skipped.
-    pub ignore_trailing_white_space: Option<bool>,
     /// Sets the string representation of a null value.
     pub null_value: Option<String>,
-    /// Sets the string representation of an empty value.
-    pub empty_value: Option<String>,
-    /// Sets the string representation of a non-number value.
-    pub nan_value: Option<String>,
-    /// Sets the string representation of a positive infinity value.
-    pub positive_inf: Option<String>,
-    /// Sets the string representation of a negative infinity value.
-    pub negative_inf: Option<String>,
     /// Sets the string that indicates a date format. The `rfc3339` is the only
     /// required format, the other format strings are implementation-specific.
     pub date_format: Option<String>,
@@ -772,35 +782,9 @@ pub struct ReadStepCsv {
     /// only required format, the other format strings are
     /// implementation-specific.
     pub timestamp_format: Option<String>,
-    /// Parse one record, which may span multiple lines.
-    pub multi_line: Option<bool>,
 }
 
 impl_enum_variant!(ReadStep::Csv(ReadStepCsv));
-
-/// Reader for files containing concatenation of multiple JSON records with the
-/// same schema.
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub struct ReadStepJsonLines {
-    /// A DDL-formatted schema. Schema can be used to coerce values into more
-    /// appropriate data types.
-    pub schema: Option<Vec<String>>,
-    /// Sets the string that indicates a date format. The `rfc3339` is the only
-    /// required format, the other format strings are implementation-specific.
-    pub date_format: Option<String>,
-    /// Allows to forcibly set one of standard basic or extended encoding.
-    pub encoding: Option<String>,
-    /// Parse one record, which may span multiple lines, per file.
-    pub multi_line: Option<bool>,
-    /// Infers all primitive values as a string type.
-    pub primitives_as_string: Option<bool>,
-    /// Sets the string that indicates a timestamp format. The `rfc3339` is the
-    /// only required format, the other format strings are
-    /// implementation-specific.
-    pub timestamp_format: Option<String>,
-}
-
-impl_enum_variant!(ReadStep::JsonLines(ReadStepJsonLines));
 
 /// Reader for GeoJSON files. It expects one `FeatureCollection` object in the
 /// root and will create a record per each `Feature` inside it extracting the
@@ -1069,12 +1053,13 @@ impl_enum_variant!(SourceCaching::Forever(SourceCachingForever));
 /// The state of the source the data was added from to allow fast resuming.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct SourceState {
+    /// Identifies the source that the state corresponds to. It is empty for a
+    /// polling source, as there can be only one. For push sources an empty name
+    /// also uniquely identifies the source know as 'default'.
+    pub source_name: Option<String>,
     /// Identifies the type of the state. Standard types include: `odf/etag`,
     /// `odf/last-modified`.
     pub kind: String,
-    /// Identifies the source data was ingested from. Standard sources include:
-    /// `odf/poll`
-    pub source: String,
     /// Opaque value representing the state.
     pub value: String,
 }
@@ -1128,7 +1113,10 @@ pub struct TransformSql {
     pub engine: String,
     /// Version of the engine to use.
     pub version: Option<String>,
-    /// SQL query the result of which will be used as an output.
+    /// SQL query the result of which will be used as an output. This is a
+    /// convenience property meant only for defining queries by hand. When
+    /// stored in the metadata this property will never be set and instead will
+    /// be converted into a single-iter `queries` array.
     pub query: Option<String>,
     /// Use this instead of query field for specifying multi-step SQL
     /// transformations. Each step acts as a shorthand for `CREATE TEMPORARY
@@ -1149,13 +1137,14 @@ impl_enum_variant!(Transform::Sql(TransformSql));
 /// Describes a derivative transformation input
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct TransformInput {
-    /// Unique dataset identifier. This field is required in metadata blocks and
-    /// can be empty only in a DatasetSnapshot.
-    pub id: Option<DatasetID>,
-    /// A name of this input's table to be used in queries.
-    pub name: DatasetName,
-    /// A local or remote dataset reference to use in dataset resolutions.
-    pub dataset_ref: Option<DatasetRefAny>,
+    /// A local or remote dataset reference. When block is accepted this MUST be
+    /// in the form of a DatasetId to guarantee reproducibility, as aliases can
+    /// change over time.
+    pub dataset_ref: DatasetRefAny,
+    /// An alias under which this input will be available in queries. Will be
+    /// populated from `datasetRef` if not provided before resolving it to
+    /// DatasetId.
+    pub alias: Option<String>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
