@@ -13,6 +13,54 @@ use std::fmt::Display;
 use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////
+// AddData
+////////////////////////////////////////////////////////////////////////////////
+
+impl AddData {
+    /// Helper for determining the last record offset in the dataset
+    pub fn last_offset(&self) -> Option<u64> {
+        self.new_data
+            .as_ref()
+            .map(|d| d.offset_interval.end)
+            .or(self.prev_offset)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// ExecuteQuery
+////////////////////////////////////////////////////////////////////////////////
+
+impl ExecuteQuery {
+    /// Helper for determining the last record offset in the dataset
+    pub fn last_offset(&self) -> Option<u64> {
+        self.new_data
+            .as_ref()
+            .map(|d| d.offset_interval.end)
+            .or(self.prev_offset)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// ExecuteQueryInput
+////////////////////////////////////////////////////////////////////////////////
+
+impl ExecuteQueryInput {
+    /// Helper for determining the input's last block hash included in the
+    /// transaction
+    pub fn last_block_hash(&self) -> Option<&Multihash> {
+        self.new_block_hash
+            .as_ref()
+            .or(self.prev_block_hash.as_ref())
+    }
+
+    /// Helper for determining the input's last record offset included in the
+    /// transaction
+    pub fn last_offset(&self) -> Option<u64> {
+        self.new_offset.or(self.prev_offset)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // DatasetVocabulary
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -194,7 +242,6 @@ impl ReadStep {
         match self {
             ReadStep::Csv(v) => v.schema.as_ref(),
             ReadStep::Json(v) => v.schema.as_ref(),
-            ReadStep::JsonLines(v) => v.schema.as_ref(),
             ReadStep::NdJson(v) => v.schema.as_ref(),
             ReadStep::GeoJson(v) => v.schema.as_ref(),
             ReadStep::NdGeoJson(v) => v.schema.as_ref(),
@@ -216,36 +263,10 @@ impl Default for ReadStepCsv {
             encoding: None,
             quote: None,
             escape: None,
-            comment: None,
             header: None,
-            enforce_schema: None,
             infer_schema: None,
-            ignore_leading_white_space: None,
-            ignore_trailing_white_space: None,
             null_value: None,
-            empty_value: None,
-            nan_value: None,
-            positive_inf: None,
-            negative_inf: None,
             date_format: None,
-            timestamp_format: None,
-            multi_line: None,
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// ReadStepJsonLines
-////////////////////////////////////////////////////////////////////////////////
-
-impl Default for ReadStepJsonLines {
-    fn default() -> Self {
-        Self {
-            schema: None,
-            date_format: None,
-            encoding: None,
-            multi_line: None,
-            primitives_as_string: None,
             timestamp_format: None,
         }
     }
