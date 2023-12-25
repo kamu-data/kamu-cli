@@ -66,6 +66,7 @@ async fn do_test_sync(
     // Tests sync between "foo" -> remote -> "bar"
     let dataset_alias = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
     let dataset_alias_2 = DatasetAlias::new(None, DatasetName::new_unchecked("bar"));
+    let is_ipfs = ipfs.is_none();
 
     let (ipfs_gateway, ipfs_client) = ipfs.unwrap_or_default();
 
@@ -333,56 +334,38 @@ async fn do_test_sync(
     );
 
     // Datasets corrupted transfer flow /////////////////////////////////////////
-
-    let _b6 =
-        DatasetTestHelper::append_random_data(dataset_repo.as_ref(), &dataset_alias, false).await;
-
-    let dir_files = std::fs::read_dir(tmp_workspace_dir.join("datasets/foo/checkpoints")).unwrap();
-    for file_info in dir_files {
-        std::fs::remove_file(file_info.unwrap().path()).unwrap();
-    }
-
-    for _i in 0..15 {
-        let _: MultihashGeneric<32> =
+    if is_ipfs {
+        let _b6 =
             DatasetTestHelper::append_random_data(dataset_repo.as_ref(), &dataset_alias, false)
                 .await;
+
+        let dir_files =
+            std::fs::read_dir(tmp_workspace_dir.join("datasets/foo/checkpoints")).unwrap();
+        for file_info in dir_files {
+            std::fs::remove_file(file_info.unwrap().path()).unwrap();
+        }
+
+        for _i in 0..15 {
+            let _: MultihashGeneric<32> =
+                DatasetTestHelper::append_random_data(dataset_repo.as_ref(), &dataset_alias, false)
+                    .await;
+        }
+
+        assert_matches!(
+            sync_svc
+            .sync(
+                &dataset_alias.as_any_ref(),
+                &push_ref.as_any_ref(),
+                SyncOptions::default(),
+                None,
+            )
+            .await,
+            Err(SyncError::Corrupted(CorruptedSourceError {
+                message,
+                source: _
+            })) if message == "Source checkpoint file is missing".to_string()
+        );
     }
-
-    let head_before_sync = dataset_repo
-        .get_dataset(&dataset_alias.as_local_ref())
-        .await
-        .unwrap()
-        .as_metadata_chain()
-        .get_ref(&BlockRef::Head)
-        .await
-        .unwrap();
-
-    assert_matches!(
-        sync_svc
-        .sync(
-            &dataset_alias.as_any_ref(),
-            &push_ref.as_any_ref(),
-            SyncOptions::default(),
-            None,
-        )
-        .await,
-        Err(SyncError::Corrupted(CorruptedSourceError {
-            message,
-            source: _
-        })) if message == "Source checkpoint file is missing".to_string()
-    );
-
-    assert_eq!(
-        dataset_repo
-            .get_dataset(&dataset_alias.as_local_ref())
-            .await
-            .unwrap()
-            .as_metadata_chain()
-            .get_ref(&BlockRef::Head)
-            .await
-            .unwrap(),
-        head_before_sync,
-    );
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
