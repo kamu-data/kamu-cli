@@ -13,7 +13,7 @@ use std::sync::Arc;
 use chrono::prelude::*;
 use opendatafabric::*;
 
-const TEST_SEQUENCE_NUMBER: i32 = 132;
+const TEST_SEQUENCE_NUMBER: u64 = 132;
 
 fn load() -> MetadataBlock {
     MetadataBlock {
@@ -22,14 +22,12 @@ fn load() -> MetadataBlock {
         event: MetadataEvent::SetTransform(SetTransform {
             inputs: vec![
                 TransformInput {
-                    id: Some(DatasetID::new_seeded_ed25519(b"input1")),
-                    name: DatasetName::try_from("input1").unwrap(),
-                    dataset_ref: None,
+                    dataset_ref: DatasetID::new_seeded_ed25519(b"input1").into(),
+                    alias: Some("input1".to_string()),
                 },
                 TransformInput {
-                    id: Some(DatasetID::new_seeded_ed25519(b"input2")),
-                    name: DatasetName::try_from("input2").unwrap(),
-                    dataset_ref: Some(DatasetRefAny::try_from("kamu/input2").unwrap()),
+                    dataset_ref: DatasetRefAny::try_from("kamu/input2").unwrap(),
+                    alias: Some("input2".to_string()),
                 },
             ],
             transform: Transform::Sql(TransformSql {
@@ -65,17 +63,15 @@ fn test_accessors() {
         inputs,
         vec![
             TransformInput {
-                id: Some(DatasetID::new_seeded_ed25519(b"input1")),
-                name: DatasetName::try_from("input1").unwrap(),
-                dataset_ref: None,
+                dataset_ref: DatasetRefAny::ID(None, DatasetID::new_seeded_ed25519(b"input1")),
+                alias: Some("input1".to_string()),
             },
             TransformInput {
-                id: Some(DatasetID::new_seeded_ed25519(b"input2")),
-                name: DatasetName::try_from("input2").unwrap(),
-                dataset_ref: Some(DatasetRefAny::AmbiguousAlias(
+                dataset_ref: DatasetRefAny::AmbiguousAlias(
                     Arc::from("kamu"),
                     DatasetName::try_from("input2").unwrap()
-                )),
+                ),
+                alias: Some("input2".to_string()),
             },
         ]
     );

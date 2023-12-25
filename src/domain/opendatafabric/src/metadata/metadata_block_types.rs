@@ -24,7 +24,7 @@ pub struct MetadataBlockTyped<T> {
     /// Hash sum of the preceding block.
     pub prev_block_hash: Option<Multihash>,
     /// Block sequence number starting from tail to head.
-    pub sequence_number: i32,
+    pub sequence_number: u64,
     /// Event data.
     pub event: T,
 }
@@ -32,14 +32,14 @@ pub struct MetadataBlockTyped<T> {
 pub struct MetadataBlockTypedRef<'a, T> {
     pub system_time: DateTime<Utc>,
     pub prev_block_hash: Option<&'a Multihash>,
-    pub sequence_number: i32,
+    pub sequence_number: u64,
     pub event: &'a T,
 }
 
 pub struct MetadataBlockTypedRefMut<'a, T> {
     pub system_time: DateTime<Utc>,
     pub prev_block_hash: Option<&'a Multihash>,
-    pub sequence_number: i32,
+    pub sequence_number: u64,
     pub event: &'a mut T,
 }
 
@@ -105,15 +105,38 @@ impl AsTypedBlock for MetadataBlock {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct MetadataEventDataStream {
-    pub output_data: Option<DataSlice>,
-    pub output_checkpoint: Option<Checkpoint>,
-    pub output_watermark: Option<DateTime<Utc>>,
+    pub prev_checkpoint: Option<Multihash>,
+    pub prev_offset: Option<u64>,
+    pub new_data: Option<DataSlice>,
+    pub new_checkpoint: Option<Checkpoint>,
+    pub new_watermark: Option<DateTime<Utc>>,
 }
 
 pub struct MetadataEventDataStreamRef<'a> {
-    pub output_data: Option<&'a DataSlice>,
-    pub output_checkpoint: Option<&'a Checkpoint>,
-    pub output_watermark: Option<&'a DateTime<Utc>>,
+    pub prev_checkpoint: Option<&'a Multihash>,
+    pub prev_offset: Option<u64>,
+    pub new_data: Option<&'a DataSlice>,
+    pub new_checkpoint: Option<&'a Checkpoint>,
+    pub new_watermark: Option<&'a DateTime<Utc>>,
+}
+
+impl MetadataEventDataStream {
+    /// Helper for determining the last record offset in the dataset
+    pub fn last_offset(&self) -> Option<u64> {
+        self.new_data
+            .as_ref()
+            .map(|d| d.offset_interval.end)
+            .or(self.prev_offset)
+    }
+}
+
+impl<'a> MetadataEventDataStreamRef<'a> {
+    /// Helper for determining the last record offset in the dataset
+    pub fn last_offset(&self) -> Option<u64> {
+        self.new_data
+            .map(|d| d.offset_interval.end)
+            .or(self.prev_offset)
+    }
 }
 
 pub trait IntoDataStreamEvent {
@@ -123,12 +146,22 @@ pub trait IntoDataStreamEvent {
 
 impl IntoDataStreamEvent for MetadataEvent {
     fn into_data_stream_event(self) -> Option<MetadataEventDataStream> {
-        let (output_data, output_checkpoint, output_watermark) = match self {
-            MetadataEvent::AddData(e) => (e.output_data, e.output_checkpoint, e.output_watermark),
-            MetadataEvent::ExecuteQuery(e) => {
-                (e.output_data, e.output_checkpoint, e.output_watermark)
-            }
-            MetadataEvent::SetWatermark(e) => (None, None, Some(e.output_watermark)),
+        let (prev_checkpoint, prev_offset, new_data, new_checkpoint, new_watermark) = match self {
+            MetadataEvent::AddData(e) => (
+                e.prev_checkpoint,
+                e.prev_offset,
+                e.new_data,
+                e.new_checkpoint,
+                e.new_watermark,
+            ),
+            MetadataEvent::ExecuteQuery(e) => (
+                e.prev_checkpoint,
+                e.prev_offset,
+                e.new_data,
+                e.new_checkpoint,
+                e.new_watermark,
+            ),
+            MetadataEvent::SetWatermark(e) => (None, None, None, None, Some(e.output_watermark)),
             MetadataEvent::Seed(_)
             | MetadataEvent::SetAttachments(_)
             | MetadataEvent::SetInfo(_)
@@ -142,25 +175,31 @@ impl IntoDataStreamEvent for MetadataEvent {
             | MetadataEvent::SetDataSchema(_) => return None,
         };
         Some(MetadataEventDataStream {
-            output_data,
-            output_checkpoint,
-            output_watermark,
+            prev_checkpoint,
+            prev_offset,
+            new_data,
+            new_checkpoint,
+            new_watermark,
         })
     }
 
     fn as_data_stream_event<'a>(&'a self) -> Option<MetadataEventDataStreamRef<'a>> {
-        let (output_data, output_checkpoint, output_watermark) = match &self {
+        let (prev_checkpoint, prev_offset, new_data, new_checkpoint, new_watermark) = match &self {
             MetadataEvent::AddData(e) => (
-                e.output_data.as_ref(),
-                e.output_checkpoint.as_ref(),
-                e.output_watermark.as_ref(),
+                e.prev_checkpoint.as_ref(),
+                e.prev_offset,
+                e.new_data.as_ref(),
+                e.new_checkpoint.as_ref(),
+                e.new_watermark.as_ref(),
             ),
             MetadataEvent::ExecuteQuery(e) => (
-                e.output_data.as_ref(),
-                e.output_checkpoint.as_ref(),
-                e.output_watermark.as_ref(),
+                e.prev_checkpoint.as_ref(),
+                e.prev_offset,
+                e.new_data.as_ref(),
+                e.new_checkpoint.as_ref(),
+                e.new_watermark.as_ref(),
             ),
-            MetadataEvent::SetWatermark(e) => (None, None, Some(&e.output_watermark)),
+            MetadataEvent::SetWatermark(e) => (None, None, None, None, Some(&e.output_watermark)),
             MetadataEvent::Seed(_)
             | MetadataEvent::SetAttachments(_)
             | MetadataEvent::SetInfo(_)
@@ -174,9 +213,11 @@ impl IntoDataStreamEvent for MetadataEvent {
             | MetadataEvent::SetDataSchema(_) => return None,
         };
         Some(MetadataEventDataStreamRef {
-            output_data,
-            output_checkpoint,
-            output_watermark,
+            prev_checkpoint,
+            prev_offset,
+            new_data,
+            new_checkpoint,
+            new_watermark,
         })
     }
 }

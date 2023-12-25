@@ -16,8 +16,8 @@ struct Timestamp {
 ////////////////////////////////////////////////////////////////////////////////
 
 table OffsetInterval {
-  start: int64;
-  end: int64;
+  start: uint64;
+  end: uint64;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -28,8 +28,8 @@ table OffsetInterval {
 table DataSlice {
   logical_hash: [ubyte];
   physical_hash: [ubyte];
-  interval: OffsetInterval;
-  size: int64;
+  offset_interval: OffsetInterval;
+  size: uint64;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -39,7 +39,7 @@ table DataSlice {
 
 table Checkpoint {
   physical_hash: [ubyte];
-  size: int64;
+  size: uint64;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -48,8 +48,8 @@ table Checkpoint {
 ////////////////////////////////////////////////////////////////////////////////
 
 table SourceState {
+  source_name: string;
   kind: string;
-  source: string;
   value: string;
 }
 
@@ -59,11 +59,12 @@ table SourceState {
 ////////////////////////////////////////////////////////////////////////////////
 
 table AddData {
-  input_checkpoint: [ubyte];
-  output_data: DataSlice;
-  output_checkpoint: Checkpoint;
-  output_watermark: Timestamp;
-  source_state: SourceState;
+  prev_checkpoint: [ubyte];
+  prev_offset: uint64 = null;
+  new_data: DataSlice;
+  new_checkpoint: Checkpoint;
+  new_watermark: Timestamp;
+  new_source_state: SourceState;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -77,28 +78,10 @@ table ReadStepCsv {
   encoding: string;
   quote: string;
   escape: string;
-  comment: string;
   header: bool = null;
-  enforce_schema: bool = null;
   infer_schema: bool = null;
-  ignore_leading_white_space: bool = null;
-  ignore_trailing_white_space: bool = null;
   null_value: string;
-  empty_value: string;
-  nan_value: string;
-  positive_inf: string;
-  negative_inf: string;
   date_format: string;
-  timestamp_format: string;
-  multi_line: bool = null;
-}
-
-table ReadStepJsonLines {
-  schema: [string];
-  date_format: string;
-  encoding: string;
-  multi_line: bool = null;
-  primitives_as_string: bool = null;
   timestamp_format: string;
 }
 
@@ -136,7 +119,6 @@ table ReadStepNdGeoJson {
 
 union ReadStep {
   ReadStepCsv,
-  ReadStepJsonLines,
   ReadStepGeoJson,
   ReadStepEsriShapefile,
   ReadStepParquet,
@@ -245,16 +227,6 @@ union Attachments {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// BlockInterval
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#blockinterval-schema
-////////////////////////////////////////////////////////////////////////////////
-
-table BlockInterval {
-  start: [ubyte];
-  end: [ubyte];
-}
-
-////////////////////////////////////////////////////////////////////////////////
 // DatasetKind
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datasetkind-schema
 ////////////////////////////////////////////////////////////////////////////////
@@ -265,14 +237,16 @@ enum DatasetKind: int32 {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// InputSlice
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#inputslice-schema
+// ExecuteQueryInput
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#executequeryinput-schema
 ////////////////////////////////////////////////////////////////////////////////
 
-table InputSlice {
+table ExecuteQueryInput {
   dataset_id: [ubyte];
-  block_interval: BlockInterval;
-  data_interval: OffsetInterval;
+  prev_block_hash: [ubyte];
+  new_block_hash: [ubyte];
+  prev_offset: uint64 = null;
+  new_offset: uint64 = null;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -281,11 +255,12 @@ table InputSlice {
 ////////////////////////////////////////////////////////////////////////////////
 
 table ExecuteQuery {
-  input_slices: [InputSlice];
-  input_checkpoint: [ubyte];
-  output_data: DataSlice;
-  output_checkpoint: Checkpoint;
-  output_watermark: Timestamp;
+  query_inputs: [ExecuteQueryInput];
+  prev_checkpoint: [ubyte];
+  prev_offset: uint64 = null;
+  new_data: DataSlice;
+  new_checkpoint: Checkpoint;
+  new_watermark: Timestamp;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -434,9 +409,8 @@ table SetPollingSource {
 ////////////////////////////////////////////////////////////////////////////////
 
 table TransformInput {
-  id: [ubyte];
-  name: string;
   dataset_ref: string;
+  alias: string;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -570,15 +544,16 @@ table Watermark {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// ExecuteQueryInput
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#executequeryinput-schema
+// ExecuteQueryRequestInput
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#executequeryrequestinput-schema
 ////////////////////////////////////////////////////////////////////////////////
 
-table ExecuteQueryInput {
+table ExecuteQueryRequestInput {
   dataset_id: [ubyte];
-  dataset_name: string;
+  dataset_alias: string;
+  query_alias: string;
   vocab: DatasetVocabulary;
-  data_interval: OffsetInterval;
+  offset_interval: OffsetInterval;
   data_paths: [string];
   schema_file: string;
   explicit_watermarks: [Watermark];
@@ -591,15 +566,15 @@ table ExecuteQueryInput {
 
 table ExecuteQueryRequest {
   dataset_id: [ubyte];
-  dataset_name: string;
+  dataset_alias: string;
   system_time: Timestamp;
-  offset: int64;
   vocab: DatasetVocabulary;
   transform: Transform;
-  inputs: [ExecuteQueryInput];
+  query_inputs: [ExecuteQueryRequestInput];
+  next_offset: uint64;
   prev_checkpoint_path: string;
   new_checkpoint_path: string;
-  out_data_path: string;
+  new_data_path: string;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -611,8 +586,8 @@ table ExecuteQueryResponseProgress {
 }
 
 table ExecuteQueryResponseSuccess {
-  data_interval: OffsetInterval;
-  output_watermark: Timestamp;
+  offset_interval: OffsetInterval;
+  new_watermark: Timestamp;
 }
 
 table ExecuteQueryResponseInvalidQuery {
@@ -654,7 +629,7 @@ table Manifest {
 table MetadataBlock {
   system_time: Timestamp;
   prev_block_hash: [ubyte];
-  sequence_number: int32;
+  sequence_number: uint64;
   event: MetadataEvent;
 }
 
