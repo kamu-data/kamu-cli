@@ -47,64 +47,65 @@ fn get_test_events() -> [(MetadataEvent, &'static str); 6] {
                     primary_key: vec!["a".to_owned()],
                 }),
             }),
-            "b7b9d53f84abee88393a92bde7f615c3a3cd2d33a7d9df1409c8a8ffee8aaf2c",
+            "18cc1680b3d36f63358b59d469d76dcbf71ddac3ea66a693ce4158cfc5dfb28d",
         ),
         (
             MetadataEvent::AddData(AddData {
-                input_checkpoint: None,
-                output_data: None,
-                output_checkpoint: None,
-                output_watermark: None,
-                source_state: None,
+                prev_checkpoint: None,
+                prev_offset: None,
+                new_data: None,
+                new_checkpoint: None,
+                new_watermark: None,
+                new_source_state: None,
             }),
-            "eb745e4f975c66d8794afce2f5792a888ecf3cb367e2c90bf108753a34a0690e",
+            "73e2977b8beae4aef53670067c1173b9d68e69721908d080b84286ab366d1e14",
         ),
         (
             MetadataEvent::AddData(AddData {
-                input_checkpoint: None,
-                output_data: Some(DataSlice {
+                prev_checkpoint: None,
+                prev_offset: Some(9),
+                new_data: Some(DataSlice {
                     logical_hash: Multihash::from_digest_sha3_256(b"logical"),
                     physical_hash: Multihash::from_digest_sha3_256(b"physical"),
-                    interval: OffsetInterval { start: 0, end: 100 },
+                    offset_interval: OffsetInterval { start: 10, end: 99 },
                     size: 100,
                 }),
-                output_checkpoint: None,
-                output_watermark: None,
-                source_state: None,
+                new_checkpoint: None,
+                new_watermark: None,
+                new_source_state: None,
             }),
-            "5f5736202e41d0da69ec9835bb0d15efc23e844dd98243da585135c9f772812d",
+            "39426541aa50092a19daa39fd488cf0a6eaace03b2130440922f27916ef74a88",
         ),
         (
             MetadataEvent::AddData(AddData {
-                input_checkpoint: None,
-                output_data: Some(DataSlice {
+                prev_checkpoint: Some(Multihash::from_digest_sha3_256(b"checkpoint")),
+                prev_offset: Some(9),
+                new_data: Some(DataSlice {
                     logical_hash: Multihash::from_digest_sha3_256(b"logical"),
                     physical_hash: Multihash::from_digest_sha3_256(b"physical"),
-                    interval: OffsetInterval { start: 0, end: 100 },
+                    offset_interval: OffsetInterval { start: 10, end: 99 },
                     size: 100,
                 }),
-                output_checkpoint: None,
-                output_watermark: None,
-                source_state: Some(SourceState {
-                    kind: "odf/etag".to_owned(),
-                    source: "odf/polling-source".to_owned(),
-                    value: "SOME_ETAG".to_owned(),
+                new_checkpoint: None,
+                new_watermark: None,
+                new_source_state: Some(SourceState {
+                    source_name: Some("push-source-1".to_owned()),
+                    kind: "kamu/kafka-offset".to_owned(),
+                    value: "SOME_OFFSET".to_owned(),
                 }),
             }),
-            "bb459566b5913507f6627a07e13ab60bbd16948ee4d8fb640e77fc4c3df57998",
+            "db5044313bbd596fb54bef9387ad61a18206d1e93e833db4d1159d20cd3cac58",
         ),
         (
             MetadataEvent::SetTransform(SetTransform {
                 inputs: vec![
                     TransformInput {
-                        id: Some(DatasetID::new_seeded_ed25519(b"input1")),
-                        name: DatasetName::try_from("input1").unwrap(),
-                        dataset_ref: None,
+                        dataset_ref: DatasetID::new_seeded_ed25519(b"input1").into(),
+                        alias: Some("input1".to_string()),
                     },
                     TransformInput {
-                        id: Some(DatasetID::new_seeded_ed25519(b"input2")),
-                        name: DatasetName::try_from("input2").unwrap(),
-                        dataset_ref: None,
+                        dataset_ref: DatasetName::try_from("input2").unwrap().into(),
+                        alias: Some("input2".to_string()),
                     },
                 ],
                 transform: Transform::Sql(TransformSql {
@@ -115,46 +116,45 @@ fn get_test_events() -> [(MetadataEvent, &'static str); 6] {
                     temporal_tables: None,
                 }),
             }),
-            "e634a72f9a9a314a64afb26fd0d34012a08c7d47402dfbc78afa78edac978777",
+            "dc2ab3737792021b6794d3969315bb521701780c91548104f149906d98c8da70",
         ),
         (
             MetadataEvent::ExecuteQuery(ExecuteQuery {
-                input_slices: vec![
-                    InputSlice {
+                query_inputs: vec![
+                    ExecuteQueryInput {
                         dataset_id: DatasetID::new_seeded_ed25519(b"input1"),
-                        block_interval: Some(BlockInterval {
-                            start: Multihash::from_digest_sha3_256(b"a"),
-                            end: Multihash::from_digest_sha3_256(b"b"),
-                        }),
-                        data_interval: Some(OffsetInterval { start: 10, end: 20 }),
+                        prev_block_hash: Some(Multihash::from_digest_sha3_256(b"a")),
+                        new_block_hash: Some(Multihash::from_digest_sha3_256(b"b")),
+                        prev_offset: Some(9),
+                        new_offset: Some(20),
                     },
-                    InputSlice {
+                    ExecuteQueryInput {
                         dataset_id: DatasetID::new_seeded_ed25519(b"input2"),
-                        block_interval: Some(BlockInterval {
-                            start: Multihash::from_digest_sha3_256(b"a"),
-                            end: Multihash::from_digest_sha3_256(b"b"),
-                        }),
-                        data_interval: None,
+                        prev_block_hash: Some(Multihash::from_digest_sha3_256(b"a")),
+                        new_block_hash: Some(Multihash::from_digest_sha3_256(b"b")),
+                        prev_offset: None,
+                        new_offset: None,
                     },
                 ],
-                input_checkpoint: None,
-                output_data: Some(DataSlice {
+                prev_checkpoint: Some(Multihash::from_digest_sha3_256(b"checkpoint")),
+                prev_offset: Some(9),
+                new_data: Some(DataSlice {
                     logical_hash: Multihash::from_digest_sha3_256(b"foo"),
                     physical_hash: Multihash::from_digest_sha3_256(b"bar"),
-                    interval: OffsetInterval { start: 10, end: 20 },
+                    offset_interval: OffsetInterval { start: 10, end: 19 },
                     size: 10,
                 }),
-                output_checkpoint: None,
-                output_watermark: Some(Utc.with_ymd_and_hms(2020, 1, 1, 12, 0, 0).unwrap()),
+                new_checkpoint: None,
+                new_watermark: Some(Utc.with_ymd_and_hms(2020, 1, 1, 12, 0, 0).unwrap()),
             }),
-            "6b9715492945e2c69a335a1cb292ccad9d3f856e6c202ca0e8335ca9e45dd9ca",
+            "a955281dca303056a88e39291d17e045d88ecdafca3ef9e75b09b83169633b52",
         ),
     ]
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-const TEST_SEQUENCE_NUMBER: i32 = 117;
+const TEST_SEQUENCE_NUMBER: u64 = 117;
 
 fn wrap_into_block(event: MetadataEvent) -> MetadataBlock {
     MetadataBlock {
@@ -222,7 +222,7 @@ fn serde_set_data_schema() {
     assert_eq!(expected_block, actual_block);
 
     let hash_actual = format!("{:x}", sha3::Sha3_256::digest(&buffer));
-    let hash_expected = "d2f009192573b1ce449c04a8b1a3866ad0f86bb15808f447481f735cd90d95f0";
+    let hash_expected = "cc969ae72e4b2a7bbd7c7ede4cda43104ccc8549497c9f4044fff1681bdd8237";
 
     assert_eq!(hash_actual, hash_expected);
 
@@ -240,8 +240,8 @@ fn serde_set_data_schema() {
 fn serde_execute_query_response() {
     let examples = [
         ExecuteQueryResponse::Success(ExecuteQueryResponseSuccess {
-            data_interval: Some(OffsetInterval { start: 0, end: 10 }),
-            output_watermark: Some(Utc::now()),
+            offset_interval: Some(OffsetInterval { start: 0, end: 10 }),
+            new_watermark: Some(Utc::now()),
         }),
         ExecuteQueryResponse::InvalidQuery(ExecuteQueryResponseInvalidQuery {
             message: "boop".to_owned(),
