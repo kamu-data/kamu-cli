@@ -56,18 +56,19 @@ macro_rules! implement_serde_as {
 #[serde(remote = "AddData")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct AddDataDef {
-    pub input_checkpoint: Option<Multihash>,
+    pub prev_checkpoint: Option<Multihash>,
+    pub prev_offset: Option<u64>,
     #[serde_as(as = "Option<DataSliceDef>")]
     #[serde(default)]
-    pub output_data: Option<DataSlice>,
+    pub new_data: Option<DataSlice>,
     #[serde_as(as = "Option<CheckpointDef>")]
     #[serde(default)]
-    pub output_checkpoint: Option<Checkpoint>,
+    pub new_checkpoint: Option<Checkpoint>,
     #[serde(default, with = "datetime_rfc3339_opt")]
-    pub output_watermark: Option<DateTime<Utc>>,
+    pub new_watermark: Option<DateTime<Utc>>,
     #[serde_as(as = "Option<SourceStateDef>")]
     #[serde(default)]
-    pub source_state: Option<SourceState>,
+    pub new_source_state: Option<SourceState>,
 }
 
 implement_serde_as!(AddData, AddDataDef, "AddDataDef");
@@ -124,9 +125,9 @@ implement_serde_as!(
 #[serde_as]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(remote = "Attachments")]
-#[serde(deny_unknown_fields, rename_all = "camelCase", tag = "kind")]
+#[serde(deny_unknown_fields, tag = "kind")]
 pub enum AttachmentsDef {
-    #[serde(rename_all = "camelCase")]
+    #[serde(alias = "embedded")]
     Embedded(#[serde_as(as = "AttachmentsEmbeddedDef")] AttachmentsEmbedded),
 }
 
@@ -148,23 +149,6 @@ pub struct AttachmentsEmbeddedDef {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// BlockInterval
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#blockinterval-schema
-////////////////////////////////////////////////////////////////////////////////
-
-#[serde_as]
-#[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(remote = "BlockInterval")]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub struct BlockIntervalDef {
-    pub start: Multihash,
-    pub end: Multihash,
-}
-
-implement_serde_as!(BlockInterval, BlockIntervalDef, "BlockIntervalDef");
-
-////////////////////////////////////////////////////////////////////////////////
 // Checkpoint
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#checkpoint-schema
 ////////////////////////////////////////////////////////////////////////////////
@@ -176,7 +160,7 @@ implement_serde_as!(BlockInterval, BlockIntervalDef, "BlockIntervalDef");
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct CheckpointDef {
     pub physical_hash: Multihash,
-    pub size: i64,
+    pub size: u64,
 }
 
 implement_serde_as!(Checkpoint, CheckpointDef, "CheckpointDef");
@@ -195,8 +179,8 @@ pub struct DataSliceDef {
     pub logical_hash: Multihash,
     pub physical_hash: Multihash,
     #[serde_as(as = "OffsetIntervalDef")]
-    pub interval: OffsetInterval,
-    pub size: i64,
+    pub offset_interval: OffsetInterval,
+    pub size: u64,
 }
 
 implement_serde_as!(DataSlice, DataSliceDef, "DataSliceDef");
@@ -208,9 +192,11 @@ implement_serde_as!(DataSlice, DataSliceDef, "DataSliceDef");
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(remote = "DatasetKind")]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
+#[serde(deny_unknown_fields)]
 pub enum DatasetKindDef {
+    #[serde(alias = "root")]
     Root,
+    #[serde(alias = "derivative")]
     Derivative,
 }
 
@@ -321,13 +307,13 @@ implement_serde_as!(EnvVar, EnvVarDef, "EnvVarDef");
 #[serde_as]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(remote = "EventTimeSource")]
-#[serde(deny_unknown_fields, rename_all = "camelCase", tag = "kind")]
+#[serde(deny_unknown_fields, tag = "kind")]
 pub enum EventTimeSourceDef {
-    #[serde(rename_all = "camelCase")]
+    #[serde(alias = "fromMetadata", alias = "frommetadata")]
     FromMetadata(#[serde_as(as = "EventTimeSourceFromMetadataDef")] EventTimeSourceFromMetadata),
-    #[serde(rename_all = "camelCase")]
+    #[serde(alias = "fromPath", alias = "frompath")]
     FromPath(#[serde_as(as = "EventTimeSourceFromPathDef")] EventTimeSourceFromPath),
-    #[serde(rename_all = "camelCase")]
+    #[serde(alias = "fromSystemTime", alias = "fromsystemtime")]
     FromSystemTime(
         #[serde_as(as = "EventTimeSourceFromSystemTimeDef")] EventTimeSourceFromSystemTime,
     ),
@@ -385,17 +371,18 @@ pub struct EventTimeSourceFromSystemTimeDef {}
 #[serde(remote = "ExecuteQuery")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct ExecuteQueryDef {
-    #[serde_as(as = "Vec<InputSliceDef>")]
-    pub input_slices: Vec<InputSlice>,
-    pub input_checkpoint: Option<Multihash>,
+    #[serde_as(as = "Vec<ExecuteQueryInputDef>")]
+    pub query_inputs: Vec<ExecuteQueryInput>,
+    pub prev_checkpoint: Option<Multihash>,
+    pub prev_offset: Option<u64>,
     #[serde_as(as = "Option<DataSliceDef>")]
     #[serde(default)]
-    pub output_data: Option<DataSlice>,
+    pub new_data: Option<DataSlice>,
     #[serde_as(as = "Option<CheckpointDef>")]
     #[serde(default)]
-    pub output_checkpoint: Option<Checkpoint>,
+    pub new_checkpoint: Option<Checkpoint>,
     #[serde(default, with = "datetime_rfc3339_opt")]
-    pub output_watermark: Option<DateTime<Utc>>,
+    pub new_watermark: Option<DateTime<Utc>>,
 }
 
 implement_serde_as!(ExecuteQuery, ExecuteQueryDef, "ExecuteQueryDef");
@@ -411,18 +398,11 @@ implement_serde_as!(ExecuteQuery, ExecuteQueryDef, "ExecuteQueryDef");
 #[serde(remote = "ExecuteQueryInput")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct ExecuteQueryInputDef {
-    #[serde(rename = "datasetID")]
     pub dataset_id: DatasetID,
-    pub dataset_name: DatasetName,
-    #[serde_as(as = "DatasetVocabularyDef")]
-    pub vocab: DatasetVocabulary,
-    #[serde_as(as = "Option<OffsetIntervalDef>")]
-    #[serde(default)]
-    pub data_interval: Option<OffsetInterval>,
-    pub data_paths: Vec<PathBuf>,
-    pub schema_file: PathBuf,
-    #[serde_as(as = "Vec<WatermarkDef>")]
-    pub explicit_watermarks: Vec<Watermark>,
+    pub prev_block_hash: Option<Multihash>,
+    pub new_block_hash: Option<Multihash>,
+    pub prev_offset: Option<u64>,
+    pub new_offset: Option<u64>,
 }
 
 implement_serde_as!(
@@ -442,27 +422,57 @@ implement_serde_as!(
 #[serde(remote = "ExecuteQueryRequest")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct ExecuteQueryRequestDef {
-    #[serde(rename = "datasetID")]
     pub dataset_id: DatasetID,
-    pub dataset_name: DatasetName,
+    pub dataset_alias: DatasetAlias,
     #[serde(with = "datetime_rfc3339")]
     pub system_time: DateTime<Utc>,
-    pub offset: i64,
     #[serde_as(as = "DatasetVocabularyDef")]
     pub vocab: DatasetVocabulary,
     #[serde_as(as = "TransformDef")]
     pub transform: Transform,
-    #[serde_as(as = "Vec<ExecuteQueryInputDef>")]
-    pub inputs: Vec<ExecuteQueryInput>,
+    #[serde_as(as = "Vec<ExecuteQueryRequestInputDef>")]
+    pub query_inputs: Vec<ExecuteQueryRequestInput>,
+    pub next_offset: u64,
     pub prev_checkpoint_path: Option<PathBuf>,
     pub new_checkpoint_path: PathBuf,
-    pub out_data_path: PathBuf,
+    pub new_data_path: PathBuf,
 }
 
 implement_serde_as!(
     ExecuteQueryRequest,
     ExecuteQueryRequestDef,
     "ExecuteQueryRequestDef"
+);
+
+////////////////////////////////////////////////////////////////////////////////
+// ExecuteQueryRequestInput
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#executequeryrequestinput-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[serde_as]
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "ExecuteQueryRequestInput")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct ExecuteQueryRequestInputDef {
+    pub dataset_id: DatasetID,
+    pub dataset_alias: DatasetAlias,
+    pub query_alias: String,
+    #[serde_as(as = "DatasetVocabularyDef")]
+    pub vocab: DatasetVocabulary,
+    #[serde_as(as = "Option<OffsetIntervalDef>")]
+    #[serde(default)]
+    pub offset_interval: Option<OffsetInterval>,
+    pub data_paths: Vec<PathBuf>,
+    pub schema_file: PathBuf,
+    #[serde_as(as = "Vec<WatermarkDef>")]
+    pub explicit_watermarks: Vec<Watermark>,
+}
+
+implement_serde_as!(
+    ExecuteQueryRequestInput,
+    ExecuteQueryRequestInputDef,
+    "ExecuteQueryRequestInputDef"
 );
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -473,17 +483,17 @@ implement_serde_as!(
 #[serde_as]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(remote = "ExecuteQueryResponse")]
-#[serde(deny_unknown_fields, rename_all = "camelCase", tag = "kind")]
+#[serde(deny_unknown_fields, tag = "kind")]
 pub enum ExecuteQueryResponseDef {
-    #[serde(rename_all = "camelCase")]
+    #[serde(alias = "progress")]
     Progress(#[serde_as(as = "ExecuteQueryResponseProgressDef")] ExecuteQueryResponseProgress),
-    #[serde(rename_all = "camelCase")]
+    #[serde(alias = "success")]
     Success(#[serde_as(as = "ExecuteQueryResponseSuccessDef")] ExecuteQueryResponseSuccess),
-    #[serde(rename_all = "camelCase")]
+    #[serde(alias = "invalidQuery", alias = "invalidquery")]
     InvalidQuery(
         #[serde_as(as = "ExecuteQueryResponseInvalidQueryDef")] ExecuteQueryResponseInvalidQuery,
     ),
-    #[serde(rename_all = "camelCase")]
+    #[serde(alias = "internalError", alias = "internalerror")]
     InternalError(
         #[serde_as(as = "ExecuteQueryResponseInternalErrorDef")] ExecuteQueryResponseInternalError,
     ),
@@ -530,9 +540,9 @@ pub struct ExecuteQueryResponseProgressDef {}
 pub struct ExecuteQueryResponseSuccessDef {
     #[serde_as(as = "Option<OffsetIntervalDef>")]
     #[serde(default)]
-    pub data_interval: Option<OffsetInterval>,
+    pub offset_interval: Option<OffsetInterval>,
     #[serde(default, with = "datetime_rfc3339_opt")]
-    pub output_watermark: Option<DateTime<Utc>>,
+    pub new_watermark: Option<DateTime<Utc>>,
 }
 
 #[serde_as]
@@ -562,13 +572,13 @@ pub struct ExecuteQueryResponseInternalErrorDef {
 #[serde_as]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(remote = "FetchStep")]
-#[serde(deny_unknown_fields, rename_all = "camelCase", tag = "kind")]
+#[serde(deny_unknown_fields, tag = "kind")]
 pub enum FetchStepDef {
-    #[serde(rename_all = "camelCase")]
+    #[serde(alias = "url")]
     Url(#[serde_as(as = "FetchStepUrlDef")] FetchStepUrl),
-    #[serde(rename_all = "camelCase")]
+    #[serde(alias = "filesGlob", alias = "filesglob")]
     FilesGlob(#[serde_as(as = "FetchStepFilesGlobDef")] FetchStepFilesGlob),
-    #[serde(rename_all = "camelCase")]
+    #[serde(alias = "container")]
     Container(#[serde_as(as = "FetchStepContainerDef")] FetchStepContainer),
 }
 
@@ -637,36 +647,15 @@ pub struct FetchStepContainerDef {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(remote = "SourceOrdering")]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
+#[serde(deny_unknown_fields)]
 pub enum SourceOrderingDef {
+    #[serde(alias = "byEventTime", alias = "byeventtime")]
     ByEventTime,
+    #[serde(alias = "byName", alias = "byname")]
     ByName,
 }
 
 implement_serde_as!(SourceOrdering, SourceOrderingDef, "SourceOrderingDef");
-
-////////////////////////////////////////////////////////////////////////////////
-// InputSlice
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#inputslice-schema
-////////////////////////////////////////////////////////////////////////////////
-
-#[serde_as]
-#[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(remote = "InputSlice")]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub struct InputSliceDef {
-    #[serde(rename = "datasetID")]
-    pub dataset_id: DatasetID,
-    #[serde_as(as = "Option<BlockIntervalDef>")]
-    #[serde(default)]
-    pub block_interval: Option<BlockInterval>,
-    #[serde_as(as = "Option<OffsetIntervalDef>")]
-    #[serde(default)]
-    pub data_interval: Option<OffsetInterval>,
-}
-
-implement_serde_as!(InputSlice, InputSliceDef, "InputSliceDef");
 
 ////////////////////////////////////////////////////////////////////////////////
 // MergeStrategy
@@ -676,13 +665,13 @@ implement_serde_as!(InputSlice, InputSliceDef, "InputSliceDef");
 #[serde_as]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(remote = "MergeStrategy")]
-#[serde(deny_unknown_fields, rename_all = "camelCase", tag = "kind")]
+#[serde(deny_unknown_fields, tag = "kind")]
 pub enum MergeStrategyDef {
-    #[serde(rename_all = "camelCase")]
+    #[serde(alias = "append")]
     Append(#[serde_as(as = "MergeStrategyAppendDef")] MergeStrategyAppend),
-    #[serde(rename_all = "camelCase")]
+    #[serde(alias = "ledger")]
     Ledger(#[serde_as(as = "MergeStrategyLedgerDef")] MergeStrategyLedger),
-    #[serde(rename_all = "camelCase")]
+    #[serde(alias = "snapshot")]
     Snapshot(#[serde_as(as = "MergeStrategySnapshotDef")] MergeStrategySnapshot),
 }
 
@@ -747,7 +736,7 @@ pub struct MetadataBlockDef {
     #[serde(with = "datetime_rfc3339")]
     pub system_time: DateTime<Utc>,
     pub prev_block_hash: Option<Multihash>,
-    pub sequence_number: i32,
+    pub sequence_number: u64,
     #[serde_as(as = "MetadataEventDef")]
     pub event: MetadataEvent,
 }
@@ -762,35 +751,35 @@ implement_serde_as!(MetadataBlock, MetadataBlockDef, "MetadataBlockDef");
 #[serde_as]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(remote = "MetadataEvent")]
-#[serde(deny_unknown_fields, rename_all = "camelCase", tag = "kind")]
+#[serde(deny_unknown_fields, tag = "kind")]
 pub enum MetadataEventDef {
-    #[serde(rename_all = "camelCase")]
+    #[serde(alias = "addData", alias = "adddata")]
     AddData(#[serde_as(as = "AddDataDef")] AddData),
-    #[serde(rename_all = "camelCase")]
+    #[serde(alias = "executeQuery", alias = "executequery")]
     ExecuteQuery(#[serde_as(as = "ExecuteQueryDef")] ExecuteQuery),
-    #[serde(rename_all = "camelCase")]
+    #[serde(alias = "seed")]
     Seed(#[serde_as(as = "SeedDef")] Seed),
-    #[serde(rename_all = "camelCase")]
+    #[serde(alias = "setPollingSource", alias = "setpollingsource")]
     SetPollingSource(#[serde_as(as = "SetPollingSourceDef")] SetPollingSource),
-    #[serde(rename_all = "camelCase")]
+    #[serde(alias = "setTransform", alias = "settransform")]
     SetTransform(#[serde_as(as = "SetTransformDef")] SetTransform),
-    #[serde(rename_all = "camelCase")]
+    #[serde(alias = "setVocab", alias = "setvocab")]
     SetVocab(#[serde_as(as = "SetVocabDef")] SetVocab),
-    #[serde(rename_all = "camelCase")]
+    #[serde(alias = "setWatermark", alias = "setwatermark")]
     SetWatermark(#[serde_as(as = "SetWatermarkDef")] SetWatermark),
-    #[serde(rename_all = "camelCase")]
+    #[serde(alias = "setAttachments", alias = "setattachments")]
     SetAttachments(#[serde_as(as = "SetAttachmentsDef")] SetAttachments),
-    #[serde(rename_all = "camelCase")]
+    #[serde(alias = "setInfo", alias = "setinfo")]
     SetInfo(#[serde_as(as = "SetInfoDef")] SetInfo),
-    #[serde(rename_all = "camelCase")]
+    #[serde(alias = "setLicense", alias = "setlicense")]
     SetLicense(#[serde_as(as = "SetLicenseDef")] SetLicense),
-    #[serde(rename_all = "camelCase")]
+    #[serde(alias = "setDataSchema", alias = "setdataschema")]
     SetDataSchema(#[serde_as(as = "SetDataSchemaDef")] SetDataSchema),
-    #[serde(rename_all = "camelCase")]
+    #[serde(alias = "addPushSource", alias = "addpushsource")]
     AddPushSource(#[serde_as(as = "AddPushSourceDef")] AddPushSource),
-    #[serde(rename_all = "camelCase")]
+    #[serde(alias = "disablePushSource", alias = "disablepushsource")]
     DisablePushSource(#[serde_as(as = "DisablePushSourceDef")] DisablePushSource),
-    #[serde(rename_all = "camelCase")]
+    #[serde(alias = "disablePollingSource", alias = "disablepollingsource")]
     DisablePollingSource(#[serde_as(as = "DisablePollingSourceDef")] DisablePollingSource),
 }
 
@@ -807,8 +796,8 @@ implement_serde_as!(MetadataEvent, MetadataEventDef, "MetadataEventDef");
 #[serde(remote = "OffsetInterval")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct OffsetIntervalDef {
-    pub start: i64,
-    pub end: i64,
+    pub start: u64,
+    pub end: u64,
 }
 
 implement_serde_as!(OffsetInterval, OffsetIntervalDef, "OffsetIntervalDef");
@@ -821,11 +810,11 @@ implement_serde_as!(OffsetInterval, OffsetIntervalDef, "OffsetIntervalDef");
 #[serde_as]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(remote = "PrepStep")]
-#[serde(deny_unknown_fields, rename_all = "camelCase", tag = "kind")]
+#[serde(deny_unknown_fields, tag = "kind")]
 pub enum PrepStepDef {
-    #[serde(rename_all = "camelCase")]
+    #[serde(alias = "decompress")]
     Decompress(#[serde_as(as = "PrepStepDecompressDef")] PrepStepDecompress),
-    #[serde(rename_all = "camelCase")]
+    #[serde(alias = "pipe")]
     Pipe(#[serde_as(as = "PrepStepPipeDef")] PrepStepPipe),
 }
 
@@ -859,9 +848,11 @@ pub struct PrepStepPipeDef {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(remote = "CompressionFormat")]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
+#[serde(deny_unknown_fields)]
 pub enum CompressionFormatDef {
+    #[serde(alias = "gzip")]
     Gzip,
+    #[serde(alias = "zip")]
     Zip,
 }
 
@@ -879,33 +870,26 @@ implement_serde_as!(
 #[serde_as]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(remote = "ReadStep")]
-#[serde(deny_unknown_fields, rename_all = "camelCase", tag = "kind")]
+#[serde(deny_unknown_fields, tag = "kind")]
 pub enum ReadStepDef {
-    #[serde(rename_all = "camelCase")]
+    #[serde(alias = "csv")]
     Csv(#[serde_as(as = "ReadStepCsvDef")] ReadStepCsv),
-    #[serde(rename_all = "camelCase")]
-    JsonLines(#[serde_as(as = "ReadStepJsonLinesDef")] ReadStepJsonLines),
-    #[serde(rename_all = "camelCase")]
+    #[serde(alias = "geoJson", alias = "geojson")]
     GeoJson(#[serde_as(as = "ReadStepGeoJsonDef")] ReadStepGeoJson),
-    #[serde(rename_all = "camelCase")]
+    #[serde(alias = "esriShapefile", alias = "esrishapefile")]
     EsriShapefile(#[serde_as(as = "ReadStepEsriShapefileDef")] ReadStepEsriShapefile),
-    #[serde(rename_all = "camelCase")]
+    #[serde(alias = "parquet")]
     Parquet(#[serde_as(as = "ReadStepParquetDef")] ReadStepParquet),
-    #[serde(rename_all = "camelCase")]
+    #[serde(alias = "json")]
     Json(#[serde_as(as = "ReadStepJsonDef")] ReadStepJson),
-    #[serde(rename_all = "camelCase")]
+    #[serde(alias = "ndJson", alias = "ndjson")]
     NdJson(#[serde_as(as = "ReadStepNdJsonDef")] ReadStepNdJson),
-    #[serde(rename_all = "camelCase")]
+    #[serde(alias = "ndGeoJson", alias = "ndgeojson")]
     NdGeoJson(#[serde_as(as = "ReadStepNdGeoJsonDef")] ReadStepNdGeoJson),
 }
 
 implement_serde_as!(ReadStep, ReadStepDef, "ReadStepDef");
 implement_serde_as!(ReadStepCsv, ReadStepCsvDef, "ReadStepCsvDef");
-implement_serde_as!(
-    ReadStepJsonLines,
-    ReadStepJsonLinesDef,
-    "ReadStepJsonLinesDef"
-);
 implement_serde_as!(ReadStepJson, ReadStepJsonDef, "ReadStepJsonDef");
 implement_serde_as!(ReadStepNdJson, ReadStepNdJsonDef, "ReadStepNdJsonDef");
 implement_serde_as!(ReadStepGeoJson, ReadStepGeoJsonDef, "ReadStepGeoJsonDef");
@@ -932,33 +916,10 @@ pub struct ReadStepCsvDef {
     pub encoding: Option<String>,
     pub quote: Option<String>,
     pub escape: Option<String>,
-    pub comment: Option<String>,
     pub header: Option<bool>,
-    pub enforce_schema: Option<bool>,
     pub infer_schema: Option<bool>,
-    pub ignore_leading_white_space: Option<bool>,
-    pub ignore_trailing_white_space: Option<bool>,
     pub null_value: Option<String>,
-    pub empty_value: Option<String>,
-    pub nan_value: Option<String>,
-    pub positive_inf: Option<String>,
-    pub negative_inf: Option<String>,
     pub date_format: Option<String>,
-    pub timestamp_format: Option<String>,
-    pub multi_line: Option<bool>,
-}
-
-#[serde_as]
-#[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(remote = "ReadStepJsonLines")]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub struct ReadStepJsonLinesDef {
-    pub schema: Option<Vec<String>>,
-    pub date_format: Option<String>,
-    pub encoding: Option<String>,
-    pub multi_line: Option<bool>,
-    pub primitives_as_string: Option<bool>,
     pub timestamp_format: Option<String>,
 }
 
@@ -1052,7 +1013,6 @@ implement_serde_as!(RequestHeader, RequestHeaderDef, "RequestHeaderDef");
 #[serde(remote = "Seed")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct SeedDef {
-    #[serde(rename = "datasetID")]
     pub dataset_id: DatasetID,
     #[serde_as(as = "DatasetKindDef")]
     pub dataset_kind: DatasetKind,
@@ -1219,9 +1179,9 @@ implement_serde_as!(SetWatermark, SetWatermarkDef, "SetWatermarkDef");
 #[serde_as]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(remote = "SourceCaching")]
-#[serde(deny_unknown_fields, rename_all = "camelCase", tag = "kind")]
+#[serde(deny_unknown_fields, tag = "kind")]
 pub enum SourceCachingDef {
-    #[serde(rename_all = "camelCase")]
+    #[serde(alias = "forever")]
     Forever(#[serde_as(as = "SourceCachingForeverDef")] SourceCachingForever),
 }
 
@@ -1250,8 +1210,8 @@ pub struct SourceCachingForeverDef {}
 #[serde(remote = "SourceState")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct SourceStateDef {
+    pub source_name: Option<String>,
     pub kind: String,
-    pub source: String,
     pub value: String,
 }
 
@@ -1299,9 +1259,9 @@ implement_serde_as!(TemporalTable, TemporalTableDef, "TemporalTableDef");
 #[serde_as]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(remote = "Transform")]
-#[serde(deny_unknown_fields, rename_all = "camelCase", tag = "kind")]
+#[serde(deny_unknown_fields, tag = "kind")]
 pub enum TransformDef {
-    #[serde(rename_all = "camelCase")]
+    #[serde(alias = "sql")]
     Sql(#[serde_as(as = "TransformSqlDef")] TransformSql),
 }
 
@@ -1336,9 +1296,8 @@ pub struct TransformSqlDef {
 #[serde(remote = "TransformInput")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct TransformInputDef {
-    pub id: Option<DatasetID>,
-    pub name: DatasetName,
-    pub dataset_ref: Option<DatasetRefAny>,
+    pub dataset_ref: DatasetRefAny,
+    pub alias: Option<String>,
 }
 
 implement_serde_as!(TransformInput, TransformInputDef, "TransformInputDef");
