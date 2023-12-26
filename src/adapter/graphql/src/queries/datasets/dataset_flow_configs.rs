@@ -61,29 +61,7 @@ impl DatasetFlowConfigs {
             .await
             .int_err()?;
 
-        Ok(maybe_flow_config.map(|flow_config| FlowConfiguration {
-            paused: !flow_config.is_active(),
-            batching: if let FlowConfigurationRule::StartCondition(condition) = &flow_config.rule {
-                Some(FlowConfigurationBatching {
-                    throttling_period: condition.throttling_period.map(|tp| tp.into()),
-                    minimal_data_batch: condition.minimal_data_batch,
-                })
-            } else {
-                None
-            },
-            schedule: if let FlowConfigurationRule::Schedule(schedule) = flow_config.rule {
-                match schedule {
-                    Schedule::TimeDelta(time_delta) => Some(FlowConfigurationSchedule::TimeDelta(
-                        time_delta.every.into(),
-                    )),
-                    Schedule::CronExpression(cron) => {
-                        Some(FlowConfigurationSchedule::Cron(cron.into()))
-                    }
-                }
-            } else {
-                None
-            },
-        }))
+        Ok(maybe_flow_config.map(|flow_config| flow_config.into()))
     }
 }
 
@@ -104,13 +82,39 @@ pub struct FlowConfiguration {
     pub batching: Option<FlowConfigurationBatching>,
 }
 
+impl From<kamu_flow_system::FlowConfigurationState> for FlowConfiguration {
+    fn from(value: kamu_flow_system::FlowConfigurationState) -> Self {
+        Self {
+            paused: !value.is_active(),
+            batching: if let FlowConfigurationRule::StartCondition(condition) = &value.rule {
+                Some(FlowConfigurationBatching {
+                    throttling_period: condition.throttling_period.map(|tp| tp.into()),
+                    minimal_data_batch: condition.minimal_data_batch,
+                })
+            } else {
+                None
+            },
+            schedule: if let FlowConfigurationRule::Schedule(schedule) = value.rule {
+                match schedule {
+                    Schedule::TimeDelta(time_delta) => Some(FlowConfigurationSchedule::TimeDelta(
+                        time_delta.every.into(),
+                    )),
+                    Schedule::CronExpression(cron) => {
+                        Some(FlowConfigurationSchedule::Cron(cron.into()))
+                    }
+                }
+            } else {
+                None
+            },
+        }
+    }
+}
+
 #[derive(Union, Debug, Clone, PartialEq, Eq)]
 pub enum FlowConfigurationSchedule {
     TimeDelta(TimeDelta),
     Cron(CronExpression),
 }
-
-/////////////////////////////////////////////////////////////////////////////////
 
 #[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct FlowConfigurationBatching {
@@ -122,13 +126,13 @@ pub struct FlowConfigurationBatching {
 
 #[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct CronExpression {
-    pub expression: String,
+    pub cron_expression: String,
 }
 
 impl From<ScheduleCronExpression> for CronExpression {
     fn from(value: ScheduleCronExpression) -> Self {
         Self {
-            expression: value.expression,
+            cron_expression: value.cron_expression,
         }
     }
 }

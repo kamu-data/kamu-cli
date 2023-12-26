@@ -22,7 +22,7 @@ use kamu_flow_system::{
 use opendatafabric as odf;
 
 use crate::prelude::*;
-use crate::queries::{DatasetFlowType, TimeUnit};
+use crate::queries::{DatasetFlowType, FlowConfiguration, TimeUnit};
 use crate::{utils, LoggedInGuard};
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -45,14 +45,14 @@ impl DatasetFlowConfigsMut {
         dataset_flow_type: DatasetFlowType,
         paused: bool,
         every: TimeDeltaInput,
-    ) -> Result<bool> {
+    ) -> Result<FlowConfiguration> {
         self.ensure_expected_dataset_kind(ctx, dataset_flow_type)
             .await?;
         self.ensure_scheduling_permission(ctx).await?;
 
         let flow_config_service = from_catalog::<dyn FlowConfigurationService>(ctx).unwrap();
 
-        flow_config_service
+        let res = flow_config_service
             .set_configuration(
                 Utc::now(),
                 FlowKeyDataset::new(self.dataset_handle.id.clone(), dataset_flow_type.into())
@@ -67,7 +67,7 @@ impl DatasetFlowConfigsMut {
                 SetFlowConfigurationError::Internal(e) => GqlError::Internal(e),
             })?;
 
-        Ok(true)
+        Ok(res.into())
     }
 
     #[graphql(guard = "LoggedInGuard::new()")]
@@ -77,21 +77,21 @@ impl DatasetFlowConfigsMut {
         dataset_flow_type: DatasetFlowType,
         paused: bool,
         cron_expression: String,
-    ) -> Result<bool> {
+    ) -> Result<FlowConfiguration> {
         self.ensure_expected_dataset_kind(ctx, dataset_flow_type)
             .await?;
         self.ensure_scheduling_permission(ctx).await?;
 
         let flow_config_service = from_catalog::<dyn FlowConfigurationService>(ctx).unwrap();
 
-        flow_config_service
+        let res = flow_config_service
             .set_configuration(
                 Utc::now(),
                 FlowKeyDataset::new(self.dataset_handle.id.clone(), dataset_flow_type.into())
                     .into(),
                 paused,
                 FlowConfigurationRule::Schedule(Schedule::CronExpression(ScheduleCronExpression {
-                    expression: cron_expression,
+                    cron_expression,
                 })),
             )
             .await
@@ -99,7 +99,7 @@ impl DatasetFlowConfigsMut {
                 SetFlowConfigurationError::Internal(e) => GqlError::Internal(e),
             })?;
 
-        Ok(true)
+        Ok(res.into())
     }
 
     #[graphql(guard = "LoggedInGuard::new()")]
@@ -110,14 +110,14 @@ impl DatasetFlowConfigsMut {
         paused: bool,
         throttling_period: Option<TimeDeltaInput>,
         minimal_data_batch: Option<i32>,
-    ) -> Result<bool> {
+    ) -> Result<FlowConfiguration> {
         self.ensure_expected_dataset_kind(ctx, dataset_flow_type)
             .await?;
         self.ensure_scheduling_permission(ctx).await?;
 
         let flow_config_service = from_catalog::<dyn FlowConfigurationService>(ctx).unwrap();
 
-        flow_config_service
+        let res = flow_config_service
             .set_configuration(
                 Utc::now(),
                 FlowKeyDataset::new(self.dataset_handle.id.clone(), dataset_flow_type.into())
@@ -133,7 +133,7 @@ impl DatasetFlowConfigsMut {
                 SetFlowConfigurationError::Internal(e) => GqlError::Internal(e),
             })?;
 
-        Ok(true)
+        Ok(res.into())
     }
 
     #[graphql(skip)]

@@ -44,8 +44,9 @@ thiserror = { version = "1", default-features = false }
 
 [dev-dependencies]
 # TODO: Limit to mock or in-memory implementations only
+event-bus = { workspace = true }
 kamu = { workspace = true }
-event-bus = {workspace = true }
+kamu-flow-system-inmem = { workspace = true }
 
 env_logger = "0.10"
 mockall = "0.11"

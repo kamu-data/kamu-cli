@@ -142,7 +142,7 @@ type CreateDatasetResultSuccess implements CreateDatasetResult & CreateDatasetFr
 }
 
 type CronExpression {
-	expression: String!
+	cronExpression: String!
 }
 
 type DataBatch {
@@ -302,9 +302,9 @@ type DatasetFlowConfigs {
 }
 
 type DatasetFlowConfigsMut {
-	setConfigTimeDelta(datasetFlowType: DatasetFlowType!, paused: Boolean!, every: TimeDeltaInput!): Boolean!
-	setConfigCronExpression(datasetFlowType: DatasetFlowType!, paused: Boolean!, cronExpression: String!): Boolean!
-	setConfigBatching(datasetFlowType: DatasetFlowType!, paused: Boolean!, throttlingPeriod: TimeDeltaInput, minimalDataBatch: Int): Boolean!
+	setConfigTimeDelta(datasetFlowType: DatasetFlowType!, paused: Boolean!, every: TimeDeltaInput!): FlowConfiguration!
+	setConfigCronExpression(datasetFlowType: DatasetFlowType!, paused: Boolean!, cronExpression: String!): FlowConfiguration!
+	setConfigBatching(datasetFlowType: DatasetFlowType!, paused: Boolean!, throttlingPeriod: TimeDeltaInput, minimalDataBatch: Int): FlowConfiguration!
 }
 
 enum DatasetFlowType {
