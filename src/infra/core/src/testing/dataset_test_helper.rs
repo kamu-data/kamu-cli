@@ -82,7 +82,7 @@ impl DatasetTestHelper {
     pub async fn append_random_data(
         dataset_repo: &dyn DatasetRepository,
         dataset_ref: impl Into<DatasetRef>,
-        is_large_file: bool,
+        data_size: usize,
     ) -> Multihash {
         let tmp_dir = tempfile::tempdir().unwrap();
 
@@ -103,11 +103,7 @@ impl DatasetTestHelper {
         let checkpoint_path = tmp_dir.path().join("checkpoint");
         ParquetWriterHelper::from_sample_data(&data_path).unwrap();
 
-        if is_large_file {
-            FileTestHelper::create_random_large_file(&checkpoint_path);
-        } else {
-            FileTestHelper::create_random_small_file(&checkpoint_path);
-        }
+        FileTestHelper::create_random_file(&checkpoint_path, data_size);
 
         let input_checkpoint = prev_data
             .as_ref()
@@ -144,24 +140,14 @@ impl DatasetTestHelper {
 pub struct FileTestHelper {}
 
 impl FileTestHelper {
-    pub fn create_random_small_file(path: &Path) -> usize {
+    pub fn create_random_file(path: &Path, data_size: usize) -> usize {
         use rand::RngCore;
 
-        let mut data = [0u8; 32];
+        let mut data = vec![0u8; data_size];
         rand::thread_rng().fill_bytes(&mut data);
 
         std::fs::write(path, data).unwrap();
-        data.len()
-    }
-
-    pub fn create_random_large_file(path: &Path) -> usize {
-        use rand::RngCore;
-
-        let mut data = [0u8; 1572864];
-        rand::thread_rng().fill_bytes(&mut data);
-
-        std::fs::write(path, data).unwrap();
-        data.len()
+        data_size
     }
 }
 

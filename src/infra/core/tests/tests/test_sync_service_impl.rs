@@ -22,6 +22,8 @@ use url::Url;
 
 use crate::utils::IpfsDaemon;
 
+const FILE_DATA_ARRAY_SIZE: usize = 32;
+
 /////////////////////////////////////////////////////////////////////////////////////////
 
 async fn assert_in_sync(
@@ -178,11 +180,19 @@ async fn do_test_sync(
     assert_in_sync(&dataset_repo, &dataset_alias, &dataset_alias_2).await;
 
     // Subsequent sync ////////////////////////////////////////////////////////
-    let _b2 =
-        DatasetTestHelper::append_random_data(dataset_repo.as_ref(), &dataset_alias, false).await;
+    let _b2 = DatasetTestHelper::append_random_data(
+        dataset_repo.as_ref(),
+        &dataset_alias,
+        FILE_DATA_ARRAY_SIZE,
+    )
+    .await;
 
-    let b3 =
-        DatasetTestHelper::append_random_data(dataset_repo.as_ref(), &dataset_alias, false).await;
+    let b3 = DatasetTestHelper::append_random_data(
+        dataset_repo.as_ref(),
+        &dataset_alias,
+        FILE_DATA_ARRAY_SIZE,
+    )
+    .await;
 
     assert_matches!(
         sync_svc.sync(&pull_ref.as_any_ref(), &dataset_alias.as_any_ref(), SyncOptions::default(), None).await,
@@ -240,8 +250,12 @@ async fn do_test_sync(
     // Datasets out-of-sync on push //////////////////////////////////////////////
 
     // Push a new block into dataset_2 (which we were pulling into before)
-    let exta_head =
-        DatasetTestHelper::append_random_data(dataset_repo.as_ref(), &dataset_alias_2, false).await;
+    let exta_head = DatasetTestHelper::append_random_data(
+        dataset_repo.as_ref(),
+        &dataset_alias_2,
+        FILE_DATA_ARRAY_SIZE,
+    )
+    .await;
 
     assert_matches!(
         sync_svc.sync(&dataset_alias_2.as_any_ref(), &push_ref.as_any_ref(), SyncOptions::default(), None).await,
@@ -309,14 +323,26 @@ async fn do_test_sync(
 
     // Datasets complex divergence //////////////////////////////////////////////
 
-    let _b4 =
-        DatasetTestHelper::append_random_data(dataset_repo.as_ref(), &dataset_alias, false).await;
+    let _b4 = DatasetTestHelper::append_random_data(
+        dataset_repo.as_ref(),
+        &dataset_alias,
+        FILE_DATA_ARRAY_SIZE,
+    )
+    .await;
 
-    let b5 =
-        DatasetTestHelper::append_random_data(dataset_repo.as_ref(), &dataset_alias, false).await;
+    let b5 = DatasetTestHelper::append_random_data(
+        dataset_repo.as_ref(),
+        &dataset_alias,
+        FILE_DATA_ARRAY_SIZE,
+    )
+    .await;
 
-    let b4_alt =
-        DatasetTestHelper::append_random_data(dataset_repo.as_ref(), &dataset_alias_2, false).await;
+    let b4_alt = DatasetTestHelper::append_random_data(
+        dataset_repo.as_ref(),
+        &dataset_alias_2,
+        FILE_DATA_ARRAY_SIZE,
+    )
+    .await;
 
     assert_matches!(
         sync_svc.sync(&dataset_alias.as_any_ref(), &push_ref.as_any_ref(), SyncOptions::default(), None).await,
@@ -335,9 +361,12 @@ async fn do_test_sync(
 
     // Datasets corrupted transfer flow /////////////////////////////////////////
     if is_ipfs {
-        let _b6 =
-            DatasetTestHelper::append_random_data(dataset_repo.as_ref(), &dataset_alias, false)
-                .await;
+        let _b6 = DatasetTestHelper::append_random_data(
+            dataset_repo.as_ref(),
+            &dataset_alias,
+            FILE_DATA_ARRAY_SIZE,
+        )
+        .await;
 
         let dir_files =
             std::fs::read_dir(tmp_workspace_dir.join("datasets/foo/checkpoints")).unwrap();
@@ -346,9 +375,12 @@ async fn do_test_sync(
         }
 
         for _i in 0..15 {
-            let _: MultihashGeneric<32> =
-                DatasetTestHelper::append_random_data(dataset_repo.as_ref(), &dataset_alias, false)
-                    .await;
+            let _: MultihashGeneric<32> = DatasetTestHelper::append_random_data(
+                dataset_repo.as_ref(),
+                &dataset_alias,
+                FILE_DATA_ARRAY_SIZE,
+            )
+            .await;
         }
 
         assert_matches!(

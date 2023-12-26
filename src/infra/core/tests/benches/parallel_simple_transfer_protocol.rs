@@ -22,6 +22,7 @@ use kamu::testing::{
     MetadataFactory,
 };
 use kamu::utils::ipfs_wrapper::IpfsClient;
+use kamu::utils::simple_transfer_protocol::ENV_VAR_SIMPLE_PROTOCOL_MAX_PARALLEL_TRANSFERS;
 use kamu::{
     DatasetFactoryImpl,
     DatasetRepositoryLocalFs,
@@ -32,6 +33,9 @@ use kamu::{
 };
 use opendatafabric::*;
 use url::Url;
+
+const FILE_DATA_ARRAY_SIZE: usize = 1572864;
+const AMOUNT_OF_BLOCKS_TO_APPEND: usize = 70;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -81,13 +85,30 @@ async fn setup_dataset(
         .unwrap()
         .head;
 
-    // Generate initial 70 blocks in dataset
-    for _ in 1..70 {
-        let _ = DatasetTestHelper::append_random_data(dataset_repo.as_ref(), &*dataset_alias, true)
-            .await;
-    }
+    append_data_to_dataset(
+        AMOUNT_OF_BLOCKS_TO_APPEND,
+        dataset_repo.as_ref(),
+        dataset_alias,
+    )
+    .await;
 
     (sync_svc, dataset_repo)
+}
+
+async fn append_data_to_dataset(
+    block_amount: usize,
+    dataset_repo: &dyn DatasetRepository,
+    dataset_ref: Arc<DatasetAlias>,
+) -> () {
+    for _ in 1..block_amount {
+        let _ = DatasetTestHelper::append_random_data(
+            dataset_repo,
+            &*dataset_ref,
+            FILE_DATA_ARRAY_SIZE,
+        )
+        .await;
+    }
+    ()
 }
 
 async fn do_test_sync(
@@ -117,10 +138,12 @@ async fn do_test_sync(
 
     // Generate additional 70 blocks in dataset to make sure next iteration will be
     // the same as previos
-    for _ in 1..70 {
-        let _ = DatasetTestHelper::append_random_data(dataset_repo.as_ref(), &*dataset_alias, true)
-            .await;
-    }
+    append_data_to_dataset(
+        AMOUNT_OF_BLOCKS_TO_APPEND,
+        dataset_repo.as_ref(),
+        dataset_alias,
+    )
+    .await;
 }
 
 fn build_temp_dirs(rt: Arc<tokio::runtime::Runtime>) -> (Arc<DatasetAlias>, Url, Url) {
@@ -171,7 +194,7 @@ fn bench_with_1_parallel(c: &mut Criterion) {
 }
 
 fn bench_with_10_parallels(c: &mut Criterion) {
-    std::env::set_var("SIMPLE_PROTOCOL_MAX_PARALLEL_TRANSFERS", "10");
+    std::env::set_var(ENV_VAR_SIMPLE_PROTOCOL_MAX_PARALLEL_TRANSFERS, "10");
     let rt: Arc<tokio::runtime::Runtime> = Arc::new(tokio::runtime::Runtime::new().unwrap());
     let tmp_workspace_dir = tempfile::tempdir().unwrap();
 

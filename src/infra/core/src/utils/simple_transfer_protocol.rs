@@ -20,7 +20,7 @@ use crate::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-const ENV_VAR_SIMPLE_PROTOCOL_MAX_PARALLEL_TRANSFERS: &str =
+pub const ENV_VAR_SIMPLE_PROTOCOL_MAX_PARALLEL_TRANSFERS: &str =
     "SIMPLE_PROTOCOL_MAX_PARALLEL_TRANSFERS";
 const DEFAULT_SIMPLE_PROTOCOL_MAX_PARALLEL_TRANSFERS: usize = 10;
 
@@ -246,16 +246,27 @@ impl SimpleTransferProtocol {
         data_slice: &DataSlice,
         trust_source_hashes: bool,
         listener: Arc<dyn SyncListener>,
-        mut stats: SyncStats,
+        arc_stats: Arc<Mutex<SyncStats>>,
     ) -> Result<(), SyncError> {
         tracing::info!(hash = ?data_slice.physical_hash, "Transfering data file");
 
-        let stream = src
+        let stream = match src
             .as_data_repo()
             .get_stream(&data_slice.physical_hash)
-            .await?;
+            .await
+        {
+            Ok(s) => Ok(s),
+            Err(GetError::NotFound(e)) => Err(CorruptedSourceError {
+                message: "Source data file is missing".to_owned(),
+                source: Some(e.into()),
+            }
+            .into()),
+            Err(GetError::Access(e)) => Err(SyncError::Access(e)),
+            Err(GetError::Internal(e)) => Err(SyncError::Internal(e)),
+        }?;
 
-        dst.as_data_repo()
+        match dst
+            .as_data_repo()
             .insert_stream(
                 stream,
                 InsertOpts {
@@ -269,7 +280,24 @@ impl SimpleTransferProtocol {
                     ..Default::default()
                 },
             )
-            .await?;
+            .await
+        {
+            Ok(_) => Ok(()),
+            Err(InsertError::HashMismatch(e)) => Err(CorruptedSourceError {
+                message: concat!(
+                    "Data file hash declared by the source didn't match ",
+                    "the computed - this may be an indication of hashing ",
+                    "algorithm mismatch or an attempted tampering",
+                )
+                .to_owned(),
+                source: Some(e.into()),
+            }
+            .into()),
+            Err(InsertError::Access(e)) => Err(SyncError::Access(e)),
+            Err(InsertError::Internal(e)) => Err(SyncError::Internal(e)),
+        }?;
+
+        let mut stats = arc_stats.lock().unwrap();
 
         stats.src.data_slices_read += 1;
         stats.dst.data_slices_written += 1;
@@ -280,23 +308,34 @@ impl SimpleTransferProtocol {
         Ok(())
     }
 
-    async fn download_block_checkpoints<'a>(
+    async fn download_block_checkpoint<'a>(
         &'a self,
         src: &'a dyn Dataset,
         dst: &'a dyn Dataset,
         checkpoint: &Checkpoint,
         trust_source_hashes: bool,
         listener: Arc<dyn SyncListener>,
-        mut stats: SyncStats,
+        arc_stats: Arc<Mutex<SyncStats>>,
     ) -> Result<(), SyncError> {
         tracing::info!(hash = ?checkpoint.physical_hash, "Transfering checkpoint file");
 
-        let stream = src
+        let stream = match src
             .as_checkpoint_repo()
             .get_stream(&checkpoint.physical_hash)
-            .await?;
+            .await
+        {
+            Ok(s) => Ok(s),
+            Err(GetError::NotFound(e)) => Err(CorruptedSourceError {
+                message: "Source checkpoint file is missing".to_owned(),
+                source: Some(e.into()),
+            }
+            .into()),
+            Err(GetError::Access(e)) => Err(SyncError::Access(e)),
+            Err(GetError::Internal(e)) => Err(SyncError::Internal(e)),
+        }?;
 
-        dst.as_checkpoint_repo()
+        match dst
+            .as_checkpoint_repo()
             .insert_stream(
                 stream,
                 InsertOpts {
@@ -313,7 +352,24 @@ impl SimpleTransferProtocol {
                     ..Default::default()
                 },
             )
-            .await?;
+            .await
+        {
+            Ok(_) => Ok(()),
+            Err(InsertError::HashMismatch(e)) => Err(CorruptedSourceError {
+                message: concat!(
+                    "Checkpoint file hash declared by the source didn't ",
+                    "match the computed - this may be an indication of hashing ",
+                    "algorithm mismatch or an attempted tampering",
+                )
+                .to_owned(),
+                source: Some(e.into()),
+            }
+            .into()),
+            Err(InsertError::Access(e)) => Err(SyncError::Access(e)),
+            Err(InsertError::Internal(e)) => Err(SyncError::Internal(e)),
+        }?;
+
+        let mut stats = arc_stats.lock().unwrap();
 
         stats.src.checkpoints_read += 1;
         stats.dst.checkpoints_written += 1;
@@ -357,6 +413,7 @@ impl SimpleTransferProtocol {
         listener.on_status(SyncStage::TransferData, &stats);
 
         // Download data and checkpoints
+        let arc_stats = Arc::new(Mutex::new(stats.clone()));
         let mut block_download_tasks = vec![];
         blocks.iter().rev().for_each(|(_, b)| {
             if let Some(block_stream) = b.as_data_stream_block() {
@@ -367,20 +424,20 @@ impl SimpleTransferProtocol {
                         data_slice,
                         trust_source_hashes,
                         listener.clone(),
-                        stats.clone(),
+                        arc_stats.clone(),
                     ))
                     // Each function return unique future
                     // cast future to next type to allow storing them in vector
                         as Pin<Box<dyn Future<Output = Result<(), SyncError>> + Send>>)
                 }
                 if let Some(checkpoint) = block_stream.event.output_checkpoint {
-                    block_download_tasks.push(Box::pin(self.download_block_checkpoints(
+                    block_download_tasks.push(Box::pin(self.download_block_checkpoint(
                         src,
                         dst,
                         checkpoint,
                         trust_source_hashes,
                         listener.clone(),
-                        stats.clone(),
+                        arc_stats.clone(),
                     )))
                 }
             }
