@@ -46,7 +46,7 @@ impl DatasetFlowConfigsMut {
         paused: bool,
         every: TimeDeltaInput,
     ) -> Result<bool> {
-        self.ensure_expected_dataset_kind(ctx, opendatafabric::DatasetKind::Root)
+        self.ensure_expected_dataset_kind(ctx, dataset_flow_type)
             .await?;
         self.ensure_scheduling_permission(ctx).await?;
 
@@ -78,7 +78,7 @@ impl DatasetFlowConfigsMut {
         paused: bool,
         cron_expression: String,
     ) -> Result<bool> {
-        self.ensure_expected_dataset_kind(ctx, opendatafabric::DatasetKind::Root)
+        self.ensure_expected_dataset_kind(ctx, dataset_flow_type)
             .await?;
         self.ensure_scheduling_permission(ctx).await?;
 
@@ -111,7 +111,7 @@ impl DatasetFlowConfigsMut {
         throttling_period: Option<TimeDeltaInput>,
         minimal_data_batch: Option<i32>,
     ) -> Result<bool> {
-        self.ensure_expected_dataset_kind(ctx, opendatafabric::DatasetKind::Derivative)
+        self.ensure_expected_dataset_kind(ctx, dataset_flow_type)
             .await?;
         self.ensure_scheduling_permission(ctx).await?;
 
@@ -140,24 +140,30 @@ impl DatasetFlowConfigsMut {
     async fn ensure_expected_dataset_kind(
         &self,
         ctx: &Context<'_>,
-        expected_kind: opendatafabric::DatasetKind,
+        dataset_flow_type: DatasetFlowType,
     ) -> Result<()> {
-        let dataset = utils::get_dataset(ctx, &self.dataset_handle).await?;
+        let dataset_flow_type: kamu_flow_system::DatasetFlowType = dataset_flow_type.into();
+        match dataset_flow_type.dataset_kind_restriction() {
+            Some(expected_kind) => {
+                let dataset = utils::get_dataset(ctx, &self.dataset_handle).await?;
 
-        let dataset_kind = dataset
-            .get_summary(GetSummaryOpts::default())
-            .await
-            .int_err()?
-            .kind;
+                let dataset_kind = dataset
+                    .get_summary(GetSummaryOpts::default())
+                    .await
+                    .int_err()?
+                    .kind;
 
-        if dataset_kind != expected_kind {
-            return Err(GqlError::Gql(Error::new(format!(
-                "Expected {:?} dataset kind",
-                expected_kind
-            ))));
+                if dataset_kind != expected_kind {
+                    return Err(GqlError::Gql(Error::new(format!(
+                        "Expected {:?} dataset kind",
+                        expected_kind
+                    ))));
+                } else {
+                    Ok(())
+                }
+            }
+            None => Ok(()),
         }
-
-        Ok(())
     }
 
     #[graphql(skip)]
