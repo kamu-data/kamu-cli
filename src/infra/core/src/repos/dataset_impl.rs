@@ -148,35 +148,41 @@ where
                     increment.seen_kind.get_or_insert(seed.dataset_kind);
                 }
                 MetadataEvent::SetTransform(set_transform) => {
-                    increment
-                        .seen_dependencies
-                        .get_or_insert(set_transform.inputs);
+                    if increment.seen_dependencies.is_none() {
+                        increment.seen_dependencies = Some(
+                            set_transform
+                                .inputs
+                                .into_iter()
+                                .map(|i| i.dataset_ref.id().cloned().unwrap())
+                                .collect(),
+                        );
+                    }
                 }
                 MetadataEvent::AddData(add_data) => {
                     increment.seen_last_pulled.get_or_insert(block.system_time);
 
-                    if let Some(output_data) = add_data.output_data {
-                        let iv = output_data.interval;
+                    if let Some(output_data) = add_data.new_data {
+                        let iv = output_data.offset_interval;
                         increment.seen_num_records += (iv.end - iv.start + 1) as u64;
 
                         increment.seen_data_size += output_data.size as u64;
                     }
 
-                    if let Some(checkpoint) = add_data.output_checkpoint {
+                    if let Some(checkpoint) = add_data.new_checkpoint {
                         increment.seen_checkpoints_size += checkpoint.size as u64;
                     }
                 }
                 MetadataEvent::ExecuteQuery(execute_query) => {
                     increment.seen_last_pulled.get_or_insert(block.system_time);
 
-                    if let Some(output_data) = execute_query.output_data {
-                        let iv = output_data.interval;
+                    if let Some(output_data) = execute_query.new_data {
+                        let iv = output_data.offset_interval;
                         increment.seen_num_records += (iv.end - iv.start + 1) as u64;
 
                         increment.seen_data_size += output_data.size as u64;
                     }
 
-                    if let Some(checkpoint) = execute_query.output_checkpoint {
+                    if let Some(checkpoint) = execute_query.new_checkpoint {
                         increment.seen_checkpoints_size += checkpoint.size as u64;
                     }
                 }
@@ -198,11 +204,11 @@ where
 
     async fn prepare_objects(
         &self,
-        data_interval: Option<OffsetInterval>,
+        offset_interval: Option<OffsetInterval>,
         data: Option<&OwnedFile>,
         checkpoint: Option<&OwnedFile>,
     ) -> Result<(Option<DataSlice>, Option<Checkpoint>), InternalError> {
-        let data_slice = if let Some(data_interval) = data_interval {
+        let data_slice = if let Some(offset_interval) = offset_interval {
             let data = data.unwrap();
             let path = data.as_path().to_path_buf();
             let logical_hash = tokio::task::spawn_blocking(move || {
@@ -223,8 +229,8 @@ where
             Some(DataSlice {
                 logical_hash,
                 physical_hash,
-                interval: data_interval,
-                size: std::fs::metadata(data.as_path()).int_err()?.len() as i64,
+                offset_interval,
+                size: std::fs::metadata(data.as_path()).int_err()?.len(),
             })
         } else {
             assert!(data.is_none());
@@ -242,7 +248,7 @@ where
 
             Some(Checkpoint {
                 physical_hash,
-                size: std::fs::metadata(checkpoint.as_path()).int_err()?.len() as i64,
+                size: std::fs::metadata(checkpoint.as_path()).int_err()?.len(),
             })
         } else {
             None
@@ -297,8 +303,9 @@ struct UpdateSummaryIncrement {
     seen_id: Option<DatasetID>,
     seen_kind: Option<DatasetKind>,
     seen_head: Option<Multihash>,
-    seen_dependencies: Option<Vec<TransformInput>>,
+    seen_dependencies: Option<Vec<DatasetID>>,
     seen_last_pulled: Option<DateTime<Utc>>,
+    // TODO: No longer needs to be incremental - can be based on `prevOffset`
     seen_num_records: u64,
     seen_data_size: u64,
     seen_checkpoints_size: u64,
@@ -360,7 +367,7 @@ where
         // Validate refferential consistency
         if opts.check_object_refs {
             if let Some(event) = event.as_data_stream_event() {
-                if let Some(data_slice) = event.output_data {
+                if let Some(data_slice) = event.new_data {
                     if !self
                         .as_data_repo()
                         .contains(&data_slice.physical_hash)
@@ -373,7 +380,7 @@ where
                         .into());
                     }
                 }
-                if let Some(checkpoint) = event.output_checkpoint {
+                if let Some(checkpoint) = event.new_checkpoint {
                     if !self
                         .as_checkpoint_repo()
                         .contains(&checkpoint.physical_hash)
@@ -414,16 +421,13 @@ where
 
         let mut new_upstream_ids: Vec<opendatafabric::DatasetID> = vec![];
         if let opendatafabric::MetadataEvent::SetTransform(transform) = &event {
-            for new_input in transform.inputs.iter() {
-                if let Some(id) = &new_input.id {
+            for new_input in &transform.inputs {
+                if let Some(id) = new_input.dataset_ref.id() {
                     new_upstream_ids.push(id.clone());
                 } else {
-                    return Err(CommitError::MetadataAppendError(AppendError::InvalidBlock(
-                        AppendValidationError::InvalidEvent(InvalidEventError::new(
-                            event,
-                            "Transform input with unresolved ID",
-                        )),
-                    )));
+                    // Normally all references must be resolved to IDs already.
+                    // We continue here while expecting MetadataChain to reject
+                    // this event.
                 }
             }
         }
@@ -477,29 +481,34 @@ where
     /// to be on the same file system as the workspace.
     async fn commit_add_data(
         &self,
-        add_data: AddDataParams,
-        data: Option<OwnedFile>,
-        checkpoint: Option<OwnedFile>,
+        params: AddDataParams,
+        data_file: Option<OwnedFile>,
+        checkpoint_file: Option<OwnedFile>,
         opts: CommitOpts<'_>,
     ) -> Result<CommitResult, CommitError> {
-        let (output_data, output_checkpoint) = self
-            .prepare_objects(add_data.output_data, data.as_ref(), checkpoint.as_ref())
+        let (new_data, new_checkpoint) = self
+            .prepare_objects(
+                params.new_offset_interval,
+                data_file.as_ref(),
+                checkpoint_file.as_ref(),
+            )
             .await?;
 
         self.commit_objects(
-            output_data.as_ref(),
-            data,
-            output_checkpoint.as_ref(),
-            checkpoint,
+            new_data.as_ref(),
+            data_file,
+            new_checkpoint.as_ref(),
+            checkpoint_file,
         )
         .await?;
 
         let metadata_event = AddData {
-            input_checkpoint: add_data.input_checkpoint,
-            output_data,
-            output_checkpoint,
-            output_watermark: add_data.output_watermark,
-            source_state: add_data.source_state,
+            prev_checkpoint: params.prev_checkpoint,
+            prev_offset: params.prev_offset,
+            new_data,
+            new_checkpoint,
+            new_watermark: params.new_watermark,
+            new_source_state: params.new_source_state,
         };
 
         self.commit_event(
@@ -528,9 +537,9 @@ where
             .await?;
 
         self.commit_objects(
-            event.output_data.as_ref(),
+            event.new_data.as_ref(),
             data,
-            event.output_checkpoint.as_ref(),
+            event.new_checkpoint.as_ref(),
             checkpoint,
         )
         .await?;
@@ -547,20 +556,21 @@ where
 
     async fn prepare_execute_query(
         &self,
-        execute_query: ExecuteQueryParams,
-        data: Option<&OwnedFile>,
+        params: ExecuteQueryParams,
+        data_file: Option<&OwnedFile>,
         checkpoint: Option<&OwnedFile>,
     ) -> Result<ExecuteQuery, InternalError> {
-        let (output_data, output_checkpoint) = self
-            .prepare_objects(execute_query.output_data, data, checkpoint)
+        let (new_data, new_checkpoint) = self
+            .prepare_objects(params.new_offset_interval, data_file, checkpoint)
             .await?;
 
         Ok(ExecuteQuery {
-            input_slices: execute_query.input_slices,
-            input_checkpoint: execute_query.input_checkpoint,
-            output_data,
-            output_checkpoint,
-            output_watermark: execute_query.output_watermark,
+            query_inputs: params.query_inputs,
+            prev_checkpoint: params.prev_checkpoint,
+            prev_offset: params.prev_offset,
+            new_data,
+            new_checkpoint,
+            new_watermark: params.new_watermark,
         })
     }
 

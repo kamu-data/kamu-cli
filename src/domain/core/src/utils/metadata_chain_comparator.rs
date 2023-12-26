@@ -8,10 +8,10 @@
 // by the Apache License, Version 2.0.
 
 use async_trait::async_trait;
+use futures::{StreamExt, TryStreamExt};
 use internal_error::*;
 use opendatafabric::{MetadataBlock, Multihash};
 use thiserror::Error;
-use tokio_stream::StreamExt;
 
 use crate::*;
 
@@ -19,6 +19,11 @@ use crate::*;
 
 pub struct MetadataChainComparator {}
 
+// TODO: This comparator explores the chains eagerly and may not be optimal for
+// really long chains. We should explore alternatives such as:
+// - making comparator streaming
+// - adding `MetadataChain::nth_block(head, sequence_number)` function that can
+//   skip through long chains faster
 impl MetadataChainComparator {
     pub async fn compare_chains(
         lhs_chain: &dyn MetadataChain,
@@ -52,19 +57,23 @@ impl MetadataChainComparator {
             },
         );
 
+        // Extract sequence numbers of head blocks
         lhs_chain.expecting_to_read_blocks(1);
-        rhs_chain.expecting_to_read_blocks(1);
+        let lhs_sequence_number = lhs_chain.get_block(lhs_head).await?.sequence_number;
 
-        // Extract sequence number of head blocks
-        let lhs_sequence_number = lhs_chain.get_block(&lhs_head).await?.sequence_number;
-        let rhs_sequence_number = if rhs_head.is_some() {
-            rhs_chain
-                .get_block(rhs_head.as_ref().unwrap())
-                .await?
-                .sequence_number
-        } else {
-            -1
+        let Some(rhs_head) = rhs_head else {
+            // LHS chain is unconditionally ahead - simply return all of its blocks
+            lhs_chain.expecting_to_read_blocks(lhs_sequence_number as usize + 1);
+            return Ok(CompareChainsResult::LhsAhead {
+                lhs_ahead_blocks: lhs_chain
+                    .iter_blocks_interval(lhs_head, None, false)
+                    .try_collect()
+                    .await?,
+            });
         };
+
+        rhs_chain.expecting_to_read_blocks(1);
+        let rhs_sequence_number = rhs_chain.get_block(rhs_head).await?.sequence_number;
 
         // If numbers are equal, it's a guaranteed divergence, as we've checked blocks
         // for equality above
@@ -117,10 +126,10 @@ impl MetadataChainComparator {
             let convergence_check = Self::check_expected_common_ancestor(
                 &rhs_chain,
                 rhs_sequence_number,
-                rhs_head.as_ref().unwrap(),
+                rhs_head,
                 &lhs_chain,
                 lhs_sequence_number,
-                Some(&lhs_head),
+                lhs_head,
             )
             .await?;
             match convergence_check {
@@ -144,14 +153,12 @@ impl MetadataChainComparator {
 
     async fn check_expected_common_ancestor(
         ahead_chain: &MetadataChainWithStats<'_>,
-        ahead_sequence_number: i32,
+        ahead_sequence_number: u64,
         ahead_head: &Multihash,
         reference_chain: &MetadataChainWithStats<'_>,
-        expected_common_sequence_number: i32,
-        expected_common_ancestor_hash: Option<&Multihash>,
+        expected_common_sequence_number: u64,
+        expected_common_ancestor_hash: &Multihash,
     ) -> Result<CommonAncestorCheck, CompareChainsError> {
-        use futures::TryStreamExt;
-
         let ahead_size: usize = (ahead_sequence_number - expected_common_sequence_number) as usize;
         ahead_chain.expecting_to_read_blocks(ahead_size);
 
@@ -165,14 +172,13 @@ impl MetadataChainComparator {
         // head, there is no divergence
         let boundary_ahead_block_data = ahead_blocks.last().map(|el| &(el.1)).unwrap();
         let boundary_block_prev_hash = boundary_ahead_block_data.prev_block_hash.as_ref();
-        if expected_common_ancestor_hash.is_some()
-            && boundary_block_prev_hash.is_some()
-            && expected_common_ancestor_hash != boundary_block_prev_hash
+        if boundary_block_prev_hash.is_some()
+            && boundary_block_prev_hash != Some(expected_common_ancestor_hash)
         {
             let common_ancestor_sequence_number = Self::find_common_ancestor_sequence_number(
                 ahead_chain,
                 boundary_block_prev_hash.unwrap(),
-                ahead_sequence_number - ahead_size as i32,
+                ahead_sequence_number - ahead_size as u64,
                 reference_chain,
                 expected_common_ancestor_hash,
                 expected_common_sequence_number,
@@ -187,28 +193,28 @@ impl MetadataChainComparator {
     }
 
     fn describe_divergence(
-        lhs_sequence_number: i32,
-        rhs_sequence_number: i32,
-        last_common_sequence_number: i32,
+        lhs_sequence_number: u64,
+        rhs_sequence_number: u64,
+        last_common_sequence_number: Option<u64>,
     ) -> CompareChainsResult {
         CompareChainsResult::Divergence {
-            uncommon_blocks_in_lhs: (lhs_sequence_number - last_common_sequence_number) as usize,
-            uncommon_blocks_in_rhs: (rhs_sequence_number - last_common_sequence_number) as usize,
+            uncommon_blocks_in_lhs: (lhs_sequence_number + 1
+                - last_common_sequence_number.unwrap_or(0))
+                as usize,
+            uncommon_blocks_in_rhs: (rhs_sequence_number + 1
+                - last_common_sequence_number.unwrap_or(0))
+                as usize,
         }
     }
 
     async fn find_common_ancestor_sequence_number(
         lhs_chain: &MetadataChainWithStats<'_>,
         lhs_head: &Multihash,
-        lhs_start_block_sequence_number: i32,
+        lhs_start_block_sequence_number: u64,
         rhs_chain: &MetadataChainWithStats<'_>,
-        rhs_head: Option<&Multihash>,
-        rhs_start_block_sequence_number: i32,
-    ) -> Result<i32, CompareChainsError> {
-        if rhs_head.is_none() {
-            return Ok(-1);
-        }
-
+        rhs_head: &Multihash,
+        rhs_start_block_sequence_number: u64,
+    ) -> Result<Option<u64>, CompareChainsError> {
         if lhs_start_block_sequence_number > rhs_start_block_sequence_number {
             lhs_chain.expecting_to_read_blocks(
                 (lhs_start_block_sequence_number - rhs_start_block_sequence_number) as usize,
@@ -220,7 +226,7 @@ impl MetadataChainComparator {
         }
 
         let mut lhs_stream = lhs_chain.iter_blocks_interval(lhs_head, None, false);
-        let mut rhs_stream = rhs_chain.iter_blocks_interval(rhs_head.unwrap(), None, false);
+        let mut rhs_stream = rhs_chain.iter_blocks_interval(rhs_head, None, false);
 
         let mut curr_lhs_block_sequence_number = lhs_start_block_sequence_number;
         while curr_lhs_block_sequence_number > rhs_start_block_sequence_number {
@@ -240,7 +246,7 @@ impl MetadataChainComparator {
         );
 
         let mut curr_block_sequence_number = curr_lhs_block_sequence_number;
-        while curr_block_sequence_number >= 0 {
+        loop {
             lhs_chain.expecting_to_read_blocks(1);
             rhs_chain.expecting_to_read_blocks(1);
 
@@ -248,12 +254,13 @@ impl MetadataChainComparator {
             let (rhs_block_hash, _) = rhs_stream.try_next().await.int_err()?.unwrap();
 
             if lhs_block_hash == rhs_block_hash {
-                return Ok(curr_block_sequence_number);
+                return Ok(Some(curr_block_sequence_number));
+            }
+            if curr_block_sequence_number == 0 {
+                return Ok(None);
             }
             curr_block_sequence_number -= 1;
         }
-
-        Ok(-1)
     }
 }
 
@@ -276,12 +283,13 @@ pub enum CompareChainsResult {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Debug)]
 enum CommonAncestorCheck {
     Success {
         ahead_blocks: Vec<(Multihash, MetadataBlock)>,
     },
     Failure {
-        common_ancestor_sequence_number: i32,
+        common_ancestor_sequence_number: Option<u64>,
     },
 }
 

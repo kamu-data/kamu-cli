@@ -19,7 +19,6 @@ use opendatafabric as odf;
 
 use crate::prelude::*;
 use crate::queries::Dataset;
-use crate::scalars::{DatasetID, DatasetName, Multihash, OSPath};
 
 ////////////////////////////////////////////////////////////////////////////////
 // AddData
@@ -28,21 +27,23 @@ use crate::scalars::{DatasetID, DatasetName, Multihash, OSPath};
 
 #[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct AddData {
-    pub input_checkpoint: Option<Multihash>,
-    pub output_data: Option<DataSlice>,
-    pub output_checkpoint: Option<Checkpoint>,
-    pub output_watermark: Option<DateTime<Utc>>,
-    pub source_state: Option<SourceState>,
+    pub prev_checkpoint: Option<Multihash>,
+    pub prev_offset: Option<u64>,
+    pub new_data: Option<DataSlice>,
+    pub new_checkpoint: Option<Checkpoint>,
+    pub new_watermark: Option<DateTime<Utc>>,
+    pub new_source_state: Option<SourceState>,
 }
 
 impl From<odf::AddData> for AddData {
     fn from(v: odf::AddData) -> Self {
         Self {
-            input_checkpoint: v.input_checkpoint.map(Into::into),
-            output_data: v.output_data.map(Into::into),
-            output_checkpoint: v.output_checkpoint.map(Into::into),
-            output_watermark: v.output_watermark.map(Into::into),
-            source_state: v.source_state.map(Into::into),
+            prev_checkpoint: v.prev_checkpoint.map(Into::into),
+            prev_offset: v.prev_offset.map(Into::into),
+            new_data: v.new_data.map(Into::into),
+            new_checkpoint: v.new_checkpoint.map(Into::into),
+            new_watermark: v.new_watermark.map(Into::into),
+            new_source_state: v.new_source_state.map(Into::into),
         }
     }
 }
@@ -123,26 +124,6 @@ impl From<odf::AttachmentsEmbedded> for AttachmentsEmbedded {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// BlockInterval
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#blockinterval-schema
-////////////////////////////////////////////////////////////////////////////////
-
-#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
-pub struct BlockInterval {
-    pub start: Multihash,
-    pub end: Multihash,
-}
-
-impl From<odf::BlockInterval> for BlockInterval {
-    fn from(v: odf::BlockInterval) -> Self {
-        Self {
-            start: v.start.into(),
-            end: v.end.into(),
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////
 // Checkpoint
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#checkpoint-schema
 ////////////////////////////////////////////////////////////////////////////////
@@ -150,7 +131,7 @@ impl From<odf::BlockInterval> for BlockInterval {
 #[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct Checkpoint {
     pub physical_hash: Multihash,
-    pub size: i64,
+    pub size: u64,
 }
 
 impl From<odf::Checkpoint> for Checkpoint {
@@ -171,8 +152,8 @@ impl From<odf::Checkpoint> for Checkpoint {
 pub struct DataSlice {
     pub logical_hash: Multihash,
     pub physical_hash: Multihash,
-    pub interval: OffsetInterval,
-    pub size: i64,
+    pub offset_interval: OffsetInterval,
+    pub size: u64,
 }
 
 impl From<odf::DataSlice> for DataSlice {
@@ -180,7 +161,7 @@ impl From<odf::DataSlice> for DataSlice {
         Self {
             logical_hash: v.logical_hash.into(),
             physical_hash: v.physical_hash.into(),
-            interval: v.interval.into(),
+            offset_interval: v.offset_interval.into(),
             size: v.size.into(),
         }
     }
@@ -222,7 +203,7 @@ impl Into<odf::DatasetKind> for DatasetKind {
 
 #[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct DatasetSnapshot {
-    pub name: DatasetName,
+    pub name: DatasetAlias,
     pub kind: DatasetKind,
     pub metadata: Vec<MetadataEvent>,
 }
@@ -379,21 +360,23 @@ impl From<odf::EventTimeSourceFromSystemTime> for EventTimeSourceFromSystemTime 
 
 #[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct ExecuteQuery {
-    pub input_slices: Vec<InputSlice>,
-    pub input_checkpoint: Option<Multihash>,
-    pub output_data: Option<DataSlice>,
-    pub output_checkpoint: Option<Checkpoint>,
-    pub output_watermark: Option<DateTime<Utc>>,
+    pub query_inputs: Vec<ExecuteQueryInput>,
+    pub prev_checkpoint: Option<Multihash>,
+    pub prev_offset: Option<u64>,
+    pub new_data: Option<DataSlice>,
+    pub new_checkpoint: Option<Checkpoint>,
+    pub new_watermark: Option<DateTime<Utc>>,
 }
 
 impl From<odf::ExecuteQuery> for ExecuteQuery {
     fn from(v: odf::ExecuteQuery) -> Self {
         Self {
-            input_slices: v.input_slices.into_iter().map(Into::into).collect(),
-            input_checkpoint: v.input_checkpoint.map(Into::into),
-            output_data: v.output_data.map(Into::into),
-            output_checkpoint: v.output_checkpoint.map(Into::into),
-            output_watermark: v.output_watermark.map(Into::into),
+            query_inputs: v.query_inputs.into_iter().map(Into::into).collect(),
+            prev_checkpoint: v.prev_checkpoint.map(Into::into),
+            prev_offset: v.prev_offset.map(Into::into),
+            new_data: v.new_data.map(Into::into),
+            new_checkpoint: v.new_checkpoint.map(Into::into),
+            new_watermark: v.new_watermark.map(Into::into),
         }
     }
 }
@@ -406,24 +389,20 @@ impl From<odf::ExecuteQuery> for ExecuteQuery {
 #[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct ExecuteQueryInput {
     pub dataset_id: DatasetID,
-    pub dataset_name: DatasetName,
-    pub vocab: DatasetVocabulary,
-    pub data_interval: Option<OffsetInterval>,
-    pub data_paths: Vec<OSPath>,
-    pub schema_file: OSPath,
-    pub explicit_watermarks: Vec<Watermark>,
+    pub prev_block_hash: Option<Multihash>,
+    pub new_block_hash: Option<Multihash>,
+    pub prev_offset: Option<u64>,
+    pub new_offset: Option<u64>,
 }
 
 impl From<odf::ExecuteQueryInput> for ExecuteQueryInput {
     fn from(v: odf::ExecuteQueryInput) -> Self {
         Self {
             dataset_id: v.dataset_id.into(),
-            dataset_name: v.dataset_name.into(),
-            vocab: v.vocab.into(),
-            data_interval: v.data_interval.map(Into::into),
-            data_paths: v.data_paths.into_iter().map(Into::into).collect(),
-            schema_file: v.schema_file.into(),
-            explicit_watermarks: v.explicit_watermarks.into_iter().map(Into::into).collect(),
+            prev_block_hash: v.prev_block_hash.map(Into::into),
+            new_block_hash: v.new_block_hash.map(Into::into),
+            prev_offset: v.prev_offset.map(Into::into),
+            new_offset: v.new_offset.map(Into::into),
         }
     }
 }
@@ -436,30 +415,62 @@ impl From<odf::ExecuteQueryInput> for ExecuteQueryInput {
 #[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct ExecuteQueryRequest {
     pub dataset_id: DatasetID,
-    pub dataset_name: DatasetName,
+    pub dataset_alias: DatasetAlias,
     pub system_time: DateTime<Utc>,
-    pub offset: i64,
     pub vocab: DatasetVocabulary,
     pub transform: Transform,
-    pub inputs: Vec<ExecuteQueryInput>,
+    pub query_inputs: Vec<ExecuteQueryRequestInput>,
+    pub next_offset: u64,
     pub prev_checkpoint_path: Option<OSPath>,
     pub new_checkpoint_path: OSPath,
-    pub out_data_path: OSPath,
+    pub new_data_path: OSPath,
 }
 
 impl From<odf::ExecuteQueryRequest> for ExecuteQueryRequest {
     fn from(v: odf::ExecuteQueryRequest) -> Self {
         Self {
             dataset_id: v.dataset_id.into(),
-            dataset_name: v.dataset_name.into(),
+            dataset_alias: v.dataset_alias.into(),
             system_time: v.system_time.into(),
-            offset: v.offset.into(),
             vocab: v.vocab.into(),
             transform: v.transform.into(),
-            inputs: v.inputs.into_iter().map(Into::into).collect(),
+            query_inputs: v.query_inputs.into_iter().map(Into::into).collect(),
+            next_offset: v.next_offset.into(),
             prev_checkpoint_path: v.prev_checkpoint_path.map(Into::into),
             new_checkpoint_path: v.new_checkpoint_path.into(),
-            out_data_path: v.out_data_path.into(),
+            new_data_path: v.new_data_path.into(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// ExecuteQueryRequestInput
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#executequeryrequestinput-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
+pub struct ExecuteQueryRequestInput {
+    pub dataset_id: DatasetID,
+    pub dataset_alias: DatasetAlias,
+    pub query_alias: String,
+    pub vocab: DatasetVocabulary,
+    pub offset_interval: Option<OffsetInterval>,
+    pub data_paths: Vec<OSPath>,
+    pub schema_file: OSPath,
+    pub explicit_watermarks: Vec<Watermark>,
+}
+
+impl From<odf::ExecuteQueryRequestInput> for ExecuteQueryRequestInput {
+    fn from(v: odf::ExecuteQueryRequestInput) -> Self {
+        Self {
+            dataset_id: v.dataset_id.into(),
+            dataset_alias: v.dataset_alias.into(),
+            query_alias: v.query_alias.into(),
+            vocab: v.vocab.into(),
+            offset_interval: v.offset_interval.map(Into::into),
+            data_paths: v.data_paths.into_iter().map(Into::into).collect(),
+            schema_file: v.schema_file.into(),
+            explicit_watermarks: v.explicit_watermarks.into_iter().map(Into::into).collect(),
         }
     }
 }
@@ -501,15 +512,15 @@ impl From<odf::ExecuteQueryResponseProgress> for ExecuteQueryResponseProgress {
 
 #[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct ExecuteQueryResponseSuccess {
-    pub data_interval: Option<OffsetInterval>,
-    pub output_watermark: Option<DateTime<Utc>>,
+    pub new_offset_interval: Option<OffsetInterval>,
+    pub new_watermark: Option<DateTime<Utc>>,
 }
 
 impl From<odf::ExecuteQueryResponseSuccess> for ExecuteQueryResponseSuccess {
     fn from(v: odf::ExecuteQueryResponseSuccess) -> Self {
         Self {
-            data_interval: v.data_interval.map(Into::into),
-            output_watermark: v.output_watermark.map(Into::into),
+            new_offset_interval: v.new_offset_interval.map(Into::into),
+            new_watermark: v.new_watermark.map(Into::into),
         }
     }
 }
@@ -646,28 +657,6 @@ impl Into<odf::SourceOrdering> for SourceOrdering {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// InputSlice
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#inputslice-schema
-////////////////////////////////////////////////////////////////////////////////
-
-#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
-pub struct InputSlice {
-    pub dataset_id: DatasetID,
-    pub block_interval: Option<BlockInterval>,
-    pub data_interval: Option<OffsetInterval>,
-}
-
-impl From<odf::InputSlice> for InputSlice {
-    fn from(v: odf::InputSlice) -> Self {
-        Self {
-            dataset_id: v.dataset_id.into(),
-            block_interval: v.block_interval.map(Into::into),
-            data_interval: v.data_interval.map(Into::into),
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////
 // MergeStrategy
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mergestrategy-schema
 ////////////////////////////////////////////////////////////////////////////////
@@ -747,7 +736,7 @@ impl From<odf::MergeStrategySnapshot> for MergeStrategySnapshot {
 pub struct MetadataBlock {
     pub system_time: DateTime<Utc>,
     pub prev_block_hash: Option<Multihash>,
-    pub sequence_number: i32,
+    pub sequence_number: u64,
     pub event: MetadataEvent,
 }
 
@@ -813,8 +802,8 @@ impl From<odf::MetadataEvent> for MetadataEvent {
 
 #[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct OffsetInterval {
-    pub start: i64,
-    pub end: i64,
+    pub start: u64,
+    pub end: u64,
 }
 
 impl From<odf::OffsetInterval> for OffsetInterval {
@@ -906,7 +895,6 @@ impl Into<odf::CompressionFormat> for CompressionFormat {
 #[derive(Union, Debug, Clone, PartialEq, Eq)]
 pub enum ReadStep {
     Csv(ReadStepCsv),
-    JsonLines(ReadStepJsonLines),
     GeoJson(ReadStepGeoJson),
     EsriShapefile(ReadStepEsriShapefile),
     Parquet(ReadStepParquet),
@@ -919,7 +907,6 @@ impl From<odf::ReadStep> for ReadStep {
     fn from(v: odf::ReadStep) -> Self {
         match v {
             odf::ReadStep::Csv(v) => Self::Csv(v.into()),
-            odf::ReadStep::JsonLines(v) => Self::JsonLines(v.into()),
             odf::ReadStep::GeoJson(v) => Self::GeoJson(v.into()),
             odf::ReadStep::EsriShapefile(v) => Self::EsriShapefile(v.into()),
             odf::ReadStep::Parquet(v) => Self::Parquet(v.into()),
@@ -937,20 +924,11 @@ pub struct ReadStepCsv {
     pub encoding: Option<String>,
     pub quote: Option<String>,
     pub escape: Option<String>,
-    pub comment: Option<String>,
     pub header: Option<bool>,
-    pub enforce_schema: Option<bool>,
     pub infer_schema: Option<bool>,
-    pub ignore_leading_white_space: Option<bool>,
-    pub ignore_trailing_white_space: Option<bool>,
     pub null_value: Option<String>,
-    pub empty_value: Option<String>,
-    pub nan_value: Option<String>,
-    pub positive_inf: Option<String>,
-    pub negative_inf: Option<String>,
     pub date_format: Option<String>,
     pub timestamp_format: Option<String>,
-    pub multi_line: Option<bool>,
 }
 
 impl From<odf::ReadStepCsv> for ReadStepCsv {
@@ -961,42 +939,10 @@ impl From<odf::ReadStepCsv> for ReadStepCsv {
             encoding: v.encoding.map(Into::into),
             quote: v.quote.map(Into::into),
             escape: v.escape.map(Into::into),
-            comment: v.comment.map(Into::into),
             header: v.header.map(Into::into),
-            enforce_schema: v.enforce_schema.map(Into::into),
             infer_schema: v.infer_schema.map(Into::into),
-            ignore_leading_white_space: v.ignore_leading_white_space.map(Into::into),
-            ignore_trailing_white_space: v.ignore_trailing_white_space.map(Into::into),
             null_value: v.null_value.map(Into::into),
-            empty_value: v.empty_value.map(Into::into),
-            nan_value: v.nan_value.map(Into::into),
-            positive_inf: v.positive_inf.map(Into::into),
-            negative_inf: v.negative_inf.map(Into::into),
             date_format: v.date_format.map(Into::into),
-            timestamp_format: v.timestamp_format.map(Into::into),
-            multi_line: v.multi_line.map(Into::into),
-        }
-    }
-}
-
-#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
-pub struct ReadStepJsonLines {
-    pub schema: Option<Vec<String>>,
-    pub date_format: Option<String>,
-    pub encoding: Option<String>,
-    pub multi_line: Option<bool>,
-    pub primitives_as_string: Option<bool>,
-    pub timestamp_format: Option<String>,
-}
-
-impl From<odf::ReadStepJsonLines> for ReadStepJsonLines {
-    fn from(v: odf::ReadStepJsonLines) -> Self {
-        Self {
-            schema: v.schema.map(|v| v.into_iter().map(Into::into).collect()),
-            date_format: v.date_format.map(Into::into),
-            encoding: v.encoding.map(Into::into),
-            multi_line: v.multi_line.map(Into::into),
-            primitives_as_string: v.primitives_as_string.map(Into::into),
             timestamp_format: v.timestamp_format.map(Into::into),
         }
     }
@@ -1294,13 +1240,13 @@ impl From<odf::SetVocab> for SetVocab {
 
 #[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct SetWatermark {
-    pub output_watermark: DateTime<Utc>,
+    pub new_watermark: DateTime<Utc>,
 }
 
 impl From<odf::SetWatermark> for SetWatermark {
     fn from(v: odf::SetWatermark) -> Self {
         Self {
-            output_watermark: v.output_watermark.into(),
+            new_watermark: v.new_watermark.into(),
         }
     }
 }
@@ -1341,16 +1287,16 @@ impl From<odf::SourceCachingForever> for SourceCachingForever {
 
 #[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct SourceState {
+    pub source_name: Option<String>,
     pub kind: String,
-    pub source: String,
     pub value: String,
 }
 
 impl From<odf::SourceState> for SourceState {
     fn from(v: odf::SourceState) -> Self {
         Self {
+            source_name: v.source_name.map(Into::into),
             kind: v.kind.into(),
-            source: v.source.into(),
             value: v.value.into(),
         }
     }
@@ -1449,25 +1395,22 @@ impl From<odf::TransformSql> for TransformSql {
 #[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 #[graphql(complex)]
 pub struct TransformInput {
-    pub id: Option<DatasetID>,
-    pub name: DatasetName,
-    pub dataset_ref: Option<DatasetRefAny>,
+    pub dataset_ref: DatasetRef,
+    pub alias: String,
 }
 
 #[ComplexObject]
 impl TransformInput {
     async fn dataset(&self, ctx: &Context<'_>) -> Result<Dataset> {
-        let dref = self.id.clone().unwrap();
-        Dataset::from_ref(ctx, &dref.as_local_ref()).await
+        Dataset::from_ref(ctx, &self.dataset_ref).await
     }
 }
 
 impl From<odf::TransformInput> for TransformInput {
     fn from(v: odf::TransformInput) -> Self {
         Self {
-            id: v.id.map(Into::into),
-            name: v.name.into(),
-            dataset_ref: v.dataset_ref.map(Into::into),
+            dataset_ref: v.dataset_ref.into(),
+            alias: v.alias.unwrap(),
         }
     }
 }

@@ -60,8 +60,8 @@ pub struct IngestRequest {
     pub event_time: Option<DateTime<Utc>>,
     /// Expected data schema (if already defined)
     pub schema: Option<SchemaRef>,
-    /// Starting offset to use for new records
-    pub next_offset: i64,
+    /// Preceeding record offset, if any
+    pub prev_offset: Option<u64>,
     /// Output dataset's vocabulary
     pub vocab: DatasetVocabulary,
     /// List of *all* previous data files (needed for merge step)
@@ -79,13 +79,13 @@ pub struct IngestRequest {
 #[derive(Debug)]
 pub struct IngestResponse {
     /// Data slice produced by the transaction, if any
-    pub data_interval: Option<OffsetInterval>,
+    pub new_offset_interval: Option<OffsetInterval>,
     /// Watermark advanced by the transaction, if any
-    pub output_watermark: Option<DateTime<Utc>>,
+    pub new_watermark: Option<DateTime<Utc>>,
     /// New checkpoint written by the engine, if any
-    pub out_checkpoint: Option<OwnedFile>,
+    pub new_checkpoint: Option<OwnedFile>,
     /// Data produced by the operation, if any
-    pub out_data: Option<OwnedFile>,
+    pub new_data: Option<OwnedFile>,
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -114,8 +114,8 @@ pub struct TransformRequest {
     pub system_time: DateTime<Utc>,
     /// Expected data schema (if already defined)
     pub schema: Option<SchemaRef>,
-    /// Starting offset to use for new records
-    pub next_offset: i64,
+    /// Preceeding record offset, if any
+    pub prev_offset: Option<u64>,
     /// Defines the input data
     pub inputs: Vec<TransformRequestInput>,
     /// Output dataset's vocabulary
@@ -132,10 +132,28 @@ pub struct TransformRequestInput {
     pub alias: String,
     /// Input dataset's vocabulary
     pub vocab: DatasetVocabulary,
-    /// Blocks that went into this transaction
-    pub block_interval: Option<BlockInterval>,
-    /// Data that went into this transaction
-    pub data_interval: Option<OffsetInterval>,
+    /// Last block of the input dataset that was previously incorporated into
+    /// the derivative transformation, if any. Must be equal to the last
+    /// non-empty `newBlockHash`. Together with `newBlockHash` defines a
+    /// half-open `(prevBlockHash, newBlockHash]` interval of blocks that will
+    /// be considered in this transaction.
+    pub prev_block_hash: Option<Multihash>,
+    /// Hash of the last block that will be incorporated into the derivative
+    /// transformation. When present, defines a half-open `(prevBlockHash,
+    /// newBlockHash]` interval of blocks that will be considered in this
+    /// transaction.
+    pub new_block_hash: Option<Multihash>,
+    /// Last data record offset in the input dataset that was previously
+    /// incorporated into the derivative transformation, if any. Must be equal
+    /// to the last non-empty `newOffset`. Together with `newOffset` defines a
+    /// half-open `(prevOffset, newOffset]` interval of data records that will
+    /// be considered in this transaction.
+    pub prev_offset: Option<u64>,
+    /// Offset of the last data record that will be incorporated into the
+    /// derivative transformation, if any. When present, defines a half-open
+    /// `(prevOffset, newOffset]` interval of data records that will be
+    /// considered in this transaction.
+    pub new_offset: Option<u64>,
     /// List of data files that will be read
     pub data_slices: Vec<Multihash>,
     /// TODO: replace with actual schema
@@ -147,21 +165,23 @@ pub struct TransformRequestInput {
 #[derive(Debug)]
 pub struct TransformResponse {
     /// Data slice produced by the transaction, if any
-    pub data_interval: Option<OffsetInterval>,
+    pub new_offset_interval: Option<OffsetInterval>,
     /// Watermark advanced by the transaction, if any
-    pub output_watermark: Option<DateTime<Utc>>,
+    pub new_watermark: Option<DateTime<Utc>>,
     /// New checkpoint written by the engine, if any
-    pub out_checkpoint: Option<OwnedFile>,
+    pub new_checkpoint: Option<OwnedFile>,
     /// Data produced by the operation, if any
-    pub out_data: Option<OwnedFile>,
+    pub new_data: Option<OwnedFile>,
 }
 
-impl Into<InputSlice> for TransformRequestInput {
-    fn into(self) -> InputSlice {
-        InputSlice {
+impl Into<ExecuteQueryInput> for TransformRequestInput {
+    fn into(self) -> ExecuteQueryInput {
+        ExecuteQueryInput {
             dataset_id: self.dataset_handle.id,
-            block_interval: self.block_interval,
-            data_interval: self.data_interval,
+            prev_block_hash: self.prev_block_hash,
+            new_block_hash: self.new_block_hash,
+            prev_offset: self.prev_offset,
+            new_offset: self.new_offset,
         }
     }
 }

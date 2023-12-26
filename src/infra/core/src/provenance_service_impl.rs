@@ -56,20 +56,17 @@ impl ProvenanceServiceImpl {
                 .await
                 .int_err()?;
 
-            // Resolving by ID because name of the input
-            // can be different than the dataset name in the workspace
             let mut resolved_inputs = Vec::new();
-            for input in &summary.dependencies {
-                let input_id = input.id.as_ref().unwrap();
-
+            for input_id in &summary.dependencies {
                 let handle = self
                     .dataset_repo
                     .resolve_dataset_ref(&input_id.as_local_ref())
                     .await?;
 
                 resolved_inputs.push(ResolvedTransformInput {
+                    // TODO: This likely needs to be changed into query alias
+                    name: handle.alias.dataset_name.clone(),
                     handle,
-                    name: input.name.clone(),
                 })
             }
 

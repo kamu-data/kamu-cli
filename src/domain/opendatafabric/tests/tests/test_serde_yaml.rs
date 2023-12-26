@@ -218,7 +218,7 @@ fn serde_dataset_snapshot_root() {
     );
 
     let expected = DatasetSnapshot {
-        name: DatasetName::try_from("kamu.test").unwrap(),
+        name: DatasetAlias::try_from("kamu.test").unwrap(),
         kind: DatasetKind::Root,
         metadata: vec![MetadataEvent::SetPollingSource(SetPollingSource {
             fetch: FetchStep::Url(FetchStepUrl {
@@ -296,7 +296,7 @@ fn serde_dataset_snapshot_derivative() {
     );
 
     let expected = DatasetSnapshot {
-        name: DatasetName::try_from("com.naturalearthdata.admin0").unwrap(),
+        name: DatasetAlias::try_from("com.naturalearthdata.admin0").unwrap(),
         kind: DatasetKind::Derivative,
         metadata: vec![MetadataEvent::SetTransform(SetTransform {
             inputs: vec![
@@ -343,13 +343,13 @@ fn serde_dataset_snapshot_derivative_with_multi_tenant_ref() {
         kind: DatasetSnapshot
         version: 1
         content:
-          name: com.naturalearthdata.admin0
+          name: a/com.naturalearthdata.admin0
           kind: Derivative
           metadata:
           - kind: SetTransform
             inputs:
-            - datasetRef: kamu/com.naturalearthdata.10m.admin0
-            - datasetRef: remote-repo/kamu/com.naturalearthdata.50m.admin0
+            - datasetRef: b/com.naturalearthdata.10m.admin0
+            - datasetRef: c/com.naturalearthdata.50m.admin0
             transform:
               kind: Sql
               engine: spark
@@ -358,20 +358,16 @@ fn serde_dataset_snapshot_derivative_with_multi_tenant_ref() {
     );
 
     let expected = DatasetSnapshot {
-        name: DatasetName::try_from("com.naturalearthdata.admin0").unwrap(),
+        name: DatasetAlias::try_from("a/com.naturalearthdata.admin0").unwrap(),
         kind: DatasetKind::Derivative,
         metadata: vec![MetadataEvent::SetTransform(SetTransform {
             inputs: vec![
                 TransformInput {
-                    dataset_ref: DatasetRefAny::try_from("kamu/com.naturalearthdata.10m.admin0")
-                        .unwrap(),
+                    dataset_ref: DatasetRef::try_from("b/com.naturalearthdata.10m.admin0").unwrap(),
                     alias: None,
                 },
                 TransformInput {
-                    dataset_ref: DatasetRefAny::try_from(
-                        "remote-repo/kamu/com.naturalearthdata.50m.admin0",
-                    )
-                    .unwrap(),
+                    dataset_ref: DatasetRef::try_from("c/com.naturalearthdata.50m.admin0").unwrap(),
                     alias: None,
                 },
             ],

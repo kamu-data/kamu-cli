@@ -240,7 +240,7 @@ fn serde_set_data_schema() {
 fn serde_execute_query_response() {
     let examples = [
         ExecuteQueryResponse::Success(ExecuteQueryResponseSuccess {
-            offset_interval: Some(OffsetInterval { start: 0, end: 10 }),
+            new_offset_interval: Some(OffsetInterval { start: 0, end: 10 }),
             new_watermark: Some(Utc::now()),
         }),
         ExecuteQueryResponse::InvalidQuery(ExecuteQueryResponseInvalidQuery {

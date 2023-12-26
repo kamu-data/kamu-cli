@@ -75,7 +75,6 @@ impl DataFormatRegistry for DataFormatRegistryImpl {
             ReadStep::Csv(_) => Self::FMT_CSV,
             ReadStep::Json(_) => Self::FMT_JSON,
             ReadStep::NdJson(_) => Self::FMT_NDJSON,
-            ReadStep::JsonLines(_) => Self::FMT_NDJSON,
             ReadStep::GeoJson(_) => Self::FMT_GEOJSON,
             ReadStep::NdGeoJson(_) => Self::FMT_NDGEOJSON,
             ReadStep::Parquet(_) => Self::FMT_PARQUET,
@@ -93,7 +92,6 @@ impl DataFormatRegistry for DataFormatRegistryImpl {
             ReadStep::Csv(conf) => Arc::new(ReaderCsv::new(ctx, conf).await?),
             ReadStep::Json(conf) => Arc::new(ReaderJson::new(ctx, conf, temp_path).await?),
             ReadStep::NdJson(conf) => Arc::new(ReaderNdJson::new(ctx, conf).await?),
-            ReadStep::JsonLines(conf) => Arc::new(ReaderNdJson::new_compat(ctx, conf).await?),
             ReadStep::GeoJson(conf) => Arc::new(ReaderGeoJson::new(ctx, conf, temp_path).await?),
             ReadStep::NdGeoJson(conf) => {
                 Arc::new(ReaderNdGeoJson::new(ctx, conf, temp_path).await?)

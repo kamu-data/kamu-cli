@@ -204,14 +204,13 @@ impl PullServiceImpl {
             // ones?
             let mut max_dep_depth = -1;
 
-            for dep in summary.dependencies {
-                let id = dep.id.unwrap();
-                tracing::debug!(%id, name = %dep.name, "Descending into dependency");
+            for dependency_id in summary.dependencies {
+                tracing::debug!(%dependency_id, "Descending into dependency");
 
                 let depth = self
                     .collect_pull_graph_depth_first(
                         &PullRequest {
-                            local_ref: Some(id.as_local_ref()),
+                            local_ref: Some(dependency_id.as_local_ref()),
                             remote_ref: None,
                         },
                         false,
@@ -590,7 +589,7 @@ impl PullService for PullServiceImpl {
     async fn set_watermark(
         &self,
         dataset_ref: &DatasetRef,
-        watermark: DateTime<Utc>,
+        new_watermark: DateTime<Utc>,
     ) -> Result<PullResult, SetWatermarkError> {
         let aliases = match self.remote_alias_reg.get_remote_aliases(dataset_ref).await {
             Ok(v) => Ok(v),
@@ -613,21 +612,19 @@ impl PullService for PullServiceImpl {
         if let Some(last_watermark) = chain
             .iter_blocks()
             .filter_data_stream_blocks()
-            .filter_map_ok(|(_, b)| b.event.output_watermark)
+            .filter_map_ok(|(_, b)| b.event.new_watermark)
             .try_first()
             .await
             .int_err()?
         {
-            if last_watermark >= watermark {
+            if last_watermark >= new_watermark {
                 return Ok(PullResult::UpToDate);
             }
         }
 
         let commit_result = dataset
             .commit_event(
-                MetadataEvent::SetWatermark(SetWatermark {
-                    output_watermark: watermark,
-                }),
+                MetadataEvent::SetWatermark(SetWatermark { new_watermark }),
                 CommitOpts::default(),
             )
             .await

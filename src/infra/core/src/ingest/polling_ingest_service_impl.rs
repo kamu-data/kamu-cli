@@ -233,8 +233,8 @@ impl PollingIngestServiceImpl {
         args.listener
             .on_stage_progress(PollingIngestStage::CheckCache, 0, TotalSteps::Exact(1));
 
-        let uncacheable = args.data_writer.last_offset().is_some()
-            && args.data_writer.last_source_state().is_none();
+        let uncacheable = args.data_writer.prev_offset().is_some()
+            && args.data_writer.prev_source_state().is_none();
 
         if uncacheable && !args.options.fetch_uncacheable {
             tracing::info!("Skipping fetch of uncacheable source");
@@ -342,7 +342,7 @@ impl PollingIngestServiceImpl {
         let fetch_step = &args.polling_source.fetch;
         let prev_source_state = args
             .data_writer
-            .last_source_state()
+            .prev_source_state()
             .and_then(|ss| PollingSourceState::try_from_source_state(&ss));
 
         let savepoint_path = self.get_savepoint_path(fetch_step, prev_source_state.as_ref())?;
@@ -670,15 +670,15 @@ impl PollingIngestServiceImpl {
             input_data_path: PathBuf::new(), // TODO: Will be filled out by IngestTask
             prev_data_slices: state.data_slices,
             schema: state.schema,
-            next_offset: state.last_offset.map(|off| off + 1).unwrap_or(0),
+            prev_offset: state.prev_offset,
             vocab: DatasetVocabulary {
                 offset_column: Some(state.vocab.offset_column.into_owned()),
                 system_time_column: Some(state.vocab.system_time_column.into_owned()),
                 event_time_column: Some(state.vocab.event_time_column.into_owned()),
             },
-            prev_checkpoint: state.last_checkpoint,
-            prev_watermark: state.last_watermark,
-            prev_source_state: state.last_source_state,
+            prev_checkpoint: state.prev_checkpoint,
+            prev_watermark: state.prev_watermark,
+            prev_source_state: state.prev_source_state,
         })
     }
 }
