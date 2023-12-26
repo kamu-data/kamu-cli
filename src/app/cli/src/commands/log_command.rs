@@ -67,9 +67,6 @@ impl LogCommand {
                 MetadataEvent::SetPollingSource(_) if f.contains("source") => true,
                 MetadataEvent::SetTransform(_) if f.contains("source") => true,
                 MetadataEvent::SetVocab(_) if f.contains("source") => true,
-                MetadataEvent::SetWatermark(_) if f.contains("data") || f.contains("watermark") => {
-                    true
-                }
                 _ => false,
             }
         } else {
@@ -405,15 +402,6 @@ impl AsciiRenderer {
                 if let Some(event_time_column) = event_time_column {
                     self.render_property(output, 0, "EventTimeColumn", event_time_column)?;
                 }
-            }
-            MetadataEvent::SetWatermark(e) => {
-                self.render_property(output, 0, "Kind", &"SetWatermark")?;
-                self.render_property(
-                    output,
-                    0,
-                    "Watermark",
-                    e.new_watermark.to_rfc3339_opts(SecondsFormat::AutoSi, true),
-                )?;
             }
         }
 

@@ -109,7 +109,6 @@ pub async fn prepare_dataset_transfer_estimate(
             | MetadataEvent::DisablePushSource(_)
             | MetadataEvent::SetTransform(_)
             | MetadataEvent::SetVocab(_)
-            | MetadataEvent::SetWatermark(_)
             | MetadataEvent::SetAttachments(_)
             | MetadataEvent::SetInfo(_)
             | MetadataEvent::SetLicense(_) => (),
@@ -439,7 +438,6 @@ async fn collect_object_references_from_block(
         | MetadataEvent::DisablePushSource(_)
         | MetadataEvent::SetTransform(_)
         | MetadataEvent::SetVocab(_)
-        | MetadataEvent::SetWatermark(_)
         | MetadataEvent::SetAttachments(_)
         | MetadataEvent::SetInfo(_)
         | MetadataEvent::SetLicense(_) => (),
