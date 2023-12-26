@@ -35,6 +35,13 @@ pub trait DataWriter {
         opts: WriteDataOpts,
     ) -> Result<WriteDataResult, WriteDataError>;
 
+    // A helper to advance the watermark only, without appending any new data.
+    async fn write_watermark(
+        &mut self,
+        new_watermark: DateTime<Utc>,
+        opts: WriteWatermarkOpts,
+    ) -> Result<WriteDataResult, WriteWatermarkError>;
+
     /// Prepares all data for commit without actually committing
     async fn stage(
         &self,
@@ -48,14 +55,25 @@ pub trait DataWriter {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+pub struct WriteWatermarkOpts {
+    /// Will be used for system time data column and metadata block timestamp
+    pub system_time: DateTime<Utc>,
+    /// Data source state to store in the commit
+    pub new_source_state: Option<odf::SourceState>,
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 pub struct WriteDataOpts {
     /// Will be used for system time data column and metadata block timestamp
     pub system_time: DateTime<Utc>,
     /// If data does not contain event time column already this value will be
     /// used to populate it
     pub source_event_time: DateTime<Utc>,
+    /// Explicit watermark to use in the commit
+    pub new_watermark: Option<DateTime<Utc>>,
     /// Data source state to store in the commit
-    pub source_state: Option<odf::SourceState>,
+    pub new_source_state: Option<odf::SourceState>,
     // TODO: Find a better way to deal with temporary files
     /// Local FS path to which data slice will be written before commiting it
     /// into the data object store of a dataset
@@ -80,6 +98,20 @@ pub struct StageDataResult {
     pub add_data: AddDataParams,
     pub output_schema: Option<SchemaRef>,
     pub data_file: Option<OwnedFile>,
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, thiserror::Error)]
+pub enum WriteWatermarkError {
+    #[error(transparent)]
+    EmptyCommit(#[from] EmptyCommitError),
+
+    #[error(transparent)]
+    CommitError(#[from] CommitError),
+
+    #[error(transparent)]
+    Internal(#[from] InternalError),
 }
 
 ///////////////////////////////////////////////////////////////////////////////

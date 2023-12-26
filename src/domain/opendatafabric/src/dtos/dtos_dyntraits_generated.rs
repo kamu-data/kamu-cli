@@ -1124,7 +1124,6 @@ pub enum MetadataEvent<'a> {
     SetPollingSource(&'a dyn SetPollingSource),
     SetTransform(&'a dyn SetTransform),
     SetVocab(&'a dyn SetVocab),
-    SetWatermark(&'a dyn SetWatermark),
     SetAttachments(&'a dyn SetAttachments),
     SetInfo(&'a dyn SetInfo),
     SetLicense(&'a dyn SetLicense),
@@ -1143,7 +1142,6 @@ impl<'a> From<&'a dtos::MetadataEvent> for MetadataEvent<'a> {
             dtos::MetadataEvent::SetPollingSource(v) => MetadataEvent::SetPollingSource(v),
             dtos::MetadataEvent::SetTransform(v) => MetadataEvent::SetTransform(v),
             dtos::MetadataEvent::SetVocab(v) => MetadataEvent::SetVocab(v),
-            dtos::MetadataEvent::SetWatermark(v) => MetadataEvent::SetWatermark(v),
             dtos::MetadataEvent::SetAttachments(v) => MetadataEvent::SetAttachments(v),
             dtos::MetadataEvent::SetInfo(v) => MetadataEvent::SetInfo(v),
             dtos::MetadataEvent::SetLicense(v) => MetadataEvent::SetLicense(v),
@@ -1164,7 +1162,6 @@ impl Into<dtos::MetadataEvent> for MetadataEvent<'_> {
             MetadataEvent::SetPollingSource(v) => dtos::MetadataEvent::SetPollingSource(v.into()),
             MetadataEvent::SetTransform(v) => dtos::MetadataEvent::SetTransform(v.into()),
             MetadataEvent::SetVocab(v) => dtos::MetadataEvent::SetVocab(v.into()),
-            MetadataEvent::SetWatermark(v) => dtos::MetadataEvent::SetWatermark(v.into()),
             MetadataEvent::SetAttachments(v) => dtos::MetadataEvent::SetAttachments(v.into()),
             MetadataEvent::SetInfo(v) => dtos::MetadataEvent::SetInfo(v.into()),
             MetadataEvent::SetLicense(v) => dtos::MetadataEvent::SetLicense(v.into()),
@@ -1843,29 +1840,6 @@ impl Into<dtos::SetVocab> for &dyn SetVocab {
             system_time_column: self.system_time_column().map(|v| v.to_owned()),
             event_time_column: self.event_time_column().map(|v| v.to_owned()),
             offset_column: self.offset_column().map(|v| v.to_owned()),
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// SetWatermark
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setwatermark-schema
-////////////////////////////////////////////////////////////////////////////////
-
-pub trait SetWatermark {
-    fn new_watermark(&self) -> DateTime<Utc>;
-}
-
-impl SetWatermark for dtos::SetWatermark {
-    fn new_watermark(&self) -> DateTime<Utc> {
-        self.new_watermark
-    }
-}
-
-impl Into<dtos::SetWatermark> for &dyn SetWatermark {
-    fn into(self) -> dtos::SetWatermark {
-        dtos::SetWatermark {
-            new_watermark: self.new_watermark(),
         }
     }
 }

@@ -639,7 +639,6 @@ pub enum MetadataEvent {
     SetPollingSource(SetPollingSource),
     SetTransform(SetTransform),
     SetVocab(SetVocab),
-    SetWatermark(SetWatermark),
     SetAttachments(SetAttachments),
     SetInfo(SetInfo),
     SetLicense(SetLicense),
@@ -662,8 +661,6 @@ impl_enum_variant!(MetadataEvent::SetPollingSource(SetPollingSource));
 impl_enum_variant!(MetadataEvent::SetTransform(SetTransform));
 
 impl_enum_variant!(MetadataEvent::SetVocab(SetVocab));
-
-impl_enum_variant!(MetadataEvent::SetWatermark(SetWatermark));
 
 impl_enum_variant!(MetadataEvent::SetAttachments(SetAttachments));
 
@@ -1013,18 +1010,6 @@ pub struct SetVocab {
     pub event_time_column: Option<String>,
     /// Name of the offset column.
     pub offset_column: Option<String>,
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// SetWatermark
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setwatermark-schema
-////////////////////////////////////////////////////////////////////////////////
-
-/// Indicates the advancement of the dataset's watermark.
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub struct SetWatermark {
-    /// Last watermark of the output data stream.
-    pub new_watermark: DateTime<Utc>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
