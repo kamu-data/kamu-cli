@@ -197,6 +197,39 @@ pub enum SyncError {
     ),
 }
 
+impl From<GetError> for SyncError {
+    fn from(v: GetError) -> Self {
+        match v {
+            GetError::NotFound(e) => CorruptedSourceError {
+                message: "Source checkpoint file is missing".to_owned(),
+                source: Some(e.into()),
+            }
+            .into(),
+            GetError::Access(e) => SyncError::Access(e),
+            GetError::Internal(e) => SyncError::Internal(e),
+        }
+    }
+}
+
+impl From<InsertError> for SyncError {
+    fn from(v: InsertError) -> Self {
+        match v {
+            InsertError::HashMismatch(e) => CorruptedSourceError {
+                message: concat!(
+                    "Checkpoint file hash declared by the source didn't ",
+                    "match the computed - this may be an indication of hashing ",
+                    "algorithm mismatch or an attempted tampering",
+                )
+                .to_owned(),
+                source: Some(e.into()),
+            }
+            .into(),
+            InsertError::Access(e) => SyncError::Access(e),
+            InsertError::Internal(e) => SyncError::Internal(e),
+        }
+    }
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Clone, Eq, PartialEq, Debug)]

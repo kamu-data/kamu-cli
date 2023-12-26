@@ -250,23 +250,12 @@ impl SimpleTransferProtocol {
     ) -> Result<(), SyncError> {
         tracing::info!(hash = ?data_slice.physical_hash, "Transfering data file");
 
-        let stream = match src
+        let stream = src
             .as_data_repo()
             .get_stream(&data_slice.physical_hash)
-            .await
-        {
-            Ok(s) => Ok(s),
-            Err(GetError::NotFound(e)) => Err(CorruptedSourceError {
-                message: "Source data file is missing".to_owned(),
-                source: Some(e.into()),
-            }
-            .into()),
-            Err(GetError::Access(e)) => Err(SyncError::Access(e)),
-            Err(GetError::Internal(e)) => Err(SyncError::Internal(e)),
-        }?;
+            .await?;
 
-        match dst
-            .as_data_repo()
+        dst.as_data_repo()
             .insert_stream(
                 stream,
                 InsertOpts {
@@ -280,22 +269,7 @@ impl SimpleTransferProtocol {
                     ..Default::default()
                 },
             )
-            .await
-        {
-            Ok(_) => Ok(()),
-            Err(InsertError::HashMismatch(e)) => Err(CorruptedSourceError {
-                message: concat!(
-                    "Data file hash declared by the source didn't match ",
-                    "the computed - this may be an indication of hashing ",
-                    "algorithm mismatch or an attempted tampering",
-                )
-                .to_owned(),
-                source: Some(e.into()),
-            }
-            .into()),
-            Err(InsertError::Access(e)) => Err(SyncError::Access(e)),
-            Err(InsertError::Internal(e)) => Err(SyncError::Internal(e)),
-        }?;
+            .await?;
 
         stats.src.data_slices_read += 1;
         stats.dst.data_slices_written += 1;
@@ -317,23 +291,12 @@ impl SimpleTransferProtocol {
     ) -> Result<(), SyncError> {
         tracing::info!(hash = ?checkpoint.physical_hash, "Transfering checkpoint file");
 
-        let stream = match src
+        let stream = src
             .as_checkpoint_repo()
             .get_stream(&checkpoint.physical_hash)
-            .await
-        {
-            Ok(s) => Ok(s),
-            Err(GetError::NotFound(e)) => Err(CorruptedSourceError {
-                message: "Source checkpoint file is missing".to_owned(),
-                source: Some(e.into()),
-            }
-            .into()),
-            Err(GetError::Access(e)) => Err(SyncError::Access(e)),
-            Err(GetError::Internal(e)) => Err(SyncError::Internal(e)),
-        }?;
+            .await?;
 
-        match dst
-            .as_checkpoint_repo()
+        dst.as_checkpoint_repo()
             .insert_stream(
                 stream,
                 InsertOpts {
@@ -350,22 +313,7 @@ impl SimpleTransferProtocol {
                     ..Default::default()
                 },
             )
-            .await
-        {
-            Ok(_) => Ok(()),
-            Err(InsertError::HashMismatch(e)) => Err(CorruptedSourceError {
-                message: concat!(
-                    "Checkpoint file hash declared by the source didn't ",
-                    "match the computed - this may be an indication of hashing ",
-                    "algorithm mismatch or an attempted tampering",
-                )
-                .to_owned(),
-                source: Some(e.into()),
-            }
-            .into()),
-            Err(InsertError::Access(e)) => Err(SyncError::Access(e)),
-            Err(InsertError::Internal(e)) => Err(SyncError::Internal(e)),
-        }?;
+            .await?;
 
         stats.src.checkpoints_read += 1;
         stats.dst.checkpoints_written += 1;
