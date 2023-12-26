@@ -14,6 +14,7 @@ use std::sync::{Arc, Mutex};
 
 use chrono::prelude::*;
 use dill::*;
+use domain::auth::AlwaysHappyDatasetActionAuthorizer;
 use event_bus::EventBus;
 use kamu::domain::*;
 use kamu::testing::*;
@@ -747,7 +748,7 @@ async fn test_set_watermark() {
 
     assert_eq!(harness.num_blocks(&dataset_alias).await, 1);
 
-    assert!(matches!(
+    assert_matches!(
         harness
             .pull_svc
             .set_watermark(
@@ -756,10 +757,10 @@ async fn test_set_watermark() {
             )
             .await,
         Ok(PullResult::Updated { .. })
-    ));
+    );
     assert_eq!(harness.num_blocks(&dataset_alias).await, 2);
 
-    assert!(matches!(
+    assert_matches!(
         harness
             .pull_svc
             .set_watermark(
@@ -768,10 +769,10 @@ async fn test_set_watermark() {
             )
             .await,
         Ok(PullResult::Updated { .. })
-    ));
+    );
     assert_eq!(harness.num_blocks(&dataset_alias).await, 3);
 
-    assert!(matches!(
+    assert_matches!(
         harness
             .pull_svc
             .set_watermark(
@@ -780,10 +781,10 @@ async fn test_set_watermark() {
             )
             .await,
         Ok(PullResult::UpToDate)
-    ));
+    );
     assert_eq!(harness.num_blocks(&dataset_alias).await, 3);
 
-    assert!(matches!(
+    assert_matches!(
         harness
             .pull_svc
             .set_watermark(
@@ -792,7 +793,7 @@ async fn test_set_watermark() {
             )
             .await,
         Ok(PullResult::UpToDate)
-    ));
+    );
     assert_eq!(harness.num_blocks(&dataset_alias).await, 3);
 }
 
@@ -808,7 +809,7 @@ async fn test_set_watermark_unauthorized() {
     let dataset_alias = n!("foo");
     harness.create_dataset(&dataset_alias).await;
 
-    assert!(matches!(
+    assert_matches!(
         harness
             .pull_svc
             .set_watermark(
@@ -817,7 +818,42 @@ async fn test_set_watermark_unauthorized() {
             )
             .await,
         Err(SetWatermarkError::Access(AccessError::Forbidden(_)))
-    ));
+    );
+
+    assert_eq!(harness.num_blocks(&dataset_alias).await, 1);
+}
+
+#[tokio::test]
+async fn test_set_watermark_rejects_on_derivative() {
+    let tmp_dir = tempfile::tempdir().unwrap();
+    let harness = PullTestHarness::new_with_authorizer(
+        tmp_dir.path(),
+        AlwaysHappyDatasetActionAuthorizer::new(),
+        true,
+    );
+
+    let dataset_alias = n!("foo");
+
+    harness
+        .dataset_repo
+        .create_dataset(
+            &dataset_alias,
+            MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Derivative).build())
+                .build_typed(),
+        )
+        .await
+        .unwrap();
+
+    assert_matches!(
+        harness
+            .pull_svc
+            .set_watermark(
+                &dataset_alias.as_local_ref(),
+                Utc.with_ymd_and_hms(2000, 1, 2, 0, 0, 0).unwrap()
+            )
+            .await,
+        Err(SetWatermarkError::IsDerivative)
+    );
 
     assert_eq!(harness.num_blocks(&dataset_alias).await, 1);
 }
@@ -853,6 +889,7 @@ impl PullTestHarness {
         std::fs::create_dir(&datasets_dir_path).unwrap();
 
         let catalog = dill::CatalogBuilder::new()
+            .add::<SystemTimeSourceDefault>()
             .add::<EventBus>()
             .add::<DependencyGraphServiceInMemory>()
             .add_value(CurrentAccountSubject::new_test())

@@ -174,7 +174,6 @@ where
 
                 let mut prev_schema = None;
                 let mut prev_add_data = None;
-                let mut prev_set_watermark = None;
 
                 // TODO: Generalize this logic
                 // TODO: PERF: Use block cache
@@ -188,15 +187,8 @@ where
                         MetadataEvent::SetDataSchema(e) if prev_schema.is_none() => {
                             prev_schema = Some(e)
                         }
-                        MetadataEvent::SetWatermark(e) if prev_set_watermark.is_none() => {
-                            prev_set_watermark = Some(e);
-                        }
-                        MetadataEvent::AddData(mut e) => {
+                        MetadataEvent::AddData(e) => {
                             if prev_add_data.is_none() {
-                                // Roll-in the last watermark into add data
-                                if let Some(wm) = &prev_set_watermark {
-                                    e.new_watermark = Some(wm.new_watermark.clone());
-                                }
                                 prev_add_data = Some(e);
                             }
                         }
@@ -394,10 +386,6 @@ where
             MetadataEvent::Seed(_) => Ok(()),
             MetadataEvent::SetTransform(_) => Ok(()),
             MetadataEvent::SetVocab(_) => Ok(()),
-            MetadataEvent::SetWatermark(_) => {
-                // TODO: Ensure is not called on Derivative datasets (in a performant way)
-                Ok(())
-            }
             MetadataEvent::SetAttachments(_) => Ok(()),
             MetadataEvent::SetInfo(_) => Ok(()),
             MetadataEvent::SetLicense(_) => Ok(()),

@@ -245,7 +245,6 @@ impl TransformServiceImpl {
                         }
                     }
                     MetadataEvent::Seed(_)
-                    | MetadataEvent::SetWatermark(_)
                     | MetadataEvent::SetAttachments(_)
                     | MetadataEvent::SetInfo(_)
                     | MetadataEvent::SetLicense(_) => {}
@@ -591,8 +590,7 @@ impl TransformServiceImpl {
                     MetadataEvent::Seed(_)
                     | MetadataEvent::SetAttachments(_)
                     | MetadataEvent::SetInfo(_)
-                    | MetadataEvent::SetLicense(_)
-                    | MetadataEvent::SetWatermark(_) => (),
+                    | MetadataEvent::SetLicense(_) => (),
                 }
 
                 if !finished_range && Some(&block_hash) == tail.as_ref() {

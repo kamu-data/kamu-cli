@@ -273,7 +273,7 @@ impl PollingIngestServiceImpl {
             None
         };
 
-        let source_state = savepoint.source_state.map(|ss| ss.to_source_state());
+        let new_source_state = savepoint.source_state.map(|ss| ss.to_source_state());
 
         let out_dir = args.operation_dir.join("out");
         let data_staging_path = out_dir.join("data");
@@ -289,7 +289,8 @@ impl PollingIngestServiceImpl {
                         .source_event_time
                         .clone()
                         .unwrap_or(args.system_time.clone()),
-                    source_state,
+                    new_watermark: None,
+                    new_source_state,
                     data_staging_path,
                 },
             )

@@ -281,6 +281,9 @@ pub enum SetWatermarkError {
         DatasetNotFoundError,
     ),
 
+    #[error("Attempting to set watermark on a derivative dataset")]
+    IsDerivative,
+
     #[error("Attempting to set watermark on a remote dataset")]
     IsRemote,
 

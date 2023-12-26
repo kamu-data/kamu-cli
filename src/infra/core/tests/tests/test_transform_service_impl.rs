@@ -508,10 +508,17 @@ async fn test_get_verification_plan_one_to_one() {
     let root_head_t5 = harness
         .append_block(
             &root_hdl,
-            MetadataFactory::metadata_block(SetWatermark { new_watermark: t4 })
-                .system_time(t5)
-                .prev(&root_head_t3, root_initial_sequence_number + 2)
-                .build(),
+            MetadataFactory::metadata_block(AddData {
+                prev_checkpoint: None,
+                prev_offset: Some(109),
+                new_data: None,
+                new_checkpoint: None,
+                new_watermark: Some(t4),
+                new_source_state: None,
+            })
+            .system_time(t5)
+            .prev(&root_head_t3, root_initial_sequence_number + 2)
+            .build(),
         )
         .await;
 

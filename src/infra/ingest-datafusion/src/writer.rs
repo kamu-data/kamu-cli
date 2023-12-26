@@ -506,6 +506,38 @@ impl DataWriter for DataWriterDataFusion {
     }
 
     #[tracing::instrument(level = "info", skip_all)]
+    async fn write_watermark(
+        &mut self,
+        new_watermark: DateTime<Utc>,
+        opts: WriteWatermarkOpts,
+    ) -> Result<WriteDataResult, WriteWatermarkError> {
+        // Do we have anything to commit?
+        if Some(&new_watermark) == self.meta.prev_watermark.as_ref()
+            && opts.new_source_state == self.meta.prev_source_state
+        {
+            return Err(EmptyCommitError {}.into());
+        }
+
+        let add_data = AddDataParams {
+            prev_checkpoint: self.meta.prev_checkpoint.clone(),
+            prev_offset: self.meta.prev_offset,
+            new_offset_interval: None,
+            new_watermark: Some(new_watermark),
+            new_source_state: opts.new_source_state,
+        };
+
+        let staged = StageDataResult {
+            system_time: opts.system_time,
+            add_data,
+            output_schema: None,
+            data_file: None,
+        };
+
+        let commit = self.commit(staged).await?;
+        Ok(commit)
+    }
+
+    #[tracing::instrument(level = "info", skip_all)]
     async fn stage(
         &self,
         new_data: Option<DataFrame>,
@@ -551,7 +583,7 @@ impl DataWriter for DataWriterDataFusion {
             // Prepare commit info
             let prev_offset = self.meta.prev_offset;
             let prev_checkpoint = self.meta.prev_checkpoint.clone();
-            let new_source_state = opts.source_state;
+            let new_source_state = opts.new_source_state;
             let prev_watermark = self.meta.prev_watermark.clone();
 
             if data_file.is_none() {
@@ -561,14 +593,14 @@ impl DataWriter for DataWriterDataFusion {
                         prev_checkpoint,
                         prev_offset,
                         new_offset_interval: None,
-                        new_watermark: prev_watermark,
+                        new_watermark: opts.new_watermark.or(prev_watermark),
                         new_source_state,
                     },
                     Some(output_schema),
                     None,
                 )
             } else {
-                let (new_offset_interval, new_watermark) = self
+                let (new_offset_interval, new_watermark_from_data) = self
                     .compute_offset_and_watermark(
                         data_file.as_ref().unwrap().as_path(),
                         prev_watermark,
@@ -580,7 +612,7 @@ impl DataWriter for DataWriterDataFusion {
                         prev_checkpoint,
                         prev_offset,
                         new_offset_interval: Some(new_offset_interval),
-                        new_watermark,
+                        new_watermark: opts.new_watermark.or(new_watermark_from_data),
                         new_source_state,
                     },
                     Some(output_schema),
@@ -594,7 +626,7 @@ impl DataWriter for DataWriterDataFusion {
                 prev_offset: self.meta.prev_offset,
                 new_offset_interval: None,
                 new_watermark: self.meta.prev_watermark.clone(),
-                new_source_state: opts.source_state,
+                new_source_state: opts.new_source_state,
             };
 
             (add_data, None, None)
@@ -794,11 +826,6 @@ impl DataWriterDataFusionBuilder {
                                 }
                             }
                             prev_source_state = Some(e.new_source_state);
-                        }
-                    }
-                    odf::MetadataEvent::SetWatermark(e) => {
-                        if prev_watermark.is_none() {
-                            prev_watermark = Some(Some(e.new_watermark));
                         }
                     }
                     odf::MetadataEvent::SetPollingSource(e) => {

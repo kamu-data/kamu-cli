@@ -1363,10 +1363,6 @@ impl<'fb> FlatbuffersEnumSerializable<'fb, fb::MetadataEvent> for odf::MetadataE
                 fb::MetadataEvent::SetVocab,
                 v.serialize(fb).as_union_value(),
             ),
-            odf::MetadataEvent::SetWatermark(v) => (
-                fb::MetadataEvent::SetWatermark,
-                v.serialize(fb).as_union_value(),
-            ),
             odf::MetadataEvent::SetAttachments(v) => (
                 fb::MetadataEvent::SetAttachments,
                 v.serialize(fb).as_union_value(),
@@ -1427,11 +1423,6 @@ impl<'fb> FlatbuffersEnumDeserializable<'fb, fb::MetadataEvent> for odf::Metadat
             fb::MetadataEvent::SetVocab => {
                 odf::MetadataEvent::SetVocab(odf::SetVocab::deserialize(unsafe {
                     fb::SetVocab::init_from_table(table)
-                }))
-            }
-            fb::MetadataEvent::SetWatermark => {
-                odf::MetadataEvent::SetWatermark(odf::SetWatermark::deserialize(unsafe {
-                    fb::SetWatermark::init_from_table(table)
                 }))
             }
             fb::MetadataEvent::SetAttachments => {
@@ -2218,29 +2209,6 @@ impl<'fb> FlatbuffersDeserializable<fb::SetVocab<'fb>> for odf::SetVocab {
             system_time_column: proxy.system_time_column().map(|v| v.to_owned()),
             event_time_column: proxy.event_time_column().map(|v| v.to_owned()),
             offset_column: proxy.offset_column().map(|v| v.to_owned()),
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// SetWatermark
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setwatermark-schema
-////////////////////////////////////////////////////////////////////////////////
-
-impl<'fb> FlatbuffersSerializable<'fb> for odf::SetWatermark {
-    type OffsetT = WIPOffset<fb::SetWatermark<'fb>>;
-
-    fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
-        let mut builder = fb::SetWatermarkBuilder::new(fb);
-        builder.add_new_watermark(&datetime_to_fb(&self.new_watermark));
-        builder.finish()
-    }
-}
-
-impl<'fb> FlatbuffersDeserializable<fb::SetWatermark<'fb>> for odf::SetWatermark {
-    fn deserialize(proxy: fb::SetWatermark<'fb>) -> Self {
-        odf::SetWatermark {
-            new_watermark: proxy.new_watermark().map(|v| fb_to_datetime(v)).unwrap(),
         }
     }
 }

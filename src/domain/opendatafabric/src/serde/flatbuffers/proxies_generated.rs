@@ -1106,13 +1106,13 @@ pub const ENUM_MIN_METADATA_EVENT: u8 = 0;
     since = "2.0.0",
     note = "Use associated constants instead. This will no longer be generated in 2021."
 )]
-pub const ENUM_MAX_METADATA_EVENT: u8 = 14;
+pub const ENUM_MAX_METADATA_EVENT: u8 = 13;
 #[deprecated(
     since = "2.0.0",
     note = "Use associated constants instead. This will no longer be generated in 2021."
 )]
 #[allow(non_camel_case_types)]
-pub const ENUM_VALUES_METADATA_EVENT: [MetadataEvent; 15] = [
+pub const ENUM_VALUES_METADATA_EVENT: [MetadataEvent; 14] = [
     MetadataEvent::NONE,
     MetadataEvent::AddData,
     MetadataEvent::ExecuteQuery,
@@ -1120,7 +1120,6 @@ pub const ENUM_VALUES_METADATA_EVENT: [MetadataEvent; 15] = [
     MetadataEvent::SetPollingSource,
     MetadataEvent::SetTransform,
     MetadataEvent::SetVocab,
-    MetadataEvent::SetWatermark,
     MetadataEvent::SetAttachments,
     MetadataEvent::SetInfo,
     MetadataEvent::SetLicense,
@@ -1143,17 +1142,16 @@ impl MetadataEvent {
     pub const SetPollingSource: Self = Self(4);
     pub const SetTransform: Self = Self(5);
     pub const SetVocab: Self = Self(6);
-    pub const SetWatermark: Self = Self(7);
-    pub const SetAttachments: Self = Self(8);
-    pub const SetInfo: Self = Self(9);
-    pub const SetLicense: Self = Self(10);
-    pub const SetDataSchema: Self = Self(11);
-    pub const AddPushSource: Self = Self(12);
-    pub const DisablePushSource: Self = Self(13);
-    pub const DisablePollingSource: Self = Self(14);
+    pub const SetAttachments: Self = Self(7);
+    pub const SetInfo: Self = Self(8);
+    pub const SetLicense: Self = Self(9);
+    pub const SetDataSchema: Self = Self(10);
+    pub const AddPushSource: Self = Self(11);
+    pub const DisablePushSource: Self = Self(12);
+    pub const DisablePollingSource: Self = Self(13);
 
     pub const ENUM_MIN: u8 = 0;
-    pub const ENUM_MAX: u8 = 14;
+    pub const ENUM_MAX: u8 = 13;
     pub const ENUM_VALUES: &'static [Self] = &[
         Self::NONE,
         Self::AddData,
@@ -1162,7 +1160,6 @@ impl MetadataEvent {
         Self::SetPollingSource,
         Self::SetTransform,
         Self::SetVocab,
-        Self::SetWatermark,
         Self::SetAttachments,
         Self::SetInfo,
         Self::SetLicense,
@@ -1181,7 +1178,6 @@ impl MetadataEvent {
             Self::SetPollingSource => Some("SetPollingSource"),
             Self::SetTransform => Some("SetTransform"),
             Self::SetVocab => Some("SetVocab"),
-            Self::SetWatermark => Some("SetWatermark"),
             Self::SetAttachments => Some("SetAttachments"),
             Self::SetInfo => Some("SetInfo"),
             Self::SetLicense => Some("SetLicense"),
@@ -9391,112 +9387,6 @@ impl core::fmt::Debug for SetVocab<'_> {
         ds.finish()
     }
 }
-pub enum SetWatermarkOffset {}
-#[derive(Copy, Clone, PartialEq)]
-
-////////////////////////////////////////////////////////////////////////////////
-pub struct SetWatermark<'a> {
-    pub _tab: flatbuffers::Table<'a>,
-}
-
-impl<'a> flatbuffers::Follow<'a> for SetWatermark<'a> {
-    type Inner = SetWatermark<'a>;
-    #[inline]
-    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
-        Self {
-            _tab: flatbuffers::Table::new(buf, loc),
-        }
-    }
-}
-
-impl<'a> SetWatermark<'a> {
-    pub const VT_NEW_WATERMARK: flatbuffers::VOffsetT = 4;
-
-    #[inline]
-    pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
-        SetWatermark { _tab: table }
-    }
-    #[allow(unused_mut)]
-    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
-        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
-        args: &'args SetWatermarkArgs<'args>,
-    ) -> flatbuffers::WIPOffset<SetWatermark<'bldr>> {
-        let mut builder = SetWatermarkBuilder::new(_fbb);
-        if let Some(x) = args.new_watermark {
-            builder.add_new_watermark(x);
-        }
-        builder.finish()
-    }
-
-    #[inline]
-    pub fn new_watermark(&self) -> Option<&'a Timestamp> {
-        // Safety:
-        // Created from valid Table for this object
-        // which contains a valid value in this slot
-        unsafe {
-            self._tab
-                .get::<Timestamp>(SetWatermark::VT_NEW_WATERMARK, None)
-        }
-    }
-}
-
-impl flatbuffers::Verifiable for SetWatermark<'_> {
-    #[inline]
-    fn run_verifier(
-        v: &mut flatbuffers::Verifier,
-        pos: usize,
-    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
-        use self::flatbuffers::Verifiable;
-        v.visit_table(pos)?
-            .visit_field::<Timestamp>("new_watermark", Self::VT_NEW_WATERMARK, false)?
-            .finish();
-        Ok(())
-    }
-}
-pub struct SetWatermarkArgs<'a> {
-    pub new_watermark: Option<&'a Timestamp>,
-}
-impl<'a> Default for SetWatermarkArgs<'a> {
-    #[inline]
-    fn default() -> Self {
-        SetWatermarkArgs {
-            new_watermark: None,
-        }
-    }
-}
-
-pub struct SetWatermarkBuilder<'a: 'b, 'b> {
-    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
-    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
-}
-impl<'a: 'b, 'b> SetWatermarkBuilder<'a, 'b> {
-    #[inline]
-    pub fn add_new_watermark(&mut self, new_watermark: &Timestamp) {
-        self.fbb_
-            .push_slot_always::<&Timestamp>(SetWatermark::VT_NEW_WATERMARK, new_watermark);
-    }
-    #[inline]
-    pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>) -> SetWatermarkBuilder<'a, 'b> {
-        let start = _fbb.start_table();
-        SetWatermarkBuilder {
-            fbb_: _fbb,
-            start_: start,
-        }
-    }
-    #[inline]
-    pub fn finish(self) -> flatbuffers::WIPOffset<SetWatermark<'a>> {
-        let o = self.fbb_.end_table(self.start_);
-        flatbuffers::WIPOffset::new(o.value())
-    }
-}
-
-impl core::fmt::Debug for SetWatermark<'_> {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        let mut ds = f.debug_struct("SetWatermark");
-        ds.field("new_watermark", &self.new_watermark());
-        ds.finish()
-    }
-}
 pub enum SetAttachmentsOffset {}
 #[derive(Copy, Clone, PartialEq)]
 
@@ -12518,21 +12408,6 @@ impl<'a> MetadataBlock<'a> {
 
     #[inline]
     #[allow(non_snake_case)]
-    pub fn event_as_set_watermark(&self) -> Option<SetWatermark<'a>> {
-        if self.event_type() == MetadataEvent::SetWatermark {
-            self.event().map(|t| {
-                // Safety:
-                // Created from a valid Table for this object
-                // Which contains a valid union in this slot
-                unsafe { SetWatermark::init_from_table(t) }
-            })
-        } else {
-            None
-        }
-    }
-
-    #[inline]
-    #[allow(non_snake_case)]
     pub fn event_as_set_attachments(&self) -> Option<SetAttachments<'a>> {
         if self.event_type() == MetadataEvent::SetAttachments {
             self.event().map(|t| {
@@ -12687,11 +12562,6 @@ impl flatbuffers::Verifiable for MetadataBlock<'_> {
                     MetadataEvent::SetVocab => v
                         .verify_union_variant::<flatbuffers::ForwardsUOffset<SetVocab>>(
                             "MetadataEvent::SetVocab",
-                            pos,
-                        ),
-                    MetadataEvent::SetWatermark => v
-                        .verify_union_variant::<flatbuffers::ForwardsUOffset<SetWatermark>>(
-                            "MetadataEvent::SetWatermark",
                             pos,
                         ),
                     MetadataEvent::SetAttachments => v
@@ -12869,16 +12739,6 @@ impl core::fmt::Debug for MetadataBlock<'_> {
             }
             MetadataEvent::SetVocab => {
                 if let Some(x) = self.event_as_set_vocab() {
-                    ds.field("event", &x)
-                } else {
-                    ds.field(
-                        "event",
-                        &"InvalidFlatbuffer: Union discriminant does not match value.",
-                    )
-                }
-            }
-            MetadataEvent::SetWatermark => {
-                if let Some(x) = self.event_as_set_watermark() {
                     ds.field("event", &x)
                 } else {
                     ds.field(

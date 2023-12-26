@@ -827,7 +827,7 @@ impl Harness {
         &mut self,
         data: &str,
         schema: &str,
-        source_state: Option<odf::SourceState>,
+        new_source_state: Option<odf::SourceState>,
     ) -> Result<WriteDataResult, WriteDataError> {
         let df = if data.is_empty() {
             None
@@ -858,7 +858,8 @@ impl Harness {
                 WriteDataOpts {
                     system_time: self.system_time,
                     source_event_time: self.source_event_time,
-                    source_state,
+                    new_watermark: None,
+                    new_source_state,
                     data_staging_path: self.temp_dir.path().join("write.tmp"),
                 },
             )
