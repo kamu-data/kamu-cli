@@ -291,7 +291,7 @@ impl DataWriterDataFusion {
             .with_column(
                 &self.meta.vocab.offset_column,
                 cast(
-                    col(&self.meta.vocab.offset_column as &str) + lit(start_offset - 1),
+                    col(&self.meta.vocab.offset_column as &str) + lit(start_offset as i64 - 1),
                     DataType::Int64,
                 ),
             )

@@ -125,18 +125,24 @@ async fn test_equal_multiple_blocks() {
     let schema_hash = push_block(&lhs_chain, block_schema.clone()).await;
     push_block(&rhs_chain, block_schema).await;
 
-    let block_data_1 =
-        MetadataFactory::metadata_block(MetadataFactory::add_data().interval(0, 9).build())
-            .prev(&schema_hash, 1)
-            .build();
+    let block_data_1 = MetadataFactory::metadata_block(
+        MetadataFactory::add_data()
+            .new_offset_interval(0, 9)
+            .build(),
+    )
+    .prev(&schema_hash, 1)
+    .build();
 
     let data_1_hash = push_block(&lhs_chain, block_data_1.clone()).await;
     push_block(&rhs_chain, block_data_1).await;
 
-    let block_data_2 =
-        MetadataFactory::metadata_block(MetadataFactory::add_data().interval(10, 19).build())
-            .prev(&data_1_hash, 2)
-            .build();
+    let block_data_2 = MetadataFactory::metadata_block(
+        MetadataFactory::add_data()
+            .new_offset_interval(10, 19)
+            .build(),
+    )
+    .prev(&data_1_hash, 2)
+    .build();
     push_block(&lhs_chain, block_data_2.clone()).await;
     push_block(&rhs_chain, block_data_2).await;
 
@@ -168,16 +174,22 @@ async fn test_one_ahead_another() {
 
     // Push data blocks only to RHS
 
-    let block_data_1 =
-        MetadataFactory::metadata_block(MetadataFactory::add_data().interval(0, 9).build())
-            .prev(&schema_hash, 1)
-            .build();
+    let block_data_1 = MetadataFactory::metadata_block(
+        MetadataFactory::add_data()
+            .new_offset_interval(0, 9)
+            .build(),
+    )
+    .prev(&schema_hash, 1)
+    .build();
     let data_1_hash = push_block(&rhs_chain, block_data_1).await;
 
-    let block_data_2 =
-        MetadataFactory::metadata_block(MetadataFactory::add_data().interval(10, 19).build())
-            .prev(&data_1_hash, 2)
-            .build();
+    let block_data_2 = MetadataFactory::metadata_block(
+        MetadataFactory::add_data()
+            .new_offset_interval(10, 19)
+            .build(),
+    )
+    .prev(&data_1_hash, 2)
+    .build();
     push_block(&rhs_chain, block_data_2).await;
 
     assert_matches!(
@@ -215,16 +227,22 @@ async fn test_equal_length_divergence() {
 
     // Push two different data blocks after the same head
 
-    let block1_data =
-        MetadataFactory::metadata_block(MetadataFactory::add_data().interval(0, 9).build())
-            .prev(&schema_hash, 1)
-            .build();
+    let block1_data = MetadataFactory::metadata_block(
+        MetadataFactory::add_data()
+            .new_offset_interval(0, 9)
+            .build(),
+    )
+    .prev(&schema_hash, 1)
+    .build();
     push_block(&lhs_chain, block1_data).await;
 
-    let block2_data =
-        MetadataFactory::metadata_block(MetadataFactory::add_data().interval(0, 9).build())
-            .prev(&schema_hash, 1)
-            .build();
+    let block2_data = MetadataFactory::metadata_block(
+        MetadataFactory::add_data()
+            .new_offset_interval(0, 9)
+            .build(),
+    )
+    .prev(&schema_hash, 1)
+    .build();
     push_block(&rhs_chain, block2_data).await;
 
     assert_matches!(
@@ -263,21 +281,30 @@ async fn test_different_length_divergence() {
     // Push two data blocks to LHS and one unrelated block to RHS after the same
     // head
 
-    let block1_data1 =
-        MetadataFactory::metadata_block(MetadataFactory::add_data().interval(0, 9).build())
-            .prev(&schema_hash, 1)
-            .build();
+    let block1_data1 = MetadataFactory::metadata_block(
+        MetadataFactory::add_data()
+            .new_offset_interval(0, 9)
+            .build(),
+    )
+    .prev(&schema_hash, 1)
+    .build();
     let block1_data1_hash = push_block(&lhs_chain, block1_data1).await;
-    let block1_data2 =
-        MetadataFactory::metadata_block(MetadataFactory::add_data().interval(10, 19).build())
-            .prev(&block1_data1_hash, 2)
-            .build();
+    let block1_data2 = MetadataFactory::metadata_block(
+        MetadataFactory::add_data()
+            .new_offset_interval(10, 19)
+            .build(),
+    )
+    .prev(&block1_data1_hash, 2)
+    .build();
     push_block(&lhs_chain, block1_data2).await;
 
-    let block2_data =
-        MetadataFactory::metadata_block(MetadataFactory::add_data().interval(0, 9).build())
-            .prev(&schema_hash, 1)
-            .build();
+    let block2_data = MetadataFactory::metadata_block(
+        MetadataFactory::add_data()
+            .new_offset_interval(0, 9)
+            .build(),
+    )
+    .prev(&schema_hash, 1)
+    .build();
     push_block(&rhs_chain, block2_data).await;
 
     assert_matches!(

@@ -63,10 +63,10 @@ async fn test_metadata_chain_events() {
         .dataset
         .commit_event(
             MetadataFactory::add_data()
-                .some_output_data_with_offset(0, 9)
-                .some_output_checkpoint()
-                .some_output_watermark()
-                .some_source_state()
+                .some_new_data_with_offset(0, 9)
+                .some_new_checkpoint()
+                .some_new_watermark()
+                .some_new_source_state()
                 .build()
                 .into(),
             CommitOpts {
@@ -196,7 +196,6 @@ async fn metadata_chain_append_event() {
         .unwrap();
     let create_result = dataset_repo
         .create_dataset_from_snapshot(
-            None,
             MetadataFactory::dataset_snapshot()
                 .name("foo")
                 .kind(DatasetKind::Root)
@@ -293,7 +292,6 @@ async fn metadata_update_readme_new() {
         .unwrap();
     let create_result = dataset_repo
         .create_dataset_from_snapshot(
-            None,
             MetadataFactory::dataset_snapshot()
                 .name("foo")
                 .kind(DatasetKind::Root)

@@ -86,7 +86,7 @@ impl DatasetHelper {
             .into_typed::<ExecuteQuery>()
             .unwrap();
 
-        let orig_slice = orig_block.event.output_data.as_ref().unwrap();
+        let orig_slice = orig_block.event.new_data.as_ref().unwrap();
         let orig_data_path = self.data_slice_path(&orig_slice).await;
 
         // Re-encode data
@@ -139,8 +139,8 @@ impl DatasetHelper {
         let new_slice = DataSlice {
             logical_hash: kamu_data_utils::data::hash::get_parquet_logical_hash(&tmp_path).unwrap(),
             physical_hash: kamu_data_utils::data::hash::get_file_physical_hash(&tmp_path).unwrap(),
-            interval: orig_slice.interval.clone(),
-            size: std::fs::metadata(&tmp_path).unwrap().len() as i64,
+            offset_interval: orig_slice.offset_interval.clone(),
+            size: std::fs::metadata(&tmp_path).unwrap().len(),
         };
 
         assert_ne!(new_slice.size, orig_slice.size);
@@ -154,7 +154,7 @@ impl DatasetHelper {
         let new_data_path = self.data_slice_path(&new_slice).await;
         std::fs::rename(&tmp_path, &new_data_path).unwrap();
         std::fs::remove_file(&orig_data_path).unwrap();
-        if let Some(orig_checkpoint) = &orig_block.event.output_checkpoint {
+        if let Some(orig_checkpoint) = &orig_block.event.new_checkpoint {
             std::fs::remove_file(self.checkpoint_path(&orig_checkpoint).await).unwrap();
         }
 
@@ -173,8 +173,8 @@ impl DatasetHelper {
             .dataset
             .commit_event(
                 ExecuteQuery {
-                    output_data: Some(new_slice.clone()),
-                    output_checkpoint: Some(Checkpoint {
+                    new_data: Some(new_slice.clone()),
+                    new_checkpoint: Some(Checkpoint {
                         physical_hash: new_checkpoint_hash,
                         size: 16,
                     }),
@@ -299,10 +299,10 @@ async fn test_transform_common(transform: Transform) {
         )
         .build();
 
-    let root_alias = DatasetAlias::new(None, root_snapshot.name.clone());
+    let root_alias = root_snapshot.name.clone();
 
     dataset_repo
-        .create_dataset_from_snapshot(None, root_snapshot)
+        .create_dataset_from_snapshot(root_snapshot)
         .await
         .unwrap();
 
@@ -323,16 +323,17 @@ async fn test_transform_common(transform: Transform) {
         .name("deriv")
         .kind(DatasetKind::Derivative)
         .push_event(
-            MetadataFactory::set_transform([&root_alias.dataset_name])
+            MetadataFactory::set_transform()
+                .inputs_from_refs([&root_alias.dataset_name])
                 .transform(transform)
                 .build(),
         )
         .build();
 
-    let deriv_alias = DatasetAlias::new(None, deriv_snapshot.name.clone());
+    let deriv_alias = deriv_snapshot.name.clone();
 
     let dataset = dataset_repo
-        .create_dataset_from_snapshot(None, deriv_snapshot)
+        .create_dataset_from_snapshot(deriv_snapshot)
         .await
         .unwrap()
         .dataset;

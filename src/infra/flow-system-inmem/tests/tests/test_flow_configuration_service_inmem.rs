@@ -421,9 +421,8 @@ impl FlowConfigurationHarness {
         let result = self
             .dataset_repo
             .create_dataset_from_snapshot(
-                None,
                 MetadataFactory::dataset_snapshot()
-                    .name(DatasetName::new_unchecked(dataset_name))
+                    .name(dataset_name)
                     .kind(DatasetKind::Root)
                     .push_event(MetadataFactory::set_polling_source().build())
                     .build(),
