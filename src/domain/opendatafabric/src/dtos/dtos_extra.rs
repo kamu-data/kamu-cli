@@ -58,6 +58,20 @@ impl ExecuteQueryInput {
     pub fn last_offset(&self) -> Option<u64> {
         self.new_offset.or(self.prev_offset)
     }
+
+    /// Helper for determining the number of records included in the transaction
+    /// from this input
+    pub fn num_records(&self) -> u64 {
+        if let Some(new_offset) = self.new_offset {
+            if let Some(prev_offset) = self.prev_offset {
+                new_offset - prev_offset
+            } else {
+                new_offset + 1
+            }
+        } else {
+            0
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////

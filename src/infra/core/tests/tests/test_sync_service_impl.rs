@@ -137,13 +137,13 @@ async fn do_test_sync(
 
     // Add dataset
     let snapshot = MetadataFactory::dataset_snapshot()
-        .name(&dataset_alias.dataset_name)
+        .name(dataset_alias.clone())
         .kind(DatasetKind::Root)
         .push_event(MetadataFactory::set_data_schema().build())
         .build();
 
     let b1 = dataset_repo
-        .create_dataset_from_snapshot(None, snapshot)
+        .create_dataset_from_snapshot(snapshot)
         .await
         .unwrap()
         .head;

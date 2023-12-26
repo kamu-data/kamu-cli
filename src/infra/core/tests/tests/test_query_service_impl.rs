@@ -72,22 +72,26 @@ async fn create_test_dataset(catalog: &dill::Catalog, tempdir: &Path) -> Dataset
         (UInt64Array::from(vec![2]), StringArray::from(vec!["c"])),
     ];
 
-    let mut offset = 0;
+    let mut prev_offset = None;
     for (a, b) in batches {
         let record_batch =
             RecordBatch::try_new(schema.clone(), vec![Arc::new(a), Arc::new(b)]).unwrap();
         ParquetWriterHelper::from_record_batch(&tmp_data_path, &record_batch).unwrap();
 
+        let start_offset = prev_offset.map(|v| v + 1).unwrap_or(0);
+        let end_offset = start_offset + record_batch.num_rows() as u64 - 1;
+
         dataset
             .commit_add_data(
                 AddDataParams {
-                    input_checkpoint: None,
-                    output_data: Some(OffsetInterval {
-                        start: offset,
-                        end: offset + record_batch.num_rows() as i64 - 1,
+                    prev_checkpoint: None,
+                    prev_offset,
+                    new_offset_interval: Some(OffsetInterval {
+                        start: start_offset,
+                        end: end_offset,
                     }),
-                    output_watermark: None,
-                    source_state: None,
+                    new_watermark: None,
+                    new_source_state: None,
                 },
                 Some(OwnedFile::new(tmp_data_path.clone())),
                 None,
@@ -96,7 +100,7 @@ async fn create_test_dataset(catalog: &dill::Catalog, tempdir: &Path) -> Dataset
             .await
             .unwrap();
 
-        offset += record_batch.num_rows() as i64;
+        prev_offset = Some(end_offset);
     }
 
     dataset_alias

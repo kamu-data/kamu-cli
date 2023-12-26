@@ -552,9 +552,11 @@ impl DependencyGraphHarness {
     async fn create_root_dataset(&self, account_name: Option<AccountName>, dataset_name: &str) {
         self.dataset_repo
             .create_dataset_from_snapshot(
-                account_name,
                 MetadataFactory::dataset_snapshot()
-                    .name(DatasetName::new_unchecked(dataset_name))
+                    .name(DatasetAlias::new(
+                        account_name,
+                        DatasetName::new_unchecked(dataset_name),
+                    ))
                     .kind(DatasetKind::Root)
                     .push_event(MetadataFactory::set_polling_source().build())
                     .build(),
@@ -571,11 +573,17 @@ impl DependencyGraphHarness {
     ) {
         self.dataset_repo
             .create_dataset_from_snapshot(
-                account_name,
                 MetadataFactory::dataset_snapshot()
-                    .name(DatasetName::new_unchecked(dataset_name))
+                    .name(DatasetAlias::new(
+                        account_name,
+                        DatasetName::new_unchecked(dataset_name),
+                    ))
                     .kind(DatasetKind::Derivative)
-                    .push_event(MetadataFactory::set_transform_aliases(input_aliases).build())
+                    .push_event(
+                        MetadataFactory::set_transform()
+                            .inputs_from_refs(input_aliases)
+                            .build(),
+                    )
                     .build(),
             )
             .await
@@ -597,20 +605,20 @@ impl DependencyGraphHarness {
             .await
             .unwrap();
 
-        let mut id_map = HashMap::new();
-        for input_alias in &input_aliases {
-            id_map.insert(
-                input_alias.dataset_name.clone(),
+        let mut id_aliases = Vec::new();
+        for input_alias in input_aliases {
+            id_aliases.push((
                 self.dataset_id_by_name(input_alias.dataset_name.as_str())
                     .await,
-            );
+                input_alias.to_string(),
+            ));
         }
 
         dataset
             .commit_event(
                 MetadataEvent::SetTransform(
-                    MetadataFactory::set_transform_aliases(input_aliases)
-                        .set_dataset_ids(id_map)
+                    MetadataFactory::set_transform()
+                        .inputs_from_refs_and_aliases(id_aliases)
                         .build(),
                 ),
                 Default::default(),

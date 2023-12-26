@@ -209,18 +209,25 @@ async fn test_append_prev_block_sequence_integrity_broken() {
 
     let hash = chain
         .append(
-            MetadataFactory::metadata_block(MetadataFactory::add_data().interval(0, 9).build())
-                .prev(&hash, 1)
-                .build(),
+            MetadataFactory::metadata_block(
+                MetadataFactory::add_data()
+                    .new_offset_interval(0, 9)
+                    .build(),
+            )
+            .prev(&hash, 1)
+            .build(),
             AppendOpts::default(),
         )
         .await
         .unwrap();
 
-    let block_too_low =
-        MetadataFactory::metadata_block(MetadataFactory::add_data().interval(10, 19).build())
-            .prev(&hash, 1 /* should be 2 */)
-            .build();
+    let block_too_low = MetadataFactory::metadata_block(
+        MetadataFactory::add_data()
+            .new_offset_interval(10, 19)
+            .build(),
+    )
+    .prev(&hash, 1 /* should be 2 */)
+    .build();
 
     assert_matches!(
         chain.append(block_too_low, AppendOpts::default()).await,
@@ -234,10 +241,13 @@ async fn test_append_prev_block_sequence_integrity_broken() {
         if prev_block_hash.as_ref() == Some(&hash) && prev_block_sequence_number == Some(2) && next_block_sequence_number == 2
     );
 
-    let block_too_high =
-        MetadataFactory::metadata_block(MetadataFactory::add_data().interval(10, 19).build())
-            .prev(&hash, 3 /* should be 2 */)
-            .build();
+    let block_too_high = MetadataFactory::metadata_block(
+        MetadataFactory::add_data()
+            .new_offset_interval(10, 19)
+            .build(),
+    )
+    .prev(&hash, 3 /* should be 2 */)
+    .build();
 
     assert_matches!(
         chain.append(block_too_high, AppendOpts::default()).await,
@@ -251,10 +261,13 @@ async fn test_append_prev_block_sequence_integrity_broken() {
         if prev_block_hash.as_ref() == Some(&hash) && prev_block_sequence_number == Some(2) && next_block_sequence_number == 4
     );
 
-    let block_just_right =
-        MetadataFactory::metadata_block(MetadataFactory::add_data().interval(10, 19).build())
-            .prev(&hash, 2)
-            .build();
+    let block_just_right = MetadataFactory::metadata_block(
+        MetadataFactory::add_data()
+            .new_offset_interval(10, 19)
+            .build(),
+    )
+    .prev(&hash, 2)
+    .build();
 
     let hash_just_right = chain
         .append(block_just_right, AppendOpts::default())
@@ -390,8 +403,8 @@ async fn test_append_watermark_non_monotonic() {
     // output_watermart = None
     let block = MetadataFactory::metadata_block(
         MetadataFactory::add_data()
-            .some_output_data()
-            .interval(0, 9)
+            .some_new_data()
+            .new_offset_interval(0, 9)
             .build(),
     )
     .prev(&hash, 1)
@@ -402,9 +415,9 @@ async fn test_append_watermark_non_monotonic() {
     // output_watermart = Some(2000-01-01)
     let block = MetadataFactory::metadata_block(
         MetadataFactory::add_data()
-            .some_output_data()
-            .interval(10, 19)
-            .watermark(Utc.with_ymd_and_hms(2000, 1, 1, 12, 0, 0).unwrap())
+            .some_new_data()
+            .new_offset_interval(10, 19)
+            .new_watermark(Some(Utc.with_ymd_and_hms(2000, 1, 1, 12, 0, 0).unwrap()))
             .build(),
     )
     .prev(&hash, 2)
@@ -415,8 +428,8 @@ async fn test_append_watermark_non_monotonic() {
     // output_watermart = None
     let block = MetadataFactory::metadata_block(
         MetadataFactory::add_data()
-            .some_output_data()
-            .interval(20, 29)
+            .some_new_data()
+            .new_offset_interval(20, 29)
             .build(),
     )
     .prev(&hash, 3)
@@ -432,9 +445,9 @@ async fn test_append_watermark_non_monotonic() {
     // output_watermart = Some(1988-01-01)
     let block = MetadataFactory::metadata_block(
         MetadataFactory::add_data()
-            .some_output_data()
-            .interval(20, 29)
-            .watermark(Utc.with_ymd_and_hms(1988, 1, 1, 12, 0, 0).unwrap())
+            .some_new_data()
+            .new_offset_interval(20, 29)
+            .new_watermark(Some(Utc.with_ymd_and_hms(1988, 1, 1, 12, 0, 0).unwrap()))
             .build(),
     )
     .prev(&hash, 3)
@@ -450,9 +463,9 @@ async fn test_append_watermark_non_monotonic() {
     // output_watermart = Some(2020-01-01)
     let block = MetadataFactory::metadata_block(
         MetadataFactory::add_data()
-            .some_output_data()
-            .interval(20, 29)
-            .watermark(Utc.with_ymd_and_hms(2020, 1, 1, 12, 0, 0).unwrap())
+            .some_new_data()
+            .new_offset_interval(20, 29)
+            .new_watermark(Some(Utc.with_ymd_and_hms(2020, 1, 1, 12, 0, 0).unwrap()))
             .build(),
     )
     .prev(&hash, 3)
@@ -486,9 +499,9 @@ async fn test_append_add_data_empty_commit() {
         .unwrap();
 
     let add_data = AddDataBuilder::empty()
-        .some_output_data()
-        .some_output_checkpoint()
-        .some_output_watermark()
+        .some_new_data()
+        .some_new_checkpoint()
+        .some_new_watermark()
         .build();
     let block = MetadataFactory::metadata_block(add_data.clone())
         .prev(&hash, 1)
@@ -499,9 +512,9 @@ async fn test_append_add_data_empty_commit() {
     // No data, same checkpoint, watermark, and source state
     let block = MetadataFactory::metadata_block(
         AddDataBuilder::empty()
-            .output_checkpoint(add_data.output_checkpoint)
-            .output_watermark(add_data.output_watermark)
-            .source_state(add_data.source_state)
+            .new_checkpoint(add_data.new_checkpoint)
+            .new_watermark(add_data.new_watermark)
+            .new_source_state(add_data.new_source_state)
             .build(),
     )
     .prev(&hash, 2)
@@ -540,9 +553,9 @@ async fn test_append_execute_query_empty_commit() {
         .unwrap();
 
     let execute_query = MetadataFactory::execute_query()
-        .some_output_data()
-        .some_output_checkpoint()
-        .some_output_watermark()
+        .some_new_data()
+        .some_new_checkpoint()
+        .some_new_watermark()
         .build();
     let block = MetadataFactory::metadata_block(execute_query.clone())
         .prev(&hash, 1)
@@ -553,8 +566,8 @@ async fn test_append_execute_query_empty_commit() {
     // No data, same checkpoint and watermark
     let block = MetadataFactory::metadata_block(
         MetadataFactory::execute_query()
-            .output_checkpoint(execute_query.output_checkpoint)
-            .output_watermark(execute_query.output_watermark)
+            .new_checkpoint(execute_query.new_checkpoint)
+            .new_watermark(execute_query.new_watermark)
             .build(),
     )
     .prev(&hash, 2)
@@ -634,7 +647,7 @@ async fn test_append_add_data_must_be_preceeded_by_schema() {
     let hash = chain
         .append(
             MetadataFactory::metadata_block(
-                MetadataFactory::add_data().some_source_state().build(),
+                MetadataFactory::add_data().some_new_source_state().build(),
             )
             .prev(&hash, 0)
             .build(),
@@ -643,28 +656,31 @@ async fn test_append_add_data_must_be_preceeded_by_schema() {
         .await
         .unwrap();
 
-    // TODO: Should rejects one with data when schema is not set yet
-    // https://github.com/kamu-data/kamu-cli/issues/314
-    let hash = chain
-        .append(
-            MetadataFactory::metadata_block(
-                MetadataFactory::add_data()
-                    .some_output_data_with_offset(0, 9)
-                    .some_source_state()
-                    .build(),
+    // Rejects one with data when schema is not set yet
+    assert_matches!(
+        chain
+            .append(
+                MetadataFactory::metadata_block(
+                    MetadataFactory::add_data()
+                        .some_new_data_with_offset(0, 9)
+                        .some_new_source_state()
+                        .build(),
+                )
+                .prev(&hash, 1)
+                .build(),
+                AppendOpts::default(),
             )
-            .prev(&hash, 1)
-            .build(),
-            AppendOpts::default(),
-        )
-        .await
-        .unwrap();
+            .await,
+        Err(AppendError::InvalidBlock(
+            AppendValidationError::InvalidEvent(..)
+        ))
+    );
 
     // Schema is now set
     let hash = chain
         .append(
             MetadataFactory::metadata_block(MetadataFactory::set_data_schema().build())
-                .prev(&hash, 2)
+                .prev(&hash, 1)
                 .build(),
             AppendOpts::default(),
         )
@@ -676,11 +692,11 @@ async fn test_append_add_data_must_be_preceeded_by_schema() {
         .append(
             MetadataFactory::metadata_block(
                 MetadataFactory::add_data()
-                    .some_output_data_with_offset(10, 19)
-                    .some_source_state()
+                    .some_new_data_with_offset(0, 9)
+                    .some_new_source_state()
                     .build(),
             )
-            .prev(&hash, 3)
+            .prev(&hash, 2)
             .build(),
             AppendOpts::default(),
         )
@@ -709,7 +725,7 @@ async fn test_append_execute_query_must_be_preceeded_by_schema() {
         .append(
             MetadataFactory::metadata_block(
                 MetadataFactory::execute_query()
-                    .output_checkpoint(Some(Checkpoint {
+                    .new_checkpoint(Some(Checkpoint {
                         physical_hash: Multihash::from_digest_sha3_256(b"foo"),
                         size: 1,
                     }))
@@ -722,32 +738,35 @@ async fn test_append_execute_query_must_be_preceeded_by_schema() {
         .await
         .unwrap();
 
-    // TODO: Should rejects one with data when schema is not set yet
-    // https://github.com/kamu-data/kamu-cli/issues/314
-    let hash = chain
-        .append(
-            MetadataFactory::metadata_block(
-                MetadataFactory::execute_query()
-                    .input_checkpoint(Some(Multihash::from_digest_sha3_256(b"foo")))
-                    .output_checkpoint(Some(Checkpoint {
-                        physical_hash: Multihash::from_digest_sha3_256(b"bar"),
-                        size: 1,
-                    }))
-                    .some_output_data_with_offset(0, 9)
-                    .build(),
+    // Rejects one with data when schema is not set yet
+    assert_matches!(
+        chain
+            .append(
+                MetadataFactory::metadata_block(
+                    MetadataFactory::execute_query()
+                        .prev_checkpoint(Some(Multihash::from_digest_sha3_256(b"foo")))
+                        .new_checkpoint(Some(Checkpoint {
+                            physical_hash: Multihash::from_digest_sha3_256(b"bar"),
+                            size: 1,
+                        }))
+                        .some_new_data_with_offset(0, 9)
+                        .build(),
+                )
+                .prev(&hash, 1)
+                .build(),
+                AppendOpts::default(),
             )
-            .prev(&hash, 1)
-            .build(),
-            AppendOpts::default(),
-        )
-        .await
-        .unwrap();
+            .await,
+        Err(AppendError::InvalidBlock(
+            AppendValidationError::InvalidEvent(..)
+        ))
+    );
 
     // Schema is now set
     let hash = chain
         .append(
             MetadataFactory::metadata_block(MetadataFactory::set_data_schema().build())
-                .prev(&hash, 2)
+                .prev(&hash, 1)
                 .build(),
             AppendOpts::default(),
         )
@@ -759,12 +778,15 @@ async fn test_append_execute_query_must_be_preceeded_by_schema() {
         .append(
             MetadataFactory::metadata_block(
                 MetadataFactory::execute_query()
-                    .input_checkpoint(Some(Multihash::from_digest_sha3_256(b"bar")))
-                    .some_output_checkpoint()
-                    .some_output_data_with_offset(10, 19)
+                    .prev_checkpoint(Some(Multihash::from_digest_sha3_256(b"foo")))
+                    .new_checkpoint(Some(Checkpoint {
+                        physical_hash: Multihash::from_digest_sha3_256(b"bar"),
+                        size: 1,
+                    }))
+                    .some_new_data_with_offset(0, 9)
                     .build(),
             )
-            .prev(&hash, 3)
+            .prev(&hash, 2)
             .build(),
             AppendOpts::default(),
         )
@@ -794,19 +816,25 @@ async fn test_iter_blocks() {
         .await
         .unwrap();
 
-    let block_3 =
-        MetadataFactory::metadata_block(MetadataFactory::add_data().interval(0, 9).build())
-            .prev(&hash_2, block_2.sequence_number)
-            .build();
+    let block_3 = MetadataFactory::metadata_block(
+        MetadataFactory::add_data()
+            .new_offset_interval(0, 9)
+            .build(),
+    )
+    .prev(&hash_2, block_2.sequence_number)
+    .build();
     let hash_3 = chain
         .append(block_3.clone(), AppendOpts::default())
         .await
         .unwrap();
 
-    let block_4 =
-        MetadataFactory::metadata_block(MetadataFactory::add_data().interval(10, 19).build())
-            .prev(&hash_3, block_3.sequence_number)
-            .build();
+    let block_4 = MetadataFactory::metadata_block(
+        MetadataFactory::add_data()
+            .new_offset_interval(10, 19)
+            .build(),
+    )
+    .prev(&hash_3, block_3.sequence_number)
+    .build();
     let hash_4 = chain
         .append(block_4.clone(), AppendOpts::default())
         .await

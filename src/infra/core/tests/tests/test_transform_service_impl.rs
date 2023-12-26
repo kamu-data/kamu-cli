@@ -77,7 +77,6 @@ impl TransformTestHarness {
     }
 
     pub async fn new_root(&self, name: &str) -> DatasetHandle {
-        let name = DatasetName::try_from(name).unwrap();
         let snap = MetadataFactory::dataset_snapshot()
             .name(name)
             .kind(DatasetKind::Root)
@@ -86,7 +85,7 @@ impl TransformTestHarness {
 
         let create_result = self
             .dataset_repo
-            .create_dataset_from_snapshot(None, snap)
+            .create_dataset_from_snapshot(snap)
             .await
             .unwrap();
         create_result.dataset_handle
@@ -97,9 +96,9 @@ impl TransformTestHarness {
         name: &str,
         inputs: &[DatasetAlias],
     ) -> (DatasetHandle, SetTransform) {
-        let name = DatasetName::try_from(name).unwrap();
-        let transform =
-            MetadataFactory::set_transform(inputs.iter().map(|d| d.dataset_name.clone())).build();
+        let transform = MetadataFactory::set_transform()
+            .inputs_from_refs(inputs)
+            .build();
         let snap = MetadataFactory::dataset_snapshot()
             .name(name)
             .kind(DatasetKind::Derivative)
@@ -109,7 +108,7 @@ impl TransformTestHarness {
 
         let create_result = self
             .dataset_repo
-            .create_dataset_from_snapshot(None, snap)
+            .create_dataset_from_snapshot(snap)
             .await
             .unwrap();
         (create_result.dataset_handle, transform)
@@ -134,7 +133,7 @@ impl TransformTestHarness {
     pub async fn append_data_block(
         &self,
         alias: &DatasetAlias,
-        records: i64,
+        records: u64,
     ) -> (Multihash, MetadataBlockTyped<AddData>) {
         let ds = self
             .dataset_repo
@@ -145,7 +144,7 @@ impl TransformTestHarness {
         let offset = chain
             .iter_blocks()
             .filter_map_ok(|(_, b)| b.event.into_variant::<AddData>())
-            .map_ok(|e| e.output_data.unwrap().interval.end + 1)
+            .map_ok(|e| e.new_data.unwrap().offset_interval.end + 1)
             .try_first()
             .await
             .unwrap()
@@ -156,8 +155,8 @@ impl TransformTestHarness {
 
         let block = MetadataFactory::metadata_block(
             MetadataFactory::add_data()
-                .interval(offset, offset + records - 1)
-                .watermark(Utc.with_ymd_and_hms(2020, 1, 1, 10, 0, 0).unwrap())
+                .new_offset_interval(offset, offset + records - 1)
+                .new_watermark(Some(Utc.with_ymd_and_hms(2020, 1, 1, 10, 0, 0).unwrap()))
                 .build(),
         )
         .prev(&prev_head, prev_block.sequence_number)
@@ -178,19 +177,6 @@ async fn test_get_next_operation() {
     let harness = TransformTestHarness::new();
 
     let foo = harness.new_root("foo").await;
-    let foo_seed = harness
-        .dataset_repo
-        .get_dataset(&foo.as_local_ref())
-        .await
-        .unwrap()
-        .as_metadata_chain()
-        .iter_blocks()
-        .try_last()
-        .await
-        .unwrap()
-        .unwrap()
-        .0;
-
     let (bar, bar_source) = harness.new_deriv("bar", &[foo.alias.clone()]).await;
 
     // No data - no work
@@ -204,7 +190,7 @@ async fn test_get_next_operation() {
     );
 
     let (foo_head, foo_block) = harness.append_data_block(&foo.alias, 10).await;
-    let foo_slice = foo_block.event.output_data.as_ref().unwrap();
+    let foo_slice = foo_block.event.new_data.as_ref().unwrap();
 
     assert!(matches!(
         harness.transform_service.get_next_operation(&bar, Utc::now()).await.unwrap(),
@@ -214,8 +200,10 @@ async fn test_get_next_operation() {
             dataset_handle: foo.clone(),
             alias: foo.alias.dataset_name.to_string(),
             vocab: DatasetVocabulary::default(),
-            block_interval: Some(BlockInterval { start: foo_seed, end: foo_head }),
-            data_interval: Some(OffsetInterval {start: 0, end: 9}),
+            prev_block_hash: None,
+            new_block_hash: Some(foo_head),
+            prev_offset: None,
+            new_offset: Some(9),
             data_slices: vec![foo_slice.physical_hash.clone()],
             schema_slice: foo_slice.physical_hash.clone(),
             explicit_watermarks: vec![Watermark {
@@ -305,7 +293,6 @@ async fn test_get_verification_plan_one_to_one() {
         .await
         .unwrap();
 
-    let root_head_seed = root_create_result.head;
     let root_head_schema = root_create_result
         .dataset
         .commit_event(
@@ -342,8 +329,8 @@ async fn test_get_verification_plan_one_to_one() {
     deriv_create_result
         .dataset
         .commit_event(
-            MetadataFactory::set_transform([&root_alias.dataset_name])
-                .input_ids_from_names()
+            MetadataFactory::set_transform()
+                .inputs_from_aliases_and_seeded_ids([&root_alias.dataset_name])
                 .build()
                 .into(),
             CommitOpts {
@@ -377,16 +364,17 @@ async fn test_get_verification_plan_one_to_one() {
         .append_block(
             &root_hdl,
             MetadataFactory::metadata_block(AddData {
-                input_checkpoint: None,
-                output_data: Some(DataSlice {
+                prev_checkpoint: None,
+                prev_offset: None,
+                new_data: Some(DataSlice {
                     logical_hash: Multihash::from_digest_sha3_256(b"foo"),
                     physical_hash: Multihash::from_digest_sha3_256(b"bar"),
-                    interval: OffsetInterval { start: 0, end: 99 },
+                    offset_interval: OffsetInterval { start: 0, end: 99 },
                     size: 10,
                 }),
-                output_checkpoint: None,
-                output_watermark: Some(t0),
-                source_state: None,
+                new_checkpoint: None,
+                new_watermark: Some(t0),
+                new_source_state: None,
             })
             .system_time(t1)
             .prev(&root_head_schema, root_initial_sequence_number)
@@ -416,23 +404,23 @@ async fn test_get_verification_plan_one_to_one() {
         .append_block(
             &deriv_hdl,
             MetadataFactory::metadata_block(ExecuteQuery {
-                input_slices: vec![InputSlice {
+                query_inputs: vec![ExecuteQueryInput {
                     dataset_id: root_hdl.id.clone(),
-                    block_interval: Some(BlockInterval {
-                        start: root_head_seed.clone(),
-                        end: root_head_t1.clone(),
-                    }),
-                    data_interval: Some(OffsetInterval { start: 0, end: 99 }),
+                    prev_block_hash: None,
+                    new_block_hash: Some(root_head_t1.clone()),
+                    prev_offset: None,
+                    new_offset: Some(99),
                 }],
-                input_checkpoint: None,
-                output_data: Some(DataSlice {
+                prev_checkpoint: None,
+                prev_offset: None,
+                new_data: Some(DataSlice {
                     logical_hash: Multihash::from_digest_sha3_256(b"foo"),
                     physical_hash: Multihash::from_digest_sha3_256(b"bar"),
-                    interval: OffsetInterval { start: 0, end: 99 },
+                    offset_interval: OffsetInterval { start: 0, end: 99 },
                     size: 10,
                 }),
-                output_checkpoint: None,
-                output_watermark: Some(t0),
+                new_checkpoint: None,
+                new_watermark: Some(t0),
             })
             .system_time(t2)
             .prev(&deriv_head_schema, deriv_initial_sequence_number)
@@ -446,19 +434,20 @@ async fn test_get_verification_plan_one_to_one() {
         .append_block(
             &root_hdl,
             MetadataFactory::metadata_block(AddData {
-                input_checkpoint: None,
-                output_data: Some(DataSlice {
+                prev_checkpoint: None,
+                prev_offset: Some(99),
+                new_data: Some(DataSlice {
                     logical_hash: Multihash::from_digest_sha3_256(b"foo"),
                     physical_hash: Multihash::from_digest_sha3_256(b"bar"),
-                    interval: OffsetInterval {
+                    offset_interval: OffsetInterval {
                         start: 100,
                         end: 109,
                     },
                     size: 10,
                 }),
-                output_checkpoint: None,
-                output_watermark: Some(t2),
-                source_state: None,
+                new_checkpoint: None,
+                new_watermark: Some(t2),
+                new_source_state: None,
             })
             .system_time(t3)
             .prev(&root_head_t1, root_initial_sequence_number + 1)
@@ -475,7 +464,7 @@ async fn test_get_verification_plan_one_to_one() {
     .unwrap();
     std::fs::write(root_head_t3_path, "<data>").unwrap();
 
-    // T4: Transform [T3; T3]
+    // T4: Transform (T1; T3]
     let t4 = Utc.with_ymd_and_hms(2020, 1, 4, 12, 0, 0).unwrap();
     let deriv_req_t4 = harness
         .transform_service
@@ -487,29 +476,26 @@ async fn test_get_verification_plan_one_to_one() {
         .append_block(
             &deriv_hdl,
             MetadataFactory::metadata_block(ExecuteQuery {
-                input_slices: vec![InputSlice {
+                query_inputs: vec![ExecuteQueryInput {
                     dataset_id: root_hdl.id.clone(),
-                    block_interval: Some(BlockInterval {
-                        start: root_head_t3.clone(),
-                        end: root_head_t3.clone(),
-                    }),
-                    data_interval: Some(OffsetInterval {
-                        start: 100,
-                        end: 109,
-                    }),
+                    prev_block_hash: Some(root_head_t1.clone()),
+                    new_block_hash: Some(root_head_t3.clone()),
+                    prev_offset: Some(99),
+                    new_offset: Some(109),
                 }],
-                input_checkpoint: None,
-                output_data: Some(DataSlice {
+                prev_checkpoint: None,
+                prev_offset: Some(99),
+                new_data: Some(DataSlice {
                     logical_hash: Multihash::from_digest_sha3_256(b"foo"),
                     physical_hash: Multihash::from_digest_sha3_256(b"bar"),
-                    interval: OffsetInterval {
+                    offset_interval: OffsetInterval {
                         start: 100,
                         end: 109,
                     },
                     size: 10,
                 }),
-                output_checkpoint: None,
-                output_watermark: Some(t2),
+                new_checkpoint: None,
+                new_watermark: Some(t2),
             })
             .system_time(t4)
             .prev(&deriv_head_t2, deriv_initial_sequence_number + 1)
@@ -522,16 +508,14 @@ async fn test_get_verification_plan_one_to_one() {
     let root_head_t5 = harness
         .append_block(
             &root_hdl,
-            MetadataFactory::metadata_block(SetWatermark {
-                output_watermark: t4,
-            })
-            .system_time(t5)
-            .prev(&root_head_t3, root_initial_sequence_number + 2)
-            .build(),
+            MetadataFactory::metadata_block(SetWatermark { new_watermark: t4 })
+                .system_time(t5)
+                .prev(&root_head_t3, root_initial_sequence_number + 2)
+                .build(),
         )
         .await;
 
-    // T6: Transform [T5; T5]
+    // T6: Transform (T3; T5]
     let t6 = Utc.with_ymd_and_hms(2020, 1, 6, 12, 0, 0).unwrap();
     let deriv_req_t6 = harness
         .transform_service
@@ -543,26 +527,26 @@ async fn test_get_verification_plan_one_to_one() {
         .append_block(
             &deriv_hdl,
             MetadataFactory::metadata_block(ExecuteQuery {
-                input_slices: vec![InputSlice {
+                query_inputs: vec![ExecuteQueryInput {
                     dataset_id: root_hdl.id.clone(),
-                    block_interval: Some(BlockInterval {
-                        start: root_head_t5.clone(),
-                        end: root_head_t5.clone(),
-                    }),
-                    data_interval: None,
+                    prev_block_hash: Some(root_head_t3.clone()),
+                    new_block_hash: Some(root_head_t5.clone()),
+                    prev_offset: Some(109),
+                    new_offset: None,
                 }],
-                input_checkpoint: None,
-                output_data: Some(DataSlice {
+                prev_checkpoint: None,
+                prev_offset: Some(109),
+                new_data: Some(DataSlice {
                     logical_hash: Multihash::from_digest_sha3_256(b"foo"),
                     physical_hash: Multihash::from_digest_sha3_256(b"bar"),
-                    interval: OffsetInterval {
+                    offset_interval: OffsetInterval {
                         start: 110,
                         end: 119,
                     },
                     size: 10,
                 }),
-                output_checkpoint: None,
-                output_watermark: Some(t4),
+                new_checkpoint: None,
+                new_watermark: Some(t4),
             })
             .system_time(t6)
             .prev(&deriv_head_t4, deriv_initial_sequence_number + 2)

@@ -197,13 +197,18 @@ impl MetadataChainComparator {
         rhs_sequence_number: u64,
         last_common_sequence_number: Option<u64>,
     ) -> CompareChainsResult {
-        CompareChainsResult::Divergence {
-            uncommon_blocks_in_lhs: (lhs_sequence_number + 1
-                - last_common_sequence_number.unwrap_or(0))
-                as usize,
-            uncommon_blocks_in_rhs: (rhs_sequence_number + 1
-                - last_common_sequence_number.unwrap_or(0))
-                as usize,
+        if let Some(last_common_sequence_number) = last_common_sequence_number {
+            CompareChainsResult::Divergence {
+                uncommon_blocks_in_lhs: (lhs_sequence_number - last_common_sequence_number)
+                    as usize,
+                uncommon_blocks_in_rhs: (rhs_sequence_number - last_common_sequence_number)
+                    as usize,
+            }
+        } else {
+            CompareChainsResult::Divergence {
+                uncommon_blocks_in_lhs: (lhs_sequence_number + 1) as usize,
+                uncommon_blocks_in_rhs: (rhs_sequence_number + 1) as usize,
+            }
         }
     }
 

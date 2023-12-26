@@ -590,9 +590,8 @@ impl GraphQLDatasetsHarness {
             .unwrap();
         dataset_repo
             .create_dataset_from_snapshot(
-                None,
                 MetadataFactory::dataset_snapshot()
-                    .name(name)
+                    .name(DatasetAlias::new(None, name))
                     .kind(DatasetKind::Root)
                     .push_event(MetadataFactory::set_polling_source().build())
                     .build(),
@@ -612,12 +611,12 @@ impl GraphQLDatasetsHarness {
             .unwrap();
         dataset_repo
             .create_dataset_from_snapshot(
-                None,
                 MetadataFactory::dataset_snapshot()
-                    .name(name)
+                    .name(DatasetAlias::new(None, name))
                     .kind(DatasetKind::Derivative)
                     .push_event(
-                        MetadataFactory::set_transform_aliases(vec![input_dataset.alias.clone()])
+                        MetadataFactory::set_transform()
+                            .inputs_from_refs(vec![input_dataset.alias.clone()])
                             .build(),
                     )
                     .build(),

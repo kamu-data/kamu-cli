@@ -54,11 +54,11 @@ async fn test_ingest_push_url_stream() {
         })
         .build();
 
-    let dataset_name = dataset_snapshot.name.clone();
-    let dataset_ref = DatasetAlias::new(None, dataset_name.clone()).as_local_ref();
+    let dataset_alias = dataset_snapshot.name.clone();
+    let dataset_ref = dataset_alias.as_local_ref();
 
     harness.create_dataset(dataset_snapshot).await;
-    let data_helper = harness.dataset_data_helper(&dataset_name).await;
+    let data_helper = harness.dataset_data_helper(&dataset_alias).await;
 
     // Round 1: Push from URL
     let src_path = harness.temp_dir.path().join("data.csv");
@@ -119,7 +119,7 @@ async fn test_ingest_push_url_stream() {
             .get_last_data_block()
             .await
             .event
-            .output_watermark
+            .new_watermark
             .map(|dt| dt.to_rfc3339()),
         Some("2020-01-01T00:00:00+00:00".to_string())
     );
@@ -157,7 +157,7 @@ async fn test_ingest_push_url_stream() {
             .get_last_data_block()
             .await
             .event
-            .output_watermark
+            .new_watermark
             .map(|dt| dt.to_rfc3339()),
         Some("2021-01-01T00:00:00+00:00".to_string())
     );
@@ -196,11 +196,11 @@ async fn test_ingest_push_media_type_override() {
         })
         .build();
 
-    let dataset_name = dataset_snapshot.name.clone();
-    let dataset_ref = DatasetAlias::new(None, dataset_name.clone()).as_local_ref();
+    let dataset_alias = dataset_snapshot.name.clone();
+    let dataset_ref = dataset_alias.as_local_ref();
 
     harness.create_dataset(dataset_snapshot).await;
-    let data_helper = harness.dataset_data_helper(&dataset_name).await;
+    let data_helper = harness.dataset_data_helper(&dataset_alias).await;
 
     // Push CSV conversion
     let src_path = harness.temp_dir.path().join("data.csv");
@@ -415,15 +415,15 @@ impl IngestTestHarness {
 
     async fn create_dataset(&self, dataset_snapshot: DatasetSnapshot) {
         self.dataset_repo
-            .create_dataset_from_snapshot(None, dataset_snapshot)
+            .create_dataset_from_snapshot(dataset_snapshot)
             .await
             .unwrap();
     }
 
-    async fn dataset_data_helper(&self, dataset_name: &DatasetName) -> DatasetDataHelper {
+    async fn dataset_data_helper(&self, dataset_alias: &DatasetAlias) -> DatasetDataHelper {
         let dataset = self
             .dataset_repo
-            .get_dataset(&dataset_name.as_local_ref())
+            .get_dataset(&dataset_alias.as_local_ref())
             .await
             .unwrap();
 
