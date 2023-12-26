@@ -525,8 +525,8 @@ impl NoOpEventError {
 #[derive(Error, PartialEq, Eq, Debug)]
 pub struct SequenceIntegrityError {
     pub prev_block_hash: Option<Multihash>,
-    pub prev_block_sequence_number: Option<i32>,
-    pub next_block_sequence_number: i32,
+    pub prev_block_sequence_number: Option<u64>,
+    pub next_block_sequence_number: u64,
 }
 
 impl Display for SequenceIntegrityError {
@@ -554,14 +554,14 @@ impl Display for SequenceIntegrityError {
 
 #[derive(Error, PartialEq, Eq, Debug)]
 pub struct OffsetsNotSequentialError {
-    pub last_offset: i64,
-    pub new_offset: i64,
+    pub expected_offset: u64,
+    pub new_offset: u64,
 }
 
 impl OffsetsNotSequentialError {
-    pub fn new(last_offset: i64, new_offset: i64) -> Self {
+    pub fn new(expected_offset: u64, new_offset: u64) -> Self {
         Self {
-            last_offset,
+            expected_offset,
             new_offset,
         }
     }
@@ -572,8 +572,7 @@ impl Display for OffsetsNotSequentialError {
         write!(
             f,
             "Expected offset interval to start at {} but got {}",
-            self.last_offset + 1,
-            self.new_offset,
+            self.expected_offset, self.new_offset,
         )
     }
 }

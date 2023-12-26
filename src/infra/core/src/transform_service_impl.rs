@@ -13,6 +13,7 @@ use std::sync::Arc;
 use chrono::{DateTime, Utc};
 use dill::*;
 use futures::{StreamExt, TryFutureExt, TryStreamExt};
+use itertools::Itertools;
 use kamu_core::engine::*;
 use kamu_core::*;
 use opendatafabric::*;
@@ -95,8 +96,8 @@ impl TransformServiceImpl {
 
         let response = engine.transform(request.clone()).await?;
         assert_eq!(
-            response.data_interval.is_some(),
-            response.out_data.is_some()
+            response.new_offset_interval.is_some(),
+            response.new_data.is_some()
         );
 
         commit_fn(request, response).await
@@ -117,7 +118,7 @@ impl TransformServiceImpl {
             .int_err()?;
 
         // Read new schema
-        let new_schema = if let Some(out_data) = &response.out_data {
+        let new_schema = if let Some(out_data) = &response.new_data {
             let file = std::fs::File::open(out_data.as_path()).int_err()?;
             let schema = ParquetRecordBatchReaderBuilder::try_new(file)
                 .int_err()?
@@ -164,17 +165,18 @@ impl TransformServiceImpl {
         }
 
         let params = ExecuteQueryParams {
-            input_slices: request.inputs.iter().map(|i| i.clone().into()).collect(),
-            input_checkpoint: request.prev_checkpoint,
-            output_data: response.data_interval,
-            output_watermark: response.output_watermark,
+            query_inputs: request.inputs.iter().map(|i| i.clone().into()).collect(),
+            prev_checkpoint: request.prev_checkpoint,
+            prev_offset: request.prev_offset,
+            new_offset_interval: response.new_offset_interval,
+            new_watermark: response.new_watermark,
         };
 
         let commit_result = dataset
             .commit_execute_query(
                 params,
-                response.out_data,
-                response.out_checkpoint,
+                response.new_data,
+                response.new_checkpoint,
                 CommitOpts {
                     block_ref: &request.block_ref,
                     system_time: Some(request.system_time),
@@ -213,8 +215,7 @@ impl TransformServiceImpl {
         let mut source = None;
         let mut schema = None;
         let mut vocab = None;
-        let mut prev_checkpoint = None;
-        let mut last_offset = None;
+        let mut prev_query = None;
 
         // TODO: PERF: Search for source, vocab, and data schema result in full scan
         {
@@ -239,11 +240,8 @@ impl TransformServiceImpl {
                         }
                     }
                     MetadataEvent::ExecuteQuery(e) => {
-                        if prev_checkpoint.is_none() {
-                            prev_checkpoint = Some(e.output_checkpoint.map(|cp| cp.physical_hash));
-                        }
-                        if last_offset.is_none() {
-                            last_offset = e.output_data.map(|d| d.interval.end);
+                        if prev_query.is_none() {
+                            prev_query = Some(e)
                         }
                     }
                     MetadataEvent::Seed(_)
@@ -260,12 +258,7 @@ impl TransformServiceImpl {
                     }
                 }
 
-                if source.is_some()
-                    && schema.is_some()
-                    && vocab.is_some()
-                    && prev_checkpoint.is_some()
-                    && last_offset.is_some()
-                {
+                if source.is_some() && schema.is_some() && vocab.is_some() && prev_query.is_some() {
                     break;
                 }
             }
@@ -278,7 +271,7 @@ impl TransformServiceImpl {
 
         // Check if all inputs are non-empty
         if futures::stream::iter(&source.inputs)
-            .map(|input| input.id.as_ref().unwrap().as_local_ref())
+            .map(|input| input.dataset_ref.id().unwrap().as_local_ref())
             .then(|input_ref| async move { self.is_never_pulled(&input_ref).await })
             .any_ok(|never_pulled| *never_pulled)
             .await?
@@ -288,8 +281,19 @@ impl TransformServiceImpl {
         }
 
         // Prepare inputs
-        let inputs: Vec<_> = futures::stream::iter(&source.inputs)
-            .then(|input| self.get_transform_input(input, output_chain))
+        let input_states: Vec<(&TransformInput, Option<&ExecuteQueryInput>)> =
+            if let Some(query) = &prev_query {
+                source
+                    .inputs
+                    .iter()
+                    .zip_eq(query.query_inputs.iter().map(Some))
+                    .collect()
+            } else {
+                source.inputs.iter().map(|i| (i, None)).collect()
+            };
+
+        let inputs: Vec<_> = futures::stream::iter(input_states)
+            .then(|(input_decl, input_state)| self.get_transform_input(input_decl, input_state))
             .try_collect()
             .await?;
 
@@ -309,10 +313,10 @@ impl TransformServiceImpl {
             transform: source.transform,
             system_time,
             schema,
-            next_offset: last_offset.map(|v| v + 1).unwrap_or(0),
+            prev_offset: prev_query.as_ref().and_then(|q| q.last_offset()),
             vocab: vocab.unwrap_or_default().into(),
             inputs,
-            prev_checkpoint: prev_checkpoint.unwrap_or(None),
+            prev_checkpoint: prev_query.and_then(|q| q.new_checkpoint.map(|c| c.physical_hash)),
         }))
     }
 
@@ -331,26 +335,32 @@ impl TransformServiceImpl {
         name
     }
 
+    // TODO: Allow derivative datasets to function with inputs containing no data
+    // This will require passing the schema explicitly instead of relying on a file
     async fn is_never_pulled(&self, dataset_ref: &DatasetRef) -> Result<bool, InternalError> {
         let dataset = self.dataset_repo.get_dataset(dataset_ref).await.int_err()?;
-        Ok(dataset
+        let last_data_block = dataset
             .as_metadata_chain()
             .iter_blocks()
             .filter_data_stream_blocks()
-            .filter_map_ok(|(_, b)| b.event.output_data)
-            .try_first()
+            .try_next()
             .await
-            .int_err()?
+            .int_err()?;
+        Ok(last_data_block
+            .and_then(|(_, b)| b.event.last_offset())
             .is_none())
     }
 
-    // TODO: PERF: Avoid iterating through output chain multiple times
     async fn get_transform_input(
         &self,
-        transform_input: &TransformInput,
-        output_chain: &dyn MetadataChain,
+        input_decl: &TransformInput,
+        input_state: Option<&ExecuteQueryInput>,
     ) -> Result<TransformRequestInput, TransformError> {
-        let dataset_id = transform_input.id.as_ref().unwrap();
+        let dataset_id = input_decl.dataset_ref.id().unwrap();
+        if let Some(input_state) = input_state {
+            assert_eq!(*dataset_id, input_state.dataset_id);
+        }
+
         let dataset_handle = self
             .dataset_repo
             .resolve_dataset_ref(&dataset_id.as_local_ref())
@@ -363,95 +373,54 @@ impl TransformServiceImpl {
             .int_err()?;
         let input_chain = dataset.as_metadata_chain();
 
-        // Determine last processed input block
-        let last_processed_block = output_chain
-            .iter_blocks()
-            .filter_map_ok(|(_, b)| b.event.into_variant::<ExecuteQuery>())
-            .map_ok(|eq| eq.input_slices)
-            .flatten_ok()
-            .filter_ok(|slice| slice.dataset_id == *dataset_id)
-            .filter_map_ok(|slice| slice.block_interval)
-            .map_ok(|bi| bi.end)
-            .try_first()
+        // Determine last processed input block and offset
+        let last_processed_block = input_state.and_then(|i| i.last_block_hash());
+        let last_processed_offset = input_state.and_then(|i| i.last_offset());
+
+        // Determine unprocessed block and offset range
+        let last_unprocessed_block = input_chain.get_ref(&BlockRef::Head).await.int_err()?;
+        let last_unprocessed_offset = input_chain
+            .iter_blocks_interval(&last_unprocessed_block, last_processed_block, false)
+            .filter_map_ok(|(_, b)| b.into_data_stream_block())
+            .try_next()
             .await
-            .int_err()?;
+            .int_err()?
+            .and_then(|b| b.event.last_offset())
+            .or(last_processed_offset);
 
-        // Collect unprocessed input blocks
-        let blocks_unprocessed: Vec<_> = input_chain
-            .iter_blocks()
-            .take_while_ok(|(block_hash, _)| Some(block_hash) != last_processed_block.as_ref())
-            .try_collect()
-            .await
-            .int_err()?;
-
-        // Sanity check: First (chronologically) unprocessed block should immediately
-        // follow the last processed block
-        if let Some((first_unprocessed_hash, first_unprocessed_block)) = blocks_unprocessed.last() {
-            if first_unprocessed_block.prev_block_hash != last_processed_block {
-                panic!(
-                    "Input data for {} is inconsistent - first unprocessed block {} does not \
-                     imediately follows last processed block {:?}",
-                    dataset_handle, first_unprocessed_hash, last_processed_block
-                );
-            }
-        }
-
-        let block_interval = if blocks_unprocessed.is_empty() {
-            None
-        } else {
-            Some(BlockInterval {
-                start: blocks_unprocessed.last().map(|(h, _)| h.clone()).unwrap(),
-                end: blocks_unprocessed.first().map(|(h, _)| h.clone()).unwrap(),
-            })
-        };
-
-        // Determine unprocessed offset range. Can be (None, None) or [start, end]
-        let offset_end = blocks_unprocessed
-            .iter()
-            .filter_map(|(_, b)| b.as_data_stream_block())
-            .filter_map(|b| b.event.output_data)
-            .map(|s| s.interval.end)
-            .next();
-        let offset_start = blocks_unprocessed
-            .iter()
-            .rev()
-            .filter_map(|(_, b)| b.as_data_stream_block())
-            .filter_map(|b| b.event.output_data)
-            .map(|s| s.interval.start)
-            .next();
-        let data_interval = match (offset_start, offset_end) {
-            (None, None) => None,
-            (Some(start), Some(end)) if start <= end => Some(OffsetInterval { start, end }),
-            _ => panic!(
-                "Input data for {} is inconsistent at block interval {:?} - unprocessed offset \
-                 range ended up as ({:?}, {:?})",
-                dataset_handle, block_interval, offset_start, offset_end
-            ),
-        };
-
-        self.get_transform_input_from_slice(
-            InputSlice {
-                dataset_id: dataset_id.clone(),
-                block_interval: block_interval.clone(),
-                data_interval: data_interval.clone(),
+        let query_input = ExecuteQueryInput {
+            dataset_id: dataset_id.clone(),
+            prev_block_hash: last_processed_block.cloned(),
+            new_block_hash: if Some(&last_unprocessed_block) != last_processed_block {
+                Some(last_unprocessed_block)
+            } else {
+                None
             },
-            transform_input.name.to_string(),
-            Some(blocks_unprocessed),
+            prev_offset: last_processed_offset,
+            new_offset: if last_unprocessed_offset != last_processed_offset {
+                last_unprocessed_offset
+            } else {
+                None
+            },
+        };
+
+        self.get_transform_input_from_query_input(
+            query_input,
+            input_decl.alias.clone().unwrap(),
             None,
         )
         .await
     }
 
-    async fn get_transform_input_from_slice(
+    async fn get_transform_input_from_query_input(
         &self,
-        input_slice: InputSlice,
+        query_input: ExecuteQueryInput,
         alias: String,
-        blocks_hint: Option<Vec<(Multihash, MetadataBlock)>>,
         vocab_hint: Option<DatasetVocabulary>,
     ) -> Result<TransformRequestInput, TransformError> {
         let dataset_handle = self
             .dataset_repo
-            .resolve_dataset_ref(&input_slice.dataset_id.as_local_ref())
+            .resolve_dataset_ref(&query_input.dataset_id.as_local_ref())
             .await
             .int_err()?;
 
@@ -467,22 +436,12 @@ impl TransformServiceImpl {
         let input_chain = dataset.as_metadata_chain();
 
         // Collect unprocessed input blocks
-        let blocks_unprocessed = if let Some(block_interval) = &input_slice.block_interval {
-            if let Some(blocks) = blocks_hint {
-                assert_eq!(blocks.last().map(|(h, _)| h), Some(&block_interval.start));
-                assert_eq!(blocks.first().map(|(h, _)| h), Some(&block_interval.end));
-                blocks
-            } else {
-                input_chain
-                    .iter_blocks_interval_inclusive(
-                        &block_interval.end,
-                        &block_interval.start,
-                        false,
-                    )
-                    .try_collect()
-                    .await
-                    .int_err()?
-            }
+        let blocks_unprocessed = if let Some(new_block_hash) = &query_input.new_block_hash {
+            input_chain
+                .iter_blocks_interval(new_block_hash, query_input.prev_block_hash.as_ref(), false)
+                .try_collect()
+                .await
+                .int_err()?
         } else {
             Vec::new()
         };
@@ -494,11 +453,11 @@ impl TransformServiceImpl {
             .rev()
             .filter_map(|(_, b)| b.as_data_stream_block())
         {
-            if let Some(slice) = block.event.output_data {
+            if let Some(slice) = block.event.new_data {
                 data_slices.push(slice.physical_hash.clone());
             }
 
-            if let Some(wm) = block.event.output_watermark {
+            if let Some(wm) = block.event.new_watermark {
                 explicit_watermarks.push(Watermark {
                     system_time: block.system_time.clone(),
                     event_time: wm.clone(),
@@ -515,7 +474,7 @@ impl TransformServiceImpl {
             input_chain
                 .iter_blocks()
                 .filter_data_stream_blocks()
-                .filter_map_ok(|(_, b)| b.event.output_data)
+                .filter_map_ok(|(_, b)| b.event.new_data)
                 .try_first()
                 .await
                 .int_err()?
@@ -534,8 +493,10 @@ impl TransformServiceImpl {
             dataset_handle,
             alias,
             vocab,
-            block_interval: input_slice.block_interval,
-            data_interval: input_slice.data_interval,
+            prev_block_hash: query_input.prev_block_hash,
+            new_block_hash: query_input.new_block_hash,
+            prev_offset: query_input.prev_offset,
+            new_offset: query_input.new_offset,
             data_slices,
             schema_slice,
             explicit_watermarks,
@@ -653,11 +614,13 @@ impl TransformServiceImpl {
             "Expected a derivative dataset but SetTransform block was not found".int_err(),
         )?;
 
+        // TODO: Replace maps with access by index, as ODF guarantees same order of
+        // inputs in ExecuteQuery as in SetTransform
         let dataset_vocabs: BTreeMap<_, _> = futures::stream::iter(&source.inputs)
             .map(|input| {
                 (
-                    input.id.clone().unwrap(),
-                    input.id.as_ref().unwrap().as_local_ref(),
+                    input.dataset_ref.id().cloned().unwrap(),
+                    input.dataset_ref.id().unwrap().as_local_ref(),
                 )
             })
             .then(|(input_id, input_ref)| async move {
@@ -668,10 +631,15 @@ impl TransformServiceImpl {
             .try_collect()
             .await?;
 
-        let input_names: BTreeMap<_, _> = source
+        let input_aliases: BTreeMap<_, _> = source
             .inputs
             .iter()
-            .map(|i| (i.id.clone().unwrap(), i.name.clone()))
+            .map(|i| {
+                (
+                    i.dataset_ref.id().cloned().unwrap(),
+                    i.alias.clone().unwrap(),
+                )
+            })
             .collect();
 
         let mut plan = Vec::new();
@@ -679,19 +647,18 @@ impl TransformServiceImpl {
         for (block_hash, block) in blocks.into_iter().rev() {
             let block_t = block.as_typed::<ExecuteQuery>().unwrap();
 
-            let inputs = futures::stream::iter(&block_t.event.input_slices)
+            let inputs = futures::stream::iter(&block_t.event.query_inputs)
                 .then(|slice| {
-                    let name = input_names.get(&slice.dataset_id).unwrap();
+                    let alias = input_aliases.get(&slice.dataset_id).unwrap();
 
                     let vocab = dataset_vocabs
                         .get(&slice.dataset_id)
                         .map(|v| v.clone())
                         .unwrap();
 
-                    self.get_transform_input_from_slice(
+                    self.get_transform_input_from_query_input(
                         slice.clone(),
-                        name.to_string(),
-                        None,
+                        alias.clone(),
                         Some(vocab),
                     )
                 })
@@ -712,17 +679,10 @@ impl TransformServiceImpl {
                     transform: source.transform.clone(),
                     system_time: block.system_time,
                     schema: schema.clone(),
-                    next_offset: block_t
-                        .event
-                        .output_data
-                        .as_ref()
-                        .map(|s| s.interval.start)
-                        // TODO: Assuming offset does not matter if block is not supposed to produce
-                        // data
-                        .unwrap_or(0),
+                    prev_offset: block_t.event.prev_offset,
                     inputs,
                     vocab: vocab.clone().unwrap_or_default(),
-                    prev_checkpoint: block_t.event.input_checkpoint.clone(),
+                    prev_checkpoint: block_t.event.prev_checkpoint.clone(),
                 },
                 expected_block: block,
                 expected_hash: block_hash,
@@ -897,18 +857,19 @@ impl TransformService for TransformServiceImpl {
                 request,
                 |request, response| async move {
                     let params = ExecuteQueryParams {
-                        input_slices: request.inputs.iter().map(|i| i.clone().into()).collect(),
-                        input_checkpoint: request.prev_checkpoint,
-                        output_data: response.data_interval,
-                        output_watermark: response.output_watermark,
+                        query_inputs: request.inputs.iter().map(|i| i.clone().into()).collect(),
+                        prev_checkpoint: request.prev_checkpoint,
+                        prev_offset: request.prev_offset,
+                        new_offset_interval: response.new_offset_interval,
+                        new_watermark: response.new_watermark,
                     };
 
                     // We expect outputs to be cleaned up automatically on drop
                     let new_event = ds
                         .prepare_execute_query(
                             params,
-                            response.out_data.as_ref(),
-                            response.out_checkpoint.as_ref(),
+                            response.new_data.as_ref(),
+                            response.new_checkpoint.as_ref(),
                         )
                         .await?;
 
@@ -930,8 +891,8 @@ impl TransformService for TransformServiceImpl {
             // Parquet format is non-reproducible, so we rely only on logical hash for
             // equivalence test and overwrite the physical hash and size with
             // the expected values for comparison
-            if let Some(actual_slice) = &mut cmp_actual_event.output_data {
-                if let Some(expected_slice) = &expected_event.output_data {
+            if let Some(actual_slice) = &mut cmp_actual_event.new_data {
+                if let Some(expected_slice) = &expected_event.new_data {
                     actual_slice.physical_hash = expected_slice.physical_hash.clone();
                     actual_slice.size = expected_slice.size;
                 }
@@ -939,7 +900,7 @@ impl TransformService for TransformServiceImpl {
 
             // Currently we're considering checkpoints non-reproducible and thus exclude
             // them from equivalence test
-            cmp_actual_event.output_checkpoint = expected_event.output_checkpoint.clone();
+            cmp_actual_event.new_checkpoint = expected_event.new_checkpoint.clone();
 
             if expected_event != cmp_actual_event {
                 tracing::warn!(%block_hash, ?expected_event, ?actual_event, "Data is not reproducible");

@@ -90,11 +90,12 @@ impl QueryServiceImpl {
             .get_dataset(&dataset_handle.as_local_ref())
             .await?;
 
+        // TODO: Update to use SetDataSchema event
         let last_data_slice_opt = dataset
             .as_metadata_chain()
             .iter_blocks()
             .filter_data_stream_blocks()
-            .filter_map_ok(|(_, b)| b.event.output_data)
+            .filter_map_ok(|(_, b)| b.event.new_data)
             .try_first()
             .await
             .map_err(|e| {
@@ -413,12 +414,12 @@ impl KamuSchema {
             .as_metadata_chain()
             .iter_blocks()
             .filter_data_stream_blocks()
-            .filter_map_ok(|(_, b)| b.event.output_data);
+            .filter_map_ok(|(_, b)| b.event.new_data);
 
         while let Some(slice) = slices.try_next().await.int_err()? {
             files.push(slice.physical_hash);
 
-            num_records += slice.interval.end - slice.interval.start + 1;
+            num_records += slice.offset_interval.end - slice.offset_interval.start + 1;
 
             if last_records_to_consider.is_some()
                 && last_records_to_consider.unwrap() <= num_records as u64

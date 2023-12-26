@@ -19,7 +19,7 @@ use chrono::{DateTime, Utc};
 use crate::dtos;
 use crate::dtos::{CompressionFormat, DatasetKind, SourceOrdering};
 use crate::formats::*;
-use crate::identity::{DatasetAlias, DatasetID, DatasetName, DatasetRefAny};
+use crate::identity::*;
 
 ////////////////////////////////////////////////////////////////////////////////
 // AddData
@@ -259,13 +259,13 @@ impl Into<dtos::DataSlice> for &dyn DataSlice {
 ////////////////////////////////////////////////////////////////////////////////
 
 pub trait DatasetSnapshot {
-    fn name(&self) -> &DatasetName;
+    fn name(&self) -> &DatasetAlias;
     fn kind(&self) -> DatasetKind;
     fn metadata(&self) -> Box<dyn Iterator<Item = MetadataEvent> + '_>;
 }
 
 impl DatasetSnapshot for dtos::DatasetSnapshot {
-    fn name(&self) -> &DatasetName {
+    fn name(&self) -> &DatasetAlias {
         &self.name
     }
     fn kind(&self) -> DatasetKind {
@@ -741,7 +741,7 @@ impl Into<dtos::ExecuteQueryResponse> for ExecuteQueryResponse<'_> {
 pub trait ExecuteQueryResponseProgress {}
 
 pub trait ExecuteQueryResponseSuccess {
-    fn offset_interval(&self) -> Option<&dyn OffsetInterval>;
+    fn new_offset_interval(&self) -> Option<&dyn OffsetInterval>;
     fn new_watermark(&self) -> Option<DateTime<Utc>>;
 }
 
@@ -757,8 +757,8 @@ pub trait ExecuteQueryResponseInternalError {
 impl ExecuteQueryResponseProgress for dtos::ExecuteQueryResponseProgress {}
 
 impl ExecuteQueryResponseSuccess for dtos::ExecuteQueryResponseSuccess {
-    fn offset_interval(&self) -> Option<&dyn OffsetInterval> {
-        self.offset_interval
+    fn new_offset_interval(&self) -> Option<&dyn OffsetInterval> {
+        self.new_offset_interval
             .as_ref()
             .map(|v| -> &dyn OffsetInterval { v })
     }
@@ -791,7 +791,7 @@ impl Into<dtos::ExecuteQueryResponseProgress> for &dyn ExecuteQueryResponseProgr
 impl Into<dtos::ExecuteQueryResponseSuccess> for &dyn ExecuteQueryResponseSuccess {
     fn into(self) -> dtos::ExecuteQueryResponseSuccess {
         dtos::ExecuteQueryResponseSuccess {
-            offset_interval: self.offset_interval().map(|v| v.into()),
+            new_offset_interval: self.new_offset_interval().map(|v| v.into()),
             new_watermark: self.new_watermark().map(|v| v),
         }
     }
@@ -1853,19 +1853,19 @@ impl Into<dtos::SetVocab> for &dyn SetVocab {
 ////////////////////////////////////////////////////////////////////////////////
 
 pub trait SetWatermark {
-    fn output_watermark(&self) -> DateTime<Utc>;
+    fn new_watermark(&self) -> DateTime<Utc>;
 }
 
 impl SetWatermark for dtos::SetWatermark {
-    fn output_watermark(&self) -> DateTime<Utc> {
-        self.output_watermark
+    fn new_watermark(&self) -> DateTime<Utc> {
+        self.new_watermark
     }
 }
 
 impl Into<dtos::SetWatermark> for &dyn SetWatermark {
     fn into(self) -> dtos::SetWatermark {
         dtos::SetWatermark {
-            output_watermark: self.output_watermark(),
+            new_watermark: self.new_watermark(),
         }
     }
 }
@@ -2073,12 +2073,12 @@ impl Into<dtos::TransformSql> for &dyn TransformSql {
 ////////////////////////////////////////////////////////////////////////////////
 
 pub trait TransformInput {
-    fn dataset_ref(&self) -> &DatasetRefAny;
+    fn dataset_ref(&self) -> &DatasetRef;
     fn alias(&self) -> Option<&str>;
 }
 
 impl TransformInput for dtos::TransformInput {
-    fn dataset_ref(&self) -> &DatasetRefAny {
+    fn dataset_ref(&self) -> &DatasetRef {
         &self.dataset_ref
     }
     fn alias(&self) -> Option<&str> {

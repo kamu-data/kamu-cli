@@ -27,6 +27,8 @@ use kamu_core::{
 };
 use opendatafabric::*;
 
+/////////////////////////////////////////////////////////////////////////////////////////
+
 pub fn get_staging_name() -> String {
     use rand::distributions::Alphanumeric;
     use rand::Rng;
@@ -48,7 +50,6 @@ pub fn get_staging_name() -> String {
 pub async fn create_dataset_from_snapshot_impl(
     dataset_repo: &dyn DatasetRepositoryExt,
     event_bus: &EventBus,
-    account_name: Option<AccountName>,
     mut snapshot: DatasetSnapshot,
 ) -> Result<CreateDatasetResult, CreateDatasetFromSnapshotError> {
     // Validate / resolve events
@@ -109,7 +110,7 @@ pub async fn create_dataset_from_snapshot_impl(
 
     let create_result = dataset_repo
         .create_dataset(
-            &DatasetAlias::new(account_name, snapshot.name),
+            &snapshot.name,
             MetadataBlockTyped {
                 system_time,
                 prev_block_hash: None,
@@ -131,9 +132,10 @@ pub async fn create_dataset_from_snapshot_impl(
         if let MetadataEvent::SetTransform(transform) = &event {
             // Collect only the latest upstream dataset IDs
             new_upstream_ids.clear();
-            for new_input in transform.inputs.iter() {
-                // Note: the IDs have been checked in `resolve_transform_inputs`
-                new_upstream_ids.push(new_input.id.clone().unwrap());
+            for new_input in &transform.inputs {
+                // Note: We already resolved all references to IDs above in
+                // `resolve_transform_inputs`
+                new_upstream_ids.push(new_input.dataset_ref.id().cloned().unwrap());
             }
         }
 
@@ -187,60 +189,44 @@ pub async fn create_dataset_from_snapshot_impl(
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-async fn resolve_transform_inputs<T>(
-    repo: &T,
-    dataset_name: &DatasetName,
+/// Resolves dataset references in transform intputs and ensures that:
+/// - input datasets are always references by unique IDs
+/// - that query alias is populated (manually or from the initial reference)
+async fn resolve_transform_inputs(
+    repo: &dyn DatasetRepository,
+    output_dataset_ailas: &DatasetAlias,
     inputs: &mut Vec<TransformInput>,
-) -> Result<(), CreateDatasetFromSnapshotError>
-where
-    T: DatasetRepository,
-    T: ?Sized,
-{
+) -> Result<(), CreateDatasetFromSnapshotError> {
+    let mut missing_inputs = Vec::new();
+
     for input in inputs.iter_mut() {
-        if let Some(input_id) = &input.id {
-            // Input is referenced by ID - in this case we allow any name
-            match repo.resolve_dataset_ref(&input_id.as_local_ref()).await {
-                Ok(_) => Ok(()),
-                Err(GetDatasetError::NotFound(_)) => Err(
-                    CreateDatasetFromSnapshotError::MissingInputs(MissingInputsError {
-                        dataset_ref: dataset_name.into(),
-                        missing_inputs: vec![input_id.as_local_ref()],
-                    }),
-                ),
-                Err(GetDatasetError::Internal(e)) => Err(e.into()),
-            }?;
-        } else {
-            // When ID is not specified we try resolving it by name or a reference
+        let hdl = match repo.resolve_dataset_ref(&input.dataset_ref).await {
+            Ok(hdl) => Ok(hdl),
+            Err(GetDatasetError::NotFound(_)) => {
+                // Accumulate errors to report as one
+                missing_inputs.push(input.dataset_ref.clone());
+                continue;
+            }
+            Err(GetDatasetError::Internal(e)) => Err(CreateDatasetFromSnapshotError::Internal(e)),
+        }?;
 
-            // When reference is available, it dominates
-            let input_local_ref = if let Some(dataset_ref) = &input.dataset_ref {
-                match dataset_ref.as_local_ref(|_| !repo.is_multi_tenant()) {
-                    Ok(local_ref) => local_ref,
-                    Err(_) => {
-                        unimplemented!("Deriving from remote dataset is not supported yet");
-                    }
-                }
-            } else {
-                // Derive reference purely from a name assuming a default account
-                let input_alias = DatasetAlias::new(None, input.name.clone());
-                input_alias.as_local_ref()
-            };
-
-            let hdl = match repo.resolve_dataset_ref(&input_local_ref).await {
-                Ok(hdl) => Ok(hdl),
-                Err(GetDatasetError::NotFound(_)) => Err(
-                    CreateDatasetFromSnapshotError::MissingInputs(MissingInputsError {
-                        dataset_ref: dataset_name.into(),
-                        missing_inputs: vec![input_local_ref],
-                    }),
-                ),
-                Err(GetDatasetError::Internal(e)) => Err(e.into()),
-            }?;
-
-            input.id = Some(hdl.id);
+        if input.alias.is_none() {
+            input.alias = Some(input.dataset_ref.to_string());
         }
+
+        input.dataset_ref = DatasetRef::ID(hdl.id);
     }
-    Ok(())
+
+    if !missing_inputs.is_empty() {
+        Err(CreateDatasetFromSnapshotError::MissingInputs(
+            MissingInputsError {
+                dataset_ref: output_dataset_ailas.into(),
+                missing_inputs,
+            },
+        ))
+    } else {
+        Ok(())
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

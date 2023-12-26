@@ -38,13 +38,13 @@ impl DatasetsMut {
         &self,
         ctx: &Context<'_>,
         dataset_kind: DatasetKind,
-        dataset_name: DatasetName,
+        dataset_alias: DatasetAlias,
     ) -> Result<CreateDatasetResult> {
         match self
             .create_from_snapshot_impl(
                 ctx,
                 odf::DatasetSnapshot {
-                    name: dataset_name.into(),
+                    name: dataset_alias.into(),
                     kind: dataset_kind.into(),
                     metadata: Vec::new(),
                 },
@@ -109,10 +109,7 @@ impl DatasetsMut {
     ) -> Result<CreateDatasetFromSnapshotResult> {
         let dataset_repo = from_catalog::<dyn domain::DatasetRepository>(ctx).unwrap();
 
-        let result = match dataset_repo
-            .create_dataset_from_snapshot(None, snapshot)
-            .await
-        {
+        let result = match dataset_repo.create_dataset_from_snapshot(snapshot).await {
             Ok(result) => {
                 let dataset = Dataset::from_ref(ctx, &result.dataset_handle.as_local_ref()).await?;
                 CreateDatasetFromSnapshotResult::Success(CreateDatasetResultSuccess { dataset })

@@ -82,7 +82,7 @@ impl ODFEngine {
         tracing::info!(?request, "Performing engine operation");
 
         let new_checkpoint_path = request.new_checkpoint_path.clone();
-        let out_data_path = request.out_data_path.clone();
+        let new_data_path = request.new_data_path.clone();
 
         let response = engine_client.execute_query(request).await;
 
@@ -101,7 +101,7 @@ impl ODFEngine {
                                 unsafe { libc::geteuid() },
                                 unsafe { libc::getegid() },
                                 new_checkpoint_path.display(),
-                                out_data_path.display(),
+                                new_data_path.display(),
                             )
                         )
                         .stdout(Stdio::null())
@@ -128,27 +128,27 @@ impl ODFEngine {
     pub async fn materialize_response(
         &self,
         engine_response: ExecuteQueryResponseSuccess,
-        out_data_path: PathBuf,
-        out_checkpoint_path: PathBuf,
+        new_data_path: PathBuf,
+        new_checkpoint_path: PathBuf,
     ) -> Result<TransformResponse, EngineError> {
-        let out_data = if engine_response.data_interval.is_some() {
-            if !out_data_path.exists() {
+        let new_data = if engine_response.new_offset_interval.is_some() {
+            if !new_data_path.exists() {
                 return Err(EngineError::contract_error(
                     "Engine did not write a response data file",
                     Vec::new(),
                 )
                 .into());
             }
-            if out_data_path.is_symlink() || !out_data_path.is_file() {
+            if new_data_path.is_symlink() || !new_data_path.is_file() {
                 return Err(EngineError::contract_error(
                     "Engine wrote data not as a plain file",
                     Vec::new(),
                 )
                 .into());
             }
-            Some(OwnedFile::new(out_data_path).into())
+            Some(OwnedFile::new(new_data_path).into())
         } else {
-            if out_data_path.exists() {
+            if new_data_path.exists() {
                 return Err(EngineError::contract_error(
                     "Engine wrote data file while the ouput slice is empty",
                     Vec::new(),
@@ -158,24 +158,24 @@ impl ODFEngine {
             None
         };
 
-        let out_checkpoint = if out_checkpoint_path.exists() {
-            if out_checkpoint_path.is_symlink() || !out_checkpoint_path.is_file() {
+        let new_checkpoint = if new_checkpoint_path.exists() {
+            if new_checkpoint_path.is_symlink() || !new_checkpoint_path.is_file() {
                 return Err(EngineError::contract_error(
                     "Engine wrote checkpoint not as a plain file",
                     Vec::new(),
                 )
                 .into());
             }
-            Some(OwnedFile::new(out_checkpoint_path).into())
+            Some(OwnedFile::new(new_checkpoint_path).into())
         } else {
             None
         };
 
         Ok(TransformResponse {
-            data_interval: engine_response.data_interval,
-            output_watermark: engine_response.output_watermark,
-            out_checkpoint,
-            out_data,
+            new_offset_interval: engine_response.new_offset_interval,
+            new_watermark: engine_response.new_watermark,
+            new_checkpoint,
+            new_data,
         })
     }
 }

@@ -45,12 +45,9 @@ impl DependencyGraphRepository for DependencyGraphRepositoryInMemory {
                     .await
                     .int_err()?;
 
-                for transform_input in summary.dependencies {
-                    if let Some(input_id) = transform_input.id {
-                        yield (dataset_handle.id.clone(), input_id);
-                    }
+                for input_id in summary.dependencies {
+                    yield (dataset_handle.id.clone(), input_id);
                 }
-
             }
         })
     }

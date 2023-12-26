@@ -25,5 +25,4 @@ impl MergeStrategySnapshot {
 impl SourceState {
     pub const KIND_ETAG: &'static str = "odf/etag";
     pub const KIND_LAST_MODIFIED: &'static str = "odf/last-modified";
-    pub const SOURCE_POLLING: &'static str = "odf/polling";
 }

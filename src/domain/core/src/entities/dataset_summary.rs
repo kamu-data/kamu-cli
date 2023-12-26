@@ -9,7 +9,7 @@
 
 use chrono::{DateTime, Utc};
 use opendatafabric::serde::yaml::*;
-use opendatafabric::{DatasetID, DatasetKind, Multihash, TransformInput};
+use opendatafabric::{DatasetID, DatasetKind, Multihash};
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, skip_serializing_none};
 
@@ -24,8 +24,7 @@ pub struct DatasetSummary {
     #[serde_as(as = "DatasetKindDef")]
     pub kind: DatasetKind,
     pub last_block_hash: Multihash,
-    #[serde_as(as = "Vec<TransformInputDef>")]
-    pub dependencies: Vec<TransformInput>,
+    pub dependencies: Vec<DatasetID>,
     #[serde(default, with = "datetime_rfc3339_opt")]
     pub last_pulled: Option<DateTime<Utc>>,
     pub num_records: u64,
