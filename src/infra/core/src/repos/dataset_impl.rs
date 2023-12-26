@@ -190,7 +190,6 @@ where
                 | MetadataEvent::SetAttachments(_)
                 | MetadataEvent::SetInfo(_)
                 | MetadataEvent::SetLicense(_)
-                | MetadataEvent::SetWatermark(_)
                 | MetadataEvent::SetVocab(_)
                 | MetadataEvent::SetPollingSource(_)
                 | MetadataEvent::DisablePollingSource(_)

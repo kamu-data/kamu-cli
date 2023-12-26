@@ -764,7 +764,6 @@ pub enum MetadataEvent {
     SetPollingSource(SetPollingSource),
     SetTransform(SetTransform),
     SetVocab(SetVocab),
-    SetWatermark(SetWatermark),
     SetAttachments(SetAttachments),
     SetInfo(SetInfo),
     SetLicense(SetLicense),
@@ -783,7 +782,6 @@ impl From<odf::MetadataEvent> for MetadataEvent {
             odf::MetadataEvent::SetPollingSource(v) => Self::SetPollingSource(v.into()),
             odf::MetadataEvent::SetTransform(v) => Self::SetTransform(v.into()),
             odf::MetadataEvent::SetVocab(v) => Self::SetVocab(v.into()),
-            odf::MetadataEvent::SetWatermark(v) => Self::SetWatermark(v.into()),
             odf::MetadataEvent::SetAttachments(v) => Self::SetAttachments(v.into()),
             odf::MetadataEvent::SetInfo(v) => Self::SetInfo(v.into()),
             odf::MetadataEvent::SetLicense(v) => Self::SetLicense(v.into()),
@@ -1229,24 +1227,6 @@ impl From<odf::SetVocab> for SetVocab {
             system_time_column: v.system_time_column.map(Into::into),
             event_time_column: v.event_time_column.map(Into::into),
             offset_column: v.offset_column.map(Into::into),
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// SetWatermark
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setwatermark-schema
-////////////////////////////////////////////////////////////////////////////////
-
-#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
-pub struct SetWatermark {
-    pub new_watermark: DateTime<Utc>,
-}
-
-impl From<odf::SetWatermark> for SetWatermark {
-    fn from(v: odf::SetWatermark) -> Self {
-        Self {
-            new_watermark: v.new_watermark.into(),
         }
     }
 }

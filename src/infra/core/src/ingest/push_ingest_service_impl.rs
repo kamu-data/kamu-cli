@@ -165,7 +165,8 @@ impl PushIngestServiceImpl {
                 WriteDataOpts {
                     system_time: args.system_time.clone(),
                     source_event_time: args.system_time.clone(),
-                    source_state: None, // TODO: Support storing ingest source state
+                    new_watermark: None,
+                    new_source_state: None, // TODO: Support storing ingest source state
                     data_staging_path,
                 },
             )

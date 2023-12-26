@@ -14,6 +14,7 @@ use std::sync::Arc;
 use chrono::prelude::*;
 use dill::*;
 use kamu_core::*;
+use kamu_ingest_datafusion::DataWriterDataFusion;
 use opendatafabric::*;
 use url::Url;
 
@@ -23,6 +24,7 @@ pub struct PullServiceImpl {
     ingest_svc: Arc<dyn PollingIngestService>,
     transform_svc: Arc<dyn TransformService>,
     sync_svc: Arc<dyn SyncService>,
+    system_time_source: Arc<dyn SystemTimeSource>,
     current_account_subject: Arc<CurrentAccountSubject>,
     dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
 }
@@ -36,6 +38,7 @@ impl PullServiceImpl {
         ingest_svc: Arc<dyn PollingIngestService>,
         transform_svc: Arc<dyn TransformService>,
         sync_svc: Arc<dyn SyncService>,
+        system_time_source: Arc<dyn SystemTimeSource>,
         current_account_subject: Arc<CurrentAccountSubject>,
         dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
     ) -> Self {
@@ -45,6 +48,7 @@ impl PullServiceImpl {
             ingest_svc,
             transform_svc,
             sync_svc,
+            system_time_source,
             current_account_subject,
             dataset_action_authorizer,
         }
@@ -607,34 +611,43 @@ impl PullService for PullServiceImpl {
             .await?;
 
         let dataset = self.dataset_repo.get_dataset(dataset_ref).await?;
-        let chain = dataset.as_metadata_chain();
-
-        if let Some(last_watermark) = chain
-            .iter_blocks()
-            .filter_data_stream_blocks()
-            .filter_map_ok(|(_, b)| b.event.new_watermark)
-            .try_first()
-            .await
-            .int_err()?
-        {
-            if last_watermark >= new_watermark {
-                return Ok(PullResult::UpToDate);
-            }
-        }
-
-        let commit_result = dataset
-            .commit_event(
-                MetadataEvent::SetWatermark(SetWatermark { new_watermark }),
-                CommitOpts::default(),
-            )
+        let summary = dataset
+            .get_summary(GetSummaryOpts::default())
             .await
             .int_err()?;
 
-        Ok(PullResult::Updated {
-            old_head: commit_result.old_head,
-            new_head: commit_result.new_head,
-            num_blocks: 1,
-        })
+        if summary.kind != DatasetKind::Root {
+            return Err(SetWatermarkError::IsDerivative);
+        }
+
+        let mut writer =
+            DataWriterDataFusion::builder(dataset, datafusion::prelude::SessionContext::new())
+                .with_metadata_state_scanned(None)
+                .await
+                .int_err()?
+                .build();
+
+        match writer
+            .write_watermark(
+                new_watermark,
+                WriteWatermarkOpts {
+                    system_time: self.system_time_source.now(),
+                    new_source_state: None,
+                },
+            )
+            .await
+        {
+            Ok(res) => Ok(PullResult::Updated {
+                old_head: Some(res.old_head),
+                new_head: res.new_head,
+                num_blocks: 1,
+            }),
+            Err(WriteWatermarkError::EmptyCommit(_)) => Ok(PullResult::UpToDate),
+            Err(WriteWatermarkError::CommitError(CommitError::MetadataAppendError(
+                AppendError::InvalidBlock(AppendValidationError::WatermarkIsNotMonotonic),
+            ))) => Ok(PullResult::UpToDate),
+            Err(e) => Err(e.int_err().into()),
+        }
     }
 }
 
