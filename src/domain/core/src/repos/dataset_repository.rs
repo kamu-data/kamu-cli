@@ -67,8 +67,7 @@ pub trait DatasetRepository: DatasetRegistry + Sync + Send {
 
     async fn create_dataset_from_snapshot(
         &self,
-        account_name: Option<AccountName>,
-        mut snapshot: DatasetSnapshot,
+        snapshot: DatasetSnapshot,
     ) -> Result<CreateDatasetResult, CreateDatasetFromSnapshotError>;
 
     async fn rename_dataset(
@@ -109,10 +108,9 @@ pub trait DatasetRepositoryExt: DatasetRepository {
 
     async fn create_datasets_from_snapshots(
         &self,
-        account_name: Option<AccountName>,
         snapshots: Vec<DatasetSnapshot>,
     ) -> Vec<(
-        DatasetName,
+        DatasetAlias,
         Result<CreateDatasetResult, CreateDatasetFromSnapshotError>,
     )>;
 }
@@ -169,21 +167,18 @@ where
 
     async fn create_datasets_from_snapshots(
         &self,
-        account_name: Option<AccountName>,
         snapshots: Vec<DatasetSnapshot>,
     ) -> Vec<(
-        DatasetName,
+        DatasetAlias,
         Result<CreateDatasetResult, CreateDatasetFromSnapshotError>,
     )> {
         let snapshots_ordered = sort_snapshots_in_dependency_order(snapshots.into_iter().collect());
 
         let mut ret = Vec::new();
         for snapshot in snapshots_ordered {
-            let name = snapshot.name.clone();
-            let res = self
-                .create_dataset_from_snapshot(account_name.clone(), snapshot)
-                .await;
-            ret.push((name, res));
+            let alias = snapshot.name.clone();
+            let res = self.create_dataset_from_snapshot(snapshot).await;
+            ret.push((alias, res));
         }
         ret
     }
@@ -195,8 +190,9 @@ fn sort_snapshots_in_dependency_order(
     mut snapshots: LinkedList<DatasetSnapshot>,
 ) -> Vec<DatasetSnapshot> {
     let mut ordered = Vec::with_capacity(snapshots.len());
-    let mut pending: HashSet<DatasetName> = snapshots.iter().map(|s| s.name.clone()).collect();
-    let mut added: HashSet<DatasetName> = HashSet::new();
+    let mut pending: HashSet<DatasetRef> =
+        snapshots.iter().map(|s| s.name.clone().into()).collect();
+    let mut added: HashSet<DatasetAlias> = HashSet::new();
 
     // TODO: cycle detection
     while !snapshots.is_empty() {
@@ -211,13 +207,13 @@ fn sort_snapshots_in_dependency_order(
             transform
                 .inputs
                 .iter()
-                .any(|input| pending.contains(&input.name))
+                .any(|input| pending.contains(&input.dataset_ref))
         } else {
             false
         };
 
         if !has_pending_deps {
-            pending.remove(&snapshot.name);
+            pending.remove(&snapshot.name.clone().into());
             added.insert(snapshot.name.clone());
             ordered.push(snapshot);
         } else {

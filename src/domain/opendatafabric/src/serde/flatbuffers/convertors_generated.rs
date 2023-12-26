@@ -883,9 +883,9 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::ExecuteQueryResponseSuccess {
     type OffsetT = WIPOffset<fb::ExecuteQueryResponseSuccess<'fb>>;
 
     fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
-        let offset_interval_offset = self.offset_interval.as_ref().map(|v| v.serialize(fb));
+        let new_offset_interval_offset = self.new_offset_interval.as_ref().map(|v| v.serialize(fb));
         let mut builder = fb::ExecuteQueryResponseSuccessBuilder::new(fb);
-        offset_interval_offset.map(|off| builder.add_offset_interval(off));
+        new_offset_interval_offset.map(|off| builder.add_new_offset_interval(off));
         self.new_watermark
             .map(|v| builder.add_new_watermark(&datetime_to_fb(&v)));
         builder.finish()
@@ -897,8 +897,8 @@ impl<'fb> FlatbuffersDeserializable<fb::ExecuteQueryResponseSuccess<'fb>>
 {
     fn deserialize(proxy: fb::ExecuteQueryResponseSuccess<'fb>) -> Self {
         odf::ExecuteQueryResponseSuccess {
-            offset_interval: proxy
-                .offset_interval()
+            new_offset_interval: proxy
+                .new_offset_interval()
                 .map(|v| odf::OffsetInterval::deserialize(v)),
             new_watermark: proxy.new_watermark().map(|v| fb_to_datetime(v)),
         }
@@ -2232,7 +2232,7 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::SetWatermark {
 
     fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
         let mut builder = fb::SetWatermarkBuilder::new(fb);
-        builder.add_output_watermark(&datetime_to_fb(&self.output_watermark));
+        builder.add_new_watermark(&datetime_to_fb(&self.new_watermark));
         builder.finish()
     }
 }
@@ -2240,7 +2240,7 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::SetWatermark {
 impl<'fb> FlatbuffersDeserializable<fb::SetWatermark<'fb>> for odf::SetWatermark {
     fn deserialize(proxy: fb::SetWatermark<'fb>) -> Self {
         odf::SetWatermark {
-            output_watermark: proxy.output_watermark().map(|v| fb_to_datetime(v)).unwrap(),
+            new_watermark: proxy.new_watermark().map(|v| fb_to_datetime(v)).unwrap(),
         }
     }
 }
@@ -2486,7 +2486,7 @@ impl<'fb> FlatbuffersDeserializable<fb::TransformInput<'fb>> for odf::TransformI
         odf::TransformInput {
             dataset_ref: proxy
                 .dataset_ref()
-                .map(|v| odf::DatasetRefAny::try_from(v).unwrap())
+                .map(|v| odf::DatasetRef::try_from(v).unwrap())
                 .unwrap(),
             alias: proxy.alias().map(|v| v.to_owned()),
         }

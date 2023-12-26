@@ -45,17 +45,11 @@ impl DependencyGraphRepository for DependencyGraphRepositoryInMemory {
                     .get_summary(GetSummaryOpts::default())
                     .await
                     .int_err()?;
-                let transform_input_ids: Vec<_> = summary
-                    .dependencies
-                    .into_iter()
-                    .filter_map(|transform_input| transform_input.id)
-                    .collect();
-                let dataset_dependencies = DatasetDependencies {
-                    downstream_dataset_id: dataset_handle.id.clone(),
-                    upstream_dataset_ids: transform_input_ids,
-                };
 
-                yield dataset_dependencies;
+                yield DatasetDependencies {
+                    downstream_dataset_id: dataset_handle.id.clone(),
+                    upstream_dataset_ids: summary.dependencies,
+                };
             }
         })
     }

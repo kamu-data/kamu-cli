@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::HashMap;
 use std::path::Path;
 
 use chrono::{DateTime, Utc};
@@ -50,33 +49,31 @@ impl MetadataFactory {
         ExecuteQueryBuilder::new()
     }
 
-    pub fn set_transform<S, I>(inputs: I) -> SetTransformBuilder
+    pub fn set_transform_from_refs<R, I>(inputs: I) -> SetTransformBuilder
     where
-        I: IntoIterator<Item = S>,
-        S: TryInto<DatasetName>,
-        <S as TryInto<DatasetName>>::Error: std::fmt::Debug,
+        I: Iterator<Item = R>,
+        R: TryInto<DatasetRef>,
+        <R as TryInto<DatasetRef>>::Error: std::fmt::Debug,
     {
-        SetTransformBuilder::new(inputs.into_iter())
+        SetTransformBuilder::from_refs(inputs)
     }
 
-    pub fn set_transform_aliases<A, I>(inputs: I) -> SetTransformBuilder
+    pub fn set_transform_from_refs_and_aliases<R, A, I>(inputs: I) -> SetTransformBuilder
     where
-        I: IntoIterator<Item = A>,
-        A: TryInto<DatasetAlias>,
-        <A as TryInto<DatasetAlias>>::Error: std::fmt::Debug,
+        I: Iterator<Item = (R, A)>,
+        A: Into<String>,
+        R: TryInto<DatasetRef>,
+        <R as TryInto<DatasetRef>>::Error: std::fmt::Debug,
     {
-        SetTransformBuilder::from_aliases(inputs.into_iter())
+        SetTransformBuilder::from_refs_and_aliases(inputs)
     }
 
-    pub fn set_transform_names_and_refs<N, R, I>(inputs: I) -> SetTransformBuilder
+    pub fn set_transform_from_aliases_and_generated_ids<A, I>(inputs: I) -> SetTransformBuilder
     where
-        I: IntoIterator<Item = (N, R)>,
-        N: TryInto<DatasetName>,
-        <N as TryInto<DatasetName>>::Error: std::fmt::Debug,
-        R: TryInto<DatasetRefAny>,
-        <R as TryInto<DatasetRefAny>>::Error: std::fmt::Debug,
+        I: Iterator<Item = A>,
+        A: Into<String>,
     {
-        SetTransformBuilder::from_names_and_refs(inputs.into_iter())
+        SetTransformBuilder::from_aliases_and_generated_ids(inputs)
     }
 
     pub fn metadata_block<E: Into<MetadataEvent>>(event: E) -> MetadataBlockBuilder<E> {
@@ -350,19 +347,18 @@ pub struct SetTransformBuilder {
 }
 
 impl SetTransformBuilder {
-    fn new<S, I>(inputs: I) -> Self
+    pub fn from_refs<R, I>(inputs: I) -> Self
     where
-        I: Iterator<Item = S>,
-        S: TryInto<DatasetName>,
-        <S as TryInto<DatasetName>>::Error: std::fmt::Debug,
+        I: Iterator<Item = R>,
+        R: TryInto<DatasetRef>,
+        <R as TryInto<DatasetRef>>::Error: std::fmt::Debug,
     {
         Self {
             v: SetTransform {
                 inputs: inputs
-                    .map(|s| TransformInput {
-                        id: None,
-                        name: s.try_into().unwrap(),
-                        dataset_ref: None,
+                    .map(|a| TransformInput {
+                        dataset_ref: a.try_into().unwrap(),
+                        alias: None,
                     })
                     .collect(),
                 transform: TransformSqlBuilder::new().build(),
@@ -370,21 +366,39 @@ impl SetTransformBuilder {
         }
     }
 
-    fn from_aliases<A, I>(inputs: I) -> Self
+    pub fn from_refs_and_aliases<R, A, I>(inputs: I) -> Self
+    where
+        I: Iterator<Item = (R, A)>,
+        A: Into<String>,
+        R: TryInto<DatasetRef>,
+        <R as TryInto<DatasetRef>>::Error: std::fmt::Debug,
+    {
+        Self {
+            v: SetTransform {
+                inputs: inputs
+                    .map(|(r, a)| TransformInput {
+                        dataset_ref: r.try_into().unwrap(),
+                        alias: Some(a.into()),
+                    })
+                    .collect(),
+                transform: TransformSqlBuilder::new().build(),
+            },
+        }
+    }
+
+    pub fn from_aliases_and_generated_ids<A, I>(inputs: I) -> Self
     where
         I: Iterator<Item = A>,
-        A: TryInto<DatasetAlias>,
-        <A as TryInto<DatasetAlias>>::Error: std::fmt::Debug,
+        A: Into<String>,
     {
         Self {
             v: SetTransform {
                 inputs: inputs
                     .map(|a| {
-                        let alias: DatasetAlias = a.try_into().unwrap();
+                        let alias = a.into();
                         TransformInput {
-                            id: None,
-                            name: alias.dataset_name.to_owned(),
-                            dataset_ref: Some(alias.as_any_ref()),
+                            dataset_ref: DatasetID::new_seeded_ed25519(alias.as_bytes()).into(),
+                            alias: Some(alias),
                         }
                     })
                     .collect(),
@@ -393,43 +407,14 @@ impl SetTransformBuilder {
         }
     }
 
-    fn from_names_and_refs<N, R, I>(inputs: I) -> Self
-    where
-        I: Iterator<Item = (N, R)>,
-        N: TryInto<DatasetName>,
-        <N as TryInto<DatasetName>>::Error: std::fmt::Debug,
-        R: TryInto<DatasetRefAny>,
-        <R as TryInto<DatasetRefAny>>::Error: std::fmt::Debug,
-    {
-        Self {
-            v: SetTransform {
-                inputs: inputs
-                    .map(|s| TransformInput {
-                        id: None,
-                        name: s.0.try_into().unwrap(),
-                        dataset_ref: Some(s.1.try_into().unwrap()),
-                    })
-                    .collect(),
-                transform: TransformSqlBuilder::new().build(),
-            },
-        }
-    }
-
-    pub fn input_ids_from_names(mut self) -> Self {
-        for input in self.v.inputs.iter_mut() {
-            input.id = Some(DatasetID::new_seeded_ed25519(input.name.as_bytes()));
-        }
-        self
-    }
-
-    pub fn set_dataset_ids(mut self, mut ids: HashMap<DatasetName, DatasetID>) -> Self {
-        for input in self.v.inputs.iter_mut() {
-            if let Some(input_id) = ids.remove(&input.name) {
-                input.id = Some(input_id)
-            }
-        }
-        self
-    }
+    // pub fn set_dataset_ids(mut self, mut ids: HashMap<DatasetName, DatasetID>) ->
+    // Self {     for input in self.v.inputs.iter_mut() {
+    //         if let Some(input_id) = ids.remove(&input.name) {
+    //             input.id = Some(input_id)
+    //         }
+    //     }
+    //     self
+    // }
 
     pub fn transform(mut self, transform: Transform) -> Self {
         self.v.transform = transform;
@@ -483,11 +468,12 @@ impl AddDataBuilder {
     pub fn empty() -> Self {
         Self {
             v: AddData {
-                input_checkpoint: None,
-                output_data: None,
-                output_checkpoint: None,
-                output_watermark: None,
-                source_state: None,
+                prev_checkpoint: None,
+                prev_offset: None,
+                new_data: None,
+                new_checkpoint: None,
+                new_watermark: None,
+                new_source_state: None,
             },
         }
     }
@@ -496,37 +482,45 @@ impl AddDataBuilder {
         Self::empty()
     }
 
-    pub fn some_input_checkpoint(mut self) -> Self {
-        if self.v.input_checkpoint.is_none() {
-            self.v.input_checkpoint = Some(Multihash::from_digest_sha3_256(b"foo"));
+    pub fn some_prev_checkpoint(mut self) -> Self {
+        if self.v.prev_checkpoint.is_none() {
+            self.v.prev_checkpoint = Some(Multihash::from_digest_sha3_256(b"foo"));
         }
         self
     }
 
-    pub fn input_checkpoint(mut self, checkpoint: Option<Multihash>) -> Self {
-        self.v.input_checkpoint = checkpoint;
+    pub fn prev_checkpoint(mut self, checkpoint: Option<Multihash>) -> Self {
+        self.v.prev_checkpoint = checkpoint;
         self
     }
 
-    pub fn some_output_data(self) -> Self {
-        self.some_output_data_with_offset(0, 9)
+    pub fn prev_offset(mut self, prev_offset: Option<u64>) -> Self {
+        self.v.prev_offset = prev_offset;
+        self
     }
 
-    pub fn some_output_data_with_offset(mut self, start: i64, end: i64) -> Self {
-        if self.v.output_data.is_none() {
-            self.v.output_data = Some(DataSlice {
+    pub fn some_new_data(self) -> Self {
+        self.some_new_data_with_offset(0, 9)
+    }
+
+    pub fn some_new_data_with_offset(mut self, start: u64, end: u64) -> Self {
+        if self.v.new_data.is_none() {
+            self.v.new_data = Some(DataSlice {
                 logical_hash: Multihash::from_digest_sha3_256(b"foo"),
                 physical_hash: Multihash::from_digest_sha3_256(b"bar"),
-                interval: OffsetInterval { start, end },
+                offset_interval: OffsetInterval { start, end },
                 size: 0,
             });
+            if start != 0 {
+                self.v.prev_offset = Some(start - 1);
+            }
         }
         self
     }
 
-    pub fn some_output_checkpoint(mut self) -> Self {
-        if self.v.output_checkpoint.is_none() {
-            self.v.output_checkpoint = Some(Checkpoint {
+    pub fn some_new_checkpoint(mut self) -> Self {
+        if self.v.new_checkpoint.is_none() {
+            self.v.new_checkpoint = Some(Checkpoint {
                 physical_hash: Multihash::from_digest_sha3_256(b"foo"),
                 size: 1,
             });
@@ -534,71 +528,69 @@ impl AddDataBuilder {
         self
     }
 
-    pub fn output_checkpoint(mut self, checkpoint: Option<Checkpoint>) -> Self {
-        self.v.output_checkpoint = checkpoint;
+    pub fn new_checkpoint(mut self, checkpoint: Option<Checkpoint>) -> Self {
+        self.v.new_checkpoint = checkpoint;
         self
     }
 
-    pub fn some_output_watermark(mut self) -> Self {
-        if self.v.output_watermark.is_none() {
-            self.v.output_watermark = Some(Utc::now());
+    pub fn some_new_watermark(mut self) -> Self {
+        if self.v.new_watermark.is_none() {
+            self.v.new_watermark = Some(Utc::now());
         }
         self
     }
 
-    pub fn output_watermark(mut self, watermark: Option<DateTime<Utc>>) -> Self {
-        self.v.output_watermark = watermark;
+    pub fn new_watermark(mut self, watermark: Option<DateTime<Utc>>) -> Self {
+        self.v.new_watermark = watermark;
         self
     }
 
-    pub fn some_source_state(mut self) -> Self {
-        if self.v.source_state.is_none() {
-            self.v.source_state = Some(SourceState {
+    pub fn some_new_source_state(mut self) -> Self {
+        if self.v.new_source_state.is_none() {
+            self.v.new_source_state = Some(SourceState {
+                source_name: None,
                 kind: SourceState::KIND_ETAG.to_owned(),
-                source: SourceState::SOURCE_POLLING.to_owned(),
                 value: "<etag>".to_owned(),
             });
         }
         self
     }
 
-    pub fn source_state(mut self, source_state: Option<SourceState>) -> Self {
-        self.v.source_state = source_state;
+    pub fn new_source_state(mut self, source_state: Option<SourceState>) -> Self {
+        self.v.new_source_state = source_state;
         self
     }
 
-    pub fn data_physical_hash(mut self, hash: Multihash) -> Self {
-        self = self.some_output_data();
-        self.v.output_data.as_mut().unwrap().physical_hash = hash;
+    pub fn new_data_physical_hash(mut self, hash: Multihash) -> Self {
+        self = self.some_new_data();
+        self.v.new_data.as_mut().unwrap().physical_hash = hash;
         self
     }
 
-    pub fn interval(mut self, start: i64, end: i64) -> Self {
-        self = self.some_output_data();
-        self.v.output_data.as_mut().unwrap().interval = OffsetInterval { start, end };
+    pub fn new_offset_interval(mut self, start: u64, end: u64) -> Self {
+        self = self.some_new_data();
+        self.v.new_data.as_mut().unwrap().offset_interval = OffsetInterval { start, end };
+        if start != 0 {
+            self.v.prev_offset = Some(start - 1);
+        }
         self
     }
 
-    pub fn data_size(mut self, size: i64) -> Self {
-        self = self.some_output_data();
-        self.v.output_data.as_mut().unwrap().size = size;
+    pub fn new_data_size(mut self, size: u64) -> Self {
+        self = self.some_new_data();
+        self.v.new_data.as_mut().unwrap().size = size;
         self
     }
 
-    pub fn checkpoint_physical_hash(mut self, hash: Multihash) -> Self {
-        self = self.some_output_checkpoint();
-        self.v.output_checkpoint.as_mut().unwrap().physical_hash = hash;
+    pub fn new_checkpoint_physical_hash(mut self, hash: Multihash) -> Self {
+        self = self.some_new_checkpoint();
+        self.v.new_checkpoint.as_mut().unwrap().physical_hash = hash;
         self
     }
 
-    pub fn checkpoint_size(mut self, size: i64) -> Self {
-        self = self.some_output_checkpoint();
-        self.v.output_checkpoint.as_mut().unwrap().size = size;
-        self
-    }
-
-    pub fn watermark(mut self, output_watermark: DateTime<Utc>) -> Self {
-        self.v.output_watermark = Some(output_watermark);
+    pub fn new_checkpoint_size(mut self, size: u64) -> Self {
+        self = self.some_new_checkpoint();
+        self.v.new_checkpoint.as_mut().unwrap().size = size;
         self
     }
 
@@ -619,44 +611,48 @@ impl ExecuteQueryBuilder {
     pub fn new() -> Self {
         Self {
             v: ExecuteQuery {
-                input_slices: Vec::new(),
-                input_checkpoint: None,
-                output_data: None,
-                output_checkpoint: None,
-                output_watermark: None,
+                query_inputs: Vec::new(),
+                prev_checkpoint: None,
+                prev_offset: None,
+                new_data: None,
+                new_checkpoint: None,
+                new_watermark: None,
             },
         }
     }
 
-    pub fn input_checkpoint(mut self, checkpoint: Option<Multihash>) -> Self {
-        self.v.input_checkpoint = checkpoint;
+    pub fn prev_checkpoint(mut self, checkpoint: Option<Multihash>) -> Self {
+        self.v.prev_checkpoint = checkpoint;
         self
     }
 
-    pub fn some_output_data(self) -> Self {
-        self.some_output_data_with_offset(0, 9)
+    pub fn some_new_data(self) -> Self {
+        self.some_new_data_with_offset(0, 9)
     }
 
-    pub fn some_output_data_with_offset(mut self, start: i64, end: i64) -> Self {
-        if self.v.output_data.is_none() {
-            self.v.output_data = Some(DataSlice {
+    pub fn some_new_data_with_offset(mut self, start: u64, end: u64) -> Self {
+        if self.v.new_data.is_none() {
+            self.v.new_data = Some(DataSlice {
                 logical_hash: Multihash::from_digest_sha3_256(b"foo"),
                 physical_hash: Multihash::from_digest_sha3_256(b"bar"),
-                interval: OffsetInterval { start, end },
+                offset_interval: OffsetInterval { start, end },
                 size: 0,
             });
+            if start != 0 {
+                self.v.prev_offset = Some(start - 1);
+            }
         }
         self
     }
 
-    pub fn output_data(mut self, data_slice: Option<DataSlice>) -> Self {
-        self.v.output_data = data_slice;
+    pub fn new_data(mut self, data_slice: Option<DataSlice>) -> Self {
+        self.v.new_data = data_slice;
         self
     }
 
-    pub fn some_output_checkpoint(mut self) -> Self {
-        if self.v.output_checkpoint.is_none() {
-            self.v.output_checkpoint = Some(Checkpoint {
+    pub fn some_new_checkpoint(mut self) -> Self {
+        if self.v.new_checkpoint.is_none() {
+            self.v.new_checkpoint = Some(Checkpoint {
                 physical_hash: Multihash::from_digest_sha3_256(b"foo"),
                 size: 1,
             });
@@ -664,18 +660,18 @@ impl ExecuteQueryBuilder {
         self
     }
 
-    pub fn output_checkpoint(mut self, checkpoint: Option<Checkpoint>) -> Self {
-        self.v.output_checkpoint = checkpoint;
+    pub fn new_checkpoint(mut self, checkpoint: Option<Checkpoint>) -> Self {
+        self.v.new_checkpoint = checkpoint;
         self
     }
 
-    pub fn some_output_watermark(mut self) -> Self {
-        self.v.output_watermark = Some(Utc::now());
+    pub fn some_new_watermark(mut self) -> Self {
+        self.v.new_watermark = Some(Utc::now());
         self
     }
 
-    pub fn output_watermark(mut self, watermark: Option<DateTime<Utc>>) -> Self {
-        self.v.output_watermark = watermark;
+    pub fn new_watermark(mut self, watermark: Option<DateTime<Utc>>) -> Self {
+        self.v.new_watermark = watermark;
         self
     }
 
@@ -691,7 +687,7 @@ impl ExecuteQueryBuilder {
 pub struct MetadataBlockBuilder<E> {
     prev_block_hash: Option<Multihash>,
     system_time: DateTime<Utc>,
-    sequence_number: i32,
+    sequence_number: u64,
     event: E,
 }
 
@@ -708,7 +704,7 @@ where
         }
     }
 
-    pub fn prev(mut self, prev_block_hash: &Multihash, prev_sequence_number: i32) -> Self {
+    pub fn prev(mut self, prev_block_hash: &Multihash, prev_sequence_number: u64) -> Self {
         self.prev_block_hash = Some(prev_block_hash.clone());
         self.sequence_number = prev_sequence_number + 1;
         self
@@ -743,7 +739,7 @@ where
 ///////////////////////////////////////////////////////////////////////////////
 
 pub struct DatasetSnapshotBuilder {
-    name: Option<DatasetName>,
+    name: Option<DatasetAlias>,
     kind: DatasetKind,
     metadata: Vec<MetadataEvent>,
 }
@@ -757,9 +753,9 @@ impl DatasetSnapshotBuilder {
         }
     }
 
-    pub fn name<S: TryInto<DatasetName>>(mut self, s: S) -> Self
+    pub fn name<S: TryInto<DatasetAlias>>(mut self, s: S) -> Self
     where
-        <S as TryInto<DatasetName>>::Error: std::fmt::Debug,
+        <S as TryInto<DatasetAlias>>::Error: std::fmt::Debug,
     {
         self.name = Some(s.try_into().unwrap());
         self
@@ -777,7 +773,9 @@ impl DatasetSnapshotBuilder {
 
     pub fn build(self) -> DatasetSnapshot {
         DatasetSnapshot {
-            name: self.name.unwrap_or_else(|| IDFactory::dataset_name()),
+            name: self
+                .name
+                .unwrap_or_else(|| DatasetAlias::new(None, IDFactory::dataset_name())),
             kind: self.kind,
             metadata: self.metadata,
         }

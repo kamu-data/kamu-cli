@@ -172,10 +172,24 @@ pub enum CommitError {
 /// Replicates [AddData] event prior to hashing of data and checkpoint
 #[derive(Debug, Clone)]
 pub struct AddDataParams {
-    pub input_checkpoint: Option<Multihash>,
-    pub output_data: Option<OffsetInterval>,
-    pub output_watermark: Option<DateTime<Utc>>,
-    pub source_state: Option<SourceState>,
+    /// Hash of the checkpoint file used to restore ingestion state, if any.
+    pub prev_checkpoint: Option<Multihash>,
+    /// Last offset of the previous data slice, if any. Must be equal to the
+    /// last non-empty `newData.offsetInterval.end`.
+    pub prev_offset: Option<u64>,
+    /// Offset interval of the output data written during this transaction, if
+    /// any.
+    pub new_offset_interval: Option<OffsetInterval>,
+    /// Last watermark of the output data stream, if any. Initial blocks may not
+    /// have watermarks, but once watermark is set - all subsequent blocks
+    /// should either carry the same watermark or specify a new (greater) one.
+    /// Thus, watermarks are monotonically non-decreasing.
+    pub new_watermark: Option<DateTime<Utc>>,
+    /// The state of the source the data was added from to allow fast resuming.
+    /// If the state did not change but is still relevant for subsequent runs it
+    /// should be carried, i.e. only the last state per source is considered
+    /// when resuming.
+    pub new_source_state: Option<SourceState>,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -183,8 +197,21 @@ pub struct AddDataParams {
 /// Replicates [ExecuteQuery] event prior to hashing of data and checkpoint
 #[derive(Debug, Clone)]
 pub struct ExecuteQueryParams {
-    pub input_slices: Vec<InputSlice>,
-    pub input_checkpoint: Option<Multihash>,
-    pub output_data: Option<OffsetInterval>,
-    pub output_watermark: Option<DateTime<Utc>>,
+    /// Defines inputs used in this transaction. Slices corresponding to every
+    /// input dataset must be present.
+    pub query_inputs: Vec<ExecuteQueryInput>,
+    /// Hash of the checkpoint file used to restore transformation state, if
+    /// any.
+    pub prev_checkpoint: Option<Multihash>,
+    /// Last offset of the previous data slice, if any. Must be equal to the
+    /// last non-empty `newData.offsetInterval.end`.
+    pub prev_offset: Option<u64>,
+    /// Offset interval of the output data written during this transaction, if
+    /// any.
+    pub new_offset_interval: Option<OffsetInterval>,
+    /// Last watermark of the output data stream, if any. Initial blocks may not
+    /// have watermarks, but once watermark is set - all subsequent blocks
+    /// should either carry the same watermark or specify a new (greater) one.
+    /// Thus, watermarks are monotonically non-decreasing.
+    pub new_watermark: Option<DateTime<Utc>>,
 }
