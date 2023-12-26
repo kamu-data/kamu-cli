@@ -141,6 +141,10 @@ type CreateDatasetResultSuccess implements CreateDatasetResult & CreateDatasetFr
 	message: String!
 }
 
+type CronExpression {
+	expression: String!
+}
+
 type DataBatch {
 	format: DataBatchFormat!
 	content: String!
@@ -233,6 +237,10 @@ type Dataset {
 	"""
 	metadata: DatasetMetadata!
 	"""
+	Access to the flow configurations of this dataset
+	"""
+	flowConfigs: DatasetFlowConfigs!
+	"""
 	Creation time of the first metadata block in the chain
 	"""
 	createdAt: DateTime!
@@ -284,6 +292,25 @@ type DatasetData {
 
 type DatasetEdge {
 	node: Dataset!
+}
+
+type DatasetFlowConfigs {
+	"""
+	Returns defined configuration for a flow of specified type
+	"""
+	flowConfig(datasetFlowType: DatasetFlowType!): FlowConfiguration
+}
+
+type DatasetFlowConfigsMut {
+	setConfigTimeDelta(datasetFlowType: DatasetFlowType!, paused: Boolean!, every: TimeDeltaInput!): Boolean!
+	setConfigCronExpression(datasetFlowType: DatasetFlowType!, paused: Boolean!, cronExpression: String!): Boolean!
+	setConfigBatching(datasetFlowType: DatasetFlowType!, paused: Boolean!, throttlingPeriod: TimeDeltaInput, minimalDataBatch: Int): Boolean!
+}
+
+enum DatasetFlowType {
+	INGEST
+	EXECUTE_QUERY
+	COMPACTION
 }
 
 scalar DatasetID
@@ -365,6 +392,10 @@ type DatasetMut {
 	Access to the mutable metadata of the dataset
 	"""
 	metadata: DatasetMetadataMut!
+	"""
+	Access to the mutable flow configurations of this dataset
+	"""
+	flowConfigs: DatasetFlowConfigsMut!
 	"""
 	Rename the dataset
 	"""
@@ -525,6 +556,19 @@ type FetchStepUrl {
 	headers: [RequestHeader!]
 }
 
+
+type FlowConfiguration {
+	paused: Boolean!
+	schedule: FlowConfigurationSchedule
+	batching: FlowConfigurationBatching
+}
+
+type FlowConfigurationBatching {
+	throttlingPeriod: TimeDelta
+	minimalDataBatch: Int
+}
+
+union FlowConfigurationSchedule = TimeDelta | CronExpression
 
 
 type InputSlice {
@@ -1054,6 +1098,23 @@ type TasksMut {
 type TemporalTable {
 	name: String!
 	primaryKey: [String!]!
+}
+
+type TimeDelta {
+	every: Int!
+	unit: TimeUnit!
+}
+
+input TimeDeltaInput {
+	every: Int!
+	unit: TimeUnit!
+}
+
+enum TimeUnit {
+	MINUTES
+	HOURS
+	DAYS
+	WEEKS
 }
 
 union Transform = TransformSql

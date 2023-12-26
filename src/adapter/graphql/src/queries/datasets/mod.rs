@@ -9,12 +9,14 @@
 
 mod dataset;
 mod dataset_data;
+mod dataset_flow_configs;
 mod dataset_metadata;
 mod datasets;
 mod metadata_chain;
 
 pub(crate) use dataset::*;
 pub(crate) use dataset_data::*;
+pub(crate) use dataset_flow_configs::*;
 pub(crate) use dataset_metadata::*;
 pub(crate) use datasets::*;
 pub(crate) use metadata_chain::*;
