@@ -765,8 +765,6 @@ pub enum MetadataEventDef {
     SetTransform(#[serde_as(as = "SetTransformDef")] SetTransform),
     #[serde(alias = "setVocab", alias = "setvocab")]
     SetVocab(#[serde_as(as = "SetVocabDef")] SetVocab),
-    #[serde(alias = "setWatermark", alias = "setwatermark")]
-    SetWatermark(#[serde_as(as = "SetWatermarkDef")] SetWatermark),
     #[serde(alias = "setAttachments", alias = "setattachments")]
     SetAttachments(#[serde_as(as = "SetAttachmentsDef")] SetAttachments),
     #[serde(alias = "setInfo", alias = "setinfo")]
@@ -1153,23 +1151,6 @@ pub struct SetVocabDef {
 }
 
 implement_serde_as!(SetVocab, SetVocabDef, "SetVocabDef");
-
-////////////////////////////////////////////////////////////////////////////////
-// SetWatermark
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setwatermark-schema
-////////////////////////////////////////////////////////////////////////////////
-
-#[serde_as]
-#[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(remote = "SetWatermark")]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub struct SetWatermarkDef {
-    #[serde(with = "datetime_rfc3339")]
-    pub new_watermark: DateTime<Utc>,
-}
-
-implement_serde_as!(SetWatermark, SetWatermarkDef, "SetWatermarkDef");
 
 ////////////////////////////////////////////////////////////////////////////////
 // SourceCaching
