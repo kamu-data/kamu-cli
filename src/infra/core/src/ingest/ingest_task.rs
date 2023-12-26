@@ -99,7 +99,7 @@ impl IngestTask {
         self.listener
             .on_stage_progress(PollingIngestStage::CheckCache, 0, TotalSteps::Exact(1));
 
-        let first_ingest = self.request.next_offset == 0;
+        let first_ingest = self.request.prev_offset.is_none();
         let uncacheable = !first_ingest && self.prev_source_state.is_none();
 
         if uncacheable && !self.options.fetch_uncacheable {
@@ -165,10 +165,10 @@ impl IngestTask {
                         // Advance the task state for the next run
                         self.request.system_time = Utc::now();
                         self.request.prev_checkpoint =
-                            commit.new_event.output_checkpoint.map(|c| c.physical_hash);
-                        self.request.prev_watermark = commit.new_event.output_watermark;
-                        if let Some(output_data) = commit.new_event.output_data {
-                            self.request.next_offset = output_data.interval.end + 1;
+                            commit.new_event.new_checkpoint.map(|c| c.physical_hash);
+                        self.request.prev_watermark = commit.new_event.new_watermark;
+                        if let Some(output_data) = commit.new_event.new_data {
+                            self.request.prev_offset = Some(output_data.offset_interval.end);
                             self.request
                                 .prev_data_slices
                                 .push(output_data.physical_hash);
@@ -384,10 +384,10 @@ impl IngestTask {
         // to it?
         if input_data_path.metadata().int_err()?.len() == 0 {
             Ok(IngestResponse {
-                data_interval: None,
-                output_watermark: self.request.prev_watermark,
-                out_checkpoint: None,
-                out_data: None,
+                new_offset_interval: None,
+                new_watermark: self.request.prev_watermark,
+                new_checkpoint: None,
+                new_data: None,
             })
         } else {
             let engine = self
@@ -418,12 +418,12 @@ impl IngestTask {
 
         let mut head = prev_hash.clone();
 
-        let data_interval = read_result.data_interval.clone();
-        let output_watermark = read_result.output_watermark;
-        let source_state = source_state.map(|v| v.to_source_state());
+        let new_offset_interval = read_result.new_offset_interval.clone();
+        let new_watermark = read_result.new_watermark;
+        let new_source_state = source_state.map(|v| v.to_source_state());
 
         // Read new schema
-        let new_schema = if let Some(out_data) = &read_result.out_data {
+        let new_schema = if let Some(out_data) = &read_result.new_data {
             let file = std::fs::File::open(out_data.as_path()).int_err()?;
             let schema = ParquetRecordBatchReaderBuilder::try_new(file)
                 .int_err()?
@@ -473,13 +473,14 @@ impl IngestTask {
             .dataset
             .commit_add_data(
                 AddDataParams {
-                    input_checkpoint: self.request.prev_checkpoint.clone(),
-                    output_data: data_interval.clone(),
-                    output_watermark,
-                    source_state,
+                    prev_checkpoint: self.request.prev_checkpoint.clone(),
+                    prev_offset: self.request.prev_offset.clone(),
+                    new_offset_interval: new_offset_interval.clone(),
+                    new_watermark,
+                    new_source_state,
                 },
-                read_result.out_data,
-                read_result.out_checkpoint,
+                read_result.new_data,
+                read_result.new_checkpoint,
                 CommitOpts {
                     block_ref: &BlockRef::Head,
                     system_time: Some(self.request.system_time),

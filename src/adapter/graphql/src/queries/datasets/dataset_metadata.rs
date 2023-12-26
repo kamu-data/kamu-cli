@@ -64,7 +64,7 @@ impl DatasetMetadata {
             .as_metadata_chain()
             .iter_blocks_ref(&domain::BlockRef::Head)
             .filter_data_stream_blocks()
-            .filter_map_ok(|(_, b)| b.event.output_watermark)
+            .filter_map_ok(|(_, b)| b.event.new_watermark)
             .try_first()
             .await
             .int_err()?)

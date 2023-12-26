@@ -213,7 +213,7 @@ implement_serde_as!(DatasetKind, DatasetKindDef, "DatasetKindDef");
 #[serde(remote = "DatasetSnapshot")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct DatasetSnapshotDef {
-    pub name: DatasetName,
+    pub name: DatasetAlias,
     #[serde_as(as = "DatasetKindDef")]
     pub kind: DatasetKind,
     #[serde_as(as = "Vec<MetadataEventDef>")]
@@ -540,7 +540,7 @@ pub struct ExecuteQueryResponseProgressDef {}
 pub struct ExecuteQueryResponseSuccessDef {
     #[serde_as(as = "Option<OffsetIntervalDef>")]
     #[serde(default)]
-    pub offset_interval: Option<OffsetInterval>,
+    pub new_offset_interval: Option<OffsetInterval>,
     #[serde(default, with = "datetime_rfc3339_opt")]
     pub new_watermark: Option<DateTime<Utc>>,
 }
@@ -1166,7 +1166,7 @@ implement_serde_as!(SetVocab, SetVocabDef, "SetVocabDef");
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct SetWatermarkDef {
     #[serde(with = "datetime_rfc3339")]
-    pub output_watermark: DateTime<Utc>,
+    pub new_watermark: DateTime<Utc>,
 }
 
 implement_serde_as!(SetWatermark, SetWatermarkDef, "SetWatermarkDef");
@@ -1296,7 +1296,7 @@ pub struct TransformSqlDef {
 #[serde(remote = "TransformInput")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct TransformInputDef {
-    pub dataset_ref: DatasetRefAny,
+    pub dataset_ref: DatasetRef,
     pub alias: Option<String>,
 }
 

@@ -395,13 +395,13 @@ impl SimpleTransferProtocol {
         // Update stats estimates based on metadata
         stats.dst_estimated.metadata_blocks_writen += blocks.len();
         for block in blocks.iter().filter_map(|(_, b)| b.as_data_stream_block()) {
-            if let Some(data_slice) = block.event.output_data {
+            if let Some(data_slice) = block.event.new_data {
                 stats.src_estimated.data_slices_read += 1;
                 stats.src_estimated.bytes_read += data_slice.size as usize;
                 stats.dst_estimated.data_slices_written += 1;
                 stats.dst_estimated.bytes_written += data_slice.size as usize;
             }
-            if let Some(checkpoint) = block.event.output_checkpoint {
+            if let Some(checkpoint) = block.event.new_checkpoint {
                 stats.src_estimated.checkpoints_read += 1;
                 stats.src_estimated.bytes_read += checkpoint.size as usize;
                 stats.dst_estimated.checkpoints_written += 1;

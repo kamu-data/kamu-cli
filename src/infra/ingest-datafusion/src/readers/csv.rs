@@ -89,47 +89,9 @@ impl Reader for ReaderCsv {
             None | Some("utf8") => Ok(()),
             Some(v) => Err(unsupported!("Unsupported Csv.encoding: {}", v)),
         }?;
-        match self.conf.comment.as_deref() {
-            None => Ok(()),
-            Some(v) => Err(unsupported!("Unsupported Csv.comment: {}", v)),
-        }?;
-        match self.conf.enforce_schema {
-            None | Some(true) => Ok(()),
-            Some(v) => Err(unsupported!("Unsupported Csv.enforceSchema: {}", v)),
-        }?;
-        match self.conf.ignore_leading_white_space {
-            None | Some(false) => Ok(()),
-            Some(v) => Err(unsupported!(
-                "Unsupported Csv.ignoreLeadingWhiteSpace: {}",
-                v
-            )),
-        }?;
-        match self.conf.ignore_trailing_white_space {
-            None | Some(false) => Ok(()),
-            Some(v) => Err(unsupported!(
-                "Unsupported Csv.ignoreTrailingWhiteSpace: {}",
-                v
-            )),
-        }?;
         match self.conf.null_value.as_deref() {
             None | Some("") => Ok(()),
             Some(v) => Err(unsupported!("Unsupported Csv.nullValue: {}", v)),
-        }?;
-        match self.conf.empty_value.as_deref() {
-            None => Ok(()),
-            Some(v) => Err(unsupported!("Unsupported Csv.emptyValue: {}", v)),
-        }?;
-        match self.conf.nan_value.as_deref() {
-            None => Ok(()),
-            Some(v) => Err(unsupported!("Unsupported Csv.nanValue: {}", v)),
-        }?;
-        match self.conf.positive_inf.as_deref() {
-            None => Ok(()),
-            Some(v) => Err(unsupported!("Unsupported Csv.positiveInf: {}", v)),
-        }?;
-        match self.conf.negative_inf.as_deref() {
-            None => Ok(()),
-            Some(v) => Err(unsupported!("Unsupported Csv.negativeInf: {}", v)),
         }?;
         match self.conf.date_format.as_deref() {
             None | Some("rfc3339") => Ok(()),
@@ -138,10 +100,6 @@ impl Reader for ReaderCsv {
         match self.conf.timestamp_format.as_deref() {
             None | Some("rfc3339") => Ok(()),
             Some(v) => Err(unsupported!("Unsupported Csv.timestampFormat: {}", v)),
-        }?;
-        match self.conf.multi_line {
-            None | Some(false) => Ok(()),
-            Some(v) => Err(unsupported!("Unsupported Csv.multiLine: {}", v)),
         }?;
 
         let options = CsvReadOptions {

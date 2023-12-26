@@ -81,7 +81,7 @@ impl VerificationServiceImpl {
                 VerificationPhase::DataIntegrity,
             );
 
-            if let Some(output_slice) = &block.event.output_data {
+            if let Some(output_slice) = &block.event.new_data {
                 // Check size first
                 let size_actual = dataset
                     .as_data_repo()
@@ -139,7 +139,7 @@ impl VerificationServiceImpl {
                     }
                 }
 
-                if let Some(checkpoint) = block.event.output_checkpoint {
+                if let Some(checkpoint) = block.event.new_checkpoint {
                     // Check size
                     let size_actual = dataset
                         .as_checkpoint_repo()

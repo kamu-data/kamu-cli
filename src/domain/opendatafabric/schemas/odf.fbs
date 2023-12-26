@@ -440,7 +440,7 @@ table SetVocab {
 ////////////////////////////////////////////////////////////////////////////////
 
 table SetWatermark {
-  output_watermark: Timestamp;
+  new_watermark: Timestamp;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -586,7 +586,7 @@ table ExecuteQueryResponseProgress {
 }
 
 table ExecuteQueryResponseSuccess {
-  offset_interval: OffsetInterval;
+  new_offset_interval: OffsetInterval;
   new_watermark: Timestamp;
 }
 

@@ -18,7 +18,7 @@ use chrono::{DateTime, Utc};
 use enum_variants::*;
 
 use crate::formats::Multihash;
-use crate::identity::{DatasetAlias, DatasetID, DatasetName, DatasetRefAny};
+use crate::identity::*;
 
 ////////////////////////////////////////////////////////////////////////////////
 // AddData
@@ -160,7 +160,7 @@ pub enum DatasetKind {
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct DatasetSnapshot {
     /// Alias of the dataset.
-    pub name: DatasetName,
+    pub name: DatasetAlias,
     /// Type of the dataset.
     pub kind: DatasetKind,
     /// An array of metadata events that will be used to populate the chain.
@@ -406,7 +406,7 @@ impl_enum_variant!(ExecuteQueryResponse::Progress(ExecuteQueryResponseProgress))
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct ExecuteQueryResponseSuccess {
     /// Data slice produced by the transaction, if any.
-    pub offset_interval: Option<OffsetInterval>,
+    pub new_offset_interval: Option<OffsetInterval>,
     /// Watermark advanced by the transaction, if any.
     pub new_watermark: Option<DateTime<Utc>>,
 }
@@ -1024,7 +1024,7 @@ pub struct SetVocab {
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct SetWatermark {
     /// Last watermark of the output data stream.
-    pub output_watermark: DateTime<Utc>,
+    pub new_watermark: DateTime<Utc>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1140,7 +1140,7 @@ pub struct TransformInput {
     /// A local or remote dataset reference. When block is accepted this MUST be
     /// in the form of a DatasetId to guarantee reproducibility, as aliases can
     /// change over time.
-    pub dataset_ref: DatasetRefAny,
+    pub dataset_ref: DatasetRef,
     /// An alias under which this input will be available in queries. Will be
     /// populated from `datasetRef` if not provided before resolving it to
     /// DatasetId.

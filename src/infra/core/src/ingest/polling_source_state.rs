@@ -26,19 +26,15 @@ pub enum PollingSourceState {
 
 impl PollingSourceState {
     pub fn from_source_state(source_state: &SourceState) -> Result<Option<Self>, InternalError> {
-        if source_state.source == SourceState::SOURCE_POLLING {
-            if source_state.kind == SourceState::KIND_ETAG {
-                Ok(Some(Self::ETag(source_state.value.clone())))
-            } else if source_state.kind == SourceState::KIND_LAST_MODIFIED {
-                let dt = DateTime::parse_from_rfc3339(&source_state.value)
-                    .map(|dt| dt.into())
-                    .int_err()?;
-                Ok(Some(Self::LastModified(dt)))
-            } else {
-                tracing::debug!(kind = %source_state.kind, "Ignoring unsupported source state kind");
-                Ok(None)
-            }
+        if source_state.kind == SourceState::KIND_ETAG {
+            Ok(Some(Self::ETag(source_state.value.clone())))
+        } else if source_state.kind == SourceState::KIND_LAST_MODIFIED {
+            let dt = DateTime::parse_from_rfc3339(&source_state.value)
+                .map(|dt| dt.into())
+                .int_err()?;
+            Ok(Some(Self::LastModified(dt)))
         } else {
+            tracing::debug!(kind = %source_state.kind, "Ignoring unsupported source state kind");
             Ok(None)
         }
     }
@@ -66,8 +62,8 @@ impl PollingSourceState {
             ),
         };
         SourceState {
+            source_name: None,
             kind,
-            source: SourceState::SOURCE_POLLING.to_owned(),
             value,
         }
     }

@@ -161,7 +161,7 @@ impl IntoDataStreamEvent for MetadataEvent {
                 e.new_checkpoint,
                 e.new_watermark,
             ),
-            MetadataEvent::SetWatermark(e) => (None, None, None, None, Some(e.output_watermark)),
+            MetadataEvent::SetWatermark(e) => (None, None, None, None, Some(e.new_watermark)),
             MetadataEvent::Seed(_)
             | MetadataEvent::SetAttachments(_)
             | MetadataEvent::SetInfo(_)
@@ -199,7 +199,7 @@ impl IntoDataStreamEvent for MetadataEvent {
                 e.new_checkpoint.as_ref(),
                 e.new_watermark.as_ref(),
             ),
-            MetadataEvent::SetWatermark(e) => (None, None, None, None, Some(&e.output_watermark)),
+            MetadataEvent::SetWatermark(e) => (None, None, None, None, Some(&e.new_watermark)),
             MetadataEvent::Seed(_)
             | MetadataEvent::SetAttachments(_)
             | MetadataEvent::SetInfo(_)

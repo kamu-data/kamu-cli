@@ -9410,7 +9410,7 @@ impl<'a> flatbuffers::Follow<'a> for SetWatermark<'a> {
 }
 
 impl<'a> SetWatermark<'a> {
-    pub const VT_OUTPUT_WATERMARK: flatbuffers::VOffsetT = 4;
+    pub const VT_NEW_WATERMARK: flatbuffers::VOffsetT = 4;
 
     #[inline]
     pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
@@ -9422,20 +9422,20 @@ impl<'a> SetWatermark<'a> {
         args: &'args SetWatermarkArgs<'args>,
     ) -> flatbuffers::WIPOffset<SetWatermark<'bldr>> {
         let mut builder = SetWatermarkBuilder::new(_fbb);
-        if let Some(x) = args.output_watermark {
-            builder.add_output_watermark(x);
+        if let Some(x) = args.new_watermark {
+            builder.add_new_watermark(x);
         }
         builder.finish()
     }
 
     #[inline]
-    pub fn output_watermark(&self) -> Option<&'a Timestamp> {
+    pub fn new_watermark(&self) -> Option<&'a Timestamp> {
         // Safety:
         // Created from valid Table for this object
         // which contains a valid value in this slot
         unsafe {
             self._tab
-                .get::<Timestamp>(SetWatermark::VT_OUTPUT_WATERMARK, None)
+                .get::<Timestamp>(SetWatermark::VT_NEW_WATERMARK, None)
         }
     }
 }
@@ -9448,19 +9448,19 @@ impl flatbuffers::Verifiable for SetWatermark<'_> {
     ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
         use self::flatbuffers::Verifiable;
         v.visit_table(pos)?
-            .visit_field::<Timestamp>("output_watermark", Self::VT_OUTPUT_WATERMARK, false)?
+            .visit_field::<Timestamp>("new_watermark", Self::VT_NEW_WATERMARK, false)?
             .finish();
         Ok(())
     }
 }
 pub struct SetWatermarkArgs<'a> {
-    pub output_watermark: Option<&'a Timestamp>,
+    pub new_watermark: Option<&'a Timestamp>,
 }
 impl<'a> Default for SetWatermarkArgs<'a> {
     #[inline]
     fn default() -> Self {
         SetWatermarkArgs {
-            output_watermark: None,
+            new_watermark: None,
         }
     }
 }
@@ -9471,9 +9471,9 @@ pub struct SetWatermarkBuilder<'a: 'b, 'b> {
 }
 impl<'a: 'b, 'b> SetWatermarkBuilder<'a, 'b> {
     #[inline]
-    pub fn add_output_watermark(&mut self, output_watermark: &Timestamp) {
+    pub fn add_new_watermark(&mut self, new_watermark: &Timestamp) {
         self.fbb_
-            .push_slot_always::<&Timestamp>(SetWatermark::VT_OUTPUT_WATERMARK, output_watermark);
+            .push_slot_always::<&Timestamp>(SetWatermark::VT_NEW_WATERMARK, new_watermark);
     }
     #[inline]
     pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>) -> SetWatermarkBuilder<'a, 'b> {
@@ -9493,7 +9493,7 @@ impl<'a: 'b, 'b> SetWatermarkBuilder<'a, 'b> {
 impl core::fmt::Debug for SetWatermark<'_> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let mut ds = f.debug_struct("SetWatermark");
-        ds.field("output_watermark", &self.output_watermark());
+        ds.field("new_watermark", &self.new_watermark());
         ds.finish()
     }
 }
@@ -11535,7 +11535,7 @@ impl<'a> flatbuffers::Follow<'a> for ExecuteQueryResponseSuccess<'a> {
 }
 
 impl<'a> ExecuteQueryResponseSuccess<'a> {
-    pub const VT_OFFSET_INTERVAL: flatbuffers::VOffsetT = 4;
+    pub const VT_NEW_OFFSET_INTERVAL: flatbuffers::VOffsetT = 4;
     pub const VT_NEW_WATERMARK: flatbuffers::VOffsetT = 6;
 
     #[inline]
@@ -11551,21 +11551,21 @@ impl<'a> ExecuteQueryResponseSuccess<'a> {
         if let Some(x) = args.new_watermark {
             builder.add_new_watermark(x);
         }
-        if let Some(x) = args.offset_interval {
-            builder.add_offset_interval(x);
+        if let Some(x) = args.new_offset_interval {
+            builder.add_new_offset_interval(x);
         }
         builder.finish()
     }
 
     #[inline]
-    pub fn offset_interval(&self) -> Option<OffsetInterval<'a>> {
+    pub fn new_offset_interval(&self) -> Option<OffsetInterval<'a>> {
         // Safety:
         // Created from valid Table for this object
         // which contains a valid value in this slot
         unsafe {
             self._tab
                 .get::<flatbuffers::ForwardsUOffset<OffsetInterval>>(
-                    ExecuteQueryResponseSuccess::VT_OFFSET_INTERVAL,
+                    ExecuteQueryResponseSuccess::VT_NEW_OFFSET_INTERVAL,
                     None,
                 )
         }
@@ -11591,8 +11591,8 @@ impl flatbuffers::Verifiable for ExecuteQueryResponseSuccess<'_> {
         use self::flatbuffers::Verifiable;
         v.visit_table(pos)?
             .visit_field::<flatbuffers::ForwardsUOffset<OffsetInterval>>(
-                "offset_interval",
-                Self::VT_OFFSET_INTERVAL,
+                "new_offset_interval",
+                Self::VT_NEW_OFFSET_INTERVAL,
                 false,
             )?
             .visit_field::<Timestamp>("new_watermark", Self::VT_NEW_WATERMARK, false)?
@@ -11601,14 +11601,14 @@ impl flatbuffers::Verifiable for ExecuteQueryResponseSuccess<'_> {
     }
 }
 pub struct ExecuteQueryResponseSuccessArgs<'a> {
-    pub offset_interval: Option<flatbuffers::WIPOffset<OffsetInterval<'a>>>,
+    pub new_offset_interval: Option<flatbuffers::WIPOffset<OffsetInterval<'a>>>,
     pub new_watermark: Option<&'a Timestamp>,
 }
 impl<'a> Default for ExecuteQueryResponseSuccessArgs<'a> {
     #[inline]
     fn default() -> Self {
         ExecuteQueryResponseSuccessArgs {
-            offset_interval: None,
+            new_offset_interval: None,
             new_watermark: None,
         }
     }
@@ -11620,14 +11620,14 @@ pub struct ExecuteQueryResponseSuccessBuilder<'a: 'b, 'b> {
 }
 impl<'a: 'b, 'b> ExecuteQueryResponseSuccessBuilder<'a, 'b> {
     #[inline]
-    pub fn add_offset_interval(
+    pub fn add_new_offset_interval(
         &mut self,
-        offset_interval: flatbuffers::WIPOffset<OffsetInterval<'b>>,
+        new_offset_interval: flatbuffers::WIPOffset<OffsetInterval<'b>>,
     ) {
         self.fbb_
             .push_slot_always::<flatbuffers::WIPOffset<OffsetInterval>>(
-                ExecuteQueryResponseSuccess::VT_OFFSET_INTERVAL,
-                offset_interval,
+                ExecuteQueryResponseSuccess::VT_NEW_OFFSET_INTERVAL,
+                new_offset_interval,
             );
     }
     #[inline]
@@ -11657,7 +11657,7 @@ impl<'a: 'b, 'b> ExecuteQueryResponseSuccessBuilder<'a, 'b> {
 impl core::fmt::Debug for ExecuteQueryResponseSuccess<'_> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let mut ds = f.debug_struct("ExecuteQueryResponseSuccess");
-        ds.field("offset_interval", &self.offset_interval());
+        ds.field("new_offset_interval", &self.new_offset_interval());
         ds.field("new_watermark", &self.new_watermark());
         ds.finish()
     }

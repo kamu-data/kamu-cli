@@ -115,7 +115,7 @@ impl EngineIoStrategy for EngineIoStrategyLocalVolume {
             )
             .await?;
 
-        let mut inputs = Vec::new();
+        let mut query_inputs = Vec::new();
         for input in request.inputs {
             let input_dataset = self
                 .dataset_repo
@@ -154,11 +154,21 @@ impl EngineIoStrategy for EngineIoStrategyLocalVolume {
                 .await?
             };
 
-            inputs.push(ExecuteQueryInput {
+            let offset_interval = if let Some(new_offset) = input.new_offset {
+                Some(OffsetInterval {
+                    start: input.prev_offset.map(|v| v + 1).unwrap_or(0),
+                    end: new_offset,
+                })
+            } else {
+                None
+            };
+
+            query_inputs.push(ExecuteQueryRequestInput {
                 dataset_id: input.dataset_handle.id,
-                dataset_name: DatasetName::new_unchecked(&input.alias),
+                dataset_alias: input.dataset_handle.alias,
+                query_alias: input.alias,
                 vocab: input.vocab,
-                data_interval: input.data_interval,
+                offset_interval,
                 data_paths,
                 schema_file,
                 explicit_watermarks: input.explicit_watermarks,
@@ -167,15 +177,15 @@ impl EngineIoStrategy for EngineIoStrategyLocalVolume {
 
         let engine_request = ExecuteQueryRequest {
             dataset_id: request.dataset_handle.id,
-            dataset_name: request.dataset_handle.alias.dataset_name,
+            dataset_alias: request.dataset_handle.alias,
             system_time: request.system_time,
-            offset: request.next_offset,
+            next_offset: request.prev_offset.map(|v| v + 1).unwrap_or(0),
             vocab: request.vocab,
             transform: request.transform,
-            inputs,
+            query_inputs,
             prev_checkpoint_path,
             new_checkpoint_path: container_out_checkpoint_path,
-            out_data_path: container_out_data_path,
+            new_data_path: container_out_data_path,
         };
 
         Ok(MaterializedEngineRequest {
@@ -288,7 +298,7 @@ impl EngineIoStrategy for EngineIoStrategyRemoteProxy {
             )
             .await?;
 
-        let mut inputs = Vec::new();
+        let mut query_inputs = Vec::new();
         for input in request.inputs {
             let input_dataset = self
                 .dataset_repo
@@ -329,11 +339,21 @@ impl EngineIoStrategy for EngineIoStrategyRemoteProxy {
                 .await?
             };
 
-            inputs.push(ExecuteQueryInput {
+            let offset_interval = if let Some(new_offset) = input.new_offset {
+                Some(OffsetInterval {
+                    start: input.prev_offset.map(|v| v + 1).unwrap_or(0),
+                    end: new_offset,
+                })
+            } else {
+                None
+            };
+
+            query_inputs.push(ExecuteQueryRequestInput {
                 dataset_id: input.dataset_handle.id,
-                dataset_name: DatasetName::new_unchecked(&input.alias),
+                dataset_alias: input.dataset_handle.alias,
+                query_alias: input.alias,
                 vocab: input.vocab,
-                data_interval: input.data_interval,
+                offset_interval,
                 data_paths,
                 schema_file,
                 explicit_watermarks: input.explicit_watermarks,
@@ -342,15 +362,15 @@ impl EngineIoStrategy for EngineIoStrategyRemoteProxy {
 
         let engine_request = ExecuteQueryRequest {
             dataset_id: request.dataset_handle.id,
-            dataset_name: request.dataset_handle.alias.dataset_name,
+            dataset_alias: request.dataset_handle.alias,
             system_time: request.system_time,
-            offset: request.next_offset,
+            next_offset: request.prev_offset.map(|v| v + 1).unwrap_or(0),
             vocab: request.vocab,
             transform: request.transform,
-            inputs,
+            query_inputs,
             prev_checkpoint_path,
             new_checkpoint_path: container_out_checkpoint_path,
-            out_data_path: container_out_data_path,
+            new_data_path: container_out_data_path,
         };
 
         Ok(MaterializedEngineRequest {

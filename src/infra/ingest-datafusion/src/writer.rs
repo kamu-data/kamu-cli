@@ -45,10 +45,10 @@ pub struct DataWriterMetadataState {
     pub merge_strategy: odf::MergeStrategy,
     pub vocab: odf::DatasetVocabularyResolvedOwned,
     pub data_slices: Vec<odf::Multihash>,
-    pub last_offset: Option<i64>,
-    pub last_checkpoint: Option<odf::Multihash>,
-    pub last_watermark: Option<DateTime<Utc>>,
-    pub last_source_state: Option<odf::SourceState>,
+    pub prev_offset: Option<u64>,
+    pub prev_checkpoint: Option<odf::Multihash>,
+    pub prev_watermark: Option<DateTime<Utc>>,
+    pub prev_source_state: Option<odf::SourceState>,
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -75,12 +75,12 @@ impl DataWriterDataFusion {
         }
     }
 
-    pub fn last_offset(&self) -> Option<i64> {
-        self.meta.last_offset
+    pub fn prev_offset(&self) -> Option<u64> {
+        self.meta.prev_offset
     }
 
-    pub fn last_source_state(&self) -> Option<&odf::SourceState> {
-        self.meta.last_source_state.as_ref()
+    pub fn prev_source_state(&self) -> Option<&odf::SourceState> {
+        self.meta.prev_source_state.as_ref()
     }
 
     pub fn vocab(&self) -> &odf::DatasetVocabularyResolvedOwned {
@@ -223,7 +223,7 @@ impl DataWriterDataFusion {
         df: DataFrame,
         system_time: DateTime<Utc>,
         fallback_event_time: DateTime<Utc>,
-        start_offset: i64,
+        start_offset: u64,
     ) -> Result<DataFrame, InternalError> {
         use datafusion::arrow::datatypes::DataType;
         use datafusion::logical_expr as expr;
@@ -453,8 +453,8 @@ impl DataWriterDataFusion {
             .value(0);
 
         let offset_interval = odf::OffsetInterval {
-            start: offset_min,
-            end: offset_max,
+            start: offset_min as u64,
+            end: offset_max as u64,
         };
 
         // Event time is either Date or Timestamp(Millisecond, UTC)
@@ -535,7 +535,7 @@ impl DataWriter for DataWriterDataFusion {
                     df,
                     opts.system_time,
                     opts.source_event_time,
-                    self.meta.last_offset.map(|e| e + 1).unwrap_or(0),
+                    self.meta.prev_offset.map(|e| e + 1).unwrap_or(0),
                 )
                 .await?;
 
@@ -549,24 +549,26 @@ impl DataWriter for DataWriterDataFusion {
             let data_file = self.write_output(opts.data_staging_path, df).await?;
 
             // Prepare commit info
-            let input_checkpoint = self.meta.last_checkpoint.clone();
-            let source_state = opts.source_state.clone();
-            let prev_watermark = self.meta.last_watermark;
+            let prev_offset = self.meta.prev_offset;
+            let prev_checkpoint = self.meta.prev_checkpoint.clone();
+            let new_source_state = opts.source_state;
+            let prev_watermark = self.meta.prev_watermark.clone();
 
             if data_file.is_none() {
                 // Empty result - carry watermark and propagate source state
                 (
                     AddDataParams {
-                        input_checkpoint,
-                        output_data: None,
-                        output_watermark: prev_watermark,
-                        source_state,
+                        prev_checkpoint,
+                        prev_offset,
+                        new_offset_interval: None,
+                        new_watermark: prev_watermark,
+                        new_source_state,
                     },
                     Some(output_schema),
                     None,
                 )
             } else {
-                let (offset_interval, output_watermark) = self
+                let (new_offset_interval, new_watermark) = self
                     .compute_offset_and_watermark(
                         data_file.as_ref().unwrap().as_path(),
                         prev_watermark,
@@ -575,10 +577,11 @@ impl DataWriter for DataWriterDataFusion {
 
                 (
                     AddDataParams {
-                        input_checkpoint,
-                        output_data: Some(offset_interval),
-                        output_watermark,
-                        source_state,
+                        prev_checkpoint,
+                        prev_offset,
+                        new_offset_interval: Some(new_offset_interval),
+                        new_watermark,
+                        new_source_state,
                     },
                     Some(output_schema),
                     data_file,
@@ -587,19 +590,20 @@ impl DataWriter for DataWriterDataFusion {
         } else {
             // TODO: Should watermark be advanced by the source event time?
             let add_data = AddDataParams {
-                input_checkpoint: self.meta.last_checkpoint.clone(),
-                output_data: None,
-                output_watermark: self.meta.last_watermark,
-                source_state: opts.source_state.clone(),
+                prev_checkpoint: self.meta.prev_checkpoint.clone(),
+                prev_offset: self.meta.prev_offset,
+                new_offset_interval: None,
+                new_watermark: self.meta.prev_watermark.clone(),
+                new_source_state: opts.source_state,
             };
 
             (add_data, None, None)
         };
 
         // Do we have anything to commit?
-        if add_data.output_data.is_none()
-            && add_data.output_watermark == self.meta.last_watermark
-            && opts.source_state == self.meta.last_source_state
+        if add_data.new_offset_interval.is_none()
+            && add_data.new_watermark == self.meta.prev_watermark
+            && add_data.new_source_state == self.meta.prev_source_state
         {
             Err(EmptyCommitError {}.into())
         } else {
@@ -666,21 +670,19 @@ impl DataWriter for DataWriterDataFusion {
 
         self.meta.head = commit_data_result.new_head.clone();
 
-        if let Some(output_data) = &new_block.event.output_data {
-            self.meta.last_offset = Some(output_data.interval.end);
-            self.meta
-                .data_slices
-                .push(output_data.physical_hash.clone());
+        if let Some(new_data) = &new_block.event.new_data {
+            self.meta.prev_offset = Some(new_data.offset_interval.end);
+            self.meta.data_slices.push(new_data.physical_hash.clone());
         }
 
-        self.meta.last_checkpoint = new_block
+        self.meta.prev_checkpoint = new_block
             .event
-            .output_checkpoint
+            .new_checkpoint
             .as_ref()
             .map(|c| c.physical_hash.clone());
 
-        self.meta.last_watermark = new_block.event.output_watermark;
-        self.meta.last_source_state = new_block.event.source_state.clone();
+        self.meta.prev_watermark = new_block.event.new_watermark;
+        self.meta.prev_source_state = new_block.event.new_source_state.clone();
 
         Ok(WriteDataResult {
             old_head,
@@ -748,12 +750,12 @@ impl DataWriterDataFusionBuilder {
 
         let mut schema = None;
         let mut source_event: Option<odf::MetadataEvent> = None;
-        let mut data_slices = Vec::new();
-        let mut last_checkpoint = None;
-        let mut last_watermark = None;
-        let mut last_source_state = None;
         let mut vocab: Option<odf::DatasetVocabulary> = None;
-        let mut last_offset = None;
+        let mut data_slices = Vec::new();
+        let mut prev_checkpoint = None;
+        let mut prev_watermark = None;
+        let mut prev_source_state = None;
+        let mut prev_offset = None;
 
         {
             use futures::stream::TryStreamExt;
@@ -770,27 +772,33 @@ impl DataWriterDataFusionBuilder {
                         }
                     }
                     odf::MetadataEvent::AddData(e) => {
-                        if let Some(output_data) = &e.output_data {
+                        if let Some(output_data) = &e.new_data {
                             data_slices.push(output_data.physical_hash.clone());
-
-                            if last_offset.is_none() {
-                                last_offset = Some(output_data.interval.end);
+                        }
+                        if prev_offset.is_none() {
+                            prev_offset = Some(e.last_offset());
+                        }
+                        if prev_checkpoint.is_none() {
+                            prev_checkpoint = Some(e.new_checkpoint.map(|cp| cp.physical_hash));
+                        }
+                        if prev_watermark.is_none() {
+                            prev_watermark = Some(e.new_watermark);
+                        }
+                        if prev_source_state.is_none() {
+                            if let Some(ss) = &e.new_source_state {
+                                if ss.source_name.as_deref() != source_name {
+                                    unimplemented!(
+                                        "Differentiating between the state of multiple sources is \
+                                         not yet supported"
+                                    );
+                                }
                             }
-                        }
-                        if last_checkpoint.is_none() {
-                            last_checkpoint = Some(e.output_checkpoint.map(|cp| cp.physical_hash));
-                        }
-                        if last_watermark.is_none() {
-                            last_watermark = Some(e.output_watermark);
-                        }
-                        // TODO: Consider multiple sources situation
-                        if last_source_state.is_none() {
-                            last_source_state = Some(e.source_state);
+                            prev_source_state = Some(e.new_source_state);
                         }
                     }
                     odf::MetadataEvent::SetWatermark(e) => {
-                        if last_watermark.is_none() {
-                            last_watermark = Some(Some(e.output_watermark));
+                        if prev_watermark.is_none() {
+                            prev_watermark = Some(Some(e.new_watermark));
                         }
                     }
                     odf::MetadataEvent::SetPollingSource(e) => {
@@ -854,10 +862,10 @@ impl DataWriterDataFusionBuilder {
             merge_strategy,
             vocab: vocab.unwrap_or_default().into(),
             data_slices,
-            last_offset,
-            last_checkpoint: last_checkpoint.unwrap_or_default(),
-            last_watermark: last_watermark.unwrap_or_default(),
-            last_source_state: last_source_state.unwrap_or_default(),
+            prev_offset: prev_offset.unwrap_or_default(),
+            prev_checkpoint: prev_checkpoint.unwrap_or_default(),
+            prev_watermark: prev_watermark.unwrap_or_default(),
+            prev_source_state: prev_source_state.unwrap_or_default(),
         }))
     }
 
