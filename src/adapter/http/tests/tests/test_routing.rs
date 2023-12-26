@@ -54,7 +54,6 @@ async fn setup_repo() -> RepoFixture {
 
     let created_dataset = dataset_repo
         .create_dataset_from_snapshot(
-            None,
             MetadataFactory::dataset_snapshot()
                 .name("foo")
                 .kind(DatasetKind::Root)

@@ -82,10 +82,11 @@ async fn create_test_dataset(catalog: &dill::Catalog, tempdir: &Path) {
     dataset
         .commit_add_data(
             AddDataParams {
-                input_checkpoint: None,
-                output_data: Some(OffsetInterval { start: 0, end: 3 }),
-                output_watermark: None,
-                source_state: None,
+                prev_checkpoint: None,
+                prev_offset: None,
+                new_offset_interval: Some(OffsetInterval { start: 0, end: 3 }),
+                new_watermark: None,
+                new_source_state: None,
             },
             Some(OwnedFile::new(tmp_data_path)),
             None,

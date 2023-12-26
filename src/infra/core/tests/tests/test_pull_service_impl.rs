@@ -13,7 +13,7 @@ use std::path::Path;
 use std::sync::{Arc, Mutex};
 
 use chrono::prelude::*;
-use dill::Component;
+use dill::*;
 use event_bus::EventBus;
 use kamu::domain::*;
 use kamu::testing::*;
@@ -111,109 +111,26 @@ async fn create_graph(
     datasets: Vec<(DatasetAlias, Vec<DatasetAlias>)>,
 ) {
     for (dataset_alias, deps) in datasets {
-        let dataset = repo
-            .create_dataset(
-                &dataset_alias,
-                MetadataFactory::metadata_block(
-                    MetadataFactory::seed(if deps.is_empty() {
-                        DatasetKind::Root
-                    } else {
-                        DatasetKind::Derivative
-                    })
-                    .id_from(dataset_alias.dataset_name.as_str())
-                    .build(),
-                )
-                .build_typed(),
-            )
-            .await
-            .unwrap()
-            .dataset;
-
-        if deps.is_empty() {
-            dataset
-                .commit_event(
-                    MetadataEvent::SetPollingSource(MetadataFactory::set_polling_source().build()),
-                    CommitOpts::default(),
-                )
-                .await
-                .unwrap();
-        } else {
-            dataset
-                .commit_event(
-                    MetadataEvent::SetTransform(
-                        MetadataFactory::set_transform_aliases(deps)
-                            .input_ids_from_names()
-                            .build(),
-                    ),
-                    CommitOpts::default(),
-                )
-                .await
-                .unwrap();
-        }
-    }
-}
-
-// TODO: Rewrite this abomination
-async fn create_graph_in_repository(
-    event_bus: Arc<EventBus>,
-    repo_path: &Path,
-    datasets: Vec<(DatasetAlias, Vec<DatasetAlias>)>,
-) {
-    for (dataset_alias, deps) in datasets {
-        let layout = DatasetLayout::create(repo_path.join(&dataset_alias.dataset_name)).unwrap();
-        let ds = DatasetFactoryImpl::get_local_fs(layout, event_bus.clone());
-        let chain = ds.as_metadata_chain();
-
-        if deps.is_empty() {
-            let seed_block = MetadataFactory::metadata_block(
-                MetadataFactory::seed(DatasetKind::Root)
-                    .id_from(dataset_alias.dataset_name.as_str())
-                    .build(),
-            )
-            .build();
-            let seed_block_sequence_number = seed_block.sequence_number;
-
-            let head = chain
-                .append(seed_block, AppendOpts::default())
-                .await
-                .unwrap();
-            chain
-                .append(
-                    MetadataFactory::metadata_block(MetadataFactory::set_polling_source().build())
-                        .prev(&head, seed_block_sequence_number)
-                        .build(),
-                    AppendOpts::default(),
-                )
-                .await
-                .unwrap();
-        } else {
-            let seed_block = MetadataFactory::metadata_block(
-                MetadataFactory::seed(DatasetKind::Derivative)
-                    .id_from(dataset_alias.dataset_name.as_str())
-                    .build(),
-            )
-            .build();
-            let seed_block_sequence_number = seed_block.sequence_number;
-
-            let head = chain
-                .append(seed_block, AppendOpts::default())
-                .await
-                .unwrap();
-
-            chain
-                .append(
-                    MetadataFactory::metadata_block(
-                        MetadataFactory::set_transform(deps.into_iter().map(|d| d.dataset_name))
-                            .input_ids_from_names()
-                            .build(),
-                    )
-                    .prev(&head, seed_block_sequence_number)
-                    .build(),
-                    AppendOpts::default(),
-                )
-                .await
-                .unwrap();
-        }
+        repo.create_dataset_from_snapshot(
+            MetadataFactory::dataset_snapshot()
+                .name(dataset_alias)
+                .kind(if deps.is_empty() {
+                    DatasetKind::Root
+                } else {
+                    DatasetKind::Derivative
+                })
+                .push_event::<MetadataEvent>(if deps.is_empty() {
+                    MetadataFactory::set_polling_source().build().into()
+                } else {
+                    MetadataFactory::set_transform()
+                        .inputs_from_refs(deps)
+                        .build()
+                        .into()
+                })
+                .build(),
+        )
+        .await
+        .unwrap();
     }
 }
 
@@ -230,7 +147,17 @@ async fn create_graph_remote(
     to_import: Vec<DatasetAlias>,
 ) {
     let tmp_repo_dir = tempfile::tempdir().unwrap();
-    create_graph_in_repository(event_bus.clone(), tmp_repo_dir.path(), datasets).await;
+
+    let remote_dataset_repo = DatasetRepositoryLocalFs::new(
+        tmp_repo_dir.path().to_owned(),
+        Arc::new(CurrentAccountSubject::new_test()),
+        Arc::new(auth::AlwaysHappyDatasetActionAuthorizer::new()),
+        Arc::new(DependencyGraphServiceInMemory::new(None)),
+        Arc::new(EventBus::new(Arc::new(CatalogBuilder::new().build()))),
+        false,
+    );
+
+    create_graph(&remote_dataset_repo, datasets).await;
 
     let tmp_repo_name = RepoName::new_unchecked("tmp");
 
@@ -970,9 +897,8 @@ impl PullTestHarness {
     async fn create_dataset(&self, dataset_alias: &DatasetAlias) {
         self.dataset_repo
             .create_dataset_from_snapshot(
-                None,
                 MetadataFactory::dataset_snapshot()
-                    .name(&dataset_alias.dataset_name)
+                    .name(DatasetAlias::new(None, dataset_alias.dataset_name.clone()))
                     .build(),
             )
             .await
@@ -1259,9 +1185,8 @@ impl SyncService for TestSyncService {
                 None => {
                     self.dataset_repo
                         .create_dataset_from_snapshot(
-                            local_ref.account_name().map(|a| a.to_owned()),
                             MetadataFactory::dataset_snapshot()
-                                .name(local_ref.dataset_name().unwrap())
+                                .name(local_ref.alias().unwrap().clone())
                                 .build(),
                         )
                         .await

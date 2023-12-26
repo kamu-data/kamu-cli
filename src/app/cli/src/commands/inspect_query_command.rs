@@ -115,8 +115,8 @@ impl InspectQueryCommand {
             writeln!(
                 output,
                 "  {}  {}",
-                style(&input.name).bold(),
-                style(input.id.as_ref().unwrap()).dim(),
+                style(input.alias.as_ref().unwrap()).bold(),
+                style(&input.dataset_ref).dim(),
             )?;
         }
 

@@ -13,12 +13,10 @@ use kamu::domain::*;
 use opendatafabric::*;
 
 use super::{common, BatchError, CLIError, Command};
-use crate::accounts;
 
 pub struct AddCommand {
     resource_loader: Arc<dyn ResourceLoader>,
     dataset_repo: Arc<dyn DatasetRepository>,
-    current_account: accounts::CurrentAccountIndication,
     snapshot_refs: Vec<String>,
     recursive: bool,
     replace: bool,
@@ -29,7 +27,6 @@ impl AddCommand {
     pub fn new<'s, I>(
         resource_loader: Arc<dyn ResourceLoader>,
         dataset_repo: Arc<dyn DatasetRepository>,
-        current_account: accounts::CurrentAccountIndication,
         snapshot_refs_iter: I,
         recursive: bool,
         replace: bool,
@@ -41,7 +38,6 @@ impl AddCommand {
         Self {
             resource_loader,
             dataset_repo,
-            current_account,
             snapshot_refs: snapshot_refs_iter.map(|s| s.to_owned()).collect(),
             recursive,
             replace,
@@ -203,14 +199,7 @@ impl Command for AddCommand {
 
         let mut add_results = self
             .dataset_repo
-            .create_datasets_from_snapshots(
-                if self.current_account.is_explicit() {
-                    Some(self.current_account.account_name.clone())
-                } else {
-                    None
-                },
-                snapshots,
-            )
+            .create_datasets_from_snapshots(snapshots)
             .await;
 
         add_results.sort_by(|(id_a, _), (id_b, _)| id_a.cmp(&id_b));
