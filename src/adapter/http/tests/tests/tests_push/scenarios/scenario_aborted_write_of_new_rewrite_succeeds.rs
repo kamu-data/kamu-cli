@@ -45,9 +45,11 @@ impl<TServerHarness: ServerSideHarness> SmartPushAbortedWriteOfNewWriteSucceeds<
 
         let client_create_result = client_repo
             .create_dataset_from_snapshot(
-                client_account_name.clone(),
                 MetadataFactory::dataset_snapshot()
-                    .name("foo")
+                    .name(DatasetAlias::new(
+                        client_account_name.clone(),
+                        DatasetName::new_unchecked("foo"),
+                    ))
                     .kind(DatasetKind::Root)
                     .push_event(MetadataFactory::set_polling_source().build())
                     .push_event(MetadataFactory::set_data_schema().build())

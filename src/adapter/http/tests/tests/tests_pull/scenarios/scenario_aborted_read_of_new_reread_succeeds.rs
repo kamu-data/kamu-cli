@@ -45,9 +45,11 @@ impl<TServerHarness: ServerSideHarness>
         let server_repo = server_harness.cli_dataset_repository();
         let server_create_result = server_repo
             .create_dataset_from_snapshot(
-                server_account_name.clone(),
                 MetadataFactory::dataset_snapshot()
-                    .name("foo")
+                    .name(DatasetAlias::new(
+                        server_account_name.clone(),
+                        DatasetName::new_unchecked("foo"),
+                    ))
                     .kind(DatasetKind::Root)
                     .push_event(MetadataFactory::set_polling_source().build())
                     .push_event(MetadataFactory::set_data_schema().build())

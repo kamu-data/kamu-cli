@@ -1014,9 +1014,8 @@ impl FlowHarness {
         let result = self
             .dataset_repo
             .create_dataset_from_snapshot(
-                None,
                 MetadataFactory::dataset_snapshot()
-                    .name(DatasetName::new_unchecked(dataset_name))
+                    .name(dataset_name)
                     .kind(DatasetKind::Root)
                     .push_event(MetadataFactory::set_polling_source().build())
                     .build(),
@@ -1032,24 +1031,17 @@ impl FlowHarness {
         dataset_name: &str,
         input_ids: Vec<DatasetID>,
     ) -> DatasetID {
-        let mut input_aliases = Vec::new();
-        for input_id in input_ids {
-            let input_hdl = self
-                .dataset_repo
-                .resolve_dataset_ref(&input_id.as_local_ref())
-                .await
-                .unwrap();
-            input_aliases.push(input_hdl.alias);
-        }
-
         let create_result = self
             .dataset_repo
             .create_dataset_from_snapshot(
-                None,
                 MetadataFactory::dataset_snapshot()
-                    .name(DatasetName::new_unchecked(dataset_name))
+                    .name(dataset_name)
                     .kind(DatasetKind::Derivative)
-                    .push_event(MetadataFactory::set_transform_aliases(input_aliases).build())
+                    .push_event(
+                        MetadataFactory::set_transform()
+                            .inputs_from_refs(input_ids)
+                            .build(),
+                    )
                     .build(),
             )
             .await

@@ -463,7 +463,6 @@ async fn create_test_case(server_harness: &dyn ServerSideHarness) -> TestCase {
 
     let create_result = server_repo
         .create_dataset_from_snapshot(
-            None,
             MetadataFactory::dataset_snapshot()
                 .name("foo")
                 .kind(DatasetKind::Root)
