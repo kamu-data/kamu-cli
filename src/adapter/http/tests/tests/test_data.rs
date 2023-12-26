@@ -49,49 +49,49 @@ async fn test_data_push_ingest_handler() {
 
     let create_result = server_harness
         .cli_dataset_repository()
-        .create_dataset_from_snapshot(
-            server_harness.operating_account_name(),
-            DatasetSnapshot {
-                name: "population".try_into().unwrap(),
-                kind: DatasetKind::Root,
-                metadata: vec![
-                    AddPushSource {
-                        source_name: None, // Default source
-                        read: ReadStepNdJson {
-                            schema: Some(vec![
-                                "event_time TIMESTAMP".to_owned(),
-                                "city STRING".to_owned(),
-                                "population BIGINT".to_owned(),
-                            ]),
-                            ..Default::default()
-                        }
-                        .into(),
-                        preprocess: None,
-                        merge: MergeStrategy::Ledger(MergeStrategyLedger {
-                            primary_key: vec!["event_time".to_owned(), "city".to_owned()],
-                        }),
+        .create_dataset_from_snapshot(DatasetSnapshot {
+            name: DatasetAlias::new(
+                server_harness.operating_account_name(),
+                DatasetName::new_unchecked("population"),
+            ),
+            kind: DatasetKind::Root,
+            metadata: vec![
+                AddPushSource {
+                    source_name: None, // Default source
+                    read: ReadStepNdJson {
+                        schema: Some(vec![
+                            "event_time TIMESTAMP".to_owned(),
+                            "city STRING".to_owned(),
+                            "population BIGINT".to_owned(),
+                        ]),
+                        ..Default::default()
                     }
                     .into(),
-                    AddPushSource {
-                        source_name: Some("device1".to_string()),
-                        read: ReadStepNdJson {
-                            schema: Some(vec![
-                                "event_time TIMESTAMP".to_owned(),
-                                "city STRING".to_owned(),
-                                "population BIGINT".to_owned(),
-                            ]),
-                            ..Default::default()
-                        }
-                        .into(),
-                        preprocess: None,
-                        merge: MergeStrategy::Ledger(MergeStrategyLedger {
-                            primary_key: vec!["event_time".to_owned(), "city".to_owned()],
-                        }),
+                    preprocess: None,
+                    merge: MergeStrategy::Ledger(MergeStrategyLedger {
+                        primary_key: vec!["event_time".to_owned(), "city".to_owned()],
+                    }),
+                }
+                .into(),
+                AddPushSource {
+                    source_name: Some("device1".to_string()),
+                    read: ReadStepNdJson {
+                        schema: Some(vec![
+                            "event_time TIMESTAMP".to_owned(),
+                            "city STRING".to_owned(),
+                            "population BIGINT".to_owned(),
+                        ]),
+                        ..Default::default()
                     }
                     .into(),
-                ],
-            },
-        )
+                    preprocess: None,
+                    merge: MergeStrategy::Ledger(MergeStrategyLedger {
+                        primary_key: vec!["event_time".to_owned(), "city".to_owned()],
+                    }),
+                }
+                .into(),
+            ],
+        })
         .await
         .unwrap();
 

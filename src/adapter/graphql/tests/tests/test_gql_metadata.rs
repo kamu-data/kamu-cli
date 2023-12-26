@@ -48,7 +48,6 @@ async fn test_current_push_sources() {
         .unwrap();
     let create_result = dataset_repo
         .create_dataset_from_snapshot(
-            None,
             MetadataFactory::dataset_snapshot()
                 .kind(DatasetKind::Root)
                 .name("foo")

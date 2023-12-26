@@ -99,7 +99,7 @@ async fn test_data_writer_happy_path() {
     .await;
 
     assert_eq!(
-        res.new_block.event.output_watermark.as_ref(),
+        res.new_block.event.new_watermark.as_ref(),
         Some(&harness.source_event_time)
     );
 
@@ -168,7 +168,7 @@ async fn test_data_writer_happy_path() {
     .await;
 
     assert_eq!(
-        res.new_block.event.output_watermark.as_ref(),
+        res.new_block.event.new_watermark.as_ref(),
         Some(&harness.source_event_time)
     );
 
@@ -176,7 +176,7 @@ async fn test_data_writer_happy_path() {
     assert_eq!(schema_block_hash, harness.get_last_schema_block().await.0);
 
     // Round 3 (nothing to commit)
-    let prev_watermark = res.new_block.event.output_watermark.unwrap();
+    let prev_watermark = res.new_block.event.new_watermark.unwrap();
     harness.set_system_time(Utc.with_ymd_and_hms(2010, 1, 3, 12, 0, 0).unwrap());
     harness.set_source_event_time(Utc.with_ymd_and_hms(2000, 1, 3, 12, 0, 0).unwrap());
 
@@ -199,8 +199,8 @@ async fn test_data_writer_happy_path() {
 
     // Round 4 (nothing but source state changed)
     let source_state = odf::SourceState {
+        source_name: None,
         kind: "odf/etag".to_string(),
-        source: "odf/poll".to_string(),
         value: "123".to_string(),
     };
 
@@ -224,11 +224,11 @@ async fn test_data_writer_happy_path() {
         .await
         .unwrap();
 
-    assert_eq!(res.new_block.event.output_data, None);
+    assert_eq!(res.new_block.event.new_data, None);
     // Watermark is carried
-    assert_eq!(res.new_block.event.output_watermark, Some(prev_watermark));
+    assert_eq!(res.new_block.event.new_watermark, Some(prev_watermark));
     // Source state updated
-    assert_eq!(res.new_block.event.source_state, Some(source_state));
+    assert_eq!(res.new_block.event.new_source_state, Some(source_state));
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -478,7 +478,7 @@ async fn test_data_writer_orders_by_event_time() {
     assert_eq!(
         res.new_block
             .event
-            .output_watermark
+            .new_watermark
             .as_ref()
             .map(|dt| dt.to_rfc3339()),
         Some("2023-01-01T00:00:00+00:00".to_string())
@@ -646,10 +646,10 @@ async fn test_data_writer_builder_scan_no_source() {
             merge_strategy: odf::MergeStrategy::Append(_),
             vocab,
             data_slices: _,
-            last_offset: None,
-            last_checkpoint: None,
-            last_watermark: None,
-            last_source_state: None,
+            prev_offset: None,
+            prev_checkpoint: None,
+            prev_watermark: None,
+            prev_source_state: None,
         } if *h == head && vocab.event_time_column == "foo"
 
     );
@@ -681,10 +681,10 @@ async fn test_data_writer_builder_scan_polling_source() {
             merge_strategy: odf::MergeStrategy::Ledger(_),
             vocab,
             data_slices: _,
-            last_offset: None,
-            last_checkpoint: None,
-            last_watermark: None,
-            last_source_state: None,
+            prev_offset: None,
+            prev_checkpoint: None,
+            prev_watermark: None,
+            prev_source_state: None,
         } if *vocab == odf::DatasetVocabularyResolvedOwned::default()
     );
 }
@@ -723,10 +723,10 @@ async fn test_data_writer_builder_scan_push_source() {
             merge_strategy: odf::MergeStrategy::Ledger(_),
             vocab,
             data_slices: _,
-            last_offset: None,
-            last_checkpoint: None,
-            last_watermark: None,
-            last_source_state: None,
+            prev_offset: None,
+            prev_checkpoint: None,
+            prev_watermark: None,
+            prev_source_state: None,
         } if *vocab == odf::DatasetVocabularyResolvedOwned::default()
     );
 }
@@ -907,7 +907,7 @@ impl Harness {
         kamu_data_utils::data::local_url::into_local_path(
             self.dataset
                 .as_data_repo()
-                .get_internal_url(&block.event.output_data.unwrap().physical_hash)
+                .get_internal_url(&block.event.new_data.unwrap().physical_hash)
                 .await,
         )
         .unwrap()

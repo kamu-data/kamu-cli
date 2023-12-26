@@ -205,92 +205,110 @@ impl AsciiRenderer {
                 self.render_property(output, 0, "Schema", schema_str)?;
             }
             MetadataEvent::AddData(AddData {
-                input_checkpoint,
-                output_data,
-                output_checkpoint,
-                output_watermark,
-                source_state,
+                prev_checkpoint,
+                prev_offset,
+                new_data,
+                new_checkpoint,
+                new_watermark,
+                new_source_state,
             }) => {
                 self.render_property(output, 0, "Kind", "AddData")?;
 
-                if let Some(icp) = input_checkpoint {
-                    self.render_property(output, 0, "InputCheckpoint", &icp)?;
+                if let Some(v) = prev_checkpoint {
+                    self.render_property(output, 0, "PrevCheckpoint", v)?;
                 }
 
-                if let Some(slice) = output_data {
-                    self.render_section(output, 0, "Data")?;
+                if let Some(v) = prev_offset {
+                    self.render_property(output, 0, "PrevOffset", v)?;
+                }
+
+                if let Some(slice) = new_data {
+                    self.render_section(output, 0, "NewData")?;
                     self.render_data_slice(output, 1, slice)?;
                 }
 
-                if let Some(ocp) = output_checkpoint {
-                    self.render_section(output, 0, "OutputCheckpoint")?;
+                if let Some(ocp) = new_checkpoint {
+                    self.render_section(output, 0, "NewCheckpoint")?;
                     self.render_checkpoint(output, 1, ocp)?;
                 }
 
-                if let Some(ss) = source_state {
-                    self.render_section(output, 0, "SourceState")?;
+                if let Some(ss) = new_source_state {
+                    self.render_section(output, 0, "NewSourceState")?;
+                    self.render_property(
+                        output,
+                        1,
+                        "SourceName",
+                        &ss.source_name.as_deref().unwrap_or_default(),
+                    )?;
                     self.render_property(output, 1, "Kind", &ss.kind)?;
-                    self.render_property(output, 1, "Source", &ss.source)?;
                     self.render_property(output, 1, "Value", &ss.value)?;
                 }
 
-                if let Some(wm) = output_watermark {
+                if let Some(wm) = new_watermark {
                     self.render_property(
                         output,
                         0,
-                        "Watermark",
+                        "NewWatermark",
                         wm.to_rfc3339_opts(SecondsFormat::AutoSi, true),
                     )?;
                 }
             }
             MetadataEvent::ExecuteQuery(ExecuteQuery {
-                input_slices,
-                input_checkpoint,
-                output_data,
-                output_checkpoint,
-                output_watermark,
+                query_inputs,
+                prev_checkpoint,
+                prev_offset,
+                new_data,
+                new_checkpoint,
+                new_watermark,
             }) => {
                 self.render_property(output, 0, "Kind", "ExecuteQuery")?;
                 self.render_section(output, 0, "Inputs")?;
-                for (i, s) in input_slices.iter().enumerate() {
-                    self.render_section(output, 1, &format!("Input[{}]", i))?;
+                for (i, s) in query_inputs.iter().enumerate() {
+                    self.render_section(output, 1, &format!("QueryInput[{}]", i))?;
 
                     self.render_property(output, 2, "ID", &s.dataset_id)?;
 
                     if let Some(name) = self.id_to_name_lookup.get(&s.dataset_id) {
                         self.render_property(output, 2, "Name", name)?;
                     }
-
-                    if let Some(bi) = &s.block_interval {
-                        self.render_property(output, 2, "Blocks.Start", &bi.start)?;
-                        self.render_property(output, 2, "Blocks.End", &bi.end)?;
+                    if let Some(v) = &s.prev_block_hash {
+                        self.render_property(output, 2, "PrevBlockHash", v)?;
                     }
-                    if let Some(iv) = &s.data_interval {
-                        self.render_property(output, 2, "Offset.Start", &iv.start)?;
-                        self.render_property(output, 2, "Offset.End", &iv.end)?;
-                        self.render_property(output, 2, "Records", &(iv.end - iv.start + 1))?;
+                    if let Some(v) = &s.new_block_hash {
+                        self.render_property(output, 2, "NewBlockHash", v)?;
+                    }
+                    if let Some(v) = s.prev_offset {
+                        self.render_property(output, 2, "PrevOffset", v)?;
+                    }
+                    if let Some(v) = s.new_offset {
+                        self.render_property(output, 2, "NewOffset", v)?;
+                        self.render_property(output, 2, "NumRecords", s.num_records())?;
                     }
                 }
 
-                if let Some(icp) = input_checkpoint {
-                    self.render_property(output, 0, "InputCheckpoint", &icp)?;
+                if let Some(v) = prev_checkpoint {
+                    self.render_property(output, 0, "PrevCheckpoint", &v)?;
                 }
 
-                if let Some(output_data) = output_data {
-                    self.render_section(output, 0, "Data")?;
-                    self.render_data_slice(output, 1, &output_data)?;
+                if let Some(v) = prev_offset {
+                    self.render_property(output, 0, "PrevOffset", &v)?;
                 }
 
-                if let Some(ocp) = output_checkpoint {
-                    self.render_section(output, 0, "OutputCheckpoint")?;
+                if let Some(new_data) = new_data {
+                    self.render_section(output, 0, "NewData")?;
+                    self.render_data_slice(output, 1, &new_data)?;
+                }
+
+                if let Some(ocp) = new_checkpoint {
+                    self.render_section(output, 0, "NewCheckpoint")?;
                     self.render_checkpoint(output, 1, &ocp)?;
                 }
 
-                if let Some(wm) = output_watermark {
+                if let Some(wm) = new_watermark {
                     self.render_property(
                         output,
                         0,
-                        "Watermark",
+                        "NewWatermark",
                         wm.to_rfc3339_opts(SecondsFormat::AutoSi, true),
                     )?;
                 }
@@ -394,8 +412,7 @@ impl AsciiRenderer {
                     output,
                     0,
                     "Watermark",
-                    e.output_watermark
-                        .to_rfc3339_opts(SecondsFormat::AutoSi, true),
+                    e.new_watermark.to_rfc3339_opts(SecondsFormat::AutoSi, true),
                 )?;
             }
         }
@@ -409,13 +426,13 @@ impl AsciiRenderer {
         indent: i32,
         slice: &DataSlice,
     ) -> Result<(), std::io::Error> {
-        self.render_property(output, indent, "Offset.Start", &slice.interval.start)?;
-        self.render_property(output, indent, "Offset.End", &slice.interval.end)?;
+        self.render_property(output, indent, "Offset.Start", &slice.offset_interval.start)?;
+        self.render_property(output, indent, "Offset.End", &slice.offset_interval.end)?;
         self.render_property(
             output,
             indent,
             "NumRecords",
-            &(slice.interval.end - slice.interval.start + 1),
+            &(slice.offset_interval.end - slice.offset_interval.start + 1),
         )?;
         self.render_property(output, indent, "LogicalHash", &slice.logical_hash)?;
         self.render_property(output, indent, "PhysicalHash", &slice.physical_hash)?;

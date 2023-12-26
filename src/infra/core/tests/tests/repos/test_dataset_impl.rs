@@ -70,9 +70,9 @@ async fn test_summary_updates() {
     // ---
     let block_3 = MetadataFactory::metadata_block(
         MetadataFactory::add_data()
-            .interval(0, 9)
-            .data_size(16)
-            .checkpoint_size(10)
+            .new_offset_interval(0, 9)
+            .new_data_size(16)
+            .new_checkpoint_size(10)
             .build(),
     )
     .prev(&hash_2, block_2.sequence_number)

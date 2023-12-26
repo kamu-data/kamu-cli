@@ -66,10 +66,10 @@ pub(crate) async fn create_random_data(dataset_layout: &DatasetLayout) -> AddDat
     let (d_hash, d_size) = create_random_file(&dataset_layout.data_dir).await;
     let (c_hash, c_size) = create_random_file(&dataset_layout.checkpoints_dir).await;
     MetadataFactory::add_data()
-        .data_physical_hash(d_hash)
-        .data_size(d_size as i64)
-        .checkpoint_physical_hash(c_hash)
-        .checkpoint_size(c_size as i64)
+        .new_data_physical_hash(d_hash)
+        .new_data_size(d_size as u64)
+        .new_checkpoint_physical_hash(c_hash)
+        .new_checkpoint_size(c_size as u64)
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

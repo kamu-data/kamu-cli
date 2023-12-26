@@ -92,7 +92,7 @@ impl Kamu {
             .as_metadata_chain()
             .iter_blocks()
             .filter_data_stream_blocks()
-            .filter_map_ok(|(_, b)| b.event.output_data)
+            .filter_map_ok(|(_, b)| b.event.new_data)
             .try_first()
             .await
             .unwrap()

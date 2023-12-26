@@ -107,10 +107,10 @@ async fn test_engine_io_common(
         )
         .build();
 
-    let root_alias = DatasetAlias::new(None, root_snapshot.name.clone());
+    let root_alias = root_snapshot.name.clone();
 
     dataset_repo
-        .create_dataset_from_snapshot(None, root_snapshot)
+        .create_dataset_from_snapshot(root_snapshot)
         .await
         .unwrap();
 
@@ -131,16 +131,17 @@ async fn test_engine_io_common(
         .name("deriv")
         .kind(DatasetKind::Derivative)
         .push_event(
-            MetadataFactory::set_transform([&root_alias.dataset_name])
+            MetadataFactory::set_transform()
+                .inputs_from_refs([&root_alias.dataset_name])
                 .transform(transform)
                 .build(),
         )
         .build();
 
-    let deriv_alias = DatasetAlias::new(None, deriv_snapshot.name.clone());
+    let deriv_alias = deriv_snapshot.name.clone();
 
     let dataset_deriv = dataset_repo
-        .create_dataset_from_snapshot(None, deriv_snapshot)
+        .create_dataset_from_snapshot(deriv_snapshot)
         .await
         .unwrap()
         .dataset;
@@ -163,7 +164,7 @@ async fn test_engine_io_common(
         .unwrap();
 
     assert_eq!(
-        block.event.output_data.unwrap().interval,
+        block.event.new_data.unwrap().offset_interval,
         OffsetInterval { start: 0, end: 2 }
     );
 
@@ -213,7 +214,7 @@ async fn test_engine_io_common(
         .unwrap();
 
     assert_eq!(
-        block.event.output_data.unwrap().interval,
+        block.event.new_data.unwrap().offset_interval,
         OffsetInterval { start: 3, end: 4 }
     );
 

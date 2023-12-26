@@ -64,10 +64,11 @@ async fn init_v0_workspace(workspace_path: &Path) {
     dataset
         .commit_add_data(
             AddDataParams {
-                input_checkpoint: None,
-                output_data: Some(OffsetInterval { start: 0, end: 10 }),
-                output_watermark: None,
-                source_state: None,
+                prev_checkpoint: None,
+                prev_offset: None,
+                new_offset_interval: Some(OffsetInterval { start: 0, end: 10 }),
+                new_watermark: None,
+                new_source_state: None,
             },
             Some(OwnedFile::new(data_path)),
             Some(OwnedFile::new(checkpoint_path)),

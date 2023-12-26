@@ -52,7 +52,6 @@ async fn test_verify_data_consistency() {
 
     dataset_repo
         .create_dataset_from_snapshot(
-            None,
             MetadataFactory::dataset_snapshot()
                 .name("foo")
                 .kind(DatasetKind::Root)
@@ -65,11 +64,14 @@ async fn test_verify_data_consistency() {
 
     dataset_repo
         .create_dataset_from_snapshot(
-            None,
             MetadataFactory::dataset_snapshot()
-                .name(&dataset_alias.dataset_name)
+                .name(dataset_alias.clone())
                 .kind(DatasetKind::Derivative)
-                .push_event(MetadataFactory::set_transform(["foo"]).build())
+                .push_event(
+                    MetadataFactory::set_transform()
+                        .inputs_from_refs(["foo"])
+                        .build(),
+                )
                 .push_event(MetadataFactory::set_data_schema().build())
                 .build(),
         )
@@ -117,10 +119,11 @@ async fn test_verify_data_consistency() {
     let head = dataset
         .commit_add_data(
             AddDataParams {
-                input_checkpoint: None,
-                output_data: Some(OffsetInterval { start: 0, end: 0 }),
-                output_watermark: None,
-                source_state: None,
+                prev_checkpoint: None,
+                prev_offset: None,
+                new_offset_interval: Some(OffsetInterval { start: 0, end: 0 }),
+                new_watermark: None,
+                new_source_state: None,
             },
             Some(OwnedFile::new(data_path)),
             None,
@@ -134,7 +137,7 @@ async fn test_verify_data_consistency() {
         dataset.as_metadata_chain().get_block(&head).await.unwrap(), 
         MetadataBlock {
             event: MetadataEvent::AddData(AddData {
-                output_data: Some(DataSlice {
+                new_data: Some(DataSlice {
                     logical_hash,
                     physical_hash,
                     ..

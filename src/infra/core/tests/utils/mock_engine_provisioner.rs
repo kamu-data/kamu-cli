@@ -64,10 +64,10 @@ impl Engine for EngineStub {
     ) -> Result<TransformResponse, EngineError> {
         // Note: At least 1 output field must be present, watermark is easy to mimic
         Ok(TransformResponse {
-            data_interval: None,
-            output_watermark: Some(Utc::now()),
-            out_checkpoint: None,
-            out_data: None,
+            new_offset_interval: None,
+            new_watermark: Some(Utc::now()),
+            new_checkpoint: None,
+            new_data: None,
         })
     }
 }

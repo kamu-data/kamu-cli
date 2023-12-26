@@ -49,31 +49,8 @@ impl MetadataFactory {
         ExecuteQueryBuilder::new()
     }
 
-    pub fn set_transform_from_refs<R, I>(inputs: I) -> SetTransformBuilder
-    where
-        I: Iterator<Item = R>,
-        R: TryInto<DatasetRef>,
-        <R as TryInto<DatasetRef>>::Error: std::fmt::Debug,
-    {
-        SetTransformBuilder::from_refs(inputs)
-    }
-
-    pub fn set_transform_from_refs_and_aliases<R, A, I>(inputs: I) -> SetTransformBuilder
-    where
-        I: Iterator<Item = (R, A)>,
-        A: Into<String>,
-        R: TryInto<DatasetRef>,
-        <R as TryInto<DatasetRef>>::Error: std::fmt::Debug,
-    {
-        SetTransformBuilder::from_refs_and_aliases(inputs)
-    }
-
-    pub fn set_transform_from_aliases_and_generated_ids<A, I>(inputs: I) -> SetTransformBuilder
-    where
-        I: Iterator<Item = A>,
-        A: Into<String>,
-    {
-        SetTransformBuilder::from_aliases_and_generated_ids(inputs)
+    pub fn set_transform() -> SetTransformBuilder {
+        SetTransformBuilder::new()
     }
 
     pub fn metadata_block<E: Into<MetadataEvent>>(event: E) -> MetadataBlockBuilder<E> {
@@ -347,74 +324,65 @@ pub struct SetTransformBuilder {
 }
 
 impl SetTransformBuilder {
-    pub fn from_refs<R, I>(inputs: I) -> Self
-    where
-        I: Iterator<Item = R>,
-        R: TryInto<DatasetRef>,
-        <R as TryInto<DatasetRef>>::Error: std::fmt::Debug,
-    {
+    pub fn new() -> Self {
         Self {
             v: SetTransform {
-                inputs: inputs
-                    .map(|a| TransformInput {
-                        dataset_ref: a.try_into().unwrap(),
-                        alias: None,
-                    })
-                    .collect(),
+                inputs: Vec::new(),
                 transform: TransformSqlBuilder::new().build(),
             },
         }
     }
 
-    pub fn from_refs_and_aliases<R, A, I>(inputs: I) -> Self
+    pub fn inputs_from_refs<R, I>(mut self, inputs: I) -> Self
     where
-        I: Iterator<Item = (R, A)>,
+        I: IntoIterator<Item = R>,
+        R: TryInto<DatasetRef>,
+        <R as TryInto<DatasetRef>>::Error: std::fmt::Debug,
+    {
+        self.v.inputs = inputs
+            .into_iter()
+            .map(|a| TransformInput {
+                dataset_ref: a.try_into().unwrap(),
+                alias: None,
+            })
+            .collect();
+        self
+    }
+
+    pub fn inputs_from_refs_and_aliases<R, A, I>(mut self, inputs: I) -> Self
+    where
+        I: IntoIterator<Item = (R, A)>,
         A: Into<String>,
         R: TryInto<DatasetRef>,
         <R as TryInto<DatasetRef>>::Error: std::fmt::Debug,
     {
-        Self {
-            v: SetTransform {
-                inputs: inputs
-                    .map(|(r, a)| TransformInput {
-                        dataset_ref: r.try_into().unwrap(),
-                        alias: Some(a.into()),
-                    })
-                    .collect(),
-                transform: TransformSqlBuilder::new().build(),
-            },
-        }
+        self.v.inputs = inputs
+            .into_iter()
+            .map(|(r, a)| TransformInput {
+                dataset_ref: r.try_into().unwrap(),
+                alias: Some(a.into()),
+            })
+            .collect();
+        self
     }
 
-    pub fn from_aliases_and_generated_ids<A, I>(inputs: I) -> Self
+    pub fn inputs_from_aliases_and_seeded_ids<A, I>(mut self, inputs: I) -> Self
     where
-        I: Iterator<Item = A>,
+        I: IntoIterator<Item = A>,
         A: Into<String>,
     {
-        Self {
-            v: SetTransform {
-                inputs: inputs
-                    .map(|a| {
-                        let alias = a.into();
-                        TransformInput {
-                            dataset_ref: DatasetID::new_seeded_ed25519(alias.as_bytes()).into(),
-                            alias: Some(alias),
-                        }
-                    })
-                    .collect(),
-                transform: TransformSqlBuilder::new().build(),
-            },
-        }
+        self.v.inputs = inputs
+            .into_iter()
+            .map(|a| {
+                let alias = a.into();
+                TransformInput {
+                    dataset_ref: DatasetID::new_seeded_ed25519(alias.as_bytes()).into(),
+                    alias: Some(alias),
+                }
+            })
+            .collect();
+        self
     }
-
-    // pub fn set_dataset_ids(mut self, mut ids: HashMap<DatasetName, DatasetID>) ->
-    // Self {     for input in self.v.inputs.iter_mut() {
-    //         if let Some(input_id) = ids.remove(&input.name) {
-    //             input.id = Some(input_id)
-    //         }
-    //     }
-    //     self
-    // }
 
     pub fn transform(mut self, transform: Transform) -> Self {
         self.v.transform = transform;

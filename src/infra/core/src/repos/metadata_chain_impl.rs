@@ -439,7 +439,15 @@ where
         new_block: &MetadataBlock,
         _block_cache: &mut Vec<MetadataBlock>,
     ) -> Result<(), AppendError> {
-        if let Some(e) = new_block.event.as_data_stream_event() {
+        // Only check AddData and ExecuteQuery.
+        // SetWatermark is also considered a data stream event but does not carry the
+        // offsets.
+        if let Some(e) = match new_block.event {
+            MetadataEvent::AddData(_) | MetadataEvent::ExecuteQuery(_) => {
+                Some(new_block.event.as_data_stream_event().unwrap())
+            }
+            _ => None,
+        } {
             // Validate input/output offset sequencing
             // TODO: PERF: Use block cache
             let expected_prev_offset = self

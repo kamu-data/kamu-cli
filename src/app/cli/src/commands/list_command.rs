@@ -264,7 +264,7 @@ impl Command for ListCommand {
                         num_blocks = b.sequence_number as u64 + 1;
                     }
                     if let Some(b) = b.as_data_stream_block() {
-                        last_watermark = b.event.output_watermark.cloned();
+                        last_watermark = b.event.new_watermark.cloned();
                         break;
                     }
                 }
