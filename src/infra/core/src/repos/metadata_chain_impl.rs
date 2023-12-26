@@ -160,10 +160,10 @@ where
                 // TODO: ensure only used on Root datasets
 
                 // Validate event is not empty
-                if e.output_data.is_none()
-                    && e.output_checkpoint.is_none()
-                    && e.output_watermark.is_none()
-                    && e.source_state.is_none()
+                if e.new_data.is_none()
+                    && e.new_checkpoint.is_none()
+                    && e.new_watermark.is_none()
+                    && e.new_source_state.is_none()
                 {
                     return Err(AppendValidationError::NoOpEvent(NoOpEventError::new(
                         e.clone(),
@@ -173,9 +173,8 @@ where
                 }
 
                 let mut prev_schema = None;
-                let mut prev_checkpoint = None;
-                let mut prev_watermark = None;
-                let mut prev_source_state = None;
+                let mut prev_add_data = None;
+                let mut prev_set_watermark = None;
 
                 // TODO: Generalize this logic
                 // TODO: PERF: Use block cache
@@ -189,65 +188,60 @@ where
                         MetadataEvent::SetDataSchema(e) if prev_schema.is_none() => {
                             prev_schema = Some(e)
                         }
-                        MetadataEvent::AddData(e) => {
-                            if prev_checkpoint.is_none() {
-                                prev_checkpoint = Some(e.output_checkpoint);
-                            }
-                            if prev_source_state.is_none() {
-                                prev_source_state = Some(e.source_state);
-                            }
-                            if prev_watermark.is_none() {
-                                prev_watermark = Some(e.output_watermark);
-                            }
+                        MetadataEvent::SetWatermark(e) if prev_set_watermark.is_none() => {
+                            prev_set_watermark = Some(e);
                         }
-                        MetadataEvent::SetWatermark(e) if prev_watermark.is_none() => {
-                            prev_watermark = Some(Some(e.output_watermark));
+                        MetadataEvent::AddData(mut e) => {
+                            if prev_add_data.is_none() {
+                                // Roll-in the last watermark into add data
+                                if let Some(wm) = &prev_set_watermark {
+                                    e.new_watermark = Some(wm.new_watermark.clone());
+                                }
+                                prev_add_data = Some(e);
+                            }
                         }
                         _ => (),
                     }
-                    if prev_schema.is_some()
-                        && prev_checkpoint.is_some()
-                        && prev_watermark.is_some()
-                        && prev_source_state.is_some()
-                    {
+                    if prev_schema.is_some() && prev_add_data.is_some() {
                         break;
                     }
                 }
 
-                // TODO: Introduce as a breaking change
-                // https://github.com/kamu-data/kamu-cli/issues/314
-                /*
-                // Validate schema was defined if we're adding data
-                if prev_schema.is_none() && e.output_data.is_some() {
+                // Validate schema was defined before adding any data
+                if prev_schema.is_none() && e.new_data.is_some() {
                     return Err(AppendValidationError::InvalidEvent(InvalidEventError::new(
                         e.clone(),
                         "SetDataSchema event must be present before adding data",
                     ))
                     .into());
                 }
-                */
 
-                let prev_checkpoint = prev_checkpoint.unwrap_or_default();
-                let prev_watermark = prev_watermark.unwrap_or_default();
-                let prev_source_state = prev_source_state.unwrap_or_default();
+                let expected_prev_checkpoint = prev_add_data
+                    .as_ref()
+                    .and_then(|v| v.new_checkpoint.as_ref())
+                    .map(|c| &c.physical_hash);
+                let prev_watermark = prev_add_data
+                    .as_ref()
+                    .and_then(|v| v.new_watermark.as_ref());
+                let prev_source_state = prev_add_data
+                    .as_ref()
+                    .and_then(|v| v.new_source_state.as_ref());
 
                 // Validate input/output checkpoint sequencing
-                if e.input_checkpoint.as_ref() != prev_checkpoint.as_ref().map(|c| &c.physical_hash)
-                {
+                if e.prev_checkpoint.as_ref() != expected_prev_checkpoint {
                     return Err(AppendValidationError::InvalidEvent(InvalidEventError::new(
                         e.clone(),
-                        "Input checkpoint does not correspond to the previous checkpoint in the \
-                         chain",
+                        "Input checkpoint does not correspond to the last checkpoint in the chain",
                     ))
                     .into());
                 }
 
                 // Validate event advances some state
-                if e.output_data.is_none()
-                    && e.output_checkpoint.as_ref().map(|v| &v.physical_hash)
-                        == prev_checkpoint.as_ref().map(|v| &v.physical_hash)
-                    && e.output_watermark == prev_watermark
-                    && e.source_state == prev_source_state
+                if e.new_data.is_none()
+                    && e.new_checkpoint.as_ref().map(|v| &v.physical_hash)
+                        == e.prev_checkpoint.as_ref()
+                    && e.new_watermark.as_ref() == prev_watermark
+                    && e.new_source_state.as_ref() == prev_source_state
                 {
                     return Err(AppendValidationError::NoOpEvent(NoOpEventError::new(
                         e.clone(),
@@ -262,10 +256,7 @@ where
             // TODO: ensure only used on Derivative datasets
             MetadataEvent::ExecuteQuery(e) => {
                 // Validate event is not empty
-                if e.output_data.is_none()
-                    && e.output_checkpoint.is_none()
-                    && e.output_watermark.is_none()
-                {
+                if e.new_data.is_none() && e.new_checkpoint.is_none() && e.new_watermark.is_none() {
                     return Err(AppendValidationError::NoOpEvent(NoOpEventError::new(
                         e.clone(),
                         "Event is empty",
@@ -298,42 +289,35 @@ where
                     }
                 }
 
-                // TODO: Introduce as a breaking change
-                // https://github.com/kamu-data/kamu-cli/issues/314
-                /*
                 // Validate schema was defined if we're adding data
-                if prev_schema.is_none() && e.output_data.is_some() {
+                if prev_schema.is_none() && e.new_data.is_some() {
                     return Err(AppendValidationError::InvalidEvent(InvalidEventError::new(
                         e.clone(),
                         "SetDataSchema event must be present before adding data",
                     ))
                     .into());
                 }
-                */
 
-                let prev_checkpoint = prev_query
+                let expected_prev_checkpoint = prev_query
                     .as_ref()
-                    .and_then(|e| e.output_checkpoint.as_ref())
+                    .and_then(|v| v.new_checkpoint.as_ref())
                     .map(|c| &c.physical_hash);
-
-                let prev_watermark = prev_query
-                    .as_ref()
-                    .and_then(|e| e.output_watermark.as_ref());
+                let prev_watermark = prev_query.as_ref().and_then(|v| v.new_watermark.as_ref());
 
                 // Validate input/output checkpoint sequencing
-                if e.input_checkpoint.as_ref() != prev_checkpoint {
+                if e.prev_checkpoint.as_ref() != expected_prev_checkpoint {
                     return Err(AppendValidationError::InvalidEvent(InvalidEventError::new(
                         e.clone(),
-                        "Input checkpoint does not correspond to the previous checkpoint in the \
-                         chain",
+                        "Input checkpoint does not correspond to the last checkpoint in the chain",
                     ))
                     .into());
                 }
 
                 // Validate event advances some state
-                if e.output_data.is_none()
-                    && e.output_checkpoint.as_ref().map(|v| &v.physical_hash) == prev_checkpoint
-                    && e.output_watermark.as_ref() == prev_watermark
+                if e.new_data.is_none()
+                    && e.new_checkpoint.as_ref().map(|v| &v.physical_hash)
+                        == e.prev_checkpoint.as_ref()
+                    && e.new_watermark.as_ref() == prev_watermark
                 {
                     return Err(AppendValidationError::NoOpEvent(NoOpEventError::new(
                         e.clone(),
@@ -430,13 +414,13 @@ where
             let prev_wm = self
                 .iter_blocks_interval(new_block.prev_block_hash.unwrap(), None, false)
                 .filter_data_stream_blocks()
-                .map_ok(|(_, b)| b.event.output_watermark)
+                .map_ok(|(_, b)| b.event.new_watermark)
                 .try_first()
                 .await
                 .int_err()?;
 
             if let Some(prev_wm) = &prev_wm {
-                match (prev_wm, new_block.event.output_watermark) {
+                match (prev_wm, new_block.event.new_watermark) {
                     (Some(_), None) => {
                         return Err(AppendValidationError::WatermarkIsNotMonotonic.into())
                     }
@@ -455,27 +439,39 @@ where
         new_block: &MetadataBlock,
         _block_cache: &mut Vec<MetadataBlock>,
     ) -> Result<(), AppendError> {
-        if let Some(data_block) = new_block.as_data_stream_block() {
-            if let Some(new_data) = data_block.event.output_data {
-                // TODO: PERF: Use block cache
-                let prev_data = self
-                    .iter_blocks_interval(data_block.prev_block_hash.unwrap(), None, false)
-                    .filter_data_stream_blocks()
-                    .filter_map_ok(|(_, b)| b.event.output_data)
-                    .try_first()
-                    .await
-                    .int_err()?;
+        if let Some(e) = new_block.event.as_data_stream_event() {
+            // Validate input/output offset sequencing
+            // TODO: PERF: Use block cache
+            let expected_prev_offset = self
+                .iter_blocks_interval(new_block.prev_block_hash.as_ref().unwrap(), None, false)
+                .filter_data_stream_blocks()
+                .try_next()
+                .await
+                .int_err()?
+                .and_then(|(_, b)| b.event.last_offset());
 
-                let last_offset = prev_data.map(|v| v.interval.end).unwrap_or(-1);
+            if e.prev_offset != expected_prev_offset {
+                return Err(AppendValidationError::InvalidEvent(InvalidEventError::new(
+                    new_block.event.clone(),
+                    "Carried prev offset does not correspond to the last offset in the chain",
+                ))
+                .into());
+            }
 
-                if new_data.interval.start != last_offset + 1 {
+            // Validate internal offset consistency
+            if let Some(new_data) = e.new_data {
+                let expected_start_offset = e.prev_offset.map(|v| v + 1).unwrap_or(0);
+                if new_data.offset_interval.start != expected_start_offset {
                     return Err(AppendValidationError::OffsetsAreNotSequential(
-                        OffsetsNotSequentialError::new(last_offset, new_data.interval.start),
+                        OffsetsNotSequentialError::new(
+                            expected_start_offset,
+                            new_data.offset_interval.start,
+                        ),
                     )
                     .into());
                 }
 
-                if new_data.interval.end < new_data.interval.start {
+                if new_data.offset_interval.end < new_data.offset_interval.start {
                     return Err(AppendValidationError::InvalidEvent(InvalidEventError::new(
                         new_block.event.clone(),
                         "Invalid offset interval",

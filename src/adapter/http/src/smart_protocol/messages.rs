@@ -200,7 +200,7 @@ pub struct TransferSizeEstimate {
 pub struct ObjectFileReference {
     pub object_type: ObjectType,
     pub physical_hash: Multihash,
-    pub size: i64,
+    pub size: u64,
 }
 
 // Object type enumeration

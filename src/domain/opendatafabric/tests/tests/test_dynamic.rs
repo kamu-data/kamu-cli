@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use std::convert::TryFrom;
-use std::sync::Arc;
 
 use chrono::prelude::*;
 use opendatafabric::*;
@@ -26,7 +25,7 @@ fn load() -> MetadataBlock {
                     alias: Some("input1".to_string()),
                 },
                 TransformInput {
-                    dataset_ref: DatasetRefAny::try_from("kamu/input2").unwrap(),
+                    dataset_ref: DatasetRef::try_from("kamu/input2").unwrap(),
                     alias: Some("input2".to_string()),
                 },
             ],
@@ -63,14 +62,11 @@ fn test_accessors() {
         inputs,
         vec![
             TransformInput {
-                dataset_ref: DatasetRefAny::ID(None, DatasetID::new_seeded_ed25519(b"input1")),
+                dataset_ref: DatasetID::new_seeded_ed25519(b"input1").into(),
                 alias: Some("input1".to_string()),
             },
             TransformInput {
-                dataset_ref: DatasetRefAny::AmbiguousAlias(
-                    Arc::from("kamu"),
-                    DatasetName::try_from("input2").unwrap()
-                ),
+                dataset_ref: DatasetRef::try_from("kamu/input2").unwrap(),
                 alias: Some("input2".to_string()),
             },
         ]

@@ -68,8 +68,8 @@ pub async fn prepare_dataset_transfer_estimate(
 
     let mut data_objects_count: u32 = 0;
     let mut checkpoint_objects_count: u32 = 0;
-    let mut bytes_in_data_objects: i64 = 0;
-    let mut bytes_in_checkpoint_objects: i64 = 0;
+    let mut bytes_in_data_objects: u64 = 0;
+    let mut bytes_in_checkpoint_objects: u64 = 0;
 
     while let Some((hash, block)) = block_stream.try_next().await? {
         blocks_count += 1;
@@ -82,23 +82,23 @@ pub async fn prepare_dataset_transfer_estimate(
 
         match block.event {
             MetadataEvent::AddData(add_data) => {
-                if let Some(output_data) = &add_data.output_data {
+                if let Some(new_data) = &add_data.new_data {
                     data_objects_count += 1;
-                    bytes_in_data_objects += output_data.size;
+                    bytes_in_data_objects += new_data.size;
                 }
-                if let Some(output_checkpoint) = &add_data.output_checkpoint {
+                if let Some(new_checkpoint) = &add_data.new_checkpoint {
                     checkpoint_objects_count += 1;
-                    bytes_in_checkpoint_objects += output_checkpoint.size;
+                    bytes_in_checkpoint_objects += new_checkpoint.size;
                 }
             }
             MetadataEvent::ExecuteQuery(execute_query) => {
-                if let Some(output_data) = &execute_query.output_data {
+                if let Some(new_data) = &execute_query.new_data {
                     data_objects_count += 1;
-                    bytes_in_data_objects += output_data.size;
+                    bytes_in_data_objects += new_data.size;
                 }
-                if let Some(output_checkpoint) = &execute_query.output_checkpoint {
+                if let Some(new_checkpoint) = &execute_query.new_checkpoint {
                     checkpoint_objects_count += 1;
-                    bytes_in_checkpoint_objects += output_checkpoint.size;
+                    bytes_in_checkpoint_objects += new_checkpoint.size;
                 }
             }
             MetadataEvent::Seed(_)
@@ -220,15 +220,12 @@ pub async fn dataset_append_metadata(
             // Collect only the latest upstream dataset IDs
             new_upstream_ids.clear();
             for new_input in transform.inputs.iter() {
-                if let Some(id) = &new_input.id {
+                if let Some(id) = new_input.dataset_ref.id() {
                     new_upstream_ids.push(id.clone());
                 } else {
-                    return Err(AppendError::InvalidBlock(
-                        AppendValidationError::InvalidEvent(InvalidEventError::new(
-                            block.event,
-                            "Transform input with unresolved ID",
-                        )),
-                    ));
+                    // Input references must be resolved to IDs here, but we
+                    // ignore the errors and let the metadata chain reject this
+                    // event
                 }
             }
         }
@@ -380,58 +377,55 @@ async fn collect_object_references_from_block(
 
     match &block.event {
         MetadataEvent::AddData(e) => {
-            if let Some(output_data) = &e.output_data {
+            if let Some(new_data) = &e.new_data {
                 if !missing_files_only
-                    || !data_repo
-                        .contains(&output_data.physical_hash)
-                        .await
-                        .unwrap()
+                    || !data_repo.contains(&new_data.physical_hash).await.unwrap()
                 {
                     target_references.push(ObjectFileReference {
                         object_type: ObjectType::DataSlice,
-                        physical_hash: output_data.physical_hash.clone(),
-                        size: output_data.size,
+                        physical_hash: new_data.physical_hash.clone(),
+                        size: new_data.size,
                     });
                 }
             }
-            if let Some(checkpoint) = &e.output_checkpoint {
+            if let Some(new_checkpoint) = &e.new_checkpoint {
                 if !missing_files_only
                     || !checkpoint_repo
-                        .contains(&checkpoint.physical_hash)
+                        .contains(&new_checkpoint.physical_hash)
                         .await
                         .unwrap()
                 {
                     target_references.push(ObjectFileReference {
                         object_type: ObjectType::Checkpoint,
-                        physical_hash: checkpoint.physical_hash.clone(),
-                        size: checkpoint.size,
+                        physical_hash: new_checkpoint.physical_hash.clone(),
+                        size: new_checkpoint.size,
                     });
                 }
             }
         }
         MetadataEvent::ExecuteQuery(e) => {
-            if let Some(data_slice) = &e.output_data {
+            if let Some(new_data) = &e.new_data {
                 if !missing_files_only
-                    || !data_repo.contains(&data_slice.physical_hash).await.unwrap()
+                    || !data_repo.contains(&new_data.physical_hash).await.unwrap()
                 {
                     target_references.push(ObjectFileReference {
                         object_type: ObjectType::DataSlice,
-                        physical_hash: data_slice.physical_hash.clone(),
-                        size: data_slice.size,
+                        physical_hash: new_data.physical_hash.clone(),
+                        size: new_data.size,
                     });
                 }
             }
-            if let Some(checkpoint) = &e.output_checkpoint {
+            if let Some(new_checkpoint) = &e.new_checkpoint {
                 if !missing_files_only
                     || !checkpoint_repo
-                        .contains(&checkpoint.physical_hash)
+                        .contains(&new_checkpoint.physical_hash)
                         .await
                         .unwrap()
                 {
                     target_references.push(ObjectFileReference {
                         object_type: ObjectType::Checkpoint,
-                        physical_hash: checkpoint.physical_hash.clone(),
-                        size: checkpoint.size,
+                        physical_hash: new_checkpoint.physical_hash.clone(),
+                        size: new_checkpoint.size,
                     });
                 }
             }

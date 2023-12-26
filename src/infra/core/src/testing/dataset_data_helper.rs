@@ -70,7 +70,7 @@ impl DatasetDataHelper {
         kamu_data_utils::data::local_url::into_local_path(
             self.dataset
                 .as_data_repo()
-                .get_internal_url(&block.event.output_data.unwrap().physical_hash)
+                .get_internal_url(&block.event.new_data.unwrap().physical_hash)
                 .await,
         )
         .unwrap()

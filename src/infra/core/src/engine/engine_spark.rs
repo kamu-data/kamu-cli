@@ -136,7 +136,7 @@ impl SparkEngine {
         };
 
         // Don't mount existing data directory if it's empty as it will confuse Spark
-        if request.next_offset != 0 {
+        if request.prev_offset.is_some() {
             volumes.push(
                 (
                     dataset_data_dir,
@@ -157,7 +157,7 @@ impl SparkEngine {
                 output_data_path: container_out_data_path,
                 system_time: request.system_time,
                 event_time: request.event_time,
-                offset: request.next_offset,
+                offset: request.prev_offset.map(|v| v + 1).unwrap_or(0),
                 // TODO: We are stripping out the "fetch step because URL can contain templating
                 // that will fail to parse in the engine.
                 // In future engine should only receive the query part of the request.
@@ -207,7 +207,7 @@ impl SparkEngine {
 
         while let Some(block) = blocks.next().await {
             let (_, block) = block.int_err()?;
-            if let Some(data_slice) = block.event.output_data {
+            if let Some(data_slice) = block.event.new_data {
                 let src_url = data_repo.get_internal_url(&data_slice.physical_hash).await;
 
                 tracing::info!(
@@ -267,7 +267,7 @@ impl SparkEngine {
         ];
 
         // Don't mount existing data directory if it's empty as it will confuse Spark
-        if request.next_offset != 0 {
+        if request.prev_offset.is_some() {
             volumes.push(
                 (
                     host_in_data_dir,
@@ -288,7 +288,7 @@ impl SparkEngine {
                 output_data_path: container_out_data_path,
                 system_time: request.system_time,
                 event_time: request.event_time,
-                offset: request.next_offset,
+                offset: request.prev_offset.map(|v| v + 1).unwrap_or(0),
                 // TODO: We are stripping out the "fetch step because URL can contain templating
                 // that will fail to parse in the engine.
                 // In future engine should only receive the query part of the request.
@@ -324,35 +324,6 @@ impl SparkEngine {
         let response_path = run_info.in_out_dir.join("response.yaml");
 
         {
-            // TODO: Spark ingest does not support `NdJson` type so we translate it into
-            // deprecated `JsonLines`
-            // TODO: Spark ingest did not distinguish `NdGeoJson` type so we translate it
-            // into `GeoJson`
-            let request = match request.source.read {
-                ReadStep::NdJson(v) => IngestRequestRaw {
-                    source: SetPollingSource {
-                        read: ReadStep::JsonLines(ReadStepJsonLines {
-                            schema: v.schema,
-                            date_format: v.date_format,
-                            encoding: v.encoding,
-                            multi_line: None,
-                            primitives_as_string: None,
-                            timestamp_format: v.timestamp_format,
-                        }),
-                        ..request.source
-                    },
-                    ..request
-                },
-                ReadStep::NdGeoJson(v) => IngestRequestRaw {
-                    source: SetPollingSource {
-                        read: ReadStep::GeoJson(ReadStepGeoJson { schema: v.schema }),
-                        ..request.source
-                    },
-                    ..request
-                },
-                _ => request,
-            };
-
             tracing::info!(?request, path = ?request_path, "Writing request");
             let file = File::create(&request_path)?;
             serde_yaml::to_writer(file, &request).int_err()?;
@@ -433,27 +404,27 @@ impl SparkEngine {
     pub async fn materialize_response(
         &self,
         engine_response: ExecuteQueryResponseSuccess,
-        out_data_path: PathBuf,
-        out_checkpoint_path: PathBuf,
+        new_data_path: PathBuf,
+        new_checkpoint_path: PathBuf,
     ) -> Result<IngestResponse, EngineError> {
-        let out_data = if engine_response.data_interval.is_some() {
-            if !out_data_path.exists() {
+        let new_data = if engine_response.new_offset_interval.is_some() {
+            if !new_data_path.exists() {
                 return Err(EngineError::contract_error(
                     "Engine did not write a response data file",
                     Vec::new(),
                 )
                 .into());
             }
-            if out_data_path.is_symlink() || !out_data_path.is_file() {
+            if new_data_path.is_symlink() || !new_data_path.is_file() {
                 return Err(EngineError::contract_error(
                     "Engine wrote data not as a plain file",
                     Vec::new(),
                 )
                 .into());
             }
-            Some(OwnedFile::new(out_data_path).into())
+            Some(OwnedFile::new(new_data_path).into())
         } else {
-            if out_data_path.exists() {
+            if new_data_path.exists() {
                 return Err(EngineError::contract_error(
                     "Engine wrote data file while the ouput slice is empty",
                     Vec::new(),
@@ -463,24 +434,24 @@ impl SparkEngine {
             None
         };
 
-        let out_checkpoint = if out_checkpoint_path.exists() {
-            if out_checkpoint_path.is_symlink() || !out_checkpoint_path.is_file() {
+        let new_checkpoint = if new_checkpoint_path.exists() {
+            if new_checkpoint_path.is_symlink() || !new_checkpoint_path.is_file() {
                 return Err(EngineError::contract_error(
                     "Engine wrote checkpoint not as a plain file",
                     Vec::new(),
                 )
                 .into());
             }
-            Some(OwnedFile::new(out_checkpoint_path).into())
+            Some(OwnedFile::new(new_checkpoint_path).into())
         } else {
             None
         };
 
         Ok(IngestResponse {
-            data_interval: engine_response.data_interval,
-            output_watermark: engine_response.output_watermark,
-            out_checkpoint,
-            out_data,
+            new_offset_interval: engine_response.new_offset_interval,
+            new_watermark: engine_response.new_watermark,
+            new_checkpoint,
+            new_data,
         })
     }
 }
@@ -552,7 +523,7 @@ pub struct IngestRequestRaw {
     pub system_time: DateTime<Utc>,
     #[serde(default, with = "datetime_rfc3339_opt")]
     pub event_time: Option<DateTime<Utc>>,
-    pub offset: i64,
+    pub offset: u64,
     #[serde(with = "SetPollingSourceDef")]
     pub source: SetPollingSource,
     #[serde(with = "DatasetVocabularyDef")]

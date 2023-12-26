@@ -36,22 +36,6 @@ impl ReaderNdJson {
             conf,
         })
     }
-
-    pub async fn new_compat(
-        ctx: SessionContext,
-        conf: ReadStepJsonLines,
-    ) -> Result<Self, ReadError> {
-        Self::new(
-            ctx,
-            ReadStepNdJson {
-                schema: conf.schema,
-                date_format: conf.date_format,
-                encoding: conf.encoding,
-                timestamp_format: conf.timestamp_format,
-            },
-        )
-        .await
-    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
