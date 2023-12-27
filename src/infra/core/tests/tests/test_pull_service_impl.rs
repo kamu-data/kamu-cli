@@ -20,8 +20,6 @@ use kamu::testing::*;
 use kamu::*;
 use opendatafabric::*;
 
-use crate::utils::DummySmartTransferProtocolClient;
-
 macro_rules! n {
     ($s:expr) => {
         DatasetAlias::new(None, DatasetName::try_from($s).unwrap())

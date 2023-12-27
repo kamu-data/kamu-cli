@@ -10,10 +10,9 @@
 use std::assert_matches::assert_matches;
 
 use kamu::domain::*;
+use kamu::testing::HttpFileServer;
 use kamu::*;
 use opendatafabric::*;
-
-use crate::utils::HttpFileServer;
 
 #[test_log::test(tokio::test)]
 async fn test_protocol() {

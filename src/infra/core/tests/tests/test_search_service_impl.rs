@@ -18,8 +18,6 @@ use kamu::*;
 use opendatafabric::*;
 use url::Url;
 
-use crate::utils::DummySmartTransferProtocolClient;
-
 // Create repo/bar dataset in a repo and check it appears in searches
 async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
     let dataset_local_alias = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));

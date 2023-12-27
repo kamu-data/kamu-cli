@@ -99,22 +99,26 @@ tracing = "0.1"
 url = { version = "2", features = ["serde"] }
 walkdir = "2"
 
+# Http file server
+tower = "0.4"
+tower-http = { version = "0.4", features = ["fs", "trace"] }
+axum = "0.6"
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"  # For getting uid:gid
 
 
 [dev-dependencies]
+criterion = { version = "0.5", features = ["async_tokio"] }
 env_logger = "0.10"
 filetime = "0.2"
+tokio = { version = "1", default-features = false, features=["rt", "macros"] }
 
 test-group = { version = "1" }
 test-log = { version = "0.2", features = ["trace"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
-# Http file server
-http = "0.2"
-hyper = "0.14"
-tower = "0.4"
-tower-http = { version = "0.4", features = ["fs", "trace"] }
-axum = "0.6"
+[[bench]]
+name = "parallel_simple_transfer_protocol"
+harness = false
+path = "tests/benches/parallel_simple_transfer_protocol.rs"

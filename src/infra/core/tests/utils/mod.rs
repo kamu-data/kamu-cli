@@ -15,13 +15,7 @@ pub use ftp_server::*;
 mod http_server;
 pub use http_server::*;
 
-mod http_file_server;
-pub use http_file_server::*;
-
 mod ipfs_daemon;
 pub use ipfs_daemon::*;
-
-mod dummy_smart_transfer_protocol_client;
-pub use dummy_smart_transfer_protocol_client::*;
 
 pub mod mock_engine_provisioner;

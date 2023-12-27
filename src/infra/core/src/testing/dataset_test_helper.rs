@@ -9,6 +9,10 @@
 
 use std::path::{Path, PathBuf};
 
+use kamu_core::*;
+use opendatafabric::*;
+
+use super::ParquetWriterHelper;
 use crate::DatasetLayout;
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -73,6 +77,77 @@ impl DatasetTestHelper {
                 }
             })
             .collect()
+    }
+
+    pub async fn append_random_data(
+        dataset_repo: &dyn DatasetRepository,
+        dataset_ref: impl Into<DatasetRef>,
+        data_size: usize,
+    ) -> Multihash {
+        let tmp_dir = tempfile::tempdir().unwrap();
+
+        let ds = dataset_repo.get_dataset(&dataset_ref.into()).await.unwrap();
+
+        let prev_data = ds
+            .as_metadata_chain()
+            .iter_blocks()
+            .filter_map_ok(|(_, b)| match b.event {
+                MetadataEvent::AddData(e) => Some(e),
+                _ => None,
+            })
+            .try_first()
+            .await
+            .unwrap();
+
+        let data_path = tmp_dir.path().join("data");
+        let checkpoint_path = tmp_dir.path().join("checkpoint");
+        ParquetWriterHelper::from_sample_data(&data_path).unwrap();
+
+        FileTestHelper::create_random_file(&checkpoint_path, data_size);
+
+        let input_checkpoint = prev_data
+            .as_ref()
+            .and_then(|e| e.output_checkpoint.as_ref())
+            .map(|c| c.physical_hash.clone());
+
+        let prev_offset = prev_data
+            .as_ref()
+            .and_then(|e| e.output_data.as_ref())
+            .map(|d| d.interval.end)
+            .unwrap_or(-1);
+        let data_interval = OffsetInterval {
+            start: prev_offset + 1,
+            end: prev_offset + 10,
+        };
+
+        ds.commit_add_data(
+            AddDataParams {
+                input_checkpoint,
+                output_data: Some(data_interval),
+                output_watermark: None,
+                source_state: None,
+            },
+            Some(OwnedFile::new(data_path)),
+            Some(OwnedFile::new(checkpoint_path)),
+            CommitOpts::default(),
+        )
+        .await
+        .unwrap()
+        .new_head
+    }
+}
+
+pub struct FileTestHelper {}
+
+impl FileTestHelper {
+    pub fn create_random_file(path: &Path, data_size: usize) -> usize {
+        use rand::RngCore;
+
+        let mut data = vec![0u8; data_size];
+        rand::thread_rng().fill_bytes(&mut data);
+
+        std::fs::write(path, data).unwrap();
+        data_size
     }
 }
 
