@@ -204,50 +204,6 @@ impl<'a> DatasetVocabularyResolved<'a> {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// TransformSql
-////////////////////////////////////////////////////////////////////////////////
-
-impl TransformSql {
-    pub fn normalize_queries(mut self, implicit_alias: Option<String>) -> Self {
-        if let Some(query) = self.query {
-            assert!(!self.queries.is_some());
-
-            self.queries = Some(vec![SqlQueryStep {
-                alias: None,
-                query: query.clone(),
-            }]);
-
-            self.query = None;
-        }
-
-        let nameless_queries = self
-            .queries
-            .as_ref()
-            .unwrap()
-            .iter()
-            .map(|q| &q.alias)
-            .filter(|a| a.is_none())
-            .count();
-
-        assert!(
-            nameless_queries <= 1,
-            "TransformSql has multiple queries without an alias"
-        );
-
-        if nameless_queries > 0 {
-            for step in self.queries.as_mut().unwrap() {
-                if step.alias.is_none() {
-                    step.alias = implicit_alias;
-                    break;
-                }
-            }
-        }
-
-        self
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////
 // ReadStep
 ////////////////////////////////////////////////////////////////////////////////
 
