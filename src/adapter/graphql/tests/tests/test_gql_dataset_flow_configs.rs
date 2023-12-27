@@ -265,7 +265,7 @@ async fn test_crud_cron_root_dataset() {
                                         "__typename": "CronExpression",
                                         "cronExpression": "0 */2 * * *",
                                     },
-                                    "batching": Value::Null                                    
+                                    "batching": Value::Null
                                 }
                             }
                         }
@@ -307,7 +307,7 @@ async fn test_crud_cron_root_dataset() {
                                         "__typename": "CronExpression",
                                         "cronExpression": "0 0 */1 * *",
                                     },
-                                    "batching": Value::Null                                    
+                                    "batching": Value::Null
                                 }
                             }
                         }
@@ -547,7 +547,6 @@ async fn test_incorrect_dataset_kinds_for_flow_type() {
             }
         })
     );
-
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
@@ -684,7 +683,7 @@ impl FlowConfigHarness {
                                 setConfigSchedule (
                                     datasetFlowType: "<dataset_flow_type>",
                                     paused: <paused>,
-                                    schedule: { 
+                                    schedule: {
                                         timeDelta: { every: <every>, unit: "<unit>" }
                                     }
                                 ) {
@@ -755,9 +754,9 @@ impl FlowConfigHarness {
                                             }
                                             batching {
                                                 __typename
-                                            }    
+                                            }
                                         }
-                                    }                                    
+                                    }
                                 }
                             }
                         }
@@ -798,7 +797,7 @@ impl FlowConfigHarness {
                                         __typename,
                                         message
                                         ... on SetFlowConfigSuccess {
-                                            config {                                        
+                                            config {
                                                 __typename
                                                 paused
                                                 schedule {
@@ -813,8 +812,8 @@ impl FlowConfigHarness {
                                                     minimalDataBatch
                                                 }
                                             }
-                                        }                      
-                                    }                                    
+                                        }
+                                    }
                                 }
                             }
                         }
