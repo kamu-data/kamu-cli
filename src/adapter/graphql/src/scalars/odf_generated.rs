@@ -55,7 +55,7 @@ impl From<odf::AddData> for AddData {
 
 #[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct AddPushSource {
-    pub source_name: Option<String>,
+    pub source_name: String,
     pub read: ReadStep,
     pub preprocess: Option<Transform>,
     pub merge: MergeStrategy,
@@ -64,7 +64,7 @@ pub struct AddPushSource {
 impl From<odf::AddPushSource> for AddPushSource {
     fn from(v: odf::AddPushSource) -> Self {
         Self {
-            source_name: v.source_name.map(Into::into),
+            source_name: v.source_name.into(),
             read: v.read.into(),
             preprocess: v.preprocess.map(Into::into),
             merge: v.merge.into(),
@@ -263,13 +263,13 @@ impl From<odf::DisablePollingSource> for DisablePollingSource {
 
 #[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct DisablePushSource {
-    pub source_name: Option<String>,
+    pub source_name: String,
 }
 
 impl From<odf::DisablePushSource> for DisablePushSource {
     fn from(v: odf::DisablePushSource) -> Self {
         Self {
-            source_name: v.source_name.map(Into::into),
+            source_name: v.source_name.into(),
         }
     }
 }
@@ -1267,7 +1267,7 @@ impl From<odf::SourceCachingForever> for SourceCachingForever {
 
 #[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct SourceState {
-    pub source_name: Option<String>,
+    pub source_name: String,
     pub kind: String,
     pub value: String,
 }
@@ -1275,7 +1275,7 @@ pub struct SourceState {
 impl From<odf::SourceState> for SourceState {
     fn from(v: odf::SourceState) -> Self {
         Self {
-            source_name: v.source_name.map(Into::into),
+            source_name: v.source_name.into(),
             kind: v.kind.into(),
             value: v.value.into(),
         }
