@@ -3283,6 +3283,7 @@ dependencies = [
  "kamu-core",
  "kamu-data-utils",
  "kamu-flow-system",
+ "kamu-flow-system-inmem",
  "kamu-task-system",
  "mockall",
  "opendatafabric",

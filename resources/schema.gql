@@ -1,3 +1,5 @@
+directive @oneOf on INPUT_OBJECT
+
 type Account {
 	"""
 	Unique and stable identitfier of this account
@@ -141,6 +143,10 @@ type CreateDatasetResultSuccess implements CreateDatasetResult & CreateDatasetFr
 	message: String!
 }
 
+type CronExpression {
+	cronExpression: String!
+}
+
 type DataBatch {
 	format: DataBatchFormat!
 	content: String!
@@ -233,6 +239,10 @@ type Dataset {
 	"""
 	metadata: DatasetMetadata!
 	"""
+	Access to the flow configurations of this dataset
+	"""
+	flows: DatasetFlows!
+	"""
 	Creation time of the first metadata block in the chain
 	"""
 	createdAt: DateTime!
@@ -284,6 +294,35 @@ type DatasetData {
 
 type DatasetEdge {
 	node: Dataset!
+}
+
+type DatasetFlowConfigs {
+	"""
+	Returns defined configuration for a flow of specified type
+	"""
+	byType(datasetFlowType: DatasetFlowType!): FlowConfiguration
+}
+
+type DatasetFlowConfigsMut {
+	setConfigSchedule(datasetFlowType: DatasetFlowType!, paused: Boolean!, schedule: ScheduleInput!): SetFlowConfigResult!
+	setConfigBatching(datasetFlowType: DatasetFlowType!, paused: Boolean!, throttlingPeriod: TimeDeltaInput, minimalDataBatch: Int): SetFlowConfigResult!
+}
+
+enum DatasetFlowType {
+	INGEST
+	EXECUTE_QUERY
+	COMPACTION
+}
+
+type DatasetFlows {
+	"""
+	Returns interface for flow configurations queries
+	"""
+	configs: DatasetFlowConfigs!
+}
+
+type DatasetFlowsMut {
+	configs: DatasetFlowConfigsMut!
 }
 
 scalar DatasetID
@@ -365,6 +404,10 @@ type DatasetMut {
 	Access to the mutable metadata of the dataset
 	"""
 	metadata: DatasetMetadataMut!
+	"""
+	Access to the mutable flow configurations of this dataset
+	"""
+	flows: DatasetFlowsMut!
 	"""
 	Rename the dataset
 	"""
@@ -525,6 +568,19 @@ type FetchStepUrl {
 	headers: [RequestHeader!]
 }
 
+
+type FlowConfiguration {
+	paused: Boolean!
+	schedule: FlowConfigurationSchedule
+	batching: FlowConfigurationBatching
+}
+
+type FlowConfigurationBatching {
+	throttlingPeriod: TimeDelta
+	minimalDataBatch: Int
+}
+
+union FlowConfigurationSchedule = TimeDelta | CronExpression
 
 
 type InputSlice {
@@ -828,6 +884,11 @@ type RequestHeader {
 	value: String!
 }
 
+input ScheduleInput @oneOf {
+	timeDelta: TimeDeltaInput
+	cronExpression: String
+}
+
 type Search {
 	"""
 	Perform search across all resources
@@ -868,6 +929,21 @@ type SetAttachments {
 
 type SetDataSchema {
 	schema: DataSchema!
+}
+
+type SetFlowConfigIncompatibleDatasetKind implements SetFlowConfigResult {
+	expectedDatasetKind: DatasetKind!
+	actualDatasetKind: DatasetKind!
+	message: String!
+}
+
+interface SetFlowConfigResult {
+	message: String!
+}
+
+type SetFlowConfigSuccess implements SetFlowConfigResult {
+	config: FlowConfiguration!
+	message: String!
 }
 
 type SetInfo {
@@ -1054,6 +1130,23 @@ type TasksMut {
 type TemporalTable {
 	name: String!
 	primaryKey: [String!]!
+}
+
+type TimeDelta {
+	every: Int!
+	unit: TimeUnit!
+}
+
+input TimeDeltaInput {
+	every: Int!
+	unit: TimeUnit!
+}
+
+enum TimeUnit {
+	MINUTES
+	HOURS
+	DAYS
+	WEEKS
 }
 
 union Transform = TransformSql

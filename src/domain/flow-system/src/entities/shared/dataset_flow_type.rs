@@ -24,6 +24,14 @@ impl DatasetFlowType {
     pub fn is_dataset_update(&self) -> bool {
         *self == DatasetFlowType::Ingest || *self == DatasetFlowType::ExecuteQuery
     }
+
+    pub fn dataset_kind_restriction(&self) -> Option<opendatafabric::DatasetKind> {
+        match self {
+            DatasetFlowType::Ingest => Some(opendatafabric::DatasetKind::Root),
+            DatasetFlowType::ExecuteQuery => Some(opendatafabric::DatasetKind::Derivative),
+            DatasetFlowType::Compaction => None,
+        }
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

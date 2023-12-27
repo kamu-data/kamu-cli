@@ -31,7 +31,7 @@ pub struct ScheduleTimeDelta {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ScheduleCronExpression {
-    pub expression: String,
+    pub cron_expression: String,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

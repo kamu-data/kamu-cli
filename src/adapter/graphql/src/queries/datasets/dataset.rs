@@ -99,6 +99,11 @@ impl Dataset {
         DatasetMetadata::new(self.dataset_handle.clone())
     }
 
+    /// Access to the flow configurations of this dataset
+    async fn flows(&self) -> DatasetFlows {
+        DatasetFlows::new(self.dataset_handle.clone())
+    }
+
     // TODO: PERF: Avoid traversing the entire chain
     /// Creation time of the first metadata block in the chain
     async fn created_at(&self, ctx: &Context<'_>) -> Result<DateTime<Utc>> {

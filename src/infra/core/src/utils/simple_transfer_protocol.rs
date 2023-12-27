@@ -418,6 +418,8 @@ impl SimpleTransferProtocol {
         blocks.iter().rev().for_each(|(_, b)| {
             if let Some(block_stream) = b.as_data_stream_block() {
                 if let Some(data_slice) = block_stream.event.output_data {
+                    // Each function return unique future
+                    // cast future to next type to allow storing them in vector
                     block_download_tasks.push(Box::pin(self.download_block_data(
                         src,
                         dst,
@@ -426,8 +428,6 @@ impl SimpleTransferProtocol {
                         listener.clone(),
                         arc_stats.clone(),
                     ))
-                    // Each function return unique future
-                    // cast future to next type to allow storing them in vector
                         as Pin<Box<dyn Future<Output = Result<(), SyncError>> + Send>>)
                 }
                 if let Some(checkpoint) = block_stream.event.output_checkpoint {
