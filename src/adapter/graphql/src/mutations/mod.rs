@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 mod auth_mut;
+mod dataset_flow_configs_mut;
 mod dataset_flows_mut;
 mod dataset_metadata_mut;
 mod dataset_mut;
@@ -15,6 +16,7 @@ mod datasets_mut;
 mod metadata_chain_mut;
 mod tasks_mut;
 pub(crate) use auth_mut::*;
+pub(crate) use dataset_flow_configs_mut::*;
 pub(crate) use dataset_flows_mut::*;
 pub(crate) use dataset_metadata_mut::*;
 pub(crate) use dataset_mut::*;

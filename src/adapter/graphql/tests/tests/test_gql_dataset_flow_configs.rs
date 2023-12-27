@@ -34,19 +34,21 @@ async fn test_crud_time_delta_root_dataset() {
         {
             datasets {
                 byId (datasetId: "<id>") {
-                    flowConfigs {
-                        flowConfig (datasetFlowType: "INGEST") {
-                            __typename
-                            paused
-                            schedule {
+                    flows {
+                        configs {
+                            byType (datasetFlowType: "INGEST") {
                                 __typename
-                                ... on TimeDelta {
-                                    every
-                                    unit
+                                paused
+                                schedule {
+                                    __typename
+                                    ... on TimeDelta {
+                                        every
+                                        unit
+                                    }
                                 }
-                            }
-                            batching {
-                                __typename
+                                batching {
+                                    __typename
+                                }
                             }
                         }
                     }
@@ -71,8 +73,10 @@ async fn test_crud_time_delta_root_dataset() {
         value!({
             "datasets": {
                 "byId": {
-                    "flowConfigs": {
-                        "flowConfig": Value::Null
+                    "flows": {
+                        "configs": {
+                            "byType": Value::Null
+                        }
                     }
                 }
             }
@@ -100,16 +104,18 @@ async fn test_crud_time_delta_root_dataset() {
         value!({
             "datasets": {
                 "byId": {
-                    "flowConfigs": {
-                        "setConfigTimeDelta": {
-                            "__typename": "FlowConfiguration",
-                            "paused": false,
-                            "schedule": {
-                                "__typename": "TimeDelta",
-                                "every": 1,
-                                "unit": "DAYS"
-                            },
-                            "batching": Value::Null
+                    "flows": {
+                        "configs": {
+                            "setConfigTimeDelta": {
+                                "__typename": "FlowConfiguration",
+                                "paused": false,
+                                "schedule": {
+                                    "__typename": "TimeDelta",
+                                    "every": 1,
+                                    "unit": "DAYS"
+                                },
+                                "batching": Value::Null
+                            }
                         }
                     }
                 }
@@ -138,16 +144,18 @@ async fn test_crud_time_delta_root_dataset() {
         value!({
             "datasets": {
                 "byId": {
-                    "flowConfigs": {
-                        "setConfigTimeDelta": {
-                            "__typename": "FlowConfiguration",
-                            "paused": true,
-                            "schedule": {
-                                "__typename": "TimeDelta",
-                                "every": 2,
-                                "unit": "HOURS"
-                            },
-                            "batching": Value::Null
+                    "flows": {
+                        "configs": {
+                            "setConfigTimeDelta": {
+                                "__typename": "FlowConfiguration",
+                                "paused": true,
+                                "schedule": {
+                                    "__typename": "TimeDelta",
+                                    "every": 2,
+                                    "unit": "HOURS"
+                                },
+                                "batching": Value::Null
+                            }
                         }
                     }
                 }
@@ -169,18 +177,20 @@ async fn test_crud_cron_root_dataset() {
         {
             datasets {
                 byId (datasetId: "<id>") {
-                    flowConfigs {
-                        flowConfig (datasetFlowType: "INGEST") {
-                            __typename
-                            paused
-                            schedule {
+                    flows {
+                        configs {
+                            byType (datasetFlowType: "INGEST") {
                                 __typename
-                                ... on CronExpression {
-                                    cronExpression
+                                paused
+                                schedule {
+                                    __typename
+                                    ... on CronExpression {
+                                        cronExpression
+                                    }
                                 }
-                            }
-                            batching {
-                                __typename
+                                batching {
+                                    __typename
+                                }
                             }
                         }
                     }
@@ -205,8 +215,10 @@ async fn test_crud_cron_root_dataset() {
         value!({
             "datasets": {
                 "byId": {
-                    "flowConfigs": {
-                        "flowConfig": Value::Null
+                    "flows": {
+                        "configs": {
+                            "byType": Value::Null
+                        }
                     }
                 }
             }
@@ -233,15 +245,17 @@ async fn test_crud_cron_root_dataset() {
         value!({
             "datasets": {
                 "byId": {
-                    "flowConfigs": {
-                        "setConfigCronExpression": {
-                            "__typename": "FlowConfiguration",
-                            "paused": false,
-                            "schedule": {
-                                "__typename": "CronExpression",
-                                "cronExpression": "0 */2 * * *",
-                            },
-                            "batching": Value::Null
+                    "flows": {
+                        "configs": {
+                            "setConfigCronExpression": {
+                                "__typename": "FlowConfiguration",
+                                "paused": false,
+                                "schedule": {
+                                    "__typename": "CronExpression",
+                                    "cronExpression": "0 */2 * * *",
+                                },
+                                "batching": Value::Null
+                            }
                         }
                     }
                 }
@@ -269,15 +283,17 @@ async fn test_crud_cron_root_dataset() {
         value!({
             "datasets": {
                 "byId": {
-                    "flowConfigs": {
-                        "setConfigCronExpression": {
-                            "__typename": "FlowConfiguration",
-                            "paused": true,
-                            "schedule": {
-                                "__typename": "CronExpression",
-                                "cronExpression": "0 0 */1 * *",
-                            },
-                            "batching": Value::Null
+                    "flows": {
+                        "configs": {
+                            "setConfigCronExpression": {
+                                "__typename": "FlowConfiguration",
+                                "paused": true,
+                                "schedule": {
+                                    "__typename": "CronExpression",
+                                    "cronExpression": "0 0 */1 * *",
+                                },
+                                "batching": Value::Null
+                            }
                         }
                     }
                 }
@@ -300,20 +316,22 @@ async fn test_crud_batching_derived_dataset() {
         {
             datasets {
                 byId (datasetId: "<id>") {
-                    flowConfigs {
-                        flowConfig (datasetFlowType: "EXECUTE_QUERY") {
-                            __typename
-                            paused
-                            schedule {
+                    flows {
+                        configs {
+                            byType (datasetFlowType: "EXECUTE_QUERY") {
                                 __typename
-                            }
-                            batching {
-                                __typename
-                                throttlingPeriod {
-                                    every
-                                    unit
+                                paused
+                                schedule {
+                                    __typename
                                 }
-                                minimalDataBatch
+                                batching {
+                                    __typename
+                                    throttlingPeriod {
+                                        every
+                                        unit
+                                    }
+                                    minimalDataBatch
+                                }
                             }
                         }
                     }
@@ -338,8 +356,10 @@ async fn test_crud_batching_derived_dataset() {
         value!({
             "datasets": {
                 "byId": {
-                    "flowConfigs": {
-                        "flowConfig": Value::Null
+                    "flows": {
+                        "configs": {
+                            "byType": Value::Null
+                        }
                     }
                 }
             }
@@ -367,18 +387,20 @@ async fn test_crud_batching_derived_dataset() {
         value!({
             "datasets": {
                 "byId": {
-                    "flowConfigs": {
-                        "setConfigBatching": {
-                            "__typename": "FlowConfiguration",
-                            "paused": false,
-                            "schedule": Value::Null,
-                            "batching": {
-                                "__typename": "FlowConfigurationBatching",
-                                "throttlingPeriod": {
-                                    "every": 30,
-                                    "unit": "MINUTES"
-                                },
-                                "minimalDataBatch": 100
+                    "flows": {
+                        "configs": {
+                            "setConfigBatching": {
+                                "__typename": "FlowConfiguration",
+                                "paused": false,
+                                "schedule": Value::Null,
+                                "batching": {
+                                    "__typename": "FlowConfigurationBatching",
+                                    "throttlingPeriod": {
+                                        "every": 30,
+                                        "unit": "MINUTES"
+                                    },
+                                    "minimalDataBatch": 100
+                                }
                             }
                         }
                     }
@@ -606,23 +628,25 @@ impl FlowConfigHarness {
             mutation {
                 datasets {
                     byId (datasetId: "<id>") {
-                        flowConfigs {
-                            setConfigTimeDelta (
-                                datasetFlowType: "<dataset_flow_type>",
-                                paused: <paused>,
-                                every: { every: <every>, unit: "<unit>" }
-                            ) {
-                                __typename,
-                                paused
-                                schedule {
-                                    __typename
-                                    ... on TimeDelta {
-                                        every
-                                        unit
+                        flows {
+                            configs {
+                                setConfigTimeDelta (
+                                    datasetFlowType: "<dataset_flow_type>",
+                                    paused: <paused>,
+                                    every: { every: <every>, unit: "<unit>" }
+                                ) {
+                                    __typename,
+                                    paused
+                                    schedule {
+                                        __typename
+                                        ... on TimeDelta {
+                                            every
+                                            unit
+                                        }
                                     }
-                                }
-                                batching {
-                                    __typename
+                                    batching {
+                                        __typename
+                                    }
                                 }
                             }
                         }
@@ -649,22 +673,24 @@ impl FlowConfigHarness {
             mutation {
                 datasets {
                     byId (datasetId: "<id>") {
-                        flowConfigs {
-                            setConfigCronExpression (
-                                datasetFlowType: "<dataset_flow_type>",
-                                paused: <paused>,
-                                cronExpression: "<cron_expression>"
-                            ) {
-                                __typename,
-                                paused
-                                schedule {
-                                    __typename
-                                    ... on CronExpression {
-                                        cronExpression
+                        flows {
+                            configs {
+                                setConfigCronExpression (
+                                    datasetFlowType: "<dataset_flow_type>",
+                                    paused: <paused>,
+                                    cronExpression: "<cron_expression>"
+                                ) {
+                                    __typename,
+                                    paused
+                                    schedule {
+                                        __typename
+                                        ... on CronExpression {
+                                            cronExpression
+                                        }
                                     }
-                                }
-                                batching {
-                                    __typename
+                                    batching {
+                                        __typename
+                                    }
                                 }
                             }
                         }
@@ -691,25 +717,27 @@ impl FlowConfigHarness {
             mutation {
                 datasets {
                     byId (datasetId: "<id>") {
-                        flowConfigs {
-                            setConfigBatching (
-                                datasetFlowType: "<dataset_flow_type>",
-                                paused: <paused>,
-                                throttlingPeriod: { every: <every>, unit: "<unit>" },
-                                minimalDataBatch: <min_data_batch>
-                            ) {
-                                __typename,
-                                paused
-                                schedule {
-                                    __typename
-                                }
-                                batching {
-                                    __typename
-                                    throttlingPeriod {
-                                        every
-                                        unit
+                        flows {
+                            configs {
+                                setConfigBatching (
+                                    datasetFlowType: "<dataset_flow_type>",
+                                    paused: <paused>,
+                                    throttlingPeriod: { every: <every>, unit: "<unit>" },
+                                    minimalDataBatch: <min_data_batch>
+                                ) {
+                                    __typename,
+                                    paused
+                                    schedule {
+                                        __typename
                                     }
-                                    minimalDataBatch
+                                    batching {
+                                        __typename
+                                        throttlingPeriod {
+                                            every
+                                            unit
+                                        }
+                                        minimalDataBatch
+                                    }
                                 }
                             }
                         }

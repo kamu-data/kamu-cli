@@ -239,7 +239,7 @@ type Dataset {
 	"""
 	Access to the flow configurations of this dataset
 	"""
-	flowConfigs: DatasetFlows!
+	flows: DatasetFlows!
 	"""
 	Creation time of the first metadata block in the chain
 	"""
@@ -294,6 +294,19 @@ type DatasetEdge {
 	node: Dataset!
 }
 
+type DatasetFlowConfigs {
+	"""
+	Returns defined configuration for a flow of specified type
+	"""
+	byType(datasetFlowType: DatasetFlowType!): FlowConfiguration
+}
+
+type DatasetFlowConfigsMut {
+	setConfigTimeDelta(datasetFlowType: DatasetFlowType!, paused: Boolean!, every: TimeDeltaInput!): FlowConfiguration!
+	setConfigCronExpression(datasetFlowType: DatasetFlowType!, paused: Boolean!, cronExpression: String!): FlowConfiguration!
+	setConfigBatching(datasetFlowType: DatasetFlowType!, paused: Boolean!, throttlingPeriod: TimeDeltaInput, minimalDataBatch: Int): FlowConfiguration!
+}
+
 enum DatasetFlowType {
 	INGEST
 	EXECUTE_QUERY
@@ -302,15 +315,13 @@ enum DatasetFlowType {
 
 type DatasetFlows {
 	"""
-	Returns defined configuration for a flow of specified type
+	Returns interface for flow configurations queries
 	"""
-	flowConfig(datasetFlowType: DatasetFlowType!): FlowConfiguration
+	configs: DatasetFlowConfigs!
 }
 
 type DatasetFlowsMut {
-	setConfigTimeDelta(datasetFlowType: DatasetFlowType!, paused: Boolean!, every: TimeDeltaInput!): FlowConfiguration!
-	setConfigCronExpression(datasetFlowType: DatasetFlowType!, paused: Boolean!, cronExpression: String!): FlowConfiguration!
-	setConfigBatching(datasetFlowType: DatasetFlowType!, paused: Boolean!, throttlingPeriod: TimeDeltaInput, minimalDataBatch: Int): FlowConfiguration!
+	configs: DatasetFlowConfigsMut!
 }
 
 scalar DatasetID
@@ -395,7 +406,7 @@ type DatasetMut {
 	"""
 	Access to the mutable flow configurations of this dataset
 	"""
-	flowConfigs: DatasetFlowsMut!
+	flows: DatasetFlowsMut!
 	"""
 	Rename the dataset
 	"""

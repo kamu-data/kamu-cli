@@ -100,7 +100,7 @@ impl Dataset {
     }
 
     /// Access to the flow configurations of this dataset
-    async fn flow_configs(&self) -> DatasetFlows {
+    async fn flows(&self) -> DatasetFlows {
         DatasetFlows::new(self.dataset_handle.clone())
     }
 

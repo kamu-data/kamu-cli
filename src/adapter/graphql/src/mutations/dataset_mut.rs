@@ -33,7 +33,7 @@ impl DatasetMut {
     }
 
     /// Access to the mutable flow configurations of this dataset
-    async fn flow_configs(&self) -> DatasetFlowsMut {
+    async fn flows(&self) -> DatasetFlowsMut {
         DatasetFlowsMut::new(self.dataset_handle.clone())
     }
 
