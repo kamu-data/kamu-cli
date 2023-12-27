@@ -765,8 +765,9 @@ impl DataWriterDataFusionBuilder {
 
     /// Scans metadata chain to populate the needed metadata
     ///
-    /// * `source_name` - name of the push source to use when extracting the
-    ///   metadata needed for writing.
+    /// * `source_name` - name of the source to use when extracting the metadata
+    ///   needed for writing. Leave empty for polling sources or to use the only
+    ///   push source defined when there is no ambiguity.
     pub async fn with_metadata_state_scanned(
         self,
         source_name: Option<&str>,
@@ -819,7 +820,7 @@ impl DataWriterDataFusionBuilder {
                         }
                         if prev_source_state.is_none() {
                             if let Some(ss) = &e.new_source_state {
-                                if ss.source_name.as_deref() != source_name {
+                                if Some(ss.source_name.as_str()) != source_name {
                                     unimplemented!(
                                         "Differentiating between the state of multiple sources is \
                                          not yet supported"
@@ -846,8 +847,20 @@ impl DataWriterDataFusionBuilder {
                     }
                     odf::MetadataEvent::AddPushSource(e) => {
                         if source_event.is_none() {
-                            if source_name == e.source_name.as_deref() {
+                            if source_name.is_none() || source_name == Some(e.source_name.as_str())
+                            {
                                 source_event = Some(e.into());
+                            }
+                        } else {
+                            // Encountered another source - if `source_name` was not specified we
+                            // return ambiguity error
+                            if source_name.is_none() {
+                                return Err(SourceNotFoundError::new(
+                                    None::<&str>,
+                                    "Explicit source name is required to pick between several \
+                                     active push sources",
+                                )
+                                .into());
                             }
                         }
                     }
