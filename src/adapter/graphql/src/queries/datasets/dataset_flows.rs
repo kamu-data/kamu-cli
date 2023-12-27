@@ -20,12 +20,12 @@ use crate::prelude::*;
 
 ///////////////////////////////////////////////////////////////////////////////
 
-pub struct DatasetFlowConfigs {
+pub struct DatasetFlows {
     dataset_handle: odf::DatasetHandle,
 }
 
 #[Object]
-impl DatasetFlowConfigs {
+impl DatasetFlows {
     #[graphql(skip)]
     pub fn new(dataset_handle: odf::DatasetHandle) -> Self {
         Self { dataset_handle }

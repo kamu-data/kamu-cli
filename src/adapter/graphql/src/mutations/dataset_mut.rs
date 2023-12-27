@@ -11,7 +11,7 @@ use domain::{DeleteDatasetError, RenameDatasetError};
 use kamu_core::{self as domain};
 use opendatafabric as odf;
 
-use super::{DatasetFlowConfigsMut, DatasetMetadataMut};
+use super::{DatasetFlowsMut, DatasetMetadataMut};
 use crate::prelude::*;
 use crate::LoggedInGuard;
 
@@ -33,8 +33,8 @@ impl DatasetMut {
     }
 
     /// Access to the mutable flow configurations of this dataset
-    async fn flow_configs(&self) -> DatasetFlowConfigsMut {
-        DatasetFlowConfigsMut::new(self.dataset_handle.clone())
+    async fn flow_configs(&self) -> DatasetFlowsMut {
+        DatasetFlowsMut::new(self.dataset_handle.clone())
     }
 
     /// Rename the dataset

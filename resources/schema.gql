@@ -239,7 +239,7 @@ type Dataset {
 	"""
 	Access to the flow configurations of this dataset
 	"""
-	flowConfigs: DatasetFlowConfigs!
+	flowConfigs: DatasetFlows!
 	"""
 	Creation time of the first metadata block in the chain
 	"""
@@ -294,23 +294,23 @@ type DatasetEdge {
 	node: Dataset!
 }
 
-type DatasetFlowConfigs {
+enum DatasetFlowType {
+	INGEST
+	EXECUTE_QUERY
+	COMPACTION
+}
+
+type DatasetFlows {
 	"""
 	Returns defined configuration for a flow of specified type
 	"""
 	flowConfig(datasetFlowType: DatasetFlowType!): FlowConfiguration
 }
 
-type DatasetFlowConfigsMut {
+type DatasetFlowsMut {
 	setConfigTimeDelta(datasetFlowType: DatasetFlowType!, paused: Boolean!, every: TimeDeltaInput!): FlowConfiguration!
 	setConfigCronExpression(datasetFlowType: DatasetFlowType!, paused: Boolean!, cronExpression: String!): FlowConfiguration!
 	setConfigBatching(datasetFlowType: DatasetFlowType!, paused: Boolean!, throttlingPeriod: TimeDeltaInput, minimalDataBatch: Int): FlowConfiguration!
-}
-
-enum DatasetFlowType {
-	INGEST
-	EXECUTE_QUERY
-	COMPACTION
 }
 
 scalar DatasetID
@@ -395,7 +395,7 @@ type DatasetMut {
 	"""
 	Access to the mutable flow configurations of this dataset
 	"""
-	flowConfigs: DatasetFlowConfigsMut!
+	flowConfigs: DatasetFlowsMut!
 	"""
 	Rename the dataset
 	"""

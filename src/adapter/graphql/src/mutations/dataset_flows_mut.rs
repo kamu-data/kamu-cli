@@ -27,12 +27,12 @@ use crate::{utils, LoggedInGuard};
 
 ///////////////////////////////////////////////////////////////////////////////
 
-pub struct DatasetFlowConfigsMut {
+pub struct DatasetFlowsMut {
     dataset_handle: odf::DatasetHandle,
 }
 
 #[Object]
-impl DatasetFlowConfigsMut {
+impl DatasetFlowsMut {
     #[graphql(skip)]
     pub fn new(dataset_handle: odf::DatasetHandle) -> Self {
         Self { dataset_handle }
