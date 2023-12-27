@@ -304,8 +304,8 @@ type DatasetFlowConfigs {
 }
 
 type DatasetFlowConfigsMut {
-	setConfigSchedule(datasetFlowType: DatasetFlowType!, paused: Boolean!, schedule: ScheduleInput!): FlowConfiguration!
-	setConfigBatching(datasetFlowType: DatasetFlowType!, paused: Boolean!, throttlingPeriod: TimeDeltaInput, minimalDataBatch: Int): FlowConfiguration!
+	setConfigSchedule(datasetFlowType: DatasetFlowType!, paused: Boolean!, schedule: ScheduleInput!): SetFlowConfigResult!
+	setConfigBatching(datasetFlowType: DatasetFlowType!, paused: Boolean!, throttlingPeriod: TimeDeltaInput, minimalDataBatch: Int): SetFlowConfigResult!
 }
 
 enum DatasetFlowType {
@@ -929,6 +929,21 @@ type SetAttachments {
 
 type SetDataSchema {
 	schema: DataSchema!
+}
+
+type SetFlowConfigIncompatibleDatasetKind implements SetFlowConfigResult {
+	expectedDatasetKind: DatasetKind!
+	actualDatasetKind: DatasetKind!
+	message: String!
+}
+
+interface SetFlowConfigResult {
+	message: String!
+}
+
+type SetFlowConfigSuccess implements SetFlowConfigResult {
+	config: FlowConfiguration!
+	message: String!
 }
 
 type SetInfo {

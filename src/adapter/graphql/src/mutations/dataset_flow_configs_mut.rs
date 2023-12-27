@@ -44,9 +44,14 @@ impl DatasetFlowConfigsMut {
         dataset_flow_type: DatasetFlowType,
         paused: bool,
         schedule: ScheduleInput,
-    ) -> Result<FlowConfiguration> {
-        self.ensure_expected_dataset_kind(ctx, dataset_flow_type)
-            .await?;
+    ) -> Result<SetFlowConfigResult> {
+        if let Some(e) = self
+            .ensure_expected_dataset_kind(ctx, dataset_flow_type)
+            .await?
+        {
+            return Ok(SetFlowConfigResult::IncompatibleDatasetKind(e));
+        }
+
         self.ensure_scheduling_permission(ctx).await?;
 
         let flow_config_service = from_catalog::<dyn FlowConfigurationService>(ctx).unwrap();
@@ -71,7 +76,9 @@ impl DatasetFlowConfigsMut {
                 SetFlowConfigurationError::Internal(e) => GqlError::Internal(e),
             })?;
 
-        Ok(res.into())
+        Ok(SetFlowConfigResult::Success(SetFlowConfigSuccess {
+            config: res.into(),
+        }))
     }
 
     #[graphql(guard = "LoggedInGuard::new()")]
@@ -82,9 +89,14 @@ impl DatasetFlowConfigsMut {
         paused: bool,
         throttling_period: Option<TimeDeltaInput>,
         minimal_data_batch: Option<i32>,
-    ) -> Result<FlowConfiguration> {
-        self.ensure_expected_dataset_kind(ctx, dataset_flow_type)
-            .await?;
+    ) -> Result<SetFlowConfigResult> {
+        if let Some(e) = self
+            .ensure_expected_dataset_kind(ctx, dataset_flow_type)
+            .await?
+        {
+            return Ok(SetFlowConfigResult::IncompatibleDatasetKind(e));
+        }
+
         self.ensure_scheduling_permission(ctx).await?;
 
         let flow_config_service = from_catalog::<dyn FlowConfigurationService>(ctx).unwrap();
@@ -105,7 +117,9 @@ impl DatasetFlowConfigsMut {
                 SetFlowConfigurationError::Internal(e) => GqlError::Internal(e),
             })?;
 
-        Ok(res.into())
+        Ok(SetFlowConfigResult::Success(SetFlowConfigSuccess {
+            config: res.into(),
+        }))
     }
 
     #[graphql(skip)]
@@ -113,7 +127,7 @@ impl DatasetFlowConfigsMut {
         &self,
         ctx: &Context<'_>,
         dataset_flow_type: DatasetFlowType,
-    ) -> Result<()> {
+    ) -> Result<Option<SetFlowConfigIncompatibleDatasetKind>> {
         let dataset_flow_type: kamu_flow_system::DatasetFlowType = dataset_flow_type.into();
         match dataset_flow_type.dataset_kind_restriction() {
             Some(expected_kind) => {
@@ -126,15 +140,15 @@ impl DatasetFlowConfigsMut {
                     .kind;
 
                 if dataset_kind != expected_kind {
-                    return Err(GqlError::Gql(Error::new(format!(
-                        "Expected {:?} dataset kind",
-                        expected_kind
-                    ))));
+                    Ok(Some(SetFlowConfigIncompatibleDatasetKind {
+                        expected_dataset_kind: expected_kind.into(),
+                        actual_dataset_kind: dataset_kind.into(),
+                    }))
                 } else {
-                    Ok(())
+                    Ok(None)
                 }
             }
-            None => Ok(()),
+            None => Ok(None),
         }
     }
 
@@ -184,6 +198,58 @@ impl From<TimeDeltaInput> for chrono::Duration {
             TimeUnit::Hours => chrono::Duration::hours(every),
             TimeUnit::Minutes => chrono::Duration::minutes(every),
         }
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+#[derive(Interface, Debug, Clone)]
+#[graphql(field(name = "message", ty = "String"))]
+pub enum SetFlowConfigResult {
+    Success(SetFlowConfigSuccess),
+    IncompatibleDatasetKind(SetFlowConfigIncompatibleDatasetKind),
+}
+
+#[derive(SimpleObject, Debug, Clone)]
+#[graphql(complex)]
+pub struct SetFlowConfigSuccess {
+    pub config: FlowConfiguration,
+}
+
+#[ComplexObject]
+impl SetFlowConfigSuccess {
+    async fn message(&self) -> String {
+        format!("Success")
+    }
+}
+
+#[derive(SimpleObject, Debug, Clone)]
+#[graphql(complex)]
+pub struct SetFlowConfigIncompatibleDatasetKind {
+    pub expected_dataset_kind: DatasetKind,
+    pub actual_dataset_kind: DatasetKind,
+}
+
+#[ComplexObject]
+impl SetFlowConfigIncompatibleDatasetKind {
+    async fn message(&self) -> String {
+        format!(
+            "Expected a {} dataset, but a {} dataset was provided",
+            self.expected_dataset_kind, self.actual_dataset_kind,
+        )
+    }
+}
+
+impl std::fmt::Display for DatasetKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                DatasetKind::Root => "Root",
+                DatasetKind::Derivative => "Derivative",
+            }
+        )
     }
 }
 

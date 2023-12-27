@@ -107,14 +107,18 @@ async fn test_crud_time_delta_root_dataset() {
                     "flows": {
                         "configs": {
                             "setConfigSchedule": {
-                                "__typename": "FlowConfiguration",
-                                "paused": false,
-                                "schedule": {
-                                    "__typename": "TimeDelta",
-                                    "every": 1,
-                                    "unit": "DAYS"
-                                },
-                                "batching": Value::Null
+                                "__typename": "SetFlowConfigSuccess",
+                                "message": "Success",
+                                "config": {
+                                    "__typename": "FlowConfiguration",
+                                    "paused": false,
+                                    "schedule": {
+                                        "__typename": "TimeDelta",
+                                        "every": 1,
+                                        "unit": "DAYS"
+                                    },
+                                    "batching": Value::Null
+                                }
                             }
                         }
                     }
@@ -147,14 +151,18 @@ async fn test_crud_time_delta_root_dataset() {
                     "flows": {
                         "configs": {
                             "setConfigSchedule": {
-                                "__typename": "FlowConfiguration",
-                                "paused": true,
-                                "schedule": {
-                                    "__typename": "TimeDelta",
-                                    "every": 2,
-                                    "unit": "HOURS"
-                                },
-                                "batching": Value::Null
+                                "__typename": "SetFlowConfigSuccess",
+                                "message": "Success",
+                                "config": {
+                                    "__typename": "FlowConfiguration",
+                                    "paused": true,
+                                    "schedule": {
+                                        "__typename": "TimeDelta",
+                                        "every": 2,
+                                        "unit": "HOURS"
+                                    },
+                                    "batching": Value::Null
+                                }
                             }
                         }
                     }
@@ -248,13 +256,17 @@ async fn test_crud_cron_root_dataset() {
                     "flows": {
                         "configs": {
                             "setConfigSchedule": {
-                                "__typename": "FlowConfiguration",
-                                "paused": false,
-                                "schedule": {
-                                    "__typename": "CronExpression",
-                                    "cronExpression": "0 */2 * * *",
-                                },
-                                "batching": Value::Null
+                                "__typename": "SetFlowConfigSuccess",
+                                "message": "Success",
+                                "config": {
+                                    "__typename": "FlowConfiguration",
+                                    "paused": false,
+                                    "schedule": {
+                                        "__typename": "CronExpression",
+                                        "cronExpression": "0 */2 * * *",
+                                    },
+                                    "batching": Value::Null                                    
+                                }
                             }
                         }
                     }
@@ -286,13 +298,17 @@ async fn test_crud_cron_root_dataset() {
                     "flows": {
                         "configs": {
                             "setConfigSchedule": {
-                                "__typename": "FlowConfiguration",
-                                "paused": true,
-                                "schedule": {
-                                    "__typename": "CronExpression",
-                                    "cronExpression": "0 0 */1 * *",
-                                },
-                                "batching": Value::Null
+                                "__typename": "SetFlowConfigSuccess",
+                                "message": "Success",
+                                "config": {
+                                    "__typename": "FlowConfiguration",
+                                    "paused": true,
+                                    "schedule": {
+                                        "__typename": "CronExpression",
+                                        "cronExpression": "0 0 */1 * *",
+                                    },
+                                    "batching": Value::Null                                    
+                                }
                             }
                         }
                     }
@@ -390,16 +406,20 @@ async fn test_crud_batching_derived_dataset() {
                     "flows": {
                         "configs": {
                             "setConfigBatching": {
-                                "__typename": "FlowConfiguration",
-                                "paused": false,
-                                "schedule": Value::Null,
-                                "batching": {
-                                    "__typename": "FlowConfigurationBatching",
-                                    "throttlingPeriod": {
-                                        "every": 30,
-                                        "unit": "MINUTES"
-                                    },
-                                    "minimalDataBatch": 100
+                                "__typename": "SetFlowConfigSuccess",
+                                "message": "Success",
+                                "config": {
+                                    "__typename": "FlowConfiguration",
+                                    "paused": false,
+                                    "schedule": Value::Null,
+                                    "batching": {
+                                        "__typename": "FlowConfigurationBatching",
+                                        "throttlingPeriod": {
+                                            "every": 30,
+                                            "unit": "MINUTES"
+                                        },
+                                        "minimalDataBatch": 100
+                                    }
                                 }
                             }
                         }
@@ -438,13 +458,23 @@ async fn test_incorrect_dataset_kinds_for_flow_type() {
         )
         .await;
 
-    assert!(res.is_err());
+    assert!(res.is_ok(), "{:?}", res);
     assert_eq!(
-        res.errors
-            .into_iter()
-            .map(|e| e.message)
-            .collect::<Vec<_>>(),
-        vec!["Expected Derivative dataset kind".to_string()]
+        res.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "flows": {
+                        "configs": {
+                            "setConfigBatching": {
+                                "__typename": "SetFlowConfigIncompatibleDatasetKind",
+                                "message": "Expected a Derivative dataset, but a Root dataset was provided",
+                            }
+                        }
+                    }
+                }
+            }
+        })
     );
 
     ////
@@ -463,13 +493,23 @@ async fn test_incorrect_dataset_kinds_for_flow_type() {
         )
         .await;
 
-    assert!(res.is_err());
+    assert!(res.is_ok(), "{:?}", res);
     assert_eq!(
-        res.errors
-            .into_iter()
-            .map(|e| e.message)
-            .collect::<Vec<_>>(),
-        vec!["Expected Root dataset kind".to_string()]
+        res.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "flows": {
+                        "configs": {
+                            "setConfigSchedule": {
+                                "__typename": "SetFlowConfigIncompatibleDatasetKind",
+                                "message": "Expected a Root dataset, but a Derivative dataset was provided",
+                            }
+                        }
+                    }
+                }
+            }
+        })
     );
 
     ////
@@ -489,14 +529,25 @@ async fn test_incorrect_dataset_kinds_for_flow_type() {
         )
         .await;
 
-    assert!(res.is_err());
+    assert!(res.is_ok(), "{:?}", res);
     assert_eq!(
-        res.errors
-            .into_iter()
-            .map(|e| e.message)
-            .collect::<Vec<_>>(),
-        vec!["Expected Root dataset kind".to_string()]
+        res.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "flows": {
+                        "configs": {
+                            "setConfigSchedule": {
+                                "__typename": "SetFlowConfigIncompatibleDatasetKind",
+                                "message": "Expected a Root dataset, but a Derivative dataset was provided",
+                            }
+                        }
+                    }
+                }
+            }
+        })
     );
+
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
@@ -638,16 +689,22 @@ impl FlowConfigHarness {
                                     }
                                 ) {
                                     __typename,
-                                    paused
-                                    schedule {
-                                        __typename
-                                        ... on TimeDelta {
-                                            every
-                                            unit
+                                    message
+                                    ... on SetFlowConfigSuccess {
+                                        config {
+                                            __typename
+                                            paused
+                                            schedule {
+                                                __typename
+                                                ... on TimeDelta {
+                                                    every
+                                                    unit
+                                                }
+                                            }
+                                            batching {
+                                                __typename
+                                            }
                                         }
-                                    }
-                                    batching {
-                                        __typename
                                     }
                                 }
                             }
@@ -685,16 +742,22 @@ impl FlowConfigHarness {
                                     }
                                 ) {
                                     __typename,
-                                    paused
-                                    schedule {
-                                        __typename
-                                        ... on CronExpression {
-                                            cronExpression
+                                    message
+                                    ... on SetFlowConfigSuccess {
+                                        config {
+                                            __typename,
+                                            paused
+                                            schedule {
+                                                __typename
+                                                ... on CronExpression {
+                                                    cronExpression
+                                                }
+                                            }
+                                            batching {
+                                                __typename
+                                            }    
                                         }
-                                    }
-                                    batching {
-                                        __typename
-                                    }
+                                    }                                    
                                 }
                             }
                         }
@@ -730,18 +793,28 @@ impl FlowConfigHarness {
                                     minimalDataBatch: <min_data_batch>
                                 ) {
                                     __typename,
-                                    paused
-                                    schedule {
-                                        __typename
-                                    }
-                                    batching {
-                                        __typename
-                                        throttlingPeriod {
-                                            every
-                                            unit
-                                        }
-                                        minimalDataBatch
-                                    }
+                                    message
+                                    ... on SetFlowConfigSuccess {
+                                        __typename,
+                                        message
+                                        ... on SetFlowConfigSuccess {
+                                            config {                                        
+                                                __typename
+                                                paused
+                                                schedule {
+                                                    __typename
+                                                }
+                                                batching {
+                                                    __typename
+                                                    throttlingPeriod {
+                                                        every
+                                                        unit
+                                                    }
+                                                    minimalDataBatch
+                                                }
+                                            }
+                                        }                      
+                                    }                                    
                                 }
                             }
                         }
