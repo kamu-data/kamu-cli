@@ -165,7 +165,7 @@ fn build_temp_dirs(rt: Arc<tokio::runtime::Runtime>) -> (Arc<DatasetAlias>, Url,
 /////////////////////////////////////////////////////////////////////////////////////////
 
 fn bench_with_1_parallel(c: &mut Criterion) {
-    std::env::set_var("SIMPLE_PROTOCOL_MAX_PARALLEL_TRANSFERS", "1");
+    std::env::set_var(ENV_VAR_SIMPLE_PROTOCOL_MAX_PARALLEL_TRANSFERS, "1");
     let rt = Arc::new(tokio::runtime::Runtime::new().unwrap());
     let tmp_workspace_dir = tempfile::tempdir().unwrap();
 

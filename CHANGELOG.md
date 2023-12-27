@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.150.0] - 2023-12-27
+### Changed
+- Changed logic in `SimpleTransferProtocol` now block data and checkpoint downloading/uploading
+  in parallel. Default parallel tasks is 10, but it could be changed by changing 
+  `SIMPLE_PROTOCOL_MAX_PARALLEL_TRANSFERS` environment variable
+
 ## [0.149.0] - 2023-12-23
 ### Added
 - Added `KAMU_WORKSPACE` env var to handle custom workspace path if needed
