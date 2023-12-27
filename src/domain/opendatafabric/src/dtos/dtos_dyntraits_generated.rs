@@ -79,15 +79,15 @@ impl Into<dtos::AddData> for &dyn AddData {
 ////////////////////////////////////////////////////////////////////////////////
 
 pub trait AddPushSource {
-    fn source_name(&self) -> Option<&str>;
+    fn source_name(&self) -> &str;
     fn read(&self) -> ReadStep;
     fn preprocess(&self) -> Option<Transform>;
     fn merge(&self) -> MergeStrategy;
 }
 
 impl AddPushSource for dtos::AddPushSource {
-    fn source_name(&self) -> Option<&str> {
-        self.source_name.as_ref().map(|v| -> &str { v.as_ref() })
+    fn source_name(&self) -> &str {
+        self.source_name.as_ref()
     }
     fn read(&self) -> ReadStep {
         (&self.read).into()
@@ -103,7 +103,7 @@ impl AddPushSource for dtos::AddPushSource {
 impl Into<dtos::AddPushSource> for &dyn AddPushSource {
     fn into(self) -> dtos::AddPushSource {
         dtos::AddPushSource {
-            source_name: self.source_name().map(|v| v.to_owned()),
+            source_name: self.source_name().to_owned(),
             read: self.read().into(),
             preprocess: self.preprocess().map(|v| v.into()),
             merge: self.merge().into(),
@@ -344,19 +344,19 @@ impl Into<dtos::DisablePollingSource> for &dyn DisablePollingSource {
 ////////////////////////////////////////////////////////////////////////////////
 
 pub trait DisablePushSource {
-    fn source_name(&self) -> Option<&str>;
+    fn source_name(&self) -> &str;
 }
 
 impl DisablePushSource for dtos::DisablePushSource {
-    fn source_name(&self) -> Option<&str> {
-        self.source_name.as_ref().map(|v| -> &str { v.as_ref() })
+    fn source_name(&self) -> &str {
+        self.source_name.as_ref()
     }
 }
 
 impl Into<dtos::DisablePushSource> for &dyn DisablePushSource {
     fn into(self) -> dtos::DisablePushSource {
         dtos::DisablePushSource {
-            source_name: self.source_name().map(|v| v.to_owned()),
+            source_name: self.source_name().to_owned(),
         }
     }
 }
@@ -1885,14 +1885,14 @@ impl Into<dtos::SourceCachingForever> for &dyn SourceCachingForever {
 ////////////////////////////////////////////////////////////////////////////////
 
 pub trait SourceState {
-    fn source_name(&self) -> Option<&str>;
+    fn source_name(&self) -> &str;
     fn kind(&self) -> &str;
     fn value(&self) -> &str;
 }
 
 impl SourceState for dtos::SourceState {
-    fn source_name(&self) -> Option<&str> {
-        self.source_name.as_ref().map(|v| -> &str { v.as_ref() })
+    fn source_name(&self) -> &str {
+        self.source_name.as_ref()
     }
     fn kind(&self) -> &str {
         self.kind.as_ref()
@@ -1905,7 +1905,7 @@ impl SourceState for dtos::SourceState {
 impl Into<dtos::SourceState> for &dyn SourceState {
     fn into(self) -> dtos::SourceState {
         dtos::SourceState {
-            source_name: self.source_name().map(|v| v.to_owned()),
+            source_name: self.source_name().to_owned(),
             kind: self.kind().to_owned(),
             value: self.value().to_owned(),
         }

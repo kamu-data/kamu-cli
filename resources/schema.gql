@@ -53,7 +53,7 @@ type AddData {
 }
 
 type AddPushSource {
-	sourceName: String
+	sourceName: String!
 	read: ReadStep!
 	preprocess: Transform
 	merge: MergeStrategy!
@@ -444,7 +444,7 @@ type DisablePollingSource {
 }
 
 type DisablePushSource {
-	sourceName: String
+	sourceName: String!
 }
 
 """
@@ -892,7 +892,7 @@ enum SourceOrdering {
 }
 
 type SourceState {
-	sourceName: String
+	sourceName: String!
 	kind: String!
 	value: String!
 }

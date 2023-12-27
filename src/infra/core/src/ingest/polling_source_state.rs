@@ -62,7 +62,7 @@ impl PollingSourceState {
             ),
         };
         SourceState {
-            source_name: None,
+            source_name: SourceState::DEFAULT_SOURCE_NAME.to_string(),
             kind,
             value,
         }

@@ -89,7 +89,7 @@ fn get_test_events() -> [(MetadataEvent, &'static str); 6] {
                 new_checkpoint: None,
                 new_watermark: None,
                 new_source_state: Some(SourceState {
-                    source_name: Some("push-source-1".to_owned()),
+                    source_name: "push-source-1".to_owned(),
                     kind: "kamu/kafka-offset".to_owned(),
                     value: "SOME_OFFSET".to_owned(),
                 }),

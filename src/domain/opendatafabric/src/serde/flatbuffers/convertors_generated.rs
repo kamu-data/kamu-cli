@@ -102,12 +102,12 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::AddPushSource {
     type OffsetT = WIPOffset<fb::AddPushSource<'fb>>;
 
     fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
-        let source_name_offset = self.source_name.as_ref().map(|v| fb.create_string(&v));
+        let source_name_offset = { fb.create_string(&self.source_name) };
         let read_offset = { self.read.serialize(fb) };
         let preprocess_offset = self.preprocess.as_ref().map(|v| v.serialize(fb));
         let merge_offset = { self.merge.serialize(fb) };
         let mut builder = fb::AddPushSourceBuilder::new(fb);
-        source_name_offset.map(|off| builder.add_source_name(off));
+        builder.add_source_name(source_name_offset);
         builder.add_read_type(read_offset.0);
         builder.add_read(read_offset.1);
         preprocess_offset.map(|(e, off)| {
@@ -123,7 +123,7 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::AddPushSource {
 impl<'fb> FlatbuffersDeserializable<fb::AddPushSource<'fb>> for odf::AddPushSource {
     fn deserialize(proxy: fb::AddPushSource<'fb>) -> Self {
         odf::AddPushSource {
-            source_name: proxy.source_name().map(|v| v.to_owned()),
+            source_name: proxy.source_name().map(|v| v.to_owned()).unwrap(),
             read: proxy
                 .read()
                 .map(|v| odf::ReadStep::deserialize(v, proxy.read_type()))
@@ -386,9 +386,9 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::DisablePushSource {
     type OffsetT = WIPOffset<fb::DisablePushSource<'fb>>;
 
     fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
-        let source_name_offset = self.source_name.as_ref().map(|v| fb.create_string(&v));
+        let source_name_offset = { fb.create_string(&self.source_name) };
         let mut builder = fb::DisablePushSourceBuilder::new(fb);
-        source_name_offset.map(|off| builder.add_source_name(off));
+        builder.add_source_name(source_name_offset);
         builder.finish()
     }
 }
@@ -396,7 +396,7 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::DisablePushSource {
 impl<'fb> FlatbuffersDeserializable<fb::DisablePushSource<'fb>> for odf::DisablePushSource {
     fn deserialize(proxy: fb::DisablePushSource<'fb>) -> Self {
         odf::DisablePushSource {
-            source_name: proxy.source_name().map(|v| v.to_owned()),
+            source_name: proxy.source_name().map(|v| v.to_owned()).unwrap(),
         }
     }
 }
@@ -2269,11 +2269,11 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::SourceState {
     type OffsetT = WIPOffset<fb::SourceState<'fb>>;
 
     fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
-        let source_name_offset = self.source_name.as_ref().map(|v| fb.create_string(&v));
+        let source_name_offset = { fb.create_string(&self.source_name) };
         let kind_offset = { fb.create_string(&self.kind) };
         let value_offset = { fb.create_string(&self.value) };
         let mut builder = fb::SourceStateBuilder::new(fb);
-        source_name_offset.map(|off| builder.add_source_name(off));
+        builder.add_source_name(source_name_offset);
         builder.add_kind(kind_offset);
         builder.add_value(value_offset);
         builder.finish()
@@ -2283,7 +2283,7 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::SourceState {
 impl<'fb> FlatbuffersDeserializable<fb::SourceState<'fb>> for odf::SourceState {
     fn deserialize(proxy: fb::SourceState<'fb>) -> Self {
         odf::SourceState {
-            source_name: proxy.source_name().map(|v| v.to_owned()),
+            source_name: proxy.source_name().map(|v| v.to_owned()).unwrap(),
             kind: proxy.kind().map(|v| v.to_owned()).unwrap(),
             value: proxy.value().map(|v| v.to_owned()).unwrap(),
         }

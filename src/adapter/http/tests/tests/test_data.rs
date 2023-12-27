@@ -43,9 +43,8 @@ async fn test_data_push_ingest_handler() {
     })
     .await;
 
-    server_harness
-        .system_time_source()
-        .set(Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap());
+    let system_time = Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap();
+    server_harness.system_time_source().set(system_time.clone());
 
     let create_result = server_harness
         .cli_dataset_repository()
@@ -55,42 +54,23 @@ async fn test_data_push_ingest_handler() {
                 DatasetName::new_unchecked("population"),
             ),
             kind: DatasetKind::Root,
-            metadata: vec![
-                AddPushSource {
-                    source_name: None, // Default source
-                    read: ReadStepNdJson {
-                        schema: Some(vec![
-                            "event_time TIMESTAMP".to_owned(),
-                            "city STRING".to_owned(),
-                            "population BIGINT".to_owned(),
-                        ]),
-                        ..Default::default()
-                    }
-                    .into(),
-                    preprocess: None,
-                    merge: MergeStrategy::Ledger(MergeStrategyLedger {
-                        primary_key: vec!["event_time".to_owned(), "city".to_owned()],
-                    }),
+            metadata: vec![AddPushSource {
+                source_name: "source1".to_string(),
+                read: ReadStepNdJson {
+                    schema: Some(vec![
+                        "event_time TIMESTAMP".to_owned(),
+                        "city STRING".to_owned(),
+                        "population BIGINT".to_owned(),
+                    ]),
+                    ..Default::default()
                 }
                 .into(),
-                AddPushSource {
-                    source_name: Some("device1".to_string()),
-                    read: ReadStepNdJson {
-                        schema: Some(vec![
-                            "event_time TIMESTAMP".to_owned(),
-                            "city STRING".to_owned(),
-                            "population BIGINT".to_owned(),
-                        ]),
-                        ..Default::default()
-                    }
-                    .into(),
-                    preprocess: None,
-                    merge: MergeStrategy::Ledger(MergeStrategyLedger {
-                        primary_key: vec!["event_time".to_owned(), "city".to_owned()],
-                    }),
-                }
-                .into(),
-            ],
+                preprocess: None,
+                merge: MergeStrategy::Ledger(MergeStrategyLedger {
+                    primary_key: vec!["event_time".to_owned(), "city".to_owned()],
+                }),
+            }
+            .into()],
         })
         .await
         .unwrap();
@@ -100,11 +80,11 @@ async fn test_data_push_ingest_handler() {
 
     let client = async move {
         let cl: reqwest::Client = reqwest::Client::new();
-        let dataset_helper = DatasetDataHelper::new(create_result.dataset);
+        let dataset_helper = DatasetDataHelper::new(create_result.dataset.clone());
         let ingest_url = format!("{}/ingest", dataset_url);
         tracing::info!(%ingest_url, "Client request");
 
-        // OK - uses default push source
+        // OK - uses the only push source
         let res = cl
             .execute(
                 cl.post(&ingest_url)
@@ -155,11 +135,74 @@ async fn test_data_push_ingest_handler() {
             )
             .await;
 
+        // Add another source
+        create_result
+            .dataset
+            .commit_event(
+                AddPushSource {
+                    source_name: "source2".to_string(),
+                    read: ReadStepNdJson {
+                        schema: Some(vec![
+                            "event_time TIMESTAMP".to_owned(),
+                            "city STRING".to_owned(),
+                            "population BIGINT".to_owned(),
+                        ]),
+                        ..Default::default()
+                    }
+                    .into(),
+                    preprocess: Some(
+                        TransformSql {
+                            engine: "datafusion".to_string(),
+                            version: None,
+                            temporal_tables: None,
+                            query: None,
+                            queries: Some(vec![SqlQueryStep {
+                                query: "select event_time, city, population + 1 as population \
+                                        from input"
+                                    .to_string(),
+                                alias: None,
+                            }]),
+                        }
+                        .into(),
+                    ),
+                    merge: MergeStrategy::Ledger(MergeStrategyLedger {
+                        primary_key: vec!["event_time".to_owned(), "city".to_owned()],
+                    }),
+                }
+                .into(),
+                CommitOpts {
+                    system_time: Some(system_time),
+                    ..CommitOpts::default()
+                },
+            )
+            .await
+            .unwrap();
+
+        // ERR - now need to disambiguate
+        let res = cl
+            .execute(
+                cl.post(&ingest_url)
+                    .json(&json!(
+                        [
+                            {
+                                "event_time": "2020-01-03T00:00:00",
+                                "city": "D",
+                                "population": 300,
+                            }
+                        ]
+                    ))
+                    .build()
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), http::StatusCode::BAD_REQUEST);
+
         // OK - uses named source
         let res = cl
             .execute(
                 cl.post(&ingest_url)
-                    .query(&[("sourceName", "device1")])
+                    .query(&[("sourceName", "source2")])
                     .json(&json!(
                         [
                             {
@@ -194,7 +237,7 @@ async fn test_data_push_ingest_handler() {
                     +--------+----------------------+----------------------+------+------------+
                     | offset | system_time          | event_time           | city | population |
                     +--------+----------------------+----------------------+------+------------+
-                    | 2      | 2050-01-01T12:00:00Z | 2020-01-03T00:00:00Z | C    | 300        |
+                    | 2      | 2050-01-01T12:00:00Z | 2020-01-03T00:00:00Z | C    | 301        |
                     +--------+----------------------+----------------------+------+------------+
                     "#
                 ),
@@ -205,7 +248,7 @@ async fn test_data_push_ingest_handler() {
         let res = cl
             .execute(
                 cl.post(&ingest_url)
-                    .query(&[("sourceName", "device2")])
+                    .query(&[("sourceName", "source3")])
                     .json(&json!(
                         [
                             {
@@ -226,6 +269,7 @@ async fn test_data_push_ingest_handler() {
         let res = cl
             .execute(
                 cl.post(&ingest_url)
+                    .query(&[("sourceName", "source1")])
                     .header("Content-Type", "text/csv")
                     .body("2020-01-04T00:00:00,D,400")
                     .build()

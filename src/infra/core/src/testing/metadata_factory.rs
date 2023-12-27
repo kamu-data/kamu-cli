@@ -262,7 +262,7 @@ impl AddPushSourceBuilder {
     fn new() -> Self {
         Self {
             v: AddPushSource {
-                source_name: None,
+                source_name: SourceState::DEFAULT_SOURCE_NAME.to_string(),
                 read: ReadStepNdJson {
                     schema: None,
                     ..Default::default()
@@ -276,7 +276,7 @@ impl AddPushSourceBuilder {
 
     pub fn source_name(mut self, name: impl Into<String>) -> Self {
         self.v = AddPushSource {
-            source_name: Some(name.into()),
+            source_name: name.into(),
             ..self.v
         };
         self
@@ -522,7 +522,7 @@ impl AddDataBuilder {
     pub fn some_new_source_state(mut self) -> Self {
         if self.v.new_source_state.is_none() {
             self.v.new_source_state = Some(SourceState {
-                source_name: None,
+                source_name: SourceState::DEFAULT_SOURCE_NAME.to_string(),
                 kind: SourceState::KIND_ETAG.to_owned(),
                 value: "<etag>".to_owned(),
             });
