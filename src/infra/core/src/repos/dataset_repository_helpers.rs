@@ -76,7 +76,7 @@ pub async fn create_dataset_from_snapshot_impl(
                     )
                     .into())
                 } else {
-                    resolve_transform_inputs(dataset_repo, &snapshot.name, &mut e.inputs).await
+                    normalize_transform(e, dataset_repo, &snapshot.name).await
                 }
             }
             MetadataEvent::SetDataSchema(_) => {
@@ -188,13 +188,60 @@ pub async fn create_dataset_from_snapshot_impl(
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+async fn normalize_transform(
+    transform: &mut SetTransform,
+    repo: &dyn DatasetRepository,
+    output_dataset_ailas: &DatasetAlias,
+) -> Result<(), CreateDatasetFromSnapshotError> {
+    // Resolve inputs to ID and alias
+    resolve_transform_inputs(&mut transform.inputs, repo, output_dataset_ailas).await?;
+
+    // Normalize query structure and validate aliases
+    let Transform::Sql(sql) = &mut transform.transform;
+
+    if let Some(query) = &sql.query {
+        if sql.queries.is_some() {
+            return Err(InvalidSnapshotError::new(
+                "Cannot specify both 'query' and 'queries' in SetTransform",
+            )
+            .into());
+        }
+
+        sql.queries = Some(vec![SqlQueryStep {
+            alias: None,
+            query: query.clone(),
+        }]);
+
+        sql.query = None;
+    }
+
+    let nameless_queries = sql
+        .queries
+        .as_ref()
+        .unwrap()
+        .iter()
+        .map(|q| &q.alias)
+        .filter(|a| a.is_none())
+        .count();
+
+    if nameless_queries > 1 {
+        return Err(InvalidSnapshotError::new(
+            "Transform has multiple queries without an alias, only one is such query is allowed \
+             to be treated as output",
+        )
+        .into());
+    }
+
+    Ok(())
+}
+
 /// Resolves dataset references in transform intputs and ensures that:
 /// - input datasets are always references by unique IDs
 /// - that query alias is populated (manually or from the initial reference)
 async fn resolve_transform_inputs(
+    inputs: &mut Vec<TransformInput>,
     repo: &dyn DatasetRepository,
     output_dataset_ailas: &DatasetAlias,
-    inputs: &mut Vec<TransformInput>,
 ) -> Result<(), CreateDatasetFromSnapshotError> {
     let mut missing_inputs = Vec::new();
 
