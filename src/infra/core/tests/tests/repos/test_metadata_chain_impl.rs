@@ -512,6 +512,15 @@ async fn test_append_add_data_empty_commit() {
     // No data, same checkpoint, watermark, and source state
     let block = MetadataFactory::metadata_block(
         AddDataBuilder::empty()
+            .prev_offset(add_data.last_offset())
+            .prev_checkpoint(Some(
+                add_data
+                    .new_checkpoint
+                    .as_ref()
+                    .unwrap()
+                    .physical_hash
+                    .clone(),
+            ))
             .new_checkpoint(add_data.new_checkpoint)
             .new_watermark(add_data.new_watermark)
             .new_source_state(add_data.new_source_state)
@@ -522,9 +531,9 @@ async fn test_append_add_data_empty_commit() {
 
     assert_matches!(
         chain.append(block, AppendOpts::default()).await,
-        Err(AppendError::InvalidBlock(
-            AppendValidationError::InvalidEvent(_)
-        ))
+        Err(AppendError::InvalidBlock(AppendValidationError::NoOpEvent(
+            _
+        )))
     );
 }
 
@@ -533,7 +542,7 @@ async fn test_append_execute_query_empty_commit() {
     let tmp_dir = tempfile::tempdir().unwrap();
     let chain = init_chain(tmp_dir.path());
 
-    let hash = chain
+    let head = chain
         .append(
             MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build())
                 .build(),
@@ -542,10 +551,24 @@ async fn test_append_execute_query_empty_commit() {
         .await
         .unwrap();
 
-    let hash = chain
+    let head = chain
+        .append(
+            MetadataFactory::metadata_block(
+                MetadataFactory::set_transform()
+                    .inputs_from_aliases_and_seeded_ids(["foo", "bar"])
+                    .build(),
+            )
+            .prev(&head, 0)
+            .build(),
+            AppendOpts::default(),
+        )
+        .await
+        .unwrap();
+
+    let head = chain
         .append(
             MetadataFactory::metadata_block(MetadataFactory::set_data_schema().build())
-                .prev(&hash, 0)
+                .prev(&head, 1)
                 .build(),
             AppendOpts::default(),
         )
@@ -553,31 +576,42 @@ async fn test_append_execute_query_empty_commit() {
         .unwrap();
 
     let execute_query = MetadataFactory::execute_query()
+        .empty_query_inputs_from_seeded_ids(["foo", "bar"])
         .some_new_data()
         .some_new_checkpoint()
         .some_new_watermark()
         .build();
     let block = MetadataFactory::metadata_block(execute_query.clone())
-        .prev(&hash, 1)
+        .prev(&head, 2)
         .build();
 
-    let hash = chain.append(block, AppendOpts::default()).await.unwrap();
+    let head = chain.append(block, AppendOpts::default()).await.unwrap();
 
     // No data, same checkpoint and watermark
     let block = MetadataFactory::metadata_block(
         MetadataFactory::execute_query()
+            .empty_query_inputs_from_seeded_ids(["foo", "bar"])
+            .prev_offset(execute_query.last_offset())
+            .prev_checkpoint(Some(
+                execute_query
+                    .new_checkpoint
+                    .as_ref()
+                    .unwrap()
+                    .physical_hash
+                    .clone(),
+            ))
             .new_checkpoint(execute_query.new_checkpoint)
             .new_watermark(execute_query.new_watermark)
             .build(),
     )
-    .prev(&hash, 2)
+    .prev(&head, 3)
     .build();
 
     assert_matches!(
         chain.append(block, AppendOpts::default()).await,
-        Err(AppendError::InvalidBlock(
-            AppendValidationError::InvalidEvent(_)
-        ))
+        Err(AppendError::InvalidBlock(AppendValidationError::NoOpEvent(
+            _
+        )))
     );
 }
 
@@ -633,7 +667,7 @@ async fn test_append_add_data_must_be_preceeded_by_schema() {
     let tmp_dir = tempfile::tempdir().unwrap();
     let chain = init_chain(tmp_dir.path());
 
-    let hash = chain
+    let head = chain
         .append(
             MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build())
                 .build(),
@@ -644,12 +678,12 @@ async fn test_append_add_data_must_be_preceeded_by_schema() {
 
     // Accepts one with empty data (in case when we infer schema, but upon initial
     // pull only source state has been set)
-    let hash = chain
+    let head = chain
         .append(
             MetadataFactory::metadata_block(
                 MetadataFactory::add_data().some_new_source_state().build(),
             )
-            .prev(&hash, 0)
+            .prev(&head, 0)
             .build(),
             AppendOpts::default(),
         )
@@ -666,7 +700,7 @@ async fn test_append_add_data_must_be_preceeded_by_schema() {
                         .some_new_source_state()
                         .build(),
                 )
-                .prev(&hash, 1)
+                .prev(&head, 1)
                 .build(),
                 AppendOpts::default(),
             )
@@ -677,10 +711,10 @@ async fn test_append_add_data_must_be_preceeded_by_schema() {
     );
 
     // Schema is now set
-    let hash = chain
+    let head = chain
         .append(
             MetadataFactory::metadata_block(MetadataFactory::set_data_schema().build())
-                .prev(&hash, 1)
+                .prev(&head, 1)
                 .build(),
             AppendOpts::default(),
         )
@@ -696,7 +730,7 @@ async fn test_append_add_data_must_be_preceeded_by_schema() {
                     .some_new_source_state()
                     .build(),
             )
-            .prev(&hash, 2)
+            .prev(&head, 2)
             .build(),
             AppendOpts::default(),
         )
@@ -709,10 +743,24 @@ async fn test_append_execute_query_must_be_preceeded_by_schema() {
     let tmp_dir = tempfile::tempdir().unwrap();
     let chain = init_chain(tmp_dir.path());
 
-    let hash = chain
+    let head = chain
         .append(
-            MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Root).build())
+            MetadataFactory::metadata_block(MetadataFactory::seed(DatasetKind::Derivative).build())
                 .build(),
+            AppendOpts::default(),
+        )
+        .await
+        .unwrap();
+
+    let head = chain
+        .append(
+            MetadataFactory::metadata_block(
+                MetadataFactory::set_transform()
+                    .inputs_from_aliases_and_seeded_ids(["foo", "bar"])
+                    .build(),
+            )
+            .prev(&head, 0)
+            .build(),
             AppendOpts::default(),
         )
         .await
@@ -721,17 +769,18 @@ async fn test_append_execute_query_must_be_preceeded_by_schema() {
     // Accepts one with empty data (in case when we infer schema, but upon initial
     // transform only checkpoint was produced)
     // TODO: we should make engines to always return the schema
-    let hash = chain
+    let head: Multihash = chain
         .append(
             MetadataFactory::metadata_block(
                 MetadataFactory::execute_query()
+                    .empty_query_inputs_from_seeded_ids(["foo", "bar"])
                     .new_checkpoint(Some(Checkpoint {
                         physical_hash: Multihash::from_digest_sha3_256(b"foo"),
                         size: 1,
                     }))
                     .build(),
             )
-            .prev(&hash, 0)
+            .prev(&head, 1)
             .build(),
             AppendOpts::default(),
         )
@@ -744,6 +793,7 @@ async fn test_append_execute_query_must_be_preceeded_by_schema() {
             .append(
                 MetadataFactory::metadata_block(
                     MetadataFactory::execute_query()
+                        .empty_query_inputs_from_seeded_ids(["foo", "bar"])
                         .prev_checkpoint(Some(Multihash::from_digest_sha3_256(b"foo")))
                         .new_checkpoint(Some(Checkpoint {
                             physical_hash: Multihash::from_digest_sha3_256(b"bar"),
@@ -752,7 +802,7 @@ async fn test_append_execute_query_must_be_preceeded_by_schema() {
                         .some_new_data_with_offset(0, 9)
                         .build(),
                 )
-                .prev(&hash, 1)
+                .prev(&head, 2)
                 .build(),
                 AppendOpts::default(),
             )
@@ -763,10 +813,10 @@ async fn test_append_execute_query_must_be_preceeded_by_schema() {
     );
 
     // Schema is now set
-    let hash = chain
+    let head = chain
         .append(
             MetadataFactory::metadata_block(MetadataFactory::set_data_schema().build())
-                .prev(&hash, 1)
+                .prev(&head, 2)
                 .build(),
             AppendOpts::default(),
         )
@@ -778,6 +828,7 @@ async fn test_append_execute_query_must_be_preceeded_by_schema() {
         .append(
             MetadataFactory::metadata_block(
                 MetadataFactory::execute_query()
+                    .empty_query_inputs_from_seeded_ids(["foo", "bar"])
                     .prev_checkpoint(Some(Multihash::from_digest_sha3_256(b"foo")))
                     .new_checkpoint(Some(Checkpoint {
                         physical_hash: Multihash::from_digest_sha3_256(b"bar"),
@@ -786,7 +837,7 @@ async fn test_append_execute_query_must_be_preceeded_by_schema() {
                     .some_new_data_with_offset(0, 9)
                     .build(),
             )
-            .prev(&hash, 2)
+            .prev(&head, 3)
             .build(),
             AppendOpts::default(),
         )

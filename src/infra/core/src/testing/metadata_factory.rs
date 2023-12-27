@@ -151,7 +151,10 @@ impl TransformSqlBuilder {
                 engine: "some_engine".to_owned(),
                 version: None,
                 query: None,
-                queries: None,
+                queries: Some(vec![SqlQueryStep {
+                    alias: None,
+                    query: "select * from input".to_string(),
+                }]),
                 temporal_tables: None,
             },
         }
@@ -163,7 +166,10 @@ impl TransformSqlBuilder {
     }
 
     pub fn query(mut self, query: &str) -> Self {
-        self.v.query = Some(query.to_owned());
+        self.v.queries = Some(vec![SqlQueryStep {
+            alias: None,
+            query: query.to_owned(),
+        }]);
         self
     }
 
@@ -589,8 +595,36 @@ impl ExecuteQueryBuilder {
         }
     }
 
+    pub fn push_query_input(mut self, input: ExecuteQueryInput) -> Self {
+        self.v.query_inputs.push(input);
+        self
+    }
+
+    pub fn empty_query_inputs_from_seeded_ids<I, A>(mut self, aliases: I) -> Self
+    where
+        I: IntoIterator<Item = A>,
+        A: Into<String>,
+    {
+        self.v.query_inputs = aliases
+            .into_iter()
+            .map(|i| ExecuteQueryInput {
+                dataset_id: DatasetID::new_seeded_ed25519(i.into().as_bytes()),
+                prev_block_hash: None,
+                new_block_hash: None,
+                prev_offset: None,
+                new_offset: None,
+            })
+            .collect();
+        self
+    }
+
     pub fn prev_checkpoint(mut self, checkpoint: Option<Multihash>) -> Self {
         self.v.prev_checkpoint = checkpoint;
+        self
+    }
+
+    pub fn prev_offset(mut self, offset: Option<u64>) -> Self {
+        self.v.prev_offset = offset;
         self
     }
 
