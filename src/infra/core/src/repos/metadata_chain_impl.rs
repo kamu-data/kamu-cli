@@ -16,6 +16,14 @@ use opendatafabric::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+macro_rules! invalid_event {
+    ($e:expr, $msg:expr $(,)?) => {
+        return Err(AppendValidationError::InvalidEvent(InvalidEventError::new($e, $msg)).into())
+    };
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
 pub struct MetadataChainImpl<ObjRepo, RefRepo> {
     obj_repo: ObjRepo,
     ref_repo: RefRepo,
@@ -201,11 +209,10 @@ where
 
                 // Validate schema was defined before adding any data
                 if prev_schema.is_none() && e.new_data.is_some() {
-                    return Err(AppendValidationError::InvalidEvent(InvalidEventError::new(
+                    invalid_event!(
                         e.clone(),
                         "SetDataSchema event must be present before adding data",
-                    ))
-                    .into());
+                    );
                 }
 
                 let expected_prev_checkpoint = prev_add_data
@@ -221,11 +228,10 @@ where
 
                 // Validate input/output checkpoint sequencing
                 if e.prev_checkpoint.as_ref() != expected_prev_checkpoint {
-                    return Err(AppendValidationError::InvalidEvent(InvalidEventError::new(
+                    invalid_event!(
                         e.clone(),
                         "Input checkpoint does not correspond to the last checkpoint in the chain",
-                    ))
-                    .into());
+                    );
                 }
 
                 // Validate event advances some state
@@ -256,6 +262,7 @@ where
                     .into());
                 }
 
+                let mut prev_transform = None;
                 let mut prev_schema = None;
                 let mut prev_query = None;
 
@@ -271,11 +278,15 @@ where
                         MetadataEvent::SetDataSchema(e) if prev_schema.is_none() => {
                             prev_schema = Some(e)
                         }
+                        MetadataEvent::SetTransform(e) if prev_transform.is_none() => {
+                            prev_transform = Some(e);
+                        }
                         MetadataEvent::ExecuteQuery(e) if prev_query.is_none() => {
                             prev_query = Some(e);
                         }
                         _ => (),
                     }
+                    // Note: `prev_transform` is optional
                     if prev_schema.is_some() && prev_query.is_some() {
                         break;
                     }
@@ -283,11 +294,78 @@ where
 
                 // Validate schema was defined if we're adding data
                 if prev_schema.is_none() && e.new_data.is_some() {
-                    return Err(AppendValidationError::InvalidEvent(InvalidEventError::new(
+                    invalid_event!(
                         e.clone(),
                         "SetDataSchema event must be present before adding data",
-                    ))
-                    .into());
+                    );
+                }
+
+                // Validate inputs are listed in the same exact order as in SetTransform (or
+                // through recursion, in previous ExecuteQuery)
+                let actual_inputs = e.query_inputs.iter().map(|i| &i.dataset_id);
+                if let Some(prev_transform) = &prev_transform {
+                    if actual_inputs.ne(prev_transform
+                        .inputs
+                        .iter()
+                        .map(|i| i.dataset_ref.id().unwrap()))
+                    {
+                        invalid_event!(
+                            e.clone(),
+                            "Inputs must be listed in same order as initially declared in \
+                             SetTransform event",
+                        );
+                    }
+                } else if let Some(prev_query) = &prev_query {
+                    if actual_inputs.ne(prev_query.query_inputs.iter().map(|i| &i.dataset_id)) {
+                        invalid_event!(
+                            e.clone(),
+                            "Inputs must be listed in same order as initially declared in \
+                             SetTransform event",
+                        );
+                    }
+                } else {
+                    invalid_event!(
+                        e.clone(),
+                        "ExecuteQuery must be preceeded by SetTransform event",
+                    );
+                }
+
+                // Validate input offset and block sequencing
+                if let Some(prev_query) = &prev_query {
+                    for (prev, new) in prev_query.query_inputs.iter().zip(&e.query_inputs) {
+                        if new.new_block_hash.is_some() && new.new_block_hash == new.prev_block_hash
+                        {
+                            invalid_event!(e.clone(), "Invalid input block interval");
+                        }
+
+                        if new.new_offset.is_some() && new.new_offset == new.prev_offset {
+                            invalid_event!(e.clone(), "Invalid input offset interval");
+                        }
+
+                        if new.prev_block_hash.as_ref() != prev.last_block_hash() {
+                            invalid_event!(
+                                e.clone(),
+                                "Input prevBlockHash does not correspond to the last block \
+                                 included in the previous query",
+                            );
+                        }
+
+                        if new.prev_offset != prev.last_offset() {
+                            invalid_event!(
+                                e.clone(),
+                                "Input prevOffset hash does not correspond to the last offset \
+                                 included in the previous query",
+                            );
+                        }
+
+                        if new.new_offset.is_some() && new.new_block_hash.is_none() {
+                            invalid_event!(
+                                e.clone(),
+                                "Input specifies a non-empty offset interval, but its block \
+                                 interval is empty",
+                            );
+                        }
+                    }
                 }
 
                 let expected_prev_checkpoint = prev_query
@@ -298,11 +376,10 @@ where
 
                 // Validate input/output checkpoint sequencing
                 if e.prev_checkpoint.as_ref() != expected_prev_checkpoint {
-                    return Err(AppendValidationError::InvalidEvent(InvalidEventError::new(
+                    invalid_event!(
                         e.clone(),
                         "Input checkpoint does not correspond to the last checkpoint in the chain",
-                    ))
-                    .into());
+                    );
                 }
 
                 // Validate event advances some state
@@ -330,14 +407,11 @@ where
                 while let Some((_, block)) = blocks.try_next().await.int_err()? {
                     match block.event {
                         MetadataEvent::AddPushSource(e) => {
-                            return Err(AppendValidationError::InvalidEvent(
-                                InvalidEventError::new(
-                                    e.clone(),
-                                    "Cannot add a polling source while some push sources are \
-                                     still active",
-                                ),
-                            )
-                            .into());
+                            invalid_event!(
+                                e.clone(),
+                                "Cannot add a polling source while some push sources are still \
+                                 active",
+                            );
                         }
                         _ => (),
                     }
@@ -351,11 +425,10 @@ where
             MetadataEvent::AddPushSource(e) => {
                 // Ensure specifies the schema
                 if e.read.schema().is_none() {
-                    return Err(AppendValidationError::InvalidEvent(InvalidEventError::new(
+                    invalid_event!(
                         e.clone(),
                         "Push sources must specify the read schema explicitly",
-                    ))
-                    .into());
+                    );
                 }
                 // Ensure no active polling source
                 let mut blocks = self.iter_blocks_interval(
@@ -366,13 +439,10 @@ where
                 while let Some((_, block)) = blocks.try_next().await.int_err()? {
                     match block.event {
                         MetadataEvent::SetPollingSource(e) => {
-                            return Err(AppendValidationError::InvalidEvent(
-                                InvalidEventError::new(
-                                    e.clone(),
-                                    "Cannot add a push source while polling source is still active",
-                                ),
-                            )
-                            .into());
+                            invalid_event!(
+                                e.clone(),
+                                "Cannot add a push source while polling source is still active",
+                            );
                         }
                         _ => (),
                     }
@@ -384,7 +454,40 @@ where
                 unimplemented!("Disabling sources is not yet fully supported")
             }
             MetadataEvent::Seed(_) => Ok(()),
-            MetadataEvent::SetTransform(_) => Ok(()),
+            MetadataEvent::SetTransform(e) => {
+                // Ensure has inputs
+                if e.inputs.len() == 0 {
+                    invalid_event!(e.clone(), "Transform must have at least one input");
+                }
+
+                // Ensure inputs are resolved to IDs and aliases are specified
+                for i in &e.inputs {
+                    if i.dataset_ref.id().is_none() || i.alias.is_none() {
+                        invalid_event!(
+                            e.clone(),
+                            "Transform inputs must be resolved to dataset IDs and specify aliases"
+                        );
+                    }
+                }
+
+                // Queries must be normalized
+                let Transform::Sql(transform) = &e.transform;
+                if transform.query.is_some() {
+                    invalid_event!(e.clone(), "Transform queries must be normalized");
+                }
+                if let Some(queries) = &transform.queries {
+                    let no_alias_queries = queries.iter().filter(|q| q.alias.is_none()).count();
+                    if no_alias_queries > 1 {
+                        invalid_event!(
+                            e.clone(),
+                            "Transform can only have one output query without an alias"
+                        );
+                    }
+                } else {
+                    invalid_event!(e.clone(), "Transform must have at least one query");
+                }
+                Ok(())
+            }
             MetadataEvent::SetVocab(_) => Ok(()),
             MetadataEvent::SetAttachments(_) => Ok(()),
             MetadataEvent::SetInfo(_) => Ok(()),
@@ -447,11 +550,10 @@ where
                 .and_then(|(_, b)| b.event.last_offset());
 
             if e.prev_offset != expected_prev_offset {
-                return Err(AppendValidationError::InvalidEvent(InvalidEventError::new(
+                invalid_event!(
                     new_block.event.clone(),
                     "Carried prev offset does not correspond to the last offset in the chain",
-                ))
-                .into());
+                );
             }
 
             // Validate internal offset consistency
@@ -468,11 +570,7 @@ where
                 }
 
                 if new_data.offset_interval.end < new_data.offset_interval.start {
-                    return Err(AppendValidationError::InvalidEvent(InvalidEventError::new(
-                        new_block.event.clone(),
-                        "Invalid offset interval",
-                    ))
-                    .into());
+                    invalid_event!(new_block.event.clone(), "Invalid offset interval",);
                 }
             }
         }

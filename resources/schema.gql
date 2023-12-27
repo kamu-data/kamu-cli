@@ -44,11 +44,12 @@ type Accounts {
 }
 
 type AddData {
-	inputCheckpoint: Multihash
-	outputData: DataSlice
-	outputCheckpoint: Checkpoint
-	outputWatermark: DateTime
-	sourceState: SourceState
+	prevCheckpoint: Multihash
+	prevOffset: Int
+	newData: DataSlice
+	newCheckpoint: Checkpoint
+	newWatermark: DateTime
+	newSourceState: SourceState
 }
 
 type AddPushSource {
@@ -76,11 +77,6 @@ type Auth {
 type AuthMut {
 	login(loginMethod: String!, loginCredentialsJson: String!): LoginResponse!
 	accountDetails(accessToken: String!): Account!
-}
-
-type BlockInterval {
-	start: Multihash!
-	end: Multihash!
 }
 
 type BlockRef {
@@ -197,7 +193,7 @@ enum DataSchemaFormat {
 type DataSlice {
 	logicalHash: Multihash!
 	physicalHash: Multihash!
-	interval: OffsetInterval!
+	offsetInterval: OffsetInterval!
 	size: Int!
 }
 
@@ -387,8 +383,6 @@ type DatasetPermissions {
 
 scalar DatasetRef
 
-scalar DatasetRefAny
-
 type Datasets {
 	"""
 	Returns dataset by its ID
@@ -416,7 +410,7 @@ type DatasetsMut {
 	"""
 	Creates a new empty dataset
 	"""
-	createEmpty(datasetKind: DatasetKind!, datasetName: DatasetName!): CreateDatasetResult!
+	createEmpty(datasetKind: DatasetKind!, datasetAlias: DatasetAlias!): CreateDatasetResult!
 	"""
 	Creates a new dataset from provided DatasetSnapshot manifest
 	"""
@@ -495,11 +489,20 @@ type EventTimeSourceFromSystemTime {
 }
 
 type ExecuteQuery {
-	inputSlices: [InputSlice!]!
-	inputCheckpoint: Multihash
-	outputData: DataSlice
-	outputCheckpoint: Checkpoint
-	outputWatermark: DateTime
+	queryInputs: [ExecuteQueryInput!]!
+	prevCheckpoint: Multihash
+	prevOffset: Int
+	newData: DataSlice
+	newCheckpoint: Checkpoint
+	newWatermark: DateTime
+}
+
+type ExecuteQueryInput {
+	datasetId: DatasetID!
+	prevBlockHash: Multihash
+	newBlockHash: Multihash
+	prevOffset: Int
+	newOffset: Int
 }
 
 union FetchStep = FetchStepUrl | FetchStepFilesGlob | FetchStepContainer
@@ -526,12 +529,6 @@ type FetchStepUrl {
 }
 
 
-
-type InputSlice {
-	datasetId: DatasetID!
-	blockInterval: BlockInterval
-	dataInterval: OffsetInterval
-}
 
 
 type LoginResponse {
@@ -614,7 +611,7 @@ type MetadataChainMut {
 	commitEvent(event: String!, eventFormat: MetadataManifestFormat!): CommitResult!
 }
 
-union MetadataEvent = AddData | ExecuteQuery | Seed | SetPollingSource | SetTransform | SetVocab | SetWatermark | SetAttachments | SetInfo | SetLicense | SetDataSchema | AddPushSource | DisablePushSource | DisablePollingSource
+union MetadataEvent = AddData | ExecuteQuery | Seed | SetPollingSource | SetTransform | SetVocab | SetAttachments | SetInfo | SetLicense | SetDataSchema | AddPushSource | DisablePushSource | DisablePollingSource
 
 enum MetadataManifestFormat {
 	YAML
@@ -738,7 +735,7 @@ enum QueryDialect {
 	SQL_DATA_FUSION
 }
 
-union ReadStep = ReadStepCsv | ReadStepJsonLines | ReadStepGeoJson | ReadStepEsriShapefile | ReadStepParquet | ReadStepJson | ReadStepNdJson | ReadStepNdGeoJson
+union ReadStep = ReadStepCsv | ReadStepGeoJson | ReadStepEsriShapefile | ReadStepParquet | ReadStepJson | ReadStepNdJson | ReadStepNdGeoJson
 
 type ReadStepCsv {
 	schema: [String!]
@@ -746,20 +743,11 @@ type ReadStepCsv {
 	encoding: String
 	quote: String
 	escape: String
-	comment: String
 	header: Boolean
-	enforceSchema: Boolean
 	inferSchema: Boolean
-	ignoreLeadingWhiteSpace: Boolean
-	ignoreTrailingWhiteSpace: Boolean
 	nullValue: String
-	emptyValue: String
-	nanValue: String
-	positiveInf: String
-	negativeInf: String
 	dateFormat: String
 	timestampFormat: String
-	multiLine: Boolean
 }
 
 type ReadStepEsriShapefile {
@@ -776,15 +764,6 @@ type ReadStepJson {
 	schema: [String!]
 	dateFormat: String
 	encoding: String
-	timestampFormat: String
-}
-
-type ReadStepJsonLines {
-	schema: [String!]
-	dateFormat: String
-	encoding: String
-	multiLine: Boolean
-	primitivesAsString: Boolean
 	timestampFormat: String
 }
 
@@ -901,10 +880,6 @@ type SetVocab {
 	offsetColumn: String
 }
 
-type SetWatermark {
-	outputWatermark: DateTime!
-}
-
 union SourceCaching = SourceCachingForever
 
 type SourceCachingForever {
@@ -917,8 +892,8 @@ enum SourceOrdering {
 }
 
 type SourceState {
+	sourceName: String
 	kind: String!
-	source: String!
 	value: String!
 }
 
@@ -1059,9 +1034,8 @@ type TemporalTable {
 union Transform = TransformSql
 
 type TransformInput {
-	id: DatasetID
-	name: DatasetName!
-	datasetRef: DatasetRefAny
+	datasetRef: DatasetRef!
+	alias: String!
 	dataset: Dataset!
 }
 
