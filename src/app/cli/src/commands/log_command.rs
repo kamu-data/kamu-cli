@@ -231,12 +231,7 @@ impl AsciiRenderer {
 
                 if let Some(ss) = new_source_state {
                     self.render_section(output, 0, "NewSourceState")?;
-                    self.render_property(
-                        output,
-                        1,
-                        "SourceName",
-                        &ss.source_name.as_deref().unwrap_or_default(),
-                    )?;
+                    self.render_property(output, 1, "SourceName", &ss.source_name)?;
                     self.render_property(output, 1, "Kind", &ss.kind)?;
                     self.render_property(output, 1, "Value", &ss.value)?;
                 }
@@ -366,22 +361,12 @@ impl AsciiRenderer {
                 merge: _,
             }) => {
                 self.render_property(output, 0, "Kind", "AddPushSource")?;
-                self.render_property(
-                    output,
-                    0,
-                    "SourceName",
-                    source_name.as_deref().unwrap_or_default(),
-                )?;
+                self.render_property(output, 0, "SourceName", &source_name)?;
                 self.render_property(output, 0, "Source", "...")?;
             }
             MetadataEvent::DisablePushSource(DisablePushSource { source_name }) => {
                 self.render_property(output, 0, "Kind", "DisablePushSource")?;
-                self.render_property(
-                    output,
-                    0,
-                    "SourceName",
-                    source_name.as_deref().unwrap_or_default(),
-                )?
+                self.render_property(output, 0, "SourceName", &source_name)?
             }
             MetadataEvent::SetTransform(_) => {
                 self.render_property(output, 0, "Kind", &"SetTransform")?;

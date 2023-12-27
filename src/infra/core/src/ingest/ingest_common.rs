@@ -46,7 +46,7 @@ pub(crate) async fn preprocess(
     }
 
     // Get result's execution plan
-    let df = ctx.table("output").await.int_err()?;
+    let df = ctx.table(OUTPUT_VIEW_ALIAS).await.int_err()?;
 
     tracing::debug!(
         schema = ?df.schema(),

@@ -62,7 +62,7 @@ pub struct AddData {
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct AddPushSource {
     /// Identifies the source within this dataset.
-    pub source_name: Option<String>,
+    pub source_name: String,
     /// Defines how data is read into structured format.
     pub read: ReadStep,
     /// Pre-processing query that shapes the data.
@@ -203,7 +203,7 @@ pub struct DisablePollingSource {}
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct DisablePushSource {
     /// Identifies the source to be disabled.
-    pub source_name: Option<String>,
+    pub source_name: String,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1038,10 +1038,8 @@ impl_enum_variant!(SourceCaching::Forever(SourceCachingForever));
 /// The state of the source the data was added from to allow fast resuming.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct SourceState {
-    /// Identifies the source that the state corresponds to. It is empty for a
-    /// polling source, as there can be only one. For push sources an empty name
-    /// also uniquely identifies the source know as 'default'.
-    pub source_name: Option<String>,
+    /// Identifies the source that the state corresponds to.
+    pub source_name: String,
     /// Identifies the type of the state. Standard types include: `odf/etag`,
     /// `odf/last-modified`.
     pub kind: String,
