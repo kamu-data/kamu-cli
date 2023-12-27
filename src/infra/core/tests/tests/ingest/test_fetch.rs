@@ -46,7 +46,14 @@ async fn test_fetch_url_file() {
     // No file to fetch
     assert_matches!(
         fetch_svc
-            .fetch("1", &fetch_step, None, &target_path, &Utc::now(), None)
+            .fetch(
+                &generate_unique_operation_id(),
+                &fetch_step,
+                None,
+                &target_path,
+                &Utc::now(),
+                None
+            )
             .await,
         Err(PollingIngestError::NotFound { .. })
     );
@@ -56,7 +63,14 @@ async fn test_fetch_url_file() {
 
     // Normal fetch
     let res = fetch_svc
-        .fetch("1", &fetch_step, None, &target_path, &Utc::now(), None)
+        .fetch(
+            &generate_unique_operation_id(),
+            &fetch_step,
+            None,
+            &target_path,
+            &Utc::now(),
+            None,
+        )
         .await
         .unwrap();
     let FetchResult::Updated(update) = res else {
@@ -68,7 +82,7 @@ async fn test_fetch_url_file() {
     // No modifications
     let res2 = fetch_svc
         .fetch(
-            "1",
+            &generate_unique_operation_id(),
             &fetch_step,
             update.source_state.as_ref(),
             &target_path,
@@ -83,7 +97,7 @@ async fn test_fetch_url_file() {
     filetime::set_file_mtime(&src_path, filetime::FileTime::from_unix_time(0, 0)).unwrap();
     let res3 = fetch_svc
         .fetch(
-            "1",
+            &generate_unique_operation_id(),
             &fetch_step,
             update.source_state.as_ref(),
             &target_path,
@@ -118,7 +132,14 @@ async fn test_fetch_url_http_unreachable() {
 
     assert_matches!(
         fetch_svc
-            .fetch("1", &fetch_step, None, &target_path, &Utc::now(), None)
+            .fetch(
+                &generate_unique_operation_id(),
+                &fetch_step,
+                None,
+                &target_path,
+                &Utc::now(),
+                None
+            )
             .await,
         Err(PollingIngestError::Unreachable { .. })
     );
@@ -147,7 +168,14 @@ async fn test_fetch_url_http_not_found() {
 
     assert_matches!(
         fetch_svc
-            .fetch("1", &fetch_step, None, &target_path, &Utc::now(), None)
+            .fetch(
+                &generate_unique_operation_id(),
+                &fetch_step,
+                None,
+                &target_path,
+                &Utc::now(),
+                None
+            )
             .await,
         Err(PollingIngestError::NotFound { .. })
     );
@@ -183,7 +211,7 @@ async fn test_fetch_url_http_ok() {
 
     let res = fetch_svc
         .fetch(
-            "1",
+            &generate_unique_operation_id(),
             &fetch_step,
             None,
             &target_path,
@@ -215,7 +243,7 @@ async fn test_fetch_url_http_ok() {
 
     let res_repeat = fetch_svc
         .fetch(
-            "1",
+            &generate_unique_operation_id(),
             &fetch_step,
             update.source_state.as_ref(),
             &target_path,
@@ -231,7 +259,7 @@ async fn test_fetch_url_http_ok() {
     filetime::set_file_mtime(&src_path, filetime::FileTime::from_unix_time(0, 0)).unwrap();
     let res_touch = fetch_svc
         .fetch(
-            "1",
+            &generate_unique_operation_id(),
             &fetch_step,
             update.source_state.as_ref(),
             &target_path,
@@ -248,7 +276,7 @@ async fn test_fetch_url_http_ok() {
     assert_matches!(
         fetch_svc
             .fetch(
-                "1",
+                &generate_unique_operation_id(),
                 &fetch_step,
                 update.source_state.as_ref(),
                 &target_path,
@@ -295,7 +323,7 @@ async fn test_fetch_url_http_env_interpolation() {
     assert_matches!(
         fetch_svc
             .fetch(
-                "1",
+                &generate_unique_operation_id(),
                 &fetch_step,
                 None,
                 &target_path,
@@ -310,7 +338,7 @@ async fn test_fetch_url_http_env_interpolation() {
 
     let res = fetch_svc
         .fetch(
-            "1",
+            &generate_unique_operation_id(),
             &fetch_step,
             None,
             &target_path,
@@ -369,7 +397,7 @@ async fn test_fetch_url_ftp_ok() {
 
     let res = fetch_svc
         .fetch(
-            "1",
+            &generate_unique_operation_id(),
             &fetch_step,
             None,
             &target_path,
@@ -428,7 +456,14 @@ async fn test_fetch_files_glob() {
     // No file to fetch
     assert_matches!(
         fetch_svc
-            .fetch("1", &fetch_step, None, &target_path, &Utc::now(), None)
+            .fetch(
+                &generate_unique_operation_id(),
+                &fetch_step,
+                None,
+                &target_path,
+                &Utc::now(),
+                None
+            )
             .await,
         Err(PollingIngestError::NotFound { .. })
     );
@@ -438,7 +473,14 @@ async fn test_fetch_files_glob() {
 
     // Normal fetch
     let res = fetch_svc
-        .fetch("1", &fetch_step, None, &target_path, &Utc::now(), None)
+        .fetch(
+            &generate_unique_operation_id(),
+            &fetch_step,
+            None,
+            &target_path,
+            &Utc::now(),
+            None,
+        )
         .await
         .unwrap();
     let FetchResult::Updated(update) = res else {
@@ -458,7 +500,7 @@ async fn test_fetch_files_glob() {
     // No modifications
     let res2 = fetch_svc
         .fetch(
-            "1",
+            &generate_unique_operation_id(),
             &fetch_step,
             update.source_state.as_ref(),
             &target_path,
@@ -473,7 +515,7 @@ async fn test_fetch_files_glob() {
     filetime::set_file_mtime(&src_path_1, filetime::FileTime::from_unix_time(0, 0)).unwrap();
     let res3 = fetch_svc
         .fetch(
-            "1",
+            &generate_unique_operation_id(),
             &fetch_step,
             update.source_state.as_ref(),
             &target_path,
@@ -491,7 +533,7 @@ async fn test_fetch_files_glob() {
 
     let res4 = fetch_svc
         .fetch(
-            "1",
+            &generate_unique_operation_id(),
             &fetch_step,
             update.source_state.as_ref(),
             &target_path,
@@ -529,7 +571,7 @@ async fn test_fetch_files_glob() {
 
     let res5 = fetch_svc
         .fetch(
-            "1",
+            &generate_unique_operation_id(),
             &fetch_step,
             update.source_state.as_ref(),
             &target_path,
@@ -555,7 +597,7 @@ async fn test_fetch_files_glob() {
 
     let res6 = fetch_svc
         .fetch(
-            "1",
+            &generate_unique_operation_id(),
             &fetch_step,
             update5.source_state.as_ref(),
             &target_path,
@@ -606,7 +648,7 @@ async fn test_fetch_container_ok() {
 
     let res = fetch_svc
         .fetch(
-            "1",
+            &generate_unique_operation_id(),
             &fetch_step,
             None,
             &target_path,
@@ -652,7 +694,14 @@ async fn test_fetch_container_batch_size_default() {
     });
 
     let res = fetch_svc
-        .fetch("1", &fetch_step, None, &target_path, &Utc::now(), None)
+        .fetch(
+            &generate_unique_operation_id(),
+            &fetch_step,
+            None,
+            &target_path,
+            &Utc::now(),
+            None,
+        )
         .await
         .unwrap();
 
@@ -684,7 +733,14 @@ async fn test_fetch_container_batch_size_set() {
     });
 
     let res = fetch_svc
-        .fetch("1", &fetch_step, None, &target_path, &Utc::now(), None)
+        .fetch(
+            &generate_unique_operation_id(),
+            &fetch_step,
+            None,
+            &target_path,
+            &Utc::now(),
+            None,
+        )
         .await
         .unwrap();
 
@@ -716,7 +772,14 @@ async fn test_fetch_container_batch_size_invalid_format() {
     });
 
     let res = fetch_svc
-        .fetch("1", &fetch_step, None, &target_path, &Utc::now(), None)
+        .fetch(
+            &generate_unique_operation_id(),
+            &fetch_step,
+            None,
+            &target_path,
+            &Utc::now(),
+            None,
+        )
         .await;
 
     assert_matches!(
@@ -745,7 +808,14 @@ async fn test_fetch_container_has_more_no_data() {
     });
 
     let res = fetch_svc
-        .fetch("1", &fetch_step, None, &target_path, &Utc::now(), None)
+        .fetch(
+            &generate_unique_operation_id(),
+            &fetch_step,
+            None,
+            &target_path,
+            &Utc::now(),
+            None,
+        )
         .await
         .unwrap();
 
@@ -782,7 +852,14 @@ async fn test_fetch_container_has_more_data_is_less_than_a_batch() {
     });
 
     let res = fetch_svc
-        .fetch("1", &fetch_step, None, &target_path, &Utc::now(), None)
+        .fetch(
+            &generate_unique_operation_id(),
+            &fetch_step,
+            None,
+            &target_path,
+            &Utc::now(),
+            None,
+        )
         .await
         .unwrap();
 
@@ -838,7 +915,14 @@ async fn test_fetch_container_has_more_data_is_more_than_a_batch() {
         });
 
         let res_1 = fetch_svc
-            .fetch("1", &fetch_step_1, None, &target_path, &Utc::now(), None)
+            .fetch(
+                &generate_unique_operation_id(),
+                &fetch_step_1,
+                None,
+                &target_path,
+                &Utc::now(),
+                None,
+            )
             .await
             .unwrap();
 
@@ -885,7 +969,7 @@ async fn test_fetch_container_has_more_data_is_more_than_a_batch() {
 
         let res_2 = fetch_svc
             .fetch(
-                "2",
+                &generate_unique_operation_id(),
                 &fetch_step_2,
                 prev_source_state.as_ref(),
                 &target_path,
@@ -937,7 +1021,7 @@ async fn test_fetch_container_has_more_data_is_more_than_a_batch() {
 
         let res_3 = fetch_svc
             .fetch(
-                "3",
+                &generate_unique_operation_id(),
                 &fetch_step_3,
                 prev_source_state.as_ref(),
                 &target_path,
@@ -985,7 +1069,7 @@ async fn test_fetch_container_has_more_data_is_more_than_a_batch() {
 
         let res_4 = fetch_svc
             .fetch(
-                "4",
+                &generate_unique_operation_id(),
                 &fetch_step_4,
                 prev_source_state.as_ref(),
                 &target_path,
@@ -1054,6 +1138,14 @@ const HAS_MORE_TESTER_SCRIPT: &str = indoc! {r#"
 
     simulate_set_new_etag "${NEW_ETAG}"
 "#};
+
+///////////////////////////////////////////////////////////////////////////////
+// Utils: helpers
+///////////////////////////////////////////////////////////////////////////////
+
+fn generate_unique_operation_id() -> String {
+    nanoid::nanoid!()
+}
 
 ///////////////////////////////////////////////////////////////////////////////
 // Utils: Listener
