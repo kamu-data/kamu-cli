@@ -17,6 +17,10 @@ use opendatafabric::*;
 
 ///////////////////////////////////////////////////////////////////////////////
 
+const OUTPUT_VIEW_ALIAS: &'static str = "__output__";
+
+///////////////////////////////////////////////////////////////////////////////
+
 #[tracing::instrument(level = "info", skip_all)]
 pub(crate) async fn preprocess(
     ctx: &SessionContext,
@@ -28,14 +32,17 @@ pub(crate) async fn preprocess(
     // TODO: Support other engines
     assert_eq!(transform.engine.to_lowercase(), "datafusion");
 
-    let transform = transform.normalize_queries(Some("output".to_string()));
-
     // Setup input
     ctx.register_table("input", df.into_view()).int_err()?;
 
     // Setup queries
     for query_step in transform.queries.unwrap_or_default() {
-        register_view_for_step(ctx, &query_step).await?;
+        register_view(
+            ctx,
+            query_step.alias.as_deref().unwrap_or(OUTPUT_VIEW_ALIAS),
+            query_step.query.as_str(),
+        )
+        .await?;
     }
 
     // Get result's execution plan
@@ -52,27 +59,22 @@ pub(crate) async fn preprocess(
 
 ///////////////////////////////////////////////////////////////////////////////
 
-async fn register_view_for_step(
-    ctx: &SessionContext,
-    step: &SqlQueryStep,
-) -> Result<(), EngineError> {
+async fn register_view(ctx: &SessionContext, alias: &str, query: &str) -> Result<(), EngineError> {
     use datafusion::logical_expr::*;
     use datafusion::sql::TableReference;
 
-    let name = step.alias.as_ref().unwrap();
-
     tracing::debug!(
-        %name,
-        query = %step.query,
+        %alias,
+        %query,
         "Creating view for a query",
     );
 
-    let logical_plan = match ctx.state().create_logical_plan(&step.query).await {
+    let logical_plan = match ctx.state().create_logical_plan(query).await {
         Ok(plan) => plan,
         Err(error) => {
             tracing::error!(
                 error = &error as &dyn std::error::Error,
-                query = %step.query,
+                %query,
                 "Error when setting up query"
             );
             return Err(InvalidQueryError::new(error.to_string(), Vec::new()).into());
@@ -80,10 +82,10 @@ async fn register_view_for_step(
     };
 
     let create_view = LogicalPlan::Ddl(DdlStatement::CreateView(CreateView {
-        name: TableReference::bare(step.alias.as_ref().unwrap()).to_owned_reference(),
+        name: TableReference::bare(alias).to_owned_reference(),
         input: Arc::new(logical_plan),
         or_replace: false,
-        definition: Some(step.query.clone()),
+        definition: Some(query.to_string()),
     }));
 
     ctx.execute_logical_plan(create_view).await.int_err()?;
