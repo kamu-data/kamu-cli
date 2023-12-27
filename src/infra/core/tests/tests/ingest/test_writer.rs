@@ -199,7 +199,7 @@ async fn test_data_writer_happy_path() {
 
     // Round 4 (nothing but source state changed)
     let source_state = odf::SourceState {
-        source_name: None,
+        source_name: odf::SourceState::DEFAULT_SOURCE_NAME.to_string(),
         kind: "odf/etag".to_string(),
         value: "123".to_string(),
     };
