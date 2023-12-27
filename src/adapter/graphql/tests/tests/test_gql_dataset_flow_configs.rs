@@ -106,7 +106,7 @@ async fn test_crud_time_delta_root_dataset() {
                 "byId": {
                     "flows": {
                         "configs": {
-                            "setConfigTimeDelta": {
+                            "setConfigSchedule": {
                                 "__typename": "FlowConfiguration",
                                 "paused": false,
                                 "schedule": {
@@ -146,7 +146,7 @@ async fn test_crud_time_delta_root_dataset() {
                 "byId": {
                     "flows": {
                         "configs": {
-                            "setConfigTimeDelta": {
+                            "setConfigSchedule": {
                                 "__typename": "FlowConfiguration",
                                 "paused": true,
                                 "schedule": {
@@ -247,7 +247,7 @@ async fn test_crud_cron_root_dataset() {
                 "byId": {
                     "flows": {
                         "configs": {
-                            "setConfigCronExpression": {
+                            "setConfigSchedule": {
                                 "__typename": "FlowConfiguration",
                                 "paused": false,
                                 "schedule": {
@@ -285,7 +285,7 @@ async fn test_crud_cron_root_dataset() {
                 "byId": {
                     "flows": {
                         "configs": {
-                            "setConfigCronExpression": {
+                            "setConfigSchedule": {
                                 "__typename": "FlowConfiguration",
                                 "paused": true,
                                 "schedule": {
@@ -630,10 +630,12 @@ impl FlowConfigHarness {
                     byId (datasetId: "<id>") {
                         flows {
                             configs {
-                                setConfigTimeDelta (
+                                setConfigSchedule (
                                     datasetFlowType: "<dataset_flow_type>",
                                     paused: <paused>,
-                                    every: { every: <every>, unit: "<unit>" }
+                                    schedule: { 
+                                        timeDelta: { every: <every>, unit: "<unit>" }
+                                    }
                                 ) {
                                     __typename,
                                     paused
@@ -675,10 +677,12 @@ impl FlowConfigHarness {
                     byId (datasetId: "<id>") {
                         flows {
                             configs {
-                                setConfigCronExpression (
+                                setConfigSchedule (
                                     datasetFlowType: "<dataset_flow_type>",
                                     paused: <paused>,
-                                    cronExpression: "<cron_expression>"
+                                    schedule: {
+                                        cronExpression: "<cron_expression>"
+                                    }
                                 ) {
                                     __typename,
                                     paused

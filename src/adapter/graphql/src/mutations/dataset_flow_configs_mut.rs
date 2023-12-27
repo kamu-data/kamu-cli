@@ -38,12 +38,12 @@ impl DatasetFlowConfigsMut {
     }
 
     #[graphql(guard = "LoggedInGuard::new()")]
-    async fn set_config_time_delta(
+    async fn set_config_schedule(
         &self,
         ctx: &Context<'_>,
         dataset_flow_type: DatasetFlowType,
         paused: bool,
-        every: TimeDeltaInput,
+        schedule: ScheduleInput,
     ) -> Result<FlowConfiguration> {
         self.ensure_expected_dataset_kind(ctx, dataset_flow_type)
             .await?;
@@ -57,41 +57,14 @@ impl DatasetFlowConfigsMut {
                 FlowKeyDataset::new(self.dataset_handle.id.clone(), dataset_flow_type.into())
                     .into(),
                 paused,
-                FlowConfigurationRule::Schedule(Schedule::TimeDelta(ScheduleTimeDelta {
-                    every: every.into(),
-                })),
-            )
-            .await
-            .map_err(|e| match e {
-                SetFlowConfigurationError::Internal(e) => GqlError::Internal(e),
-            })?;
-
-        Ok(res.into())
-    }
-
-    #[graphql(guard = "LoggedInGuard::new()")]
-    async fn set_config_cron_expression(
-        &self,
-        ctx: &Context<'_>,
-        dataset_flow_type: DatasetFlowType,
-        paused: bool,
-        cron_expression: String,
-    ) -> Result<FlowConfiguration> {
-        self.ensure_expected_dataset_kind(ctx, dataset_flow_type)
-            .await?;
-        self.ensure_scheduling_permission(ctx).await?;
-
-        let flow_config_service = from_catalog::<dyn FlowConfigurationService>(ctx).unwrap();
-
-        let res = flow_config_service
-            .set_configuration(
-                Utc::now(),
-                FlowKeyDataset::new(self.dataset_handle.id.clone(), dataset_flow_type.into())
-                    .into(),
-                paused,
-                FlowConfigurationRule::Schedule(Schedule::CronExpression(ScheduleCronExpression {
-                    cron_expression,
-                })),
+                FlowConfigurationRule::Schedule(match schedule {
+                    ScheduleInput::TimeDelta(td) => {
+                        Schedule::TimeDelta(ScheduleTimeDelta { every: td.into() })
+                    }
+                    ScheduleInput::CronExpression(cron_expression) => {
+                        Schedule::CronExpression(ScheduleCronExpression { cron_expression })
+                    }
+                }),
             )
             .await
             .map_err(|e| match e {
@@ -184,6 +157,14 @@ impl DatasetFlowConfigsMut {
 
         Ok(())
     }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+#[derive(OneofObject)]
+enum ScheduleInput {
+    TimeDelta(TimeDeltaInput),
+    CronExpression(String),
 }
 
 ///////////////////////////////////////////////////////////////////////////////

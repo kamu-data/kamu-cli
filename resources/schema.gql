@@ -1,3 +1,5 @@
+directive @oneOf on INPUT_OBJECT
+
 type Account {
 	"""
 	Unique and stable identitfier of this account
@@ -302,8 +304,7 @@ type DatasetFlowConfigs {
 }
 
 type DatasetFlowConfigsMut {
-	setConfigTimeDelta(datasetFlowType: DatasetFlowType!, paused: Boolean!, every: TimeDeltaInput!): FlowConfiguration!
-	setConfigCronExpression(datasetFlowType: DatasetFlowType!, paused: Boolean!, cronExpression: String!): FlowConfiguration!
+	setConfigSchedule(datasetFlowType: DatasetFlowType!, paused: Boolean!, schedule: ScheduleInput!): FlowConfiguration!
 	setConfigBatching(datasetFlowType: DatasetFlowType!, paused: Boolean!, throttlingPeriod: TimeDeltaInput, minimalDataBatch: Int): FlowConfiguration!
 }
 
@@ -881,6 +882,11 @@ type RenameResultSuccess implements RenameResult {
 type RequestHeader {
 	name: String!
 	value: String!
+}
+
+input ScheduleInput @oneOf {
+	timeDelta: TimeDeltaInput
+	cronExpression: String
 }
 
 type Search {
