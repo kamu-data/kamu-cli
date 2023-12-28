@@ -244,10 +244,12 @@ impl TokenExtractor {
             loop {
                 line.clear();
                 if reader.read_line(&mut line).await.unwrap() == 0 {
+                    output.flush().await.unwrap();
                     break;
                 }
 
                 output.write_all(line.as_bytes()).await.unwrap();
+
                 if let Some(capture) = re.captures(&line) {
                     if let Some(clb) = on_token.take() {
                         let token = capture.get(1).unwrap().as_str();
