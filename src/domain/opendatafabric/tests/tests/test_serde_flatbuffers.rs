@@ -222,7 +222,7 @@ fn serde_set_data_schema() {
     assert_eq!(expected_block, actual_block);
 
     let hash_actual = format!("{:x}", sha3::Sha3_256::digest(&buffer));
-    let hash_expected = "cc969ae72e4b2a7bbd7c7ede4cda43104ccc8549497c9f4044fff1681bdd8237";
+    let hash_expected = "44d64d764fb207713407b9a761566409404c907f765993105608299cd6f5bebf";
 
     assert_eq!(hash_actual, hash_expected);
 

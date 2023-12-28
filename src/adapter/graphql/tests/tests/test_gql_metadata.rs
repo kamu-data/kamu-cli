@@ -100,6 +100,7 @@ async fn test_current_push_sources() {
         .dataset
         .commit_event(
             MetadataFactory::add_push_source()
+                .source_name("source1")
                 .read(ReadStepCsv {
                     schema: Some(vec!["foo STRING".to_string()]),
                     ..Default::default()
@@ -114,7 +115,7 @@ async fn test_current_push_sources() {
         .dataset
         .commit_event(
             MetadataFactory::add_push_source()
-                .source_name("device1")
+                .source_name("source2")
                 .read(ReadStepNdJson {
                     schema: Some(vec!["foo STRING".to_string()]),
                     ..Default::default()
@@ -138,14 +139,14 @@ async fn test_current_push_sources() {
                 "byId": {
                     "metadata": {
                         "currentPushSources": [{
-                            "sourceName": "device1",
-                            "read": {
-                                "__typename": "ReadStepNdJson",
-                            }
-                         }, {
-                            "sourceName": null,
+                            "sourceName": "source1",
                             "read": {
                                 "__typename": "ReadStepCsv",
+                            }
+                        }, {
+                            "sourceName": "source2",
+                            "read": {
+                                "__typename": "ReadStepNdJson",
                             }
                          }]
                     }

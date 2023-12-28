@@ -29,7 +29,7 @@ async fn dataset_by_id_does_not_exist() {
             r#"
             {
                 datasets {
-                    byId (datasetId: "did:odf:z4k88e8n8Je6fC9Lz9FHrZ7XGsikEyBwTwtMBzxp4RH9pbWn4UM") {
+                    byId (datasetId: "did:odf:fed012126262ba49e1ba8392c26f7a39e1ba8d756c7469786d3365200c68402ff65dc") {
                         name
                     }
                 }
@@ -71,7 +71,10 @@ async fn dataset_by_id() {
                 }
                 "#
             )
-            .replace("<id>", &foo_result.dataset_handle.id.to_string()),
+            .replace(
+                "<id>",
+                &foo_result.dataset_handle.id.as_did_str().to_stack_string(),
+            ),
         )
         .await;
     assert!(res.is_ok(), "{:?}", res);
@@ -97,10 +100,11 @@ async fn dataset_create_empty() {
         r#"
         mutation {
             datasets {
-                createEmpty (datasetKind: ROOT, datasetName: "foo") {
+                createEmpty (datasetKind: ROOT, datasetAlias: "foo") {
                     ... on CreateDatasetResultSuccess {
                         dataset {
                             name
+                            alias
                         }
                     }
                 }
@@ -120,6 +124,7 @@ async fn dataset_create_empty() {
                 "createEmpty": {
                     "dataset": {
                         "name": "foo",
+                        "alias": "foo",
                     }
                 }
             }

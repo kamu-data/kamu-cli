@@ -55,17 +55,34 @@ pub async fn create_dataset_from_snapshot_impl(
     // Validate / resolve events
     for event in snapshot.metadata.iter_mut() {
         match event {
-            MetadataEvent::Seed(_) => Err(InvalidSnapshotError::new(
-                "Seed event is generated and cannot be specified explicitly",
-            )
-            .into()),
-            MetadataEvent::SetPollingSource(_) | MetadataEvent::AddPushSource(_) => {
+            MetadataEvent::Seed(_) => Err(CreateDatasetFromSnapshotError::InvalidSnapshot(
+                InvalidSnapshotError::new(
+                    "Seed event is generated and cannot be specified explicitly",
+                ),
+            )),
+            MetadataEvent::SetPollingSource(e) => {
                 if snapshot.kind != DatasetKind::Root {
                     Err(InvalidSnapshotError {
-                        reason: format!("Event is only allowed on root datasets: {:?}", event),
+                        reason: format!("SetPollingSource event is only allowed on root datasets"),
                     }
                     .into())
                 } else {
+                    if let Some(transform) = &mut e.preprocess {
+                        normalize_transform(transform)?;
+                    }
+                    Ok(())
+                }
+            }
+            MetadataEvent::AddPushSource(e) => {
+                if snapshot.kind != DatasetKind::Root {
+                    Err(InvalidSnapshotError {
+                        reason: format!("AddPushSource event is only allowed on root datasets"),
+                    }
+                    .into())
+                } else {
+                    if let Some(transform) = &mut e.preprocess {
+                        normalize_transform(transform)?;
+                    }
                     Ok(())
                 }
             }
@@ -76,7 +93,9 @@ pub async fn create_dataset_from_snapshot_impl(
                     )
                     .into())
                 } else {
-                    normalize_transform(e, dataset_repo, &snapshot.name).await
+                    resolve_transform_inputs(&mut e.inputs, dataset_repo, &snapshot.name).await?;
+                    normalize_transform(&mut e.transform)?;
+                    Ok(())
                 }
             }
             MetadataEvent::SetDataSchema(_) => {
@@ -188,16 +207,8 @@ pub async fn create_dataset_from_snapshot_impl(
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-async fn normalize_transform(
-    transform: &mut SetTransform,
-    repo: &dyn DatasetRepository,
-    output_dataset_ailas: &DatasetAlias,
-) -> Result<(), CreateDatasetFromSnapshotError> {
-    // Resolve inputs to ID and alias
-    resolve_transform_inputs(&mut transform.inputs, repo, output_dataset_ailas).await?;
-
-    // Normalize query structure and validate aliases
-    let Transform::Sql(sql) = &mut transform.transform;
+fn normalize_transform(transform: &mut Transform) -> Result<(), CreateDatasetFromSnapshotError> {
+    let Transform::Sql(sql) = transform;
 
     if let Some(query) = &sql.query {
         if sql.queries.is_some() {
@@ -234,6 +245,8 @@ async fn normalize_transform(
 
     Ok(())
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////
 
 /// Resolves dataset references in transform intputs and ensures that:
 /// - input datasets are always references by unique IDs
