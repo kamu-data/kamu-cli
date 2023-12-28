@@ -41,7 +41,7 @@ const AMOUNT_OF_BLOCKS_TO_APPEND: usize = 70;
 
 async fn setup_dataset(
     tmp_workspace_dir: &Path,
-    dataset_alias: Arc<DatasetAlias>,
+    dataset_alias: &DatasetAlias,
     ipfs: Option<(IpfsGateway, IpfsClient)>,
 ) -> (Arc<dyn SyncService>, Arc<DatasetRepositoryLocalFs>) {
     let (ipfs_gateway, ipfs_client) = ipfs.unwrap_or_default();
@@ -74,13 +74,13 @@ async fn setup_dataset(
 
     // Add dataset
     let snapshot = MetadataFactory::dataset_snapshot()
-        .name(&dataset_alias.dataset_name)
+        .name(dataset_alias.clone())
         .kind(DatasetKind::Root)
         .push_event(MetadataFactory::set_data_schema().build())
         .build();
 
     let _ = dataset_repo
-        .create_dataset_from_snapshot(None, snapshot)
+        .create_dataset_from_snapshot(snapshot)
         .await
         .unwrap()
         .head;
@@ -98,22 +98,19 @@ async fn setup_dataset(
 async fn append_data_to_dataset(
     block_amount: usize,
     dataset_repo: &dyn DatasetRepository,
-    dataset_ref: Arc<DatasetAlias>,
+    dataset_ref: &DatasetAlias,
 ) -> () {
     for _ in 1..block_amount {
-        let _ = DatasetTestHelper::append_random_data(
-            dataset_repo,
-            &*dataset_ref,
-            FILE_DATA_ARRAY_SIZE,
-        )
-        .await;
+        let _ =
+            DatasetTestHelper::append_random_data(dataset_repo, dataset_ref, FILE_DATA_ARRAY_SIZE)
+                .await;
     }
     ()
 }
 
 async fn do_test_sync(
     sync_svc: Arc<dyn SyncService>,
-    dataset_alias: Arc<DatasetAlias>,
+    dataset_alias: &DatasetAlias,
     pull_repo_url: &DatasetRefRemote,
     push_repo_url: &DatasetRefRemote,
     dataset_repo: Arc<DatasetRepositoryLocalFs>,
@@ -146,7 +143,7 @@ async fn do_test_sync(
     .await;
 }
 
-fn build_temp_dirs(rt: Arc<tokio::runtime::Runtime>) -> (Arc<DatasetAlias>, Url, Url) {
+fn build_temp_dirs(rt: Arc<tokio::runtime::Runtime>) -> (DatasetAlias, Url, Url) {
     let tmp_repo_dir = tempfile::tempdir().unwrap();
 
     // to perfrom multithreded operation (initialization server) rt.enter menthod
@@ -156,7 +153,7 @@ fn build_temp_dirs(rt: Arc<tokio::runtime::Runtime>) -> (Arc<DatasetAlias>, Url,
     let pull_repo_url = Url::from_str(&format!("http://{}/", server.local_addr())).unwrap();
     let push_repo_url = Url::from_directory_path(tmp_repo_dir.path()).unwrap();
 
-    let dataset_alias = Arc::new(DatasetAlias::new(None, DatasetName::new_unchecked("foo")));
+    let dataset_alias = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
     rt.spawn(server.run());
 
     (dataset_alias, pull_repo_url, push_repo_url)
@@ -173,7 +170,7 @@ fn bench_with_1_parallel(c: &mut Criterion) {
 
     let (sync_service_impl, dataset_repo) = rt.block_on(setup_dataset(
         &tmp_workspace_dir.path(),
-        dataset_alias.clone(),
+        &dataset_alias,
         None,
     ));
 
@@ -184,7 +181,7 @@ fn bench_with_1_parallel(c: &mut Criterion) {
         b.iter(|| {
             rt.block_on(do_test_sync(
                 sync_service_impl.clone(),
-                dataset_alias.clone(),
+                &dataset_alias,
                 &DatasetRefRemote::from(&pull_repo_url),
                 &DatasetRefRemote::from(&push_repo_url),
                 dataset_repo.clone(),
@@ -202,7 +199,7 @@ fn bench_with_10_parallels(c: &mut Criterion) {
 
     let (sync_service_impl, dataset_repo) = rt.block_on(setup_dataset(
         &tmp_workspace_dir.path(),
-        dataset_alias.clone(),
+        &dataset_alias,
         None,
     ));
 
@@ -213,7 +210,7 @@ fn bench_with_10_parallels(c: &mut Criterion) {
         b.iter(|| {
             rt.block_on(do_test_sync(
                 sync_service_impl.clone(),
-                dataset_alias.clone(),
+                &dataset_alias,
                 &DatasetRefRemote::from(&pull_repo_url),
                 &DatasetRefRemote::from(&push_repo_url),
                 dataset_repo.clone(),
