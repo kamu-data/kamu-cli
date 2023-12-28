@@ -397,7 +397,12 @@ where
 
                 Ok(())
             }
-            MetadataEvent::SetPollingSource(_) => {
+            MetadataEvent::SetPollingSource(e) => {
+                // Queries must be normalized
+                if let Some(transform) = &e.preprocess {
+                    Self::validate_transform(&new_block.event, &transform)?;
+                }
+
                 // Ensure no active push sources
                 let mut blocks = self.iter_blocks_interval(
                     new_block.prev_block_hash.as_ref().unwrap(),
@@ -430,6 +435,12 @@ where
                         "Push sources must specify the read schema explicitly",
                     );
                 }
+
+                // Queries must be normalized
+                if let Some(transform) = &e.preprocess {
+                    Self::validate_transform(&new_block.event, &transform)?;
+                }
+
                 // Ensure no active polling source
                 let mut blocks = self.iter_blocks_interval(
                     new_block.prev_block_hash.as_ref().unwrap(),
@@ -447,6 +458,7 @@ where
                         _ => (),
                     }
                 }
+
                 Ok(())
             }
             MetadataEvent::DisablePushSource(_) => {
@@ -471,21 +483,8 @@ where
                 }
 
                 // Queries must be normalized
-                let Transform::Sql(transform) = &e.transform;
-                if transform.query.is_some() {
-                    invalid_event!(e.clone(), "Transform queries must be normalized");
-                }
-                if let Some(queries) = &transform.queries {
-                    let no_alias_queries = queries.iter().filter(|q| q.alias.is_none()).count();
-                    if no_alias_queries > 1 {
-                        invalid_event!(
-                            e.clone(),
-                            "Transform can only have one output query without an alias"
-                        );
-                    }
-                } else {
-                    invalid_event!(e.clone(), "Transform must have at least one query");
-                }
+                Self::validate_transform(&new_block.event, &e.transform)?;
+
                 Ok(())
             }
             MetadataEvent::SetVocab(_) => Ok(()),
@@ -493,6 +492,37 @@ where
             MetadataEvent::SetInfo(_) => Ok(()),
             MetadataEvent::SetLicense(_) => Ok(()),
         }
+    }
+
+    fn validate_transform(e: &MetadataEvent, transform: &Transform) -> Result<(), AppendError> {
+        let Transform::Sql(transform) = transform;
+        if transform.query.is_some() {
+            invalid_event!(e.clone(), "Transform queries must be normalized");
+        }
+
+        if transform.queries.is_none() || transform.queries.as_ref().unwrap().len() == 0 {
+            invalid_event!(e.clone(), "Transform must have at least one query");
+        }
+
+        let queries = transform.queries.as_ref().unwrap();
+
+        if queries[queries.len() - 1].alias.is_some() {
+            invalid_event!(
+                e.clone(),
+                "Last query in a transform must have no alias an will be treated as an output"
+            );
+        }
+
+        for q in &queries[..queries.len() - 1] {
+            if q.alias.is_none() {
+                invalid_event!(
+                    e.clone(),
+                    "In a transform all queries except the last one must have aliases"
+                );
+            }
+        }
+
+        Ok(())
     }
 
     async fn validate_append_watermark_is_monotonic(
