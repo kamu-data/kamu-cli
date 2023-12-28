@@ -687,7 +687,6 @@ impl FlowConfigHarness {
     async fn create_root_dataset(&self) -> CreateDatasetResult {
         self.dataset_repo
             .create_dataset_from_snapshot(
-                None,
                 MetadataFactory::dataset_snapshot()
                     .kind(DatasetKind::Root)
                     .name("foo")
@@ -700,11 +699,14 @@ impl FlowConfigHarness {
     async fn create_derived_dataset(&self) -> CreateDatasetResult {
         self.dataset_repo
             .create_dataset_from_snapshot(
-                None,
                 MetadataFactory::dataset_snapshot()
                     .name("bar")
                     .kind(DatasetKind::Derivative)
-                    .push_event(MetadataFactory::set_transform(["foo"]).build())
+                    .push_event(
+                        MetadataFactory::set_transform()
+                            .inputs_from_refs(["foo"])
+                            .build(),
+                    )
                     .build(),
             )
             .await

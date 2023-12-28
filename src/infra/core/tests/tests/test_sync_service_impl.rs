@@ -375,7 +375,7 @@ async fn do_test_sync(
         }
 
         for _i in 0..15 {
-            let _: MultihashGeneric<32> = DatasetTestHelper::append_random_data(
+            DatasetTestHelper::append_random_data(
                 dataset_repo.as_ref(),
                 &dataset_alias,
                 FILE_DATA_ARRAY_SIZE,
