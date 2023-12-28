@@ -58,10 +58,13 @@ impl CachedObject {
             let mut buf = [0; 4096];
             loop {
                 use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
                 let read = data_stream.read(&mut buf).await.int_err()?;
                 if read == 0 {
+                    temp_file.flush().await.int_err()?;
                     break;
                 }
+
                 temp_file.write_all(&buf[..read]).await.int_err()?;
             }
 

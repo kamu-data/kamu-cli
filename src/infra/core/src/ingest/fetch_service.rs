@@ -294,6 +294,8 @@ impl FetchService {
             loop {
                 let read = stdout.read(&mut buf).await.int_err()?;
                 if read == 0 {
+                    target_file.flush().await.int_err()?;
+
                     break;
                 }
 

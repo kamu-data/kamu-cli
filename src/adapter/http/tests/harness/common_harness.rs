@@ -52,10 +52,12 @@ pub(crate) async fn write_dataset_alias(dataset_layout: &DatasetLayout, alias: &
 
     let alias_path = dataset_layout.info_dir.join("alias");
     let mut alias_file = tokio::fs::File::create(alias_path).await.unwrap();
+
     alias_file
         .write_all(alias.to_string().as_bytes())
         .await
         .unwrap();
+    alias_file.flush().await.unwrap();
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
