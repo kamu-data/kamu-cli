@@ -350,10 +350,6 @@ type DatasetMetadata {
 	"""
 	currentDownstreamDependencies: [Dataset!]!
 	"""
-	Deprecated - use `current_polling_source` instead
-	"""
-	currentSource: SetPollingSource
-	"""
 	Current polling source used by the root dataset
 	"""
 	currentPollingSource: SetPollingSource
