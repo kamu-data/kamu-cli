@@ -102,8 +102,9 @@ async fn test_metadata_chain_events() {
                                             }
                                         }
                                         ... on AddData {
-                                            outputData {
-                                                interval {
+                                            prevOffset
+                                            newData {
+                                                offsetInterval {
                                                     start
                                                     end
                                                 }
@@ -140,8 +141,9 @@ async fn test_metadata_chain_events() {
                                 "nodes": [{
                                     "event": {
                                         "__typename": "AddData",
-                                        "outputData": {
-                                            "interval": {
+                                        "prevOffset": null,
+                                        "newData": {
+                                            "offsetInterval": {
                                                 "start": 0,
                                                 "end": 9,
                                             }
