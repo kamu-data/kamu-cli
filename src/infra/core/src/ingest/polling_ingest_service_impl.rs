@@ -141,7 +141,6 @@ impl PollingIngestServiceImpl {
         args: IngestLoopArgs,
     ) -> Result<PollingIngestResult, PollingIngestError> {
         let ctx = ingest_common::new_session_context(self.object_store_registry.clone());
-
         let mut data_writer = DataWriterDataFusion::builder(args.dataset.clone(), ctx.clone())
             .with_metadata_state_scanned(None)
             .await
@@ -157,6 +156,9 @@ impl PollingIngestServiceImpl {
             let operation_dir = self.run_info_dir.join(format!("ingest-{}", operation_id));
             std::fs::create_dir_all(&operation_dir).int_err()?;
 
+            let new_ctx = ingest_common::new_session_context(self.object_store_registry.clone());
+            data_writer.set_session_context(new_ctx.clone());
+
             // TODO: Avoid excessive cloning
             let iteration_args = IngestIterationArgs {
                 iteration,
@@ -166,7 +168,7 @@ impl PollingIngestServiceImpl {
                 options: args.options.clone(),
                 polling_source: args.polling_source.clone(),
                 listener: args.listener.clone(),
-                ctx: &ctx,
+                ctx: new_ctx,
                 data_writer: &mut data_writer,
             };
 
@@ -764,6 +766,6 @@ struct IngestIterationArgs<'a> {
     options: PollingIngestOptions,
     polling_source: SetPollingSource,
     listener: Arc<dyn PollingIngestListener>,
-    ctx: &'a SessionContext,
+    ctx: SessionContext,
     data_writer: &'a mut DataWriterDataFusion,
 }

@@ -25,13 +25,15 @@ use opendatafabric as odf;
 
 /// Implementation of the [DataWriter] interface using Apache DataFusion engine
 pub struct DataWriterDataFusion {
-    ctx: SessionContext,
     dataset: Arc<dyn Dataset>,
     merge_strategy: Arc<dyn MergeStrategy>,
     block_ref: BlockRef,
 
     // Mutable
     meta: DataWriterMetadataState,
+
+    // Can be reset
+    ctx: SessionContext,
 }
 
 /// Contains a projection of the metadata needed for [DataWriter] to function
@@ -87,6 +89,10 @@ impl DataWriterDataFusion {
 
     pub fn source_event(&self) -> Option<&odf::MetadataEvent> {
         self.meta.source_event.as_ref()
+    }
+
+    pub fn set_session_context(&mut self, ctx: SessionContext) {
+        self.ctx = ctx;
     }
 
     fn validate_input(&self, df: &DataFrame) -> Result<(), BadInputSchemaError> {
