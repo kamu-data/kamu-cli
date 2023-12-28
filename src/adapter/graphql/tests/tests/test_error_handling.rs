@@ -44,7 +44,7 @@ async fn test_malformed_argument() {
         serde_json::json!({
             "errors":[{
                 "locations": [],
-                "message": "Failed to parse \"AccountName\": Invalid AccountName: ????",
+                "message": "Failed to parse \"AccountName\": Value '????' is not a valid AccountName",
                 "path": ["datasets", "byAccountName"],
             }],
             "data": null,
@@ -78,7 +78,7 @@ async fn test_internal_error() {
             r#"
             {
                 datasets {
-                    byId (datasetId: "did:odf:z4k88e8n8Je6fC9Lz9FHrZ7XGsikEyBwTwtMBzxp4RH9pbWn4UM") {
+                    byId (datasetId: "did:odf:fed012126262ba49e1ba8392c26f7a39e1ba8d756c7469786d3365200c68402ff65dc") {
                         name
                     }
                 }
@@ -116,7 +116,7 @@ async fn test_handler_panics() {
             r#"
             {
                 datasets {
-                    byId (datasetId: "did:odf:z4k88e8n8Je6fC9Lz9FHrZ7XGsikEyBwTwtMBzxp4RH9pbWn4UM") {
+                    byId (datasetId: "did:odf:fed012126262ba49e1ba8392c26f7a39e1ba8d756c7469786d3365200c68402ff65dc") {
                         name
                     }
                 }

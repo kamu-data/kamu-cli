@@ -170,15 +170,17 @@ impl DatasetMetadata {
     async fn current_push_sources(&self, ctx: &Context<'_>) -> Result<Vec<AddPushSource>> {
         let push_ingest_svc = from_catalog::<dyn domain::PushIngestService>(ctx).unwrap();
 
-        let push_sources = push_ingest_svc
+        let mut push_sources: Vec<AddPushSource> = push_ingest_svc
             .get_active_push_sources(&self.dataset_handle.as_local_ref())
             .await
-            .int_err()?;
-
-        Ok(push_sources
+            .int_err()?
             .into_iter()
             .map(|(_hash, block)| block.event.into())
-            .collect())
+            .collect();
+
+        push_sources.sort_by(|a, b| a.source_name.cmp(&b.source_name));
+
+        Ok(push_sources)
     }
 
     /// Current transformation used by the derivative dataset
