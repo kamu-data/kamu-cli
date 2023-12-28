@@ -105,27 +105,27 @@ impl DatasetTestHelper {
 
         FileTestHelper::create_random_file(&checkpoint_path, data_size);
 
-        let input_checkpoint = prev_data
+        let prev_checkpoint = prev_data
             .as_ref()
-            .and_then(|e| e.output_checkpoint.as_ref())
+            .and_then(|e| e.new_checkpoint.as_ref())
             .map(|c| c.physical_hash.clone());
 
-        let prev_offset = prev_data
-            .as_ref()
-            .and_then(|e| e.output_data.as_ref())
-            .map(|d| d.interval.end)
-            .unwrap_or(-1);
-        let data_interval = OffsetInterval {
-            start: prev_offset + 1,
-            end: prev_offset + 10,
+        let prev_offset = prev_data.as_ref().and_then(|e| e.last_offset());
+
+        let num_records = 10;
+        let start = prev_offset.map(|v| v + 1).unwrap_or(0);
+        let new_offset_interval = OffsetInterval {
+            start,
+            end: start + num_records - 1,
         };
 
         ds.commit_add_data(
             AddDataParams {
-                input_checkpoint,
-                output_data: Some(data_interval),
-                output_watermark: None,
-                source_state: None,
+                prev_checkpoint,
+                prev_offset,
+                new_offset_interval: Some(new_offset_interval),
+                new_watermark: None,
+                new_source_state: None,
             },
             Some(OwnedFile::new(data_path)),
             Some(OwnedFile::new(checkpoint_path)),

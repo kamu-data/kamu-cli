@@ -134,7 +134,7 @@ impl NewDatasetCommand {
                           # References the datasets that will be used as inputs.
                           # Note: We are associating inputs by name, but could also use IDs.
                           inputs:
-                            - name: com.example.city-populations
+                            - datasetRef: com.example.city-populations
                           # Transformation steps that ise one of the supported engines and query dialects
                           # See: https://docs.kamu.dev/cli/transform/supported-engines/
                           transform:

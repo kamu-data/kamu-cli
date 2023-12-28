@@ -820,7 +820,9 @@ impl DataWriterDataFusionBuilder {
                         }
                         if prev_source_state.is_none() {
                             if let Some(ss) = &e.new_source_state {
-                                if Some(ss.source_name.as_str()) != source_name {
+                                if source_name.is_some()
+                                    && source_name != Some(ss.source_name.as_str())
+                                {
                                     unimplemented!(
                                         "Differentiating between the state of multiple sources is \
                                          not yet supported"
