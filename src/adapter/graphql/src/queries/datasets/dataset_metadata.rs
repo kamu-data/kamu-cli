@@ -149,11 +149,6 @@ impl DatasetMetadata {
         Ok(downstream)
     }
 
-    /// Deprecated - use `current_polling_source` instead
-    async fn current_source(&self, ctx: &Context<'_>) -> Result<Option<SetPollingSource>> {
-        self.current_polling_source(ctx).await
-    }
-
     /// Current polling source used by the root dataset
     async fn current_polling_source(&self, ctx: &Context<'_>) -> Result<Option<SetPollingSource>> {
         let polling_ingest_svc = from_catalog::<dyn domain::PollingIngestService>(ctx).unwrap();
