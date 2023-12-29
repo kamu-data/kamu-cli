@@ -152,12 +152,12 @@ impl SparkEngine {
         Ok(MaterializedEngineRequest {
             engine_request: IngestRequestRaw {
                 dataset_id: request.dataset_handle.id,
-                dataset_name: request.dataset_handle.alias.dataset_name,
+                dataset_alias: request.dataset_handle.alias,
                 input_data_path: container_in_raw_data_path,
                 output_data_path: container_out_data_path,
                 system_time: request.system_time,
                 event_time: request.event_time,
-                offset: request.prev_offset.map(|v| v + 1).unwrap_or(0),
+                next_offset: request.prev_offset.map(|v| v + 1).unwrap_or(0),
                 // TODO: We are stripping out the "fetch step because URL can contain templating
                 // that will fail to parse in the engine.
                 // In future engine should only receive the query part of the request.
@@ -283,12 +283,12 @@ impl SparkEngine {
         Ok(MaterializedEngineRequest {
             engine_request: IngestRequestRaw {
                 dataset_id: request.dataset_handle.id,
-                dataset_name: request.dataset_handle.alias.dataset_name,
+                dataset_alias: request.dataset_handle.alias,
                 input_data_path: container_in_raw_data_path,
                 output_data_path: container_out_data_path,
                 system_time: request.system_time,
                 event_time: request.event_time,
-                offset: request.prev_offset.map(|v| v + 1).unwrap_or(0),
+                next_offset: request.prev_offset.map(|v| v + 1).unwrap_or(0),
                 // TODO: We are stripping out the "fetch step because URL can contain templating
                 // that will fail to parse in the engine.
                 // In future engine should only receive the query part of the request.
@@ -514,16 +514,15 @@ struct MaterializedEngineRequest {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct IngestRequestRaw {
-    #[serde(rename = "datasetID")]
     pub dataset_id: DatasetID,
-    pub dataset_name: DatasetName,
+    pub dataset_alias: DatasetAlias,
     pub input_data_path: PathBuf,
     pub output_data_path: PathBuf,
     #[serde(with = "datetime_rfc3339")]
     pub system_time: DateTime<Utc>,
     #[serde(default, with = "datetime_rfc3339_opt")]
     pub event_time: Option<DateTime<Utc>>,
-    pub offset: u64,
+    pub next_offset: u64,
     #[serde(with = "SetPollingSourceDef")]
     pub source: SetPollingSource,
     #[serde(with = "DatasetVocabularyDef")]
