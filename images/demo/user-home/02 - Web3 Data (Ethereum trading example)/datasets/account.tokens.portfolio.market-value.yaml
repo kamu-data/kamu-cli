@@ -25,7 +25,7 @@ content:
           - alias: market_value_reth2eth
             query: |
               select
-                rp.block_time as event_time,
+                rp.event_time,
                 tr.account_symbol,
                 tr.token_symbol,
                 tr.token_balance,
@@ -35,7 +35,7 @@ content:
                 ) as token_market_value_eth,
                 tr.token_book_value_eth_as_usd
               from `net.rocketpool.reth.mint-burn` as rp
-              join `account.tokens.portfolio.usd` for system_time as of rp.block_time as tr
+              join `account.tokens.portfolio.usd` for system_time as of rp.event_time as tr
               on rp.token_symbol = tr.token_symbol
           - alias: account.tokens.portfolio.market-value
             query: |
