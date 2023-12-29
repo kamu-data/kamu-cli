@@ -6,8 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 ### Fixed
-- Fixed race condition during tests parallel execution (`tests::ingest::test_fetch::*` test group)
-- Fixed missed `flush()`'s for `tokio::fs:file`'s
+- Fixed async file flushing issues that could result in a race condition when using containerized ingest
 - `kamu pull`: fixed containerized iterative ingestion
 
 ## [0.150.0] - 2023-12-27
