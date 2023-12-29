@@ -34,33 +34,33 @@ resolver = "2"
 
 [workspace.dependencies]
 # Utils
-container-runtime = { version = "0.150.0", path = "src/utils/container-runtime", default-features = false }
-enum-variants = { version = "0.150.0", path = "src/utils/enum-variants", default-features = false }
-event-bus = { version = "0.150.0", path = "src/utils/event-bus", default-features = false}
-event-sourcing = { version = "0.150.0", path = "src/utils/event-sourcing", default-features = false }
-event-sourcing-macros = { version = "0.150.0", path = "src/utils/event-sourcing-macros", default-features = false }
-internal-error = { version = "0.150.0", path = "src/utils/internal-error", default-features = false }
-kamu-data-utils = { version = "0.150.0", path = "src/utils/data-utils", default-features = false }
-tracing-perfetto = { version = "0.150.0", path = "src/utils/tracing-perfetto", default-features = false }
+container-runtime = { version = "0.150.1", path = "src/utils/container-runtime", default-features = false }
+enum-variants = { version = "0.150.1", path = "src/utils/enum-variants", default-features = false }
+event-bus = { version = "0.150.1", path = "src/utils/event-bus", default-features = false}
+event-sourcing = { version = "0.150.1", path = "src/utils/event-sourcing", default-features = false }
+event-sourcing-macros = { version = "0.150.1", path = "src/utils/event-sourcing-macros", default-features = false }
+internal-error = { version = "0.150.1", path = "src/utils/internal-error", default-features = false }
+kamu-data-utils = { version = "0.150.1", path = "src/utils/data-utils", default-features = false }
+tracing-perfetto = { version = "0.150.1", path = "src/utils/tracing-perfetto", default-features = false }
 # Domain
-opendatafabric = { version = "0.150.0", path = "src/domain/opendatafabric", default-features = false }
-kamu-core = { version = "0.150.0", path = "src/domain/core", default-features = false }
-kamu-task-system = { version = "0.150.0", path = "src/domain/task-system", default-features = false }
-kamu-flow-system = { version = "0.150.0", path = "src/domain/flow-system", default-features = false }
+opendatafabric = { version = "0.150.1", path = "src/domain/opendatafabric", default-features = false }
+kamu-core = { version = "0.150.1", path = "src/domain/core", default-features = false }
+kamu-task-system = { version = "0.150.1", path = "src/domain/task-system", default-features = false }
+kamu-flow-system = { version = "0.150.1", path = "src/domain/flow-system", default-features = false }
 # Infra
-kamu = { version = "0.150.0", path = "src/infra/core", default-features = false }
-kamu-ingest-datafusion = { version = "0.150.0", path = "src/infra/ingest-datafusion", default-features = false }
-kamu-task-system-inmem = { version = "0.150.0", path = "src/infra/task-system-inmem", default-features = false }
-kamu-flow-system-inmem = { version = "0.150.0", path = "src/infra/flow-system-inmem", default-features = false }
+kamu = { version = "0.150.1", path = "src/infra/core", default-features = false }
+kamu-ingest-datafusion = { version = "0.150.1", path = "src/infra/ingest-datafusion", default-features = false }
+kamu-task-system-inmem = { version = "0.150.1", path = "src/infra/task-system-inmem", default-features = false }
+kamu-flow-system-inmem = { version = "0.150.1", path = "src/infra/flow-system-inmem", default-features = false }
 # Adapters
-kamu-adapter-auth-oso = { version = "0.150.0", path = "src/adapter/auth-oso", default-features = false }
-kamu-adapter-flight-sql = { version = "0.150.0", path = "src/adapter/flight-sql", default-features = false }
-kamu-adapter-graphql = { version = "0.150.0", path = "src/adapter/graphql", default-features = false }
-kamu-adapter-http = { version = "0.150.0", path = "src/adapter/http", default-features = false }
-kamu-adapter-oauth = { version = "0.150.0", path = "src/adapter/oauth", defualt-features = false }
+kamu-adapter-auth-oso = { version = "0.150.1", path = "src/adapter/auth-oso", default-features = false }
+kamu-adapter-flight-sql = { version = "0.150.1", path = "src/adapter/flight-sql", default-features = false }
+kamu-adapter-graphql = { version = "0.150.1", path = "src/adapter/graphql", default-features = false }
+kamu-adapter-http = { version = "0.150.1", path = "src/adapter/http", default-features = false }
+kamu-adapter-oauth = { version = "0.150.1", path = "src/adapter/oauth", defualt-features = false }
 
 [workspace.package]
-version = "0.150.0"
+version = "0.150.1"
 edition = "2021"
 homepage = "https://github.com/kamu-data/kamu-cli"
 repository = "https://github.com/kamu-data/kamu-cli"
