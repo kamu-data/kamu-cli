@@ -12,9 +12,13 @@ use std::sync::Arc;
 
 use dill::Catalog;
 use internal_error::*;
+use kamu::domain::auth::AuthenticationService;
 use kamu::domain::SystemTimeSource;
 use kamu_flow_system_inmem::domain::FlowService;
 use kamu_task_system_inmem::domain::TaskExecutor;
+use opendatafabric::AccountName;
+
+use crate::accounts;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -26,14 +30,16 @@ pub struct APIServer {
     task_executor: Arc<dyn TaskExecutor>,
     flow_service: Arc<dyn FlowService>,
     time_source: Arc<dyn SystemTimeSource>,
+    access_token: String,
 }
 
 impl APIServer {
-    pub fn new(
+    pub async fn new(
         base_catalog: Catalog,
         multi_tenant_workspace: bool,
         address: Option<IpAddr>,
         port: Option<u16>,
+        current_account_name: AccountName,
     ) -> Self {
         use axum::extract::Extension;
 
@@ -44,6 +50,23 @@ impl APIServer {
         let time_source = base_catalog.get_one().unwrap();
 
         let gql_schema = kamu_adapter_graphql::schema();
+
+        let login_credentials = accounts::PasswordLoginCredentials {
+            login: current_account_name.to_string(),
+            // Note: note a mistake, use identical login and password, equal to account name
+            password: current_account_name.to_string(),
+        };
+
+        let auth_svc = base_catalog.get_one::<dyn AuthenticationService>().unwrap();
+        let access_token = auth_svc
+            .login(
+                &accounts::LOGIN_METHOD_PASSWORD.to_string(),
+                serde_json::to_string::<accounts::PasswordLoginCredentials>(&login_credentials)
+                    .unwrap(),
+            )
+            .await
+            .unwrap()
+            .access_token;
 
         let app = axum::Router::new()
             .route("/", axum::routing::get(root))
@@ -94,11 +117,16 @@ impl APIServer {
             task_executor,
             flow_service,
             time_source,
+            access_token,
         }
     }
 
     pub fn local_addr(&self) -> SocketAddr {
         self.server.local_addr()
+    }
+
+    pub fn get_access_token(&self) -> String {
+        self.access_token.clone()
     }
 
     pub async fn run(self) -> Result<(), InternalError> {

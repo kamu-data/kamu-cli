@@ -12,11 +12,12 @@ use std::sync::Arc;
 
 use console::style as s;
 use dill::Catalog;
-use kamu::ENV_VAR_KAMU_JWT_SECRET;
+use kamu::{set_random_jwt_secret, ENV_VAR_KAMU_JWT_SECRET};
 use kamu_adapter_oauth::{
     ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_ID,
     ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_SECRET,
 };
+use opendatafabric::AccountName;
 
 use super::{CLIError, Command};
 use crate::{check_env_var_set, OutputConfig};
@@ -27,6 +28,8 @@ pub struct APIServerRunCommand {
     output_config: Arc<OutputConfig>,
     address: Option<IpAddr>,
     port: Option<u16>,
+    get_token: bool,
+    account_name: AccountName,
 }
 
 impl APIServerRunCommand {
@@ -36,6 +39,8 @@ impl APIServerRunCommand {
         output_config: Arc<OutputConfig>,
         address: Option<IpAddr>,
         port: Option<u16>,
+        get_token: bool,
+        account_name: AccountName,
     ) -> Self {
         Self {
             catalog,
@@ -43,11 +48,16 @@ impl APIServerRunCommand {
             output_config,
             address,
             port,
+            get_token,
+            account_name,
         }
     }
 
     fn check_required_env_vars(&self) -> Result<(), CLIError> {
-        check_env_var_set(ENV_VAR_KAMU_JWT_SECRET)?;
+        match check_env_var_set(ENV_VAR_KAMU_JWT_SECRET) {
+            Ok(_) => {}
+            Err(_) => set_random_jwt_secret(),
+        };
 
         if self.multi_tenant_workspace {
             check_env_var_set(ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_ID)?;
@@ -70,7 +80,9 @@ impl Command for APIServerRunCommand {
             self.multi_tenant_workspace,
             self.address,
             self.port,
-        );
+            self.account_name.clone(),
+        )
+        .await;
 
         tracing::info!(
             "API server is listening on: http://{}",
@@ -87,6 +99,14 @@ impl Command for APIServerRunCommand {
                 s(format!("http://{}", api_server.local_addr())).bold(),
             );
             eprintln!("{}", s("Use Ctrl+C to stop the server").yellow());
+
+            if self.get_token {
+                eprintln!(
+                    "{} {}",
+                    s("JWT token:").green().bold(),
+                    s(api_server.get_access_token()).dim()
+                );
+            }
         }
 
         api_server.run().await.map_err(|e| CLIError::critical(e))?;
