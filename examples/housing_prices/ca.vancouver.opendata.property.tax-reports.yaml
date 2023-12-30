@@ -44,7 +44,6 @@ content:
           - NEIGHBOURHOOD_CODE STRING
           - REPORT_YEAR STRING
       preprocess:
-        # TODO: Remove after datafusion ingest is stabilized
         kind: sql
         engine: datafusion
         query: |

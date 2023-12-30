@@ -46,12 +46,12 @@ impl TransformServiceImpl {
     #[tracing::instrument(level = "info", skip_all, fields(operation_id = %request.operation_id))]
     async fn do_transform<CommitFn, Fut>(
         engine_provisioner: Arc<dyn EngineProvisioner>,
-        request: TransformRequest,
+        request: TransformRequestExt,
         commit_fn: CommitFn,
         listener: Arc<dyn TransformListener>,
     ) -> Result<TransformResult, TransformError>
     where
-        CommitFn: FnOnce(TransformRequest, TransformResponse) -> Fut,
+        CommitFn: FnOnce(TransformRequestExt, TransformResponseExt) -> Fut,
         Fut: futures::Future<Output = Result<TransformResult, TransformError>>,
     {
         tracing::info!(?request, "Transform request");
@@ -77,12 +77,12 @@ impl TransformServiceImpl {
     // Note: Can be called from multiple threads
     async fn do_transform_inner<CommitFn, Fut>(
         engine_provisioner: Arc<dyn EngineProvisioner>,
-        request: TransformRequest,
+        request: TransformRequestExt,
         commit_fn: CommitFn,
         listener: Arc<dyn TransformListener>,
     ) -> Result<TransformResult, TransformError>
     where
-        CommitFn: FnOnce(TransformRequest, TransformResponse) -> Fut,
+        CommitFn: FnOnce(TransformRequestExt, TransformResponseExt) -> Fut,
         Fut: futures::Future<Output = Result<TransformResult, TransformError>>,
     {
         let engine = engine_provisioner
@@ -94,7 +94,7 @@ impl TransformServiceImpl {
             )
             .await?;
 
-        let response = engine.transform(request.clone()).await?;
+        let response = engine.execute_transform(request.clone()).await?;
         assert_eq!(
             response.new_offset_interval.is_some(),
             response.new_data.is_some()
@@ -103,10 +103,10 @@ impl TransformServiceImpl {
         commit_fn(request, response).await
     }
 
-    async fn commit_execute_query(
+    async fn commit_execute_transform(
         dataset_repo: Arc<dyn DatasetRepository>,
-        mut request: TransformRequest,
-        response: TransformResponse,
+        mut request: TransformRequestExt,
+        response: TransformResponseExt,
     ) -> Result<TransformResult, TransformError> {
         use datafusion::parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 
@@ -164,7 +164,7 @@ impl TransformServiceImpl {
             }
         }
 
-        let params = ExecuteQueryParams {
+        let params = ExecuteTransformParams {
             query_inputs: request.inputs.iter().map(|i| i.clone().into()).collect(),
             prev_checkpoint: request.prev_checkpoint,
             prev_offset: request.prev_offset,
@@ -173,7 +173,7 @@ impl TransformServiceImpl {
         };
 
         let commit_result = dataset
-            .commit_execute_query(
+            .commit_execute_transform(
                 params,
                 response.new_data,
                 response.new_checkpoint,
@@ -199,7 +199,7 @@ impl TransformServiceImpl {
         &self,
         dataset_handle: &DatasetHandle,
         system_time: DateTime<Utc>,
-    ) -> Result<Option<TransformRequest>, TransformError> {
+    ) -> Result<Option<TransformRequestExt>, TransformError> {
         let dataset = self
             .dataset_repo
             .get_dataset(&dataset_handle.as_local_ref())
@@ -214,7 +214,7 @@ impl TransformServiceImpl {
 
         let mut source = None;
         let mut schema = None;
-        let mut vocab = None;
+        let mut set_vocab = None;
         let mut prev_query = None;
 
         // TODO: PERF: Search for source, vocab, and data schema result in full scan
@@ -223,8 +223,8 @@ impl TransformServiceImpl {
             while let Some((_, block)) = block_stream.try_next().await.int_err()? {
                 match block.event {
                     MetadataEvent::SetVocab(e) => {
-                        if vocab.is_none() {
-                            vocab = Some(e)
+                        if set_vocab.is_none() {
+                            set_vocab = Some(e)
                         }
                     }
                     MetadataEvent::SetTransform(e) => {
@@ -239,7 +239,7 @@ impl TransformServiceImpl {
                             schema = Some(e.schema_as_arrow().int_err()?)
                         }
                     }
-                    MetadataEvent::ExecuteQuery(e) => {
+                    MetadataEvent::ExecuteTransform(e) => {
                         if prev_query.is_none() {
                             prev_query = Some(e)
                         }
@@ -257,7 +257,11 @@ impl TransformServiceImpl {
                     }
                 }
 
-                if source.is_some() && schema.is_some() && vocab.is_some() && prev_query.is_some() {
+                if source.is_some()
+                    && schema.is_some()
+                    && set_vocab.is_some()
+                    && prev_query.is_some()
+                {
                     break;
                 }
             }
@@ -280,7 +284,7 @@ impl TransformServiceImpl {
         }
 
         // Prepare inputs
-        let input_states: Vec<(&TransformInput, Option<&ExecuteQueryInput>)> =
+        let input_states: Vec<(&TransformInput, Option<&ExecuteTransformInput>)> =
             if let Some(query) = &prev_query {
                 source
                     .inputs
@@ -304,7 +308,7 @@ impl TransformServiceImpl {
             return Ok(None);
         }
 
-        Ok(Some(TransformRequest {
+        Ok(Some(TransformRequestExt {
             operation_id: self.next_operation_id(),
             dataset_handle: dataset_handle.clone(),
             block_ref,
@@ -313,7 +317,7 @@ impl TransformServiceImpl {
             system_time,
             schema,
             prev_offset: prev_query.as_ref().and_then(|q| q.last_offset()),
-            vocab: vocab.unwrap_or_default().into(),
+            vocab: set_vocab.unwrap_or_default().into(),
             inputs,
             prev_checkpoint: prev_query.and_then(|q| q.new_checkpoint.map(|c| c.physical_hash)),
         }))
@@ -353,8 +357,8 @@ impl TransformServiceImpl {
     async fn get_transform_input(
         &self,
         input_decl: &TransformInput,
-        input_state: Option<&ExecuteQueryInput>,
-    ) -> Result<TransformRequestInput, TransformError> {
+        input_state: Option<&ExecuteTransformInput>,
+    ) -> Result<TransformRequestInputExt, TransformError> {
         let dataset_id = input_decl.dataset_ref.id().unwrap();
         if let Some(input_state) = input_state {
             assert_eq!(*dataset_id, input_state.dataset_id);
@@ -387,7 +391,7 @@ impl TransformServiceImpl {
             .and_then(|b| b.event.last_offset())
             .or(last_processed_offset);
 
-        let query_input = ExecuteQueryInput {
+        let query_input = ExecuteTransformInput {
             dataset_id: dataset_id.clone(),
             prev_block_hash: last_processed_block.cloned(),
             new_block_hash: if Some(&last_unprocessed_block) != last_processed_block {
@@ -413,10 +417,10 @@ impl TransformServiceImpl {
 
     async fn get_transform_input_from_query_input(
         &self,
-        query_input: ExecuteQueryInput,
+        query_input: ExecuteTransformInput,
         alias: String,
         vocab_hint: Option<DatasetVocabulary>,
-    ) -> Result<TransformRequestInput, TransformError> {
+    ) -> Result<TransformRequestInputExt, TransformError> {
         let dataset_handle = self
             .dataset_repo
             .resolve_dataset_ref(&query_input.dataset_id.as_local_ref())
@@ -488,7 +492,7 @@ impl TransformServiceImpl {
 
         let is_empty = data_slices.is_empty() && explicit_watermarks.is_empty();
 
-        let input = TransformRequestInput {
+        let input = TransformRequestInputExt {
             dataset_handle,
             alias,
             vocab,
@@ -519,8 +523,8 @@ impl TransformServiceImpl {
             .try_first()
             .await
             .int_err()?
-            .map(|sv| sv.into())
-            .unwrap_or_default())
+            .unwrap_or_default()
+            .into())
     }
 
     // TODO: Improve error handling
@@ -544,7 +548,7 @@ impl TransformServiceImpl {
         let tail = block_range.0;
 
         let mut source = None;
-        let mut vocab = None;
+        let mut set_vocab = None;
         let mut schema = None;
         let mut blocks = Vec::new();
         let mut finished_range = false;
@@ -566,8 +570,8 @@ impl TransformServiceImpl {
                         }
                     }
                     MetadataEvent::SetVocab(sv) => {
-                        if vocab.is_none() {
-                            vocab = Some(sv.into())
+                        if set_vocab.is_none() {
+                            set_vocab = Some(sv)
                         }
                     }
                     MetadataEvent::SetDataSchema(e) => {
@@ -575,7 +579,7 @@ impl TransformServiceImpl {
                             schema = Some(e.schema_as_arrow().int_err()?)
                         }
                     }
-                    MetadataEvent::ExecuteQuery(_) => {
+                    MetadataEvent::ExecuteTransform(_) => {
                         if !finished_range {
                             blocks.push((block_hash.clone(), block));
                         }
@@ -613,7 +617,7 @@ impl TransformServiceImpl {
         )?;
 
         // TODO: Replace maps with access by index, as ODF guarantees same order of
-        // inputs in ExecuteQuery as in SetTransform
+        // inputs in ExecuteTransform as in SetTransform
         let dataset_vocabs: BTreeMap<_, _> = futures::stream::iter(&source.inputs)
             .map(|input| {
                 (
@@ -643,7 +647,7 @@ impl TransformServiceImpl {
         let mut plan = Vec::new();
 
         for (block_hash, block) in blocks.into_iter().rev() {
-            let block_t = block.as_typed::<ExecuteQuery>().unwrap();
+            let block_t = block.as_typed::<ExecuteTransform>().unwrap();
 
             let inputs = futures::stream::iter(&block_t.event.query_inputs)
                 .then(|slice| {
@@ -669,7 +673,7 @@ impl TransformServiceImpl {
                 })?;
 
             let step = VerificationStep {
-                request: TransformRequest {
+                request: TransformRequestExt {
                     operation_id: self.next_operation_id(),
                     dataset_handle: dataset_handle.clone(),
                     block_ref: BlockRef::Head,
@@ -679,7 +683,7 @@ impl TransformServiceImpl {
                     schema: schema.clone(),
                     prev_offset: block_t.event.prev_offset,
                     inputs,
-                    vocab: vocab.clone().unwrap_or_default(),
+                    vocab: set_vocab.clone().unwrap_or_default().into(),
                     prev_checkpoint: block_t.event.prev_checkpoint.clone(),
                 },
                 expected_block: block,
@@ -717,7 +721,7 @@ impl TransformServiceImpl {
                 self.engine_provisioner.clone(),
                 operation,
                 |request, response| async move {
-                    Self::commit_execute_query(dataset_repo, request, response).await
+                    Self::commit_execute_transform(dataset_repo, request, response).await
                 },
                 listener,
             )
@@ -820,10 +824,13 @@ impl TransformService for TransformServiceImpl {
             let request = step.request;
             let block_hash = step.expected_hash;
             let expected_block = step.expected_block;
-            let expected_event = expected_block.event.into_variant::<ExecuteQuery>().unwrap();
+            let expected_event = expected_block
+                .event
+                .into_variant::<ExecuteTransform>()
+                .unwrap();
 
             // Will be set during "commit" step
-            let mut actual_event: Option<ExecuteQuery> = None;
+            let mut actual_event: Option<ExecuteTransform> = None;
 
             tracing::info!(
                 %block_hash,
@@ -854,7 +861,7 @@ impl TransformService for TransformServiceImpl {
                 self.engine_provisioner.clone(),
                 request,
                 |request, response| async move {
-                    let params = ExecuteQueryParams {
+                    let params = ExecuteTransformParams {
                         query_inputs: request.inputs.iter().map(|i| i.clone().into()).collect(),
                         prev_checkpoint: request.prev_checkpoint,
                         prev_offset: request.prev_offset,
@@ -864,7 +871,7 @@ impl TransformService for TransformServiceImpl {
 
                     // We expect outputs to be cleaned up automatically on drop
                     let new_event = ds
-                        .prepare_execute_query(
+                        .prepare_execute_transform(
                             params,
                             response.new_data.as_ref(),
                             response.new_checkpoint.as_ref(),
@@ -938,7 +945,7 @@ impl TransformService for TransformServiceImpl {
 
 #[derive(Debug)]
 pub struct VerificationStep {
-    pub request: TransformRequest,
+    pub request: TransformRequestExt,
     pub expected_block: MetadataBlock,
     pub expected_hash: Multihash,
 }

@@ -119,16 +119,16 @@ fn get_test_events() -> [(MetadataEvent, &'static str); 6] {
             "dc2ab3737792021b6794d3969315bb521701780c91548104f149906d98c8da70",
         ),
         (
-            MetadataEvent::ExecuteQuery(ExecuteQuery {
+            MetadataEvent::ExecuteTransform(ExecuteTransform {
                 query_inputs: vec![
-                    ExecuteQueryInput {
+                    ExecuteTransformInput {
                         dataset_id: DatasetID::new_seeded_ed25519(b"input1"),
                         prev_block_hash: Some(Multihash::from_digest_sha3_256(b"a")),
                         new_block_hash: Some(Multihash::from_digest_sha3_256(b"b")),
                         prev_offset: Some(9),
                         new_offset: Some(20),
                     },
-                    ExecuteQueryInput {
+                    ExecuteTransformInput {
                         dataset_id: DatasetID::new_seeded_ed25519(b"input2"),
                         prev_block_hash: Some(Multihash::from_digest_sha3_256(b"a")),
                         new_block_hash: Some(Multihash::from_digest_sha3_256(b"b")),
@@ -237,28 +237,28 @@ fn serde_set_data_schema() {
 }
 
 #[test]
-fn serde_execute_query_response() {
+fn serde_execute_transform_response() {
     let examples = [
-        ExecuteQueryResponse::Success(ExecuteQueryResponseSuccess {
+        TransformResponse::Success(TransformResponseSuccess {
             new_offset_interval: Some(OffsetInterval { start: 0, end: 10 }),
             new_watermark: Some(Utc::now()),
         }),
-        ExecuteQueryResponse::InvalidQuery(ExecuteQueryResponseInvalidQuery {
+        TransformResponse::InvalidQuery(TransformResponseInvalidQuery {
             message: "boop".to_owned(),
         }),
-        ExecuteQueryResponse::InternalError(ExecuteQueryResponseInternalError {
+        TransformResponse::InternalError(TransformResponseInternalError {
             message: "boop".to_owned(),
             backtrace: Some("woop".to_owned()),
         }),
-        ExecuteQueryResponse::Progress(ExecuteQueryResponseProgress {}),
+        TransformResponse::Progress(TransformResponseProgress {}),
     ];
 
     for expected in examples {
         let buf = FlatbuffersEngineProtocol
-            .write_execute_query_response(&expected)
+            .write_transform_response(&expected)
             .unwrap();
         let actual = FlatbuffersEngineProtocol
-            .read_execute_query_response(&buf)
+            .read_transform_response(&buf)
             .unwrap();
         assert_eq!(actual, expected);
     }

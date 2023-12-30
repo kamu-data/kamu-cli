@@ -13,7 +13,14 @@ use std::fmt::Display;
 use thiserror::Error;
 
 use super::Buffer;
-use crate::{DatasetSnapshot, ExecuteQueryRequest, ExecuteQueryResponse, MetadataBlock};
+use crate::{
+    DatasetSnapshot,
+    MetadataBlock,
+    RawQueryRequest,
+    RawQueryResponse,
+    TransformRequest,
+    TransformResponse,
+};
 
 ///////////////////////////////////////////////////////////////////////////////
 // MetadataBlockVersion
@@ -95,17 +102,19 @@ pub trait DatasetSnapshotDeserializer {
 ///////////////////////////////////////////////////////////////////////////////
 
 pub trait EngineProtocolSerializer {
-    fn write_execute_query_request(&self, inst: &ExecuteQueryRequest) -> Result<Buffer<u8>, Error>;
+    fn write_raw_query_request(&self, inst: &RawQueryRequest) -> Result<Buffer<u8>, Error>;
+    fn write_raw_query_response(&self, inst: &RawQueryResponse) -> Result<Buffer<u8>, Error>;
 
-    fn write_execute_query_response(
-        &self,
-        inst: &ExecuteQueryResponse,
-    ) -> Result<Buffer<u8>, Error>;
+    fn write_transform_request(&self, inst: &TransformRequest) -> Result<Buffer<u8>, Error>;
+    fn write_transform_response(&self, inst: &TransformResponse) -> Result<Buffer<u8>, Error>;
 }
 
 pub trait EngineProtocolDeserializer {
-    fn read_execute_query_request(&self, data: &[u8]) -> Result<ExecuteQueryRequest, Error>;
-    fn read_execute_query_response(&self, data: &[u8]) -> Result<ExecuteQueryResponse, Error>;
+    fn read_raw_query_request(&self, data: &[u8]) -> Result<RawQueryRequest, Error>;
+    fn read_raw_query_response(&self, data: &[u8]) -> Result<RawQueryResponse, Error>;
+
+    fn read_transform_request(&self, data: &[u8]) -> Result<TransformRequest, Error>;
+    fn read_transform_response(&self, data: &[u8]) -> Result<TransformResponse, Error>;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

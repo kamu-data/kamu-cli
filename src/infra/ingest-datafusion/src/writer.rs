@@ -18,7 +18,7 @@ use datafusion::prelude::*;
 use internal_error::*;
 use kamu_core::ingest::*;
 use kamu_core::*;
-use odf::{AsTypedBlock, MergeStrategyAppend};
+use odf::{AsTypedBlock, DatasetVocabulary, MergeStrategyAppend};
 use opendatafabric as odf;
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -41,7 +41,7 @@ pub struct DataWriterMetadataState {
     pub schema: Option<SchemaRef>,
     pub source_event: Option<odf::MetadataEvent>,
     pub merge_strategy: odf::MergeStrategy,
-    pub vocab: odf::DatasetVocabularyResolvedOwned,
+    pub vocab: odf::DatasetVocabulary,
     pub data_slices: Vec<odf::Multihash>,
     pub prev_offset: Option<u64>,
     pub prev_checkpoint: Option<odf::Multihash>,
@@ -81,7 +81,7 @@ impl DataWriterDataFusion {
         self.meta.prev_source_state.as_ref()
     }
 
-    pub fn vocab(&self) -> &odf::DatasetVocabularyResolvedOwned {
+    pub fn vocab(&self) -> &odf::DatasetVocabulary {
         &self.meta.vocab
     }
 
@@ -333,7 +333,7 @@ impl DataWriterDataFusion {
             .set_writer_version(datafusion::parquet::file::properties::WriterVersion::PARQUET_1_0)
             .set_compression(datafusion::parquet::basic::Compression::SNAPPY)
             // system_time value will be the same for all rows in a batch
-            .set_column_dictionary_enabled(self.meta.vocab.system_time_column.as_ref().into(), true)
+            .set_column_dictionary_enabled(self.meta.vocab.system_time_column.as_str().into(), true)
             .build()
     }
 
@@ -417,10 +417,10 @@ impl DataWriterDataFusion {
             .aggregate(
                 vec![],
                 vec![
-                    min(col(self.meta.vocab.offset_column.as_ref())),
-                    max(col(self.meta.vocab.offset_column.as_ref())),
+                    min(col(&self.meta.vocab.offset_column)),
+                    max(col(&self.meta.vocab.offset_column)),
                     // TODO: Add support for more watermark strategies
-                    max(col(self.meta.vocab.event_time_column.as_ref())),
+                    max(col(&self.meta.vocab.event_time_column)),
                 ],
             )
             .int_err()?;
@@ -777,7 +777,7 @@ impl DataWriterDataFusionBuilder {
 
         let mut schema = None;
         let mut source_event: Option<odf::MetadataEvent> = None;
-        let mut vocab: Option<odf::DatasetVocabulary> = None;
+        let mut set_vocab = None;
         let mut data_slices = Vec::new();
         let mut prev_checkpoint = None;
         let mut prev_watermark = None;
@@ -863,12 +863,14 @@ impl DataWriterDataFusionBuilder {
                         unimplemented!("Disabling sources is not yet fully supported")
                     }
                     odf::MetadataEvent::SetVocab(e) => {
-                        vocab = Some(e.into());
+                        if set_vocab.is_none() {
+                            set_vocab = Some(e);
+                        }
                     }
                     odf::MetadataEvent::Seed(e) => {
                         assert_eq!(e.dataset_kind, odf::DatasetKind::Root);
                     }
-                    odf::MetadataEvent::ExecuteQuery(_) => unreachable!(),
+                    odf::MetadataEvent::ExecuteTransform(_) => unreachable!(),
                     odf::MetadataEvent::SetAttachments(_)
                     | odf::MetadataEvent::SetInfo(_)
                     | odf::MetadataEvent::SetLicense(_)
@@ -898,7 +900,7 @@ impl DataWriterDataFusionBuilder {
             schema,
             source_event,
             merge_strategy,
-            vocab: vocab.unwrap_or_default().into(),
+            vocab: set_vocab.unwrap_or_default().into(),
             data_slices,
             prev_offset: prev_offset.unwrap_or_default(),
             prev_checkpoint: prev_checkpoint.unwrap_or_default(),
@@ -930,7 +932,7 @@ impl DataWriterDataFusionBuilder {
 
     fn merge_strategy_for(
         conf: odf::MergeStrategy,
-        vocab: &odf::DatasetVocabularyResolved<'_>,
+        vocab: &DatasetVocabulary,
     ) -> Arc<dyn MergeStrategy> {
         use crate::merge_strategies::*;
 
@@ -940,7 +942,7 @@ impl DataWriterDataFusionBuilder {
                 Arc::new(MergeStrategyLedger::new(cfg.primary_key.clone()))
             }
             odf::MergeStrategy::Snapshot(cfg) => Arc::new(MergeStrategySnapshot::new(
-                vocab.offset_column.to_string(),
+                vocab.offset_column.clone(),
                 cfg.clone(),
             )),
         }

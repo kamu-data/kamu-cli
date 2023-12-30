@@ -225,17 +225,17 @@ impl From<odf::DatasetSnapshot> for DatasetSnapshot {
 
 #[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct DatasetVocabulary {
-    pub system_time_column: Option<String>,
-    pub event_time_column: Option<String>,
-    pub offset_column: Option<String>,
+    pub system_time_column: String,
+    pub event_time_column: String,
+    pub offset_column: String,
 }
 
 impl From<odf::DatasetVocabulary> for DatasetVocabulary {
     fn from(v: odf::DatasetVocabulary) -> Self {
         Self {
-            system_time_column: v.system_time_column.map(Into::into),
-            event_time_column: v.event_time_column.map(Into::into),
-            offset_column: v.offset_column.map(Into::into),
+            system_time_column: v.system_time_column.into(),
+            event_time_column: v.event_time_column.into(),
+            offset_column: v.offset_column.into(),
         }
     }
 }
@@ -354,13 +354,13 @@ impl From<odf::EventTimeSourceFromSystemTime> for EventTimeSourceFromSystemTime 
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// ExecuteQuery
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#executequery-schema
+// ExecuteTransform
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#executetransform-schema
 ////////////////////////////////////////////////////////////////////////////////
 
 #[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
-pub struct ExecuteQuery {
-    pub query_inputs: Vec<ExecuteQueryInput>,
+pub struct ExecuteTransform {
+    pub query_inputs: Vec<ExecuteTransformInput>,
     pub prev_checkpoint: Option<Multihash>,
     pub prev_offset: Option<u64>,
     pub new_data: Option<DataSlice>,
@@ -368,8 +368,8 @@ pub struct ExecuteQuery {
     pub new_watermark: Option<DateTime<Utc>>,
 }
 
-impl From<odf::ExecuteQuery> for ExecuteQuery {
-    fn from(v: odf::ExecuteQuery) -> Self {
+impl From<odf::ExecuteTransform> for ExecuteTransform {
+    fn from(v: odf::ExecuteTransform) -> Self {
         Self {
             query_inputs: v.query_inputs.into_iter().map(Into::into).collect(),
             prev_checkpoint: v.prev_checkpoint.map(Into::into),
@@ -382,12 +382,12 @@ impl From<odf::ExecuteQuery> for ExecuteQuery {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// ExecuteQueryInput
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#executequeryinput-schema
+// ExecuteTransformInput
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#executetransforminput-schema
 ////////////////////////////////////////////////////////////////////////////////
 
 #[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
-pub struct ExecuteQueryInput {
+pub struct ExecuteTransformInput {
     pub dataset_id: DatasetID,
     pub prev_block_hash: Option<Multihash>,
     pub new_block_hash: Option<Multihash>,
@@ -395,160 +395,14 @@ pub struct ExecuteQueryInput {
     pub new_offset: Option<u64>,
 }
 
-impl From<odf::ExecuteQueryInput> for ExecuteQueryInput {
-    fn from(v: odf::ExecuteQueryInput) -> Self {
+impl From<odf::ExecuteTransformInput> for ExecuteTransformInput {
+    fn from(v: odf::ExecuteTransformInput) -> Self {
         Self {
             dataset_id: v.dataset_id.into(),
             prev_block_hash: v.prev_block_hash.map(Into::into),
             new_block_hash: v.new_block_hash.map(Into::into),
             prev_offset: v.prev_offset.map(Into::into),
             new_offset: v.new_offset.map(Into::into),
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// ExecuteQueryRequest
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#executequeryrequest-schema
-////////////////////////////////////////////////////////////////////////////////
-
-#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
-pub struct ExecuteQueryRequest {
-    pub dataset_id: DatasetID,
-    pub dataset_alias: DatasetAlias,
-    pub system_time: DateTime<Utc>,
-    pub vocab: DatasetVocabulary,
-    pub transform: Transform,
-    pub query_inputs: Vec<ExecuteQueryRequestInput>,
-    pub next_offset: u64,
-    pub prev_checkpoint_path: Option<OSPath>,
-    pub new_checkpoint_path: OSPath,
-    pub new_data_path: OSPath,
-}
-
-impl From<odf::ExecuteQueryRequest> for ExecuteQueryRequest {
-    fn from(v: odf::ExecuteQueryRequest) -> Self {
-        Self {
-            dataset_id: v.dataset_id.into(),
-            dataset_alias: v.dataset_alias.into(),
-            system_time: v.system_time.into(),
-            vocab: v.vocab.into(),
-            transform: v.transform.into(),
-            query_inputs: v.query_inputs.into_iter().map(Into::into).collect(),
-            next_offset: v.next_offset.into(),
-            prev_checkpoint_path: v.prev_checkpoint_path.map(Into::into),
-            new_checkpoint_path: v.new_checkpoint_path.into(),
-            new_data_path: v.new_data_path.into(),
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// ExecuteQueryRequestInput
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#executequeryrequestinput-schema
-////////////////////////////////////////////////////////////////////////////////
-
-#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
-pub struct ExecuteQueryRequestInput {
-    pub dataset_id: DatasetID,
-    pub dataset_alias: DatasetAlias,
-    pub query_alias: String,
-    pub vocab: DatasetVocabulary,
-    pub offset_interval: Option<OffsetInterval>,
-    pub data_paths: Vec<OSPath>,
-    pub schema_file: OSPath,
-    pub explicit_watermarks: Vec<Watermark>,
-}
-
-impl From<odf::ExecuteQueryRequestInput> for ExecuteQueryRequestInput {
-    fn from(v: odf::ExecuteQueryRequestInput) -> Self {
-        Self {
-            dataset_id: v.dataset_id.into(),
-            dataset_alias: v.dataset_alias.into(),
-            query_alias: v.query_alias.into(),
-            vocab: v.vocab.into(),
-            offset_interval: v.offset_interval.map(Into::into),
-            data_paths: v.data_paths.into_iter().map(Into::into).collect(),
-            schema_file: v.schema_file.into(),
-            explicit_watermarks: v.explicit_watermarks.into_iter().map(Into::into).collect(),
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// ExecuteQueryResponse
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#executequeryresponse-schema
-////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Union, Debug, Clone, PartialEq, Eq)]
-pub enum ExecuteQueryResponse {
-    Progress(ExecuteQueryResponseProgress),
-    Success(ExecuteQueryResponseSuccess),
-    InvalidQuery(ExecuteQueryResponseInvalidQuery),
-    InternalError(ExecuteQueryResponseInternalError),
-}
-
-impl From<odf::ExecuteQueryResponse> for ExecuteQueryResponse {
-    fn from(v: odf::ExecuteQueryResponse) -> Self {
-        match v {
-            odf::ExecuteQueryResponse::Progress(v) => Self::Progress(v.into()),
-            odf::ExecuteQueryResponse::Success(v) => Self::Success(v.into()),
-            odf::ExecuteQueryResponse::InvalidQuery(v) => Self::InvalidQuery(v.into()),
-            odf::ExecuteQueryResponse::InternalError(v) => Self::InternalError(v.into()),
-        }
-    }
-}
-
-#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
-pub struct ExecuteQueryResponseProgress {
-    pub _dummy: Option<String>,
-}
-
-impl From<odf::ExecuteQueryResponseProgress> for ExecuteQueryResponseProgress {
-    fn from(v: odf::ExecuteQueryResponseProgress) -> Self {
-        Self { _dummy: None }
-    }
-}
-
-#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
-pub struct ExecuteQueryResponseSuccess {
-    pub new_offset_interval: Option<OffsetInterval>,
-    pub new_watermark: Option<DateTime<Utc>>,
-}
-
-impl From<odf::ExecuteQueryResponseSuccess> for ExecuteQueryResponseSuccess {
-    fn from(v: odf::ExecuteQueryResponseSuccess) -> Self {
-        Self {
-            new_offset_interval: v.new_offset_interval.map(Into::into),
-            new_watermark: v.new_watermark.map(Into::into),
-        }
-    }
-}
-
-#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
-pub struct ExecuteQueryResponseInvalidQuery {
-    pub message: String,
-}
-
-impl From<odf::ExecuteQueryResponseInvalidQuery> for ExecuteQueryResponseInvalidQuery {
-    fn from(v: odf::ExecuteQueryResponseInvalidQuery) -> Self {
-        Self {
-            message: v.message.into(),
-        }
-    }
-}
-
-#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
-pub struct ExecuteQueryResponseInternalError {
-    pub message: String,
-    pub backtrace: Option<String>,
-}
-
-impl From<odf::ExecuteQueryResponseInternalError> for ExecuteQueryResponseInternalError {
-    fn from(v: odf::ExecuteQueryResponseInternalError) -> Self {
-        Self {
-            message: v.message.into(),
-            backtrace: v.backtrace.map(Into::into),
         }
     }
 }
@@ -759,7 +613,7 @@ impl From<odf::MetadataBlock> for MetadataBlock {
 #[derive(Union, Debug, Clone, PartialEq, Eq)]
 pub enum MetadataEvent {
     AddData(AddData),
-    ExecuteQuery(ExecuteQuery),
+    ExecuteTransform(ExecuteTransform),
     Seed(Seed),
     SetPollingSource(SetPollingSource),
     SetTransform(SetTransform),
@@ -777,7 +631,7 @@ impl From<odf::MetadataEvent> for MetadataEvent {
     fn from(v: odf::MetadataEvent) -> Self {
         match v {
             odf::MetadataEvent::AddData(v) => Self::AddData(v.into()),
-            odf::MetadataEvent::ExecuteQuery(v) => Self::ExecuteQuery(v.into()),
+            odf::MetadataEvent::ExecuteTransform(v) => Self::ExecuteTransform(v.into()),
             odf::MetadataEvent::Seed(v) => Self::Seed(v.into()),
             odf::MetadataEvent::SetPollingSource(v) => Self::SetPollingSource(v.into()),
             odf::MetadataEvent::SetTransform(v) => Self::SetTransform(v.into()),
@@ -881,6 +735,104 @@ impl Into<odf::CompressionFormat> for CompressionFormat {
         match self {
             Self::Gzip => odf::CompressionFormat::Gzip,
             Self::Zip => odf::CompressionFormat::Zip,
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// RawQueryRequest
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#rawqueryrequest-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
+pub struct RawQueryRequest {
+    pub input_data_paths: Vec<OSPath>,
+    pub transform: Transform,
+    pub output_data_path: OSPath,
+}
+
+impl From<odf::RawQueryRequest> for RawQueryRequest {
+    fn from(v: odf::RawQueryRequest) -> Self {
+        Self {
+            input_data_paths: v.input_data_paths.into_iter().map(Into::into).collect(),
+            transform: v.transform.into(),
+            output_data_path: v.output_data_path.into(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// RawQueryResponse
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#rawqueryresponse-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Union, Debug, Clone, PartialEq, Eq)]
+pub enum RawQueryResponse {
+    Progress(RawQueryResponseProgress),
+    Success(RawQueryResponseSuccess),
+    InvalidQuery(RawQueryResponseInvalidQuery),
+    InternalError(RawQueryResponseInternalError),
+}
+
+impl From<odf::RawQueryResponse> for RawQueryResponse {
+    fn from(v: odf::RawQueryResponse) -> Self {
+        match v {
+            odf::RawQueryResponse::Progress(v) => Self::Progress(v.into()),
+            odf::RawQueryResponse::Success(v) => Self::Success(v.into()),
+            odf::RawQueryResponse::InvalidQuery(v) => Self::InvalidQuery(v.into()),
+            odf::RawQueryResponse::InternalError(v) => Self::InternalError(v.into()),
+        }
+    }
+}
+
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
+pub struct RawQueryResponseProgress {
+    pub _dummy: Option<String>,
+}
+
+impl From<odf::RawQueryResponseProgress> for RawQueryResponseProgress {
+    fn from(v: odf::RawQueryResponseProgress) -> Self {
+        Self { _dummy: None }
+    }
+}
+
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
+pub struct RawQueryResponseSuccess {
+    pub num_records: u64,
+}
+
+impl From<odf::RawQueryResponseSuccess> for RawQueryResponseSuccess {
+    fn from(v: odf::RawQueryResponseSuccess) -> Self {
+        Self {
+            num_records: v.num_records.into(),
+        }
+    }
+}
+
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
+pub struct RawQueryResponseInvalidQuery {
+    pub message: String,
+}
+
+impl From<odf::RawQueryResponseInvalidQuery> for RawQueryResponseInvalidQuery {
+    fn from(v: odf::RawQueryResponseInvalidQuery) -> Self {
+        Self {
+            message: v.message.into(),
+        }
+    }
+}
+
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
+pub struct RawQueryResponseInternalError {
+    pub message: String,
+    pub backtrace: Option<String>,
+}
+
+impl From<odf::RawQueryResponseInternalError> for RawQueryResponseInternalError {
+    fn from(v: odf::RawQueryResponseInternalError) -> Self {
+        Self {
+            message: v.message.into(),
+            backtrace: v.backtrace.map(Into::into),
         }
     }
 }
@@ -1391,6 +1343,152 @@ impl From<odf::TransformInput> for TransformInput {
         Self {
             dataset_ref: v.dataset_ref.into(),
             alias: v.alias.unwrap(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// TransformRequest
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#transformrequest-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
+pub struct TransformRequest {
+    pub dataset_id: DatasetID,
+    pub dataset_alias: DatasetAlias,
+    pub system_time: DateTime<Utc>,
+    pub vocab: DatasetVocabulary,
+    pub transform: Transform,
+    pub query_inputs: Vec<TransformRequestInput>,
+    pub next_offset: u64,
+    pub prev_checkpoint_path: Option<OSPath>,
+    pub new_checkpoint_path: OSPath,
+    pub new_data_path: OSPath,
+}
+
+impl From<odf::TransformRequest> for TransformRequest {
+    fn from(v: odf::TransformRequest) -> Self {
+        Self {
+            dataset_id: v.dataset_id.into(),
+            dataset_alias: v.dataset_alias.into(),
+            system_time: v.system_time.into(),
+            vocab: v.vocab.into(),
+            transform: v.transform.into(),
+            query_inputs: v.query_inputs.into_iter().map(Into::into).collect(),
+            next_offset: v.next_offset.into(),
+            prev_checkpoint_path: v.prev_checkpoint_path.map(Into::into),
+            new_checkpoint_path: v.new_checkpoint_path.into(),
+            new_data_path: v.new_data_path.into(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// TransformRequestInput
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#transformrequestinput-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
+pub struct TransformRequestInput {
+    pub dataset_id: DatasetID,
+    pub dataset_alias: DatasetAlias,
+    pub query_alias: String,
+    pub vocab: DatasetVocabulary,
+    pub offset_interval: Option<OffsetInterval>,
+    pub data_paths: Vec<OSPath>,
+    pub schema_file: OSPath,
+    pub explicit_watermarks: Vec<Watermark>,
+}
+
+impl From<odf::TransformRequestInput> for TransformRequestInput {
+    fn from(v: odf::TransformRequestInput) -> Self {
+        Self {
+            dataset_id: v.dataset_id.into(),
+            dataset_alias: v.dataset_alias.into(),
+            query_alias: v.query_alias.into(),
+            vocab: v.vocab.into(),
+            offset_interval: v.offset_interval.map(Into::into),
+            data_paths: v.data_paths.into_iter().map(Into::into).collect(),
+            schema_file: v.schema_file.into(),
+            explicit_watermarks: v.explicit_watermarks.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// TransformResponse
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#transformresponse-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Union, Debug, Clone, PartialEq, Eq)]
+pub enum TransformResponse {
+    Progress(TransformResponseProgress),
+    Success(TransformResponseSuccess),
+    InvalidQuery(TransformResponseInvalidQuery),
+    InternalError(TransformResponseInternalError),
+}
+
+impl From<odf::TransformResponse> for TransformResponse {
+    fn from(v: odf::TransformResponse) -> Self {
+        match v {
+            odf::TransformResponse::Progress(v) => Self::Progress(v.into()),
+            odf::TransformResponse::Success(v) => Self::Success(v.into()),
+            odf::TransformResponse::InvalidQuery(v) => Self::InvalidQuery(v.into()),
+            odf::TransformResponse::InternalError(v) => Self::InternalError(v.into()),
+        }
+    }
+}
+
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
+pub struct TransformResponseProgress {
+    pub _dummy: Option<String>,
+}
+
+impl From<odf::TransformResponseProgress> for TransformResponseProgress {
+    fn from(v: odf::TransformResponseProgress) -> Self {
+        Self { _dummy: None }
+    }
+}
+
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
+pub struct TransformResponseSuccess {
+    pub new_offset_interval: Option<OffsetInterval>,
+    pub new_watermark: Option<DateTime<Utc>>,
+}
+
+impl From<odf::TransformResponseSuccess> for TransformResponseSuccess {
+    fn from(v: odf::TransformResponseSuccess) -> Self {
+        Self {
+            new_offset_interval: v.new_offset_interval.map(Into::into),
+            new_watermark: v.new_watermark.map(Into::into),
+        }
+    }
+}
+
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
+pub struct TransformResponseInvalidQuery {
+    pub message: String,
+}
+
+impl From<odf::TransformResponseInvalidQuery> for TransformResponseInvalidQuery {
+    fn from(v: odf::TransformResponseInvalidQuery) -> Self {
+        Self {
+            message: v.message.into(),
+        }
+    }
+}
+
+#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
+pub struct TransformResponseInternalError {
+    pub message: String,
+    pub backtrace: Option<String>,
+}
+
+impl From<odf::TransformResponseInternalError> for TransformResponseInternalError {
+    fn from(v: odf::TransformResponseInternalError) -> Self {
+        Self {
+            message: v.message.into(),
+            backtrace: v.backtrace.map(Into::into),
         }
     }
 }

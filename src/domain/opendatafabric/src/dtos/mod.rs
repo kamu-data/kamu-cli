@@ -7,15 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod constants;
+mod dtos_dyntraits_generated;
+mod dtos_extra;
 mod dtos_generated;
+
 pub use dtos_generated::*;
 
-mod dtos_dyntraits_generated;
 pub mod dynamic {
     pub use super::dtos_dyntraits_generated::*;
 }
-
-mod dtos_extra;
-pub use dtos_extra::*;
-
-mod constants;

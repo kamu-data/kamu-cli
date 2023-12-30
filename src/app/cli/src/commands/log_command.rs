@@ -60,7 +60,9 @@ impl LogCommand {
         if let Some(f) = &self.filter {
             match &block.event {
                 MetadataEvent::AddData(_) if f.contains("data") || f.contains("watermark") => true,
-                MetadataEvent::ExecuteQuery(_) if f.contains("data") || f.contains("watermark") => {
+                MetadataEvent::ExecuteTransform(_)
+                    if f.contains("data") || f.contains("watermark") =>
+                {
                     true
                 }
                 MetadataEvent::Seed(_) if f.contains("source") => true,
@@ -245,7 +247,7 @@ impl AsciiRenderer {
                     )?;
                 }
             }
-            MetadataEvent::ExecuteQuery(ExecuteQuery {
+            MetadataEvent::ExecuteTransform(ExecuteTransform {
                 query_inputs,
                 prev_checkpoint,
                 prev_offset,
@@ -253,7 +255,7 @@ impl AsciiRenderer {
                 new_checkpoint,
                 new_watermark,
             }) => {
-                self.render_property(output, 0, "Kind", "ExecuteQuery")?;
+                self.render_property(output, 0, "Kind", "ExecuteTransform")?;
                 self.render_section(output, 0, "Inputs")?;
                 for (i, s) in query_inputs.iter().enumerate() {
                     self.render_section(output, 1, &format!("QueryInput[{}]", i))?;

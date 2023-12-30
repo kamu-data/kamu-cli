@@ -45,8 +45,8 @@ impl MetadataFactory {
         AddDataBuilder::new()
     }
 
-    pub fn execute_query() -> ExecuteQueryBuilder {
-        ExecuteQueryBuilder::new()
+    pub fn execute_transform() -> ExecuteTransformBuilder {
+        ExecuteTransformBuilder::new()
     }
 
     pub fn set_transform() -> SetTransformBuilder {
@@ -574,17 +574,17 @@ impl AddDataBuilder {
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-// ExecuteQueryBuilder
+// ExecuteTransformBuilder
 ///////////////////////////////////////////////////////////////////////////////
 
-pub struct ExecuteQueryBuilder {
-    v: ExecuteQuery,
+pub struct ExecuteTransformBuilder {
+    v: ExecuteTransform,
 }
 
-impl ExecuteQueryBuilder {
+impl ExecuteTransformBuilder {
     pub fn new() -> Self {
         Self {
-            v: ExecuteQuery {
+            v: ExecuteTransform {
                 query_inputs: Vec::new(),
                 prev_checkpoint: None,
                 prev_offset: None,
@@ -595,7 +595,7 @@ impl ExecuteQueryBuilder {
         }
     }
 
-    pub fn push_query_input(mut self, input: ExecuteQueryInput) -> Self {
+    pub fn push_query_input(mut self, input: ExecuteTransformInput) -> Self {
         self.v.query_inputs.push(input);
         self
     }
@@ -607,7 +607,7 @@ impl ExecuteQueryBuilder {
     {
         self.v.query_inputs = aliases
             .into_iter()
-            .map(|i| ExecuteQueryInput {
+            .map(|i| ExecuteTransformInput {
                 dataset_id: DatasetID::new_seeded_ed25519(i.into().as_bytes()),
                 prev_block_hash: None,
                 new_block_hash: None,
@@ -677,7 +677,7 @@ impl ExecuteQueryBuilder {
         self
     }
 
-    pub fn build(self) -> ExecuteQuery {
+    pub fn build(self) -> ExecuteTransform {
         self.v
     }
 }

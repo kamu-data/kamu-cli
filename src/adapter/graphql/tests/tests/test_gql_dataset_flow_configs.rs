@@ -334,7 +334,7 @@ async fn test_crud_batching_derived_dataset() {
                 byId (datasetId: "<id>") {
                     flows {
                         configs {
-                            byType (datasetFlowType: "EXECUTE_QUERY") {
+                            byType (datasetFlowType: "EXECUTE_TRANSFORM") {
                                 __typename
                                 paused
                                 schedule {
@@ -384,7 +384,7 @@ async fn test_crud_batching_derived_dataset() {
 
     let mutation_code = FlowConfigHarness::set_config_batching_mutation(
         &create_derived_result.dataset_handle.id,
-        "EXECUTE_QUERY",
+        "EXECUTE_TRANSFORM",
         false,
         (30, "MINUTES"),
         100,
@@ -443,7 +443,7 @@ async fn test_incorrect_dataset_kinds_for_flow_type() {
 
     let mutation_code = FlowConfigHarness::set_config_batching_mutation(
         &create_root_result.dataset_handle.id,
-        "EXECUTE_QUERY",
+        "EXECUTE_TRANSFORM",
         false,
         (30, "MINUTES"),
         100,
@@ -574,7 +574,7 @@ async fn test_anonymous_setters_fail() {
         ),
         FlowConfigHarness::set_config_batching_mutation(
             &create_derived_result.dataset_handle.id,
-            "EXECUTE_QUERY",
+            "EXECUTE_TRANSFORM",
             false,
             (30, "MINUTES"),
             100,

@@ -174,15 +174,15 @@ pub struct DatasetSnapshot {
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datasetvocabulary-schema
 ////////////////////////////////////////////////////////////////////////////////
 
-/// Lets you manipulate names of the system columns to avoid conflicts.
+/// Specifies the mapping of system columns onto dataset schema.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct DatasetVocabulary {
     /// Name of the system time column.
-    pub system_time_column: Option<String>,
+    pub system_time_column: String,
     /// Name of the event time column.
-    pub event_time_column: Option<String>,
+    pub event_time_column: String,
     /// Name of the offset column.
-    pub offset_column: Option<String>,
+    pub offset_column: String,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -260,16 +260,16 @@ impl_enum_variant!(EventTimeSource::FromSystemTime(
 ));
 
 ////////////////////////////////////////////////////////////////////////////////
-// ExecuteQuery
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#executequery-schema
+// ExecuteTransform
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#executetransform-schema
 ////////////////////////////////////////////////////////////////////////////////
 
 /// Indicates that derivative transformation has been performed.
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub struct ExecuteQuery {
+pub struct ExecuteTransform {
     /// Defines inputs used in this transaction. Slices corresponding to every
     /// input dataset must be present.
-    pub query_inputs: Vec<ExecuteQueryInput>,
+    pub query_inputs: Vec<ExecuteTransformInput>,
     /// Hash of the checkpoint file used to restore transformation state, if
     /// any.
     pub prev_checkpoint: Option<Multihash>,
@@ -291,13 +291,13 @@ pub struct ExecuteQuery {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// ExecuteQueryInput
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#executequeryinput-schema
+// ExecuteTransformInput
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#executetransforminput-schema
 ////////////////////////////////////////////////////////////////////////////////
 
 /// Describes a slice of the input dataset used during a transformation
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub struct ExecuteQueryInput {
+pub struct ExecuteTransformInput {
     /// Input dataset identifier.
     pub dataset_id: DatasetID,
     /// Last block of the input dataset that was previously incorporated into
@@ -323,117 +323,6 @@ pub struct ExecuteQueryInput {
     /// considered in this transaction.
     pub new_offset: Option<u64>,
 }
-
-////////////////////////////////////////////////////////////////////////////////
-// ExecuteQueryRequest
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#executequeryrequest-schema
-////////////////////////////////////////////////////////////////////////////////
-
-/// Sent by the coordinator to an engine to perform the next step of data
-/// transformation
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub struct ExecuteQueryRequest {
-    /// Unique identifier of the output dataset.
-    pub dataset_id: DatasetID,
-    /// Alias of the output dataset, for logging purposes only.
-    pub dataset_alias: DatasetAlias,
-    /// System time to use for new records.
-    pub system_time: DateTime<Utc>,
-    pub vocab: DatasetVocabulary,
-    /// Transformation that will be applied to produce new data.
-    pub transform: Transform,
-    /// Defines inputs used in this transaction. Slices corresponding to every
-    /// input dataset must be present.
-    pub query_inputs: Vec<ExecuteQueryRequestInput>,
-    /// Starting offset to use for new data records.
-    pub next_offset: u64,
-    /// TODO: This will be removed when coordinator will be speaking to engines
-    /// purely through Arrow.
-    pub prev_checkpoint_path: Option<PathBuf>,
-    /// TODO: This will be removed when coordinator will be speaking to engines
-    /// purely through Arrow.
-    pub new_checkpoint_path: PathBuf,
-    /// TODO: This will be removed when coordinator will be speaking to engines
-    /// purely through Arrow.
-    pub new_data_path: PathBuf,
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// ExecuteQueryRequestInput
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#executequeryrequestinput-schema
-////////////////////////////////////////////////////////////////////////////////
-
-/// Sent as part of the execute query requst to describe the input
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub struct ExecuteQueryRequestInput {
-    /// Unique identifier of the dataset.
-    pub dataset_id: DatasetID,
-    /// Alias of the output dataset, for logging purposes only.
-    pub dataset_alias: DatasetAlias,
-    /// An alias of this input to be used in queries.
-    pub query_alias: String,
-    pub vocab: DatasetVocabulary,
-    /// Subset of data that goes into this transaction.
-    pub offset_interval: Option<OffsetInterval>,
-    /// TODO: This will be removed when coordinator will be slicing data for the
-    /// engine.
-    pub data_paths: Vec<PathBuf>,
-    /// TODO: replace with actual DDL or Parquet schema.
-    pub schema_file: PathBuf,
-    pub explicit_watermarks: Vec<Watermark>,
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// ExecuteQueryResponse
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#executequeryresponse-schema
-////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub enum ExecuteQueryResponse {
-    Progress(ExecuteQueryResponseProgress),
-    Success(ExecuteQueryResponseSuccess),
-    InvalidQuery(ExecuteQueryResponseInvalidQuery),
-    InternalError(ExecuteQueryResponseInternalError),
-}
-
-impl_enum_with_variants!(ExecuteQueryResponse);
-
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub struct ExecuteQueryResponseProgress {}
-
-impl_enum_variant!(ExecuteQueryResponse::Progress(ExecuteQueryResponseProgress));
-
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub struct ExecuteQueryResponseSuccess {
-    /// Data slice produced by the transaction, if any.
-    pub new_offset_interval: Option<OffsetInterval>,
-    /// Watermark advanced by the transaction, if any.
-    pub new_watermark: Option<DateTime<Utc>>,
-}
-
-impl_enum_variant!(ExecuteQueryResponse::Success(ExecuteQueryResponseSuccess));
-
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub struct ExecuteQueryResponseInvalidQuery {
-    /// Explanation of an error
-    pub message: String,
-}
-
-impl_enum_variant!(ExecuteQueryResponse::InvalidQuery(
-    ExecuteQueryResponseInvalidQuery
-));
-
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub struct ExecuteQueryResponseInternalError {
-    /// Brief description of an error
-    pub message: String,
-    /// Details of an error (e.g. a backtrace)
-    pub backtrace: Option<String>,
-}
-
-impl_enum_variant!(ExecuteQueryResponse::InternalError(
-    ExecuteQueryResponseInternalError
-));
 
 ////////////////////////////////////////////////////////////////////////////////
 // FetchStep
@@ -634,7 +523,7 @@ pub struct MetadataBlock {
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum MetadataEvent {
     AddData(AddData),
-    ExecuteQuery(ExecuteQuery),
+    ExecuteTransform(ExecuteTransform),
     Seed(Seed),
     SetPollingSource(SetPollingSource),
     SetTransform(SetTransform),
@@ -652,7 +541,7 @@ impl_enum_with_variants!(MetadataEvent);
 
 impl_enum_variant!(MetadataEvent::AddData(AddData));
 
-impl_enum_variant!(MetadataEvent::ExecuteQuery(ExecuteQuery));
+impl_enum_variant!(MetadataEvent::ExecuteTransform(ExecuteTransform));
 
 impl_enum_variant!(MetadataEvent::Seed(Seed));
 
@@ -729,6 +618,72 @@ pub enum CompressionFormat {
     Gzip,
     Zip,
 }
+
+////////////////////////////////////////////////////////////////////////////////
+// RawQueryRequest
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#rawqueryrequest-schema
+////////////////////////////////////////////////////////////////////////////////
+
+/// Sent by the coordinator to an engine to perform query on raw input data,
+/// usually as part of ingest preprocessing step
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct RawQueryRequest {
+    /// Paths to input data files to perform query over. Must all have identical
+    /// schema.
+    pub input_data_paths: Vec<PathBuf>,
+    /// Transformation that will be applied to produce new data.
+    pub transform: Transform,
+    /// Path where query result will be written.
+    pub output_data_path: PathBuf,
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// RawQueryResponse
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#rawqueryresponse-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum RawQueryResponse {
+    Progress(RawQueryResponseProgress),
+    Success(RawQueryResponseSuccess),
+    InvalidQuery(RawQueryResponseInvalidQuery),
+    InternalError(RawQueryResponseInternalError),
+}
+
+impl_enum_with_variants!(RawQueryResponse);
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct RawQueryResponseProgress {}
+
+impl_enum_variant!(RawQueryResponse::Progress(RawQueryResponseProgress));
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct RawQueryResponseSuccess {
+    /// Number of records produced by the query
+    pub num_records: u64,
+}
+
+impl_enum_variant!(RawQueryResponse::Success(RawQueryResponseSuccess));
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct RawQueryResponseInvalidQuery {
+    /// Explanation of an error
+    pub message: String,
+}
+
+impl_enum_variant!(RawQueryResponse::InvalidQuery(RawQueryResponseInvalidQuery));
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct RawQueryResponseInternalError {
+    /// Brief description of an error
+    pub message: String,
+    /// Details of an error (e.g. a backtrace)
+    pub backtrace: Option<String>,
+}
+
+impl_enum_variant!(RawQueryResponse::InternalError(
+    RawQueryResponseInternalError
+));
 
 ////////////////////////////////////////////////////////////////////////////////
 // ReadStep
@@ -1001,7 +956,7 @@ pub struct SetTransform {
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setvocab-schema
 ////////////////////////////////////////////////////////////////////////////////
 
-/// Specifies the mapping of system columns onto dataset schema.
+/// Lets you manipulate names of the system columns to avoid conflicts.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct SetVocab {
     /// Name of the system time column.
@@ -1056,7 +1011,8 @@ pub struct SourceState {
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct SqlQueryStep {
     /// Name of the temporary view that will be created from result of the
-    /// query.
+    /// query. Step without this alias will be treated as an output of the
+    /// transformation.
     pub alias: Option<String>,
     /// SQL query the result of which will be exposed under the alias.
     pub query: String,
@@ -1101,9 +1057,9 @@ pub struct TransformSql {
     /// stored in the metadata this property will never be set and instead will
     /// be converted into a single-iter `queries` array.
     pub query: Option<String>,
-    /// Use this instead of query field for specifying multi-step SQL
-    /// transformations. Each step acts as a shorthand for `CREATE TEMPORARY
-    /// VIEW <alias> AS (<query>)`.
+    /// Specifies multi-step SQL transformations. Each step acts as a shorthand
+    /// for `CREATE TEMPORARY VIEW <alias> AS (<query>)`. Last query in the
+    /// array should have no alias and will be treated as an output.
     pub queries: Option<Vec<SqlQueryStep>>,
     /// Temporary Flink-specific extension for creating temporal tables from
     /// streams.
@@ -1129,6 +1085,117 @@ pub struct TransformInput {
     /// DatasetId.
     pub alias: Option<String>,
 }
+
+////////////////////////////////////////////////////////////////////////////////
+// TransformRequest
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#transformrequest-schema
+////////////////////////////////////////////////////////////////////////////////
+
+/// Sent by the coordinator to an engine to perform the next step of data
+/// transformation
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct TransformRequest {
+    /// Unique identifier of the output dataset.
+    pub dataset_id: DatasetID,
+    /// Alias of the output dataset, for logging purposes only.
+    pub dataset_alias: DatasetAlias,
+    /// System time to use for new records.
+    pub system_time: DateTime<Utc>,
+    pub vocab: DatasetVocabulary,
+    /// Transformation that will be applied to produce new data.
+    pub transform: Transform,
+    /// Defines inputs used in this transaction. Slices corresponding to every
+    /// input dataset must be present.
+    pub query_inputs: Vec<TransformRequestInput>,
+    /// Starting offset to use for new data records.
+    pub next_offset: u64,
+    /// TODO: This will be removed when coordinator will be speaking to engines
+    /// purely through Arrow.
+    pub prev_checkpoint_path: Option<PathBuf>,
+    /// TODO: This will be removed when coordinator will be speaking to engines
+    /// purely through Arrow.
+    pub new_checkpoint_path: PathBuf,
+    /// TODO: This will be removed when coordinator will be speaking to engines
+    /// purely through Arrow.
+    pub new_data_path: PathBuf,
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// TransformRequestInput
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#transformrequestinput-schema
+////////////////////////////////////////////////////////////////////////////////
+
+/// Sent as part of the engine transform request operation to describe the input
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct TransformRequestInput {
+    /// Unique identifier of the dataset.
+    pub dataset_id: DatasetID,
+    /// Alias of the output dataset, for logging purposes only.
+    pub dataset_alias: DatasetAlias,
+    /// An alias of this input to be used in queries.
+    pub query_alias: String,
+    pub vocab: DatasetVocabulary,
+    /// Subset of data that goes into this transaction.
+    pub offset_interval: Option<OffsetInterval>,
+    /// TODO: This will be removed when coordinator will be slicing data for the
+    /// engine.
+    pub data_paths: Vec<PathBuf>,
+    /// TODO: replace with actual DDL or Parquet schema.
+    pub schema_file: PathBuf,
+    pub explicit_watermarks: Vec<Watermark>,
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// TransformResponse
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#transformresponse-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum TransformResponse {
+    Progress(TransformResponseProgress),
+    Success(TransformResponseSuccess),
+    InvalidQuery(TransformResponseInvalidQuery),
+    InternalError(TransformResponseInternalError),
+}
+
+impl_enum_with_variants!(TransformResponse);
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct TransformResponseProgress {}
+
+impl_enum_variant!(TransformResponse::Progress(TransformResponseProgress));
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct TransformResponseSuccess {
+    /// Data slice produced by the transaction, if any.
+    pub new_offset_interval: Option<OffsetInterval>,
+    /// Watermark advanced by the transaction, if any.
+    pub new_watermark: Option<DateTime<Utc>>,
+}
+
+impl_enum_variant!(TransformResponse::Success(TransformResponseSuccess));
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct TransformResponseInvalidQuery {
+    /// Explanation of an error
+    pub message: String,
+}
+
+impl_enum_variant!(TransformResponse::InvalidQuery(
+    TransformResponseInvalidQuery
+));
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct TransformResponseInternalError {
+    /// Brief description of an error
+    pub message: String,
+    /// Details of an error (e.g. a backtrace)
+    pub backtrace: Option<String>,
+}
+
+impl_enum_variant!(TransformResponse::InternalError(
+    TransformResponseInternalError
+));
 
 ////////////////////////////////////////////////////////////////////////////////
 // Watermark

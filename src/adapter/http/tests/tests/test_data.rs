@@ -34,6 +34,7 @@ async fn test_data_push_ingest_handler() {
         .bind::<dyn PushIngestService, PushIngestServiceImpl>()
         .add::<ObjectStoreRegistryImpl>()
         .add::<ObjectStoreBuilderLocalFs>()
+        .add::<EngineProvisionerNull>()
         .build();
 
     let server_harness = ServerSideLocalFsHarness::new(ServerSideHarnessOptions {

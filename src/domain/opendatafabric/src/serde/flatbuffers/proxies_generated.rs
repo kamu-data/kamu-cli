@@ -1115,7 +1115,7 @@ pub const ENUM_MAX_METADATA_EVENT: u8 = 13;
 pub const ENUM_VALUES_METADATA_EVENT: [MetadataEvent; 14] = [
     MetadataEvent::NONE,
     MetadataEvent::AddData,
-    MetadataEvent::ExecuteQuery,
+    MetadataEvent::ExecuteTransform,
     MetadataEvent::Seed,
     MetadataEvent::SetPollingSource,
     MetadataEvent::SetTransform,
@@ -1137,7 +1137,7 @@ pub struct MetadataEvent(pub u8);
 impl MetadataEvent {
     pub const NONE: Self = Self(0);
     pub const AddData: Self = Self(1);
-    pub const ExecuteQuery: Self = Self(2);
+    pub const ExecuteTransform: Self = Self(2);
     pub const Seed: Self = Self(3);
     pub const SetPollingSource: Self = Self(4);
     pub const SetTransform: Self = Self(5);
@@ -1155,7 +1155,7 @@ impl MetadataEvent {
     pub const ENUM_VALUES: &'static [Self] = &[
         Self::NONE,
         Self::AddData,
-        Self::ExecuteQuery,
+        Self::ExecuteTransform,
         Self::Seed,
         Self::SetPollingSource,
         Self::SetTransform,
@@ -1173,7 +1173,7 @@ impl MetadataEvent {
         match self {
             Self::NONE => Some("NONE"),
             Self::AddData => Some("AddData"),
-            Self::ExecuteQuery => Some("ExecuteQuery"),
+            Self::ExecuteTransform => Some("ExecuteTransform"),
             Self::Seed => Some("Seed"),
             Self::SetPollingSource => Some("SetPollingSource"),
             Self::SetTransform => Some("SetTransform"),
@@ -1247,58 +1247,58 @@ pub struct MetadataEventUnionTableOffset {}
     since = "2.0.0",
     note = "Use associated constants instead. This will no longer be generated in 2021."
 )]
-pub const ENUM_MIN_EXECUTE_QUERY_RESPONSE: u8 = 0;
+pub const ENUM_MIN_RAW_QUERY_RESPONSE: u8 = 0;
 #[deprecated(
     since = "2.0.0",
     note = "Use associated constants instead. This will no longer be generated in 2021."
 )]
-pub const ENUM_MAX_EXECUTE_QUERY_RESPONSE: u8 = 4;
+pub const ENUM_MAX_RAW_QUERY_RESPONSE: u8 = 4;
 #[deprecated(
     since = "2.0.0",
     note = "Use associated constants instead. This will no longer be generated in 2021."
 )]
 #[allow(non_camel_case_types)]
-pub const ENUM_VALUES_EXECUTE_QUERY_RESPONSE: [ExecuteQueryResponse; 5] = [
-    ExecuteQueryResponse::NONE,
-    ExecuteQueryResponse::ExecuteQueryResponseProgress,
-    ExecuteQueryResponse::ExecuteQueryResponseSuccess,
-    ExecuteQueryResponse::ExecuteQueryResponseInvalidQuery,
-    ExecuteQueryResponse::ExecuteQueryResponseInternalError,
+pub const ENUM_VALUES_RAW_QUERY_RESPONSE: [RawQueryResponse; 5] = [
+    RawQueryResponse::NONE,
+    RawQueryResponse::RawQueryResponseProgress,
+    RawQueryResponse::RawQueryResponseSuccess,
+    RawQueryResponse::RawQueryResponseInvalidQuery,
+    RawQueryResponse::RawQueryResponseInternalError,
 ];
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 #[repr(transparent)]
-pub struct ExecuteQueryResponse(pub u8);
+pub struct RawQueryResponse(pub u8);
 #[allow(non_upper_case_globals)]
-impl ExecuteQueryResponse {
+impl RawQueryResponse {
     pub const NONE: Self = Self(0);
-    pub const ExecuteQueryResponseProgress: Self = Self(1);
-    pub const ExecuteQueryResponseSuccess: Self = Self(2);
-    pub const ExecuteQueryResponseInvalidQuery: Self = Self(3);
-    pub const ExecuteQueryResponseInternalError: Self = Self(4);
+    pub const RawQueryResponseProgress: Self = Self(1);
+    pub const RawQueryResponseSuccess: Self = Self(2);
+    pub const RawQueryResponseInvalidQuery: Self = Self(3);
+    pub const RawQueryResponseInternalError: Self = Self(4);
 
     pub const ENUM_MIN: u8 = 0;
     pub const ENUM_MAX: u8 = 4;
     pub const ENUM_VALUES: &'static [Self] = &[
         Self::NONE,
-        Self::ExecuteQueryResponseProgress,
-        Self::ExecuteQueryResponseSuccess,
-        Self::ExecuteQueryResponseInvalidQuery,
-        Self::ExecuteQueryResponseInternalError,
+        Self::RawQueryResponseProgress,
+        Self::RawQueryResponseSuccess,
+        Self::RawQueryResponseInvalidQuery,
+        Self::RawQueryResponseInternalError,
     ];
     /// Returns the variant's name or "" if unknown.
     pub fn variant_name(self) -> Option<&'static str> {
         match self {
             Self::NONE => Some("NONE"),
-            Self::ExecuteQueryResponseProgress => Some("ExecuteQueryResponseProgress"),
-            Self::ExecuteQueryResponseSuccess => Some("ExecuteQueryResponseSuccess"),
-            Self::ExecuteQueryResponseInvalidQuery => Some("ExecuteQueryResponseInvalidQuery"),
-            Self::ExecuteQueryResponseInternalError => Some("ExecuteQueryResponseInternalError"),
+            Self::RawQueryResponseProgress => Some("RawQueryResponseProgress"),
+            Self::RawQueryResponseSuccess => Some("RawQueryResponseSuccess"),
+            Self::RawQueryResponseInvalidQuery => Some("RawQueryResponseInvalidQuery"),
+            Self::RawQueryResponseInternalError => Some("RawQueryResponseInternalError"),
             _ => None,
         }
     }
 }
-impl core::fmt::Debug for ExecuteQueryResponse {
+impl core::fmt::Debug for RawQueryResponse {
     fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
         if let Some(name) = self.variant_name() {
             f.write_str(name)
@@ -1307,7 +1307,7 @@ impl core::fmt::Debug for ExecuteQueryResponse {
         }
     }
 }
-impl<'a> flatbuffers::Follow<'a> for ExecuteQueryResponse {
+impl<'a> flatbuffers::Follow<'a> for RawQueryResponse {
     type Inner = Self;
     #[inline]
     unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
@@ -1316,15 +1316,15 @@ impl<'a> flatbuffers::Follow<'a> for ExecuteQueryResponse {
     }
 }
 
-impl flatbuffers::Push for ExecuteQueryResponse {
-    type Output = ExecuteQueryResponse;
+impl flatbuffers::Push for RawQueryResponse {
+    type Output = RawQueryResponse;
     #[inline]
     unsafe fn push(&self, dst: &mut [u8], _written_len: usize) {
         flatbuffers::emplace_scalar::<u8>(dst, self.0);
     }
 }
 
-impl flatbuffers::EndianScalar for ExecuteQueryResponse {
+impl flatbuffers::EndianScalar for RawQueryResponse {
     type Scalar = u8;
     #[inline]
     fn to_little_endian(self) -> u8 {
@@ -1338,7 +1338,7 @@ impl flatbuffers::EndianScalar for ExecuteQueryResponse {
     }
 }
 
-impl<'a> flatbuffers::Verifiable for ExecuteQueryResponse {
+impl<'a> flatbuffers::Verifiable for RawQueryResponse {
     #[inline]
     fn run_verifier(
         v: &mut flatbuffers::Verifier,
@@ -1349,8 +1349,117 @@ impl<'a> flatbuffers::Verifiable for ExecuteQueryResponse {
     }
 }
 
-impl flatbuffers::SimpleToVerifyInSlice for ExecuteQueryResponse {}
-pub struct ExecuteQueryResponseUnionTableOffset {}
+impl flatbuffers::SimpleToVerifyInSlice for RawQueryResponse {}
+pub struct RawQueryResponseUnionTableOffset {}
+
+#[deprecated(
+    since = "2.0.0",
+    note = "Use associated constants instead. This will no longer be generated in 2021."
+)]
+pub const ENUM_MIN_TRANSFORM_RESPONSE: u8 = 0;
+#[deprecated(
+    since = "2.0.0",
+    note = "Use associated constants instead. This will no longer be generated in 2021."
+)]
+pub const ENUM_MAX_TRANSFORM_RESPONSE: u8 = 4;
+#[deprecated(
+    since = "2.0.0",
+    note = "Use associated constants instead. This will no longer be generated in 2021."
+)]
+#[allow(non_camel_case_types)]
+pub const ENUM_VALUES_TRANSFORM_RESPONSE: [TransformResponse; 5] = [
+    TransformResponse::NONE,
+    TransformResponse::TransformResponseProgress,
+    TransformResponse::TransformResponseSuccess,
+    TransformResponse::TransformResponseInvalidQuery,
+    TransformResponse::TransformResponseInternalError,
+];
+
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+#[repr(transparent)]
+pub struct TransformResponse(pub u8);
+#[allow(non_upper_case_globals)]
+impl TransformResponse {
+    pub const NONE: Self = Self(0);
+    pub const TransformResponseProgress: Self = Self(1);
+    pub const TransformResponseSuccess: Self = Self(2);
+    pub const TransformResponseInvalidQuery: Self = Self(3);
+    pub const TransformResponseInternalError: Self = Self(4);
+
+    pub const ENUM_MIN: u8 = 0;
+    pub const ENUM_MAX: u8 = 4;
+    pub const ENUM_VALUES: &'static [Self] = &[
+        Self::NONE,
+        Self::TransformResponseProgress,
+        Self::TransformResponseSuccess,
+        Self::TransformResponseInvalidQuery,
+        Self::TransformResponseInternalError,
+    ];
+    /// Returns the variant's name or "" if unknown.
+    pub fn variant_name(self) -> Option<&'static str> {
+        match self {
+            Self::NONE => Some("NONE"),
+            Self::TransformResponseProgress => Some("TransformResponseProgress"),
+            Self::TransformResponseSuccess => Some("TransformResponseSuccess"),
+            Self::TransformResponseInvalidQuery => Some("TransformResponseInvalidQuery"),
+            Self::TransformResponseInternalError => Some("TransformResponseInternalError"),
+            _ => None,
+        }
+    }
+}
+impl core::fmt::Debug for TransformResponse {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        if let Some(name) = self.variant_name() {
+            f.write_str(name)
+        } else {
+            f.write_fmt(format_args!("<UNKNOWN {:?}>", self.0))
+        }
+    }
+}
+impl<'a> flatbuffers::Follow<'a> for TransformResponse {
+    type Inner = Self;
+    #[inline]
+    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        let b = flatbuffers::read_scalar_at::<u8>(buf, loc);
+        Self(b)
+    }
+}
+
+impl flatbuffers::Push for TransformResponse {
+    type Output = TransformResponse;
+    #[inline]
+    unsafe fn push(&self, dst: &mut [u8], _written_len: usize) {
+        flatbuffers::emplace_scalar::<u8>(dst, self.0);
+    }
+}
+
+impl flatbuffers::EndianScalar for TransformResponse {
+    type Scalar = u8;
+    #[inline]
+    fn to_little_endian(self) -> u8 {
+        self.0.to_le()
+    }
+    #[inline]
+    #[allow(clippy::wrong_self_convention)]
+    fn from_little_endian(v: u8) -> Self {
+        let b = u8::from_le(v);
+        Self(b)
+    }
+}
+
+impl<'a> flatbuffers::Verifiable for TransformResponse {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        u8::run_verifier(v, pos)
+    }
+}
+
+impl flatbuffers::SimpleToVerifyInSlice for TransformResponse {}
+pub struct TransformResponseUnionTableOffset {}
 
 ////////////////////////////////////////////////////////////////////////////////
 // struct Timestamp, aligned to 4
@@ -5472,16 +5581,16 @@ impl core::fmt::Debug for AttachmentsEmbedded<'_> {
         ds.finish()
     }
 }
-pub enum ExecuteQueryInputOffset {}
+pub enum ExecuteTransformInputOffset {}
 #[derive(Copy, Clone, PartialEq)]
 
 ////////////////////////////////////////////////////////////////////////////////
-pub struct ExecuteQueryInput<'a> {
+pub struct ExecuteTransformInput<'a> {
     pub _tab: flatbuffers::Table<'a>,
 }
 
-impl<'a> flatbuffers::Follow<'a> for ExecuteQueryInput<'a> {
-    type Inner = ExecuteQueryInput<'a>;
+impl<'a> flatbuffers::Follow<'a> for ExecuteTransformInput<'a> {
+    type Inner = ExecuteTransformInput<'a>;
     #[inline]
     unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
         Self {
@@ -5490,7 +5599,7 @@ impl<'a> flatbuffers::Follow<'a> for ExecuteQueryInput<'a> {
     }
 }
 
-impl<'a> ExecuteQueryInput<'a> {
+impl<'a> ExecuteTransformInput<'a> {
     pub const VT_DATASET_ID: flatbuffers::VOffsetT = 4;
     pub const VT_PREV_BLOCK_HASH: flatbuffers::VOffsetT = 6;
     pub const VT_NEW_BLOCK_HASH: flatbuffers::VOffsetT = 8;
@@ -5499,14 +5608,14 @@ impl<'a> ExecuteQueryInput<'a> {
 
     #[inline]
     pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
-        ExecuteQueryInput { _tab: table }
+        ExecuteTransformInput { _tab: table }
     }
     #[allow(unused_mut)]
     pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
         _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
-        args: &'args ExecuteQueryInputArgs<'args>,
-    ) -> flatbuffers::WIPOffset<ExecuteQueryInput<'bldr>> {
-        let mut builder = ExecuteQueryInputBuilder::new(_fbb);
+        args: &'args ExecuteTransformInputArgs<'args>,
+    ) -> flatbuffers::WIPOffset<ExecuteTransformInput<'bldr>> {
+        let mut builder = ExecuteTransformInputBuilder::new(_fbb);
         if let Some(x) = args.new_offset {
             builder.add_new_offset(x);
         }
@@ -5533,7 +5642,7 @@ impl<'a> ExecuteQueryInput<'a> {
         unsafe {
             self._tab
                 .get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
-                    ExecuteQueryInput::VT_DATASET_ID,
+                    ExecuteTransformInput::VT_DATASET_ID,
                     None,
                 )
         }
@@ -5546,7 +5655,7 @@ impl<'a> ExecuteQueryInput<'a> {
         unsafe {
             self._tab
                 .get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
-                    ExecuteQueryInput::VT_PREV_BLOCK_HASH,
+                    ExecuteTransformInput::VT_PREV_BLOCK_HASH,
                     None,
                 )
         }
@@ -5559,7 +5668,7 @@ impl<'a> ExecuteQueryInput<'a> {
         unsafe {
             self._tab
                 .get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
-                    ExecuteQueryInput::VT_NEW_BLOCK_HASH,
+                    ExecuteTransformInput::VT_NEW_BLOCK_HASH,
                     None,
                 )
         }
@@ -5571,7 +5680,7 @@ impl<'a> ExecuteQueryInput<'a> {
         // which contains a valid value in this slot
         unsafe {
             self._tab
-                .get::<u64>(ExecuteQueryInput::VT_PREV_OFFSET, None)
+                .get::<u64>(ExecuteTransformInput::VT_PREV_OFFSET, None)
         }
     }
     #[inline]
@@ -5579,11 +5688,14 @@ impl<'a> ExecuteQueryInput<'a> {
         // Safety:
         // Created from valid Table for this object
         // which contains a valid value in this slot
-        unsafe { self._tab.get::<u64>(ExecuteQueryInput::VT_NEW_OFFSET, None) }
+        unsafe {
+            self._tab
+                .get::<u64>(ExecuteTransformInput::VT_NEW_OFFSET, None)
+        }
     }
 }
 
-impl flatbuffers::Verifiable for ExecuteQueryInput<'_> {
+impl flatbuffers::Verifiable for ExecuteTransformInput<'_> {
     #[inline]
     fn run_verifier(
         v: &mut flatbuffers::Verifier,
@@ -5612,17 +5724,17 @@ impl flatbuffers::Verifiable for ExecuteQueryInput<'_> {
         Ok(())
     }
 }
-pub struct ExecuteQueryInputArgs<'a> {
+pub struct ExecuteTransformInputArgs<'a> {
     pub dataset_id: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u8>>>,
     pub prev_block_hash: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u8>>>,
     pub new_block_hash: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u8>>>,
     pub prev_offset: Option<u64>,
     pub new_offset: Option<u64>,
 }
-impl<'a> Default for ExecuteQueryInputArgs<'a> {
+impl<'a> Default for ExecuteTransformInputArgs<'a> {
     #[inline]
     fn default() -> Self {
-        ExecuteQueryInputArgs {
+        ExecuteTransformInputArgs {
             dataset_id: None,
             prev_block_hash: None,
             new_block_hash: None,
@@ -5632,18 +5744,18 @@ impl<'a> Default for ExecuteQueryInputArgs<'a> {
     }
 }
 
-pub struct ExecuteQueryInputBuilder<'a: 'b, 'b> {
+pub struct ExecuteTransformInputBuilder<'a: 'b, 'b> {
     fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
     start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
 }
-impl<'a: 'b, 'b> ExecuteQueryInputBuilder<'a, 'b> {
+impl<'a: 'b, 'b> ExecuteTransformInputBuilder<'a, 'b> {
     #[inline]
     pub fn add_dataset_id(
         &mut self,
         dataset_id: flatbuffers::WIPOffset<flatbuffers::Vector<'b, u8>>,
     ) {
         self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
-            ExecuteQueryInput::VT_DATASET_ID,
+            ExecuteTransformInput::VT_DATASET_ID,
             dataset_id,
         );
     }
@@ -5653,7 +5765,7 @@ impl<'a: 'b, 'b> ExecuteQueryInputBuilder<'a, 'b> {
         prev_block_hash: flatbuffers::WIPOffset<flatbuffers::Vector<'b, u8>>,
     ) {
         self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
-            ExecuteQueryInput::VT_PREV_BLOCK_HASH,
+            ExecuteTransformInput::VT_PREV_BLOCK_HASH,
             prev_block_hash,
         );
     }
@@ -5663,40 +5775,40 @@ impl<'a: 'b, 'b> ExecuteQueryInputBuilder<'a, 'b> {
         new_block_hash: flatbuffers::WIPOffset<flatbuffers::Vector<'b, u8>>,
     ) {
         self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
-            ExecuteQueryInput::VT_NEW_BLOCK_HASH,
+            ExecuteTransformInput::VT_NEW_BLOCK_HASH,
             new_block_hash,
         );
     }
     #[inline]
     pub fn add_prev_offset(&mut self, prev_offset: u64) {
         self.fbb_
-            .push_slot_always::<u64>(ExecuteQueryInput::VT_PREV_OFFSET, prev_offset);
+            .push_slot_always::<u64>(ExecuteTransformInput::VT_PREV_OFFSET, prev_offset);
     }
     #[inline]
     pub fn add_new_offset(&mut self, new_offset: u64) {
         self.fbb_
-            .push_slot_always::<u64>(ExecuteQueryInput::VT_NEW_OFFSET, new_offset);
+            .push_slot_always::<u64>(ExecuteTransformInput::VT_NEW_OFFSET, new_offset);
     }
     #[inline]
     pub fn new(
         _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>,
-    ) -> ExecuteQueryInputBuilder<'a, 'b> {
+    ) -> ExecuteTransformInputBuilder<'a, 'b> {
         let start = _fbb.start_table();
-        ExecuteQueryInputBuilder {
+        ExecuteTransformInputBuilder {
             fbb_: _fbb,
             start_: start,
         }
     }
     #[inline]
-    pub fn finish(self) -> flatbuffers::WIPOffset<ExecuteQueryInput<'a>> {
+    pub fn finish(self) -> flatbuffers::WIPOffset<ExecuteTransformInput<'a>> {
         let o = self.fbb_.end_table(self.start_);
         flatbuffers::WIPOffset::new(o.value())
     }
 }
 
-impl core::fmt::Debug for ExecuteQueryInput<'_> {
+impl core::fmt::Debug for ExecuteTransformInput<'_> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        let mut ds = f.debug_struct("ExecuteQueryInput");
+        let mut ds = f.debug_struct("ExecuteTransformInput");
         ds.field("dataset_id", &self.dataset_id());
         ds.field("prev_block_hash", &self.prev_block_hash());
         ds.field("new_block_hash", &self.new_block_hash());
@@ -5705,16 +5817,16 @@ impl core::fmt::Debug for ExecuteQueryInput<'_> {
         ds.finish()
     }
 }
-pub enum ExecuteQueryOffset {}
+pub enum ExecuteTransformOffset {}
 #[derive(Copy, Clone, PartialEq)]
 
 ////////////////////////////////////////////////////////////////////////////////
-pub struct ExecuteQuery<'a> {
+pub struct ExecuteTransform<'a> {
     pub _tab: flatbuffers::Table<'a>,
 }
 
-impl<'a> flatbuffers::Follow<'a> for ExecuteQuery<'a> {
-    type Inner = ExecuteQuery<'a>;
+impl<'a> flatbuffers::Follow<'a> for ExecuteTransform<'a> {
+    type Inner = ExecuteTransform<'a>;
     #[inline]
     unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
         Self {
@@ -5723,7 +5835,7 @@ impl<'a> flatbuffers::Follow<'a> for ExecuteQuery<'a> {
     }
 }
 
-impl<'a> ExecuteQuery<'a> {
+impl<'a> ExecuteTransform<'a> {
     pub const VT_QUERY_INPUTS: flatbuffers::VOffsetT = 4;
     pub const VT_PREV_CHECKPOINT: flatbuffers::VOffsetT = 6;
     pub const VT_PREV_OFFSET: flatbuffers::VOffsetT = 8;
@@ -5733,14 +5845,14 @@ impl<'a> ExecuteQuery<'a> {
 
     #[inline]
     pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
-        ExecuteQuery { _tab: table }
+        ExecuteTransform { _tab: table }
     }
     #[allow(unused_mut)]
     pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
         _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
-        args: &'args ExecuteQueryArgs<'args>,
-    ) -> flatbuffers::WIPOffset<ExecuteQuery<'bldr>> {
-        let mut builder = ExecuteQueryBuilder::new(_fbb);
+        args: &'args ExecuteTransformArgs<'args>,
+    ) -> flatbuffers::WIPOffset<ExecuteTransform<'bldr>> {
+        let mut builder = ExecuteTransformBuilder::new(_fbb);
         if let Some(x) = args.prev_offset {
             builder.add_prev_offset(x);
         }
@@ -5765,14 +5877,15 @@ impl<'a> ExecuteQuery<'a> {
     #[inline]
     pub fn query_inputs(
         &self,
-    ) -> Option<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<ExecuteQueryInput<'a>>>> {
+    ) -> Option<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<ExecuteTransformInput<'a>>>>
+    {
         // Safety:
         // Created from valid Table for this object
         // which contains a valid value in this slot
         unsafe {
             self._tab.get::<flatbuffers::ForwardsUOffset<
-                flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<ExecuteQueryInput>>,
-            >>(ExecuteQuery::VT_QUERY_INPUTS, None)
+                flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<ExecuteTransformInput>>,
+            >>(ExecuteTransform::VT_QUERY_INPUTS, None)
         }
     }
     #[inline]
@@ -5783,7 +5896,7 @@ impl<'a> ExecuteQuery<'a> {
         unsafe {
             self._tab
                 .get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
-                    ExecuteQuery::VT_PREV_CHECKPOINT,
+                    ExecuteTransform::VT_PREV_CHECKPOINT,
                     None,
                 )
         }
@@ -5793,7 +5906,7 @@ impl<'a> ExecuteQuery<'a> {
         // Safety:
         // Created from valid Table for this object
         // which contains a valid value in this slot
-        unsafe { self._tab.get::<u64>(ExecuteQuery::VT_PREV_OFFSET, None) }
+        unsafe { self._tab.get::<u64>(ExecuteTransform::VT_PREV_OFFSET, None) }
     }
     #[inline]
     pub fn new_data(&self) -> Option<DataSlice<'a>> {
@@ -5802,7 +5915,7 @@ impl<'a> ExecuteQuery<'a> {
         // which contains a valid value in this slot
         unsafe {
             self._tab
-                .get::<flatbuffers::ForwardsUOffset<DataSlice>>(ExecuteQuery::VT_NEW_DATA, None)
+                .get::<flatbuffers::ForwardsUOffset<DataSlice>>(ExecuteTransform::VT_NEW_DATA, None)
         }
     }
     #[inline]
@@ -5812,7 +5925,7 @@ impl<'a> ExecuteQuery<'a> {
         // which contains a valid value in this slot
         unsafe {
             self._tab.get::<flatbuffers::ForwardsUOffset<Checkpoint>>(
-                ExecuteQuery::VT_NEW_CHECKPOINT,
+                ExecuteTransform::VT_NEW_CHECKPOINT,
                 None,
             )
         }
@@ -5824,12 +5937,12 @@ impl<'a> ExecuteQuery<'a> {
         // which contains a valid value in this slot
         unsafe {
             self._tab
-                .get::<Timestamp>(ExecuteQuery::VT_NEW_WATERMARK, None)
+                .get::<Timestamp>(ExecuteTransform::VT_NEW_WATERMARK, None)
         }
     }
 }
 
-impl flatbuffers::Verifiable for ExecuteQuery<'_> {
+impl flatbuffers::Verifiable for ExecuteTransform<'_> {
     #[inline]
     fn run_verifier(
         v: &mut flatbuffers::Verifier,
@@ -5838,7 +5951,7 @@ impl flatbuffers::Verifiable for ExecuteQuery<'_> {
         use self::flatbuffers::Verifiable;
         v.visit_table(pos)?
             .visit_field::<flatbuffers::ForwardsUOffset<
-                flatbuffers::Vector<'_, flatbuffers::ForwardsUOffset<ExecuteQueryInput>>,
+                flatbuffers::Vector<'_, flatbuffers::ForwardsUOffset<ExecuteTransformInput>>,
             >>("query_inputs", Self::VT_QUERY_INPUTS, false)?
             .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, u8>>>(
                 "prev_checkpoint",
@@ -5861,10 +5974,10 @@ impl flatbuffers::Verifiable for ExecuteQuery<'_> {
         Ok(())
     }
 }
-pub struct ExecuteQueryArgs<'a> {
+pub struct ExecuteTransformArgs<'a> {
     pub query_inputs: Option<
         flatbuffers::WIPOffset<
-            flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<ExecuteQueryInput<'a>>>,
+            flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<ExecuteTransformInput<'a>>>,
         >,
     >,
     pub prev_checkpoint: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u8>>>,
@@ -5873,10 +5986,10 @@ pub struct ExecuteQueryArgs<'a> {
     pub new_checkpoint: Option<flatbuffers::WIPOffset<Checkpoint<'a>>>,
     pub new_watermark: Option<&'a Timestamp>,
 }
-impl<'a> Default for ExecuteQueryArgs<'a> {
+impl<'a> Default for ExecuteTransformArgs<'a> {
     #[inline]
     fn default() -> Self {
-        ExecuteQueryArgs {
+        ExecuteTransformArgs {
             query_inputs: None,
             prev_checkpoint: None,
             prev_offset: None,
@@ -5887,20 +6000,20 @@ impl<'a> Default for ExecuteQueryArgs<'a> {
     }
 }
 
-pub struct ExecuteQueryBuilder<'a: 'b, 'b> {
+pub struct ExecuteTransformBuilder<'a: 'b, 'b> {
     fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
     start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
 }
-impl<'a: 'b, 'b> ExecuteQueryBuilder<'a, 'b> {
+impl<'a: 'b, 'b> ExecuteTransformBuilder<'a, 'b> {
     #[inline]
     pub fn add_query_inputs(
         &mut self,
         query_inputs: flatbuffers::WIPOffset<
-            flatbuffers::Vector<'b, flatbuffers::ForwardsUOffset<ExecuteQueryInput<'b>>>,
+            flatbuffers::Vector<'b, flatbuffers::ForwardsUOffset<ExecuteTransformInput<'b>>>,
         >,
     ) {
         self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
-            ExecuteQuery::VT_QUERY_INPUTS,
+            ExecuteTransform::VT_QUERY_INPUTS,
             query_inputs,
         );
     }
@@ -5910,20 +6023,20 @@ impl<'a: 'b, 'b> ExecuteQueryBuilder<'a, 'b> {
         prev_checkpoint: flatbuffers::WIPOffset<flatbuffers::Vector<'b, u8>>,
     ) {
         self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
-            ExecuteQuery::VT_PREV_CHECKPOINT,
+            ExecuteTransform::VT_PREV_CHECKPOINT,
             prev_checkpoint,
         );
     }
     #[inline]
     pub fn add_prev_offset(&mut self, prev_offset: u64) {
         self.fbb_
-            .push_slot_always::<u64>(ExecuteQuery::VT_PREV_OFFSET, prev_offset);
+            .push_slot_always::<u64>(ExecuteTransform::VT_PREV_OFFSET, prev_offset);
     }
     #[inline]
     pub fn add_new_data(&mut self, new_data: flatbuffers::WIPOffset<DataSlice<'b>>) {
         self.fbb_
             .push_slot_always::<flatbuffers::WIPOffset<DataSlice>>(
-                ExecuteQuery::VT_NEW_DATA,
+                ExecuteTransform::VT_NEW_DATA,
                 new_data,
             );
     }
@@ -5931,33 +6044,35 @@ impl<'a: 'b, 'b> ExecuteQueryBuilder<'a, 'b> {
     pub fn add_new_checkpoint(&mut self, new_checkpoint: flatbuffers::WIPOffset<Checkpoint<'b>>) {
         self.fbb_
             .push_slot_always::<flatbuffers::WIPOffset<Checkpoint>>(
-                ExecuteQuery::VT_NEW_CHECKPOINT,
+                ExecuteTransform::VT_NEW_CHECKPOINT,
                 new_checkpoint,
             );
     }
     #[inline]
     pub fn add_new_watermark(&mut self, new_watermark: &Timestamp) {
         self.fbb_
-            .push_slot_always::<&Timestamp>(ExecuteQuery::VT_NEW_WATERMARK, new_watermark);
+            .push_slot_always::<&Timestamp>(ExecuteTransform::VT_NEW_WATERMARK, new_watermark);
     }
     #[inline]
-    pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>) -> ExecuteQueryBuilder<'a, 'b> {
+    pub fn new(
+        _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+    ) -> ExecuteTransformBuilder<'a, 'b> {
         let start = _fbb.start_table();
-        ExecuteQueryBuilder {
+        ExecuteTransformBuilder {
             fbb_: _fbb,
             start_: start,
         }
     }
     #[inline]
-    pub fn finish(self) -> flatbuffers::WIPOffset<ExecuteQuery<'a>> {
+    pub fn finish(self) -> flatbuffers::WIPOffset<ExecuteTransform<'a>> {
         let o = self.fbb_.end_table(self.start_);
         flatbuffers::WIPOffset::new(o.value())
     }
 }
 
-impl core::fmt::Debug for ExecuteQuery<'_> {
+impl core::fmt::Debug for ExecuteTransform<'_> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        let mut ds = f.debug_struct("ExecuteQuery");
+        let mut ds = f.debug_struct("ExecuteTransform");
         ds.field("query_inputs", &self.query_inputs());
         ds.field("prev_checkpoint", &self.prev_checkpoint());
         ds.field("prev_offset", &self.prev_offset());
@@ -10377,1691 +10492,6 @@ impl core::fmt::Debug for DatasetVocabulary<'_> {
         ds.finish()
     }
 }
-pub enum WatermarkOffset {}
-#[derive(Copy, Clone, PartialEq)]
-
-////////////////////////////////////////////////////////////////////////////////
-pub struct Watermark<'a> {
-    pub _tab: flatbuffers::Table<'a>,
-}
-
-impl<'a> flatbuffers::Follow<'a> for Watermark<'a> {
-    type Inner = Watermark<'a>;
-    #[inline]
-    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
-        Self {
-            _tab: flatbuffers::Table::new(buf, loc),
-        }
-    }
-}
-
-impl<'a> Watermark<'a> {
-    pub const VT_SYSTEM_TIME: flatbuffers::VOffsetT = 4;
-    pub const VT_EVENT_TIME: flatbuffers::VOffsetT = 6;
-
-    #[inline]
-    pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
-        Watermark { _tab: table }
-    }
-    #[allow(unused_mut)]
-    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
-        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
-        args: &'args WatermarkArgs<'args>,
-    ) -> flatbuffers::WIPOffset<Watermark<'bldr>> {
-        let mut builder = WatermarkBuilder::new(_fbb);
-        if let Some(x) = args.event_time {
-            builder.add_event_time(x);
-        }
-        if let Some(x) = args.system_time {
-            builder.add_system_time(x);
-        }
-        builder.finish()
-    }
-
-    #[inline]
-    pub fn system_time(&self) -> Option<&'a Timestamp> {
-        // Safety:
-        // Created from valid Table for this object
-        // which contains a valid value in this slot
-        unsafe { self._tab.get::<Timestamp>(Watermark::VT_SYSTEM_TIME, None) }
-    }
-    #[inline]
-    pub fn event_time(&self) -> Option<&'a Timestamp> {
-        // Safety:
-        // Created from valid Table for this object
-        // which contains a valid value in this slot
-        unsafe { self._tab.get::<Timestamp>(Watermark::VT_EVENT_TIME, None) }
-    }
-}
-
-impl flatbuffers::Verifiable for Watermark<'_> {
-    #[inline]
-    fn run_verifier(
-        v: &mut flatbuffers::Verifier,
-        pos: usize,
-    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
-        use self::flatbuffers::Verifiable;
-        v.visit_table(pos)?
-            .visit_field::<Timestamp>("system_time", Self::VT_SYSTEM_TIME, false)?
-            .visit_field::<Timestamp>("event_time", Self::VT_EVENT_TIME, false)?
-            .finish();
-        Ok(())
-    }
-}
-pub struct WatermarkArgs<'a> {
-    pub system_time: Option<&'a Timestamp>,
-    pub event_time: Option<&'a Timestamp>,
-}
-impl<'a> Default for WatermarkArgs<'a> {
-    #[inline]
-    fn default() -> Self {
-        WatermarkArgs {
-            system_time: None,
-            event_time: None,
-        }
-    }
-}
-
-pub struct WatermarkBuilder<'a: 'b, 'b> {
-    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
-    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
-}
-impl<'a: 'b, 'b> WatermarkBuilder<'a, 'b> {
-    #[inline]
-    pub fn add_system_time(&mut self, system_time: &Timestamp) {
-        self.fbb_
-            .push_slot_always::<&Timestamp>(Watermark::VT_SYSTEM_TIME, system_time);
-    }
-    #[inline]
-    pub fn add_event_time(&mut self, event_time: &Timestamp) {
-        self.fbb_
-            .push_slot_always::<&Timestamp>(Watermark::VT_EVENT_TIME, event_time);
-    }
-    #[inline]
-    pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>) -> WatermarkBuilder<'a, 'b> {
-        let start = _fbb.start_table();
-        WatermarkBuilder {
-            fbb_: _fbb,
-            start_: start,
-        }
-    }
-    #[inline]
-    pub fn finish(self) -> flatbuffers::WIPOffset<Watermark<'a>> {
-        let o = self.fbb_.end_table(self.start_);
-        flatbuffers::WIPOffset::new(o.value())
-    }
-}
-
-impl core::fmt::Debug for Watermark<'_> {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        let mut ds = f.debug_struct("Watermark");
-        ds.field("system_time", &self.system_time());
-        ds.field("event_time", &self.event_time());
-        ds.finish()
-    }
-}
-pub enum ExecuteQueryRequestInputOffset {}
-#[derive(Copy, Clone, PartialEq)]
-
-////////////////////////////////////////////////////////////////////////////////
-pub struct ExecuteQueryRequestInput<'a> {
-    pub _tab: flatbuffers::Table<'a>,
-}
-
-impl<'a> flatbuffers::Follow<'a> for ExecuteQueryRequestInput<'a> {
-    type Inner = ExecuteQueryRequestInput<'a>;
-    #[inline]
-    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
-        Self {
-            _tab: flatbuffers::Table::new(buf, loc),
-        }
-    }
-}
-
-impl<'a> ExecuteQueryRequestInput<'a> {
-    pub const VT_DATASET_ID: flatbuffers::VOffsetT = 4;
-    pub const VT_DATASET_ALIAS: flatbuffers::VOffsetT = 6;
-    pub const VT_QUERY_ALIAS: flatbuffers::VOffsetT = 8;
-    pub const VT_VOCAB: flatbuffers::VOffsetT = 10;
-    pub const VT_OFFSET_INTERVAL: flatbuffers::VOffsetT = 12;
-    pub const VT_DATA_PATHS: flatbuffers::VOffsetT = 14;
-    pub const VT_SCHEMA_FILE: flatbuffers::VOffsetT = 16;
-    pub const VT_EXPLICIT_WATERMARKS: flatbuffers::VOffsetT = 18;
-
-    #[inline]
-    pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
-        ExecuteQueryRequestInput { _tab: table }
-    }
-    #[allow(unused_mut)]
-    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
-        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
-        args: &'args ExecuteQueryRequestInputArgs<'args>,
-    ) -> flatbuffers::WIPOffset<ExecuteQueryRequestInput<'bldr>> {
-        let mut builder = ExecuteQueryRequestInputBuilder::new(_fbb);
-        if let Some(x) = args.explicit_watermarks {
-            builder.add_explicit_watermarks(x);
-        }
-        if let Some(x) = args.schema_file {
-            builder.add_schema_file(x);
-        }
-        if let Some(x) = args.data_paths {
-            builder.add_data_paths(x);
-        }
-        if let Some(x) = args.offset_interval {
-            builder.add_offset_interval(x);
-        }
-        if let Some(x) = args.vocab {
-            builder.add_vocab(x);
-        }
-        if let Some(x) = args.query_alias {
-            builder.add_query_alias(x);
-        }
-        if let Some(x) = args.dataset_alias {
-            builder.add_dataset_alias(x);
-        }
-        if let Some(x) = args.dataset_id {
-            builder.add_dataset_id(x);
-        }
-        builder.finish()
-    }
-
-    #[inline]
-    pub fn dataset_id(&self) -> Option<flatbuffers::Vector<'a, u8>> {
-        // Safety:
-        // Created from valid Table for this object
-        // which contains a valid value in this slot
-        unsafe {
-            self._tab
-                .get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
-                    ExecuteQueryRequestInput::VT_DATASET_ID,
-                    None,
-                )
-        }
-    }
-    #[inline]
-    pub fn dataset_alias(&self) -> Option<&'a str> {
-        // Safety:
-        // Created from valid Table for this object
-        // which contains a valid value in this slot
-        unsafe {
-            self._tab.get::<flatbuffers::ForwardsUOffset<&str>>(
-                ExecuteQueryRequestInput::VT_DATASET_ALIAS,
-                None,
-            )
-        }
-    }
-    #[inline]
-    pub fn query_alias(&self) -> Option<&'a str> {
-        // Safety:
-        // Created from valid Table for this object
-        // which contains a valid value in this slot
-        unsafe {
-            self._tab.get::<flatbuffers::ForwardsUOffset<&str>>(
-                ExecuteQueryRequestInput::VT_QUERY_ALIAS,
-                None,
-            )
-        }
-    }
-    #[inline]
-    pub fn vocab(&self) -> Option<DatasetVocabulary<'a>> {
-        // Safety:
-        // Created from valid Table for this object
-        // which contains a valid value in this slot
-        unsafe {
-            self._tab
-                .get::<flatbuffers::ForwardsUOffset<DatasetVocabulary>>(
-                    ExecuteQueryRequestInput::VT_VOCAB,
-                    None,
-                )
-        }
-    }
-    #[inline]
-    pub fn offset_interval(&self) -> Option<OffsetInterval<'a>> {
-        // Safety:
-        // Created from valid Table for this object
-        // which contains a valid value in this slot
-        unsafe {
-            self._tab
-                .get::<flatbuffers::ForwardsUOffset<OffsetInterval>>(
-                    ExecuteQueryRequestInput::VT_OFFSET_INTERVAL,
-                    None,
-                )
-        }
-    }
-    #[inline]
-    pub fn data_paths(
-        &self,
-    ) -> Option<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<&'a str>>> {
-        // Safety:
-        // Created from valid Table for this object
-        // which contains a valid value in this slot
-        unsafe {
-            self._tab.get::<flatbuffers::ForwardsUOffset<
-                flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<&'a str>>,
-            >>(ExecuteQueryRequestInput::VT_DATA_PATHS, None)
-        }
-    }
-    #[inline]
-    pub fn schema_file(&self) -> Option<&'a str> {
-        // Safety:
-        // Created from valid Table for this object
-        // which contains a valid value in this slot
-        unsafe {
-            self._tab.get::<flatbuffers::ForwardsUOffset<&str>>(
-                ExecuteQueryRequestInput::VT_SCHEMA_FILE,
-                None,
-            )
-        }
-    }
-    #[inline]
-    pub fn explicit_watermarks(
-        &self,
-    ) -> Option<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<Watermark<'a>>>> {
-        // Safety:
-        // Created from valid Table for this object
-        // which contains a valid value in this slot
-        unsafe {
-            self._tab.get::<flatbuffers::ForwardsUOffset<
-                flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<Watermark>>,
-            >>(ExecuteQueryRequestInput::VT_EXPLICIT_WATERMARKS, None)
-        }
-    }
-}
-
-impl flatbuffers::Verifiable for ExecuteQueryRequestInput<'_> {
-    #[inline]
-    fn run_verifier(
-        v: &mut flatbuffers::Verifier,
-        pos: usize,
-    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
-        use self::flatbuffers::Verifiable;
-        v.visit_table(pos)?
-            .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, u8>>>(
-                "dataset_id",
-                Self::VT_DATASET_ID,
-                false,
-            )?
-            .visit_field::<flatbuffers::ForwardsUOffset<&str>>(
-                "dataset_alias",
-                Self::VT_DATASET_ALIAS,
-                false,
-            )?
-            .visit_field::<flatbuffers::ForwardsUOffset<&str>>(
-                "query_alias",
-                Self::VT_QUERY_ALIAS,
-                false,
-            )?
-            .visit_field::<flatbuffers::ForwardsUOffset<DatasetVocabulary>>(
-                "vocab",
-                Self::VT_VOCAB,
-                false,
-            )?
-            .visit_field::<flatbuffers::ForwardsUOffset<OffsetInterval>>(
-                "offset_interval",
-                Self::VT_OFFSET_INTERVAL,
-                false,
-            )?
-            .visit_field::<flatbuffers::ForwardsUOffset<
-                flatbuffers::Vector<'_, flatbuffers::ForwardsUOffset<&'_ str>>,
-            >>("data_paths", Self::VT_DATA_PATHS, false)?
-            .visit_field::<flatbuffers::ForwardsUOffset<&str>>(
-                "schema_file",
-                Self::VT_SCHEMA_FILE,
-                false,
-            )?
-            .visit_field::<flatbuffers::ForwardsUOffset<
-                flatbuffers::Vector<'_, flatbuffers::ForwardsUOffset<Watermark>>,
-            >>("explicit_watermarks", Self::VT_EXPLICIT_WATERMARKS, false)?
-            .finish();
-        Ok(())
-    }
-}
-pub struct ExecuteQueryRequestInputArgs<'a> {
-    pub dataset_id: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u8>>>,
-    pub dataset_alias: Option<flatbuffers::WIPOffset<&'a str>>,
-    pub query_alias: Option<flatbuffers::WIPOffset<&'a str>>,
-    pub vocab: Option<flatbuffers::WIPOffset<DatasetVocabulary<'a>>>,
-    pub offset_interval: Option<flatbuffers::WIPOffset<OffsetInterval<'a>>>,
-    pub data_paths: Option<
-        flatbuffers::WIPOffset<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<&'a str>>>,
-    >,
-    pub schema_file: Option<flatbuffers::WIPOffset<&'a str>>,
-    pub explicit_watermarks: Option<
-        flatbuffers::WIPOffset<
-            flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<Watermark<'a>>>,
-        >,
-    >,
-}
-impl<'a> Default for ExecuteQueryRequestInputArgs<'a> {
-    #[inline]
-    fn default() -> Self {
-        ExecuteQueryRequestInputArgs {
-            dataset_id: None,
-            dataset_alias: None,
-            query_alias: None,
-            vocab: None,
-            offset_interval: None,
-            data_paths: None,
-            schema_file: None,
-            explicit_watermarks: None,
-        }
-    }
-}
-
-pub struct ExecuteQueryRequestInputBuilder<'a: 'b, 'b> {
-    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
-    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
-}
-impl<'a: 'b, 'b> ExecuteQueryRequestInputBuilder<'a, 'b> {
-    #[inline]
-    pub fn add_dataset_id(
-        &mut self,
-        dataset_id: flatbuffers::WIPOffset<flatbuffers::Vector<'b, u8>>,
-    ) {
-        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
-            ExecuteQueryRequestInput::VT_DATASET_ID,
-            dataset_id,
-        );
-    }
-    #[inline]
-    pub fn add_dataset_alias(&mut self, dataset_alias: flatbuffers::WIPOffset<&'b str>) {
-        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
-            ExecuteQueryRequestInput::VT_DATASET_ALIAS,
-            dataset_alias,
-        );
-    }
-    #[inline]
-    pub fn add_query_alias(&mut self, query_alias: flatbuffers::WIPOffset<&'b str>) {
-        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
-            ExecuteQueryRequestInput::VT_QUERY_ALIAS,
-            query_alias,
-        );
-    }
-    #[inline]
-    pub fn add_vocab(&mut self, vocab: flatbuffers::WIPOffset<DatasetVocabulary<'b>>) {
-        self.fbb_
-            .push_slot_always::<flatbuffers::WIPOffset<DatasetVocabulary>>(
-                ExecuteQueryRequestInput::VT_VOCAB,
-                vocab,
-            );
-    }
-    #[inline]
-    pub fn add_offset_interval(
-        &mut self,
-        offset_interval: flatbuffers::WIPOffset<OffsetInterval<'b>>,
-    ) {
-        self.fbb_
-            .push_slot_always::<flatbuffers::WIPOffset<OffsetInterval>>(
-                ExecuteQueryRequestInput::VT_OFFSET_INTERVAL,
-                offset_interval,
-            );
-    }
-    #[inline]
-    pub fn add_data_paths(
-        &mut self,
-        data_paths: flatbuffers::WIPOffset<
-            flatbuffers::Vector<'b, flatbuffers::ForwardsUOffset<&'b str>>,
-        >,
-    ) {
-        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
-            ExecuteQueryRequestInput::VT_DATA_PATHS,
-            data_paths,
-        );
-    }
-    #[inline]
-    pub fn add_schema_file(&mut self, schema_file: flatbuffers::WIPOffset<&'b str>) {
-        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
-            ExecuteQueryRequestInput::VT_SCHEMA_FILE,
-            schema_file,
-        );
-    }
-    #[inline]
-    pub fn add_explicit_watermarks(
-        &mut self,
-        explicit_watermarks: flatbuffers::WIPOffset<
-            flatbuffers::Vector<'b, flatbuffers::ForwardsUOffset<Watermark<'b>>>,
-        >,
-    ) {
-        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
-            ExecuteQueryRequestInput::VT_EXPLICIT_WATERMARKS,
-            explicit_watermarks,
-        );
-    }
-    #[inline]
-    pub fn new(
-        _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>,
-    ) -> ExecuteQueryRequestInputBuilder<'a, 'b> {
-        let start = _fbb.start_table();
-        ExecuteQueryRequestInputBuilder {
-            fbb_: _fbb,
-            start_: start,
-        }
-    }
-    #[inline]
-    pub fn finish(self) -> flatbuffers::WIPOffset<ExecuteQueryRequestInput<'a>> {
-        let o = self.fbb_.end_table(self.start_);
-        flatbuffers::WIPOffset::new(o.value())
-    }
-}
-
-impl core::fmt::Debug for ExecuteQueryRequestInput<'_> {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        let mut ds = f.debug_struct("ExecuteQueryRequestInput");
-        ds.field("dataset_id", &self.dataset_id());
-        ds.field("dataset_alias", &self.dataset_alias());
-        ds.field("query_alias", &self.query_alias());
-        ds.field("vocab", &self.vocab());
-        ds.field("offset_interval", &self.offset_interval());
-        ds.field("data_paths", &self.data_paths());
-        ds.field("schema_file", &self.schema_file());
-        ds.field("explicit_watermarks", &self.explicit_watermarks());
-        ds.finish()
-    }
-}
-pub enum ExecuteQueryRequestOffset {}
-#[derive(Copy, Clone, PartialEq)]
-
-////////////////////////////////////////////////////////////////////////////////
-pub struct ExecuteQueryRequest<'a> {
-    pub _tab: flatbuffers::Table<'a>,
-}
-
-impl<'a> flatbuffers::Follow<'a> for ExecuteQueryRequest<'a> {
-    type Inner = ExecuteQueryRequest<'a>;
-    #[inline]
-    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
-        Self {
-            _tab: flatbuffers::Table::new(buf, loc),
-        }
-    }
-}
-
-impl<'a> ExecuteQueryRequest<'a> {
-    pub const VT_DATASET_ID: flatbuffers::VOffsetT = 4;
-    pub const VT_DATASET_ALIAS: flatbuffers::VOffsetT = 6;
-    pub const VT_SYSTEM_TIME: flatbuffers::VOffsetT = 8;
-    pub const VT_VOCAB: flatbuffers::VOffsetT = 10;
-    pub const VT_TRANSFORM_TYPE: flatbuffers::VOffsetT = 12;
-    pub const VT_TRANSFORM: flatbuffers::VOffsetT = 14;
-    pub const VT_QUERY_INPUTS: flatbuffers::VOffsetT = 16;
-    pub const VT_NEXT_OFFSET: flatbuffers::VOffsetT = 18;
-    pub const VT_PREV_CHECKPOINT_PATH: flatbuffers::VOffsetT = 20;
-    pub const VT_NEW_CHECKPOINT_PATH: flatbuffers::VOffsetT = 22;
-    pub const VT_NEW_DATA_PATH: flatbuffers::VOffsetT = 24;
-
-    #[inline]
-    pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
-        ExecuteQueryRequest { _tab: table }
-    }
-    #[allow(unused_mut)]
-    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
-        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
-        args: &'args ExecuteQueryRequestArgs<'args>,
-    ) -> flatbuffers::WIPOffset<ExecuteQueryRequest<'bldr>> {
-        let mut builder = ExecuteQueryRequestBuilder::new(_fbb);
-        builder.add_next_offset(args.next_offset);
-        if let Some(x) = args.new_data_path {
-            builder.add_new_data_path(x);
-        }
-        if let Some(x) = args.new_checkpoint_path {
-            builder.add_new_checkpoint_path(x);
-        }
-        if let Some(x) = args.prev_checkpoint_path {
-            builder.add_prev_checkpoint_path(x);
-        }
-        if let Some(x) = args.query_inputs {
-            builder.add_query_inputs(x);
-        }
-        if let Some(x) = args.transform {
-            builder.add_transform(x);
-        }
-        if let Some(x) = args.vocab {
-            builder.add_vocab(x);
-        }
-        if let Some(x) = args.system_time {
-            builder.add_system_time(x);
-        }
-        if let Some(x) = args.dataset_alias {
-            builder.add_dataset_alias(x);
-        }
-        if let Some(x) = args.dataset_id {
-            builder.add_dataset_id(x);
-        }
-        builder.add_transform_type(args.transform_type);
-        builder.finish()
-    }
-
-    #[inline]
-    pub fn dataset_id(&self) -> Option<flatbuffers::Vector<'a, u8>> {
-        // Safety:
-        // Created from valid Table for this object
-        // which contains a valid value in this slot
-        unsafe {
-            self._tab
-                .get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
-                    ExecuteQueryRequest::VT_DATASET_ID,
-                    None,
-                )
-        }
-    }
-    #[inline]
-    pub fn dataset_alias(&self) -> Option<&'a str> {
-        // Safety:
-        // Created from valid Table for this object
-        // which contains a valid value in this slot
-        unsafe {
-            self._tab.get::<flatbuffers::ForwardsUOffset<&str>>(
-                ExecuteQueryRequest::VT_DATASET_ALIAS,
-                None,
-            )
-        }
-    }
-    #[inline]
-    pub fn system_time(&self) -> Option<&'a Timestamp> {
-        // Safety:
-        // Created from valid Table for this object
-        // which contains a valid value in this slot
-        unsafe {
-            self._tab
-                .get::<Timestamp>(ExecuteQueryRequest::VT_SYSTEM_TIME, None)
-        }
-    }
-    #[inline]
-    pub fn vocab(&self) -> Option<DatasetVocabulary<'a>> {
-        // Safety:
-        // Created from valid Table for this object
-        // which contains a valid value in this slot
-        unsafe {
-            self._tab
-                .get::<flatbuffers::ForwardsUOffset<DatasetVocabulary>>(
-                    ExecuteQueryRequest::VT_VOCAB,
-                    None,
-                )
-        }
-    }
-    #[inline]
-    pub fn transform_type(&self) -> Transform {
-        // Safety:
-        // Created from valid Table for this object
-        // which contains a valid value in this slot
-        unsafe {
-            self._tab
-                .get::<Transform>(
-                    ExecuteQueryRequest::VT_TRANSFORM_TYPE,
-                    Some(Transform::NONE),
-                )
-                .unwrap()
-        }
-    }
-    #[inline]
-    pub fn transform(&self) -> Option<flatbuffers::Table<'a>> {
-        // Safety:
-        // Created from valid Table for this object
-        // which contains a valid value in this slot
-        unsafe {
-            self._tab
-                .get::<flatbuffers::ForwardsUOffset<flatbuffers::Table<'a>>>(
-                    ExecuteQueryRequest::VT_TRANSFORM,
-                    None,
-                )
-        }
-    }
-    #[inline]
-    pub fn query_inputs(
-        &self,
-    ) -> Option<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<ExecuteQueryRequestInput<'a>>>>
-    {
-        // Safety:
-        // Created from valid Table for this object
-        // which contains a valid value in this slot
-        unsafe {
-            self._tab.get::<flatbuffers::ForwardsUOffset<
-                flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<ExecuteQueryRequestInput>>,
-            >>(ExecuteQueryRequest::VT_QUERY_INPUTS, None)
-        }
-    }
-    #[inline]
-    pub fn next_offset(&self) -> u64 {
-        // Safety:
-        // Created from valid Table for this object
-        // which contains a valid value in this slot
-        unsafe {
-            self._tab
-                .get::<u64>(ExecuteQueryRequest::VT_NEXT_OFFSET, Some(0))
-                .unwrap()
-        }
-    }
-    #[inline]
-    pub fn prev_checkpoint_path(&self) -> Option<&'a str> {
-        // Safety:
-        // Created from valid Table for this object
-        // which contains a valid value in this slot
-        unsafe {
-            self._tab.get::<flatbuffers::ForwardsUOffset<&str>>(
-                ExecuteQueryRequest::VT_PREV_CHECKPOINT_PATH,
-                None,
-            )
-        }
-    }
-    #[inline]
-    pub fn new_checkpoint_path(&self) -> Option<&'a str> {
-        // Safety:
-        // Created from valid Table for this object
-        // which contains a valid value in this slot
-        unsafe {
-            self._tab.get::<flatbuffers::ForwardsUOffset<&str>>(
-                ExecuteQueryRequest::VT_NEW_CHECKPOINT_PATH,
-                None,
-            )
-        }
-    }
-    #[inline]
-    pub fn new_data_path(&self) -> Option<&'a str> {
-        // Safety:
-        // Created from valid Table for this object
-        // which contains a valid value in this slot
-        unsafe {
-            self._tab.get::<flatbuffers::ForwardsUOffset<&str>>(
-                ExecuteQueryRequest::VT_NEW_DATA_PATH,
-                None,
-            )
-        }
-    }
-    #[inline]
-    #[allow(non_snake_case)]
-    pub fn transform_as_transform_sql(&self) -> Option<TransformSql<'a>> {
-        if self.transform_type() == Transform::TransformSql {
-            self.transform().map(|t| {
-                // Safety:
-                // Created from a valid Table for this object
-                // Which contains a valid union in this slot
-                unsafe { TransformSql::init_from_table(t) }
-            })
-        } else {
-            None
-        }
-    }
-}
-
-impl flatbuffers::Verifiable for ExecuteQueryRequest<'_> {
-    #[inline]
-    fn run_verifier(
-        v: &mut flatbuffers::Verifier,
-        pos: usize,
-    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
-        use self::flatbuffers::Verifiable;
-        v.visit_table(pos)?
-            .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, u8>>>(
-                "dataset_id",
-                Self::VT_DATASET_ID,
-                false,
-            )?
-            .visit_field::<flatbuffers::ForwardsUOffset<&str>>(
-                "dataset_alias",
-                Self::VT_DATASET_ALIAS,
-                false,
-            )?
-            .visit_field::<Timestamp>("system_time", Self::VT_SYSTEM_TIME, false)?
-            .visit_field::<flatbuffers::ForwardsUOffset<DatasetVocabulary>>(
-                "vocab",
-                Self::VT_VOCAB,
-                false,
-            )?
-            .visit_union::<Transform, _>(
-                "transform_type",
-                Self::VT_TRANSFORM_TYPE,
-                "transform",
-                Self::VT_TRANSFORM,
-                false,
-                |key, v, pos| match key {
-                    Transform::TransformSql => v
-                        .verify_union_variant::<flatbuffers::ForwardsUOffset<TransformSql>>(
-                            "Transform::TransformSql",
-                            pos,
-                        ),
-                    _ => Ok(()),
-                },
-            )?
-            .visit_field::<flatbuffers::ForwardsUOffset<
-                flatbuffers::Vector<'_, flatbuffers::ForwardsUOffset<ExecuteQueryRequestInput>>,
-            >>("query_inputs", Self::VT_QUERY_INPUTS, false)?
-            .visit_field::<u64>("next_offset", Self::VT_NEXT_OFFSET, false)?
-            .visit_field::<flatbuffers::ForwardsUOffset<&str>>(
-                "prev_checkpoint_path",
-                Self::VT_PREV_CHECKPOINT_PATH,
-                false,
-            )?
-            .visit_field::<flatbuffers::ForwardsUOffset<&str>>(
-                "new_checkpoint_path",
-                Self::VT_NEW_CHECKPOINT_PATH,
-                false,
-            )?
-            .visit_field::<flatbuffers::ForwardsUOffset<&str>>(
-                "new_data_path",
-                Self::VT_NEW_DATA_PATH,
-                false,
-            )?
-            .finish();
-        Ok(())
-    }
-}
-pub struct ExecuteQueryRequestArgs<'a> {
-    pub dataset_id: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u8>>>,
-    pub dataset_alias: Option<flatbuffers::WIPOffset<&'a str>>,
-    pub system_time: Option<&'a Timestamp>,
-    pub vocab: Option<flatbuffers::WIPOffset<DatasetVocabulary<'a>>>,
-    pub transform_type: Transform,
-    pub transform: Option<flatbuffers::WIPOffset<flatbuffers::UnionWIPOffset>>,
-    pub query_inputs: Option<
-        flatbuffers::WIPOffset<
-            flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<ExecuteQueryRequestInput<'a>>>,
-        >,
-    >,
-    pub next_offset: u64,
-    pub prev_checkpoint_path: Option<flatbuffers::WIPOffset<&'a str>>,
-    pub new_checkpoint_path: Option<flatbuffers::WIPOffset<&'a str>>,
-    pub new_data_path: Option<flatbuffers::WIPOffset<&'a str>>,
-}
-impl<'a> Default for ExecuteQueryRequestArgs<'a> {
-    #[inline]
-    fn default() -> Self {
-        ExecuteQueryRequestArgs {
-            dataset_id: None,
-            dataset_alias: None,
-            system_time: None,
-            vocab: None,
-            transform_type: Transform::NONE,
-            transform: None,
-            query_inputs: None,
-            next_offset: 0,
-            prev_checkpoint_path: None,
-            new_checkpoint_path: None,
-            new_data_path: None,
-        }
-    }
-}
-
-pub struct ExecuteQueryRequestBuilder<'a: 'b, 'b> {
-    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
-    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
-}
-impl<'a: 'b, 'b> ExecuteQueryRequestBuilder<'a, 'b> {
-    #[inline]
-    pub fn add_dataset_id(
-        &mut self,
-        dataset_id: flatbuffers::WIPOffset<flatbuffers::Vector<'b, u8>>,
-    ) {
-        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
-            ExecuteQueryRequest::VT_DATASET_ID,
-            dataset_id,
-        );
-    }
-    #[inline]
-    pub fn add_dataset_alias(&mut self, dataset_alias: flatbuffers::WIPOffset<&'b str>) {
-        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
-            ExecuteQueryRequest::VT_DATASET_ALIAS,
-            dataset_alias,
-        );
-    }
-    #[inline]
-    pub fn add_system_time(&mut self, system_time: &Timestamp) {
-        self.fbb_
-            .push_slot_always::<&Timestamp>(ExecuteQueryRequest::VT_SYSTEM_TIME, system_time);
-    }
-    #[inline]
-    pub fn add_vocab(&mut self, vocab: flatbuffers::WIPOffset<DatasetVocabulary<'b>>) {
-        self.fbb_
-            .push_slot_always::<flatbuffers::WIPOffset<DatasetVocabulary>>(
-                ExecuteQueryRequest::VT_VOCAB,
-                vocab,
-            );
-    }
-    #[inline]
-    pub fn add_transform_type(&mut self, transform_type: Transform) {
-        self.fbb_.push_slot::<Transform>(
-            ExecuteQueryRequest::VT_TRANSFORM_TYPE,
-            transform_type,
-            Transform::NONE,
-        );
-    }
-    #[inline]
-    pub fn add_transform(
-        &mut self,
-        transform: flatbuffers::WIPOffset<flatbuffers::UnionWIPOffset>,
-    ) {
-        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
-            ExecuteQueryRequest::VT_TRANSFORM,
-            transform,
-        );
-    }
-    #[inline]
-    pub fn add_query_inputs(
-        &mut self,
-        query_inputs: flatbuffers::WIPOffset<
-            flatbuffers::Vector<'b, flatbuffers::ForwardsUOffset<ExecuteQueryRequestInput<'b>>>,
-        >,
-    ) {
-        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
-            ExecuteQueryRequest::VT_QUERY_INPUTS,
-            query_inputs,
-        );
-    }
-    #[inline]
-    pub fn add_next_offset(&mut self, next_offset: u64) {
-        self.fbb_
-            .push_slot::<u64>(ExecuteQueryRequest::VT_NEXT_OFFSET, next_offset, 0);
-    }
-    #[inline]
-    pub fn add_prev_checkpoint_path(
-        &mut self,
-        prev_checkpoint_path: flatbuffers::WIPOffset<&'b str>,
-    ) {
-        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
-            ExecuteQueryRequest::VT_PREV_CHECKPOINT_PATH,
-            prev_checkpoint_path,
-        );
-    }
-    #[inline]
-    pub fn add_new_checkpoint_path(
-        &mut self,
-        new_checkpoint_path: flatbuffers::WIPOffset<&'b str>,
-    ) {
-        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
-            ExecuteQueryRequest::VT_NEW_CHECKPOINT_PATH,
-            new_checkpoint_path,
-        );
-    }
-    #[inline]
-    pub fn add_new_data_path(&mut self, new_data_path: flatbuffers::WIPOffset<&'b str>) {
-        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
-            ExecuteQueryRequest::VT_NEW_DATA_PATH,
-            new_data_path,
-        );
-    }
-    #[inline]
-    pub fn new(
-        _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>,
-    ) -> ExecuteQueryRequestBuilder<'a, 'b> {
-        let start = _fbb.start_table();
-        ExecuteQueryRequestBuilder {
-            fbb_: _fbb,
-            start_: start,
-        }
-    }
-    #[inline]
-    pub fn finish(self) -> flatbuffers::WIPOffset<ExecuteQueryRequest<'a>> {
-        let o = self.fbb_.end_table(self.start_);
-        flatbuffers::WIPOffset::new(o.value())
-    }
-}
-
-impl core::fmt::Debug for ExecuteQueryRequest<'_> {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        let mut ds = f.debug_struct("ExecuteQueryRequest");
-        ds.field("dataset_id", &self.dataset_id());
-        ds.field("dataset_alias", &self.dataset_alias());
-        ds.field("system_time", &self.system_time());
-        ds.field("vocab", &self.vocab());
-        ds.field("transform_type", &self.transform_type());
-        match self.transform_type() {
-            Transform::TransformSql => {
-                if let Some(x) = self.transform_as_transform_sql() {
-                    ds.field("transform", &x)
-                } else {
-                    ds.field(
-                        "transform",
-                        &"InvalidFlatbuffer: Union discriminant does not match value.",
-                    )
-                }
-            }
-            _ => {
-                let x: Option<()> = None;
-                ds.field("transform", &x)
-            }
-        };
-        ds.field("query_inputs", &self.query_inputs());
-        ds.field("next_offset", &self.next_offset());
-        ds.field("prev_checkpoint_path", &self.prev_checkpoint_path());
-        ds.field("new_checkpoint_path", &self.new_checkpoint_path());
-        ds.field("new_data_path", &self.new_data_path());
-        ds.finish()
-    }
-}
-pub enum ExecuteQueryResponseProgressOffset {}
-#[derive(Copy, Clone, PartialEq)]
-
-////////////////////////////////////////////////////////////////////////////////
-pub struct ExecuteQueryResponseProgress<'a> {
-    pub _tab: flatbuffers::Table<'a>,
-}
-
-impl<'a> flatbuffers::Follow<'a> for ExecuteQueryResponseProgress<'a> {
-    type Inner = ExecuteQueryResponseProgress<'a>;
-    #[inline]
-    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
-        Self {
-            _tab: flatbuffers::Table::new(buf, loc),
-        }
-    }
-}
-
-impl<'a> ExecuteQueryResponseProgress<'a> {
-    #[inline]
-    pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
-        ExecuteQueryResponseProgress { _tab: table }
-    }
-    #[allow(unused_mut)]
-    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
-        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
-        _args: &'args ExecuteQueryResponseProgressArgs,
-    ) -> flatbuffers::WIPOffset<ExecuteQueryResponseProgress<'bldr>> {
-        let mut builder = ExecuteQueryResponseProgressBuilder::new(_fbb);
-        builder.finish()
-    }
-}
-
-impl flatbuffers::Verifiable for ExecuteQueryResponseProgress<'_> {
-    #[inline]
-    fn run_verifier(
-        v: &mut flatbuffers::Verifier,
-        pos: usize,
-    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
-        use self::flatbuffers::Verifiable;
-        v.visit_table(pos)?.finish();
-        Ok(())
-    }
-}
-pub struct ExecuteQueryResponseProgressArgs {}
-impl<'a> Default for ExecuteQueryResponseProgressArgs {
-    #[inline]
-    fn default() -> Self {
-        ExecuteQueryResponseProgressArgs {}
-    }
-}
-
-pub struct ExecuteQueryResponseProgressBuilder<'a: 'b, 'b> {
-    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
-    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
-}
-impl<'a: 'b, 'b> ExecuteQueryResponseProgressBuilder<'a, 'b> {
-    #[inline]
-    pub fn new(
-        _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>,
-    ) -> ExecuteQueryResponseProgressBuilder<'a, 'b> {
-        let start = _fbb.start_table();
-        ExecuteQueryResponseProgressBuilder {
-            fbb_: _fbb,
-            start_: start,
-        }
-    }
-    #[inline]
-    pub fn finish(self) -> flatbuffers::WIPOffset<ExecuteQueryResponseProgress<'a>> {
-        let o = self.fbb_.end_table(self.start_);
-        flatbuffers::WIPOffset::new(o.value())
-    }
-}
-
-impl core::fmt::Debug for ExecuteQueryResponseProgress<'_> {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        let mut ds = f.debug_struct("ExecuteQueryResponseProgress");
-        ds.finish()
-    }
-}
-pub enum ExecuteQueryResponseSuccessOffset {}
-#[derive(Copy, Clone, PartialEq)]
-
-pub struct ExecuteQueryResponseSuccess<'a> {
-    pub _tab: flatbuffers::Table<'a>,
-}
-
-impl<'a> flatbuffers::Follow<'a> for ExecuteQueryResponseSuccess<'a> {
-    type Inner = ExecuteQueryResponseSuccess<'a>;
-    #[inline]
-    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
-        Self {
-            _tab: flatbuffers::Table::new(buf, loc),
-        }
-    }
-}
-
-impl<'a> ExecuteQueryResponseSuccess<'a> {
-    pub const VT_NEW_OFFSET_INTERVAL: flatbuffers::VOffsetT = 4;
-    pub const VT_NEW_WATERMARK: flatbuffers::VOffsetT = 6;
-
-    #[inline]
-    pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
-        ExecuteQueryResponseSuccess { _tab: table }
-    }
-    #[allow(unused_mut)]
-    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
-        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
-        args: &'args ExecuteQueryResponseSuccessArgs<'args>,
-    ) -> flatbuffers::WIPOffset<ExecuteQueryResponseSuccess<'bldr>> {
-        let mut builder = ExecuteQueryResponseSuccessBuilder::new(_fbb);
-        if let Some(x) = args.new_watermark {
-            builder.add_new_watermark(x);
-        }
-        if let Some(x) = args.new_offset_interval {
-            builder.add_new_offset_interval(x);
-        }
-        builder.finish()
-    }
-
-    #[inline]
-    pub fn new_offset_interval(&self) -> Option<OffsetInterval<'a>> {
-        // Safety:
-        // Created from valid Table for this object
-        // which contains a valid value in this slot
-        unsafe {
-            self._tab
-                .get::<flatbuffers::ForwardsUOffset<OffsetInterval>>(
-                    ExecuteQueryResponseSuccess::VT_NEW_OFFSET_INTERVAL,
-                    None,
-                )
-        }
-    }
-    #[inline]
-    pub fn new_watermark(&self) -> Option<&'a Timestamp> {
-        // Safety:
-        // Created from valid Table for this object
-        // which contains a valid value in this slot
-        unsafe {
-            self._tab
-                .get::<Timestamp>(ExecuteQueryResponseSuccess::VT_NEW_WATERMARK, None)
-        }
-    }
-}
-
-impl flatbuffers::Verifiable for ExecuteQueryResponseSuccess<'_> {
-    #[inline]
-    fn run_verifier(
-        v: &mut flatbuffers::Verifier,
-        pos: usize,
-    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
-        use self::flatbuffers::Verifiable;
-        v.visit_table(pos)?
-            .visit_field::<flatbuffers::ForwardsUOffset<OffsetInterval>>(
-                "new_offset_interval",
-                Self::VT_NEW_OFFSET_INTERVAL,
-                false,
-            )?
-            .visit_field::<Timestamp>("new_watermark", Self::VT_NEW_WATERMARK, false)?
-            .finish();
-        Ok(())
-    }
-}
-pub struct ExecuteQueryResponseSuccessArgs<'a> {
-    pub new_offset_interval: Option<flatbuffers::WIPOffset<OffsetInterval<'a>>>,
-    pub new_watermark: Option<&'a Timestamp>,
-}
-impl<'a> Default for ExecuteQueryResponseSuccessArgs<'a> {
-    #[inline]
-    fn default() -> Self {
-        ExecuteQueryResponseSuccessArgs {
-            new_offset_interval: None,
-            new_watermark: None,
-        }
-    }
-}
-
-pub struct ExecuteQueryResponseSuccessBuilder<'a: 'b, 'b> {
-    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
-    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
-}
-impl<'a: 'b, 'b> ExecuteQueryResponseSuccessBuilder<'a, 'b> {
-    #[inline]
-    pub fn add_new_offset_interval(
-        &mut self,
-        new_offset_interval: flatbuffers::WIPOffset<OffsetInterval<'b>>,
-    ) {
-        self.fbb_
-            .push_slot_always::<flatbuffers::WIPOffset<OffsetInterval>>(
-                ExecuteQueryResponseSuccess::VT_NEW_OFFSET_INTERVAL,
-                new_offset_interval,
-            );
-    }
-    #[inline]
-    pub fn add_new_watermark(&mut self, new_watermark: &Timestamp) {
-        self.fbb_.push_slot_always::<&Timestamp>(
-            ExecuteQueryResponseSuccess::VT_NEW_WATERMARK,
-            new_watermark,
-        );
-    }
-    #[inline]
-    pub fn new(
-        _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>,
-    ) -> ExecuteQueryResponseSuccessBuilder<'a, 'b> {
-        let start = _fbb.start_table();
-        ExecuteQueryResponseSuccessBuilder {
-            fbb_: _fbb,
-            start_: start,
-        }
-    }
-    #[inline]
-    pub fn finish(self) -> flatbuffers::WIPOffset<ExecuteQueryResponseSuccess<'a>> {
-        let o = self.fbb_.end_table(self.start_);
-        flatbuffers::WIPOffset::new(o.value())
-    }
-}
-
-impl core::fmt::Debug for ExecuteQueryResponseSuccess<'_> {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        let mut ds = f.debug_struct("ExecuteQueryResponseSuccess");
-        ds.field("new_offset_interval", &self.new_offset_interval());
-        ds.field("new_watermark", &self.new_watermark());
-        ds.finish()
-    }
-}
-pub enum ExecuteQueryResponseInvalidQueryOffset {}
-#[derive(Copy, Clone, PartialEq)]
-
-pub struct ExecuteQueryResponseInvalidQuery<'a> {
-    pub _tab: flatbuffers::Table<'a>,
-}
-
-impl<'a> flatbuffers::Follow<'a> for ExecuteQueryResponseInvalidQuery<'a> {
-    type Inner = ExecuteQueryResponseInvalidQuery<'a>;
-    #[inline]
-    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
-        Self {
-            _tab: flatbuffers::Table::new(buf, loc),
-        }
-    }
-}
-
-impl<'a> ExecuteQueryResponseInvalidQuery<'a> {
-    pub const VT_MESSAGE: flatbuffers::VOffsetT = 4;
-
-    #[inline]
-    pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
-        ExecuteQueryResponseInvalidQuery { _tab: table }
-    }
-    #[allow(unused_mut)]
-    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
-        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
-        args: &'args ExecuteQueryResponseInvalidQueryArgs<'args>,
-    ) -> flatbuffers::WIPOffset<ExecuteQueryResponseInvalidQuery<'bldr>> {
-        let mut builder = ExecuteQueryResponseInvalidQueryBuilder::new(_fbb);
-        if let Some(x) = args.message {
-            builder.add_message(x);
-        }
-        builder.finish()
-    }
-
-    #[inline]
-    pub fn message(&self) -> Option<&'a str> {
-        // Safety:
-        // Created from valid Table for this object
-        // which contains a valid value in this slot
-        unsafe {
-            self._tab.get::<flatbuffers::ForwardsUOffset<&str>>(
-                ExecuteQueryResponseInvalidQuery::VT_MESSAGE,
-                None,
-            )
-        }
-    }
-}
-
-impl flatbuffers::Verifiable for ExecuteQueryResponseInvalidQuery<'_> {
-    #[inline]
-    fn run_verifier(
-        v: &mut flatbuffers::Verifier,
-        pos: usize,
-    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
-        use self::flatbuffers::Verifiable;
-        v.visit_table(pos)?
-            .visit_field::<flatbuffers::ForwardsUOffset<&str>>("message", Self::VT_MESSAGE, false)?
-            .finish();
-        Ok(())
-    }
-}
-pub struct ExecuteQueryResponseInvalidQueryArgs<'a> {
-    pub message: Option<flatbuffers::WIPOffset<&'a str>>,
-}
-impl<'a> Default for ExecuteQueryResponseInvalidQueryArgs<'a> {
-    #[inline]
-    fn default() -> Self {
-        ExecuteQueryResponseInvalidQueryArgs { message: None }
-    }
-}
-
-pub struct ExecuteQueryResponseInvalidQueryBuilder<'a: 'b, 'b> {
-    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
-    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
-}
-impl<'a: 'b, 'b> ExecuteQueryResponseInvalidQueryBuilder<'a, 'b> {
-    #[inline]
-    pub fn add_message(&mut self, message: flatbuffers::WIPOffset<&'b str>) {
-        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
-            ExecuteQueryResponseInvalidQuery::VT_MESSAGE,
-            message,
-        );
-    }
-    #[inline]
-    pub fn new(
-        _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>,
-    ) -> ExecuteQueryResponseInvalidQueryBuilder<'a, 'b> {
-        let start = _fbb.start_table();
-        ExecuteQueryResponseInvalidQueryBuilder {
-            fbb_: _fbb,
-            start_: start,
-        }
-    }
-    #[inline]
-    pub fn finish(self) -> flatbuffers::WIPOffset<ExecuteQueryResponseInvalidQuery<'a>> {
-        let o = self.fbb_.end_table(self.start_);
-        flatbuffers::WIPOffset::new(o.value())
-    }
-}
-
-impl core::fmt::Debug for ExecuteQueryResponseInvalidQuery<'_> {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        let mut ds = f.debug_struct("ExecuteQueryResponseInvalidQuery");
-        ds.field("message", &self.message());
-        ds.finish()
-    }
-}
-pub enum ExecuteQueryResponseInternalErrorOffset {}
-#[derive(Copy, Clone, PartialEq)]
-
-pub struct ExecuteQueryResponseInternalError<'a> {
-    pub _tab: flatbuffers::Table<'a>,
-}
-
-impl<'a> flatbuffers::Follow<'a> for ExecuteQueryResponseInternalError<'a> {
-    type Inner = ExecuteQueryResponseInternalError<'a>;
-    #[inline]
-    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
-        Self {
-            _tab: flatbuffers::Table::new(buf, loc),
-        }
-    }
-}
-
-impl<'a> ExecuteQueryResponseInternalError<'a> {
-    pub const VT_MESSAGE: flatbuffers::VOffsetT = 4;
-    pub const VT_BACKTRACE: flatbuffers::VOffsetT = 6;
-
-    #[inline]
-    pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
-        ExecuteQueryResponseInternalError { _tab: table }
-    }
-    #[allow(unused_mut)]
-    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
-        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
-        args: &'args ExecuteQueryResponseInternalErrorArgs<'args>,
-    ) -> flatbuffers::WIPOffset<ExecuteQueryResponseInternalError<'bldr>> {
-        let mut builder = ExecuteQueryResponseInternalErrorBuilder::new(_fbb);
-        if let Some(x) = args.backtrace {
-            builder.add_backtrace(x);
-        }
-        if let Some(x) = args.message {
-            builder.add_message(x);
-        }
-        builder.finish()
-    }
-
-    #[inline]
-    pub fn message(&self) -> Option<&'a str> {
-        // Safety:
-        // Created from valid Table for this object
-        // which contains a valid value in this slot
-        unsafe {
-            self._tab.get::<flatbuffers::ForwardsUOffset<&str>>(
-                ExecuteQueryResponseInternalError::VT_MESSAGE,
-                None,
-            )
-        }
-    }
-    #[inline]
-    pub fn backtrace(&self) -> Option<&'a str> {
-        // Safety:
-        // Created from valid Table for this object
-        // which contains a valid value in this slot
-        unsafe {
-            self._tab.get::<flatbuffers::ForwardsUOffset<&str>>(
-                ExecuteQueryResponseInternalError::VT_BACKTRACE,
-                None,
-            )
-        }
-    }
-}
-
-impl flatbuffers::Verifiable for ExecuteQueryResponseInternalError<'_> {
-    #[inline]
-    fn run_verifier(
-        v: &mut flatbuffers::Verifier,
-        pos: usize,
-    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
-        use self::flatbuffers::Verifiable;
-        v.visit_table(pos)?
-            .visit_field::<flatbuffers::ForwardsUOffset<&str>>("message", Self::VT_MESSAGE, false)?
-            .visit_field::<flatbuffers::ForwardsUOffset<&str>>(
-                "backtrace",
-                Self::VT_BACKTRACE,
-                false,
-            )?
-            .finish();
-        Ok(())
-    }
-}
-pub struct ExecuteQueryResponseInternalErrorArgs<'a> {
-    pub message: Option<flatbuffers::WIPOffset<&'a str>>,
-    pub backtrace: Option<flatbuffers::WIPOffset<&'a str>>,
-}
-impl<'a> Default for ExecuteQueryResponseInternalErrorArgs<'a> {
-    #[inline]
-    fn default() -> Self {
-        ExecuteQueryResponseInternalErrorArgs {
-            message: None,
-            backtrace: None,
-        }
-    }
-}
-
-pub struct ExecuteQueryResponseInternalErrorBuilder<'a: 'b, 'b> {
-    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
-    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
-}
-impl<'a: 'b, 'b> ExecuteQueryResponseInternalErrorBuilder<'a, 'b> {
-    #[inline]
-    pub fn add_message(&mut self, message: flatbuffers::WIPOffset<&'b str>) {
-        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
-            ExecuteQueryResponseInternalError::VT_MESSAGE,
-            message,
-        );
-    }
-    #[inline]
-    pub fn add_backtrace(&mut self, backtrace: flatbuffers::WIPOffset<&'b str>) {
-        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
-            ExecuteQueryResponseInternalError::VT_BACKTRACE,
-            backtrace,
-        );
-    }
-    #[inline]
-    pub fn new(
-        _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>,
-    ) -> ExecuteQueryResponseInternalErrorBuilder<'a, 'b> {
-        let start = _fbb.start_table();
-        ExecuteQueryResponseInternalErrorBuilder {
-            fbb_: _fbb,
-            start_: start,
-        }
-    }
-    #[inline]
-    pub fn finish(self) -> flatbuffers::WIPOffset<ExecuteQueryResponseInternalError<'a>> {
-        let o = self.fbb_.end_table(self.start_);
-        flatbuffers::WIPOffset::new(o.value())
-    }
-}
-
-impl core::fmt::Debug for ExecuteQueryResponseInternalError<'_> {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        let mut ds = f.debug_struct("ExecuteQueryResponseInternalError");
-        ds.field("message", &self.message());
-        ds.field("backtrace", &self.backtrace());
-        ds.finish()
-    }
-}
-pub enum ExecuteQueryResponseRootOffset {}
-#[derive(Copy, Clone, PartialEq)]
-
-pub struct ExecuteQueryResponseRoot<'a> {
-    pub _tab: flatbuffers::Table<'a>,
-}
-
-impl<'a> flatbuffers::Follow<'a> for ExecuteQueryResponseRoot<'a> {
-    type Inner = ExecuteQueryResponseRoot<'a>;
-    #[inline]
-    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
-        Self {
-            _tab: flatbuffers::Table::new(buf, loc),
-        }
-    }
-}
-
-impl<'a> ExecuteQueryResponseRoot<'a> {
-    pub const VT_VALUE_TYPE: flatbuffers::VOffsetT = 4;
-    pub const VT_VALUE: flatbuffers::VOffsetT = 6;
-
-    #[inline]
-    pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
-        ExecuteQueryResponseRoot { _tab: table }
-    }
-    #[allow(unused_mut)]
-    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
-        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
-        args: &'args ExecuteQueryResponseRootArgs,
-    ) -> flatbuffers::WIPOffset<ExecuteQueryResponseRoot<'bldr>> {
-        let mut builder = ExecuteQueryResponseRootBuilder::new(_fbb);
-        if let Some(x) = args.value {
-            builder.add_value(x);
-        }
-        builder.add_value_type(args.value_type);
-        builder.finish()
-    }
-
-    #[inline]
-    pub fn value_type(&self) -> ExecuteQueryResponse {
-        // Safety:
-        // Created from valid Table for this object
-        // which contains a valid value in this slot
-        unsafe {
-            self._tab
-                .get::<ExecuteQueryResponse>(
-                    ExecuteQueryResponseRoot::VT_VALUE_TYPE,
-                    Some(ExecuteQueryResponse::NONE),
-                )
-                .unwrap()
-        }
-    }
-    #[inline]
-    pub fn value(&self) -> Option<flatbuffers::Table<'a>> {
-        // Safety:
-        // Created from valid Table for this object
-        // which contains a valid value in this slot
-        unsafe {
-            self._tab
-                .get::<flatbuffers::ForwardsUOffset<flatbuffers::Table<'a>>>(
-                    ExecuteQueryResponseRoot::VT_VALUE,
-                    None,
-                )
-        }
-    }
-    #[inline]
-    #[allow(non_snake_case)]
-    pub fn value_as_execute_query_response_progress(
-        &self,
-    ) -> Option<ExecuteQueryResponseProgress<'a>> {
-        if self.value_type() == ExecuteQueryResponse::ExecuteQueryResponseProgress {
-            self.value().map(|t| {
-                // Safety:
-                // Created from a valid Table for this object
-                // Which contains a valid union in this slot
-                unsafe { ExecuteQueryResponseProgress::init_from_table(t) }
-            })
-        } else {
-            None
-        }
-    }
-
-    #[inline]
-    #[allow(non_snake_case)]
-    pub fn value_as_execute_query_response_success(
-        &self,
-    ) -> Option<ExecuteQueryResponseSuccess<'a>> {
-        if self.value_type() == ExecuteQueryResponse::ExecuteQueryResponseSuccess {
-            self.value().map(|t| {
-                // Safety:
-                // Created from a valid Table for this object
-                // Which contains a valid union in this slot
-                unsafe { ExecuteQueryResponseSuccess::init_from_table(t) }
-            })
-        } else {
-            None
-        }
-    }
-
-    #[inline]
-    #[allow(non_snake_case)]
-    pub fn value_as_execute_query_response_invalid_query(
-        &self,
-    ) -> Option<ExecuteQueryResponseInvalidQuery<'a>> {
-        if self.value_type() == ExecuteQueryResponse::ExecuteQueryResponseInvalidQuery {
-            self.value().map(|t| {
-                // Safety:
-                // Created from a valid Table for this object
-                // Which contains a valid union in this slot
-                unsafe { ExecuteQueryResponseInvalidQuery::init_from_table(t) }
-            })
-        } else {
-            None
-        }
-    }
-
-    #[inline]
-    #[allow(non_snake_case)]
-    pub fn value_as_execute_query_response_internal_error(
-        &self,
-    ) -> Option<ExecuteQueryResponseInternalError<'a>> {
-        if self.value_type() == ExecuteQueryResponse::ExecuteQueryResponseInternalError {
-            self.value().map(|t| {
-                // Safety:
-                // Created from a valid Table for this object
-                // Which contains a valid union in this slot
-                unsafe { ExecuteQueryResponseInternalError::init_from_table(t) }
-            })
-        } else {
-            None
-        }
-    }
-}
-
-impl flatbuffers::Verifiable for ExecuteQueryResponseRoot<'_> {
-    #[inline]
-    fn run_verifier(
-        v: &mut flatbuffers::Verifier,
-        pos: usize,
-    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
-        use self::flatbuffers::Verifiable;
-        v.visit_table(pos)?
-     .visit_union::<ExecuteQueryResponse, _>("value_type", Self::VT_VALUE_TYPE, "value", Self::VT_VALUE, false, |key, v, pos| {
-        match key {
-          ExecuteQueryResponse::ExecuteQueryResponseProgress => v.verify_union_variant::<flatbuffers::ForwardsUOffset<ExecuteQueryResponseProgress>>("ExecuteQueryResponse::ExecuteQueryResponseProgress", pos),
-          ExecuteQueryResponse::ExecuteQueryResponseSuccess => v.verify_union_variant::<flatbuffers::ForwardsUOffset<ExecuteQueryResponseSuccess>>("ExecuteQueryResponse::ExecuteQueryResponseSuccess", pos),
-          ExecuteQueryResponse::ExecuteQueryResponseInvalidQuery => v.verify_union_variant::<flatbuffers::ForwardsUOffset<ExecuteQueryResponseInvalidQuery>>("ExecuteQueryResponse::ExecuteQueryResponseInvalidQuery", pos),
-          ExecuteQueryResponse::ExecuteQueryResponseInternalError => v.verify_union_variant::<flatbuffers::ForwardsUOffset<ExecuteQueryResponseInternalError>>("ExecuteQueryResponse::ExecuteQueryResponseInternalError", pos),
-          _ => Ok(()),
-        }
-     })?
-     .finish();
-        Ok(())
-    }
-}
-pub struct ExecuteQueryResponseRootArgs {
-    pub value_type: ExecuteQueryResponse,
-    pub value: Option<flatbuffers::WIPOffset<flatbuffers::UnionWIPOffset>>,
-}
-impl<'a> Default for ExecuteQueryResponseRootArgs {
-    #[inline]
-    fn default() -> Self {
-        ExecuteQueryResponseRootArgs {
-            value_type: ExecuteQueryResponse::NONE,
-            value: None,
-        }
-    }
-}
-
-pub struct ExecuteQueryResponseRootBuilder<'a: 'b, 'b> {
-    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
-    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
-}
-impl<'a: 'b, 'b> ExecuteQueryResponseRootBuilder<'a, 'b> {
-    #[inline]
-    pub fn add_value_type(&mut self, value_type: ExecuteQueryResponse) {
-        self.fbb_.push_slot::<ExecuteQueryResponse>(
-            ExecuteQueryResponseRoot::VT_VALUE_TYPE,
-            value_type,
-            ExecuteQueryResponse::NONE,
-        );
-    }
-    #[inline]
-    pub fn add_value(&mut self, value: flatbuffers::WIPOffset<flatbuffers::UnionWIPOffset>) {
-        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
-            ExecuteQueryResponseRoot::VT_VALUE,
-            value,
-        );
-    }
-    #[inline]
-    pub fn new(
-        _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>,
-    ) -> ExecuteQueryResponseRootBuilder<'a, 'b> {
-        let start = _fbb.start_table();
-        ExecuteQueryResponseRootBuilder {
-            fbb_: _fbb,
-            start_: start,
-        }
-    }
-    #[inline]
-    pub fn finish(self) -> flatbuffers::WIPOffset<ExecuteQueryResponseRoot<'a>> {
-        let o = self.fbb_.end_table(self.start_);
-        flatbuffers::WIPOffset::new(o.value())
-    }
-}
-
-impl core::fmt::Debug for ExecuteQueryResponseRoot<'_> {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        let mut ds = f.debug_struct("ExecuteQueryResponseRoot");
-        ds.field("value_type", &self.value_type());
-        match self.value_type() {
-            ExecuteQueryResponse::ExecuteQueryResponseProgress => {
-                if let Some(x) = self.value_as_execute_query_response_progress() {
-                    ds.field("value", &x)
-                } else {
-                    ds.field(
-                        "value",
-                        &"InvalidFlatbuffer: Union discriminant does not match value.",
-                    )
-                }
-            }
-            ExecuteQueryResponse::ExecuteQueryResponseSuccess => {
-                if let Some(x) = self.value_as_execute_query_response_success() {
-                    ds.field("value", &x)
-                } else {
-                    ds.field(
-                        "value",
-                        &"InvalidFlatbuffer: Union discriminant does not match value.",
-                    )
-                }
-            }
-            ExecuteQueryResponse::ExecuteQueryResponseInvalidQuery => {
-                if let Some(x) = self.value_as_execute_query_response_invalid_query() {
-                    ds.field("value", &x)
-                } else {
-                    ds.field(
-                        "value",
-                        &"InvalidFlatbuffer: Union discriminant does not match value.",
-                    )
-                }
-            }
-            ExecuteQueryResponse::ExecuteQueryResponseInternalError => {
-                if let Some(x) = self.value_as_execute_query_response_internal_error() {
-                    ds.field("value", &x)
-                } else {
-                    ds.field(
-                        "value",
-                        &"InvalidFlatbuffer: Union discriminant does not match value.",
-                    )
-                }
-            }
-            _ => {
-                let x: Option<()> = None;
-                ds.field("value", &x)
-            }
-        };
-        ds.finish()
-    }
-}
 pub enum ManifestOffset {}
 #[derive(Copy, Clone, PartialEq)]
 
@@ -12333,13 +10763,13 @@ impl<'a> MetadataBlock<'a> {
 
     #[inline]
     #[allow(non_snake_case)]
-    pub fn event_as_execute_query(&self) -> Option<ExecuteQuery<'a>> {
-        if self.event_type() == MetadataEvent::ExecuteQuery {
+    pub fn event_as_execute_transform(&self) -> Option<ExecuteTransform<'a>> {
+        if self.event_type() == MetadataEvent::ExecuteTransform {
             self.event().map(|t| {
                 // Safety:
                 // Created from a valid Table for this object
                 // Which contains a valid union in this slot
-                unsafe { ExecuteQuery::init_from_table(t) }
+                unsafe { ExecuteTransform::init_from_table(t) }
             })
         } else {
             None
@@ -12539,9 +10969,9 @@ impl flatbuffers::Verifiable for MetadataBlock<'_> {
                             "MetadataEvent::AddData",
                             pos,
                         ),
-                    MetadataEvent::ExecuteQuery => v
-                        .verify_union_variant::<flatbuffers::ForwardsUOffset<ExecuteQuery>>(
-                            "MetadataEvent::ExecuteQuery",
+                    MetadataEvent::ExecuteTransform => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<ExecuteTransform>>(
+                            "MetadataEvent::ExecuteTransform",
                             pos,
                         ),
                     MetadataEvent::Seed => v
@@ -12697,8 +11127,8 @@ impl core::fmt::Debug for MetadataBlock<'_> {
                     )
                 }
             }
-            MetadataEvent::ExecuteQuery => {
-                if let Some(x) = self.event_as_execute_query() {
+            MetadataEvent::ExecuteTransform => {
+                if let Some(x) = self.event_as_execute_transform() {
                     ds.field("event", &x)
                 } else {
                     ds.field(
@@ -12820,6 +11250,2615 @@ impl core::fmt::Debug for MetadataBlock<'_> {
             _ => {
                 let x: Option<()> = None;
                 ds.field("event", &x)
+            }
+        };
+        ds.finish()
+    }
+}
+pub enum RawQueryRequestOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+////////////////////////////////////////////////////////////////////////////////
+pub struct RawQueryRequest<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for RawQueryRequest<'a> {
+    type Inner = RawQueryRequest<'a>;
+    #[inline]
+    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table::new(buf, loc),
+        }
+    }
+}
+
+impl<'a> RawQueryRequest<'a> {
+    pub const VT_INPUT_DATA_PATHS: flatbuffers::VOffsetT = 4;
+    pub const VT_TRANSFORM_TYPE: flatbuffers::VOffsetT = 6;
+    pub const VT_TRANSFORM: flatbuffers::VOffsetT = 8;
+    pub const VT_OUTPUT_DATA_PATH: flatbuffers::VOffsetT = 10;
+
+    #[inline]
+    pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        RawQueryRequest { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
+        args: &'args RawQueryRequestArgs<'args>,
+    ) -> flatbuffers::WIPOffset<RawQueryRequest<'bldr>> {
+        let mut builder = RawQueryRequestBuilder::new(_fbb);
+        if let Some(x) = args.output_data_path {
+            builder.add_output_data_path(x);
+        }
+        if let Some(x) = args.transform {
+            builder.add_transform(x);
+        }
+        if let Some(x) = args.input_data_paths {
+            builder.add_input_data_paths(x);
+        }
+        builder.add_transform_type(args.transform_type);
+        builder.finish()
+    }
+
+    #[inline]
+    pub fn input_data_paths(
+        &self,
+    ) -> Option<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<&'a str>>> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab.get::<flatbuffers::ForwardsUOffset<
+                flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<&'a str>>,
+            >>(RawQueryRequest::VT_INPUT_DATA_PATHS, None)
+        }
+    }
+    #[inline]
+    pub fn transform_type(&self) -> Transform {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<Transform>(RawQueryRequest::VT_TRANSFORM_TYPE, Some(Transform::NONE))
+                .unwrap()
+        }
+    }
+    #[inline]
+    pub fn transform(&self) -> Option<flatbuffers::Table<'a>> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<flatbuffers::ForwardsUOffset<flatbuffers::Table<'a>>>(
+                    RawQueryRequest::VT_TRANSFORM,
+                    None,
+                )
+        }
+    }
+    #[inline]
+    pub fn output_data_path(&self) -> Option<&'a str> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab.get::<flatbuffers::ForwardsUOffset<&str>>(
+                RawQueryRequest::VT_OUTPUT_DATA_PATH,
+                None,
+            )
+        }
+    }
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn transform_as_transform_sql(&self) -> Option<TransformSql<'a>> {
+        if self.transform_type() == Transform::TransformSql {
+            self.transform().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { TransformSql::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+}
+
+impl flatbuffers::Verifiable for RawQueryRequest<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        v.visit_table(pos)?
+            .visit_field::<flatbuffers::ForwardsUOffset<
+                flatbuffers::Vector<'_, flatbuffers::ForwardsUOffset<&'_ str>>,
+            >>("input_data_paths", Self::VT_INPUT_DATA_PATHS, false)?
+            .visit_union::<Transform, _>(
+                "transform_type",
+                Self::VT_TRANSFORM_TYPE,
+                "transform",
+                Self::VT_TRANSFORM,
+                false,
+                |key, v, pos| match key {
+                    Transform::TransformSql => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<TransformSql>>(
+                            "Transform::TransformSql",
+                            pos,
+                        ),
+                    _ => Ok(()),
+                },
+            )?
+            .visit_field::<flatbuffers::ForwardsUOffset<&str>>(
+                "output_data_path",
+                Self::VT_OUTPUT_DATA_PATH,
+                false,
+            )?
+            .finish();
+        Ok(())
+    }
+}
+pub struct RawQueryRequestArgs<'a> {
+    pub input_data_paths: Option<
+        flatbuffers::WIPOffset<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<&'a str>>>,
+    >,
+    pub transform_type: Transform,
+    pub transform: Option<flatbuffers::WIPOffset<flatbuffers::UnionWIPOffset>>,
+    pub output_data_path: Option<flatbuffers::WIPOffset<&'a str>>,
+}
+impl<'a> Default for RawQueryRequestArgs<'a> {
+    #[inline]
+    fn default() -> Self {
+        RawQueryRequestArgs {
+            input_data_paths: None,
+            transform_type: Transform::NONE,
+            transform: None,
+            output_data_path: None,
+        }
+    }
+}
+
+pub struct RawQueryRequestBuilder<'a: 'b, 'b> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b> RawQueryRequestBuilder<'a, 'b> {
+    #[inline]
+    pub fn add_input_data_paths(
+        &mut self,
+        input_data_paths: flatbuffers::WIPOffset<
+            flatbuffers::Vector<'b, flatbuffers::ForwardsUOffset<&'b str>>,
+        >,
+    ) {
+        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
+            RawQueryRequest::VT_INPUT_DATA_PATHS,
+            input_data_paths,
+        );
+    }
+    #[inline]
+    pub fn add_transform_type(&mut self, transform_type: Transform) {
+        self.fbb_.push_slot::<Transform>(
+            RawQueryRequest::VT_TRANSFORM_TYPE,
+            transform_type,
+            Transform::NONE,
+        );
+    }
+    #[inline]
+    pub fn add_transform(
+        &mut self,
+        transform: flatbuffers::WIPOffset<flatbuffers::UnionWIPOffset>,
+    ) {
+        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
+            RawQueryRequest::VT_TRANSFORM,
+            transform,
+        );
+    }
+    #[inline]
+    pub fn add_output_data_path(&mut self, output_data_path: flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
+            RawQueryRequest::VT_OUTPUT_DATA_PATH,
+            output_data_path,
+        );
+    }
+    #[inline]
+    pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>) -> RawQueryRequestBuilder<'a, 'b> {
+        let start = _fbb.start_table();
+        RawQueryRequestBuilder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<RawQueryRequest<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl core::fmt::Debug for RawQueryRequest<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut ds = f.debug_struct("RawQueryRequest");
+        ds.field("input_data_paths", &self.input_data_paths());
+        ds.field("transform_type", &self.transform_type());
+        match self.transform_type() {
+            Transform::TransformSql => {
+                if let Some(x) = self.transform_as_transform_sql() {
+                    ds.field("transform", &x)
+                } else {
+                    ds.field(
+                        "transform",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            _ => {
+                let x: Option<()> = None;
+                ds.field("transform", &x)
+            }
+        };
+        ds.field("output_data_path", &self.output_data_path());
+        ds.finish()
+    }
+}
+pub enum RawQueryResponseProgressOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+////////////////////////////////////////////////////////////////////////////////
+pub struct RawQueryResponseProgress<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for RawQueryResponseProgress<'a> {
+    type Inner = RawQueryResponseProgress<'a>;
+    #[inline]
+    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table::new(buf, loc),
+        }
+    }
+}
+
+impl<'a> RawQueryResponseProgress<'a> {
+    #[inline]
+    pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        RawQueryResponseProgress { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
+        _args: &'args RawQueryResponseProgressArgs,
+    ) -> flatbuffers::WIPOffset<RawQueryResponseProgress<'bldr>> {
+        let mut builder = RawQueryResponseProgressBuilder::new(_fbb);
+        builder.finish()
+    }
+}
+
+impl flatbuffers::Verifiable for RawQueryResponseProgress<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        v.visit_table(pos)?.finish();
+        Ok(())
+    }
+}
+pub struct RawQueryResponseProgressArgs {}
+impl<'a> Default for RawQueryResponseProgressArgs {
+    #[inline]
+    fn default() -> Self {
+        RawQueryResponseProgressArgs {}
+    }
+}
+
+pub struct RawQueryResponseProgressBuilder<'a: 'b, 'b> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b> RawQueryResponseProgressBuilder<'a, 'b> {
+    #[inline]
+    pub fn new(
+        _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+    ) -> RawQueryResponseProgressBuilder<'a, 'b> {
+        let start = _fbb.start_table();
+        RawQueryResponseProgressBuilder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<RawQueryResponseProgress<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl core::fmt::Debug for RawQueryResponseProgress<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut ds = f.debug_struct("RawQueryResponseProgress");
+        ds.finish()
+    }
+}
+pub enum RawQueryResponseSuccessOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+pub struct RawQueryResponseSuccess<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for RawQueryResponseSuccess<'a> {
+    type Inner = RawQueryResponseSuccess<'a>;
+    #[inline]
+    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table::new(buf, loc),
+        }
+    }
+}
+
+impl<'a> RawQueryResponseSuccess<'a> {
+    pub const VT_NUM_RECORDS: flatbuffers::VOffsetT = 4;
+
+    #[inline]
+    pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        RawQueryResponseSuccess { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
+        args: &'args RawQueryResponseSuccessArgs,
+    ) -> flatbuffers::WIPOffset<RawQueryResponseSuccess<'bldr>> {
+        let mut builder = RawQueryResponseSuccessBuilder::new(_fbb);
+        builder.add_num_records(args.num_records);
+        builder.finish()
+    }
+
+    #[inline]
+    pub fn num_records(&self) -> u64 {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<u64>(RawQueryResponseSuccess::VT_NUM_RECORDS, Some(0))
+                .unwrap()
+        }
+    }
+}
+
+impl flatbuffers::Verifiable for RawQueryResponseSuccess<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        v.visit_table(pos)?
+            .visit_field::<u64>("num_records", Self::VT_NUM_RECORDS, false)?
+            .finish();
+        Ok(())
+    }
+}
+pub struct RawQueryResponseSuccessArgs {
+    pub num_records: u64,
+}
+impl<'a> Default for RawQueryResponseSuccessArgs {
+    #[inline]
+    fn default() -> Self {
+        RawQueryResponseSuccessArgs { num_records: 0 }
+    }
+}
+
+pub struct RawQueryResponseSuccessBuilder<'a: 'b, 'b> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b> RawQueryResponseSuccessBuilder<'a, 'b> {
+    #[inline]
+    pub fn add_num_records(&mut self, num_records: u64) {
+        self.fbb_
+            .push_slot::<u64>(RawQueryResponseSuccess::VT_NUM_RECORDS, num_records, 0);
+    }
+    #[inline]
+    pub fn new(
+        _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+    ) -> RawQueryResponseSuccessBuilder<'a, 'b> {
+        let start = _fbb.start_table();
+        RawQueryResponseSuccessBuilder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<RawQueryResponseSuccess<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl core::fmt::Debug for RawQueryResponseSuccess<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut ds = f.debug_struct("RawQueryResponseSuccess");
+        ds.field("num_records", &self.num_records());
+        ds.finish()
+    }
+}
+pub enum RawQueryResponseInvalidQueryOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+pub struct RawQueryResponseInvalidQuery<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for RawQueryResponseInvalidQuery<'a> {
+    type Inner = RawQueryResponseInvalidQuery<'a>;
+    #[inline]
+    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table::new(buf, loc),
+        }
+    }
+}
+
+impl<'a> RawQueryResponseInvalidQuery<'a> {
+    pub const VT_MESSAGE: flatbuffers::VOffsetT = 4;
+
+    #[inline]
+    pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        RawQueryResponseInvalidQuery { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
+        args: &'args RawQueryResponseInvalidQueryArgs<'args>,
+    ) -> flatbuffers::WIPOffset<RawQueryResponseInvalidQuery<'bldr>> {
+        let mut builder = RawQueryResponseInvalidQueryBuilder::new(_fbb);
+        if let Some(x) = args.message {
+            builder.add_message(x);
+        }
+        builder.finish()
+    }
+
+    #[inline]
+    pub fn message(&self) -> Option<&'a str> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab.get::<flatbuffers::ForwardsUOffset<&str>>(
+                RawQueryResponseInvalidQuery::VT_MESSAGE,
+                None,
+            )
+        }
+    }
+}
+
+impl flatbuffers::Verifiable for RawQueryResponseInvalidQuery<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        v.visit_table(pos)?
+            .visit_field::<flatbuffers::ForwardsUOffset<&str>>("message", Self::VT_MESSAGE, false)?
+            .finish();
+        Ok(())
+    }
+}
+pub struct RawQueryResponseInvalidQueryArgs<'a> {
+    pub message: Option<flatbuffers::WIPOffset<&'a str>>,
+}
+impl<'a> Default for RawQueryResponseInvalidQueryArgs<'a> {
+    #[inline]
+    fn default() -> Self {
+        RawQueryResponseInvalidQueryArgs { message: None }
+    }
+}
+
+pub struct RawQueryResponseInvalidQueryBuilder<'a: 'b, 'b> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b> RawQueryResponseInvalidQueryBuilder<'a, 'b> {
+    #[inline]
+    pub fn add_message(&mut self, message: flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
+            RawQueryResponseInvalidQuery::VT_MESSAGE,
+            message,
+        );
+    }
+    #[inline]
+    pub fn new(
+        _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+    ) -> RawQueryResponseInvalidQueryBuilder<'a, 'b> {
+        let start = _fbb.start_table();
+        RawQueryResponseInvalidQueryBuilder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<RawQueryResponseInvalidQuery<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl core::fmt::Debug for RawQueryResponseInvalidQuery<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut ds = f.debug_struct("RawQueryResponseInvalidQuery");
+        ds.field("message", &self.message());
+        ds.finish()
+    }
+}
+pub enum RawQueryResponseInternalErrorOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+pub struct RawQueryResponseInternalError<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for RawQueryResponseInternalError<'a> {
+    type Inner = RawQueryResponseInternalError<'a>;
+    #[inline]
+    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table::new(buf, loc),
+        }
+    }
+}
+
+impl<'a> RawQueryResponseInternalError<'a> {
+    pub const VT_MESSAGE: flatbuffers::VOffsetT = 4;
+    pub const VT_BACKTRACE: flatbuffers::VOffsetT = 6;
+
+    #[inline]
+    pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        RawQueryResponseInternalError { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
+        args: &'args RawQueryResponseInternalErrorArgs<'args>,
+    ) -> flatbuffers::WIPOffset<RawQueryResponseInternalError<'bldr>> {
+        let mut builder = RawQueryResponseInternalErrorBuilder::new(_fbb);
+        if let Some(x) = args.backtrace {
+            builder.add_backtrace(x);
+        }
+        if let Some(x) = args.message {
+            builder.add_message(x);
+        }
+        builder.finish()
+    }
+
+    #[inline]
+    pub fn message(&self) -> Option<&'a str> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab.get::<flatbuffers::ForwardsUOffset<&str>>(
+                RawQueryResponseInternalError::VT_MESSAGE,
+                None,
+            )
+        }
+    }
+    #[inline]
+    pub fn backtrace(&self) -> Option<&'a str> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab.get::<flatbuffers::ForwardsUOffset<&str>>(
+                RawQueryResponseInternalError::VT_BACKTRACE,
+                None,
+            )
+        }
+    }
+}
+
+impl flatbuffers::Verifiable for RawQueryResponseInternalError<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        v.visit_table(pos)?
+            .visit_field::<flatbuffers::ForwardsUOffset<&str>>("message", Self::VT_MESSAGE, false)?
+            .visit_field::<flatbuffers::ForwardsUOffset<&str>>(
+                "backtrace",
+                Self::VT_BACKTRACE,
+                false,
+            )?
+            .finish();
+        Ok(())
+    }
+}
+pub struct RawQueryResponseInternalErrorArgs<'a> {
+    pub message: Option<flatbuffers::WIPOffset<&'a str>>,
+    pub backtrace: Option<flatbuffers::WIPOffset<&'a str>>,
+}
+impl<'a> Default for RawQueryResponseInternalErrorArgs<'a> {
+    #[inline]
+    fn default() -> Self {
+        RawQueryResponseInternalErrorArgs {
+            message: None,
+            backtrace: None,
+        }
+    }
+}
+
+pub struct RawQueryResponseInternalErrorBuilder<'a: 'b, 'b> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b> RawQueryResponseInternalErrorBuilder<'a, 'b> {
+    #[inline]
+    pub fn add_message(&mut self, message: flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
+            RawQueryResponseInternalError::VT_MESSAGE,
+            message,
+        );
+    }
+    #[inline]
+    pub fn add_backtrace(&mut self, backtrace: flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
+            RawQueryResponseInternalError::VT_BACKTRACE,
+            backtrace,
+        );
+    }
+    #[inline]
+    pub fn new(
+        _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+    ) -> RawQueryResponseInternalErrorBuilder<'a, 'b> {
+        let start = _fbb.start_table();
+        RawQueryResponseInternalErrorBuilder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<RawQueryResponseInternalError<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl core::fmt::Debug for RawQueryResponseInternalError<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut ds = f.debug_struct("RawQueryResponseInternalError");
+        ds.field("message", &self.message());
+        ds.field("backtrace", &self.backtrace());
+        ds.finish()
+    }
+}
+pub enum RawQueryResponseRootOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+pub struct RawQueryResponseRoot<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for RawQueryResponseRoot<'a> {
+    type Inner = RawQueryResponseRoot<'a>;
+    #[inline]
+    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table::new(buf, loc),
+        }
+    }
+}
+
+impl<'a> RawQueryResponseRoot<'a> {
+    pub const VT_VALUE_TYPE: flatbuffers::VOffsetT = 4;
+    pub const VT_VALUE: flatbuffers::VOffsetT = 6;
+
+    #[inline]
+    pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        RawQueryResponseRoot { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
+        args: &'args RawQueryResponseRootArgs,
+    ) -> flatbuffers::WIPOffset<RawQueryResponseRoot<'bldr>> {
+        let mut builder = RawQueryResponseRootBuilder::new(_fbb);
+        if let Some(x) = args.value {
+            builder.add_value(x);
+        }
+        builder.add_value_type(args.value_type);
+        builder.finish()
+    }
+
+    #[inline]
+    pub fn value_type(&self) -> RawQueryResponse {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<RawQueryResponse>(
+                    RawQueryResponseRoot::VT_VALUE_TYPE,
+                    Some(RawQueryResponse::NONE),
+                )
+                .unwrap()
+        }
+    }
+    #[inline]
+    pub fn value(&self) -> Option<flatbuffers::Table<'a>> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<flatbuffers::ForwardsUOffset<flatbuffers::Table<'a>>>(
+                    RawQueryResponseRoot::VT_VALUE,
+                    None,
+                )
+        }
+    }
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn value_as_raw_query_response_progress(&self) -> Option<RawQueryResponseProgress<'a>> {
+        if self.value_type() == RawQueryResponse::RawQueryResponseProgress {
+            self.value().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { RawQueryResponseProgress::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn value_as_raw_query_response_success(&self) -> Option<RawQueryResponseSuccess<'a>> {
+        if self.value_type() == RawQueryResponse::RawQueryResponseSuccess {
+            self.value().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { RawQueryResponseSuccess::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn value_as_raw_query_response_invalid_query(
+        &self,
+    ) -> Option<RawQueryResponseInvalidQuery<'a>> {
+        if self.value_type() == RawQueryResponse::RawQueryResponseInvalidQuery {
+            self.value().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { RawQueryResponseInvalidQuery::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn value_as_raw_query_response_internal_error(
+        &self,
+    ) -> Option<RawQueryResponseInternalError<'a>> {
+        if self.value_type() == RawQueryResponse::RawQueryResponseInternalError {
+            self.value().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { RawQueryResponseInternalError::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+}
+
+impl flatbuffers::Verifiable for RawQueryResponseRoot<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        v.visit_table(pos)?
+     .visit_union::<RawQueryResponse, _>("value_type", Self::VT_VALUE_TYPE, "value", Self::VT_VALUE, false, |key, v, pos| {
+        match key {
+          RawQueryResponse::RawQueryResponseProgress => v.verify_union_variant::<flatbuffers::ForwardsUOffset<RawQueryResponseProgress>>("RawQueryResponse::RawQueryResponseProgress", pos),
+          RawQueryResponse::RawQueryResponseSuccess => v.verify_union_variant::<flatbuffers::ForwardsUOffset<RawQueryResponseSuccess>>("RawQueryResponse::RawQueryResponseSuccess", pos),
+          RawQueryResponse::RawQueryResponseInvalidQuery => v.verify_union_variant::<flatbuffers::ForwardsUOffset<RawQueryResponseInvalidQuery>>("RawQueryResponse::RawQueryResponseInvalidQuery", pos),
+          RawQueryResponse::RawQueryResponseInternalError => v.verify_union_variant::<flatbuffers::ForwardsUOffset<RawQueryResponseInternalError>>("RawQueryResponse::RawQueryResponseInternalError", pos),
+          _ => Ok(()),
+        }
+     })?
+     .finish();
+        Ok(())
+    }
+}
+pub struct RawQueryResponseRootArgs {
+    pub value_type: RawQueryResponse,
+    pub value: Option<flatbuffers::WIPOffset<flatbuffers::UnionWIPOffset>>,
+}
+impl<'a> Default for RawQueryResponseRootArgs {
+    #[inline]
+    fn default() -> Self {
+        RawQueryResponseRootArgs {
+            value_type: RawQueryResponse::NONE,
+            value: None,
+        }
+    }
+}
+
+pub struct RawQueryResponseRootBuilder<'a: 'b, 'b> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b> RawQueryResponseRootBuilder<'a, 'b> {
+    #[inline]
+    pub fn add_value_type(&mut self, value_type: RawQueryResponse) {
+        self.fbb_.push_slot::<RawQueryResponse>(
+            RawQueryResponseRoot::VT_VALUE_TYPE,
+            value_type,
+            RawQueryResponse::NONE,
+        );
+    }
+    #[inline]
+    pub fn add_value(&mut self, value: flatbuffers::WIPOffset<flatbuffers::UnionWIPOffset>) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<_>>(RawQueryResponseRoot::VT_VALUE, value);
+    }
+    #[inline]
+    pub fn new(
+        _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+    ) -> RawQueryResponseRootBuilder<'a, 'b> {
+        let start = _fbb.start_table();
+        RawQueryResponseRootBuilder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<RawQueryResponseRoot<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl core::fmt::Debug for RawQueryResponseRoot<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut ds = f.debug_struct("RawQueryResponseRoot");
+        ds.field("value_type", &self.value_type());
+        match self.value_type() {
+            RawQueryResponse::RawQueryResponseProgress => {
+                if let Some(x) = self.value_as_raw_query_response_progress() {
+                    ds.field("value", &x)
+                } else {
+                    ds.field(
+                        "value",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            RawQueryResponse::RawQueryResponseSuccess => {
+                if let Some(x) = self.value_as_raw_query_response_success() {
+                    ds.field("value", &x)
+                } else {
+                    ds.field(
+                        "value",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            RawQueryResponse::RawQueryResponseInvalidQuery => {
+                if let Some(x) = self.value_as_raw_query_response_invalid_query() {
+                    ds.field("value", &x)
+                } else {
+                    ds.field(
+                        "value",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            RawQueryResponse::RawQueryResponseInternalError => {
+                if let Some(x) = self.value_as_raw_query_response_internal_error() {
+                    ds.field("value", &x)
+                } else {
+                    ds.field(
+                        "value",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            _ => {
+                let x: Option<()> = None;
+                ds.field("value", &x)
+            }
+        };
+        ds.finish()
+    }
+}
+pub enum WatermarkOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+////////////////////////////////////////////////////////////////////////////////
+pub struct Watermark<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for Watermark<'a> {
+    type Inner = Watermark<'a>;
+    #[inline]
+    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table::new(buf, loc),
+        }
+    }
+}
+
+impl<'a> Watermark<'a> {
+    pub const VT_SYSTEM_TIME: flatbuffers::VOffsetT = 4;
+    pub const VT_EVENT_TIME: flatbuffers::VOffsetT = 6;
+
+    #[inline]
+    pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        Watermark { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
+        args: &'args WatermarkArgs<'args>,
+    ) -> flatbuffers::WIPOffset<Watermark<'bldr>> {
+        let mut builder = WatermarkBuilder::new(_fbb);
+        if let Some(x) = args.event_time {
+            builder.add_event_time(x);
+        }
+        if let Some(x) = args.system_time {
+            builder.add_system_time(x);
+        }
+        builder.finish()
+    }
+
+    #[inline]
+    pub fn system_time(&self) -> Option<&'a Timestamp> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe { self._tab.get::<Timestamp>(Watermark::VT_SYSTEM_TIME, None) }
+    }
+    #[inline]
+    pub fn event_time(&self) -> Option<&'a Timestamp> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe { self._tab.get::<Timestamp>(Watermark::VT_EVENT_TIME, None) }
+    }
+}
+
+impl flatbuffers::Verifiable for Watermark<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        v.visit_table(pos)?
+            .visit_field::<Timestamp>("system_time", Self::VT_SYSTEM_TIME, false)?
+            .visit_field::<Timestamp>("event_time", Self::VT_EVENT_TIME, false)?
+            .finish();
+        Ok(())
+    }
+}
+pub struct WatermarkArgs<'a> {
+    pub system_time: Option<&'a Timestamp>,
+    pub event_time: Option<&'a Timestamp>,
+}
+impl<'a> Default for WatermarkArgs<'a> {
+    #[inline]
+    fn default() -> Self {
+        WatermarkArgs {
+            system_time: None,
+            event_time: None,
+        }
+    }
+}
+
+pub struct WatermarkBuilder<'a: 'b, 'b> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b> WatermarkBuilder<'a, 'b> {
+    #[inline]
+    pub fn add_system_time(&mut self, system_time: &Timestamp) {
+        self.fbb_
+            .push_slot_always::<&Timestamp>(Watermark::VT_SYSTEM_TIME, system_time);
+    }
+    #[inline]
+    pub fn add_event_time(&mut self, event_time: &Timestamp) {
+        self.fbb_
+            .push_slot_always::<&Timestamp>(Watermark::VT_EVENT_TIME, event_time);
+    }
+    #[inline]
+    pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>) -> WatermarkBuilder<'a, 'b> {
+        let start = _fbb.start_table();
+        WatermarkBuilder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<Watermark<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl core::fmt::Debug for Watermark<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut ds = f.debug_struct("Watermark");
+        ds.field("system_time", &self.system_time());
+        ds.field("event_time", &self.event_time());
+        ds.finish()
+    }
+}
+pub enum TransformRequestInputOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+////////////////////////////////////////////////////////////////////////////////
+pub struct TransformRequestInput<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for TransformRequestInput<'a> {
+    type Inner = TransformRequestInput<'a>;
+    #[inline]
+    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table::new(buf, loc),
+        }
+    }
+}
+
+impl<'a> TransformRequestInput<'a> {
+    pub const VT_DATASET_ID: flatbuffers::VOffsetT = 4;
+    pub const VT_DATASET_ALIAS: flatbuffers::VOffsetT = 6;
+    pub const VT_QUERY_ALIAS: flatbuffers::VOffsetT = 8;
+    pub const VT_VOCAB: flatbuffers::VOffsetT = 10;
+    pub const VT_OFFSET_INTERVAL: flatbuffers::VOffsetT = 12;
+    pub const VT_DATA_PATHS: flatbuffers::VOffsetT = 14;
+    pub const VT_SCHEMA_FILE: flatbuffers::VOffsetT = 16;
+    pub const VT_EXPLICIT_WATERMARKS: flatbuffers::VOffsetT = 18;
+
+    #[inline]
+    pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        TransformRequestInput { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
+        args: &'args TransformRequestInputArgs<'args>,
+    ) -> flatbuffers::WIPOffset<TransformRequestInput<'bldr>> {
+        let mut builder = TransformRequestInputBuilder::new(_fbb);
+        if let Some(x) = args.explicit_watermarks {
+            builder.add_explicit_watermarks(x);
+        }
+        if let Some(x) = args.schema_file {
+            builder.add_schema_file(x);
+        }
+        if let Some(x) = args.data_paths {
+            builder.add_data_paths(x);
+        }
+        if let Some(x) = args.offset_interval {
+            builder.add_offset_interval(x);
+        }
+        if let Some(x) = args.vocab {
+            builder.add_vocab(x);
+        }
+        if let Some(x) = args.query_alias {
+            builder.add_query_alias(x);
+        }
+        if let Some(x) = args.dataset_alias {
+            builder.add_dataset_alias(x);
+        }
+        if let Some(x) = args.dataset_id {
+            builder.add_dataset_id(x);
+        }
+        builder.finish()
+    }
+
+    #[inline]
+    pub fn dataset_id(&self) -> Option<flatbuffers::Vector<'a, u8>> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
+                    TransformRequestInput::VT_DATASET_ID,
+                    None,
+                )
+        }
+    }
+    #[inline]
+    pub fn dataset_alias(&self) -> Option<&'a str> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab.get::<flatbuffers::ForwardsUOffset<&str>>(
+                TransformRequestInput::VT_DATASET_ALIAS,
+                None,
+            )
+        }
+    }
+    #[inline]
+    pub fn query_alias(&self) -> Option<&'a str> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab.get::<flatbuffers::ForwardsUOffset<&str>>(
+                TransformRequestInput::VT_QUERY_ALIAS,
+                None,
+            )
+        }
+    }
+    #[inline]
+    pub fn vocab(&self) -> Option<DatasetVocabulary<'a>> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<flatbuffers::ForwardsUOffset<DatasetVocabulary>>(
+                    TransformRequestInput::VT_VOCAB,
+                    None,
+                )
+        }
+    }
+    #[inline]
+    pub fn offset_interval(&self) -> Option<OffsetInterval<'a>> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<flatbuffers::ForwardsUOffset<OffsetInterval>>(
+                    TransformRequestInput::VT_OFFSET_INTERVAL,
+                    None,
+                )
+        }
+    }
+    #[inline]
+    pub fn data_paths(
+        &self,
+    ) -> Option<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<&'a str>>> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab.get::<flatbuffers::ForwardsUOffset<
+                flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<&'a str>>,
+            >>(TransformRequestInput::VT_DATA_PATHS, None)
+        }
+    }
+    #[inline]
+    pub fn schema_file(&self) -> Option<&'a str> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab.get::<flatbuffers::ForwardsUOffset<&str>>(
+                TransformRequestInput::VT_SCHEMA_FILE,
+                None,
+            )
+        }
+    }
+    #[inline]
+    pub fn explicit_watermarks(
+        &self,
+    ) -> Option<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<Watermark<'a>>>> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab.get::<flatbuffers::ForwardsUOffset<
+                flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<Watermark>>,
+            >>(TransformRequestInput::VT_EXPLICIT_WATERMARKS, None)
+        }
+    }
+}
+
+impl flatbuffers::Verifiable for TransformRequestInput<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        v.visit_table(pos)?
+            .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, u8>>>(
+                "dataset_id",
+                Self::VT_DATASET_ID,
+                false,
+            )?
+            .visit_field::<flatbuffers::ForwardsUOffset<&str>>(
+                "dataset_alias",
+                Self::VT_DATASET_ALIAS,
+                false,
+            )?
+            .visit_field::<flatbuffers::ForwardsUOffset<&str>>(
+                "query_alias",
+                Self::VT_QUERY_ALIAS,
+                false,
+            )?
+            .visit_field::<flatbuffers::ForwardsUOffset<DatasetVocabulary>>(
+                "vocab",
+                Self::VT_VOCAB,
+                false,
+            )?
+            .visit_field::<flatbuffers::ForwardsUOffset<OffsetInterval>>(
+                "offset_interval",
+                Self::VT_OFFSET_INTERVAL,
+                false,
+            )?
+            .visit_field::<flatbuffers::ForwardsUOffset<
+                flatbuffers::Vector<'_, flatbuffers::ForwardsUOffset<&'_ str>>,
+            >>("data_paths", Self::VT_DATA_PATHS, false)?
+            .visit_field::<flatbuffers::ForwardsUOffset<&str>>(
+                "schema_file",
+                Self::VT_SCHEMA_FILE,
+                false,
+            )?
+            .visit_field::<flatbuffers::ForwardsUOffset<
+                flatbuffers::Vector<'_, flatbuffers::ForwardsUOffset<Watermark>>,
+            >>("explicit_watermarks", Self::VT_EXPLICIT_WATERMARKS, false)?
+            .finish();
+        Ok(())
+    }
+}
+pub struct TransformRequestInputArgs<'a> {
+    pub dataset_id: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u8>>>,
+    pub dataset_alias: Option<flatbuffers::WIPOffset<&'a str>>,
+    pub query_alias: Option<flatbuffers::WIPOffset<&'a str>>,
+    pub vocab: Option<flatbuffers::WIPOffset<DatasetVocabulary<'a>>>,
+    pub offset_interval: Option<flatbuffers::WIPOffset<OffsetInterval<'a>>>,
+    pub data_paths: Option<
+        flatbuffers::WIPOffset<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<&'a str>>>,
+    >,
+    pub schema_file: Option<flatbuffers::WIPOffset<&'a str>>,
+    pub explicit_watermarks: Option<
+        flatbuffers::WIPOffset<
+            flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<Watermark<'a>>>,
+        >,
+    >,
+}
+impl<'a> Default for TransformRequestInputArgs<'a> {
+    #[inline]
+    fn default() -> Self {
+        TransformRequestInputArgs {
+            dataset_id: None,
+            dataset_alias: None,
+            query_alias: None,
+            vocab: None,
+            offset_interval: None,
+            data_paths: None,
+            schema_file: None,
+            explicit_watermarks: None,
+        }
+    }
+}
+
+pub struct TransformRequestInputBuilder<'a: 'b, 'b> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b> TransformRequestInputBuilder<'a, 'b> {
+    #[inline]
+    pub fn add_dataset_id(
+        &mut self,
+        dataset_id: flatbuffers::WIPOffset<flatbuffers::Vector<'b, u8>>,
+    ) {
+        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
+            TransformRequestInput::VT_DATASET_ID,
+            dataset_id,
+        );
+    }
+    #[inline]
+    pub fn add_dataset_alias(&mut self, dataset_alias: flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
+            TransformRequestInput::VT_DATASET_ALIAS,
+            dataset_alias,
+        );
+    }
+    #[inline]
+    pub fn add_query_alias(&mut self, query_alias: flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
+            TransformRequestInput::VT_QUERY_ALIAS,
+            query_alias,
+        );
+    }
+    #[inline]
+    pub fn add_vocab(&mut self, vocab: flatbuffers::WIPOffset<DatasetVocabulary<'b>>) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<DatasetVocabulary>>(
+                TransformRequestInput::VT_VOCAB,
+                vocab,
+            );
+    }
+    #[inline]
+    pub fn add_offset_interval(
+        &mut self,
+        offset_interval: flatbuffers::WIPOffset<OffsetInterval<'b>>,
+    ) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<OffsetInterval>>(
+                TransformRequestInput::VT_OFFSET_INTERVAL,
+                offset_interval,
+            );
+    }
+    #[inline]
+    pub fn add_data_paths(
+        &mut self,
+        data_paths: flatbuffers::WIPOffset<
+            flatbuffers::Vector<'b, flatbuffers::ForwardsUOffset<&'b str>>,
+        >,
+    ) {
+        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
+            TransformRequestInput::VT_DATA_PATHS,
+            data_paths,
+        );
+    }
+    #[inline]
+    pub fn add_schema_file(&mut self, schema_file: flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
+            TransformRequestInput::VT_SCHEMA_FILE,
+            schema_file,
+        );
+    }
+    #[inline]
+    pub fn add_explicit_watermarks(
+        &mut self,
+        explicit_watermarks: flatbuffers::WIPOffset<
+            flatbuffers::Vector<'b, flatbuffers::ForwardsUOffset<Watermark<'b>>>,
+        >,
+    ) {
+        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
+            TransformRequestInput::VT_EXPLICIT_WATERMARKS,
+            explicit_watermarks,
+        );
+    }
+    #[inline]
+    pub fn new(
+        _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+    ) -> TransformRequestInputBuilder<'a, 'b> {
+        let start = _fbb.start_table();
+        TransformRequestInputBuilder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<TransformRequestInput<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl core::fmt::Debug for TransformRequestInput<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut ds = f.debug_struct("TransformRequestInput");
+        ds.field("dataset_id", &self.dataset_id());
+        ds.field("dataset_alias", &self.dataset_alias());
+        ds.field("query_alias", &self.query_alias());
+        ds.field("vocab", &self.vocab());
+        ds.field("offset_interval", &self.offset_interval());
+        ds.field("data_paths", &self.data_paths());
+        ds.field("schema_file", &self.schema_file());
+        ds.field("explicit_watermarks", &self.explicit_watermarks());
+        ds.finish()
+    }
+}
+pub enum TransformRequestOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+////////////////////////////////////////////////////////////////////////////////
+pub struct TransformRequest<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for TransformRequest<'a> {
+    type Inner = TransformRequest<'a>;
+    #[inline]
+    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table::new(buf, loc),
+        }
+    }
+}
+
+impl<'a> TransformRequest<'a> {
+    pub const VT_DATASET_ID: flatbuffers::VOffsetT = 4;
+    pub const VT_DATASET_ALIAS: flatbuffers::VOffsetT = 6;
+    pub const VT_SYSTEM_TIME: flatbuffers::VOffsetT = 8;
+    pub const VT_VOCAB: flatbuffers::VOffsetT = 10;
+    pub const VT_TRANSFORM_TYPE: flatbuffers::VOffsetT = 12;
+    pub const VT_TRANSFORM: flatbuffers::VOffsetT = 14;
+    pub const VT_QUERY_INPUTS: flatbuffers::VOffsetT = 16;
+    pub const VT_NEXT_OFFSET: flatbuffers::VOffsetT = 18;
+    pub const VT_PREV_CHECKPOINT_PATH: flatbuffers::VOffsetT = 20;
+    pub const VT_NEW_CHECKPOINT_PATH: flatbuffers::VOffsetT = 22;
+    pub const VT_NEW_DATA_PATH: flatbuffers::VOffsetT = 24;
+
+    #[inline]
+    pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        TransformRequest { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
+        args: &'args TransformRequestArgs<'args>,
+    ) -> flatbuffers::WIPOffset<TransformRequest<'bldr>> {
+        let mut builder = TransformRequestBuilder::new(_fbb);
+        builder.add_next_offset(args.next_offset);
+        if let Some(x) = args.new_data_path {
+            builder.add_new_data_path(x);
+        }
+        if let Some(x) = args.new_checkpoint_path {
+            builder.add_new_checkpoint_path(x);
+        }
+        if let Some(x) = args.prev_checkpoint_path {
+            builder.add_prev_checkpoint_path(x);
+        }
+        if let Some(x) = args.query_inputs {
+            builder.add_query_inputs(x);
+        }
+        if let Some(x) = args.transform {
+            builder.add_transform(x);
+        }
+        if let Some(x) = args.vocab {
+            builder.add_vocab(x);
+        }
+        if let Some(x) = args.system_time {
+            builder.add_system_time(x);
+        }
+        if let Some(x) = args.dataset_alias {
+            builder.add_dataset_alias(x);
+        }
+        if let Some(x) = args.dataset_id {
+            builder.add_dataset_id(x);
+        }
+        builder.add_transform_type(args.transform_type);
+        builder.finish()
+    }
+
+    #[inline]
+    pub fn dataset_id(&self) -> Option<flatbuffers::Vector<'a, u8>> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
+                    TransformRequest::VT_DATASET_ID,
+                    None,
+                )
+        }
+    }
+    #[inline]
+    pub fn dataset_alias(&self) -> Option<&'a str> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<flatbuffers::ForwardsUOffset<&str>>(TransformRequest::VT_DATASET_ALIAS, None)
+        }
+    }
+    #[inline]
+    pub fn system_time(&self) -> Option<&'a Timestamp> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<Timestamp>(TransformRequest::VT_SYSTEM_TIME, None)
+        }
+    }
+    #[inline]
+    pub fn vocab(&self) -> Option<DatasetVocabulary<'a>> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<flatbuffers::ForwardsUOffset<DatasetVocabulary>>(
+                    TransformRequest::VT_VOCAB,
+                    None,
+                )
+        }
+    }
+    #[inline]
+    pub fn transform_type(&self) -> Transform {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<Transform>(TransformRequest::VT_TRANSFORM_TYPE, Some(Transform::NONE))
+                .unwrap()
+        }
+    }
+    #[inline]
+    pub fn transform(&self) -> Option<flatbuffers::Table<'a>> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<flatbuffers::ForwardsUOffset<flatbuffers::Table<'a>>>(
+                    TransformRequest::VT_TRANSFORM,
+                    None,
+                )
+        }
+    }
+    #[inline]
+    pub fn query_inputs(
+        &self,
+    ) -> Option<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<TransformRequestInput<'a>>>>
+    {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab.get::<flatbuffers::ForwardsUOffset<
+                flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<TransformRequestInput>>,
+            >>(TransformRequest::VT_QUERY_INPUTS, None)
+        }
+    }
+    #[inline]
+    pub fn next_offset(&self) -> u64 {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<u64>(TransformRequest::VT_NEXT_OFFSET, Some(0))
+                .unwrap()
+        }
+    }
+    #[inline]
+    pub fn prev_checkpoint_path(&self) -> Option<&'a str> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab.get::<flatbuffers::ForwardsUOffset<&str>>(
+                TransformRequest::VT_PREV_CHECKPOINT_PATH,
+                None,
+            )
+        }
+    }
+    #[inline]
+    pub fn new_checkpoint_path(&self) -> Option<&'a str> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab.get::<flatbuffers::ForwardsUOffset<&str>>(
+                TransformRequest::VT_NEW_CHECKPOINT_PATH,
+                None,
+            )
+        }
+    }
+    #[inline]
+    pub fn new_data_path(&self) -> Option<&'a str> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<flatbuffers::ForwardsUOffset<&str>>(TransformRequest::VT_NEW_DATA_PATH, None)
+        }
+    }
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn transform_as_transform_sql(&self) -> Option<TransformSql<'a>> {
+        if self.transform_type() == Transform::TransformSql {
+            self.transform().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { TransformSql::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+}
+
+impl flatbuffers::Verifiable for TransformRequest<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        v.visit_table(pos)?
+            .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, u8>>>(
+                "dataset_id",
+                Self::VT_DATASET_ID,
+                false,
+            )?
+            .visit_field::<flatbuffers::ForwardsUOffset<&str>>(
+                "dataset_alias",
+                Self::VT_DATASET_ALIAS,
+                false,
+            )?
+            .visit_field::<Timestamp>("system_time", Self::VT_SYSTEM_TIME, false)?
+            .visit_field::<flatbuffers::ForwardsUOffset<DatasetVocabulary>>(
+                "vocab",
+                Self::VT_VOCAB,
+                false,
+            )?
+            .visit_union::<Transform, _>(
+                "transform_type",
+                Self::VT_TRANSFORM_TYPE,
+                "transform",
+                Self::VT_TRANSFORM,
+                false,
+                |key, v, pos| match key {
+                    Transform::TransformSql => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<TransformSql>>(
+                            "Transform::TransformSql",
+                            pos,
+                        ),
+                    _ => Ok(()),
+                },
+            )?
+            .visit_field::<flatbuffers::ForwardsUOffset<
+                flatbuffers::Vector<'_, flatbuffers::ForwardsUOffset<TransformRequestInput>>,
+            >>("query_inputs", Self::VT_QUERY_INPUTS, false)?
+            .visit_field::<u64>("next_offset", Self::VT_NEXT_OFFSET, false)?
+            .visit_field::<flatbuffers::ForwardsUOffset<&str>>(
+                "prev_checkpoint_path",
+                Self::VT_PREV_CHECKPOINT_PATH,
+                false,
+            )?
+            .visit_field::<flatbuffers::ForwardsUOffset<&str>>(
+                "new_checkpoint_path",
+                Self::VT_NEW_CHECKPOINT_PATH,
+                false,
+            )?
+            .visit_field::<flatbuffers::ForwardsUOffset<&str>>(
+                "new_data_path",
+                Self::VT_NEW_DATA_PATH,
+                false,
+            )?
+            .finish();
+        Ok(())
+    }
+}
+pub struct TransformRequestArgs<'a> {
+    pub dataset_id: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u8>>>,
+    pub dataset_alias: Option<flatbuffers::WIPOffset<&'a str>>,
+    pub system_time: Option<&'a Timestamp>,
+    pub vocab: Option<flatbuffers::WIPOffset<DatasetVocabulary<'a>>>,
+    pub transform_type: Transform,
+    pub transform: Option<flatbuffers::WIPOffset<flatbuffers::UnionWIPOffset>>,
+    pub query_inputs: Option<
+        flatbuffers::WIPOffset<
+            flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<TransformRequestInput<'a>>>,
+        >,
+    >,
+    pub next_offset: u64,
+    pub prev_checkpoint_path: Option<flatbuffers::WIPOffset<&'a str>>,
+    pub new_checkpoint_path: Option<flatbuffers::WIPOffset<&'a str>>,
+    pub new_data_path: Option<flatbuffers::WIPOffset<&'a str>>,
+}
+impl<'a> Default for TransformRequestArgs<'a> {
+    #[inline]
+    fn default() -> Self {
+        TransformRequestArgs {
+            dataset_id: None,
+            dataset_alias: None,
+            system_time: None,
+            vocab: None,
+            transform_type: Transform::NONE,
+            transform: None,
+            query_inputs: None,
+            next_offset: 0,
+            prev_checkpoint_path: None,
+            new_checkpoint_path: None,
+            new_data_path: None,
+        }
+    }
+}
+
+pub struct TransformRequestBuilder<'a: 'b, 'b> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b> TransformRequestBuilder<'a, 'b> {
+    #[inline]
+    pub fn add_dataset_id(
+        &mut self,
+        dataset_id: flatbuffers::WIPOffset<flatbuffers::Vector<'b, u8>>,
+    ) {
+        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
+            TransformRequest::VT_DATASET_ID,
+            dataset_id,
+        );
+    }
+    #[inline]
+    pub fn add_dataset_alias(&mut self, dataset_alias: flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
+            TransformRequest::VT_DATASET_ALIAS,
+            dataset_alias,
+        );
+    }
+    #[inline]
+    pub fn add_system_time(&mut self, system_time: &Timestamp) {
+        self.fbb_
+            .push_slot_always::<&Timestamp>(TransformRequest::VT_SYSTEM_TIME, system_time);
+    }
+    #[inline]
+    pub fn add_vocab(&mut self, vocab: flatbuffers::WIPOffset<DatasetVocabulary<'b>>) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<DatasetVocabulary>>(
+                TransformRequest::VT_VOCAB,
+                vocab,
+            );
+    }
+    #[inline]
+    pub fn add_transform_type(&mut self, transform_type: Transform) {
+        self.fbb_.push_slot::<Transform>(
+            TransformRequest::VT_TRANSFORM_TYPE,
+            transform_type,
+            Transform::NONE,
+        );
+    }
+    #[inline]
+    pub fn add_transform(
+        &mut self,
+        transform: flatbuffers::WIPOffset<flatbuffers::UnionWIPOffset>,
+    ) {
+        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
+            TransformRequest::VT_TRANSFORM,
+            transform,
+        );
+    }
+    #[inline]
+    pub fn add_query_inputs(
+        &mut self,
+        query_inputs: flatbuffers::WIPOffset<
+            flatbuffers::Vector<'b, flatbuffers::ForwardsUOffset<TransformRequestInput<'b>>>,
+        >,
+    ) {
+        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
+            TransformRequest::VT_QUERY_INPUTS,
+            query_inputs,
+        );
+    }
+    #[inline]
+    pub fn add_next_offset(&mut self, next_offset: u64) {
+        self.fbb_
+            .push_slot::<u64>(TransformRequest::VT_NEXT_OFFSET, next_offset, 0);
+    }
+    #[inline]
+    pub fn add_prev_checkpoint_path(
+        &mut self,
+        prev_checkpoint_path: flatbuffers::WIPOffset<&'b str>,
+    ) {
+        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
+            TransformRequest::VT_PREV_CHECKPOINT_PATH,
+            prev_checkpoint_path,
+        );
+    }
+    #[inline]
+    pub fn add_new_checkpoint_path(
+        &mut self,
+        new_checkpoint_path: flatbuffers::WIPOffset<&'b str>,
+    ) {
+        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
+            TransformRequest::VT_NEW_CHECKPOINT_PATH,
+            new_checkpoint_path,
+        );
+    }
+    #[inline]
+    pub fn add_new_data_path(&mut self, new_data_path: flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
+            TransformRequest::VT_NEW_DATA_PATH,
+            new_data_path,
+        );
+    }
+    #[inline]
+    pub fn new(
+        _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+    ) -> TransformRequestBuilder<'a, 'b> {
+        let start = _fbb.start_table();
+        TransformRequestBuilder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<TransformRequest<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl core::fmt::Debug for TransformRequest<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut ds = f.debug_struct("TransformRequest");
+        ds.field("dataset_id", &self.dataset_id());
+        ds.field("dataset_alias", &self.dataset_alias());
+        ds.field("system_time", &self.system_time());
+        ds.field("vocab", &self.vocab());
+        ds.field("transform_type", &self.transform_type());
+        match self.transform_type() {
+            Transform::TransformSql => {
+                if let Some(x) = self.transform_as_transform_sql() {
+                    ds.field("transform", &x)
+                } else {
+                    ds.field(
+                        "transform",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            _ => {
+                let x: Option<()> = None;
+                ds.field("transform", &x)
+            }
+        };
+        ds.field("query_inputs", &self.query_inputs());
+        ds.field("next_offset", &self.next_offset());
+        ds.field("prev_checkpoint_path", &self.prev_checkpoint_path());
+        ds.field("new_checkpoint_path", &self.new_checkpoint_path());
+        ds.field("new_data_path", &self.new_data_path());
+        ds.finish()
+    }
+}
+pub enum TransformResponseProgressOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+////////////////////////////////////////////////////////////////////////////////
+pub struct TransformResponseProgress<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for TransformResponseProgress<'a> {
+    type Inner = TransformResponseProgress<'a>;
+    #[inline]
+    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table::new(buf, loc),
+        }
+    }
+}
+
+impl<'a> TransformResponseProgress<'a> {
+    #[inline]
+    pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        TransformResponseProgress { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
+        _args: &'args TransformResponseProgressArgs,
+    ) -> flatbuffers::WIPOffset<TransformResponseProgress<'bldr>> {
+        let mut builder = TransformResponseProgressBuilder::new(_fbb);
+        builder.finish()
+    }
+}
+
+impl flatbuffers::Verifiable for TransformResponseProgress<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        v.visit_table(pos)?.finish();
+        Ok(())
+    }
+}
+pub struct TransformResponseProgressArgs {}
+impl<'a> Default for TransformResponseProgressArgs {
+    #[inline]
+    fn default() -> Self {
+        TransformResponseProgressArgs {}
+    }
+}
+
+pub struct TransformResponseProgressBuilder<'a: 'b, 'b> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b> TransformResponseProgressBuilder<'a, 'b> {
+    #[inline]
+    pub fn new(
+        _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+    ) -> TransformResponseProgressBuilder<'a, 'b> {
+        let start = _fbb.start_table();
+        TransformResponseProgressBuilder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<TransformResponseProgress<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl core::fmt::Debug for TransformResponseProgress<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut ds = f.debug_struct("TransformResponseProgress");
+        ds.finish()
+    }
+}
+pub enum TransformResponseSuccessOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+pub struct TransformResponseSuccess<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for TransformResponseSuccess<'a> {
+    type Inner = TransformResponseSuccess<'a>;
+    #[inline]
+    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table::new(buf, loc),
+        }
+    }
+}
+
+impl<'a> TransformResponseSuccess<'a> {
+    pub const VT_NEW_OFFSET_INTERVAL: flatbuffers::VOffsetT = 4;
+    pub const VT_NEW_WATERMARK: flatbuffers::VOffsetT = 6;
+
+    #[inline]
+    pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        TransformResponseSuccess { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
+        args: &'args TransformResponseSuccessArgs<'args>,
+    ) -> flatbuffers::WIPOffset<TransformResponseSuccess<'bldr>> {
+        let mut builder = TransformResponseSuccessBuilder::new(_fbb);
+        if let Some(x) = args.new_watermark {
+            builder.add_new_watermark(x);
+        }
+        if let Some(x) = args.new_offset_interval {
+            builder.add_new_offset_interval(x);
+        }
+        builder.finish()
+    }
+
+    #[inline]
+    pub fn new_offset_interval(&self) -> Option<OffsetInterval<'a>> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<flatbuffers::ForwardsUOffset<OffsetInterval>>(
+                    TransformResponseSuccess::VT_NEW_OFFSET_INTERVAL,
+                    None,
+                )
+        }
+    }
+    #[inline]
+    pub fn new_watermark(&self) -> Option<&'a Timestamp> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<Timestamp>(TransformResponseSuccess::VT_NEW_WATERMARK, None)
+        }
+    }
+}
+
+impl flatbuffers::Verifiable for TransformResponseSuccess<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        v.visit_table(pos)?
+            .visit_field::<flatbuffers::ForwardsUOffset<OffsetInterval>>(
+                "new_offset_interval",
+                Self::VT_NEW_OFFSET_INTERVAL,
+                false,
+            )?
+            .visit_field::<Timestamp>("new_watermark", Self::VT_NEW_WATERMARK, false)?
+            .finish();
+        Ok(())
+    }
+}
+pub struct TransformResponseSuccessArgs<'a> {
+    pub new_offset_interval: Option<flatbuffers::WIPOffset<OffsetInterval<'a>>>,
+    pub new_watermark: Option<&'a Timestamp>,
+}
+impl<'a> Default for TransformResponseSuccessArgs<'a> {
+    #[inline]
+    fn default() -> Self {
+        TransformResponseSuccessArgs {
+            new_offset_interval: None,
+            new_watermark: None,
+        }
+    }
+}
+
+pub struct TransformResponseSuccessBuilder<'a: 'b, 'b> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b> TransformResponseSuccessBuilder<'a, 'b> {
+    #[inline]
+    pub fn add_new_offset_interval(
+        &mut self,
+        new_offset_interval: flatbuffers::WIPOffset<OffsetInterval<'b>>,
+    ) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<OffsetInterval>>(
+                TransformResponseSuccess::VT_NEW_OFFSET_INTERVAL,
+                new_offset_interval,
+            );
+    }
+    #[inline]
+    pub fn add_new_watermark(&mut self, new_watermark: &Timestamp) {
+        self.fbb_.push_slot_always::<&Timestamp>(
+            TransformResponseSuccess::VT_NEW_WATERMARK,
+            new_watermark,
+        );
+    }
+    #[inline]
+    pub fn new(
+        _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+    ) -> TransformResponseSuccessBuilder<'a, 'b> {
+        let start = _fbb.start_table();
+        TransformResponseSuccessBuilder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<TransformResponseSuccess<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl core::fmt::Debug for TransformResponseSuccess<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut ds = f.debug_struct("TransformResponseSuccess");
+        ds.field("new_offset_interval", &self.new_offset_interval());
+        ds.field("new_watermark", &self.new_watermark());
+        ds.finish()
+    }
+}
+pub enum TransformResponseInvalidQueryOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+pub struct TransformResponseInvalidQuery<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for TransformResponseInvalidQuery<'a> {
+    type Inner = TransformResponseInvalidQuery<'a>;
+    #[inline]
+    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table::new(buf, loc),
+        }
+    }
+}
+
+impl<'a> TransformResponseInvalidQuery<'a> {
+    pub const VT_MESSAGE: flatbuffers::VOffsetT = 4;
+
+    #[inline]
+    pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        TransformResponseInvalidQuery { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
+        args: &'args TransformResponseInvalidQueryArgs<'args>,
+    ) -> flatbuffers::WIPOffset<TransformResponseInvalidQuery<'bldr>> {
+        let mut builder = TransformResponseInvalidQueryBuilder::new(_fbb);
+        if let Some(x) = args.message {
+            builder.add_message(x);
+        }
+        builder.finish()
+    }
+
+    #[inline]
+    pub fn message(&self) -> Option<&'a str> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab.get::<flatbuffers::ForwardsUOffset<&str>>(
+                TransformResponseInvalidQuery::VT_MESSAGE,
+                None,
+            )
+        }
+    }
+}
+
+impl flatbuffers::Verifiable for TransformResponseInvalidQuery<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        v.visit_table(pos)?
+            .visit_field::<flatbuffers::ForwardsUOffset<&str>>("message", Self::VT_MESSAGE, false)?
+            .finish();
+        Ok(())
+    }
+}
+pub struct TransformResponseInvalidQueryArgs<'a> {
+    pub message: Option<flatbuffers::WIPOffset<&'a str>>,
+}
+impl<'a> Default for TransformResponseInvalidQueryArgs<'a> {
+    #[inline]
+    fn default() -> Self {
+        TransformResponseInvalidQueryArgs { message: None }
+    }
+}
+
+pub struct TransformResponseInvalidQueryBuilder<'a: 'b, 'b> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b> TransformResponseInvalidQueryBuilder<'a, 'b> {
+    #[inline]
+    pub fn add_message(&mut self, message: flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
+            TransformResponseInvalidQuery::VT_MESSAGE,
+            message,
+        );
+    }
+    #[inline]
+    pub fn new(
+        _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+    ) -> TransformResponseInvalidQueryBuilder<'a, 'b> {
+        let start = _fbb.start_table();
+        TransformResponseInvalidQueryBuilder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<TransformResponseInvalidQuery<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl core::fmt::Debug for TransformResponseInvalidQuery<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut ds = f.debug_struct("TransformResponseInvalidQuery");
+        ds.field("message", &self.message());
+        ds.finish()
+    }
+}
+pub enum TransformResponseInternalErrorOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+pub struct TransformResponseInternalError<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for TransformResponseInternalError<'a> {
+    type Inner = TransformResponseInternalError<'a>;
+    #[inline]
+    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table::new(buf, loc),
+        }
+    }
+}
+
+impl<'a> TransformResponseInternalError<'a> {
+    pub const VT_MESSAGE: flatbuffers::VOffsetT = 4;
+    pub const VT_BACKTRACE: flatbuffers::VOffsetT = 6;
+
+    #[inline]
+    pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        TransformResponseInternalError { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
+        args: &'args TransformResponseInternalErrorArgs<'args>,
+    ) -> flatbuffers::WIPOffset<TransformResponseInternalError<'bldr>> {
+        let mut builder = TransformResponseInternalErrorBuilder::new(_fbb);
+        if let Some(x) = args.backtrace {
+            builder.add_backtrace(x);
+        }
+        if let Some(x) = args.message {
+            builder.add_message(x);
+        }
+        builder.finish()
+    }
+
+    #[inline]
+    pub fn message(&self) -> Option<&'a str> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab.get::<flatbuffers::ForwardsUOffset<&str>>(
+                TransformResponseInternalError::VT_MESSAGE,
+                None,
+            )
+        }
+    }
+    #[inline]
+    pub fn backtrace(&self) -> Option<&'a str> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab.get::<flatbuffers::ForwardsUOffset<&str>>(
+                TransformResponseInternalError::VT_BACKTRACE,
+                None,
+            )
+        }
+    }
+}
+
+impl flatbuffers::Verifiable for TransformResponseInternalError<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        v.visit_table(pos)?
+            .visit_field::<flatbuffers::ForwardsUOffset<&str>>("message", Self::VT_MESSAGE, false)?
+            .visit_field::<flatbuffers::ForwardsUOffset<&str>>(
+                "backtrace",
+                Self::VT_BACKTRACE,
+                false,
+            )?
+            .finish();
+        Ok(())
+    }
+}
+pub struct TransformResponseInternalErrorArgs<'a> {
+    pub message: Option<flatbuffers::WIPOffset<&'a str>>,
+    pub backtrace: Option<flatbuffers::WIPOffset<&'a str>>,
+}
+impl<'a> Default for TransformResponseInternalErrorArgs<'a> {
+    #[inline]
+    fn default() -> Self {
+        TransformResponseInternalErrorArgs {
+            message: None,
+            backtrace: None,
+        }
+    }
+}
+
+pub struct TransformResponseInternalErrorBuilder<'a: 'b, 'b> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b> TransformResponseInternalErrorBuilder<'a, 'b> {
+    #[inline]
+    pub fn add_message(&mut self, message: flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
+            TransformResponseInternalError::VT_MESSAGE,
+            message,
+        );
+    }
+    #[inline]
+    pub fn add_backtrace(&mut self, backtrace: flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
+            TransformResponseInternalError::VT_BACKTRACE,
+            backtrace,
+        );
+    }
+    #[inline]
+    pub fn new(
+        _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+    ) -> TransformResponseInternalErrorBuilder<'a, 'b> {
+        let start = _fbb.start_table();
+        TransformResponseInternalErrorBuilder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<TransformResponseInternalError<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl core::fmt::Debug for TransformResponseInternalError<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut ds = f.debug_struct("TransformResponseInternalError");
+        ds.field("message", &self.message());
+        ds.field("backtrace", &self.backtrace());
+        ds.finish()
+    }
+}
+pub enum TransformResponseRootOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+pub struct TransformResponseRoot<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for TransformResponseRoot<'a> {
+    type Inner = TransformResponseRoot<'a>;
+    #[inline]
+    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: flatbuffers::Table::new(buf, loc),
+        }
+    }
+}
+
+impl<'a> TransformResponseRoot<'a> {
+    pub const VT_VALUE_TYPE: flatbuffers::VOffsetT = 4;
+    pub const VT_VALUE: flatbuffers::VOffsetT = 6;
+
+    #[inline]
+    pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        TransformResponseRoot { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr>,
+        args: &'args TransformResponseRootArgs,
+    ) -> flatbuffers::WIPOffset<TransformResponseRoot<'bldr>> {
+        let mut builder = TransformResponseRootBuilder::new(_fbb);
+        if let Some(x) = args.value {
+            builder.add_value(x);
+        }
+        builder.add_value_type(args.value_type);
+        builder.finish()
+    }
+
+    #[inline]
+    pub fn value_type(&self) -> TransformResponse {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<TransformResponse>(
+                    TransformResponseRoot::VT_VALUE_TYPE,
+                    Some(TransformResponse::NONE),
+                )
+                .unwrap()
+        }
+    }
+    #[inline]
+    pub fn value(&self) -> Option<flatbuffers::Table<'a>> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<flatbuffers::ForwardsUOffset<flatbuffers::Table<'a>>>(
+                    TransformResponseRoot::VT_VALUE,
+                    None,
+                )
+        }
+    }
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn value_as_transform_response_progress(&self) -> Option<TransformResponseProgress<'a>> {
+        if self.value_type() == TransformResponse::TransformResponseProgress {
+            self.value().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { TransformResponseProgress::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn value_as_transform_response_success(&self) -> Option<TransformResponseSuccess<'a>> {
+        if self.value_type() == TransformResponse::TransformResponseSuccess {
+            self.value().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { TransformResponseSuccess::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn value_as_transform_response_invalid_query(
+        &self,
+    ) -> Option<TransformResponseInvalidQuery<'a>> {
+        if self.value_type() == TransformResponse::TransformResponseInvalidQuery {
+            self.value().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { TransformResponseInvalidQuery::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn value_as_transform_response_internal_error(
+        &self,
+    ) -> Option<TransformResponseInternalError<'a>> {
+        if self.value_type() == TransformResponse::TransformResponseInternalError {
+            self.value().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { TransformResponseInternalError::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+}
+
+impl flatbuffers::Verifiable for TransformResponseRoot<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        v.visit_table(pos)?
+     .visit_union::<TransformResponse, _>("value_type", Self::VT_VALUE_TYPE, "value", Self::VT_VALUE, false, |key, v, pos| {
+        match key {
+          TransformResponse::TransformResponseProgress => v.verify_union_variant::<flatbuffers::ForwardsUOffset<TransformResponseProgress>>("TransformResponse::TransformResponseProgress", pos),
+          TransformResponse::TransformResponseSuccess => v.verify_union_variant::<flatbuffers::ForwardsUOffset<TransformResponseSuccess>>("TransformResponse::TransformResponseSuccess", pos),
+          TransformResponse::TransformResponseInvalidQuery => v.verify_union_variant::<flatbuffers::ForwardsUOffset<TransformResponseInvalidQuery>>("TransformResponse::TransformResponseInvalidQuery", pos),
+          TransformResponse::TransformResponseInternalError => v.verify_union_variant::<flatbuffers::ForwardsUOffset<TransformResponseInternalError>>("TransformResponse::TransformResponseInternalError", pos),
+          _ => Ok(()),
+        }
+     })?
+     .finish();
+        Ok(())
+    }
+}
+pub struct TransformResponseRootArgs {
+    pub value_type: TransformResponse,
+    pub value: Option<flatbuffers::WIPOffset<flatbuffers::UnionWIPOffset>>,
+}
+impl<'a> Default for TransformResponseRootArgs {
+    #[inline]
+    fn default() -> Self {
+        TransformResponseRootArgs {
+            value_type: TransformResponse::NONE,
+            value: None,
+        }
+    }
+}
+
+pub struct TransformResponseRootBuilder<'a: 'b, 'b> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b> TransformResponseRootBuilder<'a, 'b> {
+    #[inline]
+    pub fn add_value_type(&mut self, value_type: TransformResponse) {
+        self.fbb_.push_slot::<TransformResponse>(
+            TransformResponseRoot::VT_VALUE_TYPE,
+            value_type,
+            TransformResponse::NONE,
+        );
+    }
+    #[inline]
+    pub fn add_value(&mut self, value: flatbuffers::WIPOffset<flatbuffers::UnionWIPOffset>) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<_>>(TransformResponseRoot::VT_VALUE, value);
+    }
+    #[inline]
+    pub fn new(
+        _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>,
+    ) -> TransformResponseRootBuilder<'a, 'b> {
+        let start = _fbb.start_table();
+        TransformResponseRootBuilder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<TransformResponseRoot<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl core::fmt::Debug for TransformResponseRoot<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut ds = f.debug_struct("TransformResponseRoot");
+        ds.field("value_type", &self.value_type());
+        match self.value_type() {
+            TransformResponse::TransformResponseProgress => {
+                if let Some(x) = self.value_as_transform_response_progress() {
+                    ds.field("value", &x)
+                } else {
+                    ds.field(
+                        "value",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            TransformResponse::TransformResponseSuccess => {
+                if let Some(x) = self.value_as_transform_response_success() {
+                    ds.field("value", &x)
+                } else {
+                    ds.field(
+                        "value",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            TransformResponse::TransformResponseInvalidQuery => {
+                if let Some(x) = self.value_as_transform_response_invalid_query() {
+                    ds.field("value", &x)
+                } else {
+                    ds.field(
+                        "value",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            TransformResponse::TransformResponseInternalError => {
+                if let Some(x) = self.value_as_transform_response_internal_error() {
+                    ds.field("value", &x)
+                } else {
+                    ds.field(
+                        "value",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            _ => {
+                let x: Option<()> = None;
+                ds.field("value", &x)
             }
         };
         ds.finish()

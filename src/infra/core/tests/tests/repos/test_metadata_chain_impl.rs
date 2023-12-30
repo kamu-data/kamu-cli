@@ -538,7 +538,7 @@ async fn test_append_add_data_empty_commit() {
 }
 
 #[tokio::test]
-async fn test_append_execute_query_empty_commit() {
+async fn test_append_execute_transform_empty_commit() {
     let tmp_dir = tempfile::tempdir().unwrap();
     let chain = init_chain(tmp_dir.path());
 
@@ -575,13 +575,13 @@ async fn test_append_execute_query_empty_commit() {
         .await
         .unwrap();
 
-    let execute_query = MetadataFactory::execute_query()
+    let execute_transform = MetadataFactory::execute_transform()
         .empty_query_inputs_from_seeded_ids(["foo", "bar"])
         .some_new_data()
         .some_new_checkpoint()
         .some_new_watermark()
         .build();
-    let block = MetadataFactory::metadata_block(execute_query.clone())
+    let block = MetadataFactory::metadata_block(execute_transform.clone())
         .prev(&head, 2)
         .build();
 
@@ -589,19 +589,19 @@ async fn test_append_execute_query_empty_commit() {
 
     // No data, same checkpoint and watermark
     let block = MetadataFactory::metadata_block(
-        MetadataFactory::execute_query()
+        MetadataFactory::execute_transform()
             .empty_query_inputs_from_seeded_ids(["foo", "bar"])
-            .prev_offset(execute_query.last_offset())
+            .prev_offset(execute_transform.last_offset())
             .prev_checkpoint(Some(
-                execute_query
+                execute_transform
                     .new_checkpoint
                     .as_ref()
                     .unwrap()
                     .physical_hash
                     .clone(),
             ))
-            .new_checkpoint(execute_query.new_checkpoint)
-            .new_watermark(execute_query.new_watermark)
+            .new_checkpoint(execute_transform.new_checkpoint)
+            .new_watermark(execute_transform.new_watermark)
             .build(),
     )
     .prev(&head, 3)
@@ -739,7 +739,7 @@ async fn test_append_add_data_must_be_preceeded_by_schema() {
 }
 
 #[test_log::test(tokio::test)]
-async fn test_append_execute_query_must_be_preceeded_by_schema() {
+async fn test_append_execute_transform_must_be_preceeded_by_schema() {
     let tmp_dir = tempfile::tempdir().unwrap();
     let chain = init_chain(tmp_dir.path());
 
@@ -772,7 +772,7 @@ async fn test_append_execute_query_must_be_preceeded_by_schema() {
     let head: Multihash = chain
         .append(
             MetadataFactory::metadata_block(
-                MetadataFactory::execute_query()
+                MetadataFactory::execute_transform()
                     .empty_query_inputs_from_seeded_ids(["foo", "bar"])
                     .new_checkpoint(Some(Checkpoint {
                         physical_hash: Multihash::from_digest_sha3_256(b"foo"),
@@ -792,7 +792,7 @@ async fn test_append_execute_query_must_be_preceeded_by_schema() {
         chain
             .append(
                 MetadataFactory::metadata_block(
-                    MetadataFactory::execute_query()
+                    MetadataFactory::execute_transform()
                         .empty_query_inputs_from_seeded_ids(["foo", "bar"])
                         .prev_checkpoint(Some(Multihash::from_digest_sha3_256(b"foo")))
                         .new_checkpoint(Some(Checkpoint {
@@ -827,7 +827,7 @@ async fn test_append_execute_query_must_be_preceeded_by_schema() {
     chain
         .append(
             MetadataFactory::metadata_block(
-                MetadataFactory::execute_query()
+                MetadataFactory::execute_transform()
                     .empty_query_inputs_from_seeded_ids(["foo", "bar"])
                     .prev_checkpoint(Some(Multihash::from_digest_sha3_256(b"foo")))
                     .new_checkpoint(Some(Checkpoint {

@@ -237,11 +237,11 @@ enum DatasetKind: int32 {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// ExecuteQueryInput
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#executequeryinput-schema
+// ExecuteTransformInput
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#executetransforminput-schema
 ////////////////////////////////////////////////////////////////////////////////
 
-table ExecuteQueryInput {
+table ExecuteTransformInput {
   dataset_id: [ubyte];
   prev_block_hash: [ubyte];
   new_block_hash: [ubyte];
@@ -250,12 +250,12 @@ table ExecuteQueryInput {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// ExecuteQuery
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#executequery-schema
+// ExecuteTransform
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#executetransform-schema
 ////////////////////////////////////////////////////////////////////////////////
 
-table ExecuteQuery {
-  query_inputs: [ExecuteQueryInput];
+table ExecuteTransform {
+  query_inputs: [ExecuteTransformInput];
   prev_checkpoint: [ubyte];
   prev_offset: uint64 = null;
   new_data: DataSlice;
@@ -498,7 +498,7 @@ table DisablePollingSource {
 
 union MetadataEvent {
   AddData,
-  ExecuteQuery,
+  ExecuteTransform,
   Seed,
   SetPollingSource,
   SetTransform,
@@ -524,83 +524,6 @@ table DatasetVocabulary {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// Watermark
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#watermark-schema
-////////////////////////////////////////////////////////////////////////////////
-
-table Watermark {
-  system_time: Timestamp;
-  event_time: Timestamp;
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// ExecuteQueryRequestInput
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#executequeryrequestinput-schema
-////////////////////////////////////////////////////////////////////////////////
-
-table ExecuteQueryRequestInput {
-  dataset_id: [ubyte];
-  dataset_alias: string;
-  query_alias: string;
-  vocab: DatasetVocabulary;
-  offset_interval: OffsetInterval;
-  data_paths: [string];
-  schema_file: string;
-  explicit_watermarks: [Watermark];
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// ExecuteQueryRequest
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#executequeryrequest-schema
-////////////////////////////////////////////////////////////////////////////////
-
-table ExecuteQueryRequest {
-  dataset_id: [ubyte];
-  dataset_alias: string;
-  system_time: Timestamp;
-  vocab: DatasetVocabulary;
-  transform: Transform;
-  query_inputs: [ExecuteQueryRequestInput];
-  next_offset: uint64;
-  prev_checkpoint_path: string;
-  new_checkpoint_path: string;
-  new_data_path: string;
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// ExecuteQueryResponse
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#executequeryresponse-schema
-////////////////////////////////////////////////////////////////////////////////
-
-table ExecuteQueryResponseProgress {
-}
-
-table ExecuteQueryResponseSuccess {
-  new_offset_interval: OffsetInterval;
-  new_watermark: Timestamp;
-}
-
-table ExecuteQueryResponseInvalidQuery {
-  message: string;
-}
-
-table ExecuteQueryResponseInternalError {
-  message: string;
-  backtrace: string;
-}
-
-union ExecuteQueryResponse {
-  ExecuteQueryResponseProgress,
-  ExecuteQueryResponseSuccess,
-  ExecuteQueryResponseInvalidQuery,
-  ExecuteQueryResponseInternalError,
-}
-
-table ExecuteQueryResponseRoot {
-  value: ExecuteQueryResponse;
-}
-
-////////////////////////////////////////////////////////////////////////////////
 // Manifest
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#manifest-schema
 ////////////////////////////////////////////////////////////////////////////////
@@ -621,5 +544,125 @@ table MetadataBlock {
   prev_block_hash: [ubyte];
   sequence_number: uint64;
   event: MetadataEvent;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// RawQueryRequest
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#rawqueryrequest-schema
+////////////////////////////////////////////////////////////////////////////////
+
+table RawQueryRequest {
+  input_data_paths: [string];
+  transform: Transform;
+  output_data_path: string;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// RawQueryResponse
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#rawqueryresponse-schema
+////////////////////////////////////////////////////////////////////////////////
+
+table RawQueryResponseProgress {
+}
+
+table RawQueryResponseSuccess {
+  num_records: uint64;
+}
+
+table RawQueryResponseInvalidQuery {
+  message: string;
+}
+
+table RawQueryResponseInternalError {
+  message: string;
+  backtrace: string;
+}
+
+union RawQueryResponse {
+  RawQueryResponseProgress,
+  RawQueryResponseSuccess,
+  RawQueryResponseInvalidQuery,
+  RawQueryResponseInternalError,
+}
+
+table RawQueryResponseRoot {
+  value: RawQueryResponse;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Watermark
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#watermark-schema
+////////////////////////////////////////////////////////////////////////////////
+
+table Watermark {
+  system_time: Timestamp;
+  event_time: Timestamp;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// TransformRequestInput
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#transformrequestinput-schema
+////////////////////////////////////////////////////////////////////////////////
+
+table TransformRequestInput {
+  dataset_id: [ubyte];
+  dataset_alias: string;
+  query_alias: string;
+  vocab: DatasetVocabulary;
+  offset_interval: OffsetInterval;
+  data_paths: [string];
+  schema_file: string;
+  explicit_watermarks: [Watermark];
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// TransformRequest
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#transformrequest-schema
+////////////////////////////////////////////////////////////////////////////////
+
+table TransformRequest {
+  dataset_id: [ubyte];
+  dataset_alias: string;
+  system_time: Timestamp;
+  vocab: DatasetVocabulary;
+  transform: Transform;
+  query_inputs: [TransformRequestInput];
+  next_offset: uint64;
+  prev_checkpoint_path: string;
+  new_checkpoint_path: string;
+  new_data_path: string;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// TransformResponse
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#transformresponse-schema
+////////////////////////////////////////////////////////////////////////////////
+
+table TransformResponseProgress {
+}
+
+table TransformResponseSuccess {
+  new_offset_interval: OffsetInterval;
+  new_watermark: Timestamp;
+}
+
+table TransformResponseInvalidQuery {
+  message: string;
+}
+
+table TransformResponseInternalError {
+  message: string;
+  backtrace: string;
+}
+
+union TransformResponse {
+  TransformResponseProgress,
+  TransformResponseSuccess,
+  TransformResponseInvalidQuery,
+  TransformResponseInternalError,
+}
+
+table TransformResponseRoot {
+  value: TransformResponse;
 }
 
