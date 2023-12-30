@@ -158,16 +158,15 @@ impl QueryService for QueryServiceImpl {
             .get_dataset(&dataset_handle.as_local_ref())
             .await?;
 
-        let vocab = dataset
+        let vocab: DatasetVocabulary = dataset
             .as_metadata_chain()
             .iter_blocks()
             .filter_map_ok(|(_, b)| b.event.into_variant::<SetVocab>())
             .try_first()
             .await
             .int_err()?
-            .map(|sv| -> DatasetVocabulary { sv.into() })
             .unwrap_or_default()
-            .into_resolved();
+            .into();
 
         let ctx = self
             .session_context(QueryOptions {

@@ -340,7 +340,7 @@ type DatasetFlowRunsMut {
 
 enum DatasetFlowType {
 	INGEST
-	EXECUTE_QUERY
+	EXECUTE_TRANSFORM
 	COMPACTION
 }
 
@@ -568,8 +568,8 @@ type EventTimeSourceFromSystemTime {
 	dummy: String
 }
 
-type ExecuteQuery {
-	queryInputs: [ExecuteQueryInput!]!
+type ExecuteTransform {
+	queryInputs: [ExecuteTransformInput!]!
 	prevCheckpoint: Multihash
 	prevOffset: Int
 	newData: DataSlice
@@ -577,7 +577,7 @@ type ExecuteQuery {
 	newWatermark: DateTime
 }
 
-type ExecuteQueryInput {
+type ExecuteTransformInput {
 	datasetId: DatasetID!
 	prevBlockHash: Multihash
 	newBlockHash: Multihash
@@ -926,7 +926,7 @@ type MetadataChainMut {
 	commitEvent(event: String!, eventFormat: MetadataManifestFormat!): CommitResult!
 }
 
-union MetadataEvent = AddData | ExecuteQuery | Seed | SetPollingSource | SetTransform | SetVocab | SetAttachments | SetInfo | SetLicense | SetDataSchema | AddPushSource | DisablePushSource | DisablePollingSource
+union MetadataEvent = AddData | ExecuteTransform | Seed | SetPollingSource | SetTransform | SetVocab | SetAttachments | SetInfo | SetLicense | SetDataSchema | AddPushSource | DisablePushSource | DisablePollingSource
 
 enum MetadataManifestFormat {
 	YAML

@@ -12,6 +12,7 @@ use std::path::PathBuf;
 
 use chrono::{DateTime, Utc};
 use datafusion::arrow::datatypes::SchemaRef;
+use datafusion::prelude::{DataFrame, SessionContext};
 use internal_error::*;
 use opendatafabric::*;
 use thiserror::Error;
@@ -24,68 +25,36 @@ use crate::{BlockRef, OwnedFile};
 
 #[async_trait::async_trait]
 pub trait Engine: Send + Sync {
-    async fn transform(&self, request: TransformRequest) -> Result<TransformResponse, EngineError>;
-}
+    async fn execute_raw_query(
+        &self,
+        request: RawQueryRequestExt,
+    ) -> Result<RawQueryResponseExt, EngineError>;
 
-// TODO: This interface is temporary and will be removed when ingestion is moved
-// from Spark into Kamu
-#[async_trait::async_trait]
-pub trait IngestEngine: Send + Sync {
-    async fn ingest(&self, request: IngestRequest) -> Result<IngestResponse, EngineError>;
+    async fn execute_transform(
+        &self,
+        request: TransformRequestExt,
+    ) -> Result<TransformResponseExt, EngineError>;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 // Request / Response DTOs
 ///////////////////////////////////////////////////////////////////////////////
 
-/// A request for ingesting new data into a root dataset.
-///
-/// Design notes: This DTO is formed as an intermediate between analyzing
-/// metadata chain and passing a final request to an engine. It contains
-/// enough information to define the entire ingest operation so that no extra
-/// interaction with metadata chain was needed, but it still operates with
-/// higher-level types. This request will be resolved into physical data
-/// locations before passing it to the engine.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct IngestRequest {
+#[derive(Clone)]
+pub struct RawQueryRequestExt {
     /// Randomly assigned value that identifies this specific engine operation
     pub operation_id: String,
-    /// Identifies the output dataset
-    pub dataset_handle: DatasetHandle,
-    /// Polling source
-    pub polling_source: SetPollingSource,
-    /// System time to use for new records
-    pub system_time: DateTime<Utc>,
-    /// Event time extracted from source's metadata
-    pub event_time: Option<DateTime<Utc>>,
-    /// Expected data schema (if already defined)
-    pub schema: Option<SchemaRef>,
-    /// Preceeding record offset, if any
-    pub prev_offset: Option<u64>,
-    /// Output dataset's vocabulary
-    pub vocab: DatasetVocabulary,
-    /// List of *all* previous data files (needed for merge step)
-    pub prev_data_slices: Vec<Multihash>,
-    /// Previous checkpoint, if any
-    pub prev_checkpoint: Option<Multihash>,
-    /// Previous watermark, if any
-    pub prev_watermark: Option<DateTime<Utc>>,
-    /// Previous source state, if any
-    pub prev_source_state: Option<SourceState>,
-    /// Host path to raw data to read
-    pub input_data_path: PathBuf,
+    /// Datafusion context to use for reading the result into a [DataFrame]
+    pub ctx: SessionContext,
+    /// Data to be used in the query
+    pub input_data: DataFrame,
+    /// Defines the query to be performed
+    pub transform: Transform,
 }
 
-#[derive(Debug)]
-pub struct IngestResponse {
-    /// Data slice produced by the transaction, if any
-    pub new_offset_interval: Option<OffsetInterval>,
-    /// Watermark advanced by the transaction, if any
-    pub new_watermark: Option<DateTime<Utc>>,
-    /// New checkpoint written by the engine, if any
-    pub new_checkpoint: Option<OwnedFile>,
-    /// Data produced by the operation, if any
-    pub new_data: Option<OwnedFile>,
+#[derive(Debug, Clone)]
+pub struct RawQueryResponseExt {
+    pub output_data: Option<DataFrame>,
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -93,13 +62,13 @@ pub struct IngestResponse {
 /// A request for derivative (streaming) transformation.
 ///
 /// Design notes: This DTO is formed as an intermediate between analyzing
-/// metadata chain and passing a final request to an engine. It contains
+/// metadata chain and passing the final request to an engine. It contains
 /// enough information to define the entire transform operation so that no extra
 /// interaction with metadata chain was needed, but it still operates with
 /// higher-level types. This request will be resolved into physical data
 /// locations before passing it to the engine.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TransformRequest {
+pub struct TransformRequestExt {
     /// Randomly assigned value that identifies this specific engine operation
     pub operation_id: String,
     /// Identifies the output dataset
@@ -117,7 +86,7 @@ pub struct TransformRequest {
     /// Preceeding record offset, if any
     pub prev_offset: Option<u64>,
     /// Defines the input data
-    pub inputs: Vec<TransformRequestInput>,
+    pub inputs: Vec<TransformRequestInputExt>,
     /// Output dataset's vocabulary
     pub vocab: DatasetVocabulary,
     /// Previous checkpoint, if any
@@ -125,7 +94,7 @@ pub struct TransformRequest {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TransformRequestInput {
+pub struct TransformRequestInputExt {
     /// Identifies the input dataset
     pub dataset_handle: DatasetHandle,
     /// An alias of this input to be used in queries
@@ -163,7 +132,7 @@ pub struct TransformRequestInput {
 }
 
 #[derive(Debug)]
-pub struct TransformResponse {
+pub struct TransformResponseExt {
     /// Data slice produced by the transaction, if any
     pub new_offset_interval: Option<OffsetInterval>,
     /// Watermark advanced by the transaction, if any
@@ -174,8 +143,8 @@ pub struct TransformResponse {
     pub new_data: Option<OwnedFile>,
 }
 
-impl Into<TransformRequestInput> for ExecuteQueryInput {
-    fn from(val: TransformRequestInput) -> Self{
+impl Into<TransformRequestInputExt> for ExecuteTransformInput {
+    fn from(val: TransformRequestInputExt) -> Self{
         Self {
             dataset_id: val.dataset_handle.id,
             prev_block_hash: val.prev_block_hash,

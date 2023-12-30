@@ -18,7 +18,6 @@ use kamu_core::engine::*;
 use kamu_core::*;
 
 use super::engine_odf::*;
-use super::engine_spark::*;
 use crate::utils::docker_images;
 use crate::*;
 
@@ -26,11 +25,14 @@ use crate::*;
 
 pub struct EngineProvisionerLocal {
     config: EngineProvisionerLocalConfig,
-    spark_ingest_engine: Arc<dyn IngestEngine>,
     spark_engine: Arc<dyn Engine>,
     flink_engine: Arc<dyn Engine>,
     datafusion_engine: Arc<dyn Engine>,
     container_runtime: ContainerRuntime,
+    inner: Arc<Inner>,
+}
+
+struct Inner {
     state: Mutex<State>,
     notify: tokio::sync::Notify,
 }
@@ -57,12 +59,6 @@ impl EngineProvisionerLocal {
         let run_info_dir: Arc<std::path::Path> = Arc::from(run_info_dir.as_path());
 
         Self {
-            spark_ingest_engine: Arc::new(SparkEngine::new(
-                container_runtime.clone(),
-                &config.spark_image,
-                run_info_dir.clone(),
-                dataset_repo.clone(),
-            )),
             spark_engine: Arc::new(ODFEngine::new(
                 container_runtime.clone(),
                 engine_config.clone(),
@@ -85,11 +81,13 @@ impl EngineProvisionerLocal {
                 dataset_repo.clone(),
             )),
             container_runtime,
-            state: Mutex::new(State {
-                outstanding_handles: 0,
-                known_images: HashSet::new(),
+            inner: Arc::new(Inner {
+                state: Mutex::new(State {
+                    outstanding_handles: 0,
+                    known_images: HashSet::new(),
+                }),
+                notify: tokio::sync::Notify::new(),
             }),
-            notify: tokio::sync::Notify::new(),
             config,
         }
     }
@@ -100,12 +98,12 @@ impl EngineProvisionerLocal {
         listener: Arc<dyn EngineProvisioningListener>,
     ) -> Result<(), EngineProvisioningError> {
         let mut pull_image = {
-            let state = self.state.lock().unwrap();
+            let state = self.inner.state.lock().unwrap();
             !state.known_images.contains(image)
         };
 
         if pull_image && self.container_runtime.has_image(image).await.int_err()? {
-            let mut state = self.state.lock().unwrap();
+            let mut state = self.inner.state.lock().unwrap();
             state.known_images.insert(image.to_owned());
             pull_image = false;
         };
@@ -119,7 +117,7 @@ impl EngineProvisionerLocal {
                 .pull_image(image, Some(listener.as_ref()))
                 .await?;
             {
-                let mut state = self.state.lock().unwrap();
+                let mut state = self.inner.state.lock().unwrap();
                 state.known_images.insert(image.to_owned());
             }
         }
@@ -133,7 +131,7 @@ impl EngineProvisionerLocal {
         loop {
             // Lock
             {
-                let mut state = self.state.lock().unwrap();
+                let mut state = self.inner.state.lock().unwrap();
                 let max_concurrency = self.get_dynamic_max_concurrency(state.outstanding_handles);
 
                 if state.outstanding_handles < max_concurrency {
@@ -150,7 +148,7 @@ impl EngineProvisionerLocal {
                 }
             } // Unlock
 
-            self.notify.notified().await;
+            self.inner.notify.notified().await;
         }
     }
 
@@ -174,33 +172,26 @@ impl EngineProvisionerLocal {
             }
         }
     }
+
+    /// Called when [EngineHandle] is dropped
+    fn release_engine(inner: &Inner, engine: &dyn Engine) {
+        tracing::info!("Releasing the engine {:p}", engine);
+
+        {
+            let mut state = inner.state.lock().unwrap();
+            state.outstanding_handles -= 1;
+            inner.notify.notify_one();
+        }
+    }
 }
 
 #[async_trait::async_trait]
 impl EngineProvisioner for EngineProvisionerLocal {
-    async fn provision_ingest_engine(
-        &self,
-        maybe_listener: Option<Arc<dyn EngineProvisioningListener>>,
-    ) -> Result<IngestEngineHandle, EngineProvisioningError> {
-        let listener = maybe_listener.unwrap_or_else(|| Arc::new(NullEngineProvisioningListener));
-        self.ensure_image(&self.config.spark_image, listener.clone())
-            .await?;
-
-        listener.begin("spark-ingest");
-        self.wait_for_max_concurrency().await;
-        listener.success();
-
-        Ok(IngestEngineHandle::new(
-            self,
-            self.spark_ingest_engine.clone(),
-        ))
-    }
-
     async fn provision_engine(
         &self,
         engine_id: &str,
         maybe_listener: Option<Arc<dyn EngineProvisioningListener>>,
-    ) -> Result<EngineHandle, EngineProvisioningError> {
+    ) -> Result<Arc<dyn Engine>, EngineProvisioningError> {
         let listener = maybe_listener.unwrap_or_else(|| Arc::new(NullEngineProvisioningListener));
 
         let (engine, image) = match engine_id {
@@ -225,27 +216,7 @@ impl EngineProvisioner for EngineProvisionerLocal {
         self.wait_for_max_concurrency().await;
         listener.success();
 
-        Ok(EngineHandle::new(self, engine))
-    }
-
-    fn release_engine(&self, engine: &dyn Engine) {
-        tracing::info!("Releasing the engine {:p}", engine);
-
-        {
-            let mut state = self.state.lock().unwrap();
-            state.outstanding_handles -= 1;
-            self.notify.notify_one();
-        }
-    }
-
-    fn release_ingest_engine(&self, engine: &dyn IngestEngine) {
-        tracing::info!("Releasing the engine {:p}", engine);
-
-        {
-            let mut state = self.state.lock().unwrap();
-            state.outstanding_handles -= 1;
-            self.notify.notify_one();
-        }
+        Ok(Arc::new(EngineHandle::new(self.inner.clone(), engine)))
     }
 }
 
@@ -296,17 +267,47 @@ impl EngineProvisioner for EngineProvisionerNull {
         &self,
         _engine_id: &str,
         _maybe_listener: Option<Arc<dyn EngineProvisioningListener>>,
-    ) -> Result<EngineHandle, EngineProvisioningError> {
+    ) -> Result<Arc<dyn Engine>, EngineProvisioningError> {
         unimplemented!()
     }
+}
 
-    async fn provision_ingest_engine(
+///////////////////////////////////////////////////////////////////////////////
+// EngineHandle
+///////////////////////////////////////////////////////////////////////////////
+
+/// Wraps an engine use to decrease concurrent use counter when engine is
+/// dropped
+struct EngineHandle {
+    inner: Arc<Inner>,
+    engine: Arc<dyn Engine>,
+}
+
+impl EngineHandle {
+    pub fn new(inner: Arc<Inner>, engine: Arc<dyn Engine>) -> Self {
+        Self { inner, engine }
+    }
+}
+
+#[async_trait::async_trait]
+impl Engine for EngineHandle {
+    async fn execute_raw_query(
         &self,
-        _maybe_listener: Option<Arc<dyn EngineProvisioningListener>>,
-    ) -> Result<IngestEngineHandle, EngineProvisioningError> {
-        unimplemented!()
+        request: RawQueryRequestExt,
+    ) -> Result<RawQueryResponseExt, EngineError> {
+        self.engine.execute_raw_query(request).await
     }
 
-    fn release_engine(&self, _engine: &dyn Engine) {}
-    fn release_ingest_engine(&self, _engine: &dyn IngestEngine) {}
+    async fn execute_transform(
+        &self,
+        request: TransformRequestExt,
+    ) -> Result<TransformResponseExt, EngineError> {
+        self.engine.execute_transform(request).await
+    }
+}
+
+impl Drop for EngineHandle {
+    fn drop(&mut self) {
+        EngineProvisionerLocal::release_engine(&self.inner, self.engine.as_ref());
+    }
 }

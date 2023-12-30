@@ -154,7 +154,7 @@ impl IntoDataStreamEvent for MetadataEvent {
                 e.new_checkpoint,
                 e.new_watermark,
             ),
-            MetadataEvent::ExecuteQuery(e) => (
+            MetadataEvent::ExecuteTransform(e) => (
                 e.prev_checkpoint,
                 e.prev_offset,
                 e.new_data,
@@ -191,7 +191,7 @@ impl IntoDataStreamEvent for MetadataEvent {
                 e.new_checkpoint.as_ref(),
                 e.new_watermark.as_ref(),
             ),
-            MetadataEvent::ExecuteQuery(e) => (
+            MetadataEvent::ExecuteTransform(e) => (
                 e.prev_checkpoint.as_ref(),
                 e.prev_offset,
                 e.new_data.as_ref(),

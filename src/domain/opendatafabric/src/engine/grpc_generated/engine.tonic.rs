@@ -92,11 +92,11 @@ pub mod engine_client {
             self.inner = self.inner.max_encoding_message_size(limit);
             self
         }
-        pub async fn execute_query(
+        pub async fn execute_raw_query(
             &mut self,
-            request: impl tonic::IntoRequest<super::ExecuteQueryRequest>,
+            request: impl tonic::IntoRequest<super::RawQueryRequest>,
         ) -> std::result::Result<
-            tonic::Response<tonic::codec::Streaming<super::ExecuteQueryResponse>>,
+            tonic::Response<tonic::codec::Streaming<super::RawQueryResponse>>,
             tonic::Status,
         > {
             self.inner.ready().await.map_err(|e| {
@@ -106,10 +106,30 @@ pub mod engine_client {
                 )
             })?;
             let codec = tonic::codec::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static("/engine.Engine/ExecuteQuery");
+            let path = http::uri::PathAndQuery::from_static("/engine.Engine/ExecuteRawQuery");
             let mut req = request.into_request();
             req.extensions_mut()
-                .insert(GrpcMethod::new("engine.Engine", "ExecuteQuery"));
+                .insert(GrpcMethod::new("engine.Engine", "ExecuteRawQuery"));
+            self.inner.server_streaming(req, path, codec).await
+        }
+        pub async fn execute_transform(
+            &mut self,
+            request: impl tonic::IntoRequest<super::TransformRequest>,
+        ) -> std::result::Result<
+            tonic::Response<tonic::codec::Streaming<super::TransformResponse>>,
+            tonic::Status,
+        > {
+            self.inner.ready().await.map_err(|e| {
+                tonic::Status::new(
+                    tonic::Code::Unknown,
+                    format!("Service was not ready: {}", e.into()),
+                )
+            })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static("/engine.Engine/ExecuteTransform");
+            let mut req = request.into_request();
+            req.extensions_mut()
+                .insert(GrpcMethod::new("engine.Engine", "ExecuteTransform"));
             self.inner.server_streaming(req, path, codec).await
         }
     }
@@ -122,15 +142,23 @@ pub mod engine_server {
     /// use with EngineServer.
     #[async_trait]
     pub trait Engine: Send + Sync + 'static {
-        /// Server streaming response type for the ExecuteQuery method.
-        type ExecuteQueryStream: futures_core::Stream<
-                Item = std::result::Result<super::ExecuteQueryResponse, tonic::Status>,
+        /// Server streaming response type for the ExecuteRawQuery method.
+        type ExecuteRawQueryStream: futures_core::Stream<Item = std::result::Result<super::RawQueryResponse, tonic::Status>>
+            + Send
+            + 'static;
+        async fn execute_raw_query(
+            &self,
+            request: tonic::Request<super::RawQueryRequest>,
+        ) -> std::result::Result<tonic::Response<Self::ExecuteRawQueryStream>, tonic::Status>;
+        /// Server streaming response type for the ExecuteTransform method.
+        type ExecuteTransformStream: futures_core::Stream<
+                Item = std::result::Result<super::TransformResponse, tonic::Status>,
             > + Send
             + 'static;
-        async fn execute_query(
+        async fn execute_transform(
             &self,
-            request: tonic::Request<super::ExecuteQueryRequest>,
-        ) -> std::result::Result<tonic::Response<Self::ExecuteQueryStream>, tonic::Status>;
+            request: tonic::Request<super::TransformRequest>,
+        ) -> std::result::Result<tonic::Response<Self::ExecuteTransformStream>, tonic::Status>;
     }
     #[derive(Debug)]
     pub struct EngineServer<T: Engine> {
@@ -209,23 +237,22 @@ pub mod engine_server {
         fn call(&mut self, req: http::Request<B>) -> Self::Future {
             let inner = self.inner.clone();
             match req.uri().path() {
-                "/engine.Engine/ExecuteQuery" => {
+                "/engine.Engine/ExecuteRawQuery" => {
                     #[allow(non_camel_case_types)]
-                    struct ExecuteQuerySvc<T: Engine>(pub Arc<T>);
-                    impl<T: Engine>
-                        tonic::server::ServerStreamingService<super::ExecuteQueryRequest>
-                        for ExecuteQuerySvc<T>
+                    struct ExecuteRawQuerySvc<T: Engine>(pub Arc<T>);
+                    impl<T: Engine> tonic::server::ServerStreamingService<super::RawQueryRequest>
+                        for ExecuteRawQuerySvc<T>
                     {
-                        type Response = super::ExecuteQueryResponse;
-                        type ResponseStream = T::ExecuteQueryStream;
+                        type Response = super::RawQueryResponse;
+                        type ResponseStream = T::ExecuteRawQueryStream;
                         type Future =
                             BoxFuture<tonic::Response<Self::ResponseStream>, tonic::Status>;
                         fn call(
                             &mut self,
-                            request: tonic::Request<super::ExecuteQueryRequest>,
+                            request: tonic::Request<super::RawQueryRequest>,
                         ) -> Self::Future {
                             let inner = Arc::clone(&self.0);
-                            let fut = async move { (*inner).execute_query(request).await };
+                            let fut = async move { (*inner).execute_raw_query(request).await };
                             Box::pin(fut)
                         }
                     }
@@ -236,7 +263,49 @@ pub mod engine_server {
                     let inner = self.inner.clone();
                     let fut = async move {
                         let inner = inner.0;
-                        let method = ExecuteQuerySvc(inner);
+                        let method = ExecuteRawQuerySvc(inner);
+                        let codec = tonic::codec::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            )
+                            .apply_max_message_size_config(
+                                max_decoding_message_size,
+                                max_encoding_message_size,
+                            );
+                        let res = grpc.server_streaming(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/engine.Engine/ExecuteTransform" => {
+                    #[allow(non_camel_case_types)]
+                    struct ExecuteTransformSvc<T: Engine>(pub Arc<T>);
+                    impl<T: Engine> tonic::server::ServerStreamingService<super::TransformRequest>
+                        for ExecuteTransformSvc<T>
+                    {
+                        type Response = super::TransformResponse;
+                        type ResponseStream = T::ExecuteTransformStream;
+                        type Future =
+                            BoxFuture<tonic::Response<Self::ResponseStream>, tonic::Status>;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::TransformRequest>,
+                        ) -> Self::Future {
+                            let inner = Arc::clone(&self.0);
+                            let fut = async move { (*inner).execute_transform(request).await };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let max_decoding_message_size = self.max_decoding_message_size;
+                    let max_encoding_message_size = self.max_encoding_message_size;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let inner = inner.0;
+                        let method = ExecuteTransformSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(

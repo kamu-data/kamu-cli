@@ -17,11 +17,6 @@ content:
         - '.features[] | select(.geometry != null) | .'
       read:
         kind: ndGeoJson
-      preprocess:
-        # TODO: Remove after datafusion ingest is stabilized
-        kind: sql
-        engine: datafusion
-        query: select * from input
       merge:
         # TODO
         kind: append

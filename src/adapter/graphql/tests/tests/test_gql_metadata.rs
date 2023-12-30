@@ -35,6 +35,7 @@ async fn test_current_push_sources() {
         .add_builder(PushIngestServiceImpl::builder().with_run_info_dir(tempdir.path().join("run")))
         .bind::<dyn PushIngestService, PushIngestServiceImpl>()
         .add::<SystemTimeSourceDefault>()
+        .add::<EngineProvisionerNull>()
         .add::<ObjectStoreRegistryImpl>()
         .add::<DataFormatRegistryImpl>()
         .add::<auth::AlwaysHappyDatasetActionAuthorizer>()

@@ -29,11 +29,6 @@ content:
           - age_group STRING
           - case_status STRING
           - case_type STRING
-      preprocess:
-        # TODO: Remove after datafusion ingest is stabilized
-        kind: sql
-        engine: datafusion
-        query: select * from input
       # How to combine newly-ingested data with data that is already in the dataset
       merge:
         kind: ledger

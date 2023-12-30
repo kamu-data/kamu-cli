@@ -685,7 +685,7 @@ async fn test_data_writer_builder_scan_polling_source() {
             prev_checkpoint: None,
             prev_watermark: None,
             prev_source_state: None,
-        } if *vocab == odf::DatasetVocabularyResolvedOwned::default()
+        } if *vocab == odf::DatasetVocabulary::default()
     );
 }
 
@@ -727,7 +727,7 @@ async fn test_data_writer_builder_scan_push_source() {
             prev_checkpoint: None,
             prev_watermark: None,
             prev_source_state: None,
-        } if *vocab == odf::DatasetVocabularyResolvedOwned::default()
+        } if *vocab == odf::DatasetVocabulary::default()
     );
 }
 

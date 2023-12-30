@@ -30,6 +30,7 @@ pub struct PushIngestServiceImpl {
     data_format_registry: Arc<dyn DataFormatRegistry>,
     run_info_dir: PathBuf,
     time_source: Arc<dyn SystemTimeSource>,
+    engine_provisioner: Arc<dyn EngineProvisioner>,
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -43,6 +44,7 @@ impl PushIngestServiceImpl {
         data_format_registry: Arc<dyn DataFormatRegistry>,
         run_info_dir: PathBuf,
         time_source: Arc<dyn SystemTimeSource>,
+        engine_provisioner: Arc<dyn EngineProvisioner>,
     ) -> Self {
         Self {
             dataset_repo,
@@ -51,6 +53,7 @@ impl PushIngestServiceImpl {
             data_format_registry,
             run_info_dir,
             time_source,
+            engine_provisioner,
         }
     }
 
@@ -144,8 +147,22 @@ impl PushIngestServiceImpl {
         let input_data_path = self.maybe_fetch(source, &args).await?;
 
         let df = if let Some(df) = self.read(&input_data_path, &args).await? {
-            if let Some(transform) = args.push_source.preprocess.clone() {
-                Some(ingest_common::preprocess(&args.ctx, transform, df).await?)
+            if let Some(transform) = &args.push_source.preprocess {
+                args.listener.on_stage_progress(
+                    PushIngestStage::Preprocess,
+                    0,
+                    TotalSteps::Exact(1),
+                );
+
+                ingest_common::preprocess(
+                    &args.operation_id,
+                    self.engine_provisioner.as_ref(),
+                    &args.ctx,
+                    transform,
+                    df,
+                    args.listener.clone().get_engine_provisioning_listener(),
+                )
+                .await?
             } else {
                 Some(df)
             }

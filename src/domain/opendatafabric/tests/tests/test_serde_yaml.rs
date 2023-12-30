@@ -399,16 +399,16 @@ fn serde_metadata_block() {
     let block = MetadataBlock {
         prev_block_hash: Some(Multihash::from_digest_sha3_256(b"prev")),
         system_time: Utc.with_ymd_and_hms(2020, 1, 1, 12, 0, 0).unwrap(),
-        event: MetadataEvent::ExecuteQuery(ExecuteQuery {
+        event: MetadataEvent::ExecuteTransform(ExecuteTransform {
             query_inputs: vec![
-                ExecuteQueryInput {
+                ExecuteTransformInput {
                     dataset_id: DatasetID::new_seeded_ed25519(b"input1"),
                     prev_block_hash: Some(Multihash::from_digest_sha3_256(b"a")),
                     new_block_hash: Some(Multihash::from_digest_sha3_256(b"b")),
                     prev_offset: Some(9),
                     new_offset: Some(20),
                 },
-                ExecuteQueryInput {
+                ExecuteTransformInput {
                     dataset_id: DatasetID::new_seeded_ed25519(b"input2"),
                     prev_block_hash: Some(Multihash::from_digest_sha3_256(b"a")),
                     new_block_hash: Some(Multihash::from_digest_sha3_256(b"b")),
@@ -439,7 +439,7 @@ fn serde_metadata_block() {
           prevBlockHash: f16209eb949bd8ff0bb1d827f11809aebc6bd0d5955c7f368469a913c70d196620272
           sequenceNumber: 127
           event:
-            kind: ExecuteQuery
+            kind: ExecuteTransform
             queryInputs:
             - datasetId: \
          did:odf:fed01816ef0a9abe93aba816ef0a9abe93aba90e6065747170300c0d3d30c2cd8d7a4
@@ -486,7 +486,7 @@ fn serde_metadata_block_obsolete_version() {
           prevBlockHash: f16209eb949bd8ff0bb1d827f11809aebc6bd0d5955c7f368469a913c70d196620272
           sequenceNumber: 127
           event:
-            kind: ExecuteQuery
+            kind: ExecuteTransform
             queryInputs:
             - datasetId: \
          did:odf:fed01816ef0a9abe93aba816ef0a9abe93aba90e6065747170300c0d3d30c2cd8d7a4

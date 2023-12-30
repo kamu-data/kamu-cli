@@ -88,7 +88,7 @@ impl NewDatasetCommand {
                             kind: sql
                             # Use one of the supported engines and a query in its dialect
                             # See: https://docs.kamu.dev/cli/transform/supported-engines/
-                            engine: spark
+                            engine: datafusion
                             query: |
                               select
                                 date,
@@ -139,7 +139,7 @@ impl NewDatasetCommand {
                           # See: https://docs.kamu.dev/cli/transform/supported-engines/
                           transform:
                             kind: sql
-                            engine: spark
+                            engine: datafusion
                             query: |
                               select
                                 date,

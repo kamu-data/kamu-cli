@@ -10,86 +10,41 @@
 use std::sync::Arc;
 
 use datafusion::prelude::*;
-use internal_error::*;
 use kamu_core::engine::*;
-use kamu_core::ObjectStoreRegistry;
+use kamu_core::{ObjectStoreRegistry, *};
 use opendatafabric::*;
 
-///////////////////////////////////////////////////////////////////////////////
-
-const OUTPUT_VIEW_ALIAS: &'static str = "__output__";
+use crate::engine::*;
 
 ///////////////////////////////////////////////////////////////////////////////
 
 #[tracing::instrument(level = "info", skip_all)]
 pub(crate) async fn preprocess(
+    operation_id: &str,
+    engine_provisioner: &dyn EngineProvisioner,
     ctx: &SessionContext,
-    transform: Transform,
-    df: DataFrame,
-) -> Result<DataFrame, EngineError> {
-    let Transform::Sql(transform) = transform;
-
-    // TODO: Support other engines
-    assert_eq!(transform.engine.to_lowercase(), "datafusion");
-
-    // Setup input
-    ctx.register_table("input", df.into_view()).int_err()?;
-
-    // Setup queries
-    for query_step in transform.queries.unwrap_or_default() {
-        register_view(
-            ctx,
-            query_step.alias.as_deref().unwrap_or(OUTPUT_VIEW_ALIAS),
-            query_step.query.as_str(),
-        )
-        .await?;
-    }
-
-    // Get result's execution plan
-    let df = ctx.table(OUTPUT_VIEW_ALIAS).await.int_err()?;
-
-    tracing::debug!(
-        schema = ?df.schema(),
-        logical_plan = ?df.logical_plan(),
-        "Performing preprocess step",
-    );
-
-    Ok(df)
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-async fn register_view(ctx: &SessionContext, alias: &str, query: &str) -> Result<(), EngineError> {
-    use datafusion::logical_expr::*;
-    use datafusion::sql::TableReference;
-
-    tracing::debug!(
-        %alias,
-        %query,
-        "Creating view for a query",
-    );
-
-    let logical_plan = match ctx.state().create_logical_plan(query).await {
-        Ok(plan) => plan,
-        Err(error) => {
-            tracing::error!(
-                error = &error as &dyn std::error::Error,
-                %query,
-                "Error when setting up query"
-            );
-            return Err(InvalidQueryError::new(error.to_string(), Vec::new()).into());
-        }
+    transform: &Transform,
+    input_data: DataFrame,
+    maybe_listener: Option<Arc<dyn EngineProvisioningListener>>,
+) -> Result<Option<DataFrame>, EngineError> {
+    let engine = match transform.engine().to_lowercase().as_str() {
+        "datafusion" => Arc::new(EngineDatafusionInproc::new()),
+        engine_id => engine_provisioner
+            .provision_engine(engine_id, maybe_listener)
+            .await
+            .int_err()?,
     };
 
-    let create_view = LogicalPlan::Ddl(DdlStatement::CreateView(CreateView {
-        name: TableReference::bare(alias).to_owned_reference(),
-        input: Arc::new(logical_plan),
-        or_replace: false,
-        definition: Some(query.to_string()),
-    }));
+    let response = engine
+        .execute_raw_query(RawQueryRequestExt {
+            operation_id: operation_id.to_string(),
+            ctx: ctx.clone(),
+            input_data,
+            transform: transform.clone(),
+        })
+        .await?;
 
-    ctx.execute_logical_plan(create_view).await.int_err()?;
-    Ok(())
+    Ok(response.output_data)
 }
 
 ///////////////////////////////////////////////////////////////////////////////

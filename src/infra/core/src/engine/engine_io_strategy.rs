@@ -24,7 +24,7 @@ pub trait EngineIoStrategy: Send + Sync {
     async fn materialize_request(
         &self,
         dataset: &dyn Dataset,
-        request: TransformRequest,
+        request: TransformRequestExt,
         operation_dir: &Path,
     ) -> Result<MaterializedEngineRequest, InternalError>;
 }
@@ -32,7 +32,7 @@ pub trait EngineIoStrategy: Send + Sync {
 ///////////////////////////////////////////////////////////////////////////////
 
 pub struct MaterializedEngineRequest {
-    pub engine_request: ExecuteQueryRequest,
+    pub engine_request: TransformRequest,
     pub out_data_path: PathBuf,
     pub out_checkpoint_path: PathBuf,
     pub volumes: Vec<VolumeSpec>,
@@ -91,7 +91,7 @@ impl EngineIoStrategy for EngineIoStrategyLocalVolume {
     async fn materialize_request(
         &self,
         dataset: &dyn Dataset,
-        request: TransformRequest,
+        request: TransformRequestExt,
         operation_dir: &Path,
     ) -> Result<MaterializedEngineRequest, InternalError> {
         let host_out_dir = operation_dir.join("out");
@@ -163,7 +163,7 @@ impl EngineIoStrategy for EngineIoStrategyLocalVolume {
                 None
             };
 
-            query_inputs.push(ExecuteQueryRequestInput {
+            query_inputs.push(TransformRequestInput {
                 dataset_id: input.dataset_handle.id,
                 dataset_alias: input.dataset_handle.alias,
                 query_alias: input.alias,
@@ -175,7 +175,7 @@ impl EngineIoStrategy for EngineIoStrategyLocalVolume {
             })
         }
 
-        let engine_request = ExecuteQueryRequest {
+        let engine_request = TransformRequest {
             dataset_id: request.dataset_handle.id,
             dataset_alias: request.dataset_handle.alias,
             system_time: request.system_time,
@@ -270,7 +270,7 @@ impl EngineIoStrategy for EngineIoStrategyRemoteProxy {
     async fn materialize_request(
         &self,
         dataset: &dyn Dataset,
-        request: TransformRequest,
+        request: TransformRequestExt,
         operation_dir: &Path,
     ) -> Result<MaterializedEngineRequest, InternalError> {
         // TODO: PERF: Parallel data transfer
@@ -348,7 +348,7 @@ impl EngineIoStrategy for EngineIoStrategyRemoteProxy {
                 None
             };
 
-            query_inputs.push(ExecuteQueryRequestInput {
+            query_inputs.push(TransformRequestInput {
                 dataset_id: input.dataset_handle.id,
                 dataset_alias: input.dataset_handle.alias,
                 query_alias: input.alias,
@@ -360,7 +360,7 @@ impl EngineIoStrategy for EngineIoStrategyRemoteProxy {
             })
         }
 
-        let engine_request = ExecuteQueryRequest {
+        let engine_request = TransformRequest {
             dataset_id: request.dataset_handle.id,
             dataset_alias: request.dataset_handle.alias,
             system_time: request.system_time,

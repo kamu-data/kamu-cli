@@ -10,7 +10,6 @@
 mod data_format_registry_impl;
 mod fetch_service;
 mod ingest_common;
-mod ingest_task;
 mod polling_ingest_service_impl;
 mod polling_source_state;
 mod prep_service;
@@ -18,7 +17,6 @@ mod push_ingest_service_impl;
 
 pub use data_format_registry_impl::*;
 pub use fetch_service::*;
-pub use ingest_task::*;
 pub use polling_ingest_service_impl::*;
 pub use polling_source_state::*;
 pub use prep_service::*;

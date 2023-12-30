@@ -194,9 +194,9 @@ async fn test_get_next_operation() {
 
     assert!(matches!(
         harness.transform_service.get_next_operation(&bar, Utc::now()).await.unwrap(),
-        Some(TransformRequest{ transform, inputs, .. })
+        Some(TransformRequestExt{ transform, inputs, .. })
         if transform == bar_source.transform &&
-        inputs == vec![TransformRequestInput {
+        inputs == vec![TransformRequestInputExt {
             dataset_handle: foo.clone(),
             alias: foo.alias.dataset_name.to_string(),
             vocab: DatasetVocabulary::default(),
@@ -403,8 +403,8 @@ async fn test_get_verification_plan_one_to_one() {
     let deriv_head_t2 = harness
         .append_block(
             &deriv_hdl,
-            MetadataFactory::metadata_block(ExecuteQuery {
-                query_inputs: vec![ExecuteQueryInput {
+            MetadataFactory::metadata_block(ExecuteTransform {
+                query_inputs: vec![ExecuteTransformInput {
                     dataset_id: root_hdl.id.clone(),
                     prev_block_hash: None,
                     new_block_hash: Some(root_head_t1.clone()),
@@ -475,8 +475,8 @@ async fn test_get_verification_plan_one_to_one() {
     let deriv_head_t4 = harness
         .append_block(
             &deriv_hdl,
-            MetadataFactory::metadata_block(ExecuteQuery {
-                query_inputs: vec![ExecuteQueryInput {
+            MetadataFactory::metadata_block(ExecuteTransform {
+                query_inputs: vec![ExecuteTransformInput {
                     dataset_id: root_hdl.id.clone(),
                     prev_block_hash: Some(root_head_t1.clone()),
                     new_block_hash: Some(root_head_t3.clone()),
@@ -533,8 +533,8 @@ async fn test_get_verification_plan_one_to_one() {
     let deriv_head_t6 = harness
         .append_block(
             &deriv_hdl,
-            MetadataFactory::metadata_block(ExecuteQuery {
-                query_inputs: vec![ExecuteQueryInput {
+            MetadataFactory::metadata_block(ExecuteTransform {
+                query_inputs: vec![ExecuteTransformInput {
                     dataset_id: root_hdl.id.clone(),
                     prev_block_hash: Some(root_head_t3.clone()),
                     new_block_hash: Some(root_head_t5.clone()),
@@ -601,7 +601,7 @@ async fn test_get_verification_plan_one_to_one() {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-fn assert_requests_eqivalent(lhs: &TransformRequest, mut rhs: TransformRequest) {
+fn assert_requests_eqivalent(lhs: &TransformRequestExt, mut rhs: TransformRequestExt) {
     // Operation IDs are randomly generated, so ignoring them for this check
     rhs.operation_id = lhs.operation_id.clone();
 

@@ -490,6 +490,7 @@ impl IngestTestHarness {
                 Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap(),
             ))
             .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
+            .add::<EngineProvisionerNull>()
             .add_builder(
                 PushIngestServiceImpl::builder()
                     .with_object_store_registry(Arc::new(ObjectStoreRegistryImpl::new(vec![
