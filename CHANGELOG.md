@@ -62,7 +62,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.147.0] - 2023-12-13
 ### Changed
 - Updates to support open-data-fabric/open-data-fabric#63
-- Metadata chain will complain about `AddData` or `ExecuteQuery` events if there is no `SetDataSchema` event
+- Metadata chain will complain about `AddData` or `ExecuteTransform` events if there is no `SetDataSchema` event
 - Push ingest no longer piggy-backs on `SetPollingSource` - it requires `AddPushSource` event to be present
 - `DatasetWriter` will now validate that schema of the new data block matches the schema in `SetDataSchema` to prevent schema drift
 ### Added

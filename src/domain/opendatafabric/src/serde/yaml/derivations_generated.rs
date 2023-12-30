@@ -233,9 +233,9 @@ implement_serde_as!(DatasetSnapshot, DatasetSnapshotDef, "DatasetSnapshotDef");
 #[serde(remote = "DatasetVocabulary")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct DatasetVocabularyDef {
-    pub system_time_column: Option<String>,
-    pub event_time_column: Option<String>,
-    pub offset_column: Option<String>,
+    pub system_time_column: String,
+    pub event_time_column: String,
+    pub offset_column: String,
 }
 
 implement_serde_as!(
@@ -361,18 +361,18 @@ pub struct EventTimeSourceFromPathDef {
 pub struct EventTimeSourceFromSystemTimeDef {}
 
 ////////////////////////////////////////////////////////////////////////////////
-// ExecuteQuery
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#executequery-schema
+// ExecuteTransform
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#executetransform-schema
 ////////////////////////////////////////////////////////////////////////////////
 
 #[serde_as]
 #[skip_serializing_none]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(remote = "ExecuteQuery")]
+#[serde(remote = "ExecuteTransform")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub struct ExecuteQueryDef {
-    #[serde_as(as = "Vec<ExecuteQueryInputDef>")]
-    pub query_inputs: Vec<ExecuteQueryInput>,
+pub struct ExecuteTransformDef {
+    #[serde_as(as = "Vec<ExecuteTransformInputDef>")]
+    pub query_inputs: Vec<ExecuteTransformInput>,
     pub prev_checkpoint: Option<Multihash>,
     pub prev_offset: Option<u64>,
     #[serde_as(as = "Option<DataSliceDef>")]
@@ -385,19 +385,19 @@ pub struct ExecuteQueryDef {
     pub new_watermark: Option<DateTime<Utc>>,
 }
 
-implement_serde_as!(ExecuteQuery, ExecuteQueryDef, "ExecuteQueryDef");
+implement_serde_as!(ExecuteTransform, ExecuteTransformDef, "ExecuteTransformDef");
 
 ////////////////////////////////////////////////////////////////////////////////
-// ExecuteQueryInput
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#executequeryinput-schema
+// ExecuteTransformInput
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#executetransforminput-schema
 ////////////////////////////////////////////////////////////////////////////////
 
 #[serde_as]
 #[skip_serializing_none]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(remote = "ExecuteQueryInput")]
+#[serde(remote = "ExecuteTransformInput")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub struct ExecuteQueryInputDef {
+pub struct ExecuteTransformInputDef {
     pub dataset_id: DatasetID,
     pub prev_block_hash: Option<Multihash>,
     pub new_block_hash: Option<Multihash>,
@@ -406,163 +406,10 @@ pub struct ExecuteQueryInputDef {
 }
 
 implement_serde_as!(
-    ExecuteQueryInput,
-    ExecuteQueryInputDef,
-    "ExecuteQueryInputDef"
+    ExecuteTransformInput,
+    ExecuteTransformInputDef,
+    "ExecuteTransformInputDef"
 );
-
-////////////////////////////////////////////////////////////////////////////////
-// ExecuteQueryRequest
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#executequeryrequest-schema
-////////////////////////////////////////////////////////////////////////////////
-
-#[serde_as]
-#[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(remote = "ExecuteQueryRequest")]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub struct ExecuteQueryRequestDef {
-    pub dataset_id: DatasetID,
-    pub dataset_alias: DatasetAlias,
-    #[serde(with = "datetime_rfc3339")]
-    pub system_time: DateTime<Utc>,
-    #[serde_as(as = "DatasetVocabularyDef")]
-    pub vocab: DatasetVocabulary,
-    #[serde_as(as = "TransformDef")]
-    pub transform: Transform,
-    #[serde_as(as = "Vec<ExecuteQueryRequestInputDef>")]
-    pub query_inputs: Vec<ExecuteQueryRequestInput>,
-    pub next_offset: u64,
-    pub prev_checkpoint_path: Option<PathBuf>,
-    pub new_checkpoint_path: PathBuf,
-    pub new_data_path: PathBuf,
-}
-
-implement_serde_as!(
-    ExecuteQueryRequest,
-    ExecuteQueryRequestDef,
-    "ExecuteQueryRequestDef"
-);
-
-////////////////////////////////////////////////////////////////////////////////
-// ExecuteQueryRequestInput
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#executequeryrequestinput-schema
-////////////////////////////////////////////////////////////////////////////////
-
-#[serde_as]
-#[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(remote = "ExecuteQueryRequestInput")]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub struct ExecuteQueryRequestInputDef {
-    pub dataset_id: DatasetID,
-    pub dataset_alias: DatasetAlias,
-    pub query_alias: String,
-    #[serde_as(as = "DatasetVocabularyDef")]
-    pub vocab: DatasetVocabulary,
-    #[serde_as(as = "Option<OffsetIntervalDef>")]
-    #[serde(default)]
-    pub offset_interval: Option<OffsetInterval>,
-    pub data_paths: Vec<PathBuf>,
-    pub schema_file: PathBuf,
-    #[serde_as(as = "Vec<WatermarkDef>")]
-    pub explicit_watermarks: Vec<Watermark>,
-}
-
-implement_serde_as!(
-    ExecuteQueryRequestInput,
-    ExecuteQueryRequestInputDef,
-    "ExecuteQueryRequestInputDef"
-);
-
-////////////////////////////////////////////////////////////////////////////////
-// ExecuteQueryResponse
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#executequeryresponse-schema
-////////////////////////////////////////////////////////////////////////////////
-
-#[serde_as]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(remote = "ExecuteQueryResponse")]
-#[serde(deny_unknown_fields, tag = "kind")]
-pub enum ExecuteQueryResponseDef {
-    #[serde(alias = "progress")]
-    Progress(#[serde_as(as = "ExecuteQueryResponseProgressDef")] ExecuteQueryResponseProgress),
-    #[serde(alias = "success")]
-    Success(#[serde_as(as = "ExecuteQueryResponseSuccessDef")] ExecuteQueryResponseSuccess),
-    #[serde(alias = "invalidQuery", alias = "invalidquery")]
-    InvalidQuery(
-        #[serde_as(as = "ExecuteQueryResponseInvalidQueryDef")] ExecuteQueryResponseInvalidQuery,
-    ),
-    #[serde(alias = "internalError", alias = "internalerror")]
-    InternalError(
-        #[serde_as(as = "ExecuteQueryResponseInternalErrorDef")] ExecuteQueryResponseInternalError,
-    ),
-}
-
-implement_serde_as!(
-    ExecuteQueryResponse,
-    ExecuteQueryResponseDef,
-    "ExecuteQueryResponseDef"
-);
-implement_serde_as!(
-    ExecuteQueryResponseProgress,
-    ExecuteQueryResponseProgressDef,
-    "ExecuteQueryResponseProgressDef"
-);
-implement_serde_as!(
-    ExecuteQueryResponseSuccess,
-    ExecuteQueryResponseSuccessDef,
-    "ExecuteQueryResponseSuccessDef"
-);
-implement_serde_as!(
-    ExecuteQueryResponseInvalidQuery,
-    ExecuteQueryResponseInvalidQueryDef,
-    "ExecuteQueryResponseInvalidQueryDef"
-);
-implement_serde_as!(
-    ExecuteQueryResponseInternalError,
-    ExecuteQueryResponseInternalErrorDef,
-    "ExecuteQueryResponseInternalErrorDef"
-);
-
-#[serde_as]
-#[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(remote = "ExecuteQueryResponseProgress")]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub struct ExecuteQueryResponseProgressDef {}
-
-#[serde_as]
-#[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(remote = "ExecuteQueryResponseSuccess")]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub struct ExecuteQueryResponseSuccessDef {
-    #[serde_as(as = "Option<OffsetIntervalDef>")]
-    #[serde(default)]
-    pub new_offset_interval: Option<OffsetInterval>,
-    #[serde(default, with = "datetime_rfc3339_opt")]
-    pub new_watermark: Option<DateTime<Utc>>,
-}
-
-#[serde_as]
-#[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(remote = "ExecuteQueryResponseInvalidQuery")]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub struct ExecuteQueryResponseInvalidQueryDef {
-    pub message: String,
-}
-
-#[serde_as]
-#[skip_serializing_none]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(remote = "ExecuteQueryResponseInternalError")]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub struct ExecuteQueryResponseInternalErrorDef {
-    pub message: String,
-    pub backtrace: Option<String>,
-}
 
 ////////////////////////////////////////////////////////////////////////////////
 // FetchStep
@@ -755,8 +602,8 @@ implement_serde_as!(MetadataBlock, MetadataBlockDef, "MetadataBlockDef");
 pub enum MetadataEventDef {
     #[serde(alias = "addData", alias = "adddata")]
     AddData(#[serde_as(as = "AddDataDef")] AddData),
-    #[serde(alias = "executeQuery", alias = "executequery")]
-    ExecuteQuery(#[serde_as(as = "ExecuteQueryDef")] ExecuteQuery),
+    #[serde(alias = "executeTransform", alias = "executetransform")]
+    ExecuteTransform(#[serde_as(as = "ExecuteTransformDef")] ExecuteTransform),
     #[serde(alias = "seed")]
     Seed(#[serde_as(as = "SeedDef")] Seed),
     #[serde(alias = "setPollingSource", alias = "setpollingsource")]
@@ -859,6 +706,104 @@ implement_serde_as!(
     CompressionFormatDef,
     "CompressionFormatDef"
 );
+
+////////////////////////////////////////////////////////////////////////////////
+// RawQueryRequest
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#rawqueryrequest-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[serde_as]
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "RawQueryRequest")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct RawQueryRequestDef {
+    pub input_data_paths: Vec<PathBuf>,
+    #[serde_as(as = "TransformDef")]
+    pub transform: Transform,
+    pub output_data_path: PathBuf,
+}
+
+implement_serde_as!(RawQueryRequest, RawQueryRequestDef, "RawQueryRequestDef");
+
+////////////////////////////////////////////////////////////////////////////////
+// RawQueryResponse
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#rawqueryresponse-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[serde_as]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "RawQueryResponse")]
+#[serde(deny_unknown_fields, tag = "kind")]
+pub enum RawQueryResponseDef {
+    #[serde(alias = "progress")]
+    Progress(#[serde_as(as = "RawQueryResponseProgressDef")] RawQueryResponseProgress),
+    #[serde(alias = "success")]
+    Success(#[serde_as(as = "RawQueryResponseSuccessDef")] RawQueryResponseSuccess),
+    #[serde(alias = "invalidQuery", alias = "invalidquery")]
+    InvalidQuery(#[serde_as(as = "RawQueryResponseInvalidQueryDef")] RawQueryResponseInvalidQuery),
+    #[serde(alias = "internalError", alias = "internalerror")]
+    InternalError(
+        #[serde_as(as = "RawQueryResponseInternalErrorDef")] RawQueryResponseInternalError,
+    ),
+}
+
+implement_serde_as!(RawQueryResponse, RawQueryResponseDef, "RawQueryResponseDef");
+implement_serde_as!(
+    RawQueryResponseProgress,
+    RawQueryResponseProgressDef,
+    "RawQueryResponseProgressDef"
+);
+implement_serde_as!(
+    RawQueryResponseSuccess,
+    RawQueryResponseSuccessDef,
+    "RawQueryResponseSuccessDef"
+);
+implement_serde_as!(
+    RawQueryResponseInvalidQuery,
+    RawQueryResponseInvalidQueryDef,
+    "RawQueryResponseInvalidQueryDef"
+);
+implement_serde_as!(
+    RawQueryResponseInternalError,
+    RawQueryResponseInternalErrorDef,
+    "RawQueryResponseInternalErrorDef"
+);
+
+#[serde_as]
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "RawQueryResponseProgress")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct RawQueryResponseProgressDef {}
+
+#[serde_as]
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "RawQueryResponseSuccess")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct RawQueryResponseSuccessDef {
+    pub num_records: u64,
+}
+
+#[serde_as]
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "RawQueryResponseInvalidQuery")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct RawQueryResponseInvalidQueryDef {
+    pub message: String,
+}
+
+#[serde_as]
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "RawQueryResponseInternalError")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct RawQueryResponseInternalErrorDef {
+    pub message: String,
+    pub backtrace: Option<String>,
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 // ReadStep
@@ -1282,6 +1227,155 @@ pub struct TransformInputDef {
 }
 
 implement_serde_as!(TransformInput, TransformInputDef, "TransformInputDef");
+
+////////////////////////////////////////////////////////////////////////////////
+// TransformRequest
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#transformrequest-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[serde_as]
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "TransformRequest")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct TransformRequestDef {
+    pub dataset_id: DatasetID,
+    pub dataset_alias: DatasetAlias,
+    #[serde(with = "datetime_rfc3339")]
+    pub system_time: DateTime<Utc>,
+    #[serde_as(as = "DatasetVocabularyDef")]
+    pub vocab: DatasetVocabulary,
+    #[serde_as(as = "TransformDef")]
+    pub transform: Transform,
+    #[serde_as(as = "Vec<TransformRequestInputDef>")]
+    pub query_inputs: Vec<TransformRequestInput>,
+    pub next_offset: u64,
+    pub prev_checkpoint_path: Option<PathBuf>,
+    pub new_checkpoint_path: PathBuf,
+    pub new_data_path: PathBuf,
+}
+
+implement_serde_as!(TransformRequest, TransformRequestDef, "TransformRequestDef");
+
+////////////////////////////////////////////////////////////////////////////////
+// TransformRequestInput
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#transformrequestinput-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[serde_as]
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "TransformRequestInput")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct TransformRequestInputDef {
+    pub dataset_id: DatasetID,
+    pub dataset_alias: DatasetAlias,
+    pub query_alias: String,
+    #[serde_as(as = "DatasetVocabularyDef")]
+    pub vocab: DatasetVocabulary,
+    #[serde_as(as = "Option<OffsetIntervalDef>")]
+    #[serde(default)]
+    pub offset_interval: Option<OffsetInterval>,
+    pub data_paths: Vec<PathBuf>,
+    pub schema_file: PathBuf,
+    #[serde_as(as = "Vec<WatermarkDef>")]
+    pub explicit_watermarks: Vec<Watermark>,
+}
+
+implement_serde_as!(
+    TransformRequestInput,
+    TransformRequestInputDef,
+    "TransformRequestInputDef"
+);
+
+////////////////////////////////////////////////////////////////////////////////
+// TransformResponse
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#transformresponse-schema
+////////////////////////////////////////////////////////////////////////////////
+
+#[serde_as]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "TransformResponse")]
+#[serde(deny_unknown_fields, tag = "kind")]
+pub enum TransformResponseDef {
+    #[serde(alias = "progress")]
+    Progress(#[serde_as(as = "TransformResponseProgressDef")] TransformResponseProgress),
+    #[serde(alias = "success")]
+    Success(#[serde_as(as = "TransformResponseSuccessDef")] TransformResponseSuccess),
+    #[serde(alias = "invalidQuery", alias = "invalidquery")]
+    InvalidQuery(
+        #[serde_as(as = "TransformResponseInvalidQueryDef")] TransformResponseInvalidQuery,
+    ),
+    #[serde(alias = "internalError", alias = "internalerror")]
+    InternalError(
+        #[serde_as(as = "TransformResponseInternalErrorDef")] TransformResponseInternalError,
+    ),
+}
+
+implement_serde_as!(
+    TransformResponse,
+    TransformResponseDef,
+    "TransformResponseDef"
+);
+implement_serde_as!(
+    TransformResponseProgress,
+    TransformResponseProgressDef,
+    "TransformResponseProgressDef"
+);
+implement_serde_as!(
+    TransformResponseSuccess,
+    TransformResponseSuccessDef,
+    "TransformResponseSuccessDef"
+);
+implement_serde_as!(
+    TransformResponseInvalidQuery,
+    TransformResponseInvalidQueryDef,
+    "TransformResponseInvalidQueryDef"
+);
+implement_serde_as!(
+    TransformResponseInternalError,
+    TransformResponseInternalErrorDef,
+    "TransformResponseInternalErrorDef"
+);
+
+#[serde_as]
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "TransformResponseProgress")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct TransformResponseProgressDef {}
+
+#[serde_as]
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "TransformResponseSuccess")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct TransformResponseSuccessDef {
+    #[serde_as(as = "Option<OffsetIntervalDef>")]
+    #[serde(default)]
+    pub new_offset_interval: Option<OffsetInterval>,
+    #[serde(default, with = "datetime_rfc3339_opt")]
+    pub new_watermark: Option<DateTime<Utc>>,
+}
+
+#[serde_as]
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "TransformResponseInvalidQuery")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct TransformResponseInvalidQueryDef {
+    pub message: String,
+}
+
+#[serde_as]
+#[skip_serializing_none]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(remote = "TransformResponseInternalError")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct TransformResponseInternalErrorDef {
+    pub message: String,
+    pub backtrace: Option<String>,
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 // Watermark

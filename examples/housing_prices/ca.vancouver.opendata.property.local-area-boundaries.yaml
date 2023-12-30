@@ -10,11 +10,6 @@ content:
         url: https://opendata.vancouver.ca/explore/dataset/local-area-boundary/download/?format=geojson&timezone=America/Los_Angeles&lang=en
       read:
         kind: geoJson
-      preprocess:
-        # TODO: Remove after datafusion ingest is stabilized
-        kind: sql
-        engine: datafusion
-        query: select * from input
       merge:
         # TODO
         kind: append

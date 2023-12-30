@@ -102,7 +102,7 @@ impl MetadataBlockDeserializer for FlatbuffersMetadataBlockDeserializer {
 pub struct FlatbuffersEngineProtocol;
 
 impl EngineProtocolSerializer for FlatbuffersEngineProtocol {
-    fn write_execute_query_request(&self, inst: &ExecuteQueryRequest) -> Result<Buffer<u8>, Error> {
+    fn write_raw_query_request(&self, inst: &RawQueryRequest) -> Result<Buffer<u8>, Error> {
         let mut fb = flatbuffers::FlatBufferBuilder::new();
         let offset = inst.serialize(&mut fb);
         fb.finish(offset, None);
@@ -110,14 +110,33 @@ impl EngineProtocolSerializer for FlatbuffersEngineProtocol {
         Ok(Buffer::new(head, buf.len(), buf))
     }
 
-    fn write_execute_query_response(
-        &self,
-        inst: &ExecuteQueryResponse,
-    ) -> Result<Buffer<u8>, Error> {
+    fn write_raw_query_response(&self, inst: &RawQueryResponse) -> Result<Buffer<u8>, Error> {
         let mut fb = flatbuffers::FlatBufferBuilder::new();
         let offset = {
             let (typ, offset) = inst.serialize(&mut fb);
-            let mut builder = fbgen::ExecuteQueryResponseRootBuilder::new(&mut fb);
+            let mut builder = fbgen::RawQueryResponseRootBuilder::new(&mut fb);
+            builder.add_value_type(typ);
+            builder.add_value(offset);
+            builder.finish()
+        };
+        fb.finish(offset, None);
+        let (buf, head) = fb.collapse();
+        Ok(Buffer::new(head, buf.len(), buf))
+    }
+
+    fn write_transform_request(&self, inst: &TransformRequest) -> Result<Buffer<u8>, Error> {
+        let mut fb = flatbuffers::FlatBufferBuilder::new();
+        let offset = inst.serialize(&mut fb);
+        fb.finish(offset, None);
+        let (buf, head) = fb.collapse();
+        Ok(Buffer::new(head, buf.len(), buf))
+    }
+
+    fn write_transform_response(&self, inst: &TransformResponse) -> Result<Buffer<u8>, Error> {
+        let mut fb = flatbuffers::FlatBufferBuilder::new();
+        let offset = {
+            let (typ, offset) = inst.serialize(&mut fb);
+            let mut builder = fbgen::TransformResponseRootBuilder::new(&mut fb);
             builder.add_value_type(typ);
             builder.add_value(offset);
             builder.finish()
@@ -129,18 +148,35 @@ impl EngineProtocolSerializer for FlatbuffersEngineProtocol {
 }
 
 impl EngineProtocolDeserializer for FlatbuffersEngineProtocol {
-    fn read_execute_query_request(&self, data: &[u8]) -> Result<ExecuteQueryRequest, Error> {
+    fn read_raw_query_request(&self, data: &[u8]) -> Result<RawQueryRequest, Error> {
         let proxy =
-            flatbuffers::root::<fbgen::ExecuteQueryRequest>(data).map_err(|e| Error::serde(e))?;
+            flatbuffers::root::<fbgen::RawQueryRequest>(data).map_err(|e| Error::serde(e))?;
 
-        Ok(ExecuteQueryRequest::deserialize(proxy))
+        Ok(RawQueryRequest::deserialize(proxy))
     }
 
-    fn read_execute_query_response(&self, data: &[u8]) -> Result<ExecuteQueryResponse, Error> {
-        let proxy = flatbuffers::root::<super::proxies_generated::ExecuteQueryResponseRoot>(data)
+    fn read_raw_query_response(&self, data: &[u8]) -> Result<RawQueryResponse, Error> {
+        let proxy = flatbuffers::root::<super::proxies_generated::RawQueryResponseRoot>(data)
             .map_err(|e| Error::serde(e))?;
 
-        Ok(ExecuteQueryResponse::deserialize(
+        Ok(RawQueryResponse::deserialize(
+            proxy.value().unwrap(),
+            proxy.value_type(),
+        ))
+    }
+
+    fn read_transform_request(&self, data: &[u8]) -> Result<TransformRequest, Error> {
+        let proxy =
+            flatbuffers::root::<fbgen::TransformRequest>(data).map_err(|e| Error::serde(e))?;
+
+        Ok(TransformRequest::deserialize(proxy))
+    }
+
+    fn read_transform_response(&self, data: &[u8]) -> Result<TransformResponse, Error> {
+        let proxy = flatbuffers::root::<super::proxies_generated::TransformResponseRoot>(data)
+            .map_err(|e| Error::serde(e))?;
+
+        Ok(TransformResponse::deserialize(
             proxy.value().unwrap(),
             proxy.value_type(),
         ))

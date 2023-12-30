@@ -292,33 +292,29 @@ impl Into<dtos::DatasetSnapshot> for &dyn DatasetSnapshot {
 ////////////////////////////////////////////////////////////////////////////////
 
 pub trait DatasetVocabulary {
-    fn system_time_column(&self) -> Option<&str>;
-    fn event_time_column(&self) -> Option<&str>;
-    fn offset_column(&self) -> Option<&str>;
+    fn system_time_column(&self) -> &str;
+    fn event_time_column(&self) -> &str;
+    fn offset_column(&self) -> &str;
 }
 
 impl DatasetVocabulary for dtos::DatasetVocabulary {
-    fn system_time_column(&self) -> Option<&str> {
-        self.system_time_column
-            .as_ref()
-            .map(|v| -> &str { v.as_ref() })
+    fn system_time_column(&self) -> &str {
+        self.system_time_column.as_ref()
     }
-    fn event_time_column(&self) -> Option<&str> {
-        self.event_time_column
-            .as_ref()
-            .map(|v| -> &str { v.as_ref() })
+    fn event_time_column(&self) -> &str {
+        self.event_time_column.as_ref()
     }
-    fn offset_column(&self) -> Option<&str> {
-        self.offset_column.as_ref().map(|v| -> &str { v.as_ref() })
+    fn offset_column(&self) -> &str {
+        self.offset_column.as_ref()
     }
 }
 
 impl Into<dtos::DatasetVocabulary> for &dyn DatasetVocabulary {
     fn into(self) -> dtos::DatasetVocabulary {
         dtos::DatasetVocabulary {
-            system_time_column: self.system_time_column().map(|v| v.to_owned()),
-            event_time_column: self.event_time_column().map(|v| v.to_owned()),
-            offset_column: self.offset_column().map(|v| v.to_owned()),
+            system_time_column: self.system_time_column().to_owned(),
+            event_time_column: self.event_time_column().to_owned(),
+            offset_column: self.offset_column().to_owned(),
         }
     }
 }
@@ -466,12 +462,12 @@ impl Into<dtos::EventTimeSourceFromSystemTime> for &dyn EventTimeSourceFromSyste
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// ExecuteQuery
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#executequery-schema
+// ExecuteTransform
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#executetransform-schema
 ////////////////////////////////////////////////////////////////////////////////
 
-pub trait ExecuteQuery {
-    fn query_inputs(&self) -> Box<dyn Iterator<Item = &dyn ExecuteQueryInput> + '_>;
+pub trait ExecuteTransform {
+    fn query_inputs(&self) -> Box<dyn Iterator<Item = &dyn ExecuteTransformInput> + '_>;
     fn prev_checkpoint(&self) -> Option<&Multihash>;
     fn prev_offset(&self) -> Option<u64>;
     fn new_data(&self) -> Option<&dyn DataSlice>;
@@ -479,12 +475,12 @@ pub trait ExecuteQuery {
     fn new_watermark(&self) -> Option<DateTime<Utc>>;
 }
 
-impl ExecuteQuery for dtos::ExecuteQuery {
-    fn query_inputs(&self) -> Box<dyn Iterator<Item = &dyn ExecuteQueryInput> + '_> {
+impl ExecuteTransform for dtos::ExecuteTransform {
+    fn query_inputs(&self) -> Box<dyn Iterator<Item = &dyn ExecuteTransformInput> + '_> {
         Box::new(
             self.query_inputs
                 .iter()
-                .map(|i| -> &dyn ExecuteQueryInput { i }),
+                .map(|i| -> &dyn ExecuteTransformInput { i }),
         )
     }
     fn prev_checkpoint(&self) -> Option<&Multihash> {
@@ -506,9 +502,9 @@ impl ExecuteQuery for dtos::ExecuteQuery {
     }
 }
 
-impl Into<dtos::ExecuteQuery> for &dyn ExecuteQuery {
-    fn into(self) -> dtos::ExecuteQuery {
-        dtos::ExecuteQuery {
+impl Into<dtos::ExecuteTransform> for &dyn ExecuteTransform {
+    fn into(self) -> dtos::ExecuteTransform {
+        dtos::ExecuteTransform {
             query_inputs: self.query_inputs().map(|i| i.into()).collect(),
             prev_checkpoint: self.prev_checkpoint().map(|v| v.clone()),
             prev_offset: self.prev_offset().map(|v| v),
@@ -520,11 +516,11 @@ impl Into<dtos::ExecuteQuery> for &dyn ExecuteQuery {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// ExecuteQueryInput
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#executequeryinput-schema
+// ExecuteTransformInput
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#executetransforminput-schema
 ////////////////////////////////////////////////////////////////////////////////
 
-pub trait ExecuteQueryInput {
+pub trait ExecuteTransformInput {
     fn dataset_id(&self) -> &DatasetID;
     fn prev_block_hash(&self) -> Option<&Multihash>;
     fn new_block_hash(&self) -> Option<&Multihash>;
@@ -532,7 +528,7 @@ pub trait ExecuteQueryInput {
     fn new_offset(&self) -> Option<u64>;
 }
 
-impl ExecuteQueryInput for dtos::ExecuteQueryInput {
+impl ExecuteTransformInput for dtos::ExecuteTransformInput {
     fn dataset_id(&self) -> &DatasetID {
         &self.dataset_id
     }
@@ -550,266 +546,14 @@ impl ExecuteQueryInput for dtos::ExecuteQueryInput {
     }
 }
 
-impl Into<dtos::ExecuteQueryInput> for &dyn ExecuteQueryInput {
-    fn into(self) -> dtos::ExecuteQueryInput {
-        dtos::ExecuteQueryInput {
+impl Into<dtos::ExecuteTransformInput> for &dyn ExecuteTransformInput {
+    fn into(self) -> dtos::ExecuteTransformInput {
+        dtos::ExecuteTransformInput {
             dataset_id: self.dataset_id().clone(),
             prev_block_hash: self.prev_block_hash().map(|v| v.clone()),
             new_block_hash: self.new_block_hash().map(|v| v.clone()),
             prev_offset: self.prev_offset().map(|v| v),
             new_offset: self.new_offset().map(|v| v),
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// ExecuteQueryRequest
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#executequeryrequest-schema
-////////////////////////////////////////////////////////////////////////////////
-
-pub trait ExecuteQueryRequest {
-    fn dataset_id(&self) -> &DatasetID;
-    fn dataset_alias(&self) -> &DatasetAlias;
-    fn system_time(&self) -> DateTime<Utc>;
-    fn vocab(&self) -> &dyn DatasetVocabulary;
-    fn transform(&self) -> Transform;
-    fn query_inputs(&self) -> Box<dyn Iterator<Item = &dyn ExecuteQueryRequestInput> + '_>;
-    fn next_offset(&self) -> u64;
-    fn prev_checkpoint_path(&self) -> Option<&Path>;
-    fn new_checkpoint_path(&self) -> &Path;
-    fn new_data_path(&self) -> &Path;
-}
-
-impl ExecuteQueryRequest for dtos::ExecuteQueryRequest {
-    fn dataset_id(&self) -> &DatasetID {
-        &self.dataset_id
-    }
-    fn dataset_alias(&self) -> &DatasetAlias {
-        &self.dataset_alias
-    }
-    fn system_time(&self) -> DateTime<Utc> {
-        self.system_time
-    }
-    fn vocab(&self) -> &dyn DatasetVocabulary {
-        &self.vocab
-    }
-    fn transform(&self) -> Transform {
-        (&self.transform).into()
-    }
-    fn query_inputs(&self) -> Box<dyn Iterator<Item = &dyn ExecuteQueryRequestInput> + '_> {
-        Box::new(
-            self.query_inputs
-                .iter()
-                .map(|i| -> &dyn ExecuteQueryRequestInput { i }),
-        )
-    }
-    fn next_offset(&self) -> u64 {
-        self.next_offset
-    }
-    fn prev_checkpoint_path(&self) -> Option<&Path> {
-        self.prev_checkpoint_path
-            .as_ref()
-            .map(|v| -> &Path { v.as_ref() })
-    }
-    fn new_checkpoint_path(&self) -> &Path {
-        self.new_checkpoint_path.as_ref()
-    }
-    fn new_data_path(&self) -> &Path {
-        self.new_data_path.as_ref()
-    }
-}
-
-impl Into<dtos::ExecuteQueryRequest> for &dyn ExecuteQueryRequest {
-    fn into(self) -> dtos::ExecuteQueryRequest {
-        dtos::ExecuteQueryRequest {
-            dataset_id: self.dataset_id().clone(),
-            dataset_alias: self.dataset_alias().to_owned(),
-            system_time: self.system_time(),
-            vocab: self.vocab().into(),
-            transform: self.transform().into(),
-            query_inputs: self.query_inputs().map(|i| i.into()).collect(),
-            next_offset: self.next_offset(),
-            prev_checkpoint_path: self.prev_checkpoint_path().map(|v| v.to_owned()),
-            new_checkpoint_path: self.new_checkpoint_path().to_owned(),
-            new_data_path: self.new_data_path().to_owned(),
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// ExecuteQueryRequestInput
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#executequeryrequestinput-schema
-////////////////////////////////////////////////////////////////////////////////
-
-pub trait ExecuteQueryRequestInput {
-    fn dataset_id(&self) -> &DatasetID;
-    fn dataset_alias(&self) -> &DatasetAlias;
-    fn query_alias(&self) -> &str;
-    fn vocab(&self) -> &dyn DatasetVocabulary;
-    fn offset_interval(&self) -> Option<&dyn OffsetInterval>;
-    fn data_paths(&self) -> Box<dyn Iterator<Item = &Path> + '_>;
-    fn schema_file(&self) -> &Path;
-    fn explicit_watermarks(&self) -> Box<dyn Iterator<Item = &dyn Watermark> + '_>;
-}
-
-impl ExecuteQueryRequestInput for dtos::ExecuteQueryRequestInput {
-    fn dataset_id(&self) -> &DatasetID {
-        &self.dataset_id
-    }
-    fn dataset_alias(&self) -> &DatasetAlias {
-        &self.dataset_alias
-    }
-    fn query_alias(&self) -> &str {
-        self.query_alias.as_ref()
-    }
-    fn vocab(&self) -> &dyn DatasetVocabulary {
-        &self.vocab
-    }
-    fn offset_interval(&self) -> Option<&dyn OffsetInterval> {
-        self.offset_interval
-            .as_ref()
-            .map(|v| -> &dyn OffsetInterval { v })
-    }
-    fn data_paths(&self) -> Box<dyn Iterator<Item = &Path> + '_> {
-        Box::new(self.data_paths.iter().map(|i| -> &Path { i.as_ref() }))
-    }
-    fn schema_file(&self) -> &Path {
-        self.schema_file.as_ref()
-    }
-    fn explicit_watermarks(&self) -> Box<dyn Iterator<Item = &dyn Watermark> + '_> {
-        Box::new(
-            self.explicit_watermarks
-                .iter()
-                .map(|i| -> &dyn Watermark { i }),
-        )
-    }
-}
-
-impl Into<dtos::ExecuteQueryRequestInput> for &dyn ExecuteQueryRequestInput {
-    fn into(self) -> dtos::ExecuteQueryRequestInput {
-        dtos::ExecuteQueryRequestInput {
-            dataset_id: self.dataset_id().clone(),
-            dataset_alias: self.dataset_alias().to_owned(),
-            query_alias: self.query_alias().to_owned(),
-            vocab: self.vocab().into(),
-            offset_interval: self.offset_interval().map(|v| v.into()),
-            data_paths: self.data_paths().map(|i| i.to_owned()).collect(),
-            schema_file: self.schema_file().to_owned(),
-            explicit_watermarks: self.explicit_watermarks().map(|i| i.into()).collect(),
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// ExecuteQueryResponse
-// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#executequeryresponse-schema
-////////////////////////////////////////////////////////////////////////////////
-
-pub enum ExecuteQueryResponse<'a> {
-    Progress(&'a dyn ExecuteQueryResponseProgress),
-    Success(&'a dyn ExecuteQueryResponseSuccess),
-    InvalidQuery(&'a dyn ExecuteQueryResponseInvalidQuery),
-    InternalError(&'a dyn ExecuteQueryResponseInternalError),
-}
-
-impl<'a> From<&'a dtos::ExecuteQueryResponse> for ExecuteQueryResponse<'a> {
-    fn from(other: &'a dtos::ExecuteQueryResponse) -> Self {
-        match other {
-            dtos::ExecuteQueryResponse::Progress(v) => ExecuteQueryResponse::Progress(v),
-            dtos::ExecuteQueryResponse::Success(v) => ExecuteQueryResponse::Success(v),
-            dtos::ExecuteQueryResponse::InvalidQuery(v) => ExecuteQueryResponse::InvalidQuery(v),
-            dtos::ExecuteQueryResponse::InternalError(v) => ExecuteQueryResponse::InternalError(v),
-        }
-    }
-}
-
-impl Into<dtos::ExecuteQueryResponse> for ExecuteQueryResponse<'_> {
-    fn into(self) -> dtos::ExecuteQueryResponse {
-        match self {
-            ExecuteQueryResponse::Progress(v) => dtos::ExecuteQueryResponse::Progress(v.into()),
-            ExecuteQueryResponse::Success(v) => dtos::ExecuteQueryResponse::Success(v.into()),
-            ExecuteQueryResponse::InvalidQuery(v) => {
-                dtos::ExecuteQueryResponse::InvalidQuery(v.into())
-            }
-            ExecuteQueryResponse::InternalError(v) => {
-                dtos::ExecuteQueryResponse::InternalError(v.into())
-            }
-        }
-    }
-}
-
-pub trait ExecuteQueryResponseProgress {}
-
-pub trait ExecuteQueryResponseSuccess {
-    fn new_offset_interval(&self) -> Option<&dyn OffsetInterval>;
-    fn new_watermark(&self) -> Option<DateTime<Utc>>;
-}
-
-pub trait ExecuteQueryResponseInvalidQuery {
-    fn message(&self) -> &str;
-}
-
-pub trait ExecuteQueryResponseInternalError {
-    fn message(&self) -> &str;
-    fn backtrace(&self) -> Option<&str>;
-}
-
-impl ExecuteQueryResponseProgress for dtos::ExecuteQueryResponseProgress {}
-
-impl ExecuteQueryResponseSuccess for dtos::ExecuteQueryResponseSuccess {
-    fn new_offset_interval(&self) -> Option<&dyn OffsetInterval> {
-        self.new_offset_interval
-            .as_ref()
-            .map(|v| -> &dyn OffsetInterval { v })
-    }
-    fn new_watermark(&self) -> Option<DateTime<Utc>> {
-        self.new_watermark.as_ref().map(|v| -> DateTime<Utc> { *v })
-    }
-}
-
-impl ExecuteQueryResponseInvalidQuery for dtos::ExecuteQueryResponseInvalidQuery {
-    fn message(&self) -> &str {
-        self.message.as_ref()
-    }
-}
-
-impl ExecuteQueryResponseInternalError for dtos::ExecuteQueryResponseInternalError {
-    fn message(&self) -> &str {
-        self.message.as_ref()
-    }
-    fn backtrace(&self) -> Option<&str> {
-        self.backtrace.as_ref().map(|v| -> &str { v.as_ref() })
-    }
-}
-
-impl Into<dtos::ExecuteQueryResponseProgress> for &dyn ExecuteQueryResponseProgress {
-    fn into(self) -> dtos::ExecuteQueryResponseProgress {
-        dtos::ExecuteQueryResponseProgress {}
-    }
-}
-
-impl Into<dtos::ExecuteQueryResponseSuccess> for &dyn ExecuteQueryResponseSuccess {
-    fn into(self) -> dtos::ExecuteQueryResponseSuccess {
-        dtos::ExecuteQueryResponseSuccess {
-            new_offset_interval: self.new_offset_interval().map(|v| v.into()),
-            new_watermark: self.new_watermark().map(|v| v),
-        }
-    }
-}
-
-impl Into<dtos::ExecuteQueryResponseInvalidQuery> for &dyn ExecuteQueryResponseInvalidQuery {
-    fn into(self) -> dtos::ExecuteQueryResponseInvalidQuery {
-        dtos::ExecuteQueryResponseInvalidQuery {
-            message: self.message().to_owned(),
-        }
-    }
-}
-
-impl Into<dtos::ExecuteQueryResponseInternalError> for &dyn ExecuteQueryResponseInternalError {
-    fn into(self) -> dtos::ExecuteQueryResponseInternalError {
-        dtos::ExecuteQueryResponseInternalError {
-            message: self.message().to_owned(),
-            backtrace: self.backtrace().map(|v| v.to_owned()),
         }
     }
 }
@@ -1119,7 +863,7 @@ impl Into<dtos::MetadataBlock> for &dyn MetadataBlock {
 
 pub enum MetadataEvent<'a> {
     AddData(&'a dyn AddData),
-    ExecuteQuery(&'a dyn ExecuteQuery),
+    ExecuteTransform(&'a dyn ExecuteTransform),
     Seed(&'a dyn Seed),
     SetPollingSource(&'a dyn SetPollingSource),
     SetTransform(&'a dyn SetTransform),
@@ -1137,7 +881,7 @@ impl<'a> From<&'a dtos::MetadataEvent> for MetadataEvent<'a> {
     fn from(other: &'a dtos::MetadataEvent) -> Self {
         match other {
             dtos::MetadataEvent::AddData(v) => MetadataEvent::AddData(v),
-            dtos::MetadataEvent::ExecuteQuery(v) => MetadataEvent::ExecuteQuery(v),
+            dtos::MetadataEvent::ExecuteTransform(v) => MetadataEvent::ExecuteTransform(v),
             dtos::MetadataEvent::Seed(v) => MetadataEvent::Seed(v),
             dtos::MetadataEvent::SetPollingSource(v) => MetadataEvent::SetPollingSource(v),
             dtos::MetadataEvent::SetTransform(v) => MetadataEvent::SetTransform(v),
@@ -1157,7 +901,7 @@ impl Into<dtos::MetadataEvent> for MetadataEvent<'_> {
     fn into(self) -> dtos::MetadataEvent {
         match self {
             MetadataEvent::AddData(v) => dtos::MetadataEvent::AddData(v.into()),
-            MetadataEvent::ExecuteQuery(v) => dtos::MetadataEvent::ExecuteQuery(v.into()),
+            MetadataEvent::ExecuteTransform(v) => dtos::MetadataEvent::ExecuteTransform(v.into()),
             MetadataEvent::Seed(v) => dtos::MetadataEvent::Seed(v.into()),
             MetadataEvent::SetPollingSource(v) => dtos::MetadataEvent::SetPollingSource(v.into()),
             MetadataEvent::SetTransform(v) => dtos::MetadataEvent::SetTransform(v.into()),
@@ -1268,6 +1012,146 @@ impl Into<dtos::PrepStepPipe> for &dyn PrepStepPipe {
     fn into(self) -> dtos::PrepStepPipe {
         dtos::PrepStepPipe {
             command: self.command().map(|i| i.to_owned()).collect(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// RawQueryRequest
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#rawqueryrequest-schema
+////////////////////////////////////////////////////////////////////////////////
+
+pub trait RawQueryRequest {
+    fn input_data_paths(&self) -> Box<dyn Iterator<Item = &Path> + '_>;
+    fn transform(&self) -> Transform;
+    fn output_data_path(&self) -> &Path;
+}
+
+impl RawQueryRequest for dtos::RawQueryRequest {
+    fn input_data_paths(&self) -> Box<dyn Iterator<Item = &Path> + '_> {
+        Box::new(
+            self.input_data_paths
+                .iter()
+                .map(|i| -> &Path { i.as_ref() }),
+        )
+    }
+    fn transform(&self) -> Transform {
+        (&self.transform).into()
+    }
+    fn output_data_path(&self) -> &Path {
+        self.output_data_path.as_ref()
+    }
+}
+
+impl Into<dtos::RawQueryRequest> for &dyn RawQueryRequest {
+    fn into(self) -> dtos::RawQueryRequest {
+        dtos::RawQueryRequest {
+            input_data_paths: self.input_data_paths().map(|i| i.to_owned()).collect(),
+            transform: self.transform().into(),
+            output_data_path: self.output_data_path().to_owned(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// RawQueryResponse
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#rawqueryresponse-schema
+////////////////////////////////////////////////////////////////////////////////
+
+pub enum RawQueryResponse<'a> {
+    Progress(&'a dyn RawQueryResponseProgress),
+    Success(&'a dyn RawQueryResponseSuccess),
+    InvalidQuery(&'a dyn RawQueryResponseInvalidQuery),
+    InternalError(&'a dyn RawQueryResponseInternalError),
+}
+
+impl<'a> From<&'a dtos::RawQueryResponse> for RawQueryResponse<'a> {
+    fn from(other: &'a dtos::RawQueryResponse) -> Self {
+        match other {
+            dtos::RawQueryResponse::Progress(v) => RawQueryResponse::Progress(v),
+            dtos::RawQueryResponse::Success(v) => RawQueryResponse::Success(v),
+            dtos::RawQueryResponse::InvalidQuery(v) => RawQueryResponse::InvalidQuery(v),
+            dtos::RawQueryResponse::InternalError(v) => RawQueryResponse::InternalError(v),
+        }
+    }
+}
+
+impl Into<dtos::RawQueryResponse> for RawQueryResponse<'_> {
+    fn into(self) -> dtos::RawQueryResponse {
+        match self {
+            RawQueryResponse::Progress(v) => dtos::RawQueryResponse::Progress(v.into()),
+            RawQueryResponse::Success(v) => dtos::RawQueryResponse::Success(v.into()),
+            RawQueryResponse::InvalidQuery(v) => dtos::RawQueryResponse::InvalidQuery(v.into()),
+            RawQueryResponse::InternalError(v) => dtos::RawQueryResponse::InternalError(v.into()),
+        }
+    }
+}
+
+pub trait RawQueryResponseProgress {}
+
+pub trait RawQueryResponseSuccess {
+    fn num_records(&self) -> u64;
+}
+
+pub trait RawQueryResponseInvalidQuery {
+    fn message(&self) -> &str;
+}
+
+pub trait RawQueryResponseInternalError {
+    fn message(&self) -> &str;
+    fn backtrace(&self) -> Option<&str>;
+}
+
+impl RawQueryResponseProgress for dtos::RawQueryResponseProgress {}
+
+impl RawQueryResponseSuccess for dtos::RawQueryResponseSuccess {
+    fn num_records(&self) -> u64 {
+        self.num_records
+    }
+}
+
+impl RawQueryResponseInvalidQuery for dtos::RawQueryResponseInvalidQuery {
+    fn message(&self) -> &str {
+        self.message.as_ref()
+    }
+}
+
+impl RawQueryResponseInternalError for dtos::RawQueryResponseInternalError {
+    fn message(&self) -> &str {
+        self.message.as_ref()
+    }
+    fn backtrace(&self) -> Option<&str> {
+        self.backtrace.as_ref().map(|v| -> &str { v.as_ref() })
+    }
+}
+
+impl Into<dtos::RawQueryResponseProgress> for &dyn RawQueryResponseProgress {
+    fn into(self) -> dtos::RawQueryResponseProgress {
+        dtos::RawQueryResponseProgress {}
+    }
+}
+
+impl Into<dtos::RawQueryResponseSuccess> for &dyn RawQueryResponseSuccess {
+    fn into(self) -> dtos::RawQueryResponseSuccess {
+        dtos::RawQueryResponseSuccess {
+            num_records: self.num_records(),
+        }
+    }
+}
+
+impl Into<dtos::RawQueryResponseInvalidQuery> for &dyn RawQueryResponseInvalidQuery {
+    fn into(self) -> dtos::RawQueryResponseInvalidQuery {
+        dtos::RawQueryResponseInvalidQuery {
+            message: self.message().to_owned(),
+        }
+    }
+}
+
+impl Into<dtos::RawQueryResponseInternalError> for &dyn RawQueryResponseInternalError {
+    fn into(self) -> dtos::RawQueryResponseInternalError {
+        dtos::RawQueryResponseInternalError {
+            message: self.message().to_owned(),
+            backtrace: self.backtrace().map(|v| v.to_owned()),
         }
     }
 }
@@ -2065,6 +1949,254 @@ impl Into<dtos::TransformInput> for &dyn TransformInput {
         dtos::TransformInput {
             dataset_ref: self.dataset_ref().to_owned(),
             alias: self.alias().map(|v| v.to_owned()),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// TransformRequest
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#transformrequest-schema
+////////////////////////////////////////////////////////////////////////////////
+
+pub trait TransformRequest {
+    fn dataset_id(&self) -> &DatasetID;
+    fn dataset_alias(&self) -> &DatasetAlias;
+    fn system_time(&self) -> DateTime<Utc>;
+    fn vocab(&self) -> &dyn DatasetVocabulary;
+    fn transform(&self) -> Transform;
+    fn query_inputs(&self) -> Box<dyn Iterator<Item = &dyn TransformRequestInput> + '_>;
+    fn next_offset(&self) -> u64;
+    fn prev_checkpoint_path(&self) -> Option<&Path>;
+    fn new_checkpoint_path(&self) -> &Path;
+    fn new_data_path(&self) -> &Path;
+}
+
+impl TransformRequest for dtos::TransformRequest {
+    fn dataset_id(&self) -> &DatasetID {
+        &self.dataset_id
+    }
+    fn dataset_alias(&self) -> &DatasetAlias {
+        &self.dataset_alias
+    }
+    fn system_time(&self) -> DateTime<Utc> {
+        self.system_time
+    }
+    fn vocab(&self) -> &dyn DatasetVocabulary {
+        &self.vocab
+    }
+    fn transform(&self) -> Transform {
+        (&self.transform).into()
+    }
+    fn query_inputs(&self) -> Box<dyn Iterator<Item = &dyn TransformRequestInput> + '_> {
+        Box::new(
+            self.query_inputs
+                .iter()
+                .map(|i| -> &dyn TransformRequestInput { i }),
+        )
+    }
+    fn next_offset(&self) -> u64 {
+        self.next_offset
+    }
+    fn prev_checkpoint_path(&self) -> Option<&Path> {
+        self.prev_checkpoint_path
+            .as_ref()
+            .map(|v| -> &Path { v.as_ref() })
+    }
+    fn new_checkpoint_path(&self) -> &Path {
+        self.new_checkpoint_path.as_ref()
+    }
+    fn new_data_path(&self) -> &Path {
+        self.new_data_path.as_ref()
+    }
+}
+
+impl Into<dtos::TransformRequest> for &dyn TransformRequest {
+    fn into(self) -> dtos::TransformRequest {
+        dtos::TransformRequest {
+            dataset_id: self.dataset_id().clone(),
+            dataset_alias: self.dataset_alias().to_owned(),
+            system_time: self.system_time(),
+            vocab: self.vocab().into(),
+            transform: self.transform().into(),
+            query_inputs: self.query_inputs().map(|i| i.into()).collect(),
+            next_offset: self.next_offset(),
+            prev_checkpoint_path: self.prev_checkpoint_path().map(|v| v.to_owned()),
+            new_checkpoint_path: self.new_checkpoint_path().to_owned(),
+            new_data_path: self.new_data_path().to_owned(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// TransformRequestInput
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#transformrequestinput-schema
+////////////////////////////////////////////////////////////////////////////////
+
+pub trait TransformRequestInput {
+    fn dataset_id(&self) -> &DatasetID;
+    fn dataset_alias(&self) -> &DatasetAlias;
+    fn query_alias(&self) -> &str;
+    fn vocab(&self) -> &dyn DatasetVocabulary;
+    fn offset_interval(&self) -> Option<&dyn OffsetInterval>;
+    fn data_paths(&self) -> Box<dyn Iterator<Item = &Path> + '_>;
+    fn schema_file(&self) -> &Path;
+    fn explicit_watermarks(&self) -> Box<dyn Iterator<Item = &dyn Watermark> + '_>;
+}
+
+impl TransformRequestInput for dtos::TransformRequestInput {
+    fn dataset_id(&self) -> &DatasetID {
+        &self.dataset_id
+    }
+    fn dataset_alias(&self) -> &DatasetAlias {
+        &self.dataset_alias
+    }
+    fn query_alias(&self) -> &str {
+        self.query_alias.as_ref()
+    }
+    fn vocab(&self) -> &dyn DatasetVocabulary {
+        &self.vocab
+    }
+    fn offset_interval(&self) -> Option<&dyn OffsetInterval> {
+        self.offset_interval
+            .as_ref()
+            .map(|v| -> &dyn OffsetInterval { v })
+    }
+    fn data_paths(&self) -> Box<dyn Iterator<Item = &Path> + '_> {
+        Box::new(self.data_paths.iter().map(|i| -> &Path { i.as_ref() }))
+    }
+    fn schema_file(&self) -> &Path {
+        self.schema_file.as_ref()
+    }
+    fn explicit_watermarks(&self) -> Box<dyn Iterator<Item = &dyn Watermark> + '_> {
+        Box::new(
+            self.explicit_watermarks
+                .iter()
+                .map(|i| -> &dyn Watermark { i }),
+        )
+    }
+}
+
+impl Into<dtos::TransformRequestInput> for &dyn TransformRequestInput {
+    fn into(self) -> dtos::TransformRequestInput {
+        dtos::TransformRequestInput {
+            dataset_id: self.dataset_id().clone(),
+            dataset_alias: self.dataset_alias().to_owned(),
+            query_alias: self.query_alias().to_owned(),
+            vocab: self.vocab().into(),
+            offset_interval: self.offset_interval().map(|v| v.into()),
+            data_paths: self.data_paths().map(|i| i.to_owned()).collect(),
+            schema_file: self.schema_file().to_owned(),
+            explicit_watermarks: self.explicit_watermarks().map(|i| i.into()).collect(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// TransformResponse
+// https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#transformresponse-schema
+////////////////////////////////////////////////////////////////////////////////
+
+pub enum TransformResponse<'a> {
+    Progress(&'a dyn TransformResponseProgress),
+    Success(&'a dyn TransformResponseSuccess),
+    InvalidQuery(&'a dyn TransformResponseInvalidQuery),
+    InternalError(&'a dyn TransformResponseInternalError),
+}
+
+impl<'a> From<&'a dtos::TransformResponse> for TransformResponse<'a> {
+    fn from(other: &'a dtos::TransformResponse) -> Self {
+        match other {
+            dtos::TransformResponse::Progress(v) => TransformResponse::Progress(v),
+            dtos::TransformResponse::Success(v) => TransformResponse::Success(v),
+            dtos::TransformResponse::InvalidQuery(v) => TransformResponse::InvalidQuery(v),
+            dtos::TransformResponse::InternalError(v) => TransformResponse::InternalError(v),
+        }
+    }
+}
+
+impl Into<dtos::TransformResponse> for TransformResponse<'_> {
+    fn into(self) -> dtos::TransformResponse {
+        match self {
+            TransformResponse::Progress(v) => dtos::TransformResponse::Progress(v.into()),
+            TransformResponse::Success(v) => dtos::TransformResponse::Success(v.into()),
+            TransformResponse::InvalidQuery(v) => dtos::TransformResponse::InvalidQuery(v.into()),
+            TransformResponse::InternalError(v) => dtos::TransformResponse::InternalError(v.into()),
+        }
+    }
+}
+
+pub trait TransformResponseProgress {}
+
+pub trait TransformResponseSuccess {
+    fn new_offset_interval(&self) -> Option<&dyn OffsetInterval>;
+    fn new_watermark(&self) -> Option<DateTime<Utc>>;
+}
+
+pub trait TransformResponseInvalidQuery {
+    fn message(&self) -> &str;
+}
+
+pub trait TransformResponseInternalError {
+    fn message(&self) -> &str;
+    fn backtrace(&self) -> Option<&str>;
+}
+
+impl TransformResponseProgress for dtos::TransformResponseProgress {}
+
+impl TransformResponseSuccess for dtos::TransformResponseSuccess {
+    fn new_offset_interval(&self) -> Option<&dyn OffsetInterval> {
+        self.new_offset_interval
+            .as_ref()
+            .map(|v| -> &dyn OffsetInterval { v })
+    }
+    fn new_watermark(&self) -> Option<DateTime<Utc>> {
+        self.new_watermark.as_ref().map(|v| -> DateTime<Utc> { *v })
+    }
+}
+
+impl TransformResponseInvalidQuery for dtos::TransformResponseInvalidQuery {
+    fn message(&self) -> &str {
+        self.message.as_ref()
+    }
+}
+
+impl TransformResponseInternalError for dtos::TransformResponseInternalError {
+    fn message(&self) -> &str {
+        self.message.as_ref()
+    }
+    fn backtrace(&self) -> Option<&str> {
+        self.backtrace.as_ref().map(|v| -> &str { v.as_ref() })
+    }
+}
+
+impl Into<dtos::TransformResponseProgress> for &dyn TransformResponseProgress {
+    fn into(self) -> dtos::TransformResponseProgress {
+        dtos::TransformResponseProgress {}
+    }
+}
+
+impl Into<dtos::TransformResponseSuccess> for &dyn TransformResponseSuccess {
+    fn into(self) -> dtos::TransformResponseSuccess {
+        dtos::TransformResponseSuccess {
+            new_offset_interval: self.new_offset_interval().map(|v| v.into()),
+            new_watermark: self.new_watermark().map(|v| v),
+        }
+    }
+}
+
+impl Into<dtos::TransformResponseInvalidQuery> for &dyn TransformResponseInvalidQuery {
+    fn into(self) -> dtos::TransformResponseInvalidQuery {
+        dtos::TransformResponseInvalidQuery {
+            message: self.message().to_owned(),
+        }
+    }
+}
+
+impl Into<dtos::TransformResponseInternalError> for &dyn TransformResponseInternalError {
+    fn into(self) -> dtos::TransformResponseInternalError {
+        dtos::TransformResponseInternalError {
+            message: self.message().to_owned(),
+            backtrace: self.backtrace().map(|v| v.to_owned()),
         }
     }
 }

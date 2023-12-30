@@ -10,13 +10,25 @@
 // @generated
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct ExecuteQueryRequest {
+pub struct RawQueryRequest {
     #[prost(bytes = "vec", tag = "1")]
     pub flatbuffer: ::prost::alloc::vec::Vec<u8>,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct ExecuteQueryResponse {
+pub struct RawQueryResponse {
+    #[prost(bytes = "vec", tag = "1")]
+    pub flatbuffer: ::prost::alloc::vec::Vec<u8>,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct TransformRequest {
+    #[prost(bytes = "vec", tag = "1")]
+    pub flatbuffer: ::prost::alloc::vec::Vec<u8>,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct TransformResponse {
     #[prost(bytes = "vec", tag = "1")]
     pub flatbuffer: ::prost::alloc::vec::Vec<u8>,
 }

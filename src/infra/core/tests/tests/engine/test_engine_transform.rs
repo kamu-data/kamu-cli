@@ -83,7 +83,7 @@ impl DatasetHelper {
             .get_block(&old_head)
             .await
             .unwrap()
-            .into_typed::<ExecuteQuery>()
+            .into_typed::<ExecuteTransform>()
             .unwrap();
 
         let orig_slice = orig_block.event.new_data.as_ref().unwrap();
@@ -172,7 +172,7 @@ impl DatasetHelper {
         let new_head = self
             .dataset
             .commit_event(
-                ExecuteQuery {
+                ExecuteTransform {
                     new_data: Some(new_slice.clone()),
                     new_checkpoint: Some(Checkpoint {
                         physical_hash: new_checkpoint_hash,
@@ -190,7 +190,7 @@ impl DatasetHelper {
             .unwrap()
             .new_head;
 
-        tracing::warn!(%old_head, %new_head, ?orig_slice, ?new_slice, "Re-written last ExecuteQuery block");
+        tracing::warn!(%old_head, %new_head, ?orig_slice, ?new_slice, "Re-written last ExecuteTransform block");
     }
 
     async fn rewrite_last_data_block_with_equivalent_different_encoding(&self) {
@@ -350,7 +350,7 @@ async fn test_transform_common(transform: Transform) {
         .unwrap();
     assert_matches!(res, TransformResult::Updated { .. });
 
-    // First transform writes two blocks: SetDataSchema, ExecuteQuery
+    // First transform writes two blocks: SetDataSchema, ExecuteTransform
     assert_eq!(deriv_helper.block_count().await, 4);
 
     deriv_data_helper

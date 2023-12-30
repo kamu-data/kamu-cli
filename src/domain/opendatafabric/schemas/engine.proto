@@ -5,14 +5,14 @@ package engine;
 // See: https://github.com/google/flatbuffers/issues/4919
 
 service Engine {
-    // Performs the next iteration of the transformation
-    rpc ExecuteQuery (ExecuteQueryRequest) returns (stream ExecuteQueryResponse);
+  // Executes a raw query processing (usually as part of ingest preprocessing)
+  rpc ExecuteRawQuery(RawQueryRequest) returns (stream RawQueryResponse);
+  // Performs the next iteration of the streaming derivative transformation
+  rpc ExecuteTransform(TransformRequest) returns (stream TransformResponse);
 }
 
-message ExecuteQueryRequest {
-    bytes flatbuffer = 1;
-}
+message RawQueryRequest { bytes flatbuffer = 1; }
+message RawQueryResponse { bytes flatbuffer = 1; }
 
-message ExecuteQueryResponse {
-    bytes flatbuffer = 1;
-}
+message TransformRequest { bytes flatbuffer = 1; }
+message TransformResponse { bytes flatbuffer = 1; }

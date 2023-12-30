@@ -91,12 +91,12 @@ pub async fn prepare_dataset_transfer_estimate(
                     bytes_in_checkpoint_objects += new_checkpoint.size;
                 }
             }
-            MetadataEvent::ExecuteQuery(execute_query) => {
-                if let Some(new_data) = &execute_query.new_data {
+            MetadataEvent::ExecuteTransform(execute_transform) => {
+                if let Some(new_data) = &execute_transform.new_data {
                     data_objects_count += 1;
                     bytes_in_data_objects += new_data.size;
                 }
-                if let Some(new_checkpoint) = &execute_query.new_checkpoint {
+                if let Some(new_checkpoint) = &execute_transform.new_checkpoint {
                     checkpoint_objects_count += 1;
                     bytes_in_checkpoint_objects += new_checkpoint.size;
                 }
@@ -402,7 +402,7 @@ async fn collect_object_references_from_block(
                 }
             }
         }
-        MetadataEvent::ExecuteQuery(e) => {
+        MetadataEvent::ExecuteTransform(e) => {
             if let Some(new_data) = &e.new_data {
                 if !missing_files_only
                     || !data_repo.contains(&new_data.physical_hash).await.unwrap()

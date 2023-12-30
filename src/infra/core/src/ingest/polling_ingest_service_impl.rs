@@ -15,7 +15,7 @@ use container_runtime::ContainerRuntime;
 use datafusion::prelude::{DataFrame, SessionContext};
 use dill::*;
 use kamu_core::ingest::*;
-use kamu_core::{engine, *};
+use kamu_core::*;
 use kamu_ingest_datafusion::DataWriterDataFusion;
 use opendatafabric::serde::yaml::Manifest;
 use opendatafabric::*;
@@ -84,49 +84,13 @@ impl PollingIngestServiceImpl {
         let listener =
             get_listener(&dataset_handle).unwrap_or_else(|| Arc::new(NullPollingIngestListener));
 
-        // TODO: Remove this scan after we eliminate Spark ingest
-        let Some((_, polling_source_block)) = dataset
-            .as_metadata_chain()
-            .last_of_type::<SetPollingSource>()
-            .await
-            .int_err()?
-        else {
-            tracing::warn!(
-                %dataset_handle,
-                "Dataset does not define a polling source - considering up-to-date",
-            );
-
-            let result = PollingIngestResult::UpToDate {
-                no_source_defined: true,
-                uncacheable: false,
-            };
-
-            listener.begin();
-            listener.success(&result);
-            return Ok(result);
-        };
-
-        // TODO: Temporarily we continue to default to Spark ingest, but use new engine
-        // if preprocessing query specifies datafusion
-        let engine = polling_source_block
-            .event
-            .preprocess
-            .as_ref()
-            .map(|Transform::Sql(t)| t.engine.as_str());
-
-        if engine == Some("datafusion") {
-            self.ingest_loop(IngestLoopArgs {
-                dataset_handle,
-                dataset,
-                options,
-                polling_source: polling_source_block.event,
-                listener,
-            })
-            .await
-        } else {
-            self.legacy_spark_ingest(dataset_handle, dataset, options, listener)
-                .await
-        }
+        self.ingest_loop(IngestLoopArgs {
+            dataset_handle,
+            dataset,
+            options,
+            listener,
+        })
+        .await
     }
 
     #[tracing::instrument(
@@ -147,6 +111,21 @@ impl PollingIngestServiceImpl {
             .int_err()?
             .build();
 
+        let Some(MetadataEvent::SetPollingSource(polling_source)) =
+            data_writer.source_event().cloned()
+        else {
+            tracing::warn!("Dataset does not define a polling source - considering up-to-date",);
+
+            let result = PollingIngestResult::UpToDate {
+                no_source_defined: true,
+                uncacheable: false,
+            };
+
+            args.listener.begin();
+            args.listener.success(&result);
+            return Ok(result);
+        };
+
         let mut iteration = 0;
         let mut combined_result = None;
         loop {
@@ -166,7 +145,7 @@ impl PollingIngestServiceImpl {
                 operation_dir,
                 system_time: self.time_source.now(),
                 options: args.options.clone(),
-                polling_source: args.polling_source.clone(),
+                polling_source: polling_source.clone(),
                 listener: args.listener.clone(),
                 ctx: new_ctx,
                 data_writer: &mut data_writer,
@@ -263,8 +242,22 @@ impl PollingIngestServiceImpl {
             .on_stage_progress(PollingIngestStage::Read, 0, TotalSteps::Exact(1));
 
         let df = if let Some(df) = self.read(&args, &prepare_result).await? {
-            if let Some(transform) = args.polling_source.preprocess.clone() {
-                Some(ingest_common::preprocess(&args.ctx, transform, df).await?)
+            if let Some(transform) = &args.polling_source.preprocess {
+                args.listener.on_stage_progress(
+                    PollingIngestStage::Preprocess,
+                    0,
+                    TotalSteps::Exact(1),
+                );
+
+                ingest_common::preprocess(
+                    &args.operation_id,
+                    self.engine_provisioner.as_ref(),
+                    &args.ctx,
+                    transform,
+                    df,
+                    args.listener.clone().get_engine_provisioning_listener(),
+                )
+                .await?
             } else {
                 Some(df)
             }
@@ -591,100 +584,6 @@ impl PollingIngestServiceImpl {
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-// Legacy Spark-based ingest path
-///////////////////////////////////////////////////////////////////////////////
-
-impl PollingIngestServiceImpl {
-    async fn legacy_spark_ingest(
-        &self,
-        dataset_handle: DatasetHandle,
-        dataset: Arc<dyn Dataset>,
-        options: PollingIngestOptions,
-        listener: Arc<dyn PollingIngestListener>,
-    ) -> Result<PollingIngestResult, PollingIngestError> {
-        let request = self
-            .legacy_prepare_ingest_request(dataset_handle, dataset.clone())
-            .await?;
-
-        // TODO: create via DI to avoid passing through all dependencies
-        let ingest_task = IngestTask::new(
-            dataset,
-            request,
-            options.clone(),
-            listener,
-            self.engine_provisioner.clone(),
-            self.container_runtime.clone(),
-            &self.run_info_dir,
-            &self.cache_dir,
-        )
-        .await?;
-
-        Self::legacy_poll_until_exhausted(ingest_task, options).await
-    }
-
-    async fn legacy_poll_until_exhausted(
-        mut task: IngestTask,
-        options: PollingIngestOptions,
-    ) -> Result<PollingIngestResult, PollingIngestError> {
-        let mut combined_result = None;
-
-        loop {
-            match task.ingest(ingest_common::next_operation_id()).await {
-                Ok(res) => {
-                    combined_result = Some(Self::merge_results(combined_result, res));
-
-                    let has_more = match combined_result {
-                        Some(PollingIngestResult::UpToDate { .. }) => false,
-                        Some(PollingIngestResult::Updated { has_more, .. }) => has_more,
-                        None => unreachable!(),
-                    };
-
-                    if !has_more || !options.exhaust_sources {
-                        break;
-                    }
-                }
-                Err(e) => return Err(e),
-            }
-        }
-        Ok(combined_result.unwrap())
-    }
-
-    async fn legacy_prepare_ingest_request(
-        &self,
-        dataset_handle: DatasetHandle,
-        dataset: Arc<dyn Dataset>,
-    ) -> Result<engine::IngestRequest, InternalError> {
-        // Reusing builder's state projection logic
-        let writer_builder = DataWriterDataFusion::builder(dataset, SessionContext::new())
-            .with_metadata_state_scanned(None)
-            .await
-            .int_err()?;
-
-        let state = writer_builder.metadata_state().unwrap().clone();
-
-        Ok(engine::IngestRequest {
-            operation_id: "".to_string(), // TODO: Will be filled out by IngestTask
-            dataset_handle,
-            polling_source: state.source_event.unwrap().into_variant().unwrap(),
-            system_time: self.time_source.now(),
-            event_time: None, // TODO: Will be filled out by IngestTask
-            input_data_path: PathBuf::new(), // TODO: Will be filled out by IngestTask
-            prev_data_slices: state.data_slices,
-            schema: state.schema,
-            prev_offset: state.prev_offset,
-            vocab: DatasetVocabulary {
-                offset_column: Some(state.vocab.offset_column.into_owned()),
-                system_time_column: Some(state.vocab.system_time_column.into_owned()),
-                event_time_column: Some(state.vocab.event_time_column.into_owned()),
-            },
-            prev_checkpoint: state.prev_checkpoint,
-            prev_watermark: state.prev_watermark,
-            prev_source_state: state.prev_source_state,
-        })
-    }
-}
-
-///////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 impl PollingIngestService for PollingIngestServiceImpl {
@@ -749,11 +648,23 @@ impl PollingIngestService for PollingIngestServiceImpl {
     }
 }
 
+///////////////////////////////////////////////////////////////////////////////
+
+pub(crate) enum FetchStepResult {
+    UpToDate,
+    Updated(FetchSavepoint),
+}
+
+pub(crate) struct PrepStepResult {
+    pub data: SavepointData,
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 struct IngestLoopArgs {
     dataset_handle: DatasetHandle,
     dataset: Arc<dyn Dataset>,
     options: PollingIngestOptions,
-    polling_source: SetPollingSource,
     listener: Arc<dyn PollingIngestListener>,
 }
 
@@ -767,4 +678,33 @@ struct IngestIterationArgs<'a> {
     listener: Arc<dyn PollingIngestListener>,
     ctx: SessionContext,
     data_writer: &'a mut DataWriterDataFusion,
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+pub(crate) struct FetchProgressListenerBridge {
+    listener: Arc<dyn PollingIngestListener>,
+}
+
+impl FetchProgressListenerBridge {
+    pub(crate) fn new(listener: Arc<dyn PollingIngestListener>) -> Self {
+        Self { listener }
+    }
+}
+
+impl FetchProgressListener for FetchProgressListenerBridge {
+    fn on_progress(&self, progress: &FetchProgress) {
+        self.listener.on_stage_progress(
+            PollingIngestStage::Fetch,
+            progress.fetched_bytes,
+            match progress.total_bytes {
+                TotalBytes::Unknown => TotalSteps::Unknown,
+                TotalBytes::Exact(v) => TotalSteps::Exact(v),
+            },
+        );
+    }
+
+    fn get_pull_image_listener(self: Arc<Self>) -> Option<Arc<dyn PullImageListener>> {
+        self.listener.clone().get_pull_image_listener()
+    }
 }

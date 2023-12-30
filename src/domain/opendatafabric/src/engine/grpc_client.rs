@@ -11,15 +11,23 @@ use internal_error::*;
 use thiserror::Error;
 
 use super::grpc_generated::engine_client::EngineClient as EngineClientGRPC;
-use super::grpc_generated::ExecuteQueryRequest as ExecuteQueryRequestGRPC;
+use super::grpc_generated::{
+    RawQueryRequest as RawQueryRequestGRPC,
+    TransformRequest as TransformRequestGRPC,
+};
 use crate::serde::flatbuffers::FlatbuffersEngineProtocol;
 use crate::serde::{EngineProtocolDeserializer, EngineProtocolSerializer};
 use crate::{
-    ExecuteQueryRequest,
-    ExecuteQueryResponse,
-    ExecuteQueryResponseInternalError,
-    ExecuteQueryResponseInvalidQuery,
-    ExecuteQueryResponseSuccess,
+    RawQueryRequest,
+    RawQueryResponse,
+    RawQueryResponseInternalError,
+    RawQueryResponseInvalidQuery,
+    RawQueryResponseSuccess,
+    TransformRequest,
+    TransformResponse,
+    TransformResponseInternalError,
+    TransformResponseInvalidQuery,
+    TransformResponseSuccess,
 };
 
 pub struct EngineGrpcClient {
@@ -33,35 +41,74 @@ impl EngineGrpcClient {
         Ok(Self { client })
     }
 
-    pub async fn execute_query(
+    pub async fn execute_raw_query(
         &mut self,
-        request: ExecuteQueryRequest,
-    ) -> Result<ExecuteQueryResponseSuccess, ExecuteQueryError> {
+        request: RawQueryRequest,
+    ) -> Result<RawQueryResponseSuccess, ExecuteRawQueryError> {
         let fb = FlatbuffersEngineProtocol
-            .write_execute_query_request(&request)
+            .write_raw_query_request(&request)
             .int_err()?;
 
-        let request_grpc = tonic::Request::new(ExecuteQueryRequestGRPC {
+        let request_grpc = tonic::Request::new(RawQueryRequestGRPC {
             flatbuffer: fb.collapse_vec(),
         });
 
         let mut stream = self
             .client
-            .execute_query(request_grpc)
+            .execute_raw_query(request_grpc)
             .await
             .int_err()?
             .into_inner();
 
         while let Some(response_grpc) = stream.message().await.int_err()? {
             let response = FlatbuffersEngineProtocol
-                .read_execute_query_response(&response_grpc.flatbuffer)
+                .read_raw_query_response(&response_grpc.flatbuffer)
                 .int_err()?;
 
             match response {
-                ExecuteQueryResponse::Progress(_progress) => (),
-                ExecuteQueryResponse::Success(success) => return Ok(success),
-                ExecuteQueryResponse::InvalidQuery(error) => return Err(error.into()),
-                ExecuteQueryResponse::InternalError(error) => return Err(error.into()),
+                RawQueryResponse::Progress(_progress) => (),
+                RawQueryResponse::Success(success) => return Ok(success),
+                RawQueryResponse::InvalidQuery(error) => return Err(error.into()),
+                RawQueryResponse::InternalError(error) => return Err(error.into()),
+            }
+        }
+
+        Err(
+            "Engine did not transmit Success or Error message in the response stream"
+                .int_err()
+                .into(),
+        )
+    }
+
+    pub async fn execute_transform(
+        &mut self,
+        request: TransformRequest,
+    ) -> Result<TransformResponseSuccess, ExecuteTransformError> {
+        let fb = FlatbuffersEngineProtocol
+            .write_transform_request(&request)
+            .int_err()?;
+
+        let request_grpc = tonic::Request::new(TransformRequestGRPC {
+            flatbuffer: fb.collapse_vec(),
+        });
+
+        let mut stream = self
+            .client
+            .execute_transform(request_grpc)
+            .await
+            .int_err()?
+            .into_inner();
+
+        while let Some(response_grpc) = stream.message().await.int_err()? {
+            let response = FlatbuffersEngineProtocol
+                .read_transform_response(&response_grpc.flatbuffer)
+                .int_err()?;
+
+            match response {
+                TransformResponse::Progress(_progress) => (),
+                TransformResponse::Success(success) => return Ok(success),
+                TransformResponse::InvalidQuery(error) => return Err(error.into()),
+                TransformResponse::InternalError(error) => return Err(error.into()),
             }
         }
 
@@ -76,23 +123,47 @@ impl EngineGrpcClient {
 ///////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Error)]
-pub enum ExecuteQueryError {
+pub enum ExecuteRawQueryError {
     #[error("Invalid query: {0}")]
-    InvalidQuery(ExecuteQueryResponseInvalidQuery),
+    InvalidQuery(RawQueryResponseInvalidQuery),
     #[error("Engine internal error: {0}")]
-    EngineInternalError(ExecuteQueryResponseInternalError),
+    EngineInternalError(RawQueryResponseInternalError),
     #[error(transparent)]
     InternalError(#[from] InternalError),
 }
 
-impl From<ExecuteQueryResponseInvalidQuery> for ExecuteQueryError {
-    fn from(error: ExecuteQueryResponseInvalidQuery) -> Self {
+impl From<RawQueryResponseInvalidQuery> for ExecuteRawQueryError {
+    fn from(error: RawQueryResponseInvalidQuery) -> Self {
         Self::InvalidQuery(error)
     }
 }
 
-impl From<ExecuteQueryResponseInternalError> for ExecuteQueryError {
-    fn from(error: ExecuteQueryResponseInternalError) -> Self {
+impl From<RawQueryResponseInternalError> for ExecuteRawQueryError {
+    fn from(error: RawQueryResponseInternalError) -> Self {
+        Self::EngineInternalError(error)
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Error)]
+pub enum ExecuteTransformError {
+    #[error("Invalid query: {0}")]
+    InvalidQuery(TransformResponseInvalidQuery),
+    #[error("Engine internal error: {0}")]
+    EngineInternalError(TransformResponseInternalError),
+    #[error(transparent)]
+    InternalError(#[from] InternalError),
+}
+
+impl From<TransformResponseInvalidQuery> for ExecuteTransformError {
+    fn from(error: TransformResponseInvalidQuery) -> Self {
+        Self::InvalidQuery(error)
+    }
+}
+
+impl From<TransformResponseInternalError> for ExecuteTransformError {
+    fn from(error: TransformResponseInternalError) -> Self {
         Self::EngineInternalError(error)
     }
 }

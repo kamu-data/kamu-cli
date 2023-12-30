@@ -12,23 +12,23 @@
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq)]
 pub enum DatasetFlowType {
     Ingest,
-    ExecuteQuery,
+    ExecuteTransform,
     Compaction,
 }
 
 impl DatasetFlowType {
     pub fn all() -> &'static [DatasetFlowType] {
-        &[Self::Ingest, Self::ExecuteQuery, Self::Compaction]
+        &[Self::Ingest, Self::ExecuteTransform, Self::Compaction]
     }
 
     pub fn is_dataset_update(&self) -> bool {
-        *self == DatasetFlowType::Ingest || *self == DatasetFlowType::ExecuteQuery
+        *self == DatasetFlowType::Ingest || *self == DatasetFlowType::ExecuteTransform
     }
 
     pub fn dataset_kind_restriction(&self) -> Option<opendatafabric::DatasetKind> {
         match self {
             DatasetFlowType::Ingest => Some(opendatafabric::DatasetKind::Root),
-            DatasetFlowType::ExecuteQuery => Some(opendatafabric::DatasetKind::Derivative),
+            DatasetFlowType::ExecuteTransform => Some(opendatafabric::DatasetKind::Derivative),
             DatasetFlowType::Compaction => None,
         }
     }

@@ -15,7 +15,7 @@ use crate::prelude::*;
 #[graphql(remote = "kamu_flow_system::DatasetFlowType")]
 pub enum DatasetFlowType {
     Ingest,
-    ExecuteQuery,
+    ExecuteTransform,
     Compaction,
 }
 
