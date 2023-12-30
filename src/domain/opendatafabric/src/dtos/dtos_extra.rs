@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::borrow::Cow;
 use std::fmt::Display;
 
 use crate::*;
@@ -27,10 +26,10 @@ impl AddData {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// ExecuteQuery
+// ExecuteTransform
 ////////////////////////////////////////////////////////////////////////////////
 
-impl ExecuteQuery {
+impl ExecuteTransform {
     /// Helper for determining the last record offset in the dataset
     pub fn last_offset(&self) -> Option<u64> {
         self.new_data
@@ -41,10 +40,10 @@ impl ExecuteQuery {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// ExecuteQueryInput
+// ExecuteTransformInput
 ////////////////////////////////////////////////////////////////////////////////
 
-impl ExecuteQueryInput {
+impl ExecuteTransformInput {
     /// Helper for determining the input's last block hash included in the
     /// transaction
     pub fn last_block_hash(&self) -> Option<&Multihash> {
@@ -75,26 +74,22 @@ impl ExecuteQueryInput {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// DatasetVocabulary
+// Transform
 ////////////////////////////////////////////////////////////////////////////////
 
-impl DatasetVocabulary {
-    pub fn into_resolved(self) -> DatasetVocabularyResolvedOwned {
-        self.into()
-    }
-}
-
-impl Default for SetVocab {
-    fn default() -> Self {
-        Self {
-            offset_column: None,
-            system_time_column: None,
-            event_time_column: None,
+impl Transform {
+    pub fn engine(&self) -> &str {
+        match self {
+            Transform::Sql(v) => v.engine.as_str(),
         }
     }
 }
 
-impl Default for DatasetVocabulary {
+////////////////////////////////////////////////////////////////////////////////
+// SetVocab
+////////////////////////////////////////////////////////////////////////////////
+
+impl Default for SetVocab {
     fn default() -> Self {
         Self {
             offset_column: None,
@@ -107,98 +102,29 @@ impl Default for DatasetVocabulary {
 impl From<SetVocab> for DatasetVocabulary {
     fn from(v: SetVocab) -> Self {
         Self {
-            offset_column: v.offset_column,
-            system_time_column: v.system_time_column,
-            event_time_column: v.event_time_column,
+            offset_column: v
+                .offset_column
+                .unwrap_or_else(|| DatasetVocabulary::DEFAULT_OFFSET_COLUMN_NAME.to_string()),
+            system_time_column: v
+                .system_time_column
+                .unwrap_or_else(|| DatasetVocabulary::DEFAULT_SYSTEM_TIME_COLUMN_NAME.to_string()),
+            event_time_column: v
+                .event_time_column
+                .unwrap_or_else(|| DatasetVocabulary::DEFAULT_EVENT_TIME_COLUMN_NAME.to_string()),
         }
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// DatasetVocabulary
+////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DatasetVocabularyResolved<'a> {
-    /// Name of the system time column.
-    pub system_time_column: Cow<'a, str>,
-    /// Name of the event time column.
-    pub event_time_column: Cow<'a, str>,
-    /// Name of the offset column.
-    pub offset_column: Cow<'a, str>,
-}
-
-pub type DatasetVocabularyResolvedOwned = DatasetVocabularyResolved<'static>;
-
-impl Default for DatasetVocabularyResolvedOwned {
+impl Default for DatasetVocabulary {
     fn default() -> Self {
-        Self::from(DatasetVocabulary::default())
-    }
-}
-
-impl<'a> From<&'a DatasetVocabulary> for DatasetVocabularyResolved<'a> {
-    fn from(value: &'a DatasetVocabulary) -> Self {
         Self {
-            system_time_column: Cow::Borrowed(
-                value
-                    .system_time_column
-                    .as_ref()
-                    .map(String::as_str)
-                    .unwrap_or(DatasetVocabulary::DEFAULT_SYSTEM_TIME_COLUMN_NAME),
-            ),
-            event_time_column: Cow::Borrowed(
-                value
-                    .event_time_column
-                    .as_ref()
-                    .map(String::as_str)
-                    .unwrap_or(DatasetVocabulary::DEFAULT_EVENT_TIME_COLUMN_NAME),
-            ),
-            offset_column: Cow::Borrowed(
-                value
-                    .offset_column
-                    .as_ref()
-                    .map(String::as_str)
-                    .unwrap_or(DatasetVocabulary::DEFAULT_OFFSET_COLUMN_NAME),
-            ),
-        }
-    }
-}
-
-impl From<DatasetVocabulary> for DatasetVocabularyResolvedOwned {
-    fn from(value: DatasetVocabulary) -> Self {
-        Self {
-            system_time_column: value
-                .system_time_column
-                .map(Cow::Owned)
-                .unwrap_or(Cow::Borrowed(
-                    DatasetVocabulary::DEFAULT_SYSTEM_TIME_COLUMN_NAME,
-                )),
-
-            event_time_column: value
-                .event_time_column
-                .map(Cow::Owned)
-                .unwrap_or(Cow::Borrowed(
-                    DatasetVocabulary::DEFAULT_EVENT_TIME_COLUMN_NAME,
-                )),
-            offset_column: value
-                .offset_column
-                .map(Cow::Owned)
-                .unwrap_or(Cow::Borrowed(DatasetVocabulary::DEFAULT_OFFSET_COLUMN_NAME)),
-        }
-    }
-}
-
-impl From<SetVocab> for DatasetVocabularyResolvedOwned {
-    fn from(value: SetVocab) -> Self {
-        let vocab: DatasetVocabulary = value.into();
-        Self::from(vocab)
-    }
-}
-
-impl<'a> DatasetVocabularyResolved<'a> {
-    pub fn into_owned(self) -> DatasetVocabularyResolvedOwned {
-        DatasetVocabularyResolvedOwned {
-            system_time_column: self.system_time_column.into_owned().into(),
-            event_time_column: self.event_time_column.into_owned().into(),
-            offset_column: self.offset_column.into_owned().into(),
+            offset_column: Self::DEFAULT_OFFSET_COLUMN_NAME.to_string(),
+            system_time_column: Self::DEFAULT_SYSTEM_TIME_COLUMN_NAME.to_string(),
+            event_time_column: Self::DEFAULT_EVENT_TIME_COLUMN_NAME.to_string(),
         }
     }
 }
@@ -287,16 +213,36 @@ impl Default for ReadStepEsriShapefile {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// ExecuteQueryResponse
+// RawQueryResponse
 ////////////////////////////////////////////////////////////////////////////////
 
-impl Display for ExecuteQueryResponseInvalidQuery {
+impl Display for RawQueryResponseInvalidQuery {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", &self.message)
     }
 }
 
-impl Display for ExecuteQueryResponseInternalError {
+impl Display for RawQueryResponseInternalError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", &self.message)?;
+        if let Some(bt) = &self.backtrace {
+            write!(f, "\n\n--- Engine Backtrace ---\n{}", bt)?;
+        }
+        Ok(())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// TransformResponse
+////////////////////////////////////////////////////////////////////////////////
+
+impl Display for TransformResponseInvalidQuery {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", &self.message)
+    }
+}
+
+impl Display for TransformResponseInternalError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", &self.message)?;
         if let Some(bt) = &self.backtrace {

@@ -172,17 +172,17 @@ where
                         increment.seen_checkpoints_size += checkpoint.size as u64;
                     }
                 }
-                MetadataEvent::ExecuteQuery(execute_query) => {
+                MetadataEvent::ExecuteTransform(execute_transform) => {
                     increment.seen_last_pulled.get_or_insert(block.system_time);
 
-                    if let Some(output_data) = execute_query.new_data {
+                    if let Some(output_data) = execute_transform.new_data {
                         let iv = output_data.offset_interval;
                         increment.seen_num_records += (iv.end - iv.start + 1) as u64;
 
                         increment.seen_data_size += output_data.size as u64;
                     }
 
-                    if let Some(checkpoint) = execute_query.new_checkpoint {
+                    if let Some(checkpoint) = execute_transform.new_checkpoint {
                         increment.seen_checkpoints_size += checkpoint.size as u64;
                     }
                 }
@@ -520,19 +520,19 @@ where
         .await
     }
 
-    /// Helper function to commit ExecuteQuery event into a local dataset.
+    /// Helper function to commit ExecuteTransform event into a local dataset.
     ///
     /// Will attempt to atomically move data and checkpoint files, so those have
     /// to be on the same file system as the workspace.
-    async fn commit_execute_query(
+    async fn commit_execute_transform(
         &self,
-        execute_query: ExecuteQueryParams,
+        execute_transform: ExecuteTransformParams,
         data: Option<OwnedFile>,
         checkpoint: Option<OwnedFile>,
         opts: CommitOpts<'_>,
     ) -> Result<CommitResult, CommitError> {
         let event = self
-            .prepare_execute_query(execute_query, data.as_ref(), checkpoint.as_ref())
+            .prepare_execute_transform(execute_transform, data.as_ref(), checkpoint.as_ref())
             .await?;
 
         self.commit_objects(
@@ -553,17 +553,17 @@ where
         .await
     }
 
-    async fn prepare_execute_query(
+    async fn prepare_execute_transform(
         &self,
-        params: ExecuteQueryParams,
+        params: ExecuteTransformParams,
         data_file: Option<&OwnedFile>,
         checkpoint: Option<&OwnedFile>,
-    ) -> Result<ExecuteQuery, InternalError> {
+    ) -> Result<ExecuteTransform, InternalError> {
         let (new_data, new_checkpoint) = self
             .prepare_objects(params.new_offset_interval, data_file, checkpoint)
             .await?;
 
-        Ok(ExecuteQuery {
+        Ok(ExecuteTransform {
             query_inputs: params.query_inputs,
             prev_checkpoint: params.prev_checkpoint,
             prev_offset: params.prev_offset,

@@ -109,7 +109,7 @@ pub async fn create_dataset_from_snapshot_impl(
             | MetadataEvent::SetLicense(_)
             | MetadataEvent::SetVocab(_) => Ok(()),
             MetadataEvent::AddData(_)
-            | MetadataEvent::ExecuteQuery(_)
+            | MetadataEvent::ExecuteTransform(_)
             | MetadataEvent::DisablePollingSource(_)
             | MetadataEvent::DisablePushSource(_) => Err(InvalidSnapshotError::new(format!(
                 "Event is not allowed to appear in a DatasetSnapshot: {:?}",

@@ -7,14 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::ops::Deref;
 use std::sync::Arc;
 
 use container_runtime::{ImagePullError, PullImageListener};
 use internal_error::InternalError;
 use thiserror::Error;
 
-use crate::entities::engine::{Engine, IngestEngine};
+use crate::entities::engine::Engine;
 
 ///////////////////////////////////////////////////////////////////////////////
 // EngineProvisioner
@@ -26,19 +25,7 @@ pub trait EngineProvisioner: Send + Sync {
         &self,
         engine_id: &str,
         maybe_listener: Option<Arc<dyn EngineProvisioningListener>>,
-    ) -> Result<EngineHandle, EngineProvisioningError>;
-
-    /// Do not use directly - called automatically by [EngineHandle]
-    fn release_engine(&self, engine: &dyn Engine);
-
-    /// TODO: Will be removed
-    async fn provision_ingest_engine(
-        &self,
-        maybe_listener: Option<Arc<dyn EngineProvisioningListener>>,
-    ) -> Result<IngestEngineHandle, EngineProvisioningError>;
-
-    /// Do not use directly - called automatically by [IngestEngineHandle]
-    fn release_ingest_engine(&self, engine: &dyn IngestEngine);
+    ) -> Result<Arc<dyn Engine>, EngineProvisioningError>;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -67,66 +54,4 @@ pub enum EngineProvisioningError {
     ImagePull(#[from] ImagePullError),
     #[error(transparent)]
     Internal(#[from] InternalError),
-}
-
-///////////////////////////////////////////////////////////////////////////////
-// EngineHandle
-///////////////////////////////////////////////////////////////////////////////
-
-pub struct EngineHandle<'a> {
-    provisioner: &'a dyn EngineProvisioner,
-    engine: Arc<dyn Engine>,
-}
-
-impl<'a> EngineHandle<'a> {
-    pub fn new(provisioner: &'a dyn EngineProvisioner, engine: Arc<dyn Engine>) -> Self {
-        Self {
-            provisioner,
-            engine,
-        }
-    }
-}
-
-impl<'a> Deref for EngineHandle<'a> {
-    type Target = dyn Engine;
-
-    fn deref(&self) -> &Self::Target {
-        self.engine.as_ref()
-    }
-}
-
-impl<'a> Drop for EngineHandle<'a> {
-    fn drop(&mut self) {
-        self.provisioner.release_engine(self.engine.as_ref());
-    }
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-pub struct IngestEngineHandle<'a> {
-    provisioner: &'a dyn EngineProvisioner,
-    engine: Arc<dyn IngestEngine>,
-}
-
-impl<'a> IngestEngineHandle<'a> {
-    pub fn new(provisioner: &'a dyn EngineProvisioner, engine: Arc<dyn IngestEngine>) -> Self {
-        Self {
-            provisioner,
-            engine,
-        }
-    }
-}
-
-impl<'a> Deref for IngestEngineHandle<'a> {
-    type Target = dyn IngestEngine;
-
-    fn deref(&self) -> &Self::Target {
-        self.engine.as_ref()
-    }
-}
-
-impl<'a> Drop for IngestEngineHandle<'a> {
-    fn drop(&mut self) {
-        self.provisioner.release_ingest_engine(self.engine.as_ref());
-    }
 }

@@ -12,12 +12,10 @@ use std::sync::Arc;
 
 use chrono::{TimeZone, Utc};
 use container_runtime::ContainerRuntime;
-use datafusion::parquet::record::RowAccessor;
 use datafusion::prelude::*;
 use dill::Component;
 use event_bus::EventBus;
 use indoc::indoc;
-use itertools::Itertools;
 use kamu::domain::*;
 use kamu::testing::*;
 use kamu::*;
@@ -26,92 +24,9 @@ use tempfile::TempDir;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(containerized, engine, ingest, spark)]
-#[test_log::test(tokio::test)]
-async fn test_ingest_polling_legacy_spark() {
-    let harness = IngestTestHarness::new();
-
-    let src_path = harness.temp_dir.path().join("data.csv");
-    std::fs::write(
-        &src_path,
-        indoc!(
-            "
-            city,population
-            A,1000
-            B,2000
-            C,3000
-            "
-        ),
-    )
-    .unwrap();
-
-    let dataset_snapshot = MetadataFactory::dataset_snapshot()
-        .name("foo.bar")
-        .kind(DatasetKind::Root)
-        .push_event(
-            MetadataFactory::set_polling_source()
-                .fetch_file(&src_path)
-                .read(ReadStep::Csv(ReadStepCsv {
-                    header: Some(true),
-                    schema: Some(vec![
-                        "city STRING".to_string(),
-                        "population INT".to_string(),
-                    ]),
-                    ..ReadStepCsv::default()
-                }))
-                .preprocess(TransformSql {
-                    engine: "spark".to_string(),
-                    version: None,
-                    query: Some(
-                        indoc::indoc!(
-                            r#"
-                            select
-                                city,
-                                population * 10 as population
-                            from input
-                            "#
-                        )
-                        .to_string(),
-                    ),
-                    queries: None,
-                    temporal_tables: None,
-                })
-                .build(),
-        )
-        .build();
-
-    let dataset_alias = dataset_snapshot.name.clone();
-
-    harness.create_dataset(dataset_snapshot).await;
-    harness.ingest(&dataset_alias).await.unwrap();
-
-    let parquet_reader = harness.read_datafile(&dataset_alias).await;
-
-    assert_eq!(
-        parquet_reader.get_column_names(),
-        ["offset", "system_time", "event_time", "city", "population"]
-    );
-
-    assert_eq!(
-        parquet_reader
-            .get_row_iter()
-            .map(|r| r.unwrap())
-            .map(IngestTestHarness::row_mapper)
-            .sorted()
-            .collect::<Vec<_>>(),
-        [
-            (0, "A".to_owned(), 10000),
-            (1, "B".to_owned(), 20000),
-            (2, "C".to_owned(), 30000)
-        ]
-    );
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
 #[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
-async fn test_ingest_polling_datafusion_snapshot() {
+async fn test_ingest_polling_snapshot() {
     let harness = IngestTestHarness::new();
 
     let src_path = harness.temp_dir.path().join("data.csv");
@@ -316,7 +231,7 @@ async fn test_ingest_polling_datafusion_snapshot() {
 
 #[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
-async fn test_ingest_polling_datafusion_ledger() {
+async fn test_ingest_polling_ledger() {
     let harness = IngestTestHarness::new();
     let src_path = harness.temp_dir.path().join("data.csv");
 
@@ -534,7 +449,7 @@ async fn test_ingest_polling_datafusion_ledger() {
 
 #[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
-async fn test_ingest_polling_datafusion_empty_data() {
+async fn test_ingest_polling_empty_data() {
     let harness = IngestTestHarness::new();
     let src_path = harness.temp_dir.path().join("data.csv");
 
@@ -595,7 +510,7 @@ async fn test_ingest_polling_datafusion_empty_data() {
 
 #[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
-async fn test_ingest_polling_datafusion_event_time_as_date() {
+async fn test_ingest_polling_event_time_as_date() {
     let harness = IngestTestHarness::new();
     let src_path = harness.temp_dir.path().join("data.csv");
 
@@ -704,7 +619,7 @@ async fn test_ingest_polling_datafusion_event_time_as_date() {
 
 #[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
-async fn test_ingest_polling_datafusion_event_time_of_invalid_type() {
+async fn test_ingest_polling_event_time_of_invalid_type() {
     let harness = IngestTestHarness::new();
     let src_path = harness.temp_dir.path().join("data.csv");
 
@@ -772,7 +687,7 @@ async fn test_ingest_polling_datafusion_event_time_of_invalid_type() {
 
 #[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
-async fn test_ingest_polling_datafusion_bad_column_names_preserve() {
+async fn test_ingest_polling_bad_column_names_preserve() {
     let harness = IngestTestHarness::new();
     let src_path = harness.temp_dir.path().join("data.json");
 
@@ -864,7 +779,7 @@ async fn test_ingest_polling_datafusion_bad_column_names_preserve() {
 
 #[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
-async fn test_ingest_polling_datafusion_bad_column_names_rename() {
+async fn test_ingest_polling_bad_column_names_rename() {
     let harness = IngestTestHarness::new();
     let src_path = harness.temp_dir.path().join("data.json");
 
@@ -945,6 +860,188 @@ async fn test_ingest_polling_datafusion_bad_column_names_rename() {
                 | 0      | 2050-01-01T12:00:00Z | 2020-01-01T12:00:00Z | A    | 1000       |
                 | 1      | 2050-01-01T12:00:00Z | 2020-01-01T12:00:00Z | B    | 2000       |
                 | 2      | 2050-01-01T12:00:00Z | 2020-01-01T12:00:00Z | C    | 3000       |
+                +--------+----------------------+----------------------+------+------------+
+                "#
+            ),
+        )
+        .await;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(containerized, engine, ingest, spark)]
+#[test_log::test(tokio::test)]
+async fn test_ingest_polling_preprocess_with_spark() {
+    let harness = IngestTestHarness::new();
+
+    let src_path = harness.temp_dir.path().join("data.csv");
+    std::fs::write(
+        &src_path,
+        indoc!(
+            "
+            city,population
+            A,1000
+            B,2000
+            C,3000
+            "
+        ),
+    )
+    .unwrap();
+
+    let dataset_snapshot = MetadataFactory::dataset_snapshot()
+        .name("foo.bar")
+        .kind(DatasetKind::Root)
+        .push_event(
+            MetadataFactory::set_polling_source()
+                .fetch_file(&src_path)
+                .read(ReadStep::Csv(ReadStepCsv {
+                    header: Some(true),
+                    schema: Some(vec![
+                        "city STRING".to_string(),
+                        "population BIGINT".to_string(),
+                    ]),
+                    ..ReadStepCsv::default()
+                }))
+                .preprocess(TransformSql {
+                    engine: "spark".to_string(),
+                    version: None,
+                    query: Some(
+                        indoc::indoc!(
+                            r#"
+                            select
+                                city,
+                                population * 10 as population
+                            from input
+                            "#
+                        )
+                        .to_string(),
+                    ),
+                    queries: None,
+                    temporal_tables: None,
+                })
+                .build(),
+        )
+        .build();
+
+    let dataset_alias = dataset_snapshot.name.clone();
+
+    harness.create_dataset(dataset_snapshot).await;
+    harness.ingest(&dataset_alias).await.unwrap();
+
+    let data_helper = harness.dataset_data_helper(&dataset_alias).await;
+
+    data_helper
+        .assert_last_data_eq(
+            indoc!(
+                r#"
+                message arrow_schema {
+                  OPTIONAL INT64 offset;
+                  REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
+                  REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
+                  OPTIONAL BYTE_ARRAY city (STRING);
+                  OPTIONAL INT64 population;
+                }
+                "#
+            ),
+            indoc!(
+                r#"
+                +--------+----------------------+----------------------+------+------------+
+                | offset | system_time          | event_time           | city | population |
+                +--------+----------------------+----------------------+------+------------+
+                | 0      | 2050-01-01T12:00:00Z | 2050-01-01T12:00:00Z | A    | 10000      |
+                | 1      | 2050-01-01T12:00:00Z | 2050-01-01T12:00:00Z | B    | 20000      |
+                | 2      | 2050-01-01T12:00:00Z | 2050-01-01T12:00:00Z | C    | 30000      |
+                +--------+----------------------+----------------------+------+------------+
+                "#
+            ),
+        )
+        .await;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(containerized, engine, ingest, flink)]
+#[test_log::test(tokio::test)]
+async fn test_ingest_polling_preprocess_with_flink() {
+    let harness = IngestTestHarness::new();
+
+    let src_path = harness.temp_dir.path().join("data.csv");
+    std::fs::write(
+        &src_path,
+        indoc!(
+            "
+            city,population
+            A,1000
+            B,2000
+            C,3000
+            "
+        ),
+    )
+    .unwrap();
+
+    let dataset_snapshot = MetadataFactory::dataset_snapshot()
+        .name("foo.bar")
+        .kind(DatasetKind::Root)
+        .push_event(
+            MetadataFactory::set_polling_source()
+                .fetch_file(&src_path)
+                .read(ReadStep::Csv(ReadStepCsv {
+                    header: Some(true),
+                    schema: Some(vec![
+                        "city STRING".to_string(),
+                        "population BIGINT".to_string(),
+                    ]),
+                    ..ReadStepCsv::default()
+                }))
+                .preprocess(TransformSql {
+                    engine: "flink".to_string(),
+                    version: None,
+                    query: Some(
+                        indoc::indoc!(
+                            r#"
+                            select
+                                city,
+                                population * 10 as population
+                            from input
+                            "#
+                        )
+                        .to_string(),
+                    ),
+                    queries: None,
+                    temporal_tables: None,
+                })
+                .build(),
+        )
+        .build();
+
+    let dataset_alias = dataset_snapshot.name.clone();
+
+    harness.create_dataset(dataset_snapshot).await;
+    harness.ingest(&dataset_alias).await.unwrap();
+
+    let data_helper = harness.dataset_data_helper(&dataset_alias).await;
+
+    data_helper
+        .assert_last_data_eq(
+            indoc!(
+                r#"
+                message arrow_schema {
+                  OPTIONAL INT64 offset;
+                  REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
+                  REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
+                  OPTIONAL BYTE_ARRAY city (STRING);
+                  OPTIONAL INT64 population;
+                }
+                "#
+            ),
+            indoc!(
+                r#"
+                +--------+----------------------+----------------------+------+------------+
+                | offset | system_time          | event_time           | city | population |
+                +--------+----------------------+----------------------+------+------------+
+                | 0      | 2050-01-01T12:00:00Z | 2050-01-01T12:00:00Z | A    | 10000      |
+                | 1      | 2050-01-01T12:00:00Z | 2050-01-01T12:00:00Z | B    | 20000      |
+                | 2      | 2050-01-01T12:00:00Z | 2050-01-01T12:00:00Z | C    | 30000      |
                 +--------+----------------------+----------------------+------+------------+
                 "#
             ),
@@ -1103,23 +1200,5 @@ impl IngestTestHarness {
             .unwrap();
 
         DatasetDataHelper::new_with_context(dataset, self.ctx.clone())
-    }
-
-    async fn read_datafile(&self, dataset_alias: &DatasetAlias) -> ParquetReaderHelper {
-        let part_file = self
-            .dataset_data_helper(dataset_alias)
-            .await
-            .get_last_data_file()
-            .await;
-        ParquetReaderHelper::open(&part_file)
-    }
-
-    /// Deprecated: use [kamu_data_utils::testing::assert_data_eq]
-    fn row_mapper(r: datafusion::parquet::record::Row) -> (i64, String, i32) {
-        (
-            r.get_long(0).unwrap(),
-            r.get_string(3).unwrap().clone(),
-            r.get_int(4).unwrap(),
-        )
     }
 }

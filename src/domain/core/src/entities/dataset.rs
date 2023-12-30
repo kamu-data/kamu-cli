@@ -40,25 +40,26 @@ pub trait Dataset: Send + Sync {
         opts: CommitOpts<'_>,
     ) -> Result<CommitResult, CommitError>;
 
-    /// Helper function to commit [ExecuteQuery] event into a local dataset.
+    /// Helper function to commit [ExecuteTransform] event into a local dataset.
     ///
     /// Will attempt to atomically move data and checkpoint files, so those have
     /// to be on the same file system as the workspace.
-    async fn commit_execute_query(
+    async fn commit_execute_transform(
         &self,
-        execute_query: ExecuteQueryParams,
+        execute_transform: ExecuteTransformParams,
         data: Option<OwnedFile>,
         checkpoint: Option<OwnedFile>,
         opts: CommitOpts<'_>,
     ) -> Result<CommitResult, CommitError>;
 
-    /// Helper function to prepare [ExecuteQuery] event wihtout committing it.
-    async fn prepare_execute_query(
+    /// Helper function to prepare [ExecuteTransform] event wihtout committing
+    /// it.
+    async fn prepare_execute_transform(
         &self,
-        execute_query: ExecuteQueryParams,
+        execute_transform: ExecuteTransformParams,
         data: Option<&OwnedFile>,
         checkpoint: Option<&OwnedFile>,
-    ) -> Result<ExecuteQuery, InternalError>;
+    ) -> Result<ExecuteTransform, InternalError>;
 
     fn as_metadata_chain(&self) -> &dyn MetadataChain;
     fn as_data_repo(&self) -> &dyn ObjectRepository;
@@ -194,12 +195,12 @@ pub struct AddDataParams {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-/// Replicates [ExecuteQuery] event prior to hashing of data and checkpoint
+/// Replicates [ExecuteTransform] event prior to hashing of data and checkpoint
 #[derive(Debug, Clone)]
-pub struct ExecuteQueryParams {
+pub struct ExecuteTransformParams {
     /// Defines inputs used in this transaction. Slices corresponding to every
     /// input dataset must be present.
-    pub query_inputs: Vec<ExecuteQueryInput>,
+    pub query_inputs: Vec<ExecuteTransformInput>,
     /// Hash of the checkpoint file used to restore transformation state, if
     /// any.
     pub prev_checkpoint: Option<Multihash>,

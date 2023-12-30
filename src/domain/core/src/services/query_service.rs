@@ -70,7 +70,7 @@ pub struct DatasetQueryOptions {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EngineDesc {
-    /// A short name of the engine, e.g. "Spark", "Flink"
+    /// A short name of the engine, e.g. "Spark", "Flink", "Datafusion"
     /// Intended for use in UI for quick engine identification and selection
     pub name: String,
     /// Language and dialect this engine is using for queries

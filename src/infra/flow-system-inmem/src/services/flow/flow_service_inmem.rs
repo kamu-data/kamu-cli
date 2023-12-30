@@ -380,7 +380,7 @@ impl FlowServiceInMemory {
     async fn schedule_flow_task(&self, flow: &mut Flow) -> Result<TaskID, InternalError> {
         let logical_plan = match &flow.flow_key {
             FlowKey::Dataset(flow_key) => match flow_key.flow_type {
-                DatasetFlowType::Ingest | DatasetFlowType::ExecuteQuery => {
+                DatasetFlowType::Ingest | DatasetFlowType::ExecuteTransform => {
                     LogicalPlan::UpdateDataset(UpdateDataset {
                         dataset_id: flow_key.dataset_id.clone(),
                     })

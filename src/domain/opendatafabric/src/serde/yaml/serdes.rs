@@ -28,10 +28,16 @@ struct MetadataEventWrapper(#[serde(with = "MetadataEventDef")] MetadataEvent);
 struct DatasetSnapshotWrapper(#[serde(with = "DatasetSnapshotDef")] DatasetSnapshot);
 
 #[derive(Serialize, Deserialize)]
-struct ExecuteQueryRequestWrapper(#[serde(with = "ExecuteQueryRequestDef")] ExecuteQueryRequest);
+struct RawQueryRequestWrapper(#[serde(with = "RawQueryRequestDef")] RawQueryRequest);
 
 #[derive(Serialize, Deserialize)]
-struct ExecuteQueryResponseWrapper(#[serde(with = "ExecuteQueryResponseDef")] ExecuteQueryResponse);
+struct RawQueryResponseWrapper(#[serde(with = "RawQueryResponseDef")] RawQueryResponse);
+
+#[derive(Serialize, Deserialize)]
+struct TransformRequestWrapper(#[serde(with = "TransformRequestDef")] TransformRequest);
+
+#[derive(Serialize, Deserialize)]
+struct TransformResponseWrapper(#[serde(with = "TransformResponseDef")] TransformResponse);
 
 ///////////////////////////////////////////////////////////////////////////////
 // YamlMetadataBlockSerializer
@@ -196,19 +202,32 @@ impl DatasetSnapshotDeserializer for YamlDatasetSnapshotDeserializer {
 pub struct YamlEngineProtocol;
 
 impl EngineProtocolSerializer for YamlEngineProtocol {
-    fn write_execute_query_request(&self, inst: &ExecuteQueryRequest) -> Result<Buffer<u8>, Error> {
-        let buf = serde_yaml::to_string(&ExecuteQueryRequestWrapper(inst.clone()))
+    fn write_raw_query_request(&self, inst: &RawQueryRequest) -> Result<Buffer<u8>, Error> {
+        let buf = serde_yaml::to_string(&RawQueryRequestWrapper(inst.clone()))
             .map_err(|e| Error::serde(e))?
             .into_bytes();
 
         Ok(Buffer::new(0, buf.len(), buf))
     }
 
-    fn write_execute_query_response(
-        &self,
-        inst: &ExecuteQueryResponse,
-    ) -> Result<Buffer<u8>, Error> {
-        let buf = serde_yaml::to_string(&ExecuteQueryResponseWrapper(inst.clone()))
+    fn write_raw_query_response(&self, inst: &RawQueryResponse) -> Result<Buffer<u8>, Error> {
+        let buf = serde_yaml::to_string(&RawQueryResponseWrapper(inst.clone()))
+            .map_err(|e| Error::serde(e))?
+            .into_bytes();
+
+        Ok(Buffer::new(0, buf.len(), buf))
+    }
+
+    fn write_transform_request(&self, inst: &TransformRequest) -> Result<Buffer<u8>, Error> {
+        let buf = serde_yaml::to_string(&TransformRequestWrapper(inst.clone()))
+            .map_err(|e| Error::serde(e))?
+            .into_bytes();
+
+        Ok(Buffer::new(0, buf.len(), buf))
+    }
+
+    fn write_transform_response(&self, inst: &TransformResponse) -> Result<Buffer<u8>, Error> {
+        let buf = serde_yaml::to_string(&TransformResponseWrapper(inst.clone()))
             .map_err(|e| Error::serde(e))?
             .into_bytes();
 
@@ -217,15 +236,29 @@ impl EngineProtocolSerializer for YamlEngineProtocol {
 }
 
 impl EngineProtocolDeserializer for YamlEngineProtocol {
-    fn read_execute_query_request(&self, data: &[u8]) -> Result<ExecuteQueryRequest, Error> {
-        let inst: ExecuteQueryRequestWrapper =
+    fn read_raw_query_request(&self, data: &[u8]) -> Result<RawQueryRequest, Error> {
+        let inst: RawQueryRequestWrapper =
             serde_yaml::from_slice(data).map_err(|e| Error::serde(e))?;
 
         Ok(inst.0)
     }
 
-    fn read_execute_query_response(&self, data: &[u8]) -> Result<ExecuteQueryResponse, Error> {
-        let inst: ExecuteQueryResponseWrapper =
+    fn read_raw_query_response(&self, data: &[u8]) -> Result<RawQueryResponse, Error> {
+        let inst: RawQueryResponseWrapper =
+            serde_yaml::from_slice(data).map_err(|e| Error::serde(e))?;
+
+        Ok(inst.0)
+    }
+
+    fn read_transform_request(&self, data: &[u8]) -> Result<TransformRequest, Error> {
+        let inst: TransformRequestWrapper =
+            serde_yaml::from_slice(data).map_err(|e| Error::serde(e))?;
+
+        Ok(inst.0)
+    }
+
+    fn read_transform_response(&self, data: &[u8]) -> Result<TransformResponse, Error> {
+        let inst: TransformResponseWrapper =
             serde_yaml::from_slice(data).map_err(|e| Error::serde(e))?;
 
         Ok(inst.0)

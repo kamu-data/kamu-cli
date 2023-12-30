@@ -252,7 +252,7 @@ where
                 Ok(())
             }
             // TODO: ensure only used on Derivative datasets
-            MetadataEvent::ExecuteQuery(e) => {
+            MetadataEvent::ExecuteTransform(e) => {
                 // Validate event is not empty
                 if e.new_data.is_none() && e.new_checkpoint.is_none() && e.new_watermark.is_none() {
                     return Err(AppendValidationError::NoOpEvent(NoOpEventError::new(
@@ -281,7 +281,7 @@ where
                         MetadataEvent::SetTransform(e) if prev_transform.is_none() => {
                             prev_transform = Some(e);
                         }
-                        MetadataEvent::ExecuteQuery(e) if prev_query.is_none() => {
+                        MetadataEvent::ExecuteTransform(e) if prev_query.is_none() => {
                             prev_query = Some(e);
                         }
                         _ => (),
@@ -301,7 +301,7 @@ where
                 }
 
                 // Validate inputs are listed in the same exact order as in SetTransform (or
-                // through recursion, in previous ExecuteQuery)
+                // through recursion, in previous ExecuteTransform)
                 let actual_inputs = e.query_inputs.iter().map(|i| &i.dataset_id);
                 if let Some(prev_transform) = &prev_transform {
                     if actual_inputs.ne(prev_transform
@@ -326,7 +326,7 @@ where
                 } else {
                     invalid_event!(
                         e.clone(),
-                        "ExecuteQuery must be preceeded by SetTransform event",
+                        "ExecuteTransform must be preceeded by SetTransform event",
                     );
                 }
 
@@ -560,11 +560,11 @@ where
         new_block: &MetadataBlock,
         _block_cache: &mut Vec<MetadataBlock>,
     ) -> Result<(), AppendError> {
-        // Only check AddData and ExecuteQuery.
+        // Only check AddData and ExecuteTransform.
         // SetWatermark is also considered a data stream event but does not carry the
         // offsets.
         if let Some(e) = match new_block.event {
-            MetadataEvent::AddData(_) | MetadataEvent::ExecuteQuery(_) => {
+            MetadataEvent::AddData(_) | MetadataEvent::ExecuteTransform(_) => {
                 Some(new_block.event.as_data_stream_event().unwrap())
             }
             _ => None,
