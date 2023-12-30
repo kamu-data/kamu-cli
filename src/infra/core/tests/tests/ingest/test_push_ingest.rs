@@ -354,6 +354,105 @@ async fn test_ingest_push_media_type_override() {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_group::group(engine, ingest, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_ingest_push_schema_stability() {
+    let harness = IngestTestHarness::new();
+
+    let dataset_snapshot = MetadataFactory::dataset_snapshot()
+        .name("foo.bar")
+        .kind(DatasetKind::Root)
+        .push_event(
+            MetadataFactory::add_push_source()
+                .read(ReadStepCsv {
+                    header: Some(true),
+                    schema: Some(
+                        ["event_time TIMESTAMP", "city STRING", "population BIGINT"]
+                            .iter()
+                            .map(|s| s.to_string())
+                            .collect(),
+                    ),
+                    ..ReadStepCsv::default()
+                })
+                .merge(MergeStrategyAppend {})
+                .build(),
+        )
+        .build();
+
+    let dataset_alias = dataset_snapshot.name.clone();
+    let dataset_ref = dataset_alias.as_local_ref();
+
+    harness.create_dataset(dataset_snapshot).await;
+    let data_helper = harness.dataset_data_helper(&dataset_alias).await;
+
+    // Round 1: Push from URL
+    let src_path = harness.temp_dir.path().join("data.csv");
+    std::fs::write(
+        &src_path,
+        indoc!(
+            "
+            event_time,city,population
+            2020-01-01,A,1000
+            2020-01-01,B,2000
+            2020-01-01,C,3000
+            "
+        ),
+    )
+    .unwrap();
+
+    harness
+        .push_ingest_svc
+        .ingest_from_url(
+            &dataset_ref,
+            None,
+            url::Url::from_file_path(&src_path).unwrap(),
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+
+    // This schema is written automatically by the writer
+    let schema_current = data_helper
+        .get_last_set_data_schema_block()
+        .await
+        .event
+        .schema_as_arrow()
+        .unwrap();
+
+    // This schema is captured earlier with:
+    // - kamu-cli = 0.150.0
+    // - datafusion = 33
+    let schema_prev = SetDataSchema {
+        schema: hex::decode(
+            "0c000000080008000000040008000000040000000500000014010000bc0000006c0000003\
+            c0000000400000010ffffff1000000018000000000001021400000000ffffff40000000000\
+            00001000000000a000000706f70756c6174696f6e000044ffffff180000000c00000000000\
+            1051000000000000000040004000400000004000000636974790000000070ffffff1400000\
+            00c0000000000010a1c00000000000000b4ffffff080000000000010003000000555443000\
+            a0000006576656e745f74696d65000010001400100000000f00040000000800100000001c0\
+            000000c0000000000000a240000000000000008000c000a000400080000000800000000000\
+            10003000000555443000b00000073797374656d5f74696d65001000140010000e000f00040\
+            000000800100000001800000020000000000001021c00000008000c0004000b00080000004\
+            00000000000000100000000060000006f66667365740000").unwrap(),
+    }.schema_as_arrow().unwrap();
+
+    // This comparison should replicate schema equivalence test performed
+    // by the writer
+    kamu_ingest_datafusion::DataWriterDataFusion::validate_output_schema_equivalence(
+        &schema_current,
+        &schema_prev,
+    )
+    .expect(
+        "Schema drift detected! Schema produced by the current kamu/datafusion version is not \
+         equivalent to the schema produced previously. This will result in writer errors on \
+         existing datasets. You'll need to investigate how exactly the schema representation \
+         changed and whether equivalence test needs to be relaxed.",
+    );
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
 struct IngestTestHarness {
     temp_dir: TempDir,
     dataset_repo: Arc<dyn DatasetRepository>,
