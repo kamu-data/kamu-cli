@@ -439,12 +439,6 @@ pub fn get_command(
                     let workspace_svc = cli_catalog.get_one::<WorkspaceService>()?;
 
                     let current_account_subject = cli_catalog.get_one::<CurrentAccountSubject>()?;
-                    let current_account_name = match current_account_subject.as_ref() {
-                        CurrentAccountSubject::Logged(l) => l.account_name.clone(),
-                        CurrentAccountSubject::Anonymous(_) => {
-                            panic!("Cannot launch API server with anonymous account")
-                        }
-                    };
 
                     Box::new(APIServerRunCommand::new(
                         base_catalog.clone(),
@@ -453,7 +447,7 @@ pub fn get_command(
                         server_matches.get_one("address").map(|a| *a),
                         server_matches.get_one("http-port").map(|p| *p),
                         server_matches.get_flag("get-token"),
-                        current_account_name,
+                        current_account_subject,
                     ))
                 }
                 Some(("gql-query", query_matches)) => Box::new(APIServerGqlQueryCommand::new(

@@ -12,15 +12,17 @@ use std::sync::Arc;
 
 use console::style as s;
 use dill::Catalog;
+use kamu::domain::auth::AuthenticationService;
+use kamu::domain::CurrentAccountSubject;
 use kamu::{set_random_jwt_secret, ENV_VAR_KAMU_JWT_SECRET};
 use kamu_adapter_oauth::{
     ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_ID,
     ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_SECRET,
 };
-use opendatafabric::AccountName;
 
 use super::{CLIError, Command};
-use crate::{check_env_var_set, OutputConfig};
+use crate::{accounts, check_env_var_set, OutputConfig};
+use internal_error::ResultIntoInternal;
 
 pub struct APIServerRunCommand {
     catalog: Catalog,
@@ -29,7 +31,7 @@ pub struct APIServerRunCommand {
     address: Option<IpAddr>,
     port: Option<u16>,
     get_token: bool,
-    account_name: AccountName,
+    account_subject: Arc<CurrentAccountSubject>,
 }
 
 impl APIServerRunCommand {
@@ -40,7 +42,7 @@ impl APIServerRunCommand {
         address: Option<IpAddr>,
         port: Option<u16>,
         get_token: bool,
-        account_name: AccountName,
+        account_subject: Arc<CurrentAccountSubject>,
     ) -> Self {
         Self {
             catalog,
@@ -49,7 +51,7 @@ impl APIServerRunCommand {
             address,
             port,
             get_token,
-            account_name,
+            account_subject,
         }
     }
 
@@ -73,6 +75,28 @@ impl Command for APIServerRunCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
         // Check required env variables are present before starting API server
         self.check_required_env_vars()?;
+        let current_account_name = match self.account_subject.as_ref() {
+            CurrentAccountSubject::Logged(l) => l.account_name.clone(),
+            CurrentAccountSubject::Anonymous(_) => {
+                unreachable!("Cannot launch API server with anonymous account")
+            }
+        };
+        let login_credentials = accounts::PasswordLoginCredentials {
+            login: current_account_name.to_string(),
+            // Note: note a mistake, use identical login and password, equal to account name
+            password: current_account_name.to_string(),
+        };
+
+        let auth_svc = self.catalog.get_one::<dyn AuthenticationService>().unwrap();
+        let access_token = auth_svc
+            .login(
+                &accounts::LOGIN_METHOD_PASSWORD.to_string(),
+                serde_json::to_string::<accounts::PasswordLoginCredentials>(&login_credentials)
+                    .int_err()?,
+            )
+            .await
+            .int_err()?
+            .access_token;
 
         // TODO: Cloning catalog is too expensive currently
         let api_server = crate::explore::APIServer::new(
@@ -80,9 +104,7 @@ impl Command for APIServerRunCommand {
             self.multi_tenant_workspace,
             self.address,
             self.port,
-            self.account_name.clone(),
-        )
-        .await;
+        );
 
         tracing::info!(
             "API server is listening on: http://{}",
@@ -104,7 +126,7 @@ impl Command for APIServerRunCommand {
                 eprintln!(
                     "{} {}",
                     s("JWT token:").green().bold(),
-                    s(api_server.get_access_token()).dim()
+                    s(access_token).dim()
                 );
             }
         }
