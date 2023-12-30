@@ -93,6 +93,17 @@ impl DatasetDataHelper {
             .unwrap()
     }
 
+    pub async fn get_last_set_data_schema_block(&self) -> MetadataBlockTyped<SetDataSchema> {
+        self.dataset
+            .as_metadata_chain()
+            .iter_blocks()
+            .filter_map_ok(|(_, b)| b.into_typed::<SetDataSchema>())
+            .try_first()
+            .await
+            .unwrap()
+            .unwrap()
+    }
+
     pub async fn assert_last_data_schema_eq(&self, expected: &str) {
         let df = self.get_last_data().await;
         kamu_data_utils::testing::assert_schema_eq(df.schema(), expected);

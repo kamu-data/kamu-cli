@@ -310,19 +310,16 @@ impl DataWriterDataFusion {
         Ok(df)
     }
 
-    fn validate_output_schema(
-        &self,
+    pub fn validate_output_schema_equivalence(
+        prev_schema: &SchemaRef,
         new_schema: &SchemaRef,
     ) -> Result<(), IncompatibleSchemaError> {
-        if let Some(prev_schema) = self.meta.schema.as_ref() {
-            if *prev_schema.as_ref() != *new_schema.as_ref() {
-                return Err(IncompatibleSchemaError::new(
-                    "Schema of the new slice differs from the schema defined by SetDataSchema \
-                     event",
-                    prev_schema.clone(),
-                    new_schema.clone(),
-                ));
-            }
+        if *prev_schema.as_ref() != *new_schema.as_ref() {
+            return Err(IncompatibleSchemaError::new(
+                "Schema of the new slice differs from the schema defined by SetDataSchema event",
+                prev_schema.clone(),
+                new_schema.clone(),
+            ));
         }
         Ok(())
     }
@@ -524,7 +521,7 @@ impl DataWriter for DataWriterDataFusion {
         let staged = StageDataResult {
             system_time: opts.system_time,
             add_data,
-            output_schema: None,
+            new_schema: None,
             data_file: None,
         };
 
@@ -538,7 +535,7 @@ impl DataWriter for DataWriterDataFusion {
         new_data: Option<DataFrame>,
         opts: WriteDataOpts,
     ) -> Result<StageDataResult, StageDataError> {
-        let (add_data, output_schema, data_file) = if let Some(new_data) = new_data {
+        let (add_data, new_schema, data_file) = if let Some(new_data) = new_data {
             self.validate_input(&new_data)?;
 
             // Normalize timestamps
@@ -569,8 +566,10 @@ impl DataWriter for DataWriterDataFusion {
             tracing::info!(schema = ?df.schema(), "Final output schema");
 
             // Validate schema matches the declared one
-            let output_schema = SchemaRef::new(df.schema().into());
-            self.validate_output_schema(&output_schema)?;
+            let new_schema = SchemaRef::new(df.schema().into());
+            if let Some(prev_schema) = &self.meta.schema {
+                Self::validate_output_schema_equivalence(prev_schema, &new_schema)?;
+            }
 
             // Write output
             let data_file = self.write_output(opts.data_staging_path, df).await?;
@@ -591,7 +590,7 @@ impl DataWriter for DataWriterDataFusion {
                         new_watermark: opts.new_watermark.or(prev_watermark),
                         new_source_state,
                     },
-                    Some(output_schema),
+                    Some(new_schema),
                     None,
                 )
             } else {
@@ -610,7 +609,7 @@ impl DataWriter for DataWriterDataFusion {
                         new_watermark: opts.new_watermark.or(new_watermark_from_data),
                         new_source_state,
                     },
-                    Some(output_schema),
+                    Some(new_schema),
                     data_file,
                 )
             }
@@ -637,7 +636,7 @@ impl DataWriter for DataWriterDataFusion {
             Ok(StageDataResult {
                 system_time: opts.system_time,
                 add_data,
-                output_schema,
+                new_schema,
                 data_file,
             })
         }
@@ -649,12 +648,12 @@ impl DataWriter for DataWriterDataFusion {
 
         // Commit schema if it was not previously defined
         if self.meta.schema.is_none() {
-            if let Some(output_schema) = staged.output_schema {
+            if let Some(new_schema) = staged.new_schema {
                 // TODO: Make commit of schema and data atomic
                 let commit_schema_result = self
                     .dataset
                     .commit_event(
-                        odf::SetDataSchema::new(&output_schema).into(),
+                        odf::SetDataSchema::new(&new_schema).into(),
                         CommitOpts {
                             block_ref: &self.block_ref,
                             system_time: Some(staged.system_time),
@@ -666,7 +665,7 @@ impl DataWriter for DataWriterDataFusion {
 
                 // Update state
                 self.meta.head = commit_schema_result.new_head;
-                self.meta.schema = Some(output_schema);
+                self.meta.schema = Some(new_schema);
             }
         }
 

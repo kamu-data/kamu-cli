@@ -96,7 +96,7 @@ pub struct WriteDataResult {
 pub struct StageDataResult {
     pub system_time: DateTime<Utc>,
     pub add_data: AddDataParams,
-    pub output_schema: Option<SchemaRef>,
+    pub new_schema: Option<SchemaRef>,
     pub data_file: Option<OwnedFile>,
 }
 
