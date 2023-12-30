@@ -12,6 +12,7 @@ use std::sync::Arc;
 
 use console::style as s;
 use dill::Catalog;
+use internal_error::ResultIntoInternal;
 use kamu::domain::auth::AuthenticationService;
 use kamu::domain::CurrentAccountSubject;
 use kamu::{set_random_jwt_secret, ENV_VAR_KAMU_JWT_SECRET};
@@ -22,7 +23,6 @@ use kamu_adapter_oauth::{
 
 use super::{CLIError, Command};
 use crate::{accounts, check_env_var_set, OutputConfig};
-use internal_error::ResultIntoInternal;
 
 pub struct APIServerRunCommand {
     catalog: Catalog,
