@@ -438,8 +438,6 @@ pub fn get_command(
                 None => {
                     let workspace_svc = cli_catalog.get_one::<WorkspaceService>()?;
 
-                    let current_account_subject = cli_catalog.get_one::<CurrentAccountSubject>()?;
-
                     Box::new(APIServerRunCommand::new(
                         base_catalog.clone(),
                         workspace_svc.is_multi_tenant_workspace(),
@@ -447,7 +445,7 @@ pub fn get_command(
                         server_matches.get_one("address").map(|a| *a),
                         server_matches.get_one("http-port").map(|p| *p),
                         server_matches.get_flag("get-token"),
-                        current_account_subject,
+                        cli_catalog.get_one()?,
                     ))
                 }
                 Some(("gql-query", query_matches)) => Box::new(APIServerGqlQueryCommand::new(

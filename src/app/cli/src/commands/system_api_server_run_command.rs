@@ -68,13 +68,8 @@ impl APIServerRunCommand {
 
         Ok(())
     }
-}
 
-#[async_trait::async_trait(?Send)]
-impl Command for APIServerRunCommand {
-    async fn run(&mut self) -> Result<(), CLIError> {
-        // Check required env variables are present before starting API server
-        self.check_required_env_vars()?;
+    async fn get_access_token(&self) -> Result<String, CLIError> {
         let current_account_name = match self.account_subject.as_ref() {
             CurrentAccountSubject::Logged(l) => l.account_name.clone(),
             CurrentAccountSubject::Anonymous(_) => {
@@ -97,6 +92,17 @@ impl Command for APIServerRunCommand {
             .await
             .int_err()?
             .access_token;
+
+        Ok(access_token)
+    }
+}
+
+#[async_trait::async_trait(?Send)]
+impl Command for APIServerRunCommand {
+    async fn run(&mut self) -> Result<(), CLIError> {
+        // Check required env variables are present before starting API server
+        self.check_required_env_vars()?;
+        let access_token = self.get_access_token().await?;
 
         // TODO: Cloning catalog is too expensive currently
         let api_server = crate::explore::APIServer::new(
