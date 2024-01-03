@@ -12,7 +12,8 @@ body:
           required: true
   - type: textarea
     attributes:
-      label: Version
+      label: kamu version
+      description: Please copy and paste `kamu version` output.
       placeholder: |
         $ kamu version
         appVersion: 0.150.0
@@ -52,11 +53,12 @@ body:
       required: true
   - type: textarea
     attributes:
-      label: Relevant log output
-      description: Please copy and paste any relevant log output. This will be automatically formatted into code, so no need for backticks.
-      render: sh
+      label: Logs
+      description: |
+        Please attach `.kamu/run/kamu.log` right after the execution of faulty command.
+        Another option: please copy and paste all relevant log data.
     validations:
-      required: true
+      required: false
   - type: textarea
     attributes:
       label: Anything else?

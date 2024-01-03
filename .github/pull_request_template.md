@@ -8,5 +8,5 @@ Closes: <#issue>
 - [ ] [CHANGELOG.md](./CHANGELOG.md) updated
 - [ ] API changes are backwards-compatible
 - [ ] Workspace layout changes include a migration
-- [ ] Documentation updated
+- [ ] Documentation update PR: <link or N/A>
 - [ ] Dataset pipelines update scheduled if needed
