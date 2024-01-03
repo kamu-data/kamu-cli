@@ -214,7 +214,7 @@ impl FlowServiceInMemory {
             None => {
                 let mut flow = self.make_new_flow(flow_key.clone(), trigger).await?;
 
-                let next_activation_time = schedule.next_activation_time(start_time);
+                let next_activation_time = schedule.next_activation_time(start_time).int_err()?;
                 self.enqueue_flow(flow.flow_id, next_activation_time)?;
 
                 flow.activate_at_time(self.time_source.now(), next_activation_time)

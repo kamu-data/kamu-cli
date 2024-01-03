@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 mod test_flow_configuration_service_inmem;
+mod test_schedule;
 
 // TODO: Windows scheduling is still unstable, need to debug it later
 #[cfg(not(windows))]
