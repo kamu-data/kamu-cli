@@ -11,20 +11,9 @@
 
 use chrono::Utc;
 use event_bus::EventBus;
-use internal_error::ResultIntoInternal;
+use internal_error::*;
 use kamu_core::events::DatasetEventDependenciesUpdated;
-use kamu_core::{
-    AppendOpts,
-    BlockRef,
-    CreateDatasetFromSnapshotError,
-    CreateDatasetResult,
-    DatasetRepository,
-    DatasetRepositoryExt,
-    GetDatasetError,
-    InvalidSnapshotError,
-    MissingInputsError,
-    SetRefOpts,
-};
+use kamu_core::*;
 use opendatafabric::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -157,7 +146,7 @@ pub async fn create_dataset_from_snapshot_impl(
             }
         }
 
-        head = chain
+        head = match chain
             .append(
                 MetadataBlock {
                     system_time,
@@ -171,7 +160,16 @@ pub async fn create_dataset_from_snapshot_impl(
                 },
             )
             .await
-            .int_err()?;
+        {
+            Ok(head) => Ok(head),
+            Err(e) => {
+                // Attempt to clean up dataset
+                let _ = dataset_repo
+                    .delete_dataset(&create_result.dataset_handle.as_local_ref())
+                    .await;
+                Err(e)
+            }
+        }?;
 
         sequence_number += 1;
     }

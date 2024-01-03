@@ -2,16 +2,16 @@ kind: DatasetSnapshot
 version: 1
 content:
   name: quebec.case-details.hm
-  kind: derivative
+  kind: Derivative
   # List of metadata events that get dataset into its initial state
   metadata:
-    - kind: setTransform
+    - kind: SetTransform
       # References the datasets that will be used as sources of data.
       inputs:
-        - name: quebec.case-details
+        - datasetRef: quebec.case-details
       # Transformation that will be applied to produce new data
       transform:
-        kind: sql
+        kind: Sql
         engine: datafusion
         query: |
           SELECT
@@ -31,9 +31,9 @@ content:
                  else 'UNKNOWN' end as age_group,
             health_region as location
             FROM "quebec.case-details"
-    - kind: setVocab
+    - kind: SetVocab
       eventTimeColumn: reported_date
-    - kind: setInfo
+    - kind: SetInfo
       description: Confirmed positive cases of COVID-19 in Quebec (harmonized).
       keywords:
         - Healthcare
@@ -45,9 +45,9 @@ content:
         - Quebec
         - Canada
         - Harmonized
-    - kind: setAttachments
+    - kind: SetAttachments
       attachments:
-        kind: embedded
+        kind: Embedded
         items:
           - path: README.md
             content: |
@@ -56,7 +56,7 @@ content:
               See [original dataset](#todo).
 
               See [harmonization schema and semantics](#todo).
-    - kind: setLicense
+    - kind: SetLicense
       shortName: OGL-Canada-2.0
       spdxId: OGL-Canada-2.0
       name: Open Government Licence - Canada

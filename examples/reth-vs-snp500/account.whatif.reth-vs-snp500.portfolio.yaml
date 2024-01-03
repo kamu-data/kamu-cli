@@ -3,14 +3,14 @@ kind: DatasetSnapshot
 version: 1
 content:
   name: account.whatif.reth-vs-snp500.portfolio
-  kind: derivative
+  kind: Derivative
   metadata:
-    - kind: setTransform
+    - kind: SetTransform
       inputs:
-        - name: account.tokens.portfolio.usd
-        - name: co.alphavantage.tickers.daily.spy
+        - datasetRef: account.tokens.portfolio.usd
+        - datasetRef: co.alphavantage.tickers.daily.spy
       transform:
-        kind: sql
+        kind: Sql
         engine: flink
         temporalTables:
           - name: co.alphavantage.tickers.daily.spy
@@ -38,11 +38,10 @@ content:
               from `account.tokens.portfolio.usd` as tr
               join `co.alphavantage.tickers.daily.spy` for system_time as of tr.block_time as spy2usd
               on spy2usd.to_symbol = tr.account_anchor_symbol and spy2usd.from_symbol = 'spy' and tr.token_symbol = 'rETH'
-          - alias: account.whatif.reth-vs-snp500.portfolio
-            query: |
+          - query: |
               select 
                 *,
                 sum(alt_spy_amount) over (partition by token_symbol order by block_time) as alt_spy_balance
               from spy_transactions
-    - kind: setVocab
+    - kind: SetVocab
       eventTimeColumn: block_time

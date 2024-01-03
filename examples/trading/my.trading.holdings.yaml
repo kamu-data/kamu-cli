@@ -2,13 +2,13 @@ kind: DatasetSnapshot
 version: 1
 content:
   name: my.trading.holdings
-  kind: derivative
+  kind: Derivative
   metadata:
-    - kind: setTransform
+    - kind: SetTransform
       inputs:
-        - name: my.trading.transactions
+        - datasetRef: my.trading.transactions
       transform:
-        kind: sql
+        kind: Sql
         engine: flink
         query: |
           SELECT

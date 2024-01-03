@@ -3,11 +3,11 @@ kind: DatasetSnapshot
 version: 1
 content:
   name: account.tokens.transfers
-  kind: root
+  kind: Root
   metadata:
-    - kind: setPollingSource
+    - kind: SetPollingSource
       fetch:
-        kind: url
+        kind: Url
         url: "https://api.etherscan.io/api\
           ?module=account\
           &action=tokentx\
@@ -18,10 +18,10 @@ content:
           &endblock=99999999\
           &apikey=${{ env.ETHERSCAN_API_KEY }}"
       read:
-        kind: json
+        kind: Json
         subPath: result
       preprocess:
-        kind: sql
+        kind: Sql
         engine: datafusion
         query: |
           SELECT
@@ -45,8 +45,8 @@ content:
             "confirmations"
           FROM input
       merge:
-        kind: ledger
+        kind: Ledger
         primaryKey:
           - transaction_hash
-    - kind: setVocab
+    - kind: SetVocab
       eventTimeColumn: block_time

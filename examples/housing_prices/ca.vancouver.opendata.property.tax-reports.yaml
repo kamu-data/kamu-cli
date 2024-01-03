@@ -2,14 +2,14 @@ kind: DatasetSnapshot
 version: 1
 content:
   name: ca.vancouver.opendata.property.tax-reports
-  kind: root
+  kind: Root
   metadata:
-    - kind: setPollingSource
+    - kind: SetPollingSource
       fetch:
-        kind: url
+        kind: Url
         url: https://opendata.vancouver.ca/explore/dataset/property-tax-report/download/?format=csv&timezone=America/Los_Angeles&lang=en&use_labels_for_header=true&csv_separator=%3B
       read:
-        kind: csv
+        kind: Csv
         separator: ";"
         header: true
         nullValue: ""
@@ -44,7 +44,7 @@ content:
           - NEIGHBOURHOOD_CODE STRING
           - REPORT_YEAR STRING
       preprocess:
-        kind: sql
+        kind: Sql
         engine: datafusion
         query: |
           select
@@ -79,8 +79,8 @@ content:
             cast(concat(report_year, '-01-01') as date) as report_year
           from input
       merge:
-        kind: ledger
+        kind: Ledger
         primaryKey:
           - pid
-    - kind: setVocab
+    - kind: SetVocab
       eventTimeColumn: report_year

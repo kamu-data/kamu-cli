@@ -2,11 +2,11 @@ kind: DatasetSnapshot
 version: 1
 content:
   name: ontario.case-details
-  kind: root
+  kind: Root
   metadata:
-    - kind: setPollingSource
+    - kind: SetPollingSource
       fetch:
-        kind: url
+        kind: Url
         # Around September, 2023 Government of Ontario have started blocking requests for data
         # from non-browser tools (e.g. curl, wget, kamu). Another testament to how fragile the world's
         # open data infrastructure is. To keep the demo operational we have switched the source to use
@@ -16,15 +16,15 @@ content:
         # Official page: https://data.ontario.ca/dataset/confirmed-positive-cases-of-covid-19-in-ontario
         url: https://s3.us-west-2.amazonaws.com/datasets.kamu.dev/demo/covid/covid-19-ontario-2023-11-28.csv.gz
       prepare:
-        - kind: decompress
-          format: gzip
+        - kind: Decompress
+          format: Gzip
       read:
-        kind: csv
+        kind: Csv
         separator: ","
         header: true
         nullValue: ""
       preprocess:
-        kind: sql
+        kind: Sql
         engine: datafusion
         query: |
           SELECT
@@ -42,8 +42,8 @@ content:
             "Reporting_PHU_Longitude" as longitude
           FROM input
       merge:
-        kind: ledger
+        kind: Ledger
         primaryKey:
           - id
-    - kind: setVocab
+    - kind: SetVocab
       eventTimeColumn: case_reported_date

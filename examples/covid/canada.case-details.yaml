@@ -2,19 +2,19 @@ kind: DatasetSnapshot
 version: 1
 content:
   name: canada.case-details
-  kind: derivative
+  kind: Derivative
   # List of metadata events that get dataset into its initial state
   metadata:
-    - kind: setTransform
+    - kind: SetTransform
       # References the datasets that will be used as sources of data.
       inputs:
-        - name: alberta.case-details.hm
-        - name: british-columbia.case-details.hm
-        - name: ontario.case-details.hm
-        - name: quebec.case-details.hm
+        - datasetRef: alberta.case-details.hm
+        - datasetRef: british-columbia.case-details.hm
+        - datasetRef: ontario.case-details.hm
+        - datasetRef: quebec.case-details.hm
       # Transformation that will be applied to produce new data
       transform:
-        kind: sql
+        kind: Sql
         engine: spark
         query: |
           SELECT
@@ -48,9 +48,9 @@ content:
             gender,
             location
             FROM `quebec.case-details.hm`
-    - kind: setVocab
+    - kind: SetVocab
       eventTimeColumn: reported_date
-    - kind: setInfo
+    - kind: SetInfo
       description: Pan-Canadian COVID-19 case data combined from variety of official provincial and municipal data sources.
       keywords:
         - Collection
@@ -61,9 +61,9 @@ content:
         - Disaggregated
         - Anonymized
         - Canada
-    - kind: setAttachments
+    - kind: SetAttachments
       attachments:
-        kind: embedded
+        kind: Embedded
         items:
           - path: README.md
             content: |
@@ -173,7 +173,7 @@ content:
               ## Contact us
 
               You can learn more about the COVID-19 Canada Open Data Working Group at [our website](https://opencovid.ca/) and reach out to us via our [contact page](https://opencovid.ca/contact-us/).
-    - kind: setLicense
+    - kind: SetLicense
       shortName: OGL-Canada-2.0
       spdxId: OGL-Canada-2.0
       name: Open Government Licence - Canada

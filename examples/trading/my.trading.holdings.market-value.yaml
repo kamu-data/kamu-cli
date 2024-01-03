@@ -2,14 +2,14 @@ kind: DatasetSnapshot
 version: 1
 content:
   name: my.trading.holdings.market-value
-  kind: derivative
+  kind: Derivative
   metadata:
-    - kind: setTransform
+    - kind: SetTransform
       inputs:
-        - name: com.yahoo.finance.tickers.daily
-        - name: my.trading.holdings
+        - datasetRef: com.yahoo.finance.tickers.daily
+        - datasetRef: my.trading.holdings
       transform:
-        kind: sql
+        kind: Sql
         engine: flink
         temporalTables:
           - name: my.trading.holdings

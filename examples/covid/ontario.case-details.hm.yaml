@@ -2,16 +2,16 @@ kind: DatasetSnapshot
 version: 1
 content:
   name: ontario.case-details.hm
-  kind: derivative
+  kind: Derivative
   # List of metadata events that get dataset into its initial state
   metadata:
-    - kind: setTransform
+    - kind: SetTransform
       # References the datasets that will be used as sources of data.
       inputs:
-        - name: ontario.case-details
+        - datasetRef: ontario.case-details
       # Transformation that will be applied to produce new data
       transform:
-        kind: sql
+        kind: Sql
         engine: datafusion
         query: |
           SELECT
@@ -23,9 +23,9 @@ content:
             age_group,
             city as location
             FROM "ontario.case-details"
-    - kind: setVocab
+    - kind: SetVocab
       eventTimeColumn: reported_date
-    - kind: setInfo
+    - kind: SetInfo
       description: Confirmed positive cases of COVID-19 in Ontario (harmonized).
       keywords:
         - Healthcare
@@ -37,9 +37,9 @@ content:
         - Ontario
         - Canada
         - Harmonized
-    - kind: setAttachments
+    - kind: SetAttachments
       attachments:
-        kind: embedded
+        kind: Embedded
         items:
           - path: README.md
             content: |
@@ -48,7 +48,7 @@ content:
               See [original dataset](#todo).
 
               See [harmonization schema and semantics](#todo).
-    - kind: setLicense
+    - kind: SetLicense
       shortName: OGL-Ontario
       name: Open Government Licence - Ontario
       websiteUrl: https://www.ontario.ca/page/open-government-licence-ontario

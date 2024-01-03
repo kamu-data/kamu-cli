@@ -2,14 +2,14 @@ kind: DatasetSnapshot
 version: 1
 content:
   name: alberta.case-details
-  kind: root
+  kind: Root
   metadata:
     # Specifies the source of data that can be periodically polled to refresh the dataset
     # See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setpollingsource-schema
-    - kind: setPollingSource
+    - kind: SetPollingSource
       # Where to fetch the data from.
       fetch:
-        kind: url
+        kind: Url
         # Note: On July 15, 2023 Government of Alberta have stopped providing
         # disaggregated data on COVID-19 cases. Another testament to how short-lived are the 
         # data pipelines that rely on constant human effort to keep running.
@@ -19,7 +19,7 @@ content:
         url: https://s3.us-west-2.amazonaws.com/datasets.kamu.dev/demo/covid/covid-19-alberta-statistics-data.csv
       # How to interpret the data.
       read:
-        kind: csv
+        kind: Csv
         header: true
         schema:
           - id BIGINT
@@ -31,13 +31,13 @@ content:
           - case_type STRING
       # How to combine newly-ingested data with data that is already in the dataset
       merge:
-        kind: ledger
+        kind: Ledger
         primaryKey:
           - id
     # Tells kamu to use `date_reported` column as event time intead of the default `event_tume`
-    - kind: setVocab
+    - kind: SetVocab
       eventTimeColumn: date_reported
-    - kind: setInfo
+    - kind: SetInfo
       description: Confirmed positive cases of COVID-19 in Alberta.
       keywords:
         - Healthcare
@@ -48,9 +48,9 @@ content:
         - Anonymized
         - Alberta
         - Canada
-    - kind: setAttachments
+    - kind: SetAttachments
       attachments:
-        kind: embedded
+        kind: Embedded
         items:
           - path: README.md
             content: |
@@ -71,7 +71,7 @@ content:
 
               **Related dataset(s)**:
               - [Daily aggregate count of confirmed positive cases of COVID-19 in Alberta](#todo)
-    - kind: setLicense
+    - kind: SetLicense
       shortName: OGL-Canada-2.0
       spdxId: OGL-Canada-2.0
       name: Open Government Licence - Canada

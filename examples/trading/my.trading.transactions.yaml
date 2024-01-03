@@ -2,14 +2,14 @@ version: 1
 kind: DatasetSnapshot
 content:
   name: my.trading.transactions
-  kind: root
+  kind: Root
   metadata:
-    - kind: setPollingSource
+    - kind: SetPollingSource
       fetch:
-        kind: filesGlob
+        kind: FilesGlob
         path: data/transactions.csv
       read:
-        kind: csv
+        kind: Csv
         header: true
         schema:
           - event_time TIMESTAMP
@@ -18,6 +18,6 @@ content:
           - price DOUBLE
           - settlement DOUBLE
       merge:
-        kind: ledger
+        kind: Ledger
         primaryKey:
           - event_time

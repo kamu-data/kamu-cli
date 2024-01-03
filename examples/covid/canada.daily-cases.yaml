@@ -2,13 +2,13 @@ kind: DatasetSnapshot
 version: 1
 content:
   name: canada.daily-cases
-  kind: derivative
+  kind: Derivative
   metadata:
-    - kind: setTransform
+    - kind: SetTransform
       inputs:
-        - name: canada.case-details
+        - datasetRef: canada.case-details
       transform:
-        kind: sql
+        kind: Sql
         engine: flink
         query: |
           SELECT
@@ -17,9 +17,9 @@ content:
             COUNT(*) as `total_daily`
           FROM `canada.case-details`
           GROUP BY TUMBLE(`reported_date`, INTERVAL '1' DAY), `province`
-    - kind: setVocab
+    - kind: SetVocab
       eventTimeColumn: reported_date
-    - kind: setInfo
+    - kind: SetInfo
       description: Pan-Canadian COVID-19 daily case counts on per Health Region level of aggregation.
       keywords:
         - Healthcare
@@ -28,9 +28,9 @@ content:
         - SARS-CoV-2
         - Aggregated
         - Canada
-    - kind: setAttachments
+    - kind: SetAttachments
       attachments:
-        kind: embedded
+        kind: Embedded
         items:
           - path: README.md
             content: |
@@ -39,7 +39,7 @@ content:
               This dataset compiles the aggregate number of daily cases of COVID-19 registered in Canada.
 
               The dataset is based on [canada.case-details](#) dataset, refer to it for the explanation of the data and licensing terms.
-    - kind: setLicense
+    - kind: SetLicense
       shortName: OGL-Ontario
       name: Open Government Licence - Ontario
       websiteUrl: https://www.ontario.ca/page/open-government-licence-ontario
