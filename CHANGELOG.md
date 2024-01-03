@@ -4,7 +4,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+
 ## [0.150.1] - 2023-12-29
+### Added
+- New flag `--get-token` for `kamu system api-server` cli command which additionaly prints
+  JWT token in console
 ### Fixed
 - Fixed async file flushing issues that could result in a race condition when using containerized ingest
 - `kamu pull`: fixed containerized iterative ingestion

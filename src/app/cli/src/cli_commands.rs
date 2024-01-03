@@ -437,12 +437,15 @@ pub fn get_command(
             Some(("api-server", server_matches)) => match server_matches.subcommand() {
                 None => {
                     let workspace_svc = cli_catalog.get_one::<WorkspaceService>()?;
+
                     Box::new(APIServerRunCommand::new(
                         base_catalog.clone(),
                         workspace_svc.is_multi_tenant_workspace(),
                         cli_catalog.get_one()?,
                         server_matches.get_one("address").map(|a| *a),
                         server_matches.get_one("http-port").map(|p| *p),
+                        server_matches.get_flag("get-token"),
+                        cli_catalog.get_one()?,
                     ))
                 }
                 Some(("gql-query", query_matches)) => Box::new(APIServerGqlQueryCommand::new(
