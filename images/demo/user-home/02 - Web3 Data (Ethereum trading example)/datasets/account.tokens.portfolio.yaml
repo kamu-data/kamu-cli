@@ -3,14 +3,14 @@ kind: DatasetSnapshot
 version: 1
 content:
   name: account.tokens.portfolio
-  kind: derivative
+  kind: Derivative
   metadata:
-    - kind: setTransform
+    - kind: SetTransform
       inputs:
-        - name: account.tokens.transfers
-        - name: account.transactions
+        - datasetRef: account.tokens.transfers
+        - datasetRef: account.transactions
       transform:
-        kind: sql
+        kind: Sql
         engine: flink
         queries:
           - alias: token_transfers
@@ -58,12 +58,11 @@ content:
               on 
                 tr.transaction_hash = tx.transaction_hash
                 and tr.block_time = tx.block_time
-          - alias: account.tokens.portfolio
-            query: |
+          - query: |
               select
                 *,
                 sum(token_amount) over (partition by token_symbol order by block_time) as token_balance,
                 sum(-eth_amount) over (partition by token_symbol order by block_time) as token_book_value_eth
               from token_transactions
-    - kind: setVocab
+    - kind: SetVocab
       eventTimeColumn: block_time

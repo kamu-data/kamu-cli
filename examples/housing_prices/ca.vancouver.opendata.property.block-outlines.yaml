@@ -2,21 +2,21 @@ kind: DatasetSnapshot
 version: 1
 content:
   name: ca.vancouver.opendata.property.block-outlines
-  kind: root
+  kind: Root
   metadata:
-    - kind: setPollingSource
+    - kind: SetPollingSource
       fetch:
-        kind: url
+        kind: Url
         url: https://opendata.vancouver.ca/explore/dataset/block-outlines/download/?format=geojson&timezone=America/Los_Angeles&lang=en
       prepare:
-      - kind: pipe
+      - kind: Pipe
         # Dataset contains some malformed geometry :(
         command:
         - 'jq'
         - '-c'
         - '.features[] | select(.geometry != null) | .'
       read:
-        kind: ndGeoJson
+        kind: NdGeoJson
       merge:
         # TODO
-        kind: append
+        kind: Append

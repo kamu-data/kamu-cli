@@ -3,15 +3,15 @@ kind: DatasetSnapshot
 version: 1
 content:
   name: com.cryptocompare.ohlcv.eth-usd
-  kind: root
+  kind: Root
   metadata:
-    - kind: setPollingSource
+    - kind: SetPollingSource
       fetch:
-        kind: container
+        kind: Container
         # Image src: https://github.com/kamu-data/kamu-contrib/tree/ee8b5943f5696c0868adbd8eb1682028ad4e54c2/com.cryptocompare
         image: "ghcr.io/kamu-data/fetch-com.cryptocompare.ohlcv.eth-usd:0.1.0"
       read:
-        kind: ndJson
+        kind: NdJson
         schema:
           - time BIGINT
           - high DOUBLE
@@ -23,7 +23,7 @@ content:
           - '"conversionType" STRING'
           - '"conversionSymbol" STRING'
       preprocess:
-        kind: sql
+        kind: Sql
         engine: datafusion
         query: |
           select
@@ -40,20 +40,20 @@ content:
             "conversionSymbol" as conversion_symbol
           from input
       merge:
-        kind: ledger
+        kind: Ledger
         primaryKey:
           - event_time
           - from_symbol
           - to_symbol
-    - kind: setAttachments
+    - kind: SetAttachments
       attachments:
-        kind: embedded
+        kind: Embedded
         items:
           - path: README.md
             content: |
               # ETH to USD Prices from CryptoCompare
               This dataset pulls best available granularity data within CryptoCompare's free API tier.
-    - kind: setLicense
+    - kind: SetLicense
       shortName: Proprietary
       name: CryptoCompare - API License Agreement
       websiteUrl: https://www.cryptocompare.com/api-licence-agreement/

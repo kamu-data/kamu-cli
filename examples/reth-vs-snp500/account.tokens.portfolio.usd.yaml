@@ -3,14 +3,14 @@ kind: DatasetSnapshot
 version: 1
 content:
   name: account.tokens.portfolio.usd
-  kind: derivative
+  kind: Derivative
   metadata:
-    - kind: setTransform
+    - kind: SetTransform
       inputs:
-        - name: account.tokens.portfolio
-        - name: com.cryptocompare.ohlcv.eth-usd
+        - datasetRef: account.tokens.portfolio
+        - datasetRef: com.cryptocompare.ohlcv.eth-usd
       transform:
-        kind: sql
+        kind: Sql
         engine: flink
         temporalTables:
           - name: com.cryptocompare.ohlcv.eth-usd
@@ -39,11 +39,10 @@ content:
               from `account.tokens.portfolio` as tr
               join `com.cryptocompare.ohlcv.eth-usd` for system_time as of tr.block_time as eth2usd
               on tr.account_symbol = eth2usd.from_symbol and eth2usd.to_symbol = 'usd'
-          - alias: account.tokens.portfolio.usd
-            query: |
+          - query: |
               select
                 *,
                 sum(-eth_amount_as_usd) over (partition by token_symbol order by block_time) as token_book_value_eth_as_usd
               from with_usd_amount
-    - kind: setVocab
+    - kind: SetVocab
       eventTimeColumn: block_time

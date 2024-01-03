@@ -360,6 +360,20 @@ impl From<CreateDatasetError> for CreateDatasetFromSnapshotError {
     }
 }
 
+impl From<AppendError> for CreateDatasetFromSnapshotError {
+    fn from(v: AppendError) -> Self {
+        match v {
+            AppendError::InvalidBlock(e) => {
+                Self::InvalidSnapshot(InvalidSnapshotError::new(e.to_string()))
+            }
+            AppendError::RefCASFailed(_) | AppendError::Access(_) | AppendError::RefNotFound(_) => {
+                Self::Internal(v.int_err())
+            }
+            AppendError::Internal(e) => Self::Internal(e),
+        }
+    }
+}
+
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]

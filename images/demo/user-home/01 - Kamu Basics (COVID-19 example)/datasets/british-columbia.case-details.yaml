@@ -2,24 +2,24 @@ kind: DatasetSnapshot
 version: 1
 content:
   name: british-columbia.case-details
-  kind: root
+  kind: Root
   metadata:
     # Specifies the source of data that can be periodically polled to refresh the dataset
     # See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setpollingsource-schema
-    - kind: setPollingSource
+    - kind: SetPollingSource
       # Where to fetch the data from.
       fetch:
-        kind: url
+        kind: Url
         url: http://www.bccdc.ca/Health-Info-Site/Documents/BCCDC_COVID19_Dashboard_Case_Details.csv
       # How to interpret the data.
       read:
-        kind: csv
+        kind: Csv
         separator: ","
         header: true
         nullValue: ""
       # Pre-processing query that shapes the data (optional)
       preprocess:
-        kind: sql
+        kind: Sql
         engine: datafusion
         # Note use of row_number() below is very unfortunate and is due to the data source
         # not providing us any viable primary key to deduplicate records on
@@ -34,9 +34,9 @@ content:
           from input
       # How to combine newly-ingested data with data that is already in the dataset
       merge:
-        kind: ledger
+        kind: Ledger
         primaryKey:
           - id
     # Tells kamu to use `reported_date` column as event time intead of the default `event_tume`
-    - kind: setVocab
+    - kind: SetVocab
       eventTimeColumn: reported_date

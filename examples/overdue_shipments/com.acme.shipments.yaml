@@ -2,14 +2,14 @@ kind: DatasetSnapshot
 version: 1
 content:
   name: com.acme.shipments
-  kind: root
+  kind: Root
   metadata:
-    - kind: setPollingSource
+    - kind: SetPollingSource
       fetch:
-        kind: filesGlob
+        kind: FilesGlob
         path: data/shipments-*.csv
       read:
-        kind: csv
+        kind: Csv
         header: true
         schema:
           - event_time TIMESTAMP
@@ -17,6 +17,6 @@ content:
           - order_id BIGINT
           - quantity BIGINT
       merge:
-        kind: ledger
+        kind: Ledger
         primaryKey:
           - shipment_id

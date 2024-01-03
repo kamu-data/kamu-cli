@@ -3,15 +3,15 @@ kind: DatasetSnapshot
 version: 1
 content:
   name: account.tokens.portfolio.market-value
-  kind: derivative
+  kind: Derivative
   metadata:
-    - kind: setTransform
+    - kind: SetTransform
       inputs:
-        - name: account.tokens.portfolio.usd
-        - name: net.rocketpool.reth.mint-burn
-        - name: com.cryptocompare.ohlcv.eth-usd
+        - datasetRef: account.tokens.portfolio.usd
+        - datasetRef: net.rocketpool.reth.mint-burn
+        - datasetRef: com.cryptocompare.ohlcv.eth-usd
       transform:
-        kind: sql
+        kind: Sql
         engine: flink
         temporalTables:
           - name: account.tokens.portfolio.usd
@@ -37,8 +37,7 @@ content:
               from `net.rocketpool.reth.mint-burn` as rp
               join `account.tokens.portfolio.usd` for system_time as of rp.event_time as tr
               on rp.token_symbol = tr.token_symbol
-          - alias: account.tokens.portfolio.market-value
-            query: |
+          - query: |
               select
                 rp.event_time,
                 rp.account_symbol,
