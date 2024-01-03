@@ -2,14 +2,14 @@ kind: DatasetSnapshot
 version: 1
 content:
   name: my.trading.transactions.cad
-  kind: derivative
+  kind: Derivative
   metadata:
-    - kind: setTransform
+    - kind: SetTransform
       inputs:
-        - name: ca.bankofcanada.exchange-rates.daily
-        - name: my.trading.transactions
+        - datasetRef: ca.bankofcanada.exchange-rates.daily
+        - datasetRef: my.trading.transactions
       transform:
-        kind: sql
+        kind: Sql
         engine: flink
         temporalTables:
           - name: ca.bankofcanada.exchange-rates.daily

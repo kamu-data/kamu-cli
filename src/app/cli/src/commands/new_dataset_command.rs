@@ -52,29 +52,29 @@ impl NewDatasetCommand {
                       # A human-friendly alias of the dataset
                       name: {}
                       # Root sources are the points of entry of external data into the system
-                      kind: root
+                      kind: Root
                       # List of metadata events that get dataset into its initial state
                       # See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#metadataevent-schema
                       metadata:
                         # Specifies the source of data that can be periodically polled to refresh the dataset
                         # See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setpollingsource-schema
-                        - kind: setPollingSource
+                        - kind: SetPollingSource
                           # Where to fetch the data from.
                           # Includes source URL, a protocol to use, cache control
                           # See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#fetchstep-schema
                           fetch:
-                            kind: url
+                            kind: Url
                             url: https://example.com/city_populations_over_time.zip
                           # OPTIONAL: How to prepare the binary data
                           # Includes decompression, file filtering, format conversions
                           prepare:
-                            - kind: decompress
-                              format: zip
+                            - kind: Decompress
+                              format: Zip
                           # How to interpret the data.
                           # Includes data format, schema to apply, error handling
                           # See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstep-schema
                           read:
-                            kind: csv
+                            kind: Csv
                             header: true
                             timestampFormat: yyyy-M-d
                             schema:
@@ -85,7 +85,7 @@ impl NewDatasetCommand {
                           # Useful for converting text data read from CSVs into strict types
                           # See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#transform-schema
                           preprocess:
-                            kind: sql
+                            kind: Sql
                             # Use one of the supported engines and a query in its dialect
                             # See: https://docs.kamu.dev/cli/transform/supported-engines/
                             engine: datafusion
@@ -99,14 +99,14 @@ impl NewDatasetCommand {
                           # How to combine data ingested in the past with the new data.
                           # See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mergestrategy-schema
                           merge:
-                            kind: ledger
+                            kind: Ledger
                             primaryKey:
                               - date
                               - city
                           # Lets you manipulate names of the system columns to avoid conflicts
                           # or use names better suited for yout data.
                           # See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setvocab-schema
-                        - kind: setVocab
+                        - kind: SetVocab
                           eventTimeColumn: date
                     "#
                 ),
@@ -124,13 +124,13 @@ impl NewDatasetCommand {
                       name: {}
                       # Derivative sources produce data by transforming and combining
                       # one or multiple existing datasets.
-                      kind: derivative
+                      kind: Derivative
                       # List of metadata events that get dataset into its initial state
                       # See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#metadataevent-schema
                       metadata:
                         # Transformation that will be applied to produce new data
                         # See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#settransform-schema
-                        - kind: setTransform
+                        - kind: SetTransform
                           # References the datasets that will be used as inputs.
                           # Note: We are associating inputs by name, but could also use IDs.
                           inputs:
@@ -138,7 +138,7 @@ impl NewDatasetCommand {
                           # Transformation steps that ise one of the supported engines and query dialects
                           # See: https://docs.kamu.dev/cli/transform/supported-engines/
                           transform:
-                            kind: sql
+                            kind: Sql
                             engine: datafusion
                             query: |
                               select
@@ -149,7 +149,7 @@ impl NewDatasetCommand {
                         # Lets you manipulate names of the system columns to avoid
                         # conflicts or use names better suited for yout data.
                         # See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setvocab-schema
-                        - kind: setVocab
+                        - kind: SetVocab
                           eventTimeColumn: date
                     "#
                 ),

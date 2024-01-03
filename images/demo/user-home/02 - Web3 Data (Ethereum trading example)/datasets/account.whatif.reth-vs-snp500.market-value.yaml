@@ -3,14 +3,14 @@ kind: DatasetSnapshot
 version: 1
 content:
   name: account.whatif.reth-vs-snp500.market-value
-  kind: derivative
+  kind: Derivative
   metadata:
-    - kind: setTransform
+    - kind: SetTransform
       inputs:
-        - name: account.whatif.reth-vs-snp500.portfolio
-        - name: co.alphavantage.tickers.daily.spy
+        - datasetRef: account.whatif.reth-vs-snp500.portfolio
+        - datasetRef: co.alphavantage.tickers.daily.spy
       transform:
-        kind: sql
+        kind: Sql
         engine: flink
         temporalTables:
           - name: account.whatif.reth-vs-snp500.portfolio

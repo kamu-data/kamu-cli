@@ -3,11 +3,11 @@ kind: DatasetSnapshot
 version: 1
 content:
   name: co.alphavantage.tickers.daily.spy
-  kind: root
+  kind: Root
   metadata:
-    - kind: setPollingSource
+    - kind: SetPollingSource
       fetch:
-        kind: url
+        kind: Url
         url: "https://www.alphavantage.co/query\
           ?function=TIME_SERIES_DAILY\
           &symbol=SPY\
@@ -15,7 +15,7 @@ content:
           &datatype=csv\
           &apikey=${{ env.ALPHA_VANTAGE_API_KEY }}"
       read:
-        kind: csv
+        kind: Csv
         header: true
         schema:
           - timestamp TIMESTAMP
@@ -25,7 +25,7 @@ content:
           - close DOUBLE
           - volume DOUBLE
       preprocess:
-        kind: sql
+        kind: Sql
         engine: datafusion
         query: |
           select
@@ -39,6 +39,6 @@ content:
             volume
           from input
       merge:
-        kind: ledger
+        kind: Ledger
         primaryKey:
           - event_time

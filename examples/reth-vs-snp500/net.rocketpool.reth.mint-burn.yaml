@@ -3,11 +3,11 @@ kind: DatasetSnapshot
 version: 1
 content:
   name: net.rocketpool.reth.mint-burn
-  kind: root
+  kind: Root
   metadata:
-    - kind: setPollingSource
+    - kind: SetPollingSource
       fetch:
-        kind: container
+        kind: Container
         # Image src: https://github.com/kamu-data/kamu-contrib/tree/5009e5d75b4f1fb903e5745fa35ea67a4815fbe7/net.rocketpool
         image: "ghcr.io/kamu-data/fetch-net.rocketpool.reth.mint-burn:0.2.0"
         env:
@@ -17,26 +17,24 @@ content:
           - name: ODF_BATCH_SIZE
             value: "10000"
       read:
-        kind: ndJson
+        kind: NdJson
       preprocess:
-        kind: sql
+        kind: Sql
         engine: datafusion
         query: |
           SELECT
+            to_timestamp_seconds("eventTime") as event_time,
             'rETH' as token_symbol,
             "eventName" as event_name,
             cast("amount" as double) / pow(10.0, 18) as amount,
             cast("ethAmount" as double) / pow(10.0, 18) as eth_amount,
             "blockNumber" as block_number,
             "blockHash" as block_hash,
-            to_timestamp_seconds("eventTime") as event_time,
             "transactionIndex" as transaction_index,
             "transactionHash" as transaction_hash,
             "logIndex" as log_index
           FROM input
       merge:
-        kind: ledger
+        kind: Ledger
         primaryKey:
           - transaction_hash
-    - kind: setVocab
-      eventTimeColumn: block_time

@@ -2,14 +2,14 @@ kind: DatasetSnapshot
 version: 1
 content:
   name: com.yahoo.finance.tickers.daily
-  kind: root
+  kind: Root
   metadata:
-    - kind: setPollingSource
+    - kind: SetPollingSource
       fetch:
-        kind: filesGlob
+        kind: FilesGlob
         path: data/tickers.csv
       read:
-        kind: csv
+        kind: Csv
         header: true
         schema:
           - Date TIMESTAMP
@@ -21,7 +21,7 @@ content:
           - Open DOUBLE
           - Volume DOUBLE
       preprocess:
-        kind: sql
+        kind: Sql
         engine: datafusion
         query: |
           SELECT
@@ -35,7 +35,7 @@ content:
             Volume as volume
           FROM input
       merge:
-        kind: ledger
+        kind: Ledger
         primaryKey:
           - event_time
           - symbol

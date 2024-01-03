@@ -2,13 +2,13 @@ kind: DatasetSnapshot
 version: 1
 content:
   name: canada.daily-cases
-  kind: derivative
+  kind: Derivative
   metadata:
-    - kind: setTransform
+    - kind: SetTransform
       inputs:
-        - name: canada.case-details
+        - datasetRef: canada.case-details
       transform:
-        kind: sql
+        kind: Sql
         engine: flink
         query: |
           SELECT
@@ -17,5 +17,5 @@ content:
             COUNT(*) as `total_daily`
           FROM `canada.case-details`
           GROUP BY TUMBLE(`reported_date`, INTERVAL '1' DAY), `province`
-    - kind: setVocab
+    - kind: SetVocab
       eventTimeColumn: reported_date

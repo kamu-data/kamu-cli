@@ -2,17 +2,17 @@ kind: DatasetSnapshot
 version: 1
 content:
   name: canada.case-details
-  kind: derivative
+  kind: Derivative
   # List of metadata events that get dataset into its initial state
   metadata:
-    - kind: setTransform
+    - kind: SetTransform
       # References the datasets that will be used as sources of data.
       inputs:
-        - name: british-columbia.case-details
-        - name: ontario.case-details
+        - datasetRef: british-columbia.case-details
+        - datasetRef: ontario.case-details
       # Transformation that will be applied to produce new data
       transform:
-        kind: sql
+        kind: Sql
         engine: spark
         query: |
           SELECT
@@ -44,5 +44,5 @@ content:
             age_group,
             city as location
             FROM `ontario.case-details`
-    - kind: setVocab
+    - kind: SetVocab
       eventTimeColumn: reported_date

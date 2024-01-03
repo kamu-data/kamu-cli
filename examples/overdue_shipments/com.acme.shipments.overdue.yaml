@@ -2,14 +2,14 @@ version: 1
 kind: DatasetSnapshot
 content:
   name: com.acme.shipments.overdue
-  kind: derivative
+  kind: Derivative
   metadata:
-    - kind: setTransform
+    - kind: SetTransform
       inputs:
-        - name: com.acme.orders
-        - name: com.acme.shipments
+        - datasetRef: com.acme.orders
+        - datasetRef: com.acme.shipments
       transform:
-        kind: sql
+        kind: Sql
         engine: flink
         queries:
           # This is a Stream-to-Stream join that matches orders and shipments on order_id, 
@@ -42,10 +42,9 @@ content:
               FROM order_shipments
               GROUP BY TUMBLE(order_time, INTERVAL '1' DAY), order_id
           # Return only records for orders that were not fully fulfilled
-          - alias: com.acme.shipments.overdue
-            query: |
+          - query: |
               SELECT *
               FROM order_shipments_agg
               WHERE order_quantity <> shipped_quantity_total
-    - kind: setVocab
+    - kind: SetVocab
       eventTimeColumn: order_time
