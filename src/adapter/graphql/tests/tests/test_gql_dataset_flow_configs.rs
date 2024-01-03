@@ -467,7 +467,7 @@ async fn test_incorrect_dataset_kinds_for_flow_type() {
                     "flows": {
                         "configs": {
                             "setConfigBatching": {
-                                "__typename": "SetFlowConfigIncompatibleDatasetKind",
+                                "__typename": "FlowIncompatibleDatasetKind",
                                 "message": "Expected a Derivative dataset, but a Root dataset was provided",
                             }
                         }
@@ -502,7 +502,7 @@ async fn test_incorrect_dataset_kinds_for_flow_type() {
                     "flows": {
                         "configs": {
                             "setConfigSchedule": {
-                                "__typename": "SetFlowConfigIncompatibleDatasetKind",
+                                "__typename": "FlowIncompatibleDatasetKind",
                                 "message": "Expected a Root dataset, but a Derivative dataset was provided",
                             }
                         }
@@ -538,7 +538,7 @@ async fn test_incorrect_dataset_kinds_for_flow_type() {
                     "flows": {
                         "configs": {
                             "setConfigSchedule": {
-                                "__typename": "SetFlowConfigIncompatibleDatasetKind",
+                                "__typename": "FlowIncompatibleDatasetKind",
                                 "message": "Expected a Root dataset, but a Derivative dataset was provided",
                             }
                         }

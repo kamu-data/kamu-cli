@@ -47,6 +47,7 @@ thiserror = { version = "1", default-features = false }
 event-bus = { workspace = true }
 kamu = { workspace = true }
 kamu-flow-system-inmem = { workspace = true }
+kamu-task-system-inmem = { workspace = true }
 
 env_logger = "0.10"
 mockall = "0.11"
