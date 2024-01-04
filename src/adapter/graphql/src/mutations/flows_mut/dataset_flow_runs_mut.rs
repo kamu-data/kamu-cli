@@ -8,8 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::Utc;
-use kamu_core::CurrentAccountSubject;
-use kamu_flow_system::{FlowKeyDataset, FlowService, RequestFlowError};
+use kamu_flow_system::{CancelFlowError, FlowID, FlowKeyDataset, FlowService, RequestFlowError};
 use opendatafabric as odf;
 
 use super::{
@@ -18,7 +17,7 @@ use super::{
     FlowIncompatibleDatasetKind,
 };
 use crate::prelude::*;
-use crate::LoggedInGuard;
+use crate::{utils, LoggedInGuard};
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -48,13 +47,7 @@ impl DatasetFlowRunsMut {
         ensure_scheduling_permission(ctx, &self.dataset_handle).await?;
 
         let flow_service = from_catalog::<dyn FlowService>(ctx).unwrap();
-        let current_account_subject = from_catalog::<CurrentAccountSubject>(ctx).unwrap();
-        let logged_account = match current_account_subject.as_ref() {
-            CurrentAccountSubject::Logged(la) => la,
-            CurrentAccountSubject::Anonymous(_) => {
-                unreachable!("LoggedInGuard would not allow anonymous accounts here")
-            }
-        };
+        let logged_account = utils::get_logged_account(ctx);
 
         let res = flow_service
             .trigger_manual_flow(
@@ -62,7 +55,7 @@ impl DatasetFlowRunsMut {
                 FlowKeyDataset::new(self.dataset_handle.id.clone(), dataset_flow_type.into())
                     .into(),
                 odf::AccountID::from(odf::FAKE_ACCOUNT_ID),
-                logged_account.account_name.clone(),
+                logged_account.account_name,
             )
             .await
             .map_err(|e| match e {
@@ -72,6 +65,34 @@ impl DatasetFlowRunsMut {
         Ok(TriggerFlowResult::Success(TriggerFlowSuccess {
             flow: res.into(),
         }))
+    }
+
+    #[graphql(guard = "LoggedInGuard::new()")]
+    async fn cancel_flow(&self, ctx: &Context<'_>, flow_id: u64) -> Result<CancelFlowResult> {
+        ensure_scheduling_permission(ctx, &self.dataset_handle).await?;
+
+        let flow_service = from_catalog::<dyn FlowService>(ctx).unwrap();
+        let logged_account = utils::get_logged_account(ctx);
+
+        let res = flow_service
+            .cancel_flow(
+                FlowID::new(flow_id),
+                odf::AccountID::from(odf::FAKE_ACCOUNT_ID),
+                logged_account.account_name,
+            )
+            .await;
+
+        match res {
+            Ok(flow_state) => Ok(CancelFlowResult::Success(CancelFlowSuccess {
+                flow: flow_state.into(),
+            })),
+            Err(e) => match e {
+                CancelFlowError::NotFound(_) => {
+                    Ok(CancelFlowResult::NotFound(CancelFlowNotFound { flow_id }))
+                }
+                CancelFlowError::Internal(e) => Err(GqlError::Internal(e)),
+            },
+        }
     }
 }
 
@@ -94,6 +115,41 @@ pub struct TriggerFlowSuccess {
 impl TriggerFlowSuccess {
     pub async fn message(&self) -> String {
         format!("Success")
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+#[derive(Interface, Debug, Clone)]
+#[graphql(field(name = "message", ty = "String"))]
+pub enum CancelFlowResult {
+    Success(CancelFlowSuccess),
+    NotFound(CancelFlowNotFound),
+}
+
+#[derive(SimpleObject, Debug, Clone)]
+#[graphql(complex)]
+pub struct CancelFlowSuccess {
+    pub flow: Flow,
+}
+
+#[ComplexObject]
+impl CancelFlowSuccess {
+    pub async fn message(&self) -> String {
+        format!("Success")
+    }
+}
+
+#[derive(SimpleObject, Debug, Clone)]
+#[graphql(complex)]
+pub struct CancelFlowNotFound {
+    pub flow_id: u64,
+}
+
+#[ComplexObject]
+impl CancelFlowNotFound {
+    pub async fn message(&self) -> String {
+        format!("Flow '{}' was not found", self.flow_id)
     }
 }
 

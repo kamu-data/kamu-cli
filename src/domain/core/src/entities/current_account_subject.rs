@@ -19,7 +19,7 @@ pub enum CurrentAccountSubject {
     Anonymous(AnonymousAccountReason),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct LoggedAccount {
     pub account_name: AccountName,
 }

@@ -91,6 +91,20 @@ type BlockRef {
 }
 
 
+type CancelFlowNotFound implements CancelFlowResult {
+	flowId: Int!
+	message: String!
+}
+
+interface CancelFlowResult {
+	message: String!
+}
+
+type CancelFlowSuccess implements CancelFlowResult {
+	flow: Flow!
+	message: String!
+}
+
 type Checkpoint {
 	physicalHash: Multihash!
 	size: Int!
@@ -310,6 +324,7 @@ type DatasetFlowConfigsMut {
 
 type DatasetFlowRunsMut {
 	triggerFlow(datasetFlowType: DatasetFlowType!): TriggerFlowResult!
+	cancelFlow(flowId: Int!): CancelFlowResult!
 }
 
 enum DatasetFlowType {
