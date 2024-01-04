@@ -13,7 +13,6 @@ use kamu_flow_system::{
     FlowConfigurationService,
     FlowKeyDataset,
     Schedule,
-    ScheduleCronExpression,
     ScheduleTimeDelta,
     SetFlowConfigurationError,
     StartConditionConfiguration,
@@ -58,6 +57,16 @@ impl DatasetFlowConfigsMut {
         ensure_scheduling_permission(ctx, &self.dataset_handle).await?;
 
         let flow_config_service = from_catalog::<dyn FlowConfigurationService>(ctx).unwrap();
+        let configuration_rule = match schedule {
+            ScheduleInput::TimeDelta(td) => {
+                Schedule::TimeDelta(ScheduleTimeDelta { every: td.into() })
+            }
+            ScheduleInput::CronExpression(cron_expression) => {
+                let cron_struct = Schedule::validate_cron_expression(cron_expression)
+                    .map_err(|e| GqlError::Gql(e.into()))?;
+                Schedule::CronExpression(cron_struct)
+            }
+        };
 
         let res = flow_config_service
             .set_configuration(
@@ -65,14 +74,7 @@ impl DatasetFlowConfigsMut {
                 FlowKeyDataset::new(self.dataset_handle.id.clone(), dataset_flow_type.into())
                     .into(),
                 paused,
-                FlowConfigurationRule::Schedule(match schedule {
-                    ScheduleInput::TimeDelta(td) => {
-                        Schedule::TimeDelta(ScheduleTimeDelta { every: td.into() })
-                    }
-                    ScheduleInput::CronExpression(cron_expression) => {
-                        Schedule::CronExpression(ScheduleCronExpression { cron_expression })
-                    }
-                }),
+                FlowConfigurationRule::Schedule(configuration_rule),
             )
             .await
             .map_err(|e| match e {

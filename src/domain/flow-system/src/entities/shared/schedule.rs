@@ -21,7 +21,7 @@ pub enum Schedule {
     /// Time-delta based schedule
     TimeDelta(ScheduleTimeDelta),
     /// Cron-based schedule
-    CronExpression(ScheduleCronExpression),
+    CronExpression(CronSchedule),
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -33,17 +33,10 @@ pub struct ScheduleTimeDelta {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ScheduleCronExpression {
-    pub cron_expression: String,
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
 #[derive(Error, Debug)]
 pub enum ScheduleError {
     #[error(transparent)]
-    InvalidCronExptression(#[from] InvalidCronExptressionError),
+    InvalidCronExptression(#[from] InvalidCronExpressionError),
 
     #[error(transparent)]
     CronExpressionIterationExceed(#[from] CronExpressionIterationError),
@@ -51,7 +44,7 @@ pub enum ScheduleError {
 
 #[derive(Error, Debug)]
 #[error("Cron expression {expression} is invalid")]
-pub struct InvalidCronExptressionError {
+pub struct InvalidCronExpressionError {
     pub expression: String,
 }
 
@@ -64,29 +57,39 @@ pub struct CronExpressionIterationError {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 impl Schedule {
+    pub fn validate_cron_expression(
+        cron_expression: String,
+    ) -> Result<CronSchedule, ScheduleError> {
+        let schedule = match CronSchedule::from_str(&cron_expression) {
+            Err(_) => {
+                return Err(ScheduleError::InvalidCronExptression(
+                    InvalidCronExpressionError {
+                        expression: cron_expression.clone(),
+                    },
+                ));
+            }
+            Ok(cron_schedule) => cron_schedule,
+        };
+        match schedule.upcoming(Utc).next() {
+            Some(_) => Ok(schedule),
+            None => Err(ScheduleError::CronExpressionIterationExceed(
+                CronExpressionIterationError {
+                    expression: cron_expression.clone(),
+                },
+            )),
+        }
+    }
     pub fn next_activation_time(&self, now: DateTime<Utc>) -> Result<DateTime<Utc>, ScheduleError> {
         match self {
             Schedule::TimeDelta(td) => Ok(now + td.every),
-            Schedule::CronExpression(ce) => {
-                let schedule = match CronSchedule::from_str(&ce.cron_expression) {
-                    Err(_) => {
-                        return Err(ScheduleError::InvalidCronExptression(
-                            InvalidCronExptressionError {
-                                expression: ce.cron_expression.clone(),
-                            },
-                        ));
-                    }
-                    Ok(cron_schedule) => cron_schedule,
-                };
-                match schedule.upcoming(Utc).next() {
-                    Some(nct) => Ok(nct),
-                    None => Err(ScheduleError::CronExpressionIterationExceed(
-                        CronExpressionIterationError {
-                            expression: ce.cron_expression.clone(),
-                        },
-                    )),
-                }
-            }
+            Schedule::CronExpression(ce) => match ce.upcoming(Utc).next() {
+                Some(nct) => Ok(nct),
+                None => Err(ScheduleError::CronExpressionIterationExceed(
+                    CronExpressionIterationError {
+                        expression: ce.to_string(),
+                    },
+                )),
+            },
         }
     }
 }
@@ -101,9 +104,7 @@ impl From<chrono::Duration> for Schedule {
 
 impl From<String> for Schedule {
     fn from(value: String) -> Self {
-        Self::CronExpression(ScheduleCronExpression {
-            cron_expression: value,
-        })
+        Self::CronExpression(CronSchedule::from_str(&value).unwrap())
     }
 }
 
