@@ -308,6 +308,10 @@ type DatasetFlowConfigsMut {
 	setConfigBatching(datasetFlowType: DatasetFlowType!, paused: Boolean!, throttlingPeriod: TimeDeltaInput, minimalDataBatch: Int): SetFlowConfigResult!
 }
 
+type DatasetFlowRunsMut {
+	triggerFlow(datasetFlowType: DatasetFlowType!): TriggerFlowResult!
+}
+
 enum DatasetFlowType {
 	INGEST
 	EXECUTE_QUERY
@@ -323,6 +327,7 @@ type DatasetFlows {
 
 type DatasetFlowsMut {
 	configs: DatasetFlowConfigsMut!
+	runs: DatasetFlowRunsMut!
 }
 
 scalar DatasetID
@@ -569,6 +574,10 @@ type FetchStepUrl {
 }
 
 
+type Flow {
+	flowId: Int!
+}
+
 type FlowConfiguration {
 	paused: Boolean!
 	schedule: FlowConfigurationSchedule
@@ -581,6 +590,12 @@ type FlowConfigurationBatching {
 }
 
 union FlowConfigurationSchedule = TimeDelta | CronExpression
+
+type FlowIncompatibleDatasetKind implements SetFlowConfigResult & TriggerFlowResult {
+	expectedDatasetKind: DatasetKind!
+	actualDatasetKind: DatasetKind!
+	message: String!
+}
 
 
 type InputSlice {
@@ -931,12 +946,6 @@ type SetDataSchema {
 	schema: DataSchema!
 }
 
-type SetFlowConfigIncompatibleDatasetKind implements SetFlowConfigResult {
-	expectedDatasetKind: DatasetKind!
-	actualDatasetKind: DatasetKind!
-	message: String!
-}
-
 interface SetFlowConfigResult {
 	message: String!
 }
@@ -1163,6 +1172,15 @@ type TransformSql {
 	version: String
 	queries: [SqlQueryStep!]!
 	temporalTables: [TemporalTable!]
+}
+
+interface TriggerFlowResult {
+	message: String!
+}
+
+type TriggerFlowSuccess implements TriggerFlowResult {
+	flow: Flow!
+	message: String!
 }
 
 interface UpdateReadmeResult {

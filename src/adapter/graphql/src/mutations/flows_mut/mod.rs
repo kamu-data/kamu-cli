@@ -7,16 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod test_accounts;
-mod test_auth;
-mod test_error_handling;
-mod test_gql_data;
-mod test_gql_dataset_flow_configs;
-mod test_gql_dataset_flow_runs;
-mod test_gql_datasets;
-mod test_gql_metadata;
-mod test_gql_metadata_chain;
-mod test_gql_search;
-mod test_guards;
-mod test_tasks;
-mod test_update_schema;
+mod dataset_flow_configs_mut;
+mod dataset_flow_runs_mut;
+mod dataset_flows_mut;
+mod flows_mut_utils;
+
+pub(crate) use dataset_flow_configs_mut::*;
+pub(crate) use dataset_flow_runs_mut::*;
+pub(crate) use dataset_flows_mut::*;
+pub(crate) use flows_mut_utils::*;

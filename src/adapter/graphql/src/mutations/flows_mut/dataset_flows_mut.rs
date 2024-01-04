@@ -9,7 +9,7 @@
 
 use opendatafabric as odf;
 
-use super::DatasetFlowConfigsMut;
+use super::{DatasetFlowConfigsMut, DatasetFlowRunsMut};
 use crate::prelude::*;
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -27,6 +27,10 @@ impl DatasetFlowsMut {
 
     async fn configs(&self) -> DatasetFlowConfigsMut {
         DatasetFlowConfigsMut::new(self.dataset_handle.clone())
+    }
+
+    async fn runs(&self) -> DatasetFlowRunsMut {
+        DatasetFlowRunsMut::new(self.dataset_handle.clone())
     }
 }
 
