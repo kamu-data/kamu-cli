@@ -155,27 +155,6 @@ impl Projection for FlowState {
                             }
                         }
                     }
-                    E::Cancelled(FlowEventCancelled {
-                        event_time,
-                        flow_id: _,
-                        by_account_id: _,
-                        by_account_name: _,
-                    }) => {
-                        if let Some(outcome) = s.outcome {
-                            if outcome == FlowOutcome::Success {
-                                Err(ProjectionError::new(Some(s), event))
-                            } else {
-                                // Ignore for idempotence reasons
-                                Ok(s)
-                            }
-                        } else {
-                            Ok(FlowState {
-                                outcome: Some(FlowOutcome::Cancelled),
-                                terminated_at: Some(event_time.clone()),
-                                ..s
-                            })
-                        }
-                    }
                     E::Aborted(FlowEventAborted {
                         event_time,
                         flow_id: _,

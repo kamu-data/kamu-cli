@@ -91,11 +91,11 @@ type BlockRef {
 }
 
 
-interface CancelFlowResult {
+interface CancelScheduledTasksResult {
 	message: String!
 }
 
-type CancelFlowSuccess implements CancelFlowResult {
+type CancelScheduledTasksSuccess implements CancelScheduledTasksResult {
 	flow: Flow!
 	message: String!
 }
@@ -319,7 +319,7 @@ type DatasetFlowConfigsMut {
 
 type DatasetFlowRunsMut {
 	triggerFlow(datasetFlowType: DatasetFlowType!): TriggerFlowResult!
-	cancelFlow(flowId: FlowID!): CancelFlowResult!
+	cancelScheduledTasks(flowId: FlowID!): CancelScheduledTasksResult!
 }
 
 enum DatasetFlowType {
@@ -611,7 +611,12 @@ type FlowIncompatibleDatasetKind implements SetFlowConfigResult & TriggerFlowRes
 	message: String!
 }
 
-type FlowNotFound implements CancelFlowResult {
+type FlowNotFound implements CancelScheduledTasksResult {
+	flowId: FlowID!
+	message: String!
+}
+
+type FlowNotScheduled implements CancelScheduledTasksResult {
 	flowId: FlowID!
 	message: String!
 }

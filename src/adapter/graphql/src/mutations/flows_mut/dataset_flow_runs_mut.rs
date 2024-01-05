@@ -17,6 +17,7 @@ use super::{
     FlowInDatasetError,
     FlowIncompatibleDatasetKind,
     FlowNotFound,
+    FlowNotScheduled,
 };
 use crate::prelude::*;
 use crate::{utils, LoggedInGuard};
@@ -70,35 +71,39 @@ impl DatasetFlowRunsMut {
     }
 
     #[graphql(guard = "LoggedInGuard::new()")]
-    async fn cancel_flow(&self, ctx: &Context<'_>, flow_id: FlowID) -> Result<CancelFlowResult> {
+    async fn cancel_scheduled_tasks(
+        &self,
+        ctx: &Context<'_>,
+        flow_id: FlowID,
+    ) -> Result<CancelScheduledTasksResult> {
         ensure_scheduling_permission(ctx, &self.dataset_handle).await?;
 
         if let Some(error) =
             check_if_flow_belongs_to_dataset(ctx, flow_id, &self.dataset_handle).await?
         {
             return Ok(match error {
-                FlowInDatasetError::NotFound(e) => CancelFlowResult::NotFound(e),
+                FlowInDatasetError::NotFound(e) => CancelScheduledTasksResult::NotFound(e),
             });
         }
 
         let flow_service = from_catalog::<dyn fs::FlowService>(ctx).unwrap();
-        let logged_account = utils::get_logged_account(ctx);
 
-        let res = flow_service
-            .cancel_flow(
-                flow_id.into(),
-                odf::AccountID::from(odf::FAKE_ACCOUNT_ID),
-                logged_account.account_name,
-            )
-            .await;
+        let res = flow_service.cancel_scheduled_tasks(flow_id.into()).await;
 
         match res {
-            Ok(flow_state) => Ok(CancelFlowResult::Success(CancelFlowSuccess {
-                flow: flow_state.into(),
-            })),
+            Ok(flow_state) => Ok(CancelScheduledTasksResult::Success(
+                CancelScheduledTasksSuccess {
+                    flow: flow_state.into(),
+                },
+            )),
             Err(e) => match e {
-                fs::CancelFlowError::NotFound(_) => unreachable!("Flow checked already"),
-                fs::CancelFlowError::Internal(e) => Err(GqlError::Internal(e)),
+                fs::CancelScheduledTasksError::NotFound(_) => unreachable!("Flow checked already"),
+                fs::CancelScheduledTasksError::NotScheduled(_) => {
+                    Ok(CancelScheduledTasksResult::NotScheduled(FlowNotScheduled {
+                        flow_id,
+                    }))
+                }
+                fs::CancelScheduledTasksError::Internal(e) => Err(GqlError::Internal(e)),
             },
         }
     }
@@ -130,19 +135,20 @@ impl TriggerFlowSuccess {
 
 #[derive(Interface, Clone)]
 #[graphql(field(name = "message", ty = "String"))]
-pub enum CancelFlowResult {
-    Success(CancelFlowSuccess),
+pub enum CancelScheduledTasksResult {
+    Success(CancelScheduledTasksSuccess),
     NotFound(FlowNotFound),
+    NotScheduled(FlowNotScheduled),
 }
 
 #[derive(SimpleObject, Clone)]
 #[graphql(complex)]
-pub struct CancelFlowSuccess {
+pub struct CancelScheduledTasksSuccess {
     pub flow: Flow,
 }
 
 #[ComplexObject]
-impl CancelFlowSuccess {
+impl CancelScheduledTasksSuccess {
     pub async fn message(&self) -> String {
         format!("Success")
     }

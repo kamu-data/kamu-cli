@@ -16,17 +16,23 @@ use chrono::Utc;
 use dill::Component;
 use event_bus::EventBus;
 use indoc::indoc;
-use kamu::testing::MetadataFactory;
+use kamu::testing::{MetadataFactory, MockDependencyGraphRepository};
 use kamu::{DatasetRepositoryLocalFs, DependencyGraphServiceInMemory};
-use kamu_core::{auth, CreateDatasetResult, DatasetRepository, SystemTimeSourceDefault};
-use kamu_flow_system::{FlowEventStore, FlowServiceRunConfig};
+use kamu_core::{
+    auth,
+    CreateDatasetResult,
+    DatasetRepository,
+    DependencyGraphRepository,
+    SystemTimeSourceDefault,
+};
+use kamu_flow_system::{FlowID, FlowServiceRunConfig, FlowServiceTestDriver};
 use kamu_flow_system_inmem::{
     FlowConfigurationEventStoreInMem,
     FlowConfigurationServiceInMemory,
     FlowEventStoreInMem,
     FlowServiceInMemory,
 };
-use kamu_task_system::TaskID;
+use kamu_task_system::{TaskEventFinished, TaskID, TaskOutcome};
 use kamu_task_system_inmem::{TaskSchedulerInMemory, TaskSystemEventStoreInMemory};
 use opendatafabric::{DatasetID, DatasetKind};
 
@@ -221,8 +227,10 @@ async fn test_cancel_ingest_root_dataset() {
     let response_json = response.data.into_json().unwrap();
     let flow_id = FlowRunsHarness::extract_flow_id_from_trigger_response(&response_json);
 
+    harness.mimic_flow_scheduled(flow_id).await;
+
     let mutation_code =
-        FlowRunsHarness::cancel_flow_mutation(&create_result.dataset_handle.id, flow_id);
+        FlowRunsHarness::cancel_scheduled_tasks_mutation(&create_result.dataset_handle.id, flow_id);
 
     let res = schema
         .execute(
@@ -239,14 +247,14 @@ async fn test_cancel_ingest_root_dataset() {
                 "byId": {
                     "flows": {
                         "runs": {
-                            "cancelFlow": {
-                                "__typename": "CancelFlowSuccess",
+                            "cancelScheduledTasks": {
+                                "__typename": "CancelScheduledTasksSuccess",
                                 "message": "Success",
                                 "flow": {
                                     "__typename": "Flow",
                                     "flowId": flow_id,
                                     "status": "FINISHED",
-                                    "outcome": "CANCELLED"
+                                    "outcome": "ABORTED"
                                 }
                             }
                         }
@@ -282,8 +290,12 @@ async fn test_cancel_transform_derived_dataset() {
     let response_json = response.data.into_json().unwrap();
     let flow_id = FlowRunsHarness::extract_flow_id_from_trigger_response(&response_json);
 
-    let mutation_code =
-        FlowRunsHarness::cancel_flow_mutation(&create_derived_result.dataset_handle.id, flow_id);
+    harness.mimic_flow_scheduled(flow_id).await;
+
+    let mutation_code = FlowRunsHarness::cancel_scheduled_tasks_mutation(
+        &create_derived_result.dataset_handle.id,
+        flow_id,
+    );
 
     let response = schema
         .execute(
@@ -300,14 +312,14 @@ async fn test_cancel_transform_derived_dataset() {
                 "byId": {
                     "flows": {
                         "runs": {
-                            "cancelFlow": {
-                                "__typename": "CancelFlowSuccess",
+                            "cancelScheduledTasks": {
+                                "__typename": "CancelScheduledTasksSuccess",
                                 "message": "Success",
                                 "flow": {
                                     "__typename": "Flow",
                                     "flowId": flow_id,
                                     "status": "FINISHED",
-                                    "outcome": "CANCELLED"
+                                    "outcome": "ABORTED"
                                 }
                             }
                         }
@@ -326,7 +338,7 @@ async fn test_cancel_wrong_flow_id_fails() {
     let create_result = harness.create_root_dataset().await;
 
     let mutation_code =
-        FlowRunsHarness::cancel_flow_mutation(&create_result.dataset_handle.id, "5");
+        FlowRunsHarness::cancel_scheduled_tasks_mutation(&create_result.dataset_handle.id, "5");
 
     let schema = kamu_adapter_graphql::schema_quiet();
     let response = schema
@@ -344,7 +356,7 @@ async fn test_cancel_wrong_flow_id_fails() {
                 "byId": {
                     "flows": {
                         "runs": {
-                            "cancelFlow": {
+                            "cancelScheduledTasks": {
                                 "__typename": "FlowNotFound",
                                 "message": "Flow '5' was not found",
                             }
@@ -379,8 +391,10 @@ async fn test_cancel_foreign_flow_fails() {
     let response_json = response.data.into_json().unwrap();
     let flow_id = FlowRunsHarness::extract_flow_id_from_trigger_response(&response_json);
 
-    let mutation_code =
-        FlowRunsHarness::cancel_flow_mutation(&create_derived_result.dataset_handle.id, flow_id);
+    let mutation_code = FlowRunsHarness::cancel_scheduled_tasks_mutation(
+        &create_derived_result.dataset_handle.id,
+        flow_id,
+    );
 
     let response = schema
         .execute(
@@ -397,9 +411,65 @@ async fn test_cancel_foreign_flow_fails() {
                 "byId": {
                     "flows": {
                         "runs": {
-                            "cancelFlow": {
+                            "cancelScheduledTasks": {
                                 "__typename": "FlowNotFound",
                                 "message": "Flow '0' was not found",
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_cancel_queued_flow_fails() {
+    let harness = FlowRunsHarness::new();
+    let create_result = harness.create_root_dataset().await;
+
+    let mutation_code =
+        FlowRunsHarness::trigger_flow_mutation(&create_result.dataset_handle.id, "INGEST");
+
+    let schema = kamu_adapter_graphql::schema_quiet();
+    let response = schema
+        .execute(
+            async_graphql::Request::new(mutation_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(response.is_ok(), "{:?}", response);
+    let res_json = response.data.into_json().unwrap();
+    let flow_id = res_json["datasets"]["byId"]["flows"]["runs"]["triggerFlow"]["flow"]["flowId"]
+        .as_str()
+        .unwrap();
+
+    // Note: no scheduling!
+
+    let mutation_code =
+        FlowRunsHarness::cancel_scheduled_tasks_mutation(&create_result.dataset_handle.id, flow_id);
+
+    let response = schema
+        .execute(
+            async_graphql::Request::new(mutation_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(response.is_ok(), "{:?}", response);
+    assert_eq!(
+        response.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "flows": {
+                        "runs": {
+                            "cancelScheduledTasks": {
+                                "__typename": "FlowNotScheduled",
+                                "message": format!("Flow '{flow_id}' was not scheduled yet"),
                             }
                         }
                     }
@@ -433,8 +503,10 @@ async fn test_cancel_already_cancelled_flow() {
         .as_str()
         .unwrap();
 
+    harness.mimic_flow_scheduled(flow_id).await;
+
     let mutation_code =
-        FlowRunsHarness::cancel_flow_mutation(&create_result.dataset_handle.id, flow_id);
+        FlowRunsHarness::cancel_scheduled_tasks_mutation(&create_result.dataset_handle.id, flow_id);
 
     let response = schema
         .execute(
@@ -462,14 +534,14 @@ async fn test_cancel_already_cancelled_flow() {
                 "byId": {
                     "flows": {
                         "runs": {
-                            "cancelFlow": {
-                                "__typename": "CancelFlowSuccess",
+                            "cancelScheduledTasks": {
+                                "__typename": "CancelScheduledTasksSuccess",
                                 "message": "Success",
                                 "flow": {
                                     "__typename": "Flow",
                                     "flowId": flow_id,
                                     "status": "FINISHED",
-                                    "outcome": "CANCELLED"
+                                    "outcome": "ABORTED"
                                 }
                             }
                         }
@@ -484,7 +556,12 @@ async fn test_cancel_already_cancelled_flow() {
 
 #[test_log::test(tokio::test)]
 async fn test_cancel_already_succeeded_flow() {
-    let harness = FlowRunsHarness::new();
+    let mut dependency_graph_repo_mock = MockDependencyGraphRepository::new();
+    dependency_graph_repo_mock
+        .expect_list_dependencies_of_all_datasets()
+        .return_once(|| Box::pin(futures::stream::empty()));
+
+    let harness = FlowRunsHarness::new_custom(dependency_graph_repo_mock);
     let create_result: CreateDatasetResult = harness.create_root_dataset().await;
 
     let mutation_code =
@@ -502,10 +579,11 @@ async fn test_cancel_already_succeeded_flow() {
     let response_json = response.data.into_json().unwrap();
     let flow_id = FlowRunsHarness::extract_flow_id_from_trigger_response(&response_json);
 
-    harness.mimic_flow_completed(flow_id).await;
+    let flow_task_id = harness.mimic_flow_scheduled(flow_id).await;
+    harness.mimic_task_completed(flow_task_id).await;
 
     let mutation_code =
-        FlowRunsHarness::cancel_flow_mutation(&create_result.dataset_handle.id, flow_id);
+        FlowRunsHarness::cancel_scheduled_tasks_mutation(&create_result.dataset_handle.id, flow_id);
 
     let response = schema
         .execute(
@@ -522,8 +600,8 @@ async fn test_cancel_already_succeeded_flow() {
                 "byId": {
                     "flows": {
                         "runs": {
-                            "cancelFlow": {
-                                "__typename": "CancelFlowSuccess",
+                            "cancelScheduledTasks": {
+                                "__typename": "CancelScheduledTasksSuccess",
                                 "message": "Success",
                                 "flow": {
                                     "__typename": "Flow",
@@ -555,7 +633,10 @@ async fn test_anonymous_operation_fails() {
             &create_derived_result.dataset_handle.id,
             "EXECUTE_QUERY",
         ),
-        FlowRunsHarness::cancel_flow_mutation(&create_root_result.dataset_handle.id, "0"),
+        FlowRunsHarness::cancel_scheduled_tasks_mutation(
+            &create_root_result.dataset_handle.id,
+            "0",
+        ),
     ];
 
     let schema = kamu_adapter_graphql::schema_quiet();
@@ -583,6 +664,10 @@ struct FlowRunsHarness {
 
 impl FlowRunsHarness {
     fn new() -> Self {
+        Self::new_custom(MockDependencyGraphRepository::new())
+    }
+
+    fn new_custom(dependency_graph_repo: MockDependencyGraphRepository) -> Self {
         let tempdir = tempfile::tempdir().unwrap();
 
         let catalog_base = dill::CatalogBuilder::new()
@@ -596,6 +681,8 @@ impl FlowRunsHarness {
             .add::<SystemTimeSourceDefault>()
             .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
             .add::<DependencyGraphServiceInMemory>()
+            .add_value(dependency_graph_repo)
+            .bind::<dyn DependencyGraphRepository, MockDependencyGraphRepository>()
             .add::<FlowConfigurationServiceInMemory>()
             .add::<FlowConfigurationEventStoreInMem>()
             .add::<FlowServiceInMemory>()
@@ -648,29 +735,35 @@ impl FlowRunsHarness {
             .unwrap()
     }
 
-    async fn mimic_flow_completed(&self, flow_id: &str) {
-        let flow_event_store = self
+    async fn mimic_flow_scheduled(&self, flow_id: &str) -> TaskID {
+        let flow_service_test_driver = self
             .catalog_authorized
-            .get_one::<dyn FlowEventStore>()
+            .get_one::<dyn FlowServiceTestDriver>()
             .unwrap();
-
-        use kamu_flow_system::{Flow, FlowID};
 
         let flow_id = FlowID::new(flow_id.parse::<u64>().unwrap());
-        let mut flow = Flow::load(flow_id, flow_event_store.as_ref())
+        flow_service_test_driver
+            .mimic_flow_scheduled(flow_id)
+            .await
+            .unwrap()
+    }
+
+    async fn mimic_task_completed(&self, task_id: TaskID) {
+        let flow_service_test_driver = self
+            .catalog_authorized
+            .get_one::<dyn FlowServiceTestDriver>()
+            .unwrap();
+        flow_service_test_driver.mimic_running_started();
+
+        let event_bus = self.catalog_authorized.get_one::<EventBus>().unwrap();
+        event_bus
+            .dispatch_event(TaskEventFinished {
+                event_time: Utc::now(),
+                task_id,
+                outcome: TaskOutcome::Success,
+            })
             .await
             .unwrap();
-
-        let random_task_id = TaskID::new(12345);
-        flow.on_task_scheduled(Utc::now(), random_task_id).unwrap();
-        flow.on_task_finished(
-            Utc::now(),
-            random_task_id,
-            kamu_task_system::TaskOutcome::Success,
-        )
-        .unwrap();
-
-        flow.save(flow_event_store.as_ref()).await.unwrap();
     }
 
     fn extract_flow_id_from_trigger_response<'a>(response_json: &serde_json::Value) -> &str {
@@ -712,7 +805,7 @@ impl FlowRunsHarness {
         .replace("<dataset_flow_type>", dataset_flow_type)
     }
 
-    fn cancel_flow_mutation(id: &DatasetID, flow_id: &str) -> String {
+    fn cancel_scheduled_tasks_mutation(id: &DatasetID, flow_id: &str) -> String {
         indoc!(
             r#"
             mutation {
@@ -720,12 +813,12 @@ impl FlowRunsHarness {
                     byId (datasetId: "<id>") {
                         flows {
                             runs {
-                                cancelFlow (
+                                cancelScheduledTasks (
                                     flowId: "<flow_id>",
                                 ) {
                                     __typename,
                                     message
-                                    ... on CancelFlowSuccess {
+                                    ... on CancelScheduledTasksSuccess {
                                         flow {
                                             __typename
                                             flowId

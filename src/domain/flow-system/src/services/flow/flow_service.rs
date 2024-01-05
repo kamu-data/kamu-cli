@@ -75,13 +75,11 @@ pub trait FlowService: Sync + Send {
     /// Returns current state of a given flow
     async fn get_flow(&self, flow_id: FlowID) -> Result<FlowState, GetFlowError>;
 
-    /// Attempts to cancel the given flow
-    async fn cancel_flow(
+    /// Attempts to cancel the tasks already scheduled for the given flow
+    async fn cancel_scheduled_tasks(
         &self,
         flow_id: FlowID,
-        by_account_id: AccountID,
-        by_account_name: AccountName,
-    ) -> Result<FlowState, CancelFlowError>;
+    ) -> Result<FlowState, CancelScheduledTasksError>;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -134,9 +132,11 @@ pub enum GetFlowError {
 }
 
 #[derive(thiserror::Error, Debug)]
-pub enum CancelFlowError {
+pub enum CancelScheduledTasksError {
     #[error(transparent)]
     NotFound(#[from] FlowNotFoundError),
+    #[error(transparent)]
+    NotScheduled(#[from] FlowNotScheduledError),
     #[error(transparent)]
     Internal(#[from] InternalError),
 }
@@ -150,8 +150,8 @@ pub struct FlowNotFoundError {
 }
 
 #[derive(thiserror::Error, Debug)]
-#[error("Flow {flow_id} has already finished")]
-pub struct CancelFinishedFlowError {
+#[error("Flow {flow_id} is not scheduled yet.")]
+pub struct FlowNotScheduledError {
     pub flow_id: FlowID,
 }
 
@@ -169,7 +169,7 @@ impl From<LoadError<FlowState>> for GetFlowError {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-impl From<LoadError<FlowState>> for CancelFlowError {
+impl From<LoadError<FlowState>> for CancelScheduledTasksError {
     fn from(value: LoadError<FlowState>) -> Self {
         match value {
             LoadError::NotFound(err) => Self::NotFound(FlowNotFoundError { flow_id: err.query }),
