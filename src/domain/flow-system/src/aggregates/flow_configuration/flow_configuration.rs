@@ -57,20 +57,6 @@ impl FlowConfiguration {
         self.apply(event)
     }
 
-    /// Pause configuration
-    pub fn pause_configuration(
-        &mut self,
-        now: DateTime<Utc>,
-    ) -> Result<(), ProjectionError<FlowConfigurationState>> {
-        let event = FlowConfigurationEventModified {
-            event_time: now,
-            flow_key: self.flow_key.clone(),
-            paused: true,
-            rule: self.rule.clone(),
-        };
-        self.apply(event)
-    }
-
     /// Handle dataset removal
     pub fn notify_dataset_removed(
         &mut self,

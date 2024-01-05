@@ -33,13 +33,6 @@ pub trait FlowConfigurationService: Sync + Send {
         rule: FlowConfigurationRule,
     ) -> Result<FlowConfigurationState, SetFlowConfigurationError>;
 
-    /// Pause flow configuration
-    async fn pause_flow_configuration(
-        &self,
-        request_time: DateTime<Utc>,
-        flow_key: FlowKey,
-    ) -> Result<(), SetFlowConfigurationError>;
-
     /// Lists all flow configurations, which are currently enabled
     fn list_enabled_configurations(&self) -> FlowConfigurationStateStream;
 }
