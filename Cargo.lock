@@ -1582,6 +1582,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "cron"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1ff76b51e4c068c52bfd2866e1567bee7c567ae8f24ada09fd4307019e25eab7"
+dependencies = [
+ "chrono",
+ "nom",
+ "once_cell",
+]
+
+[[package]]
 name = "crossbeam-channel"
 version = "0.5.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3272,6 +3283,7 @@ dependencies = [
  "async-graphql",
  "async-trait",
  "chrono",
+ "cron",
  "datafusion",
  "dill",
  "env_logger",
@@ -3505,6 +3517,8 @@ version = "0.150.1"
 dependencies = [
  "async-trait",
  "chrono",
+ "cron",
+ "datafusion",
  "enum-variants",
  "event-sourcing",
  "internal-error",
@@ -3526,6 +3540,7 @@ dependencies = [
  "async-stream",
  "async-trait",
  "chrono",
+ "cron",
  "dill",
  "env_logger",
  "event-bus",
@@ -3962,6 +3977,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "minimal-lexical"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "68354c5c6bd36d73ff3feceb05efa59b6acb7626617f4962be322a825e61f79a"
+
+[[package]]
 name = "miniz_oxide"
 version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4081,6 +4102,16 @@ dependencies = [
  "bitflags 2.4.1",
  "cfg-if",
  "libc",
+]
+
+[[package]]
+name = "nom"
+version = "7.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d273983c5a657a70a3e8f2a01329822f3b8c8172b73826411a55751e404a0a4a"
+dependencies = [
+ "memchr",
+ "minimal-lexical",
 ]
 
 [[package]]

@@ -214,13 +214,14 @@ impl FlowServiceInMemory {
             None => {
                 let mut flow = self.make_new_flow(flow_key.clone(), trigger).await?;
 
-                let next_activation_time = schedule.next_activation_time(start_time);
-                self.enqueue_flow(flow.flow_id, next_activation_time)?;
+                if let Some(next_activation_time) = schedule.next_activation_time(start_time) {
+                    self.enqueue_flow(flow.flow_id, next_activation_time)?;
 
-                flow.activate_at_time(self.time_source.now(), next_activation_time)
-                    .int_err()?;
+                    flow.activate_at_time(self.time_source.now(), next_activation_time)
+                        .int_err()?;
 
-                flow.save(self.flow_event_store.as_ref()).await.int_err()?;
+                    flow.save(self.flow_event_store.as_ref()).await.int_err()?;
+                }
 
                 Ok(flow.into())
             }

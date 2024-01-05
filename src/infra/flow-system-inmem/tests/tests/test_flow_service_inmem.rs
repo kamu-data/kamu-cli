@@ -482,6 +482,122 @@ async fn test_dataset_deleted() {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_cron_task_completions_trigger_next_loop_on_success() {
+    let harness = FlowHarness::new();
+    let foo_id = harness.create_root_dataset("foo").await;
+    harness
+        .set_dataset_flow_schedule(
+            Utc::now(),
+            foo_id.clone(),
+            DatasetFlowType::Ingest,
+            Duration::milliseconds(30).into(),
+        )
+        .await;
+
+    harness
+        .set_dataset_flow_schedule(
+            Utc::now(),
+            foo_id.clone(),
+            DatasetFlowType::Ingest,
+            Duration::milliseconds(40).into(),
+        )
+        .await;
+
+    // Enforce dependency graph initialization
+    harness.eager_dependencies_graph_init().await;
+
+    // Remember start time
+    let start_time = Utc::now()
+        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
+        .unwrap();
+
+    // Flow listener will collect snapshots at important moments of time
+    let test_flow_listener = harness.catalog.get_one::<TestFlowSystemListener>().unwrap();
+
+    // Obtain access to event bus
+    let event_bus = harness.catalog.get_one::<EventBus>().unwrap();
+
+    // Run scheduler concurrently with manual triggers script
+    let _ = tokio::select! {
+        res = harness.flow_service.run(start_time) => res.int_err(),
+        _ = async {
+            // Each of 3 datasets should be scheduled after this time
+            let mut next_time = start_time + Duration::milliseconds(1100);
+            tokio::time::sleep(std::time::Duration::from_millis(1100)).await;
+
+            // Plan different task execution outcomes for each dataset
+            let mut planned_outcomes = HashMap::new();
+            planned_outcomes.insert(&foo_id, TaskOutcome::Success);
+
+            // Determine which task state belongs to which dataset
+            let scheduled_tasks = harness.take_scheduled_tasks().await;
+            let mut scheduled_tasks_by_dataset_id = HashMap::new();
+            for scheduled_task in scheduled_tasks {
+                let task_dataset_id = match &scheduled_task.logical_plan {
+                    LogicalPlan::UpdateDataset(lp) => lp.dataset_id.clone(),
+                    _ => unreachable!()
+                };
+                scheduled_tasks_by_dataset_id.insert(task_dataset_id, scheduled_task);
+            };
+
+            // Send task finished event for each dataset with certain interval
+            let dataset_task = scheduled_tasks_by_dataset_id.get(&foo_id).unwrap();
+            event_bus.dispatch_event(TaskEventFinished {
+                event_time: next_time,
+                task_id: dataset_task.task_id,
+                outcome: *(planned_outcomes.get(&foo_id).unwrap())
+            }).await.unwrap();
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+            next_time += Duration::milliseconds(10);
+
+            // Let the succeeded dataset to schedule another update. 40s + 20s max waiting
+            tokio::time::sleep(std::time::Duration::from_millis(70)).await;
+
+         } => Ok(()),
+    }
+    .unwrap();
+
+    let state = test_flow_listener.state.lock().unwrap();
+    assert_eq!(4, state.snapshots.len());
+
+    let foo_flow_key: FlowKey = FlowKeyDataset::new(foo_id.clone(), DatasetFlowType::Ingest).into();
+
+    assert_flow_test_checks(&[
+        // Snapshot 0: after initial queueing
+        FlowTestCheck {
+            snapshot: &state.snapshots[0].1,
+            patterns: vec![(&foo_flow_key, FlowStatus::Queued, None)],
+        },
+        FlowTestCheck {
+            snapshot: &state.snapshots[1].1,
+            patterns: vec![(&foo_flow_key, FlowStatus::Scheduled, None)],
+        },
+        FlowTestCheck {
+            snapshot: &state.snapshots[2].1,
+            patterns: vec![
+                (&foo_flow_key, FlowStatus::Queued, None),
+                (
+                    &foo_flow_key,
+                    FlowStatus::Finished,
+                    Some(FlowOutcome::Success),
+                ),
+            ],
+        },
+        FlowTestCheck {
+            snapshot: &state.snapshots[3].1,
+            patterns: vec![
+                (&foo_flow_key, FlowStatus::Scheduled, None),
+                (
+                    &foo_flow_key,
+                    FlowStatus::Finished,
+                    Some(FlowOutcome::Success),
+                ),
+            ],
+        },
+    ]);
+}
+
+#[test_log::test(tokio::test)]
 async fn test_task_completions_trigger_next_loop_on_success() {
     let harness = FlowHarness::new();
 

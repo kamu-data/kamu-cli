@@ -237,7 +237,7 @@ async fn test_crud_cron_root_dataset() {
         &create_result.dataset_handle.id,
         "INGEST",
         false,
-        "0 */2 * * *",
+        "0 */2 * * * *",
     );
 
     let res = schema
@@ -263,7 +263,7 @@ async fn test_crud_cron_root_dataset() {
                                     "paused": false,
                                     "schedule": {
                                         "__typename": "CronExpression",
-                                        "cronExpression": "0 */2 * * *",
+                                        "cronExpression": "0 */2 * * * *",
                                     },
                                     "batching": Value::Null
                                 }
@@ -279,7 +279,7 @@ async fn test_crud_cron_root_dataset() {
         &create_result.dataset_handle.id,
         "INGEST",
         true,
-        "0 0 */1 * *",
+        "0 0 */1 * * *",
     );
 
     let res = schema
@@ -305,7 +305,7 @@ async fn test_crud_cron_root_dataset() {
                                     "paused": true,
                                     "schedule": {
                                         "__typename": "CronExpression",
-                                        "cronExpression": "0 0 */1 * *",
+                                        "cronExpression": "0 0 */1 * * *",
                                     },
                                     "batching": Value::Null
                                 }
@@ -315,6 +315,51 @@ async fn test_crud_cron_root_dataset() {
                 }
             }
         })
+    );
+
+    // Try to pass invalid cron expression
+    let invalid_cron_spression = "0 0 */1 *";
+    let mutation_code = FlowConfigHarness::set_config_cron_expression_multation(
+        &create_result.dataset_handle.id,
+        "INGEST",
+        true,
+        &invalid_cron_spression,
+    );
+
+    let res = schema
+        .execute(
+            async_graphql::Request::new(mutation_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+    assert!(res.is_err(), "{:?}", res);
+    assert_eq!(
+        res.errors[0].message,
+        format!("Cron expression {} is invalid", invalid_cron_spression)
+    );
+
+    // Try to pass valid cron expression from past
+    let past_cron_spression = "0 0 0 1 JAN ? 2024";
+    let mutation_code = FlowConfigHarness::set_config_cron_expression_multation(
+        &create_result.dataset_handle.id,
+        "INGEST",
+        true,
+        &past_cron_spression,
+    );
+
+    let res = schema
+        .execute(
+            async_graphql::Request::new(mutation_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+    assert!(res.is_err(), "{:?}", res);
+    assert_eq!(
+        res.errors[0].message,
+        format!(
+            "Cron expression {} iteration has been exceeded",
+            past_cron_spression
+        )
     );
 }
 
