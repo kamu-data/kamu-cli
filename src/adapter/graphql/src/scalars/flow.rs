@@ -11,17 +11,43 @@ use crate::prelude::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
+#[derive(SimpleObject, Clone, PartialEq, Eq)]
 pub struct Flow {
     pub flow_id: u64,
+    pub status: FlowStatus,
+    pub outcome: Option<FlowOutcome>,
 }
 
 impl From<kamu_flow_system::FlowState> for Flow {
     fn from(value: kamu_flow_system::FlowState) -> Self {
         Self {
             flow_id: value.flow_id.into(),
+            status: value.status().into(),
+            outcome: value.outcome.map(Into::into),
         }
     }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Enum, Copy, Clone, Eq, PartialEq)]
+#[graphql(remote = "kamu_flow_system::FlowStatus")]
+pub enum FlowStatus {
+    Draft,
+    Queued,
+    Scheduled,
+    Finished,
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Enum, Copy, Clone, Eq, PartialEq)]
+#[graphql(remote = "kamu_flow_system::FlowOutcome")]
+pub enum FlowOutcome {
+    Success,
+    Failed,
+    Cancelled,
+    Aborted,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

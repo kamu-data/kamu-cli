@@ -14,7 +14,7 @@ use crate::prelude::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
+#[derive(SimpleObject, Clone, PartialEq, Eq)]
 pub struct FlowConfiguration {
     pub paused: bool,
     pub schedule: Option<FlowConfigurationSchedule>,
@@ -49,13 +49,13 @@ impl From<kamu_flow_system::FlowConfigurationState> for FlowConfiguration {
     }
 }
 
-#[derive(Union, Debug, Clone, PartialEq, Eq)]
+#[derive(Union, Clone, PartialEq, Eq)]
 pub enum FlowConfigurationSchedule {
     TimeDelta(TimeDelta),
     Cron(CronExpression),
 }
 
-#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
+#[derive(SimpleObject, Clone, PartialEq, Eq)]
 pub struct FlowConfigurationBatching {
     pub throttling_period: Option<TimeDelta>,
     pub minimal_data_batch: Option<i32>,
@@ -63,7 +63,7 @@ pub struct FlowConfigurationBatching {
 
 /////////////////////////////////////////////////////////////////////////////////
 
-#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
+#[derive(SimpleObject, Clone, PartialEq, Eq)]
 pub struct CronExpression {
     pub cron_expression: String,
 }
@@ -78,13 +78,13 @@ impl From<CronSchedule> for CronExpression {
 
 /////////////////////////////////////////////////////////////////////////////////
 
-#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
+#[derive(SimpleObject, Clone, PartialEq, Eq)]
 pub struct TimeDelta {
     pub every: u32,
     pub unit: TimeUnit,
 }
 
-#[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Enum, Clone, Copy, PartialEq, Eq)]
 pub enum TimeUnit {
     Minutes,
     Hours,

@@ -591,6 +591,8 @@ type FetchStepUrl {
 
 type Flow {
 	flowId: Int!
+	status: FlowStatus!
+	outcome: FlowOutcome
 }
 
 type FlowConfiguration {
@@ -610,6 +612,20 @@ type FlowIncompatibleDatasetKind implements SetFlowConfigResult & TriggerFlowRes
 	expectedDatasetKind: DatasetKind!
 	actualDatasetKind: DatasetKind!
 	message: String!
+}
+
+enum FlowOutcome {
+	SUCCESS
+	FAILED
+	CANCELLED
+	ABORTED
+}
+
+enum FlowStatus {
+	DRAFT
+	QUEUED
+	SCHEDULED
+	FINISHED
 }
 
 

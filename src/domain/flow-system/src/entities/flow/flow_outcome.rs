@@ -11,13 +11,13 @@
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FlowOutcome {
-    /// Update succeeded
+    /// Flow succeeded
     Success,
-    /// Update failed to complete, even after retry logic
+    /// Flow failed to complete, even after retry logic
     Failed,
-    /// Update was cancelled by a user
+    /// Flow was cancelled by a user
     Cancelled,
-    /// Update was aborted by system by force
+    /// Flow was aborted by system by force
     Aborted,
 }
 
