@@ -404,8 +404,8 @@ async fn test_cancel_foreign_flow_fails() {
                     "flows": {
                         "runs": {
                             "cancelFlow": {
-                                "__typename": "FlowUnmatchedInDataset",
-                                "message": "Flow '0' does not belong to dataset 'bar'",
+                                "__typename": "FlowNotFound",
+                                "message": "Flow '0' was not found",
                             }
                         }
                     }
@@ -524,6 +524,29 @@ async fn test_cancel_already_succeeded_flow() {
         .await;
 
     assert!(res.is_ok(), "{:?}", res);
+    assert_eq!(
+        res.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "flows": {
+                        "runs": {
+                            "cancelFlow": {
+                                "__typename": "CancelFlowSuccess",
+                                "message": "Success",
+                                "flow": {
+                                    "__typename": "Flow",
+                                    "flowId": flow_id,
+                                    "status": "FINISHED",
+                                    "outcome": "SUCCESS"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////

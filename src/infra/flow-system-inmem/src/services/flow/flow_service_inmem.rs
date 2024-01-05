@@ -697,15 +697,7 @@ impl FlowService for FlowServiceInMemory {
                     .await
                     .int_err()?;
             }
-            FlowStatus::Finished => {
-                if let Some(flow_outcome) = flow.outcome
-                    && flow_outcome != FlowOutcome::Cancelled
-                {
-                    return Err(CancelFlowError::AlreadyFinished(CancelFinishedFlowError {
-                        flow_id,
-                    }));
-                }
-            }
+            FlowStatus::Finished => { /* Skip, idempotence */ }
         }
 
         Ok(flow.into())

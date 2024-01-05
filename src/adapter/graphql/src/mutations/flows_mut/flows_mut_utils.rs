@@ -10,7 +10,7 @@
 use kamu_core::GetSummaryOpts;
 use {kamu_flow_system as fs, opendatafabric as odf};
 
-use super::{FlowNotFound, FlowUnmatchedInDataset};
+use super::FlowNotFound;
 use crate::prelude::*;
 use crate::utils;
 
@@ -42,7 +42,6 @@ pub(crate) async fn ensure_scheduling_permission(
 #[graphql(field(name = "message", ty = "String"))]
 pub(crate) enum FlowInDatasetError {
     NotFound(FlowNotFound),
-    UnmatchedInDataset(FlowUnmatchedInDataset),
 }
 
 pub(crate) async fn check_if_flow_belongs_to_dataset(
@@ -56,21 +55,11 @@ pub(crate) async fn check_if_flow_belongs_to_dataset(
         Ok(flow_state) => match flow_state.flow_key {
             fs::FlowKey::Dataset(fk_dataset) => {
                 if fk_dataset.dataset_id != dataset_handle.id {
-                    return Ok(Some(FlowInDatasetError::UnmatchedInDataset(
-                        FlowUnmatchedInDataset {
-                            flow_id,
-                            dataset_alias: dataset_handle.alias.clone().into(),
-                        },
-                    )));
+                    return Ok(Some(FlowInDatasetError::NotFound(FlowNotFound { flow_id })));
                 }
             }
             fs::FlowKey::System(_) => {
-                return Ok(Some(FlowInDatasetError::UnmatchedInDataset(
-                    FlowUnmatchedInDataset {
-                        flow_id,
-                        dataset_alias: dataset_handle.alias.clone().into(),
-                    },
-                )))
+                return Ok(Some(FlowInDatasetError::NotFound(FlowNotFound { flow_id })))
             }
         },
         Err(e) => match e {

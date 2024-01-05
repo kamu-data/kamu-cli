@@ -28,23 +28,3 @@ impl FlowNotFound {
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-
-#[derive(SimpleObject, Debug, Clone)]
-#[graphql(complex)]
-pub(crate) struct FlowUnmatchedInDataset {
-    pub flow_id: FlowID,
-    pub dataset_alias: DatasetAlias,
-}
-
-#[ComplexObject]
-impl FlowUnmatchedInDataset {
-    pub async fn message(&self) -> String {
-        let flow_id: fs::FlowID = self.flow_id.into();
-        format!(
-            "Flow '{}' does not belong to dataset '{}'",
-            flow_id, self.dataset_alias
-        )
-    }
-}
-
-///////////////////////////////////////////////////////////////////////////////

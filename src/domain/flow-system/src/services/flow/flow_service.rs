@@ -138,8 +138,6 @@ pub enum CancelFlowError {
     #[error(transparent)]
     NotFound(#[from] FlowNotFoundError),
     #[error(transparent)]
-    AlreadyFinished(#[from] CancelFinishedFlowError),
-    #[error(transparent)]
     Internal(#[from] InternalError),
 }
 

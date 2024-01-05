@@ -91,11 +91,6 @@ type BlockRef {
 }
 
 
-type CancelFlowAlreadyFinished implements CancelFlowResult {
-	flowId: FlowID!
-	message: String!
-}
-
 interface CancelFlowResult {
 	message: String!
 }
@@ -633,12 +628,6 @@ enum FlowStatus {
 	QUEUED
 	SCHEDULED
 	FINISHED
-}
-
-type FlowUnmatchedInDataset implements CancelFlowResult {
-	flowId: FlowID!
-	datasetAlias: DatasetAlias!
-	message: String!
 }
 
 
