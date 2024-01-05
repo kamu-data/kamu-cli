@@ -91,11 +91,6 @@ type BlockRef {
 }
 
 
-type CancelFlowNotFound implements CancelFlowResult {
-	flowId: Int!
-	message: String!
-}
-
 interface CancelFlowResult {
 	message: String!
 }
@@ -324,7 +319,7 @@ type DatasetFlowConfigsMut {
 
 type DatasetFlowRunsMut {
 	triggerFlow(datasetFlowType: DatasetFlowType!): TriggerFlowResult!
-	cancelFlow(flowId: Int!): CancelFlowResult!
+	cancelFlow(flowId: FlowID!): CancelFlowResult!
 }
 
 enum DatasetFlowType {
@@ -590,7 +585,7 @@ type FetchStepUrl {
 
 
 type Flow {
-	flowId: Int!
+	flowId: FlowID!
 	status: FlowStatus!
 	outcome: FlowOutcome
 }
@@ -608,9 +603,16 @@ type FlowConfigurationBatching {
 
 union FlowConfigurationSchedule = TimeDelta | CronExpression
 
+scalar FlowID
+
 type FlowIncompatibleDatasetKind implements SetFlowConfigResult & TriggerFlowResult {
 	expectedDatasetKind: DatasetKind!
 	actualDatasetKind: DatasetKind!
+	message: String!
+}
+
+type FlowNotFound implements CancelFlowResult {
+	flowId: FlowID!
 	message: String!
 }
 
@@ -626,6 +628,12 @@ enum FlowStatus {
 	QUEUED
 	SCHEDULED
 	FINISHED
+}
+
+type FlowUnmatchedInDataset implements CancelFlowResult {
+	flowId: FlowID!
+	datasetAlias: DatasetAlias!
+	message: String!
 }
 
 

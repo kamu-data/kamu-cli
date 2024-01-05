@@ -8,11 +8,13 @@
 // by the Apache License, Version 2.0.
 
 mod dataset_flow_configs_mut;
+mod dataset_flow_errors;
 mod dataset_flow_runs_mut;
 mod dataset_flows_mut;
 mod flows_mut_utils;
 
 pub(crate) use dataset_flow_configs_mut::*;
+pub(crate) use dataset_flow_errors::*;
 pub(crate) use dataset_flow_runs_mut::*;
 pub(crate) use dataset_flows_mut::*;
 pub(crate) use flows_mut_utils::*;

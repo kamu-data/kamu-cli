@@ -8,8 +8,9 @@
 // by the Apache License, Version 2.0.
 
 use kamu_core::GetSummaryOpts;
-use opendatafabric as odf;
+use {kamu_flow_system as fs, opendatafabric as odf};
 
+use super::{FlowNotFound, FlowUnmatchedInDataset};
 use crate::prelude::*;
 use crate::utils;
 
@@ -33,6 +34,54 @@ pub(crate) async fn ensure_scheduling_permission(
         })?;
 
     Ok(())
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+#[derive(Interface, Clone)]
+#[graphql(field(name = "message", ty = "String"))]
+pub(crate) enum FlowInDatasetError {
+    NotFound(FlowNotFound),
+    UnmatchedInDataset(FlowUnmatchedInDataset),
+}
+
+pub(crate) async fn check_if_flow_belongs_to_dataset(
+    ctx: &Context<'_>,
+    flow_id: FlowID,
+    dataset_handle: &odf::DatasetHandle,
+) -> Result<Option<FlowInDatasetError>> {
+    let flow_service = from_catalog::<dyn fs::FlowService>(ctx).unwrap();
+
+    match flow_service.get_flow(flow_id.into()).await {
+        Ok(flow_state) => match flow_state.flow_key {
+            fs::FlowKey::Dataset(fk_dataset) => {
+                if fk_dataset.dataset_id != dataset_handle.id {
+                    return Ok(Some(FlowInDatasetError::UnmatchedInDataset(
+                        FlowUnmatchedInDataset {
+                            flow_id,
+                            dataset_alias: dataset_handle.alias.clone().into(),
+                        },
+                    )));
+                }
+            }
+            fs::FlowKey::System(_) => {
+                return Ok(Some(FlowInDatasetError::UnmatchedInDataset(
+                    FlowUnmatchedInDataset {
+                        flow_id,
+                        dataset_alias: dataset_handle.alias.clone().into(),
+                    },
+                )))
+            }
+        },
+        Err(e) => match e {
+            fs::GetFlowError::NotFound(_) => {
+                return Ok(Some(FlowInDatasetError::NotFound(FlowNotFound { flow_id })))
+            }
+            fs::GetFlowError::Internal(e) => return Err(GqlError::Internal(e)),
+        },
+    }
+
+    Ok(None)
 }
 
 ///////////////////////////////////////////////////////////////////////////////

@@ -8,12 +8,13 @@
 // by the Apache License, Version 2.0.
 
 use crate::prelude::*;
+use crate::scalars::FlowID;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(SimpleObject, Clone, PartialEq, Eq)]
 pub struct Flow {
-    pub flow_id: u64,
+    pub flow_id: FlowID,
     pub status: FlowStatus,
     pub outcome: Option<FlowOutcome>,
 }
