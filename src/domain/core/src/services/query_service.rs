@@ -74,7 +74,7 @@ pub struct EngineDesc {
     /// Intended for use in UI for quick engine identification and selection
     pub name: String,
     /// Language and dialect this engine is using for queries
-    /// Indended for configuring correct code highlighting and completion
+    /// Indented for configuring correct code highlighting and completion
     pub dialect: QueryDialect,
     /// OCI image repository and a tag of the latest engine image, e.g.
     /// "ghcr.io/kamu-data/engine-datafusion:0.1.2"

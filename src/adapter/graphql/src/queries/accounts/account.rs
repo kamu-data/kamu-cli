@@ -103,7 +103,7 @@ impl Account {
         &self.account_name
     }
 
-    /// Unique and stable identitfier of this account
+    /// Unique and stable identifier of this account
     async fn id(&self) -> &AccountID {
         &self.account_id
     }

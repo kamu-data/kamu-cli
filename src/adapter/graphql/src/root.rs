@@ -32,7 +32,7 @@ impl Query {
 
     /// Dataset-related functionality group.
     ///
-    /// Datasets are historical streams of events recorded under a cetrain
+    /// Datasets are historical streams of events recorded under a certain
     /// schema.
     async fn datasets(&self) -> Datasets {
         Datasets
@@ -81,7 +81,7 @@ impl Mutation {
 
     /// Dataset-related functionality group.
     ///
-    /// Datasets are historical streams of events recorded under a cetrain
+    /// Datasets are historical streams of events recorded under a certain
     /// schema.
     async fn datasets(&self) -> DatasetsMut {
         DatasetsMut

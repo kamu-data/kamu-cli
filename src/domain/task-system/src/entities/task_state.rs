@@ -17,7 +17,7 @@ use crate::*;
 /// Represents the state of the task at specific point in time (projection)
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TaskState {
-    /// Unique and stable identitfier of this task
+    /// Unique and stable identifier of this task
     pub task_id: TaskID,
     /// Life-cycle status of a task
     pub status: TaskStatus,

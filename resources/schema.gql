@@ -9,7 +9,7 @@ directive @oneOf on INPUT_OBJECT
 
 type Account {
 	"""
-	Unique and stable identitfier of this account
+	Unique and stable identifier of this account
 	"""
 	id: AccountID!
 	"""
@@ -529,7 +529,7 @@ type EngineDesc {
 	name: String!
 	"""
 	Language and dialect this engine is using for queries
-	Indended for configuring code highlighting and completions.
+	Indented for configuring code highlighting and completions.
 	"""
 	dialect: QueryDialect!
 	"""
@@ -754,7 +754,7 @@ type Mutation {
 	"""
 	Dataset-related functionality group.
 	
-	Datasets are historical streams of events recorded under a cetrain
+	Datasets are historical streams of events recorded under a certain
 	schema.
 	"""
 	datasets: DatasetsMut!
@@ -819,7 +819,7 @@ type Query {
 	"""
 	Dataset-related functionality group.
 	
-	Datasets are historical streams of events recorded under a cetrain
+	Datasets are historical streams of events recorded under a certain
 	schema.
 	"""
 	datasets: Datasets!
@@ -1060,7 +1060,7 @@ type SqlQueryStep {
 
 type Task {
 	"""
-	Unique and stable identitfier of this task
+	Unique and stable identifier of this task
 	"""
 	taskId: TaskID!
 	"""
