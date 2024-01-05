@@ -122,6 +122,34 @@ impl FlowConfigurationService for FlowConfigurationServiceInMemory {
         }
     }
 
+    /// Pause flow configuration
+    async fn pause_flow_configuration(
+        &self,
+        request_time: DateTime<Utc>,
+        flow_key: FlowKey,
+    ) -> Result<(), SetFlowConfigurationError> {
+        let maybe_flow_configuration =
+            FlowConfiguration::try_load(flow_key.clone(), self.event_store.as_ref()).await?;
+
+        if let Some(mut flow_configuration) = maybe_flow_configuration {
+            if flow_configuration.is_active() {
+                flow_configuration
+                    .pause_configuration(self.time_source.now())
+                    .int_err()?;
+
+                flow_configuration
+                    .save(self.event_store.as_ref())
+                    .await
+                    .int_err()?;
+
+                self.publish_flow_configuration_modified(&flow_configuration, request_time)
+                    .await?;
+            }
+        }
+
+        Ok(())
+    }
+
     /// Lists all enabled configurations
     fn list_enabled_configurations(&self) -> FlowConfigurationStateStream {
         // Note: terribly ineffecient - walks over events multiple times

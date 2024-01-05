@@ -91,6 +91,11 @@ type BlockRef {
 }
 
 
+type CancelFlowAlreadyFinished implements CancelFlowResult {
+	flowId: FlowID!
+	message: String!
+}
+
 interface CancelFlowResult {
 	message: String!
 }

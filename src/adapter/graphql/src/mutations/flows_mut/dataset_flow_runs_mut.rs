@@ -101,6 +101,9 @@ impl DatasetFlowRunsMut {
                 flow: flow_state.into(),
             })),
             Err(e) => match e {
+                fs::CancelFlowError::AlreadyFinished(_) => Ok(CancelFlowResult::AlreadyFinished(
+                    CancelFlowAlreadyFinished { flow_id },
+                )),
                 fs::CancelFlowError::NotFound(_) => unreachable!("Flow checked already"),
                 fs::CancelFlowError::Internal(e) => Err(GqlError::Internal(e)),
             },
@@ -136,6 +139,7 @@ impl TriggerFlowSuccess {
 #[graphql(field(name = "message", ty = "String"))]
 pub enum CancelFlowResult {
     Success(CancelFlowSuccess),
+    AlreadyFinished(CancelFlowAlreadyFinished),
     NotFound(FlowNotFound),
     UnmatchedInDataset(FlowUnmatchedInDataset),
 }
@@ -150,6 +154,19 @@ pub struct CancelFlowSuccess {
 impl CancelFlowSuccess {
     pub async fn message(&self) -> String {
         format!("Success")
+    }
+}
+
+#[derive(SimpleObject, Clone)]
+#[graphql(complex)]
+pub struct CancelFlowAlreadyFinished {
+    pub flow_id: FlowID,
+}
+
+#[ComplexObject]
+impl CancelFlowAlreadyFinished {
+    pub async fn message(&self) -> String {
+        format!("Cancelling already finished flows is not allowed")
     }
 }
 

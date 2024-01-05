@@ -138,6 +138,8 @@ pub enum CancelFlowError {
     #[error(transparent)]
     NotFound(#[from] FlowNotFoundError),
     #[error(transparent)]
+    AlreadyFinished(#[from] CancelFinishedFlowError),
+    #[error(transparent)]
     Internal(#[from] InternalError),
 }
 
@@ -146,6 +148,12 @@ pub enum CancelFlowError {
 #[derive(thiserror::Error, Debug)]
 #[error("Flow {flow_id} not found")]
 pub struct FlowNotFoundError {
+    pub flow_id: FlowID,
+}
+
+#[derive(thiserror::Error, Debug)]
+#[error("Flow {flow_id} has already finished")]
+pub struct CancelFinishedFlowError {
     pub flow_id: FlowID,
 }
 

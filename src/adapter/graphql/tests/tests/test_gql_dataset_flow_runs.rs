@@ -12,19 +12,21 @@
 use std::sync::Arc;
 
 use async_graphql::{value, Value};
+use chrono::Utc;
 use dill::Component;
 use event_bus::EventBus;
 use indoc::indoc;
 use kamu::testing::MetadataFactory;
 use kamu::{DatasetRepositoryLocalFs, DependencyGraphServiceInMemory};
 use kamu_core::{auth, CreateDatasetResult, DatasetRepository, SystemTimeSourceDefault};
-use kamu_flow_system::FlowServiceRunConfig;
+use kamu_flow_system::{FlowEventStore, FlowServiceRunConfig};
 use kamu_flow_system_inmem::{
     FlowConfigurationEventStoreInMem,
     FlowConfigurationServiceInMemory,
     FlowEventStoreInMem,
     FlowServiceInMemory,
 };
+use kamu_task_system::TaskID;
 use kamu_task_system_inmem::{TaskSchedulerInMemory, TaskSystemEventStoreInMemory};
 use opendatafabric::{DatasetID, DatasetKind};
 
@@ -416,6 +418,117 @@ async fn test_cancel_foreign_flow_fails() {
 ////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_cancel_already_cancelled_flow() {
+    let harness = FlowRunsHarness::new();
+    let create_result = harness.create_root_dataset().await;
+
+    let mutation_code =
+        FlowRunsHarness::trigger_flow_mutation(&create_result.dataset_handle.id, "INGEST");
+
+    let schema = kamu_adapter_graphql::schema_quiet();
+    let res = schema
+        .execute(
+            async_graphql::Request::new(mutation_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(res.is_ok(), "{:?}", res);
+    let res_json = res.data.into_json().unwrap();
+    let flow_id = res_json["datasets"]["byId"]["flows"]["runs"]["triggerFlow"]["flow"]["flowId"]
+        .as_str()
+        .unwrap();
+
+    let mutation_code =
+        FlowRunsHarness::cancel_flow_mutation(&create_result.dataset_handle.id, flow_id);
+
+    let res = schema
+        .execute(
+            async_graphql::Request::new(mutation_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(res.is_ok(), "{:?}", res);
+
+    // Apply 2nd time
+    let res = schema
+        .execute(
+            async_graphql::Request::new(mutation_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(res.is_ok(), "{:?}", res);
+
+    assert_eq!(
+        res.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "flows": {
+                        "runs": {
+                            "cancelFlow": {
+                                "__typename": "CancelFlowSuccess",
+                                "message": "Success",
+                                "flow": {
+                                    "__typename": "Flow",
+                                    "flowId": flow_id,
+                                    "status": "FINISHED",
+                                    "outcome": "CANCELLED"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_cancel_already_succeeded_flow() {
+    let harness = FlowRunsHarness::new();
+    let create_result = harness.create_root_dataset().await;
+
+    let mutation_code =
+        FlowRunsHarness::trigger_flow_mutation(&create_result.dataset_handle.id, "INGEST");
+
+    let schema = kamu_adapter_graphql::schema_quiet();
+    let res = schema
+        .execute(
+            async_graphql::Request::new(mutation_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    // TODO: extract flow ID
+    assert!(res.is_ok(), "{:?}", res);
+    let res_json = res.data.into_json().unwrap();
+    let flow_id = res_json["datasets"]["byId"]["flows"]["runs"]["triggerFlow"]["flow"]["flowId"]
+        .as_str()
+        .unwrap();
+
+    harness.mimic_flow_completed(flow_id).await;
+
+    let mutation_code =
+        FlowRunsHarness::cancel_flow_mutation(&create_result.dataset_handle.id, flow_id);
+
+    let res = schema
+        .execute(
+            async_graphql::Request::new(mutation_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(res.is_ok(), "{:?}", res);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_anonymous_operation_fails() {
     let harness = FlowRunsHarness::new();
 
@@ -519,6 +632,31 @@ impl FlowRunsHarness {
             )
             .await
             .unwrap()
+    }
+
+    async fn mimic_flow_completed(&self, flow_id: &str) {
+        let flow_event_store = self
+            .catalog_authorized
+            .get_one::<dyn FlowEventStore>()
+            .unwrap();
+
+        use kamu_flow_system::{Flow, FlowID};
+
+        let flow_id = FlowID::new(flow_id.parse::<u64>().unwrap());
+        let mut flow = Flow::load(flow_id, flow_event_store.as_ref())
+            .await
+            .unwrap();
+
+        let random_task_id = TaskID::new(12345);
+        flow.on_task_scheduled(Utc::now(), random_task_id).unwrap();
+        flow.on_task_finished(
+            Utc::now(),
+            random_task_id,
+            kamu_task_system::TaskOutcome::Success,
+        )
+        .unwrap();
+
+        flow.save(flow_event_store.as_ref()).await.unwrap();
     }
 
     fn trigger_flow_mutation(id: &DatasetID, dataset_flow_type: &str) -> String {

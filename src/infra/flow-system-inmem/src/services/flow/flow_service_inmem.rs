@@ -416,11 +416,24 @@ impl FlowServiceInMemory {
     }
 
     async fn abort_flow(&self, flow_id: FlowID) -> Result<(), InternalError> {
+        // Mark flow as aborted
         let mut flow = Flow::load(flow_id, self.flow_event_store.as_ref())
             .await
             .int_err()?;
         flow.abort(self.time_source.now()).int_err()?;
         flow.save(self.flow_event_store.as_ref()).await.int_err()?;
+
+        // Cancel associated tasks, but first drop task -> flow associations
+        {
+            let mut state = self.state.lock().unwrap();
+            for task_id in &flow.task_ids {
+                state.pending_flows.untrack_flow_by_task(*task_id);
+            }
+        }
+        for task_id in &flow.task_ids {
+            self.task_scheduler.cancel_task(*task_id).await.int_err()?;
+        }
+
         Ok(())
     }
 }
@@ -670,20 +683,29 @@ impl FlowService for FlowServiceInMemory {
     ) -> Result<FlowState, CancelFlowError> {
         let mut flow = Flow::load(flow_id, self.flow_event_store.as_ref()).await?;
 
-        if flow.can_cancel() {
-            flow.cancel(self.time_source.now(), by_account_id, by_account_name)
-                .int_err()?;
-            flow.save(self.flow_event_store.as_ref()).await.int_err()?;
+        // Flow might be in a queued state - no tasks have been scheduled yet
+        match flow.status() {
+            FlowStatus::Draft | FlowStatus::Queued | FlowStatus::Scheduled => {
+                // Cancel pending flow
+                flow.cancel(self.time_source.now(), by_account_id, by_account_name)
+                    .int_err()?;
+                flow.save(self.flow_event_store.as_ref()).await.int_err()?;
 
-            let mut state = self.state.lock().unwrap();
-            if state.time_wheel.is_flow_activation_planned(flow_id) {
-                state
-                    .time_wheel
-                    .cancel_flow_activation(flow_id)
-                    .map_err(|e| CancelFlowError::Internal(e.int_err()))?;
+                // Pause flow config, until re-enabled - this will trigger safe abortion flow
+                self.flow_configuration_service
+                    .pause_flow_configuration(self.time_source.now(), flow.flow_key.clone())
+                    .await
+                    .int_err()?;
             }
-
-            state.pending_flows.drop_pending_flow(&flow.flow_key);
+            FlowStatus::Finished => {
+                if let Some(flow_outcome) = flow.outcome
+                    && flow_outcome != FlowOutcome::Cancelled
+                {
+                    return Err(CancelFlowError::AlreadyFinished(CancelFinishedFlowError {
+                        flow_id,
+                    }));
+                }
+            }
         }
 
         Ok(flow.into())
@@ -777,6 +799,7 @@ impl AsyncEventHandler<FlowConfigurationEventModified> for FlowServiceInMemory {
                 };
 
                 state.active_configs.drop_flow_config(&event.flow_key);
+
                 let maybe_pending_flow_id = state.pending_flows.drop_pending_flow(&event.flow_key);
                 if let Some(flow_id) = &maybe_pending_flow_id {
                     state
@@ -790,8 +813,6 @@ impl AsyncEventHandler<FlowConfigurationEventModified> for FlowServiceInMemory {
             if let Some(flow_id) = maybe_pending_flow_id {
                 self.abort_flow(flow_id).await?;
             }
-
-            // TODO: should we abort scheduled tasks?
         } else {
             {
                 let state = self.state.lock().unwrap();

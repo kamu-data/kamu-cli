@@ -113,11 +113,6 @@ impl Flow {
         self.apply(event)
     }
 
-    /// Checks if flow may be cancelled
-    pub fn can_cancel(&self) -> bool {
-        self.0.as_state().can_cancel()
-    }
-
     /// Cancel flow before task started
     pub fn cancel(
         &mut self,
