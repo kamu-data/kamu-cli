@@ -49,7 +49,7 @@ pub struct InvalidCronExpressionError {
 }
 
 #[derive(Error, Debug)]
-#[error("Cron expression {expression} iteration has been exceed")]
+#[error("Cron expression {expression} iteration has been exceeded")]
 pub struct CronExpressionIterationError {
     pub expression: String,
 }
@@ -79,17 +79,11 @@ impl Schedule {
             )),
         }
     }
-    pub fn next_activation_time(&self, now: DateTime<Utc>) -> Result<DateTime<Utc>, ScheduleError> {
+
+    pub fn next_activation_time(&self, now: DateTime<Utc>) -> Option<DateTime<Utc>> {
         match self {
-            Schedule::TimeDelta(td) => Ok(now + td.every),
-            Schedule::CronExpression(ce) => match ce.upcoming(Utc).next() {
-                Some(nct) => Ok(nct),
-                None => Err(ScheduleError::CronExpressionIterationExceed(
-                    CronExpressionIterationError {
-                        expression: ce.to_string(),
-                    },
-                )),
-            },
+            Schedule::TimeDelta(td) => Some(now + td.every),
+            Schedule::CronExpression(ce) => ce.upcoming(Utc).next(),
         }
     }
 }
@@ -109,3 +103,62 @@ impl From<String> for Schedule {
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(test)]
+mod tests {
+    use chrono::prelude::*;
+
+    use super::*;
+
+    #[test]
+    fn test_validate_invalid_expression() {
+        // Try to pass invalid cron expression
+        let invalid_cron_expression = "invalid".to_string();
+        let err_result =
+            Schedule::validate_cron_expression(invalid_cron_expression.clone()).unwrap_err();
+
+        assert_eq!(
+            err_result.to_string(),
+            format!("Cron expression {} is invalid", &invalid_cron_expression),
+        );
+    }
+
+    #[test]
+    fn test_validate_expired_expression() {
+        // Try to pass invalid cron expression
+        let expired_cron_expression = "0 0 0 1 JAN ? 2024".to_string();
+        let err_result =
+            Schedule::validate_cron_expression(expired_cron_expression.clone()).unwrap_err();
+
+        assert_eq!(
+            err_result.to_string(),
+            format!(
+                "Cron expression {} iteration has been exceeded",
+                &expired_cron_expression
+            ),
+        );
+    }
+
+    #[test]
+    fn test_get_next_time_from_expression() {
+        let cron_expression: Schedule = "0 0 0 1 JAN ? *".to_string().into();
+
+        let current_year = Utc::now().year();
+        let expected_time = Utc
+            .with_ymd_and_hms(current_year + 1, 1, 1, 0, 0, 0)
+            .unwrap();
+
+        let cron_time = cron_expression.next_activation_time(Utc::now()).unwrap();
+
+        assert_eq!(cron_time, expected_time);
+    }
+
+    // Should return None if cron expression has no more iteration
+    #[test]
+    fn test_get_next_time_from_expired_expression() {
+        let cron_expression: Schedule = "0 0 0 1 JAN ? 2024".to_string().into();
+        let cron_time = cron_expression.next_activation_time(Utc::now());
+
+        assert_eq!(cron_time, None);
+    }
+}

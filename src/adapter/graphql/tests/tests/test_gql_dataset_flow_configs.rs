@@ -357,7 +357,7 @@ async fn test_crud_cron_root_dataset() {
     assert_eq!(
         res.errors[0].message,
         format!(
-            "Cron expression {} iteration has been exceed",
+            "Cron expression {} iteration has been exceeded",
             past_cron_spression
         )
     );

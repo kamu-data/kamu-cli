@@ -3521,6 +3521,7 @@ dependencies = [
  "enum-variants",
  "event-sourcing",
  "internal-error",
+ "kamu",
  "kamu-core",
  "kamu-task-system",
  "opendatafabric",
