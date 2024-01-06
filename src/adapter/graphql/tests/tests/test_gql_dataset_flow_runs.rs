@@ -11,20 +11,28 @@
 
 use std::sync::Arc;
 
-use async_graphql::value;
+use async_graphql::{value, Value};
+use chrono::Utc;
 use dill::Component;
 use event_bus::EventBus;
 use indoc::indoc;
-use kamu::testing::MetadataFactory;
+use kamu::testing::{MetadataFactory, MockDependencyGraphRepository};
 use kamu::{DatasetRepositoryLocalFs, DependencyGraphServiceInMemory};
-use kamu_core::{auth, CreateDatasetResult, DatasetRepository, SystemTimeSourceDefault};
-use kamu_flow_system::FlowServiceRunConfig;
+use kamu_core::{
+    auth,
+    CreateDatasetResult,
+    DatasetRepository,
+    DependencyGraphRepository,
+    SystemTimeSourceDefault,
+};
+use kamu_flow_system::{FlowID, FlowServiceRunConfig, FlowServiceTestDriver};
 use kamu_flow_system_inmem::{
     FlowConfigurationEventStoreInMem,
     FlowConfigurationServiceInMemory,
     FlowEventStoreInMem,
     FlowServiceInMemory,
 };
+use kamu_task_system::{TaskEventFinished, TaskID, TaskOutcome};
 use kamu_task_system_inmem::{TaskSchedulerInMemory, TaskSystemEventStoreInMemory};
 use opendatafabric::{DatasetID, DatasetKind};
 
@@ -41,16 +49,16 @@ async fn test_trigger_ingest_root_dataset() {
         FlowRunsHarness::trigger_flow_mutation(&create_result.dataset_handle.id, "INGEST");
 
     let schema = kamu_adapter_graphql::schema_quiet();
-    let res = schema
+    let response = schema
         .execute(
             async_graphql::Request::new(mutation_code.clone())
                 .data(harness.catalog_authorized.clone()),
         )
         .await;
 
-    assert!(res.is_ok(), "{:?}", res);
+    assert!(response.is_ok(), "{:?}", response);
     assert_eq!(
-        res.data,
+        response.data,
         value!({
             "datasets": {
                 "byId": {
@@ -61,7 +69,9 @@ async fn test_trigger_ingest_root_dataset() {
                                 "message": "Success",
                                 "flow": {
                                     "__typename": "Flow",
-                                    "flowId": 0
+                                    "flowId": "0",
+                                    "status": "QUEUED",
+                                    "outcome": Value::Null
                                 }
                             }
                         }
@@ -86,16 +96,16 @@ async fn test_trigger_execute_query_derived_dataset() {
     );
 
     let schema = kamu_adapter_graphql::schema_quiet();
-    let res = schema
+    let response = schema
         .execute(
             async_graphql::Request::new(mutation_code.clone())
                 .data(harness.catalog_authorized.clone()),
         )
         .await;
 
-    assert!(res.is_ok(), "{:?}", res);
+    assert!(response.is_ok(), "{:?}", response);
     assert_eq!(
-        res.data,
+        response.data,
         value!({
             "datasets": {
                 "byId": {
@@ -106,7 +116,9 @@ async fn test_trigger_execute_query_derived_dataset() {
                                 "message": "Success",
                                 "flow": {
                                     "__typename": "Flow",
-                                    "flowId": 0
+                                    "flowId": "0",
+                                    "status": "QUEUED",
+                                    "outcome": Value::Null
                                 }
                             }
                         }
@@ -135,16 +147,16 @@ async fn test_incorrect_dataset_kinds_for_flow_type() {
 
     let schema = kamu_adapter_graphql::schema_quiet();
 
-    let res = schema
+    let response = schema
         .execute(
             async_graphql::Request::new(mutation_code.clone())
                 .data(harness.catalog_authorized.clone()),
         )
         .await;
 
-    assert!(res.is_ok(), "{:?}", res);
+    assert!(response.is_ok(), "{:?}", response);
     assert_eq!(
-        res.data,
+        response.data,
         value!({
             "datasets": {
                 "byId": {
@@ -166,16 +178,16 @@ async fn test_incorrect_dataset_kinds_for_flow_type() {
     let mutation_code =
         FlowRunsHarness::trigger_flow_mutation(&create_derived_result.dataset_handle.id, "INGEST");
 
-    let res = schema
+    let response = schema
         .execute(
             async_graphql::Request::new(mutation_code.clone())
                 .data(harness.catalog_authorized.clone()),
         )
         .await;
 
-    assert!(res.is_ok(), "{:?}", res);
+    assert!(response.is_ok(), "{:?}", response);
     assert_eq!(
-        res.data,
+        response.data,
         value!({
             "datasets": {
                 "byId": {
@@ -196,7 +208,420 @@ async fn test_incorrect_dataset_kinds_for_flow_type() {
 ////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_anonymous_run_fails() {
+async fn test_cancel_ingest_root_dataset() {
+    let harness = FlowRunsHarness::new();
+    let create_result = harness.create_root_dataset().await;
+
+    let mutation_code =
+        FlowRunsHarness::trigger_flow_mutation(&create_result.dataset_handle.id, "INGEST");
+
+    let schema = kamu_adapter_graphql::schema_quiet();
+    let response = schema
+        .execute(
+            async_graphql::Request::new(mutation_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(response.is_ok(), "{:?}", response);
+    let response_json = response.data.into_json().unwrap();
+    let flow_id = FlowRunsHarness::extract_flow_id_from_trigger_response(&response_json);
+
+    harness.mimic_flow_scheduled(flow_id).await;
+
+    let mutation_code =
+        FlowRunsHarness::cancel_scheduled_tasks_mutation(&create_result.dataset_handle.id, flow_id);
+
+    let res = schema
+        .execute(
+            async_graphql::Request::new(mutation_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(res.is_ok(), "{:?}", res);
+    assert_eq!(
+        res.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "flows": {
+                        "runs": {
+                            "cancelScheduledTasks": {
+                                "__typename": "CancelScheduledTasksSuccess",
+                                "message": "Success",
+                                "flow": {
+                                    "__typename": "Flow",
+                                    "flowId": flow_id,
+                                    "status": "FINISHED",
+                                    "outcome": "ABORTED"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_cancel_transform_derived_dataset() {
+    let harness = FlowRunsHarness::new();
+    harness.create_root_dataset().await;
+    let create_derived_result = harness.create_derived_dataset().await;
+
+    let mutation_code = FlowRunsHarness::trigger_flow_mutation(
+        &create_derived_result.dataset_handle.id,
+        "EXECUTE_QUERY",
+    );
+
+    let schema = kamu_adapter_graphql::schema_quiet();
+    let response = schema
+        .execute(
+            async_graphql::Request::new(mutation_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(response.is_ok(), "{:?}", response);
+    let response_json = response.data.into_json().unwrap();
+    let flow_id = FlowRunsHarness::extract_flow_id_from_trigger_response(&response_json);
+
+    harness.mimic_flow_scheduled(flow_id).await;
+
+    let mutation_code = FlowRunsHarness::cancel_scheduled_tasks_mutation(
+        &create_derived_result.dataset_handle.id,
+        flow_id,
+    );
+
+    let response = schema
+        .execute(
+            async_graphql::Request::new(mutation_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(response.is_ok(), "{:?}", response);
+    assert_eq!(
+        response.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "flows": {
+                        "runs": {
+                            "cancelScheduledTasks": {
+                                "__typename": "CancelScheduledTasksSuccess",
+                                "message": "Success",
+                                "flow": {
+                                    "__typename": "Flow",
+                                    "flowId": flow_id,
+                                    "status": "FINISHED",
+                                    "outcome": "ABORTED"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_cancel_wrong_flow_id_fails() {
+    let harness = FlowRunsHarness::new();
+    let create_result = harness.create_root_dataset().await;
+
+    let mutation_code =
+        FlowRunsHarness::cancel_scheduled_tasks_mutation(&create_result.dataset_handle.id, "5");
+
+    let schema = kamu_adapter_graphql::schema_quiet();
+    let response = schema
+        .execute(
+            async_graphql::Request::new(mutation_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(response.is_ok(), "{:?}", response);
+    assert_eq!(
+        response.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "flows": {
+                        "runs": {
+                            "cancelScheduledTasks": {
+                                "__typename": "FlowNotFound",
+                                "message": "Flow '5' was not found",
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_cancel_foreign_flow_fails() {
+    let harness = FlowRunsHarness::new();
+    let create_root_result = harness.create_root_dataset().await;
+    let create_derived_result = harness.create_derived_dataset().await;
+
+    let mutation_code =
+        FlowRunsHarness::trigger_flow_mutation(&create_root_result.dataset_handle.id, "INGEST");
+
+    let schema = kamu_adapter_graphql::schema_quiet();
+    let response = schema
+        .execute(
+            async_graphql::Request::new(mutation_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(response.is_ok(), "{:?}", response);
+    let response_json = response.data.into_json().unwrap();
+    let flow_id = FlowRunsHarness::extract_flow_id_from_trigger_response(&response_json);
+
+    let mutation_code = FlowRunsHarness::cancel_scheduled_tasks_mutation(
+        &create_derived_result.dataset_handle.id,
+        flow_id,
+    );
+
+    let response = schema
+        .execute(
+            async_graphql::Request::new(mutation_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(response.is_ok(), "{:?}", response);
+    assert_eq!(
+        response.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "flows": {
+                        "runs": {
+                            "cancelScheduledTasks": {
+                                "__typename": "FlowNotFound",
+                                "message": "Flow '0' was not found",
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_cancel_queued_flow_fails() {
+    let harness = FlowRunsHarness::new();
+    let create_result = harness.create_root_dataset().await;
+
+    let mutation_code =
+        FlowRunsHarness::trigger_flow_mutation(&create_result.dataset_handle.id, "INGEST");
+
+    let schema = kamu_adapter_graphql::schema_quiet();
+    let response = schema
+        .execute(
+            async_graphql::Request::new(mutation_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(response.is_ok(), "{:?}", response);
+    let res_json = response.data.into_json().unwrap();
+    let flow_id = res_json["datasets"]["byId"]["flows"]["runs"]["triggerFlow"]["flow"]["flowId"]
+        .as_str()
+        .unwrap();
+
+    // Note: no scheduling!
+
+    let mutation_code =
+        FlowRunsHarness::cancel_scheduled_tasks_mutation(&create_result.dataset_handle.id, flow_id);
+
+    let response = schema
+        .execute(
+            async_graphql::Request::new(mutation_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(response.is_ok(), "{:?}", response);
+    assert_eq!(
+        response.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "flows": {
+                        "runs": {
+                            "cancelScheduledTasks": {
+                                "__typename": "FlowNotScheduled",
+                                "message": format!("Flow '{flow_id}' was not scheduled yet"),
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_cancel_already_cancelled_flow() {
+    let harness = FlowRunsHarness::new();
+    let create_result = harness.create_root_dataset().await;
+
+    let mutation_code =
+        FlowRunsHarness::trigger_flow_mutation(&create_result.dataset_handle.id, "INGEST");
+
+    let schema = kamu_adapter_graphql::schema_quiet();
+    let response = schema
+        .execute(
+            async_graphql::Request::new(mutation_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(response.is_ok(), "{:?}", response);
+    let res_json = response.data.into_json().unwrap();
+    let flow_id = res_json["datasets"]["byId"]["flows"]["runs"]["triggerFlow"]["flow"]["flowId"]
+        .as_str()
+        .unwrap();
+
+    harness.mimic_flow_scheduled(flow_id).await;
+
+    let mutation_code =
+        FlowRunsHarness::cancel_scheduled_tasks_mutation(&create_result.dataset_handle.id, flow_id);
+
+    let response = schema
+        .execute(
+            async_graphql::Request::new(mutation_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(response.is_ok(), "{:?}", response);
+
+    // Apply 2nd time
+    let response = schema
+        .execute(
+            async_graphql::Request::new(mutation_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(response.is_ok(), "{:?}", response);
+
+    assert_eq!(
+        response.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "flows": {
+                        "runs": {
+                            "cancelScheduledTasks": {
+                                "__typename": "CancelScheduledTasksSuccess",
+                                "message": "Success",
+                                "flow": {
+                                    "__typename": "Flow",
+                                    "flowId": flow_id,
+                                    "status": "FINISHED",
+                                    "outcome": "ABORTED"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_cancel_already_succeeded_flow() {
+    let mut dependency_graph_repo_mock = MockDependencyGraphRepository::new();
+    dependency_graph_repo_mock
+        .expect_list_dependencies_of_all_datasets()
+        .return_once(|| Box::pin(futures::stream::empty()));
+
+    let harness = FlowRunsHarness::new_custom(dependency_graph_repo_mock);
+    let create_result: CreateDatasetResult = harness.create_root_dataset().await;
+
+    let mutation_code =
+        FlowRunsHarness::trigger_flow_mutation(&create_result.dataset_handle.id, "INGEST");
+
+    let schema = kamu_adapter_graphql::schema_quiet();
+    let response = schema
+        .execute(
+            async_graphql::Request::new(mutation_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(response.is_ok(), "{:?}", response);
+    let response_json = response.data.into_json().unwrap();
+    let flow_id = FlowRunsHarness::extract_flow_id_from_trigger_response(&response_json);
+
+    let flow_task_id = harness.mimic_flow_scheduled(flow_id).await;
+    harness.mimic_task_completed(flow_task_id).await;
+
+    let mutation_code =
+        FlowRunsHarness::cancel_scheduled_tasks_mutation(&create_result.dataset_handle.id, flow_id);
+
+    let response = schema
+        .execute(
+            async_graphql::Request::new(mutation_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(response.is_ok(), "{:?}", response);
+    assert_eq!(
+        response.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "flows": {
+                        "runs": {
+                            "cancelScheduledTasks": {
+                                "__typename": "CancelScheduledTasksSuccess",
+                                "message": "Success",
+                                "flow": {
+                                    "__typename": "Flow",
+                                    "flowId": flow_id,
+                                    "status": "FINISHED",
+                                    "outcome": "SUCCESS"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_anonymous_operation_fails() {
     let harness = FlowRunsHarness::new();
 
     let create_root_result = harness.create_root_dataset().await;
@@ -208,18 +633,22 @@ async fn test_anonymous_run_fails() {
             &create_derived_result.dataset_handle.id,
             "EXECUTE_QUERY",
         ),
+        FlowRunsHarness::cancel_scheduled_tasks_mutation(
+            &create_root_result.dataset_handle.id,
+            "0",
+        ),
     ];
 
     let schema = kamu_adapter_graphql::schema_quiet();
     for mutation_code in mutation_codes {
-        let res = schema
+        let response = schema
             .execute(
                 async_graphql::Request::new(mutation_code.clone())
                     .data(harness.catalog_anonymous.clone()),
             )
             .await;
 
-        expect_anonymous_access_error(res);
+        expect_anonymous_access_error(response);
     }
 }
 
@@ -235,6 +664,10 @@ struct FlowRunsHarness {
 
 impl FlowRunsHarness {
     fn new() -> Self {
+        Self::new_custom(MockDependencyGraphRepository::new())
+    }
+
+    fn new_custom(dependency_graph_repo: MockDependencyGraphRepository) -> Self {
         let tempdir = tempfile::tempdir().unwrap();
 
         let catalog_base = dill::CatalogBuilder::new()
@@ -248,6 +681,8 @@ impl FlowRunsHarness {
             .add::<SystemTimeSourceDefault>()
             .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
             .add::<DependencyGraphServiceInMemory>()
+            .add_value(dependency_graph_repo)
+            .bind::<dyn DependencyGraphRepository, MockDependencyGraphRepository>()
             .add::<FlowConfigurationServiceInMemory>()
             .add::<FlowConfigurationEventStoreInMem>()
             .add::<FlowServiceInMemory>()
@@ -300,6 +735,43 @@ impl FlowRunsHarness {
             .unwrap()
     }
 
+    async fn mimic_flow_scheduled(&self, flow_id: &str) -> TaskID {
+        let flow_service_test_driver = self
+            .catalog_authorized
+            .get_one::<dyn FlowServiceTestDriver>()
+            .unwrap();
+
+        let flow_id = FlowID::new(flow_id.parse::<u64>().unwrap());
+        flow_service_test_driver
+            .mimic_flow_scheduled(flow_id)
+            .await
+            .unwrap()
+    }
+
+    async fn mimic_task_completed(&self, task_id: TaskID) {
+        let flow_service_test_driver = self
+            .catalog_authorized
+            .get_one::<dyn FlowServiceTestDriver>()
+            .unwrap();
+        flow_service_test_driver.mimic_running_started();
+
+        let event_bus = self.catalog_authorized.get_one::<EventBus>().unwrap();
+        event_bus
+            .dispatch_event(TaskEventFinished {
+                event_time: Utc::now(),
+                task_id,
+                outcome: TaskOutcome::Success,
+            })
+            .await
+            .unwrap();
+    }
+
+    fn extract_flow_id_from_trigger_response<'a>(response_json: &serde_json::Value) -> &str {
+        response_json["datasets"]["byId"]["flows"]["runs"]["triggerFlow"]["flow"]["flowId"]
+            .as_str()
+            .unwrap()
+    }
+
     fn trigger_flow_mutation(id: &DatasetID, dataset_flow_type: &str) -> String {
         indoc!(
             r#"
@@ -317,6 +789,8 @@ impl FlowRunsHarness {
                                         flow {
                                             __typename
                                             flowId
+                                            status
+                                            outcome
                                         }
                                     }
                                 }
@@ -329,6 +803,39 @@ impl FlowRunsHarness {
         )
         .replace("<id>", &id.to_string())
         .replace("<dataset_flow_type>", dataset_flow_type)
+    }
+
+    fn cancel_scheduled_tasks_mutation(id: &DatasetID, flow_id: &str) -> String {
+        indoc!(
+            r#"
+            mutation {
+                datasets {
+                    byId (datasetId: "<id>") {
+                        flows {
+                            runs {
+                                cancelScheduledTasks (
+                                    flowId: "<flow_id>",
+                                ) {
+                                    __typename,
+                                    message
+                                    ... on CancelScheduledTasksSuccess {
+                                        flow {
+                                            __typename
+                                            flowId
+                                            status
+                                            outcome
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            "#
+        )
+        .replace("<id>", &id.to_string())
+        .replace("<flow_id>", &flow_id.to_string())
     }
 }
 

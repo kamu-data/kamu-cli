@@ -7,18 +7,20 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use internal_error::InternalError;
+use kamu_task_system::TaskID;
+
+use crate::FlowID;
+
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum FlowOutcome {
-    /// Flow succeeded
-    Success,
-    /// Flow failed to complete, even after retry logic
-    Failed,
-    /// Flow was cancelled by a user
-    Cancelled,
-    /// Flow was aborted by system by force
-    Aborted,
+#[async_trait::async_trait]
+pub trait FlowServiceTestDriver: Sync + Send {
+    /// Pretends running started
+    fn mimic_running_started(&self);
+
+    /// Pretends it is time to schedule the given flow that was in Queued state
+    async fn mimic_flow_scheduled(&self, flow_id: FlowID) -> Result<TaskID, InternalError>;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

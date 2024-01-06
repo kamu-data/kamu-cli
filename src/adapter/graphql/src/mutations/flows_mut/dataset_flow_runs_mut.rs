@@ -8,17 +8,19 @@
 // by the Apache License, Version 2.0.
 
 use chrono::Utc;
-use kamu_core::CurrentAccountSubject;
-use kamu_flow_system::{FlowKeyDataset, FlowService, RequestFlowError};
-use opendatafabric as odf;
+use {kamu_flow_system as fs, opendatafabric as odf};
 
 use super::{
+    check_if_flow_belongs_to_dataset,
     ensure_expected_dataset_kind,
     ensure_scheduling_permission,
+    FlowInDatasetError,
     FlowIncompatibleDatasetKind,
+    FlowNotFound,
+    FlowNotScheduled,
 };
 use crate::prelude::*;
-use crate::LoggedInGuard;
+use crate::{utils, LoggedInGuard};
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -47,44 +49,76 @@ impl DatasetFlowRunsMut {
 
         ensure_scheduling_permission(ctx, &self.dataset_handle).await?;
 
-        let flow_service = from_catalog::<dyn FlowService>(ctx).unwrap();
-        let current_account_subject = from_catalog::<CurrentAccountSubject>(ctx).unwrap();
-        let logged_account = match current_account_subject.as_ref() {
-            CurrentAccountSubject::Logged(la) => la,
-            CurrentAccountSubject::Anonymous(_) => {
-                unreachable!("LoggedInGuard would not allow anonymous accounts here")
-            }
-        };
+        let flow_service = from_catalog::<dyn fs::FlowService>(ctx).unwrap();
+        let logged_account = utils::get_logged_account(ctx);
 
         let res = flow_service
             .trigger_manual_flow(
                 Utc::now(),
-                FlowKeyDataset::new(self.dataset_handle.id.clone(), dataset_flow_type.into())
+                fs::FlowKeyDataset::new(self.dataset_handle.id.clone(), dataset_flow_type.into())
                     .into(),
                 odf::AccountID::from(odf::FAKE_ACCOUNT_ID),
-                logged_account.account_name.clone(),
+                logged_account.account_name,
             )
             .await
             .map_err(|e| match e {
-                RequestFlowError::Internal(e) => GqlError::Internal(e),
+                fs::RequestFlowError::Internal(e) => GqlError::Internal(e),
             })?;
 
         Ok(TriggerFlowResult::Success(TriggerFlowSuccess {
             flow: res.into(),
         }))
     }
+
+    #[graphql(guard = "LoggedInGuard::new()")]
+    async fn cancel_scheduled_tasks(
+        &self,
+        ctx: &Context<'_>,
+        flow_id: FlowID,
+    ) -> Result<CancelScheduledTasksResult> {
+        ensure_scheduling_permission(ctx, &self.dataset_handle).await?;
+
+        if let Some(error) =
+            check_if_flow_belongs_to_dataset(ctx, flow_id, &self.dataset_handle).await?
+        {
+            return Ok(match error {
+                FlowInDatasetError::NotFound(e) => CancelScheduledTasksResult::NotFound(e),
+            });
+        }
+
+        let flow_service = from_catalog::<dyn fs::FlowService>(ctx).unwrap();
+
+        let res = flow_service.cancel_scheduled_tasks(flow_id.into()).await;
+
+        match res {
+            Ok(flow_state) => Ok(CancelScheduledTasksResult::Success(
+                CancelScheduledTasksSuccess {
+                    flow: flow_state.into(),
+                },
+            )),
+            Err(e) => match e {
+                fs::CancelScheduledTasksError::NotFound(_) => unreachable!("Flow checked already"),
+                fs::CancelScheduledTasksError::NotScheduled(_) => {
+                    Ok(CancelScheduledTasksResult::NotScheduled(FlowNotScheduled {
+                        flow_id,
+                    }))
+                }
+                fs::CancelScheduledTasksError::Internal(e) => Err(GqlError::Internal(e)),
+            },
+        }
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-#[derive(Interface, Debug, Clone)]
+#[derive(Interface, Clone)]
 #[graphql(field(name = "message", ty = "String"))]
 pub enum TriggerFlowResult {
     Success(TriggerFlowSuccess),
     IncompatibleDatasetKind(FlowIncompatibleDatasetKind),
 }
 
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject, Clone)]
 #[graphql(complex)]
 pub struct TriggerFlowSuccess {
     pub flow: Flow,
@@ -92,6 +126,29 @@ pub struct TriggerFlowSuccess {
 
 #[ComplexObject]
 impl TriggerFlowSuccess {
+    pub async fn message(&self) -> String {
+        format!("Success")
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+#[derive(Interface, Clone)]
+#[graphql(field(name = "message", ty = "String"))]
+pub enum CancelScheduledTasksResult {
+    Success(CancelScheduledTasksSuccess),
+    NotFound(FlowNotFound),
+    NotScheduled(FlowNotScheduled),
+}
+
+#[derive(SimpleObject, Clone)]
+#[graphql(complex)]
+pub struct CancelScheduledTasksSuccess {
+    pub flow: Flow,
+}
+
+#[ComplexObject]
+impl CancelScheduledTasksSuccess {
     pub async fn message(&self) -> String {
         format!("Success")
     }

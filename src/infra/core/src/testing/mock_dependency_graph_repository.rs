@@ -7,18 +7,16 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use kamu_core::{DatasetDependenciesIDStream, DependencyGraphRepository};
+
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum FlowOutcome {
-    /// Flow succeeded
-    Success,
-    /// Flow failed to complete, even after retry logic
-    Failed,
-    /// Flow was cancelled by a user
-    Cancelled,
-    /// Flow was aborted by system by force
-    Aborted,
+mockall::mock! {
+    pub DependencyGraphRepository {}
+    #[async_trait::async_trait]
+    impl DependencyGraphRepository for DependencyGraphRepository {
+        fn list_dependencies_of_all_datasets<'a>(&'a self) -> DatasetDependenciesIDStream<'a>;
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

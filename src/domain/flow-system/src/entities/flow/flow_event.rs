@@ -10,7 +10,6 @@
 use chrono::{DateTime, Utc};
 use enum_variants::*;
 use kamu_task_system::{TaskID, TaskOutcome};
-use opendatafabric::{AccountID, AccountName};
 
 use crate::*;
 
@@ -30,9 +29,7 @@ pub enum FlowEvent {
     TaskScheduled(FlowEventTaskScheduled),
     /// Finished task
     TaskFinished(FlowEventTaskFinished),
-    /// Cancelled update (user or admin initiative)
-    Cancelled(FlowEventCancelled),
-    /// Aborted update (system factor, such as dataset delete)
+    /// Aborted flow (system factor, such as dataset delete)
     Aborted(FlowEventAborted),
 }
 
@@ -95,16 +92,6 @@ pub struct FlowEventTaskFinished {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct FlowEventCancelled {
-    pub event_time: DateTime<Utc>,
-    pub flow_id: FlowID,
-    pub by_account_id: AccountID,
-    pub by_account_name: AccountName,
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FlowEventAborted {
     pub event_time: DateTime<Utc>,
     pub flow_id: FlowID,
@@ -121,7 +108,6 @@ impl FlowEvent {
             FlowEvent::TriggerAdded(e) => e.flow_id,
             FlowEvent::TaskScheduled(e) => e.flow_id,
             FlowEvent::TaskFinished(e) => e.flow_id,
-            FlowEvent::Cancelled(e) => e.flow_id,
             FlowEvent::Aborted(e) => e.flow_id,
         }
     }
@@ -134,7 +120,6 @@ impl FlowEvent {
             FlowEvent::TriggerAdded(e) => &e.event_time,
             FlowEvent::TaskScheduled(e) => &e.event_time,
             FlowEvent::TaskFinished(e) => &e.event_time,
-            FlowEvent::Cancelled(e) => &e.event_time,
             FlowEvent::Aborted(e) => &e.event_time,
         }
     }
@@ -150,7 +135,6 @@ impl_enum_variant!(FlowEvent::Queued(FlowEventQueued));
 impl_enum_variant!(FlowEvent::TriggerAdded(FlowEventTriggerAdded));
 impl_enum_variant!(FlowEvent::TaskScheduled(FlowEventTaskScheduled));
 impl_enum_variant!(FlowEvent::TaskFinished(FlowEventTaskFinished));
-impl_enum_variant!(FlowEvent::Cancelled(FlowEventCancelled));
 impl_enum_variant!(FlowEvent::Aborted(FlowEventAborted));
 
 /////////////////////////////////////////////////////////////////////////////////////////

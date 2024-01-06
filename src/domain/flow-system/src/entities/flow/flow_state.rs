@@ -32,11 +32,6 @@ pub struct FlowState {
 }
 
 impl FlowState {
-    /// Checks if flow may be cancelled
-    pub fn can_cancel(&self) -> bool {
-        !self.outcome.is_some() && self.task_ids.is_empty() && self.terminated_at.is_none()
-    }
-
     /// Computes status
     pub fn status(&self) -> FlowStatus {
         if self.outcome.is_some() {
@@ -160,29 +155,17 @@ impl Projection for FlowState {
                             }
                         }
                     }
-                    E::Cancelled(FlowEventCancelled {
-                        event_time,
-                        flow_id: _,
-                        by_account_id: _,
-                        by_account_name: _,
-                    }) => {
-                        if s.outcome.is_some() || !s.task_ids.is_empty() {
-                            Err(ProjectionError::new(Some(s), event))
-                        } else {
-                            Ok(FlowState {
-                                outcome: Some(FlowOutcome::Cancelled),
-                                terminated_at: Some(event_time.clone()),
-                                ..s
-                            })
-                        }
-                    }
                     E::Aborted(FlowEventAborted {
                         event_time,
                         flow_id: _,
                     }) => {
-                        if s.outcome.is_some() {
-                            // Ignore for idempotence reasons
-                            Ok(s)
+                        if let Some(outcome) = s.outcome {
+                            if outcome == FlowOutcome::Success {
+                                Err(ProjectionError::new(Some(s), event))
+                            } else {
+                                // Ignore for idempotence reasons
+                                Ok(s)
+                            }
                         } else {
                             Ok(FlowState {
                                 outcome: Some(FlowOutcome::Aborted),

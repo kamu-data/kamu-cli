@@ -6,8 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 2024-01-05
 ### Added
-- New GraphQL API to manually schedule dataset flows
+- New GraphQL APIs to manually schedule and cancel dataset flows
 - Cron expression implementation for dataset flows
+### Changed
+- Automatically cancelling scheduled tasks if parent flow is cancelled or aborted
 
 ## [0.150.1] - 2023-12-29
 ### Added

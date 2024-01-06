@@ -10,7 +10,6 @@
 use chrono::{DateTime, Utc};
 use event_sourcing::*;
 use kamu_task_system::{TaskID, TaskOutcome};
-use opendatafabric::{AccountID, AccountName};
 
 use crate::*;
 
@@ -109,27 +108,6 @@ impl Flow {
             flow_id: self.flow_id,
             task_id,
             task_outcome,
-        };
-        self.apply(event)
-    }
-
-    /// Checks if flow may be cancelled
-    pub fn can_cancel(&self) -> bool {
-        self.0.as_state().can_cancel()
-    }
-
-    /// Cancel flow before task started
-    pub fn cancel(
-        &mut self,
-        now: DateTime<Utc>,
-        by_account_id: AccountID,
-        by_account_name: AccountName,
-    ) -> Result<(), ProjectionError<FlowState>> {
-        let event = FlowEventCancelled {
-            event_time: now,
-            flow_id: self.flow_id,
-            by_account_id,
-            by_account_name,
         };
         self.apply(event)
     }

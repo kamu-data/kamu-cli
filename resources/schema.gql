@@ -91,6 +91,15 @@ type BlockRef {
 }
 
 
+interface CancelScheduledTasksResult {
+	message: String!
+}
+
+type CancelScheduledTasksSuccess implements CancelScheduledTasksResult {
+	flow: Flow!
+	message: String!
+}
+
 type Checkpoint {
 	physicalHash: Multihash!
 	size: Int!
@@ -310,6 +319,7 @@ type DatasetFlowConfigsMut {
 
 type DatasetFlowRunsMut {
 	triggerFlow(datasetFlowType: DatasetFlowType!): TriggerFlowResult!
+	cancelScheduledTasks(flowId: FlowID!): CancelScheduledTasksResult!
 }
 
 enum DatasetFlowType {
@@ -575,7 +585,9 @@ type FetchStepUrl {
 
 
 type Flow {
-	flowId: Int!
+	flowId: FlowID!
+	status: FlowStatus!
+	outcome: FlowOutcome
 }
 
 type FlowConfiguration {
@@ -591,10 +603,36 @@ type FlowConfigurationBatching {
 
 union FlowConfigurationSchedule = TimeDelta | CronExpression
 
+scalar FlowID
+
 type FlowIncompatibleDatasetKind implements SetFlowConfigResult & TriggerFlowResult {
 	expectedDatasetKind: DatasetKind!
 	actualDatasetKind: DatasetKind!
 	message: String!
+}
+
+type FlowNotFound implements CancelScheduledTasksResult {
+	flowId: FlowID!
+	message: String!
+}
+
+type FlowNotScheduled implements CancelScheduledTasksResult {
+	flowId: FlowID!
+	message: String!
+}
+
+enum FlowOutcome {
+	SUCCESS
+	FAILED
+	CANCELLED
+	ABORTED
+}
+
+enum FlowStatus {
+	DRAFT
+	QUEUED
+	SCHEDULED
+	FINISHED
 }
 
 

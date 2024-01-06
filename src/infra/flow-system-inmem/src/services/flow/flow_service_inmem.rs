@@ -53,6 +53,7 @@ struct State {
 
 #[component(pub)]
 #[interface(dyn FlowService)]
+#[interface(dyn FlowServiceTestDriver)]
 #[interface(dyn AsyncEventHandler<TaskEventFinished>)]
 #[interface(dyn AsyncEventHandler<DatasetEventDeleted>)]
 #[interface(dyn AsyncEventHandler<FlowConfigurationEventModified>)]
@@ -375,7 +376,7 @@ impl FlowServiceInMemory {
     }
 
     #[tracing::instrument(level = "trace", skip_all, fields(flow_id = %flow.flow_id))]
-    async fn schedule_flow_task(&self, flow: &mut Flow) -> Result<(), InternalError> {
+    async fn schedule_flow_task(&self, flow: &mut Flow) -> Result<TaskID, InternalError> {
         let logical_plan = match &flow.flow_key {
             FlowKey::Dataset(flow_key) => match flow_key.flow_type {
                 DatasetFlowType::Ingest | DatasetFlowType::ExecuteQuery => {
@@ -412,15 +413,34 @@ impl FlowServiceInMemory {
             .pending_flows
             .track_flow_task(flow.flow_id, task.task_id);
 
-        Ok(())
+        Ok(task.task_id)
     }
 
     async fn abort_flow(&self, flow_id: FlowID) -> Result<(), InternalError> {
+        // Mark flow as aborted
         let mut flow = Flow::load(flow_id, self.flow_event_store.as_ref())
             .await
             .int_err()?;
+
+        self.abort_flow_impl(&mut flow).await
+    }
+
+    async fn abort_flow_impl(&self, flow: &mut Flow) -> Result<(), InternalError> {
+        // Abort flow itself
         flow.abort(self.time_source.now()).int_err()?;
         flow.save(self.flow_event_store.as_ref()).await.int_err()?;
+
+        // Cancel associated tasks, but first drop task -> flow associations
+        {
+            let mut state = self.state.lock().unwrap();
+            for task_id in &flow.task_ids {
+                state.pending_flows.untrack_flow_by_task(*task_id);
+            }
+        }
+        for task_id in &flow.task_ids {
+            self.task_scheduler.cancel_task(*task_id).await.int_err()?;
+        }
+
         Ok(())
     }
 }
@@ -656,37 +676,68 @@ impl FlowService for FlowServiceInMemory {
         Ok(flow.into())
     }
 
-    /// Attempts to cancel the given flow
+    /// Attempts to cancel the tasks already scheduled for the given flow
     #[tracing::instrument(
         level = "debug",
         skip_all,
-        fields(%flow_id, %by_account_id, %by_account_name)
+        fields(%flow_id)
     )]
-    async fn cancel_flow(
+    async fn cancel_scheduled_tasks(
         &self,
         flow_id: FlowID,
-        by_account_id: AccountID,
-        by_account_name: AccountName,
-    ) -> Result<FlowState, CancelFlowError> {
+    ) -> Result<FlowState, CancelScheduledTasksError> {
         let mut flow = Flow::load(flow_id, self.flow_event_store.as_ref()).await?;
 
-        if flow.can_cancel() {
-            flow.cancel(self.time_source.now(), by_account_id, by_account_name)
-                .int_err()?;
-            flow.save(self.flow_event_store.as_ref()).await.int_err()?;
-
-            let mut state = self.state.lock().unwrap();
-            if state.time_wheel.is_flow_activation_planned(flow_id) {
-                state
-                    .time_wheel
-                    .cancel_flow_activation(flow_id)
-                    .map_err(|e| CancelFlowError::Internal(e.int_err()))?;
+        // May not be called for Draft or Queued flows.
+        // Cancel tasks in Scheduled state.
+        // Ignore in Finished state
+        match flow.status() {
+            FlowStatus::Draft | FlowStatus::Queued => {
+                return Err(CancelScheduledTasksError::NotScheduled(
+                    FlowNotScheduledError { flow_id },
+                ))
             }
+            FlowStatus::Scheduled => {
+                // Abort current flow and it's scheduled tasks
+                self.abort_flow_impl(&mut flow).await?;
 
-            state.pending_flows.drop_pending_flow(&flow.flow_key);
+                // Schedule next period
+                let abort_time = self.round_time(self.time_source.now())?;
+                self.try_enqueue_auto_polling_flow_if_enabled(abort_time, &flow.flow_key)
+                    .await?;
+            }
+            FlowStatus::Finished => { /* Skip, idempotence */ }
         }
 
         Ok(flow.into())
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait::async_trait]
+impl FlowServiceTestDriver for FlowServiceInMemory {
+    /// Pretends running started
+    fn mimic_running_started(&self) {
+        let mut state = self.state.lock().unwrap();
+        state.running = true;
+    }
+
+    /// Pretends it is time to schedule the given flow that was in Queued state
+    async fn mimic_flow_scheduled(&self, flow_id: FlowID) -> Result<TaskID, InternalError> {
+        {
+            let mut state = self.state.lock().unwrap();
+            state
+                .time_wheel
+                .cancel_flow_activation(flow_id.clone())
+                .int_err()?;
+        }
+
+        let mut flow = Flow::load(flow_id, self.flow_event_store.as_ref())
+            .await
+            .int_err()?;
+        let task_id = self.schedule_flow_task(&mut flow).await.int_err()?;
+        Ok(task_id)
     }
 }
 
@@ -777,6 +828,7 @@ impl AsyncEventHandler<FlowConfigurationEventModified> for FlowServiceInMemory {
                 };
 
                 state.active_configs.drop_flow_config(&event.flow_key);
+
                 let maybe_pending_flow_id = state.pending_flows.drop_pending_flow(&event.flow_key);
                 if let Some(flow_id) = &maybe_pending_flow_id {
                     state
@@ -790,8 +842,6 @@ impl AsyncEventHandler<FlowConfigurationEventModified> for FlowServiceInMemory {
             if let Some(flow_id) = maybe_pending_flow_id {
                 self.abort_flow(flow_id).await?;
             }
-
-            // TODO: should we abort scheduled tasks?
         } else {
             {
                 let state = self.state.lock().unwrap();

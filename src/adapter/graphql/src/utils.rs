@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use async_graphql::Context;
 use internal_error::*;
-use kamu_core::{AccessError, Dataset, DatasetRepository};
+use kamu_core::{AccessError, CurrentAccountSubject, Dataset, DatasetRepository, LoggedAccount};
 use opendatafabric::DatasetHandle;
 use thiserror::Error;
 
@@ -38,6 +38,18 @@ pub(crate) async fn get_dataset(
         .await
         .int_err()?;
     Ok(dataset)
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+pub(crate) fn get_logged_account(ctx: &Context<'_>) -> LoggedAccount {
+    let current_account_subject = from_catalog::<CurrentAccountSubject>(ctx).unwrap();
+    match current_account_subject.as_ref() {
+        CurrentAccountSubject::Logged(la) => la.clone(),
+        CurrentAccountSubject::Anonymous(_) => {
+            unreachable!("We are not expecting anonymous accounts")
+        }
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
