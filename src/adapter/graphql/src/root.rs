@@ -55,7 +55,7 @@ impl Query {
         Tasks
     }
 
-    /// Search-related functionality group.
+    /// Search-related functionality group
     async fn search(&self) -> Search {
         Search
     }
@@ -63,6 +63,11 @@ impl Query {
     /// Querying and data manipulations
     async fn data(&self) -> DataQueries {
         DataQueries
+    }
+
+    /// Admin-related functionality group
+    async fn admin(&self) -> Admin {
+        Admin
     }
 }
 

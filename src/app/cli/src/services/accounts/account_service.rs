@@ -27,7 +27,7 @@ pub const LOGIN_METHOD_PASSWORD: &str = "password";
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct AccountService {
-    pub predefined_accounts: HashMap<String, auth::AccountInfo>,
+    pub predefined_accounts: HashMap<String, AccountInfo>,
     pub allow_login_unknown: bool,
 }
 
@@ -35,7 +35,8 @@ pub struct AccountService {
 #[interface(dyn auth::AuthenticationProvider)]
 impl AccountService {
     pub fn new(users_config: Arc<UsersConfig>) -> Self {
-        let mut predefined_accounts: HashMap<String, auth::AccountInfo> = HashMap::new();
+        let mut predefined_accounts: HashMap<String, AccountInfo> = HashMap::new();
+
         for predefined_account in &users_config.predefined {
             predefined_accounts.insert(
                 predefined_account.account_name.to_string(),
@@ -107,7 +108,7 @@ impl AccountService {
         RelatedAccountIndication::new(target_account)
     }
 
-    fn find_account_info_impl(&self, account_name: &String) -> Option<auth::AccountInfo> {
+    fn find_account_info_impl(&self, account_name: &String) -> Option<AccountInfo> {
         // The account might be predefined in the configuration
         self.predefined_accounts
             .get(account_name)
@@ -117,7 +118,7 @@ impl AccountService {
     fn get_account_info_impl(
         &self,
         account_name: &String,
-    ) -> Result<auth::AccountInfo, auth::RejectedCredentialsError> {
+    ) -> Result<AccountInfo, auth::RejectedCredentialsError> {
         // The account might be predefined in the configuration
         match self.predefined_accounts.get(account_name) {
             // Use the predefined record
@@ -127,12 +128,13 @@ impl AccountService {
                 // If configuration allows login unknown users, pretend this is an unknown user
                 // without avatar and with the name identical to login
                 if self.allow_login_unknown {
-                    Ok(auth::AccountInfo {
+                    Ok(AccountInfo {
                         account_id: FAKE_ACCOUNT_ID.to_string(),
                         account_name: AccountName::new_unchecked(account_name),
                         account_type: AccountType::User,
                         display_name: account_name.clone(),
                         avatar_url: None,
+                        is_admin: false,
                     })
                 } else {
                     // Otherwise we don't recognized this user between predefined
@@ -198,7 +200,7 @@ impl auth::AuthenticationProvider for AccountService {
     async fn account_info_by_token(
         &self,
         provider_credentials_json: String,
-    ) -> Result<auth::AccountInfo, InternalError> {
+    ) -> Result<AccountInfo, InternalError> {
         let provider_credentials = serde_json::from_str::<PasswordProviderCredentials>(
             &provider_credentials_json.as_str(),
         )

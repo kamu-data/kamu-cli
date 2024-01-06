@@ -17,15 +17,18 @@ pub struct UserActor {
     pub name: String,
     #[polar(attribute)]
     pub anonymous: bool,
+    #[polar(attribute)]
+    pub is_admin: bool,
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 impl UserActor {
-    pub fn new(name: &str, anonymous: bool) -> Self {
+    pub fn new(name: &str, anonymous: bool, is_admin: bool) -> Self {
         Self {
             name: name.to_string(),
             anonymous,
+            is_admin,
         }
     }
 }
@@ -36,8 +39,8 @@ impl std::fmt::Display for UserActor {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "User(name='{}', anonymous={})",
-            &self.name, self.anonymous
+            "User(name='{}', anonymous={}, is_admin={})",
+            &self.name, self.anonymous, self.is_admin
         )
     }
 }

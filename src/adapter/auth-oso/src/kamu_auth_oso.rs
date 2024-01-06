@@ -27,7 +27,7 @@ impl KamuAuthOso {
         let oso = match KamuAuthOso::load_oso() {
             Ok(oso) => oso,
             Err(e) => {
-                panic!("Failed to initialize OSO: {:?}", e);
+                panic!("Failed to initialize OSO: {e:?}");
             }
         };
 
@@ -62,6 +62,7 @@ impl KamuAuthOso {
                 );
 
             allow(actor: UserActor, action: String, dataset: DatasetResource) if
+                actor.is_admin or
                 has_permission(actor, action, dataset);
         "#,
         )?;

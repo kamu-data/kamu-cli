@@ -45,3 +45,27 @@ impl Guard for LoggedInGuard {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
+
+pub const STAFF_ONLY_MESSAGE: &str = "Access restricted to administrators only";
+
+pub struct AdminGuard {}
+
+impl AdminGuard {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+#[async_trait::async_trait]
+impl Guard for AdminGuard {
+    async fn check(&self, ctx: &Context<'_>) -> Result<()> {
+        let current_account_subject = from_catalog::<CurrentAccountSubject>(ctx).unwrap();
+
+        match current_account_subject.as_ref() {
+            CurrentAccountSubject::Logged(a) if a.is_admin => Ok(()),
+            _ => Err(async_graphql::Error::new(STAFF_ONLY_MESSAGE)),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////

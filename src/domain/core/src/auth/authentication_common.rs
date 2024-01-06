@@ -30,6 +30,8 @@ pub struct AccountInfo {
     pub account_type: AccountType,
     pub display_name: AccountDisplayName,
     pub avatar_url: Option<String>,
+    #[serde(default)]
+    pub is_admin: bool,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
@@ -48,6 +50,7 @@ impl AccountInfo {
             account_type: AccountType::User,
             display_name: DEFAULT_ACCOUNT_NAME.to_string(),
             avatar_url: Some(DEFAULT_AVATAR_URL.to_string()),
+            is_admin: false,
         }
     }
 }
