@@ -253,10 +253,6 @@ fn serde_dataset_snapshot_root() {
             merge: MergeStrategy::Snapshot(MergeStrategySnapshot {
                 primary_key: vec!["id".to_owned()],
                 compare_columns: None,
-                observation_column: None,
-                obsv_added: None,
-                obsv_changed: None,
-                obsv_removed: None,
             }),
         })],
     };

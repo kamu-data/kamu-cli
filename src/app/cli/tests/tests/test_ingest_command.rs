@@ -73,13 +73,20 @@ async fn test_push_ingest_from_file() {
         .await;
     assert_eq!(
         parquet.get_column_names(),
-        ["offset", "system_time", "event_time", "city", "population"]
+        [
+            "offset",
+            "op",
+            "system_time",
+            "event_time",
+            "city",
+            "population"
+        ]
     );
     assert_eq!(
         parquet
             .get_row_iter()
             .map(|r| r.unwrap())
-            .map(|r| (r.get_string(3).unwrap().clone(), r.get_long(4).unwrap()))
+            .map(|r| (r.get_string(4).unwrap().clone(), r.get_long(5).unwrap()))
             .sorted()
             .collect::<Vec<_>>(),
         [

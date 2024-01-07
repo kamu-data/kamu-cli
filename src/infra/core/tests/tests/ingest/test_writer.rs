@@ -12,7 +12,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use chrono::{DateTime, TimeZone, Utc};
-use datafusion::arrow::datatypes::Schema;
+use datafusion::arrow::datatypes::{Field, Schema, SchemaRef};
 use datafusion::prelude::*;
 use dill::Component;
 use event_bus::EventBus;
@@ -32,6 +32,28 @@ use opendatafabric as odf;
 // crate.
 ///////////////////////////////////////////////////////////////
 
+fn assert_schemas_equal(lhs: SchemaRef, rhs: SchemaRef, ignore_nullability: bool) {
+    let map_field = |f: &Arc<Field>| -> Arc<Field> {
+        if ignore_nullability {
+            Arc::new(f.as_ref().clone().with_nullable(true))
+        } else {
+            f.clone()
+        }
+    };
+
+    let lhs = Schema::new_with_metadata(
+        lhs.fields().iter().map(map_field).collect::<Vec<_>>(),
+        lhs.metadata().clone(),
+    );
+    let rhs = Schema::new_with_metadata(
+        rhs.fields().iter().map(map_field).collect::<Vec<_>>(),
+        rhs.metadata().clone(),
+    );
+    assert_eq!(lhs, rhs);
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
 #[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_data_writer_happy_path() {
@@ -39,10 +61,6 @@ async fn test_data_writer_happy_path() {
         .merge(odf::MergeStrategySnapshot {
             primary_key: vec!["city".to_string()],
             compare_columns: None,
-            observation_column: None,
-            obsv_added: None,
-            obsv_changed: None,
-            obsv_removed: None,
         })
         .build()
         .into()])
@@ -72,9 +90,9 @@ async fn test_data_writer_happy_path() {
             r#"
             message arrow_schema {
               OPTIONAL INT64 offset;
+              REQUIRED INT32 op (INTEGER(8,false));
               REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
               REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
-              REQUIRED BYTE_ARRAY observed (STRING);
               OPTIONAL BYTE_ARRAY city (STRING);
               OPTIONAL INT64 population;
             }
@@ -86,13 +104,13 @@ async fn test_data_writer_happy_path() {
         df.clone(),
         indoc!(
             r#"
-            +--------+----------------------+----------------------+----------+------+------------+
-            | offset | system_time          | event_time           | observed | city | population |
-            +--------+----------------------+----------------------+----------+------+------------+
-            | 0      | 2010-01-01T12:00:00Z | 2000-01-01T12:00:00Z | I        | A    | 1000       |
-            | 1      | 2010-01-01T12:00:00Z | 2000-01-01T12:00:00Z | I        | B    | 2000       |
-            | 2      | 2010-01-01T12:00:00Z | 2000-01-01T12:00:00Z | I        | C    | 3000       |
-            +--------+----------------------+----------------------+----------+------+------------+
+            +--------+----+----------------------+----------------------+------+------------+
+            | offset | op | system_time          | event_time           | city | population |
+            +--------+----+----------------------+----------------------+------+------------+
+            | 0      | 0  | 2010-01-01T12:00:00Z | 2000-01-01T12:00:00Z | A    | 1000       |
+            | 1      | 0  | 2010-01-01T12:00:00Z | 2000-01-01T12:00:00Z | B    | 2000       |
+            | 2      | 0  | 2010-01-01T12:00:00Z | 2000-01-01T12:00:00Z | C    | 3000       |
+            +--------+----+----------------------+----------------------+------+------------+
             "#
         ),
     )
@@ -103,17 +121,15 @@ async fn test_data_writer_happy_path() {
         Some(&harness.source_event_time)
     );
 
-    // Check schema block was written automatically
+    // Compare schemas in block and in data
     let (schema_block_hash, schema_block) = harness.get_last_schema_block().await;
-    assert_eq!(
-        harness.get_last_data_block().await.prev_block_hash.unwrap(),
-        schema_block_hash
-    );
-    let df_schema_arrow: Schema = df.schema().into();
-    assert_eq!(
-        df_schema_arrow,
-        *schema_block.event.schema_as_arrow().unwrap(),
-    );
+    let schema_in_block = schema_block.event.schema_as_arrow().unwrap();
+    let schema_in_data = SchemaRef::new(df.schema().into());
+    // TODO: DataFusion issue where the schema of the
+    // DataFrame being saved into parquet and those read out of it differs in
+    // nullability
+    assert_ne!(schema_in_block, schema_in_data);
+    assert_schemas_equal(schema_in_block, schema_in_data, true);
 
     // Round 2
     harness.set_system_time(Utc.with_ymd_and_hms(2010, 1, 2, 12, 0, 0).unwrap());
@@ -143,9 +159,9 @@ async fn test_data_writer_happy_path() {
             r#"
             message arrow_schema {
               OPTIONAL INT64 offset;
+              REQUIRED INT32 op (INTEGER(8,false));
               REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
-              REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
-              REQUIRED BYTE_ARRAY observed (STRING);
+              OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
               OPTIONAL BYTE_ARRAY city (STRING);
               OPTIONAL INT64 population;
             }
@@ -157,11 +173,11 @@ async fn test_data_writer_happy_path() {
         df,
         indoc!(
             r#"
-            +--------+----------------------+----------------------+----------+------+------------+
-            | offset | system_time          | event_time           | observed | city | population |
-            +--------+----------------------+----------------------+----------+------+------------+
-            | 3      | 2010-01-02T12:00:00Z | 2000-01-02T12:00:00Z | I        | D    | 4000       |
-            +--------+----------------------+----------------------+----------+------+------------+
+            +--------+----+----------------------+----------------------+------+------------+
+            | offset | op | system_time          | event_time           | city | population |
+            +--------+----+----------------------+----------------------+------+------------+
+            | 3      | 0  | 2010-01-02T12:00:00Z | 2000-01-02T12:00:00Z | D    | 4000       |
+            +--------+----+----------------------+----------------------+------+------------+
             "#
         ),
     )
@@ -262,6 +278,7 @@ async fn test_data_writer_rejects_incompatible_schema() {
             r#"
             message arrow_schema {
               OPTIONAL INT64 offset;
+              REQUIRED INT32 op (INTEGER(8,false));
               REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
               REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
               OPTIONAL BYTE_ARRAY city (STRING);
@@ -275,13 +292,13 @@ async fn test_data_writer_rejects_incompatible_schema() {
         df.clone(),
         indoc!(
             r#"
-            +--------+----------------------+----------------------+------+------------+
-            | offset | system_time          | event_time           | city | population |
-            +--------+----------------------+----------------------+------+------------+
-            | 0      | 2010-01-01T12:00:00Z | 2000-01-01T12:00:00Z | A    | 1000       |
-            | 1      | 2010-01-01T12:00:00Z | 2000-01-01T12:00:00Z | B    | 2000       |
-            | 2      | 2010-01-01T12:00:00Z | 2000-01-01T12:00:00Z | C    | 3000       |
-            +--------+----------------------+----------------------+------+------------+
+            +--------+----+----------------------+----------------------+------+------------+
+            | offset | op | system_time          | event_time           | city | population |
+            +--------+----+----------------------+----------------------+------+------------+
+            | 0      | 0  | 2010-01-01T12:00:00Z | 2000-01-01T12:00:00Z | A    | 1000       |
+            | 1      | 0  | 2010-01-01T12:00:00Z | 2000-01-01T12:00:00Z | B    | 2000       |
+            | 2      | 0  | 2010-01-01T12:00:00Z | 2000-01-01T12:00:00Z | C    | 3000       |
+            +--------+----+----------------------+----------------------+------+------------+
             "#
         ),
     )
@@ -312,6 +329,7 @@ async fn test_data_writer_rejects_incompatible_schema() {
             r#"
             message arrow_schema {
               OPTIONAL INT64 offset;
+              REQUIRED INT32 op (INTEGER(8,false));
               REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
               REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
               OPTIONAL BYTE_ARRAY city (STRING);
@@ -325,11 +343,11 @@ async fn test_data_writer_rejects_incompatible_schema() {
         df,
         indoc!(
             r#"
-            +--------+----------------------+----------------------+------+------------+
-            | offset | system_time          | event_time           | city | population |
-            +--------+----------------------+----------------------+------+------------+
-            | 3      | 2010-01-02T12:00:00Z | 2000-01-02T12:00:00Z | D    | 4000       |
-            +--------+----------------------+----------------------+------+------------+
+            +--------+----+----------------------+----------------------+------+------------+
+            | offset | op | system_time          | event_time           | city | population |
+            +--------+----+----------------------+----------------------+------+------------+
+            | 3      | 0  | 2010-01-02T12:00:00Z | 2000-01-02T12:00:00Z | D    | 4000       |
+            +--------+----+----------------------+----------------------+------+------------+
             "#
         ),
     )
@@ -392,6 +410,7 @@ async fn test_data_writer_rejects_incompatible_schema() {
             r#"
             message arrow_schema {
               OPTIONAL INT64 offset;
+              REQUIRED INT32 op (INTEGER(8,false));
               REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
               REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
               OPTIONAL BYTE_ARRAY city (STRING);
@@ -405,11 +424,11 @@ async fn test_data_writer_rejects_incompatible_schema() {
         df,
         indoc!(
             r#"
-            +--------+----------------------+----------------------+------+------------+
-            | offset | system_time          | event_time           | city | population |
-            +--------+----------------------+----------------------+------+------------+
-            | 4      | 2010-01-03T12:00:00Z | 2000-01-03T12:00:00Z | E    | 5000       |
-            +--------+----------------------+----------------------+------+------------+
+            +--------+----+----------------------+----------------------+------+------------+
+            | offset | op | system_time          | event_time           | city | population |
+            +--------+----+----------------------+----------------------+------+------------+
+            | 4      | 0  | 2010-01-03T12:00:00Z | 2000-01-03T12:00:00Z | E    | 5000       |
+            +--------+----+----------------------+----------------------+------+------------+
             "#
         ),
     )
@@ -420,7 +439,7 @@ async fn test_data_writer_rejects_incompatible_schema() {
 
 #[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
-async fn test_data_writer_orders_by_event_time() {
+async fn test_data_writer_ledger_orders_by_event_time() {
     let mut harness = Harness::new(vec![MetadataFactory::set_polling_source()
         .merge(odf::MergeStrategyAppend {})
         .build()
@@ -450,6 +469,7 @@ async fn test_data_writer_orders_by_event_time() {
             r#"
             message arrow_schema {
               OPTIONAL INT64 offset;
+              REQUIRED INT32 op (INTEGER(8,false));
               REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
               OPTIONAL INT32 event_time (DATE);
               OPTIONAL BYTE_ARRAY city (STRING);
@@ -463,13 +483,13 @@ async fn test_data_writer_orders_by_event_time() {
         df,
         indoc!(
             r#"
-            +--------+----------------------+------------+------+------------+
-            | offset | system_time          | event_time | city | population |
-            +--------+----------------------+------------+------+------------+
-            | 0      | 2010-01-01T12:00:00Z | 2021-01-01 | A    | 1000       |
-            | 1      | 2010-01-01T12:00:00Z | 2022-01-01 | C    | 3000       |
-            | 2      | 2010-01-01T12:00:00Z | 2023-01-01 | B    | 2000       |
-            +--------+----------------------+------------+------+------------+
+            +--------+----+----------------------+------------+------+------------+
+            | offset | op | system_time          | event_time | city | population |
+            +--------+----+----------------------+------------+------+------------+
+            | 0      | 0  | 2010-01-01T12:00:00Z | 2021-01-01 | A    | 1000       |
+            | 1      | 0  | 2010-01-01T12:00:00Z | 2022-01-01 | C    | 3000       |
+            | 2      | 0  | 2010-01-01T12:00:00Z | 2023-01-01 | B    | 2000       |
+            +--------+----+----------------------+------------+------+------------+
             "#
         ),
     )
@@ -482,6 +502,145 @@ async fn test_data_writer_orders_by_event_time() {
             .as_ref()
             .map(|dt| dt.to_rfc3339()),
         Some("2023-01-01T00:00:00+00:00".to_string())
+    );
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, ingest, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_data_writer_snapshot_orders_by_pk_and_operation_type() {
+    let mut harness = Harness::new(vec![MetadataFactory::set_polling_source()
+        .merge(odf::MergeStrategySnapshot {
+            primary_key: vec!["city".to_string()],
+            compare_columns: None,
+        })
+        .build()
+        .into()])
+    .await;
+
+    let res = harness
+        .write(
+            indoc!(
+                r#"
+                city,population
+                C,3000
+                A,1000
+                D,4000
+                B,2000
+                "#
+            ),
+            "city STRING, population BIGINT",
+        )
+        .await
+        .unwrap();
+
+    let df = harness.get_last_data().await;
+
+    assert_schema_eq(
+        df.schema(),
+        indoc!(
+            r#"
+            message arrow_schema {
+              OPTIONAL INT64 offset;
+              REQUIRED INT32 op (INTEGER(8,false));
+              REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
+              REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
+              OPTIONAL BYTE_ARRAY city (STRING);
+              OPTIONAL INT64 population;
+            }
+            "#
+        ),
+    );
+
+    assert_data_eq(
+        df,
+        indoc!(
+            r#"
+            +--------+----+----------------------+----------------------+------+------------+
+            | offset | op | system_time          | event_time           | city | population |
+            +--------+----+----------------------+----------------------+------+------------+
+            | 0      | 0  | 2010-01-01T12:00:00Z | 2000-01-01T12:00:00Z | A    | 1000       |
+            | 1      | 0  | 2010-01-01T12:00:00Z | 2000-01-01T12:00:00Z | B    | 2000       |
+            | 2      | 0  | 2010-01-01T12:00:00Z | 2000-01-01T12:00:00Z | C    | 3000       |
+            | 3      | 0  | 2010-01-01T12:00:00Z | 2000-01-01T12:00:00Z | D    | 4000       |
+            +--------+----+----------------------+----------------------+------+------------+
+            "#
+        ),
+    )
+    .await;
+
+    assert_eq!(
+        res.new_block
+            .event
+            .new_watermark
+            .as_ref()
+            .map(|dt| dt.to_rfc3339()),
+        Some("2000-01-01T12:00:00+00:00".to_string())
+    );
+
+    // Round 2
+    harness.set_system_time(Utc.with_ymd_and_hms(2010, 1, 2, 12, 0, 0).unwrap());
+    harness.set_source_event_time(Utc.with_ymd_and_hms(2000, 1, 2, 12, 0, 0).unwrap());
+
+    let res = harness
+        .write(
+            indoc!(
+                r#"
+                city,population
+                C,3000
+                B,4000
+                D,5000
+                "#
+            ),
+            "city STRING, population BIGINT",
+        )
+        .await
+        .unwrap();
+
+    let df = harness.get_last_data().await;
+
+    assert_schema_eq(
+        df.schema(),
+        indoc!(
+            r#"
+            message arrow_schema {
+              OPTIONAL INT64 offset;
+              REQUIRED INT32 op (INTEGER(8,false));
+              REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
+              OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
+              OPTIONAL BYTE_ARRAY city (STRING);
+              OPTIONAL INT64 population;
+            }
+            "#
+        ),
+    );
+
+    assert_data_eq(
+        df,
+        indoc!(
+            r#"
+            +--------+----+----------------------+----------------------+------+------------+
+            | offset | op | system_time          | event_time           | city | population |
+            +--------+----+----------------------+----------------------+------+------------+
+            | 4      | 1  | 2010-01-02T12:00:00Z | 2000-01-01T12:00:00Z | A    | 1000       |
+            | 5      | 2  | 2010-01-02T12:00:00Z | 2000-01-01T12:00:00Z | B    | 2000       |
+            | 6      | 3  | 2010-01-02T12:00:00Z | 2000-01-02T12:00:00Z | B    | 4000       |
+            | 7      | 2  | 2010-01-02T12:00:00Z | 2000-01-01T12:00:00Z | D    | 4000       |
+            | 8      | 3  | 2010-01-02T12:00:00Z | 2000-01-02T12:00:00Z | D    | 5000       |
+            +--------+----+----------------------+----------------------+------+------------+
+            "#
+        ),
+    )
+    .await;
+
+    assert_eq!(
+        res.new_block
+            .event
+            .new_watermark
+            .as_ref()
+            .map(|dt| dt.to_rfc3339()),
+        Some("2000-01-02T12:00:00+00:00".to_string())
     );
 }
 
@@ -521,6 +680,7 @@ async fn test_data_writer_normalizes_timestamps_to_utc_millis() {
             r#"
             message arrow_schema {
               OPTIONAL INT64 offset;
+              REQUIRED INT32 op (INTEGER(8,false));
               REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
               OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
               OPTIONAL BYTE_ARRAY city (STRING);
@@ -534,13 +694,13 @@ async fn test_data_writer_normalizes_timestamps_to_utc_millis() {
         df,
         indoc!(
             r#"
-            +--------+----------------------+----------------------+------+------------+
-            | offset | system_time          | event_time           | city | population |
-            +--------+----------------------+----------------------+------+------------+
-            | 0      | 2010-01-01T12:00:00Z | 2000-01-01T00:00:00Z | A    | 1000       |
-            | 1      | 2010-01-01T12:00:00Z | 2000-01-01T00:00:00Z | B    | 2000       |
-            | 2      | 2010-01-01T12:00:00Z | 2000-01-01T00:00:00Z | C    | 3000       |
-            +--------+----------------------+----------------------+------+------------+
+            +--------+----+----------------------+----------------------+------+------------+
+            | offset | op | system_time          | event_time           | city | population |
+            +--------+----+----------------------+----------------------+------+------------+
+            | 0      | 0  | 2010-01-01T12:00:00Z | 2000-01-01T00:00:00Z | A    | 1000       |
+            | 1      | 0  | 2010-01-01T12:00:00Z | 2000-01-01T00:00:00Z | B    | 2000       |
+            | 2      | 0  | 2010-01-01T12:00:00Z | 2000-01-01T00:00:00Z | C    | 3000       |
+            +--------+----+----------------------+----------------------+------+------------+
             "#
         ),
     )
@@ -606,10 +766,15 @@ async fn test_data_writer_optimal_parquet_encoding() {
     // See: https://github.com/kamu-data/kamu-engine-flink/issues/3
     // assert_data_encoding(0, Encoding::DELTA_BINARY_PACKED);
 
-    let system_time_col = meta.row_group(0).column(1);
+    let operation_type_col = meta.row_group(0).column(1);
+    assert_eq!(operation_type_col.column_path().string(), "op");
+    assert_eq!(operation_type_col.compression(), Compression::SNAPPY);
+    assert_data_encoding(1, Encoding::RLE_DICTIONARY);
+
+    let system_time_col = meta.row_group(0).column(2);
     assert_eq!(system_time_col.column_path().string(), "system_time");
     assert_eq!(system_time_col.compression(), Compression::SNAPPY);
-    assert_data_encoding(1, Encoding::RLE_DICTIONARY);
+    assert_data_encoding(2, Encoding::RLE_DICTIONARY);
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

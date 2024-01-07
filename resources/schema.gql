@@ -864,10 +864,6 @@ type MergeStrategyLedger {
 type MergeStrategySnapshot {
 	primaryKey: [String!]!
 	compareColumns: [String!]
-	observationColumn: String
-	obsvAdded: String
-	obsvChanged: String
-	obsvRemoved: String
 }
 
 type MetadataBlockConnection {
@@ -1208,9 +1204,10 @@ type SetTransform {
 }
 
 type SetVocab {
+	offsetColumn: String
+	operationTypeColumn: String
 	systemTimeColumn: String
 	eventTimeColumn: String
-	offsetColumn: String
 }
 
 union SourceCaching = SourceCachingForever

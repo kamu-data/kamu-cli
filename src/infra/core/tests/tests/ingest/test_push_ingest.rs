@@ -48,9 +48,8 @@ async fn test_ingest_push_url_stream() {
                 .build(),
         )
         .push_event(SetVocab {
-            system_time_column: None,
             event_time_column: Some("date".to_string()),
-            offset_column: None,
+            ..Default::default()
         })
         .build();
 
@@ -93,6 +92,7 @@ async fn test_ingest_push_url_stream() {
                 r#"
                 message arrow_schema {
                   OPTIONAL INT64 offset;
+                  REQUIRED INT32 op (INTEGER(8,false));
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                   OPTIONAL INT64 date (TIMESTAMP(MILLIS,true));
                   OPTIONAL BYTE_ARRAY city (STRING);
@@ -102,13 +102,13 @@ async fn test_ingest_push_url_stream() {
             ),
             indoc!(
                 r#"
-                +--------+----------------------+----------------------+------+------------+
-                | offset | system_time          | date                 | city | population |
-                +--------+----------------------+----------------------+------+------------+
-                | 0      | 2050-01-01T12:00:00Z | 2020-01-01T00:00:00Z | A    | 1000       |
-                | 1      | 2050-01-01T12:00:00Z | 2020-01-01T00:00:00Z | B    | 2000       |
-                | 2      | 2050-01-01T12:00:00Z | 2020-01-01T00:00:00Z | C    | 3000       |
-                +--------+----------------------+----------------------+------+------------+
+                +--------+----+----------------------+----------------------+------+------------+
+                | offset | op | system_time          | date                 | city | population |
+                +--------+----+----------------------+----------------------+------+------------+
+                | 0      | 0  | 2050-01-01T12:00:00Z | 2020-01-01T00:00:00Z | A    | 1000       |
+                | 1      | 0  | 2050-01-01T12:00:00Z | 2020-01-01T00:00:00Z | B    | 2000       |
+                | 2      | 0  | 2050-01-01T12:00:00Z | 2020-01-01T00:00:00Z | C    | 3000       |
+                +--------+----+----------------------+----------------------+------+------------+
                 "#
             ),
         )
@@ -143,11 +143,11 @@ async fn test_ingest_push_url_stream() {
     data_helper
         .assert_last_data_records_eq(indoc!(
             r#"
-            +--------+----------------------+----------------------+------+------------+
-            | offset | system_time          | date                 | city | population |
-            +--------+----------------------+----------------------+------+------------+
-            | 3      | 2050-01-01T12:00:00Z | 2021-01-01T00:00:00Z | C    | 4000       |
-            +--------+----------------------+----------------------+------+------------+
+            +--------+----+----------------------+----------------------+------+------------+
+            | offset | op | system_time          | date                 | city | population |
+            +--------+----+----------------------+----------------------+------+------------+
+            | 3      | 0  | 2050-01-01T12:00:00Z | 2021-01-01T00:00:00Z | C    | 4000       |
+            +--------+----+----------------------+----------------------+------+------------+
             "#
         ))
         .await;
@@ -190,9 +190,8 @@ async fn test_ingest_push_media_type_override() {
                 .build(),
         )
         .push_event(SetVocab {
-            system_time_column: None,
             event_time_column: Some("date".to_string()),
-            offset_column: None,
+            ..Default::default()
         })
         .build();
 
@@ -232,6 +231,7 @@ async fn test_ingest_push_media_type_override() {
                 r#"
                 message arrow_schema {
                   OPTIONAL INT64 offset;
+                  REQUIRED INT32 op (INTEGER(8,false));
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                   OPTIONAL INT64 date (TIMESTAMP(MILLIS,true));
                   OPTIONAL BYTE_ARRAY city (STRING);
@@ -241,11 +241,11 @@ async fn test_ingest_push_media_type_override() {
             ),
             indoc!(
                 r#"
-                +--------+----------------------+----------------------+------+------------+
-                | offset | system_time          | date                 | city | population |
-                +--------+----------------------+----------------------+------+------------+
-                | 0      | 2050-01-01T12:00:00Z | 2020-01-01T00:00:00Z | A    | 1000       |
-                +--------+----------------------+----------------------+------+------------+
+                +--------+----+----------------------+----------------------+------+------------+
+                | offset | op | system_time          | date                 | city | population |
+                +--------+----+----------------------+----------------------+------+------------+
+                | 0      | 0  | 2050-01-01T12:00:00Z | 2020-01-01T00:00:00Z | A    | 1000       |
+                +--------+----+----------------------+----------------------+------+------------+
                 "#
             ),
         )
@@ -281,6 +281,7 @@ async fn test_ingest_push_media_type_override() {
                 r#"
                 message arrow_schema {
                   OPTIONAL INT64 offset;
+                  REQUIRED INT32 op (INTEGER(8,false));
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                   OPTIONAL INT64 date (TIMESTAMP(MILLIS,true));
                   OPTIONAL BYTE_ARRAY city (STRING);
@@ -290,11 +291,11 @@ async fn test_ingest_push_media_type_override() {
             ),
             indoc!(
                 r#"
-                +--------+----------------------+----------------------+------+------------+
-                | offset | system_time          | date                 | city | population |
-                +--------+----------------------+----------------------+------+------------+
-                | 1      | 2050-01-01T12:00:00Z | 2020-01-01T00:00:00Z | B    | 2000       |
-                +--------+----------------------+----------------------+------+------------+
+                +--------+----+----------------------+----------------------+------+------------+
+                | offset | op | system_time          | date                 | city | population |
+                +--------+----+----------------------+----------------------+------+------------+
+                | 1      | 0  | 2050-01-01T12:00:00Z | 2020-01-01T00:00:00Z | B    | 2000       |
+                +--------+----+----------------------+----------------------+------+------------+
                 "#
             ),
         )
@@ -332,6 +333,7 @@ async fn test_ingest_push_media_type_override() {
                 r#"
                 message arrow_schema {
                   OPTIONAL INT64 offset;
+                  REQUIRED INT32 op (INTEGER(8,false));
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                   OPTIONAL INT64 date (TIMESTAMP(MILLIS,true));
                   OPTIONAL BYTE_ARRAY city (STRING);
@@ -341,11 +343,11 @@ async fn test_ingest_push_media_type_override() {
             ),
             indoc!(
                 r#"
-                +--------+----------------------+----------------------+------+------------+
-                | offset | system_time          | date                 | city | population |
-                +--------+----------------------+----------------------+------+------------+
-                | 2      | 2050-01-01T12:00:00Z | 2020-01-01T00:00:00Z | C    | 3000       |
-                +--------+----------------------+----------------------+------+------------+
+                +--------+----+----------------------+----------------------+------+------------+
+                | offset | op | system_time          | date                 | city | population |
+                +--------+----+----------------------+----------------------+------+------------+
+                | 2      | 0  | 2050-01-01T12:00:00Z | 2020-01-01T00:00:00Z | C    | 3000       |
+                +--------+----+----------------------+----------------------+------+------------+
                 "#
             ),
         )
@@ -412,29 +414,31 @@ async fn test_ingest_push_schema_stability() {
         .await
         .unwrap();
 
+    let set_data_schema = data_helper.get_last_set_data_schema_block().await.event;
+
     // This schema is written automatically by the writer
-    let schema_current = data_helper
-        .get_last_set_data_schema_block()
-        .await
-        .event
-        .schema_as_arrow()
-        .unwrap();
+    let schema_current = set_data_schema.schema_as_arrow().unwrap();
 
     // This schema is captured earlier with:
-    // - kamu-cli = 0.150.0
+    // - kamu-cli = 'branch/breaking-changes'
     // - datafusion = 33
+    //
+    // To refresh use:
+    // println!("{}", hex::encode(set_data_schema.schema.as_slice()));
     let schema_prev = SetDataSchema {
         schema: hex::decode(
-            "0c000000080008000000040008000000040000000500000014010000bc0000006c0000003\
-            c0000000400000010ffffff1000000018000000000001021400000000ffffff40000000000\
-            00001000000000a000000706f70756c6174696f6e000044ffffff180000000c00000000000\
-            1051000000000000000040004000400000004000000636974790000000070ffffff1400000\
-            00c0000000000010a1c00000000000000b4ffffff080000000000010003000000555443000\
-            a0000006576656e745f74696d65000010001400100000000f00040000000800100000001c0\
-            000000c0000000000000a240000000000000008000c000a000400080000000800000000000\
-            10003000000555443000b00000073797374656d5f74696d65001000140010000e000f00040\
-            000000800100000001800000020000000000001021c00000008000c0004000b00080000004\
-            00000000000000100000000060000006f66667365740000").unwrap(),
+            "0c00000008000800000004000800000004000000060000005801000014010000bc0000006\
+            c0000003c00000004000000d0feffff10000000180000000000010214000000c0feffff400\
+            0000000000001000000000a000000706f70756c6174696f6e000004ffffff180000000c000\
+            000000001051000000000000000040004000400000004000000636974790000000030fffff\
+            f140000000c0000000000010a1c00000000000000b4ffffff0800000000000100030000005\
+            55443000a0000006576656e745f74696d65000010001400100000000f00040000000800100\
+            000001c0000000c0000000000000a240000000000000008000c000a0004000800000008000\
+            0000000010003000000555443000b00000073797374656d5f74696d6500100016001000000\
+            00f0004000000080010000000180000001c000000000000021800000000000600080004000\
+            60000000800000000000000020000006f7000001000140010000e000f00040000000800100\
+            000001800000020000000000001021c00000008000c0004000b00080000004000000000000\
+            00100000000060000006f66667365740000").unwrap(),
     }.schema_as_arrow().unwrap();
 
     // This comparison should replicate schema equivalence test performed

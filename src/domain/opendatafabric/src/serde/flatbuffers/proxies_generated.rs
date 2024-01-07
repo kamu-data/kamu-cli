@@ -4496,10 +4496,6 @@ impl<'a> flatbuffers::Follow<'a> for MergeStrategySnapshot<'a> {
 impl<'a> MergeStrategySnapshot<'a> {
     pub const VT_PRIMARY_KEY: flatbuffers::VOffsetT = 4;
     pub const VT_COMPARE_COLUMNS: flatbuffers::VOffsetT = 6;
-    pub const VT_OBSERVATION_COLUMN: flatbuffers::VOffsetT = 8;
-    pub const VT_OBSV_ADDED: flatbuffers::VOffsetT = 10;
-    pub const VT_OBSV_CHANGED: flatbuffers::VOffsetT = 12;
-    pub const VT_OBSV_REMOVED: flatbuffers::VOffsetT = 14;
 
     #[inline]
     pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
@@ -4511,18 +4507,6 @@ impl<'a> MergeStrategySnapshot<'a> {
         args: &'args MergeStrategySnapshotArgs<'args>,
     ) -> flatbuffers::WIPOffset<MergeStrategySnapshot<'bldr>> {
         let mut builder = MergeStrategySnapshotBuilder::new(_fbb);
-        if let Some(x) = args.obsv_removed {
-            builder.add_obsv_removed(x);
-        }
-        if let Some(x) = args.obsv_changed {
-            builder.add_obsv_changed(x);
-        }
-        if let Some(x) = args.obsv_added {
-            builder.add_obsv_added(x);
-        }
-        if let Some(x) = args.observation_column {
-            builder.add_observation_column(x);
-        }
         if let Some(x) = args.compare_columns {
             builder.add_compare_columns(x);
         }
@@ -4558,54 +4542,6 @@ impl<'a> MergeStrategySnapshot<'a> {
             >>(MergeStrategySnapshot::VT_COMPARE_COLUMNS, None)
         }
     }
-    #[inline]
-    pub fn observation_column(&self) -> Option<&'a str> {
-        // Safety:
-        // Created from valid Table for this object
-        // which contains a valid value in this slot
-        unsafe {
-            self._tab.get::<flatbuffers::ForwardsUOffset<&str>>(
-                MergeStrategySnapshot::VT_OBSERVATION_COLUMN,
-                None,
-            )
-        }
-    }
-    #[inline]
-    pub fn obsv_added(&self) -> Option<&'a str> {
-        // Safety:
-        // Created from valid Table for this object
-        // which contains a valid value in this slot
-        unsafe {
-            self._tab.get::<flatbuffers::ForwardsUOffset<&str>>(
-                MergeStrategySnapshot::VT_OBSV_ADDED,
-                None,
-            )
-        }
-    }
-    #[inline]
-    pub fn obsv_changed(&self) -> Option<&'a str> {
-        // Safety:
-        // Created from valid Table for this object
-        // which contains a valid value in this slot
-        unsafe {
-            self._tab.get::<flatbuffers::ForwardsUOffset<&str>>(
-                MergeStrategySnapshot::VT_OBSV_CHANGED,
-                None,
-            )
-        }
-    }
-    #[inline]
-    pub fn obsv_removed(&self) -> Option<&'a str> {
-        // Safety:
-        // Created from valid Table for this object
-        // which contains a valid value in this slot
-        unsafe {
-            self._tab.get::<flatbuffers::ForwardsUOffset<&str>>(
-                MergeStrategySnapshot::VT_OBSV_REMOVED,
-                None,
-            )
-        }
-    }
 }
 
 impl flatbuffers::Verifiable for MergeStrategySnapshot<'_> {
@@ -4622,26 +4558,6 @@ impl flatbuffers::Verifiable for MergeStrategySnapshot<'_> {
             .visit_field::<flatbuffers::ForwardsUOffset<
                 flatbuffers::Vector<'_, flatbuffers::ForwardsUOffset<&'_ str>>,
             >>("compare_columns", Self::VT_COMPARE_COLUMNS, false)?
-            .visit_field::<flatbuffers::ForwardsUOffset<&str>>(
-                "observation_column",
-                Self::VT_OBSERVATION_COLUMN,
-                false,
-            )?
-            .visit_field::<flatbuffers::ForwardsUOffset<&str>>(
-                "obsv_added",
-                Self::VT_OBSV_ADDED,
-                false,
-            )?
-            .visit_field::<flatbuffers::ForwardsUOffset<&str>>(
-                "obsv_changed",
-                Self::VT_OBSV_CHANGED,
-                false,
-            )?
-            .visit_field::<flatbuffers::ForwardsUOffset<&str>>(
-                "obsv_removed",
-                Self::VT_OBSV_REMOVED,
-                false,
-            )?
             .finish();
         Ok(())
     }
@@ -4653,10 +4569,6 @@ pub struct MergeStrategySnapshotArgs<'a> {
     pub compare_columns: Option<
         flatbuffers::WIPOffset<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<&'a str>>>,
     >,
-    pub observation_column: Option<flatbuffers::WIPOffset<&'a str>>,
-    pub obsv_added: Option<flatbuffers::WIPOffset<&'a str>>,
-    pub obsv_changed: Option<flatbuffers::WIPOffset<&'a str>>,
-    pub obsv_removed: Option<flatbuffers::WIPOffset<&'a str>>,
 }
 impl<'a> Default for MergeStrategySnapshotArgs<'a> {
     #[inline]
@@ -4664,10 +4576,6 @@ impl<'a> Default for MergeStrategySnapshotArgs<'a> {
         MergeStrategySnapshotArgs {
             primary_key: None,
             compare_columns: None,
-            observation_column: None,
-            obsv_added: None,
-            obsv_changed: None,
-            obsv_removed: None,
         }
     }
 }
@@ -4702,34 +4610,6 @@ impl<'a: 'b, 'b> MergeStrategySnapshotBuilder<'a, 'b> {
         );
     }
     #[inline]
-    pub fn add_observation_column(&mut self, observation_column: flatbuffers::WIPOffset<&'b str>) {
-        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
-            MergeStrategySnapshot::VT_OBSERVATION_COLUMN,
-            observation_column,
-        );
-    }
-    #[inline]
-    pub fn add_obsv_added(&mut self, obsv_added: flatbuffers::WIPOffset<&'b str>) {
-        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
-            MergeStrategySnapshot::VT_OBSV_ADDED,
-            obsv_added,
-        );
-    }
-    #[inline]
-    pub fn add_obsv_changed(&mut self, obsv_changed: flatbuffers::WIPOffset<&'b str>) {
-        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
-            MergeStrategySnapshot::VT_OBSV_CHANGED,
-            obsv_changed,
-        );
-    }
-    #[inline]
-    pub fn add_obsv_removed(&mut self, obsv_removed: flatbuffers::WIPOffset<&'b str>) {
-        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
-            MergeStrategySnapshot::VT_OBSV_REMOVED,
-            obsv_removed,
-        );
-    }
-    #[inline]
     pub fn new(
         _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a>,
     ) -> MergeStrategySnapshotBuilder<'a, 'b> {
@@ -4751,10 +4631,6 @@ impl core::fmt::Debug for MergeStrategySnapshot<'_> {
         let mut ds = f.debug_struct("MergeStrategySnapshot");
         ds.field("primary_key", &self.primary_key());
         ds.field("compare_columns", &self.compare_columns());
-        ds.field("observation_column", &self.observation_column());
-        ds.field("obsv_added", &self.obsv_added());
-        ds.field("obsv_changed", &self.obsv_changed());
-        ds.field("obsv_removed", &self.obsv_removed());
         ds.finish()
     }
 }
@@ -9351,9 +9227,10 @@ impl<'a> flatbuffers::Follow<'a> for SetVocab<'a> {
 }
 
 impl<'a> SetVocab<'a> {
-    pub const VT_SYSTEM_TIME_COLUMN: flatbuffers::VOffsetT = 4;
-    pub const VT_EVENT_TIME_COLUMN: flatbuffers::VOffsetT = 6;
-    pub const VT_OFFSET_COLUMN: flatbuffers::VOffsetT = 8;
+    pub const VT_OFFSET_COLUMN: flatbuffers::VOffsetT = 4;
+    pub const VT_OPERATION_TYPE_COLUMN: flatbuffers::VOffsetT = 6;
+    pub const VT_SYSTEM_TIME_COLUMN: flatbuffers::VOffsetT = 8;
+    pub const VT_EVENT_TIME_COLUMN: flatbuffers::VOffsetT = 10;
 
     #[inline]
     pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
@@ -9365,18 +9242,41 @@ impl<'a> SetVocab<'a> {
         args: &'args SetVocabArgs<'args>,
     ) -> flatbuffers::WIPOffset<SetVocab<'bldr>> {
         let mut builder = SetVocabBuilder::new(_fbb);
-        if let Some(x) = args.offset_column {
-            builder.add_offset_column(x);
-        }
         if let Some(x) = args.event_time_column {
             builder.add_event_time_column(x);
         }
         if let Some(x) = args.system_time_column {
             builder.add_system_time_column(x);
         }
+        if let Some(x) = args.operation_type_column {
+            builder.add_operation_type_column(x);
+        }
+        if let Some(x) = args.offset_column {
+            builder.add_offset_column(x);
+        }
         builder.finish()
     }
 
+    #[inline]
+    pub fn offset_column(&self) -> Option<&'a str> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<flatbuffers::ForwardsUOffset<&str>>(SetVocab::VT_OFFSET_COLUMN, None)
+        }
+    }
+    #[inline]
+    pub fn operation_type_column(&self) -> Option<&'a str> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<flatbuffers::ForwardsUOffset<&str>>(SetVocab::VT_OPERATION_TYPE_COLUMN, None)
+        }
+    }
     #[inline]
     pub fn system_time_column(&self) -> Option<&'a str> {
         // Safety:
@@ -9397,16 +9297,6 @@ impl<'a> SetVocab<'a> {
                 .get::<flatbuffers::ForwardsUOffset<&str>>(SetVocab::VT_EVENT_TIME_COLUMN, None)
         }
     }
-    #[inline]
-    pub fn offset_column(&self) -> Option<&'a str> {
-        // Safety:
-        // Created from valid Table for this object
-        // which contains a valid value in this slot
-        unsafe {
-            self._tab
-                .get::<flatbuffers::ForwardsUOffset<&str>>(SetVocab::VT_OFFSET_COLUMN, None)
-        }
-    }
 }
 
 impl flatbuffers::Verifiable for SetVocab<'_> {
@@ -9418,6 +9308,16 @@ impl flatbuffers::Verifiable for SetVocab<'_> {
         use self::flatbuffers::Verifiable;
         v.visit_table(pos)?
             .visit_field::<flatbuffers::ForwardsUOffset<&str>>(
+                "offset_column",
+                Self::VT_OFFSET_COLUMN,
+                false,
+            )?
+            .visit_field::<flatbuffers::ForwardsUOffset<&str>>(
+                "operation_type_column",
+                Self::VT_OPERATION_TYPE_COLUMN,
+                false,
+            )?
+            .visit_field::<flatbuffers::ForwardsUOffset<&str>>(
                 "system_time_column",
                 Self::VT_SYSTEM_TIME_COLUMN,
                 false,
@@ -9427,27 +9327,24 @@ impl flatbuffers::Verifiable for SetVocab<'_> {
                 Self::VT_EVENT_TIME_COLUMN,
                 false,
             )?
-            .visit_field::<flatbuffers::ForwardsUOffset<&str>>(
-                "offset_column",
-                Self::VT_OFFSET_COLUMN,
-                false,
-            )?
             .finish();
         Ok(())
     }
 }
 pub struct SetVocabArgs<'a> {
+    pub offset_column: Option<flatbuffers::WIPOffset<&'a str>>,
+    pub operation_type_column: Option<flatbuffers::WIPOffset<&'a str>>,
     pub system_time_column: Option<flatbuffers::WIPOffset<&'a str>>,
     pub event_time_column: Option<flatbuffers::WIPOffset<&'a str>>,
-    pub offset_column: Option<flatbuffers::WIPOffset<&'a str>>,
 }
 impl<'a> Default for SetVocabArgs<'a> {
     #[inline]
     fn default() -> Self {
         SetVocabArgs {
+            offset_column: None,
+            operation_type_column: None,
             system_time_column: None,
             event_time_column: None,
-            offset_column: None,
         }
     }
 }
@@ -9457,6 +9354,23 @@ pub struct SetVocabBuilder<'a: 'b, 'b> {
     start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
 }
 impl<'a: 'b, 'b> SetVocabBuilder<'a, 'b> {
+    #[inline]
+    pub fn add_offset_column(&mut self, offset_column: flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
+            SetVocab::VT_OFFSET_COLUMN,
+            offset_column,
+        );
+    }
+    #[inline]
+    pub fn add_operation_type_column(
+        &mut self,
+        operation_type_column: flatbuffers::WIPOffset<&'b str>,
+    ) {
+        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
+            SetVocab::VT_OPERATION_TYPE_COLUMN,
+            operation_type_column,
+        );
+    }
     #[inline]
     pub fn add_system_time_column(&mut self, system_time_column: flatbuffers::WIPOffset<&'b str>) {
         self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
@@ -9469,13 +9383,6 @@ impl<'a: 'b, 'b> SetVocabBuilder<'a, 'b> {
         self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
             SetVocab::VT_EVENT_TIME_COLUMN,
             event_time_column,
-        );
-    }
-    #[inline]
-    pub fn add_offset_column(&mut self, offset_column: flatbuffers::WIPOffset<&'b str>) {
-        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
-            SetVocab::VT_OFFSET_COLUMN,
-            offset_column,
         );
     }
     #[inline]
@@ -9496,9 +9403,10 @@ impl<'a: 'b, 'b> SetVocabBuilder<'a, 'b> {
 impl core::fmt::Debug for SetVocab<'_> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let mut ds = f.debug_struct("SetVocab");
+        ds.field("offset_column", &self.offset_column());
+        ds.field("operation_type_column", &self.operation_type_column());
         ds.field("system_time_column", &self.system_time_column());
         ds.field("event_time_column", &self.event_time_column());
-        ds.field("offset_column", &self.offset_column());
         ds.finish()
     }
 }
@@ -10333,9 +10241,10 @@ impl<'a> flatbuffers::Follow<'a> for DatasetVocabulary<'a> {
 }
 
 impl<'a> DatasetVocabulary<'a> {
-    pub const VT_SYSTEM_TIME_COLUMN: flatbuffers::VOffsetT = 4;
-    pub const VT_EVENT_TIME_COLUMN: flatbuffers::VOffsetT = 6;
-    pub const VT_OFFSET_COLUMN: flatbuffers::VOffsetT = 8;
+    pub const VT_OFFSET_COLUMN: flatbuffers::VOffsetT = 4;
+    pub const VT_OPERATION_TYPE_COLUMN: flatbuffers::VOffsetT = 6;
+    pub const VT_SYSTEM_TIME_COLUMN: flatbuffers::VOffsetT = 8;
+    pub const VT_EVENT_TIME_COLUMN: flatbuffers::VOffsetT = 10;
 
     #[inline]
     pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
@@ -10347,18 +10256,45 @@ impl<'a> DatasetVocabulary<'a> {
         args: &'args DatasetVocabularyArgs<'args>,
     ) -> flatbuffers::WIPOffset<DatasetVocabulary<'bldr>> {
         let mut builder = DatasetVocabularyBuilder::new(_fbb);
-        if let Some(x) = args.offset_column {
-            builder.add_offset_column(x);
-        }
         if let Some(x) = args.event_time_column {
             builder.add_event_time_column(x);
         }
         if let Some(x) = args.system_time_column {
             builder.add_system_time_column(x);
         }
+        if let Some(x) = args.operation_type_column {
+            builder.add_operation_type_column(x);
+        }
+        if let Some(x) = args.offset_column {
+            builder.add_offset_column(x);
+        }
         builder.finish()
     }
 
+    #[inline]
+    pub fn offset_column(&self) -> Option<&'a str> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab.get::<flatbuffers::ForwardsUOffset<&str>>(
+                DatasetVocabulary::VT_OFFSET_COLUMN,
+                None,
+            )
+        }
+    }
+    #[inline]
+    pub fn operation_type_column(&self) -> Option<&'a str> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab.get::<flatbuffers::ForwardsUOffset<&str>>(
+                DatasetVocabulary::VT_OPERATION_TYPE_COLUMN,
+                None,
+            )
+        }
+    }
     #[inline]
     pub fn system_time_column(&self) -> Option<&'a str> {
         // Safety:
@@ -10383,18 +10319,6 @@ impl<'a> DatasetVocabulary<'a> {
             )
         }
     }
-    #[inline]
-    pub fn offset_column(&self) -> Option<&'a str> {
-        // Safety:
-        // Created from valid Table for this object
-        // which contains a valid value in this slot
-        unsafe {
-            self._tab.get::<flatbuffers::ForwardsUOffset<&str>>(
-                DatasetVocabulary::VT_OFFSET_COLUMN,
-                None,
-            )
-        }
-    }
 }
 
 impl flatbuffers::Verifiable for DatasetVocabulary<'_> {
@@ -10406,6 +10330,16 @@ impl flatbuffers::Verifiable for DatasetVocabulary<'_> {
         use self::flatbuffers::Verifiable;
         v.visit_table(pos)?
             .visit_field::<flatbuffers::ForwardsUOffset<&str>>(
+                "offset_column",
+                Self::VT_OFFSET_COLUMN,
+                false,
+            )?
+            .visit_field::<flatbuffers::ForwardsUOffset<&str>>(
+                "operation_type_column",
+                Self::VT_OPERATION_TYPE_COLUMN,
+                false,
+            )?
+            .visit_field::<flatbuffers::ForwardsUOffset<&str>>(
                 "system_time_column",
                 Self::VT_SYSTEM_TIME_COLUMN,
                 false,
@@ -10415,27 +10349,24 @@ impl flatbuffers::Verifiable for DatasetVocabulary<'_> {
                 Self::VT_EVENT_TIME_COLUMN,
                 false,
             )?
-            .visit_field::<flatbuffers::ForwardsUOffset<&str>>(
-                "offset_column",
-                Self::VT_OFFSET_COLUMN,
-                false,
-            )?
             .finish();
         Ok(())
     }
 }
 pub struct DatasetVocabularyArgs<'a> {
+    pub offset_column: Option<flatbuffers::WIPOffset<&'a str>>,
+    pub operation_type_column: Option<flatbuffers::WIPOffset<&'a str>>,
     pub system_time_column: Option<flatbuffers::WIPOffset<&'a str>>,
     pub event_time_column: Option<flatbuffers::WIPOffset<&'a str>>,
-    pub offset_column: Option<flatbuffers::WIPOffset<&'a str>>,
 }
 impl<'a> Default for DatasetVocabularyArgs<'a> {
     #[inline]
     fn default() -> Self {
         DatasetVocabularyArgs {
+            offset_column: None,
+            operation_type_column: None,
             system_time_column: None,
             event_time_column: None,
-            offset_column: None,
         }
     }
 }
@@ -10445,6 +10376,23 @@ pub struct DatasetVocabularyBuilder<'a: 'b, 'b> {
     start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
 }
 impl<'a: 'b, 'b> DatasetVocabularyBuilder<'a, 'b> {
+    #[inline]
+    pub fn add_offset_column(&mut self, offset_column: flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
+            DatasetVocabulary::VT_OFFSET_COLUMN,
+            offset_column,
+        );
+    }
+    #[inline]
+    pub fn add_operation_type_column(
+        &mut self,
+        operation_type_column: flatbuffers::WIPOffset<&'b str>,
+    ) {
+        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
+            DatasetVocabulary::VT_OPERATION_TYPE_COLUMN,
+            operation_type_column,
+        );
+    }
     #[inline]
     pub fn add_system_time_column(&mut self, system_time_column: flatbuffers::WIPOffset<&'b str>) {
         self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
@@ -10457,13 +10405,6 @@ impl<'a: 'b, 'b> DatasetVocabularyBuilder<'a, 'b> {
         self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
             DatasetVocabulary::VT_EVENT_TIME_COLUMN,
             event_time_column,
-        );
-    }
-    #[inline]
-    pub fn add_offset_column(&mut self, offset_column: flatbuffers::WIPOffset<&'b str>) {
-        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
-            DatasetVocabulary::VT_OFFSET_COLUMN,
-            offset_column,
         );
     }
     #[inline]
@@ -10486,9 +10427,10 @@ impl<'a: 'b, 'b> DatasetVocabularyBuilder<'a, 'b> {
 impl core::fmt::Debug for DatasetVocabulary<'_> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let mut ds = f.debug_struct("DatasetVocabulary");
+        ds.field("offset_column", &self.offset_column());
+        ds.field("operation_type_column", &self.operation_type_column());
         ds.field("system_time_column", &self.system_time_column());
         ds.field("event_time_column", &self.event_time_column());
-        ds.field("offset_column", &self.offset_column());
         ds.finish()
     }
 }

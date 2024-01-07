@@ -225,17 +225,19 @@ impl From<odf::DatasetSnapshot> for DatasetSnapshot {
 
 #[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct DatasetVocabulary {
+    pub offset_column: String,
+    pub operation_type_column: String,
     pub system_time_column: String,
     pub event_time_column: String,
-    pub offset_column: String,
 }
 
 impl From<odf::DatasetVocabulary> for DatasetVocabulary {
     fn from(v: odf::DatasetVocabulary) -> Self {
         Self {
+            offset_column: v.offset_column.into(),
+            operation_type_column: v.operation_type_column.into(),
             system_time_column: v.system_time_column.into(),
             event_time_column: v.event_time_column.into(),
-            offset_column: v.offset_column.into(),
         }
     }
 }
@@ -560,10 +562,6 @@ impl From<odf::MergeStrategyLedger> for MergeStrategyLedger {
 pub struct MergeStrategySnapshot {
     pub primary_key: Vec<String>,
     pub compare_columns: Option<Vec<String>>,
-    pub observation_column: Option<String>,
-    pub obsv_added: Option<String>,
-    pub obsv_changed: Option<String>,
-    pub obsv_removed: Option<String>,
 }
 
 impl From<odf::MergeStrategySnapshot> for MergeStrategySnapshot {
@@ -573,10 +571,6 @@ impl From<odf::MergeStrategySnapshot> for MergeStrategySnapshot {
             compare_columns: v
                 .compare_columns
                 .map(|v| v.into_iter().map(Into::into).collect()),
-            observation_column: v.observation_column.map(Into::into),
-            obsv_added: v.obsv_added.map(Into::into),
-            obsv_changed: v.obsv_changed.map(Into::into),
-            obsv_removed: v.obsv_removed.map(Into::into),
         }
     }
 }
@@ -1168,17 +1162,19 @@ impl From<odf::SetTransform> for SetTransform {
 
 #[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct SetVocab {
+    pub offset_column: Option<String>,
+    pub operation_type_column: Option<String>,
     pub system_time_column: Option<String>,
     pub event_time_column: Option<String>,
-    pub offset_column: Option<String>,
 }
 
 impl From<odf::SetVocab> for SetVocab {
     fn from(v: odf::SetVocab) -> Self {
         Self {
+            offset_column: v.offset_column.map(Into::into),
+            operation_type_column: v.operation_type_column.map(Into::into),
             system_time_column: v.system_time_column.map(Into::into),
             event_time_column: v.event_time_column.map(Into::into),
-            offset_column: v.offset_column.map(Into::into),
         }
     }
 }
