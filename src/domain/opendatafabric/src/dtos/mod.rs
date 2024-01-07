@@ -11,8 +11,10 @@ mod constants;
 mod dtos_dyntraits_generated;
 mod dtos_extra;
 mod dtos_generated;
+mod operation_type;
 
 pub use dtos_generated::*;
+pub use operation_type::*;
 
 pub mod dynamic {
     pub use super::dtos_dyntraits_generated::*;

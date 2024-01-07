@@ -177,12 +177,14 @@ pub struct DatasetSnapshot {
 /// Specifies the mapping of system columns onto dataset schema.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct DatasetVocabulary {
+    /// Name of the offset column.
+    pub offset_column: String,
+    /// Name of the operation type column.
+    pub operation_type_column: String,
     /// Name of the system time column.
     pub system_time_column: String,
     /// Name of the event time column.
     pub event_time_column: String,
-    /// Name of the offset column.
-    pub offset_column: String,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -481,17 +483,6 @@ pub struct MergeStrategySnapshot {
     /// Names of the columns to compared to determine if a row has changed
     /// between two snapshots.
     pub compare_columns: Option<Vec<String>>,
-    /// Name of the observation type column that will be added to the data.
-    pub observation_column: Option<String>,
-    /// Name of the observation type when the data with certain primary key is
-    /// seen for the first time.
-    pub obsv_added: Option<String>,
-    /// Name of the observation type when the data with certain primary key has
-    /// changed compared to the last time it was seen.
-    pub obsv_changed: Option<String>,
-    /// Name of the observation type when the data with certain primary key has
-    /// been seen before but now is missing from the snapshot.
-    pub obsv_removed: Option<String>,
 }
 
 impl_enum_variant!(MergeStrategy::Snapshot(MergeStrategySnapshot));
@@ -959,12 +950,14 @@ pub struct SetTransform {
 /// Lets you manipulate names of the system columns to avoid conflicts.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct SetVocab {
+    /// Name of the offset column.
+    pub offset_column: Option<String>,
+    /// Name of the operation type column.
+    pub operation_type_column: Option<String>,
     /// Name of the system time column.
     pub system_time_column: Option<String>,
     /// Name of the event time column.
     pub event_time_column: Option<String>,
-    /// Name of the offset column.
-    pub offset_column: Option<String>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////

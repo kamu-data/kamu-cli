@@ -330,13 +330,15 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::DatasetVocabulary {
     type OffsetT = WIPOffset<fb::DatasetVocabulary<'fb>>;
 
     fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
+        let offset_column_offset = { fb.create_string(&self.offset_column) };
+        let operation_type_column_offset = { fb.create_string(&self.operation_type_column) };
         let system_time_column_offset = { fb.create_string(&self.system_time_column) };
         let event_time_column_offset = { fb.create_string(&self.event_time_column) };
-        let offset_column_offset = { fb.create_string(&self.offset_column) };
         let mut builder = fb::DatasetVocabularyBuilder::new(fb);
+        builder.add_offset_column(offset_column_offset);
+        builder.add_operation_type_column(operation_type_column_offset);
         builder.add_system_time_column(system_time_column_offset);
         builder.add_event_time_column(event_time_column_offset);
-        builder.add_offset_column(offset_column_offset);
         builder.finish()
     }
 }
@@ -344,9 +346,10 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::DatasetVocabulary {
 impl<'fb> FlatbuffersDeserializable<fb::DatasetVocabulary<'fb>> for odf::DatasetVocabulary {
     fn deserialize(proxy: fb::DatasetVocabulary<'fb>) -> Self {
         odf::DatasetVocabulary {
+            offset_column: proxy.offset_column().map(|v| v.to_owned()).unwrap(),
+            operation_type_column: proxy.operation_type_column().map(|v| v.to_owned()).unwrap(),
             system_time_column: proxy.system_time_column().map(|v| v.to_owned()).unwrap(),
             event_time_column: proxy.event_time_column().map(|v| v.to_owned()).unwrap(),
-            offset_column: proxy.offset_column().map(|v| v.to_owned()).unwrap(),
         }
     }
 }
@@ -938,20 +941,9 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::MergeStrategySnapshot {
             let offsets: Vec<_> = v.iter().map(|i| fb.create_string(&i)).collect();
             fb.create_vector(&offsets)
         });
-        let observation_column_offset = self
-            .observation_column
-            .as_ref()
-            .map(|v| fb.create_string(&v));
-        let obsv_added_offset = self.obsv_added.as_ref().map(|v| fb.create_string(&v));
-        let obsv_changed_offset = self.obsv_changed.as_ref().map(|v| fb.create_string(&v));
-        let obsv_removed_offset = self.obsv_removed.as_ref().map(|v| fb.create_string(&v));
         let mut builder = fb::MergeStrategySnapshotBuilder::new(fb);
         builder.add_primary_key(primary_key_offset);
         compare_columns_offset.map(|off| builder.add_compare_columns(off));
-        observation_column_offset.map(|off| builder.add_observation_column(off));
-        obsv_added_offset.map(|off| builder.add_obsv_added(off));
-        obsv_changed_offset.map(|off| builder.add_obsv_changed(off));
-        obsv_removed_offset.map(|off| builder.add_obsv_removed(off));
         builder.finish()
     }
 }
@@ -966,10 +958,6 @@ impl<'fb> FlatbuffersDeserializable<fb::MergeStrategySnapshot<'fb>> for odf::Mer
             compare_columns: proxy
                 .compare_columns()
                 .map(|v| v.iter().map(|i| i.to_owned()).collect()),
-            observation_column: proxy.observation_column().map(|v| v.to_owned()),
-            obsv_added: proxy.obsv_added().map(|v| v.to_owned()),
-            obsv_changed: proxy.obsv_changed().map(|v| v.to_owned()),
-            obsv_removed: proxy.obsv_removed().map(|v| v.to_owned()),
         }
     }
 }
@@ -2057,6 +2045,11 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::SetVocab {
     type OffsetT = WIPOffset<fb::SetVocab<'fb>>;
 
     fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
+        let offset_column_offset = self.offset_column.as_ref().map(|v| fb.create_string(&v));
+        let operation_type_column_offset = self
+            .operation_type_column
+            .as_ref()
+            .map(|v| fb.create_string(&v));
         let system_time_column_offset = self
             .system_time_column
             .as_ref()
@@ -2065,11 +2058,11 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::SetVocab {
             .event_time_column
             .as_ref()
             .map(|v| fb.create_string(&v));
-        let offset_column_offset = self.offset_column.as_ref().map(|v| fb.create_string(&v));
         let mut builder = fb::SetVocabBuilder::new(fb);
+        offset_column_offset.map(|off| builder.add_offset_column(off));
+        operation_type_column_offset.map(|off| builder.add_operation_type_column(off));
         system_time_column_offset.map(|off| builder.add_system_time_column(off));
         event_time_column_offset.map(|off| builder.add_event_time_column(off));
-        offset_column_offset.map(|off| builder.add_offset_column(off));
         builder.finish()
     }
 }
@@ -2077,9 +2070,10 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::SetVocab {
 impl<'fb> FlatbuffersDeserializable<fb::SetVocab<'fb>> for odf::SetVocab {
     fn deserialize(proxy: fb::SetVocab<'fb>) -> Self {
         odf::SetVocab {
+            offset_column: proxy.offset_column().map(|v| v.to_owned()),
+            operation_type_column: proxy.operation_type_column().map(|v| v.to_owned()),
             system_time_column: proxy.system_time_column().map(|v| v.to_owned()),
             event_time_column: proxy.event_time_column().map(|v| v.to_owned()),
-            offset_column: proxy.offset_column().map(|v| v.to_owned()),
         }
     }
 }

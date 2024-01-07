@@ -10,16 +10,10 @@
 use crate::*;
 
 impl DatasetVocabulary {
+    pub const DEFAULT_OFFSET_COLUMN_NAME: &'static str = "offset";
+    pub const DEFAULT_OPERATION_TYPE_COLUMN_NAME: &'static str = "op";
     pub const DEFAULT_SYSTEM_TIME_COLUMN_NAME: &'static str = "system_time";
     pub const DEFAULT_EVENT_TIME_COLUMN_NAME: &'static str = "event_time";
-    pub const DEFAULT_OFFSET_COLUMN_NAME: &'static str = "offset";
-}
-
-impl MergeStrategySnapshot {
-    pub const DEFAULT_OBSV_COLUMN_NAME: &'static str = "observed";
-    pub const DEFAULT_OBSV_ADDED: &'static str = "I";
-    pub const DEFAULT_OBSV_CHANGED: &'static str = "U";
-    pub const DEFAULT_OBSV_REMOVED: &'static str = "D";
 }
 
 impl SourceState {

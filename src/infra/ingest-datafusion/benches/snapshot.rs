@@ -13,6 +13,7 @@ use std::sync::Arc;
 use criterion::{criterion_group, criterion_main, Criterion};
 use datafusion::dataframe::DataFrameWriteOptions;
 use datafusion::prelude::*;
+use opendatafabric as odf;
 use rand::{Rng, SeedableRng};
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -20,11 +21,12 @@ use rand::{Rng, SeedableRng};
 async fn setup(
     tempdir: &Path,
     orig_rows: usize,
+    removed_rows: usize,
     changed_rows: usize,
     added_rows: usize,
 ) -> (String, String) {
     use datafusion::arrow::array;
-    use datafusion::arrow::datatypes::{DataType, Field, Int64Type, Schema};
+    use datafusion::arrow::datatypes::{DataType, Field, Int64Type, Schema, UInt8Type};
     use datafusion::arrow::record_batch::RecordBatch;
 
     let ctx = SessionContext::new();
@@ -33,7 +35,7 @@ async fn setup(
     let new = tempdir.join("new").to_str().unwrap().to_string();
 
     let mut offset = array::PrimitiveBuilder::<Int64Type>::with_capacity(orig_rows);
-    let mut observed = array::StringBuilder::new();
+    let mut op = array::PrimitiveBuilder::<UInt8Type>::new();
     let mut pk1 = array::PrimitiveBuilder::<Int64Type>::with_capacity(orig_rows);
     let mut pk2 = array::PrimitiveBuilder::<Int64Type>::with_capacity(orig_rows);
     let mut cmp1 = array::PrimitiveBuilder::<Int64Type>::with_capacity(orig_rows);
@@ -50,45 +52,53 @@ async fn setup(
 
     for i in 0..orig_rows {
         offset.append_value(i as i64);
-        observed.append_value("I");
+        op.append_value(odf::OperationType::Append as u8);
     }
 
-    let mut buf = Vec::with_capacity(orig_rows + added_rows);
-    buf.resize(orig_rows + added_rows, 0);
+    // |------------------------- buffer --------------------------|
+    // |----------------- orig -----------------|----- added ------|
+    // |-- removed --|-- changed --|
+    //               |------------------ new ----------------------|
+    let buf_len = orig_rows + added_rows;
+    let orig_range = ..orig_rows;
+    let changed_range = removed_rows..removed_rows + changed_rows;
+    let new_range = removed_rows..;
+    let mut buf = Vec::with_capacity(buf_len);
+    buf.resize(buf_len, 0);
 
     let mut rng = rand::rngs::SmallRng::seed_from_u64(123127986998);
 
     rng.try_fill(&mut buf[..]).unwrap();
-    pk1.append_slice(&buf[..orig_rows]);
-    new_pk1.append_slice(&buf[..]);
+    pk1.append_slice(&buf[orig_range.clone()]);
+    new_pk1.append_slice(&buf[new_range.clone()]);
 
     rng.try_fill(&mut buf[..]).unwrap();
-    pk2.append_slice(&buf[..orig_rows]);
-    new_pk2.append_slice(&buf[..]);
+    pk2.append_slice(&buf[orig_range.clone()]);
+    new_pk2.append_slice(&buf[new_range.clone()]);
 
     rng.try_fill(&mut buf[..]).unwrap();
-    cmp1.append_slice(&buf[..orig_rows]);
-    rng.try_fill(&mut buf[..changed_rows]).unwrap();
-    new_cmp1.append_slice(&buf[..]);
+    cmp1.append_slice(&buf[orig_range.clone()]);
+    rng.try_fill(&mut buf[changed_range.clone()]).unwrap();
+    new_cmp1.append_slice(&buf[new_range.clone()]);
 
     rng.try_fill(&mut buf[..]).unwrap();
-    cmp2.append_slice(&buf[..orig_rows]);
-    rng.try_fill(&mut buf[..changed_rows]).unwrap();
-    new_cmp2.append_slice(&buf[..]);
+    cmp2.append_slice(&buf[orig_range.clone()]);
+    rng.try_fill(&mut buf[changed_range.clone()]).unwrap();
+    new_cmp2.append_slice(&buf[new_range.clone()]);
 
     rng.try_fill(&mut buf[..]).unwrap();
-    aux1.append_slice(&buf[..orig_rows]);
-    new_aux1.append_slice(&buf[..]);
+    aux1.append_slice(&buf[orig_range.clone()]);
+    new_aux1.append_slice(&buf[new_range.clone()]);
 
     rng.try_fill(&mut buf[..]).unwrap();
-    aux2.append_slice(&buf[..orig_rows]);
-    new_aux2.append_slice(&buf[..]);
+    aux2.append_slice(&buf[orig_range.clone()]);
+    new_aux2.append_slice(&buf[new_range.clone()]);
 
     ctx.read_batch(
         RecordBatch::try_new(
             Arc::new(Schema::new(vec![
                 Field::new("offset", DataType::Int64, false),
-                Field::new("observed", DataType::Utf8, false),
+                Field::new("op", DataType::UInt8, false),
                 Field::new("pk1", DataType::Int64, false),
                 Field::new("pk2", DataType::Int64, false),
                 Field::new("cmp1", DataType::Int64, false),
@@ -98,7 +108,7 @@ async fn setup(
             ])),
             vec![
                 Arc::new(offset.finish()),
-                Arc::new(observed.finish()),
+                Arc::new(op.finish()),
                 Arc::new(pk1.finish()),
                 Arc::new(pk2.finish()),
                 Arc::new(cmp1.finish()),
@@ -162,14 +172,10 @@ async fn merge_snapshot(prev_path: &str, new_path: &str, expected_rows: usize) {
     let new = ctx.table("new").await.unwrap();
 
     let res = MergeStrategySnapshot::new(
-        "offset".to_string(),
-        opendatafabric::MergeStrategySnapshot {
+        odf::DatasetVocabulary::default(),
+        odf::MergeStrategySnapshot {
             primary_key: vec!["pk1".to_string(), "pk2".to_string()],
             compare_columns: Some(vec!["cmp1".to_string(), "cmp2".to_string()]),
-            observation_column: None,
-            obsv_added: None,
-            obsv_changed: None,
-            obsv_removed: None,
         },
     )
     .merge(Some(prev), new)
@@ -184,19 +190,29 @@ async fn merge_snapshot(prev_path: &str, new_path: &str, expected_rows: usize) {
 
 fn bench(c: &mut Criterion) {
     let orig_rows = 1000_000;
+    let removed_rows = 100_000;
     let changed_rows = 200_000;
     let added_rows = 100_000;
+
+    // 1 event (+I, -R) per added/removed row + 2 events per changed (-C, +C)
+    let expected_rows = added_rows + removed_rows + 2 * changed_rows;
 
     let tempdir = tempfile::tempdir().unwrap();
 
     let rt = tokio::runtime::Runtime::new().unwrap();
 
-    let (prev, new) = rt.block_on(setup(tempdir.path(), orig_rows, changed_rows, added_rows));
+    let (prev, new) = rt.block_on(setup(
+        tempdir.path(),
+        orig_rows,
+        removed_rows,
+        changed_rows,
+        added_rows,
+    ));
 
     let mut group = c.benchmark_group("merge");
     group.sample_size(10);
     group.bench_function("snapshot", |b| {
-        b.iter(|| rt.block_on(merge_snapshot(&prev, &new, changed_rows + added_rows)))
+        b.iter(|| rt.block_on(merge_snapshot(&prev, &new, expected_rows)))
     });
 }
 

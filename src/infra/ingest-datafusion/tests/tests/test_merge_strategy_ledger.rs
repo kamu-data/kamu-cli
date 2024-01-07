@@ -15,8 +15,13 @@ use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::prelude::*;
 use kamu_ingest_datafusion::*;
+use opendatafabric as odf;
 
 use crate::utils::*;
+
+///////////////////////////////////////////////////////////////////////////////
+
+type Op = odf::OperationType;
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -54,186 +59,253 @@ where
     ctx.read_batch(batch).unwrap()
 }
 
+///////////////////////////////////////////////////////////////////////////////
+
+fn make_output<I, S>(ctx: &SessionContext, rows: I) -> DataFrame
+where
+    I: IntoIterator<Item = (Op, i32, S, i64)>,
+    S: Into<String>,
+{
+    let schema = Arc::new(Schema::new(vec![
+        Field::new("op", DataType::UInt8, false),
+        Field::new("year", DataType::Int32, false),
+        Field::new("city", DataType::Utf8, false),
+        Field::new("population", DataType::Int64, false),
+    ]));
+
+    let mut op = Vec::new();
+    let mut year = Vec::new();
+    let mut city = Vec::new();
+    let mut population = Vec::new();
+
+    for (o, y, c, p) in rows.into_iter() {
+        op.push(o as u8);
+        year.push(y);
+        city.push(c.into());
+        population.push(p);
+    }
+
+    let batch = RecordBatch::try_new(
+        schema,
+        vec![
+            Arc::new(array::UInt8Array::from(op)),
+            Arc::new(array::Int32Array::from(year)),
+            Arc::new(array::StringArray::from(city)),
+            Arc::new(array::Int64Array::from(population)),
+        ],
+    )
+    .unwrap();
+
+    ctx.read_batch(batch).unwrap()
+}
+
 fn make_output_empty(ctx: &SessionContext) -> DataFrame {
-    make_input::<[_; 0], &str>(&ctx, [])
+    make_output::<[_; 0], &str>(&ctx, [])
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(engine, ingest, datafusion)]
-#[test_log::test(tokio::test)]
-async fn test_ledger_to_empty() {
+async fn test_ledger_merge<L, I, E, S>(ledger: L, input: I, expected: E)
+where
+    L: IntoIterator<Item = (Op, i32, S, i64)>,
+    I: IntoIterator<Item = (i32, S, i64)>,
+    E: IntoIterator<Item = (Op, i32, S, i64)>,
+    S: Into<String>,
+{
     let ctx = SessionContext::new();
-    let strat = MergeStrategyLedger::new(vec!["year".to_string(), "city".to_string()]);
-
-    let new = make_input(
-        &ctx,
-        [
-            (2020, "vancouver", 1),
-            (2020, "seattle", 2),
-            (2020, "kyiv", 3),
-        ],
+    let strat = MergeStrategyLedger::new(
+        odf::DatasetVocabulary {
+            event_time_column: "year".to_string(),
+            ..Default::default()
+        },
+        odf::MergeStrategyLedger {
+            primary_key: vec!["year".to_string(), "city".to_string()],
+        },
     );
 
-    let actual = strat.merge(None, new).unwrap();
-    let expected = make_input(
-        &ctx,
-        [
-            (2020, "vancouver", 1),
-            (2020, "seattle", 2),
-            (2020, "kyiv", 3),
-        ],
-    );
-    assert_dfs_equivalent(expected, actual).await;
+    let prev = {
+        let df = make_output(&ctx, ledger);
+        if df.clone().count().await.unwrap() == 0 {
+            None
+        } else {
+            Some(df)
+        }
+    };
+    let new = make_input(&ctx, input);
+    let expected = make_output(&ctx, expected);
+    let actual = strat.merge(prev, new).unwrap();
+
+    // Sort events according to the strategy
+    let actual = actual.sort(strat.sort_order()).unwrap();
+
+    assert_dfs_equivalent(expected, actual, false, true, true).await;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
-async fn test_ledger_unseen() {
-    let ctx = SessionContext::new();
-    let strat = MergeStrategyLedger::new(vec!["year".to_string(), "city".to_string()]);
-
-    let prev = make_input(
-        &ctx,
+async fn test_ledger_merge_to_empty() {
+    test_ledger_merge(
+        [],
         [
             (2020, "vancouver", 1),
             (2020, "seattle", 2),
             (2020, "kyiv", 3),
         ],
-    );
-    let new = make_input(&ctx, [(2020, "odessa", 4)]);
-
-    let actual = strat.merge(Some(prev), new).unwrap();
-    let expected = make_input(&ctx, [(2020, "odessa", 4)]);
-    assert_dfs_equivalent(expected, actual).await;
+        [
+            (Op::Append, 2020, "vancouver", 1),
+            (Op::Append, 2020, "seattle", 2),
+            (Op::Append, 2020, "kyiv", 3),
+        ],
+    )
+    .await;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
-async fn test_ledger_seen_tail_ordered() {
-    let ctx = SessionContext::new();
-    let strat = MergeStrategyLedger::new(vec!["year".to_string(), "city".to_string()]);
-
-    let prev = make_input(
-        &ctx,
+async fn test_ledger_merge_unseen() {
+    test_ledger_merge(
         [
-            (2020, "vancouver", 1),
-            (2020, "seattle", 2),
-            (2020, "kyiv", 3),
+            (Op::Append, 2020, "vancouver", 1),
+            (Op::Append, 2020, "seattle", 2),
+            (Op::Append, 2020, "kyiv", 3),
         ],
-    );
-    let new = make_input(&ctx, [(2020, "seattle", 2), (2020, "kyiv", 3)]);
-
-    let actual = strat.merge(Some(prev), new).unwrap();
-    let expected = make_output_empty(&ctx);
-    assert_dfs_equivalent(expected, actual).await;
+        [(2020, "odessa", 4)],
+        [(Op::Append, 2020, "odessa", 4)],
+    )
+    .await;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
-async fn test_ledger_seen_tail_unordered() {
-    let ctx = SessionContext::new();
-    let strat = MergeStrategyLedger::new(vec!["year".to_string(), "city".to_string()]);
-
-    let prev = make_input(
-        &ctx,
+async fn test_ledger_merge_seen_tail_ordered() {
+    test_ledger_merge(
         [
-            (2020, "vancouver", 1),
-            (2020, "seattle", 2),
-            (2020, "kyiv", 3),
+            (Op::Append, 2020, "vancouver", 1),
+            (Op::Append, 2020, "seattle", 2),
+            (Op::Append, 2020, "kyiv", 3),
         ],
-    );
-    let new = make_input(&ctx, [(2020, "kyiv", 3), (2020, "seattle", 2)]);
-
-    let actual = strat.merge(Some(prev), new).unwrap();
-    let expected = make_output_empty(&ctx);
-    assert_dfs_equivalent(expected, actual).await;
+        [(2020, "seattle", 2), (2020, "kyiv", 3)],
+        [],
+    )
+    .await;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
-async fn test_ledger_seen_middle() {
-    let ctx = SessionContext::new();
-    let strat = MergeStrategyLedger::new(vec!["year".to_string(), "city".to_string()]);
-
-    let prev = make_input(
-        &ctx,
+async fn test_ledger_merge_seen_tail_unordered() {
+    test_ledger_merge(
         [
-            (2020, "vancouver", 1),
-            (2020, "seattle", 2),
-            (2020, "kyiv", 3),
+            (Op::Append, 2020, "vancouver", 1),
+            (Op::Append, 2020, "seattle", 2),
+            (Op::Append, 2020, "kyiv", 3),
         ],
-    );
-    let new = make_input(&ctx, [(2020, "seattle", 2)]);
-
-    let actual = strat.merge(Some(prev), new).unwrap();
-    let expected = make_output_empty(&ctx);
-    assert_dfs_equivalent(expected, actual).await;
+        [(2020, "kyiv", 3), (2020, "seattle", 2)],
+        [],
+    )
+    .await;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
-async fn test_ledger_respects_pk() {
+async fn test_ledger_merge_seen_middle() {
+    test_ledger_merge(
+        [
+            (Op::Append, 2020, "vancouver", 1),
+            (Op::Append, 2020, "seattle", 2),
+            (Op::Append, 2020, "kyiv", 3),
+        ],
+        [(2020, "seattle", 2)],
+        [],
+    )
+    .await;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, ingest, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_ledger_merge_respects_pk() {
     let ctx = SessionContext::new();
 
     let prev = make_input(&ctx, [(2020, "vancouver", 1), (2020, "seattle", 2)]);
     let new = make_input(&ctx, [(2020, "kiev", 3)]);
-    let actual = MergeStrategyLedger::new(vec!["year".to_string()])
-        .merge(Some(prev), new)
-        .unwrap();
-    let expected = make_output_empty(&ctx);
-    assert_dfs_equivalent(expected, actual).await;
-
-    let prev = make_input(&ctx, [(2020, "vancouver", 1), (2020, "seattle", 2)]);
-    let new = make_input(&ctx, [(2020, "seattle", 3)]);
-    let actual = MergeStrategyLedger::new(vec!["year".to_string(), "city".to_string()])
-        .merge(Some(prev), new)
-        .unwrap();
-    let expected = make_output_empty(&ctx);
-    assert_dfs_equivalent(expected, actual).await;
-
-    let prev = make_input(&ctx, [(2020, "vancouver", 1), (2020, "seattle", 2)]);
-    let new = make_input(&ctx, [(2020, "seattle", 3)]);
-    let actual = MergeStrategyLedger::new(vec![
-        "year".to_string(),
-        "city".to_string(),
-        "population".to_string(),
-    ])
+    let actual = MergeStrategyLedger::new(
+        odf::DatasetVocabulary::default(),
+        odf::MergeStrategyLedger {
+            primary_key: vec!["year".to_string()],
+        },
+    )
     .merge(Some(prev), new)
     .unwrap();
-    let expected = make_input(&ctx, [(2020, "seattle", 3)]);
-    assert_dfs_equivalent(expected, actual).await;
+    let expected = make_output_empty(&ctx);
+    assert_dfs_equivalent(expected, actual, false, true, true).await;
+
+    let prev = make_input(&ctx, [(2020, "vancouver", 1), (2020, "seattle", 2)]);
+    let new = make_input(&ctx, [(2020, "seattle", 3)]);
+    let actual = MergeStrategyLedger::new(
+        odf::DatasetVocabulary::default(),
+        odf::MergeStrategyLedger {
+            primary_key: vec!["year".to_string(), "city".to_string()],
+        },
+    )
+    .merge(Some(prev), new)
+    .unwrap();
+    let expected = make_output_empty(&ctx);
+    assert_dfs_equivalent(expected, actual, false, true, true).await;
+
+    let prev = make_input(&ctx, [(2020, "vancouver", 1), (2020, "seattle", 2)]);
+    let new = make_input(&ctx, [(2020, "seattle", 3)]);
+    let actual = MergeStrategyLedger::new(
+        odf::DatasetVocabulary::default(),
+        odf::MergeStrategyLedger {
+            primary_key: vec![
+                "year".to_string(),
+                "city".to_string(),
+                "population".to_string(),
+            ],
+        },
+    )
+    .merge(Some(prev), new)
+    .unwrap();
+    let expected = make_output(&ctx, [(Op::Append, 2020, "seattle", 3)]);
+    assert_dfs_equivalent(expected, actual, false, true, true).await;
 
     let prev = make_input(&ctx, [(2020, "vancouver", 1), (2020, "seattle", 2)]);
     let new = make_input(&ctx, [(2021, "seattle", 3)]);
-    let actual = MergeStrategyLedger::new(vec!["year".to_string(), "city".to_string()])
-        .merge(Some(prev), new)
-        .unwrap();
-    let expected = make_input(&ctx, [(2021, "seattle", 3)]);
-    assert_dfs_equivalent(expected, actual).await;
+    let actual = MergeStrategyLedger::new(
+        odf::DatasetVocabulary::default(),
+        odf::MergeStrategyLedger {
+            primary_key: vec!["year".to_string(), "city".to_string()],
+        },
+    )
+    .merge(Some(prev), new)
+    .unwrap();
+    let expected = make_output(&ctx, [(Op::Append, 2021, "seattle", 3)]);
+    assert_dfs_equivalent(expected, actual, false, true, true).await;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
-async fn test_ledger_invalid_pk() {
+async fn test_ledger_merge_invalid_pk() {
     let ctx = SessionContext::new();
-    let strat = MergeStrategyLedger::new(vec![
-        "year".to_string(),
-        "city".to_string(),
-        "foo".to_string(),
-    ]);
+    let strat = MergeStrategyLedger::new(
+        odf::DatasetVocabulary::default(),
+        odf::MergeStrategyLedger {
+            primary_key: vec!["year".to_string(), "city".to_string(), "foo".to_string()],
+        },
+    );
 
     let new = make_input(
         &ctx,

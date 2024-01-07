@@ -292,29 +292,34 @@ impl Into<dtos::DatasetSnapshot> for &dyn DatasetSnapshot {
 ////////////////////////////////////////////////////////////////////////////////
 
 pub trait DatasetVocabulary {
+    fn offset_column(&self) -> &str;
+    fn operation_type_column(&self) -> &str;
     fn system_time_column(&self) -> &str;
     fn event_time_column(&self) -> &str;
-    fn offset_column(&self) -> &str;
 }
 
 impl DatasetVocabulary for dtos::DatasetVocabulary {
+    fn offset_column(&self) -> &str {
+        self.offset_column.as_ref()
+    }
+    fn operation_type_column(&self) -> &str {
+        self.operation_type_column.as_ref()
+    }
     fn system_time_column(&self) -> &str {
         self.system_time_column.as_ref()
     }
     fn event_time_column(&self) -> &str {
         self.event_time_column.as_ref()
     }
-    fn offset_column(&self) -> &str {
-        self.offset_column.as_ref()
-    }
 }
 
 impl Into<dtos::DatasetVocabulary> for &dyn DatasetVocabulary {
     fn into(self) -> dtos::DatasetVocabulary {
         dtos::DatasetVocabulary {
+            offset_column: self.offset_column().to_owned(),
+            operation_type_column: self.operation_type_column().to_owned(),
             system_time_column: self.system_time_column().to_owned(),
             event_time_column: self.event_time_column().to_owned(),
-            offset_column: self.offset_column().to_owned(),
         }
     }
 }
@@ -748,10 +753,6 @@ pub trait MergeStrategyLedger {
 pub trait MergeStrategySnapshot {
     fn primary_key(&self) -> Box<dyn Iterator<Item = &str> + '_>;
     fn compare_columns(&self) -> Option<Box<dyn Iterator<Item = &str> + '_>>;
-    fn observation_column(&self) -> Option<&str>;
-    fn obsv_added(&self) -> Option<&str>;
-    fn obsv_changed(&self) -> Option<&str>;
-    fn obsv_removed(&self) -> Option<&str>;
 }
 
 impl MergeStrategyAppend for dtos::MergeStrategyAppend {}
@@ -772,20 +773,6 @@ impl MergeStrategySnapshot for dtos::MergeStrategySnapshot {
             .map(|v| -> Box<dyn Iterator<Item = &str> + '_> {
                 Box::new(v.iter().map(|i| -> &str { i.as_ref() }))
             })
-    }
-    fn observation_column(&self) -> Option<&str> {
-        self.observation_column
-            .as_ref()
-            .map(|v| -> &str { v.as_ref() })
-    }
-    fn obsv_added(&self) -> Option<&str> {
-        self.obsv_added.as_ref().map(|v| -> &str { v.as_ref() })
-    }
-    fn obsv_changed(&self) -> Option<&str> {
-        self.obsv_changed.as_ref().map(|v| -> &str { v.as_ref() })
-    }
-    fn obsv_removed(&self) -> Option<&str> {
-        self.obsv_removed.as_ref().map(|v| -> &str { v.as_ref() })
     }
 }
 
@@ -810,10 +797,6 @@ impl Into<dtos::MergeStrategySnapshot> for &dyn MergeStrategySnapshot {
             compare_columns: self
                 .compare_columns()
                 .map(|v| v.map(|i| i.to_owned()).collect()),
-            observation_column: self.observation_column().map(|v| v.to_owned()),
-            obsv_added: self.obsv_added().map(|v| v.to_owned()),
-            obsv_changed: self.obsv_changed().map(|v| v.to_owned()),
-            obsv_removed: self.obsv_removed().map(|v| v.to_owned()),
         }
     }
 }
@@ -1697,12 +1680,21 @@ impl Into<dtos::SetTransform> for &dyn SetTransform {
 ////////////////////////////////////////////////////////////////////////////////
 
 pub trait SetVocab {
+    fn offset_column(&self) -> Option<&str>;
+    fn operation_type_column(&self) -> Option<&str>;
     fn system_time_column(&self) -> Option<&str>;
     fn event_time_column(&self) -> Option<&str>;
-    fn offset_column(&self) -> Option<&str>;
 }
 
 impl SetVocab for dtos::SetVocab {
+    fn offset_column(&self) -> Option<&str> {
+        self.offset_column.as_ref().map(|v| -> &str { v.as_ref() })
+    }
+    fn operation_type_column(&self) -> Option<&str> {
+        self.operation_type_column
+            .as_ref()
+            .map(|v| -> &str { v.as_ref() })
+    }
     fn system_time_column(&self) -> Option<&str> {
         self.system_time_column
             .as_ref()
@@ -1713,17 +1705,15 @@ impl SetVocab for dtos::SetVocab {
             .as_ref()
             .map(|v| -> &str { v.as_ref() })
     }
-    fn offset_column(&self) -> Option<&str> {
-        self.offset_column.as_ref().map(|v| -> &str { v.as_ref() })
-    }
 }
 
 impl Into<dtos::SetVocab> for &dyn SetVocab {
     fn into(self) -> dtos::SetVocab {
         dtos::SetVocab {
+            offset_column: self.offset_column().map(|v| v.to_owned()),
+            operation_type_column: self.operation_type_column().map(|v| v.to_owned()),
             system_time_column: self.system_time_column().map(|v| v.to_owned()),
             event_time_column: self.event_time_column().map(|v| v.to_owned()),
-            offset_column: self.offset_column().map(|v| v.to_owned()),
         }
     }
 }

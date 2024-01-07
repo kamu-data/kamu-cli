@@ -88,10 +88,6 @@ async fn test_ingest_polling_snapshot() {
                 .merge(MergeStrategySnapshot {
                     primary_key: vec!["city".to_string()],
                     compare_columns: None,
-                    observation_column: None,
-                    obsv_added: None,
-                    obsv_changed: None,
-                    obsv_removed: None,
                 })
                 .build(),
         )
@@ -124,9 +120,9 @@ async fn test_ingest_polling_snapshot() {
                 r#"
                 message arrow_schema {
                   OPTIONAL INT64 offset;
+                  REQUIRED INT32 op (INTEGER(8,false));
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                   REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
-                  REQUIRED BYTE_ARRAY observed (STRING);
                   OPTIONAL BYTE_ARRAY city (STRING);
                   OPTIONAL INT64 population;
                 }
@@ -134,13 +130,13 @@ async fn test_ingest_polling_snapshot() {
             ),
             indoc!(
                 r#"
-                +--------+----------------------+----------------------+----------+------+------------+
-                | offset | system_time          | event_time           | observed | city | population |
-                +--------+----------------------+----------------------+----------+------+------------+
-                | 0      | 2050-01-01T12:00:00Z | 2050-01-01T12:00:00Z | I        | A    | 10001      |
-                | 1      | 2050-01-01T12:00:00Z | 2050-01-01T12:00:00Z | I        | B    | 20001      |
-                | 2      | 2050-01-01T12:00:00Z | 2050-01-01T12:00:00Z | I        | C    | 30001      |
-                +--------+----------------------+----------------------+----------+------+------------+
+                +--------+----+----------------------+----------------------+------+------------+
+                | offset | op | system_time          | event_time           | city | population |
+                +--------+----+----------------------+----------------------+------+------------+
+                | 0      | 0  | 2050-01-01T12:00:00Z | 2050-01-01T12:00:00Z | A    | 10001      |
+                | 1      | 0  | 2050-01-01T12:00:00Z | 2050-01-01T12:00:00Z | B    | 20001      |
+                | 2      | 0  | 2050-01-01T12:00:00Z | 2050-01-01T12:00:00Z | C    | 30001      |
+                +--------+----+----------------------+----------------------+------+------------+
                 "#
             ),
         )
@@ -179,11 +175,12 @@ async fn test_ingest_polling_snapshot() {
     data_helper
         .assert_last_data_records_eq(indoc!(
             r#"
-            +--------+----------------------+----------------------+----------+------+------------+
-            | offset | system_time          | event_time           | observed | city | population |
-            +--------+----------------------+----------------------+----------+------+------------+
-            | 3      | 2050-02-01T12:00:00Z | 2050-02-01T12:00:00Z | U        | C    | 40001      |
-            +--------+----------------------+----------------------+----------+------+------------+
+            +--------+----+----------------------+----------------------+------+------------+
+            | offset | op | system_time          | event_time           | city | population |
+            +--------+----+----------------------+----------------------+------+------------+
+            | 3      | 2  | 2050-02-01T12:00:00Z | 2050-01-01T12:00:00Z | C    | 30001      |
+            | 4      | 3  | 2050-02-01T12:00:00Z | 2050-02-01T12:00:00Z | C    | 40001      |
+            +--------+----+----------------------+----------------------+------+------------+
             "#
         ))
         .await;
@@ -259,22 +256,14 @@ async fn test_ingest_polling_ledger() {
                     ),
                     ..ReadStepCsv::default()
                 }))
-                .preprocess(TransformSql {
-                    engine: "datafusion".to_string(),
-                    version: None,
-                    query: Some("select * from input".to_string()),
-                    queries: None,
-                    temporal_tables: None,
-                })
                 .merge(MergeStrategyLedger {
                     primary_key: vec!["date".to_string(), "city".to_string()],
                 })
                 .build(),
         )
         .push_event(SetVocab {
-            system_time_column: None,
             event_time_column: Some("date".to_string()),
-            offset_column: None,
+            ..Default::default()
         })
         .build();
 
@@ -304,6 +293,7 @@ async fn test_ingest_polling_ledger() {
                 r#"
                 message arrow_schema {
                   OPTIONAL INT64 offset;
+                  REQUIRED INT32 op (INTEGER(8,false));
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                   OPTIONAL INT64 date (TIMESTAMP(MILLIS,true));
                   OPTIONAL BYTE_ARRAY city (STRING);
@@ -313,14 +303,14 @@ async fn test_ingest_polling_ledger() {
             ),
             indoc!(
                 r#"
-            +--------+----------------------+----------------------+------+------------+
-            | offset | system_time          | date                 | city | population |
-            +--------+----------------------+----------------------+------+------------+
-            | 0      | 2050-01-01T12:00:00Z | 2020-01-01T00:00:00Z | A    | 1000       |
-            | 1      | 2050-01-01T12:00:00Z | 2020-01-01T00:00:00Z | B    | 2000       |
-            | 2      | 2050-01-01T12:00:00Z | 2020-01-01T00:00:00Z | C    | 3000       |
-            +--------+----------------------+----------------------+------+------------+
-            "#
+                +--------+----+----------------------+----------------------+------+------------+
+                | offset | op | system_time          | date                 | city | population |
+                +--------+----+----------------------+----------------------+------+------------+
+                | 0      | 0  | 2050-01-01T12:00:00Z | 2020-01-01T00:00:00Z | A    | 1000       |
+                | 1      | 0  | 2050-01-01T12:00:00Z | 2020-01-01T00:00:00Z | B    | 2000       |
+                | 2      | 0  | 2050-01-01T12:00:00Z | 2020-01-01T00:00:00Z | C    | 3000       |
+                +--------+----+----------------------+----------------------+------+------------+
+                "#
             ),
         )
         .await;
@@ -354,11 +344,11 @@ async fn test_ingest_polling_ledger() {
     data_helper
         .assert_last_data_records_eq(indoc!(
             r#"
-            +--------+----------------------+----------------------+------+------------+
-            | offset | system_time          | date                 | city | population |
-            +--------+----------------------+----------------------+------+------------+
-            | 3      | 2050-01-01T12:00:00Z | 2021-01-01T00:00:00Z | C    | 4000       |
-            +--------+----------------------+----------------------+------+------------+
+            +--------+----+----------------------+----------------------+------+------------+
+            | offset | op | system_time          | date                 | city | population |
+            +--------+----+----------------------+----------------------+------+------------+
+            | 3      | 0  | 2050-01-01T12:00:00Z | 2021-01-01T00:00:00Z | C    | 4000       |
+            +--------+----+----------------------+----------------------+------+------------+
             "#
         ))
         .await;
@@ -390,11 +380,11 @@ async fn test_ingest_polling_ledger() {
     data_helper
         .assert_last_data_records_eq(indoc!(
             r#"
-            +--------+----------------------+----------------------+------+------------+
-            | offset | system_time          | date                 | city | population |
-            +--------+----------------------+----------------------+------+------------+
-            | 4      | 2050-01-01T12:00:00Z | 2020-01-01T00:00:00Z | D    | 4000       |
-            +--------+----------------------+----------------------+------+------------+
+            +--------+----+----------------------+----------------------+------+------------+
+            | offset | op | system_time          | date                 | city | population |
+            +--------+----+----------------------+----------------------+------+------------+
+            | 4      | 0  | 2050-01-01T12:00:00Z | 2020-01-01T00:00:00Z | D    | 4000       |
+            +--------+----+----------------------+----------------------+------+------------+
             "#
         ))
         .await;
@@ -485,9 +475,8 @@ async fn test_ingest_polling_empty_data() {
                 .build(),
         )
         .push_event(SetVocab {
-            system_time_column: None,
             event_time_column: Some("date".to_string()),
-            offset_column: None,
+            ..Default::default()
         })
         .build();
 
@@ -538,22 +527,15 @@ async fn test_ingest_polling_event_time_as_date() {
                     ),
                     ..ReadStepCsv::default()
                 }))
-                .preprocess(TransformSql {
-                    engine: "datafusion".to_string(),
-                    version: None,
-                    query: Some("select * from input".to_string()),
-                    queries: None,
-                    temporal_tables: None,
-                })
-                .merge(MergeStrategyLedger {
+                .merge(MergeStrategySnapshot {
                     primary_key: vec!["date".to_string(), "city".to_string()],
+                    compare_columns: None,
                 })
                 .build(),
         )
         .push_event(SetVocab {
-            system_time_column: None,
             event_time_column: Some("date".to_string()),
-            offset_column: None,
+            ..Default::default()
         })
         .build();
 
@@ -583,6 +565,7 @@ async fn test_ingest_polling_event_time_as_date() {
                 r#"
                 message arrow_schema {
                   OPTIONAL INT64 offset;
+                  REQUIRED INT32 op (INTEGER(8,false));
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                   OPTIONAL INT32 date (DATE);
                   OPTIONAL BYTE_ARRAY city (STRING);
@@ -592,13 +575,13 @@ async fn test_ingest_polling_event_time_as_date() {
             ),
             indoc!(
                 r#"
-                +--------+----------------------+------------+------+------------+
-                | offset | system_time          | date       | city | population |
-                +--------+----------------------+------------+------+------------+
-                | 0      | 2050-01-01T12:00:00Z | 2020-01-01 | A    | 1000       |
-                | 1      | 2050-01-01T12:00:00Z | 2020-01-01 | B    | 2000       |
-                | 2      | 2050-01-01T12:00:00Z | 2020-01-01 | C    | 3000       |
-                +--------+----------------------+------------+------+------------+
+                +--------+----+----------------------+------------+------+------------+
+                | offset | op | system_time          | date       | city | population |
+                +--------+----+----------------------+------------+------+------------+
+                | 0      | 0  | 2050-01-01T12:00:00Z | 2020-01-01 | A    | 1000       |
+                | 1      | 0  | 2050-01-01T12:00:00Z | 2020-01-01 | B    | 2000       |
+                | 2      | 0  | 2050-01-01T12:00:00Z | 2020-01-01 | C    | 3000       |
+                +--------+----+----------------------+------------+------+------------+
                 "#
             ),
         )
@@ -646,19 +629,11 @@ async fn test_ingest_polling_event_time_of_invalid_type() {
                     ]),
                     ..ReadStepCsv::default()
                 }))
-                .preprocess(TransformSql {
-                    engine: "datafusion".to_string(),
-                    version: None,
-                    query: Some("select * from input".to_string()),
-                    queries: None,
-                    temporal_tables: None,
-                })
                 .build(),
         )
         .push_event(SetVocab {
-            system_time_column: None,
             event_time_column: Some("date".to_string()),
-            offset_column: None,
+            ..Default::default()
         })
         .build();
 
@@ -713,19 +688,11 @@ async fn test_ingest_polling_bad_column_names_preserve() {
                     ]),
                     ..ReadStepNdJson::default()
                 })
-                .preprocess(TransformSql {
-                    engine: "datafusion".to_string(),
-                    version: None,
-                    query: Some("select * from input".to_string()),
-                    queries: None,
-                    temporal_tables: None,
-                })
                 .build(),
         )
         .push_event(SetVocab {
-            system_time_column: None,
             event_time_column: Some("Date (UTC)".to_string()),
-            offset_column: None,
+            ..Default::default()
         })
         .build();
 
@@ -753,6 +720,7 @@ async fn test_ingest_polling_bad_column_names_preserve() {
                 r#"
                 message arrow_schema {
                   OPTIONAL INT64 offset;
+                  REQUIRED INT32 op (INTEGER(8,false));
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                   REQUIRED INT32 Date (UTC) (DATE);
                   REQUIRED BYTE_ARRAY City Name (STRING);
@@ -762,13 +730,13 @@ async fn test_ingest_polling_bad_column_names_preserve() {
             ),
             indoc!(
                 r#"
-                +--------+----------------------+------------+-----------+------------+
-                | offset | system_time          | Date (UTC) | City Name | Population |
-                +--------+----------------------+------------+-----------+------------+
-                | 0      | 2050-01-01T12:00:00Z | 2020-01-01 | A         | 1000       |
-                | 1      | 2050-01-01T12:00:00Z | 2020-01-01 | B         | 2000       |
-                | 2      | 2050-01-01T12:00:00Z | 2020-01-01 | C         | 3000       |
-                +--------+----------------------+------------+-----------+------------+
+                +--------+----+----------------------+------------+-----------+------------+
+                | offset | op | system_time          | Date (UTC) | City Name | Population |
+                +--------+----+----------------------+------------+-----------+------------+
+                | 0      | 0  | 2050-01-01T12:00:00Z | 2020-01-01 | A         | 1000       |
+                | 1      | 0  | 2050-01-01T12:00:00Z | 2020-01-01 | B         | 2000       |
+                | 2      | 0  | 2050-01-01T12:00:00Z | 2020-01-01 | C         | 3000       |
+                +--------+----+----------------------+------------+-----------+------------+
                 "#
             ),
         )
@@ -845,6 +813,7 @@ async fn test_ingest_polling_bad_column_names_rename() {
                 r#"
                 message arrow_schema {
                   OPTIONAL INT64 offset;
+                  REQUIRED INT32 op (INTEGER(8,false));
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                   OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
                   OPTIONAL BYTE_ARRAY city (STRING);
@@ -854,13 +823,13 @@ async fn test_ingest_polling_bad_column_names_rename() {
             ),
             indoc!(
                 r#"
-                +--------+----------------------+----------------------+------+------------+
-                | offset | system_time          | event_time           | city | population |
-                +--------+----------------------+----------------------+------+------------+
-                | 0      | 2050-01-01T12:00:00Z | 2020-01-01T12:00:00Z | A    | 1000       |
-                | 1      | 2050-01-01T12:00:00Z | 2020-01-01T12:00:00Z | B    | 2000       |
-                | 2      | 2050-01-01T12:00:00Z | 2020-01-01T12:00:00Z | C    | 3000       |
-                +--------+----------------------+----------------------+------+------------+
+                +--------+----+----------------------+----------------------+------+------------+
+                | offset | op | system_time          | event_time           | city | population |
+                +--------+----+----------------------+----------------------+------+------------+
+                | 0      | 0  | 2050-01-01T12:00:00Z | 2020-01-01T12:00:00Z | A    | 1000       |
+                | 1      | 0  | 2050-01-01T12:00:00Z | 2020-01-01T12:00:00Z | B    | 2000       |
+                | 2      | 0  | 2050-01-01T12:00:00Z | 2020-01-01T12:00:00Z | C    | 3000       |
+                +--------+----+----------------------+----------------------+------+------------+
                 "#
             ),
         )
@@ -936,6 +905,7 @@ async fn test_ingest_polling_preprocess_with_spark() {
                 r#"
                 message arrow_schema {
                   OPTIONAL INT64 offset;
+                  REQUIRED INT32 op (INTEGER(8,false));
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                   REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
                   OPTIONAL BYTE_ARRAY city (STRING);
@@ -945,13 +915,13 @@ async fn test_ingest_polling_preprocess_with_spark() {
             ),
             indoc!(
                 r#"
-                +--------+----------------------+----------------------+------+------------+
-                | offset | system_time          | event_time           | city | population |
-                +--------+----------------------+----------------------+------+------------+
-                | 0      | 2050-01-01T12:00:00Z | 2050-01-01T12:00:00Z | A    | 10000      |
-                | 1      | 2050-01-01T12:00:00Z | 2050-01-01T12:00:00Z | B    | 20000      |
-                | 2      | 2050-01-01T12:00:00Z | 2050-01-01T12:00:00Z | C    | 30000      |
-                +--------+----------------------+----------------------+------+------------+
+                +--------+----+----------------------+----------------------+------+------------+
+                | offset | op | system_time          | event_time           | city | population |
+                +--------+----+----------------------+----------------------+------+------------+
+                | 0      | 0  | 2050-01-01T12:00:00Z | 2050-01-01T12:00:00Z | A    | 10000      |
+                | 1      | 0  | 2050-01-01T12:00:00Z | 2050-01-01T12:00:00Z | B    | 20000      |
+                | 2      | 0  | 2050-01-01T12:00:00Z | 2050-01-01T12:00:00Z | C    | 30000      |
+                +--------+----+----------------------+----------------------+------+------------+
                 "#
             ),
         )
@@ -1027,6 +997,7 @@ async fn test_ingest_polling_preprocess_with_flink() {
                 r#"
                 message arrow_schema {
                   OPTIONAL INT64 offset;
+                  REQUIRED INT32 op (INTEGER(8,false));
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                   REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
                   OPTIONAL BYTE_ARRAY city (STRING);
@@ -1036,13 +1007,13 @@ async fn test_ingest_polling_preprocess_with_flink() {
             ),
             indoc!(
                 r#"
-                +--------+----------------------+----------------------+------+------------+
-                | offset | system_time          | event_time           | city | population |
-                +--------+----------------------+----------------------+------+------------+
-                | 0      | 2050-01-01T12:00:00Z | 2050-01-01T12:00:00Z | A    | 10000      |
-                | 1      | 2050-01-01T12:00:00Z | 2050-01-01T12:00:00Z | B    | 20000      |
-                | 2      | 2050-01-01T12:00:00Z | 2050-01-01T12:00:00Z | C    | 30000      |
-                +--------+----------------------+----------------------+------+------------+
+                +--------+----+----------------------+----------------------+------+------------+
+                | offset | op | system_time          | event_time           | city | population |
+                +--------+----+----------------------+----------------------+------+------------+
+                | 0      | 0  | 2050-01-01T12:00:00Z | 2050-01-01T12:00:00Z | A    | 10000      |
+                | 1      | 0  | 2050-01-01T12:00:00Z | 2050-01-01T12:00:00Z | B    | 20000      |
+                | 2      | 0  | 2050-01-01T12:00:00Z | 2050-01-01T12:00:00Z | C    | 30000      |
+                +--------+----+----------------------+----------------------+------+------------+
                 "#
             ),
         )
@@ -1075,13 +1046,6 @@ async fn test_ingest_checks_auth() {
                         "population BIGINT".to_string(),
                     ]),
                     ..ReadStepNdJson::default()
-                })
-                .preprocess(TransformSql {
-                    engine: "datafusion".to_string(),
-                    version: None,
-                    query: Some("select * from input".to_string()),
-                    queries: None,
-                    temporal_tables: None,
                 })
                 .build(),
         )

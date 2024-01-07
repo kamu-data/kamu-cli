@@ -13,11 +13,12 @@ use std::sync::Arc;
 use criterion::{criterion_group, criterion_main, Criterion};
 use datafusion::dataframe::DataFrameWriteOptions;
 use datafusion::prelude::*;
+use opendatafabric as odf;
 use rand::{Rng, SeedableRng};
 
 async fn setup(tempdir: &Path, num_rows: usize) -> String {
     use datafusion::arrow::array;
-    use datafusion::arrow::datatypes::{DataType, Field, Int64Type, Schema};
+    use datafusion::arrow::datatypes::{DataType, Field, Int64Type, Schema, UInt8Type};
     use datafusion::arrow::record_batch::RecordBatch;
 
     let ctx = SessionContext::new();
@@ -25,7 +26,7 @@ async fn setup(tempdir: &Path, num_rows: usize) -> String {
     let path = tempdir.join("data").to_str().unwrap().to_string();
 
     let mut offset = array::PrimitiveBuilder::<Int64Type>::with_capacity(num_rows);
-    let mut observed = array::StringBuilder::new();
+    let mut op = array::PrimitiveBuilder::<UInt8Type>::new();
     let mut pk1 = array::PrimitiveBuilder::<Int64Type>::with_capacity(num_rows);
     let mut pk2 = array::PrimitiveBuilder::<Int64Type>::with_capacity(num_rows);
     let mut cmp1 = array::PrimitiveBuilder::<Int64Type>::with_capacity(num_rows);
@@ -35,10 +36,11 @@ async fn setup(tempdir: &Path, num_rows: usize) -> String {
 
     let mut rng = rand::rngs::SmallRng::seed_from_u64(123127986998);
 
-    let obsv = ["I", "U", "D"];
     for i in 0..num_rows {
         offset.append_value(i as i64);
-        observed.append_value(obsv[rng.gen_range(0..3)]);
+        op.append_value(
+            rng.gen_range(odf::OperationType::Append as u8..=odf::OperationType::CorrectTo as u8),
+        );
     }
 
     let mut buf = Vec::with_capacity(num_rows);
@@ -66,7 +68,7 @@ async fn setup(tempdir: &Path, num_rows: usize) -> String {
         RecordBatch::try_new(
             Arc::new(Schema::new(vec![
                 Field::new("offset", DataType::Int64, false),
-                Field::new("observed", DataType::Utf8, false),
+                Field::new("op", DataType::UInt8, false),
                 Field::new("pk1", DataType::Int64, false),
                 Field::new("pk2", DataType::Int64, false),
                 Field::new("cmp1", DataType::Int64, false),
@@ -76,7 +78,7 @@ async fn setup(tempdir: &Path, num_rows: usize) -> String {
             ])),
             vec![
                 Arc::new(offset.finish()),
-                Arc::new(observed.finish()),
+                Arc::new(op.finish()),
                 Arc::new(pk1.finish()),
                 Arc::new(pk2.finish()),
                 Arc::new(cmp1.finish()),
@@ -106,14 +108,10 @@ async fn project(path: &str) {
     let ledger = ctx.table("ledger").await.unwrap();
 
     let res = MergeStrategySnapshot::new(
-        "offset".to_string(),
-        opendatafabric::MergeStrategySnapshot {
+        odf::DatasetVocabulary::default(),
+        odf::MergeStrategySnapshot {
             primary_key: vec!["pk1".to_string(), "pk2".to_string()],
             compare_columns: Some(vec!["cmp1".to_string(), "cmp2".to_string()]),
-            observation_column: None,
-            obsv_added: None,
-            obsv_changed: None,
-            obsv_removed: None,
         },
     )
     .project(ledger)

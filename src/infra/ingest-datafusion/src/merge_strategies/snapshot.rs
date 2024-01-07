@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use datafusion::common::{DFSchema, OwnedTableReference};
+use datafusion::error::DataFusionError;
 use datafusion::logical_expr::{LogicalPlanBuilder, Operator};
 use datafusion::prelude::*;
 use datafusion::sql::TableReference;
@@ -17,41 +18,27 @@ use opendatafabric as odf;
 
 use crate::*;
 
+type Op = odf::OperationType;
+
 /// Snapshot merge strategy.
 ///
 /// See [odf::MergeStrategySnapshot] for details.
 pub struct MergeStrategySnapshot {
+    vocab: odf::DatasetVocabulary,
     primary_key: Vec<String>,
     compare_columns: Option<Vec<String>>,
-    order_column: String,
-    obsv_column: String,
-    obsv_added: String,
-    obsv_changed: String,
-    obsv_removed: String,
 }
 
 impl MergeStrategySnapshot {
-    pub fn new(order_column: String, cfg: odf::MergeStrategySnapshot) -> Self {
+    pub fn new(vocab: odf::DatasetVocabulary, cfg: odf::MergeStrategySnapshot) -> Self {
         assert!(cfg.primary_key.len() != 0);
         if let Some(c) = &cfg.compare_columns {
             assert!(c.len() != 0);
         }
         Self {
+            vocab,
             primary_key: cfg.primary_key,
             compare_columns: cfg.compare_columns,
-            order_column,
-            obsv_column: cfg.observation_column.unwrap_or_else(|| {
-                odf::MergeStrategySnapshot::DEFAULT_OBSV_COLUMN_NAME.to_string()
-            }),
-            obsv_added: cfg
-                .obsv_added
-                .unwrap_or_else(|| odf::MergeStrategySnapshot::DEFAULT_OBSV_ADDED.to_string()),
-            obsv_changed: cfg
-                .obsv_changed
-                .unwrap_or_else(|| odf::MergeStrategySnapshot::DEFAULT_OBSV_CHANGED.to_string()),
-            obsv_removed: cfg
-                .obsv_removed
-                .unwrap_or_else(|| odf::MergeStrategySnapshot::DEFAULT_OBSV_REMOVED.to_string()),
         }
     }
 
@@ -60,40 +47,45 @@ impl MergeStrategySnapshot {
     /// Implementation is mostly equivalent to this example (using
     /// datafusion-cli):
     ///
-    ///   create or replace table ledger (
-    ///       offset bigint not null,
-    ///       obsv string not null,
-    ///       city string not null,
-    ///       population int not null
-    ///   ) as values
-    ///   (0, '+', 'a', 1000),
-    ///   (1, '+', 'b', 2000),
-    ///   (2, '+', 'c', 3000),
-    ///   (3, 'u', 'b', 2500),
-    ///   (4, 'u', 'a', 1500),
-    ///   (5, '-', 'a', 1500);
+    /// ```text
+    /// create or replace table ledger (
+    ///     offset bigint not null,
+    ///     op string not null,
+    ///     city string not null, -- PK
+    ///     population int not null
+    /// ) as values
+    ///   (0, '+A', 'a', 1000),
+    ///   (1, '+A', 'b', 2000),
+    ///   (2, '+A', 'c', 3000),
+    ///   (3, '-C', 'b', 2000),
+    ///   (4, '+C', 'b', 2500),
+    ///   (5, '-C', 'a', 1000),
+    ///   (6, '+C', 'a', 1500),
+    ///   (7, '-R', 'a', 1500);
     ///
-    ///   select * from (
-    ///      select
-    ///          *,
-    ///          row_number() over (
-    ///              partition by city
-    ///              order by offset desc) as __row_num
-    ///       from ledger
-    ///   ) where __row_num = 1 and obsv != '-';
+    /// select * from (
+    ///    select
+    ///        *,
+    ///        row_number() over (
+    ///            partition by city
+    ///            order by offset desc
+    ///        ) as __rank
+    ///     from ledger
+    /// ) where __rank = 1 and op != '-R';
+    /// ```
     ///
     /// Which should output:
     ///
-    ///   +--------+------+------+------------+-----------+
-    ///   | offset | obsv | city | population | __row_num |
-    ///   +--------+------+------+------------+-----------+
-    ///   | 2      | +    | c    | 3000       | 1         |
-    ///   | 3      | u    | b    | 2500       | 1         |
-    ///   +--------+------+------+------------+-----------+
+    /// ```text
+    /// +--------+----+------+------------+--------+
+    /// | offset | op | city | population | __rank |
+    /// +--------+----+------+------------+--------+
+    /// | 2      | +I | c    | 3000       | 1      |
+    /// | 3      | +C | b    | 2500       | 1      |
+    /// +--------+----+------+------------+--------+
+    /// ```
     pub fn project(&self, ledger: DataFrame) -> Result<DataFrame, InternalError> {
         // TODO: PERF: Re-assess implementation as it may be sub-optimal
-        //
-
         let rank_col = "__rank";
 
         let state = ledger
@@ -104,17 +96,16 @@ impl MergeStrategySnapshot {
                     ),
                     args: Vec::new(),
                     partition_by: self.primary_key.iter().map(|c| col(c)).collect(),
-                    order_by: vec![col(&self.order_column).sort(false, false)],
+                    order_by: vec![col(&self.vocab.offset_column).sort(false, false)],
                     window_frame: datafusion::logical_expr::WindowFrame::new(true),
                 },
             )
             .alias(rank_col)])
             .int_err()?
-            .filter(
-                col(rank_col)
-                    .eq(lit(1))
-                    .and(col(&self.obsv_column).not_eq(lit(&self.obsv_removed))),
-            )
+            .filter(col(rank_col).eq(lit(1)).and(or(
+                col(&self.vocab.operation_type_column).eq(lit(Op::Append as u8)),
+                col(&self.vocab.operation_type_column).eq(lit(Op::CorrectTo as u8)),
+            )))
             .int_err()?
             .without_columns(&[rank_col])
             .int_err()?;
@@ -122,18 +113,24 @@ impl MergeStrategySnapshot {
         Ok(state)
     }
 
-    /// Returns filter like:
-    ///   a.x is distinct from b.x OR a.y is distinct from b.y OR ...
+    /// Returns a filter like:
+    ///
+    /// ```text
+    /// where
+    ///   ((new.event_time is not null) and (old.event_time is distinct from new.event_time))
+    ///   or (old.x is distinct from new.x)
+    ///   or (old.y is distinct from new.y)
+    ///   or ...
     fn get_cdc_filter(
         &self,
-        schema: &DFSchema,
-        left_qual: TableReference<'static>,
-        right_qual: TableReference<'static>,
-    ) -> Result<Expr, InternalError> {
+        new_schema: &DFSchema,
+        old_qual: TableReference<'static>,
+        new_qual: TableReference<'static>,
+    ) -> Result<Expr, DataFusionErrorWrapped> {
         let columns: Vec<_> = if let Some(compare_columns) = &self.compare_columns {
             compare_columns.iter().map(|s| s.as_str()).collect()
         } else {
-            schema
+            new_schema
                 .fields()
                 .iter()
                 .filter(|f| !self.primary_key.contains(f.name()))
@@ -144,99 +141,156 @@ impl MergeStrategySnapshot {
         let expr = columns
             .into_iter()
             .map(move |c| {
-                binary_expr(
-                    col(Column::new(Some(left_qual.clone()), c)),
+                let distinct = binary_expr(
+                    col(Column::new(Some(old_qual.clone()), c)),
                     Operator::IsDistinctFrom,
-                    col(Column::new(Some(right_qual.clone()), c)),
-                )
+                    col(Column::new(Some(new_qual.clone()), c)),
+                );
+
+                // Event time in `new` can be null and this alone should not be the reason to
+                // consider the row changed
+                let expr = if c != self.vocab.event_time_column {
+                    distinct
+                } else {
+                    and(
+                        col(Column::new(Some(new_qual.clone()), c)).is_not_null(),
+                        distinct,
+                    )
+                };
+
+                expr
             })
             .reduce(Expr::or)
-            .unwrap_or(lit(true));
+            .unwrap_or(lit(false));
 
         Ok(expr)
     }
 
-    /// Returns select expression like:
-    ///   SELECT
-    ///     CASE
-    ///       WHEN a.pk is null THEN 'I'
-    ///       WHEN b.pk is null THEN 'D'
-    ///       ELSE 'U'
-    ///     END as observed,
-    ///     a.x,
-    ///     a.y
-    ///   FROM ...
-    fn get_cdc_select(
-        &self,
-        schema: &DFSchema,
-        left_qual: TableReference<'static>,
-        right_qual: TableReference<'static>,
-    ) -> Result<Vec<Expr>, InternalError> {
-        let pk = self.primary_key.first().unwrap();
-
-        let case = when(
-            col(Column::new(Some(left_qual.clone()), pk)).is_null(),
-            lit(&self.obsv_added),
-        )
-        .when(
-            col(Column::new(Some(right_qual.clone()), pk)).is_null(),
-            lit(&self.obsv_removed),
-        )
-        .otherwise(lit(&self.obsv_changed))
-        .int_err()?
-        .alias(&self.obsv_column);
-
-        let mut select = vec![case];
-        select.extend(schema.fields().iter().map(|f| {
-            coalesce(vec![
-                col(Column::new(Some(right_qual.clone()), f.name())),
-                col(Column::new(Some(left_qual.clone()), f.name())),
-            ])
-            .alias(f.name())
-        }));
-
-        Ok(select)
-    }
-
-    /// Performs Change Data Capture diff between old and new state.
+    /// Performs Change Data Capture diff between old and new states.
     ///
-    /// It is mostly equivalent to this query (using datafusion-cli):
+    /// It is mostly equivalent to this query (try in datafusion-cli):
     ///
+    /// ```text
+    /// create or replace table old (
+    ///     year int,
+    ///     city string not null,
+    ///     population int not null
+    /// ) as values
+    /// (2020, 'vancouver', 1),
+    /// (2020, 'seattle', 2),
+    /// (2020, 'kyiv', 3);
+    ///
+    /// create or replace table new (
+    ///     year int,
+    ///     city string not null,
+    ///     population int not null
+    /// ) as values
+    /// (null, 'seattle', 2),
+    /// (null, 'kyiv', 4),
+    /// (null, 'odessa', 5);
+    ///
+    /// with cdc as (
+    ///   select
+    ///     old.year as old_year,
+    ///     old.city as old_city,
+    ///     old.population as old_population,
+    ///     new.year as new_year,
+    ///     new.city as new_city,
+    ///     new.population as new_population
+    ///   from old
+    ///   full outer join new
+    ///     on old.city = new.city
+    ///   where
+    ///     -- Note the special treatment of event time to ignore nulls in `new`
+    ///     ((new.year is not null) and (old.year is distinct from new.year))
+    ///     or (old.population is distinct from new.population)
+    /// )
+    ///
+    /// select * from (
     ///   select
     ///     case
-    ///       when old.city is null then '+'
-    ///       when new.city is null then '-'
-    ///       else 'u'
-    ///     end as obsv,
-    ///     coalesce(old.city, new.city) as city,
-    ///     coalesce(old.population, new.population) as population
-    ///   from old
-    ///   full join new
-    ///   on old.city = new.city
-    ///   where old.population is distinct from new.population;
-    fn cdc_diff(&self, old: DataFrame, new: DataFrame) -> Result<DataFrame, InternalError> {
+    ///       when old_city is null then '+A'
+    ///       when new_city is null then '-R'
+    ///       else '+C'
+    ///     end as op,
+    ///     case
+    ///       when new_city is null then old_year
+    ///       else new_year
+    ///     end as year,
+    ///     case
+    ///       when new_city is null then old_city
+    ///       else new_city
+    ///     end as city,
+    ///     case
+    ///       when new_city is null then old_population
+    ///       else new_population
+    ///     end as population
+    ///   from cdc
+    ///   union all
+    ///   select
+    ///     '-C' as op,
+    ///     old_year as year,
+    ///     old_city as city,
+    ///     old_population as population
+    ///   from cdc
+    ///   where
+    ///     old_city is not null and new_city is not null
+    /// )
+    /// order by city, op;
+    /// ```
+    ///
+    /// The complexity of this query is mostly caused by the need to emit two
+    /// events (correct-from and correct-to) for records that were modified,
+    /// necessitating UNION ALL, and by requirement that correction events
+    /// must appear side by side, necessitating ORDER BY.
+    fn cdc_diff(
+        &self,
+        old: DataFrame,
+        new: DataFrame,
+    ) -> Result<DataFrame, DataFusionErrorWrapped> {
+        // TODO: Schema evolution
         let a_old: OwnedTableReference = "old".into();
         let a_new: OwnedTableReference = "new".into();
+        let old_col = |name: &str| -> Expr { Expr::Column(Column::new(Some(a_old.clone()), name)) };
+        let new_col = |name: &str| -> Expr { Expr::Column(Column::new(Some(a_new.clone()), name)) };
+
+        // Select expression for +A, -R, +C part of UNION ALL
+        let pk = self.primary_key.first().unwrap().as_str();
+        let mut select_app_retr_correct_to = Vec::new();
+        select_app_retr_correct_to.push(
+            when(old_col(pk).is_null(), lit(Op::Append as u8))
+                .when(new_col(pk).is_null(), lit(Op::Retract as u8))
+                .otherwise(lit(Op::CorrectTo as u8))?
+                .alias(&self.vocab.operation_type_column),
+        );
+        select_app_retr_correct_to.extend(new.schema().fields().iter().map(|f| {
+            when(new_col(pk).is_null(), old_col(f.name()))
+                .otherwise(new_col(f.name()))
+                .unwrap()
+                .alias(f.name())
+        }));
+
+        // Select expression for -C part of UNION ALL
+        let mut select_correct_from = Vec::new();
+        select_correct_from
+            .push(lit(Op::CorrectFrom as u8).alias(&self.vocab.operation_type_column));
+        select_correct_from.extend(
+            new.schema()
+                .fields()
+                .iter()
+                .map(|f| old_col(f.name()).alias(f.name())),
+        );
 
         let (session_state, old) = old.into_parts();
         let (_, new) = new.into_parts();
+        let old = LogicalPlanBuilder::from(old).alias(a_old.clone())?;
+        let new = LogicalPlanBuilder::from(new).alias(a_new.clone())?;
 
-        let old = LogicalPlanBuilder::from(old)
-            .alias(a_old.clone())
-            .int_err()?;
-        let new = LogicalPlanBuilder::from(new)
-            .alias(a_new.clone())
-            .int_err()?;
-
-        // TODO: Schema evolution
-        // Filters out values that didn't change
         let filter = self.get_cdc_filter(new.schema().as_ref(), a_old.clone(), a_new.clone())?;
 
-        let select: Vec<Expr> = self.get_cdc_select(new.schema(), a_old.clone(), a_new.clone())?;
-
-        let plan = old
+        let cdc = old
             .join(
-                new.build().int_err()?,
+                new.build()?,
                 JoinType::Full,
                 (
                     self.primary_key
@@ -249,15 +303,25 @@ impl MergeStrategySnapshot {
                         .collect(),
                 ),
                 None,
-            )
-            .int_err()?
-            .filter(filter)
-            .int_err()?
-            .project(select)
-            .int_err()?
-            .build()
-            .int_err()?;
+            )?
+            .filter(filter)?
+            .build()?;
 
+        // TODO: PERF: Currently DataFusion will perform full join twice, although it
+        // would likely be more performant to reuse the result of `cdc` sub-query.
+        // See: https://github.com/apache/arrow-datafusion/issues/8777
+        let plan = LogicalPlanBuilder::from(cdc.clone())
+            .project(select_app_retr_correct_to)?
+            .union(
+                LogicalPlanBuilder::from(cdc)
+                    .filter(and(old_col(pk).is_not_null(), new_col(pk).is_not_null()))?
+                    .project(select_correct_from)?
+                    .build()?,
+            )?
+            .build()?;
+
+        // Note: Final sorting will be done by the caller using `sort_order()`
+        // expression.
         Ok(DataFrame::new(session_state, plan))
     }
 }
@@ -270,10 +334,14 @@ impl MergeStrategy for MergeStrategySnapshot {
                 .select(self.primary_key.iter().map(|c| col(c)).collect())
                 .int_err()?;
 
+            // Consider all records as appends
             let df = new
-                .with_column(&self.obsv_column, lit(&self.obsv_added))
+                .with_column(
+                    &self.vocab.operation_type_column,
+                    lit(odf::OperationType::Append as u8),
+                )
                 .int_err()?
-                .columns_to_front(&[&self.obsv_column])
+                .columns_to_front(&[&self.vocab.operation_type_column])
                 .int_err()?;
 
             return Ok(df);
@@ -282,12 +350,41 @@ impl MergeStrategy for MergeStrategySnapshot {
         // Project existing CDC ledger into a state
         let proj = self
             .project(prev.unwrap())?
-            .without_columns(&[&self.obsv_column, &self.order_column])
+            .without_columns(&[&self.vocab.offset_column, &self.vocab.operation_type_column])
             .int_err()?;
 
         // Diff state with new data
-        let res = self.cdc_diff(proj, new).int_err()?;
+        let res = self.cdc_diff(proj, new)?;
 
         Ok(res)
+    }
+
+    fn sort_order(&self) -> Vec<Expr> {
+        // Main goal here is to establish correct order of -C / +C corrections, so we
+        // sort records by primary key and then by operation type
+        self.primary_key
+            .iter()
+            .map(|c| col(c).sort(true, true))
+            .chain(std::iter::once(
+                col(&self.vocab.operation_type_column).sort(true, true),
+            ))
+            .collect()
+    }
+}
+
+/// Helps us capture backtraces as close to the point as possible
+#[derive(Debug, thiserror::Error)]
+#[error("{0}")]
+struct DataFusionErrorWrapped(InternalError);
+
+impl From<DataFusionError> for DataFusionErrorWrapped {
+    fn from(value: DataFusionError) -> Self {
+        Self(value.int_err())
+    }
+}
+
+impl From<DataFusionErrorWrapped> for MergeError {
+    fn from(value: DataFusionErrorWrapped) -> Self {
+        Self::Internal(value.0)
     }
 }

@@ -12,6 +12,7 @@ use std::sync::Arc;
 use datafusion::arrow::array;
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use datafusion::arrow::record_batch::RecordBatch;
+use datafusion::common::DFField;
 use datafusion::prelude::*;
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -45,50 +46,63 @@ pub async fn assert_dfs_equal(lhs: DataFrame, rhs: DataFrame) {
 ///////////////////////////////////////////////////////////////////////////////
 
 // Checks for equivalence ingoring the order of rows and nullability of columns
-pub async fn assert_dfs_equivalent(lhs: DataFrame, rhs: DataFrame) {
-    let lhs_cols = lhs
-        .schema()
-        .fields()
-        .iter()
-        .map(|f| col(f.name()).sort(false, true))
-        .collect();
-
-    let rhs_cols = rhs
-        .schema()
-        .fields()
-        .iter()
-        .map(|f| col(f.name()).sort(false, true))
-        .collect();
-
-    let lhs_sorted = lhs.sort(lhs_cols).unwrap();
-    let rhs_sorted = rhs.sort(rhs_cols).unwrap();
-
-    let lhs_schema_stripped = datafusion::common::DFSchema::new_with_metadata(
-        lhs_sorted
+pub async fn assert_dfs_equivalent(
+    lhs: DataFrame,
+    rhs: DataFrame,
+    ignore_order: bool,
+    ignore_nullability: bool,
+    ignore_qualifiers: bool,
+) {
+    let (lhs, rhs) = if !ignore_order {
+        (lhs, rhs)
+    } else {
+        let lhs_cols = lhs
             .schema()
             .fields()
             .iter()
-            .map(|f| f.clone().strip_qualifier().with_nullable(true))
-            .collect(),
+            .map(|f| col(f.name()).sort(false, true))
+            .collect();
+
+        let rhs_cols = rhs
+            .schema()
+            .fields()
+            .iter()
+            .map(|f| col(f.name()).sort(false, true))
+            .collect();
+
+        (lhs.sort(lhs_cols).unwrap(), rhs.sort(rhs_cols).unwrap())
+    };
+
+    let map_field = |f: &DFField| -> DFField {
+        let f = f.clone();
+        let f = if !ignore_qualifiers {
+            f
+        } else {
+            f.strip_qualifier()
+        };
+        if !ignore_nullability {
+            f
+        } else {
+            f.with_nullable(true)
+        }
+    };
+
+    let lhs_schema_stripped = datafusion::common::DFSchema::new_with_metadata(
+        lhs.schema().fields().iter().map(map_field).collect(),
         Default::default(),
     )
     .unwrap();
 
     let rhs_schema_stripped = datafusion::common::DFSchema::new_with_metadata(
-        rhs_sorted
-            .schema()
-            .fields()
-            .iter()
-            .map(|f| f.clone().strip_qualifier().with_nullable(true))
-            .collect(),
+        rhs.schema().fields().iter().map(map_field).collect(),
         Default::default(),
     )
     .unwrap();
 
     pretty_assertions::assert_eq!(lhs_schema_stripped, rhs_schema_stripped);
 
-    let lhs_batches = lhs_sorted.collect().await.unwrap();
-    let rhs_batches = rhs_sorted.collect().await.unwrap();
+    let lhs_batches = lhs.collect().await.unwrap();
+    let rhs_batches = rhs.collect().await.unwrap();
 
     let lhs_count: usize = lhs_batches.iter().map(|b| b.num_rows()).sum();
     let rhs_count: usize = rhs_batches.iter().map(|b| b.num_rows()).sum();
@@ -162,7 +176,7 @@ async fn test_assert_dfs_equivalent_success() {
 
     let a = make_input(&ctx, [("vancouver", 1), ("seattle", 2), ("kyiv", 3)]);
     let b = make_input(&ctx, [("kyiv", 3), ("vancouver", 1), ("seattle", 2)]);
-    assert_dfs_equivalent(a, b).await;
+    assert_dfs_equivalent(a, b, true, true, true).await;
 }
 
 #[test_log::test(tokio::test)]
@@ -172,7 +186,7 @@ async fn test_assert_dfs_equivalent_fails_column() {
 
     let a = make_input(&ctx, [("vancouver", 1), ("seattle", 2), ("kyiv", 3)]);
     let b = make_input(&ctx, [("kyiv", 3), ("vancouver", 2), ("seattle", 2)]);
-    assert_dfs_equivalent(a, b).await;
+    assert_dfs_equivalent(a, b, true, true, true).await;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

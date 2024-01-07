@@ -11,7 +11,8 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use chrono::{DateTime, TimeZone, Utc};
-use datafusion::arrow::datatypes::SchemaRef;
+use datafusion::arrow::datatypes::{DataType, SchemaRef, TimeUnit};
+use datafusion::common::DFSchema;
 use datafusion::dataframe::DataFrameWriteOptions;
 use datafusion::parquet::file::properties::WriterProperties;
 use datafusion::prelude::*;
@@ -96,10 +97,9 @@ impl DataWriterDataFusion {
     }
 
     fn validate_input(&self, df: &DataFrame) -> Result<(), BadInputSchemaError> {
-        use datafusion::arrow::datatypes::DataType;
-
         for system_column in [
             &self.meta.vocab.offset_column,
+            &self.meta.vocab.operation_type_column,
             &self.meta.vocab.system_time_column,
         ] {
             if df.schema().has_column_with_unqualified_name(system_column) {
@@ -145,8 +145,6 @@ impl DataWriterDataFusion {
     // represeted as `Timestamp(Millis, "UTC")` for compatibility with other engines
     // (e.g. Flink does not support event time with nanosecond precision).
     fn normalize_raw_result(&self, df: DataFrame) -> Result<DataFrame, InternalError> {
-        use datafusion::arrow::datatypes::{DataType, TimeUnit};
-
         let utc_tz: Arc<str> = Arc::from("UTC");
         let mut select: Vec<Expr> = Vec::new();
         let mut noop = true;
@@ -173,7 +171,42 @@ impl DataWriterDataFusion {
             Ok(df)
         } else {
             let df = df.select(select).int_err()?;
-            tracing::info!(schema = ?df.schema(), "Schema after timestamp normalization");
+            tracing::debug!(schema = ?df.schema(), "Schema after timestamp normalization");
+            Ok(df)
+        }
+    }
+
+    /// Populates event time column with nulls if it does not exist
+    fn ensure_event_time_column(
+        &self,
+        df: DataFrame,
+        prev_schema: Option<&DFSchema>,
+    ) -> Result<DataFrame, InternalError> {
+        if !df
+            .schema()
+            .has_column_with_unqualified_name(&self.meta.vocab.event_time_column)
+        {
+            let data_type = prev_schema
+                .and_then(|s| {
+                    s.field_with_unqualified_name(&self.meta.vocab.event_time_column)
+                        .ok()
+                })
+                .map(|f| f.data_type().clone())
+                .unwrap_or(DataType::Timestamp(
+                    TimeUnit::Millisecond,
+                    Some(Arc::from("UTC")),
+                ));
+
+            tracing::debug!("Event time column is missing - source fallback time will be used");
+            df.with_column(
+                &self.meta.vocab.event_time_column,
+                cast(
+                    Expr::Literal(datafusion::scalar::ScalarValue::Null),
+                    data_type,
+                ),
+            )
+            .int_err()
+        } else {
             Ok(df)
         }
     }
@@ -225,18 +258,20 @@ impl DataWriterDataFusion {
         fallback_event_time: DateTime<Utc>,
         start_offset: u64,
     ) -> Result<DataFrame, InternalError> {
-        use datafusion::arrow::datatypes::DataType;
         use datafusion::logical_expr as expr;
         use datafusion::logical_expr::expr::WindowFunction;
         use datafusion::scalar::ScalarValue;
 
-        // Collect non-system column names for later
-        let mut raw_columns_wo_event_time: Vec<_> = df
+        // Collect column names for later
+        let mut data_columns: Vec<_> = df
             .schema()
             .fields()
             .iter()
             .map(|f| f.name().clone())
-            .filter(|n| n.as_str() != self.meta.vocab.event_time_column)
+            .filter(|n| {
+                n.as_str() != self.meta.vocab.event_time_column
+                    && n.as_str() != self.meta.vocab.operation_type_column
+            })
             .collect();
 
         // System time
@@ -250,24 +285,37 @@ impl DataWriterDataFusion {
             )
             .int_err()?;
 
-        // Event time: Add from source event time if missing in data
-        let df = if df
+        // Event time
+        // If event time column is not present in the source data, after merge step it
+        // may still have some null values. We need to fill those with the fallback
+        // event time from the data source.
+        let event_time_data_type = df
             .schema()
-            .has_column_with_unqualified_name(&self.meta.vocab.event_time_column)
-        {
-            df
-        } else {
-            df.with_column(
-                &self.meta.vocab.event_time_column,
-                Expr::Literal(ScalarValue::TimestampMillisecond(
-                    Some(fallback_event_time.timestamp_millis()),
-                    Some("UTC".into()),
-                )),
-            )
+            .field_with_unqualified_name(&self.meta.vocab.event_time_column)
             .int_err()?
-        };
+            .data_type()
+            .clone();
+        let df = df
+            .with_column(
+                &self.meta.vocab.event_time_column,
+                // TODO: Using `case` expression instead of `coalesce()` due to DataFusion bug
+                // See: https://github.com/apache/arrow-datafusion/issues/8790
+                when(
+                    col(&self.meta.vocab.event_time_column).is_null(),
+                    cast(
+                        Expr::Literal(ScalarValue::TimestampMillisecond(
+                            Some(fallback_event_time.timestamp_millis()),
+                            Some("UTC".into()),
+                        )),
+                        event_time_data_type,
+                    ),
+                )
+                .otherwise(col(&self.meta.vocab.event_time_column))
+                .int_err()?,
+            )
+            .int_err()?;
 
-        // Offset
+        // Offset & event time
         // Note: ODF expects events within one chunk to be sorted by event time, so we
         // ensure data is held in one partition to avoid reordering when saving to
         // parquet.
@@ -285,9 +333,7 @@ impl DataWriterDataFusion {
                     ),
                     args: vec![],
                     partition_by: vec![],
-                    order_by: vec![
-                        col(&self.meta.vocab.event_time_column as &str).sort(true, false)
-                    ],
+                    order_by: self.merge_strategy.sort_order(),
                     window_frame: expr::WindowFrame::new(false),
                 }),
             )
@@ -306,10 +352,11 @@ impl DataWriterDataFusion {
         // Reorder columns for nice looks
         let mut full_columns = vec![
             self.meta.vocab.offset_column.to_string(),
+            self.meta.vocab.operation_type_column.to_string(),
             self.meta.vocab.system_time_column.to_string(),
             self.meta.vocab.event_time_column.to_string(),
         ];
-        full_columns.append(&mut raw_columns_wo_event_time);
+        full_columns.append(&mut data_columns);
         let full_columns_str: Vec<_> = full_columns.iter().map(String::as_str).collect();
 
         let df = df.select_columns(&full_columns_str).int_err()?;
@@ -338,6 +385,11 @@ impl DataWriterDataFusion {
         WriterProperties::builder()
             .set_writer_version(datafusion::parquet::file::properties::WriterVersion::PARQUET_1_0)
             .set_compression(datafusion::parquet::basic::Compression::SNAPPY)
+            // op column is low cardinality and best encoded as RLE_DICTIONARY
+            .set_column_dictionary_enabled(
+                self.meta.vocab.operation_type_column.as_str().into(),
+                true,
+            )
             // system_time value will be the same for all rows in a batch
             .set_column_dictionary_enabled(self.meta.vocab.system_time_column.as_str().into(), true)
             .build()
@@ -551,6 +603,9 @@ impl DataWriter for DataWriterDataFusion {
             // TODO: PERF: We could likely benefit from checkpointing here
             let prev = self.get_all_previous_data(&self.meta.data_slices).await?;
 
+            // Populate event time with nulls if missing, using matching type to prev data
+            let df = self.ensure_event_time_column(df, prev.as_ref().map(|p| p.schema()))?;
+
             let df = self.merge_strategy.merge(prev, df)?;
 
             tracing::debug!(
@@ -569,10 +624,10 @@ impl DataWriter for DataWriterDataFusion {
                 )
                 .await?;
 
-            tracing::info!(schema = ?df.schema(), "Final output schema");
-
             // Validate schema matches the declared one
             let new_schema = SchemaRef::new(df.schema().into());
+            tracing::info!(schema = ?new_schema, "Final output schema");
+
             if let Some(prev_schema) = &self.meta.schema {
                 Self::validate_output_schema_equivalence(prev_schema, &new_schema)?;
             }
@@ -943,14 +998,13 @@ impl DataWriterDataFusionBuilder {
         use crate::merge_strategies::*;
 
         match conf {
-            odf::MergeStrategy::Append(_cfg) => Arc::new(MergeStrategyAppend),
+            odf::MergeStrategy::Append(_cfg) => Arc::new(MergeStrategyAppend::new(vocab.clone())),
             odf::MergeStrategy::Ledger(cfg) => {
-                Arc::new(MergeStrategyLedger::new(cfg.primary_key.clone()))
+                Arc::new(MergeStrategyLedger::new(vocab.clone(), cfg))
             }
-            odf::MergeStrategy::Snapshot(cfg) => Arc::new(MergeStrategySnapshot::new(
-                vocab.offset_column.clone(),
-                cfg.clone(),
-            )),
+            odf::MergeStrategy::Snapshot(cfg) => {
+                Arc::new(MergeStrategySnapshot::new(vocab.clone(), cfg))
+            }
         }
     }
 }

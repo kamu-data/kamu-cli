@@ -7,10 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-pub const SPARK: &'static str = "ghcr.io/kamu-data/engine-spark:0.21.1-spark_3.1.2";
+pub const SPARK: &'static str = "ghcr.io/kamu-data/engine-spark:0.22.1-spark_3.1.2";
 pub const FLINK: &'static str =
-    "ghcr.io/kamu-data/engine-flink:0.17.0-flink_1.16.0-scala_2.12-java8";
-pub const DATAFUSION: &'static str = "ghcr.io/kamu-data/engine-datafusion:0.6.0";
+    "ghcr.io/kamu-data/engine-flink:0.18.0-flink_1.16.0-scala_2.12-java8";
+pub const DATAFUSION: &'static str = "ghcr.io/kamu-data/engine-datafusion:0.7.0";
 
 pub const LIVY: &'static str = SPARK;
 pub const JUPYTER: &'static str = "ghcr.io/kamu-data/jupyter:0.5.2";
