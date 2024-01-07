@@ -87,21 +87,9 @@ async fn test_engine_io_common(
                     ]),
                     ..ReadStepCsv::default()
                 })
-                // TODO: Temporary no-op to make ingest use experimental DataFusion engine
-                .preprocess(TransformSql {
-                    engine: "datafusion".to_string(),
-                    query: Some("select * from input".to_string()),
-                    version: None,
-                    queries: None,
-                    temporal_tables: None,
-                })
                 .merge(MergeStrategySnapshot {
                     primary_key: vec!["city".to_string()],
                     compare_columns: None,
-                    observation_column: None,
-                    obsv_added: None,
-                    obsv_changed: None,
-                    obsv_removed: None,
                 })
                 .build(),
         )

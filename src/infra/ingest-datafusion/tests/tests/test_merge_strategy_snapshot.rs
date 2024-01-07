@@ -16,25 +16,33 @@ use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::prelude::*;
 use kamu_data_utils::data::dataframe_ext::*;
 use kamu_ingest_datafusion::*;
+use opendatafabric as odf;
 
 use crate::utils::*;
 
 ///////////////////////////////////////////////////////////////////////////////
 
-async fn make_input<I, S>(ctx: &SessionContext, table_name: &str, rows: I) -> DataFrame
+type Op = odf::OperationType;
+
+///////////////////////////////////////////////////////////////////////////////
+
+fn make_input<I, S>(ctx: &SessionContext, rows: I) -> DataFrame
 where
     I: IntoIterator<Item = (S, i64)>,
     S: Into<String>,
 {
     let schema = Arc::new(Schema::new(vec![
+        Field::new("year", DataType::Int32, true),
         Field::new("city", DataType::Utf8, false),
         Field::new("population", DataType::Int64, false),
     ]));
 
+    let mut year = Vec::new();
     let mut city = Vec::new();
     let mut population = Vec::new();
 
     for (c, p) in rows.into_iter() {
+        year.push(None);
         city.push(c.into());
         population.push(p);
     }
@@ -42,40 +50,38 @@ where
     let batch = RecordBatch::try_new(
         schema,
         vec![
+            Arc::new(array::Int32Array::from(year)),
             Arc::new(array::StringArray::from(city)),
             Arc::new(array::Int64Array::from(population)),
         ],
     )
     .unwrap();
 
-    ctx.register_batch(table_name, batch).unwrap();
-    ctx.table(table_name).await.unwrap()
+    ctx.read_batch(batch).unwrap()
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-async fn make_output<I, C, S>(ctx: &SessionContext, table_name: &str, rows: I) -> DataFrame
+fn make_output<I, S>(ctx: &SessionContext, rows: I) -> DataFrame
 where
-    I: IntoIterator<Item = (C, S, i64)>,
-    C: Into<String>,
+    I: IntoIterator<Item = (odf::OperationType, Option<i32>, S, i64)>,
     S: Into<String>,
 {
     let schema = Arc::new(Schema::new(vec![
-        Field::new(
-            opendatafabric::MergeStrategySnapshot::DEFAULT_OBSV_COLUMN_NAME,
-            DataType::Utf8,
-            false,
-        ),
+        Field::new("op", DataType::UInt8, false),
+        Field::new("year", DataType::Int32, true),
         Field::new("city", DataType::Utf8, false),
         Field::new("population", DataType::Int64, false),
     ]));
 
-    let mut obsv = Vec::new();
+    let mut op = Vec::new();
+    let mut year = Vec::new();
     let mut city = Vec::new();
     let mut population = Vec::new();
 
-    for (o, c, p) in rows.into_iter() {
-        obsv.push(o.into());
+    for (o, y, c, p) in rows.into_iter() {
+        op.push(o as u8);
+        year.push(y);
         city.push(c.into());
         population.push(p);
     }
@@ -83,86 +89,91 @@ where
     let batch = RecordBatch::try_new(
         schema,
         vec![
-            Arc::new(array::StringArray::from(obsv)),
+            Arc::new(array::UInt8Array::from(op)),
+            Arc::new(array::Int32Array::from(year)),
             Arc::new(array::StringArray::from(city)),
             Arc::new(array::Int64Array::from(population)),
         ],
     )
     .unwrap();
 
-    ctx.register_batch(table_name, batch).unwrap();
-    ctx.table(table_name).await.unwrap()
-}
-
-async fn make_output_empty(ctx: &SessionContext, table_name: &str) -> DataFrame {
-    make_output::<[_; 0], &str, &str>(ctx, table_name, []).await
+    ctx.read_batch(batch).unwrap()
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-async fn make_ledger<I, C, S>(ctx: &SessionContext, table_name: &str, rows: I) -> DataFrame
+fn make_ledger<I, S>(ctx: &SessionContext, rows: I) -> DataFrame
 where
-    I: IntoIterator<Item = (C, S, i64)>,
-    C: Into<String>,
+    I: IntoIterator<Item = (odf::OperationType, i32, S, i64)>,
     S: Into<String>,
 {
-    with_offsets(make_output(ctx, table_name, rows).await)
-}
+    let schema = Arc::new(Schema::new(vec![
+        Field::new("offset", DataType::UInt64, false),
+        Field::new("op", DataType::UInt8, false),
+        Field::new("year", DataType::Int32, false),
+        Field::new("city", DataType::Utf8, false),
+        Field::new("population", DataType::Int64, false),
+    ]));
 
-///////////////////////////////////////////////////////////////////////////////
+    let mut offset = Vec::new();
+    let mut op = Vec::new();
+    let mut year = Vec::new();
+    let mut city = Vec::new();
+    let mut population = Vec::new();
 
-fn with_offsets(df: DataFrame) -> DataFrame {
-    df.window(vec![Expr::WindowFunction(
-        datafusion::logical_expr::expr::WindowFunction {
-            fun: datafusion::logical_expr::WindowFunction::BuiltInWindowFunction(
-                datafusion::logical_expr::BuiltInWindowFunction::RowNumber,
-            ),
-            args: Vec::new(),
-            partition_by: vec![],
-            order_by: vec![],
-            window_frame: datafusion::logical_expr::WindowFrame::new(false),
-        },
+    for (i, (o, y, c, p)) in rows.into_iter().enumerate() {
+        offset.push(i as u64);
+        op.push(o as u8);
+        year.push(y);
+        city.push(c.into());
+        population.push(p);
+    }
+
+    let batch = RecordBatch::try_new(
+        schema,
+        vec![
+            Arc::new(array::UInt64Array::from(offset)),
+            Arc::new(array::UInt8Array::from(op)),
+            Arc::new(array::Int32Array::from(year)),
+            Arc::new(array::StringArray::from(city)),
+            Arc::new(array::Int64Array::from(population)),
+        ],
     )
-    .alias("offset")])
-        .unwrap()
+    .unwrap();
+
+    ctx.read_batch(batch).unwrap()
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-fn get_strat() -> MergeStrategySnapshot {
-    MergeStrategySnapshot::new(
-        "offset".to_string(),
-        opendatafabric::MergeStrategySnapshot {
-            primary_key: vec!["city".to_string()],
-            compare_columns: None,
-            observation_column: None,
-            obsv_added: None,
-            obsv_changed: None,
-            obsv_removed: None,
-        },
-    )
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-async fn test_snapshot_project<I1, C1, S1, I2, S2>(ledger: I1, expected: I2)
+async fn test_snapshot_project<L, E, S>(ledger: L, expected: E)
 where
-    I1: IntoIterator<Item = (C1, S1, i64)>,
-    C1: Into<String>,
-    S1: Into<String>,
-    I2: IntoIterator<Item = (S2, i64)>,
-    S2: Into<String>,
+    L: IntoIterator<Item = (odf::OperationType, i32, S, i64)>,
+    E: IntoIterator<Item = (odf::OperationType, i32, S, i64)>,
+    S: Into<String>,
 {
     let ctx = SessionContext::new();
-    let strat: MergeStrategySnapshot = get_strat();
+    let strat = MergeStrategySnapshot::new(
+        odf::DatasetVocabulary {
+            event_time_column: "year".to_string(),
+            ..Default::default()
+        },
+        odf::MergeStrategySnapshot {
+            primary_key: vec!["city".to_string()],
+            compare_columns: None,
+        },
+    );
 
-    let ledger = make_ledger(&ctx, "ledger", ledger).await;
-    let expected = make_input(&ctx, "expected", expected).await;
-
-    let actual = strat.project(ledger).unwrap();
-    let actual = actual.without_columns(&["offset", "observed"]).unwrap();
-
-    assert_dfs_equivalent(expected, actual).await;
+    let ledger = make_ledger(&ctx, ledger);
+    let expected = make_ledger(&ctx, expected)
+        .without_columns(&["offset"])
+        .unwrap();
+    let actual = strat
+        .project(ledger)
+        .unwrap()
+        .without_columns(&["offset"])
+        .unwrap();
+    assert_dfs_equivalent(expected, actual, true, true, true).await;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -172,17 +183,23 @@ where
 #[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_snapshot_project_empty() {
-    test_snapshot_project::<[_; 0], &str, &str, [_; 0], &str>([], []).await;
+    test_snapshot_project::<_, _, &str>([], []).await;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
-async fn test_snapshot_project_add() {
+async fn test_snapshot_project_append() {
     test_snapshot_project(
-        [("I", "vancouver", 1), ("I", "seattle", 2)],
-        [("vancouver", 1), ("seattle", 2)],
+        [
+            (Op::Append, 2020, "vancouver", 1),
+            (Op::Append, 2020, "seattle", 2),
+        ],
+        [
+            (Op::Append, 2020, "vancouver", 1),
+            (Op::Append, 2020, "seattle", 2),
+        ],
     )
     .await;
 }
@@ -191,9 +208,12 @@ async fn test_snapshot_project_add() {
 
 #[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
-async fn test_snapshot_project_add_remove() {
-    test_snapshot_project::<_, _, _, [_; 0], &str>(
-        [("I", "vancouver", 1), ("D", "vancouver", 0)],
+async fn test_snapshot_project_append_retract() {
+    test_snapshot_project(
+        [
+            (Op::Append, 2020, "vancouver", 1),
+            (Op::Retract, 2020, "vancouver", 0),
+        ],
         [],
     )
     .await;
@@ -203,10 +223,14 @@ async fn test_snapshot_project_add_remove() {
 
 #[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
-async fn test_snapshot_project_update() {
+async fn test_snapshot_project_correct() {
     test_snapshot_project(
-        [("I", "vancouver", 1), ("U", "vancouver", 2)],
-        [("vancouver", 2)],
+        [
+            (Op::Append, 2020, "vancouver", 1),
+            (Op::CorrectFrom, 2020, "vancouver", 1),
+            (Op::CorrectTo, 2020, "vancouver", 2),
+        ],
+        [(Op::CorrectTo, 2020, "vancouver", 2)],
     )
     .await;
 }
@@ -218,14 +242,19 @@ async fn test_snapshot_project_update() {
 async fn test_snapshot_project_mixed() {
     test_snapshot_project(
         [
-            ("I", "vancouver", 1),
-            ("I", "seattle", 2),
-            ("U", "vancouver", 3),
-            ("I", "kyiv", 4),
-            ("D", "seattle", 0),
-            ("U", "kyiv", 1),
+            (Op::Append, 2020, "vancouver", 1),
+            (Op::Append, 2020, "seattle", 2),
+            (Op::CorrectFrom, 2020, "vancouver", 1),
+            (Op::CorrectTo, 2020, "vancouver", 3),
+            (Op::Append, 2020, "kyiv", 4),
+            (Op::Retract, 2020, "seattle", 0),
+            (Op::CorrectFrom, 2020, "kyiv", 4),
+            (Op::CorrectTo, 2020, "kyiv", 1),
         ],
-        [("vancouver", 3), ("kyiv", 1)],
+        [
+            (Op::CorrectTo, 2020, "vancouver", 3),
+            (Op::CorrectTo, 2020, "kyiv", 1),
+        ],
     )
     .await;
 }
@@ -234,105 +263,187 @@ async fn test_snapshot_project_mixed() {
 // MergeStrategySnapshot::merge
 ///////////////////////////////////////////////////////////////////////////////
 
-#[test_group::group(engine, ingest, datafusion)]
-#[test_log::test(tokio::test)]
-async fn test_snapshot_to_empty() {
+async fn test_snapshot_merge<L, I, E, S>(ledger: L, input: I, expected: E)
+where
+    L: IntoIterator<Item = (odf::OperationType, i32, S, i64)>,
+    I: IntoIterator<Item = (S, i64)>,
+    E: IntoIterator<Item = (odf::OperationType, Option<i32>, S, i64)>,
+    S: Into<String>,
+{
     let ctx = SessionContext::new();
-    let strat = get_strat();
 
-    let new = make_input(&ctx, "new", [("vancouver", 1), ("seattle", 2)]).await;
-
-    let actual = strat.merge(None, new).unwrap();
-    let expected = make_output(
-        &ctx,
-        "expected",
-        [("I", "vancouver", 1), ("I", "seattle", 2)],
-    )
-    .await;
-    assert_dfs_equivalent(expected, actual).await;
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-#[test_group::group(engine, ingest, datafusion)]
-#[test_log::test(tokio::test)]
-async fn test_snapshot_no_changes_ordered() {
-    let ctx = SessionContext::new();
-    let strat = get_strat();
-
-    let prev = make_ledger(&ctx, "prev", [("I", "vancouver", 1), ("I", "seattle", 2)]).await;
-    let new = make_input(&ctx, "new", [("vancouver", 1), ("seattle", 2)]).await;
-
-    let actual = strat.merge(Some(prev), new).unwrap();
-    let expected = make_output_empty(&ctx, "expected").await;
-    assert_dfs_equivalent(expected, actual).await;
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-#[test_group::group(engine, ingest, datafusion)]
-#[test_log::test(tokio::test)]
-async fn test_snapshot_no_changes_unordered() {
-    let ctx = SessionContext::new();
-    let strat = get_strat();
-
-    let prev = make_ledger(&ctx, "prev", [("I", "vancouver", 1), ("I", "seattle", 2)]).await;
-    let new = make_input(&ctx, "new", [("seattle", 2), ("vancouver", 1)]).await;
-
-    let actual = strat.merge(Some(prev), new).unwrap();
-    let expected = make_output_empty(&ctx, "expected").await;
-    assert_dfs_equivalent(expected, actual).await;
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-#[test_group::group(engine, ingest, datafusion)]
-#[test_log::test(tokio::test)]
-async fn test_snapshot_mix_of_changes() {
-    let ctx = SessionContext::new();
-    let strat = get_strat();
-
-    let prev = make_ledger(
-        &ctx,
-        "prev",
-        [("I", "vancouver", 1), ("I", "seattle", 2), ("I", "kyiv", 3)],
-    )
-    .await;
-    let new = make_input(&ctx, "new", [("seattle", 2), ("kyiv", 4), ("odessa", 5)]).await;
-
-    let actual = strat.merge(Some(prev), new).unwrap();
-    let expected = make_output(
-        &ctx,
-        "expected",
-        [("D", "vancouver", 1), ("U", "kyiv", 4), ("I", "odessa", 5)],
-    )
-    .await;
-
-    assert_dfs_equivalent(expected, actual).await;
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-#[test_group::group(engine, ingest, datafusion)]
-#[test_log::test(tokio::test)]
-async fn test_snapshot_invalid_pk() {
-    let ctx = SessionContext::new();
     let strat = MergeStrategySnapshot::new(
-        "offset".to_string(),
-        opendatafabric::MergeStrategySnapshot {
-            primary_key: vec!["city".to_string(), "foo".to_string()],
+        odf::DatasetVocabulary {
+            event_time_column: "year".to_string(),
+            ..Default::default()
+        },
+        odf::MergeStrategySnapshot {
+            primary_key: vec!["city".to_string()],
             compare_columns: None,
-            observation_column: None,
-            obsv_added: None,
-            obsv_changed: None,
-            obsv_removed: None,
         },
     );
 
-    let new = make_input(&ctx, "new", [("vancouver", 1), ("seattle", 2)]).await;
+    let prev = {
+        let df = make_ledger(&ctx, ledger);
+        if df.clone().count().await.unwrap() == 0 {
+            None
+        } else {
+            Some(df)
+        }
+    };
+
+    let new = make_input(&ctx, input);
+    let expected = make_output(&ctx, expected);
+    let actual = strat.merge(prev, new).unwrap();
+
+    // Sort events according to the strategy
+    let actual = actual.sort(strat.sort_order()).unwrap();
+
+    assert_dfs_equivalent(expected, actual, false, true, true).await;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, ingest, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_snapshot_merge_to_empty() {
+    test_snapshot_merge(
+        [],
+        [("vancouver", 1), ("seattle", 2)],
+        [
+            (Op::Append, None, "seattle", 2),
+            (Op::Append, None, "vancouver", 1),
+        ],
+    )
+    .await;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, ingest, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_snapshot_merge_no_changes_ordered() {
+    test_snapshot_merge(
+        [
+            (Op::Append, 2020, "vancouver", 1),
+            (Op::Append, 2020, "seattle", 2),
+        ],
+        [("vancouver", 1), ("seattle", 2)],
+        [],
+    )
+    .await;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, ingest, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_snapshot_merge_no_changes_unordered() {
+    test_snapshot_merge(
+        [
+            (Op::Append, 2020, "vancouver", 1),
+            (Op::Append, 2020, "seattle", 2),
+        ],
+        [("seattle", 2), ("vancouver", 1)],
+        [],
+    )
+    .await;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, ingest, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_snapshot_merge_mix_of_changes() {
+    test_snapshot_merge(
+        [
+            (Op::Append, 2020, "vancouver", 1),
+            (Op::Append, 2020, "seattle", 2),
+            (Op::Append, 2020, "kyiv", 3),
+        ],
+        [("seattle", 2), ("kyiv", 4), ("odessa", 5)],
+        [
+            (Op::CorrectFrom, Some(2020), "kyiv", 3),
+            (Op::CorrectTo, None, "kyiv", 4),
+            (Op::Append, None, "odessa", 5),
+            (Op::Retract, Some(2020), "vancouver", 1),
+        ],
+    )
+    .await;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, ingest, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_snapshot_merge_invalid_pk() {
+    let ctx = SessionContext::new();
+    let strat = MergeStrategySnapshot::new(
+        odf::DatasetVocabulary::default(),
+        odf::MergeStrategySnapshot {
+            primary_key: vec!["city".to_string(), "foo".to_string()],
+            compare_columns: None,
+        },
+    );
+
+    let new = make_input(&ctx, [("vancouver", 1), ("seattle", 2)]);
 
     let res = strat.merge(None, new);
     assert_matches!(res, Err(MergeError::Internal(_)));
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, ingest, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_snapshot_merge_input_carries_event_time() {
+    let ctx = SessionContext::new();
+
+    let strat = MergeStrategySnapshot::new(
+        odf::DatasetVocabulary {
+            event_time_column: "year".to_string(),
+            ..Default::default()
+        },
+        odf::MergeStrategySnapshot {
+            primary_key: vec!["city".to_string()],
+            compare_columns: None,
+        },
+    );
+
+    let prev = make_ledger(
+        &ctx,
+        [
+            (Op::Append, 2020, "vancouver", 1),
+            (Op::Append, 2020, "seattle", 2),
+            (Op::Append, 2020, "kyiv", 3),
+        ],
+    );
+
+    let new = make_output(
+        &ctx,
+        [
+            (Op::Append, Some(2020), "seattle", 2),
+            (Op::Append, Some(2021), "kyiv", 3),
+            (Op::Append, Some(2021), "odessa", 5),
+        ],
+    )
+    .without_columns(&["op"])
+    .unwrap();
+
+    let expected = make_output(
+        &ctx,
+        [
+            (Op::CorrectFrom, Some(2020), "kyiv", 3),
+            (Op::CorrectTo, Some(2021), "kyiv", 3),
+            (Op::Append, Some(2021), "odessa", 5),
+            (Op::Retract, Some(2020), "vancouver", 1),
+        ],
+    );
+
+    let actual = strat.merge(Some(prev), new).unwrap();
+
+    // Sort events according to the strategy
+    let actual = actual.sort(strat.sort_order()).unwrap();
+
+    assert_dfs_equivalent(expected, actual, false, true, true).await;
+}

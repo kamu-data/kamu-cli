@@ -7,17 +7,41 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use datafusion::prelude::DataFrame;
+use datafusion::prelude::*;
+use internal_error::*;
+use kamu_data_utils::data::dataframe_ext::DataFrameExt;
+use opendatafabric as odf;
 
 use crate::*;
 
 /// Append merge strategy.
 ///
 /// See [opendatafabric::MergeStrategy] for details.
-pub struct MergeStrategyAppend;
+pub struct MergeStrategyAppend {
+    vocab: odf::DatasetVocabulary,
+}
+
+impl MergeStrategyAppend {
+    pub fn new(vocab: odf::DatasetVocabulary) -> Self {
+        Self { vocab }
+    }
+}
 
 impl MergeStrategy for MergeStrategyAppend {
     fn merge(&self, _prev: Option<DataFrame>, new: DataFrame) -> Result<DataFrame, MergeError> {
-        Ok(new)
+        let df = new
+            .with_column(
+                &self.vocab.operation_type_column,
+                lit(odf::OperationType::Append as u8),
+            )
+            .int_err()?
+            .columns_to_front(&[&self.vocab.operation_type_column])
+            .int_err()?;
+
+        Ok(df)
+    }
+
+    fn sort_order(&self) -> Vec<Expr> {
+        vec![col(&self.vocab.event_time_column).sort(true, true)]
     }
 }

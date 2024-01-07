@@ -376,12 +376,16 @@ impl AsciiRenderer {
             }
             MetadataEvent::SetVocab(SetVocab {
                 offset_column,
+                operation_type_column,
                 system_time_column,
                 event_time_column,
             }) => {
                 self.render_property(output, 0, "Kind", &"SetVocab")?;
                 if let Some(offset_column) = offset_column {
                     self.render_property(output, 0, "OffsetColumn", offset_column)?;
+                }
+                if let Some(operation_type_column) = operation_type_column {
+                    self.render_property(output, 0, "OperationTypeColumn", operation_type_column)?;
                 }
                 if let Some(system_time_column) = system_time_column {
                     self.render_property(output, 0, "SystemTimeColumn", system_time_column)?;

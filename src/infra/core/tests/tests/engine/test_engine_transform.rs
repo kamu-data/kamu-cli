@@ -286,14 +286,6 @@ async fn test_transform_common(transform: Transform) {
                     ]),
                     ..ReadStepCsv::default()
                 }))
-                // TODO: Temporary no-op to make ingest use experimental DataFusion engine
-                .preprocess(TransformSql {
-                    engine: "datafusion".to_string(),
-                    query: Some("select * from input".to_string()),
-                    version: None,
-                    queries: None,
-                    temporal_tables: None,
-                })
                 .build(),
         )
         .build();

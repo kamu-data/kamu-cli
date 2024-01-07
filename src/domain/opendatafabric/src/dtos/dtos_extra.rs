@@ -93,6 +93,7 @@ impl Default for SetVocab {
     fn default() -> Self {
         Self {
             offset_column: None,
+            operation_type_column: None,
             system_time_column: None,
             event_time_column: None,
         }
@@ -105,6 +106,9 @@ impl From<SetVocab> for DatasetVocabulary {
             offset_column: v
                 .offset_column
                 .unwrap_or_else(|| DatasetVocabulary::DEFAULT_OFFSET_COLUMN_NAME.to_string()),
+            operation_type_column: v.operation_type_column.unwrap_or_else(|| {
+                DatasetVocabulary::DEFAULT_OPERATION_TYPE_COLUMN_NAME.to_string()
+            }),
             system_time_column: v
                 .system_time_column
                 .unwrap_or_else(|| DatasetVocabulary::DEFAULT_SYSTEM_TIME_COLUMN_NAME.to_string()),
@@ -123,6 +127,7 @@ impl Default for DatasetVocabulary {
     fn default() -> Self {
         Self {
             offset_column: Self::DEFAULT_OFFSET_COLUMN_NAME.to_string(),
+            operation_type_column: Self::DEFAULT_OPERATION_TYPE_COLUMN_NAME.to_string(),
             system_time_column: Self::DEFAULT_SYSTEM_TIME_COLUMN_NAME.to_string(),
             event_time_column: Self::DEFAULT_EVENT_TIME_COLUMN_NAME.to_string(),
         }

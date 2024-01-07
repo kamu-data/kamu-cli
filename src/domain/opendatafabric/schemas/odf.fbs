@@ -179,10 +179,6 @@ table MergeStrategyLedger {
 table MergeStrategySnapshot {
   primary_key: [string];
   compare_columns: [string];
-  observation_column: string;
-  obsv_added: string;
-  obsv_changed: string;
-  obsv_removed: string;
 }
 
 union MergeStrategy {
@@ -429,9 +425,10 @@ table SetTransform {
 ////////////////////////////////////////////////////////////////////////////////
 
 table SetVocab {
+  offset_column: string;
+  operation_type_column: string;
   system_time_column: string;
   event_time_column: string;
-  offset_column: string;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -518,9 +515,10 @@ union MetadataEvent {
 ////////////////////////////////////////////////////////////////////////////////
 
 table DatasetVocabulary {
+  offset_column: string;
+  operation_type_column: string;
   system_time_column: string;
   event_time_column: string;
-  offset_column: string;
 }
 
 ////////////////////////////////////////////////////////////////////////////////

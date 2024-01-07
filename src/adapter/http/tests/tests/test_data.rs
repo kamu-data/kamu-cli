@@ -116,6 +116,7 @@ async fn test_data_push_ingest_handler() {
                     r#"
                     message arrow_schema {
                       OPTIONAL INT64 offset;
+                      REQUIRED INT32 op (INTEGER(8,false));
                       REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                       OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
                       OPTIONAL BYTE_ARRAY city (STRING);
@@ -125,12 +126,12 @@ async fn test_data_push_ingest_handler() {
                 ),
                 indoc!(
                     r#"
-                    +--------+----------------------+----------------------+------+------------+
-                    | offset | system_time          | event_time           | city | population |
-                    +--------+----------------------+----------------------+------+------------+
-                    | 0      | 2050-01-01T12:00:00Z | 2020-01-01T00:00:00Z | A    | 100        |
-                    | 1      | 2050-01-01T12:00:00Z | 2020-01-02T00:00:00Z | B    | 200        |
-                    +--------+----------------------+----------------------+------+------------+
+                    +--------+----+----------------------+----------------------+------+------------+
+                    | offset | op | system_time          | event_time           | city | population |
+                    +--------+----+----------------------+----------------------+------+------------+
+                    | 0      | 0  | 2050-01-01T12:00:00Z | 2020-01-01T00:00:00Z | A    | 100        |
+                    | 1      | 0  | 2050-01-01T12:00:00Z | 2020-01-02T00:00:00Z | B    | 200        |
+                    +--------+----+----------------------+----------------------+------+------------+
                     "#
                 ),
             )
@@ -226,6 +227,7 @@ async fn test_data_push_ingest_handler() {
                     r#"
                     message arrow_schema {
                       OPTIONAL INT64 offset;
+                      REQUIRED INT32 op (INTEGER(8,false));
                       REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                       OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
                       OPTIONAL BYTE_ARRAY city (STRING);
@@ -235,11 +237,11 @@ async fn test_data_push_ingest_handler() {
                 ),
                 indoc!(
                     r#"
-                    +--------+----------------------+----------------------+------+------------+
-                    | offset | system_time          | event_time           | city | population |
-                    +--------+----------------------+----------------------+------+------------+
-                    | 2      | 2050-01-01T12:00:00Z | 2020-01-03T00:00:00Z | C    | 301        |
-                    +--------+----------------------+----------------------+------+------------+
+                    +--------+----+----------------------+----------------------+------+------------+
+                    | offset | op | system_time          | event_time           | city | population |
+                    +--------+----+----------------------+----------------------+------+------------+
+                    | 2      | 0  | 2050-01-01T12:00:00Z | 2020-01-03T00:00:00Z | C    | 301        |
+                    +--------+----+----------------------+----------------------+------+------------+
                     "#
                 ),
             )
@@ -286,6 +288,7 @@ async fn test_data_push_ingest_handler() {
                     r#"
                     message arrow_schema {
                       OPTIONAL INT64 offset;
+                      REQUIRED INT32 op (INTEGER(8,false));
                       REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                       OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
                       OPTIONAL BYTE_ARRAY city (STRING);
@@ -295,11 +298,11 @@ async fn test_data_push_ingest_handler() {
                 ),
                 indoc!(
                     r#"
-                    +--------+----------------------+----------------------+------+------------+
-                    | offset | system_time          | event_time           | city | population |
-                    +--------+----------------------+----------------------+------+------------+
-                    | 3      | 2050-01-01T12:00:00Z | 2020-01-04T00:00:00Z | D    | 400        |
-                    +--------+----------------------+----------------------+------+------------+
+                    +--------+----+----------------------+----------------------+------+------------+
+                    | offset | op | system_time          | event_time           | city | population |
+                    +--------+----+----------------------+----------------------+------+------------+
+                    | 3      | 0  | 2050-01-01T12:00:00Z | 2020-01-04T00:00:00Z | D    | 400        |
+                    +--------+----+----------------------+----------------------+------+------------+
                     "#
                 ),
             )

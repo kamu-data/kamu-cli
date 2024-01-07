@@ -233,9 +233,10 @@ implement_serde_as!(DatasetSnapshot, DatasetSnapshotDef, "DatasetSnapshotDef");
 #[serde(remote = "DatasetVocabulary")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct DatasetVocabularyDef {
+    pub offset_column: String,
+    pub operation_type_column: String,
     pub system_time_column: String,
     pub event_time_column: String,
-    pub offset_column: String,
 }
 
 implement_serde_as!(
@@ -563,10 +564,6 @@ pub struct MergeStrategyLedgerDef {
 pub struct MergeStrategySnapshotDef {
     pub primary_key: Vec<String>,
     pub compare_columns: Option<Vec<String>>,
-    pub observation_column: Option<String>,
-    pub obsv_added: Option<String>,
-    pub obsv_changed: Option<String>,
-    pub obsv_removed: Option<String>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1090,9 +1087,10 @@ implement_serde_as!(SetTransform, SetTransformDef, "SetTransformDef");
 #[serde(remote = "SetVocab")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct SetVocabDef {
+    pub offset_column: Option<String>,
+    pub operation_type_column: Option<String>,
     pub system_time_column: Option<String>,
     pub event_time_column: Option<String>,
-    pub offset_column: Option<String>,
 }
 
 implement_serde_as!(SetVocab, SetVocabDef, "SetVocabDef");
