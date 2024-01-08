@@ -12,18 +12,6 @@ body:
           required: true
   - type: textarea
     attributes:
-      label: kamu version
-      description: Please copy and paste `kamu version` output.
-      placeholder: |
-        $ kamu version
-        appVersion: 0.150.0
-        buildTimestamp: 2023-12-29T10:41:15.288818966Z
-        ...
-      render: sh
-    validations:
-      required: true
-  - type: textarea
-    attributes:
       label: Describe the bug
       description: A clear and concise description of what the bug is.
     validations:
@@ -49,6 +37,18 @@ body:
     attributes:
       label: Expected Behavior
       description: A concise description of what you expected to happen.
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: kamu version
+      description: Please copy and paste `kamu version` output.
+      placeholder: |
+        $ kamu version
+        appVersion: 0.150.0
+        buildTimestamp: 2023-12-29T10:41:15.288818966Z
+        ...
+      render: sh
     validations:
       required: true
   - type: textarea
