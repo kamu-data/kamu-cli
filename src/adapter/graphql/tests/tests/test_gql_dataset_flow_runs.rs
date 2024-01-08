@@ -32,7 +32,7 @@ use kamu_flow_system_inmem::{
     FlowEventStoreInMem,
     FlowServiceInMemory,
 };
-use kamu_task_system::{TaskEventFinished, TaskID, TaskOutcome};
+use kamu_task_system::{TaskEventFinished, TaskEventRunning, TaskID, TaskOutcome};
 use kamu_task_system_inmem::{TaskSchedulerInMemory, TaskSystemEventStoreInMemory};
 use opendatafabric::{DatasetID, DatasetKind};
 
@@ -580,6 +580,7 @@ async fn test_cancel_already_succeeded_flow() {
     let flow_id = FlowRunsHarness::extract_flow_id_from_trigger_response(&response_json);
 
     let flow_task_id = harness.mimic_flow_scheduled(flow_id).await;
+    harness.mimic_task_running(flow_task_id).await;
     harness.mimic_task_completed(flow_task_id).await;
 
     let mutation_code =
@@ -746,6 +747,23 @@ impl FlowRunsHarness {
             .mimic_flow_scheduled(flow_id)
             .await
             .unwrap()
+    }
+
+    async fn mimic_task_running(&self, task_id: TaskID) {
+        let flow_service_test_driver = self
+            .catalog_authorized
+            .get_one::<dyn FlowServiceTestDriver>()
+            .unwrap();
+        flow_service_test_driver.mimic_running_started();
+
+        let event_bus = self.catalog_authorized.get_one::<EventBus>().unwrap();
+        event_bus
+            .dispatch_event(TaskEventRunning {
+                event_time: Utc::now(),
+                task_id,
+            })
+            .await
+            .unwrap();
     }
 
     async fn mimic_task_completed(&self, task_id: TaskID) {

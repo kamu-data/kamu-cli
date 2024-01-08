@@ -25,10 +25,12 @@ pub struct FlowState {
     pub activate_at: Option<DateTime<Utc>>,
     /// Associated task IDs
     pub task_ids: Vec<TaskID>,
+    /// Started running at time
+    pub running_since: Option<DateTime<Utc>>,
     /// Flow outcome
     pub outcome: Option<FlowOutcome>,
-    /// Termiation time (cancel or abort)
-    pub terminated_at: Option<DateTime<Utc>>,
+    /// Finish time (success or cancel/abort)
+    pub finished_at: Option<DateTime<Utc>>,
 }
 
 impl FlowState {
@@ -36,12 +38,14 @@ impl FlowState {
     pub fn status(&self) -> FlowStatus {
         if self.outcome.is_some() {
             FlowStatus::Finished
+        } else if self.running_since.is_some() {
+            FlowStatus::Running
         } else if !self.task_ids.is_empty() {
             FlowStatus::Scheduled
         } else if self.activate_at.is_some() {
             FlowStatus::Queued
         } else {
-            FlowStatus::Draft
+            FlowStatus::Waiting
         }
     }
 }
@@ -65,8 +69,9 @@ impl Projection for FlowState {
                     flow_key,
                     activate_at: None,
                     task_ids: vec![],
+                    running_since: None,
                     outcome: None,
-                    terminated_at: None,
+                    finished_at: None,
                 }),
                 _ => Err(ProjectionError::new(None, event)),
             },
@@ -125,13 +130,30 @@ impl Projection for FlowState {
                             Ok(FlowState { task_ids, ..s })
                         }
                     }
+                    E::TaskRunning(FlowEventTaskRunning {
+                        event_time,
+                        flow_id: _,
+                        task_id,
+                    }) => {
+                        if s.outcome.is_some()
+                            || s.activate_at.is_none()
+                            || !s.task_ids.contains(task_id)
+                        {
+                            Err(ProjectionError::new(Some(s), event))
+                        } else {
+                            Ok(FlowState {
+                                running_since: Some(*event_time),
+                                ..s
+                            })
+                        }
+                    }
                     E::TaskFinished(FlowEventTaskFinished {
                         event_time,
                         flow_id: _,
                         task_id,
                         task_outcome,
                     }) => {
-                        if !s.task_ids.contains(task_id) {
+                        if !s.task_ids.contains(task_id) || s.running_since.is_none() {
                             Err(ProjectionError::new(Some(s), event))
                         } else if s.outcome.is_some() {
                             // Ignore for idempotence motivation
@@ -140,11 +162,12 @@ impl Projection for FlowState {
                             match task_outcome {
                                 TaskOutcome::Success => Ok(FlowState {
                                     outcome: Some(FlowOutcome::Success),
+                                    finished_at: Some(event_time.clone()),
                                     ..s
                                 }),
                                 TaskOutcome::Cancelled => Ok(FlowState {
                                     outcome: Some(FlowOutcome::Cancelled),
-                                    terminated_at: Some(event_time.clone()),
+                                    finished_at: Some(event_time.clone()),
                                     ..s
                                 }),
                                 // TODO: support retries
@@ -169,7 +192,7 @@ impl Projection for FlowState {
                         } else {
                             Ok(FlowState {
                                 outcome: Some(FlowOutcome::Aborted),
-                                terminated_at: Some(event_time.clone()),
+                                finished_at: Some(event_time.clone()),
                                 ..s
                             })
                         }

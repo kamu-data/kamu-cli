@@ -540,8 +540,12 @@ async fn test_cron_task_completions_trigger_next_loop_on_success() {
                 scheduled_tasks_by_dataset_id.insert(task_dataset_id, scheduled_task);
             };
 
-            // Send task finished event for each dataset with certain interval
+            // Send task running and finished events for each dataset with certain interval
             let dataset_task = scheduled_tasks_by_dataset_id.get(&foo_id).unwrap();
+            event_bus.dispatch_event(TaskEventRunning {
+                event_time: next_time,
+                task_id: dataset_task.task_id,
+            }).await.unwrap();
             event_bus.dispatch_event(TaskEventFinished {
                 event_time: next_time,
                 task_id: dataset_task.task_id,
@@ -655,9 +659,13 @@ async fn test_task_completions_trigger_next_loop_on_success() {
                 scheduled_tasks_by_dataset_id.insert(task_dataset_id, scheduled_task);
             };
 
-            // Send task finished event for each dataset with certain interval
+            // Send task runnung & finished events for each dataset with certain interval
             for dataset_id in [&foo_id, &bar_id, &baz_id] {
                 let dataset_task = scheduled_tasks_by_dataset_id.get(dataset_id).unwrap();
+                event_bus.dispatch_event(TaskEventRunning {
+                    event_time: next_time,
+                    task_id: dataset_task.task_id,
+                }).await.unwrap();
                 event_bus.dispatch_event(TaskEventFinished {
                     event_time: next_time,
                     task_id: dataset_task.task_id,
@@ -873,7 +881,11 @@ async fn test_update_success_triggers_update_of_derived_datasets() {
             };
             assert_eq!(task_dataset_id, foo_id);
 
-            // Send finished for this task
+            // Send running & finished for this task
+            event_bus.dispatch_event(TaskEventRunning {
+                event_time: next_time,
+                task_id: scheduled_tasks[0].task_id,
+            }).await.unwrap();
             event_bus.dispatch_event(TaskEventFinished {
                 event_time: next_time,
                 task_id: scheduled_tasks[0].task_id,

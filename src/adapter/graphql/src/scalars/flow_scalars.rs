@@ -107,9 +107,10 @@ impl From<fs::FlowKeySystem> for FlowKeySystem {
 #[derive(Enum, Copy, Clone, Eq, PartialEq)]
 #[graphql(remote = "kamu_flow_system::FlowStatus")]
 pub enum FlowStatus {
-    Draft,
+    Waiting,
     Queued,
     Scheduled,
+    Running,
     Finished,
 }
 

@@ -621,9 +621,26 @@ type Flow {
 	"""
 	status: FlowStatus!
 	"""
-	Outcome of the flow
+	Outcome of the flow (Finished state only)
 	"""
 	outcome: FlowOutcome
+	"""
+	Planned activation time (at least, Queued state)
+	"""
+	activateAt: DateTime
+	"""
+	Recorded start of running (Running state seen at least once)
+	"""
+	runningSince: DateTime
+	"""
+	Recorded time of finish (succesfull or failed after retry) or abortion
+	(Finished state seen at least once)
+	"""
+	finishedAt: DateTime
+	"""
+	Associated tasks
+	"""
+	tasks: [Task!]!
 }
 
 type FlowConfiguration {
@@ -696,9 +713,10 @@ enum FlowOutcome {
 }
 
 enum FlowStatus {
-	DRAFT
+	WAITING
 	QUEUED
 	SCHEDULED
+	RUNNING
 	FINISHED
 }
 

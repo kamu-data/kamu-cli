@@ -42,6 +42,7 @@ impl DatasetFlowRuns {
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_PER_PAGE);
 
+        // TODO: consider pushing pagination control down to service/repository levels
         let flows_stream = flow_service
             .list_all_flows_by_dataset(&self.dataset_handle.id)
             .map_err(|e| e.int_err())?;
