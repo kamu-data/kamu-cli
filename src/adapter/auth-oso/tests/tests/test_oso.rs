@@ -154,3 +154,28 @@ async fn test_having_explicit_write_permission_in_private_dataset() {
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_admin_can_read_and_write_another_private_dataset() {
+    let is_admin = true;
+    let user_actor = UserActor::new("foo", false, is_admin);
+    let dataset_resource = DatasetResource::new("bar", false);
+
+    let oso = KamuAuthOso::new().oso;
+
+    let write_result = oso.is_allowed(
+        user_actor.clone(),
+        format!("{}", DatasetAction::Write),
+        dataset_resource.clone(),
+    );
+    let read_result = oso.is_allowed(
+        user_actor.clone(),
+        format!("{}", DatasetAction::Read),
+        dataset_resource.clone(),
+    );
+
+    assert_allowed!(write_result);
+    assert_allowed!(read_result);
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
