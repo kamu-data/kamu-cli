@@ -44,13 +44,13 @@ impl DependencyGraphRepository for DependencyGraphRepositoryInMemory {
                     .get_summary(GetSummaryOpts::default())
                     .await
                     .int_err()?;
+                let transform_input_ids: Vec<_> = summary
+                    .dependencies
+                    .into_iter()
+                    .filter_map(|transform_input| transform_input.id)
+                    .collect();
 
-                for transform_input in summary.dependencies {
-                    if let Some(input_id) = transform_input.id {
-                        yield (dataset_handle.id.clone(), input_id);
-                    }
-                }
-
+                yield (dataset_handle.id.clone(), transform_input_ids);
             }
         })
     }

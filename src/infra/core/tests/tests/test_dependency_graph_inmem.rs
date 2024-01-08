@@ -364,22 +364,25 @@ impl DependencyGraphHarness {
             .unwrap();
 
         let mut res = Vec::new();
-        for (downstream_id, upstream_id) in dependencies {
+        for (downstream_id, upstream_ids) in dependencies {
             let downstream_hdl = self
                 .dataset_repo
                 .resolve_dataset_ref(&downstream_id.as_local_ref())
                 .await
                 .unwrap();
-            let upstream_hdl = self
-                .dataset_repo
-                .resolve_dataset_ref(&upstream_id.as_local_ref())
-                .await
-                .unwrap();
 
-            res.push((
-                format!("{}", upstream_hdl.alias),
-                format!("{}", downstream_hdl.alias),
-            ));
+            for upstream_id in upstream_ids {
+                let upstream_hdl = self
+                    .dataset_repo
+                    .resolve_dataset_ref(&upstream_id.as_local_ref())
+                    .await
+                    .unwrap();
+
+                res.push((
+                    format!("{}", upstream_hdl.alias),
+                    format!("{}", downstream_hdl.alias),
+                ));
+            }
         }
 
         res.sort();

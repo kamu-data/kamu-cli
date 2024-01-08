@@ -106,8 +106,15 @@ impl DependencyGraphServiceInMemory {
         use tokio_stream::StreamExt;
 
         let mut dependencies_stream = repository.list_dependencies_of_all_datasets();
-        while let Some(Ok((dataset_id, upstream_dataset_id))) = dependencies_stream.next().await {
-            self.add_dependency(state, &upstream_dataset_id, &dataset_id);
+
+        while let Some(Ok((dataset_id, upstream_dataset_ids))) = dependencies_stream.next().await {
+            if !upstream_dataset_ids.is_empty() {
+                for upstream_dataset_id in upstream_dataset_ids {
+                    self.add_dependency(state, &upstream_dataset_id, &dataset_id);
+                }
+            } else {
+                state.get_or_create_dataset_node(&dataset_id);
+            }
         }
 
         state.initially_scanned = true;

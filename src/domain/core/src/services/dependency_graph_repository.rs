@@ -23,6 +23,6 @@ pub trait DependencyGraphRepository: Sync + Send {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub type DatasetDependenciesIDStream<'a> =
-    Pin<Box<dyn Stream<Item = Result<(DatasetID, DatasetID), InternalError>> + Send + 'a>>;
+    Pin<Box<dyn Stream<Item = Result<(DatasetID, Vec<DatasetID>), InternalError>> + Send + 'a>>;
 
 /////////////////////////////////////////////////////////////////////////////////////////
