@@ -608,8 +608,21 @@ type FetchStepUrl {
 
 
 type Flow {
+	"""
+	Unique identifier of the flow
+	"""
 	flowId: FlowID!
+	"""
+	Key of the flow
+	"""
+	flowKey: FlowKey!
+	"""
+	Status of the flow
+	"""
 	status: FlowStatus!
+	"""
+	Outcome of the flow
+	"""
 	outcome: FlowOutcome
 }
 
@@ -652,6 +665,17 @@ type FlowIncompatibleDatasetKind implements SetFlowConfigResult & TriggerFlowRes
 	expectedDatasetKind: DatasetKind!
 	actualDatasetKind: DatasetKind!
 	message: String!
+}
+
+union FlowKey = FlowKeyDataset | FlowKeySystem
+
+type FlowKeyDataset {
+	datasetId: DatasetID!
+	flowType: DatasetFlowType!
+}
+
+type FlowKeySystem {
+	flowType: SystemFlowType!
 }
 
 type FlowNotFound implements CancelScheduledTasksResult {
@@ -1097,6 +1121,10 @@ type SqlQueryStep {
 	query: String!
 }
 
+
+enum SystemFlowType {
+	GC
+}
 
 type Task {
 	"""

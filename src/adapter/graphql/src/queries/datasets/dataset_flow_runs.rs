@@ -11,6 +11,7 @@ use futures::TryStreamExt;
 use {kamu_flow_system as fs, opendatafabric as odf};
 
 use crate::prelude::*;
+use crate::queries::Flow;
 use crate::utils;
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -52,7 +53,7 @@ impl DatasetFlowRuns {
             .into_iter()
             .skip(page * per_page)
             .take(per_page)
-            .map(|flow| flow.into())
+            .map(|flow_state| Flow::new(flow_state))
             .collect();
 
         Ok(FlowConnection::new(nodes, page, per_page, total_count))

@@ -20,6 +20,7 @@ use super::{
     FlowNotScheduled,
 };
 use crate::prelude::*;
+use crate::queries::Flow;
 use crate::{utils, LoggedInGuard};
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -52,7 +53,7 @@ impl DatasetFlowRunsMut {
         let flow_service = from_catalog::<dyn fs::FlowService>(ctx).unwrap();
         let logged_account = utils::get_logged_account(ctx);
 
-        let res = flow_service
+        let flow_state = flow_service
             .trigger_manual_flow(
                 Utc::now(),
                 fs::FlowKeyDataset::new(self.dataset_handle.id.clone(), dataset_flow_type.into())
@@ -66,7 +67,7 @@ impl DatasetFlowRunsMut {
             })?;
 
         Ok(TriggerFlowResult::Success(TriggerFlowSuccess {
-            flow: res.into(),
+            flow: Flow::new(flow_state),
         }))
     }
 
@@ -93,7 +94,7 @@ impl DatasetFlowRunsMut {
         match res {
             Ok(flow_state) => Ok(CancelScheduledTasksResult::Success(
                 CancelScheduledTasksSuccess {
-                    flow: flow_state.into(),
+                    flow: Flow::new(flow_state),
                 },
             )),
             Err(e) => match e {
