@@ -57,9 +57,10 @@ impl ClientSideHarness {
 
         b.add::<DependencyGraphServiceInMemory>();
 
-        b.add_value(CurrentAccountSubject::logged(AccountName::new_unchecked(
-            CLIENT_ACCOUNT_NAME,
-        )));
+        b.add_value(CurrentAccountSubject::logged(
+            AccountName::new_unchecked(CLIENT_ACCOUNT_NAME),
+            false,
+        ));
 
         b.add::<auth::AlwaysHappyDatasetActionAuthorizer>();
 

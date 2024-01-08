@@ -106,9 +106,10 @@ impl DatasetAuthorizerHarness {
 
         let catalog = dill::CatalogBuilder::new()
             .add::<EventBus>()
-            .add_value(CurrentAccountSubject::logged(AccountName::new_unchecked(
-                current_account_name,
-            )))
+            .add_value(CurrentAccountSubject::logged(
+                AccountName::new_unchecked(current_account_name),
+                false,
+            ))
             .add::<KamuAuthOso>()
             .add::<OsoDatasetAuthorizer>()
             .add::<DependencyGraphServiceInMemory>()
