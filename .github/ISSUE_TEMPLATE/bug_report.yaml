@@ -1,27 +1,18 @@
 name: 🐞 Bug
 description: Create a report to help us improve
 title: "<title>"
-labels: ["Bug"]
+labels: ["bug"]
 body:
-  - type: checkboxes
+  - type: markdown
     attributes:
-      label: Is there an existing issue for this?
-      description: Please search to see if an issue already exists for the bug you encountered.
-      options:
-        - label: I have searched the existing issues
-          required: true
-  - type: textarea
-    attributes:
-      label: kamu version
-      description: Please copy and paste `kamu version` output.
-      placeholder: |
-        $ kamu version
-        appVersion: 0.150.0
-        buildTimestamp: 2023-12-29T10:41:15.288818966Z
-        ...
-      render: sh
-    validations:
-      required: true
+      value: |
+        Thanks for taking the time to fill out this bug report!
+
+        **NOTE** Before reporting an issue, please verify the version you are running with `kamu version` and compare it to the latest release documented on the top of `kamu`'s [README.md](https://github.com/kamu-data/kamu-cli#readme). If they differ, please update your version of `kamu` to the latest possible and retry your command before creating an issue.
+
+        Commands you might need to run to create the issue
+          $ kamu version
+          $ cat .kamu/run/kamu.log
   - type: textarea
     attributes:
       label: Describe the bug
@@ -53,10 +44,22 @@ body:
       required: true
   - type: textarea
     attributes:
+      label: kamu version
+      description: Please copy and paste `kamu version` output.
+      placeholder: |
+        $ kamu version
+        appVersion: 0.150.0
+        buildTimestamp: 2023-12-29T10:41:15.288818966Z
+        ...
+      render: sh
+    validations:
+      required: true
+  - type: textarea
+    attributes:
       label: Logs
       description: |
         Please attach `.kamu/run/kamu.log` right after the execution of faulty command.
-        Another option: please copy and paste all relevant log data.
+        Alternatively, please copy and paste all relevant log data.
     validations:
       required: false
   - type: textarea
