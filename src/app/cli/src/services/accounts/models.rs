@@ -62,7 +62,7 @@ impl CurrentAccountIndication {
     }
 
     pub fn to_current_account_subject(&self) -> CurrentAccountSubject {
-        let is_admin = false;
+        let is_admin = true;
 
         CurrentAccountSubject::logged(AccountName::from(self.account_name.clone()), is_admin)
     }
