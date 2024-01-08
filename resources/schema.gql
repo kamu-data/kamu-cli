@@ -67,6 +67,10 @@ type AddPushSource {
 	merge: MergeStrategy!
 }
 
+type Admin {
+	selfTest: String!
+}
+
 type AttachmentEmbedded {
 	path: String!
 	content: String!
@@ -839,13 +843,17 @@ type Query {
 	"""
 	tasks: Tasks!
 	"""
-	Search-related functionality group.
+	Search-related functionality group
 	"""
 	search: Search!
 	"""
 	Querying and data manipulations
 	"""
 	data: DataQueries!
+	"""
+	Admin-related functionality group
+	"""
+	admin: Admin!
 }
 
 enum QueryDialect {
