@@ -332,6 +332,10 @@ type DatasetFlowConfigsMut {
 	setConfigBatching(datasetFlowType: DatasetFlowType!, paused: Boolean!, throttlingPeriod: TimeDeltaInput, minimalDataBatch: Int): SetFlowConfigResult!
 }
 
+type DatasetFlowRuns {
+	viewFlows(page: Int, perPage: Int): FlowConnection!
+}
+
 type DatasetFlowRunsMut {
 	triggerFlow(datasetFlowType: DatasetFlowType!): TriggerFlowResult!
 	cancelScheduledTasks(flowId: FlowID!): CancelScheduledTasksResult!
@@ -348,6 +352,10 @@ type DatasetFlows {
 	Returns interface for flow configurations queries
 	"""
 	configs: DatasetFlowConfigs!
+	"""
+	Returns interface for flow runs queries
+	"""
+	runs: DatasetFlowRuns!
 }
 
 type DatasetFlowsMut {
@@ -617,6 +625,26 @@ type FlowConfigurationBatching {
 }
 
 union FlowConfigurationSchedule = TimeDelta | CronExpression
+
+type FlowConnection {
+	"""
+	A shorthand for `edges { node { ... } }`
+	"""
+	nodes: [Flow!]!
+	"""
+	Approximate number of total nodes
+	"""
+	totalCount: Int!
+	"""
+	Page information
+	"""
+	pageInfo: PageBasedInfo!
+	edges: [FlowEdge!]!
+}
+
+type FlowEdge {
+	node: Flow!
+}
 
 scalar FlowID
 

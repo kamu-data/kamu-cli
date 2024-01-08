@@ -11,6 +11,7 @@ use kamu_flow_system::{FlowConfigurationService, FlowKeyDataset};
 use opendatafabric as odf;
 
 use crate::prelude::*;
+use crate::utils::check_dataset_read_access;
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -31,20 +32,7 @@ impl DatasetFlowConfigs {
         ctx: &Context<'_>,
         dataset_flow_type: DatasetFlowType,
     ) -> Result<Option<FlowConfiguration>> {
-        use kamu_core::auth;
-        let dataset_action_authorizer =
-            from_catalog::<dyn auth::DatasetActionAuthorizer>(ctx).unwrap();
-
-        dataset_action_authorizer
-            .check_action_allowed(&self.dataset_handle, auth::DatasetAction::Read)
-            .await
-            .map_err(|_| {
-                GqlError::Gql(
-                    Error::new("Dataset access error").extend_with(|_, eev| {
-                        eev.set("alias", self.dataset_handle.alias.to_string())
-                    }),
-                )
-            })?;
+        check_dataset_read_access(ctx, &self.dataset_handle).await?;
 
         let flow_config_service = from_catalog::<dyn FlowConfigurationService>(ctx).unwrap();
         let maybe_flow_config = flow_config_service

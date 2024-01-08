@@ -9,11 +9,11 @@
 
 use std::sync::Arc;
 
-use async_graphql::Context;
+use async_graphql::{Context, ErrorExtensions};
 use internal_error::*;
-use kamu_core::{AccessError, CurrentAccountSubject, Dataset, DatasetRepository, LoggedAccount};
+use kamu_core::auth::DatasetActionUnauthorizedError;
+use kamu_core::{CurrentAccountSubject, Dataset, DatasetRepository, LoggedAccount};
 use opendatafabric::DatasetHandle;
-use thiserror::Error;
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -54,42 +54,46 @@ pub(crate) fn get_logged_account(ctx: &Context<'_>) -> LoggedAccount {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+pub(crate) async fn check_dataset_read_access(
+    ctx: &Context<'_>,
+    dataset_handle: &DatasetHandle,
+) -> Result<(), GqlError> {
+    let dataset_action_authorizer =
+        from_catalog::<dyn kamu_core::auth::DatasetActionAuthorizer>(ctx).int_err()?;
+
+    dataset_action_authorizer
+        .check_action_allowed(dataset_handle, kamu_core::auth::DatasetAction::Read)
+        .await
+        .map_err(|e| match e {
+            DatasetActionUnauthorizedError::Access(_) => GqlError::Gql(
+                async_graphql::Error::new("Dataset access error")
+                    .extend_with(|_, eev| eev.set("alias", dataset_handle.alias.to_string())),
+            ),
+            DatasetActionUnauthorizedError::Internal(e) => GqlError::Internal(e),
+        })?;
+
+    Ok(())
+}
+
 pub(crate) async fn check_dataset_write_access(
     ctx: &Context<'_>,
     dataset_handle: &DatasetHandle,
-) -> Result<(), CheckDatasetAccessError> {
+) -> Result<(), GqlError> {
     let dataset_action_authorizer =
         from_catalog::<dyn kamu_core::auth::DatasetActionAuthorizer>(ctx).int_err()?;
 
     dataset_action_authorizer
         .check_action_allowed(dataset_handle, kamu_core::auth::DatasetAction::Write)
-        .await?;
+        .await
+        .map_err(|e| match e {
+            DatasetActionUnauthorizedError::Access(_) => GqlError::Gql(
+                async_graphql::Error::new("Dataset access error")
+                    .extend_with(|_, eev| eev.set("alias", dataset_handle.alias.to_string())),
+            ),
+            DatasetActionUnauthorizedError::Internal(e) => GqlError::Internal(e),
+        })?;
 
     Ok(())
-}
-
-#[derive(Debug, Error)]
-pub(crate) enum CheckDatasetAccessError {
-    #[error(transparent)]
-    Access(AccessError),
-
-    #[error(transparent)]
-    Internal(InternalError),
-}
-
-impl From<InternalError> for CheckDatasetAccessError {
-    fn from(value: InternalError) -> Self {
-        Self::Internal(value)
-    }
-}
-
-impl From<kamu_core::auth::DatasetActionUnauthorizedError> for CheckDatasetAccessError {
-    fn from(v: kamu_core::auth::DatasetActionUnauthorizedError) -> Self {
-        match v {
-            kamu_core::auth::DatasetActionUnauthorizedError::Access(e) => Self::Access(e),
-            kamu_core::auth::DatasetActionUnauthorizedError::Internal(e) => Self::Internal(e),
-        }
-    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////

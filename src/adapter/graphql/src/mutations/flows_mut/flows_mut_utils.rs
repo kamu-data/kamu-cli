@@ -20,20 +20,7 @@ pub(crate) async fn ensure_scheduling_permission(
     ctx: &Context<'_>,
     dataset_handle: &odf::DatasetHandle,
 ) -> Result<()> {
-    use kamu_core::auth;
-    let dataset_action_authorizer = from_catalog::<dyn auth::DatasetActionAuthorizer>(ctx).unwrap();
-
-    dataset_action_authorizer
-        .check_action_allowed(dataset_handle, auth::DatasetAction::Write)
-        .await
-        .map_err(|_| {
-            GqlError::Gql(
-                Error::new("Dataset access error")
-                    .extend_with(|_, eev| eev.set("alias", dataset_handle.alias.to_string())),
-            )
-        })?;
-
-    Ok(())
+    utils::check_dataset_write_access(ctx, dataset_handle).await
 }
 
 ///////////////////////////////////////////////////////////////////////////////

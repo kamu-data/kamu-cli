@@ -10,7 +10,6 @@
 use chrono::{DateTime, Utc};
 use event_sourcing::LoadError;
 use internal_error::{ErrorIntoInternal, InternalError};
-use kamu_core::DatasetNotFoundError;
 use opendatafabric::{AccountID, AccountName, DatasetID};
 use tokio_stream::Stream;
 
@@ -98,8 +97,6 @@ pub enum RequestFlowError {
 #[derive(thiserror::Error, Debug)]
 pub enum ListFlowsByDatasetError {
     #[error(transparent)]
-    DatasetNotFound(#[from] DatasetNotFoundError),
-    #[error(transparent)]
     Internal(#[from] InternalError),
 }
 
@@ -111,8 +108,6 @@ pub enum ListSystemFlowsError {
 
 #[derive(thiserror::Error, Debug)]
 pub enum GetLastDatasetFlowError {
-    #[error(transparent)]
-    DatasetNotFound(#[from] DatasetNotFoundError),
     #[error(transparent)]
     Internal(#[from] InternalError),
 }

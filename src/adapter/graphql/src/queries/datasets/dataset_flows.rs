@@ -9,7 +9,7 @@
 
 use opendatafabric as odf;
 
-use super::DatasetFlowConfigs;
+use super::{DatasetFlowConfigs, DatasetFlowRuns};
 use crate::prelude::*;
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -30,7 +30,10 @@ impl DatasetFlows {
         DatasetFlowConfigs::new(self.dataset_handle.clone())
     }
 
-    // TODO: flow queries
+    /// Returns interface for flow runs queries
+    async fn runs(&self) -> DatasetFlowRuns {
+        DatasetFlowRuns::new(self.dataset_handle.clone())
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
