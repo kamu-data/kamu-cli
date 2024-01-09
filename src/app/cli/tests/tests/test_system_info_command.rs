@@ -14,7 +14,7 @@ use kamu_cli::*;
 #[test_log::test(tokio::test)]
 async fn test_system_info() {
     assert_matches!(
-        SystemInfo::collect(),
+        SystemInfo::collect().await,
         SystemInfo {
             build: BuildInfo {
                 app_version: kamu_cli::VERSION,
@@ -32,6 +32,8 @@ async fn test_system_info() {
                 cargo_target_triple: Some(_),
                 cargo_features: Some(_),
                 cargo_opt_level: Some(_),
+                workspace_dir: Some(_),
+                docker_version: _,
             }
         }
     )

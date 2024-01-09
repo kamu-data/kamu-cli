@@ -119,6 +119,12 @@ impl ContainerRuntime {
         Ok(())
     }
 
+    pub fn custom_cmd(&self, command: String) -> Command {
+        let mut cmd = self.new_command();
+        cmd.arg(command);
+        cmd
+    }
+
     pub fn run_cmd(&self, args: RunArgs) -> Command {
         let mut cmd = self.new_command();
         cmd.arg("run");

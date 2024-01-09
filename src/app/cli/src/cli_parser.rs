@@ -1184,6 +1184,15 @@ pub fn cli() -> Command {
                                     .value_name("FMT")
                                     .value_parser(["shell", "json", "yaml"]),
                             ]),
+                        Command::new("diagnose")
+                            .about("Run basic system diagnose check")
+                            .args([
+                                Arg::new("output-format")
+                                    .long("output-format")
+                                    .short('o')
+                                    .value_name("FMT")
+                                    .value_parser(["shell", "json", "yaml"]),
+                            ]),
                         Command::new("ipfs")
                             .about("IPFS helpers")
                             .subcommand_required(true)

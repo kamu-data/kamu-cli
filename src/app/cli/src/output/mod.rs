@@ -8,6 +8,8 @@
 // by the Apache License, Version 2.0.
 
 mod output_config;
+mod output_write;
 pub use output_config::*;
+pub use output_write::*;
 
 pub mod records_writers;
