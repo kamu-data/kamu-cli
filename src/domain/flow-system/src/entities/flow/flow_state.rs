@@ -21,6 +21,8 @@ pub struct FlowState {
     pub flow_id: FlowID,
     /// Flow key
     pub flow_key: FlowKey,
+    /// Primary flow trigger
+    pub primary_trigger: FlowTrigger,
     /// Timing records
     pub timing: FlowTimingRecords,
     /// Associated task IDs
@@ -69,10 +71,11 @@ impl Projection for FlowState {
                     event_time: _,
                     flow_id,
                     flow_key,
-                    trigger: _,
+                    trigger,
                 }) => Ok(Self {
                     flow_id,
                     flow_key,
+                    primary_trigger: trigger,
                     timing: FlowTimingRecords {
                         activate_at: None,
                         running_since: None,

@@ -7,11 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use chrono::{DateTime, Utc};
 use {kamu_flow_system as fs, kamu_task_system as ts};
 
 use crate::prelude::*;
-use crate::queries::Task;
+use crate::queries::{Account, Task};
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -63,31 +62,100 @@ impl Flow {
         }
         Ok(tasks)
     }
-}
 
-///////////////////////////////////////////////////////////////////////////////
-
-#[derive(SimpleObject, Debug, Clone)]
-pub struct FlowTimingRecords {
-    /// Planned activation time (at least, Queued state)
-    activate_at: Option<DateTime<Utc>>,
-
-    /// Recorded start of running (Running state seen at least once)
-    running_since: Option<DateTime<Utc>>,
-
-    /// Recorded time of finish (succesfull or failed after retry) or abortion
-    /// (Finished state seen at least once)
-    finished_at: Option<DateTime<Utc>>,
-}
-
-impl From<fs::FlowTimingRecords> for FlowTimingRecords {
-    fn from(value: fs::FlowTimingRecords) -> Self {
-        Self {
-            activate_at: value.activate_at,
-            running_since: value.running_since,
-            finished_at: value.finished_at,
+    /// A user, who initiated the flow run. None for system-initiated flows
+    async fn initiator(&self) -> Option<Account> {
+        match self.flow_state.primary_trigger.initiator_account_name() {
+            Some(initiator) => Some(Account::from_account_name(initiator.clone().into())),
+            None => None,
         }
+    }
+
+    /// Primary flow trigger
+    async fn primary_trigger(&self) -> FlowTrigger {
+        self.flow_state.primary_trigger.clone().into()
     }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+
+#[derive(Union, Clone, Eq, PartialEq)]
+pub enum FlowTrigger {
+    Manual(FlowTriggerManual),
+    AutoPolling(FlowTriggerAutoPolling),
+    Push(FlowTriggerPush),
+    InputDatasetFlow(FlowTriggerInputDatasetFlow),
+}
+
+impl From<fs::FlowTrigger> for FlowTrigger {
+    fn from(value: fs::FlowTrigger) -> Self {
+        match value {
+            fs::FlowTrigger::Manual(manual) => Self::Manual(manual.into()),
+            fs::FlowTrigger::AutoPolling(auto_polling) => Self::AutoPolling(auto_polling.into()),
+            fs::FlowTrigger::Push(push) => Self::Push(push.into()),
+            fs::FlowTrigger::InputDatasetFlow(input) => Self::InputDatasetFlow(input.into()),
+        }
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject, Clone, PartialEq, Eq)]
+pub struct FlowTriggerManual {
+    pub initiator: Account,
+}
+
+impl From<fs::FlowTriggerManual> for FlowTriggerManual {
+    fn from(value: fs::FlowTriggerManual) -> Self {
+        Self {
+            initiator: Account::from_account_name(value.initiator_account_name),
+        }
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject, Clone, PartialEq, Eq)]
+pub struct FlowTriggerAutoPolling {
+    dummy: bool,
+}
+
+impl From<fs::FlowTriggerAutoPolling> for FlowTriggerAutoPolling {
+    fn from(_: fs::FlowTriggerAutoPolling) -> Self {
+        Self { dummy: true }
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject, Clone, PartialEq, Eq)]
+pub struct FlowTriggerPush {
+    dummy: bool,
+}
+
+impl From<fs::FlowTriggerPush> for FlowTriggerPush {
+    fn from(_: fs::FlowTriggerPush) -> Self {
+        Self { dummy: true }
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject, Clone, PartialEq, Eq)]
+pub struct FlowTriggerInputDatasetFlow {
+    pub dataset_id: DatasetID,
+    pub flow_type: DatasetFlowType,
+    pub flow_id: FlowID,
+}
+
+impl From<fs::FlowTriggerInputDatasetFlow> for FlowTriggerInputDatasetFlow {
+    fn from(value: fs::FlowTriggerInputDatasetFlow) -> Self {
+        Self {
+            dataset_id: value.dataset_id.into(),
+            flow_type: value.flow_type.into(),
+            flow_id: value.flow_id.into(),
+        }
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////

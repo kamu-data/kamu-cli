@@ -261,9 +261,9 @@ impl FlowServiceInMemory {
 
             if let Some(start_condition) = maybe_dependent_start_condition {
                 let trigger = FlowTrigger::InputDatasetFlow(FlowTriggerInputDatasetFlow {
-                    input_dataset_id: dataset_id.clone(),
-                    input_flow_type: flow_type,
-                    input_flow_id: flow_id,
+                    dataset_id: dataset_id.clone(),
+                    flow_type,
+                    flow_id,
                 });
 
                 let flow_key = FlowKeyDataset::new(dependent_dataset_id.clone(), flow_type).into();

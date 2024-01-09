@@ -632,6 +632,14 @@ type Flow {
 	Associated tasks
 	"""
 	tasks: [Task!]!
+	"""
+	A user, who initiated the flow run. None for system-initiated flows
+	"""
+	initiator: Account
+	"""
+	Primary flow trigger
+	"""
+	primaryTrigger: FlowTrigger!
 }
 
 type FlowConfiguration {
@@ -725,6 +733,26 @@ type FlowTimingRecords {
 	(Finished state seen at least once)
 	"""
 	finishedAt: DateTime
+}
+
+union FlowTrigger = FlowTriggerManual | FlowTriggerAutoPolling | FlowTriggerPush | FlowTriggerInputDatasetFlow
+
+type FlowTriggerAutoPolling {
+	dummy: Boolean!
+}
+
+type FlowTriggerInputDatasetFlow {
+	datasetId: DatasetID!
+	flowType: DatasetFlowType!
+	flowId: FlowID!
+}
+
+type FlowTriggerManual {
+	initiator: Account!
+}
+
+type FlowTriggerPush {
+	dummy: Boolean!
 }
 
 
