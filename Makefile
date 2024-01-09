@@ -106,3 +106,7 @@ codegen-graphql:
 
 .PHONY: codegen
 codegen: codegen-odf-serde codegen-engine-tonic codegen-graphql
+
+.PHONY: codegen-graphql-schema
+codegen-graphql-schema:
+	cargo nextest run -p kamu-adapter-graphql update_graphql_schema
