@@ -47,20 +47,9 @@ impl Flow {
         self.flow_state.outcome.map(|o| o.into())
     }
 
-    /// Planned activation time (at least, Queued state)
-    async fn activate_at(&self) -> Option<DateTime<Utc>> {
-        self.flow_state.activate_at
-    }
-
-    /// Recorded start of running (Running state seen at least once)
-    async fn running_since(&self) -> Option<DateTime<Utc>> {
-        self.flow_state.running_since
-    }
-
-    /// Recorded time of finish (succesfull or failed after retry) or abortion
-    /// (Finished state seen at least once)
-    async fn finished_at(&self) -> Option<DateTime<Utc>> {
-        self.flow_state.finished_at
+    /// Timing records associated with the flow lifecycle
+    async fn timing(&self) -> FlowTimingRecords {
+        self.flow_state.timing.into()
     }
 
     /// Associated tasks
@@ -73,6 +62,31 @@ impl Flow {
             tasks.push(Task::new(ts_task));
         }
         Ok(tasks)
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject, Debug, Clone)]
+pub struct FlowTimingRecords {
+    /// Planned activation time (at least, Queued state)
+    activate_at: Option<DateTime<Utc>>,
+
+    /// Recorded start of running (Running state seen at least once)
+    running_since: Option<DateTime<Utc>>,
+
+    /// Recorded time of finish (succesfull or failed after retry) or abortion
+    /// (Finished state seen at least once)
+    finished_at: Option<DateTime<Utc>>,
+}
+
+impl From<fs::FlowTimingRecords> for FlowTimingRecords {
+    fn from(value: fs::FlowTimingRecords) -> Self {
+        Self {
+            activate_at: value.activate_at,
+            running_since: value.running_since,
+            finished_at: value.finished_at,
+        }
     }
 }
 

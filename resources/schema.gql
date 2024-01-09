@@ -625,18 +625,9 @@ type Flow {
 	"""
 	outcome: FlowOutcome
 	"""
-	Planned activation time (at least, Queued state)
+	Timing records associated with the flow lifecycle
 	"""
-	activateAt: DateTime
-	"""
-	Recorded start of running (Running state seen at least once)
-	"""
-	runningSince: DateTime
-	"""
-	Recorded time of finish (succesfull or failed after retry) or abortion
-	(Finished state seen at least once)
-	"""
-	finishedAt: DateTime
+	timing: FlowTimingRecords!
 	"""
 	Associated tasks
 	"""
@@ -718,6 +709,22 @@ enum FlowStatus {
 	SCHEDULED
 	RUNNING
 	FINISHED
+}
+
+type FlowTimingRecords {
+	"""
+	Planned activation time (at least, Queued state)
+	"""
+	activateAt: DateTime
+	"""
+	Recorded start of running (Running state seen at least once)
+	"""
+	runningSince: DateTime
+	"""
+	Recorded time of finish (succesfull or failed after retry) or abortion
+	(Finished state seen at least once)
+	"""
+	finishedAt: DateTime
 }
 
 

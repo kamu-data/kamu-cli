@@ -21,14 +21,20 @@ pub struct FlowState {
     pub flow_id: FlowID,
     /// Flow key
     pub flow_key: FlowKey,
-    /// Activating at time
-    pub activate_at: Option<DateTime<Utc>>,
+    /// Timing records
+    pub timing: FlowTimingRecords,
     /// Associated task IDs
     pub task_ids: Vec<TaskID>,
-    /// Started running at time
-    pub running_since: Option<DateTime<Utc>>,
     /// Flow outcome
     pub outcome: Option<FlowOutcome>,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub struct FlowTimingRecords {
+    /// Activating at time
+    pub activate_at: Option<DateTime<Utc>>,
+    /// Started running at time
+    pub running_since: Option<DateTime<Utc>>,
     /// Finish time (success or cancel/abort)
     pub finished_at: Option<DateTime<Utc>>,
 }
@@ -38,11 +44,11 @@ impl FlowState {
     pub fn status(&self) -> FlowStatus {
         if self.outcome.is_some() {
             FlowStatus::Finished
-        } else if self.running_since.is_some() {
+        } else if self.timing.running_since.is_some() {
             FlowStatus::Running
         } else if !self.task_ids.is_empty() {
             FlowStatus::Scheduled
-        } else if self.activate_at.is_some() {
+        } else if self.timing.activate_at.is_some() {
             FlowStatus::Queued
         } else {
             FlowStatus::Waiting
@@ -67,11 +73,13 @@ impl Projection for FlowState {
                 }) => Ok(Self {
                     flow_id,
                     flow_key,
-                    activate_at: None,
+                    timing: FlowTimingRecords {
+                        activate_at: None,
+                        running_since: None,
+                        finished_at: None,
+                    },
                     task_ids: vec![],
-                    running_since: None,
                     outcome: None,
-                    finished_at: None,
                 }),
                 _ => Err(ProjectionError::new(None, event)),
             },
@@ -100,7 +108,10 @@ impl Projection for FlowState {
                             Err(ProjectionError::new(Some(s), event))
                         } else {
                             Ok(FlowState {
-                                activate_at: Some(*activate_at),
+                                timing: FlowTimingRecords {
+                                    activate_at: Some(*activate_at),
+                                    ..s.timing
+                                },
                                 ..s
                             })
                         }
@@ -121,7 +132,7 @@ impl Projection for FlowState {
                         flow_id: _,
                         task_id,
                     }) => {
-                        if s.outcome.is_some() || s.activate_at.is_none() {
+                        if s.outcome.is_some() || s.timing.activate_at.is_none() {
                             Err(ProjectionError::new(Some(s), event))
                         } else {
                             let mut task_ids = s.task_ids.clone();
@@ -136,13 +147,16 @@ impl Projection for FlowState {
                         task_id,
                     }) => {
                         if s.outcome.is_some()
-                            || s.activate_at.is_none()
+                            || s.timing.activate_at.is_none()
                             || !s.task_ids.contains(task_id)
                         {
                             Err(ProjectionError::new(Some(s), event))
                         } else {
                             Ok(FlowState {
-                                running_since: Some(*event_time),
+                                timing: FlowTimingRecords {
+                                    running_since: Some(*event_time),
+                                    ..s.timing
+                                },
                                 ..s
                             })
                         }
@@ -153,7 +167,7 @@ impl Projection for FlowState {
                         task_id,
                         task_outcome,
                     }) => {
-                        if !s.task_ids.contains(task_id) || s.running_since.is_none() {
+                        if !s.task_ids.contains(task_id) || s.timing.running_since.is_none() {
                             Err(ProjectionError::new(Some(s), event))
                         } else if s.outcome.is_some() {
                             // Ignore for idempotence motivation
@@ -162,12 +176,18 @@ impl Projection for FlowState {
                             match task_outcome {
                                 TaskOutcome::Success => Ok(FlowState {
                                     outcome: Some(FlowOutcome::Success),
-                                    finished_at: Some(event_time.clone()),
+                                    timing: FlowTimingRecords {
+                                        finished_at: Some(*event_time),
+                                        ..s.timing
+                                    },
                                     ..s
                                 }),
                                 TaskOutcome::Cancelled => Ok(FlowState {
                                     outcome: Some(FlowOutcome::Cancelled),
-                                    finished_at: Some(event_time.clone()),
+                                    timing: FlowTimingRecords {
+                                        finished_at: Some(*event_time),
+                                        ..s.timing
+                                    },
                                     ..s
                                 }),
                                 // TODO: support retries
@@ -192,7 +212,10 @@ impl Projection for FlowState {
                         } else {
                             Ok(FlowState {
                                 outcome: Some(FlowOutcome::Aborted),
-                                finished_at: Some(event_time.clone()),
+                                timing: FlowTimingRecords {
+                                    finished_at: Some(*event_time),
+                                    ..s.timing
+                                },
                                 ..s
                             })
                         }
