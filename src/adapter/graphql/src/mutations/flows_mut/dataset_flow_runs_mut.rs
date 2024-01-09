@@ -50,6 +50,9 @@ impl DatasetFlowRunsMut {
 
         ensure_scheduling_permission(ctx, &self.dataset_handle).await?;
 
+        // TODO: for some datasets launching manually might not be an option:
+        //   i.e., root datasets with push sources require input data to arrive
+
         let flow_service = from_catalog::<dyn fs::FlowService>(ctx).unwrap();
         let logged_account = utils::get_logged_account(ctx);
 

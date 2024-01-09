@@ -613,9 +613,9 @@ type Flow {
 	"""
 	flowId: FlowID!
 	"""
-	Key of the flow
+	Description of key flow parameters
 	"""
-	flowKey: FlowKey!
+	description: FlowDescription!
 	"""
 	Status of the flow
 	"""
@@ -675,6 +675,44 @@ type FlowConnection {
 	edges: [FlowEdge!]!
 }
 
+union FlowDescription = FlowDescriptionDataset | FlowDescriptionSystem
+
+type FlowDescriptionCompaction {
+	originalBlocksCount: Int!
+	resultingBlocksCount: Int
+}
+
+type FlowDescriptionDataset {
+	datasetId: DatasetID!
+	details: FlowDescriptionDatasetDetails!
+}
+
+union FlowDescriptionDatasetDetails = FlowDescriptionPollingIngest | FlowDescriptionPushIngest | FlowDescriptionExecuteQuery | FlowDescriptionCompaction
+
+type FlowDescriptionExecuteQuery {
+	recordsCountByInput: [FlowDescriptionExecuteQueryInput!]!
+	transformedRecordsCount: Int
+}
+
+type FlowDescriptionExecuteQueryInput {
+	datasetId: DatasetID!
+	numRecords: Int!
+}
+
+type FlowDescriptionPollingIngest {
+	ingestedRecordsCount: Int
+}
+
+type FlowDescriptionPushIngest {
+	sourceName: String
+	inputRecordsCount: Int!
+	ingestedRecordsCount: Int
+}
+
+type FlowDescriptionSystem {
+	flowType: SystemFlowType!
+}
+
 type FlowEdge {
 	node: Flow!
 }
@@ -685,17 +723,6 @@ type FlowIncompatibleDatasetKind implements SetFlowConfigResult & TriggerFlowRes
 	expectedDatasetKind: DatasetKind!
 	actualDatasetKind: DatasetKind!
 	message: String!
-}
-
-union FlowKey = FlowKeyDataset | FlowKeySystem
-
-type FlowKeyDataset {
-	datasetId: DatasetID!
-	flowType: DatasetFlowType!
-}
-
-type FlowKeySystem {
-	flowType: SystemFlowType!
 }
 
 type FlowNotFound implements CancelScheduledTasksResult {

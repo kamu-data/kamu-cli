@@ -29,6 +29,14 @@ impl FlowTrigger {
             None
         }
     }
+
+    pub fn push_source_name(&self) -> Option<String> {
+        if let FlowTrigger::Push(trigger_push) = self {
+            trigger_push.source_name.to_owned()
+        } else {
+            panic!("Any trigger kind except Push unexpected")
+        }
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -49,6 +57,7 @@ pub struct FlowTriggerAutoPolling {}
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FlowTriggerPush {
     // TODO: source (HTTP, MQTT, CMD, ...)
+    source_name: Option<String>,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

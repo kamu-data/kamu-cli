@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use kamu_core::PollingIngestService;
 use {kamu_flow_system as fs, kamu_task_system as ts};
 
 use crate::prelude::*;
@@ -31,9 +32,69 @@ impl Flow {
         self.flow_state.flow_id.into()
     }
 
-    /// Key of the flow
-    async fn flow_key(&self) -> FlowKey {
-        self.flow_state.flow_key.clone().into()
+    /// Description of key flow parameters
+    async fn description(&self, ctx: &Context<'_>) -> Result<FlowDescription> {
+        Ok(match &self.flow_state.flow_key {
+            fs::FlowKey::Dataset(fk_dataset) => {
+                FlowDescription::Dataset(self.dataset_flow_description(ctx, &fk_dataset).await?)
+            }
+            fs::FlowKey::System(fk_systen) => {
+                FlowDescription::System(self.system_flow_description(&fk_systen))
+            }
+        })
+    }
+
+    #[graphql(skip)]
+    async fn dataset_flow_description(
+        &self,
+        ctx: &Context<'_>,
+        dataset_key: &fs::FlowKeyDataset,
+    ) -> Result<FlowDescriptionDataset> {
+        Ok(FlowDescriptionDataset {
+            dataset_id: dataset_key.dataset_id.clone().into(),
+            details: match dataset_key.flow_type {
+                fs::DatasetFlowType::Ingest => {
+                    let polling_ingest_svc = from_catalog::<dyn PollingIngestService>(ctx).unwrap();
+
+                    let maybe_polling_source = polling_ingest_svc
+                        .get_active_polling_source(&dataset_key.dataset_id.as_local_ref())
+                        .await
+                        .int_err()?;
+
+                    if maybe_polling_source.is_some() {
+                        FlowDescriptionDatasetDetails::PollingIngest(FlowDescriptionPollingIngest {
+                            ingested_records_count: None, // TODO
+                        })
+                    } else {
+                        let source_name = self.flow_state.primary_trigger.push_source_name();
+                        FlowDescriptionDatasetDetails::PushIngest(FlowDescriptionPushIngest {
+                            source_name,
+                            input_records_count: 0,       // TODO
+                            ingested_records_count: None, // TODO
+                        })
+                    }
+                }
+                fs::DatasetFlowType::ExecuteQuery => {
+                    FlowDescriptionDatasetDetails::ExecuteQuery(FlowDescriptionExecuteQuery {
+                        records_count_by_input: vec![],  // TODO
+                        transformed_records_count: None, // TODO
+                    })
+                }
+                fs::DatasetFlowType::Compaction => {
+                    FlowDescriptionDatasetDetails::Compaction(FlowDescriptionCompaction {
+                        original_blocks_count: 0,     // TODO
+                        resulting_blocks_count: None, // TODO
+                    })
+                }
+            },
+        })
+    }
+
+    #[graphql(skip)]
+    fn system_flow_description(&self, system_key: &fs::FlowKeySystem) -> FlowDescriptionSystem {
+        FlowDescriptionSystem {
+            flow_type: system_key.flow_type.into(),
+        }
     }
 
     /// Status of the flow
@@ -80,6 +141,63 @@ impl Flow {
     async fn start_condition(&self) -> Option<FlowStartCondition> {
         self.flow_state.start_condition.map(|sc| sc.into())
     }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+#[derive(Union, Clone, Eq, PartialEq)]
+pub enum FlowDescription {
+    Dataset(FlowDescriptionDataset),
+    System(FlowDescriptionSystem),
+}
+
+#[derive(SimpleObject, Clone, PartialEq, Eq)]
+pub struct FlowDescriptionSystem {
+    flow_type: SystemFlowType,
+}
+
+#[derive(SimpleObject, Clone, PartialEq, Eq)]
+pub struct FlowDescriptionDataset {
+    dataset_id: DatasetID,
+    details: FlowDescriptionDatasetDetails,
+}
+
+#[derive(Union, Clone, Eq, PartialEq)]
+pub enum FlowDescriptionDatasetDetails {
+    PollingIngest(FlowDescriptionPollingIngest),
+    PushIngest(FlowDescriptionPushIngest),
+    ExecuteQuery(FlowDescriptionExecuteQuery),
+    Compaction(FlowDescriptionCompaction),
+}
+
+#[derive(SimpleObject, Clone, PartialEq, Eq)]
+pub struct FlowDescriptionPollingIngest {
+    ingested_records_count: Option<u64>,
+}
+
+#[derive(SimpleObject, Clone, PartialEq, Eq)]
+pub struct FlowDescriptionPushIngest {
+    source_name: Option<String>,
+    input_records_count: u64,
+    ingested_records_count: Option<u64>,
+}
+
+#[derive(SimpleObject, Clone, PartialEq, Eq)]
+pub struct FlowDescriptionExecuteQuery {
+    records_count_by_input: Vec<FlowDescriptionExecuteQueryInput>,
+    transformed_records_count: Option<u64>,
+}
+
+#[derive(SimpleObject, Clone, PartialEq, Eq)]
+pub struct FlowDescriptionExecuteQueryInput {
+    dataset_id: DatasetID,
+    num_records: u64,
+}
+
+#[derive(SimpleObject, Clone, PartialEq, Eq)]
+pub struct FlowDescriptionCompaction {
+    original_blocks_count: u64,
+    resulting_blocks_count: Option<u64>,
 }
 
 ///////////////////////////////////////////////////////////////////////////////
