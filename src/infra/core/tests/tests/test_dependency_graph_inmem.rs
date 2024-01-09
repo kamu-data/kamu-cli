@@ -23,6 +23,7 @@ use kamu::{
 use kamu_core::{
     auth,
     CurrentAccountSubject,
+    DatasetDependencies,
     DatasetRepository,
     DependencyGraphRepository,
     DependencyGraphService,
@@ -364,22 +365,30 @@ impl DependencyGraphHarness {
             .unwrap();
 
         let mut res = Vec::new();
-        for (downstream_id, upstream_id) in dependencies {
+        for dataset_dependencies in dependencies {
+            let DatasetDependencies {
+                downstream_dataset_id,
+                upstream_dataset_ids,
+            } = dataset_dependencies;
+
             let downstream_hdl = self
                 .dataset_repo
-                .resolve_dataset_ref(&downstream_id.as_local_ref())
-                .await
-                .unwrap();
-            let upstream_hdl = self
-                .dataset_repo
-                .resolve_dataset_ref(&upstream_id.as_local_ref())
+                .resolve_dataset_ref(&downstream_dataset_id.as_local_ref())
                 .await
                 .unwrap();
 
-            res.push((
-                format!("{}", upstream_hdl.alias),
-                format!("{}", downstream_hdl.alias),
-            ));
+            for upstream_dataset_id in upstream_dataset_ids {
+                let upstream_hdl = self
+                    .dataset_repo
+                    .resolve_dataset_ref(&upstream_dataset_id.as_local_ref())
+                    .await
+                    .unwrap();
+
+                res.push((
+                    format!("{}", upstream_hdl.alias),
+                    format!("{}", downstream_hdl.alias),
+                ));
+            }
         }
 
         res.sort();

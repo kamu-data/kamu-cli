@@ -22,7 +22,12 @@ pub trait DependencyGraphRepository: Sync + Send {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+pub struct DatasetDependencies {
+    pub downstream_dataset_id: DatasetID,
+    pub upstream_dataset_ids: Vec<DatasetID>,
+}
+
 pub type DatasetDependenciesIDStream<'a> =
-    Pin<Box<dyn Stream<Item = Result<(DatasetID, DatasetID), InternalError>> + Send + 'a>>;
+    Pin<Box<dyn Stream<Item = Result<DatasetDependencies, InternalError>> + Send + 'a>>;
 
 /////////////////////////////////////////////////////////////////////////////////////////

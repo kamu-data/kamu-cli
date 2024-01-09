@@ -32,6 +32,7 @@ impl DependencyGraphRepository for DependencyGraphRepositoryInMemory {
 
         Box::pin(async_stream::try_stream! {
             let mut datasets_stream = self.dataset_repo.get_all_datasets();
+
             while let Some(Ok(dataset_handle)) = datasets_stream.next().await {
                 let dataset_span = tracing::debug_span!("Scanning dataset dependencies", dataset=%dataset_handle);
                 let _ = dataset_span.enter();
@@ -44,13 +45,17 @@ impl DependencyGraphRepository for DependencyGraphRepositoryInMemory {
                     .get_summary(GetSummaryOpts::default())
                     .await
                     .int_err()?;
+                let transform_input_ids: Vec<_> = summary
+                    .dependencies
+                    .into_iter()
+                    .filter_map(|transform_input| transform_input.id)
+                    .collect();
+                let dataset_dependencies = DatasetDependencies {
+                    downstream_dataset_id: dataset_handle.id.clone(),
+                    upstream_dataset_ids: transform_input_ids,
+                };
 
-                for transform_input in summary.dependencies {
-                    if let Some(input_id) = transform_input.id {
-                        yield (dataset_handle.id.clone(), input_id);
-                    }
-                }
-
+                yield dataset_dependencies;
             }
         })
     }
