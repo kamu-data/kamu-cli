@@ -112,9 +112,32 @@ cargo nextest run -p opendatafabric
 
 
 ### Build Speed Tweaks (Optional)
+
+#### Building
+
+Given the native nature of Rust, we often have to rebuild very similar source code revisions (e.g. switching between git branches).
+
+This is where [sccache](https://github.com/mozilla/sccache#installation) can help us save the compilation cache and our time (dramatically). 
+After installing in a way that is convenient for you, configure as follows (`$CARGO_HOME/config.toml`):
+
+```toml
+[build]
+rustc-wrapper = "/path/to/sccache"
+```
+
+Alternatively you can use the environment variable `RUSTC_WRAPPER`:
+
+```shell
+export RUSTC_WRAPPER=/path/to/sccache # for your convenience, save it to your $SHELL configuration file (e.g. `.bashrc`, `.zshrc, etc)
+cargo build
+```
+
+
+#### Linking
+
 Consider configuring Rust to use `lld` linker, which is much faster than the default `ld` (may improve link times by ~10-20x).
 
-To do so install `lld`, then create `~/.cargo/config.toml` file with the following contents:
+To do so install `lld`, then update `$CARGO_HOME/config.toml` file with the following contents:
 
 ```toml
 [build]
@@ -123,7 +146,7 @@ rustflags = ["-C", "link-arg=-fuse-ld=lld"]
 
 One more alternative is to use `mold` linker, which is also much faster than the default `ld`.
 
-To do so install `mold` or build it with `clang++` compiler from [mold sources](https://github.com/rui314/mold#how-to-build) then create `~/.cargo/config.toml` file with the following contents:
+To do so install `mold` or build it with `clang++` compiler from [mold sources](https://github.com/rui314/mold#how-to-build) then update `$CARGO_HOME/config.toml` file with the following contents:
 
 ```toml
 [build]
