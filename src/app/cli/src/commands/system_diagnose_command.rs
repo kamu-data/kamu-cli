@@ -85,18 +85,22 @@ impl RunCheck {
 
         let workspace_layout = WorkspaceService::find_workspace();
         let current_workspace = WorkspaceService::new(Arc::new(workspace_layout.clone()));
-        let container_info = container_runtime
+
+        let is_rootless = match container_runtime
             .custom_cmd(r"info".to_string())
             .output()
             .await
-            .unwrap();
+        {
+            Ok(container_info) => String::from_utf8(container_info.stdout)
+                .unwrap()
+                .contains("rootless: true"),
+            Err(_) => false,
+        };
 
         Self {
             container_runtime_type: container_runtime.config.runtime,
             is_installed: !is_container_command_err,
-            is_rootless: String::from_utf8(container_info.stdout)
-                .unwrap()
-                .contains("rootless: true"),
+            is_rootless,
             workspace_dir: workspace_layout.root_dir.to_str().map(String::from),
             is_workspace_consitence: current_workspace.is_in_workspace()
                 && current_workspace.is_upgrade_needed().unwrap_or(false),

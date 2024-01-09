@@ -118,17 +118,20 @@ pub struct BuildInfo {
     pub cargo_features: Option<&'static str>,
     pub cargo_opt_level: Option<&'static str>,
     pub workspace_dir: Option<String>,
-    pub docker_version: String,
+    pub container_version: String,
 }
 
 impl BuildInfo {
     pub async fn collect() -> Self {
         let container_runtime = ContainerRuntime::default();
-        let container_version_output = container_runtime
+        let container_version_output = match container_runtime
             .custom_cmd("--version".to_string())
             .output()
             .await
-            .unwrap();
+        {
+            Ok(container_info) => String::from_utf8(container_info.stdout).unwrap(),
+            Err(_) => "".to_string(),
+        };
 
         Self {
             app_version: env!("CARGO_PKG_VERSION"),
@@ -148,7 +151,7 @@ impl BuildInfo {
                 .root_dir
                 .to_str()
                 .map(String::from),
-            docker_version: String::from_utf8(container_version_output.stdout).unwrap(),
+            container_version: container_version_output,
         }
     }
 }

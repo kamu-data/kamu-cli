@@ -33,7 +33,7 @@ async fn test_system_info() {
                 cargo_features: Some(_),
                 cargo_opt_level: Some(_),
                 workspace_dir: Some(_),
-                docker_version: _,
+                container_version: _,
             }
         }
     )
