@@ -436,13 +436,13 @@ fn configure_logging(output_config: &OutputConfig, workspace_layout: &WorkspaceL
         eprintln!(
             "\n{}",
             console::style(
-                "Oh no, looks like kamu has crashed!\n\
-                Please follow the next install intructions https://docs.kamu.dev/cli/get-started/installation/. \n\
-                Also, please, run `kamu system diagnose` to check does your environment match the requirements. \n\
-                Please help us by reporting this problem at \
-                https://github.com/kamu-data/kamu-cli/issues \n\
-                with detailed info of error and result of `kamu system info` command."
-            ).bold()
+                "Oh no, looks like kamu has crashed!\n
+                Please try running `kamu system \
+                 diagnose` to verify your environment. \n
+                If the issue persists, help \
+                 us by reporting this problem at https://github.com/kamu-data/kamu-cli/issues"
+            )
+            .bold()
         );
     });
 

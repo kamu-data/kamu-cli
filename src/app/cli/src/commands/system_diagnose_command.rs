@@ -7,103 +7,191 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::fs::File;
+use std::io::{Stdout, Write};
+use std::path::Path;
 use std::sync::Arc;
 
-use container_runtime::{ContainerRuntime, ContainerRuntimeType};
+use console::style;
+use container_runtime::ContainerRuntime;
+use futures::TryStreamExt;
+use kamu::domain::{DatasetRepository, VerificationOptions, VerificationService};
 
 use super::{CLIError, Command};
-use crate::output::*;
-use crate::WorkspaceService;
+
+pub const DUMMY_IMAGE: &str = "docker.io/busybox:latest";
 
 pub struct SystemDiagnoseCommand {
-    output_config: Arc<OutputConfig>,
-    output_format: Option<String>,
+    dataset_repo: Arc<dyn DatasetRepository>,
+    verification_svc: Arc<dyn VerificationService>,
 }
 
 impl SystemDiagnoseCommand {
-    pub fn new<S>(output_config: Arc<OutputConfig>, output_format: Option<S>) -> Self
-    where
-        S: Into<String>,
-    {
+    pub fn new(
+        dataset_repo: Arc<dyn DatasetRepository>,
+        verification_svc: Arc<dyn VerificationService>,
+    ) -> Self {
         Self {
-            output_config,
-            output_format: output_format.map(|s| s.into()),
+            dataset_repo,
+            verification_svc,
         }
     }
 }
 
 #[async_trait::async_trait(?Send)]
 impl Command for SystemDiagnoseCommand {
-    fn needs_workspace(&self) -> bool {
-        false
-    }
-
     async fn run(&mut self) -> Result<(), CLIError> {
-        write_output(
-            SystemDiagnose::check().await,
-            &self.output_config,
-            self.output_format.as_ref(),
-        )?;
+        SystemDiagnose::check(self.dataset_repo.clone(), self.verification_svc.clone()).await?;
         Ok(())
     }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, serde::Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SystemDiagnose {
-    pub run_check: RunCheck,
-}
+pub struct SystemDiagnose {}
 
 impl SystemDiagnose {
-    pub async fn check() -> Self {
-        Self {
-            run_check: RunCheck::collect().await,
-        }
+    pub async fn check(
+        dataset_repo: Arc<dyn DatasetRepository>,
+        verification_svc: Arc<dyn VerificationService>,
+    ) -> Result<(), CLIError> {
+        let diagnose_check = RunCheck::new();
+        diagnose_check.run(dataset_repo, verification_svc).await
     }
 }
 
-#[derive(Debug, serde::Serialize)]
-#[serde(rename_all = "camelCase")]
 pub struct RunCheck {
-    pub container_runtime_type: ContainerRuntimeType,
-    pub is_installed: bool,
-    pub is_rootless: bool,
-    pub workspace_dir: Option<String>,
-    pub is_workspace_consitence: bool,
+    container_runtime: ContainerRuntime,
 }
 
 impl RunCheck {
-    pub async fn collect() -> Self {
-        let container_runtime = ContainerRuntime::default();
-        let is_container_command_err = container_runtime
+    fn new() -> Self {
+        Self {
+            container_runtime: ContainerRuntime::default(),
+        }
+    }
+
+    async fn run_container_check(&self, f: &mut Stdout) -> Result<(), CLIError> {
+        write!(f, "container installed... ")?;
+
+        let is_container_installed = match self
+            .container_runtime
             .custom_cmd("--version".to_string())
             .output()
             .await
-            .is_err();
-
-        let workspace_layout = WorkspaceService::find_workspace();
-        let current_workspace = WorkspaceService::new(Arc::new(workspace_layout.clone()));
-
-        let is_rootless = match container_runtime
-            .custom_cmd(r"info".to_string())
-            .output()
-            .await
         {
-            Ok(container_info) => String::from_utf8(container_info.stdout)
-                .unwrap()
-                .contains("rootless: true"),
-            Err(_) => false,
+            Ok(_) => style("ok").green(),
+            Err(_) => style("failed").red(),
         };
 
-        Self {
-            container_runtime_type: container_runtime.config.runtime,
-            is_installed: !is_container_command_err,
-            is_rootless,
-            workspace_dir: workspace_layout.root_dir.to_str().map(String::from),
-            is_workspace_consitence: current_workspace.is_in_workspace()
-                && current_workspace.is_upgrade_needed().unwrap_or(false),
+        write!(f, "{is_container_installed}")?;
+        Ok(())
+    }
+
+    async fn run_container_pull_check(&self, f: &mut Stdout) -> Result<(), CLIError> {
+        write!(f, "\ncontainer can pull images... ")?;
+
+        let is_container_image_pulled =
+            match self.container_runtime.pull_image(DUMMY_IMAGE, None).await {
+                Ok(_) => style("ok").green(),
+                Err(_) => style("failed").red(),
+            };
+
+        write!(f, "{is_container_image_pulled}")?;
+        Ok(())
+    }
+
+    async fn run_container_rootless_check(&self, f: &mut Stdout) -> Result<(), CLIError> {
+        write!(f, "\ncontainer rootless check... ")?;
+
+        let is_container_rootless = match self
+            .container_runtime
+            .run_attached(DUMMY_IMAGE)
+            .init(true)
+            .spawn()
+            .unwrap()
+            .wait()
+            .await
+        {
+            Ok(_) => style("ok").green(),
+            Err(_) => style("failed").red(),
+        };
+
+        write!(f, "{is_container_rootless}")?;
+        Ok(())
+    }
+
+    async fn run_container_volume_mount_check(&self, f: &mut Stdout) -> Result<(), CLIError> {
+        write!(f, "\ncontainer volume mounts work... ")?;
+        let temp_dir = tempfile::tempdir()?;
+        let cwd = Path::new(".").canonicalize()?;
+
+        let file_path = temp_dir.path().join("tmp.txt");
+        let _ = File::create(file_path)?;
+
+        let is_container_rootless = match self
+            .container_runtime
+            .run_attached(DUMMY_IMAGE)
+            .volume((cwd, temp_dir.into_path()))
+            .init(true)
+            .spawn()
+            .unwrap()
+            .wait()
+            .await
+        {
+            Ok(_) => style("ok").green(),
+            Err(_) => style("failed").red(),
+        };
+
+        write!(f, "{is_container_rootless}")?;
+        Ok(())
+    }
+
+    async fn run_workspace_consistency_check(
+        &self,
+        dataset_repo: Arc<dyn DatasetRepository>,
+        verification_svc: Arc<dyn VerificationService>,
+        f: &mut Stdout,
+    ) -> Result<(), CLIError> {
+        write!(f, "\nworkspace consistent... ")?;
+        let datasets: Vec<_> = dataset_repo.get_all_datasets().try_collect().await?;
+
+        let verify_options = VerificationOptions {
+            check_integrity: true,
+            replay_transformations: false,
+        };
+        for dataset in datasets {
+            if let Err(_) = verification_svc
+                .verify(
+                    &dataset.as_local_ref(),
+                    (None, None),
+                    verify_options.clone(),
+                    None,
+                )
+                .await
+            {
+                write!(f, "{}", style("failed").red())?;
+                return Ok(());
+            };
         }
+        write!(f, "{}", style("ok").green())?;
+
+        Ok(())
+    }
+
+    pub async fn run(
+        &self,
+        dataset_repo: Arc<dyn DatasetRepository>,
+        verification_svc: Arc<dyn VerificationService>,
+    ) -> Result<(), CLIError> {
+        let mut out = std::io::stdout();
+
+        self.run_container_check(&mut out).await?;
+        self.run_container_pull_check(&mut out).await?;
+        self.run_container_rootless_check(&mut out).await?;
+        self.run_container_volume_mount_check(&mut out).await?;
+        self.run_workspace_consistency_check(dataset_repo, verification_svc, &mut out)
+            .await?;
+        Ok(())
     }
 }

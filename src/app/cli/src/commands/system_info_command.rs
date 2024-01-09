@@ -77,7 +77,7 @@ impl Command for VersionCommand {
 
     async fn run(&mut self) -> Result<(), CLIError> {
         write_output(
-            BuildInfo::collect().await,
+            BuildInfo::collect(),
             &self.output_config,
             self.output_format.as_ref(),
         )?;
@@ -91,12 +91,14 @@ impl Command for VersionCommand {
 #[serde(rename_all = "camelCase")]
 pub struct SystemInfo {
     pub build: BuildInfo,
+    pub additional: AdditionalInfo,
 }
 
 impl SystemInfo {
     pub async fn collect() -> Self {
         Self {
-            build: BuildInfo::collect().await,
+            build: BuildInfo::collect(),
+            additional: AdditionalInfo::collect().await,
         }
     }
 }
@@ -118,21 +120,10 @@ pub struct BuildInfo {
     pub cargo_features: Option<&'static str>,
     pub cargo_opt_level: Option<&'static str>,
     pub workspace_dir: Option<String>,
-    pub container_version: String,
 }
 
 impl BuildInfo {
-    pub async fn collect() -> Self {
-        let container_runtime = ContainerRuntime::default();
-        let container_version_output = match container_runtime
-            .custom_cmd("--version".to_string())
-            .output()
-            .await
-        {
-            Ok(container_info) => String::from_utf8(container_info.stdout).unwrap(),
-            Err(_) => "".to_string(),
-        };
-
+    pub fn collect() -> Self {
         Self {
             app_version: env!("CARGO_PKG_VERSION"),
             build_timestamp: option_env!("VERGEN_BUILD_TIMESTAMP"),
@@ -151,6 +142,29 @@ impl BuildInfo {
                 .root_dir
                 .to_str()
                 .map(String::from),
+        }
+    }
+}
+
+#[derive(Debug, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AdditionalInfo {
+    pub container_version: String,
+}
+
+impl AdditionalInfo {
+    pub async fn collect() -> Self {
+        let container_runtime = ContainerRuntime::default();
+        let container_version_output = match container_runtime
+            .custom_cmd("--version".to_string())
+            .output()
+            .await
+        {
+            Ok(container_info) => String::from_utf8(container_info.stdout).unwrap(),
+            Err(_) => "".to_string(),
+        };
+
+        Self {
             container_version: container_version_output,
         }
     }

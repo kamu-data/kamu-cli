@@ -467,9 +467,9 @@ pub fn get_command(
                 cli_catalog.get_one()?,
                 info_matches.get_one("output-format").map(String::as_str),
             )),
-            Some(("diagnose", info_matches)) => Box::new(SystemDiagnoseCommand::new(
+            Some(("diagnose", _)) => Box::new(SystemDiagnoseCommand::new(
                 cli_catalog.get_one()?,
-                info_matches.get_one("output-format").map(String::as_str),
+                cli_catalog.get_one()?,
             )),
             Some(("ipfs", ipfs_matches)) => match ipfs_matches.subcommand() {
                 Some(("add", add_matches)) => Box::new(SystemIpfsAddCommand::new(
