@@ -75,6 +75,11 @@ impl Flow {
     async fn primary_trigger(&self) -> FlowTrigger {
         self.flow_state.primary_trigger.clone().into()
     }
+
+    /// Start condition
+    async fn start_condition(&self) -> Option<FlowStartCondition> {
+        self.flow_state.start_condition.map(|sc| sc.into())
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -98,8 +103,6 @@ impl From<fs::FlowTrigger> for FlowTrigger {
     }
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////
-
 #[derive(SimpleObject, Clone, PartialEq, Eq)]
 pub struct FlowTriggerManual {
     pub initiator: Account,
@@ -113,8 +116,6 @@ impl From<fs::FlowTriggerManual> for FlowTriggerManual {
     }
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////
-
 #[derive(SimpleObject, Clone, PartialEq, Eq)]
 pub struct FlowTriggerAutoPolling {
     dummy: bool,
@@ -126,8 +127,6 @@ impl From<fs::FlowTriggerAutoPolling> for FlowTriggerAutoPolling {
     }
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////
-
 #[derive(SimpleObject, Clone, PartialEq, Eq)]
 pub struct FlowTriggerPush {
     dummy: bool,
@@ -138,8 +137,6 @@ impl From<fs::FlowTriggerPush> for FlowTriggerPush {
         Self { dummy: true }
     }
 }
-
-/////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(SimpleObject, Clone, PartialEq, Eq)]
 pub struct FlowTriggerInputDatasetFlow {
@@ -159,3 +156,46 @@ impl From<fs::FlowTriggerInputDatasetFlow> for FlowTriggerInputDatasetFlow {
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Union, Clone, Eq, PartialEq)]
+pub enum FlowStartCondition {
+    Throttling(FlowStartConditionThrottling),
+    Batching(FlowStartConditionBatching),
+}
+
+impl From<fs::FlowStartCondition> for FlowStartCondition {
+    fn from(value: fs::FlowStartCondition) -> Self {
+        match value {
+            fs::FlowStartCondition::Throttling(t) => Self::Throttling(t.into()),
+            fs::FlowStartCondition::Batching(b) => Self::Batching(b.into()),
+        }
+    }
+}
+
+#[derive(SimpleObject, Clone, PartialEq, Eq)]
+pub struct FlowStartConditionThrottling {
+    pub interval_sec: i64,
+}
+
+impl From<fs::FlowStartConditionThrottling> for FlowStartConditionThrottling {
+    fn from(value: fs::FlowStartConditionThrottling) -> Self {
+        Self {
+            interval_sec: value.interval.num_seconds(),
+        }
+    }
+}
+
+#[derive(SimpleObject, Clone, PartialEq, Eq)]
+pub struct FlowStartConditionBatching {
+    pub threshold_new_records: usize,
+}
+
+impl From<fs::FlowStartConditionBatching> for FlowStartConditionBatching {
+    fn from(value: fs::FlowStartConditionBatching) -> Self {
+        Self {
+            threshold_new_records: value.threshold_new_records,
+        }
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////

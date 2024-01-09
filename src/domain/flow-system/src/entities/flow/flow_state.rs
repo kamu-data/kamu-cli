@@ -23,6 +23,8 @@ pub struct FlowState {
     pub flow_key: FlowKey,
     /// Primary flow trigger
     pub primary_trigger: FlowTrigger,
+    /// Start condition (if defined)
+    pub start_condition: Option<FlowStartCondition>,
     /// Timing records
     pub timing: FlowTimingRecords,
     /// Associated task IDs
@@ -76,6 +78,7 @@ impl Projection for FlowState {
                     flow_id,
                     flow_key,
                     primary_trigger: trigger,
+                    start_condition: None,
                     timing: FlowTimingRecords {
                         activate_at: None,
                         running_since: None,
@@ -94,12 +97,15 @@ impl Projection for FlowState {
                     E::StartConditionDefined(FlowEventStartConditionDefined {
                         event_time: _,
                         flow_id: _,
-                        start_condition: _,
+                        start_condition,
                     }) => {
                         if s.outcome.is_some() || !s.task_ids.is_empty() {
                             Err(ProjectionError::new(Some(s), event))
                         } else {
-                            Ok(s)
+                            Ok(FlowState {
+                                start_condition: Some(*start_condition),
+                                ..s
+                            })
                         }
                     }
                     E::Queued(FlowEventQueued {

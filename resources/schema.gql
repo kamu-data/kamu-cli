@@ -640,6 +640,10 @@ type Flow {
 	Primary flow trigger
 	"""
 	primaryTrigger: FlowTrigger!
+	"""
+	Start condition
+	"""
+	startCondition: FlowStartCondition
 }
 
 type FlowConfiguration {
@@ -709,6 +713,16 @@ enum FlowOutcome {
 	FAILED
 	CANCELLED
 	ABORTED
+}
+
+union FlowStartCondition = FlowStartConditionThrottling | FlowStartConditionBatching
+
+type FlowStartConditionBatching {
+	thresholdNewRecords: Int!
+}
+
+type FlowStartConditionThrottling {
+	intervalSec: Int!
 }
 
 enum FlowStatus {
