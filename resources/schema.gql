@@ -28,6 +28,10 @@ type Account {
 	Avatar URL
 	"""
 	avatarUrl: String
+	"""
+	Indicates the administrator status
+	"""
+	isAdmin: Boolean!
 }
 
 scalar AccountDisplayName

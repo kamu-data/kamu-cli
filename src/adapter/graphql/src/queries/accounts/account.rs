@@ -146,6 +146,16 @@ impl Account {
             .await?;
         Ok(&full_account_info.avatar_url)
     }
+
+    /// Indicates the administrator status
+    async fn is_admin(&self, ctx: &Context<'_>) -> Result<bool> {
+        let full_account_info = self
+            .full_account_info
+            .get_or_try_init(|| self.resolve_full_account_info(ctx))
+            .await?;
+
+        Ok(full_account_info.is_admin)
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
