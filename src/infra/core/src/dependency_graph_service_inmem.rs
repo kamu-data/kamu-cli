@@ -107,13 +107,18 @@ impl DependencyGraphServiceInMemory {
 
         let mut dependencies_stream = repository.list_dependencies_of_all_datasets();
 
-        while let Some(Ok((dataset_id, upstream_dataset_ids))) = dependencies_stream.next().await {
+        while let Some(Ok(dataset_dependencies)) = dependencies_stream.next().await {
+            let DatasetDependencies {
+                downstream_dataset_id,
+                upstream_dataset_ids,
+            } = dataset_dependencies;
+
             if !upstream_dataset_ids.is_empty() {
                 for upstream_dataset_id in upstream_dataset_ids {
-                    self.add_dependency(state, &upstream_dataset_id, &dataset_id);
+                    self.add_dependency(state, &upstream_dataset_id, &downstream_dataset_id);
                 }
             } else {
-                state.get_or_create_dataset_node(&dataset_id);
+                state.get_or_create_dataset_node(&downstream_dataset_id);
             }
         }
 
