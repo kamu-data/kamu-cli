@@ -99,6 +99,17 @@ impl Account {
     }
 
     #[graphql(skip)]
+    #[inline]
+    async fn get_full_account_info(
+        &self,
+        ctx: &Context<'_>,
+    ) -> Result<&kamu_core::auth::AccountInfo> {
+        self.full_account_info
+            .get_or_try_init(|| self.resolve_full_account_info(ctx))
+            .await
+    }
+
+    #[graphql(skip)]
     pub(crate) fn account_name_internal(&self) -> &AccountName {
         &self.account_name
     }
@@ -115,10 +126,7 @@ impl Account {
 
     /// Account name to display
     async fn display_name(&self, ctx: &Context<'_>) -> Result<AccountDisplayName> {
-        let full_account_info = self
-            .full_account_info
-            .get_or_try_init(|| self.resolve_full_account_info(ctx))
-            .await?;
+        let full_account_info = self.get_full_account_info(ctx).await?;
 
         Ok(AccountDisplayName::from(
             full_account_info.display_name.clone(),
@@ -127,10 +135,7 @@ impl Account {
 
     /// Account type
     async fn account_type(&self, ctx: &Context<'_>) -> Result<AccountType> {
-        let full_account_info = self
-            .full_account_info
-            .get_or_try_init(|| self.resolve_full_account_info(ctx))
-            .await?;
+        let full_account_info = self.get_full_account_info(ctx).await?;
 
         Ok(match full_account_info.account_type {
             kamu_core::auth::AccountType::User => AccountType::User,
@@ -140,19 +145,14 @@ impl Account {
 
     /// Avatar URL
     async fn avatar_url(&self, ctx: &Context<'_>) -> Result<&Option<String>> {
-        let full_account_info = self
-            .full_account_info
-            .get_or_try_init(|| self.resolve_full_account_info(ctx))
-            .await?;
+        let full_account_info = self.get_full_account_info(ctx).await?;
+
         Ok(&full_account_info.avatar_url)
     }
 
     /// Indicates the administrator status
     async fn is_admin(&self, ctx: &Context<'_>) -> Result<bool> {
-        let full_account_info = self
-            .full_account_info
-            .get_or_try_init(|| self.resolve_full_account_info(ctx))
-            .await?;
+        let full_account_info = self.get_full_account_info(ctx).await?;
 
         Ok(full_account_info.is_admin)
     }
