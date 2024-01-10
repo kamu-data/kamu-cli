@@ -12,6 +12,7 @@ use opendatafabric::*;
 use url::Url;
 
 use crate::commands::*;
+use crate::config::UsersConfig;
 use crate::{accounts, odf_server, CommandInterpretationFailed, WorkspaceService};
 
 pub fn get_command(
@@ -22,12 +23,15 @@ pub fn get_command(
     let command: Box<dyn Command> = match arg_matches.subcommand() {
         Some(("add", submatches)) => {
             let workspace_svc = cli_catalog.get_one::<WorkspaceService>()?;
+            let user_config = cli_catalog.get_one::<UsersConfig>()?;
+
             Box::new(AddCommand::new(
                 cli_catalog.get_one()?,
                 cli_catalog.get_one()?,
                 accounts::AccountService::current_account_indication(
                     &arg_matches,
                     workspace_svc.is_multi_tenant_workspace(),
+                    user_config.as_ref(),
                 ),
                 submatches
                     .get_many("manifest")
@@ -182,12 +186,15 @@ pub fn get_command(
         },
         Some(("list", submatches)) => {
             let workspace_svc = cli_catalog.get_one::<WorkspaceService>()?;
+            let user_config = cli_catalog.get_one::<UsersConfig>()?;
+
             Box::new(ListCommand::new(
                 cli_catalog.get_one()?,
                 cli_catalog.get_one()?,
                 accounts::AccountService::current_account_indication(
                     &arg_matches,
                     workspace_svc.is_multi_tenant_workspace(),
+                    user_config.as_ref(),
                 ),
                 accounts::AccountService::related_account_indication(submatches),
                 cli_catalog.get_one()?,

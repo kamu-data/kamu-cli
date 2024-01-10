@@ -42,18 +42,20 @@ pub async fn run(
     workspace_layout: WorkspaceLayout,
     matches: clap::ArgMatches,
 ) -> Result<(), CLIError> {
-    // Always capture backtraces for logging - we will separately decide wheter to
-    // display them to the user based on verbocity level
+    // Always capture backtraces for logging - we will separately decide whether to
+    // display them to the user based on verbosity level
     if std::env::var_os("RUST_BACKTRACE").is_none() {
         std::env::set_var("RUST_BACKTRACE", "1");
     }
 
     let workspace_svc = WorkspaceService::new(Arc::new(workspace_layout.clone()));
     let workspace_version = workspace_svc.workspace_version()?;
+    let config = load_config(&workspace_layout);
 
     let current_account = accounts::AccountService::current_account_indication(
         &matches,
         workspace_svc.is_multi_tenant_workspace(),
+        config.users.as_ref().unwrap(),
     );
 
     prepare_run_dir(&workspace_layout.run_info_dir);
@@ -85,7 +87,6 @@ pub async fn run(
             "Initializing kamu-cli"
         );
 
-        let config = load_config(&workspace_layout);
         register_config_in_catalog(
             &config,
             &mut base_catalog_builder,
@@ -315,7 +316,6 @@ fn load_config(workspace_layout: &WorkspaceLayout) -> config::CLIConfig {
     config
 }
 
-// Public only for tests
 pub fn register_config_in_catalog(
     config: &config::CLIConfig,
     catalog_builder: &mut CatalogBuilder,

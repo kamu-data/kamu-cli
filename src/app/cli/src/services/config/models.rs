@@ -333,7 +333,7 @@ impl UsersConfig {
                 account_type: AccountType::User,
                 display_name: String::from(auth::DEFAULT_ACCOUNT_NAME),
                 avatar_url: Some(String::from(auth::DEFAULT_AVATAR_URL)),
-                is_admin: false,
+                is_admin: true,
             }],
             allow_login_unknown: Some(false),
         }

@@ -50,16 +50,16 @@ impl AccountService {
         }
     }
 
-    fn default_account_name(multitenant_workspace: bool) -> String {
-        if multitenant_workspace {
+    fn default_account_name(multi_tenant_workspace: bool) -> String {
+        if multi_tenant_workspace {
             whoami::username()
         } else {
             String::from(auth::DEFAULT_ACCOUNT_NAME)
         }
     }
 
-    fn default_user_name(multitenant_workspace: bool) -> String {
-        if multitenant_workspace {
+    fn default_user_name(multi_tenant_workspace: bool) -> String {
+        if multi_tenant_workspace {
             whoami::realname()
         } else {
             String::from(auth::DEFAULT_ACCOUNT_NAME)
@@ -68,13 +68,13 @@ impl AccountService {
 
     pub fn current_account_indication(
         arg_matches: &ArgMatches,
-        multitenant_workspace: bool,
+        multi_tenant_workspace: bool,
+        users_config: &UsersConfig,
     ) -> CurrentAccountIndication {
-        let default_account_name: String =
-            AccountService::default_account_name(multitenant_workspace);
-        let default_user_name: String = AccountService::default_user_name(multitenant_workspace);
+        let (current_account, user_name, specified_explicitly) = {
+            let default_account_name = AccountService::default_account_name(multi_tenant_workspace);
+            let default_user_name = AccountService::default_user_name(multi_tenant_workspace);
 
-        let (current_account, user_name, specified_explicitly) =
             if let Some(account) = arg_matches.get_one::<String>("account") {
                 (
                     account.clone(),
@@ -88,9 +88,20 @@ impl AccountService {
                 )
             } else {
                 (default_account_name, default_user_name, false)
-            };
+            }
+        };
 
-        CurrentAccountIndication::new(current_account, user_name, specified_explicitly)
+        let is_admin = if multi_tenant_workspace {
+            users_config
+                .predefined
+                .iter()
+                .find(|a| a.account_name.as_str().eq(&current_account))
+                .map_or(false, |a| a.is_admin)
+        } else {
+            true
+        };
+
+        CurrentAccountIndication::new(current_account, user_name, specified_explicitly, is_admin)
     }
 
     pub fn related_account_indication(sub_matches: &ArgMatches) -> RelatedAccountIndication {

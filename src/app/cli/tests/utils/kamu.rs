@@ -34,7 +34,10 @@ impl Kamu {
     pub fn new<P: Into<PathBuf>>(workspace_path: P) -> Self {
         let workspace_path = workspace_path.into();
         let workspace_layout = WorkspaceLayout::new(workspace_path.join(".kamu"));
-        let current_account = accounts::CurrentAccountIndication::new("kamu", "kamu", false);
+        let specified_explicitly = false;
+        let is_admin = false;
+        let current_account =
+            accounts::CurrentAccountIndication::new("kamu", "kamu", specified_explicitly, is_admin);
         Self {
             workspace_layout,
             current_account,
