@@ -7,18 +7,15 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod accounts;
-mod admin;
-mod auth;
-mod data;
-mod datasets;
-mod search;
-mod tasks;
+use crate::prelude::*;
+use crate::AdminGuard;
 
-pub(crate) use accounts::*;
-pub(crate) use admin::*;
-pub(crate) use auth::*;
-pub(crate) use data::*;
-pub(crate) use datasets::*;
-pub(crate) use search::*;
-pub(crate) use tasks::*;
+pub struct Admin;
+
+#[Object]
+impl Admin {
+    #[graphql(guard = "AdminGuard::new()")]
+    async fn self_test(&self, _ctx: &Context<'_>) -> Result<String> {
+        Ok("OK".to_string())
+    }
+}

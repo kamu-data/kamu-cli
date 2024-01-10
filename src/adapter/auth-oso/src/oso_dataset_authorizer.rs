@@ -45,8 +45,10 @@ impl OsoDatasetAuthorizer {
 
     fn actor(&self) -> UserActor {
         match self.current_account_subject.as_ref() {
-            CurrentAccountSubject::Anonymous(_) => UserActor::new("", true),
-            CurrentAccountSubject::Logged(l) => UserActor::new(l.account_name.as_str(), false),
+            CurrentAccountSubject::Anonymous(_) => UserActor::new("", true, false),
+            CurrentAccountSubject::Logged(l) => {
+                UserActor::new(l.account_name.as_str(), false, l.is_admin)
+            }
         }
     }
 

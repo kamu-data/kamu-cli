@@ -26,7 +26,7 @@ impl Task {
         Self { state }
     }
 
-    /// Unique and stable identitfier of this task
+    /// Unique and stable identifier of this task
     async fn task_id(&self) -> TaskID {
         self.state.task_id.into()
     }

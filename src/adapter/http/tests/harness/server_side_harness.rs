@@ -68,6 +68,7 @@ pub(crate) fn server_authentication_mock() -> MockAuthenticationService {
             account_type: AccountType::User,
             display_name: SERVER_ACCOUNT_NAME.to_string(),
             avatar_url: Some(DEFAULT_AVATAR_URL.to_string()),
+            is_admin: false,
         },
     )
 }
@@ -75,10 +76,13 @@ pub(crate) fn server_authentication_mock() -> MockAuthenticationService {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) fn create_cli_user_catalog(base_catalog: &dill::Catalog) -> dill::Catalog {
+    let is_admin = false;
+
     dill::CatalogBuilder::new_chained(base_catalog)
-        .add_value(CurrentAccountSubject::logged(AccountName::new_unchecked(
-            SERVER_ACCOUNT_NAME,
-        )))
+        .add_value(CurrentAccountSubject::logged(
+            AccountName::new_unchecked(SERVER_ACCOUNT_NAME),
+            is_admin,
+        ))
         .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
         .build()
 }

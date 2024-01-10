@@ -343,7 +343,7 @@ struct GithubProviderCredentials {
     pub access_token: String,
 }
 
-impl From<GithubAccountInfo> for kamu_core::auth::AccountInfo {
+impl From<GithubAccountInfo> for AccountInfo {
     fn from(value: GithubAccountInfo) -> Self {
         Self {
             account_id: FAKE_ACCOUNT_ID.to_string(),
@@ -351,6 +351,7 @@ impl From<GithubAccountInfo> for kamu_core::auth::AccountInfo {
             account_type: AccountType::User,
             display_name: value.name.or_else(|| Some(value.login)).unwrap(),
             avatar_url: value.avatar_url,
+            is_admin: false,
         }
     }
 }

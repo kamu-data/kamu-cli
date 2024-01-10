@@ -42,10 +42,16 @@ pub struct CurrentAccountIndication {
     pub account_name: AccountName,
     pub user_name: String,
     pub specified_explicitly: bool,
+    is_admin: bool,
 }
 
 impl CurrentAccountIndication {
-    pub fn new<A, U>(account_name: A, user_name: U, specified_explicitly: bool) -> Self
+    pub fn new<A, U>(
+        account_name: A,
+        user_name: U,
+        specified_explicitly: bool,
+        is_admin: bool,
+    ) -> Self
     where
         A: Into<String>,
         U: Into<String>,
@@ -54,6 +60,7 @@ impl CurrentAccountIndication {
             account_name: AccountName::try_from(account_name.into()).unwrap(),
             user_name: user_name.into(),
             specified_explicitly,
+            is_admin,
         }
     }
 
@@ -62,7 +69,7 @@ impl CurrentAccountIndication {
     }
 
     pub fn to_current_account_subject(&self) -> CurrentAccountSubject {
-        CurrentAccountSubject::logged(AccountName::from(self.account_name.clone()))
+        CurrentAccountSubject::logged(AccountName::from(self.account_name.clone()), self.is_admin)
     }
 }
 

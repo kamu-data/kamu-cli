@@ -63,20 +63,23 @@ impl<Svc> AuthenticationMiddleware<Svc> {
                 .account_info_by_token(access_token.token)
                 .await
             {
-                Ok(account_info) => Ok(CurrentAccountSubject::logged(account_info.account_name)),
+                Ok(account_info) => Ok(CurrentAccountSubject::logged(
+                    account_info.account_name,
+                    account_info.is_admin,
+                )),
                 Err(auth::GetAccountInfoError::AccessToken(e)) => match e {
                     auth::AccessTokenError::Expired => Ok(CurrentAccountSubject::anonymous(
                         AnonymousAccountReason::AuthenticationExpired,
                     )),
                     auth::AccessTokenError::Invalid(_) => {
-                        tracing::warn!("Ingoring invalid auth token");
+                        tracing::warn!("Ignoring invalid auth token");
                         Ok(CurrentAccountSubject::anonymous(
                             AnonymousAccountReason::AuthenticationInvalid,
                         ))
                     }
                 },
                 Err(auth::GetAccountInfoError::Internal(_)) => {
-                    return Err(internal_server_error_response());
+                    Err(internal_server_error_response())
                 }
             }
         } else {

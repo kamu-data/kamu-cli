@@ -27,7 +27,7 @@ pub const LOGIN_METHOD_PASSWORD: &str = "password";
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct AccountService {
-    pub predefined_accounts: HashMap<String, auth::AccountInfo>,
+    pub predefined_accounts: HashMap<String, AccountInfo>,
     pub allow_login_unknown: bool,
 }
 
@@ -35,7 +35,8 @@ pub struct AccountService {
 #[interface(dyn auth::AuthenticationProvider)]
 impl AccountService {
     pub fn new(users_config: Arc<UsersConfig>) -> Self {
-        let mut predefined_accounts: HashMap<String, auth::AccountInfo> = HashMap::new();
+        let mut predefined_accounts: HashMap<String, AccountInfo> = HashMap::new();
+
         for predefined_account in &users_config.predefined {
             predefined_accounts.insert(
                 predefined_account.account_name.to_string(),
@@ -49,16 +50,16 @@ impl AccountService {
         }
     }
 
-    fn default_account_name(multitenant_workspace: bool) -> String {
-        if multitenant_workspace {
+    fn default_account_name(multi_tenant_workspace: bool) -> String {
+        if multi_tenant_workspace {
             whoami::username()
         } else {
             String::from(auth::DEFAULT_ACCOUNT_NAME)
         }
     }
 
-    fn default_user_name(multitenant_workspace: bool) -> String {
-        if multitenant_workspace {
+    fn default_user_name(multi_tenant_workspace: bool) -> String {
+        if multi_tenant_workspace {
             whoami::realname()
         } else {
             String::from(auth::DEFAULT_ACCOUNT_NAME)
@@ -67,13 +68,13 @@ impl AccountService {
 
     pub fn current_account_indication(
         arg_matches: &ArgMatches,
-        multitenant_workspace: bool,
+        multi_tenant_workspace: bool,
+        users_config: &UsersConfig,
     ) -> CurrentAccountIndication {
-        let default_account_name: String =
-            AccountService::default_account_name(multitenant_workspace);
-        let default_user_name: String = AccountService::default_user_name(multitenant_workspace);
+        let (current_account, user_name, specified_explicitly) = {
+            let default_account_name = AccountService::default_account_name(multi_tenant_workspace);
+            let default_user_name = AccountService::default_user_name(multi_tenant_workspace);
 
-        let (current_account, user_name, specified_explicitly) =
             if let Some(account) = arg_matches.get_one::<String>("account") {
                 (
                     account.clone(),
@@ -87,9 +88,20 @@ impl AccountService {
                 )
             } else {
                 (default_account_name, default_user_name, false)
-            };
+            }
+        };
 
-        CurrentAccountIndication::new(current_account, user_name, specified_explicitly)
+        let is_admin = if multi_tenant_workspace {
+            users_config
+                .predefined
+                .iter()
+                .find(|a| a.account_name.as_str().eq(&current_account))
+                .map_or(false, |a| a.is_admin)
+        } else {
+            true
+        };
+
+        CurrentAccountIndication::new(current_account, user_name, specified_explicitly, is_admin)
     }
 
     pub fn related_account_indication(sub_matches: &ArgMatches) -> RelatedAccountIndication {
@@ -107,7 +119,7 @@ impl AccountService {
         RelatedAccountIndication::new(target_account)
     }
 
-    fn find_account_info_impl(&self, account_name: &String) -> Option<auth::AccountInfo> {
+    fn find_account_info_impl(&self, account_name: &String) -> Option<AccountInfo> {
         // The account might be predefined in the configuration
         self.predefined_accounts
             .get(account_name)
@@ -117,7 +129,7 @@ impl AccountService {
     fn get_account_info_impl(
         &self,
         account_name: &String,
-    ) -> Result<auth::AccountInfo, auth::RejectedCredentialsError> {
+    ) -> Result<AccountInfo, auth::RejectedCredentialsError> {
         // The account might be predefined in the configuration
         match self.predefined_accounts.get(account_name) {
             // Use the predefined record
@@ -127,12 +139,13 @@ impl AccountService {
                 // If configuration allows login unknown users, pretend this is an unknown user
                 // without avatar and with the name identical to login
                 if self.allow_login_unknown {
-                    Ok(auth::AccountInfo {
+                    Ok(AccountInfo {
                         account_id: FAKE_ACCOUNT_ID.to_string(),
                         account_name: AccountName::new_unchecked(account_name),
                         account_type: AccountType::User,
                         display_name: account_name.clone(),
                         avatar_url: None,
+                        is_admin: false,
                     })
                 } else {
                     // Otherwise we don't recognized this user between predefined
@@ -198,7 +211,7 @@ impl auth::AuthenticationProvider for AccountService {
     async fn account_info_by_token(
         &self,
         provider_credentials_json: String,
-    ) -> Result<auth::AccountInfo, InternalError> {
+    ) -> Result<AccountInfo, InternalError> {
         let provider_credentials = serde_json::from_str::<PasswordProviderCredentials>(
             &provider_credentials_json.as_str(),
         )

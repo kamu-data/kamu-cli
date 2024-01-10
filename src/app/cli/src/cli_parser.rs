@@ -12,7 +12,7 @@ use std::net::IpAddr;
 use clap::{value_parser, Arg, ArgAction, Command};
 use opendatafabric::*;
 
-fn tabular_output_params<'a>(app: Command) -> Command {
+fn tabular_output_params(app: Command) -> Command {
     app.args([
         Arg::new("output-format")
             .long("output-format")
@@ -650,7 +650,7 @@ pub fn cli() -> Command {
                     .args([
                         Arg::new("address")
                             .long("address")
-                            .value_parser(value_parser!(std::net::IpAddr))
+                            .value_parser(value_parser!(IpAddr))
                             .help("Expose HTTP server on specific network interface"),
                         Arg::new("http-port")
                             .long("http-port")
@@ -1147,7 +1147,7 @@ pub fn cli() -> Command {
                             .args([
                                 Arg::new("address")
                                     .long("address")
-                                    .value_parser(value_parser!(std::net::IpAddr))
+                                    .value_parser(value_parser!(IpAddr))
                                     .help("Bind to a specific network interface"),
                                 Arg::new("http-port")
                                     .long("http-port")
@@ -1232,7 +1232,7 @@ pub fn cli() -> Command {
                     .args([
                         Arg::new("address")
                             .long("address")
-                            .value_parser(value_parser!(std::net::IpAddr))
+                            .value_parser(value_parser!(IpAddr))
                             .help("Expose HTTP server on specific network interface"),
                         Arg::new("http-port")
                             .long("http-port")

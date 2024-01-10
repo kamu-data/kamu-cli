@@ -22,6 +22,7 @@ pub enum CurrentAccountSubject {
 #[derive(Debug, Clone)]
 pub struct LoggedAccount {
     pub account_name: AccountName,
+    pub is_admin: bool,
 }
 
 #[derive(Debug)]
@@ -36,12 +37,17 @@ impl CurrentAccountSubject {
         Self::Anonymous(reason)
     }
 
-    pub fn logged(account_name: AccountName) -> Self {
-        Self::Logged(LoggedAccount { account_name })
+    pub fn logged(account_name: AccountName, is_admin: bool) -> Self {
+        Self::Logged(LoggedAccount {
+            account_name,
+            is_admin,
+        })
     }
 
     pub fn new_test() -> Self {
-        Self::logged(AccountName::new_unchecked(DEFAULT_ACCOUNT_NAME))
+        let is_admin = false;
+
+        Self::logged(AccountName::new_unchecked(DEFAULT_ACCOUNT_NAME), is_admin)
     }
 }
 

@@ -32,7 +32,7 @@ impl Query {
 
     /// Dataset-related functionality group.
     ///
-    /// Datasets are historical streams of events recorded under a cetrain
+    /// Datasets are historical streams of events recorded under a certain
     /// schema.
     async fn datasets(&self) -> Datasets {
         Datasets
@@ -55,7 +55,7 @@ impl Query {
         Tasks
     }
 
-    /// Search-related functionality group.
+    /// Search-related functionality group
     async fn search(&self) -> Search {
         Search
     }
@@ -63,6 +63,11 @@ impl Query {
     /// Querying and data manipulations
     async fn data(&self) -> DataQueries {
         DataQueries
+    }
+
+    /// Admin-related functionality group
+    async fn admin(&self) -> Admin {
+        Admin
     }
 }
 
@@ -81,7 +86,7 @@ impl Mutation {
 
     /// Dataset-related functionality group.
     ///
-    /// Datasets are historical streams of events recorded under a cetrain
+    /// Datasets are historical streams of events recorded under a certain
     /// schema.
     async fn datasets(&self) -> DatasetsMut {
         DatasetsMut

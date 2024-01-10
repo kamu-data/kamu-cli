@@ -9,7 +9,7 @@ directive @oneOf on INPUT_OBJECT
 
 type Account {
 	"""
-	Unique and stable identitfier of this account
+	Unique and stable identifier of this account
 	"""
 	id: AccountID!
 	"""
@@ -28,6 +28,10 @@ type Account {
 	Avatar URL
 	"""
 	avatarUrl: String
+	"""
+	Indicates the administrator status
+	"""
+	isAdmin: Boolean!
 }
 
 scalar AccountDisplayName
@@ -65,6 +69,10 @@ type AddPushSource {
 	read: ReadStep!
 	preprocess: Transform
 	merge: MergeStrategy!
+}
+
+type Admin {
+	selfTest: String!
 }
 
 type AttachmentEmbedded {
@@ -529,7 +537,7 @@ type EngineDesc {
 	name: String!
 	"""
 	Language and dialect this engine is using for queries
-	Indended for configuring code highlighting and completions.
+	Indented for configuring code highlighting and completions.
 	"""
 	dialect: QueryDialect!
 	"""
@@ -754,7 +762,7 @@ type Mutation {
 	"""
 	Dataset-related functionality group.
 	
-	Datasets are historical streams of events recorded under a cetrain
+	Datasets are historical streams of events recorded under a certain
 	schema.
 	"""
 	datasets: DatasetsMut!
@@ -819,7 +827,7 @@ type Query {
 	"""
 	Dataset-related functionality group.
 	
-	Datasets are historical streams of events recorded under a cetrain
+	Datasets are historical streams of events recorded under a certain
 	schema.
 	"""
 	datasets: Datasets!
@@ -839,13 +847,17 @@ type Query {
 	"""
 	tasks: Tasks!
 	"""
-	Search-related functionality group.
+	Search-related functionality group
 	"""
 	search: Search!
 	"""
 	Querying and data manipulations
 	"""
 	data: DataQueries!
+	"""
+	Admin-related functionality group
+	"""
+	admin: Admin!
 }
 
 enum QueryDialect {
@@ -1060,7 +1072,7 @@ type SqlQueryStep {
 
 type Task {
 	"""
-	Unique and stable identitfier of this task
+	Unique and stable identifier of this task
 	"""
 	taskId: TaskID!
 	"""
