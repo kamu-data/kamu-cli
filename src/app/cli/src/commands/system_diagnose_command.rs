@@ -7,33 +7,42 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::fs::File;
-use std::io::{Stdout, Write};
+use std::fs::{self, File};
+use std::io::Write;
 use std::path::Path;
 use std::sync::Arc;
 
 use console::style;
 use container_runtime::ContainerRuntime;
 use futures::TryStreamExt;
-use kamu::domain::{DatasetRepository, VerificationOptions, VerificationService};
+use kamu::domain::{
+    DatasetRepository,
+    VerificationMultiListener,
+    VerificationOptions,
+    VerificationService,
+};
 
 use super::{CLIError, Command};
+use crate::VerificationMultiProgress;
 
 pub const DUMMY_IMAGE: &str = "docker.io/busybox:latest";
 
 pub struct SystemDiagnoseCommand {
     dataset_repo: Arc<dyn DatasetRepository>,
     verification_svc: Arc<dyn VerificationService>,
+    container_runtime: Arc<ContainerRuntime>,
 }
 
 impl SystemDiagnoseCommand {
     pub fn new(
         dataset_repo: Arc<dyn DatasetRepository>,
         verification_svc: Arc<dyn VerificationService>,
+        container_runtime: Arc<ContainerRuntime>,
     ) -> Self {
         Self {
             dataset_repo,
             verification_svc,
+            container_runtime,
         }
     }
 }
@@ -41,40 +50,41 @@ impl SystemDiagnoseCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for SystemDiagnoseCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
-        SystemDiagnose::check(self.dataset_repo.clone(), self.verification_svc.clone()).await?;
+        let diagnose_check = RunCheck::new(
+            self.dataset_repo.clone(),
+            self.verification_svc.clone(),
+            self.container_runtime.clone(),
+        );
+        diagnose_check.run().await?;
         Ok(())
     }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-pub struct SystemDiagnose {}
-
-impl SystemDiagnose {
-    pub async fn check(
-        dataset_repo: Arc<dyn DatasetRepository>,
-        verification_svc: Arc<dyn VerificationService>,
-    ) -> Result<(), CLIError> {
-        let diagnose_check = RunCheck::new();
-        diagnose_check.run(dataset_repo, verification_svc).await
-    }
-}
-
 pub struct RunCheck {
-    container_runtime: ContainerRuntime,
+    dataset_repo: Arc<dyn DatasetRepository>,
+    verification_svc: Arc<dyn VerificationService>,
+    container_runtime: Arc<ContainerRuntime>,
 }
 
 impl RunCheck {
-    fn new() -> Self {
+    fn new(
+        dataset_repo: Arc<dyn DatasetRepository>,
+        verification_svc: Arc<dyn VerificationService>,
+        container_runtime: Arc<ContainerRuntime>,
+    ) -> Self {
         Self {
-            container_runtime: ContainerRuntime::default(),
+            dataset_repo,
+            verification_svc,
+            container_runtime,
         }
     }
 
-    async fn run_container_check(&self, f: &mut Stdout) -> Result<(), CLIError> {
+    async fn container_check(&self, f: &mut dyn std::io::Write) -> Result<(), CLIError> {
         write!(f, "container installed... ")?;
 
-        let is_container_installed = match self
+        let container_installed_check_status = match self
             .container_runtime
             .custom_cmd("--version".to_string())
             .output()
@@ -84,12 +94,12 @@ impl RunCheck {
             Err(_) => style("failed").red(),
         };
 
-        write!(f, "{is_container_installed}")?;
+        write!(f, "{container_installed_check_status}")?;
         Ok(())
     }
 
-    async fn run_container_pull_check(&self, f: &mut Stdout) -> Result<(), CLIError> {
-        write!(f, "\ncontainer can pull images... ")?;
+    async fn container_pull_check(&self, f: &mut dyn std::io::Write) -> Result<(), CLIError> {
+        write!(f, "container can pull images... ")?;
 
         let is_container_image_pulled =
             match self.container_runtime.pull_image(DUMMY_IMAGE, None).await {
@@ -101,10 +111,13 @@ impl RunCheck {
         Ok(())
     }
 
-    async fn run_container_rootless_check(&self, f: &mut Stdout) -> Result<(), CLIError> {
-        write!(f, "\ncontainer rootless check... ")?;
+    async fn container_rootless_run_check(
+        &self,
+        f: &mut dyn std::io::Write,
+    ) -> Result<(), CLIError> {
+        write!(f, "container rootless run check... ")?;
 
-        let is_container_rootless = match self
+        let container_rootless_check_status = match self
             .container_runtime
             .run_attached(DUMMY_IMAGE)
             .init(true)
@@ -117,19 +130,22 @@ impl RunCheck {
             Err(_) => style("failed").red(),
         };
 
-        write!(f, "{is_container_rootless}")?;
+        write!(f, "{container_rootless_check_status}")?;
         Ok(())
     }
 
-    async fn run_container_volume_mount_check(&self, f: &mut Stdout) -> Result<(), CLIError> {
-        write!(f, "\ncontainer volume mounts work... ")?;
+    async fn container_volume_mount_check(
+        &self,
+        f: &mut dyn std::io::Write,
+    ) -> Result<(), CLIError> {
+        write!(f, "container volume mounts work... ")?;
         let temp_dir = tempfile::tempdir()?;
         let cwd = Path::new(".").canonicalize()?;
 
         let file_path = temp_dir.path().join("tmp.txt");
-        let _ = File::create(file_path)?;
+        let _ = File::create(file_path.clone())?;
 
-        let is_container_rootless = match self
+        let container_volume_check_status = match self
             .container_runtime
             .run_attached(DUMMY_IMAGE)
             .volume((cwd, temp_dir.into_path()))
@@ -143,30 +159,34 @@ impl RunCheck {
             Err(_) => style("failed").red(),
         };
 
-        write!(f, "{is_container_rootless}")?;
+        fs::remove_file(file_path)?;
+
+        write!(f, "{container_volume_check_status}")?;
         Ok(())
     }
 
-    async fn run_workspace_consistency_check(
+    async fn workspace_consistency_check(
         &self,
-        dataset_repo: Arc<dyn DatasetRepository>,
-        verification_svc: Arc<dyn VerificationService>,
-        f: &mut Stdout,
+        listener: Option<Arc<VerificationMultiProgress>>,
+        f: &mut dyn std::io::Write,
     ) -> Result<(), CLIError> {
-        write!(f, "\nworkspace consistent... ")?;
-        let datasets: Vec<_> = dataset_repo.get_all_datasets().try_collect().await?;
+        write!(f, "workspace consistent... ")?;
+        let datasets: Vec<_> = self.dataset_repo.get_all_datasets().try_collect().await?;
 
         let verify_options = VerificationOptions {
             check_integrity: true,
             replay_transformations: false,
         };
+
         for dataset in datasets {
-            if let Err(_) = verification_svc
+            let listener = listener.clone().and_then(|l| l.begin_verify(&dataset));
+            if let Err(_) = self
+                .verification_svc
                 .verify(
                     &dataset.as_local_ref(),
                     (None, None),
                     verify_options.clone(),
-                    None,
+                    listener,
                 )
                 .await
             {
@@ -179,19 +199,29 @@ impl RunCheck {
         Ok(())
     }
 
-    pub async fn run(
-        &self,
-        dataset_repo: Arc<dyn DatasetRepository>,
-        verification_svc: Arc<dyn VerificationService>,
-    ) -> Result<(), CLIError> {
+    pub async fn run(&self) -> Result<(), CLIError> {
         let mut out = std::io::stdout();
 
-        self.run_container_check(&mut out).await?;
-        self.run_container_pull_check(&mut out).await?;
-        self.run_container_rootless_check(&mut out).await?;
-        self.run_container_volume_mount_check(&mut out).await?;
-        self.run_workspace_consistency_check(dataset_repo, verification_svc, &mut out)
+        self.container_check(&mut out).await?;
+        write!(out, "\n")?;
+        self.container_pull_check(&mut out).await?;
+        write!(out, "\n")?;
+        self.container_rootless_run_check(&mut out).await?;
+        write!(out, "\n")?;
+        self.container_volume_mount_check(&mut out).await?;
+        write!(out, "\n")?;
+        let progress = VerificationMultiProgress::new();
+        let listener = Arc::new(progress.clone());
+
+        let draw_thread = std::thread::spawn(move || {
+            progress.draw();
+        });
+        self.workspace_consistency_check(Some(listener.clone()), &mut out)
             .await?;
+        write!(out, "\n")?;
+        listener.finish();
+        draw_thread.join().unwrap();
+
         Ok(())
     }
 }

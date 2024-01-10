@@ -10,25 +10,35 @@
 use std::sync::Arc;
 
 use container_runtime::ContainerRuntime;
+use internal_error::*;
 
 use super::{CLIError, Command};
 use crate::output::*;
-use crate::WorkspaceService;
+use crate::WorkspaceLayout;
 
 ///////////////////////////////////////////////////////////////////////////////
 
 pub struct SystemInfoCommand {
     output_config: Arc<OutputConfig>,
     output_format: Option<String>,
+    workspace_layout: WorkspaceLayout,
+    container_runtime: Arc<ContainerRuntime>,
 }
 
 impl SystemInfoCommand {
-    pub fn new<S>(output_config: Arc<OutputConfig>, output_format: Option<S>) -> Self
+    pub fn new<S>(
+        output_config: Arc<OutputConfig>,
+        container_runtime: Arc<ContainerRuntime>,
+        workspace_layout: WorkspaceLayout,
+        output_format: Option<S>,
+    ) -> Self
     where
         S: Into<String>,
     {
         Self {
             output_config,
+            container_runtime,
+            workspace_layout,
             output_format: output_format.map(|s| s.into()),
         }
     }
@@ -42,7 +52,11 @@ impl Command for SystemInfoCommand {
 
     async fn run(&mut self) -> Result<(), CLIError> {
         write_output(
-            SystemInfo::collect().await,
+            SystemInfo::collect(
+                self.container_runtime.clone(),
+                self.workspace_layout.clone(),
+            )
+            .await,
             &self.output_config,
             self.output_format.as_ref(),
         )?;
@@ -54,16 +68,22 @@ impl Command for SystemInfoCommand {
 
 pub struct VersionCommand {
     output_config: Arc<OutputConfig>,
+    workspace_layout: WorkspaceLayout,
     output_format: Option<String>,
 }
 
 impl VersionCommand {
-    pub fn new<S>(output_config: Arc<OutputConfig>, output_format: Option<S>) -> Self
+    pub fn new<S>(
+        output_config: Arc<OutputConfig>,
+        workspace_layout: WorkspaceLayout,
+        output_format: Option<S>,
+    ) -> Self
     where
         S: Into<String>,
     {
         Self {
             output_config,
+            workspace_layout,
             output_format: output_format.map(|s| s.into()),
         }
     }
@@ -77,12 +97,39 @@ impl Command for VersionCommand {
 
     async fn run(&mut self) -> Result<(), CLIError> {
         write_output(
-            BuildInfo::collect(),
+            BuildInfo::collect(self.workspace_layout.clone()),
             &self.output_config,
             self.output_format.as_ref(),
         )?;
         Ok(())
     }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+pub fn write_output<T: serde::Serialize>(
+    value: T,
+    output_config: &OutputConfig,
+    output_format: Option<impl AsRef<str>>,
+) -> Result<(), InternalError> {
+    let output_format = if let Some(fmt) = &output_format {
+        fmt.as_ref()
+    } else {
+        if output_config.is_tty {
+            "shell"
+        } else {
+            "json"
+        }
+    };
+
+    // TODO: Generalize this code in output config, just like we do for tabular
+    // output
+    match output_format {
+        "json" => serde_json::to_writer_pretty(std::io::stdout(), &value).int_err()?,
+        "shell" | "yaml" | _ => serde_yaml::to_writer(std::io::stdout(), &value).int_err()?,
+    }
+
+    Ok(())
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -95,10 +142,13 @@ pub struct SystemInfo {
 }
 
 impl SystemInfo {
-    pub async fn collect() -> Self {
+    pub async fn collect(
+        container_runtime: Arc<ContainerRuntime>,
+        workspace_layout: WorkspaceLayout,
+    ) -> Self {
         Self {
-            build: BuildInfo::collect(),
-            additional: AdditionalInfo::collect().await,
+            build: BuildInfo::collect(workspace_layout),
+            additional: AdditionalInfo::collect(container_runtime).await,
         }
     }
 }
@@ -123,7 +173,7 @@ pub struct BuildInfo {
 }
 
 impl BuildInfo {
-    pub fn collect() -> Self {
+    pub fn collect(workspace_layout: WorkspaceLayout) -> Self {
         Self {
             app_version: env!("CARGO_PKG_VERSION"),
             build_timestamp: option_env!("VERGEN_BUILD_TIMESTAMP"),
@@ -138,10 +188,7 @@ impl BuildInfo {
             cargo_target_triple: option_env!("VERGEN_CARGO_TARGET_TRIPLE"),
             cargo_features: option_env!("VERGEN_CARGO_FEATURES"),
             cargo_opt_level: option_env!("VERGEN_CARGO_OPT_LEVEL"),
-            workspace_dir: WorkspaceService::find_workspace()
-                .root_dir
-                .to_str()
-                .map(String::from),
+            workspace_dir: workspace_layout.root_dir.to_str().map(String::from),
         }
     }
 }
@@ -153,8 +200,7 @@ pub struct AdditionalInfo {
 }
 
 impl AdditionalInfo {
-    pub async fn collect() -> Self {
-        let container_runtime = ContainerRuntime::default();
+    pub async fn collect(container_runtime: Arc<ContainerRuntime>) -> Self {
         let container_version_output = match container_runtime
             .custom_cmd("--version".to_string())
             .output()

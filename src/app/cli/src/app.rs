@@ -440,7 +440,8 @@ fn configure_logging(output_config: &OutputConfig, workspace_layout: &WorkspaceL
                 Please try running `kamu system \
                  diagnose` to verify your environment. \n
                 If the issue persists, help \
-                 us by reporting this problem at https://github.com/kamu-data/kamu-cli/issues"
+                 us by reporting this problem at https://github.com/kamu-data/kamu-cli/issues \
+                 with result from kamu system info command"
             )
             .bold()
         );

@@ -463,11 +463,18 @@ pub fn get_command(
                 Some(("gql-schema", _)) => Box::new(APIServerGqlSchemaCommand {}),
                 _ => return Err(CommandInterpretationFailed.into()),
             },
-            Some(("info", info_matches)) => Box::new(SystemInfoCommand::new(
-                cli_catalog.get_one()?,
-                info_matches.get_one("output-format").map(String::as_str),
-            )),
+            Some(("info", info_matches)) => {
+                let workspace_svc = cli_catalog.get_one::<WorkspaceService>()?;
+
+                Box::new(SystemInfoCommand::new(
+                    cli_catalog.get_one()?,
+                    cli_catalog.get_one()?,
+                    workspace_svc.layout().unwrap().clone(),
+                    info_matches.get_one("output-format").map(String::as_str),
+                ))
+            }
             Some(("diagnose", _)) => Box::new(SystemDiagnoseCommand::new(
+                cli_catalog.get_one()?,
                 cli_catalog.get_one()?,
                 cli_catalog.get_one()?,
             )),
@@ -530,10 +537,15 @@ pub fn get_command(
             submatches.get_flag("recursive"),
             submatches.get_flag("integrity"),
         )),
-        Some(("version", submatches)) => Box::new(VersionCommand::new(
-            cli_catalog.get_one()?,
-            submatches.get_one("output-format").map(String::as_str),
-        )),
+        Some(("version", submatches)) => {
+            let workspace_svc = cli_catalog.get_one::<WorkspaceService>()?;
+
+            Box::new(VersionCommand::new(
+                cli_catalog.get_one()?,
+                workspace_svc.layout().unwrap().clone(),
+                submatches.get_one("output-format").map(String::as_str),
+            ))
+        }
         _ => return Err(CommandInterpretationFailed.into()),
     };
 
