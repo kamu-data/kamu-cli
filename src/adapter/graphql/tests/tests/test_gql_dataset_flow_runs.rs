@@ -13,16 +13,25 @@ use std::sync::Arc;
 
 use async_graphql::{value, Value};
 use chrono::Utc;
+use container_runtime::ContainerRuntime;
 use dill::Component;
 use event_bus::EventBus;
 use indoc::indoc;
 use kamu::testing::{MetadataFactory, MockDependencyGraphRepository};
-use kamu::{DatasetRepositoryLocalFs, DependencyGraphServiceInMemory};
+use kamu::{
+    DataFormatRegistryImpl,
+    DatasetRepositoryLocalFs,
+    DependencyGraphServiceInMemory,
+    EngineProvisionerNull,
+    ObjectStoreRegistryImpl,
+    PollingIngestServiceImpl,
+};
 use kamu_core::{
     auth,
     CreateDatasetResult,
     DatasetRepository,
     DependencyGraphRepository,
+    PollingIngestService,
     SystemTimeSourceDefault,
 };
 use kamu_flow_system::{FlowID, FlowServiceRunConfig, FlowServiceTestDriver};
@@ -34,7 +43,7 @@ use kamu_flow_system_inmem::{
 };
 use kamu_task_system::{TaskEventFinished, TaskEventRunning, TaskID, TaskOutcome};
 use kamu_task_system_inmem::{TaskSchedulerInMemory, TaskSystemEventStoreInMemory};
-use opendatafabric::{DatasetID, DatasetKind};
+use opendatafabric::{DatasetID, DatasetKind, FAKE_ACCOUNT_ID};
 
 use crate::utils::{authentication_catalogs, expect_anonymous_access_error};
 
@@ -72,6 +81,66 @@ async fn test_trigger_ingest_root_dataset() {
                                     "flowId": "0",
                                     "status": "QUEUED",
                                     "outcome": Value::Null
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+
+    let request_code = FlowRunsHarness::list_flows_query(&create_result.dataset_handle.id);
+    let response = schema
+        .execute(
+            async_graphql::Request::new(request_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(response.is_ok(), "{:?}", response);
+    assert_eq!(
+        response.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "flows": {
+                        "runs": {
+                            "listFlows": {
+                                "nodes": [
+                                    {
+                                        "flowId": "0",
+                                        "description": {
+                                            "__typename": "FlowDescriptionDatasetPollingIngest",
+                                            "datasetId": create_result.dataset_handle.id.to_string(),
+                                            "ingestedRecordsCount": Value::Null,
+                                        },
+                                        "status": "QUEUED",
+                                        "outcome": Value::Null,
+                                        "timing": {
+                                            "runningSince": Value::Null,
+                                            "finishedAt": Value::Null,
+                                        },
+                                        "tasks": [],
+                                        "initiator": {
+                                            "id": FAKE_ACCOUNT_ID,
+                                            "accountName": auth::DEFAULT_ACCOUNT_NAME,
+                                        },
+                                        "primaryTrigger": {
+                                            "__typename": "FlowTriggerManual",
+                                            "initiator": {
+                                                "id": FAKE_ACCOUNT_ID,
+                                                "accountName": auth::DEFAULT_ACCOUNT_NAME,
+                                            }
+                                        },
+                                        "startCondition": Value::Null,
+                                    }
+                                ],
+                                "pageInfo": {
+                                    "hasPreviousPage": false,
+                                    "hasNextPage": false,
+                                    "currentPage": 0,
+                                    "totalPages": 1,
                                 }
                             }
                         }
@@ -119,6 +188,66 @@ async fn test_trigger_execute_query_derived_dataset() {
                                     "flowId": "0",
                                     "status": "QUEUED",
                                     "outcome": Value::Null
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+
+    let request_code = FlowRunsHarness::list_flows_query(&create_derived_result.dataset_handle.id);
+    let response = schema
+        .execute(
+            async_graphql::Request::new(request_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(response.is_ok(), "{:?}", response);
+    assert_eq!(
+        response.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "flows": {
+                        "runs": {
+                            "listFlows": {
+                                "nodes": [
+                                    {
+                                        "flowId": "0",
+                                        "description": {
+                                            "__typename": "FlowDescriptionDatasetExecuteQuery",
+                                            "datasetId": create_derived_result.dataset_handle.id.to_string(),
+                                            "transformedRecordsCount": Value::Null,
+                                        },
+                                        "status": "QUEUED",
+                                        "outcome": Value::Null,
+                                        "timing": {
+                                            "runningSince": Value::Null,
+                                            "finishedAt": Value::Null,
+                                        },
+                                        "tasks": [],
+                                        "initiator": {
+                                            "id": FAKE_ACCOUNT_ID,
+                                            "accountName": auth::DEFAULT_ACCOUNT_NAME,
+                                        },
+                                        "primaryTrigger": {
+                                            "__typename": "FlowTriggerManual",
+                                            "initiator": {
+                                                "id": FAKE_ACCOUNT_ID,
+                                                "accountName": auth::DEFAULT_ACCOUNT_NAME,
+                                            }
+                                        },
+                                        "startCondition": Value::Null,
+                                    }
+                                ],
+                                "pageInfo": {
+                                    "hasPreviousPage": false,
+                                    "hasNextPage": false,
+                                    "currentPage": 0,
+                                    "totalPages": 1,
                                 }
                             }
                         }
@@ -263,6 +392,7 @@ async fn test_cancel_ingest_root_dataset() {
             }
         })
     );
+
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
@@ -670,6 +800,10 @@ impl FlowRunsHarness {
 
     fn new_custom(dependency_graph_repo: MockDependencyGraphRepository) -> Self {
         let tempdir = tempfile::tempdir().unwrap();
+        let run_info_dir = tempdir.path().join("run");
+        let cache_dir = tempdir.path().join("cache");
+        std::fs::create_dir(&run_info_dir).unwrap();
+        std::fs::create_dir(&cache_dir).unwrap();
 
         let catalog_base = dill::CatalogBuilder::new()
             .add::<EventBus>()
@@ -691,6 +825,16 @@ impl FlowRunsHarness {
             .add_value(FlowServiceRunConfig::new(chrono::Duration::seconds(1)))
             .add::<TaskSchedulerInMemory>()
             .add::<TaskSystemEventStoreInMemory>()
+            .add_builder(
+                PollingIngestServiceImpl::builder()
+                    .with_cache_dir(cache_dir)
+                    .with_run_info_dir(run_info_dir)
+                    .with_container_runtime(Arc::new(ContainerRuntime::default()))
+                    .with_data_format_registry(Arc::new(DataFormatRegistryImpl::new())),
+            )
+            .bind::<dyn PollingIngestService, PollingIngestServiceImpl>()
+            .add::<EngineProvisionerNull>()
+            .add::<ObjectStoreRegistryImpl>()
             .build();
 
         // Init dataset with no sources
@@ -716,6 +860,7 @@ impl FlowRunsHarness {
                 MetadataFactory::dataset_snapshot()
                     .kind(DatasetKind::Root)
                     .name("foo")
+                    .push_event(MetadataFactory::set_polling_source().build())
                     .build(),
             )
             .await
@@ -788,6 +933,95 @@ impl FlowRunsHarness {
         response_json["datasets"]["byId"]["flows"]["runs"]["triggerFlow"]["flow"]["flowId"]
             .as_str()
             .unwrap()
+    }
+
+    fn list_flows_query(id: &DatasetID) -> String {
+        indoc!(
+            r#"
+            {
+                datasets {
+                    byId (datasetId: "<id>") {
+                        flows {
+                            runs {
+                                listFlows {
+                                    nodes {
+                                        flowId
+                                        description {
+                                            __typename
+                                            ... on FlowDescriptionDatasetCompaction {
+                                                datasetId
+                                                originalBlocksCount
+                                                resultingBlocksCount
+                                            }
+                                            ... on FlowDescriptionDatasetExecuteQuery {
+                                                datasetId
+                                                transformedRecordsCount
+                                            }
+                                            ... on FlowDescriptionDatasetPollingIngest {
+                                                datasetId
+                                                ingestedRecordsCount
+                                            }
+                                            ... on FlowDescriptionDatasetPushIngest {
+                                                datasetId
+                                                sourceName
+                                                inputRecordsCount
+                                                ingestedRecordsCount
+                                            }
+                                        }
+                                        status
+                                        outcome
+                                        timing {
+                                            runningSince
+                                            finishedAt
+                                        }
+                                        tasks {
+                                            taskId
+                                            status
+                                            outcome
+                                        }
+                                        initiator {
+                                            id
+                                            accountName
+                                        }
+                                        primaryTrigger {
+                                            __typename
+                                            ... on FlowTriggerInputDatasetFlow {
+                                                datasetId
+                                                flowType
+                                                flowId
+                                            }
+                                            ... on FlowTriggerManual {
+                                                initiator {
+                                                    id
+                                                    accountName
+                                                }
+                                            }
+                                        }
+                                        startCondition {
+                                            __typename
+                                            ... on FlowStartConditionBatching {
+                                                thresholdNewRecords
+                                            }
+                                            ... on FlowStartConditionThrottling {
+                                                intervalSec
+                                            }
+                                        }
+                                    }
+                                    pageInfo {
+                                        hasPreviousPage
+                                        hasNextPage
+                                        currentPage
+                                        totalPages
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            "#
+        )
+        .replace("<id>", &id.to_string())
     }
 
     fn trigger_flow_mutation(id: &DatasetID, dataset_flow_type: &str) -> String {
