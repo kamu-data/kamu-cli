@@ -824,12 +824,12 @@ impl FlowRunsHarness {
             .add_value(FlowServiceRunConfig::new(chrono::Duration::seconds(1)))
             .add::<TaskSchedulerInMemory>()
             .add::<TaskSystemEventStoreInMemory>()
+            .add::<DataFormatRegistryImpl>()
             .add_builder(
                 PollingIngestServiceImpl::builder()
                     .with_cache_dir(cache_dir)
                     .with_run_info_dir(run_info_dir)
-                    .with_container_runtime(Arc::new(ContainerRuntime::default()))
-                    .with_data_format_registry(Arc::new(DataFormatRegistryImpl::new())),
+                    .with_container_runtime(Arc::new(ContainerRuntime::default())),
             )
             .bind::<dyn PollingIngestService, PollingIngestServiceImpl>()
             .add::<EngineProvisionerNull>()

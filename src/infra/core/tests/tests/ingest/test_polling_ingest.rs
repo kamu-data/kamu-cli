@@ -1050,6 +1050,7 @@ impl IngestTestHarness {
                 Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap(),
             ))
             .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
+            .add::<DataFormatRegistryImpl>()
             .add_builder(
                 PollingIngestServiceImpl::builder()
                     .with_cache_dir(cache_dir)
@@ -1057,7 +1058,6 @@ impl IngestTestHarness {
                     .with_object_store_registry(Arc::new(ObjectStoreRegistryImpl::new(vec![
                         Arc::new(ObjectStoreBuilderLocalFs::new()),
                     ])))
-                    .with_data_format_registry(Arc::new(DataFormatRegistryImpl::new()))
                     .with_run_info_dir(run_info_dir),
             )
             .bind::<dyn PollingIngestService, PollingIngestServiceImpl>()

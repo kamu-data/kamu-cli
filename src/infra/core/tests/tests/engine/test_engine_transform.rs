@@ -235,12 +235,12 @@ async fn test_transform_common(transform: Transform) {
             ObjectStoreBuilderLocalFs::new(),
         )]))
         .bind::<dyn ObjectStoreRegistry, ObjectStoreRegistryImpl>()
+        .add::<DataFormatRegistryImpl>()
         .add_builder(
             PollingIngestServiceImpl::builder()
                 .with_cache_dir(cache_dir)
                 .with_run_info_dir(run_info_dir)
                 .with_container_runtime(Arc::new(ContainerRuntime::default()))
-                .with_data_format_registry(Arc::new(DataFormatRegistryImpl::new())),
         )
         .bind::<dyn PollingIngestService, PollingIngestServiceImpl>()
         .add::<TransformServiceImpl>()
