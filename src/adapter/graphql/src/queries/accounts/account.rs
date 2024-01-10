@@ -50,8 +50,8 @@ impl Account {
     }
 
     #[graphql(skip)]
-    pub(crate) fn from_account_name(name: &odf::AccountName) -> Self {
-        Self::new(AccountID::from(odf::FAKE_ACCOUNT_ID), name.clone().into())
+    pub(crate) fn from_account_name(name: odf::AccountName) -> Self {
+        Self::new(AccountID::from(odf::FAKE_ACCOUNT_ID), name.into())
     }
 
     #[graphql(skip)]

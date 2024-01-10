@@ -12,6 +12,7 @@ mod admin;
 mod auth;
 mod data;
 mod datasets;
+mod flows;
 mod search;
 mod tasks;
 
@@ -20,5 +21,6 @@ pub(crate) use admin::*;
 pub(crate) use auth::*;
 pub(crate) use data::*;
 pub(crate) use datasets::*;
+pub(crate) use flows::*;
 pub(crate) use search::*;
 pub(crate) use tasks::*;

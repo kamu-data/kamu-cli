@@ -96,6 +96,20 @@ impl Flow {
         self.apply(event)
     }
 
+    /// Task running
+    pub fn on_task_running(
+        &mut self,
+        now: DateTime<Utc>,
+        task_id: TaskID,
+    ) -> Result<(), ProjectionError<FlowState>> {
+        let event = FlowEventTaskRunning {
+            event_time: now,
+            flow_id: self.flow_id,
+            task_id,
+        };
+        self.apply(event)
+    }
+
     /// Task finished
     pub fn on_task_finished(
         &mut self,

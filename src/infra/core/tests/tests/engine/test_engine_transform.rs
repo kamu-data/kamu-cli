@@ -224,10 +224,10 @@ async fn test_transform_common(transform: Transform) {
                 .with_multi_tenant(false),
         )
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+        .add_value(ContainerRuntime::default())
         .add_builder(
             EngineProvisionerLocal::builder()
                 .with_config(EngineProvisionerLocalConfig::default())
-                .with_container_runtime(ContainerRuntime::default())
                 .with_run_info_dir(run_info_dir.clone()),
         )
         .bind::<dyn EngineProvisioner, EngineProvisionerLocal>()
@@ -235,12 +235,11 @@ async fn test_transform_common(transform: Transform) {
             ObjectStoreBuilderLocalFs::new(),
         )]))
         .bind::<dyn ObjectStoreRegistry, ObjectStoreRegistryImpl>()
+        .add::<DataFormatRegistryImpl>()
         .add_builder(
             PollingIngestServiceImpl::builder()
                 .with_cache_dir(cache_dir)
-                .with_run_info_dir(run_info_dir)
-                .with_container_runtime(Arc::new(ContainerRuntime::default()))
-                .with_data_format_registry(Arc::new(DataFormatRegistryImpl::new())),
+                .with_run_info_dir(run_info_dir),
         )
         .bind::<dyn PollingIngestService, PollingIngestServiceImpl>()
         .add::<TransformServiceImpl>()

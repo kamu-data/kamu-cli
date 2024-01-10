@@ -11,7 +11,7 @@ use kamu_core::{self as domain};
 use opendatafabric as odf;
 
 use crate::prelude::*;
-use crate::utils::{check_dataset_write_access, CheckDatasetAccessError};
+use crate::utils::check_dataset_write_access;
 use crate::LoggedInGuard;
 
 ////////////////////////////////////////////////////////////////////////////////////////
@@ -48,19 +48,7 @@ impl MetadataChainMut {
         event: String,
         event_format: MetadataManifestFormat,
     ) -> Result<CommitResult> {
-        match check_dataset_write_access(ctx, &self.dataset_handle).await {
-            Ok(_) => {}
-            Err(e) => match e {
-                CheckDatasetAccessError::Access(_) => {
-                    return Err(GqlError::Gql(
-                        Error::new("Dataset access error").extend_with(|_, eev| {
-                            eev.set("alias", self.dataset_handle.alias.to_string())
-                        }),
-                    ))
-                }
-                CheckDatasetAccessError::Internal(e) => return Err(e.into()),
-            },
-        };
+        check_dataset_write_access(ctx, &self.dataset_handle).await?;
 
         let event = match event_format {
             MetadataManifestFormat::Yaml => {

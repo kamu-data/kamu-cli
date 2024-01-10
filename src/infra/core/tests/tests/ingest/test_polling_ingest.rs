@@ -1039,10 +1039,10 @@ impl IngestTestHarness {
                     .with_multi_tenant(false),
             )
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+            .add_value(ContainerRuntime::default())
             .add_builder(
                 EngineProvisionerLocal::builder()
                     .with_config(EngineProvisionerLocalConfig::default())
-                    .with_container_runtime(ContainerRuntime::default())
                     .with_run_info_dir(run_info_dir.clone()),
             )
             .bind::<dyn EngineProvisioner, EngineProvisionerLocal>()
@@ -1050,14 +1050,13 @@ impl IngestTestHarness {
                 Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap(),
             ))
             .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
+            .add::<DataFormatRegistryImpl>()
             .add_builder(
                 PollingIngestServiceImpl::builder()
                     .with_cache_dir(cache_dir)
-                    .with_container_runtime(Arc::new(ContainerRuntime::default()))
                     .with_object_store_registry(Arc::new(ObjectStoreRegistryImpl::new(vec![
                         Arc::new(ObjectStoreBuilderLocalFs::new()),
                     ])))
-                    .with_data_format_registry(Arc::new(DataFormatRegistryImpl::new()))
                     .with_run_info_dir(run_info_dir),
             )
             .bind::<dyn PollingIngestService, PollingIngestServiceImpl>()

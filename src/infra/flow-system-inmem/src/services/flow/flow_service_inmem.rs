@@ -54,6 +54,7 @@ struct State {
 #[component(pub)]
 #[interface(dyn FlowService)]
 #[interface(dyn FlowServiceTestDriver)]
+#[interface(dyn AsyncEventHandler<TaskEventRunning>)]
 #[interface(dyn AsyncEventHandler<TaskEventFinished>)]
 #[interface(dyn AsyncEventHandler<DatasetEventDeleted>)]
 #[interface(dyn AsyncEventHandler<FlowConfigurationEventModified>)]
@@ -260,9 +261,9 @@ impl FlowServiceInMemory {
 
             if let Some(start_condition) = maybe_dependent_start_condition {
                 let trigger = FlowTrigger::InputDatasetFlow(FlowTriggerInputDatasetFlow {
-                    input_dataset_id: dataset_id.clone(),
-                    input_flow_type: flow_type,
-                    input_flow_id: flow_id,
+                    dataset_id: dataset_id.clone(),
+                    flow_type,
+                    flow_id,
                 });
 
                 let flow_key = FlowKeyDataset::new(dependent_dataset_id.clone(), flow_type).into();
@@ -689,15 +690,15 @@ impl FlowService for FlowServiceInMemory {
         let mut flow = Flow::load(flow_id, self.flow_event_store.as_ref()).await?;
 
         // May not be called for Draft or Queued flows.
-        // Cancel tasks in Scheduled state.
+        // Cancel tasks for flows in Scheduled/Running state.
         // Ignore in Finished state
         match flow.status() {
-            FlowStatus::Draft | FlowStatus::Queued => {
+            FlowStatus::Waiting | FlowStatus::Queued => {
                 return Err(CancelScheduledTasksError::NotScheduled(
                     FlowNotScheduledError { flow_id },
                 ))
             }
-            FlowStatus::Scheduled => {
+            FlowStatus::Scheduled | FlowStatus::Running => {
                 // Abort current flow and it's scheduled tasks
                 self.abort_flow_impl(&mut flow).await?;
 
@@ -738,6 +739,35 @@ impl FlowServiceTestDriver for FlowServiceInMemory {
             .int_err()?;
         let task_id = self.schedule_flow_task(&mut flow).await.int_err()?;
         Ok(task_id)
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait::async_trait]
+impl AsyncEventHandler<TaskEventRunning> for FlowServiceInMemory {
+    #[tracing::instrument(level = "debug", skip_all, fields(?event))]
+    async fn handle(&self, event: &TaskEventRunning) -> Result<(), InternalError> {
+        // Is this a task associated with flows?
+        let maybe_flow_id = {
+            let state = self.state.lock().unwrap();
+            if !state.running {
+                // Abort if running hasn't started yet
+                return Ok(());
+            }
+            state.pending_flows.try_get_flow_id_by_task(event.task_id)
+        };
+
+        if let Some(flow_id) = maybe_flow_id {
+            let mut flow = Flow::load(flow_id, self.flow_event_store.as_ref())
+                .await
+                .int_err()?;
+            flow.on_task_running(self.time_source.now(), event.task_id)
+                .int_err()?;
+            flow.save(self.flow_event_store.as_ref()).await.int_err()?;
+        }
+
+        Ok(())
     }
 }
 

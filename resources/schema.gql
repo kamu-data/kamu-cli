@@ -332,6 +332,10 @@ type DatasetFlowConfigsMut {
 	setConfigBatching(datasetFlowType: DatasetFlowType!, paused: Boolean!, throttlingPeriod: TimeDeltaInput, minimalDataBatch: Int): SetFlowConfigResult!
 }
 
+type DatasetFlowRuns {
+	listFlows(page: Int, perPage: Int): FlowConnection!
+}
+
 type DatasetFlowRunsMut {
 	triggerFlow(datasetFlowType: DatasetFlowType!): TriggerFlowResult!
 	cancelScheduledTasks(flowId: FlowID!): CancelScheduledTasksResult!
@@ -348,6 +352,10 @@ type DatasetFlows {
 	Returns interface for flow configurations queries
 	"""
 	configs: DatasetFlowConfigs!
+	"""
+	Returns interface for flow runs queries
+	"""
+	runs: DatasetFlowRuns!
 }
 
 type DatasetFlowsMut {
@@ -600,9 +608,42 @@ type FetchStepUrl {
 
 
 type Flow {
+	"""
+	Unique identifier of the flow
+	"""
 	flowId: FlowID!
+	"""
+	Description of key flow parameters
+	"""
+	description: FlowDescription!
+	"""
+	Status of the flow
+	"""
 	status: FlowStatus!
+	"""
+	Outcome of the flow (Finished state only)
+	"""
 	outcome: FlowOutcome
+	"""
+	Timing records associated with the flow lifecycle
+	"""
+	timing: FlowTimingRecords!
+	"""
+	Associated tasks
+	"""
+	tasks: [Task!]!
+	"""
+	A user, who initiated the flow run. None for system-initiated flows
+	"""
+	initiator: Account
+	"""
+	Primary flow trigger
+	"""
+	primaryTrigger: FlowTrigger!
+	"""
+	Start condition
+	"""
+	startCondition: FlowStartCondition
 }
 
 type FlowConfiguration {
@@ -617,6 +658,55 @@ type FlowConfigurationBatching {
 }
 
 union FlowConfigurationSchedule = TimeDelta | CronExpression
+
+type FlowConnection {
+	"""
+	A shorthand for `edges { node { ... } }`
+	"""
+	nodes: [Flow!]!
+	"""
+	Approximate number of total nodes
+	"""
+	totalCount: Int!
+	"""
+	Page information
+	"""
+	pageInfo: PageBasedInfo!
+	edges: [FlowEdge!]!
+}
+
+union FlowDescription = FlowDescriptionDatasetPollingIngest | FlowDescriptionDatasetPushIngest | FlowDescriptionDatasetExecuteQuery | FlowDescriptionDatasetCompaction | FlowDescriptionSystemGC
+
+type FlowDescriptionDatasetCompaction {
+	datasetId: DatasetID!
+	originalBlocksCount: Int!
+	resultingBlocksCount: Int
+}
+
+type FlowDescriptionDatasetExecuteQuery {
+	datasetId: DatasetID!
+	transformedRecordsCount: Int
+}
+
+type FlowDescriptionDatasetPollingIngest {
+	datasetId: DatasetID!
+	ingestedRecordsCount: Int
+}
+
+type FlowDescriptionDatasetPushIngest {
+	datasetId: DatasetID!
+	sourceName: String
+	inputRecordsCount: Int!
+	ingestedRecordsCount: Int
+}
+
+type FlowDescriptionSystemGC {
+	dummy: Boolean!
+}
+
+type FlowEdge {
+	node: Flow!
+}
 
 scalar FlowID
 
@@ -643,11 +733,58 @@ enum FlowOutcome {
 	ABORTED
 }
 
+union FlowStartCondition = FlowStartConditionThrottling | FlowStartConditionBatching
+
+type FlowStartConditionBatching {
+	thresholdNewRecords: Int!
+}
+
+type FlowStartConditionThrottling {
+	intervalSec: Int!
+}
+
 enum FlowStatus {
-	DRAFT
+	WAITING
 	QUEUED
 	SCHEDULED
+	RUNNING
 	FINISHED
+}
+
+type FlowTimingRecords {
+	"""
+	Planned activation time (at least, Queued state)
+	"""
+	activateAt: DateTime
+	"""
+	Recorded start of running (Running state seen at least once)
+	"""
+	runningSince: DateTime
+	"""
+	Recorded time of finish (succesfull or failed after retry) or abortion
+	(Finished state seen at least once)
+	"""
+	finishedAt: DateTime
+}
+
+union FlowTrigger = FlowTriggerManual | FlowTriggerAutoPolling | FlowTriggerPush | FlowTriggerInputDatasetFlow
+
+type FlowTriggerAutoPolling {
+	dummy: Boolean!
+}
+
+type FlowTriggerInputDatasetFlow {
+	datasetId: DatasetID!
+	flowType: DatasetFlowType!
+	flowId: FlowID!
+}
+
+type FlowTriggerManual {
+	initiator: Account!
+}
+
+type FlowTriggerPush {
+	dummy: Boolean!
 }
 
 

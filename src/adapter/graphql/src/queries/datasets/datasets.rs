@@ -39,7 +39,7 @@ impl Datasets {
         account_name: AccountName,
         dataset_name: DatasetName,
     ) -> Result<Option<Dataset>> {
-        let account = Account::from_account_name(&account_name);
+        let account = Account::from_account_name(account_name.clone().into());
 
         let dataset_alias = odf::DatasetAlias::new(Some(account_name.into()), dataset_name.into());
 
@@ -103,7 +103,7 @@ impl Datasets {
         page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<DatasetConnection> {
-        let account_ref = Account::from_account_name(&account_name);
+        let account_ref = Account::from_account_name(account_name.into());
         self.by_account_impl(ctx, account_ref, page, per_page).await
     }
 }

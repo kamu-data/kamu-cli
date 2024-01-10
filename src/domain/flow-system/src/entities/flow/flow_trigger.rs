@@ -21,6 +21,24 @@ pub enum FlowTrigger {
     InputDatasetFlow(FlowTriggerInputDatasetFlow),
 }
 
+impl FlowTrigger {
+    pub fn initiator_account_name(&self) -> Option<&AccountName> {
+        if let FlowTrigger::Manual(manual) = self {
+            Some(&manual.initiator_account_name)
+        } else {
+            None
+        }
+    }
+
+    pub fn push_source_name(&self) -> Option<String> {
+        if let FlowTrigger::Push(trigger_push) = self {
+            trigger_push.source_name.to_owned()
+        } else {
+            panic!("Any trigger kind except Push unexpected")
+        }
+    }
+}
+
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -39,15 +57,16 @@ pub struct FlowTriggerAutoPolling {}
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FlowTriggerPush {
     // TODO: source (HTTP, MQTT, CMD, ...)
+    source_name: Option<String>,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FlowTriggerInputDatasetFlow {
-    pub input_dataset_id: DatasetID,
-    pub input_flow_type: DatasetFlowType,
-    pub input_flow_id: FlowID,
+    pub dataset_id: DatasetID,
+    pub flow_type: DatasetFlowType,
+    pub flow_id: FlowID,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
