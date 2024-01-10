@@ -31,6 +31,7 @@ pub struct SystemDiagnoseCommand {
     dataset_repo: Arc<dyn DatasetRepository>,
     verification_svc: Arc<dyn VerificationService>,
     container_runtime: Arc<ContainerRuntime>,
+    is_in_workpace: bool,
 }
 
 impl SystemDiagnoseCommand {
@@ -38,22 +39,29 @@ impl SystemDiagnoseCommand {
         dataset_repo: Arc<dyn DatasetRepository>,
         verification_svc: Arc<dyn VerificationService>,
         container_runtime: Arc<ContainerRuntime>,
+        is_in_workpace: bool,
     ) -> Self {
         Self {
             dataset_repo,
             verification_svc,
             container_runtime,
+            is_in_workpace,
         }
     }
 }
 
 #[async_trait::async_trait(?Send)]
 impl Command for SystemDiagnoseCommand {
+    fn needs_workspace(&self) -> bool {
+        false
+    }
+
     async fn run(&mut self) -> Result<(), CLIError> {
         let diagnose_check = RunCheck::new(
             self.dataset_repo.clone(),
             self.verification_svc.clone(),
             self.container_runtime.clone(),
+            self.is_in_workpace,
         );
         diagnose_check.run().await?;
         Ok(())
@@ -66,6 +74,7 @@ pub struct RunCheck {
     dataset_repo: Arc<dyn DatasetRepository>,
     verification_svc: Arc<dyn VerificationService>,
     container_runtime: Arc<ContainerRuntime>,
+    is_in_workpace: bool,
 }
 
 impl RunCheck {
@@ -73,11 +82,13 @@ impl RunCheck {
         dataset_repo: Arc<dyn DatasetRepository>,
         verification_svc: Arc<dyn VerificationService>,
         container_runtime: Arc<ContainerRuntime>,
+        is_in_workpace: bool,
     ) -> Self {
         Self {
             dataset_repo,
             verification_svc,
             container_runtime,
+            is_in_workpace,
         }
     }
 
@@ -210,18 +221,26 @@ impl RunCheck {
         write!(out, "\n")?;
         self.container_volume_mount_check(&mut out).await?;
         write!(out, "\n")?;
-        let progress = VerificationMultiProgress::new();
-        let listener = Arc::new(progress.clone());
+        if self.is_in_workpace {
+            let progress = VerificationMultiProgress::new();
+            let listener = Arc::new(progress.clone());
 
-        let draw_thread = std::thread::spawn(move || {
-            progress.draw();
-        });
-        self.workspace_consistency_check(Some(listener.clone()), &mut out)
-            .await?;
+            let draw_thread = std::thread::spawn(move || {
+                progress.draw();
+            });
+            self.workspace_consistency_check(Some(listener.clone()), &mut out)
+                .await?;
+            listener.finish();
+            draw_thread.join().unwrap();
+        } else {
+            write!(
+                out,
+                "{}",
+                style("directory is not a kamu workspace").yellow(),
+            )?;
+        }
+
         write!(out, "\n")?;
-        listener.finish();
-        draw_thread.join().unwrap();
-
         Ok(())
     }
 }

@@ -464,20 +464,27 @@ pub fn get_command(
                 _ => return Err(CommandInterpretationFailed.into()),
             },
             Some(("info", info_matches)) => {
-                let workspace_svc = cli_catalog.get_one::<WorkspaceService>()?;
+                let workspace_root_dir = match cli_catalog.get_one::<WorkspaceService>()?.layout() {
+                    Some(wl) => wl.root_dir.to_str().map(String::from).unwrap(),
+                    None => "".to_string(),
+                };
 
                 Box::new(SystemInfoCommand::new(
                     cli_catalog.get_one()?,
                     cli_catalog.get_one()?,
-                    workspace_svc.layout().unwrap().clone(),
+                    workspace_root_dir,
                     info_matches.get_one("output-format").map(String::as_str),
                 ))
             }
-            Some(("diagnose", _)) => Box::new(SystemDiagnoseCommand::new(
-                cli_catalog.get_one()?,
-                cli_catalog.get_one()?,
-                cli_catalog.get_one()?,
-            )),
+            Some(("diagnose", _)) => {
+                let workspace_svc = cli_catalog.get_one::<WorkspaceService>()?;
+                Box::new(SystemDiagnoseCommand::new(
+                    cli_catalog.get_one()?,
+                    cli_catalog.get_one()?,
+                    cli_catalog.get_one()?,
+                    workspace_svc.is_in_workspace(),
+                ))
+            }
             Some(("ipfs", ipfs_matches)) => match ipfs_matches.subcommand() {
                 Some(("add", add_matches)) => Box::new(SystemIpfsAddCommand::new(
                     cli_catalog.get_one()?,
@@ -538,11 +545,14 @@ pub fn get_command(
             submatches.get_flag("integrity"),
         )),
         Some(("version", submatches)) => {
-            let workspace_svc = cli_catalog.get_one::<WorkspaceService>()?;
+            let workspace_root_dir = match cli_catalog.get_one::<WorkspaceService>()?.layout() {
+                Some(wl) => wl.root_dir.to_str().map(String::from).unwrap(),
+                None => "".to_string(),
+            };
 
             Box::new(VersionCommand::new(
                 cli_catalog.get_one()?,
-                workspace_svc.layout().unwrap().clone(),
+                workspace_root_dir,
                 submatches.get_one("output-format").map(String::as_str),
             ))
         }

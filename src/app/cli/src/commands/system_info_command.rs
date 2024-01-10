@@ -14,14 +14,13 @@ use internal_error::*;
 
 use super::{CLIError, Command};
 use crate::output::*;
-use crate::WorkspaceLayout;
 
 ///////////////////////////////////////////////////////////////////////////////
 
 pub struct SystemInfoCommand {
     output_config: Arc<OutputConfig>,
     output_format: Option<String>,
-    workspace_layout: WorkspaceLayout,
+    workspace_root_dir: String,
     container_runtime: Arc<ContainerRuntime>,
 }
 
@@ -29,7 +28,7 @@ impl SystemInfoCommand {
     pub fn new<S>(
         output_config: Arc<OutputConfig>,
         container_runtime: Arc<ContainerRuntime>,
-        workspace_layout: WorkspaceLayout,
+        workspace_root_dir: String,
         output_format: Option<S>,
     ) -> Self
     where
@@ -38,7 +37,7 @@ impl SystemInfoCommand {
         Self {
             output_config,
             container_runtime,
-            workspace_layout,
+            workspace_root_dir,
             output_format: output_format.map(|s| s.into()),
         }
     }
@@ -54,7 +53,7 @@ impl Command for SystemInfoCommand {
         write_output(
             SystemInfo::collect(
                 self.container_runtime.clone(),
-                self.workspace_layout.clone(),
+                self.workspace_root_dir.clone(),
             )
             .await,
             &self.output_config,
@@ -68,14 +67,14 @@ impl Command for SystemInfoCommand {
 
 pub struct VersionCommand {
     output_config: Arc<OutputConfig>,
-    workspace_layout: WorkspaceLayout,
+    workspace_root_dir: String,
     output_format: Option<String>,
 }
 
 impl VersionCommand {
     pub fn new<S>(
         output_config: Arc<OutputConfig>,
-        workspace_layout: WorkspaceLayout,
+        workspace_root_dir: String,
         output_format: Option<S>,
     ) -> Self
     where
@@ -83,7 +82,7 @@ impl VersionCommand {
     {
         Self {
             output_config,
-            workspace_layout,
+            workspace_root_dir,
             output_format: output_format.map(|s| s.into()),
         }
     }
@@ -97,7 +96,7 @@ impl Command for VersionCommand {
 
     async fn run(&mut self) -> Result<(), CLIError> {
         write_output(
-            BuildInfo::collect(self.workspace_layout.clone()),
+            BuildInfo::collect(self.workspace_root_dir.clone()),
             &self.output_config,
             self.output_format.as_ref(),
         )?;
@@ -107,7 +106,7 @@ impl Command for VersionCommand {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-pub fn write_output<T: serde::Serialize>(
+fn write_output<T: serde::Serialize>(
     value: T,
     output_config: &OutputConfig,
     output_format: Option<impl AsRef<str>>,
@@ -144,10 +143,10 @@ pub struct SystemInfo {
 impl SystemInfo {
     pub async fn collect(
         container_runtime: Arc<ContainerRuntime>,
-        workspace_layout: WorkspaceLayout,
+        workspace_root_dir: String,
     ) -> Self {
         Self {
-            build: BuildInfo::collect(workspace_layout),
+            build: BuildInfo::collect(workspace_root_dir),
             additional: AdditionalInfo::collect(container_runtime).await,
         }
     }
@@ -169,11 +168,11 @@ pub struct BuildInfo {
     pub cargo_target_triple: Option<&'static str>,
     pub cargo_features: Option<&'static str>,
     pub cargo_opt_level: Option<&'static str>,
-    pub workspace_dir: Option<String>,
+    pub workspace_dir: String,
 }
 
 impl BuildInfo {
-    pub fn collect(workspace_layout: WorkspaceLayout) -> Self {
+    pub fn collect(workspace_root_dir: String) -> Self {
         Self {
             app_version: env!("CARGO_PKG_VERSION"),
             build_timestamp: option_env!("VERGEN_BUILD_TIMESTAMP"),
@@ -188,7 +187,7 @@ impl BuildInfo {
             cargo_target_triple: option_env!("VERGEN_CARGO_TARGET_TRIPLE"),
             cargo_features: option_env!("VERGEN_CARGO_FEATURES"),
             cargo_opt_level: option_env!("VERGEN_CARGO_OPT_LEVEL"),
-            workspace_dir: workspace_layout.root_dir.to_str().map(String::from),
+            workspace_dir: workspace_root_dir,
         }
     }
 }
