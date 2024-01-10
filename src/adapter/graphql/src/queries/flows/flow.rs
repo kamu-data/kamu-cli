@@ -92,8 +92,10 @@ impl Flow {
 
     #[graphql(skip)]
     fn system_flow_description(&self, system_key: &fs::FlowKeySystem) -> FlowDescriptionSystem {
-        FlowDescriptionSystem {
-            flow_type: system_key.flow_type.into(),
+        match system_key.flow_type {
+            fs::SystemFlowType::GC => {
+                FlowDescriptionSystem::GC(FlowDescriptionSystemGC { dummy: true })
+            }
         }
     }
 
@@ -149,12 +151,18 @@ impl Flow {
 pub enum FlowDescription {
     #[graphql(flatten)]
     Dataset(FlowDescriptionDataset),
+    #[graphql(flatten)]
     System(FlowDescriptionSystem),
 }
 
+#[derive(Union, Clone, PartialEq, Eq)]
+pub enum FlowDescriptionSystem {
+    GC(FlowDescriptionSystemGC),
+}
+
 #[derive(SimpleObject, Clone, PartialEq, Eq)]
-pub struct FlowDescriptionSystem {
-    flow_type: SystemFlowType,
+pub struct FlowDescriptionSystemGC {
+    dummy: bool,
 }
 
 #[derive(Union, Clone, PartialEq, Eq)]

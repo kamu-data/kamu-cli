@@ -675,7 +675,7 @@ type FlowConnection {
 	edges: [FlowEdge!]!
 }
 
-union FlowDescription = FlowDescriptionDatasetPollingIngest | FlowDescriptionDatasetPushIngest | FlowDescriptionDatasetExecuteQuery | FlowDescriptionDatasetCompaction | FlowDescriptionSystem
+union FlowDescription = FlowDescriptionDatasetPollingIngest | FlowDescriptionDatasetPushIngest | FlowDescriptionDatasetExecuteQuery | FlowDescriptionDatasetCompaction | FlowDescriptionSystemGC
 
 type FlowDescriptionDatasetCompaction {
 	datasetId: DatasetID!
@@ -700,8 +700,8 @@ type FlowDescriptionDatasetPushIngest {
 	ingestedRecordsCount: Int
 }
 
-type FlowDescriptionSystem {
-	flowType: SystemFlowType!
+type FlowDescriptionSystemGC {
+	dummy: Boolean!
 }
 
 type FlowEdge {
@@ -1206,10 +1206,6 @@ type SqlQueryStep {
 	query: String!
 }
 
-
-enum SystemFlowType {
-	GC
-}
 
 type Task {
 	"""
