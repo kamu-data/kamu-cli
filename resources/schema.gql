@@ -333,7 +333,7 @@ type DatasetFlowConfigsMut {
 }
 
 type DatasetFlowRuns {
-	viewFlows(page: Int, perPage: Int): FlowConnection!
+	listFlows(page: Int, perPage: Int): FlowConnection!
 }
 
 type DatasetFlowRunsMut {
@@ -675,35 +675,26 @@ type FlowConnection {
 	edges: [FlowEdge!]!
 }
 
-union FlowDescription = FlowDescriptionDataset | FlowDescriptionSystem
+union FlowDescription = FlowDescriptionDatasetPollingIngest | FlowDescriptionDatasetPushIngest | FlowDescriptionDatasetExecuteQuery | FlowDescriptionDatasetCompaction | FlowDescriptionSystem
 
-type FlowDescriptionCompaction {
+type FlowDescriptionDatasetCompaction {
+	datasetId: DatasetID!
 	originalBlocksCount: Int!
 	resultingBlocksCount: Int
 }
 
-type FlowDescriptionDataset {
+type FlowDescriptionDatasetExecuteQuery {
 	datasetId: DatasetID!
-	details: FlowDescriptionDatasetDetails!
-}
-
-union FlowDescriptionDatasetDetails = FlowDescriptionPollingIngest | FlowDescriptionPushIngest | FlowDescriptionExecuteQuery | FlowDescriptionCompaction
-
-type FlowDescriptionExecuteQuery {
-	recordsCountByInput: [FlowDescriptionExecuteQueryInput!]!
 	transformedRecordsCount: Int
 }
 
-type FlowDescriptionExecuteQueryInput {
+type FlowDescriptionDatasetPollingIngest {
 	datasetId: DatasetID!
-	numRecords: Int!
-}
-
-type FlowDescriptionPollingIngest {
 	ingestedRecordsCount: Int
 }
 
-type FlowDescriptionPushIngest {
+type FlowDescriptionDatasetPushIngest {
+	datasetId: DatasetID!
 	sourceName: String
 	inputRecordsCount: Int!
 	ingestedRecordsCount: Int

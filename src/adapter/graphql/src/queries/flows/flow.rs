@@ -50,43 +50,43 @@ impl Flow {
         ctx: &Context<'_>,
         dataset_key: &fs::FlowKeyDataset,
     ) -> Result<FlowDescriptionDataset> {
-        Ok(FlowDescriptionDataset {
-            dataset_id: dataset_key.dataset_id.clone().into(),
-            details: match dataset_key.flow_type {
-                fs::DatasetFlowType::Ingest => {
-                    let polling_ingest_svc = from_catalog::<dyn PollingIngestService>(ctx).unwrap();
+        Ok(match dataset_key.flow_type {
+            fs::DatasetFlowType::Ingest => {
+                let polling_ingest_svc = from_catalog::<dyn PollingIngestService>(ctx).unwrap();
 
-                    let maybe_polling_source = polling_ingest_svc
-                        .get_active_polling_source(&dataset_key.dataset_id.as_local_ref())
-                        .await
-                        .int_err()?;
+                let maybe_polling_source = polling_ingest_svc
+                    .get_active_polling_source(&dataset_key.dataset_id.as_local_ref())
+                    .await
+                    .int_err()?;
 
-                    if maybe_polling_source.is_some() {
-                        FlowDescriptionDatasetDetails::PollingIngest(FlowDescriptionPollingIngest {
-                            ingested_records_count: None, // TODO
-                        })
-                    } else {
-                        let source_name = self.flow_state.primary_trigger.push_source_name();
-                        FlowDescriptionDatasetDetails::PushIngest(FlowDescriptionPushIngest {
-                            source_name,
-                            input_records_count: 0,       // TODO
-                            ingested_records_count: None, // TODO
-                        })
-                    }
-                }
-                fs::DatasetFlowType::ExecuteQuery => {
-                    FlowDescriptionDatasetDetails::ExecuteQuery(FlowDescriptionExecuteQuery {
-                        records_count_by_input: vec![],  // TODO
-                        transformed_records_count: None, // TODO
+                if maybe_polling_source.is_some() {
+                    FlowDescriptionDataset::PollingIngest(FlowDescriptionDatasetPollingIngest {
+                        dataset_id: dataset_key.dataset_id.clone().into(),
+                        ingested_records_count: None, // TODO
+                    })
+                } else {
+                    let source_name = self.flow_state.primary_trigger.push_source_name();
+                    FlowDescriptionDataset::PushIngest(FlowDescriptionDatasetPushIngest {
+                        dataset_id: dataset_key.dataset_id.clone().into(),
+                        source_name,
+                        input_records_count: 0,       // TODO
+                        ingested_records_count: None, // TODO
                     })
                 }
-                fs::DatasetFlowType::Compaction => {
-                    FlowDescriptionDatasetDetails::Compaction(FlowDescriptionCompaction {
-                        original_blocks_count: 0,     // TODO
-                        resulting_blocks_count: None, // TODO
-                    })
-                }
-            },
+            }
+            fs::DatasetFlowType::ExecuteQuery => {
+                FlowDescriptionDataset::ExecuteQuery(FlowDescriptionDatasetExecuteQuery {
+                    dataset_id: dataset_key.dataset_id.clone().into(),
+                    transformed_records_count: None, // TODO
+                })
+            }
+            fs::DatasetFlowType::Compaction => {
+                FlowDescriptionDataset::Compaction(FlowDescriptionDatasetCompaction {
+                    dataset_id: dataset_key.dataset_id.clone().into(),
+                    original_blocks_count: 0,     // TODO
+                    resulting_blocks_count: None, // TODO
+                })
+            }
         })
     }
 
@@ -147,6 +147,7 @@ impl Flow {
 
 #[derive(Union, Clone, Eq, PartialEq)]
 pub enum FlowDescription {
+    #[graphql(flatten)]
     Dataset(FlowDescriptionDataset),
     System(FlowDescriptionSystem),
 }
@@ -156,46 +157,37 @@ pub struct FlowDescriptionSystem {
     flow_type: SystemFlowType,
 }
 
+#[derive(Union, Clone, PartialEq, Eq)]
+pub enum FlowDescriptionDataset {
+    PollingIngest(FlowDescriptionDatasetPollingIngest),
+    PushIngest(FlowDescriptionDatasetPushIngest),
+    ExecuteQuery(FlowDescriptionDatasetExecuteQuery),
+    Compaction(FlowDescriptionDatasetCompaction),
+}
+
 #[derive(SimpleObject, Clone, PartialEq, Eq)]
-pub struct FlowDescriptionDataset {
+pub struct FlowDescriptionDatasetPollingIngest {
     dataset_id: DatasetID,
-    details: FlowDescriptionDatasetDetails,
-}
-
-#[derive(Union, Clone, Eq, PartialEq)]
-pub enum FlowDescriptionDatasetDetails {
-    PollingIngest(FlowDescriptionPollingIngest),
-    PushIngest(FlowDescriptionPushIngest),
-    ExecuteQuery(FlowDescriptionExecuteQuery),
-    Compaction(FlowDescriptionCompaction),
-}
-
-#[derive(SimpleObject, Clone, PartialEq, Eq)]
-pub struct FlowDescriptionPollingIngest {
     ingested_records_count: Option<u64>,
 }
 
 #[derive(SimpleObject, Clone, PartialEq, Eq)]
-pub struct FlowDescriptionPushIngest {
+pub struct FlowDescriptionDatasetPushIngest {
+    dataset_id: DatasetID,
     source_name: Option<String>,
     input_records_count: u64,
     ingested_records_count: Option<u64>,
 }
 
 #[derive(SimpleObject, Clone, PartialEq, Eq)]
-pub struct FlowDescriptionExecuteQuery {
-    records_count_by_input: Vec<FlowDescriptionExecuteQueryInput>,
+pub struct FlowDescriptionDatasetExecuteQuery {
+    dataset_id: DatasetID,
     transformed_records_count: Option<u64>,
 }
 
 #[derive(SimpleObject, Clone, PartialEq, Eq)]
-pub struct FlowDescriptionExecuteQueryInput {
+pub struct FlowDescriptionDatasetCompaction {
     dataset_id: DatasetID,
-    num_records: u64,
-}
-
-#[derive(SimpleObject, Clone, PartialEq, Eq)]
-pub struct FlowDescriptionCompaction {
     original_blocks_count: u64,
     resulting_blocks_count: Option<u64>,
 }

@@ -29,7 +29,7 @@ impl DatasetFlowRuns {
         Self { dataset_handle }
     }
 
-    pub async fn view_flows(
+    pub async fn list_flows(
         &self,
         ctx: &Context<'_>,
         page: Option<usize>,
