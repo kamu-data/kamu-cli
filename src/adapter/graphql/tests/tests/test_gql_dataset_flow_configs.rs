@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use async_graphql::{value, Value};
+use async_graphql::value;
 use dill::Component;
 use event_bus::EventBus;
 use indoc::indoc;
@@ -75,7 +75,7 @@ async fn test_crud_time_delta_root_dataset() {
                 "byId": {
                     "flows": {
                         "configs": {
-                            "byType": Value::Null
+                            "byType": null
                         }
                     }
                 }
@@ -117,7 +117,7 @@ async fn test_crud_time_delta_root_dataset() {
                                         "every": 1,
                                         "unit": "DAYS"
                                     },
-                                    "batching": Value::Null
+                                    "batching": null
                                 }
                             }
                         }
@@ -161,7 +161,7 @@ async fn test_crud_time_delta_root_dataset() {
                                         "every": 2,
                                         "unit": "HOURS"
                                     },
-                                    "batching": Value::Null
+                                    "batching": null
                                 }
                             }
                         }
@@ -225,7 +225,7 @@ async fn test_crud_cron_root_dataset() {
                 "byId": {
                     "flows": {
                         "configs": {
-                            "byType": Value::Null
+                            "byType": null
                         }
                     }
                 }
@@ -265,7 +265,7 @@ async fn test_crud_cron_root_dataset() {
                                         "__typename": "CronExpression",
                                         "cronExpression": "0 */2 * * * *",
                                     },
-                                    "batching": Value::Null
+                                    "batching": null
                                 }
                             }
                         }
@@ -307,7 +307,7 @@ async fn test_crud_cron_root_dataset() {
                                         "__typename": "CronExpression",
                                         "cronExpression": "0 0 */1 * * *",
                                     },
-                                    "batching": Value::Null
+                                    "batching": null
                                 }
                             }
                         }
@@ -419,7 +419,7 @@ async fn test_crud_batching_derived_dataset() {
                 "byId": {
                     "flows": {
                         "configs": {
-                            "byType": Value::Null
+                            "byType": null
                         }
                     }
                 }
@@ -456,7 +456,7 @@ async fn test_crud_batching_derived_dataset() {
                                 "config": {
                                     "__typename": "FlowConfiguration",
                                     "paused": false,
-                                    "schedule": Value::Null,
+                                    "schedule": null,
                                     "batching": {
                                         "__typename": "FlowConfigurationBatching",
                                         "throttlingPeriod": {

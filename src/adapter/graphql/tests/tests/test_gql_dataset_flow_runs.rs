@@ -11,7 +11,7 @@
 
 use std::sync::Arc;
 
-use async_graphql::{value, Value};
+use async_graphql::value;
 use chrono::Utc;
 use container_runtime::ContainerRuntime;
 use dill::Component;
@@ -80,7 +80,7 @@ async fn test_trigger_ingest_root_dataset() {
                                     "__typename": "Flow",
                                     "flowId": "0",
                                     "status": "QUEUED",
-                                    "outcome": Value::Null
+                                    "outcome": null
                                 }
                             }
                         }
@@ -113,13 +113,13 @@ async fn test_trigger_ingest_root_dataset() {
                                         "description": {
                                             "__typename": "FlowDescriptionDatasetPollingIngest",
                                             "datasetId": create_result.dataset_handle.id.to_string(),
-                                            "ingestedRecordsCount": Value::Null,
+                                            "ingestedRecordsCount": null,
                                         },
                                         "status": "QUEUED",
-                                        "outcome": Value::Null,
+                                        "outcome": null,
                                         "timing": {
-                                            "runningSince": Value::Null,
-                                            "finishedAt": Value::Null,
+                                            "runningSince": null,
+                                            "finishedAt": null,
                                         },
                                         "tasks": [],
                                         "initiator": {
@@ -133,7 +133,7 @@ async fn test_trigger_ingest_root_dataset() {
                                                 "accountName": auth::DEFAULT_ACCOUNT_NAME,
                                             }
                                         },
-                                        "startCondition": Value::Null,
+                                        "startCondition": null,
                                     }
                                 ],
                                 "pageInfo": {
@@ -187,7 +187,7 @@ async fn test_trigger_execute_query_derived_dataset() {
                                     "__typename": "Flow",
                                     "flowId": "0",
                                     "status": "QUEUED",
-                                    "outcome": Value::Null
+                                    "outcome": null
                                 }
                             }
                         }
@@ -220,13 +220,13 @@ async fn test_trigger_execute_query_derived_dataset() {
                                         "description": {
                                             "__typename": "FlowDescriptionDatasetExecuteQuery",
                                             "datasetId": create_derived_result.dataset_handle.id.to_string(),
-                                            "transformedRecordsCount": Value::Null,
+                                            "transformedRecordsCount": null,
                                         },
                                         "status": "QUEUED",
-                                        "outcome": Value::Null,
+                                        "outcome": null,
                                         "timing": {
-                                            "runningSince": Value::Null,
-                                            "finishedAt": Value::Null,
+                                            "runningSince": null,
+                                            "finishedAt": null,
                                         },
                                         "tasks": [],
                                         "initiator": {
@@ -240,7 +240,7 @@ async fn test_trigger_execute_query_derived_dataset() {
                                                 "accountName": auth::DEFAULT_ACCOUNT_NAME,
                                             }
                                         },
-                                        "startCondition": Value::Null,
+                                        "startCondition": null,
                                     }
                                 ],
                                 "pageInfo": {
@@ -392,7 +392,6 @@ async fn test_cancel_ingest_root_dataset() {
             }
         })
     );
-
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
