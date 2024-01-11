@@ -143,8 +143,8 @@ pub struct TransformResponseExt {
     pub new_data: Option<OwnedFile>,
 }
 
-impl Into<TransformRequestInputExt> for ExecuteTransformInput {
-    fn from(val: TransformRequestInputExt) -> Self{
+impl From<TransformRequestInputExt> for ExecuteTransformInput {
+    fn from(val: TransformRequestInputExt) -> Self {
         Self {
             dataset_id: val.dataset_handle.id,
             prev_block_hash: val.prev_block_hash,

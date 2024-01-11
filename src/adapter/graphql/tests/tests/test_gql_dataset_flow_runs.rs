@@ -162,14 +162,14 @@ async fn test_trigger_ingest_root_dataset() {
 ////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_trigger_execute_query_derived_dataset() {
+async fn test_trigger_execute_transform_derived_dataset() {
     let harness = FlowRunsHarness::new();
     harness.create_root_dataset().await;
     let create_derived_result = harness.create_derived_dataset().await;
 
     let mutation_code = FlowRunsHarness::trigger_flow_mutation(
         &create_derived_result.dataset_handle.id,
-        "EXECUTE_QUERY",
+        "EXECUTE_TRANSFORM",
     );
 
     let schema = kamu_adapter_graphql::schema_quiet();
@@ -226,7 +226,7 @@ async fn test_trigger_execute_query_derived_dataset() {
                                     {
                                         "flowId": "0",
                                         "description": {
-                                            "__typename": "FlowDescriptionDatasetExecuteQuery",
+                                            "__typename": "FlowDescriptionDatasetExecuteTransform",
                                             "datasetId": create_derived_result.dataset_handle.id.to_string(),
                                             "transformedRecordsCount": null,
                                         },
@@ -279,7 +279,7 @@ async fn test_incorrect_dataset_kinds_for_flow_type() {
 
     let mutation_code = FlowRunsHarness::trigger_flow_mutation(
         &create_root_result.dataset_handle.id,
-        "EXECUTE_QUERY",
+        "EXECUTE_TRANSFORM",
     );
 
     let schema = kamu_adapter_graphql::schema_quiet();
@@ -412,7 +412,7 @@ async fn test_cancel_transform_derived_dataset() {
 
     let mutation_code = FlowRunsHarness::trigger_flow_mutation(
         &create_derived_result.dataset_handle.id,
-        "EXECUTE_QUERY",
+        "EXECUTE_TRANSFORM",
     );
 
     let schema = kamu_adapter_graphql::schema_quiet();
@@ -880,7 +880,7 @@ async fn test_anonymous_operation_fails() {
         FlowRunsHarness::trigger_flow_mutation(&create_root_result.dataset_handle.id, "INGEST"),
         FlowRunsHarness::trigger_flow_mutation(
             &create_derived_result.dataset_handle.id,
-            "EXECUTE_QUERY",
+            "EXECUTE_TRANSFORM",
         ),
         FlowRunsHarness::cancel_scheduled_tasks_mutation(
             &create_root_result.dataset_handle.id,
@@ -974,7 +974,6 @@ impl FlowRunsHarness {
     async fn create_root_dataset(&self) -> CreateDatasetResult {
         self.dataset_repo
             .create_dataset_from_snapshot(
-                None,
                 MetadataFactory::dataset_snapshot()
                     .kind(DatasetKind::Root)
                     .name("foo")
@@ -988,11 +987,14 @@ impl FlowRunsHarness {
     async fn create_derived_dataset(&self) -> CreateDatasetResult {
         self.dataset_repo
             .create_dataset_from_snapshot(
-                None,
                 MetadataFactory::dataset_snapshot()
                     .name("bar")
                     .kind(DatasetKind::Derivative)
-                    .push_event(MetadataFactory::set_transform(["foo"]).build())
+                    .push_event(
+                        MetadataFactory::set_transform()
+                            .inputs_from_refs(["foo"])
+                            .build(),
+                    )
                     .build(),
             )
             .await
@@ -1088,7 +1090,7 @@ impl FlowRunsHarness {
                                                 originalBlocksCount
                                                 resultingBlocksCount
                                             }
-                                            ... on FlowDescriptionDatasetExecuteQuery {
+                                            ... on FlowDescriptionDatasetExecuteTransform {
                                                 datasetId
                                                 transformedRecordsCount
                                             }
