@@ -15,44 +15,6 @@ use crate::prelude::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct TaskID(ts::TaskID);
+simple_scalar!(TaskID, ts::TaskID);
 
 /////////////////////////////////////////////////////////////////////////////////////////
-
-impl From<ts::TaskID> for TaskID {
-    fn from(value: ts::TaskID) -> Self {
-        TaskID(value)
-    }
-}
-
-impl From<TaskID> for ts::TaskID {
-    fn from(val: TaskID) -> Self {
-        val.0
-    }
-}
-
-impl Deref for TaskID {
-    type Target = ts::TaskID;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-#[Scalar]
-impl ScalarType for TaskID {
-    fn parse(value: Value) -> InputValueResult<Self> {
-        if let Value::String(s) = &value {
-            match s.parse() {
-                Ok(i) => Ok(Self(ts::TaskID::new(i))),
-                Err(_) => Err(InputValueError::expected_type(value)),
-            }
-        } else {
-            Err(InputValueError::expected_type(value))
-        }
-    }
-
-    fn to_value(&self) -> Value {
-        Value::String(self.0.to_string())
-    }
-}

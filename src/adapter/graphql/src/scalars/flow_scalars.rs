@@ -16,47 +16,7 @@ use crate::prelude::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct FlowID(fs::FlowID);
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-impl From<fs::FlowID> for FlowID {
-    fn from(value: fs::FlowID) -> Self {
-        FlowID(value)
-    }
-}
-
-impl From<FlowID> for fs::FlowID {
-    fn from(val: FlowID) -> Self {
-        val.0
-    }
-}
-
-impl Deref for FlowID {
-    type Target = fs::FlowID;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-#[Scalar]
-impl ScalarType for FlowID {
-    fn parse(value: Value) -> InputValueResult<Self> {
-        if let Value::String(s) = &value {
-            match s.parse() {
-                Ok(i) => Ok(Self(fs::FlowID::new(i))),
-                Err(_) => Err(InputValueError::expected_type(value)),
-            }
-        } else {
-            Err(InputValueError::expected_type(value))
-        }
-    }
-
-    fn to_value(&self) -> Value {
-        Value::String(self.0.to_string())
-    }
-}
+simple_scalar!(FlowID, fs::FlowID);
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
