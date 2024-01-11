@@ -633,6 +633,10 @@ type Flow {
 	"""
 	tasks: [Task!]!
 	"""
+	History of flow events
+	"""
+	history: [FlowEvent!]!
+	"""
 	A user, who initiated the flow run. None for system-initiated flows
 	"""
 	initiator: Account
@@ -706,6 +710,46 @@ type FlowDescriptionSystemGC {
 
 type FlowEdge {
 	node: Flow!
+}
+
+type FlowEvent {
+	id: String!
+	eventTime: DateTime!
+	eventData: FlowEventData!
+}
+
+type FlowEventAborted {
+	dummy: Boolean!
+}
+
+union FlowEventData = FlowEventInitiated | FlowEventStartConditionDefined | FlowEventQueued | FlowEventTriggerAdded | FlowEventTaskScheduled | FlowEventTaskRunning | FlowEventTaskFinished | FlowEventAborted
+
+type FlowEventInitiated {
+	trigger: FlowTrigger!
+}
+
+type FlowEventQueued {
+	activateAt: DateTime!
+}
+
+type FlowEventStartConditionDefined {
+	startCondition: FlowStartCondition!
+}
+
+type FlowEventTaskFinished {
+	task: Task!
+}
+
+type FlowEventTaskRunning {
+	task: Task!
+}
+
+type FlowEventTaskScheduled {
+	task: Task!
+}
+
+type FlowEventTriggerAdded {
+	trigger: FlowTrigger!
 }
 
 scalar FlowID

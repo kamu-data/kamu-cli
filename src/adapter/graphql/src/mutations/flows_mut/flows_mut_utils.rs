@@ -25,7 +25,7 @@ pub(crate) async fn ensure_scheduling_permission(
 
 ///////////////////////////////////////////////////////////////////////////////
 
-#[derive(Interface, Clone)]
+#[derive(Interface)]
 #[graphql(field(name = "message", ty = "String"))]
 pub(crate) enum FlowInDatasetError {
     NotFound(FlowNotFound),
@@ -95,7 +95,7 @@ pub(crate) async fn ensure_expected_dataset_kind(
 
 #[derive(SimpleObject, Debug, Clone)]
 #[graphql(complex)]
-pub struct FlowIncompatibleDatasetKind {
+pub(crate) struct FlowIncompatibleDatasetKind {
     pub expected_dataset_kind: DatasetKind,
     pub actual_dataset_kind: DatasetKind,
 }

@@ -157,16 +157,16 @@ impl From<TimeDeltaInput> for chrono::Duration {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-#[derive(Interface, Clone)]
+#[derive(Interface)]
 #[graphql(field(name = "message", ty = "String"))]
-pub enum SetFlowConfigResult {
+enum SetFlowConfigResult {
     Success(SetFlowConfigSuccess),
     IncompatibleDatasetKind(FlowIncompatibleDatasetKind),
 }
 
-#[derive(SimpleObject, Clone)]
+#[derive(SimpleObject)]
 #[graphql(complex)]
-pub struct SetFlowConfigSuccess {
+struct SetFlowConfigSuccess {
     pub config: FlowConfiguration,
 }
 
