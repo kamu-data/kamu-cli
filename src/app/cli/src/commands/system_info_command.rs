@@ -221,10 +221,17 @@ impl ContainerRuntimeInfo {
     pub async fn collect(container_runtime: Arc<ContainerRuntime>) -> Self {
         let container_info_output = match container_runtime.info().output().await {
             Ok(container_info) => {
-                let output = String::from_utf8(container_info.stdout).unwrap();
-                Value::from_str(output.as_str()).unwrap()
+                if container_info.status.success() {
+                    let output = String::from_utf8(container_info.stdout).unwrap();
+                    Value::from_str(output.as_str()).unwrap()
+                } else {
+                    Value::from_str("{\"error\":\"Unable to parse container runtime info result\"}")
+                        .unwrap()
+                }
             }
-            Err(_) => Value::from_str("Unable to fetch container runtime info").unwrap(),
+            Err(_) => {
+                Value::from_str("{\"error\":\"Unable to fetch container runtime info\"}").unwrap()
+            }
         };
 
         Self {
