@@ -333,6 +333,7 @@ type DatasetFlowConfigsMut {
 }
 
 type DatasetFlowRuns {
+	getFlow(flowId: FlowID!): GetFlowResult!
 	listFlows(page: Int, perPage: Int): FlowConnection!
 }
 
@@ -764,7 +765,7 @@ type FlowIncompatibleDatasetKind implements SetFlowConfigResult & TriggerFlowRes
 	message: String!
 }
 
-type FlowNotFound implements CancelScheduledTasksResult {
+type FlowNotFound implements GetFlowResult & CancelScheduledTasksResult {
 	flowId: FlowID!
 	message: String!
 }
@@ -833,6 +834,15 @@ type FlowTriggerManual {
 
 type FlowTriggerPush {
 	dummy: Boolean!
+}
+
+interface GetFlowResult {
+	message: String!
+}
+
+type GetFlowSuccess implements GetFlowResult {
+	flow: Flow!
+	message: String!
 }
 
 

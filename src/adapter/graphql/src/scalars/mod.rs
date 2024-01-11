@@ -52,9 +52,9 @@ macro_rules! simple_scalar {
             }
         }
 
-        impl Into<$source_type> for $name {
-            fn into(self) -> $source_type {
-                self.0
+        impl From<$name> for $source_type {
+            fn from(val: $name) -> Self {
+                val.0
             }
         }
 
