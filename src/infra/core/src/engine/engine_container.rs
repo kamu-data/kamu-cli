@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use container_runtime::*;
 use kamu_core::engine::EngineError;
@@ -31,7 +32,7 @@ impl EngineContainer {
 
     #[tracing::instrument(level = "info", name = "init_engine", skip_all, fields(image))]
     pub async fn new(
-        container_runtime: ContainerRuntime,
+        container_runtime: Arc<ContainerRuntime>,
         engine_config: ODFEngineConfig,
         logs_config: LogsConfig,
         image: &str,

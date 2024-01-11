@@ -91,7 +91,7 @@ async fn test_ingest_push_url_stream() {
             indoc!(
                 r#"
                 message arrow_schema {
-                  OPTIONAL INT64 offset;
+                  OPTIONAL INT64 offset (INTEGER(64,false));
                   REQUIRED INT32 op (INTEGER(8,false));
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                   OPTIONAL INT64 date (TIMESTAMP(MILLIS,true));
@@ -230,7 +230,7 @@ async fn test_ingest_push_media_type_override() {
             indoc!(
                 r#"
                 message arrow_schema {
-                  OPTIONAL INT64 offset;
+                  OPTIONAL INT64 offset (INTEGER(64,false));
                   REQUIRED INT32 op (INTEGER(8,false));
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                   OPTIONAL INT64 date (TIMESTAMP(MILLIS,true));
@@ -280,7 +280,7 @@ async fn test_ingest_push_media_type_override() {
             indoc!(
                 r#"
                 message arrow_schema {
-                  OPTIONAL INT64 offset;
+                  OPTIONAL INT64 offset (INTEGER(64,false));
                   REQUIRED INT32 op (INTEGER(8,false));
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                   OPTIONAL INT64 date (TIMESTAMP(MILLIS,true));
@@ -332,7 +332,7 @@ async fn test_ingest_push_media_type_override() {
             indoc!(
                 r#"
                 message arrow_schema {
-                  OPTIONAL INT64 offset;
+                  OPTIONAL INT64 offset (INTEGER(64,false));
                   REQUIRED INT32 op (INTEGER(8,false));
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                   OPTIONAL INT64 date (TIMESTAMP(MILLIS,true));
@@ -427,22 +427,20 @@ async fn test_ingest_push_schema_stability() {
     // println!("{}", hex::encode(set_data_schema.schema.as_slice()));
     let schema_prev = SetDataSchema {
         schema: hex::decode(
-            "0c00000008000800000004000800000004000000060000005801000014010000bc0000006\
-            c0000003c00000004000000d0feffff10000000180000000000010214000000c0feffff400\
-            0000000000001000000000a000000706f70756c6174696f6e000004ffffff180000000c000\
-            000000001051000000000000000040004000400000004000000636974790000000030fffff\
-            f140000000c0000000000010a1c00000000000000b4ffffff0800000000000100030000005\
-            55443000a0000006576656e745f74696d65000010001400100000000f00040000000800100\
-            000001c0000000c0000000000000a240000000000000008000c000a0004000800000008000\
-            0000000010003000000555443000b00000073797374656d5f74696d6500100016001000000\
-            00f0004000000080010000000180000001c000000000000021800000000000600080004000\
-            60000000800000000000000020000006f7000001000140010000e000f00040000000800100\
-            000001800000020000000000001021c00000008000c0004000b00080000004000000000000\
-            00100000000060000006f66667365740000").unwrap(),
+            "0c0000000800080000000400080000000400000006000000580100001c010000c40000008\
+            4000000440000000400000098ffffff1800000020000000000001021c00000008000c00040\
+            00b00080000004000000000000001000000000a000000706f70756c6174696f6e0000d4fff\
+            fff180000000c0000000000010510000000000000000400040004000000040000006369747\
+            9000000001000140010000e000f0004000000080010000000140000000c0000000000010a1\
+            c00000000000000c4ffffff080000000000010003000000555443000a0000006576656e745\
+            f74696d650000bcffffff1c0000000c0000000000000a240000000000000008000c000a000\
+            40008000000080000000000010003000000555443000b00000073797374656d5f74696d650\
+            010001400100000000f000400000008001000000010000000140000000000000210000000c\
+            6ffffff0800000000000000020000006f7000001000160010000e000f00040000000800100\
+            00000180000001c00000000000102180000000000060008000400060000004000000000000\
+            000060000006f66667365740000").unwrap(),
     }.schema_as_arrow().unwrap();
 
-    // This comparison should replicate schema equivalence test performed
-    // by the writer
     kamu_ingest_datafusion::DataWriterDataFusion::validate_output_schema_equivalence(
         &schema_current,
         &schema_prev,

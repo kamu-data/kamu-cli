@@ -54,4 +54,4 @@ impl Into<u8> for OperationType {
 
 #[derive(Debug, thiserror::Error)]
 #[error("Invalid operation type value {0}")]
-pub struct InvalidOperationType(u8);
+pub struct InvalidOperationType(pub u8);

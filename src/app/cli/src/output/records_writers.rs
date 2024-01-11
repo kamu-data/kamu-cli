@@ -70,9 +70,9 @@ impl RecordsFormat {
             .unwrap()
     }
 
+    // TODO: PERF: Rethink into a columnar approach
     pub fn format(&self, row: usize, col: usize, array: &ArrayRef) -> String {
         use datafusion::arrow::array::*;
-        use datafusion::arrow::datatypes::TimeUnit;
 
         // Check for null
         let null_value = self
@@ -112,34 +112,7 @@ impl RecordsFormat {
             .and_then(|cf| cf.value_fmt.as_ref())
             .or_else(|| self.default_column_format.value_fmt.as_ref())
         {
-            match array.data_type() {
-                DataType::Int8 => format_typed!(Int8Array, i8, array, value_fmt, row),
-                DataType::Int16 => format_typed!(Int16Array, i16, array, value_fmt, row),
-                DataType::Int32 => format_typed!(Int32Array, i32, array, value_fmt, row),
-                DataType::Int64 => format_typed!(Int64Array, i64, array, value_fmt, row),
-                DataType::UInt8 => format_typed!(UInt8Array, u8, array, value_fmt, row),
-                DataType::UInt16 => format_typed!(UInt16Array, u16, array, value_fmt, row),
-                DataType::UInt32 => format_typed!(UInt32Array, u32, array, value_fmt, row),
-                DataType::UInt64 => format_typed!(UInt64Array, u64, array, value_fmt, row),
-                DataType::Float32 => format_typed!(Float32Array, f32, array, value_fmt, row),
-                DataType::Float64 => format_typed!(Float64Array, f64, array, value_fmt, row),
-                DataType::Timestamp(time_unit, _) => match time_unit {
-                    TimeUnit::Microsecond => {
-                        let t_array = array
-                            .as_any()
-                            .downcast_ref::<TimestampMicrosecondArray>()
-                            .unwrap();
-                        let t_value_fmt = value_fmt
-                            .downcast_ref::<fn(DateTime<Utc>) -> String>()
-                            .unwrap();
-                        let value = t_array.value_as_datetime(row).unwrap();
-                        let value = DateTime::from_naive_utc_and_offset(value, Utc);
-                        t_value_fmt(value)
-                    }
-                    _ => unimplemented!(),
-                },
-                _ => unimplemented!(),
-            }
+            value_fmt(array, row)
         } else {
             array_value_to_string(array, row).unwrap()
         };
@@ -185,7 +158,8 @@ pub struct ColumnFormat {
     null_value: Option<String>,
     binary_placeholder: Option<String>,
     max_len: Option<usize>,
-    value_fmt: Option<Box<dyn Any>>,
+    //value_fmt: Option<Box<dyn Any>>,
+    value_fmt: Option<Box<dyn Fn(&ArrayRef, usize) -> String>>,
 }
 
 impl ColumnFormat {
@@ -221,15 +195,62 @@ impl ColumnFormat {
         }
     }
 
-    pub fn with_value_fmt<T: 'static>(self, value_fmt: fn(T) -> String) -> Self {
+    pub fn with_value_fmt<F>(self, value_fmt: F) -> Self
+    where
+        F: Fn(&ArrayRef, usize) -> String + 'static,
+    {
         Self {
             value_fmt: Some(Box::new(value_fmt)),
             ..self
         }
     }
 
+    pub fn with_value_fmt_t<T: 'static>(self, value_fmt: fn(T) -> String) -> Self {
+        let value_fmt: Box<dyn Any> = Box::new(value_fmt);
+        Self {
+            value_fmt: Some(Box::new(move |array, row| {
+                Self::value_fmt_t(array, row, &value_fmt)
+            })),
+            ..self
+        }
+    }
+
     pub fn get_style_spec(&self) -> Option<&str> {
         self.style_spec.as_ref().map(|s| s.as_str())
+    }
+
+    fn value_fmt_t(array: &ArrayRef, row: usize, value_fmt: &dyn Any) -> String {
+        use datafusion::arrow::array::*;
+        use datafusion::arrow::datatypes::TimeUnit;
+
+        match array.data_type() {
+            DataType::Int8 => format_typed!(Int8Array, i8, array, value_fmt, row),
+            DataType::Int16 => format_typed!(Int16Array, i16, array, value_fmt, row),
+            DataType::Int32 => format_typed!(Int32Array, i32, array, value_fmt, row),
+            DataType::Int64 => format_typed!(Int64Array, i64, array, value_fmt, row),
+            DataType::UInt8 => format_typed!(UInt8Array, u8, array, value_fmt, row),
+            DataType::UInt16 => format_typed!(UInt16Array, u16, array, value_fmt, row),
+            DataType::UInt32 => format_typed!(UInt32Array, u32, array, value_fmt, row),
+            DataType::UInt64 => format_typed!(UInt64Array, u64, array, value_fmt, row),
+            DataType::Float32 => format_typed!(Float32Array, f32, array, value_fmt, row),
+            DataType::Float64 => format_typed!(Float64Array, f64, array, value_fmt, row),
+            DataType::Timestamp(time_unit, _) => match time_unit {
+                TimeUnit::Microsecond => {
+                    let t_array = array
+                        .as_any()
+                        .downcast_ref::<TimestampMicrosecondArray>()
+                        .unwrap();
+                    let t_value_fmt = value_fmt
+                        .downcast_ref::<fn(DateTime<Utc>) -> String>()
+                        .unwrap();
+                    let value = t_array.value_as_datetime(row).unwrap();
+                    let value = DateTime::from_naive_utc_and_offset(value, Utc);
+                    t_value_fmt(value)
+                }
+                _ => unimplemented!(),
+            },
+            _ => unimplemented!(),
+        }
     }
 }
 

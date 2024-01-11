@@ -16,6 +16,7 @@ use futures::{StreamExt, TryFutureExt, TryStreamExt};
 use itertools::Itertools;
 use kamu_core::engine::*;
 use kamu_core::*;
+use kamu_ingest_datafusion::DataWriterDataFusion;
 use opendatafabric::*;
 
 pub struct TransformServiceImpl {
@@ -132,16 +133,8 @@ impl TransformServiceImpl {
         if let Some(prev_schema) = request.schema {
             // Validate schema
             if let Some(new_schema) = new_schema {
-                if prev_schema != new_schema {
-                    return Err(IncompatibleSchemaError::new(
-                        "Schema of the new slice differs from the schema defined by SetDataSchema \
-                         event - this indicates a compatibility breakage in the engine output",
-                        prev_schema.clone(),
-                        new_schema.clone(),
-                    )
-                    .int_err()
-                    .into());
-                }
+                DataWriterDataFusion::validate_output_schema_equivalence(&prev_schema, &new_schema)
+                    .int_err()?
             }
         } else {
             // Set schema upon first transform

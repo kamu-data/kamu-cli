@@ -26,7 +26,7 @@ async fn setup(
     added_rows: usize,
 ) -> (String, String) {
     use datafusion::arrow::array;
-    use datafusion::arrow::datatypes::{DataType, Field, Int64Type, Schema, UInt8Type};
+    use datafusion::arrow::datatypes::{DataType, Field, Int64Type, Schema, UInt64Type, UInt8Type};
     use datafusion::arrow::record_batch::RecordBatch;
 
     let ctx = SessionContext::new();
@@ -34,7 +34,7 @@ async fn setup(
     let prev = tempdir.join("prev").to_str().unwrap().to_string();
     let new = tempdir.join("new").to_str().unwrap().to_string();
 
-    let mut offset = array::PrimitiveBuilder::<Int64Type>::with_capacity(orig_rows);
+    let mut offset = array::PrimitiveBuilder::<UInt64Type>::with_capacity(orig_rows);
     let mut op = array::PrimitiveBuilder::<UInt8Type>::new();
     let mut pk1 = array::PrimitiveBuilder::<Int64Type>::with_capacity(orig_rows);
     let mut pk2 = array::PrimitiveBuilder::<Int64Type>::with_capacity(orig_rows);
@@ -51,7 +51,7 @@ async fn setup(
     let mut new_aux2 = array::PrimitiveBuilder::<Int64Type>::with_capacity(orig_rows + added_rows);
 
     for i in 0..orig_rows {
-        offset.append_value(i as i64);
+        offset.append_value(i as u64);
         op.append_value(odf::OperationType::Append as u8);
     }
 
@@ -97,7 +97,7 @@ async fn setup(
     ctx.read_batch(
         RecordBatch::try_new(
             Arc::new(Schema::new(vec![
-                Field::new("offset", DataType::Int64, false),
+                Field::new("offset", DataType::UInt64, false),
                 Field::new("op", DataType::UInt8, false),
                 Field::new("pk1", DataType::Int64, false),
                 Field::new("pk2", DataType::Int64, false),

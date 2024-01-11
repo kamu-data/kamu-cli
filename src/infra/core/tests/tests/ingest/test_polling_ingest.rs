@@ -11,7 +11,7 @@ use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
 use chrono::{TimeZone, Utc};
-use container_runtime::ContainerRuntime;
+use container_runtime::*;
 use datafusion::prelude::*;
 use dill::Component;
 use event_bus::EventBus;
@@ -119,7 +119,7 @@ async fn test_ingest_polling_snapshot() {
             indoc!(
                 r#"
                 message arrow_schema {
-                  OPTIONAL INT64 offset;
+                  OPTIONAL INT64 offset (INTEGER(64,false));
                   REQUIRED INT32 op (INTEGER(8,false));
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                   REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
@@ -292,7 +292,7 @@ async fn test_ingest_polling_ledger() {
             indoc!(
                 r#"
                 message arrow_schema {
-                  OPTIONAL INT64 offset;
+                  OPTIONAL INT64 offset (INTEGER(64,false));
                   REQUIRED INT32 op (INTEGER(8,false));
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                   OPTIONAL INT64 date (TIMESTAMP(MILLIS,true));
@@ -564,7 +564,7 @@ async fn test_ingest_polling_event_time_as_date() {
             indoc!(
                 r#"
                 message arrow_schema {
-                  OPTIONAL INT64 offset;
+                  OPTIONAL INT64 offset (INTEGER(64,false));
                   REQUIRED INT32 op (INTEGER(8,false));
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                   OPTIONAL INT32 date (DATE);
@@ -719,7 +719,7 @@ async fn test_ingest_polling_bad_column_names_preserve() {
             indoc!(
                 r#"
                 message arrow_schema {
-                  OPTIONAL INT64 offset;
+                  OPTIONAL INT64 offset (INTEGER(64,false));
                   REQUIRED INT32 op (INTEGER(8,false));
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                   REQUIRED INT32 Date (UTC) (DATE);
@@ -812,7 +812,7 @@ async fn test_ingest_polling_bad_column_names_rename() {
             indoc!(
                 r#"
                 message arrow_schema {
-                  OPTIONAL INT64 offset;
+                  OPTIONAL INT64 offset (INTEGER(64,false));
                   REQUIRED INT32 op (INTEGER(8,false));
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                   OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
@@ -904,7 +904,7 @@ async fn test_ingest_polling_preprocess_with_spark() {
             indoc!(
                 r#"
                 message arrow_schema {
-                  OPTIONAL INT64 offset;
+                  OPTIONAL INT64 offset (INTEGER(64,false));
                   REQUIRED INT32 op (INTEGER(8,false));
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                   REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
@@ -996,7 +996,7 @@ async fn test_ingest_polling_preprocess_with_flink() {
             indoc!(
                 r#"
                 message arrow_schema {
-                  OPTIONAL INT64 offset;
+                  OPTIONAL INT64 offset (INTEGER(64,false));
                   REQUIRED INT32 op (INTEGER(8,false));
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                   REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
@@ -1089,6 +1089,8 @@ impl IngestTestHarness {
         std::fs::create_dir(&cache_dir).unwrap();
 
         let catalog = dill::CatalogBuilder::new()
+            .add_value(ContainerRuntimeConfig::default())
+            .add::<ContainerRuntime>()
             .add::<EventBus>()
             .add::<DependencyGraphServiceInMemory>()
             .add_value(CurrentAccountSubject::new_test())
@@ -1103,7 +1105,6 @@ impl IngestTestHarness {
             .add_builder(
                 EngineProvisionerLocal::builder()
                     .with_config(EngineProvisionerLocalConfig::default())
-                    .with_container_runtime(ContainerRuntime::default())
                     .with_run_info_dir(run_info_dir.clone()),
             )
             .bind::<dyn EngineProvisioner, EngineProvisionerLocal>()
@@ -1114,7 +1115,6 @@ impl IngestTestHarness {
             .add_builder(
                 PollingIngestServiceImpl::builder()
                     .with_cache_dir(cache_dir)
-                    .with_container_runtime(Arc::new(ContainerRuntime::default()))
                     .with_object_store_registry(Arc::new(ObjectStoreRegistryImpl::new(vec![
                         Arc::new(ObjectStoreBuilderLocalFs::new()),
                     ])))
