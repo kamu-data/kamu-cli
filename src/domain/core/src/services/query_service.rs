@@ -23,13 +23,24 @@ pub trait QueryService: Send + Sync {
     async fn create_session(&self) -> Result<SessionContext, CreateSessionError>;
 
     /// Returns the specified number of the latest records in the dataset
-    /// This is equivalent to the SQL query: `SELECT * FROM dataset ORDER BY
-    /// offset DESC LIMIT N`
+    /// This is equivalent to SQL query like:
+    ///
+    /// ```text
+    /// select * from (
+    ///   select
+    ///     *
+    ///   from dataset
+    ///   order by offset desc
+    ///   limit lim
+    ///   offset skip
+    /// )
+    /// order by offset
+    /// ```
     async fn tail(
         &self,
         dataset_ref: &DatasetRef,
-        skip: u64,
-        limit: u64,
+        skip: usize,
+        limit: usize,
     ) -> Result<DataFrame, QueryError>;
 
     /// Prepares an execution plan for the SQL statement and returns a
@@ -63,7 +74,7 @@ pub struct DatasetQueryOptions {
     /// number of part files examined, e.g. if limit is 100 and last data part
     /// file contains 150 records - only this file will be considered for the
     /// query and the rest of data will be completely ignored.
-    pub last_records_to_consider: Option<u64>,
+    pub last_records_to_consider: Option<usize>,
 }
 
 ///////////////////////////////////////////////////////////////////////////////

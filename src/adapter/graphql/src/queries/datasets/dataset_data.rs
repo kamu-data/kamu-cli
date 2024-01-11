@@ -55,8 +55,19 @@ impl DatasetData {
     }
 
     /// Returns the specified number of the latest records in the dataset
-    /// This is equivalent to the SQL query: `SELECT * FROM dataset ORDER BY
-    /// event_time DESC LIMIT N`
+    /// This is equivalent to SQL query like:
+    ///
+    /// ```text
+    /// select * from (
+    ///   select
+    ///     *
+    ///   from dataset
+    ///   order by offset desc
+    ///   limit lim
+    ///   offset skip
+    /// )
+    /// order by offset
+    /// ```
     async fn tail(
         &self,
         ctx: &Context<'_>,
@@ -74,8 +85,8 @@ impl DatasetData {
         let df = match query_svc
             .tail(
                 &self.dataset_handle.as_local_ref(),
-                skip.unwrap_or(0),
-                limit,
+                skip.unwrap_or(0) as usize,
+                limit as usize,
             )
             .await
         {
