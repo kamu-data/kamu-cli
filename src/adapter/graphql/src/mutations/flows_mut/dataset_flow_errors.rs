@@ -13,7 +13,7 @@ use crate::prelude::*;
 
 ///////////////////////////////////////////////////////////////////////////////
 
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject)]
 #[graphql(complex)]
 pub(crate) struct FlowNotFound {
     pub flow_id: FlowID,
@@ -29,7 +29,7 @@ impl FlowNotFound {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-#[derive(SimpleObject, Debug, Clone)]
+#[derive(SimpleObject)]
 #[graphql(complex)]
 pub(crate) struct FlowNotScheduled {
     pub flow_id: FlowID,

@@ -3282,6 +3282,7 @@ dependencies = [
  "dill",
  "env_logger",
  "event-bus",
+ "event-sourcing",
  "futures",
  "indoc 2.0.4",
  "internal-error",

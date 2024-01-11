@@ -124,16 +124,16 @@ impl FlowEvent {
         }
     }
 
-    pub fn event_time(&self) -> &DateTime<Utc> {
+    pub fn event_time(&self) -> DateTime<Utc> {
         match self {
-            FlowEvent::Initiated(e) => &e.event_time,
-            FlowEvent::StartConditionDefined(e) => &e.event_time,
-            FlowEvent::Queued(e) => &e.event_time,
-            FlowEvent::TriggerAdded(e) => &e.event_time,
-            FlowEvent::TaskScheduled(e) => &e.event_time,
-            FlowEvent::TaskRunning(e) => &e.event_time,
-            FlowEvent::TaskFinished(e) => &e.event_time,
-            FlowEvent::Aborted(e) => &e.event_time,
+            FlowEvent::Initiated(e) => e.event_time,
+            FlowEvent::StartConditionDefined(e) => e.event_time,
+            FlowEvent::Queued(e) => e.event_time,
+            FlowEvent::TriggerAdded(e) => e.event_time,
+            FlowEvent::TaskScheduled(e) => e.event_time,
+            FlowEvent::TaskRunning(e) => e.event_time,
+            FlowEvent::TaskFinished(e) => e.event_time,
+            FlowEvent::Aborted(e) => e.event_time,
         }
     }
 }

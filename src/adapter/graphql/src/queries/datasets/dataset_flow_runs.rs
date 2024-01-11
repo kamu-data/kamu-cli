@@ -10,6 +10,7 @@
 use futures::TryStreamExt;
 use {kamu_flow_system as fs, opendatafabric as odf};
 
+use crate::mutations::{check_if_flow_belongs_to_dataset, FlowInDatasetError, FlowNotFound};
 use crate::prelude::*;
 use crate::queries::Flow;
 use crate::utils;
@@ -29,7 +30,26 @@ impl DatasetFlowRuns {
         Self { dataset_handle }
     }
 
-    pub async fn list_flows(
+    async fn get_flow(&self, ctx: &Context<'_>, flow_id: FlowID) -> Result<GetFlowResult> {
+        utils::check_dataset_read_access(ctx, &self.dataset_handle).await?;
+
+        if let Some(error) =
+            check_if_flow_belongs_to_dataset(ctx, flow_id, &self.dataset_handle).await?
+        {
+            return Ok(match error {
+                FlowInDatasetError::NotFound(e) => GetFlowResult::NotFound(e),
+            });
+        }
+
+        let flow_service = from_catalog::<dyn fs::FlowService>(ctx).unwrap();
+        let flow_state = flow_service.get_flow(flow_id.into()).await.int_err()?;
+
+        Ok(GetFlowResult::Success(GetFlowSuccess {
+            flow: Flow::new(flow_state),
+        }))
+    }
+
+    async fn list_flows(
         &self,
         ctx: &Context<'_>,
         page: Option<usize>,
@@ -64,5 +84,27 @@ impl DatasetFlowRuns {
 ///////////////////////////////////////////////////////////////////////////////
 
 page_based_connection!(Flow, FlowConnection, FlowEdge);
+
+///////////////////////////////////////////////////////////////////////////////
+
+#[derive(Interface)]
+#[graphql(field(name = "message", ty = "String"))]
+enum GetFlowResult {
+    Success(GetFlowSuccess),
+    NotFound(FlowNotFound),
+}
+
+#[derive(SimpleObject)]
+#[graphql(complex)]
+struct GetFlowSuccess {
+    pub flow: Flow,
+}
+
+#[ComplexObject]
+impl GetFlowSuccess {
+    pub async fn message(&self) -> String {
+        "Success".to_string()
+    }
+}
 
 ///////////////////////////////////////////////////////////////////////////////

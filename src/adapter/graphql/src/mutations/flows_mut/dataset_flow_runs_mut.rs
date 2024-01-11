@@ -115,16 +115,16 @@ impl DatasetFlowRunsMut {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-#[derive(Interface, Clone)]
+#[derive(Interface)]
 #[graphql(field(name = "message", ty = "String"))]
-pub enum TriggerFlowResult {
+enum TriggerFlowResult {
     Success(TriggerFlowSuccess),
     IncompatibleDatasetKind(FlowIncompatibleDatasetKind),
 }
 
-#[derive(SimpleObject, Clone)]
+#[derive(SimpleObject)]
 #[graphql(complex)]
-pub struct TriggerFlowSuccess {
+struct TriggerFlowSuccess {
     pub flow: Flow,
 }
 
@@ -137,17 +137,17 @@ impl TriggerFlowSuccess {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-#[derive(Interface, Clone)]
+#[derive(Interface)]
 #[graphql(field(name = "message", ty = "String"))]
-pub enum CancelScheduledTasksResult {
+enum CancelScheduledTasksResult {
     Success(CancelScheduledTasksSuccess),
     NotFound(FlowNotFound),
     NotScheduled(FlowNotScheduled),
 }
 
-#[derive(SimpleObject, Clone)]
+#[derive(SimpleObject)]
 #[graphql(complex)]
-pub struct CancelScheduledTasksSuccess {
+struct CancelScheduledTasksSuccess {
     pub flow: Flow,
 }
 

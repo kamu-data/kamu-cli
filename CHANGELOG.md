@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 ### Added
 - Initial support for local predefined Admin users
-- New GraphQL APIs to list summary information on dataset flows
+- New GraphQL APIs extending flows system capabilities:
+   - ability to list summary information about flows
+   - flow execution history function
 
 ## [0.151.0] - 2024-01-09
 ### Added

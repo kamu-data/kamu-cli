@@ -7,15 +7,17 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use futures::TryStreamExt;
 use kamu_core::PollingIngestService;
 use {kamu_flow_system as fs, kamu_task_system as ts};
 
+use super::{FlowEvent, FlowStartCondition, FlowTrigger};
 use crate::prelude::*;
 use crate::queries::{Account, Task};
 
 ///////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Flow {
     flow_state: fs::FlowState,
 }
@@ -126,6 +128,21 @@ impl Flow {
         Ok(tasks)
     }
 
+    /// History of flow events
+    async fn history(&self, ctx: &Context<'_>) -> Result<Vec<FlowEvent>> {
+        let flow_event_store = from_catalog::<dyn fs::FlowEventStore>(ctx).unwrap();
+        let flow_events: Vec<_> = flow_event_store
+            .get_events(&self.flow_state.flow_id, Default::default())
+            .try_collect()
+            .await
+            .int_err()?;
+
+        Ok(flow_events
+            .into_iter()
+            .map(|(id, ev)| FlowEvent::new(id, ev))
+            .collect::<Vec<_>>())
+    }
+
     /// A user, who initiated the flow run. None for system-initiated flows
     async fn initiator(&self) -> Option<Account> {
         self.flow_state
@@ -147,173 +164,57 @@ impl Flow {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-#[derive(Union, Clone, Eq, PartialEq)]
-pub enum FlowDescription {
+#[derive(Union)]
+enum FlowDescription {
     #[graphql(flatten)]
     Dataset(FlowDescriptionDataset),
     #[graphql(flatten)]
     System(FlowDescriptionSystem),
 }
 
-#[derive(Union, Clone, PartialEq, Eq)]
-pub enum FlowDescriptionSystem {
+#[derive(Union)]
+enum FlowDescriptionSystem {
     GC(FlowDescriptionSystemGC),
 }
 
-#[derive(SimpleObject, Clone, PartialEq, Eq)]
-pub struct FlowDescriptionSystemGC {
+#[derive(SimpleObject)]
+struct FlowDescriptionSystemGC {
     dummy: bool,
 }
 
-#[derive(Union, Clone, PartialEq, Eq)]
-pub enum FlowDescriptionDataset {
+#[derive(Union)]
+enum FlowDescriptionDataset {
     PollingIngest(FlowDescriptionDatasetPollingIngest),
     PushIngest(FlowDescriptionDatasetPushIngest),
     ExecuteQuery(FlowDescriptionDatasetExecuteQuery),
     Compaction(FlowDescriptionDatasetCompaction),
 }
 
-#[derive(SimpleObject, Clone, PartialEq, Eq)]
-pub struct FlowDescriptionDatasetPollingIngest {
+#[derive(SimpleObject)]
+struct FlowDescriptionDatasetPollingIngest {
     dataset_id: DatasetID,
     ingested_records_count: Option<u64>,
 }
 
-#[derive(SimpleObject, Clone, PartialEq, Eq)]
-pub struct FlowDescriptionDatasetPushIngest {
+#[derive(SimpleObject)]
+struct FlowDescriptionDatasetPushIngest {
     dataset_id: DatasetID,
     source_name: Option<String>,
     input_records_count: u64,
     ingested_records_count: Option<u64>,
 }
 
-#[derive(SimpleObject, Clone, PartialEq, Eq)]
-pub struct FlowDescriptionDatasetExecuteQuery {
+#[derive(SimpleObject)]
+struct FlowDescriptionDatasetExecuteQuery {
     dataset_id: DatasetID,
     transformed_records_count: Option<u64>,
 }
 
-#[derive(SimpleObject, Clone, PartialEq, Eq)]
-pub struct FlowDescriptionDatasetCompaction {
+#[derive(SimpleObject)]
+struct FlowDescriptionDatasetCompaction {
     dataset_id: DatasetID,
     original_blocks_count: u64,
     resulting_blocks_count: Option<u64>,
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-#[derive(Union, Clone, Eq, PartialEq)]
-pub enum FlowTrigger {
-    Manual(FlowTriggerManual),
-    AutoPolling(FlowTriggerAutoPolling),
-    Push(FlowTriggerPush),
-    InputDatasetFlow(FlowTriggerInputDatasetFlow),
-}
-
-impl From<fs::FlowTrigger> for FlowTrigger {
-    fn from(value: fs::FlowTrigger) -> Self {
-        match value {
-            fs::FlowTrigger::Manual(manual) => Self::Manual(manual.into()),
-            fs::FlowTrigger::AutoPolling(auto_polling) => Self::AutoPolling(auto_polling.into()),
-            fs::FlowTrigger::Push(push) => Self::Push(push.into()),
-            fs::FlowTrigger::InputDatasetFlow(input) => Self::InputDatasetFlow(input.into()),
-        }
-    }
-}
-
-#[derive(SimpleObject, Clone, PartialEq, Eq)]
-pub struct FlowTriggerManual {
-    pub initiator: Account,
-}
-
-impl From<fs::FlowTriggerManual> for FlowTriggerManual {
-    fn from(value: fs::FlowTriggerManual) -> Self {
-        Self {
-            initiator: Account::from_account_name(value.initiator_account_name),
-        }
-    }
-}
-
-#[derive(SimpleObject, Clone, PartialEq, Eq)]
-pub struct FlowTriggerAutoPolling {
-    dummy: bool,
-}
-
-impl From<fs::FlowTriggerAutoPolling> for FlowTriggerAutoPolling {
-    fn from(_: fs::FlowTriggerAutoPolling) -> Self {
-        Self { dummy: true }
-    }
-}
-
-#[derive(SimpleObject, Clone, PartialEq, Eq)]
-pub struct FlowTriggerPush {
-    dummy: bool,
-}
-
-impl From<fs::FlowTriggerPush> for FlowTriggerPush {
-    fn from(_: fs::FlowTriggerPush) -> Self {
-        Self { dummy: true }
-    }
-}
-
-#[derive(SimpleObject, Clone, PartialEq, Eq)]
-pub struct FlowTriggerInputDatasetFlow {
-    pub dataset_id: DatasetID,
-    pub flow_type: DatasetFlowType,
-    pub flow_id: FlowID,
-}
-
-impl From<fs::FlowTriggerInputDatasetFlow> for FlowTriggerInputDatasetFlow {
-    fn from(value: fs::FlowTriggerInputDatasetFlow) -> Self {
-        Self {
-            dataset_id: value.dataset_id.into(),
-            flow_type: value.flow_type.into(),
-            flow_id: value.flow_id.into(),
-        }
-    }
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Union, Clone, Eq, PartialEq)]
-pub enum FlowStartCondition {
-    Throttling(FlowStartConditionThrottling),
-    Batching(FlowStartConditionBatching),
-}
-
-impl From<fs::FlowStartCondition> for FlowStartCondition {
-    fn from(value: fs::FlowStartCondition) -> Self {
-        match value {
-            fs::FlowStartCondition::Throttling(t) => Self::Throttling(t.into()),
-            fs::FlowStartCondition::Batching(b) => Self::Batching(b.into()),
-        }
-    }
-}
-
-#[derive(SimpleObject, Clone, PartialEq, Eq)]
-pub struct FlowStartConditionThrottling {
-    pub interval_sec: i64,
-}
-
-impl From<fs::FlowStartConditionThrottling> for FlowStartConditionThrottling {
-    fn from(value: fs::FlowStartConditionThrottling) -> Self {
-        Self {
-            interval_sec: value.interval.num_seconds(),
-        }
-    }
-}
-
-#[derive(SimpleObject, Clone, PartialEq, Eq)]
-pub struct FlowStartConditionBatching {
-    pub threshold_new_records: usize,
-}
-
-impl From<fs::FlowStartConditionBatching> for FlowStartConditionBatching {
-    fn from(value: fs::FlowStartConditionBatching) -> Self {
-        Self {
-            threshold_new_records: value.threshold_new_records,
-        }
-    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////

@@ -34,7 +34,15 @@ use kamu_core::{
     PollingIngestService,
     SystemTimeSourceDefault,
 };
-use kamu_flow_system::{FlowID, FlowServiceRunConfig, FlowServiceTestDriver};
+use kamu_flow_system::{
+    Flow,
+    FlowEventStore,
+    FlowID,
+    FlowServiceRunConfig,
+    FlowServiceTestDriver,
+    FlowTrigger,
+    FlowTriggerAutoPolling,
+};
 use kamu_flow_system_inmem::{
     FlowConfigurationEventStoreInMem,
     FlowConfigurationServiceInMemory,
@@ -751,6 +759,117 @@ async fn test_cancel_already_succeeded_flow() {
 ////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_history_of_completed_flow() {
+    let mut dependency_graph_repo_mock = MockDependencyGraphRepository::new();
+    dependency_graph_repo_mock
+        .expect_list_dependencies_of_all_datasets()
+        .return_once(|| Box::pin(futures::stream::empty()));
+
+    let harness = FlowRunsHarness::new_custom(dependency_graph_repo_mock);
+    let create_result: CreateDatasetResult = harness.create_root_dataset().await;
+
+    let mutation_code =
+        FlowRunsHarness::trigger_flow_mutation(&create_result.dataset_handle.id, "INGEST");
+
+    let schema = kamu_adapter_graphql::schema_quiet();
+    let response = schema
+        .execute(
+            async_graphql::Request::new(mutation_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(response.is_ok(), "{:?}", response);
+    let response_json = response.data.into_json().unwrap();
+    let flow_id = FlowRunsHarness::extract_flow_id_from_trigger_response(&response_json);
+    harness
+        .mimic_flow_secondary_trigger(flow_id, FlowTrigger::AutoPolling(FlowTriggerAutoPolling {}))
+        .await;
+
+    let flow_task_id = harness.mimic_flow_scheduled(flow_id).await;
+    harness.mimic_task_running(flow_task_id).await;
+    harness.mimic_task_completed(flow_task_id).await;
+
+    let query = FlowRunsHarness::flow_history_query(&create_result.dataset_handle.id, flow_id);
+
+    let response = schema
+        .execute(
+            async_graphql::Request::new(query.clone()).data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(response.is_ok(), "{:?}", response);
+    assert_eq!(
+        response.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "flows": {
+                        "runs": {
+                            "getFlow": {
+                                "__typename": "GetFlowSuccess",
+                                "message": "Success",
+                                "flow": {
+                                    "history": [
+                                        {
+                                            "__typename": "FlowEventInitiated",
+                                            "eventId": "0",
+                                            "trigger": {
+                                                "__typename": "FlowTriggerManual"
+                                            }
+                                        },
+                                        {
+                                            "__typename": "FlowEventQueued",
+                                            "eventId": "1",
+                                        },
+                                        {
+                                            "__typename": "FlowEventTriggerAdded",
+                                            "eventId": "2",
+                                            "trigger": {
+                                                "__typename": "FlowTriggerAutoPolling"
+                                            }
+                                        },
+                                        {
+                                            "__typename": "FlowEventTaskChanged",
+                                            "eventId": "3",
+                                            "taskId": "0",
+                                            "taskStatus": "QUEUED",
+                                            "task": {
+                                                "taskId": "0",
+                                            }
+                                        },
+                                        {
+                                            "__typename": "FlowEventTaskChanged",
+                                            "eventId": "4",
+                                            "taskId": "0",
+                                            "taskStatus": "RUNNING",
+                                            "task": {
+                                                "taskId": "0",
+                                            }
+                                        },
+                                        {
+                                            "__typename": "FlowEventTaskChanged",
+                                            "eventId": "5",
+                                            "taskId": "0",
+                                            "taskStatus": "FINISHED",
+                                            "task": {
+                                                "taskId": "0",
+                                            }
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_anonymous_operation_fails() {
     let harness = FlowRunsHarness::new();
 
@@ -893,6 +1012,23 @@ impl FlowRunsHarness {
             .unwrap()
     }
 
+    async fn mimic_flow_secondary_trigger(&self, flow_id: &str, flow_trigger: FlowTrigger) {
+        let flow_event_store = self
+            .catalog_authorized
+            .get_one::<dyn FlowEventStore>()
+            .unwrap();
+
+        let mut flow = Flow::load(
+            FlowID::new(flow_id.parse::<u64>().unwrap()),
+            flow_event_store.as_ref(),
+        )
+        .await
+        .unwrap();
+
+        flow.add_trigger(Utc::now(), flow_trigger).unwrap();
+        flow.save(flow_event_store.as_ref()).await.unwrap();
+    }
+
     async fn mimic_task_running(&self, task_id: TaskID) {
         let flow_service_test_driver = self
             .catalog_authorized
@@ -1021,6 +1157,60 @@ impl FlowRunsHarness {
             "#
         )
         .replace("<id>", &id.to_string())
+    }
+
+    fn flow_history_query(id: &DatasetID, flow_id: &str) -> String {
+        // Note: avoid extracting time-based properties in test
+        indoc!(
+            r#"
+            {
+                datasets {
+                    byId (datasetId: "<id>") {
+                        flows {
+                            runs {
+                                getFlow(flowId: "<flowId>") {
+                                    __typename
+                                    ... on GetFlowSuccess {
+                                        message
+                                        flow {
+                                            history {
+                                                __typename
+                                                eventId
+                                                ... on FlowEventInitiated {
+                                                    trigger {
+                                                        __typename
+                                                    }
+                                                }
+                                                ... on FlowEventStartConditionDefined {
+                                                    startCondition {
+                                                        __typename
+                                                    }
+                                                }
+                                                ... on FlowEventTriggerAdded {
+                                                    trigger {
+                                                        __typename
+                                                    }
+                                                }
+                                                ... on FlowEventTaskChanged {
+                                                    taskId
+                                                    taskStatus
+                                                    task {
+                                                        taskId
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            "#
+        )
+        .replace("<id>", &id.to_string())
+        .replace("<flowId>", flow_id)
     }
 
     fn trigger_flow_mutation(id: &DatasetID, dataset_flow_type: &str) -> String {

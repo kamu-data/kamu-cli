@@ -333,6 +333,7 @@ type DatasetFlowConfigsMut {
 }
 
 type DatasetFlowRuns {
+	getFlow(flowId: FlowID!): GetFlowResult!
 	listFlows(page: Int, perPage: Int): FlowConnection!
 }
 
@@ -560,6 +561,8 @@ type EnvVar {
 	value: String
 }
 
+scalar EventID
+
 union EventTimeSource = EventTimeSourceFromMetadata | EventTimeSourceFromPath | EventTimeSourceFromSystemTime
 
 type EventTimeSourceFromMetadata {
@@ -632,6 +635,10 @@ type Flow {
 	Associated tasks
 	"""
 	tasks: [Task!]!
+	"""
+	History of flow events
+	"""
+	history: [FlowEvent!]!
 	"""
 	A user, who initiated the flow run. None for system-initiated flows
 	"""
@@ -708,6 +715,48 @@ type FlowEdge {
 	node: Flow!
 }
 
+interface FlowEvent {
+	eventId: EventID!
+	eventTime: DateTime!
+}
+
+type FlowEventAborted implements FlowEvent {
+	eventId: EventID!
+	eventTime: DateTime!
+}
+
+type FlowEventInitiated implements FlowEvent {
+	eventId: EventID!
+	eventTime: DateTime!
+	trigger: FlowTrigger!
+}
+
+type FlowEventQueued implements FlowEvent {
+	eventId: EventID!
+	eventTime: DateTime!
+	activateAt: DateTime!
+}
+
+type FlowEventStartConditionDefined implements FlowEvent {
+	eventId: EventID!
+	eventTime: DateTime!
+	startCondition: FlowStartCondition!
+}
+
+type FlowEventTaskChanged implements FlowEvent {
+	eventId: EventID!
+	eventTime: DateTime!
+	taskId: TaskID!
+	taskStatus: TaskStatus!
+	task: Task!
+}
+
+type FlowEventTriggerAdded implements FlowEvent {
+	eventId: EventID!
+	eventTime: DateTime!
+	trigger: FlowTrigger!
+}
+
 scalar FlowID
 
 type FlowIncompatibleDatasetKind implements SetFlowConfigResult & TriggerFlowResult {
@@ -716,7 +765,7 @@ type FlowIncompatibleDatasetKind implements SetFlowConfigResult & TriggerFlowRes
 	message: String!
 }
 
-type FlowNotFound implements CancelScheduledTasksResult {
+type FlowNotFound implements GetFlowResult & CancelScheduledTasksResult {
 	flowId: FlowID!
 	message: String!
 }
@@ -785,6 +834,15 @@ type FlowTriggerManual {
 
 type FlowTriggerPush {
 	dummy: Boolean!
+}
+
+interface GetFlowResult {
+	message: String!
+}
+
+type GetFlowSuccess implements GetFlowResult {
+	flow: Flow!
+	message: String!
 }
 
 

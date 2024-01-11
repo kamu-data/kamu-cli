@@ -26,6 +26,7 @@ kamu-core = { workspace = true }
 kamu-task-system = { workspace = true }
 kamu-flow-system  = { workspace = true }
 event-bus = { workspace = true }
+event-sourcing = { workspace = true }
 
 async-graphql = { version = "6", features = ["chrono", "url", "apollo_tracing"] }
 async-trait = { version = "0.1", default-features = false }
