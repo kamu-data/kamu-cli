@@ -60,12 +60,12 @@ impl ExecuteTransformInput {
 
     /// Helper for determining the number of records included in the transaction
     /// from this input
-    pub fn num_records(&self) -> u64 {
+    pub fn num_records(&self) -> usize {
         if let Some(new_offset) = self.new_offset {
             if let Some(prev_offset) = self.prev_offset {
-                new_offset - prev_offset
+                (new_offset - prev_offset) as usize
             } else {
-                new_offset + 1
+                (new_offset + 1) as usize
             }
         } else {
             0
@@ -254,6 +254,16 @@ impl Display for TransformResponseInternalError {
             write!(f, "\n\n--- Engine Backtrace ---\n{}", bt)?;
         }
         Ok(())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// DataSlice
+////////////////////////////////////////////////////////////////////////////////
+
+impl DataSlice {
+    pub fn num_records(&self) -> usize {
+        (self.offset_interval.end - self.offset_interval.start + 1) as usize
     }
 }
 

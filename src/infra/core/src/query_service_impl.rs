@@ -14,10 +14,10 @@ use datafusion::catalog::CatalogProvider;
 use datafusion::datasource::TableProvider;
 use datafusion::execution::runtime_env::{RuntimeConfig, RuntimeEnv};
 use datafusion::parquet::arrow::async_reader::ParquetObjectReader;
-use datafusion::parquet::basic::LogicalType;
 use datafusion::parquet::file::metadata::ParquetMetaData;
 use datafusion::parquet::schema::types::Type;
 use datafusion::prelude::*;
+use datafusion::sql::TableReference;
 use dill::*;
 use futures::stream::{self, StreamExt, TryStreamExt};
 use kamu_core::auth::{DatasetAction, DatasetActionAuthorizer};
@@ -148,16 +148,21 @@ impl QueryService for QueryServiceImpl {
     async fn tail(
         &self,
         dataset_ref: &DatasetRef,
-        skip: u64,
-        limit: u64,
+        skip: usize,
+        limit: usize,
     ) -> Result<DataFrame, QueryError> {
         let dataset_handle = self.dataset_repo.resolve_dataset_ref(dataset_ref).await?;
+
+        self.dataset_action_authorizer
+            .check_action_allowed(&dataset_handle, DatasetAction::Read)
+            .await?;
 
         let dataset = self
             .dataset_repo
             .get_dataset(&dataset_handle.as_local_ref())
             .await?;
 
+        // TODO: PERF: Avoid full scan of metadata
         let vocab: DatasetVocabulary = dataset
             .as_metadata_chain()
             .iter_blocks()
@@ -183,73 +188,15 @@ impl QueryService for QueryServiceImpl {
                 QueryError::Internal(e)
             })?;
 
-        // TODO: This is a workaround for Arrow not handling timestamps with explicit
-        // timezones. We basically have to re-cast all timestamp fields into
-        // timestamps after querying. See:
-        // - https://github.com/apache/arrow-datafusion/issues/959
-        // - https://github.com/apache/arrow-rs/issues/393
-        let res_schema = self
-            .get_schema_impl(&ctx, &dataset_handle.as_local_ref())
+        let df = ctx
+            .table(TableReference::bare(dataset_handle.alias.to_string()))
             .await?;
 
-        tracing::debug!(schema = ?res_schema, "QueryService::tail: Got schema");
+        let df = df
+            .sort(vec![col(&vocab.offset_column).sort(false, true)])?
+            .limit(skip, Some(limit))?
+            .sort(vec![col(&vocab.offset_column).sort(true, false)])?;
 
-        if let None = res_schema {
-            return Err(QueryError::DatasetSchemaNotAvailable(
-                DatasetSchemaNotAvailableError {
-                    dataset_ref: dataset_handle.as_local_ref(),
-                },
-            ));
-        }
-
-        let fields: Vec<String> = match res_schema.unwrap() {
-            Type::GroupType { fields, .. } => fields
-                .iter()
-                .map(|f| match f.as_ref() {
-                    pt @ Type::PrimitiveType { .. } => {
-                        if let Some(LogicalType::Timestamp {
-                            is_adjusted_to_u_t_c,
-                            ..
-                        }) = pt.get_basic_info().logical_type()
-                        {
-                            if is_adjusted_to_u_t_c {
-                                return format!(
-                                    "CAST(\"{name}\" as TIMESTAMP) as \"{name}\"",
-                                    name = pt.get_basic_info().name()
-                                );
-                            }
-                        }
-                        format!("\"{}\"", pt.get_basic_info().name())
-                    }
-                    Type::GroupType { basic_info, .. } => {
-                        format!("\"{}\"", basic_info.name())
-                    }
-                })
-                .collect(),
-            Type::PrimitiveType { .. } => unreachable!(),
-        };
-
-        tracing::debug!(fields = ?fields, "QueryService::tail: Got schema fields");
-
-        let query = format!(
-            r#"SELECT {fields} FROM "{dataset}" ORDER BY {offset_col} DESC LIMIT {num_records}"#,
-            fields = fields.join(", "),
-            dataset = dataset_handle.alias,
-            offset_col = vocab.offset_column.to_owned(),
-            num_records = skip + limit
-        );
-
-        tracing::debug!(query = %query, "QueryService::tail: Executing SQL query");
-
-        let df = match ctx.sql(&query).await {
-            Ok(res) => Ok(res),
-            Err(e) => {
-                tracing::error!(error = ?e, "QueryService::tail: SQL query failed");
-                Err(QueryError::DataFusionError(e))
-            }
-        }?;
-
-        let df = df.limit(skip as usize, None)?;
         Ok(df)
     }
 
@@ -404,7 +351,7 @@ impl KamuSchema {
     async fn collect_data_file_hashes(
         &self,
         dataset: &dyn Dataset,
-        last_records_to_consider: Option<u64>,
+        last_records_to_consider: Option<usize>,
     ) -> Result<Vec<Multihash>, InternalError> {
         let mut files = Vec::new();
         let mut num_records = 0;
@@ -416,12 +363,11 @@ impl KamuSchema {
             .filter_map_ok(|(_, b)| b.event.new_data);
 
         while let Some(slice) = slices.try_next().await.int_err()? {
+            num_records += slice.num_records();
             files.push(slice.physical_hash);
 
-            num_records += slice.offset_interval.end - slice.offset_interval.start + 1;
-
             if last_records_to_consider.is_some()
-                && last_records_to_consider.unwrap() <= num_records as u64
+                && last_records_to_consider.unwrap() <= num_records
             {
                 break;
             }

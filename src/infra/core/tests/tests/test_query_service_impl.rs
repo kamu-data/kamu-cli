@@ -12,7 +12,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use datafusion::arrow::array::*;
-use datafusion::arrow::datatypes::{DataType, Field, Int64Type, Schema};
+use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use datafusion::arrow::record_batch::RecordBatch;
 use dill::Component;
 use event_bus::EventBus;
@@ -25,7 +25,6 @@ use kamu::testing::{
 };
 use kamu::utils::s3_context::S3Context;
 use kamu::*;
-use kamu_data_utils::data::format::JsonArrayWriter;
 use opendatafabric::*;
 use tempfile::TempDir;
 
@@ -69,9 +68,13 @@ async fn create_test_dataset(catalog: &dill::Catalog, tempdir: &Path) -> Dataset
             UInt64Array::from(vec![0, 1]),
             StringArray::from(vec!["a", "b"]),
         ),
-        (UInt64Array::from(vec![2]), StringArray::from(vec!["c"])),
+        (
+            UInt64Array::from(vec![2, 3]),
+            StringArray::from(vec!["c", "d"]),
+        ),
     ];
 
+    // TODO: Replace with DataWriter
     let mut prev_offset = None;
     for (a, b) in batches {
         let record_batch =
@@ -255,19 +258,41 @@ async fn test_dataset_tail_common(catalog: dill::Catalog, tempdir: &TempDir) {
     let dataset_alias = create_test_dataset(&catalog, tempdir.path()).await;
     let dataset_ref = DatasetRef::from(dataset_alias);
 
+    // Within last block
     let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
     let df = query_svc.tail(&dataset_ref, 1, 1).await.unwrap();
-    let record_batches = df.collect().await.unwrap();
 
-    let mut buf = Vec::new();
-    let mut writer = Box::new(JsonArrayWriter::new(&mut buf));
-    record_batches.iter().for_each(|b| writer.write(b).unwrap());
-    writer.finish().unwrap();
+    kamu_data_utils::testing::assert_data_eq(
+        df,
+        indoc::indoc!(
+            r#"
+            +--------+------+
+            | offset | blah |
+            +--------+------+
+            | 2      | c    |
+            +--------+------+
+            "#
+        ),
+    )
+    .await;
 
-    let data_content = String::from_utf8(buf).unwrap();
-    let data_json = serde_json::from_str::<serde_json::Value>(data_content.as_str()).unwrap();
+    // Corsses block boundary
+    let df = query_svc.tail(&dataset_ref, 1, 2).await.unwrap();
 
-    assert_eq!(data_json, serde_json::json!([{"blah": "b", "offset": 1}]));
+    kamu_data_utils::testing::assert_data_eq(
+        df,
+        indoc::indoc!(
+            r#"
+            +--------+------+
+            | offset | blah |
+            +--------+------+
+            | 1      | b    |
+            | 2      | c    |
+            +--------+------+
+            "#
+        ),
+    )
+    .await;
 }
 
 #[test_group::group(engine, datafusion)]
@@ -276,8 +301,7 @@ async fn test_dataset_tail_local_fs() {
     let tempdir = tempfile::tempdir().unwrap();
     let catalog = create_catalog_with_local_workspace(
         tempdir.path(),
-        // schema check + data check
-        MockDatasetActionAuthorizer::new().expect_check_read_a_dataset(2),
+        MockDatasetActionAuthorizer::new().expect_check_read_a_dataset(4),
     )
     .await;
     test_dataset_tail_common(catalog, &tempdir).await;
@@ -289,8 +313,7 @@ async fn test_dataset_tail_s3() {
     let s3 = LocalS3Server::new().await;
     let catalog = create_catalog_with_s3_workspace(
         &s3,
-        // schema check + data check
-        MockDatasetActionAuthorizer::new().expect_check_read_a_dataset(2),
+        MockDatasetActionAuthorizer::new().expect_check_read_a_dataset(4),
     )
     .await;
     test_dataset_tail_common(catalog, &s3.tmp_dir).await;
@@ -336,23 +359,24 @@ async fn test_dataset_sql_authorized_common(catalog: dill::Catalog, tempdir: &Te
         "SELECT COUNT(*) AS num_records FROM {}",
         dataset_alias.to_string()
     );
-    let result = query_svc
+    let df = query_svc
         .sql_statement(statement.as_str(), QueryOptions::default())
-        .await;
+        .await
+        .unwrap();
 
-    assert_matches!(result, Ok(_));
-
-    let data_frame = result.unwrap();
-    let batches = data_frame.collect().await.unwrap();
-    assert_eq!(1, batches.len());
-    let last_batch = batches.last().unwrap();
-
-    assert_eq!(1, last_batch.num_rows());
-    assert_eq!(1, last_batch.num_columns());
-    assert_eq!(
-        &[3],
-        last_batch.column(0).as_primitive::<Int64Type>().values()
+    kamu_data_utils::testing::assert_data_eq(
+        df,
+        indoc::indoc!(
+            r#"
+            +-------------+
+            | num_records |
+            +-------------+
+            | 4           |
+            +-------------+
+            "#
+        ),
     )
+    .await;
 }
 
 #[test_group::group(engine, datafusion)]
