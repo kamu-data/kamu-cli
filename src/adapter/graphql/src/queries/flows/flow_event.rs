@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
-use {event_sourcing as evs, kamu_flow_system as fs};
+use {event_sourcing as evs, kamu_flow_system as fs, kamu_task_system as ts};
 
 use super::{FlowStartCondition, FlowTrigger};
 use crate::prelude::*;
@@ -32,13 +32,9 @@ pub enum FlowEvent {
     Queued(FlowEventQueued),
     /// Secondary triger added
     TriggerAdded(FlowEventTriggerAdded),
-    /// Scheduled/Rescheduled a task
-    TaskScheduled(FlowEventTaskScheduled),
-    /// Task running
-    TaskRunning(FlowEventTaskRunning),
-    /// Finished task
-    TaskFinished(FlowEventTaskFinished),
-    /// Aborted flow (system factor, such as dataset delete)
+    /// Associated task has changed status
+    TaskChanged(FlowEventTaskChanged),
+    /// Aborted flow (user cancellation or system factor, such as ds delete)
     Aborted(FlowEventAborted),
 }
 
@@ -53,15 +49,24 @@ impl FlowEvent {
             fs::FlowEvent::TriggerAdded(e) => {
                 Self::TriggerAdded(FlowEventTriggerAdded::new(event_id, e))
             }
-            fs::FlowEvent::TaskScheduled(e) => {
-                Self::TaskScheduled(FlowEventTaskScheduled::new(event_id, e))
-            }
-            fs::FlowEvent::TaskRunning(e) => {
-                Self::TaskRunning(FlowEventTaskRunning::new(event_id, e))
-            }
-            fs::FlowEvent::TaskFinished(e) => {
-                Self::TaskFinished(FlowEventTaskFinished::new(event_id, e))
-            }
+            fs::FlowEvent::TaskScheduled(e) => Self::TaskChanged(FlowEventTaskChanged::new(
+                event_id,
+                e.event_time,
+                e.task_id,
+                TaskStatus::Queued,
+            )),
+            fs::FlowEvent::TaskRunning(e) => Self::TaskChanged(FlowEventTaskChanged::new(
+                event_id,
+                e.event_time,
+                e.task_id,
+                TaskStatus::Running,
+            )),
+            fs::FlowEvent::TaskFinished(e) => Self::TaskChanged(FlowEventTaskChanged::new(
+                event_id,
+                e.event_time,
+                e.task_id,
+                TaskStatus::Finished,
+            )),
             fs::FlowEvent::Aborted(e) => Self::Aborted(FlowEventAborted::new(event_id, e)),
         }
     }
@@ -149,74 +154,27 @@ impl FlowEventTriggerAdded {
 
 #[derive(SimpleObject)]
 #[graphql(complex)]
-pub struct FlowEventTaskScheduled {
+pub struct FlowEventTaskChanged {
     event_id: String,
     event_time: DateTime<Utc>,
     task_id: TaskID,
+    task_status: TaskStatus,
 }
 
 #[ComplexObject]
-impl FlowEventTaskScheduled {
+impl FlowEventTaskChanged {
     #[graphql(skip)]
-    fn new(event_id: evs::EventID, event: fs::FlowEventTaskScheduled) -> Self {
+    fn new(
+        event_id: evs::EventID,
+        event_time: DateTime<Utc>,
+        task_id: ts::TaskID,
+        task_status: TaskStatus,
+    ) -> Self {
         Self {
             event_id: event_id.to_string(),
-            event_time: event.event_time,
-            task_id: event.task_id.into(),
-        }
-    }
-
-    async fn task(&self, ctx: &Context<'_>) -> Result<Task> {
-        let task_state = utils::get_task(ctx, self.task_id.into()).await?;
-        Ok(Task::new(task_state))
-    }
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-#[derive(SimpleObject)]
-#[graphql(complex)]
-pub struct FlowEventTaskRunning {
-    event_id: String,
-    event_time: DateTime<Utc>,
-    task_id: TaskID,
-}
-
-#[ComplexObject]
-impl FlowEventTaskRunning {
-    #[graphql(skip)]
-    fn new(event_id: evs::EventID, event: fs::FlowEventTaskRunning) -> Self {
-        Self {
-            event_id: event_id.to_string(),
-            event_time: event.event_time,
-            task_id: event.task_id.into(),
-        }
-    }
-
-    async fn task(&self, ctx: &Context<'_>) -> Result<Task> {
-        let task_state = utils::get_task(ctx, self.task_id.into()).await?;
-        Ok(Task::new(task_state))
-    }
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-#[derive(SimpleObject)]
-#[graphql(complex)]
-pub struct FlowEventTaskFinished {
-    event_id: String,
-    event_time: DateTime<Utc>,
-    task_id: TaskID,
-}
-
-#[ComplexObject]
-impl FlowEventTaskFinished {
-    #[graphql(skip)]
-    fn new(event_id: evs::EventID, event: fs::FlowEventTaskFinished) -> Self {
-        Self {
-            event_id: event_id.to_string(),
-            event_time: event.event_time,
-            task_id: event.task_id.into(),
+            event_time,
+            task_id: task_id.into(),
+            task_status,
         }
     }
 

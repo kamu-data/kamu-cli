@@ -740,24 +740,11 @@ type FlowEventStartConditionDefined implements FlowEvent {
 	startCondition: FlowStartCondition!
 }
 
-type FlowEventTaskFinished implements FlowEvent {
+type FlowEventTaskChanged implements FlowEvent {
 	eventId: String!
 	eventTime: DateTime!
 	taskId: TaskID!
-	task: Task!
-}
-
-type FlowEventTaskRunning implements FlowEvent {
-	eventId: String!
-	eventTime: DateTime!
-	taskId: TaskID!
-	task: Task!
-}
-
-type FlowEventTaskScheduled implements FlowEvent {
-	eventId: String!
-	eventTime: DateTime!
-	taskId: TaskID!
+	taskStatus: TaskStatus!
 	task: Task!
 }
 
