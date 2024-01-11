@@ -104,34 +104,34 @@ impl ListCommand {
             // pulled
             ColumnFormat::new()
                 .with_style_spec("c")
-                .with_value_fmt(Self::humanize_relative_date),
+                .with_value_fmt_t(Self::humanize_relative_date),
         );
         cols.push(
             // records
             ColumnFormat::new()
                 .with_style_spec("r")
-                .with_value_fmt(Self::humanize_quantity),
+                .with_value_fmt_t(Self::humanize_quantity),
         );
         if self.detail_level > 0 {
             cols.push(
                 // blocks
                 ColumnFormat::new()
                     .with_style_spec("r")
-                    .with_value_fmt(Self::humanize_quantity),
+                    .with_value_fmt_t(Self::humanize_quantity),
             );
         }
         cols.push(
             // size
             ColumnFormat::new()
                 .with_style_spec("r")
-                .with_value_fmt(Self::humanize_data_size),
+                .with_value_fmt_t(Self::humanize_data_size),
         );
         if self.detail_level > 0 {
             cols.push(
                 // watermark
                 ColumnFormat::new()
                     .with_style_spec("c")
-                    .with_value_fmt(Self::humanize_relative_date),
+                    .with_value_fmt_t(Self::humanize_relative_date),
             );
         }
         cols

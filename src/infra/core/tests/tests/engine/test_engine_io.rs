@@ -29,7 +29,7 @@ async fn test_engine_io_common(
 ) {
     let engine_provisioner = Arc::new(EngineProvisionerLocal::new(
         EngineProvisionerLocalConfig::default(),
-        ContainerRuntime::default(),
+        Arc::new(ContainerRuntime::default()),
         dataset_repo.clone(),
         run_info_dir.to_path_buf(),
     ));

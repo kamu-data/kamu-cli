@@ -28,7 +28,7 @@ fn write_test_data(path: impl AsRef<Path>) {
     let schema = Arc::new(Schema::new(vec![
         Field::new(
             DatasetVocabulary::DEFAULT_OFFSET_COLUMN_NAME,
-            DataType::Int64,
+            DataType::UInt64,
             false,
         ),
         Field::new(
@@ -55,7 +55,7 @@ fn write_test_data(path: impl AsRef<Path>) {
     let record_batch = RecordBatch::try_new(
         schema,
         vec![
-            Arc::new(array::Int64Array::from(vec![0, 1, 2])),
+            Arc::new(array::UInt64Array::from(vec![0, 1, 2])),
             Arc::new(
                 array::TimestampMillisecondArray::from(vec![system_time, system_time, system_time])
                     .with_timezone("UTC"),
@@ -102,7 +102,7 @@ async fn test_read_parquet() {
         indoc!(
             r#"
             message arrow_schema {
-              REQUIRED INT64 offset;
+              REQUIRED INT64 offset (INTEGER(64,false));
               REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
               REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
               REQUIRED BYTE_ARRAY city (STRING);

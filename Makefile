@@ -2,6 +2,7 @@ ODF_SPEC_DIR=../open-data-fabric
 ODF_CRATE_DIR=./src/domain/opendatafabric
 RUSTFMT=rustfmt --edition 2021
 LICENSE_HEADER=docs/license_header.txt
+TEST_LOG_PARAMS=RUST_LOG_SPAN_EVENTS=new,close RUST_LOG=debug
 
 
 ###############################################################################
@@ -19,15 +20,20 @@ lint:
 # Test
 ###############################################################################
 
+# Executes the setup actions for tests (e.g. pulling images)
+.PHONY: test-fast
+test-setup:
+	$(TEST_LOG_PARAMS) cargo nextest run -E 'test(::setup::)' --no-capture
+
 # Run all tests using nextest and configured concurrency limits
 .PHONY: test
 test:
-	RUST_LOG_SPAN_EVENTS=new,close RUST_LOG=debug cargo nextest run
+	$(TEST_LOG_PARAMS) cargo nextest run
 
 # Run all tests excluding the heavy engines
 .PHONY: test-fast
 test-fast:
-	RUST_LOG_SPAN_EVENTS=new,close RUST_LOG=debug cargo nextest run -E 'not (test(::spark::) | test(::flink::))'
+	$(TEST_LOG_PARAMS) cargo nextest run -E 'not (test(::spark::) | test(::flink::))'
 
 
 ###############################################################################

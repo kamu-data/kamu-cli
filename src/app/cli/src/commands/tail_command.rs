@@ -9,6 +9,8 @@
 
 use std::sync::Arc;
 
+use datafusion::arrow::array::{ArrayRef, Int32Array, UInt8Array};
+use datafusion::arrow::datatypes::DataType;
 use kamu::domain::QueryService;
 use opendatafabric::*;
 
@@ -52,7 +54,40 @@ impl Command for TailCommand {
 
         let record_batches = df.collect().await.map_err(|e| CLIError::failure(e))?;
 
-        let mut writer = self.output_cfg.get_records_writer(RecordsFormat::default());
+        let mut writer =
+            self.output_cfg
+                .get_records_writer(RecordsFormat::default().with_column_formats(vec![
+                    // TODO: `RecordsFormat` should allow specifying column formats by name, not
+                    // only positionally
+                    ColumnFormat::default(),
+                    ColumnFormat::default().with_value_fmt(|array: &ArrayRef, row: usize| {
+                        let err = Err(InvalidOperationType(0));
+                        let op = match array.data_type() {
+                            DataType::UInt8 => array
+                                .as_any()
+                                .downcast_ref::<UInt8Array>()
+                                .map(|a| a.value(row))
+                                .map(OperationType::try_from)
+                                .unwrap_or(err),
+                            // Compatibility fallback
+                            DataType::Int32 => array
+                                .as_any()
+                                .downcast_ref::<Int32Array>()
+                                .map(|a| a.value(row) as u8)
+                                .map(OperationType::try_from)
+                                .unwrap_or(err),
+                            _ => err,
+                        };
+                        match op {
+                            Ok(OperationType::Append) => "+A",
+                            Ok(OperationType::Retract) => "-R",
+                            Ok(OperationType::CorrectFrom) => "-C",
+                            Ok(OperationType::CorrectTo) => "+C",
+                            _ => "??",
+                        }
+                        .to_string()
+                    }),
+                ]));
         writer.write_batches(&record_batches)?;
         writer.finish()?;
         Ok(())

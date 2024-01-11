@@ -11,7 +11,8 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use chrono::{DateTime, TimeZone, Utc};
-use datafusion::arrow::datatypes::{DataType, SchemaRef, TimeUnit};
+use datafusion::arrow::array::Array;
+use datafusion::arrow::datatypes::{DataType, Field, SchemaRef, TimeUnit};
 use datafusion::common::DFSchema;
 use datafusion::dataframe::DataFrameWriteOptions;
 use datafusion::parquet::file::properties::WriterProperties;
@@ -344,7 +345,7 @@ impl DataWriterDataFusion {
                 &self.meta.vocab.offset_column,
                 cast(
                     col(&self.meta.vocab.offset_column as &str) + lit(start_offset as i64 - 1),
-                    DataType::Int64,
+                    DataType::UInt64,
                 ),
             )
             .int_err()?;
@@ -367,14 +368,31 @@ impl DataWriterDataFusion {
         prev_schema: &SchemaRef,
         new_schema: &SchemaRef,
     ) -> Result<(), IncompatibleSchemaError> {
-        if *prev_schema.as_ref() != *new_schema.as_ref() {
-            return Err(IncompatibleSchemaError::new(
+        if !Self::is_schema_equivalent(prev_schema, new_schema) {
+            Err(IncompatibleSchemaError::new(
                 "Schema of the new slice differs from the schema defined by SetDataSchema event",
                 prev_schema.clone(),
                 new_schema.clone(),
-            ));
+            ))
+        } else {
+            Ok(())
         }
-        Ok(())
+    }
+
+    fn is_schema_equivalent(lhs: &SchemaRef, rhs: &SchemaRef) -> bool {
+        lhs.fields().len() == rhs.fields().len()
+            && lhs
+                .fields()
+                .iter()
+                .zip(rhs.fields().iter())
+                .all(|(l, r)| Self::is_schema_equivalent_rec(l, r))
+    }
+
+    fn is_schema_equivalent_rec(lhs: &Field, rhs: &Field) -> bool {
+        // Ignore nullability
+        lhs.name() == rhs.name()
+            && lhs.data_type() == rhs.data_type()
+            && lhs.metadata() == rhs.metadata()
     }
 
     // TODO: Externalize configuration
@@ -446,8 +464,8 @@ impl DataWriterDataFusion {
         use datafusion::arrow::array::{
             Date32Array,
             Date64Array,
-            Int64Array,
             TimestampMillisecondArray,
+            UInt64Array,
         };
 
         let df = self
@@ -490,14 +508,14 @@ impl DataWriterDataFusion {
         let offset_min = batches[0]
             .column(0)
             .as_any()
-            .downcast_ref::<Int64Array>()
+            .downcast_ref::<UInt64Array>()
             .unwrap()
             .value(0);
 
         let offset_max = batches[0]
             .column(1)
             .as_any()
-            .downcast_ref::<Int64Array>()
+            .downcast_ref::<UInt64Array>()
             .unwrap()
             .value(0);
 
