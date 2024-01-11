@@ -93,17 +93,24 @@ KAMU_CONTAINER_RUNTIME_TYPE=docker cargo test <some_test>
 
 
 ### Run Tests
+Before you run tests for the first time you need to run:
+```sh
+make test-setup
+```
+
+This will download all necessary images for containerized tests.
+
 You can run all tests as:
 ```sh
 make test
 ```
 
-In most cases you can skip tests invlolving very heavy Spark and Flink engines by running:
+In most cases you can skip tests involving very heavy Spark and Flink engines by running:
 ```sh
 make test-fast
 ```
 
-These are just wappers on top of [Nextest](https://nexte.st/) that [control](/.config/nextest.toml) test concurrency and retries. 
+These are just wrappers on top of [Nextest](https://nexte.st/) that [control](/.config/nextest.toml) test concurrency and retries.
 
 To run tests for a specific crate, e.g. `opendatafabric` use:
 ```sh

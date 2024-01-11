@@ -23,7 +23,7 @@ use super::engine_io_strategy::*;
 use super::ODFEngineConfig;
 
 pub struct ODFEngine {
-    container_runtime: ContainerRuntime,
+    container_runtime: Arc<ContainerRuntime>,
     engine_config: ODFEngineConfig,
     image: String,
     run_info_dir: Arc<Path>,
@@ -32,7 +32,7 @@ pub struct ODFEngine {
 
 impl ODFEngine {
     pub fn new(
-        container_runtime: ContainerRuntime,
+        container_runtime: Arc<ContainerRuntime>,
         engine_config: ODFEngineConfig,
         image: &str,
         run_info_dir: Arc<Path>,

@@ -28,7 +28,7 @@ pub struct EngineProvisionerLocal {
     spark_engine: Arc<dyn Engine>,
     flink_engine: Arc<dyn Engine>,
     datafusion_engine: Arc<dyn Engine>,
-    container_runtime: ContainerRuntime,
+    container_runtime: Arc<ContainerRuntime>,
     inner: Arc<Inner>,
 }
 
@@ -46,7 +46,7 @@ struct State {
 impl EngineProvisionerLocal {
     pub fn new(
         config: EngineProvisionerLocalConfig,
-        container_runtime: ContainerRuntime,
+        container_runtime: Arc<ContainerRuntime>,
         dataset_repo: Arc<dyn DatasetRepository>,
         run_info_dir: PathBuf,
     ) -> Self {

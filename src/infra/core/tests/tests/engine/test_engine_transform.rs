@@ -12,8 +12,10 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use chrono::{TimeZone, Utc};
-use container_runtime::ContainerRuntime;
+use container_runtime::*;
+use datafusion::arrow::datatypes::DataType;
 use datafusion::arrow::record_batch::RecordBatch;
+use datafusion::common::{DFField, DFSchema};
 use dill::Component;
 use event_bus::EventBus;
 use futures::StreamExt;
@@ -214,6 +216,8 @@ async fn test_transform_common(transform: Transform) {
     std::fs::create_dir(&cache_dir).unwrap();
 
     let catalog = dill::CatalogBuilder::new()
+        .add_value(ContainerRuntimeConfig::default())
+        .add::<ContainerRuntime>()
         .add::<EventBus>()
         .add::<kamu_core::auth::AlwaysHappyDatasetActionAuthorizer>()
         .add::<kamu::DependencyGraphServiceInMemory>()
@@ -224,7 +228,6 @@ async fn test_transform_common(transform: Transform) {
                 .with_multi_tenant(false),
         )
         .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-        .add_value(ContainerRuntime::default())
         .add_builder(
             EngineProvisionerLocal::builder()
                 .with_config(EngineProvisionerLocalConfig::default())
@@ -263,9 +266,9 @@ async fn test_transform_common(transform: Transform) {
         indoc!(
             "
             city,population
-            A,1000
-            B,2000
-            C,3000
+            A,10
+            B,20
+            C,30
             "
         ),
     )
@@ -286,6 +289,10 @@ async fn test_transform_common(transform: Transform) {
                     ]),
                     ..ReadStepCsv::default()
                 }))
+                .merge(MergeStrategySnapshot {
+                    primary_key: vec!["city".to_string()],
+                    compare_columns: None,
+                })
                 .build(),
         )
         .build();
@@ -316,7 +323,7 @@ async fn test_transform_common(transform: Transform) {
         .push_event(
             MetadataFactory::set_transform()
                 .inputs_from_refs([&root_alias.dataset_name])
-                .transform(transform)
+                .transform(transform.clone())
                 .build(),
         )
         .build();
@@ -344,19 +351,37 @@ async fn test_transform_common(transform: Transform) {
     // First transform writes two blocks: SetDataSchema, ExecuteTransform
     assert_eq!(deriv_helper.block_count().await, 4);
 
-    deriv_data_helper
-        .assert_last_data_records_eq(indoc!(
+    let df = deriv_data_helper.get_last_data().await;
+    kamu_data_utils::testing::assert_data_eq(
+        df.clone(),
+        indoc!(
             r#"
-            +--------+----------------------+----------------------+------+----------------+
-            | offset | system_time          | event_time           | city | population_x10 |
-            +--------+----------------------+----------------------+------+----------------+
-            | 0      | 2050-01-02T12:00:00Z | 2050-01-01T12:00:00Z | A    | 10000          |
-            | 1      | 2050-01-02T12:00:00Z | 2050-01-01T12:00:00Z | B    | 20000          |
-            | 2      | 2050-01-02T12:00:00Z | 2050-01-01T12:00:00Z | C    | 30000          |
-            +--------+----------------------+----------------------+------+----------------+
+            +--------+----+----------------------+----------------------+------+----------------+
+            | offset | op | system_time          | event_time           | city | population_x10 |
+            +--------+----+----------------------+----------------------+------+----------------+
+            | 0      | 0  | 2050-01-02T12:00:00Z | 2050-01-01T12:00:00Z | A    | 100            |
+            | 1      | 0  | 2050-01-02T12:00:00Z | 2050-01-01T12:00:00Z | B    | 200            |
+            | 2      | 0  | 2050-01-02T12:00:00Z | 2050-01-01T12:00:00Z | C    | 300            |
+            +--------+----+----------------------+----------------------+------+----------------+
             "#
-        ))
-        .await;
+        ),
+    )
+    .await;
+    kamu_data_utils::testing::assert_schema_eq(
+        &normalize_schema(df.schema(), transform.engine()),
+        indoc!(
+            r#"
+            message arrow_schema {
+              REQUIRED INT64 offset (INTEGER(64,false));
+              REQUIRED INT32 op (INTEGER(8,false));
+              REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
+              REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
+              OPTIONAL BYTE_ARRAY city (STRING);
+              OPTIONAL INT32 population_x10;
+            }
+            "#
+        ),
+    );
 
     ///////////////////////////////////////////////////////////////////////////
     // Round 2
@@ -367,8 +392,10 @@ async fn test_transform_common(transform: Transform) {
         indoc!(
             "
             city,population
-            D,4000
-            E,5000
+            A,10
+            C,35
+            D,40
+            E,50
             "
         ),
     )
@@ -394,18 +421,39 @@ async fn test_transform_common(transform: Transform) {
     // Only one block written this time
     assert_eq!(deriv_helper.block_count().await, 5);
 
-    deriv_data_helper
-        .assert_last_data_records_eq(indoc!(
+    let df = deriv_data_helper.get_last_data().await;
+    kamu_data_utils::testing::assert_data_eq(
+        df.clone(),
+        indoc!(
             r#"
-            +--------+----------------------+----------------------+------+----------------+
-            | offset | system_time          | event_time           | city | population_x10 |
-            +--------+----------------------+----------------------+------+----------------+
-            | 3      | 2050-01-03T12:00:00Z | 2050-01-02T12:00:00Z | D    | 40000          |
-            | 4      | 2050-01-03T12:00:00Z | 2050-01-02T12:00:00Z | E    | 50000          |
-            +--------+----------------------+----------------------+------+----------------+
+            +--------+----+----------------------+----------------------+------+----------------+
+            | offset | op | system_time          | event_time           | city | population_x10 |
+            +--------+----+----------------------+----------------------+------+----------------+
+            | 3      | 1  | 2050-01-03T12:00:00Z | 2050-01-01T12:00:00Z | B    | 200            |
+            | 4      | 2  | 2050-01-03T12:00:00Z | 2050-01-01T12:00:00Z | C    | 300            |
+            | 5      | 3  | 2050-01-03T12:00:00Z | 2050-01-02T12:00:00Z | C    | 350            |
+            | 6      | 0  | 2050-01-03T12:00:00Z | 2050-01-02T12:00:00Z | D    | 400            |
+            | 7      | 0  | 2050-01-03T12:00:00Z | 2050-01-02T12:00:00Z | E    | 500            |
+            +--------+----+----------------------+----------------------+------+----------------+
             "#
-        ))
-        .await;
+        ),
+    )
+    .await;
+    kamu_data_utils::testing::assert_schema_eq(
+        &normalize_schema(df.schema(), transform.engine()),
+        indoc!(
+            r#"
+            message arrow_schema {
+              REQUIRED INT64 offset (INTEGER(64,false));
+              REQUIRED INT32 op (INTEGER(8,false));
+              REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
+              REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
+              OPTIONAL BYTE_ARRAY city (STRING);
+              OPTIONAL INT32 population_x10;
+            }
+            "#
+        ),
+    );
 
     ///////////////////////////////////////////////////////////////////////////
     // Verify - equivalent data with different encoding
@@ -445,7 +493,14 @@ async fn test_transform_with_engine_spark() {
     test_transform_common(
         MetadataFactory::transform()
             .engine("spark")
-            .query("SELECT event_time, city, population * 10 as population_x10 FROM root")
+            .query(
+                "SELECT
+                    op,
+                    event_time,
+                    city,
+                    population * 10 as population_x10
+                FROM root",
+            )
             .build(),
     )
     .await
@@ -454,10 +509,19 @@ async fn test_transform_with_engine_spark() {
 #[test_group::group(containerized, engine, transform, flink)]
 #[test_log::test(tokio::test)]
 async fn test_transform_with_engine_flink() {
+    // TODO: Remove `op` filed once Flink support input corrections/retractions
+    // See: https://github.com/kamu-data/kamu-engine-flink/issues/11
     test_transform_common(
         MetadataFactory::transform()
             .engine("flink")
-            .query("SELECT event_time, city, population * 10 as population_x10 FROM root")
+            .query(
+                "SELECT
+                    `op`,
+                    `event_time`,
+                    city,
+                    population * 10 as population_x10
+                FROM root",
+            )
             .build(),
     )
     .await
@@ -470,9 +534,67 @@ async fn test_transform_with_engine_datafusion() {
         MetadataFactory::transform()
             .engine("datafusion")
             .query(
-                "SELECT event_time, city, cast(population * 10 as int) as population_x10 FROM root",
+                "SELECT
+                    op,
+                    event_time,
+                    city,
+                    cast(population * 10 as int) as population_x10
+                FROM root",
             )
             .build(),
     )
     .await
+}
+
+/// Accounts for engine-specific quirks in the schema
+fn normalize_schema(s: &DFSchema, engine: &str) -> DFSchema {
+    DFSchema::new_with_metadata(
+        s.fields()
+            .iter()
+            .map(|f| {
+                match engine {
+                    // Datafusion has poor control over nullability
+                    "datafusion" => match f.name().as_str() {
+                        "offset" | "event_time" => f.clone().with_nullable(false),
+                        _ => f.clone(),
+                    },
+                    // Spark:
+                    // - `offset` and `op` don't have unsigned logical types
+                    // - produces optional `offset` and `event_time`
+                    "spark" => match f.name().as_str() {
+                        "offset" => {
+                            assert_matches!(*f.data_type(), DataType::Int64);
+                            assert_eq!(f.is_nullable(), true);
+                            DFField::new_unqualified(f.name(), DataType::UInt64, false)
+                        }
+                        "op" => {
+                            assert_matches!(*f.data_type(), DataType::Int32);
+                            assert_eq!(f.is_nullable(), true);
+                            DFField::new_unqualified(f.name(), DataType::UInt8, false)
+                        }
+                        "event_time" => f.clone().with_nullable(false),
+                        _ => f.clone(),
+                    },
+                    // Flink:
+                    // - `offset` and `op` don't have unsigned logical types
+                    // - produces optional `event_time`
+                    "flink" => match f.name().as_str() {
+                        "offset" => {
+                            assert_matches!(*f.data_type(), DataType::Int64);
+                            DFField::new_unqualified(f.name(), DataType::UInt64, f.is_nullable())
+                        }
+                        "op" => {
+                            assert_matches!(*f.data_type(), DataType::Int32);
+                            DFField::new_unqualified(f.name(), DataType::UInt8, f.is_nullable())
+                        }
+                        "event_time" => f.clone().with_nullable(false),
+                        _ => f.clone(),
+                    },
+                    _ => unreachable!(),
+                }
+            })
+            .collect::<Vec<_>>(),
+        s.metadata().clone(),
+    )
+    .unwrap()
 }

@@ -18,14 +18,14 @@ use rand::{Rng, SeedableRng};
 
 async fn setup(tempdir: &Path, num_rows: usize) -> String {
     use datafusion::arrow::array;
-    use datafusion::arrow::datatypes::{DataType, Field, Int64Type, Schema, UInt8Type};
+    use datafusion::arrow::datatypes::{DataType, Field, Int64Type, Schema, UInt64Type, UInt8Type};
     use datafusion::arrow::record_batch::RecordBatch;
 
     let ctx = SessionContext::new();
 
     let path = tempdir.join("data").to_str().unwrap().to_string();
 
-    let mut offset = array::PrimitiveBuilder::<Int64Type>::with_capacity(num_rows);
+    let mut offset = array::PrimitiveBuilder::<UInt64Type>::with_capacity(num_rows);
     let mut op = array::PrimitiveBuilder::<UInt8Type>::new();
     let mut pk1 = array::PrimitiveBuilder::<Int64Type>::with_capacity(num_rows);
     let mut pk2 = array::PrimitiveBuilder::<Int64Type>::with_capacity(num_rows);
@@ -37,7 +37,7 @@ async fn setup(tempdir: &Path, num_rows: usize) -> String {
     let mut rng = rand::rngs::SmallRng::seed_from_u64(123127986998);
 
     for i in 0..num_rows {
-        offset.append_value(i as i64);
+        offset.append_value(i as u64);
         op.append_value(
             rng.gen_range(odf::OperationType::Append as u8..=odf::OperationType::CorrectTo as u8),
         );
@@ -67,7 +67,7 @@ async fn setup(tempdir: &Path, num_rows: usize) -> String {
     ctx.read_batch(
         RecordBatch::try_new(
             Arc::new(Schema::new(vec![
-                Field::new("offset", DataType::Int64, false),
+                Field::new("offset", DataType::UInt64, false),
                 Field::new("op", DataType::UInt8, false),
                 Field::new("pk1", DataType::Int64, false),
                 Field::new("pk2", DataType::Int64, false),
