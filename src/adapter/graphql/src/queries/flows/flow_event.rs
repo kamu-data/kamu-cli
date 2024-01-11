@@ -175,6 +175,7 @@ impl FlowEventTaskScheduled {
 ///////////////////////////////////////////////////////////////////////////////
 
 #[derive(SimpleObject)]
+#[graphql(complex)]
 pub struct FlowEventTaskRunning {
     event_id: String,
     event_time: DateTime<Utc>,
@@ -201,6 +202,7 @@ impl FlowEventTaskRunning {
 ///////////////////////////////////////////////////////////////////////////////
 
 #[derive(SimpleObject)]
+#[graphql(complex)]
 pub struct FlowEventTaskFinished {
     event_id: String,
     event_time: DateTime<Utc>,

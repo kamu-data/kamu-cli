@@ -744,12 +744,14 @@ type FlowEventTaskFinished implements FlowEvent {
 	eventId: String!
 	eventTime: DateTime!
 	taskId: TaskID!
+	task: Task!
 }
 
 type FlowEventTaskRunning implements FlowEvent {
 	eventId: String!
 	eventTime: DateTime!
 	taskId: TaskID!
+	task: Task!
 }
 
 type FlowEventTaskScheduled implements FlowEvent {
