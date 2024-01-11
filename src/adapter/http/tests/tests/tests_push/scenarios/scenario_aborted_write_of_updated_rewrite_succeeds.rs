@@ -80,7 +80,7 @@ impl<TServerHarness: ServerSideHarness>
         .await;
 
         // Extend client-side dataset with new nodes
-        let client_dataset_ref = make_dataset_ref(&&client_account_name, "foo");
+        let client_dataset_ref = make_dataset_ref(&client_account_name, "foo");
         client_repo
             .get_dataset(&client_dataset_ref)
             .await

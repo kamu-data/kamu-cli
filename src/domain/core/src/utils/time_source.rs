@@ -63,7 +63,7 @@ impl SystemTimeSource for SystemTimeSourceStub {
     fn now(&self) -> DateTime<Utc> {
         match *self.t.lock().unwrap() {
             None => Utc::now(),
-            Some(ref t) => t.clone(),
+            Some(ref t) => *t,
         }
     }
 }

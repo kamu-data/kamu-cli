@@ -1086,7 +1086,7 @@ impl FlowRunsHarness {
             "#
         )
         .replace("<id>", &id.to_string())
-        .replace("<flow_id>", &flow_id.to_string())
+        .replace("<flow_id>", flow_id)
     }
 }
 

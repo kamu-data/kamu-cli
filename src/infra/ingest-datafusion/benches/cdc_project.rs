@@ -124,7 +124,7 @@ async fn project(path: &str) {
 }
 
 fn bench(c: &mut Criterion) {
-    let num_rows = 1000_000;
+    let num_rows = 1_000_000;
 
     let tempdir = tempfile::tempdir().unwrap();
 

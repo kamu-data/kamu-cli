@@ -14,8 +14,7 @@ use datafusion::common::DFSchema;
 use datafusion::parquet::schema::types::Type;
 
 pub fn arrow_schema_to_parquet_schema(arrow_schema: &Schema) -> Arc<Type> {
-    let parquet_schema =
-        datafusion::parquet::arrow::arrow_to_parquet_schema(&arrow_schema).unwrap();
+    let parquet_schema = datafusion::parquet::arrow::arrow_to_parquet_schema(arrow_schema).unwrap();
     parquet_schema.root_schema_ptr()
 }
 

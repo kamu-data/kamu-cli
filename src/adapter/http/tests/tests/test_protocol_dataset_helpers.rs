@@ -327,7 +327,7 @@ async fn test_pull_object_url_s3() {
             download_from_url.path() == format!(
                 "/{}/{}/data/{}",
                 TEST_BUCKET_NAME,
-                test_case.dataset_id.cid.to_string(),
+                test_case.dataset_id.cid,
                 physical_hash.to_multibase_string()
             ).as_str() &&
             download_from_headers == vec![]
@@ -353,7 +353,7 @@ async fn test_pull_object_url_s3() {
             download_from_url.path() == format!(
                 "/{}/{}/checkpoints/{}",
                 TEST_BUCKET_NAME,
-                test_case.dataset_id.cid.to_string(),
+                test_case.dataset_id.cid,
                 physical_hash.to_multibase_string()
             )
             .as_str() &&
@@ -405,7 +405,7 @@ async fn test_pull_object_url_s3() {
             upload_to_url.path() == format!(
                 "/{}/{}/data/{}",
                 TEST_BUCKET_NAME,
-                test_case.dataset_id.cid.to_string(),
+                test_case.dataset_id.cid,
                 physical_hash.to_multibase_string()
             ).as_str() &&
             upload_to_headers == vec![]
@@ -430,7 +430,7 @@ async fn test_pull_object_url_s3() {
             upload_to_url.path() == format!(
                 "/{}/{}/checkpoints/{}",
                 TEST_BUCKET_NAME,
-                test_case.dataset_id.cid.to_string(),
+                test_case.dataset_id.cid,
                 physical_hash.to_multibase_string()
             )
             .as_str() &&
@@ -449,11 +449,11 @@ struct TestCase {
 }
 
 impl TestCase {
-    pub fn data_slice_object<'a>(&'a self) -> &'a messages::ObjectFileReference {
-        self.object_file_references.get(0).unwrap()
+    pub fn data_slice_object(&self) -> &messages::ObjectFileReference {
+        self.object_file_references.first().unwrap()
     }
 
-    pub fn checkpoint_object<'a>(&'a self) -> &'a messages::ObjectFileReference {
+    pub fn checkpoint_object(&self) -> &messages::ObjectFileReference {
         self.object_file_references.get(1).unwrap()
     }
 }

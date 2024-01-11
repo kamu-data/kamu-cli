@@ -29,7 +29,7 @@ impl DatasetsMut {
         let hdl = dataset_repo
             .try_resolve_dataset_ref(&dataset_id.as_local_ref())
             .await?;
-        Ok(hdl.map(|h| DatasetMut::new(h)))
+        Ok(hdl.map(DatasetMut::new))
     }
 
     /// Creates a new empty dataset
@@ -179,7 +179,7 @@ pub struct CreateDatasetResultSuccess {
 #[ComplexObject]
 impl CreateDatasetResultSuccess {
     async fn message(&self) -> String {
-        format!("Success")
+        "Success".to_string()
     }
 }
 

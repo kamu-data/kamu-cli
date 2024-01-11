@@ -32,9 +32,9 @@ impl From<String> for AccountID {
     }
 }
 
-impl Into<String> for AccountID {
-    fn into(self) -> String {
-        self.0
+impl From<AccountID> for String {
+    fn from(val: AccountID) -> Self {
+        val.0
     }
 }
 impl Deref for AccountID {
@@ -72,9 +72,9 @@ impl From<odf::AccountName> for AccountName {
     }
 }
 
-impl Into<odf::AccountName> for AccountName {
-    fn into(self) -> odf::AccountName {
-        self.0
+impl From<AccountName> for odf::AccountName {
+    fn from(val: AccountName) -> Self {
+        val.0
     }
 }
 
@@ -114,9 +114,9 @@ impl From<kamu_core::auth::AccountDisplayName> for AccountDisplayName {
     }
 }
 
-impl Into<kamu_core::auth::AccountDisplayName> for AccountDisplayName {
-    fn into(self) -> kamu_core::auth::AccountDisplayName {
-        self.0
+impl From<AccountDisplayName> for kamu_core::auth::AccountDisplayName {
+    fn from(val: AccountDisplayName) -> Self {
+        val.0
     }
 }
 

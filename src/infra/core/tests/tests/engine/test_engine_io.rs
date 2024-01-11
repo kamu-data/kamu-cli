@@ -151,7 +151,7 @@ async fn test_engine_io_common(
         .unwrap()
     {
         TransformResult::Updated { new_head, .. } => new_head,
-        v @ _ => panic!("Unexpected result: {:?}", v),
+        v => panic!("Unexpected result: {:?}", v),
     };
 
     let block = dataset_deriv
@@ -201,7 +201,7 @@ async fn test_engine_io_common(
         .unwrap()
     {
         TransformResult::Updated { new_head, .. } => new_head,
-        v @ _ => panic!("Unexpected result: {:?}", v),
+        v => panic!("Unexpected result: {:?}", v),
     };
 
     let block = dataset_deriv

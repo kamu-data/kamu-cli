@@ -37,7 +37,7 @@ pub struct RunArgs {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct ExecArgs {
     pub tty: bool,
     pub interactive: bool,
@@ -88,40 +88,30 @@ impl Default for RunArgs {
     }
 }
 
-impl Default for ExecArgs {
-    fn default() -> Self {
-        Self {
-            tty: false,
-            interactive: false,
-            work_dir: None,
-        }
-    }
-}
-
-impl<P1, P2> Into<VolumeSpec> for (P1, P2)
+impl<P1, P2> From<(P1, P2)> for VolumeSpec
 where
     P1: Into<PathBuf>,
     P2: Into<PathBuf>,
 {
-    fn into(self) -> VolumeSpec {
+    fn from(val: (P1, P2)) -> Self {
         VolumeSpec {
-            source: self.0.into(),
-            dest: self.1.into(),
+            source: val.0.into(),
+            dest: val.1.into(),
             access: VolumeAccess::ReadWrite,
         }
     }
 }
 
-impl<P1, P2> Into<VolumeSpec> for (P1, P2, VolumeAccess)
+impl<P1, P2> From<(P1, P2, VolumeAccess)> for VolumeSpec
 where
     P1: Into<PathBuf>,
     P2: Into<PathBuf>,
 {
-    fn into(self) -> VolumeSpec {
+    fn from(val: (P1, P2, VolumeAccess)) -> Self {
         VolumeSpec {
-            source: self.0.into(),
-            dest: self.1.into(),
-            access: self.2,
+            source: val.0.into(),
+            dest: val.1.into(),
+            access: val.2,
         }
     }
 }

@@ -50,9 +50,9 @@ pub trait DatasetRepository: DatasetRegistry + Sync + Send {
         dataset_ref: &DatasetRef,
     ) -> Result<DatasetHandle, GetDatasetError>;
 
-    fn get_all_datasets<'s>(&'s self) -> DatasetHandleStream<'s>;
+    fn get_all_datasets(&self) -> DatasetHandleStream<'_>;
 
-    fn get_datasets_by_owner<'s>(&'s self, account_name: AccountName) -> DatasetHandleStream<'s>;
+    fn get_datasets_by_owner(&self, account_name: AccountName) -> DatasetHandleStream<'_>;
 
     async fn get_dataset(
         &self,

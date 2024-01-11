@@ -53,8 +53,8 @@ impl DataSchema {
 
         let mut buf = Vec::new();
         match format {
-            DataSchemaFormat::Parquet => write_schema_parquet(&mut buf, &schema),
-            DataSchemaFormat::ParquetJson => write_schema_parquet_json(&mut buf, &schema),
+            DataSchemaFormat::Parquet => write_schema_parquet(&mut buf, schema),
+            DataSchemaFormat::ParquetJson => write_schema_parquet_json(&mut buf, schema),
         }
         .int_err()?;
 

@@ -202,7 +202,7 @@ impl From<auth::DatasetActionUnauthorizedError> for PushIngestError {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, Default)]
 pub struct PushSourceNotFoundError {
     source_name: Option<String>,
 }
@@ -212,12 +212,6 @@ impl PushSourceNotFoundError {
         Self {
             source_name: source_name.map(|v| v.into()),
         }
-    }
-}
-
-impl Default for PushSourceNotFoundError {
-    fn default() -> Self {
-        Self { source_name: None }
     }
 }
 

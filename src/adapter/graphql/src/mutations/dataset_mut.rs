@@ -48,7 +48,7 @@ impl DatasetMut {
             .eq(new_name.as_str())
         {
             return Ok(RenameResult::NoChanges(RenameResultNoChanges {
-                preserved_name: new_name.into(),
+                preserved_name: new_name,
             }));
         }
 
@@ -59,7 +59,7 @@ impl DatasetMut {
         {
             Ok(_) => Ok(RenameResult::Success(RenameResultSuccess {
                 old_name: self.dataset_handle.alias.dataset_name.clone().into(),
-                new_name: new_name.into(),
+                new_name,
             })),
             Err(RenameDatasetError::NameCollision(e)) => {
                 Ok(RenameResult::NameCollision(RenameResultNameCollision {
@@ -128,7 +128,7 @@ pub struct RenameResultSuccess {
 #[ComplexObject]
 impl RenameResultSuccess {
     async fn message(&self) -> String {
-        format!("Success")
+        "Success".to_string()
     }
 }
 
@@ -141,7 +141,7 @@ pub struct RenameResultNoChanges {
 #[ComplexObject]
 impl RenameResultNoChanges {
     async fn message(&self) -> String {
-        format!("No changes")
+        "No changes".to_string()
     }
 }
 
@@ -176,7 +176,7 @@ pub struct DeleteResultSuccess {
 #[ComplexObject]
 impl DeleteResultSuccess {
     async fn message(&self) -> String {
-        format!("Success")
+        "Success".to_string()
     }
 }
 

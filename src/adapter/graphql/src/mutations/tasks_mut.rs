@@ -62,7 +62,7 @@ impl TasksMut {
         let task_state = task_sched
             .create_task(ts::LogicalPlan::Probe(ts::Probe {
                 dataset_id: dataset_id.map(Into::into),
-                busy_time: busy_time_ms.map(|millis| std::time::Duration::from_millis(millis)),
+                busy_time: busy_time_ms.map(std::time::Duration::from_millis),
                 end_with_outcome: end_with_outcome.map(Into::into),
             }))
             .await

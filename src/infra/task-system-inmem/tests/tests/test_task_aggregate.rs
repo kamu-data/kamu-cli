@@ -71,7 +71,7 @@ async fn test_task_save_load_update() {
     .await
     .unwrap();
     assert_eq!(task.status, TaskStatus::Running);
-    assert_eq!(task.cancellation_requested, true);
+    assert!(task.cancellation_requested);
 
     // Update
     task.update(&event_store).await.unwrap();

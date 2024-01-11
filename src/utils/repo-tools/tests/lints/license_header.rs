@@ -29,7 +29,7 @@ fn get_all_crates() -> Vec<PathBuf> {
     root_cargo["workspace"]["members"]
         .as_array()
         .unwrap()
-        .into_iter()
+        .iter()
         .map(|v| v.as_str().unwrap())
         .map(|s| repo_root.join(s))
         .collect()

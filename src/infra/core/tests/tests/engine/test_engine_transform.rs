@@ -87,7 +87,7 @@ impl DatasetHelper {
             .unwrap();
 
         let orig_slice = orig_block.event.output_data.as_ref().unwrap();
-        let orig_data_path = self.data_slice_path(&orig_slice).await;
+        let orig_data_path = self.data_slice_path(orig_slice).await;
 
         // Re-encode data
         let mut reader =
@@ -155,7 +155,7 @@ impl DatasetHelper {
         std::fs::rename(&tmp_path, &new_data_path).unwrap();
         std::fs::remove_file(&orig_data_path).unwrap();
         if let Some(orig_checkpoint) = &orig_block.event.output_checkpoint {
-            std::fs::remove_file(self.checkpoint_path(&orig_checkpoint).await).unwrap();
+            std::fs::remove_file(self.checkpoint_path(orig_checkpoint).await).unwrap();
         }
 
         // Rewrite last block

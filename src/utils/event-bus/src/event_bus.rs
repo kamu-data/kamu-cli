@@ -106,7 +106,7 @@ impl EventBus {
         let maybe_closure_handlers: Option<EventClosureHandlers<TEvent>> = {
             let state = self.state.lock().unwrap();
             let maybe_event_handlers = state.get_closure_handlers_for::<TEvent>();
-            maybe_event_handlers.map(|handlers| handlers.clone())
+            maybe_event_handlers.cloned()
         };
 
         if let Some(closure_handlers) = maybe_closure_handlers {
@@ -138,9 +138,9 @@ impl State {
         }
     }
 
-    pub fn get_closure_handlers_for<'a, TEvent: 'static + Clone>(
-        &'a self,
-    ) -> Option<&'a EventClosureHandlers<TEvent>> {
+    pub fn get_closure_handlers_for<TEvent: 'static + Clone>(
+        &self,
+    ) -> Option<&EventClosureHandlers<TEvent>> {
         if let Some(event_handlers) = self
             .closure_handlers_by_event_type
             .get(&TypeId::of::<TEvent>())
@@ -159,7 +159,7 @@ impl State {
     ) -> &mut EventClosureHandlers<TEvent> {
         self.closure_handlers_by_event_type
             .entry(TypeId::of::<TEvent>())
-            .or_insert(Box::new(EventClosureHandlers::<TEvent>::default()))
+            .or_insert(Box::<EventClosureHandlers<TEvent>>::default())
             .downcast_mut::<EventClosureHandlers<TEvent>>()
             .unwrap()
     }

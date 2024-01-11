@@ -91,7 +91,7 @@ pub(crate) struct LoginResponse {
 impl From<kamu_core::auth::LoginResponse> for LoginResponse {
     fn from(value: kamu_core::auth::LoginResponse) -> Self {
         Self {
-            access_token: value.access_token.into(),
+            access_token: value.access_token,
             account: Account::from_account_info(value.account_info),
         }
     }

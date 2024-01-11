@@ -131,7 +131,7 @@ pub struct TriggerFlowSuccess {
 #[ComplexObject]
 impl TriggerFlowSuccess {
     pub async fn message(&self) -> String {
-        format!("Success")
+        "Success".to_string()
     }
 }
 
@@ -154,7 +154,7 @@ pub struct CancelScheduledTasksSuccess {
 #[ComplexObject]
 impl CancelScheduledTasksSuccess {
     pub async fn message(&self) -> String {
-        format!("Success")
+        "Success".to_string()
     }
 }
 

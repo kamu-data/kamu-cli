@@ -328,10 +328,7 @@ async fn test_dataset_sql_authorized_common(catalog: dill::Catalog, tempdir: &Te
     let dataset_alias = create_test_dataset(&catalog, tempdir.path()).await;
 
     let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
-    let statement = format!(
-        "SELECT COUNT(*) AS num_records FROM {}",
-        dataset_alias.to_string()
-    );
+    let statement = format!("SELECT COUNT(*) AS num_records FROM {}", dataset_alias);
     let result = query_svc
         .sql_statement(statement.as_str(), QueryOptions::default())
         .await;
@@ -381,7 +378,7 @@ async fn test_dataset_sql_unauthorized_common(catalog: dill::Catalog, tempdir: &
     let dataset_alias = create_test_dataset(&catalog, tempdir.path()).await;
 
     let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
-    let statement = format!("SELECT COUNT(*) FROM {}", dataset_alias.to_string());
+    let statement = format!("SELECT COUNT(*) FROM {}", dataset_alias);
     let result = query_svc
         .sql_statement(statement.as_str(), QueryOptions::default())
         .await;

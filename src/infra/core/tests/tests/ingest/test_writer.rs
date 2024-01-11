@@ -590,8 +590,7 @@ async fn test_data_writer_optimal_parquet_encoding() {
             .get_column_page_reader(col)
             .unwrap()
             .map(|p| p.unwrap())
-            .filter(|p| p.page_type() == PageType::DATA_PAGE)
-            .next()
+            .find(|p| p.page_type() == PageType::DATA_PAGE)
             .unwrap();
 
         assert_eq!(data_page.encoding(), enc);
@@ -770,7 +769,7 @@ impl Harness {
                 MetadataFactory::metadata_block(
                     MetadataFactory::seed(odf::DatasetKind::Root).build(),
                 )
-                .system_time(system_time.clone())
+                .system_time(system_time)
                 .build_typed(),
             )
             .await
@@ -782,7 +781,7 @@ impl Harness {
                 .commit_event(
                     event,
                     CommitOpts {
-                        system_time: Some(system_time.clone()),
+                        system_time: Some(system_time),
                         ..Default::default()
                     },
                 )
@@ -830,7 +829,7 @@ impl Harness {
         schema: &str,
         source_state: Option<odf::SourceState>,
     ) -> Result<WriteDataResult, WriteDataError> {
-        let df = if data.len() == 0 {
+        let df = if data.is_empty() {
             None
         } else {
             let data_path = self.temp_dir.path().join("data.bin");
@@ -857,8 +856,8 @@ impl Harness {
             .write(
                 df,
                 WriteDataOpts {
-                    system_time: self.system_time.clone(),
-                    source_event_time: self.source_event_time.clone(),
+                    system_time: self.system_time,
+                    source_event_time: self.source_event_time,
                     source_state,
                     data_staging_path: self.temp_dir.path().join("write.tmp"),
                 },

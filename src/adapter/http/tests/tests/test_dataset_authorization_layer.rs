@@ -330,8 +330,7 @@ impl ServerHarness {
     }
 
     pub fn test_url(&self, path: &str) -> Url {
-        Url::from_str(format!("http://{}/{}", self.server.local_addr().to_string(), path).as_str())
-            .unwrap()
+        Url::from_str(format!("http://{}/{}", self.server.local_addr(), path).as_str()).unwrap()
     }
 
     async fn foo_handler() -> http::StatusCode {

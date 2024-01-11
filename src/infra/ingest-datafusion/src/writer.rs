@@ -476,8 +476,7 @@ impl DataWriterDataFusion {
                  {}",
                 batches[0].schema().field(2)
             )
-            .int_err()
-            .into());
+            .int_err());
         };
 
         // Ensure watermark is monotonically non-decreasing
@@ -552,7 +551,7 @@ impl DataWriter for DataWriterDataFusion {
             // Prepare commit info
             let input_checkpoint = self.meta.last_checkpoint.clone();
             let source_state = opts.source_state.clone();
-            let prev_watermark = self.meta.last_watermark.clone();
+            let prev_watermark = self.meta.last_watermark;
 
             if data_file.is_none() {
                 // Empty result - carry watermark and propagate source state
@@ -590,7 +589,7 @@ impl DataWriter for DataWriterDataFusion {
             let add_data = AddDataParams {
                 input_checkpoint: self.meta.last_checkpoint.clone(),
                 output_data: None,
-                output_watermark: self.meta.last_watermark.clone(),
+                output_watermark: self.meta.last_watermark,
                 source_state: opts.source_state.clone(),
             };
 
@@ -810,10 +809,8 @@ impl DataWriterDataFusionBuilder {
                         unimplemented!("Disabling sources is not yet fully supported")
                     }
                     odf::MetadataEvent::AddPushSource(e) => {
-                        if source_event.is_none() {
-                            if source_name == e.source_name.as_deref() {
-                                source_event = Some(e.into());
-                            }
+                        if source_event.is_none() && source_name == e.source_name.as_deref() {
+                            source_event = Some(e.into());
                         }
                     }
                     odf::MetadataEvent::DisablePushSource(_) => {
@@ -938,8 +935,8 @@ impl SourceNotFoundError {
     }
 }
 
-impl Into<PushSourceNotFoundError> for SourceNotFoundError {
-    fn into(self) -> PushSourceNotFoundError {
-        PushSourceNotFoundError::new(self.source_name)
+impl From<SourceNotFoundError> for PushSourceNotFoundError {
+    fn from(val: SourceNotFoundError) -> Self {
+        PushSourceNotFoundError::new(val.source_name)
     }
 }

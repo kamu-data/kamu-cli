@@ -428,7 +428,7 @@ impl ContainerProcess {
 impl Drop for ContainerProcess {
     fn drop(&mut self) {
         // id is present only when process have not yet been awaited for
-        if let Some(_) = self.child.id() {
+        if self.child.id().is_some() {
             tracing::warn!(
                 container_name = %self.container_name,
                 "Container was not terminated - cleaning up synchronously"

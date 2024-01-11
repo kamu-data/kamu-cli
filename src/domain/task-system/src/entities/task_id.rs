@@ -27,8 +27,8 @@ impl std::fmt::Display for TaskID {
     }
 }
 
-impl Into<u64> for TaskID {
-    fn into(self) -> u64 {
-        self.0
+impl From<TaskID> for u64 {
+    fn from(val: TaskID) -> Self {
+        val.0
     }
 }

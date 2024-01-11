@@ -43,7 +43,7 @@ impl MergeStrategy for MergeStrategyLedger {
         if prev.is_none() {
             // Validate PK columns exist
             new.clone()
-                .select(self.primary_key.iter().map(|c| col(c)).collect())
+                .select(self.primary_key.iter().map(col).collect())
                 .int_err()?;
 
             return Ok(new);

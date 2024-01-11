@@ -50,22 +50,13 @@ pub trait PollingIngestService: Send + Sync {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct PollingIngestOptions {
     /// Fetch latest data from uncacheable data sources
     pub fetch_uncacheable: bool,
     /// Pull sources that yield multiple data files until they are
     /// fully exhausted
     pub exhaust_sources: bool,
-}
-
-impl Default for PollingIngestOptions {
-    fn default() -> Self {
-        Self {
-            fetch_uncacheable: false,
-            exhaust_sources: false,
-        }
-    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////

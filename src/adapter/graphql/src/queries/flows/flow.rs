@@ -36,10 +36,10 @@ impl Flow {
     async fn description(&self, ctx: &Context<'_>) -> Result<FlowDescription> {
         Ok(match &self.flow_state.flow_key {
             fs::FlowKey::Dataset(fk_dataset) => {
-                FlowDescription::Dataset(self.dataset_flow_description(ctx, &fk_dataset).await?)
+                FlowDescription::Dataset(self.dataset_flow_description(ctx, fk_dataset).await?)
             }
             fs::FlowKey::System(fk_systen) => {
-                FlowDescription::System(self.system_flow_description(&fk_systen))
+                FlowDescription::System(self.system_flow_description(fk_systen))
             }
         })
     }
@@ -128,10 +128,10 @@ impl Flow {
 
     /// A user, who initiated the flow run. None for system-initiated flows
     async fn initiator(&self) -> Option<Account> {
-        match self.flow_state.primary_trigger.initiator_account_name() {
-            Some(initiator) => Some(Account::from_account_name(initiator.clone().into())),
-            None => None,
-        }
+        self.flow_state
+            .primary_trigger
+            .initiator_account_name()
+            .map(|initiator| Account::from_account_name(initiator.clone()))
     }
 
     /// Primary flow trigger

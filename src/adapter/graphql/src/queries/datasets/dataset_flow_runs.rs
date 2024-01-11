@@ -54,7 +54,7 @@ impl DatasetFlowRuns {
             .into_iter()
             .skip(page * per_page)
             .take(per_page)
-            .map(|flow_state| Flow::new(flow_state))
+            .map(Flow::new)
             .collect();
 
         Ok(FlowConnection::new(nodes, page, per_page, total_count))

@@ -112,7 +112,7 @@ async fn test_summary_updates() {
             kind: DatasetKind::Root,
             last_block_hash: hash_3.clone(),
             dependencies: Vec::new(),
-            last_pulled: Some(block_3.system_time.clone()),
+            last_pulled: Some(block_3.system_time),
             num_records: 10,
             data_size: 16,
             checkpoints_size: 10,

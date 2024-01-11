@@ -119,7 +119,7 @@ pub struct CommitResultSuccess {
 #[ComplexObject]
 impl CommitResultSuccess {
     pub async fn message(&self) -> String {
-        format!("Success")
+        "Success".to_string()
     }
 }
 
@@ -131,7 +131,7 @@ pub struct NoChanges;
 #[Object]
 impl NoChanges {
     pub async fn message(&self) -> String {
-        format!("No changes")
+        "No changes".to_string()
     }
 }
 

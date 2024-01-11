@@ -99,7 +99,7 @@ async fn append_data_to_dataset(
     block_amount: usize,
     dataset_repo: &dyn DatasetRepository,
     dataset_ref: Arc<DatasetAlias>,
-) -> () {
+) {
     for _ in 1..block_amount {
         let _ = DatasetTestHelper::append_random_data(
             dataset_repo,
@@ -108,7 +108,6 @@ async fn append_data_to_dataset(
         )
         .await;
     }
-    ()
 }
 
 async fn do_test_sync(
@@ -172,7 +171,7 @@ fn bench_with_1_parallel(c: &mut Criterion) {
     let (dataset_alias, pull_repo_url, push_repo_url) = build_temp_dirs(rt.clone());
 
     let (sync_service_impl, dataset_repo) = rt.block_on(setup_dataset(
-        &tmp_workspace_dir.path(),
+        tmp_workspace_dir.path(),
         dataset_alias.clone(),
         None,
     ));
@@ -201,7 +200,7 @@ fn bench_with_10_parallels(c: &mut Criterion) {
     let (dataset_alias, pull_repo_url, push_repo_url) = build_temp_dirs(rt.clone());
 
     let (sync_service_impl, dataset_repo) = rt.block_on(setup_dataset(
-        &tmp_workspace_dir.path(),
+        tmp_workspace_dir.path(),
         dataset_alias.clone(),
         None,
     ));

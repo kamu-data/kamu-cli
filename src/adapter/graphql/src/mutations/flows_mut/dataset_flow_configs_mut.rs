@@ -173,7 +173,7 @@ pub struct SetFlowConfigSuccess {
 #[ComplexObject]
 impl SetFlowConfigSuccess {
     pub async fn message(&self) -> String {
-        format!("Success")
+        "Success".to_string()
     }
 }
 

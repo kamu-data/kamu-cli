@@ -136,14 +136,14 @@ pub trait MetadataChainExt: MetadataChain {
 
     /// Convenience function to iterate blocks starting with the `head`
     /// reference
-    fn iter_blocks<'a>(&'a self) -> DynMetadataStream<'a> {
+    fn iter_blocks(&self) -> DynMetadataStream<'_> {
         self.iter_blocks_interval_ref(&BlockRef::Head, None)
     }
 
     /// Convenience function to iterate blocks starting with the specified
     /// reference
     fn iter_blocks_ref<'a>(&'a self, head: &'a BlockRef) -> DynMetadataStream<'a> {
-        self.iter_blocks_interval_ref(&head, None)
+        self.iter_blocks_interval_ref(head, None)
     }
 }
 

@@ -172,7 +172,7 @@ impl ClientSideHarness {
     pub async fn pull_dataset_result(&self, dataset_ref: DatasetRefAny) -> PullResult {
         self.pull_datasets(dataset_ref)
             .await
-            .get(0)
+            .first()
             .unwrap()
             .result
             .as_ref()
@@ -212,7 +212,7 @@ impl ClientSideHarness {
             .push_dataset(dataset_local_ref, dataset_remote_ref)
             .await;
 
-        match &(results.get(0).unwrap().result) {
+        match &(results.first().unwrap().result) {
             Ok(sync_result) => sync_result.clone(),
             Err(e) => {
                 println!("Error: {:#?}", e);

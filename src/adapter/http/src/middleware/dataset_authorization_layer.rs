@@ -115,13 +115,13 @@ where
 
             let action = (dataset_action_query)(&request);
 
-            match dataset_repo.resolve_dataset_ref(&dataset_ref).await {
+            match dataset_repo.resolve_dataset_ref(dataset_ref).await {
                 Ok(dataset_handle) => {
                     if let Err(err) = dataset_action_authorizer
                         .check_action_allowed(&dataset_handle, action)
                         .await
                     {
-                        if let Err(err_result) = Self::check_logged_in(&catalog) {
+                        if let Err(err_result) = Self::check_logged_in(catalog) {
                             tracing::error!(
                                 "Dataset '{}' {} access denied: user not logged in",
                                 dataset_ref,

@@ -58,7 +58,7 @@ fn main() {
 
     update_crates(&new_version);
 
-    update_license(&Path::new("LICENSE.txt"), &current_version, &new_version);
+    update_license(Path::new("LICENSE.txt"), &current_version, &new_version);
 }
 
 fn get_current_version() -> Version {
@@ -101,8 +101,8 @@ fn update_license(license_path: &Path, current_version: &Version, new_version: &
     std::fs::write(license_path, new_text).expect("Failed to write to license file");
 }
 
-fn update_license_text<'t>(
-    text: &'t str,
+fn update_license_text(
+    text: &str,
     current_version: &Version,
     new_version: &Version,
     current_date: &NaiveDate,

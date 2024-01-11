@@ -167,7 +167,7 @@ async fn merge(prev_path: &str, new_path: &str, expected_rows: usize) {
 ///////////////////////////////////////////////////////////////////////////////
 
 fn bench(c: &mut Criterion) {
-    let orig_rows = 1000_000;
+    let orig_rows = 1_000_000;
     let added_rows = 500_000;
     let overlap_rows = 100_000;
 

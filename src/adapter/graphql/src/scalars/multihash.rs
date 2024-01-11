@@ -22,9 +22,9 @@ impl From<odf::Multihash> for Multihash {
     }
 }
 
-impl Into<odf::Multihash> for Multihash {
-    fn into(self) -> odf::Multihash {
-        self.0
+impl From<Multihash> for odf::Multihash {
+    fn from(val: Multihash) -> Self {
+        val.0
     }
 }
 

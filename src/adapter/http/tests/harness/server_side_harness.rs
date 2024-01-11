@@ -93,7 +93,7 @@ pub(crate) fn create_web_user_catalog(
     base_catalog: &dill::Catalog,
     options: &ServerSideHarnessOptions,
 ) -> dill::Catalog {
-    let mut web_catalog_builder = dill::CatalogBuilder::new_chained(&base_catalog);
+    let mut web_catalog_builder = dill::CatalogBuilder::new_chained(base_catalog);
     if options.authorized_writes {
         web_catalog_builder.add::<auth::AlwaysHappyDatasetActionAuthorizer>();
     } else {

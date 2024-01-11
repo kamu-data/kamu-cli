@@ -50,7 +50,7 @@ async fn test_smart_push_new_dataset_unauthenticated() {
             .push_dataset(scenario.client_dataset_ref, scenario.server_dataset_ref)
             .await;
 
-        let dataset_result = &push_result.get(0).unwrap().result;
+        let dataset_result = &push_result.first().unwrap().result;
 
         assert_matches!(
             dataset_result,
@@ -96,7 +96,7 @@ async fn test_smart_push_new_dataset_wrong_user() {
             .push_dataset(scenario.client_dataset_ref, wrong_server_dataset_ref)
             .await;
 
-        let dataset_result = &push_result.get(0).unwrap().result;
+        let dataset_result = &push_result.first().unwrap().result;
 
         assert_matches!(
             dataset_result,
@@ -135,7 +135,7 @@ async fn test_smart_push_existing_dataset_unauthenticated() {
             .push_dataset(scenario.client_dataset_ref, scenario.server_dataset_ref)
             .await;
 
-        let dataset_result = &push_result.get(0).unwrap().result;
+        let dataset_result = &push_result.first().unwrap().result;
 
         assert_matches!(
             dataset_result,
@@ -174,7 +174,7 @@ async fn test_smart_push_existing_dataset_unauthorized() {
             .push_dataset(scenario.client_dataset_ref, scenario.server_dataset_ref)
             .await;
 
-        let dataset_result = &push_result.get(0).unwrap().result;
+        let dataset_result = &push_result.first().unwrap().result;
 
         assert_matches!(
             dataset_result,

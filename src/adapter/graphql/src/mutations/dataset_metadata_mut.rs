@@ -102,7 +102,7 @@ impl DatasetMetadataMut {
                         .items
                         .iter()
                         .filter(|a| !a.path.to_lowercase().starts_with("readme."))
-                        .map(|a| a.clone())
+                        .cloned()
                         .collect(),
                 };
                 new.items.push(odf::AttachmentEmbedded {
