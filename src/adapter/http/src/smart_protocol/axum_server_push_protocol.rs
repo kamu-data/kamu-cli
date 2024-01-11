@@ -83,7 +83,7 @@ impl AxumServerPushProtocolInstance {
         let push_request = self.handle_push_request_initiation().await?;
 
         let mut new_blocks = self.try_handle_push_metadata_request(push_request).await?;
-        if new_blocks.len() > 0 {
+        if !new_blocks.is_empty() {
             if self.dataset.is_none() {
                 tracing::info!("Dataset does not exist, trying to create from Seed block");
 
@@ -249,7 +249,7 @@ impl AxumServerPushProtocolInstance {
                 &self.maybe_bearer_header,
             )
             .await
-            .map_err(|e| PushServerError::Internal(e))?;
+            .map_err(PushServerError::Internal)?;
 
             object_transfer_strategies.push(transfer_strategy);
         }
@@ -319,7 +319,7 @@ impl AxumServerPushProtocolInstance {
 
         tracing::debug!("Push client sent a complete request. Commiting the dataset");
 
-        if new_blocks.len() > 0 {
+        if !new_blocks.is_empty() {
             let dataset = self.dataset.as_ref().unwrap().as_ref();
             let response = dataset_append_metadata(dataset, new_blocks)
                 .await

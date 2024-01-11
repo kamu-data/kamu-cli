@@ -185,15 +185,8 @@ impl ServerHarness {
     }
 
     pub fn test_url(&self) -> Url {
-        Url::from_str(
-            format!(
-                "http://{}{}",
-                self.server.local_addr().to_string(),
-                TEST_ENDPOINT
-            )
-            .as_str(),
-        )
-        .unwrap()
+        Url::from_str(format!("http://{}{}", self.server.local_addr(), TEST_ENDPOINT).as_str())
+            .unwrap()
     }
 
     async fn foo_handler(

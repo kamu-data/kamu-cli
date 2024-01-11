@@ -35,7 +35,7 @@ impl Accounts {
         let maybe_account_info = authentication_service
             .find_account_info_by_name(&account_name)
             .await?;
-        Ok(maybe_account_info.map(|ai| Account::from_account_info(ai)))
+        Ok(maybe_account_info.map(Account::from_account_info))
     }
 }
 

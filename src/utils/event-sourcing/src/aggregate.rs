@@ -198,7 +198,7 @@ where
         let mut event_stream = event_store.get_events(
             &self.query,
             GetEventsOpts {
-                from: prev_stored_event.clone(),
+                from: prev_stored_event,
                 to: opts.as_of_event,
             },
         );
@@ -238,9 +238,9 @@ where
 
         let events = self.pending_events.take_inner();
 
-        if events.len() != 0 {
+        if !events.is_empty() {
             let num_events = events.len();
-            let prev_stored_event = self.last_stored_event.clone();
+            let prev_stored_event = self.last_stored_event;
 
             let last_stored_event = event_store.save_events(&self.query, events).await?;
             self.last_stored_event = Some(last_stored_event);

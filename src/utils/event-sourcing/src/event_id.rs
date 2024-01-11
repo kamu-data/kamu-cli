@@ -22,9 +22,9 @@ impl EventID {
     }
 }
 
-impl Into<u64> for EventID {
-    fn into(self) -> u64 {
-        self.0
+impl From<EventID> for u64 {
+    fn from(val: EventID) -> Self {
+        val.0
     }
 }
 

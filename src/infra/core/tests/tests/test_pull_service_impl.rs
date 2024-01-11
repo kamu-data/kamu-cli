@@ -606,7 +606,7 @@ async fn test_sync_from() {
         .unwrap();
     let pull_aliases: Vec<_> = aliases
         .get_by_kind(RemoteAliasKind::Pull)
-        .map(|i| i.clone())
+        .cloned()
         .collect();
 
     assert_eq!(
@@ -653,7 +653,7 @@ async fn test_sync_from_url_and_local_ref() {
         .unwrap();
     let pull_aliases: Vec<_> = aliases
         .get_by_kind(RemoteAliasKind::Pull)
-        .map(|i| i.clone())
+        .cloned()
         .collect();
 
     assert_eq!(
@@ -700,7 +700,7 @@ async fn test_sync_from_url_and_local_multi_tenant_ref() {
         .unwrap();
     let pull_aliases: Vec<_> = aliases
         .get_by_kind(RemoteAliasKind::Pull)
-        .map(|i| i.clone())
+        .cloned()
         .collect();
 
     assert_eq!(
@@ -747,7 +747,7 @@ async fn test_sync_from_url_only() {
         .unwrap();
     let pull_aliases: Vec<_> = aliases
         .get_by_kind(RemoteAliasKind::Pull)
-        .map(|i| i.clone())
+        .cloned()
         .collect();
 
     assert_eq!(
@@ -794,7 +794,7 @@ async fn test_sync_from_url_only_multi_tenant_case() {
         .unwrap();
     let pull_aliases: Vec<_> = aliases
         .get_by_kind(RemoteAliasKind::Pull)
-        .map(|i| i.clone())
+        .cloned()
         .collect();
 
     assert_eq!(

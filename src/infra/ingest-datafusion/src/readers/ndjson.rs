@@ -64,15 +64,15 @@ impl Reader for ReaderNdJson {
 
     async fn read(&self, path: &Path) -> Result<DataFrame, ReadError> {
         // TODO: Move this to reader construction phase
-        match self.conf.encoding.as_ref().map(|s| s.as_str()) {
+        match self.conf.encoding.as_deref() {
             None | Some("utf8") => Ok(()),
             Some(v) => Err(unsupported!("Unsupported NdJson.encoding: {}", v)),
         }?;
-        match self.conf.date_format.as_ref().map(|s| s.as_str()) {
+        match self.conf.date_format.as_deref() {
             None | Some("rfc3339") => Ok(()),
             Some(v) => Err(unsupported!("Unsupported NdJson.dateFormat: {}", v)),
         }?;
-        match self.conf.timestamp_format.as_ref().map(|s| s.as_str()) {
+        match self.conf.timestamp_format.as_deref() {
             None | Some("rfc3339") => Ok(()),
             Some(v) => Err(unsupported!("Unsupported NdJson.timestampFormat: {}", v)),
         }?;

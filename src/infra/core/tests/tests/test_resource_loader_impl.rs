@@ -20,7 +20,7 @@ fn create_test_snapshot(path: &Path) -> DatasetSnapshot {
     let buffer = YamlDatasetSnapshotSerializer
         .write_manifest(&snapshot)
         .unwrap();
-    std::fs::write(path, &buffer).unwrap();
+    std::fs::write(path, buffer).unwrap();
     snapshot
 }
 
@@ -49,7 +49,7 @@ async fn test_load_from_file_url() {
     let path = tempdir.path().join("test.yaml");
     let expected = create_test_snapshot(&path);
 
-    let url = url::Url::from_file_path(&path.canonicalize().unwrap()).unwrap();
+    let url = url::Url::from_file_path(path.canonicalize().unwrap()).unwrap();
     let loader = ResourceLoaderImpl::new();
     let actual = loader.load_dataset_snapshot_from_url(&url).await.unwrap();
     assert_eq!(expected, actual);

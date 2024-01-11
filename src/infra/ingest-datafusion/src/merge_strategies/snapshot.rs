@@ -32,9 +32,9 @@ pub struct MergeStrategySnapshot {
 
 impl MergeStrategySnapshot {
     pub fn new(order_column: String, cfg: odf::MergeStrategySnapshot) -> Self {
-        assert!(cfg.primary_key.len() != 0);
+        assert!(!cfg.primary_key.is_empty());
         if let Some(c) = &cfg.compare_columns {
-            assert!(c.len() != 0);
+            assert!(!c.is_empty());
         }
         Self {
             primary_key: cfg.primary_key,
@@ -103,7 +103,7 @@ impl MergeStrategySnapshot {
                         datafusion::logical_expr::BuiltInWindowFunction::RowNumber,
                     ),
                     args: Vec::new(),
-                    partition_by: self.primary_key.iter().map(|c| col(c)).collect(),
+                    partition_by: self.primary_key.iter().map(col).collect(),
                     order_by: vec![col(&self.order_column).sort(false, false)],
                     window_frame: datafusion::logical_expr::WindowFrame::new(true),
                 },
@@ -267,7 +267,7 @@ impl MergeStrategy for MergeStrategySnapshot {
         if prev.is_none() {
             // Validate PK columns exist
             new.clone()
-                .select(self.primary_key.iter().map(|c| col(c)).collect())
+                .select(self.primary_key.iter().map(col).collect())
                 .int_err()?;
 
             let df = new

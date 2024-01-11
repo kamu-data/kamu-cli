@@ -156,12 +156,12 @@ pub struct TransformResponse {
     pub out_data: Option<OwnedFile>,
 }
 
-impl Into<InputSlice> for TransformRequestInput {
-    fn into(self) -> InputSlice {
+impl From<TransformRequestInput> for InputSlice {
+    fn from(val: TransformRequestInput) -> Self {
         InputSlice {
-            dataset_id: self.dataset_handle.id,
-            block_interval: self.block_interval,
-            data_interval: self.data_interval,
+            dataset_id: val.dataset_handle.id,
+            block_interval: val.block_interval,
+            data_interval: val.data_interval,
         }
     }
 }
@@ -205,10 +205,10 @@ impl std::fmt::Display for InvalidQueryError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Invalid query: {}", self.message)?;
 
-        if self.log_files.len() != 0 {
+        if !self.log_files.is_empty() {
             write!(f, "\nSee log files for details:\n")?;
             for path in self.log_files.iter() {
-                write!(f, "- {}\n", path.display())?;
+                writeln!(f, "- {}", path.display())?;
             }
         }
 
@@ -244,10 +244,10 @@ impl std::fmt::Display for ProcessError {
             None => write!(f, "Process terminated by a signal")?,
         }
 
-        if self.log_files.len() != 0 {
-            write!(f, ", see log files for details:\n")?;
+        if !self.log_files.is_empty() {
+            writeln!(f, ", see log files for details:")?;
             for path in self.log_files.iter() {
-                write!(f, "- {}\n", path.display())?;
+                writeln!(f, "- {}", path.display())?;
             }
         }
 
@@ -268,10 +268,10 @@ impl std::fmt::Display for ContractError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Contract error: {}", self.reason)?;
 
-        if self.log_files.len() != 0 {
-            write!(f, ", see log files for details:\n")?;
+        if !self.log_files.is_empty() {
+            writeln!(f, ", see log files for details:")?;
             for path in self.log_files.iter() {
-                write!(f, "- {}\n", path.display())?;
+                writeln!(f, "- {}", path.display())?;
             }
         }
 
@@ -290,7 +290,7 @@ pub struct InternalEngineError {
 
 impl std::fmt::Display for InternalEngineError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if self.log_files.len() != 0 {
+        if !self.log_files.is_empty() {
             write!(f, "Internal engine error, see log files for details:")?;
             for path in self.log_files.iter() {
                 write!(f, "\n- {}", path.display())?;

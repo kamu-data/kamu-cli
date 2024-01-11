@@ -395,7 +395,7 @@ async fn do_test_sync(
             Err(SyncError::Corrupted(CorruptedSourceError {
                 message,
                 source: _
-            })) if message == "Source checkpoint file is missing".to_string()
+            })) if message == *"Source checkpoint file is missing"
         );
     }
 }

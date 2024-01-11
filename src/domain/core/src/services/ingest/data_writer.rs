@@ -208,7 +208,7 @@ struct FmtSchema<'a>(&'a SchemaRef);
 
 impl<'a> std::fmt::Display for FmtSchema<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let parquet_schema = datafusion::parquet::arrow::arrow_to_parquet_schema(&self.0).unwrap();
+        let parquet_schema = datafusion::parquet::arrow::arrow_to_parquet_schema(self.0).unwrap();
 
         let mut buf = Vec::new();
         datafusion::parquet::schema::printer::print_schema(&mut buf, parquet_schema.root_schema());

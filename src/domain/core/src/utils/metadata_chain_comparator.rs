@@ -56,7 +56,7 @@ impl MetadataChainComparator {
         rhs_chain.expecting_to_read_blocks(1);
 
         // Extract sequence number of head blocks
-        let lhs_sequence_number = lhs_chain.get_block(&lhs_head).await?.sequence_number;
+        let lhs_sequence_number = lhs_chain.get_block(lhs_head).await?.sequence_number;
         let rhs_sequence_number = if rhs_head.is_some() {
             rhs_chain
                 .get_block(rhs_head.as_ref().unwrap())
@@ -78,18 +78,18 @@ impl MetadataChainComparator {
                 rhs_sequence_number,
             )
             .await?;
-            return Ok(Self::describe_divergence(
+            Ok(Self::describe_divergence(
                 lhs_sequence_number,
                 rhs_sequence_number,
                 last_common_sequence_number,
-            ));
+            ))
         }
         // Source ahead
         else if lhs_sequence_number > rhs_sequence_number {
             let convergence_check = Self::check_expected_common_ancestor(
                 &lhs_chain,
                 lhs_sequence_number,
-                &lhs_head,
+                lhs_head,
                 &rhs_chain,
                 rhs_sequence_number,
                 rhs_head,
@@ -120,7 +120,7 @@ impl MetadataChainComparator {
                 rhs_head.as_ref().unwrap(),
                 &lhs_chain,
                 lhs_sequence_number,
-                Some(&lhs_head),
+                Some(lhs_head),
             )
             .await?;
             match convergence_check {
@@ -330,27 +330,24 @@ impl From<IterBlocksError> for CompareChainsError {
     fn from(v: IterBlocksError) -> Self {
         match v {
             IterBlocksError::RefNotFound(e) => CompareChainsError::Internal(e.int_err()),
-            IterBlocksError::BlockNotFound(e) => CompareChainsError::Corrupted(
-                CorruptedSourceError {
+            IterBlocksError::BlockNotFound(e) => {
+                CompareChainsError::Corrupted(CorruptedSourceError {
                     message: "Metadata chain is broken".to_owned(),
                     source: Some(e.into()),
-                }
-                .into(),
-            ),
-            IterBlocksError::BlockVersion(e) => CompareChainsError::Corrupted(
-                CorruptedSourceError {
+                })
+            }
+            IterBlocksError::BlockVersion(e) => {
+                CompareChainsError::Corrupted(CorruptedSourceError {
                     message: "Metadata chain is broken".to_owned(),
                     source: Some(e.into()),
-                }
-                .into(),
-            ),
-            IterBlocksError::BlockMalformed(e) => CompareChainsError::Corrupted(
-                CorruptedSourceError {
+                })
+            }
+            IterBlocksError::BlockMalformed(e) => {
+                CompareChainsError::Corrupted(CorruptedSourceError {
                     message: "Metadata chain is broken".to_owned(),
                     source: Some(e.into()),
-                }
-                .into(),
-            ),
+                })
+            }
             IterBlocksError::InvalidInterval(_) => unreachable!(),
             IterBlocksError::Access(e) => CompareChainsError::Access(e),
             IterBlocksError::Internal(e) => CompareChainsError::Internal(e),
@@ -362,15 +359,15 @@ impl From<IterBlocksError> for CompareChainsError {
 
 struct MetadataChainWithStats<'a> {
     chain: &'a dyn MetadataChain,
-    on_expected: Box<dyn Fn(usize) -> () + Send + Sync + 'a>,
-    on_read: Box<dyn Fn(usize) -> () + Send + Sync + 'a>,
+    on_expected: Box<dyn Fn(usize) + Send + Sync + 'a>,
+    on_read: Box<dyn Fn(usize) + Send + Sync + 'a>,
 }
 
 impl<'a> MetadataChainWithStats<'a> {
     fn new(
         chain: &'a dyn MetadataChain,
-        on_expected: impl Fn(usize) -> () + Send + Sync + 'a,
-        on_read: impl Fn(usize) -> () + Send + Sync + 'a,
+        on_expected: impl Fn(usize) + Send + Sync + 'a,
+        on_read: impl Fn(usize) + Send + Sync + 'a,
     ) -> Self {
         Self {
             chain,

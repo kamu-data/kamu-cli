@@ -1117,7 +1117,7 @@ impl IngestTestHarness {
     /// Deprecated: use [kamu_data_utils::testing::assert_data_eq]
     fn row_mapper(r: datafusion::parquet::record::Row) -> (i64, String, i32) {
         (
-            r.get_long(0).unwrap().clone(),
+            r.get_long(0).unwrap(),
             r.get_string(3).unwrap().clone(),
             r.get_int(4).unwrap(),
         )

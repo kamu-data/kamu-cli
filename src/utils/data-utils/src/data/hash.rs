@@ -27,7 +27,7 @@ pub fn get_parquet_logical_hash(
     use arrow_digest::{RecordDigest, RecordDigestV0};
     use datafusion::parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 
-    let file = std::fs::File::open(&data_path)?;
+    let file = std::fs::File::open(data_path)?;
     let parquet_reader = ParquetRecordBatchReaderBuilder::try_new(file)?
         .with_batch_size(LOGICAL_HASH_BATCH_SIZE)
         .build()?;

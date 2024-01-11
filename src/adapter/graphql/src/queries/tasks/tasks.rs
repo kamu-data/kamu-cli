@@ -55,7 +55,7 @@ impl Tasks {
         let mut nodes: Vec<_> = tasks_stream
             .skip(page * per_page)
             .take(per_page + 1) // Take one extra to see if next page exists
-            .map_ok(|t| Task::new(t))
+            .map_ok(Task::new)
             .try_collect()
             .await?;
 

@@ -86,8 +86,7 @@ async fn get_client(addr: &SocketAddr) -> FlightSqlServiceClient<Channel> {
         .await
         .expect("error connecting");
 
-    let client = FlightSqlServiceClient::new(channel);
-    client
+    FlightSqlServiceClient::new(channel)
 }
 
 ///////////////////////////////////////////////////////////////////////////////

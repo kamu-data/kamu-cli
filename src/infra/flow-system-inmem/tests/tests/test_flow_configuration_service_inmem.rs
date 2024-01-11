@@ -81,7 +81,7 @@ async fn test_visibility() {
         ),
         (bar_id, DatasetFlowType::Ingest, &bar_ingest_schedule),
     ] {
-        harness.expect_dataset_flow_schedule(&configs, dataset_id, dataset_flow_type, &schedule);
+        harness.expect_dataset_flow_schedule(&configs, dataset_id, dataset_flow_type, schedule);
     }
 }
 

@@ -24,8 +24,7 @@ fn init_chain() -> impl MetadataChain {
 }
 
 async fn push_block(chain: &dyn MetadataChain, block: MetadataBlock) -> Multihash {
-    let res = chain.append(block, AppendOpts::default()).await.unwrap();
-    res
+    chain.append(block, AppendOpts::default()).await.unwrap()
 }
 
 async fn compare_chains(

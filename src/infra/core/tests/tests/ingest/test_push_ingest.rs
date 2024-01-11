@@ -373,7 +373,7 @@ impl IngestTestHarness {
         let run_info_dir = temp_dir.path().join("run");
         let cache_dir = temp_dir.path().join("cache");
         std::fs::create_dir(&run_info_dir).unwrap();
-        std::fs::create_dir(&cache_dir).unwrap();
+        std::fs::create_dir(cache_dir).unwrap();
 
         let catalog = dill::CatalogBuilder::new()
             .add::<EventBus>()

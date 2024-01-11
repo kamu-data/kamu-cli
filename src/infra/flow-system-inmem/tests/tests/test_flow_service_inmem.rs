@@ -54,7 +54,7 @@ async fn test_read_initial_config_and_queue_properly() {
         .unwrap();
 
     // Run scheduler concurrently with manual triggers script
-    let _ = tokio::select! {
+    tokio::select! {
         res = harness.flow_service.run(start_time) => res.int_err(),
         _ = tokio::time::sleep(std::time::Duration::from_millis(120)) => Ok(()),
     }
@@ -132,7 +132,7 @@ async fn test_manual_trigger() {
         .unwrap();
 
     // Run scheduler concurrently with manual triggers script
-    let _ = tokio::select! {
+    tokio::select! {
         res = harness.flow_service.run(start_time) => res.int_err(),
         _ = async {
             // Sleep < "foo" period
@@ -228,7 +228,7 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
         .unwrap();
 
     // Run scheduler concurrently with manual triggers script
-    let _ = tokio::select! {
+    tokio::select! {
         res = harness.flow_service.run(start_time) => res.int_err(),
         _ = async {
             // Sleep < "foo"/"bar" period
@@ -250,7 +250,6 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
 
             // "foo" will get rescheduled in 50 ms, "bar" in 30ms, leave extra for stabilization
             tokio::time::sleep(std::time::Duration::from_millis(70)).await;
-
          } => Ok(()),
     }
     .unwrap();
@@ -390,7 +389,7 @@ async fn test_dataset_deleted() {
     let test_flow_listener = harness.catalog.get_one::<TestFlowSystemListener>().unwrap();
 
     // Run scheduler concurrently with manual triggers script
-    let _ = tokio::select! {
+    tokio::select! {
         res = harness.flow_service.run(start_time) => res.int_err(),
         _ = async {
             // Sleep < "foo" period
@@ -518,7 +517,7 @@ async fn test_cron_task_completions_trigger_next_loop_on_success() {
     let event_bus = harness.catalog.get_one::<EventBus>().unwrap();
 
     // Run scheduler concurrently with manual triggers script
-    let _ = tokio::select! {
+    tokio::select! {
         res = harness.flow_service.run(start_time) => res.int_err(),
         _ = async {
             // Each of 3 datasets should be scheduled after this time
@@ -635,7 +634,7 @@ async fn test_task_completions_trigger_next_loop_on_success() {
     let event_bus = harness.catalog.get_one::<EventBus>().unwrap();
 
     // Run scheduler concurrently with manual triggers script
-    let _ = tokio::select! {
+    tokio::select! {
         res = harness.flow_service.run(start_time) => res.int_err(),
         _ = async {
             // Each of 3 datasets should be scheduled after this time
@@ -998,7 +997,7 @@ struct FlowTestCheck<'a> {
     patterns: Vec<(&'a FlowKey, FlowStatus, Option<FlowOutcome>)>,
 }
 
-fn assert_flow_test_checks<'a>(flow_test_checks: &[FlowTestCheck<'a>]) {
+fn assert_flow_test_checks(flow_test_checks: &[FlowTestCheck<'_>]) {
     for test_check in flow_test_checks {
         let mut pattern_idx_per_key = HashMap::new();
 

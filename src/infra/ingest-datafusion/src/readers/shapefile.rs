@@ -63,7 +63,7 @@ impl ReaderEsriShapefile {
         let temp_json_path = tmp_path.join("__temp.json");
         let mut file = std::fs::File::create_new(&temp_json_path).int_err()?;
 
-        let mut reader = shapefile::Reader::from_path(&shp_path).int_err()?;
+        let mut reader = shapefile::Reader::from_path(shp_path).int_err()?;
         for rec in reader.iter_shapes_and_records() {
             let (shape, record) = rec.int_err()?;
 
@@ -131,7 +131,7 @@ impl ReaderEsriShapefile {
                 let matches: Vec<_> = glob::glob(path.to_str().unwrap())
                     .int_err()?
                     .filter_map(|e| e.ok())
-                    .filter(|p| is_shp_file(&p))
+                    .filter(|p| is_shp_file(p))
                     .collect();
 
                 if matches.len() == 1 {
@@ -181,11 +181,11 @@ impl ReaderEsriShapefile {
 
         for (name, value) in record {
             let json_value = match value {
-                ShpValue::Character(v) => v.map(|v| JsonValue::String(v)),
+                ShpValue::Character(v) => v.map(JsonValue::String),
                 ShpValue::Numeric(v) => {
                     v.map(|v| JsonValue::Number(serde_json::Number::from_f64(v).unwrap()))
                 }
-                ShpValue::Logical(v) => v.map(|v| JsonValue::Bool(v)),
+                ShpValue::Logical(v) => v.map(JsonValue::Bool),
                 ShpValue::Date(v) => {
                     v.map(|v| JsonValue::String(format!("{}-{}-{}", v.year(), v.month(), v.day())))
                 }
@@ -235,11 +235,7 @@ impl Reader for ReaderEsriShapefile {
         let sub_path = self.sub_path.clone();
 
         let temp_json_path = tokio::task::spawn_blocking(move || {
-            Self::convert_to_ndjson_blocking(
-                &in_path,
-                &out_path,
-                sub_path.as_ref().map(String::as_str),
-            )
+            Self::convert_to_ndjson_blocking(&in_path, &out_path, sub_path.as_deref())
         })
         .await
         .int_err()??;

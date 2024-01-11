@@ -29,9 +29,9 @@ impl std::fmt::Display for FlowID {
     }
 }
 
-impl Into<u64> for FlowID {
-    fn into(self) -> u64 {
-        self.0
+impl From<FlowID> for u64 {
+    fn from(val: FlowID) -> Self {
+        val.0
     }
 }
 

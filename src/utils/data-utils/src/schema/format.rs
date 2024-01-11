@@ -24,7 +24,7 @@ pub fn write_schema_parquet(output: &mut dyn Write, schema: &Type) -> Result<(),
 /// Same as [write_schema_parquet] but outputs into a String
 pub fn format_schema_parquet(schema: &Type) -> String {
     let mut buf = Vec::new();
-    write_schema_parquet(&mut buf, &schema).unwrap();
+    write_schema_parquet(&mut buf, schema).unwrap();
     String::from_utf8(buf).unwrap()
 }
 
@@ -52,7 +52,7 @@ pub fn write_schema_arrow(output: &mut dyn Write, schema: &Schema) -> Result<(),
 /// Same as [write_schema_arrow] but outputs into a String
 pub fn format_schema_arrow(schema: &Schema) -> String {
     let mut buf = Vec::new();
-    write_schema_arrow(&mut buf, &schema).unwrap();
+    write_schema_arrow(&mut buf, schema).unwrap();
     String::from_utf8(buf).unwrap()
 }
 
@@ -163,7 +163,7 @@ impl<'a> ParquetJsonSchemaWriter<'a> {
                 } => {
                     format!(
                         "TIMESTAMP({},{})",
-                        Self::print_timeunit(&unit),
+                        Self::print_timeunit(unit),
                         is_adjusted_to_u_t_c
                     )
                 }
@@ -173,7 +173,7 @@ impl<'a> ParquetJsonSchemaWriter<'a> {
                 } => {
                     format!(
                         "TIME({},{})",
-                        Self::print_timeunit(&unit),
+                        Self::print_timeunit(unit),
                         is_adjusted_to_u_t_c
                     )
                 }
@@ -190,7 +190,7 @@ impl<'a> ParquetJsonSchemaWriter<'a> {
             None => {
                 // Also print converted type if it is available
                 match converted_type {
-                    ConvertedType::NONE => format!(""),
+                    ConvertedType::NONE => String::new(),
                     decimal @ ConvertedType::DECIMAL => {
                         // For decimal type we should print precision and scale if they
                         // are > 0, e.g. DECIMAL(9, 2) -
@@ -200,7 +200,7 @@ impl<'a> ParquetJsonSchemaWriter<'a> {
                                 format!("({},{})", p, s)
                             }
                             (p, 0) if p > 0 => format!("({})", p),
-                            _ => format!(""),
+                            _ => String::new(),
                         };
                         format!("{}{}", decimal, precision_scale)
                     }

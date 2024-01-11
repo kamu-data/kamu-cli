@@ -13,13 +13,13 @@ use kamu_core::{AnonymousAccountReason, CurrentAccountSubject};
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub fn authentication_catalogs(base_catalog: &dill::Catalog) -> (dill::Catalog, dill::Catalog) {
-    let catalog_anonymous = dill::CatalogBuilder::new_chained(&base_catalog)
+    let catalog_anonymous = dill::CatalogBuilder::new_chained(base_catalog)
         .add_value(CurrentAccountSubject::anonymous(
             AnonymousAccountReason::NoAuthenticationProvided,
         ))
         .build();
 
-    let catalog_authorized = dill::CatalogBuilder::new_chained(&base_catalog)
+    let catalog_authorized = dill::CatalogBuilder::new_chained(base_catalog)
         .add_value(CurrentAccountSubject::new_test())
         .build();
 

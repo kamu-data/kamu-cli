@@ -55,7 +55,7 @@ where
 }
 
 fn make_output_empty(ctx: &SessionContext) -> DataFrame {
-    make_input::<[_; 0], &str>(&ctx, [])
+    make_input::<[_; 0], &str>(ctx, [])
 }
 
 ///////////////////////////////////////////////////////////////////////////////

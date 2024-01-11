@@ -111,7 +111,7 @@ impl AxumServerPullProtocolInstance {
 
         let size_estimate_result = prepare_dataset_transfer_estimate(
             metadata_chain,
-            pull_request.stop_at.as_ref().or(Some(&head)).unwrap(),
+            pull_request.stop_at.as_ref().unwrap_or(&head),
             pull_request.begin_after.as_ref(),
         )
         .await;
@@ -169,7 +169,7 @@ impl AxumServerPullProtocolInstance {
 
                 let metadata_batch = prepare_dataset_metadata_batch(
                     metadata_chain,
-                    pull_request.stop_at.as_ref().or(Some(&head)).unwrap(),
+                    pull_request.stop_at.as_ref().unwrap_or(&head),
                     pull_request.begin_after.as_ref(),
                 )
                 .await

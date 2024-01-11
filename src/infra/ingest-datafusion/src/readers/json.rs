@@ -109,11 +109,7 @@ impl Reader for ReaderJson {
         let in_path = path.to_path_buf();
         let out_path = self.temp_path.clone();
         tokio::task::spawn_blocking(move || {
-            Self::convert_to_ndjson_blocking(
-                &in_path,
-                sub_path.as_ref().map(|s| s.as_str()),
-                &out_path,
-            )
+            Self::convert_to_ndjson_blocking(&in_path, sub_path.as_deref(), &out_path)
         })
         .await
         .int_err()??;

@@ -167,7 +167,7 @@ enum ApiErrorCategory<'a> {
 /// these categories are very general in order to be applicable regardless of
 /// context.
 trait ApiErrorCategorizable {
-    fn categorize<'a>(&'a self) -> ApiErrorCategory<'a>;
+    fn categorize(&self) -> ApiErrorCategory<'_>;
 }
 
 impl<E> IntoApiError for E
@@ -201,19 +201,19 @@ where
 /////////////////////////////////////////////////////////////////////////////////
 
 impl ApiErrorCategorizable for InternalError {
-    fn categorize<'a>(&'a self) -> ApiErrorCategory<'a> {
-        ApiErrorCategory::Internal(&self)
+    fn categorize(&self) -> ApiErrorCategory<'_> {
+        ApiErrorCategory::Internal(self)
     }
 }
 
 impl ApiErrorCategorizable for AccessError {
-    fn categorize<'a>(&'a self) -> ApiErrorCategory<'a> {
-        ApiErrorCategory::Access(&self)
+    fn categorize(&self) -> ApiErrorCategory<'_> {
+        ApiErrorCategory::Access(self)
     }
 }
 
 impl ApiErrorCategorizable for PushIngestError {
-    fn categorize<'a>(&'a self) -> ApiErrorCategory<'a> {
+    fn categorize(&self) -> ApiErrorCategory<'_> {
         match &self {
             Self::Access(e) => ApiErrorCategory::Access(e),
             Self::Internal(e) => ApiErrorCategory::Internal(e),
@@ -223,7 +223,7 @@ impl ApiErrorCategorizable for PushIngestError {
 }
 
 impl ApiErrorCategorizable for GetDatasetError {
-    fn categorize<'a>(&'a self) -> ApiErrorCategory<'a> {
+    fn categorize(&self) -> ApiErrorCategory<'_> {
         match &self {
             Self::Internal(e) => ApiErrorCategory::Internal(e),
             _ => ApiErrorCategory::Other,
@@ -232,7 +232,7 @@ impl ApiErrorCategorizable for GetDatasetError {
 }
 
 impl ApiErrorCategorizable for GetRefError {
-    fn categorize<'a>(&'a self) -> ApiErrorCategory<'a> {
+    fn categorize(&self) -> ApiErrorCategory<'_> {
         match &self {
             Self::Access(e) => ApiErrorCategory::Access(e),
             Self::Internal(e) => ApiErrorCategory::Internal(e),
@@ -242,7 +242,7 @@ impl ApiErrorCategorizable for GetRefError {
 }
 
 impl ApiErrorCategorizable for GetBlockError {
-    fn categorize<'a>(&'a self) -> ApiErrorCategory<'a> {
+    fn categorize(&self) -> ApiErrorCategory<'_> {
         match &self {
             Self::Access(e) => ApiErrorCategory::Access(e),
             Self::Internal(e) => ApiErrorCategory::Internal(e),
@@ -252,7 +252,7 @@ impl ApiErrorCategorizable for GetBlockError {
 }
 
 impl ApiErrorCategorizable for GetError {
-    fn categorize<'a>(&'a self) -> ApiErrorCategory<'a> {
+    fn categorize(&self) -> ApiErrorCategory<'_> {
         match &self {
             Self::Access(e) => ApiErrorCategory::Access(e),
             Self::Internal(e) => ApiErrorCategory::Internal(e),
@@ -262,7 +262,7 @@ impl ApiErrorCategorizable for GetError {
 }
 
 impl ApiErrorCategorizable for InsertError {
-    fn categorize<'a>(&'a self) -> ApiErrorCategory<'a> {
+    fn categorize(&self) -> ApiErrorCategory<'_> {
         match &self {
             Self::Access(e) => ApiErrorCategory::Access(e),
             Self::Internal(e) => ApiErrorCategory::Internal(e),

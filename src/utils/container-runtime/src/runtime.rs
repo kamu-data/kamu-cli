@@ -80,7 +80,7 @@ impl ContainerRuntime {
         if !self
             .has_image(image)
             .await
-            .map_err(|err| ImagePullError::runtime(image, err.into()))?
+            .map_err(|err| ImagePullError::runtime(image, err))?
         {
             self.pull_image(image, maybe_listener).await?;
         }
@@ -455,7 +455,7 @@ impl ContainerRuntime {
             re.replace(s, |caps: &regex::Captures| {
                 format!("/{}", caps[1].to_lowercase())
             })
-            .replace("\\", "/")
+            .replace('\\', "/")
         }
     }
 
@@ -464,7 +464,7 @@ impl ContainerRuntime {
             path.to_str().unwrap().to_owned()
         } else {
             // When formatting path on windows we may get wrong separators
-            path.to_str().unwrap().replace("\\", "/")
+            path.to_str().unwrap().replace('\\', "/")
         }
     }
 
@@ -474,11 +474,7 @@ impl ContainerRuntime {
             path
         } else {
             let s = path.to_str().unwrap();
-            let s_norm = if s.starts_with("\\\\?\\") {
-                &s[4..]
-            } else {
-                &s
-            };
+            let s_norm = if s.starts_with("\\\\?\\") { &s[4..] } else { s };
             PathBuf::from(s_norm)
         }
     }

@@ -26,7 +26,7 @@ where
 #[async_trait::async_trait]
 impl DataFrameExt for DataFrame {
     fn columns_to_front(self, front_cols: &[&str]) -> Result<Self> {
-        let mut columns: Vec<_> = front_cols.into_iter().map(|s| col(*s)).collect();
+        let mut columns: Vec<_> = front_cols.iter().map(|s| col(*s)).collect();
 
         columns.extend(
             self.schema()

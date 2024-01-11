@@ -488,7 +488,7 @@ impl KamuFlightSqlService {
 
     fn schema_to_arrow(&self, arrow_schema: &Schema) -> Result<Vec<u8>, Status> {
         let options = IpcWriteOptions::default();
-        let pair = SchemaAsIpc::new(&arrow_schema, &options);
+        let pair = SchemaAsIpc::new(arrow_schema, &options);
         let data_gen = IpcDataGenerator::default();
         let encoded_data = data_gen.schema_to_bytes(pair.0, pair.1);
         let mut schema_bytes = vec![];

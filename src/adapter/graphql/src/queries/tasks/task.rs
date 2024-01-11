@@ -52,21 +52,21 @@ impl Task {
 
     /// Time when task was originally created and placed in a queue
     async fn created_at(&self) -> DateTime<Utc> {
-        self.state.created_at.clone()
+        self.state.created_at
     }
 
     /// Time when task transitioned into a running state
     async fn ran_at(&self) -> Option<DateTime<Utc>> {
-        self.state.ran_at.clone()
+        self.state.ran_at
     }
 
     /// Time when cancellation of task was requested
     async fn cancellation_requested_at(&self) -> Option<DateTime<Utc>> {
-        self.state.cancellation_requested_at.clone()
+        self.state.cancellation_requested_at
     }
 
     /// Time when task has reached a final outcome
     async fn finished_at(&self) -> Option<DateTime<Utc>> {
-        self.state.finished_at.clone()
+        self.state.finished_at
     }
 }

@@ -127,11 +127,11 @@ impl From<async_graphql::Error> for GqlError {
     }
 }
 
-impl Into<async_graphql::Error> for GqlError {
-    fn into(self) -> async_graphql::Error {
-        match self {
-            Self::Internal(err) => async_graphql::Error::new_with_source(err),
-            Self::Gql(err) => err,
+impl From<GqlError> for async_graphql::Error {
+    fn from(val: GqlError) -> Self {
+        match val {
+            GqlError::Internal(err) => async_graphql::Error::new_with_source(err),
+            GqlError::Gql(err) => err,
         }
     }
 }

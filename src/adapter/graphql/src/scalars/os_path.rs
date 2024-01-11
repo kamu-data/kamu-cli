@@ -22,9 +22,9 @@ impl From<PathBuf> for OSPath {
     }
 }
 
-impl Into<PathBuf> for OSPath {
-    fn into(self) -> PathBuf {
-        self.0
+impl From<OSPath> for PathBuf {
+    fn from(val: OSPath) -> Self {
+        val.0
     }
 }
 

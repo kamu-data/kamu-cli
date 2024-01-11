@@ -26,9 +26,9 @@ impl From<ts::TaskID> for TaskID {
     }
 }
 
-impl Into<ts::TaskID> for TaskID {
-    fn into(self) -> ts::TaskID {
-        self.0
+impl From<TaskID> for ts::TaskID {
+    fn from(val: TaskID) -> Self {
+        val.0
     }
 }
 

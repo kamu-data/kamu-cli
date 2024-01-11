@@ -20,7 +20,7 @@ use opendatafabric::{AccountName, DatasetAlias, DatasetRef, MetadataEvent, Multi
 
 pub(crate) fn copy_folder_recursively(src: &Path, dst: &Path) -> io::Result<()> {
     if src.exists() {
-        fs::create_dir_all(&dst)?;
+        fs::create_dir_all(dst)?;
         let copy_options = fs_extra::dir::CopyOptions::new().content_only(true);
         fs_extra::dir::copy(src, dst, &copy_options).unwrap();
     }
@@ -100,7 +100,7 @@ pub(crate) async fn commit_add_data_event(
     dataset_layout: &DatasetLayout,
 ) -> CommitResult {
     dataset_repo
-        .get_dataset(&dataset_ref)
+        .get_dataset(dataset_ref)
         .await
         .unwrap()
         .commit_event(

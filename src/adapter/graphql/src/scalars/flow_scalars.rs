@@ -27,9 +27,9 @@ impl From<fs::FlowID> for FlowID {
     }
 }
 
-impl Into<fs::FlowID> for FlowID {
-    fn into(self) -> fs::FlowID {
-        self.0
+impl From<FlowID> for fs::FlowID {
+    fn from(val: FlowID) -> Self {
+        val.0
     }
 }
 

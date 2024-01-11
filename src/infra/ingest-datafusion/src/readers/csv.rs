@@ -49,7 +49,7 @@ impl Reader for ReaderCsv {
     async fn read(&self, path: &Path) -> Result<DataFrame, ReadError> {
         // TODO: Move this to reader construction phase
         let delimiter = match &self.conf.separator {
-            Some(v) if v.len() > 0 => {
+            Some(v) if !v.is_empty() => {
                 if v.as_bytes().len() > 1 {
                     return Err("Csv.separator supports only single-character ascii values"
                         .int_err()
@@ -60,7 +60,7 @@ impl Reader for ReaderCsv {
             _ => b',',
         };
         let quote = match &self.conf.quote {
-            Some(v) if v.len() > 0 => {
+            Some(v) if !v.is_empty() => {
                 if v.as_bytes().len() > 1 {
                     Err(unsupported!(
                         "Csv.quote supports only single-character ascii values, got: {}",
@@ -73,7 +73,7 @@ impl Reader for ReaderCsv {
             _ => Ok(b'"'),
         }?;
         let escape = match &self.conf.escape {
-            Some(v) if v.len() > 0 => {
+            Some(v) if !v.is_empty() => {
                 if v.as_bytes().len() > 1 {
                     Err(unsupported!(
                         "Csv.escape supports only single-character ascii values, got: {}",
@@ -85,11 +85,11 @@ impl Reader for ReaderCsv {
             }
             _ => Ok(None),
         }?;
-        match self.conf.encoding.as_ref().map(|s| s.as_str()) {
+        match self.conf.encoding.as_deref() {
             None | Some("utf8") => Ok(()),
             Some(v) => Err(unsupported!("Unsupported Csv.encoding: {}", v)),
         }?;
-        match self.conf.comment.as_ref().map(|s| s.as_str()) {
+        match self.conf.comment.as_deref() {
             None => Ok(()),
             Some(v) => Err(unsupported!("Unsupported Csv.comment: {}", v)),
         }?;
@@ -111,31 +111,31 @@ impl Reader for ReaderCsv {
                 v
             )),
         }?;
-        match self.conf.null_value.as_ref().map(|s| s.as_str()) {
+        match self.conf.null_value.as_deref() {
             None | Some("") => Ok(()),
             Some(v) => Err(unsupported!("Unsupported Csv.nullValue: {}", v)),
         }?;
-        match self.conf.empty_value.as_ref().map(|s| s.as_str()) {
+        match self.conf.empty_value.as_deref() {
             None => Ok(()),
             Some(v) => Err(unsupported!("Unsupported Csv.emptyValue: {}", v)),
         }?;
-        match self.conf.nan_value.as_ref().map(|s| s.as_str()) {
+        match self.conf.nan_value.as_deref() {
             None => Ok(()),
             Some(v) => Err(unsupported!("Unsupported Csv.nanValue: {}", v)),
         }?;
-        match self.conf.positive_inf.as_ref().map(|s| s.as_str()) {
+        match self.conf.positive_inf.as_deref() {
             None => Ok(()),
             Some(v) => Err(unsupported!("Unsupported Csv.positiveInf: {}", v)),
         }?;
-        match self.conf.negative_inf.as_ref().map(|s| s.as_str()) {
+        match self.conf.negative_inf.as_deref() {
             None => Ok(()),
             Some(v) => Err(unsupported!("Unsupported Csv.negativeInf: {}", v)),
         }?;
-        match self.conf.date_format.as_ref().map(|s| s.as_str()) {
+        match self.conf.date_format.as_deref() {
             None | Some("rfc3339") => Ok(()),
             Some(v) => Err(unsupported!("Unsupported Csv.dateFormat: {}", v)),
         }?;
-        match self.conf.timestamp_format.as_ref().map(|s| s.as_str()) {
+        match self.conf.timestamp_format.as_deref() {
             None | Some("rfc3339") => Ok(()),
             Some(v) => Err(unsupported!("Unsupported Csv.timestampFormat: {}", v)),
         }?;

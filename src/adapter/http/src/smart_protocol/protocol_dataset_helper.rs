@@ -146,11 +146,11 @@ pub async fn prepare_dataset_metadata_batch(
 
         let block_bytes: Bytes = metadata_chain
             .as_object_repo()
-            .get_bytes(&hash)
+            .get_bytes(hash)
             .await
             .int_err()?;
 
-        let block_data: &[u8] = &(*block_bytes);
+        let block_data: &[u8] = &block_bytes;
 
         let mut header = Header::new_gnu();
         header.set_size(block_bytes.len() as u64);
@@ -278,7 +278,7 @@ async fn unpack_dataset_metadata_batch(objects_batch: ObjectsBatch) -> Vec<(Mult
         .filter_map(|e| e.ok())
         .map(|mut entry| {
             let entry_size = entry.size();
-            let mut buf = vec![0 as u8; entry_size as usize];
+            let mut buf = vec![0_u8; entry_size as usize];
             entry.read(buf.as_mut_slice()).unwrap();
 
             let path = entry.path().unwrap().to_owned();
@@ -353,7 +353,7 @@ pub async fn collect_object_references_from_metadata(
     for (_, block) in blocks {
         collect_object_references_from_block(
             dataset,
-            &block,
+            block,
             &mut res_references,
             missing_files_only,
         )

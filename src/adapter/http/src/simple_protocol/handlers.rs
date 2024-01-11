@@ -56,7 +56,7 @@ pub async fn dataset_refs_handler(
     axum::extract::Extension(dataset): axum::extract::Extension<Arc<dyn Dataset>>,
     axum::extract::Path(ref_param): axum::extract::Path<RefFromPath>,
 ) -> Result<String, ApiError> {
-    let block_ref = match BlockRef::from_str(&ref_param.reference.as_str()) {
+    let block_ref = match BlockRef::from_str(ref_param.reference.as_str()) {
         Ok(block_ref) => Ok(block_ref),
         Err(e) => Err(ApiError::not_found(e)),
     }?;

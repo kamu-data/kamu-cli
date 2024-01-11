@@ -97,7 +97,7 @@ async fn init_v0_workspace(workspace_path: &Path) {
         content: dataset_config,
     };
     let v0_config_path = dataset_dir.join("config");
-    let file = std::fs::File::create(&v0_config_path).unwrap();
+    let file = std::fs::File::create(v0_config_path).unwrap();
     serde_yaml::to_writer(file, &manifest).unwrap();
 }
 

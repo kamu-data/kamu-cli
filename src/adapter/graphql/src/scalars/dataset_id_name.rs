@@ -27,15 +27,15 @@ impl From<odf::DatasetID> for DatasetID {
     }
 }
 
-impl Into<odf::DatasetID> for DatasetID {
-    fn into(self) -> odf::DatasetID {
-        self.0
+impl From<DatasetID> for odf::DatasetID {
+    fn from(val: DatasetID) -> Self {
+        val.0
     }
 }
 
-impl Into<String> for DatasetID {
-    fn into(self) -> String {
-        self.0.to_did_string()
+impl From<DatasetID> for String {
+    fn from(val: DatasetID) -> Self {
+        val.0.to_did_string()
     }
 }
 
@@ -75,15 +75,15 @@ impl From<odf::DatasetName> for DatasetName {
     }
 }
 
-impl Into<odf::DatasetName> for DatasetName {
-    fn into(self) -> odf::DatasetName {
-        self.0
+impl From<DatasetName> for odf::DatasetName {
+    fn from(val: DatasetName) -> Self {
+        val.0
     }
 }
 
-impl Into<String> for DatasetName {
-    fn into(self) -> String {
-        self.0.into()
+impl From<DatasetName> for String {
+    fn from(val: DatasetName) -> Self {
+        val.0.into()
     }
 }
 
@@ -129,15 +129,15 @@ impl From<odf::DatasetRefAny> for DatasetRefAny {
     }
 }
 
-impl Into<odf::DatasetRefAny> for DatasetRefAny {
-    fn into(self) -> odf::DatasetRefAny {
-        self.0
+impl From<DatasetRefAny> for odf::DatasetRefAny {
+    fn from(val: DatasetRefAny) -> Self {
+        val.0
     }
 }
 
-impl Into<String> for DatasetRefAny {
-    fn into(self) -> String {
-        self.0.to_string()
+impl From<DatasetRefAny> for String {
+    fn from(val: DatasetRefAny) -> Self {
+        val.0.to_string()
     }
 }
 
@@ -183,15 +183,15 @@ impl From<odf::DatasetRef> for DatasetRef {
     }
 }
 
-impl Into<odf::DatasetRef> for DatasetRef {
-    fn into(self) -> odf::DatasetRef {
-        self.0
+impl From<DatasetRef> for odf::DatasetRef {
+    fn from(val: DatasetRef) -> Self {
+        val.0
     }
 }
 
-impl Into<String> for DatasetRef {
-    fn into(self) -> String {
-        self.0.to_string()
+impl From<DatasetRef> for String {
+    fn from(val: DatasetRef) -> Self {
+        val.0.to_string()
     }
 }
 
@@ -237,15 +237,15 @@ impl From<odf::DatasetAlias> for DatasetAlias {
     }
 }
 
-impl Into<odf::DatasetAlias> for DatasetAlias {
-    fn into(self) -> odf::DatasetAlias {
-        self.0
+impl From<DatasetAlias> for odf::DatasetAlias {
+    fn from(val: DatasetAlias) -> Self {
+        val.0
     }
 }
 
-impl Into<String> for DatasetAlias {
-    fn into(self) -> String {
-        self.0.to_string()
+impl From<DatasetAlias> for String {
+    fn from(val: DatasetAlias) -> Self {
+        val.0.to_string()
     }
 }
 

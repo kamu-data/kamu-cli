@@ -323,7 +323,7 @@ async fn test_crud_cron_root_dataset() {
         &create_result.dataset_handle.id,
         "INGEST",
         true,
-        &invalid_cron_spression,
+        invalid_cron_spression,
     );
 
     let res = schema
@@ -344,7 +344,7 @@ async fn test_crud_cron_root_dataset() {
         &create_result.dataset_handle.id,
         "INGEST",
         true,
-        &past_cron_spression,
+        past_cron_spression,
     );
 
     let res = schema
