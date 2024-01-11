@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New GraphQL APIs extending flows system capabilities:
    - ability to list summary information about flows
    - flow execution history function
+### Fixed
+- Fixed bug in getting available dataset actions for a user, in case of `kamu ui`
 
 ## [0.151.0] - 2024-01-09
 ### Added
