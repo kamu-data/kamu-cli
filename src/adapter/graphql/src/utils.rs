@@ -13,6 +13,7 @@ use async_graphql::{Context, ErrorExtensions};
 use internal_error::*;
 use kamu_core::auth::DatasetActionUnauthorizedError;
 use kamu_core::{CurrentAccountSubject, Dataset, DatasetRepository, LoggedAccount};
+use kamu_task_system as ts;
 use opendatafabric::DatasetHandle;
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -94,6 +95,16 @@ pub(crate) async fn check_dataset_write_access(
         })?;
 
     Ok(())
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+pub(crate) async fn get_task(
+    ctx: &Context<'_>,
+    task_id: ts::TaskID,
+) -> Result<ts::TaskState, InternalError> {
+    let task_scheduler = from_catalog::<dyn ts::TaskScheduler>(ctx).unwrap();
+    task_scheduler.get_task(task_id).await.int_err()
 }
 
 ///////////////////////////////////////////////////////////////////////////////

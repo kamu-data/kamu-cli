@@ -712,43 +712,56 @@ type FlowEdge {
 	node: Flow!
 }
 
-type FlowEvent {
-	id: String!
+interface FlowEvent {
+	eventId: String!
 	eventTime: DateTime!
-	eventData: FlowEventData!
 }
 
-type FlowEventAborted {
-	dummy: Boolean!
+type FlowEventAborted implements FlowEvent {
+	eventId: String!
+	eventTime: DateTime!
 }
 
-union FlowEventData = FlowEventInitiated | FlowEventStartConditionDefined | FlowEventQueued | FlowEventTriggerAdded | FlowEventTaskScheduled | FlowEventTaskRunning | FlowEventTaskFinished | FlowEventAborted
-
-type FlowEventInitiated {
+type FlowEventInitiated implements FlowEvent {
+	eventId: String!
+	eventTime: DateTime!
 	trigger: FlowTrigger!
 }
 
-type FlowEventQueued {
+type FlowEventQueued implements FlowEvent {
+	eventId: String!
+	eventTime: DateTime!
 	activateAt: DateTime!
 }
 
-type FlowEventStartConditionDefined {
+type FlowEventStartConditionDefined implements FlowEvent {
+	eventId: String!
+	eventTime: DateTime!
 	startCondition: FlowStartCondition!
 }
 
-type FlowEventTaskFinished {
+type FlowEventTaskFinished implements FlowEvent {
+	eventId: String!
+	eventTime: DateTime!
+	taskId: TaskID!
+}
+
+type FlowEventTaskRunning implements FlowEvent {
+	eventId: String!
+	eventTime: DateTime!
+	taskId: TaskID!
+}
+
+type FlowEventTaskScheduled implements FlowEvent {
+	eventId: String!
+	eventTime: DateTime!
+	taskId: TaskID!
 	task: Task!
 }
 
-type FlowEventTaskRunning {
-	task: Task!
-}
-
-type FlowEventTaskScheduled {
-	task: Task!
-}
-
-type FlowEventTriggerAdded {
+type FlowEventTriggerAdded implements FlowEvent {
+	eventId: String!
+	eventTime: DateTime!
 	trigger: FlowTrigger!
 }
 
