@@ -20,8 +20,8 @@ use crate::output::*;
 pub struct TailCommand {
     query_svc: Arc<dyn QueryService>,
     dataset_ref: DatasetRef,
-    skip: u64,
-    limit: u64,
+    skip: usize,
+    limit: usize,
     output_cfg: Arc<OutputConfig>,
 }
 
@@ -29,8 +29,8 @@ impl TailCommand {
     pub fn new(
         query_svc: Arc<dyn QueryService>,
         dataset_ref: DatasetRef,
-        skip: u64,
-        limit: u64,
+        skip: usize,
+        limit: usize,
         output_cfg: Arc<OutputConfig>,
     ) -> Self {
         Self {

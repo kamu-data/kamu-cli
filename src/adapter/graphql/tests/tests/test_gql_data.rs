@@ -71,11 +71,12 @@ async fn create_test_dataset(catalog: &dill::Catalog, tempdir: &Path) {
         .await
         .unwrap();
 
-    let a: Arc<dyn Array> = Arc::new(UInt64Array::from(vec![0, 1, 2]));
-    let b: Arc<dyn Array> = Arc::new(StringArray::from(vec!["a", "b", "c"]));
+    let a: Arc<dyn Array> = Arc::new(UInt64Array::from(vec![0, 1, 2, 3]));
+    let b: Arc<dyn Array> = Arc::new(StringArray::from(vec!["a", "b", "c", "d"]));
     let record_batch =
         RecordBatch::try_new(Arc::clone(&schema), vec![Arc::clone(&a), Arc::clone(&b)]).unwrap();
 
+    // TODO: Use DataWriter
     let tmp_data_path = tempdir.join("data");
     ParquetWriterHelper::from_record_batch(&tmp_data_path, &record_batch).unwrap();
 
@@ -193,7 +194,7 @@ async fn test_dataset_tail_local_fs() {
     let json = serde_json::from_str::<serde_json::Value>(&json).unwrap();
     let data = &json["datasets"]["byOwnerAndName"]["data"]["tail"]["data"]["content"];
     let data = serde_json::from_str::<serde_json::Value>(data.as_str().unwrap()).unwrap();
-    assert_eq!(data, serde_json::json!([{"blah": "b", "offset": 1}]));
+    assert_eq!(data, serde_json::json!([{"blah": "c", "offset": 2}]));
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
