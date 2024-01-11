@@ -76,8 +76,8 @@ impl Flow {
                     })
                 }
             }
-            fs::DatasetFlowType::ExecuteQuery => {
-                FlowDescriptionDataset::ExecuteQuery(FlowDescriptionDatasetExecuteQuery {
+            fs::DatasetFlowType::ExecuteTransform => {
+                FlowDescriptionDataset::ExecuteTransform(FlowDescriptionDatasetExecuteTransform {
                     dataset_id: dataset_key.dataset_id.clone().into(),
                     transformed_records_count: None, // TODO
                 })
@@ -186,7 +186,7 @@ struct FlowDescriptionSystemGC {
 enum FlowDescriptionDataset {
     PollingIngest(FlowDescriptionDatasetPollingIngest),
     PushIngest(FlowDescriptionDatasetPushIngest),
-    ExecuteQuery(FlowDescriptionDatasetExecuteQuery),
+    ExecuteTransform(FlowDescriptionDatasetExecuteTransform),
     Compaction(FlowDescriptionDatasetCompaction),
 }
 
@@ -205,7 +205,7 @@ struct FlowDescriptionDatasetPushIngest {
 }
 
 #[derive(SimpleObject)]
-struct FlowDescriptionDatasetExecuteQuery {
+struct FlowDescriptionDatasetExecuteTransform {
     dataset_id: DatasetID,
     transformed_records_count: Option<u64>,
 }

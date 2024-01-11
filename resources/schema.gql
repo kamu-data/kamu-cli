@@ -692,7 +692,7 @@ type FlowConnection {
 	edges: [FlowEdge!]!
 }
 
-union FlowDescription = FlowDescriptionDatasetPollingIngest | FlowDescriptionDatasetPushIngest | FlowDescriptionDatasetExecuteQuery | FlowDescriptionDatasetCompaction | FlowDescriptionSystemGC
+union FlowDescription = FlowDescriptionDatasetPollingIngest | FlowDescriptionDatasetPushIngest | FlowDescriptionDatasetExecuteTransform | FlowDescriptionDatasetCompaction | FlowDescriptionSystemGC
 
 type FlowDescriptionDatasetCompaction {
 	datasetId: DatasetID!
@@ -700,7 +700,7 @@ type FlowDescriptionDatasetCompaction {
 	resultingBlocksCount: Int
 }
 
-type FlowDescriptionDatasetExecuteQuery {
+type FlowDescriptionDatasetExecuteTransform {
 	datasetId: DatasetID!
 	transformedRecordsCount: Int
 }

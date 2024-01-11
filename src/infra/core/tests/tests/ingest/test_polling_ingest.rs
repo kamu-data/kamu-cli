@@ -1091,6 +1091,8 @@ impl IngestTestHarness {
         let catalog = dill::CatalogBuilder::new()
             .add_value(ContainerRuntimeConfig::default())
             .add::<ContainerRuntime>()
+            .add::<ObjectStoreRegistryImpl>()
+            .add::<ObjectStoreBuilderLocalFs>()
             .add::<EventBus>()
             .add::<DependencyGraphServiceInMemory>()
             .add_value(CurrentAccountSubject::new_test())
@@ -1102,7 +1104,6 @@ impl IngestTestHarness {
                     .with_multi_tenant(false),
             )
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-            .add_value(ContainerRuntime::default())
             .add_builder(
                 EngineProvisionerLocal::builder()
                     .with_config(EngineProvisionerLocalConfig::default())
@@ -1117,9 +1118,6 @@ impl IngestTestHarness {
             .add_builder(
                 PollingIngestServiceImpl::builder()
                     .with_cache_dir(cache_dir)
-                    .with_object_store_registry(Arc::new(ObjectStoreRegistryImpl::new(vec![
-                        Arc::new(ObjectStoreBuilderLocalFs::new()),
-                    ])))
                     .with_run_info_dir(run_info_dir),
             )
             .bind::<dyn PollingIngestService, PollingIngestServiceImpl>()
