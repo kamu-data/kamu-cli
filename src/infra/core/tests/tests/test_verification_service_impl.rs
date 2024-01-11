@@ -83,6 +83,7 @@ async fn test_verify_data_consistency() {
                 (None, None),
                 VerificationOptions {
                     check_integrity: true,
+                    check_logical_hashes: true,
                     replay_transformations: false
                 },
                 None,
@@ -152,6 +153,7 @@ async fn test_verify_data_consistency() {
                 (None, None),
                 VerificationOptions {
                     check_integrity: true,
+                    check_logical_hashes: true,
                     replay_transformations: false
                 },
                 None,
@@ -180,7 +182,7 @@ async fn test_verify_data_consistency() {
         verification_svc.verify(
             &dataset_alias.as_local_ref(),
             (None, None),
-            VerificationOptions {check_integrity: true, replay_transformations: false},
+            VerificationOptions {check_integrity: true, check_logical_hashes: true, replay_transformations: false},
             None,
         ).await,
         Err(VerificationError::DataDoesNotMatchMetadata(

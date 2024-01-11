@@ -60,6 +60,7 @@ pub enum VerificationResult {
 #[derive(Debug, Clone)]
 pub struct VerificationOptions {
     pub check_integrity: bool,
+    pub check_logical_hashes: bool,
     pub replay_transformations: bool,
 }
 
@@ -67,6 +68,7 @@ impl Default for VerificationOptions {
     fn default() -> Self {
         Self {
             check_integrity: true,
+            check_logical_hashes: true,
             replay_transformations: true,
         }
     }

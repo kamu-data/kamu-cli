@@ -7,20 +7,23 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::str::FromStr;
 use std::sync::Arc;
 
 use container_runtime::ContainerRuntime;
 use internal_error::*;
+use serde_json::Value;
 
 use super::{CLIError, Command};
 use crate::output::*;
+use crate::WorkspaceService;
 
 ///////////////////////////////////////////////////////////////////////////////
 
 pub struct SystemInfoCommand {
     output_config: Arc<OutputConfig>,
     output_format: Option<String>,
-    workspace_root_dir: String,
+    workspace_svc: Arc<WorkspaceService>,
     container_runtime: Arc<ContainerRuntime>,
 }
 
@@ -28,7 +31,7 @@ impl SystemInfoCommand {
     pub fn new<S>(
         output_config: Arc<OutputConfig>,
         container_runtime: Arc<ContainerRuntime>,
-        workspace_root_dir: String,
+        workspace_svc: Arc<WorkspaceService>,
         output_format: Option<S>,
     ) -> Self
     where
@@ -37,7 +40,7 @@ impl SystemInfoCommand {
         Self {
             output_config,
             container_runtime,
-            workspace_root_dir,
+            workspace_svc,
             output_format: output_format.map(|s| s.into()),
         }
     }
@@ -51,11 +54,7 @@ impl Command for SystemInfoCommand {
 
     async fn run(&mut self) -> Result<(), CLIError> {
         write_output(
-            SystemInfo::collect(
-                self.container_runtime.clone(),
-                self.workspace_root_dir.clone(),
-            )
-            .await,
+            SystemInfo::collect(self.container_runtime.clone(), self.workspace_svc.clone()).await,
             &self.output_config,
             self.output_format.as_ref(),
         )?;
@@ -67,22 +66,16 @@ impl Command for SystemInfoCommand {
 
 pub struct VersionCommand {
     output_config: Arc<OutputConfig>,
-    workspace_root_dir: String,
     output_format: Option<String>,
 }
 
 impl VersionCommand {
-    pub fn new<S>(
-        output_config: Arc<OutputConfig>,
-        workspace_root_dir: String,
-        output_format: Option<S>,
-    ) -> Self
+    pub fn new<S>(output_config: Arc<OutputConfig>, output_format: Option<S>) -> Self
     where
         S: Into<String>,
     {
         Self {
             output_config,
-            workspace_root_dir,
             output_format: output_format.map(|s| s.into()),
         }
     }
@@ -96,7 +89,7 @@ impl Command for VersionCommand {
 
     async fn run(&mut self) -> Result<(), CLIError> {
         write_output(
-            BuildInfo::collect(self.workspace_root_dir.clone()),
+            BuildInfo::collect(),
             &self.output_config,
             self.output_format.as_ref(),
         )?;
@@ -137,17 +130,19 @@ fn write_output<T: serde::Serialize>(
 #[serde(rename_all = "camelCase")]
 pub struct SystemInfo {
     pub build: BuildInfo,
-    pub additional: AdditionalInfo,
+    pub workspace: WorkspaceInfo,
+    pub container_runtime: ContainerRuntimeInfo,
 }
 
 impl SystemInfo {
     pub async fn collect(
-        container_runtime: Arc<ContainerRuntime>,
-        workspace_root_dir: String,
+        container_runtime_svc: Arc<ContainerRuntime>,
+        workspace_svc: Arc<WorkspaceService>,
     ) -> Self {
         Self {
-            build: BuildInfo::collect(workspace_root_dir),
-            additional: AdditionalInfo::collect(container_runtime).await,
+            build: BuildInfo::collect(),
+            workspace: WorkspaceInfo::collect(workspace_svc),
+            container_runtime: ContainerRuntimeInfo::collect(container_runtime_svc).await,
         }
     }
 }
@@ -168,11 +163,10 @@ pub struct BuildInfo {
     pub cargo_target_triple: Option<&'static str>,
     pub cargo_features: Option<&'static str>,
     pub cargo_opt_level: Option<&'static str>,
-    pub workspace_dir: String,
 }
 
 impl BuildInfo {
-    pub fn collect(workspace_root_dir: String) -> Self {
+    pub fn collect() -> Self {
         Self {
             app_version: env!("CARGO_PKG_VERSION"),
             build_timestamp: option_env!("VERGEN_BUILD_TIMESTAMP"),
@@ -187,30 +181,54 @@ impl BuildInfo {
             cargo_target_triple: option_env!("VERGEN_CARGO_TARGET_TRIPLE"),
             cargo_features: option_env!("VERGEN_CARGO_FEATURES"),
             cargo_opt_level: option_env!("VERGEN_CARGO_OPT_LEVEL"),
-            workspace_dir: workspace_root_dir,
         }
     }
 }
 
 #[derive(Debug, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct AdditionalInfo {
-    pub container_version: String,
+pub struct WorkspaceInfo {
+    pub version: u32,
+    pub root_dir: String,
 }
 
-impl AdditionalInfo {
+impl WorkspaceInfo {
+    pub fn collect(workspace_svc: Arc<WorkspaceService>) -> Self {
+        if !workspace_svc.is_in_workspace() {
+            return Self {
+                version: 0,
+                root_dir: "".to_string(),
+            };
+        }
+        let root_dir = match workspace_svc.layout() {
+            Some(wl) => wl.root_dir.to_str().map(String::from).unwrap(),
+            None => "".to_string(),
+        };
+        Self {
+            version: workspace_svc.workspace_version().unwrap().unwrap().into(),
+            root_dir,
+        }
+    }
+}
+
+#[derive(Debug, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ContainerRuntimeInfo {
+    pub info: Value,
+}
+
+impl ContainerRuntimeInfo {
     pub async fn collect(container_runtime: Arc<ContainerRuntime>) -> Self {
-        let container_version_output = match container_runtime
-            .custom_cmd("--version".to_string())
-            .output()
-            .await
-        {
-            Ok(container_info) => String::from_utf8(container_info.stdout).unwrap(),
-            Err(_) => "".to_string(),
+        let container_info_output = match container_runtime.info().output().await {
+            Ok(container_info) => {
+                let output = String::from_utf8(container_info.stdout).unwrap();
+                Value::from_str(output.as_str()).unwrap()
+            }
+            Err(_) => Value::from_str("Unable to fetch container runtime info").unwrap(),
         };
 
         Self {
-            container_version: container_version_output,
+            info: container_info_output,
         }
     }
 }

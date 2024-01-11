@@ -39,6 +39,16 @@ pub enum ContainerRuntimeType {
     Podman,
 }
 
+impl std::fmt::Display for ContainerRuntimeType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            ContainerRuntimeType::Docker => "docker",
+            ContainerRuntimeType::Podman => "podman",
+        };
+        write!(f, "{}", s)
+    }
+}
+
 /// Corresponds to podman's containers.conf::netns
 /// We podman is used inside containers (e.g. podman-in-docker or podman-in-k8s)
 /// it usually runs uses host network namespace.

@@ -115,11 +115,13 @@ impl Command for VerifyCommand {
         let options = if self.integrity {
             VerificationOptions {
                 check_integrity: true,
+                check_logical_hashes: true,
                 replay_transformations: false,
             }
         } else {
             VerificationOptions {
                 check_integrity: true,
+                check_logical_hashes: true,
                 replay_transformations: true,
             }
         };

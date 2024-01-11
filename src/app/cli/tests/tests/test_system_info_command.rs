@@ -16,14 +16,12 @@ use kamu_cli::*;
 #[test_log::test(tokio::test)]
 async fn test_system_info() {
     let container_runtime = Arc::new(ContainerRuntime::new(ContainerRuntimeConfig::default()));
-    let workpace_root_dir = WorkspaceService::find_workspace()
-        .root_dir
-        .to_str()
-        .map(String::from)
-        .unwrap();
+    let workpace_svc = Arc::new(WorkspaceService::new(Arc::new(
+        WorkspaceService::find_workspace(),
+    )));
 
     assert_matches!(
-        SystemInfo::collect(container_runtime, workpace_root_dir).await,
+        SystemInfo::collect(container_runtime, workpace_svc).await,
         SystemInfo {
             build: BuildInfo {
                 app_version: kamu_cli::VERSION,
@@ -41,11 +39,12 @@ async fn test_system_info() {
                 cargo_target_triple: Some(_),
                 cargo_features: Some(_),
                 cargo_opt_level: Some(_),
-                workspace_dir: _,
             },
-            additional: AdditionalInfo {
-                container_version: _
-            }
+            workspace: WorkspaceInfo {
+                version: _,
+                root_dir: _,
+            },
+            container_runtime: ContainerRuntimeInfo { info: _ },
         }
     )
 }

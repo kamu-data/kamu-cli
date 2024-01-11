@@ -119,9 +119,11 @@ impl ContainerRuntime {
         Ok(())
     }
 
-    pub fn custom_cmd(&self, command: String) -> Command {
+    pub fn info(&self) -> Command {
         let mut cmd = self.new_command();
-        cmd.arg(command);
+        cmd.arg("info");
+        cmd.arg("-f");
+        cmd.arg("json");
         cmd
     }
 

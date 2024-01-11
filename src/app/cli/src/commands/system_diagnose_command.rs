@@ -9,7 +9,6 @@
 
 use std::fs::{self, File};
 use std::io::Write;
-use std::path::Path;
 use std::sync::Arc;
 
 use console::style;
@@ -21,11 +20,12 @@ use kamu::domain::{
     VerificationOptions,
     VerificationService,
 };
+use kamu::utils::docker_images::BUSYBOX;
 
 use super::{CLIError, Command};
 use crate::VerificationMultiProgress;
 
-pub const DUMMY_IMAGE: &str = "docker.io/busybox:latest";
+const TEST_CONTAINER_NAME: &str = "test-volume-mount";
 
 pub struct SystemDiagnoseCommand {
     dataset_repo: Arc<dyn DatasetRepository>,
@@ -93,30 +93,43 @@ impl RunCheck {
     }
 
     async fn container_check(&self, f: &mut dyn std::io::Write) -> Result<(), CLIError> {
-        write!(f, "container installed... ")?;
+        write!(f, "{} installed... ", self.container_runtime.config.runtime)?;
 
-        let container_installed_check_status = match self
-            .container_runtime
-            .custom_cmd("--version".to_string())
-            .output()
-            .await
-        {
-            Ok(_) => style("ok").green(),
-            Err(_) => style("failed").red(),
+        match self.container_runtime.info().output().await {
+            Ok(res) => {
+                match res.status.success() {
+                    true => write!(f, "{}", style("ok").green())?,
+                    false => {
+                        write!(f, "{}", style("failed").red())?;
+                        write!(
+                            f,
+                            "\n{}",
+                            style(String::from_utf8(res.stderr).unwrap()).red()
+                        )?;
+                    }
+                };
+            }
+            Err(err) => {
+                write!(f, "{}", style("failed").red())?;
+                write!(f, "\n{}", style(err).red())?;
+            }
         };
 
-        write!(f, "{container_installed_check_status}")?;
         Ok(())
     }
 
     async fn container_pull_check(&self, f: &mut dyn std::io::Write) -> Result<(), CLIError> {
-        write!(f, "container can pull images... ")?;
+        write!(
+            f,
+            "{} can pull images... ",
+            self.container_runtime.config.runtime
+        )?;
 
-        let is_container_image_pulled =
-            match self.container_runtime.pull_image(DUMMY_IMAGE, None).await {
-                Ok(_) => style("ok").green(),
-                Err(_) => style("failed").red(),
-            };
+        let is_container_image_pulled = match self.container_runtime.pull_image(BUSYBOX, None).await
+        {
+            Ok(_) => style("ok").green(),
+            Err(_) => style("failed").red(),
+        };
 
         write!(f, "{is_container_image_pulled}")?;
         Ok(())
@@ -126,22 +139,33 @@ impl RunCheck {
         &self,
         f: &mut dyn std::io::Write,
     ) -> Result<(), CLIError> {
-        write!(f, "container rootless run check... ")?;
+        write!(
+            f,
+            "{} rootless run check... ",
+            self.container_runtime.config.runtime
+        )?;
 
-        let container_rootless_check_status = match self
+        match self
             .container_runtime
-            .run_attached(DUMMY_IMAGE)
+            .run_attached(BUSYBOX)
             .init(true)
             .spawn()
             .unwrap()
             .wait()
             .await
         {
-            Ok(_) => style("ok").green(),
-            Err(_) => style("failed").red(),
+            Ok(status) => {
+                match status.success() {
+                    true => write!(f, "{}", style("ok").green())?,
+                    false => write!(f, "{}", style("failed").red())?,
+                };
+            }
+            Err(err) => {
+                write!(f, "{}", style("failed").red())?;
+                write!(f, "\n{}", style(err).red())?;
+            }
         };
 
-        write!(f, "{container_rootless_check_status}")?;
         Ok(())
     }
 
@@ -149,30 +173,43 @@ impl RunCheck {
         &self,
         f: &mut dyn std::io::Write,
     ) -> Result<(), CLIError> {
-        write!(f, "container volume mounts work... ")?;
-        let temp_dir = tempfile::tempdir()?;
-        let cwd = Path::new(".").canonicalize()?;
+        write!(
+            f,
+            "{} volume mounts work... ",
+            self.container_runtime.config.runtime
+        )?;
+        let dir_to_mount = std::env::current_dir()?.join("tmp");
+        std::fs::create_dir(dir_to_mount.clone())?;
 
-        let file_path = temp_dir.path().join("tmp.txt");
+        let file_path = dir_to_mount.join("tmp.txt");
         let _ = File::create(file_path.clone())?;
 
-        let container_volume_check_status = match self
+        match self
             .container_runtime
-            .run_attached(DUMMY_IMAGE)
-            .volume((cwd, temp_dir.into_path()))
+            .run_attached(BUSYBOX)
+            .volume((dir_to_mount.clone(), "/out"))
+            .container_name(TEST_CONTAINER_NAME)
+            .args(["cat", "/out/tmp.txt"])
             .init(true)
             .spawn()
             .unwrap()
             .wait()
             .await
         {
-            Ok(_) => style("ok").green(),
-            Err(_) => style("failed").red(),
+            Ok(status) => {
+                match status.success() {
+                    true => write!(f, "{}", style("ok").green())?,
+                    false => write!(f, "{}", style("failed").red())?,
+                };
+            }
+            Err(err) => {
+                println!("{:?}", err);
+                write!(f, "{}", style("failed").red())?;
+                write!(f, "\n{}", style(err).red())?;
+            }
         };
 
-        fs::remove_file(file_path)?;
-
-        write!(f, "{container_volume_check_status}")?;
+        fs::remove_dir_all(dir_to_mount)?;
         Ok(())
     }
 
@@ -186,6 +223,7 @@ impl RunCheck {
 
         let verify_options = VerificationOptions {
             check_integrity: true,
+            check_logical_hashes: false,
             replay_transformations: false,
         };
 
