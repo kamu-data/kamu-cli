@@ -560,6 +560,8 @@ type EnvVar {
 	value: String
 }
 
+scalar EventID
+
 union EventTimeSource = EventTimeSourceFromMetadata | EventTimeSourceFromPath | EventTimeSourceFromSystemTime
 
 type EventTimeSourceFromMetadata {
@@ -713,35 +715,35 @@ type FlowEdge {
 }
 
 interface FlowEvent {
-	eventId: String!
+	eventId: EventID!
 	eventTime: DateTime!
 }
 
 type FlowEventAborted implements FlowEvent {
-	eventId: String!
+	eventId: EventID!
 	eventTime: DateTime!
 }
 
 type FlowEventInitiated implements FlowEvent {
-	eventId: String!
+	eventId: EventID!
 	eventTime: DateTime!
 	trigger: FlowTrigger!
 }
 
 type FlowEventQueued implements FlowEvent {
-	eventId: String!
+	eventId: EventID!
 	eventTime: DateTime!
 	activateAt: DateTime!
 }
 
 type FlowEventStartConditionDefined implements FlowEvent {
-	eventId: String!
+	eventId: EventID!
 	eventTime: DateTime!
 	startCondition: FlowStartCondition!
 }
 
 type FlowEventTaskChanged implements FlowEvent {
-	eventId: String!
+	eventId: EventID!
 	eventTime: DateTime!
 	taskId: TaskID!
 	taskStatus: TaskStatus!
@@ -749,7 +751,7 @@ type FlowEventTaskChanged implements FlowEvent {
 }
 
 type FlowEventTriggerAdded implements FlowEvent {
-	eventId: String!
+	eventId: EventID!
 	eventTime: DateTime!
 	trigger: FlowTrigger!
 }

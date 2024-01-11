@@ -19,9 +19,8 @@ use crate::utils;
 
 #[derive(Interface)]
 #[graphql(
-    // TODO: create scalar type EventID
-    field(name = "event_id", ty = "String"),
-    field(name = "event_time", ty = "&DateTime<Utc>"),
+    field(name = "event_id", ty = "&EventID"),
+    field(name = "event_time", ty = "&DateTime<Utc>")
 )]
 pub enum FlowEvent {
     /// Flow initiated
@@ -76,7 +75,7 @@ impl FlowEvent {
 
 #[derive(SimpleObject)]
 pub struct FlowEventInitiated {
-    event_id: String,
+    event_id: EventID,
     event_time: DateTime<Utc>,
     trigger: FlowTrigger,
 }
@@ -84,7 +83,7 @@ pub struct FlowEventInitiated {
 impl FlowEventInitiated {
     fn new(event_id: evs::EventID, event: fs::FlowEventInitiated) -> Self {
         Self {
-            event_id: event_id.to_string(),
+            event_id: event_id.into(),
             event_time: event.event_time,
             trigger: event.trigger.into(),
         }
@@ -95,7 +94,7 @@ impl FlowEventInitiated {
 
 #[derive(SimpleObject)]
 pub struct FlowEventStartConditionDefined {
-    event_id: String,
+    event_id: EventID,
     event_time: DateTime<Utc>,
     start_condition: FlowStartCondition,
 }
@@ -103,7 +102,7 @@ pub struct FlowEventStartConditionDefined {
 impl FlowEventStartConditionDefined {
     fn new(event_id: evs::EventID, event: fs::FlowEventStartConditionDefined) -> Self {
         Self {
-            event_id: event_id.to_string(),
+            event_id: event_id.into(),
             event_time: event.event_time,
             start_condition: event.start_condition.into(),
         }
@@ -114,7 +113,7 @@ impl FlowEventStartConditionDefined {
 
 #[derive(SimpleObject)]
 pub struct FlowEventQueued {
-    event_id: String,
+    event_id: EventID,
     event_time: DateTime<Utc>,
     activate_at: DateTime<Utc>,
 }
@@ -122,7 +121,7 @@ pub struct FlowEventQueued {
 impl FlowEventQueued {
     fn new(event_id: evs::EventID, event: fs::FlowEventQueued) -> Self {
         Self {
-            event_id: event_id.to_string(),
+            event_id: event_id.into(),
             event_time: event.event_time,
             activate_at: event.activate_at,
         }
@@ -133,7 +132,7 @@ impl FlowEventQueued {
 
 #[derive(SimpleObject)]
 pub struct FlowEventTriggerAdded {
-    event_id: String,
+    event_id: EventID,
     event_time: DateTime<Utc>,
     trigger: FlowTrigger,
 }
@@ -141,7 +140,7 @@ pub struct FlowEventTriggerAdded {
 impl FlowEventTriggerAdded {
     fn new(event_id: evs::EventID, event: fs::FlowEventTriggerAdded) -> Self {
         Self {
-            event_id: event_id.to_string(),
+            event_id: event_id.into(),
             event_time: event.event_time,
             trigger: event.trigger.into(),
         }
@@ -150,12 +149,10 @@ impl FlowEventTriggerAdded {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-// TODO: consider flattening task events into 1 struct
-
 #[derive(SimpleObject)]
 #[graphql(complex)]
 pub struct FlowEventTaskChanged {
-    event_id: String,
+    event_id: EventID,
     event_time: DateTime<Utc>,
     task_id: TaskID,
     task_status: TaskStatus,
@@ -171,7 +168,7 @@ impl FlowEventTaskChanged {
         task_status: TaskStatus,
     ) -> Self {
         Self {
-            event_id: event_id.to_string(),
+            event_id: event_id.into(),
             event_time,
             task_id: task_id.into(),
             task_status,
@@ -188,14 +185,14 @@ impl FlowEventTaskChanged {
 
 #[derive(SimpleObject)]
 pub struct FlowEventAborted {
-    event_id: String,
+    event_id: EventID,
     event_time: DateTime<Utc>,
 }
 
 impl FlowEventAborted {
     fn new(event_id: evs::EventID, event: fs::FlowEventAborted) -> Self {
         Self {
-            event_id: event_id.to_string(),
+            event_id: event_id.into(),
             event_time: event.event_time,
         }
     }
