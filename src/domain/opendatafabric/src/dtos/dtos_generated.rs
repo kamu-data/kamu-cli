@@ -411,8 +411,8 @@ impl_enum_with_variants!(MergeStrategy);
 
 /// Append merge strategy.
 ///
-/// Under this strategy polled data will be appended in its original form to the
-/// already ingested data without modifications.
+/// Under this strategy new data will be appended to the dataset in its
+/// entirety, without any deduplication.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct MergeStrategyAppend {}
 
@@ -420,18 +420,11 @@ impl_enum_variant!(MergeStrategy::Append(MergeStrategyAppend));
 
 /// Ledger merge strategy.
 ///
-/// This strategy should be used for data sources containing append-only event
-/// streams. New data dumps can have new rows added, but once data already
-/// made it into one dump it never changes or disappears.
-///
-/// A system time column will be added to the data to indicate the time
-/// when the record was observed first by the system.
-///
-/// It relies on a user-specified primary key columns to identify which records
-/// were already seen and not duplicate them.
-///
-/// It will always preserve all columns from existing and new snapshots, so
-/// the set of columns can only grow.
+/// This strategy should be used for data sources containing ledgers of events.
+/// Currently this strategy will only perform deduplication of events using
+/// user-specified primary key columns. This means that the source data can
+/// contain partially overlapping set of records and only those records that
+/// were not previously seen will be appended.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct MergeStrategyLedger {
     /// Names of the columns that uniquely identify the record throughout its
@@ -443,38 +436,30 @@ impl_enum_variant!(MergeStrategy::Ledger(MergeStrategyLedger));
 
 /// Snapshot merge strategy.
 ///
-/// This strategy can be used for data dumps that are taken periodical
-/// and contain only the latest state of the observed entity or system.
-/// Over time such dumps can have new rows added, and old rows either removed
-/// or modified.
+/// This strategy can be used for data state snapshots that are taken
+/// periodically and contain only the latest state of the observed entity or
+/// system. Over time such snapshots can have new rows added, and old rows
+/// either removed or modified.
 ///
 /// This strategy transforms snapshot data into an append-only event stream
-/// where data already added is immutable. It does so by treating rows in
-/// snapshots as "observation" events and adding an "observed" column
-/// that will contain:
-/// - "I" - when a row appears for the first time
-/// - "D" - when row disappears
-/// - "U" - whenever any row data has changed
+/// where data already added is immutable. It does so by performing Change Data
+/// Capture - essentially diffing the current state of data against the
+/// reconstructed previous state and recording differences as retractions or
+/// corrections. The Operation Type "op" column will contain:
+/// - append (`+A`) when a row appears for the first time
+/// - retraction (`-D`) when row disappears
+/// - correction (`-C`, `+C`) when row data has changed, with `-C` event
+///   carrying the old value of the row and `+C` carrying the new value.
 ///
-/// It relies on a user-specified primary key columns to correlate the rows
-/// between the two snapshots.
+/// To correctly associate rows between old and new snapshots this strategy
+/// relies on user-specified primary key columns.
 ///
-/// The time when a snapshot was taken (event time) is usually captured in some
-/// form of metadata (e.g. in the name of the snapshot file, or in the caching
-/// headers). In order to populate the event time we rely on the `FetchStep`
-/// to extract the event time from metadata. User then should specify the name
-/// of the event time column that will be populated from this value.
-///
-/// If the data contains a column that is guaranteed to change whenever
-/// any of the data columns changes (for example this can be a last
-/// modification timestamp, an incremental version, or a data hash), then
-/// it can be specified as modification indicator to speed up the detection of
+/// To identify whether a row has changed this strategy will compare all other
+/// columns one by one. If the data contains a column that is guaranteed to
+/// change whenever any of the data columns changes (for example a last
+/// modification timestamp, an incremental version, or a data hash), then it can
+/// be specified in `compareColumns` property to speed up the detection of
 /// modified rows.
-///
-/// Schema Changes:
-///
-/// This strategy will always preserve all columns from the existing and new
-/// snapshots, so the set of columns can only grow.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct MergeStrategySnapshot {
     /// Names of the columns that uniquely identify the record throughout its
