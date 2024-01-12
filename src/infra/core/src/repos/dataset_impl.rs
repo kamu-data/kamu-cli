@@ -163,7 +163,7 @@ where
 
                     if let Some(output_data) = add_data.new_data {
                         let iv = output_data.offset_interval;
-                        increment.seen_num_records += (iv.end - iv.start + 1);
+                        increment.seen_num_records += iv.end - iv.start + 1;
 
                         increment.seen_data_size += output_data.size;
                     }
@@ -177,7 +177,7 @@ where
 
                     if let Some(output_data) = execute_transform.new_data {
                         let iv = output_data.offset_interval;
-                        increment.seen_num_records += (iv.end - iv.start + 1);
+                        increment.seen_num_records += iv.end - iv.start + 1;
 
                         increment.seen_data_size += output_data.size;
                     }

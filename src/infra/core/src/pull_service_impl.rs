@@ -314,7 +314,7 @@ impl PullServiceImpl {
     }
 
     fn infer_local_name_from_url(&self, url: &Url) -> Result<DatasetName, PullError> {
-        if let Some(last_segment) = url.path_segments().and_then(|s| s.next_back()) {
+        if let Some(last_segment) = url.path_segments().and_then(|s| s.last()) {
             if let Ok(name) = DatasetName::try_from(last_segment) {
                 return Ok(name);
             }
