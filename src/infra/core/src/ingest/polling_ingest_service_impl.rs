@@ -334,7 +334,7 @@ impl PollingIngestServiceImpl {
         let prev_source_state = args
             .data_writer
             .prev_source_state()
-            .and_then(|ss| PollingSourceState::try_from_source_state(ss));
+            .and_then(PollingSourceState::try_from_source_state);
 
         let savepoint_path = self.get_savepoint_path(fetch_step, prev_source_state.as_ref())?;
         let savepoint = self.read_fetch_savepoint(&savepoint_path)?;
