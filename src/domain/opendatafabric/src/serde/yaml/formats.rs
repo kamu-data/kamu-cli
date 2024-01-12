@@ -59,7 +59,7 @@ pub mod datetime_rfc3339_opt {
     ) -> Result<S::Ok, S::Error> {
         match option {
             None => serializer.serialize_none(),
-            Some(date) => super::datetime_rfc3339::serialize(&date, serializer),
+            Some(date) => super::datetime_rfc3339::serialize(date, serializer),
         }
     }
 

@@ -45,16 +45,16 @@ pub struct MetadataBlockTypedRefMut<'a, T> {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-impl<T> Into<MetadataBlock> for MetadataBlockTyped<T>
+impl<T> From<MetadataBlockTyped<T>> for MetadataBlock
 where
     T: Into<MetadataEvent>,
 {
-    fn into(self) -> MetadataBlock {
+    fn from(val: MetadataBlockTyped<T>) -> Self {
         MetadataBlock {
-            system_time: self.system_time,
-            prev_block_hash: self.prev_block_hash,
-            sequence_number: self.sequence_number,
-            event: self.event.into(),
+            system_time: val.system_time,
+            prev_block_hash: val.prev_block_hash,
+            sequence_number: val.sequence_number,
+            event: val.event.into(),
         }
     }
 }
@@ -65,10 +65,10 @@ where
 /// event type
 pub trait AsTypedBlock {
     fn into_typed<T: VariantOf<MetadataEvent>>(self) -> Option<MetadataBlockTyped<T>>;
-    fn as_typed<'a, T: VariantOf<MetadataEvent>>(&'a self) -> Option<MetadataBlockTypedRef<'a, T>>;
-    fn as_typed_mut<'a, T: VariantOf<MetadataEvent>>(
-        &'a mut self,
-    ) -> Option<MetadataBlockTypedRefMut<'a, T>>;
+    fn as_typed<T: VariantOf<MetadataEvent>>(&self) -> Option<MetadataBlockTypedRef<'_, T>>;
+    fn as_typed_mut<T: VariantOf<MetadataEvent>>(
+        &mut self,
+    ) -> Option<MetadataBlockTypedRefMut<'_, T>>;
 }
 
 impl AsTypedBlock for MetadataBlock {
@@ -81,7 +81,7 @@ impl AsTypedBlock for MetadataBlock {
         })
     }
 
-    fn as_typed<'a, T: VariantOf<MetadataEvent>>(&'a self) -> Option<MetadataBlockTypedRef<'a, T>> {
+    fn as_typed<T: VariantOf<MetadataEvent>>(&self) -> Option<MetadataBlockTypedRef<'_, T>> {
         T::as_variant(&self.event).map(|e| MetadataBlockTypedRef {
             system_time: self.system_time,
             prev_block_hash: self.prev_block_hash.as_ref(),
@@ -90,9 +90,9 @@ impl AsTypedBlock for MetadataBlock {
         })
     }
 
-    fn as_typed_mut<'a, T: VariantOf<MetadataEvent>>(
-        &'a mut self,
-    ) -> Option<MetadataBlockTypedRefMut<'a, T>> {
+    fn as_typed_mut<T: VariantOf<MetadataEvent>>(
+        &mut self,
+    ) -> Option<MetadataBlockTypedRefMut<'_, T>> {
         T::as_variant_mut(&mut self.event).map(|e| MetadataBlockTypedRefMut {
             system_time: self.system_time,
             prev_block_hash: self.prev_block_hash.as_ref(),
@@ -141,7 +141,7 @@ impl<'a> MetadataEventDataStreamRef<'a> {
 
 pub trait IntoDataStreamEvent {
     fn into_data_stream_event(self) -> Option<MetadataEventDataStream>;
-    fn as_data_stream_event<'a>(&'a self) -> Option<MetadataEventDataStreamRef<'a>>;
+    fn as_data_stream_event(&self) -> Option<MetadataEventDataStreamRef<'_>>;
 }
 
 impl IntoDataStreamEvent for MetadataEvent {
@@ -182,7 +182,7 @@ impl IntoDataStreamEvent for MetadataEvent {
         })
     }
 
-    fn as_data_stream_event<'a>(&'a self) -> Option<MetadataEventDataStreamRef<'a>> {
+    fn as_data_stream_event(&self) -> Option<MetadataEventDataStreamRef<'_>> {
         let (prev_checkpoint, prev_offset, new_data, new_checkpoint, new_watermark) = match &self {
             MetadataEvent::AddData(e) => (
                 e.prev_checkpoint.as_ref(),
@@ -236,7 +236,7 @@ pub struct MetadataBlockDataStreamRef<'a> {
 
 pub trait IntoDataStreamBlock {
     fn into_data_stream_block(self) -> Option<MetadataBlockDataStream>;
-    fn as_data_stream_block<'a>(&'a self) -> Option<MetadataBlockDataStreamRef<'a>>;
+    fn as_data_stream_block(&self) -> Option<MetadataBlockDataStreamRef<'_>>;
 }
 
 impl IntoDataStreamBlock for MetadataBlock {
@@ -252,15 +252,13 @@ impl IntoDataStreamBlock for MetadataBlock {
         }
     }
 
-    fn as_data_stream_block<'a>(&'a self) -> Option<MetadataBlockDataStreamRef<'a>> {
-        if let Some(event) = self.event.as_data_stream_event() {
-            Some(MetadataBlockDataStreamRef {
+    fn as_data_stream_block(&self) -> Option<MetadataBlockDataStreamRef<'_>> {
+        self.event
+            .as_data_stream_event()
+            .map(|event| MetadataBlockDataStreamRef {
                 system_time: &self.system_time,
                 prev_block_hash: self.prev_block_hash.as_ref(),
                 event,
             })
-        } else {
-            None
-        }
     }
 }
