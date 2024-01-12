@@ -45,7 +45,7 @@ async fn test_data_push_ingest_handler() {
     .await;
 
     let system_time = Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap();
-    server_harness.system_time_source().set(system_time.clone());
+    server_harness.system_time_source().set(system_time);
 
     let create_result = server_harness
         .cli_dataset_repository()

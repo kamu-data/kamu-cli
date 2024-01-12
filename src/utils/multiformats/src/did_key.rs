@@ -42,7 +42,7 @@ impl DidKey {
             public_key.len()
         );
 
-        let mut pk = [0 as u8; MAX_DID_KEY_LEN];
+        let mut pk = [0_u8; MAX_DID_KEY_LEN];
         pk.clone_from_slice(public_key);
 
         Ok(Self { public_key: pk })
@@ -65,11 +65,11 @@ impl DidKey {
         use rand::rngs::SmallRng;
         use rand::{RngCore, SeedableRng};
 
-        let mut seed_buf = [0 as u8; 32];
+        let mut seed_buf = [0_u8; 32];
         seed_buf[..seed.len()].copy_from_slice(seed);
         let mut prng = SmallRng::from_seed(seed_buf);
 
-        let mut public_key = [0 as u8; ed25519_dalek::PUBLIC_KEY_LENGTH];
+        let mut public_key = [0_u8; ed25519_dalek::PUBLIC_KEY_LENGTH];
         prng.fill_bytes(&mut public_key[..]);
 
         Self::new(Multicodec::Ed25519Pub, &public_key).unwrap()
@@ -96,14 +96,10 @@ impl DidKey {
 
     /// Reads DID from canonical byte representation
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, DeserializeError<DidKey>> {
-        let (key_type, key_bytes) =
-            uvar::decode::u32(bytes).map_err(|e| DeserializeError::new_from(e))?;
+        let (key_type, key_bytes) = uvar::decode::u32(bytes).map_err(DeserializeError::new_from)?;
+        let key_type: Multicodec = key_type.try_into().map_err(DeserializeError::new_from)?;
 
-        let key_type: Multicodec = key_type
-            .try_into()
-            .map_err(|e| DeserializeError::new_from(e))?;
-
-        Self::new(key_type, key_bytes).map_err(|e| DeserializeError::new_from(e))
+        Self::new(key_type, key_bytes).map_err(DeserializeError::new_from)
     }
 
     /// Parses DID from a canonical `did:key:<multibase>` string
@@ -116,7 +112,7 @@ impl DidKey {
 
     /// Parses DID from a multibase string (without `did:key:`) prefix
     pub fn from_multibase(s: &str) -> Result<Self, ParseError<DidKey>> {
-        let mut buf = [0 as u8; MAX_VARINT_LEN + ed25519_dalek::PUBLIC_KEY_LENGTH];
+        let mut buf = [0_u8; MAX_VARINT_LEN + ed25519_dalek::PUBLIC_KEY_LENGTH];
         let len = Multibase::decode(s, &mut buf[..]).map_err(|e| ParseError::new_from(s, e))?;
         Self::from_bytes(&buf[..len]).map_err(|e| ParseError::new_from(s, e))
     }
@@ -153,7 +149,7 @@ pub struct DidKeyBytes {
 impl DidKeyBytes {
     fn new(value: &DidKey) -> Self {
         use std::io::Write;
-        let mut buf = [0 as u8; MAX_DID_BINARY_REPR_LEN];
+        let mut buf = [0_u8; MAX_DID_BINARY_REPR_LEN];
 
         let len = {
             let mut cursor = std::io::Cursor::new(&mut buf[..]);
@@ -257,7 +253,7 @@ impl<'a> DidKeyMultibaseFmt<'a> {
 
     pub fn to_stack_string(self) -> StackString<MAX_DID_MULTIBASE_REPR_LEN> {
         Multibase::encode::<MAX_DID_MULTIBASE_REPR_LEN>(
-            &self.value.as_bytes().as_slice(),
+            self.value.as_bytes().as_slice(),
             self.encoding,
         )
     }
@@ -275,7 +271,7 @@ impl<'a> std::fmt::Display for DidKeyMultibaseFmt<'a> {
             f,
             "{}",
             Multibase::format::<MAX_DID_MULTIBASE_REPR_LEN>(
-                &self.value.as_bytes().as_slice(),
+                self.value.as_bytes().as_slice(),
                 self.encoding
             )
         )
