@@ -68,7 +68,7 @@ impl AliasListCommand {
 
         let mut items = 0;
         let mut table = Table::new();
-        table.set_format(TableWriter::get_table_format());
+        table.set_format(TableWriter::<Vec<u8>>::get_table_format());
 
         table.set_titles(row![bc->"Dataset", bc->"Kind", bc->"Alias"]);
 

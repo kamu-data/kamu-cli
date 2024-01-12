@@ -16,11 +16,11 @@ content:
       read:
         kind: Csv
         header: true
-        timestampFormat: "yyyy/MM/dd HH:mm:ssx"
+        # timestampFormat: "yyyy/MM/dd HH:mm:ssx"
         schema:
           - ObjectId BIGINT
           - row_id BIGINT
-          - date_reported TIMESTAMP
+          - date_reported STRING
           - health_region STRING
           - age_group STRING
           - gender STRING
@@ -31,12 +31,33 @@ content:
           - province STRING
           - province_abbr STRING
           - hr_uid INT
+      # Using Spark engine to convert a tricky date time string into a timestamp
+      # See: https://github.com/kamu-data/kamu-cli/issues/438
+      preprocess:
+        kind: Sql
+        engine: spark
+        query: |
+          select
+            objectid,
+            row_id,
+            to_timestamp(date_reported, "yyyy/MM/dd HH:mm:ssx") as date_reported,
+            health_region,
+            age_group,
+            gender,
+            exposure,
+            case_status,
+            latitude,
+            longitude,
+            province,
+            province_abbr,
+            hr_uid
+          from input
       # How to combine newly-ingested data with data that is already in the dataset
       merge:
         kind: Ledger
         primaryKey:
           - row_id
-    # Tells kamu to use `date_reported` column as event time intead of the default `event_tume`
+    # Tells kamu to use `date_reported` column as event time instead of the default `event_time`
     - kind: SetVocab
       eventTimeColumn: date_reported
     - kind: SetInfo

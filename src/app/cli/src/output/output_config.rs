@@ -37,7 +37,7 @@ impl OutputConfig {
             OutputFormat::Json => Box::new(JsonArrayWriter::new(std::io::stdout())),
             OutputFormat::NdJson => Box::new(JsonLineDelimitedWriter::new(std::io::stdout())),
             OutputFormat::JsonSoA => unimplemented!("SoA Json format is not yet implemented"),
-            OutputFormat::Table => Box::new(TableWriter::new(fmt)),
+            OutputFormat::Table => Box::new(TableWriter::new(fmt, std::io::stdout())),
         }
     }
 }

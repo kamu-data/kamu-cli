@@ -58,7 +58,7 @@ impl RepositoryListCommand {
         repos.sort();
 
         let mut table = Table::new();
-        table.set_format(TableWriter::get_table_format());
+        table.set_format(TableWriter::<Vec<u8>>::get_table_format());
 
         table.set_titles(row![bc->"Name", bc->"URL"]);
 
