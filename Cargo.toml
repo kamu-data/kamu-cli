@@ -78,6 +78,10 @@ include = [
 publish = false
 
 
+[workspace.lints.clippy]
+new_without_default = "allow"
+
+
 [profile.dev]
 # Change this to 1 for faster builds that still preserve enough info for backtraces.
 # Use 2 when you need to attach a debugger.
