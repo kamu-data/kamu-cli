@@ -1,6 +1,5 @@
 ODF_SPEC_DIR=../open-data-fabric
 ODF_CRATE_DIR=./src/domain/opendatafabric
-RUSTFMT=rustfmt --edition 2021
 LICENSE_HEADER=docs/license_header.txt
 TEST_LOG_PARAMS=RUST_LOG_SPAN_EVENTS=new,close RUST_LOG=debug
 
@@ -80,16 +79,16 @@ codegen-odf-serde:
 	python $(ODF_SPEC_DIR)/tools/jsonschema_to_flatbuffers.py $(ODF_SPEC_DIR)/schemas > $(ODF_CRATE_DIR)/schemas/odf.fbs
 	flatc -o $(ODF_CRATE_DIR)/src/serde/flatbuffers --rust --gen-onefile $(ODF_CRATE_DIR)/schemas/odf.fbs
 	mv $(ODF_CRATE_DIR)/src/serde/flatbuffers/odf_generated.rs $(ODF_CRATE_DIR)/src/serde/flatbuffers/proxies_generated.rs
-	$(RUSTFMT) $(ODF_CRATE_DIR)/src/serde/flatbuffers/proxies_generated.rs
+	rustfmt $(ODF_CRATE_DIR)/src/serde/flatbuffers/proxies_generated.rs
 
 	python $(ODF_SPEC_DIR)/tools/jsonschema_to_rust_dtos.py $(ODF_SPEC_DIR)/schemas \
-		| $(RUSTFMT) > $(ODF_CRATE_DIR)/src/dtos/dtos_generated.rs
+		| rustfmt > $(ODF_CRATE_DIR)/src/dtos/dtos_generated.rs
 	python $(ODF_SPEC_DIR)/tools/jsonschema_to_rust_traits.py $(ODF_SPEC_DIR)/schemas \
-		| $(RUSTFMT) > $(ODF_CRATE_DIR)/src/dtos/dtos_dyntraits_generated.rs
+		| rustfmt > $(ODF_CRATE_DIR)/src/dtos/dtos_dyntraits_generated.rs
 	python $(ODF_SPEC_DIR)/tools/jsonschema_to_rust_serde_yaml.py $(ODF_SPEC_DIR)/schemas \
-		| $(RUSTFMT) > $(ODF_CRATE_DIR)/src/serde/yaml/derivations_generated.rs
+		| rustfmt > $(ODF_CRATE_DIR)/src/serde/yaml/derivations_generated.rs
 	python $(ODF_SPEC_DIR)/tools/jsonschema_to_rust_flatbuffers.py $(ODF_SPEC_DIR)/schemas \
-		| $(RUSTFMT) > $(ODF_CRATE_DIR)/src/serde/flatbuffers/convertors_generated.rs
+		| rustfmt > $(ODF_CRATE_DIR)/src/serde/flatbuffers/convertors_generated.rs
 
 	$(call add_license_header, "$(ODF_CRATE_DIR)/src/serde/flatbuffers/proxies_generated.rs")
 	$(call add_license_header, "$(ODF_CRATE_DIR)/src/dtos/dtos_generated.rs")
@@ -107,8 +106,8 @@ codegen-engine-tonic:
 		--tonic_out=$(ODF_CRATE_DIR)/src/engine/grpc_generated \
 		--tonic_opt=compile_well_known_types
 
-	$(RUSTFMT) $(ODF_CRATE_DIR)/src/engine/grpc_generated/engine.rs
-	$(RUSTFMT) $(ODF_CRATE_DIR)/src/engine/grpc_generated/engine.tonic.rs
+	rustfmt $(ODF_CRATE_DIR)/src/engine/grpc_generated/engine.rs
+	rustfmt $(ODF_CRATE_DIR)/src/engine/grpc_generated/engine.tonic.rs
 
 	$(call add_license_header, "$(ODF_CRATE_DIR)/src/engine/grpc_generated/engine.rs")
 	$(call add_license_header, "$(ODF_CRATE_DIR)/src/engine/grpc_generated/engine.tonic.rs")
@@ -117,7 +116,7 @@ codegen-engine-tonic:
 .PHONY: codegen-graphql
 codegen-graphql:
 	python $(ODF_SPEC_DIR)/tools/jsonschema_to_rust_gql.py $(ODF_SPEC_DIR)/schemas \
-		| $(RUSTFMT) > src/adapter/graphql/src/scalars/odf_generated.rs
+		| rustfmt > src/adapter/graphql/src/scalars/odf_generated.rs
 	$(call add_license_header, "src/adapter/graphql/src/scalars/odf_generated.rs")
 
 
