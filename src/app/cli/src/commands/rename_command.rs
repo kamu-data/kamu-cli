@@ -55,7 +55,7 @@ impl Command for RenameCommand {
 
         eprintln!(
             "{}",
-            console::style(format!("Dataset renamed")).green().bold()
+            console::style("Dataset renamed".to_string()).green().bold()
         );
 
         Ok(())

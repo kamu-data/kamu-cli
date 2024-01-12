@@ -113,7 +113,7 @@ impl CLIError {
         }
     }
 
-    pub fn pretty<'a>(&'a self, include_backtraces: bool) -> impl Display + 'a {
+    pub fn pretty(&self, include_backtraces: bool) -> impl Display + '_ {
         super::error_fmt::PrettyCLIError {
             error: self,
             include_backtraces,
@@ -272,9 +272,9 @@ pub struct RequiredEnvVarNotSet {
 
 pub fn check_env_var_set(var_name: &str) -> Result<(), CLIError> {
     std::env::var(var_name).map_err(|_| {
-        return CLIError::usage_error_from(RequiredEnvVarNotSet {
+        CLIError::usage_error_from(RequiredEnvVarNotSet {
             var_name: var_name.to_string(),
-        });
+        })
     })?;
 
     Ok(())

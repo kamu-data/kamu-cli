@@ -158,7 +158,7 @@ impl FlowServiceInMemory {
                 let mut state = self.state.lock().unwrap();
                 state
                     .active_configs
-                    .add_dataset_flow_config(&dataset_flow_key, rule);
+                    .add_dataset_flow_config(dataset_flow_key, rule);
             }
             FlowKey::System(system_flow_key) => {
                 if let FlowConfigurationRule::Schedule(schedule) = &rule {
@@ -530,7 +530,7 @@ impl FlowService for FlowServiceInMemory {
             Some(flow_id) => self
                 .merge_secondary_flow_trigger(flow_id, trigger)
                 .await
-                .map_err(|e| RequestFlowError::Internal(e)),
+                .map_err(RequestFlowError::Internal),
 
             // Otherwise, initiate a new flow and activate it at the nearest scheduler slot
             None => {
@@ -728,10 +728,7 @@ impl FlowServiceTestDriver for FlowServiceInMemory {
     async fn mimic_flow_scheduled(&self, flow_id: FlowID) -> Result<TaskID, InternalError> {
         {
             let mut state = self.state.lock().unwrap();
-            state
-                .time_wheel
-                .cancel_flow_activation(flow_id.clone())
-                .int_err()?;
+            state.time_wheel.cancel_flow_activation(flow_id).int_err()?;
         }
 
         let mut flow = Flow::load(flow_id, self.flow_event_store.as_ref())
@@ -799,18 +796,17 @@ impl AsyncEventHandler<TaskEventFinished> for FlowServiceInMemory {
 
             // In case of success:
             //  - enqueue updates of dependent datasets
-            if event.outcome == TaskOutcome::Success {
-                if let FlowKey::Dataset(flow_key) = &flow.flow_key
-                    && flow_key.flow_type.is_dataset_update()
-                {
-                    self.enqueue_dependent_dataset_flows(
-                        finish_time,
-                        &flow_key.dataset_id,
-                        flow_key.flow_type,
-                        flow.flow_id,
-                    )
-                    .await?;
-                }
+            if event.outcome == TaskOutcome::Success
+                && let FlowKey::Dataset(flow_key) = &flow.flow_key
+                && flow_key.flow_type.is_dataset_update()
+            {
+                self.enqueue_dependent_dataset_flows(
+                    finish_time,
+                    &flow_key.dataset_id,
+                    flow_key.flow_type,
+                    flow.flow_id,
+                )
+                .await?;
             }
 
             {

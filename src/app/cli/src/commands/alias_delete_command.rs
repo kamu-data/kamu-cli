@@ -60,15 +60,11 @@ impl Command for AliasDeleteCommand {
         } else if let Some(alias) = &self.alias {
             let both = !self.pull && !self.push;
 
-            if self.pull || both {
-                if aliases.delete(alias, RemoteAliasKind::Pull).await? {
-                    count += 1;
-                }
+            if (self.pull || both) && aliases.delete(alias, RemoteAliasKind::Pull).await? {
+                count += 1;
             }
-            if self.push || both {
-                if aliases.delete(alias, RemoteAliasKind::Push).await? {
-                    count += 1;
-                }
+            if (self.push || both) && aliases.delete(alias, RemoteAliasKind::Push).await? {
+                count += 1;
             }
         } else {
             return Err(CLIError::usage_error("Specify either an alias or --all"));

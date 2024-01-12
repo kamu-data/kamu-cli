@@ -264,7 +264,7 @@ impl VerificationProgress {
         let step_str = if out_of != 0 {
             format!("[{}/{}]", step, out_of)
         } else {
-            format!("[-/-]")
+            "[-/-]".to_string()
         };
 
         let dataset = if let Some(block) = block {
@@ -324,12 +324,12 @@ impl VerificationListener for VerificationProgress {
         let s = self.state.lock().unwrap();
         let msg = match error {
             VerificationError::DataDoesNotMatchMetadata(..) => {
-                format!("Validation error (data doesn't match metadata)")
+                "Validation error (data doesn't match metadata)".to_string()
             }
             VerificationError::DataNotReproducible(..) => {
-                format!("Validation error (data is not reproducible)")
+                "Validation error (data is not reproducible)".to_string()
             }
-            _ => format!("Error during transformation"),
+            _ => "Error during transformation".to_string(),
         };
         self.curr_progress.finish_with_message(self.spinner_message(
             s.block_index + 1,

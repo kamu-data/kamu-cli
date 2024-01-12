@@ -276,7 +276,7 @@ impl SqlShellImpl {
         for entry in std::fs::read_dir(&workspace_layout.datasets_dir)? {
             let p = entry?.path();
             if let Some(name) = p.file_name().and_then(|s| s.to_str()) {
-                if name.starts_with(".") {
+                if name.starts_with('.') {
                     continue;
                 }
 

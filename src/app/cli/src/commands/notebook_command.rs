@@ -57,7 +57,7 @@ impl NotebookCommand {
                 .into_iter()
                 .map(|elem| {
                     let s = elem.as_ref();
-                    match s.find("=") {
+                    match s.find('=') {
                         None => (s.to_owned(), None),
                         Some(pos) => {
                             let (name, value) = s.split_at(pos);
@@ -113,7 +113,7 @@ impl Command for NotebookCommand {
             .run(
                 &self.workspace_layout.datasets_dir,
                 &self.workspace_layout.run_info_dir,
-                self.address.clone(),
+                self.address,
                 self.port,
                 environment_vars,
                 self.output_config.verbosity_level > 0,

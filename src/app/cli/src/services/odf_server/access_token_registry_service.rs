@@ -54,7 +54,7 @@ impl AccessTokenRegistryService {
         }
     }
 
-    fn account_name<'a>(&'a self) -> &'a AccountName {
+    fn account_name(&self) -> &AccountName {
         match self.current_account_subject.as_ref() {
             CurrentAccountSubject::Logged(l) => &l.account_name,
             CurrentAccountSubject::Anonymous(_) => panic!("Anonymous current account unexpected"),
@@ -179,7 +179,7 @@ impl AccessTokenRegistryService {
             .iter_mut()
             .find(|c| &c.frontend_url == odf_server_frontend_url)
         {
-            if let Some(_) = token_map.drop_account_token(account_name) {
+            if token_map.drop_account_token(account_name).is_some() {
                 return self.storage.write_access_tokens_registry(scope, &registry);
             }
         }

@@ -93,7 +93,7 @@ impl Command for LineageCommand {
                 .then(|r| self.dataset_repo.resolve_dataset_ref(r))
                 .try_collect()
                 .await
-                .map_err(|e| CLIError::failure(e))?
+                .map_err(CLIError::failure)?
         };
 
         dataset_handles.sort_by(|a, b| a.alias.cmp(&b.alias));
@@ -108,7 +108,7 @@ impl Command for LineageCommand {
                     LineageOptions {},
                 )
                 .await
-                .map_err(|e| CLIError::failure(e))?;
+                .map_err(CLIError::failure)?;
         }
         visitor.done();
 
@@ -305,15 +305,15 @@ struct HtmlStyle;
 
 impl DotStyle for HtmlStyle {
     fn root_style() -> String {
-        format!(r#"style="fill: orange""#)
+        r#"style="fill: orange""#.to_string()
     }
 
     fn derivative_style() -> String {
-        format!(r#"style="fill: lightblue""#)
+        r#"style="fill: lightblue""#.to_string()
     }
 
     fn remote_style() -> String {
-        format!(r#"style="fill: lightgrey""#)
+        r#"style="fill: lightgrey""#.to_string()
     }
 }
 
@@ -355,12 +355,7 @@ impl LineageVisitor for HtmlBrowseVisitor {
         std::mem::swap(&mut visitor, &mut self.html_visitor);
 
         std::fs::write(&self.temp_path, visitor.unwrap()).unwrap();
-        webbrowser::open(
-            &url::Url::from_file_path(&self.temp_path)
-                .unwrap()
-                .to_string(),
-        )
-        .unwrap();
+        webbrowser::open(url::Url::from_file_path(&self.temp_path).unwrap().as_ref()).unwrap();
     }
 }
 

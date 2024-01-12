@@ -71,7 +71,7 @@ impl RecordsFormat {
         self.column_formats
             .get(column)
             .and_then(|cf| cf.style_spec.as_ref())
-            .or_else(|| self.default_column_format.style_spec.as_ref())
+            .or(self.default_column_format.style_spec.as_ref())
             .map(|s| s.as_str())
             .unwrap()
     }
@@ -85,7 +85,7 @@ impl RecordsFormat {
             .column_formats
             .get(col)
             .and_then(|cf| cf.null_value.as_ref())
-            .or_else(|| self.default_column_format.null_value.as_ref())
+            .or(self.default_column_format.null_value.as_ref())
             .unwrap();
 
         if array.is_null(row) {
@@ -102,7 +102,7 @@ impl RecordsFormat {
                     .column_formats
                     .get(col)
                     .and_then(|cf| cf.binary_placeholder.as_ref())
-                    .or_else(|| self.default_column_format.binary_placeholder.as_ref());
+                    .or(self.default_column_format.binary_placeholder.as_ref());
 
                 if let Some(binary_placeholder) = binary_placeholder {
                     return binary_placeholder.clone();
@@ -116,7 +116,7 @@ impl RecordsFormat {
             .column_formats
             .get(col)
             .and_then(|cf| cf.value_fmt.as_ref())
-            .or_else(|| self.default_column_format.value_fmt.as_ref())
+            .or(self.default_column_format.value_fmt.as_ref())
         {
             value_fmt(array, row)
         } else {
@@ -129,7 +129,7 @@ impl RecordsFormat {
             .column_formats
             .get(col)
             .and_then(|cf| cf.max_len)
-            .or_else(|| self.default_column_format.max_len)
+            .or(self.default_column_format.max_len)
         {
             // Quick bytes check
             if value.len() > max_len {
@@ -159,6 +159,7 @@ impl Default for RecordsFormat {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Default)]
 pub struct ColumnFormat {
     style_spec: Option<String>,
     null_value: Option<String>,
@@ -221,7 +222,7 @@ impl ColumnFormat {
     }
 
     pub fn get_style_spec(&self) -> Option<&str> {
-        self.style_spec.as_ref().map(|s| s.as_str())
+        self.style_spec.as_deref()
     }
 
     fn value_fmt_t(
@@ -265,18 +266,6 @@ impl ColumnFormat {
                 _ => unimplemented!(),
             },
             _ => unimplemented!(),
-        }
-    }
-}
-
-impl Default for ColumnFormat {
-    fn default() -> Self {
-        Self {
-            style_spec: None,
-            null_value: None,
-            binary_placeholder: None,
-            max_len: None,
-            value_fmt: None,
         }
     }
 }
@@ -337,7 +326,7 @@ where
         if !self.header_written {
             let mut header = Vec::new();
             for field in records.schema().fields() {
-                header.push(Cell::new(&field.name()).style_spec("bc"));
+                header.push(Cell::new(field.name()).style_spec("bc"));
             }
             self.table.set_titles(Row::new(header));
             self.header_written = true;
@@ -349,8 +338,8 @@ where
             for col in 0..records.num_columns() {
                 let array = records.column(col);
 
-                let style_spec = self.format.get_style_spec(row, col, &array);
-                let value = self.format.format(row, col, &array);
+                let style_spec = self.format.get_style_spec(row, col, array);
+                let value = self.format.format(row, col, array);
                 cells.push(Cell::new(&value).style_spec(style_spec));
             }
             self.table.add_row(Row::new(cells));

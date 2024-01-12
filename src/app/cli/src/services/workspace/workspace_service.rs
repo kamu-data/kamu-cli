@@ -82,7 +82,7 @@ impl WorkspaceService {
     //// Layout of the workspace (if we are in one)
     pub fn layout(&self) -> Option<&WorkspaceLayout> {
         if self.is_in_workspace() {
-            Some(&self.workspace_layout.as_ref())
+            Some(self.workspace_layout.as_ref())
         } else {
             None
         }
@@ -107,16 +107,14 @@ impl WorkspaceService {
     pub fn workspace_version(&self) -> Result<Option<WorkspaceVersion>, InternalError> {
         if !self.is_in_workspace() {
             Ok(None)
+        } else if !self.workspace_layout.version_path.is_file() {
+            Ok(Some(WorkspaceVersion::V0_Initial))
         } else {
-            if !self.workspace_layout.version_path.is_file() {
-                Ok(Some(WorkspaceVersion::V0_Initial))
-            } else {
-                let version_str =
-                    std::fs::read_to_string(&self.workspace_layout.version_path).int_err()?;
+            let version_str =
+                std::fs::read_to_string(&self.workspace_layout.version_path).int_err()?;
 
-                let version: u32 = version_str.trim().parse().int_err()?;
-                Ok(Some(version.into()))
-            }
+            let version: u32 = version_str.trim().parse().int_err()?;
+            Ok(Some(version.into()))
         }
     }
 

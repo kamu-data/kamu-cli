@@ -145,7 +145,7 @@ impl Command for ConfigSetCommand {
         };
 
         if let Some(value) = &self.value {
-            self.config_svc.set(&self.key, &value, scope)?;
+            self.config_svc.set(&self.key, value, scope)?;
 
             eprintln!(
                 "{} {} {} {} {} {} {}",

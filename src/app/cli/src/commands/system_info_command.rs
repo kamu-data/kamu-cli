@@ -93,12 +93,10 @@ fn write_output<T: serde::Serialize>(
 ) -> Result<(), InternalError> {
     let output_format = if let Some(fmt) = &output_format {
         fmt.as_ref()
+    } else if output_config.is_tty {
+        "shell"
     } else {
-        if output_config.is_tty {
-            "shell"
-        } else {
-            "json"
-        }
+        "json"
     };
 
     // TODO: Generalize this code in output config, just like we do for tabular

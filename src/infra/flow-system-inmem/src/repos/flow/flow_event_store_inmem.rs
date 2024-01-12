@@ -131,7 +131,7 @@ impl EventStore<FlowState> for FlowEventStoreInMem {
             let state = self.inner.as_state();
             let mut g = state.lock().unwrap();
             for event in &events {
-                Self::update_index(&mut g, &event);
+                Self::update_index(&mut g, event);
             }
         }
 
@@ -157,7 +157,7 @@ impl FlowEventStore for FlowEventStoreInMem {
         let state = self.inner.as_state();
         let g = state.lock().unwrap();
         g.typed_flows_by_dataset
-            .get(BorrowedFlowKeyDataset::new(&dataset_id, flow_type).as_trait())
+            .get(BorrowedFlowKeyDataset::new(dataset_id, flow_type).as_trait())
             .and_then(|flows| flows.last().cloned())
     }
 

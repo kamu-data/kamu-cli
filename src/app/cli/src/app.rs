@@ -391,7 +391,7 @@ pub fn register_config_in_catalog(
         catalog_builder.add_value(config.users.clone().unwrap());
     } else {
         if let Some(users) = &config.users {
-            if users.predefined.len() > 0 {
+            if !users.predefined.is_empty() {
                 panic!("There cannot be predefined users in a single-tenant workspace");
             }
         }
@@ -452,8 +452,8 @@ fn configure_logging(output_config: &OutputConfig, workspace_layout: &WorkspaceL
     let env_filter = match EnvFilter::try_from_default_env() {
         Ok(filter) => filter,
         Err(_) => match output_config.verbosity_level {
-            0 | 1 => EnvFilter::new(DEFAULT_LOGGING_CONFIG.to_owned()),
-            _ => EnvFilter::new(VERBOSE_LOGGING_CONFIG.to_owned()),
+            0 | 1 => EnvFilter::new(DEFAULT_LOGGING_CONFIG),
+            _ => EnvFilter::new(VERBOSE_LOGGING_CONFIG),
         },
     };
 
@@ -571,8 +571,7 @@ fn get_output_format_recursive<'a>(
             .unwrap();
         let has_output_format = subcommand
             .get_opts()
-            .find(|opt| opt.get_id() == "output-format")
-            .is_some();
+            .any(|opt| opt.get_id() == "output-format");
 
         if has_output_format {
             if let Some(fmt) = submatches.get_one("output-format").map(String::as_str) {

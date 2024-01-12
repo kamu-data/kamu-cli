@@ -100,7 +100,7 @@ impl EventStore<TaskState> for TaskSystemEventStoreInMemory {
             let state = self.inner.as_state();
             let mut g = state.lock().unwrap();
             for event in &events {
-                Self::update_index_by_dataset(&mut g.tasks_by_dataset, &event);
+                Self::update_index_by_dataset(&mut g.tasks_by_dataset, event);
             }
         }
 

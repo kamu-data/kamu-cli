@@ -41,17 +41,16 @@ impl OAuthGithub {
 
     fn get_client_id() -> String {
         std::env::var(ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_ID)
-            .expect(format!("{} env var is not set", ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_ID).as_str())
+            .unwrap_or_else(|_| panic!("{} env var is not set", ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_ID))
     }
 
     fn get_client_secret() -> String {
-        std::env::var(ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_SECRET).expect(
-            format!(
+        std::env::var(ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_SECRET).unwrap_or_else(|_| {
+            panic!(
                 "{} env var is not set",
                 ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_SECRET
             )
-            .as_str(),
-        )
+        })
     }
 
     fn get_client(&self) -> Result<reqwest::Client, reqwest::Error> {
@@ -92,7 +91,7 @@ impl OAuthGithub {
         let github_access_token =
             serde_json::from_str::<GithubAccessToken>(&body).map_err(|_| {
                 kamu_core::auth::ProviderLoginError::RejectedCredentials(
-                    kamu_core::auth::RejectedCredentialsError::new(body.into()),
+                    kamu_core::auth::RejectedCredentialsError::new(body),
                 )
             })?;
 
@@ -266,7 +265,7 @@ impl kamu_core::auth::AuthenticationProvider for OAuthGithub {
         provider_credentials_json: String,
     ) -> Result<kamu_core::auth::AccountInfo, InternalError> {
         let provider_credentials =
-            serde_json::from_str::<GithubProviderCredentials>(&provider_credentials_json.as_str())
+            serde_json::from_str::<GithubProviderCredentials>(provider_credentials_json.as_str())
                 .int_err()?;
 
         let account_info = self
@@ -321,13 +320,11 @@ impl CachedState {
     }
 
     pub fn find_account_info_by_login(&self, login: &String) -> Option<GithubAccountInfo> {
-        self.accounts_by_login.get(login).map(|gai| gai.clone())
+        self.accounts_by_login.get(login).cloned()
     }
 
     pub fn find_access_token_resolution(&self, access_token: &String) -> Option<GithubAccountInfo> {
-        self.accounts_by_access_token
-            .get(access_token)
-            .map(|gai| gai.clone())
+        self.accounts_by_access_token.get(access_token).cloned()
     }
 }
 
@@ -349,7 +346,7 @@ impl From<GithubAccountInfo> for AccountInfo {
             account_id: FAKE_ACCOUNT_ID.to_string(),
             account_name: AccountName::try_from(&value.login).unwrap(),
             account_type: AccountType::User,
-            display_name: value.name.or_else(|| Some(value.login)).unwrap(),
+            display_name: value.name.unwrap_or(value.login),
             avatar_url: value.avatar_url,
             is_admin: false,
         }
