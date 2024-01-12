@@ -202,14 +202,14 @@ impl DependencyGraphService for DependencyGraphServiceInMemory {
         self.ensure_datasets_initially_scanned()
             .await
             .int_err()
-            .map_err(|e| GetDownstreamDependenciesError::Internal(e))?;
+            .map_err(GetDownstreamDependenciesError::Internal)?;
 
         let downstream_node_datasets: Vec<_> = {
             let state = self.state.lock().await;
 
             let node_index = state
                 .get_dataset_node(dataset_id)
-                .map_err(|e| GetDownstreamDependenciesError::DatasetNotFound(e))?;
+                .map_err(GetDownstreamDependenciesError::DatasetNotFound)?;
 
             state
                 .datasets_graph
@@ -236,14 +236,14 @@ impl DependencyGraphService for DependencyGraphServiceInMemory {
         self.ensure_datasets_initially_scanned()
             .await
             .int_err()
-            .map_err(|e| GetUpstreamDependenciesError::Internal(e))?;
+            .map_err(GetUpstreamDependenciesError::Internal)?;
 
         let upstream_node_datasets: Vec<_> = {
             let state = self.state.lock().await;
 
             let node_index = state
                 .get_dataset_node(dataset_id)
-                .map_err(|e| GetUpstreamDependenciesError::DatasetNotFound(e))?;
+                .map_err(GetUpstreamDependenciesError::DatasetNotFound)?;
 
             state
                 .datasets_graph

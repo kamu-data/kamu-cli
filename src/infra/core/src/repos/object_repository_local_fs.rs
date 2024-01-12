@@ -153,7 +153,7 @@ where
     }
 
     async fn get_stream(&self, hash: &Multihash) -> Result<Box<AsyncReadObj>, GetError> {
-        let path = self.get_path(&hash);
+        let path = self.get_path(hash);
 
         tracing::debug!(?path, "Reading object stream");
 
@@ -169,7 +169,7 @@ where
     }
 
     async fn get_internal_url(&self, hash: &Multihash) -> Url {
-        Url::from_file_path(self.get_path(&hash)).unwrap()
+        Url::from_file_path(self.get_path(hash)).unwrap()
     }
 
     async fn get_external_download_url(

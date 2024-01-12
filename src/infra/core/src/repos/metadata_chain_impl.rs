@@ -66,7 +66,7 @@ where
         new_block: &MetadataBlock,
         _block_cache: &mut Vec<MetadataBlock>,
     ) -> Result<(), AppendError> {
-        if !new_block.prev_block_hash.is_some() {
+        if new_block.prev_block_hash.is_none() {
             if new_block.sequence_number != 0 {
                 return Err(
                     AppendValidationError::SequenceIntegrity(SequenceIntegrityError {
@@ -400,7 +400,7 @@ where
             MetadataEvent::SetPollingSource(e) => {
                 // Queries must be normalized
                 if let Some(transform) = &e.preprocess {
-                    Self::validate_transform(&new_block.event, &transform)?;
+                    Self::validate_transform(&new_block.event, transform)?;
                 }
 
                 // Ensure no active push sources
@@ -438,7 +438,7 @@ where
 
                 // Queries must be normalized
                 if let Some(transform) = &e.preprocess {
-                    Self::validate_transform(&new_block.event, &transform)?;
+                    Self::validate_transform(&new_block.event, transform)?;
                 }
 
                 // Ensure no active polling source
@@ -468,7 +468,7 @@ where
             MetadataEvent::Seed(_) => Ok(()),
             MetadataEvent::SetTransform(e) => {
                 // Ensure has inputs
-                if e.inputs.len() == 0 {
+                if e.inputs.is_empty() {
                     invalid_event!(e.clone(), "Transform must have at least one input");
                 }
 
@@ -500,7 +500,7 @@ where
             invalid_event!(e.clone(), "Transform queries must be normalized");
         }
 
-        if transform.queries.is_none() || transform.queries.as_ref().unwrap().len() == 0 {
+        if transform.queries.is_none() || transform.queries.as_ref().unwrap().is_empty() {
             invalid_event!(e.clone(), "Transform must have at least one query");
         }
 
@@ -613,7 +613,7 @@ impl<ObjRepo, RefRepo> MetadataChainImpl<ObjRepo, RefRepo> {
         hash: &Multihash,
         block_bytes: &[u8],
     ) -> Result<MetadataBlock, GetBlockError> {
-        match FlatbuffersMetadataBlockDeserializer.read_manifest(&block_bytes) {
+        match FlatbuffersMetadataBlockDeserializer.read_manifest(block_bytes) {
             Ok(block) => Ok(block),
             Err(e) => match e {
                 Error::UnsupportedVersion { .. } => {

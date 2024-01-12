@@ -220,7 +220,7 @@ impl QueryService for QueryServiceImpl {
     ) -> Result<DataFrame, QueryError> {
         let ctx = self
             .session_context(options)
-            .map_err(|e| QueryError::Internal(e))?;
+            .map_err(QueryError::Internal)?;
         Ok(ctx.sql(statement).await?)
     }
 
@@ -228,7 +228,7 @@ impl QueryService for QueryServiceImpl {
     async fn get_schema(&self, dataset_ref: &DatasetRef) -> Result<Option<Type>, QueryError> {
         let ctx = self
             .session_context(QueryOptions::default())
-            .map_err(|e| QueryError::Internal(e))?;
+            .map_err(QueryError::Internal)?;
         self.get_schema_impl(&ctx, dataset_ref).await
     }
 
@@ -413,10 +413,9 @@ impl KamuSchema {
                     .check_action_allowed(&hdl, auth::DatasetAction::Read)
                     .await
                     .is_ok()
+                    && self.has_data(&hdl).await.unwrap()
                 {
-                    if self.has_data(&hdl).await.unwrap() {
-                        res.push(hdl.alias.to_string())
-                    }
+                    res.push(hdl.alias.to_string())
                 }
             }
 
@@ -562,7 +561,7 @@ async fn read_data_slice_metadata(
     data_slice_store_path: &object_store::path::Path,
 ) -> Result<Arc<ParquetMetaData>, QueryError> {
     let object_meta = object_store
-        .head(&data_slice_store_path)
+        .head(data_slice_store_path)
         .await
         .map_err(|e| {
             tracing::error!(

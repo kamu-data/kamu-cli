@@ -142,7 +142,7 @@ impl IpfsClient {
             let (scheme, cid) = stdout
                 .trim()
                 .trim_start_matches('/')
-                .split_once("/")
+                .split_once('/')
                 .unwrap();
             assert_eq!(scheme, "ipfs");
             Ok(Some(cid.to_owned()))
@@ -205,18 +205,9 @@ pub struct AddOptions<'a> {
     pub ignore: Option<&'a [&'a str]>,
 }
 
+#[derive(Default)]
 pub struct PublishOptions<'a> {
     pub key: Option<&'a str>,
     pub allow_offline: Option<bool>,
     pub resolve: Option<bool>,
-}
-
-impl Default for PublishOptions<'_> {
-    fn default() -> Self {
-        Self {
-            key: None,
-            allow_offline: None,
-            resolve: None,
-        }
-    }
 }

@@ -43,7 +43,7 @@ impl ParquetWriterHelper {
             None,
         )?;
 
-        arrow_writer.write(&record_batch)?;
+        arrow_writer.write(record_batch)?;
         arrow_writer.close()?;
 
         Ok(())

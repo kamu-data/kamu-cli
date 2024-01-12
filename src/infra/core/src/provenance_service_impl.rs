@@ -43,7 +43,7 @@ impl ProvenanceServiceImpl {
         visitor: &mut dyn LineageVisitor,
     ) -> Result<(), GetLineageError> {
         self.dataset_action_authorizer
-            .check_action_allowed(&dataset_handle, auth::DatasetAction::Read)
+            .check_action_allowed(dataset_handle, auth::DatasetAction::Read)
             .await?;
 
         if let Some(dataset) = self
@@ -203,14 +203,14 @@ pub struct DefaultStyle;
 
 impl DotStyle for DefaultStyle {
     fn root_style() -> String {
-        format!("style=filled, fillcolor=darkolivegreen1")
+        "style=filled, fillcolor=darkolivegreen1".to_string()
     }
 
     fn derivative_style() -> String {
-        format!("style=filled, fillcolor=lightblue")
+        "style=filled, fillcolor=lightblue".to_string()
     }
 
     fn remote_style() -> String {
-        format!("style=filled, fillcolor=gray")
+        "style=filled, fillcolor=gray".to_string()
     }
 }

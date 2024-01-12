@@ -87,7 +87,7 @@ impl DatasetRepositoryLocalFs {
         &self,
         dataset_handle: &DatasetHandle,
     ) -> Result<impl Dataset, InternalError> {
-        let layout = DatasetLayout::new(self.storage_strategy.get_dataset_path(&dataset_handle));
+        let layout = DatasetLayout::new(self.storage_strategy.get_dataset_path(dataset_handle));
         Ok(DatasetFactoryImpl::get_local_fs(
             layout,
             self.event_bus.clone(),
@@ -146,7 +146,7 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
             DatasetRef::Handle(h) => Ok(h.clone()),
             DatasetRef::Alias(alias) => self
                 .storage_strategy
-                .resolve_dataset_alias(&alias)
+                .resolve_dataset_alias(alias)
                 .await
                 .map_err(|e| match e {
                     ResolveDatasetError::Internal(e) => GetDatasetError::Internal(e),
@@ -164,11 +164,11 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
     }
 
     // TODO: PERF: Resolving handles currently involves reading summary files
-    fn get_all_datasets<'s>(&'s self) -> DatasetHandleStream<'s> {
+    fn get_all_datasets(&self) -> DatasetHandleStream<'_> {
         self.storage_strategy.get_all_datasets()
     }
 
-    fn get_datasets_by_owner<'s>(&'s self, account_name: AccountName) -> DatasetHandleStream<'s> {
+    fn get_datasets_by_owner(&self, account_name: AccountName) -> DatasetHandleStream<'_> {
         self.storage_strategy.get_datasets_by_owner(account_name)
     }
 
@@ -399,9 +399,9 @@ trait DatasetStorageStrategy: Sync + Send {
 
     fn get_dataset_path(&self, dataset_handle: &DatasetHandle) -> PathBuf;
 
-    fn get_all_datasets<'s>(&'s self) -> DatasetHandleStream<'s>;
+    fn get_all_datasets(&self) -> DatasetHandleStream<'_>;
 
-    fn get_datasets_by_owner<'s>(&'s self, account_name: AccountName) -> DatasetHandleStream<'s>;
+    fn get_datasets_by_owner(&self, account_name: AccountName) -> DatasetHandleStream<'_>;
 
     async fn resolve_dataset_alias(
         &self,
@@ -462,7 +462,7 @@ impl DatasetSingleTenantStorageStrategy {
     }
 
     fn dataset_path_impl(&self, dataset_alias: &DatasetAlias) -> PathBuf {
-        let dataset_name = self.dataset_name(&dataset_alias);
+        let dataset_name = self.dataset_name(dataset_alias);
         self.root.join(dataset_name)
     }
 
@@ -498,14 +498,14 @@ impl DatasetStorageStrategy for DatasetSingleTenantStorageStrategy {
         self.dataset_path_impl(&dataset_handle.alias)
     }
 
-    fn get_all_datasets<'s>(&'s self) -> DatasetHandleStream<'s> {
+    fn get_all_datasets(&self) -> DatasetHandleStream<'_> {
         Box::pin(async_stream::try_stream! {
             let read_dataset_dir = std::fs::read_dir(&self.root).int_err()?;
 
             for r_dataset_dir in read_dataset_dir {
                 let dataset_dir_entry = r_dataset_dir.int_err()?;
                 if let Some(s) = dataset_dir_entry.file_name().to_str() {
-                    if s.starts_with(".") {
+                    if s.starts_with('.') {
                         continue;
                     }
                 }
@@ -520,7 +520,7 @@ impl DatasetStorageStrategy for DatasetSingleTenantStorageStrategy {
         })
     }
 
-    fn get_datasets_by_owner<'s>(&'s self, account_name: AccountName) -> DatasetHandleStream<'s> {
+    fn get_datasets_by_owner(&self, account_name: AccountName) -> DatasetHandleStream<'_> {
         if account_name == DEFAULT_ACCOUNT_NAME {
             self.get_all_datasets()
         } else {
@@ -538,7 +538,7 @@ impl DatasetStorageStrategy for DatasetSingleTenantStorageStrategy {
             "Multi-tenant refs shouldn't have reached down to here with earlier validations"
         );
 
-        let dataset_path = self.dataset_path_impl(&dataset_alias);
+        let dataset_path = self.dataset_path_impl(dataset_alias);
         if !dataset_path.exists() {
             return Err(ResolveDatasetError::NotFound(DatasetNotFoundError {
                 dataset_ref: dataset_alias.as_local_ref(),
@@ -560,7 +560,7 @@ impl DatasetStorageStrategy for DatasetSingleTenantStorageStrategy {
         for r_dataset_dir in read_dataset_dir {
             let dataset_dir_entry = r_dataset_dir.int_err()?;
             if let Some(s) = dataset_dir_entry.file_name().to_str() {
-                if s.starts_with(".") {
+                if s.starts_with('.') {
                     continue;
                 }
             }
@@ -601,7 +601,7 @@ impl DatasetStorageStrategy for DatasetSingleTenantStorageStrategy {
         new_name: &DatasetName,
     ) -> Result<(), InternalError> {
         let old_dataset_path = self.get_dataset_path(dataset_handle);
-        let new_dataset_path = old_dataset_path.parent().unwrap().join(&new_name);
+        let new_dataset_path = old_dataset_path.parent().unwrap().join(new_name);
         std::fs::rename(old_dataset_path, new_dataset_path).int_err()?;
         Ok(())
     }
@@ -694,7 +694,7 @@ impl DatasetMultiTenantStorageStrategy {
             for r_dataset_dir in read_dataset_dir {
                 let dataset_dir_entry = r_dataset_dir.int_err()?;
                 if let Some(s) = dataset_dir_entry.file_name().to_str() {
-                    if s.starts_with(".") {
+                    if s.starts_with('.') {
                         continue;
                     }
                 }
@@ -737,14 +737,14 @@ impl DatasetStorageStrategy for DatasetMultiTenantStorageStrategy {
             .join(dataset_handle.id.as_multibase().to_stack_string())
     }
 
-    fn get_all_datasets<'s>(&'s self) -> DatasetHandleStream<'s> {
+    fn get_all_datasets(&self) -> DatasetHandleStream<'_> {
         Box::pin(async_stream::try_stream! {
             let read_account_dir = std::fs::read_dir(&self.root).int_err()?;
 
             for r_account_dir in read_account_dir {
                 let account_dir_entry = r_account_dir.int_err()?;
                 if let Some(s) = account_dir_entry.file_name().to_str() {
-                    if s.starts_with(".") {
+                    if s.starts_with('.') {
                         continue;
                     }
                 }
@@ -763,7 +763,7 @@ impl DatasetStorageStrategy for DatasetMultiTenantStorageStrategy {
         })
     }
 
-    fn get_datasets_by_owner<'s>(&'s self, account_name: AccountName) -> DatasetHandleStream<'s> {
+    fn get_datasets_by_owner(&self, account_name: AccountName) -> DatasetHandleStream<'_> {
         Box::pin(async_stream::try_stream! {
             let account_dir_path = self.root.join(account_name.clone());
             if !account_dir_path.is_dir() {
@@ -792,7 +792,7 @@ impl DatasetStorageStrategy for DatasetMultiTenantStorageStrategy {
             for r_dataset_dir in read_dataset_dir {
                 let dataset_dir_entry = r_dataset_dir.int_err()?;
                 if let Some(s) = dataset_dir_entry.file_name().to_str() {
-                    if s.starts_with(".") {
+                    if s.starts_with('.') {
                         continue;
                     }
                 }
@@ -808,7 +808,7 @@ impl DatasetStorageStrategy for DatasetMultiTenantStorageStrategy {
 
                 let candidate_dataset_alias = self
                     .attempt_resolving_dataset_alias_via_path(
-                        &effective_account_name,
+                        effective_account_name,
                         &dataset_path,
                         &dataset_id,
                     )
@@ -835,7 +835,7 @@ impl DatasetStorageStrategy for DatasetMultiTenantStorageStrategy {
         for r_account_dir in read_account_dir {
             let account_dir_entry = r_account_dir.int_err()?;
             if let Some(s) = account_dir_entry.file_name().to_str() {
-                if s.starts_with(".") {
+                if s.starts_with('.') {
                     continue;
                 }
             }

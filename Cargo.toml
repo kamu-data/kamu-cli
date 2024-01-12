@@ -80,6 +80,7 @@ publish = false
 
 [workspace.lints.clippy]
 new_without_default = "allow"
+too_many_arguments = "allow"
 
 
 [profile.dev]

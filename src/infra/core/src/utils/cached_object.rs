@@ -103,7 +103,7 @@ impl CachedObject {
             ObjectState::Temp {
                 _temp_dir,
                 temp_file_path,
-            } => &temp_file_path,
+            } => temp_file_path,
         }
     }
 }

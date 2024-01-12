@@ -65,7 +65,7 @@ impl PushIngestServiceImpl {
         media_type: Option<MediaType>,
         listener: Arc<dyn PushIngestListener>,
     ) -> Result<PushIngestResult, PushIngestError> {
-        let dataset_handle = self.dataset_repo.resolve_dataset_ref(&dataset_ref).await?;
+        let dataset_handle = self.dataset_repo.resolve_dataset_ref(dataset_ref).await?;
 
         self.dataset_action_authorizer
             .check_action_allowed(&dataset_handle, auth::DatasetAction::Write)
@@ -180,8 +180,8 @@ impl PushIngestServiceImpl {
             .stage(
                 df,
                 WriteDataOpts {
-                    system_time: args.system_time.clone(),
-                    source_event_time: args.system_time.clone(),
+                    system_time: args.system_time,
+                    source_event_time: args.system_time,
                     new_watermark: None,
                     new_source_state: None, // TODO: Support storing ingest source state
                     data_staging_path,
@@ -297,7 +297,7 @@ impl PushIngestServiceImpl {
             .get_reader(args.ctx.clone(), conf, temp_path)
             .await?;
 
-        let df = reader.read(&input_data_path).await?;
+        let df = reader.read(input_data_path).await?;
 
         Ok(Some(df))
     }

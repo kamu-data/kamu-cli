@@ -48,7 +48,7 @@ impl NamedObjectRepository for NamedObjectRepositoryS3 {
                 GetObjectError::NoSuchKey(_) => Err(GetNamedError::NotFound(NotFoundError {
                     name: name.to_owned(),
                 })),
-                err @ _ => Err(err.int_err().into()),
+                err => Err(err.int_err().into()),
             },
         }?;
 
@@ -70,7 +70,7 @@ impl NamedObjectRepository for NamedObjectRepositoryS3 {
             Ok(_) => {}
             Err(err) => match err.into_service_error() {
                 // TODO: Detect credentials error
-                err @ _ => return Err(err.int_err().into()),
+                err => return Err(err.int_err().into()),
             },
         }
 
@@ -86,7 +86,7 @@ impl NamedObjectRepository for NamedObjectRepositoryS3 {
             Ok(_) => {}
             Err(err) => match err.into_service_error() {
                 // TODO: Detect credentials error
-                err @ _ => return Err(err.int_err().into()),
+                err => return Err(err.int_err().into()),
             },
         }
 

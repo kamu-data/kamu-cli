@@ -37,7 +37,7 @@ impl ResourceLoaderImpl {
                 let bytes = response.bytes().await.int_err()?;
                 YamlDatasetSnapshotDeserializer
                     .read_manifest(&bytes)
-                    .map_err(|e| ResourceError::serde(e))
+                    .map_err(ResourceError::serde)
             }
             Err(err) if err.status() == Some(http::StatusCode::NOT_FOUND) => {
                 Err(ResourceError::not_found(url.as_str().to_owned(), None))
@@ -59,7 +59,7 @@ impl ResourceLoader for ResourceLoaderImpl {
         let buffer = std::fs::read(path).int_err()?;
         let snapshot = YamlDatasetSnapshotDeserializer
             .read_manifest(&buffer)
-            .map_err(|e| ResourceError::serde(e))?;
+            .map_err(ResourceError::serde)?;
         Ok(snapshot)
     }
 

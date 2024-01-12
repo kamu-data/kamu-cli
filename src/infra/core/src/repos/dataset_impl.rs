@@ -135,7 +135,7 @@ where
     ) -> Result<UpdateSummaryIncrement, GetSummaryError> {
         let mut block_stream =
             self.metadata_chain
-                .iter_blocks_interval(&current_head, last_seen, true);
+                .iter_blocks_interval(current_head, last_seen, true);
 
         use tokio_stream::StreamExt;
         let mut increment: UpdateSummaryIncrement = UpdateSummaryIncrement::default();
@@ -163,13 +163,13 @@ where
 
                     if let Some(output_data) = add_data.new_data {
                         let iv = output_data.offset_interval;
-                        increment.seen_num_records += (iv.end - iv.start + 1) as u64;
+                        increment.seen_num_records += (iv.end - iv.start + 1);
 
-                        increment.seen_data_size += output_data.size as u64;
+                        increment.seen_data_size += output_data.size;
                     }
 
                     if let Some(checkpoint) = add_data.new_checkpoint {
-                        increment.seen_checkpoints_size += checkpoint.size as u64;
+                        increment.seen_checkpoints_size += checkpoint.size;
                     }
                 }
                 MetadataEvent::ExecuteTransform(execute_transform) => {
@@ -177,13 +177,13 @@ where
 
                     if let Some(output_data) = execute_transform.new_data {
                         let iv = output_data.offset_interval;
-                        increment.seen_num_records += (iv.end - iv.start + 1) as u64;
+                        increment.seen_num_records += (iv.end - iv.start + 1);
 
-                        increment.seen_data_size += output_data.size as u64;
+                        increment.seen_data_size += output_data.size;
                     }
 
                     if let Some(checkpoint) = execute_transform.new_checkpoint {
-                        increment.seen_checkpoints_size += checkpoint.size as u64;
+                        increment.seen_checkpoints_size += checkpoint.size;
                     }
                 }
                 MetadataEvent::SetDataSchema(_)
@@ -314,7 +314,7 @@ impl UpdateSummaryIncrement {
     fn seen_chain_beginning(&self) -> bool {
         // Seed blocks are guaranteed to appear only once in a chain, and only at the
         // very beginning
-        return self.seen_id.is_some();
+        self.seen_id.is_some()
     }
 
     fn into_summary(self) -> DatasetSummary {
@@ -434,7 +434,7 @@ where
         let block = MetadataBlock {
             prev_block_hash: prev_block_hash.clone(),
             sequence_number,
-            system_time: opts.system_time.unwrap_or_else(|| Utc::now()),
+            system_time: opts.system_time.unwrap_or_else(Utc::now),
             event,
         };
 

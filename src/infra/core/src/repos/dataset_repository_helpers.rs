@@ -52,7 +52,8 @@ pub async fn create_dataset_from_snapshot_impl(
             MetadataEvent::SetPollingSource(e) => {
                 if snapshot.kind != DatasetKind::Root {
                     Err(InvalidSnapshotError {
-                        reason: format!("SetPollingSource event is only allowed on root datasets"),
+                        reason: "SetPollingSource event is only allowed on root datasets"
+                            .to_string(),
                     }
                     .into())
                 } else {
@@ -65,7 +66,7 @@ pub async fn create_dataset_from_snapshot_impl(
             MetadataEvent::AddPushSource(e) => {
                 if snapshot.kind != DatasetKind::Root {
                     Err(InvalidSnapshotError {
-                        reason: format!("AddPushSource event is only allowed on root datasets"),
+                        reason: "AddPushSource event is only allowed on root datasets".to_string(),
                     }
                     .into())
                 } else {

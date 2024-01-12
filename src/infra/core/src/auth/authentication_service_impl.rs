@@ -60,7 +60,7 @@ impl AuthenticationServiceImpl {
         time_source: Arc<dyn SystemTimeSource>,
     ) -> Self {
         let kamu_jwt_secret = std::env::var(ENV_VAR_KAMU_JWT_SECRET)
-            .expect(format!("{} env var is not set", ENV_VAR_KAMU_JWT_SECRET).as_str());
+            .unwrap_or_else(|_| panic!("{} env var is not set", ENV_VAR_KAMU_JWT_SECRET));
 
         let mut authentication_providers_by_method = HashMap::new();
 
@@ -185,7 +185,7 @@ impl AuthenticationService for AuthenticationServiceImpl {
     ) -> Result<AccountInfo, GetAccountInfoError> {
         let decoded_access_token = self
             .decode_access_token(access_token)
-            .map_err(|e| GetAccountInfoError::AccessToken(e))?;
+            .map_err(GetAccountInfoError::AccessToken)?;
 
         let provider = self
             .resolve_authentication_provider(decoded_access_token.login_method.as_str())
@@ -204,7 +204,7 @@ impl AuthenticationService for AuthenticationServiceImpl {
         account_name: &'a AccountName,
     ) -> Result<Option<AccountInfo>, InternalError> {
         for provider in self.authentication_providers.iter() {
-            let maybe_account_info = provider.find_account_info_by_name(&account_name).await?;
+            let maybe_account_info = provider.find_account_info_by_name(account_name).await?;
             if maybe_account_info.is_some() {
                 return Ok(maybe_account_info);
             }
