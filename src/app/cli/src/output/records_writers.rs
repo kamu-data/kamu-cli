@@ -26,11 +26,17 @@ use prettytable::{Cell, Row, Table};
 /////////////////////////////////////////////////////////////////////////////////////////
 
 macro_rules! format_typed {
-    ($array_type:ty, $item_type: ty, $array: ident, $value_fmt: ident, $row: ident) => {{
+    ($array_type:ty, $item_type: ty, $actual_type: expr, $array: ident, $value_fmt: ident, $row: ident) => {{
         let t_array = $array.as_any().downcast_ref::<$array_type>().unwrap();
         let t_value_fmt = $value_fmt
             .downcast_ref::<fn($item_type) -> String>()
-            .unwrap();
+            .unwrap_or_else(|| {
+                panic!(
+                    "Expected formatter for type {} but for {} instead",
+                    stringify!($item_type),
+                    $actual_type,
+                )
+            });
         t_value_fmt(t_array.value($row))
     }};
 }
@@ -158,7 +164,6 @@ pub struct ColumnFormat {
     null_value: Option<String>,
     binary_placeholder: Option<String>,
     max_len: Option<usize>,
-    //value_fmt: Option<Box<dyn Any>>,
     value_fmt: Option<Box<dyn Fn(&ArrayRef, usize) -> String>>,
 }
 
@@ -205,11 +210,11 @@ impl ColumnFormat {
         }
     }
 
-    pub fn with_value_fmt_t<T: 'static>(self, value_fmt: fn(T) -> String) -> Self {
-        let value_fmt: Box<dyn Any> = Box::new(value_fmt);
+    pub fn with_value_fmt_t<T: 'static>(self, value_fmt_t: fn(T) -> String) -> Self {
+        let value_fmt_t: Box<dyn Any> = Box::new(value_fmt_t);
         Self {
             value_fmt: Some(Box::new(move |array, row| {
-                Self::value_fmt_t(array, row, &value_fmt)
+                Self::value_fmt_t(array, row, value_fmt_t.as_ref(), std::any::type_name::<T>())
             })),
             ..self
         }
@@ -219,21 +224,26 @@ impl ColumnFormat {
         self.style_spec.as_ref().map(|s| s.as_str())
     }
 
-    fn value_fmt_t(array: &ArrayRef, row: usize, value_fmt: &dyn Any) -> String {
+    fn value_fmt_t(
+        array: &ArrayRef,
+        row: usize,
+        value_fmt: &dyn Any,
+        type_name: &'static str,
+    ) -> String {
         use datafusion::arrow::array::*;
         use datafusion::arrow::datatypes::TimeUnit;
 
         match array.data_type() {
-            DataType::Int8 => format_typed!(Int8Array, i8, array, value_fmt, row),
-            DataType::Int16 => format_typed!(Int16Array, i16, array, value_fmt, row),
-            DataType::Int32 => format_typed!(Int32Array, i32, array, value_fmt, row),
-            DataType::Int64 => format_typed!(Int64Array, i64, array, value_fmt, row),
-            DataType::UInt8 => format_typed!(UInt8Array, u8, array, value_fmt, row),
-            DataType::UInt16 => format_typed!(UInt16Array, u16, array, value_fmt, row),
-            DataType::UInt32 => format_typed!(UInt32Array, u32, array, value_fmt, row),
-            DataType::UInt64 => format_typed!(UInt64Array, u64, array, value_fmt, row),
-            DataType::Float32 => format_typed!(Float32Array, f32, array, value_fmt, row),
-            DataType::Float64 => format_typed!(Float64Array, f64, array, value_fmt, row),
+            DataType::Int8 => format_typed!(Int8Array, i8, type_name, array, value_fmt, row),
+            DataType::Int16 => format_typed!(Int16Array, i16, type_name, array, value_fmt, row),
+            DataType::Int32 => format_typed!(Int32Array, i32, type_name, array, value_fmt, row),
+            DataType::Int64 => format_typed!(Int64Array, i64, type_name, array, value_fmt, row),
+            DataType::UInt8 => format_typed!(UInt8Array, u8, type_name, array, value_fmt, row),
+            DataType::UInt16 => format_typed!(UInt16Array, u16, type_name, array, value_fmt, row),
+            DataType::UInt32 => format_typed!(UInt32Array, u32, type_name, array, value_fmt, row),
+            DataType::UInt64 => format_typed!(UInt64Array, u64, type_name, array, value_fmt, row),
+            DataType::Float32 => format_typed!(Float32Array, f32, type_name, array, value_fmt, row),
+            DataType::Float64 => format_typed!(Float64Array, f64, type_name, array, value_fmt, row),
             DataType::Timestamp(time_unit, _) => match time_unit {
                 TimeUnit::Microsecond => {
                     let t_array = array
@@ -242,7 +252,12 @@ impl ColumnFormat {
                         .unwrap();
                     let t_value_fmt = value_fmt
                         .downcast_ref::<fn(DateTime<Utc>) -> String>()
-                        .unwrap();
+                        .unwrap_or_else(|| {
+                            panic!(
+                                "Expected formatter for type DateTime<Utc> but for {} instead",
+                                type_name,
+                            )
+                        });
                     let value = t_array.value_as_datetime(row).unwrap();
                     let value = DateTime::from_naive_utc_and_offset(value, Utc);
                     t_value_fmt(value)
@@ -268,7 +283,8 @@ impl Default for ColumnFormat {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct TableWriter {
+pub struct TableWriter<W> {
+    out: W,
     format: RecordsFormat,
     header_written: bool,
     rows_written: usize,
@@ -276,14 +292,15 @@ pub struct TableWriter {
     table: Table,
 }
 
-impl TableWriter {
+impl<W> TableWriter<W> {
     // TODO: prettytable is hard to print out into a generic Writer
     // as it wants tty output to implement term::Terminal trait
-    pub fn new(format: RecordsFormat) -> Self {
+    pub fn new(format: RecordsFormat, out: W) -> Self {
         let mut table = Table::new();
         table.set_format(Self::get_table_format());
 
         Self {
+            out,
             format,
             header_written: false,
             rows_written: 0,
@@ -312,7 +329,10 @@ impl TableWriter {
     }
 }
 
-impl RecordsWriter for TableWriter {
+impl<W> RecordsWriter for TableWriter<W>
+where
+    W: std::io::Write,
+{
     fn write_batch(&mut self, records: &RecordBatch) -> Result<(), std::io::Error> {
         if !self.header_written {
             let mut header = Vec::new();
@@ -350,7 +370,7 @@ impl RecordsWriter for TableWriter {
             }
         }
 
-        self.table.printstd();
+        self.table.print(&mut self.out)?;
         Ok(())
     }
 }

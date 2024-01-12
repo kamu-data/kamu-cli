@@ -13,5 +13,6 @@ mod test_complete_command;
 mod test_di_graph;
 mod test_ingest_command;
 mod test_new_dataset_command;
+mod test_output;
 mod test_system_info_command;
 mod test_workspace_svc;

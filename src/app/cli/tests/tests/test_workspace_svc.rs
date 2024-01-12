@@ -132,11 +132,13 @@ async fn test_workspace_upgrade() {
         }) if err.source().unwrap().is::<WorkspaceUpgradeRequired>()
     );
 
+    // TODO: Restore this test upon the first upgrade post V5 breaking changes
+    /*
     kamu.execute(["system", "upgrade-workspace"]).await.unwrap();
 
     assert_eq!(
         workspace_svc.workspace_version().unwrap(),
-        Some(WorkspaceLayout::VERSION)
+        Some(WorkspaceVersion::LATEST)
     );
 
     assert!(temp_dir.path().join(".kamu/version").is_file());
@@ -148,4 +150,5 @@ async fn test_workspace_upgrade() {
         .is_file());
 
     kamu.execute(["list"]).await.unwrap();
+    */
 }

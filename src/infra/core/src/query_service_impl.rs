@@ -162,6 +162,18 @@ impl QueryService for QueryServiceImpl {
             .get_dataset(&dataset_handle.as_local_ref())
             .await?;
 
+        let summary = dataset
+            .get_summary(GetSummaryOpts::default())
+            .await
+            .int_err()?;
+
+        if summary.num_records == 0 {
+            return Err(DatasetSchemaNotAvailableError {
+                dataset_ref: dataset_ref.clone(),
+            }
+            .into());
+        }
+
         // TODO: PERF: Avoid full scan of metadata
         let vocab: DatasetVocabulary = dataset
             .as_metadata_chain()

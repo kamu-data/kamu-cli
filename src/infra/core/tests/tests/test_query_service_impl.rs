@@ -321,6 +321,31 @@ async fn test_dataset_tail_s3() {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_log::test(tokio::test)]
+async fn test_dataset_tail_empty_dataset() {
+    let tempdir = tempfile::tempdir().unwrap();
+    let catalog = create_catalog_with_local_workspace(
+        tempdir.path(),
+        MockDatasetActionAuthorizer::new().expect_check_read_a_dataset(2),
+    )
+    .await;
+
+    let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
+    dataset_repo
+        .create_dataset_from_seed(
+            &"foo".try_into().unwrap(),
+            MetadataFactory::seed(DatasetKind::Root).build(),
+        )
+        .await
+        .unwrap();
+
+    let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
+    let res = query_svc.tail(&"foo".try_into().unwrap(), 0, 10).await;
+    assert_matches!(res, Err(QueryError::DatasetSchemaNotAvailable(_)));
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
 async fn test_dataset_tail_unauthorized_common(catalog: dill::Catalog, tempdir: &TempDir) {
     let dataset_alias = create_test_dataset(&catalog, tempdir.path()).await;
     let dataset_ref = DatasetRef::from(dataset_alias);
