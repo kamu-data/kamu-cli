@@ -100,7 +100,7 @@ impl WorkspaceService {
 
     /// Whether workspace requires and upgrade
     pub fn is_upgrade_needed(&self) -> Result<bool, InternalError> {
-        Ok(self.workspace_version()? != Some(WorkspaceLayout::VERSION))
+        Ok(self.workspace_version()? != Some(WorkspaceVersion::LATEST))
     }
 
     /// Returns the version of the current workspace
@@ -122,7 +122,7 @@ impl WorkspaceService {
 
     /// Returns the version that code expects to function correctly
     pub fn latest_supported_version(&self) -> WorkspaceVersion {
-        WorkspaceLayout::VERSION
+        WorkspaceVersion::LATEST
     }
 
     /// Perform an upgrade of the workspace if necessary
@@ -132,7 +132,7 @@ impl WorkspaceService {
             .expect("Upgrade called when not in workspace");
 
         let mut current_version = prev_version;
-        let new_version = WorkspaceLayout::VERSION;
+        let new_version = WorkspaceVersion::LATEST;
 
         if current_version == new_version {
             return Ok(WorkspaceUpgradeResult {
@@ -151,12 +151,16 @@ impl WorkspaceService {
             );
 
             match current_version {
-                WorkspaceVersion::V0_Initial => self.upgrade_0_to_1()?,
-                WorkspaceVersion::V1_WorkspaceCacheDir => self.upgrade_1_to_2()?,
-                WorkspaceVersion::V2_DatasetConfig => self.upgrade_2_to_3()?,
-                WorkspaceVersion::V3_SavepointCreatedAt => self.upgrade_3_to_4()?,
-                _ => unreachable!(),
-            }
+                WorkspaceVersion::V0_Initial => self.upgrade_0_to_1(),
+                WorkspaceVersion::V1_WorkspaceCacheDir => self.upgrade_1_to_2(),
+                WorkspaceVersion::V2_DatasetConfig => self.upgrade_2_to_3(),
+                WorkspaceVersion::V3_SavepointCreatedAt => self.upgrade_3_to_4(),
+                WorkspaceVersion::V4_SavepointZeroCopy => self.upgrade_4_to_5(),
+                WorkspaceVersion::V5_BreakingMetadataChanges => panic!("Already of latest version"),
+                WorkspaceVersion::Unknown(_) => {
+                    Err(WorkspaceFutureVersionError::new(current_version, new_version).into())
+                }
+            }?;
 
             current_version = current_version.next();
             std::fs::write(
@@ -172,7 +176,7 @@ impl WorkspaceService {
         })
     }
 
-    fn upgrade_0_to_1(&self) -> Result<(), InternalError> {
+    fn upgrade_0_to_1(&self) -> Result<(), WorkspaceUpgradeError> {
         for entry in self.workspace_layout.datasets_dir.read_dir().int_err()? {
             let dataset_dir = entry.int_err()?;
             let cache_dir = dataset_dir.path().join("cache");
@@ -185,7 +189,7 @@ impl WorkspaceService {
         Ok(())
     }
 
-    fn upgrade_1_to_2(&self) -> Result<(), InternalError> {
+    fn upgrade_1_to_2(&self) -> Result<(), WorkspaceUpgradeError> {
         for entry in self.workspace_layout.datasets_dir.read_dir().int_err()? {
             let dataset_dir = entry.int_err()?;
             let dataset_config_path = dataset_dir.path().join("config");
@@ -207,7 +211,7 @@ impl WorkspaceService {
         Ok(())
     }
 
-    fn upgrade_2_to_3(&self) -> Result<(), InternalError> {
+    fn upgrade_2_to_3(&self) -> Result<(), WorkspaceUpgradeError> {
         if self.workspace_layout.cache_dir.exists() {
             tracing::info!("Clearing the cache directory");
 
@@ -223,7 +227,7 @@ impl WorkspaceService {
         Ok(())
     }
 
-    fn upgrade_3_to_4(&self) -> Result<(), InternalError> {
+    fn upgrade_3_to_4(&self) -> Result<(), WorkspaceUpgradeError> {
         if self.workspace_layout.cache_dir.exists() {
             tracing::info!("Clearing the cache directory");
 
@@ -237,6 +241,18 @@ impl WorkspaceService {
             }
         }
         Ok(())
+    }
+
+    fn upgrade_4_to_5(&self) -> Result<(), WorkspaceUpgradeError> {
+        Err(WorkspaceUpgradeImpossibleError::new(
+            "This version of kamu contains major compatibility breaking changes in metadata and \
+             data schemas. In an effort to continue evolving the protocol we made a decision to \
+             forgo an expensive and long transitional period and introduced these changes without \
+             a migration procedure. Please delete `.kamu` directory manually and re-create your \
+             workspace. We apologise for the inconvenience and will work on improving stabiliy of \
+             our releases.",
+        )
+        .into())
     }
 }
 
@@ -253,11 +269,29 @@ pub enum WorkspaceUpgradeError {
     #[error(transparent)]
     FutureVersion(#[from] WorkspaceFutureVersionError),
     #[error(transparent)]
+    UpgradeImpossible(#[from] WorkspaceUpgradeImpossibleError),
+    #[error(transparent)]
     Internal(
         #[from]
         #[backtrace]
         InternalError,
     ),
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(thiserror::Error, Debug)]
+#[error("{message}")]
+pub struct WorkspaceUpgradeImpossibleError {
+    message: String,
+}
+
+impl WorkspaceUpgradeImpossibleError {
+    pub fn new(message: impl Into<String>) -> Self {
+        Self {
+            message: message.into(),
+        }
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -270,6 +304,18 @@ pub enum WorkspaceUpgradeError {
 pub struct WorkspaceFutureVersionError {
     pub workspace_version: WorkspaceVersion,
     pub latest_supported_version: WorkspaceVersion,
+}
+
+impl WorkspaceFutureVersionError {
+    pub fn new(
+        workspace_version: WorkspaceVersion,
+        latest_supported_version: WorkspaceVersion,
+    ) -> Self {
+        Self {
+            workspace_version,
+            latest_supported_version,
+        }
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
