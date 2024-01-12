@@ -120,24 +120,23 @@ impl VerificationServiceImpl {
                             },
                         ));
                     } else {
-                        if !check_logical_hashes {
-                            break;
-                        }
                         // Derivative data may be replayed and produce different binary file
                         // but data must have same logical hash to be valid.
-                        let logical_hash_actual =
-                            data_hashing_helper.logical_hash().await.int_err()?;
+                        if check_logical_hashes {
+                            let logical_hash_actual =
+                                data_hashing_helper.logical_hash().await.int_err()?;
 
-                        if logical_hash_actual != output_slice.logical_hash {
-                            return Err(VerificationError::DataDoesNotMatchMetadata(
-                                DataDoesNotMatchMetadata {
-                                    block_hash,
-                                    error: DataVerificationError::LogicalHashMismatch {
-                                        expected: output_slice.logical_hash.clone(),
-                                        actual: logical_hash_actual,
+                            if logical_hash_actual != output_slice.logical_hash {
+                                return Err(VerificationError::DataDoesNotMatchMetadata(
+                                    DataDoesNotMatchMetadata {
+                                        block_hash,
+                                        error: DataVerificationError::LogicalHashMismatch {
+                                            expected: output_slice.logical_hash.clone(),
+                                            actual: logical_hash_actual,
+                                        },
                                     },
-                                },
-                            ));
+                                ));
+                            }
                         }
                     }
                 }

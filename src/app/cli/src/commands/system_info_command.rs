@@ -6,8 +6,6 @@
 // As of the Change Date specified in that file, in accordance with
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
-
-use std::str::FromStr;
 use std::sync::Arc;
 
 use container_runtime::ContainerRuntime;
@@ -16,7 +14,7 @@ use serde_json::Value;
 
 use super::{CLIError, Command};
 use crate::output::*;
-use crate::WorkspaceService;
+use crate::{WorkspaceService, WorkspaceVersion};
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -204,8 +202,12 @@ impl WorkspaceInfo {
             Some(wl) => wl.root_dir.to_str().map(String::from).unwrap(),
             None => "".to_string(),
         };
+        let workspace_version = workspace_svc
+            .workspace_version()
+            .unwrap_or_default()
+            .unwrap_or(WorkspaceVersion::Unknown(0));
         Self {
-            version: workspace_svc.workspace_version().unwrap().unwrap().into(),
+            version: workspace_version.into(),
             root_dir,
         }
     }
@@ -222,15 +224,18 @@ impl ContainerRuntimeInfo {
         let container_info_output = match container_runtime.info().output().await {
             Ok(container_info) => {
                 if container_info.status.success() {
-                    let output = String::from_utf8(container_info.stdout).unwrap();
-                    Value::from_str(output.as_str()).unwrap()
+                    match serde_json::from_slice(&container_info.stdout) {
+                        Ok(res) => res,
+                        Err(_) => {
+                            serde_json::json!({"error":"Unable to parse container runtime info result"})
+                        }
+                    }
                 } else {
-                    Value::from_str("{\"error\":\"Unable to parse container runtime info result\"}")
-                        .unwrap()
+                    serde_json::json!({"error":"Unable to run container runtime info command"})
                 }
             }
             Err(_) => {
-                Value::from_str("{\"error\":\"Unable to fetch container runtime info\"}").unwrap()
+                serde_json::json!({"error":"Unable to fetch container runtime info"})
             }
         };
 
