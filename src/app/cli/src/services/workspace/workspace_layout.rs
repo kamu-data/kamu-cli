@@ -36,8 +36,6 @@ pub struct WorkspaceLayout {
 }
 
 impl WorkspaceLayout {
-    pub const VERSION: WorkspaceVersion = WorkspaceVersion::V4_SavepointZeroCopy;
-
     pub fn new(root: impl Into<PathBuf>) -> Self {
         let root_dir = root.into();
         Self {
@@ -60,7 +58,7 @@ impl WorkspaceLayout {
         std::fs::create_dir(&ws.repos_dir).int_err()?;
         std::fs::create_dir(&ws.cache_dir).int_err()?;
         std::fs::create_dir(&ws.run_info_dir).int_err()?;
-        std::fs::write(&ws.version_path, Self::VERSION.to_string()).int_err()?;
+        std::fs::write(&ws.version_path, WorkspaceVersion::LATEST.to_string()).int_err()?;
 
         // Only save the workspace configuration if it is different from default
         let ws_config = WorkspaceConfig::new(multi_tenant);
@@ -86,10 +84,14 @@ pub enum WorkspaceVersion {
     V3_SavepointCreatedAt,
     // Added a zero-copy ingest for local FS files that affected the savepoint schema
     V4_SavepointZeroCopy,
+    // Breaking changes in metadata and data schemas
+    V5_BreakingMetadataChanges,
     Unknown(u32),
 }
 
 impl WorkspaceVersion {
+    pub const LATEST: WorkspaceVersion = WorkspaceVersion::V5_BreakingMetadataChanges;
+
     pub fn next(&self) -> Self {
         let v: u32 = (*self).into();
         (v + 1).into()
@@ -104,6 +106,7 @@ impl From<u32> for WorkspaceVersion {
             2 => WorkspaceVersion::V2_DatasetConfig,
             3 => WorkspaceVersion::V3_SavepointCreatedAt,
             4 => WorkspaceVersion::V4_SavepointZeroCopy,
+            5 => WorkspaceVersion::V5_BreakingMetadataChanges,
             _ => WorkspaceVersion::Unknown(value),
         }
     }
@@ -117,6 +120,7 @@ impl Into<u32> for WorkspaceVersion {
             Self::V2_DatasetConfig => 2,
             Self::V3_SavepointCreatedAt => 3,
             Self::V4_SavepointZeroCopy => 4,
+            Self::V5_BreakingMetadataChanges => 5,
             Self::Unknown(value) => value,
         }
     }
