@@ -204,7 +204,6 @@ fn test_dataset_refs_conversions() {
     fn takes_ref_any<R: Into<DatasetRefAny>>(_: R) {}
 
     takes_ref_local(DatasetID::new_seeded_ed25519(b"key"));
-    takes_ref_local(DatasetID::new_seeded_ed25519(b"key"));
     takes_ref_local(DatasetName::new_unchecked("bar"));
     takes_ref_local(&DatasetName::new_unchecked("baz"));
     takes_ref_local(DatasetHandle {
@@ -217,11 +216,9 @@ fn test_dataset_refs_conversions() {
     });
 
     takes_ref_remote(DatasetID::new_seeded_ed25519(b"key"));
-    takes_ref_remote(DatasetID::new_seeded_ed25519(b"key"));
     takes_ref_remote(DatasetAliasRemote::try_from("foo/bar").unwrap());
     takes_ref_remote(&DatasetAliasRemote::try_from("foo/bar").unwrap());
 
-    takes_ref_any(DatasetID::new_seeded_ed25519(b"key"));
     takes_ref_any(DatasetID::new_seeded_ed25519(b"key"));
     takes_ref_any(DatasetName::new_unchecked("bar"));
     takes_ref_any(&DatasetName::new_unchecked("baz"));
