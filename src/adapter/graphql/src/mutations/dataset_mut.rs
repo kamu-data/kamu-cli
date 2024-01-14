@@ -130,6 +130,11 @@ impl DatasetMut {
                     new_head: new_head.into(),
                 }))
             }
+            Err(e @ domain::SetWatermarkError::IsDerivative) => {
+                Ok(SetWatermarkResult::IsDerivative(SetWatermarkIsDerivative {
+                    message: e.to_string(),
+                }))
+            }
             Err(e) => Err(e.int_err().into()),
         }
     }
@@ -232,7 +237,7 @@ impl DeleteResultDanglingReference {
 pub enum SetWatermarkResult {
     UpToDate(SetWatermarkUpToDate),
     Updated(SetWatermarkUpdated),
-    NotARootDataset(SetWatermarkNotARootDataset),
+    IsDerivative(SetWatermarkIsDerivative),
 }
 
 #[derive(SimpleObject, Debug, Clone)]
@@ -262,7 +267,7 @@ impl SetWatermarkUpdated {
 }
 
 #[derive(SimpleObject, Debug, Clone)]
-pub struct SetWatermarkNotARootDataset {
+pub struct SetWatermarkIsDerivative {
     pub message: String,
 }
 
