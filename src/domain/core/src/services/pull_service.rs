@@ -50,6 +50,7 @@ pub trait PullService: Send + Sync {
         listener: Option<Arc<dyn PullMultiListener>>,
     ) -> Result<Vec<PullResponse>, InternalError>;
 
+    /// Manually advances the watermark of a root dataset
     async fn set_watermark(
         &self,
         dataset_ref: &DatasetRef,
