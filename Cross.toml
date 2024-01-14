@@ -1,3 +1,5 @@
+# This avoids cross picking up custom linker from ~/.cargo/config.toml
+# See: https://github.com/cross-rs/cross/issues/621
 [build.env]
 passthrough = [
     "CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER=x86_64-linux-gnu-gcc",
