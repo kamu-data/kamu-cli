@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use chrono::{DateTime, Utc};
 use domain::{DeleteDatasetError, RenameDatasetError};
 use kamu_core::{self as domain};
 use opendatafabric as odf;
@@ -106,6 +107,32 @@ impl DatasetMut {
             Err(DeleteDatasetError::Internal(e)) => Err(e.into()),
         }
     }
+
+    /// Manually advances the watermark of a root dataset
+    #[graphql(guard = "LoggedInGuard::new()")]
+    async fn set_watermark(
+        &self,
+        ctx: &Context<'_>,
+        watermark: DateTime<Utc>,
+    ) -> Result<SetWatermarkResult> {
+        let pull_svc = from_catalog::<dyn domain::PullService>(ctx).unwrap();
+        match pull_svc
+            .set_watermark(&self.dataset_handle.as_local_ref(), watermark)
+            .await
+        {
+            Ok(domain::PullResult::UpToDate) => {
+                Ok(SetWatermarkResult::UpToDate(SetWatermarkUpToDate {
+                    _dummy: String::new(),
+                }))
+            }
+            Ok(domain::PullResult::Updated { new_head, .. }) => {
+                Ok(SetWatermarkResult::Updated(SetWatermarkUpdated {
+                    new_head: new_head.into(),
+                }))
+            }
+            Err(e) => Err(e.int_err().into()),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
@@ -196,6 +223,47 @@ impl DeleteResultDanglingReference {
             self.dangling_child_refs.len()
         )
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Interface, Debug, Clone)]
+#[graphql(field(name = "message", ty = "String"))]
+pub enum SetWatermarkResult {
+    UpToDate(SetWatermarkUpToDate),
+    Updated(SetWatermarkUpdated),
+    NotARootDataset(SetWatermarkNotARootDataset),
+}
+
+#[derive(SimpleObject, Debug, Clone)]
+#[graphql(complex)]
+pub struct SetWatermarkUpToDate {
+    pub _dummy: String,
+}
+
+#[ComplexObject]
+impl SetWatermarkUpToDate {
+    async fn message(&self) -> String {
+        "UpToDate".to_string()
+    }
+}
+
+#[derive(SimpleObject, Debug, Clone)]
+#[graphql(complex)]
+pub struct SetWatermarkUpdated {
+    pub new_head: Multihash,
+}
+
+#[ComplexObject]
+impl SetWatermarkUpdated {
+    async fn message(&self) -> String {
+        "Updated".to_string()
+    }
+}
+
+#[derive(SimpleObject, Debug, Clone)]
+pub struct SetWatermarkNotARootDataset {
+    pub message: String,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////

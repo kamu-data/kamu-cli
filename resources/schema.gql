@@ -458,6 +458,10 @@ type DatasetMut {
 	Delete the dataset
 	"""
 	delete: DeleteResult!
+	"""
+	Manually advances the watermark of a root dataset
+	"""
+	setWatermark(watermark: DateTime!): SetWatermarkResult!
 }
 
 scalar DatasetName
@@ -1219,6 +1223,24 @@ type SetVocab {
 	operationTypeColumn: String
 	systemTimeColumn: String
 	eventTimeColumn: String
+}
+
+type SetWatermarkNotARootDataset implements SetWatermarkResult {
+	message: String!
+}
+
+interface SetWatermarkResult {
+	message: String!
+}
+
+type SetWatermarkUpToDate implements SetWatermarkResult {
+	dummy: String!
+	message: String!
+}
+
+type SetWatermarkUpdated implements SetWatermarkResult {
+	newHead: Multihash!
+	message: String!
 }
 
 union SourceCaching = SourceCachingForever
