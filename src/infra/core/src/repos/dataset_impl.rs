@@ -138,8 +138,10 @@ where
                 .iter_blocks_interval(current_head, last_seen, true);
 
         use tokio_stream::StreamExt;
-        let mut increment: UpdateSummaryIncrement = UpdateSummaryIncrement::default();
-        increment.seen_head = Some(current_head.clone());
+        let mut increment: UpdateSummaryIncrement = UpdateSummaryIncrement {
+            seen_head: Some(current_head.clone()),
+            ..Default::default()
+        };
 
         while let Some((_, block)) = block_stream.try_next().await.int_err()? {
             match block.event {

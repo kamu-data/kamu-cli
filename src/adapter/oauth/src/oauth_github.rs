@@ -187,7 +187,7 @@ impl OAuthGithub {
 
     fn store_token_account_info_in_cache(
         &self,
-        access_token: &String,
+        access_token: &str,
         github_account_info: &GithubAccountInfo,
     ) {
         let mut cached_state = self
@@ -195,8 +195,7 @@ impl OAuthGithub {
             .lock()
             .expect("Could not lock cached state");
 
-        cached_state
-            .save_access_token_resolution(access_token.clone(), github_account_info.clone());
+        cached_state.save_access_token_resolution(access_token, github_account_info.clone());
     }
 
     fn find_github_account_info_in_cache(&self, login: &String) -> Option<GithubAccountInfo> {
@@ -310,11 +309,11 @@ impl CachedState {
 
     pub fn save_access_token_resolution(
         &mut self,
-        access_token: String,
+        access_token: &str,
         github_account_info: GithubAccountInfo,
     ) {
         self.accounts_by_access_token
-            .insert(access_token, github_account_info.clone());
+            .insert(access_token.to_string(), github_account_info.clone());
 
         self.save_account_info(github_account_info);
     }

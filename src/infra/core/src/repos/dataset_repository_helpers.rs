@@ -251,7 +251,7 @@ fn normalize_transform(transform: &mut Transform) -> Result<(), CreateDatasetFro
 /// - input datasets are always references by unique IDs
 /// - that query alias is populated (manually or from the initial reference)
 async fn resolve_transform_inputs(
-    inputs: &mut Vec<TransformInput>,
+    inputs: &mut [TransformInput],
     repo: &dyn DatasetRepository,
     output_dataset_ailas: &DatasetAlias,
 ) -> Result<(), CreateDatasetFromSnapshotError> {

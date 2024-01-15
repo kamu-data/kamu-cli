@@ -70,7 +70,7 @@ impl AuthenticationServiceImpl {
             let insert_result = authentication_providers_by_method
                 .insert(login_method, authentication_provider.clone());
 
-            if let Some(_) = insert_result {
+            if insert_result.is_some() {
                 panic!(
                     "Duplicate authentication provider for method {}",
                     login_method

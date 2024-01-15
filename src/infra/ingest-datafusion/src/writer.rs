@@ -215,7 +215,7 @@ impl DataWriterDataFusion {
     // TODO: PERF: This will not scale well as number of blocks grows
     async fn get_all_previous_data(
         &self,
-        prev_data_slices: &Vec<odf::Multihash>,
+        prev_data_slices: &[odf::Multihash],
     ) -> Result<Option<DataFrame>, InternalError> {
         if prev_data_slices.is_empty() {
             return Ok(None);

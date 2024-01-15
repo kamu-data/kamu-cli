@@ -43,7 +43,7 @@ where
     async fn validate_append_prev_block_exists(
         &self,
         new_block: &MetadataBlock,
-        _block_cache: &mut Vec<MetadataBlock>,
+        _block_cache: &mut [MetadataBlock],
     ) -> Result<(), AppendError> {
         if let Some(prev) = &new_block.prev_block_hash {
             match self.obj_repo.contains(prev).await {
@@ -64,7 +64,7 @@ where
     async fn validate_append_sequence_numbers_integrity(
         &self,
         new_block: &MetadataBlock,
-        _block_cache: &mut Vec<MetadataBlock>,
+        _block_cache: &mut [MetadataBlock],
     ) -> Result<(), AppendError> {
         if new_block.prev_block_hash.is_none() {
             if new_block.sequence_number != 0 {
@@ -106,7 +106,7 @@ where
     async fn validate_append_seed_block_order(
         &self,
         new_block: &MetadataBlock,
-        _block_cache: &mut Vec<MetadataBlock>,
+        _block_cache: &mut [MetadataBlock],
     ) -> Result<(), AppendError> {
         match &new_block.event {
             MetadataEvent::Seed(_) if new_block.prev_block_hash.is_none() => Ok(()),
@@ -156,7 +156,7 @@ where
     async fn validate_append_event_logical_structure(
         &self,
         new_block: &MetadataBlock,
-        _block_cache: &mut Vec<MetadataBlock>,
+        _block_cache: &mut [MetadataBlock],
     ) -> Result<(), AppendError> {
         match &new_block.event {
             MetadataEvent::SetDataSchema(_) => {
@@ -528,7 +528,7 @@ where
     async fn validate_append_watermark_is_monotonic(
         &self,
         new_block: &MetadataBlock,
-        _block_cache: &mut Vec<MetadataBlock>,
+        _block_cache: &mut [MetadataBlock],
     ) -> Result<(), AppendError> {
         if let Some(new_block) = new_block.as_data_stream_block() {
             // TODO: PERF: Use block cache
@@ -558,7 +558,7 @@ where
     async fn validate_append_offsets_are_sequential(
         &self,
         new_block: &MetadataBlock,
-        _block_cache: &mut Vec<MetadataBlock>,
+        _block_cache: &mut [MetadataBlock],
     ) -> Result<(), AppendError> {
         // Only check AddData and ExecuteTransform.
         // SetWatermark is also considered a data stream event but does not carry the

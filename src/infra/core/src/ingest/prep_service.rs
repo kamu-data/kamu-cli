@@ -29,7 +29,7 @@ impl PrepService {
 
     pub fn prepare(
         &self,
-        prep_steps: &Vec<PrepStep>,
+        prep_steps: &[PrepStep],
         src_path: &Path,
         target_path: &Path,
     ) -> Result<(), PollingIngestError> {

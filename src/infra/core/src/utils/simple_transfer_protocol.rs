@@ -277,7 +277,6 @@ impl SimpleTransferProtocol {
                     },
                     expected_hash: Some(&data_slice.physical_hash),
                     size_hint: Some(data_slice.size as usize),
-                    ..Default::default()
                 },
             )
             .await
@@ -349,7 +348,6 @@ impl SimpleTransferProtocol {
                     // currently support streaming uploads
                     // without knowing Content-Length. We should remove it in future.
                     size_hint: Some(checkpoint.size as usize),
-                    ..Default::default()
                 },
             )
             .await

@@ -239,10 +239,10 @@ where
 
         match self.s3_context.put_object(key, data).await {
             Ok(_) => {}
-            Err(err) => match err.into_service_error() {
-                // TODO: Detect credentials error
-                err => return Err(err.int_err().into()),
-            },
+            Err(err) => {
+                let err = err.into_service_error();
+                return Err(err.int_err().into());
+            }
         }
 
         Ok(InsertResult { hash })
@@ -281,10 +281,10 @@ where
             .await
         {
             Ok(_) => {}
-            Err(err) => match err.into_service_error() {
-                // TODO: Detect credentials error
-                err => return Err(err.int_err().into()),
-            },
+            Err(err) => {
+                let err = err.into_service_error();
+                return Err(err.int_err().into());
+            }
         }
 
         Ok(InsertResult { hash })
@@ -308,10 +308,10 @@ where
 
         match self.s3_context.delete_object(key).await {
             Ok(_) => {}
-            Err(err) => match err.into_service_error() {
-                // TODO: Detect credentials error
-                err => return Err(err.int_err().into()),
-            },
+            Err(err) => {
+                let err = err.into_service_error();
+                return Err(err.int_err().into());
+            }
         }
 
         Ok(())
