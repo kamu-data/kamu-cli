@@ -106,6 +106,7 @@ glob = "0.3"  # Used for path completions
 indoc = "2"
 itertools = "0.11"
 libc = "0.2"  # Signal names
+rand = "0.8"
 regex = "1"
 shlex = "1"  # Parsing partial input for custom completions
 signal-hook = "0.3"  # Signal handling
@@ -125,7 +126,6 @@ libc = "0.2"  # For getting uid:gid
 
 [dev-dependencies]
 env_logger = "0.10"
-rand = "0.8"
 test-group = { version = "1" }
 test-log = { version = "0.2", features = ["trace"] }
 

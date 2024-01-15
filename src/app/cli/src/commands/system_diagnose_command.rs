@@ -205,7 +205,7 @@ impl DiagCheck for CheckContainerRuntimeRootlessRun {
     async fn run(&self) -> Result<(), DiagCheckError> {
         let run_args = RunArgs {
             image: BUSYBOX.to_string(),
-            container_name: Some("check-rootless-run".to_owned()),
+            container_name: Some(generate_container_name("kamu-check-rootless-run-")),
             ..RunArgs::default()
         };
 
@@ -241,7 +241,7 @@ impl DiagCheck for CheckContainerRuntimeVolumeMount {
         let _ = OwnedFile::new(file_path);
         let run_args = RunArgs {
             image: BUSYBOX.to_string(),
-            container_name: Some("check-volume-mount".to_owned()),
+            container_name: Some(generate_container_name("kamu-check-volume-mount-")),
             ..RunArgs::default()
         };
 
@@ -322,4 +322,17 @@ fn handle_output_result(result: Output) -> Result<(), DiagCheckError> {
             }))
         }
     }
+}
+
+fn generate_container_name(container_prefix: &str) -> String {
+    use rand::Rng;
+    let mut res = container_prefix.to_owned();
+
+    res.extend(
+        rand::thread_rng()
+            .sample_iter(&rand::distributions::Alphanumeric)
+            .take(5)
+            .map(char::from),
+    );
+    res
 }
