@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    - flow execution history function
 ### Fixed
 - Fixed bug in getting available dataset actions for a user, in case of `kamu ui`
+- `kamu add`: corrected a link in help examples
 
 ## [0.151.0] - 2024-01-09
 ### Added
