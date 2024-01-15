@@ -145,6 +145,8 @@ impl SystemInfo {
     }
 }
 
+///////////////////////////////////////////////////////////////////////////////
+
 #[derive(Debug, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BuildInfo {
@@ -183,6 +185,8 @@ impl BuildInfo {
     }
 }
 
+///////////////////////////////////////////////////////////////////////////////
+
 #[derive(Debug, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkspaceInfo {
@@ -198,20 +202,25 @@ impl WorkspaceInfo {
                 root_dir: "".to_string(),
             };
         }
+
         let root_dir = match workspace_svc.layout() {
             Some(wl) => wl.root_dir.to_str().map(String::from).unwrap(),
             None => "".to_string(),
         };
+
         let workspace_version = workspace_svc
             .workspace_version()
             .unwrap_or_default()
             .unwrap_or(WorkspaceVersion::Unknown(0));
+
         Self {
             version: workspace_version.into(),
             root_dir,
         }
     }
 }
+
+///////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -227,15 +236,15 @@ impl ContainerRuntimeInfo {
                     match serde_json::from_slice(&container_info.stdout) {
                         Ok(res) => res,
                         Err(_) => {
-                            serde_json::json!({"error":"Unable to parse container runtime info result"})
+                            serde_json::json!({"error": "Unable to parse container runtime info result"})
                         }
                     }
                 } else {
-                    serde_json::json!({"error":"Unable to run container runtime info command"})
+                    serde_json::json!({"error": "Unable to run container runtime info command"})
                 }
             }
             Err(_) => {
-                serde_json::json!({"error":"Unable to fetch container runtime info"})
+                serde_json::json!({"error": "Unable to fetch container runtime info"})
             }
         };
 
@@ -244,3 +253,5 @@ impl ContainerRuntimeInfo {
         }
     }
 }
+
+///////////////////////////////////////////////////////////////////////////////

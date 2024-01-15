@@ -45,7 +45,7 @@ impl std::fmt::Display for ContainerRuntimeType {
             ContainerRuntimeType::Docker => "docker",
             ContainerRuntimeType::Podman => "podman",
         };
-        write!(f, "{}", s)
+        write!(f, "{s}")
     }
 }
 

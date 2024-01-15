@@ -14,6 +14,8 @@ use std::time::Duration;
 use kamu::domain::*;
 use opendatafabric::*;
 
+///////////////////////////////////////////////////////////////////////////////
+
 #[derive(Clone)]
 pub struct VerificationMultiProgress {
     pub multi_progress: Arc<indicatif::MultiProgress>,
@@ -286,3 +288,5 @@ impl PullImageListener for VerificationProgress {
         ))
     }
 }
+
+///////////////////////////////////////////////////////////////////////////////

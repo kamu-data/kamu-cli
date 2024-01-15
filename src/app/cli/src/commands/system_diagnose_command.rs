@@ -6,6 +6,7 @@
 // As of the Change Date specified in that file, in accordance with
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
+
 use std::fs::File;
 use std::io::Write;
 use std::process::Output;
@@ -28,8 +29,12 @@ use thiserror::Error;
 use super::{CLIError, Command};
 use crate::VerificationMultiProgress;
 
+///////////////////////////////////////////////////////////////////////////////
+
 const SUCCESS_MESSAGE: &str = "ok";
 const FAILED_MESSAGE: &str = "failed";
+
+///////////////////////////////////////////////////////////////////////////////
 
 pub struct SystemDiagnoseCommand {
     dataset_repo: Arc<dyn DatasetRepository>,
@@ -63,7 +68,7 @@ impl Command for SystemDiagnoseCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
         let mut out = std::io::stdout();
 
-        let mut diagnose_checks: Vec<Box<dyn DiagCheck>> = vec![
+        let mut diagnostic_checks: Vec<Box<dyn DiagnosticCheck>> = vec![
             Box::new(CheckContainerRuntimeIsInstalled {
                 container_runtime: self.container_runtime.clone(),
             }),
@@ -79,15 +84,15 @@ impl Command for SystemDiagnoseCommand {
         ];
         // Add checks which required workspace initialization
         if self.is_in_workpace {
-            diagnose_checks.push(Box::new(CheckWorkspaceConsistent {
+            diagnostic_checks.push(Box::new(CheckWorkspaceConsistent {
                 dataset_repo: self.dataset_repo.clone(),
                 verification_svc: self.verification_svc.clone(),
             }));
         }
 
-        for diag_check in diagnose_checks.iter() {
-            write!(out, "{}... ", diag_check.name())?;
-            match diag_check.run().await {
+        for diagnostic_check in diagnostic_checks.iter() {
+            write!(out, "{}... ", diagnostic_check.name())?;
+            match diagnostic_check.run().await {
                 Ok(_) => write!(out, "{}\n", style(SUCCESS_MESSAGE).green())?,
                 Err(err) => {
                     write!(out, "{}\n", style(FAILED_MESSAGE).red())?;
@@ -110,7 +115,7 @@ impl Command for SystemDiagnoseCommand {
 ///////////////////////////////////////////////////////////////////////////////
 
 #[derive(thiserror::Error, Debug)]
-enum DiagCheckError {
+enum DiagnosticCheckError {
     #[error(transparent)]
     Failed(#[from] CommandExecError),
     #[error(transparent)]
@@ -133,7 +138,7 @@ pub struct CommandExecError {
     pub error_log: String,
 }
 
-impl From<std::io::Error> for DiagCheckError {
+impl From<std::io::Error> for DiagnosticCheckError {
     fn from(e: std::io::Error) -> Self {
         Self::Failed(CommandExecError {
             message: "Unable to perform io operation".to_string(),
@@ -145,23 +150,22 @@ impl From<std::io::Error> for DiagCheckError {
 ///////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-trait DiagCheck {
+trait DiagnosticCheck {
     fn name(&self) -> String;
-    async fn run(&self) -> Result<(), DiagCheckError>;
+    async fn run(&self) -> Result<(), DiagnosticCheckError>;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-
 struct CheckContainerRuntimeIsInstalled {
     container_runtime: Arc<ContainerRuntime>,
 }
 
 #[async_trait::async_trait]
-impl DiagCheck for CheckContainerRuntimeIsInstalled {
+impl DiagnosticCheck for CheckContainerRuntimeIsInstalled {
     fn name(&self) -> String {
         format!("{} installed", self.container_runtime.config.runtime)
     }
-    async fn run(&self) -> Result<(), DiagCheckError> {
+    async fn run(&self) -> Result<(), DiagnosticCheckError> {
         let command_res = self.container_runtime.info().output().await.int_err()?;
         handle_output_result(command_res)
     }
@@ -174,11 +178,11 @@ struct CheckContainerRuntimeImagePull {
 }
 
 #[async_trait::async_trait]
-impl DiagCheck for CheckContainerRuntimeImagePull {
+impl DiagnosticCheck for CheckContainerRuntimeImagePull {
     fn name(&self) -> String {
         format!("{} can pull images", self.container_runtime.config.runtime)
     }
-    async fn run(&self) -> Result<(), DiagCheckError> {
+    async fn run(&self) -> Result<(), DiagnosticCheckError> {
         self.container_runtime
             .pull_image(BUSYBOX, None)
             .await
@@ -195,14 +199,14 @@ struct CheckContainerRuntimeRootlessRun {
 }
 
 #[async_trait::async_trait]
-impl DiagCheck for CheckContainerRuntimeRootlessRun {
+impl DiagnosticCheck for CheckContainerRuntimeRootlessRun {
     fn name(&self) -> String {
         format!(
             "{} rootless run check",
             self.container_runtime.config.runtime
         )
     }
-    async fn run(&self) -> Result<(), DiagCheckError> {
+    async fn run(&self) -> Result<(), DiagnosticCheckError> {
         let run_args = RunArgs {
             image: BUSYBOX.to_string(),
             container_name: Some(generate_container_name("kamu-check-rootless-run-")),
@@ -227,14 +231,14 @@ struct CheckContainerRuntimeVolumeMount {
 }
 
 #[async_trait::async_trait]
-impl DiagCheck for CheckContainerRuntimeVolumeMount {
+impl DiagnosticCheck for CheckContainerRuntimeVolumeMount {
     fn name(&self) -> String {
         format!(
             "{} volume mounts work",
             self.container_runtime.config.runtime
         )
     }
-    async fn run(&self) -> Result<(), DiagCheckError> {
+    async fn run(&self) -> Result<(), DiagnosticCheckError> {
         let dir_to_mount = std::env::current_dir()?;
         let file_path = dir_to_mount.join("tmp.txt");
         let _ = File::create(file_path.clone())?;
@@ -264,11 +268,11 @@ struct CheckWorkspaceConsistent {
 }
 
 #[async_trait::async_trait]
-impl DiagCheck for CheckWorkspaceConsistent {
+impl DiagnosticCheck for CheckWorkspaceConsistent {
     fn name(&self) -> String {
         "workspace consistent".to_string()
     }
-    async fn run(&self) -> Result<(), DiagCheckError> {
+    async fn run(&self) -> Result<(), DiagnosticCheckError> {
         let progress = VerificationMultiProgress::new();
         let listener_option = Arc::new(progress.clone());
 
@@ -305,18 +309,18 @@ impl DiagCheck for CheckWorkspaceConsistent {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-fn handle_output_result(result: Output) -> Result<(), DiagCheckError> {
+fn handle_output_result(result: Output) -> Result<(), DiagnosticCheckError> {
     match result.status.success() {
         true => Ok(()),
         false => {
             let err_msg = String::from_utf8(result.stderr).map_err(|e| {
-                DiagCheckError::Failed(CommandExecError {
+                DiagnosticCheckError::Failed(CommandExecError {
                     message: "Cannot parse command execution error".to_string(),
                     error_log: e.to_string(),
                 })
             })?;
 
-            Err(DiagCheckError::Failed(CommandExecError {
+            Err(DiagnosticCheckError::Failed(CommandExecError {
                 message: "Container runtime command unavailable".to_string(),
                 error_log: err_msg,
             }))
@@ -336,3 +340,5 @@ fn generate_container_name(container_prefix: &str) -> String {
     );
     res
 }
+
+///////////////////////////////////////////////////////////////////////////////
