@@ -149,7 +149,7 @@ pub fn cli() -> Command {
 
                         Add a dataset from manifest hosted externally (e.g. on GihHub):
 
-                            kamu add https://raw.githubusercontent.com/kamu-data/kamu-repo-contrib/master/ca.bankofcanada.exchange-rates.daily.yaml
+                            kamu add https://raw.githubusercontent.com/kamu-data/kamu-contrib/master/ca.bankofcanada/ca.bankofcanada.exchange-rates.daily.yaml
 
                         To add dataset from a repository see `kamu pull` command.
                         "#
