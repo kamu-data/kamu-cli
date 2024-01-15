@@ -8,10 +8,11 @@ body:
       value: |
         Thanks for taking the time to fill out this bug report!
 
-        **NOTE** Before reporting an issue, please verify the version you are running with `kamu version` and compare it to the latest release documented on the top of `kamu`'s [README.md](https://github.com/kamu-data/kamu-cli#readme). If they differ, please update your version of `kamu` to the latest possible and retry your command before creating an issue.
+        **NOTE** Before reporting an issue, please verify the version you are running with `kamu version` and compare it to the latest release (as seen at the top of `kamu`'s  [README.md](https://github.com/kamu-data/kamu-cli#readme)). Please upgrade to the latest version of `kamu` before creating an issue, and try running `kamu system diagnose` command that can help detect typical issues with your environment.
 
         Commands you might need to run to create the issue
-          $ kamu version
+          $ kamu system info
+          $ kamu system diagnose
           $ cat .kamu/run/kamu.log
   - type: textarea
     attributes:
@@ -44,10 +45,10 @@ body:
       required: true
   - type: textarea
     attributes:
-      label: kamu version
-      description: Please copy and paste `kamu version` output.
+      label: kamu system info
+      description: Please copy and paste `kamu system info` output.
       placeholder: |
-        $ kamu version
+        $ kamu system info
         appVersion: 0.150.0
         buildTimestamp: 2023-12-29T10:41:15.288818966Z
         ...

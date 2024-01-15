@@ -44,6 +44,7 @@ impl VerificationServiceImpl {
         dataset_handle: &'a DatasetHandle,
         dataset_kind: DatasetKind,
         block_range: (Option<Multihash>, Option<Multihash>),
+        check_logical_hashes: bool,
         listener: Arc<dyn VerificationListener>,
     ) -> Result<VerificationResult, VerificationError> {
         let dataset = self
@@ -118,7 +119,7 @@ impl VerificationServiceImpl {
                                 },
                             },
                         ));
-                    } else {
+                    } else if check_logical_hashes {
                         // Derivative data may be replayed and produce different binary file
                         // but data must have same logical hash to be valid.
                         let logical_hash_actual =
@@ -295,6 +296,7 @@ impl VerificationService for VerificationServiceImpl {
                     &dataset_handle,
                     dataset_kind,
                     block_range.clone(),
+                    options.check_logical_hashes,
                     listener.clone(),
                 )
                 .await?;

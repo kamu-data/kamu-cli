@@ -8,6 +8,8 @@
 // by the Apache License, Version 2.0.
 
 mod output_config;
+mod verify_progress;
 pub use output_config::*;
+pub use verify_progress::*;
 
 pub mod records_writers;

@@ -8,13 +8,20 @@
 // by the Apache License, Version 2.0.
 
 use std::assert_matches::assert_matches;
+use std::sync::Arc;
 
+use container_runtime::{ContainerRuntime, ContainerRuntimeConfig};
 use kamu_cli::*;
 
 #[test_log::test(tokio::test)]
 async fn test_system_info() {
+    let container_runtime = Arc::new(ContainerRuntime::new(ContainerRuntimeConfig::default()));
+    let workpace_svc = Arc::new(WorkspaceService::new(Arc::new(
+        WorkspaceService::find_workspace(),
+    )));
+
     assert_matches!(
-        SystemInfo::collect(),
+        SystemInfo::collect(container_runtime, workpace_svc).await,
         SystemInfo {
             build: BuildInfo {
                 app_version: kamu_cli::VERSION,
@@ -32,7 +39,12 @@ async fn test_system_info() {
                 cargo_target_triple: Some(_),
                 cargo_features: Some(_),
                 cargo_opt_level: Some(_),
-            }
+            },
+            workspace: WorkspaceInfo {
+                version: _,
+                root_dir: _,
+            },
+            container_runtime: ContainerRuntimeInfo { info: _ },
         }
     )
 }

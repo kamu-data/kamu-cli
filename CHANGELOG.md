@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New GraphQL APIs extending flows system capabilities:
    - ability to list summary information about flows
    - flow execution history function
+- New command `kamu system diagnose` to run checks for correct system work
+- Additional info about workpace and container version for `kamu system info` command
 ### Fixed
 - Fixed bug in getting available dataset actions for a user, in case of `kamu ui`
 - `kamu add`: corrected a link in help examples
