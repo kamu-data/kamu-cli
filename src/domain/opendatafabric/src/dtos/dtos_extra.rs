@@ -90,6 +90,7 @@ impl Transform {
 ////////////////////////////////////////////////////////////////////////////////
 
 impl Default for SetVocab {
+    #[allow(clippy::derivable_impls)]
     fn default() -> Self {
         Self {
             offset_column: None,
@@ -157,6 +158,7 @@ impl ReadStep {
 ////////////////////////////////////////////////////////////////////////////////
 
 impl Default for ReadStepCsv {
+    #[allow(clippy::derivable_impls)]
     fn default() -> Self {
         Self {
             schema: None,
@@ -178,6 +180,7 @@ impl Default for ReadStepCsv {
 ////////////////////////////////////////////////////////////////////////////////
 
 impl Default for ReadStepJson {
+    #[allow(clippy::derivable_impls)]
     fn default() -> Self {
         Self {
             sub_path: None,
@@ -194,6 +197,7 @@ impl Default for ReadStepJson {
 ////////////////////////////////////////////////////////////////////////////////
 
 impl Default for ReadStepNdJson {
+    #[allow(clippy::derivable_impls)]
     fn default() -> Self {
         Self {
             schema: None,
@@ -209,6 +213,7 @@ impl Default for ReadStepNdJson {
 ////////////////////////////////////////////////////////////////////////////////
 
 impl Default for ReadStepEsriShapefile {
+    #[allow(clippy::derivable_impls)]
     fn default() -> Self {
         Self {
             schema: None,

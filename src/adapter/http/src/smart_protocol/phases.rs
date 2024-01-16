@@ -9,6 +9,7 @@
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+#[allow(clippy::enum_variant_names)]
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum PullPhase {
     InitialRequest,

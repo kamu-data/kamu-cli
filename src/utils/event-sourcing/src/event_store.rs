@@ -14,6 +14,7 @@ use crate::{EventID, Projection};
 /////////////////////////////////////////////////////////////////////////////////////////
 
 /// Common set of operations for an event store
+#[allow(clippy::len_without_is_empty)]
 #[async_trait::async_trait]
 pub trait EventStore<Proj: Projection>: Send + Sync {
     /// Returns the event history of an aggregate in chronological order
