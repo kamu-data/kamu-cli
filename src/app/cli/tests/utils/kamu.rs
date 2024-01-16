@@ -188,7 +188,6 @@ impl Kamu {
         let base_catalog = kamu_cli::configure_base_catalog(&self.workspace_layout, false).build();
 
         let mut cli_catalog_builder = kamu_cli::configure_cli_catalog(&base_catalog);
-        cli_catalog_builder.add_value(self.workspace_layout.clone());
         cli_catalog_builder.add_value(self.current_account.to_current_account_subject());
         cli_catalog_builder.build()
     }

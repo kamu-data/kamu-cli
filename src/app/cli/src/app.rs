@@ -96,7 +96,6 @@ pub async fn run(
         let base_catalog = base_catalog_builder.build();
 
         let cli_catalog = configure_cli_catalog(&base_catalog)
-            .add_value(workspace_layout.clone())
             .add_value(current_account.to_current_account_subject())
             .build();
 
@@ -188,6 +187,8 @@ pub fn configure_base_catalog(
     multi_tenant_workspace: bool,
 ) -> CatalogBuilder {
     let mut b = CatalogBuilder::new();
+
+    b.add_value(workspace_layout.clone());
 
     b.add::<ContainerRuntime>();
 
@@ -283,6 +284,10 @@ pub fn configure_base_catalog(
 
     b.add::<AuthenticationServiceImpl>();
 
+    // Give both CLI and server access to stored repo access tokens
+    b.add::<odf_server::AccessTokenRegistryService>();
+    b.add::<odf_server::CLIAccessTokenStore>();
+
     b.add::<kamu_adapter_auth_oso::KamuAuthOso>();
     b.add::<kamu_adapter_auth_oso::OsoDatasetAuthorizer>();
 
@@ -296,10 +301,7 @@ pub fn configure_cli_catalog(base_catalog: &Catalog) -> CatalogBuilder {
     b.add::<config::ConfigService>();
     b.add::<GcService>();
     b.add::<WorkspaceService>();
-
-    b.add::<odf_server::AccessTokenRegistryService>();
     b.add::<odf_server::LoginService>();
-    b.add::<odf_server::CLIAccessTokenStore>();
 
     b
 }
