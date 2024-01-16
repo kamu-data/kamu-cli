@@ -685,7 +685,8 @@ impl From<&DatasetHandleRemote> for DatasetRefAny {
 
 impl std::cmp::Ord for DatasetRefAny {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        fn tuplify<'a>(
+        #[allow(clippy::type_complexity)]
+        fn tuplify(
             v: &DatasetRefAny,
         ) -> (
             Option<&str>,

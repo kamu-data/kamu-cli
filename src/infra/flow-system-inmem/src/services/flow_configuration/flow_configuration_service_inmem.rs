@@ -124,7 +124,7 @@ impl FlowConfigurationService for FlowConfigurationServiceInMemory {
 
     /// Lists all enabled configurations
     fn list_enabled_configurations(&self) -> FlowConfigurationStateStream {
-        // Note: terribly ineffecient - walks over events multiple times
+        // Note: terribly inefficient - walks over events multiple times
         Box::pin(async_stream::try_stream! {
             for system_flow_type in SystemFlowType::all() {
                 let flow_key = (*system_flow_type).into();

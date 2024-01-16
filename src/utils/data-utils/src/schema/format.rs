@@ -42,7 +42,7 @@ pub fn write_schema_parquet_json(
 /////////////////////////////////////////////////////////////////////////////////////////
 
 /// Prints arrow schema to output
-/// TODO: It currently convers schema to Parquet, but we will avoid this in the
+/// TODO: It currently converts schema to Parquet, but we will avoid this in the
 /// future to preserve most descriptive types.
 pub fn write_schema_arrow(output: &mut dyn Write, schema: &Schema) -> Result<(), std::io::Error> {
     let parquet_schema = crate::schema::convert::arrow_schema_to_parquet_schema(schema);

@@ -75,7 +75,7 @@ pub struct WriteDataOpts {
     /// Data source state to store in the commit
     pub new_source_state: Option<odf::SourceState>,
     // TODO: Find a better way to deal with temporary files
-    /// Local FS path to which data slice will be written before commiting it
+    /// Local FS path to which data slice will be written before committing it
     /// into the data object store of a dataset
     pub data_staging_path: PathBuf,
 }

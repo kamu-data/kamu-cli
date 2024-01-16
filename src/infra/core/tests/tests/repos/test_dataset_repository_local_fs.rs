@@ -218,7 +218,7 @@ async fn test_rename_unauthorized() {
     let harness =
         LocalFsRepoHarness::create(&tempdir, MockDatasetActionAuthorizer::denying(), true).await;
 
-    test_dataset_repository_shared::test_rename_dataset_unauthroized(
+    test_dataset_repository_shared::test_rename_dataset_unauthorized(
         harness.dataset_repo.as_ref(),
         None,
     )
@@ -270,7 +270,7 @@ async fn test_delete_unauthorized() {
         LocalFsRepoHarness::create(&tempdir, MockDatasetActionAuthorizer::denying(), true).await;
     harness.dependencies_eager_initialization().await;
 
-    test_dataset_repository_shared::test_delete_dataset_unauthroized(
+    test_dataset_repository_shared::test_delete_dataset_unauthorized(
         harness.dataset_repo.as_ref(),
         None,
     )

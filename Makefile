@@ -73,12 +73,18 @@ define add_license_header
 	mv tmp $(1)
 endef
 
+define insert_text_into_beginning
+	echo $(1) | cat - $(2) > tmp
+	mv tmp $(2)
+endef
+
 
 .PHONY: codegen-odf-serde
 codegen-odf-serde:
 	python $(ODF_SPEC_DIR)/tools/jsonschema_to_flatbuffers.py $(ODF_SPEC_DIR)/schemas > $(ODF_CRATE_DIR)/schemas/odf.fbs
 	flatc -o $(ODF_CRATE_DIR)/src/serde/flatbuffers --rust --gen-onefile $(ODF_CRATE_DIR)/schemas/odf.fbs
 	mv $(ODF_CRATE_DIR)/src/serde/flatbuffers/odf_generated.rs $(ODF_CRATE_DIR)/src/serde/flatbuffers/proxies_generated.rs
+	$(call insert_text_into_beginning, "#![allow(clippy::all)]", "$(ODF_CRATE_DIR)/src/serde/flatbuffers/proxies_generated.rs")
 	rustfmt $(ODF_CRATE_DIR)/src/serde/flatbuffers/proxies_generated.rs
 
 	python $(ODF_SPEC_DIR)/tools/jsonschema_to_rust_dtos.py $(ODF_SPEC_DIR)/schemas \

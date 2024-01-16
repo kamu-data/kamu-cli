@@ -46,7 +46,7 @@ impl NamedObjectRepository for NamedObjectRepositoryInMemory {
         }
     }
 
-    /// Update referece to point at the specified object hash
+    /// Update reference to point at the specified object hash
     async fn set(&self, name: &str, data: &[u8]) -> Result<(), SetNamedError> {
         let mut objects_by_name = self.objects_by_name.lock().unwrap();
         objects_by_name.insert(String::from(name), Bytes::copy_from_slice(data));

@@ -824,7 +824,7 @@ type FlowTimingRecords {
 	"""
 	runningSince: DateTime
 	"""
-	Recorded time of finish (succesfull or failed after retry) or abortion
+	Recorded time of finish (successful or failed after retry) or abortion
 	(Finished state seen at least once)
 	"""
 	finishedAt: DateTime

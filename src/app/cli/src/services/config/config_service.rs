@@ -133,16 +133,14 @@ impl ConfigService {
 
         let mut buffer = String::new();
 
-        let mut nesting = 0;
-        for subkey in key.split('.') {
+        for (nesting, sub_key) in key.split('.').enumerate() {
             if nesting != 0 {
                 writeln!(buffer).unwrap();
             }
             for _ in 0..nesting {
                 write!(buffer, "  ").unwrap();
             }
-            write!(buffer, "{}:", subkey).unwrap();
-            nesting += 1;
+            write!(buffer, "{sub_key}:").unwrap();
         }
         write!(buffer, " {}", value).unwrap();
 
@@ -195,6 +193,7 @@ impl ConfigService {
         }
     }
 
+    #[allow(clippy::only_used_in_recursion)]
     fn unset_recursive(&self, key: &str, value: &mut serde_yaml::Mapping) -> bool {
         if let Some((head, tail)) = key.split_once('.') {
             let index = serde_yaml::Value::String(head.to_owned());
@@ -231,6 +230,7 @@ impl ConfigService {
         result
     }
 
+    #[allow(clippy::only_used_in_recursion)]
     fn visit_keys_recursive(
         &self,
         prefix: &str,

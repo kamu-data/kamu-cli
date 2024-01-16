@@ -22,21 +22,21 @@ pub fn derive_aggregate(tokens: proc_macro::TokenStream) -> proc_macro::TokenStr
 
     let type_name = input.ident;
 
-    let syn::Data::Struct(struc) = input.data else {
+    let syn::Data::Struct(data_struct) = input.data else {
         panic_generic()
     };
-    let syn::Fields::Unnamed(mut aggregate) = struc.fields else {
+    let syn::Fields::Unnamed(mut aggregate) = data_struct.fields else {
         panic_generic()
     };
     let Some(aggregate) = aggregate.unnamed.pop().map(|p| p.into_value()) else {
         panic_generic()
     };
 
-    let syn::Type::Path(mut aggretage_type) = aggregate.ty else {
+    let syn::Type::Path(mut aggregate_type) = aggregate.ty else {
         panic_generic()
     };
 
-    let Some(syn::PathArguments::AngleBracketed(mut generic_args)) = aggretage_type
+    let Some(syn::PathArguments::AngleBracketed(mut generic_args)) = aggregate_type
         .path
         .segments
         .pop()

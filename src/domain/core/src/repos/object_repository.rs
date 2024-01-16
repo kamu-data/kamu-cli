@@ -42,7 +42,7 @@ pub trait ObjectRepository: Send + Sync {
     ///
     /// When, for example, working with S3-backed repo an internal Url will be
     /// in the form of "s3://bucket/a/b/c", so the user has to be
-    /// authorized to access the data. To let any anouthorized user access
+    /// authorized to access the data. To let any authorized user access
     /// the data use [ObjectRepository::get_external_download_url()] to issue a
     /// pre-signed URL.
     async fn get_internal_url(&self, hash: &Multihash) -> Url;
@@ -51,7 +51,7 @@ pub trait ObjectRepository: Send + Sync {
     ///
     /// When, for example, working with S3-backed repo this method will issue a
     /// pre-signed URL that (for a limited time) will be accessible to any user.
-    /// For refering to objects internally use
+    /// For referring to objects internally use
     /// [ObjectRepository::get_internal_url()].
     async fn get_external_download_url(
         &self,
@@ -84,7 +84,7 @@ pub trait ObjectRepository: Send + Sync {
 
     /// Inserts file by atomic move - only valid for local filesystem repository
     ///
-    /// TODO: Consider to move in a separate trait or access via downcasing.
+    /// TODO: Consider to move in a separate trait or access via downcasting.
     async fn insert_file_move<'a>(
         &'a self,
         src: &Path,

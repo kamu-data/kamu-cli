@@ -66,13 +66,11 @@ impl NamedObjectRepository for NamedObjectRepositoryS3 {
 
         tracing::debug!(?key, "Inserting object");
 
-        match self.s3_context.put_object(key, data).await {
-            Ok(_) => {}
-            Err(err) => {
-                let err = err.into_service_error();
-                return Err(err.int_err().into());
-            }
-        }
+        self.s3_context
+            .put_object(key, data)
+            .await
+            // TODO: Detect credentials error
+            .map_err(|e| e.into_service_error().int_err())?;
 
         Ok(())
     }
@@ -82,13 +80,11 @@ impl NamedObjectRepository for NamedObjectRepositoryS3 {
 
         tracing::debug!(?key, "Deleting object");
 
-        match self.s3_context.delete_object(key).await {
-            Ok(_) => {}
-            Err(err) => {
-                let err = err.into_service_error();
-                return Err(err.int_err().into());
-            }
-        }
+        self.s3_context
+            .delete_object(key)
+            .await
+            // TODO: Detect credentials error
+            .map_err(|e| e.into_service_error().int_err())?;
 
         Ok(())
     }

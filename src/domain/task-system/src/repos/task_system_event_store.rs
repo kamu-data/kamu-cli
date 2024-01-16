@@ -21,7 +21,7 @@ pub trait TaskSystemEventStore: EventStore<TaskState> {
 
     /// Returns the tasks associated with the specified dataset in reverse
     /// chronological order based on creation time
-    fn get_tasks_by_dataset<'a>(&'a self, dataset_id: &DatasetID) -> TaskIDStream<'a>;
+    fn get_tasks_by_dataset(&self, dataset_id: &DatasetID) -> TaskIDStream;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

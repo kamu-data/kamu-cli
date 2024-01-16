@@ -164,7 +164,7 @@ impl EngineProvisionerLocal {
             (Some(multi), NetworkNamespaceType::Private) => multi,
             (Some(multi), NetworkNamespaceType::Host) => {
                 tracing::warn!(
-                    "Ingoring specified engine max concurrency of {} since running in the Host \
+                    "Ignoring specified engine max concurrency of {} since running in the Host \
                      networking mode",
                     multi
                 );
@@ -195,16 +195,10 @@ impl EngineProvisioner for EngineProvisionerLocal {
         let listener = maybe_listener.unwrap_or_else(|| Arc::new(NullEngineProvisioningListener));
 
         let (engine, image) = match engine_id {
-            "spark" => Ok((
-                self.spark_engine.clone() as Arc<dyn Engine>,
-                &self.config.spark_image,
-            )),
-            "flink" => Ok((
-                self.flink_engine.clone() as Arc<dyn Engine>,
-                &self.config.flink_image,
-            )),
+            "spark" => Ok((self.spark_engine.clone(), &self.config.spark_image)),
+            "flink" => Ok((self.flink_engine.clone(), &self.config.flink_image)),
             "datafusion" => Ok((
-                self.datafusion_engine.clone() as Arc<dyn Engine>,
+                self.datafusion_engine.clone(),
                 &self.config.datafusion_image,
             )),
             _ => Err(format!("Unsupported engine {}", engine_id).int_err()),

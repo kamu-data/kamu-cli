@@ -134,8 +134,8 @@ impl LineageVisitor for ShellVisitor {
     fn begin(&mut self) {}
 
     fn enter(&mut self, dataset: &NodeInfo<'_>) -> bool {
-        let fmt = match &dataset {
-            &NodeInfo::Local { alias, kind, .. } => match kind {
+        let fmt = match dataset {
+            NodeInfo::Local { alias, kind, .. } => match kind {
                 DatasetKind::Root => format!(
                     "{}{}",
                     console::style(alias).bold(),
@@ -147,7 +147,7 @@ impl LineageVisitor for ShellVisitor {
                     console::style(": Derivative").dim(),
                 ),
             },
-            &NodeInfo::Remote { alias, .. } => {
+            NodeInfo::Remote { alias, .. } => {
                 format!(
                     "{}{}",
                     console::style(alias).dim(),
@@ -167,8 +167,8 @@ impl LineageVisitor for ShellVisitor {
 
     fn exit(&mut self, dataset: &NodeInfo<'_>) {
         let num_deps = match dataset {
-            &NodeInfo::Local { dependencies, .. } => dependencies.len(),
-            &NodeInfo::Remote { .. } => 1, // Questionmark dep
+            NodeInfo::Local { dependencies, .. } => dependencies.len(),
+            NodeInfo::Remote { .. } => 1, // Questionmark dep
         };
 
         let mut deps_left = num_deps;
@@ -234,12 +234,12 @@ impl LineageVisitor for CsvVisitor {
         }
 
         match dataset {
-            &NodeInfo::Local { dependencies, .. } => {
-                for dep in dependencies {
+            NodeInfo::Local { dependencies, .. } => {
+                for dep in *dependencies {
                     println!("\"{}\",\"true\",\"{}\"", dataset.alias(), dep.name);
                 }
             }
-            &NodeInfo::Remote { .. } => {
+            NodeInfo::Remote { .. } => {
                 println!("\"{}\",\"false\",\"\"", dataset.alias());
             }
         }

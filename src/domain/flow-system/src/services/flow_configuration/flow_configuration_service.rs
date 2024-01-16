@@ -18,7 +18,7 @@ use crate::{FlowConfigurationRule, FlowConfigurationState, FlowKey};
 
 #[async_trait::async_trait]
 pub trait FlowConfigurationService: Sync + Send {
-    /// Find current configuration of a certian type
+    /// Find current configuration of a certain type
     async fn find_configuration(
         &self,
         flow_key: FlowKey,

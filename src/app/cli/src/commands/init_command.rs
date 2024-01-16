@@ -18,7 +18,7 @@ pub struct InitCommand {
 }
 
 impl InitCommand {
-    pub fn new<'a>(workspace_layout: Arc<WorkspaceLayout>, multi_tenant: bool) -> Self {
+    pub fn new(workspace_layout: Arc<WorkspaceLayout>, multi_tenant: bool) -> Self {
         Self {
             workspace_layout,
             multi_tenant,

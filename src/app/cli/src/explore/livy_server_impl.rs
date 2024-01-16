@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::fs::File;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -44,7 +44,7 @@ impl LivyServerImpl {
         addr: &str,
         host_port: u16,
         datasets_dir: &PathBuf,
-        run_info_dir: &PathBuf,
+        run_info_dir: &Path,
         inherit_stdio: bool,
         on_started: StartedClb,
     ) -> Result<(), InternalError>

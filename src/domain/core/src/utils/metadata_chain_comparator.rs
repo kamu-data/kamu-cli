@@ -75,77 +75,80 @@ impl MetadataChainComparator {
         rhs_chain.expecting_to_read_blocks(1);
         let rhs_sequence_number = rhs_chain.get_block(rhs_head).await?.sequence_number;
 
-        // If numbers are equal, it's a guaranteed divergence, as we've checked blocks
-        // for equality above
-        if lhs_sequence_number == rhs_sequence_number {
-            let last_common_sequence_number = Self::find_common_ancestor_sequence_number(
-                &lhs_chain,
-                lhs_head,
-                lhs_sequence_number,
-                &rhs_chain,
-                rhs_head,
-                rhs_sequence_number,
-            )
-            .await?;
-            Ok(Self::describe_divergence(
-                lhs_sequence_number,
-                rhs_sequence_number,
-                last_common_sequence_number,
-            ))
-        }
-        // Source ahead
-        else if lhs_sequence_number > rhs_sequence_number {
-            let convergence_check = Self::check_expected_common_ancestor(
-                &lhs_chain,
-                lhs_sequence_number,
-                lhs_head,
-                &rhs_chain,
-                rhs_sequence_number,
-                rhs_head,
-            )
-            .await?;
-            match convergence_check {
-                CommonAncestorCheck::Success { ahead_blocks } => {
-                    return Ok(CompareChainsResult::LhsAhead {
-                        lhs_ahead_blocks: ahead_blocks,
-                    })
-                }
-                CommonAncestorCheck::Failure {
-                    common_ancestor_sequence_number: last_common_sequence_number,
-                } => {
-                    return Ok(Self::describe_divergence(
+        use std::cmp::Ordering;
+
+        match lhs_sequence_number.cmp(&rhs_sequence_number) {
+            // If numbers are equal, it's a guaranteed divergence, as we've checked blocks
+            // for equality above
+            Ordering::Equal => {
+                let last_common_sequence_number = Self::find_common_ancestor_sequence_number(
+                    &lhs_chain,
+                    lhs_head,
+                    lhs_sequence_number,
+                    &rhs_chain,
+                    rhs_head,
+                    rhs_sequence_number,
+                )
+                .await?;
+
+                Ok(Self::describe_divergence(
+                    lhs_sequence_number,
+                    rhs_sequence_number,
+                    last_common_sequence_number,
+                ))
+            }
+            // Source ahead
+            Ordering::Greater => {
+                let convergence_check = Self::check_expected_common_ancestor(
+                    &lhs_chain,
+                    lhs_sequence_number,
+                    lhs_head,
+                    &rhs_chain,
+                    rhs_sequence_number,
+                    rhs_head,
+                )
+                .await?;
+
+                match convergence_check {
+                    CommonAncestorCheck::Success { ahead_blocks } => {
+                        Ok(CompareChainsResult::LhsAhead {
+                            lhs_ahead_blocks: ahead_blocks,
+                        })
+                    }
+                    CommonAncestorCheck::Failure {
+                        common_ancestor_sequence_number: last_common_sequence_number,
+                    } => Ok(Self::describe_divergence(
                         lhs_sequence_number,
                         rhs_sequence_number,
                         last_common_sequence_number,
-                    ));
+                    )),
                 }
             }
-        }
-        // Destination ahead
-        else {
-            let convergence_check = Self::check_expected_common_ancestor(
-                &rhs_chain,
-                rhs_sequence_number,
-                rhs_head,
-                &lhs_chain,
-                lhs_sequence_number,
-                lhs_head,
-            )
-            .await?;
-            match convergence_check {
-                CommonAncestorCheck::Success { ahead_blocks } => {
-                    return Ok(CompareChainsResult::LhsBehind {
-                        rhs_ahead_blocks: ahead_blocks,
-                    })
-                }
-                CommonAncestorCheck::Failure {
-                    common_ancestor_sequence_number: last_common_sequence_number,
-                } => {
-                    return Ok(Self::describe_divergence(
+            // Destination ahead
+            Ordering::Less => {
+                let convergence_check = Self::check_expected_common_ancestor(
+                    &rhs_chain,
+                    rhs_sequence_number,
+                    rhs_head,
+                    &lhs_chain,
+                    lhs_sequence_number,
+                    lhs_head,
+                )
+                .await?;
+
+                match convergence_check {
+                    CommonAncestorCheck::Success { ahead_blocks } => {
+                        Ok(CompareChainsResult::LhsBehind {
+                            rhs_ahead_blocks: ahead_blocks,
+                        })
+                    }
+                    CommonAncestorCheck::Failure {
+                        common_ancestor_sequence_number: last_common_sequence_number,
+                    } => Ok(Self::describe_divergence(
                         lhs_sequence_number,
                         rhs_sequence_number,
                         last_common_sequence_number,
-                    ));
+                    )),
                 }
             }
         }

@@ -24,13 +24,13 @@ pub struct DatasetPullRequest {
 /// Response to initial dataset pull request message
 pub type DatasetPullResponse = Result<DatasetPullSuccessResponse, DatasetPullRequestError>;
 
-/// Succesful response to initial dataset pull request
+/// Successful response to initial dataset pull request
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct DatasetPullSuccessResponse {
     pub size_estimate: TransferSizeEstimate,
 }
 
-// Unsuccesful response to initial dataset pull request
+// Unsuccessful response to initial dataset pull request
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub enum DatasetPullRequestError {
     Internal(DatasetInternalError),
@@ -90,11 +90,11 @@ pub struct DatasetPushRequest {
 /// Response to initial dataset push request message
 pub type DatasetPushResponse = Result<DatasetPushRequestAccepted, DatasetPushRequestError>;
 
-/// Succes response to initial dataset push request message
+/// Success response to initial dataset push request message
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct DatasetPushRequestAccepted {}
 
-// Unsuccesful response to initial dataset push request
+// Unsuccessful response to initial dataset push request
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub enum DatasetPushRequestError {
     Internal(DatasetInternalError),

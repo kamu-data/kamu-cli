@@ -15,7 +15,7 @@ mockall::mock! {
     pub DependencyGraphRepository {}
     #[async_trait::async_trait]
     impl DependencyGraphRepository for DependencyGraphRepository {
-        fn list_dependencies_of_all_datasets<'a>(&'a self) -> DatasetDependenciesIDStream<'a>;
+        fn list_dependencies_of_all_datasets(&self) -> DatasetDependenciesIDStream<'_>;
     }
 }
 

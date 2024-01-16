@@ -73,8 +73,8 @@ async fn test_read_initial_config_and_queue_properly() {
     let bar_moment = state.snapshots[2].0;
 
     assert_eq!(start_time, start_moment);
-    assert_eq!((foo_moment - start_moment), Duration::milliseconds(60)); // planned time for "foo"
-    assert_eq!((bar_moment - start_moment), Duration::milliseconds(90)); // planned time for "bar"
+    assert_eq!(foo_moment - start_moment, Duration::milliseconds(60)); // planned time for "foo"
+    assert_eq!(bar_moment - start_moment, Duration::milliseconds(90)); // planned time for "bar"
 
     assert_flow_test_checks(&[
         // Snapshot 0: after initial queueing
@@ -164,8 +164,8 @@ async fn test_manual_trigger() {
     let foo_moment = state.snapshots[2].0;
 
     assert_eq!(start_moment, start_time);
-    assert_eq!((bar_moment - start_moment), Duration::milliseconds(40)); // next slot after 40ms trigger with 10ms align
-    assert_eq!((foo_moment - start_moment), Duration::milliseconds(60)); // 60ms as planned
+    assert_eq!(bar_moment - start_moment, Duration::milliseconds(40)); // next slot after 40ms trigger with 10ms align
+    assert_eq!(foo_moment - start_moment, Duration::milliseconds(60)); // 60ms as planned
 
     assert_flow_test_checks(&[
         // Snapshot 0: after initial queueing, no "bar", only "foo"
@@ -264,10 +264,10 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
     let foo_sch_moment = state.snapshots[4].0;
 
     assert_eq!(start_moment, start_time);
-    assert_eq!((pause_moment - start_moment), Duration::milliseconds(25));
-    assert_eq!((resume_moment - start_moment), Duration::milliseconds(55));
-    assert_eq!((bar_sch_moment - start_moment), Duration::milliseconds(90));
-    assert_eq!((foo_sch_moment - start_moment), Duration::milliseconds(110));
+    assert_eq!(pause_moment - start_moment, Duration::milliseconds(25));
+    assert_eq!(resume_moment - start_moment, Duration::milliseconds(55));
+    assert_eq!(bar_sch_moment - start_moment, Duration::milliseconds(90));
+    assert_eq!(foo_sch_moment - start_moment, Duration::milliseconds(110));
 
     assert_flow_test_checks(&[
         // Snapshot 0: after initial queueing
@@ -422,9 +422,9 @@ async fn test_dataset_deleted() {
     let bar_del_moment = state.snapshots[3].0;
 
     assert_eq!(start_moment, start_time);
-    assert_eq!((foo_del_moment - start_moment), Duration::milliseconds(25));
-    assert_eq!((bar_sch_moment - start_moment), Duration::milliseconds(70));
-    assert_eq!((bar_del_moment - start_moment), Duration::milliseconds(75));
+    assert_eq!(foo_del_moment - start_moment, Duration::milliseconds(25));
+    assert_eq!(bar_sch_moment - start_moment, Duration::milliseconds(70));
+    assert_eq!(bar_del_moment - start_moment, Duration::milliseconds(75));
 
     assert_flow_test_checks(&[
         // Snapshot 0: after initial queueing
@@ -658,7 +658,7 @@ async fn test_task_completions_trigger_next_loop_on_success() {
                 scheduled_tasks_by_dataset_id.insert(task_dataset_id, scheduled_task);
             };
 
-            // Send task runnung & finished events for each dataset with certain interval
+            // Send task running & finished events for each dataset with certain interval
             for dataset_id in [&foo_id, &bar_id, &baz_id] {
                 let dataset_task = scheduled_tasks_by_dataset_id.get(dataset_id).unwrap();
                 event_bus.dispatch_event(TaskEventRunning {
@@ -692,21 +692,12 @@ async fn test_task_completions_trigger_next_loop_on_success() {
     let reschedule_foo_moment = state.snapshots[5].0;
 
     assert_eq!(start_moment, start_time);
-    assert_eq!((schedule_moment - start_moment), Duration::milliseconds(40));
+    assert_eq!(schedule_moment - start_moment, Duration::milliseconds(40));
+    assert_eq!(finish_foo_moment - start_moment, Duration::milliseconds(60));
+    assert_eq!(finish_bar_moment - start_moment, Duration::milliseconds(70));
+    assert_eq!(finish_baz_moment - start_moment, Duration::milliseconds(80));
     assert_eq!(
-        (finish_foo_moment - start_moment),
-        Duration::milliseconds(60)
-    );
-    assert_eq!(
-        (finish_bar_moment - start_moment),
-        Duration::milliseconds(70)
-    );
-    assert_eq!(
-        (finish_baz_moment - start_moment),
-        Duration::milliseconds(80)
-    );
-    assert_eq!(
-        (reschedule_foo_moment - start_moment),
+        reschedule_foo_moment - start_moment,
         Duration::milliseconds(100)
     );
 
@@ -907,19 +898,16 @@ async fn test_update_success_triggers_update_of_derived_datasets() {
 
     assert_eq!(start_moment, start_time);
     assert_eq!(
-        (schedule_foo_moment - start_moment),
+        schedule_foo_moment - start_moment,
         Duration::milliseconds(30)
     );
+    assert_eq!(finish_foo_moment - start_moment, Duration::milliseconds(50));
     assert_eq!(
-        (finish_foo_moment - start_moment),
+        schedule_bar_baz_moment - start_moment,
         Duration::milliseconds(50)
     );
     assert_eq!(
-        (schedule_bar_baz_moment - start_moment),
-        Duration::milliseconds(50)
-    );
-    assert_eq!(
-        (reschedule_foo_moment - start_moment),
+        reschedule_foo_moment - start_moment,
         Duration::milliseconds(80)
     );
 

@@ -400,7 +400,7 @@ async fn test_append_watermark_non_monotonic() {
         .await
         .unwrap();
 
-    // output_watermart = None
+    // output_watermark = None
     let block = MetadataFactory::metadata_block(
         MetadataFactory::add_data()
             .some_new_data()
@@ -412,7 +412,7 @@ async fn test_append_watermark_non_monotonic() {
 
     let hash = chain.append(block, AppendOpts::default()).await.unwrap();
 
-    // output_watermart = Some(2000-01-01)
+    // output_watermark = Some(2000-01-01)
     let block = MetadataFactory::metadata_block(
         MetadataFactory::add_data()
             .some_new_data()
@@ -425,7 +425,7 @@ async fn test_append_watermark_non_monotonic() {
 
     let hash = chain.append(block, AppendOpts::default()).await.unwrap();
 
-    // output_watermart = None
+    // output_watermark = None
     let block = MetadataFactory::metadata_block(
         MetadataFactory::add_data()
             .some_new_data()
@@ -442,7 +442,7 @@ async fn test_append_watermark_non_monotonic() {
         ))
     );
 
-    // output_watermart = Some(1988-01-01)
+    // output_watermark = Some(1988-01-01)
     let block = MetadataFactory::metadata_block(
         MetadataFactory::add_data()
             .some_new_data()
@@ -460,7 +460,7 @@ async fn test_append_watermark_non_monotonic() {
         ))
     );
 
-    // output_watermart = Some(2020-01-01)
+    // output_watermark = Some(2020-01-01)
     let block = MetadataFactory::metadata_block(
         MetadataFactory::add_data()
             .some_new_data()
@@ -663,7 +663,7 @@ async fn test_append_add_push_source_requires_explicit_schema() {
 }
 
 #[test_log::test(tokio::test)]
-async fn test_append_add_data_must_be_preceeded_by_schema() {
+async fn test_append_add_data_must_be_preseeded_by_schema() {
     let tmp_dir = tempfile::tempdir().unwrap();
     let chain = init_chain(tmp_dir.path());
 
@@ -739,7 +739,7 @@ async fn test_append_add_data_must_be_preceeded_by_schema() {
 }
 
 #[test_log::test(tokio::test)]
-async fn test_append_execute_transform_must_be_preceeded_by_schema() {
+async fn test_append_execute_transform_must_be_preseeded_by_schema() {
     let tmp_dir = tempfile::tempdir().unwrap();
     let chain = init_chain(tmp_dir.path());
 

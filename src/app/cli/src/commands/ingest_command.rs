@@ -72,9 +72,9 @@ impl IngestCommand {
     fn path_to_url(path: &str) -> Result<url::Url, CLIError> {
         let p = PathBuf::from(path)
             .canonicalize()
-            .map_err(|e| CLIError::usage_error(format!("Ivalid path {}: {}", path, e)))?;
+            .map_err(|e| CLIError::usage_error(format!("Invalid path {path}: {e}")))?;
         url::Url::from_file_path(p)
-            .map_err(|_| CLIError::usage_error(format!("Ivalid path {}", path)))
+            .map_err(|_| CLIError::usage_error(format!("Invalid path {path}")))
     }
 
     async fn ensure_valid_push_target(
@@ -154,7 +154,7 @@ impl Command for IngestCommand {
         let listener = if !self.output_config.is_tty
             || self.output_config.quiet
             || self.output_config.verbosity_level != 0
-            || (self.output_config.is_tty && self.stdin)
+            || self.stdin
         {
             None
         } else {

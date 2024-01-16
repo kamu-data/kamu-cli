@@ -251,24 +251,22 @@ impl PushService for PushServiceImpl {
             })
             .collect();
 
-        // If no errors - add alliases to initial items
+        // If no errors - add aliases to initial items
         if options.add_aliases && results.iter().all(|r| r.result.is_ok()) {
             for request in &initial_requests {
-                match request {
-                    PushRequest {
-                        local_ref: Some(local_ref),
-                        remote_ref: Some(remote_ref),
-                    } => {
-                        // TODO: Improve error handling
-                        self.remote_alias_reg
-                            .get_remote_aliases(local_ref)
-                            .await
-                            .unwrap()
-                            .add(remote_ref, RemoteAliasKind::Push)
-                            .await
-                            .unwrap();
-                    }
-                    _ => {}
+                if let PushRequest {
+                    local_ref: Some(local_ref),
+                    remote_ref: Some(remote_ref),
+                } = request
+                {
+                    // TODO: Improve error handling
+                    self.remote_alias_reg
+                        .get_remote_aliases(local_ref)
+                        .await
+                        .unwrap()
+                        .add(remote_ref, RemoteAliasKind::Push)
+                        .await
+                        .unwrap();
                 }
             }
         }

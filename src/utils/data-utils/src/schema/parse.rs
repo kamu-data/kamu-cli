@@ -20,7 +20,7 @@ use datafusion::prelude::SessionContext;
 ///
 ///   "a STRING, b INT NOT NULL, c TIMESTAMP"
 ///
-/// `force_utc_time` paratemeter is related to:
+/// `force_utc_time` parameter is related to:
 ///     https://github.com/apache/arrow-datafusion/issues/686
 ///
 /// DataFusion currently has inconsistent timezone handling behavior. It will
@@ -55,7 +55,7 @@ pub async fn parse_ddl_to_datafusion_schema(
 ///
 ///   "a STRING, b INT NOT NULL, c TIMESTAMP"
 ///
-/// `force_utc_time` paratemeter is related to:
+/// `force_utc_time` parameter is related to:
 ///     https://github.com/apache/arrow-datafusion/issues/686
 ///
 /// DataFusion currently has inconsistent timezone handling behavior. It will

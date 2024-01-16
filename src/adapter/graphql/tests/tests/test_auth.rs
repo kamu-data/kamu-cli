@@ -180,7 +180,7 @@ async fn test_account_details_expired_token() {
 
     assert!(res.is_err());
     assert_eq!(res.errors.len(), 1);
-    assert_eq!(res.errors[0].message, format!("Access token error"));
+    assert_eq!(res.errors[0].message, "Access token error".to_string());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////

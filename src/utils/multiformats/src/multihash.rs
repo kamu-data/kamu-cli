@@ -192,6 +192,10 @@ impl MultihashBytes {
         self.len
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
     pub fn as_slice(&self) -> &[u8] {
         &self.buf[..self.len]
     }

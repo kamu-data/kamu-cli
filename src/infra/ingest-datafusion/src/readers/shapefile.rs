@@ -88,7 +88,7 @@ impl ReaderEsriShapefile {
         Ok(temp_json_path)
     }
 
-    // TODO: PERF: Consider subPath argumemnt to skip extracting unrelated data
+    // TODO: PERF: Consider subPath argument to skip extracting unrelated data
     fn extract_zip(in_path: &Path, out_path: &Path) -> Result<(), InternalError> {
         std::fs::create_dir(out_path).int_err()?;
         let mut archive =
@@ -127,7 +127,7 @@ impl ReaderEsriShapefile {
             if path.is_file() {
                 Ok(path)
             } else {
-                // Try globbed match
+                // Try globed match
                 let matches: Vec<_> = glob::glob(path.to_str().unwrap())
                     .int_err()?
                     .filter_map(|e| e.ok())
@@ -156,17 +156,19 @@ impl ReaderEsriShapefile {
         } else {
             let shp_files = list_shp_files();
 
-            if shp_files.len() == 1 {
-                Ok(shp_files.into_iter().next().unwrap())
-            } else if shp_files.len() > 1 {
-                Err(bad_input!(
+            use std::cmp::Ordering;
+
+            match shp_files.len().cmp(&1) {
+                Ordering::Equal => Ok(shp_files.into_iter().next().unwrap()),
+                Ordering::Greater => Err(bad_input!(
                     "Archive contains multiple .shp files. Specify `subPath` argument to select \
                      one of:\n  - {}",
                     to_relative_paths(shp_files).join("\n  - ")
                 )
-                .into())
-            } else {
-                Err(BadInputError::new("Archive does not contain any .shp files").into())
+                .into()),
+                Ordering::Less => {
+                    Err(BadInputError::new("Archive does not contain any .shp files").into())
+                }
             }
         }
     }

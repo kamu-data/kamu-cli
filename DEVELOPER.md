@@ -81,7 +81,7 @@ New to Rust? Check out these [IDE configuration tip](#ide-tips).
 ### Configure Podman as Default Runtime (Recommended)
 Set podman as preferred runtime for your user:
 ```shell
-cargo run --bin kamu-cli -- config set --user engine.runtime podman
+cargo run -- config set --user engine.runtime podman
 ```
 
 When you run tests or use `kamu` anywhere in your user directory you will now use `podman` runtime.
@@ -209,7 +209,7 @@ In the `/src` directory you will find:
   - Crates here **combine all layers above into functional applications**
 
 ### Dependency Injection
-This architecture relies heavily on separation of interfaces from implementations and [dependency inversion principle](https://martinfowler.com/articles/injection.html), so we are using a homegown dependency injection library [`dill`](https://github.com/sergiimk/dill-rs) to simplify glueing these pieces together.
+This architecture relies heavily on separation of interfaces from implementations and [dependency inversion principle](https://martinfowler.com/articles/injection.html), so we are using a homegrown dependency injection library [`dill`](https://github.com/sergiimk/dill-rs) to simplify gluing these pieces together.
 
 ### Async
 The system is built to be highly-concurrent and, for better or worse, the explicit `async/await` style concurrency is most prevalent in Rust libraries now. Therefore:
@@ -220,7 +220,7 @@ The system is built to be highly-concurrent and, for better or worse, the explic
 
 ### Error Handling
 Our error handling approach is still evolving, but here are some basic design rules we settled on:
-- We don't return `Box<dyn Error>` or any fancier alternatves (like `anyhow` or `error_stack`) - we want users to be able to handle our errors precisely
+- We don't return `Box<dyn Error>` or any fancier alternatives (like `anyhow` or `error_stack`) - we want users to be able to handle our errors precisely
 - We don't put all errors into a giant enum - this is as hard for users to handle as `Box<dyn Error>`
 - We are explicit about what can go wrong in every function - i.e. we define error types **per function**
 - Errors in domain interfaces typically carry `Internal(_)` enum variant for propagating errors that are not part of the normal flow
@@ -234,7 +234,7 @@ With these ideas in mind:
 ### Test Groups
 We use the homegrown [`test-group`](https://crates.io/crates/test-group) crate to organize tests in groups. The complete set of groups is:
 - `containerized` - for tests that spawn Docker/Podman containers
-- `engine` - for tests that involve any data engine or data framework (query, ingest, or transfrom paths), subsequently grouped by:
+- `engine` - for tests that involve any data engine or data framework (query, ingest, or transform paths), subsequently grouped by:
   - `datafusion` - tests that use Apache DataFusion
   - `spark` - tests that use Apache Spark
   - `flink` - tests that use Apache Flink
@@ -248,7 +248,7 @@ We use the homegrown [`test-group`](https://crates.io/crates/test-group) crate t
 ## Typical Workflows
 
 ### Feature Branches
-1. Our policy is to have `master` branch **always stable, ready to be released at any point in time**, thus all changes are developed on feature branches and merged to `master` only when they passess all the checks
+1. Our policy is to have `master` branch **always stable, ready to be released at any point in time**, thus all changes are developed on feature branches and merged to `master` only when they pass all the checks
 2. Continuous **upkeep** of our repo is every developer's responsibility, so before starting a feature branch check if [major dependency update](#major-dependencies-update) is due and perform it on a separate branch
 3. Please follow this convention for branch names:
    1. `bug/invalid-url-path-in-s3-store`
@@ -262,7 +262,7 @@ We use the homegrown [`test-group`](https://crates.io/crates/test-group) crate t
 6. Branches should have coarse-grained commits with good descriptions - otherwise commits should be squashed
 7. Follow [minor dependency update](#minor-dependencies-update) procedure - do it right before merging to avoid merge conflicts in `Cargo.lock` while you're maintaining your branch
 8. (Optional) We usually create a new release for every feature merged into `master`, so follow the [release procedure](#release-procedure)
-9. Maintainers who merge branches should do so via `git merge --ff-only` and NOT rebasing not to lose **commit signatures**
+9. Maintainers who merge branches should do so via `git merge --ff-only` and NOT rebasing to not lose **commit signatures**
 
 ### Release Procedure
 1. Start by either creating a release branch or with an existing feature branch
@@ -275,7 +275,7 @@ We use the homegrown [`test-group`](https://crates.io/crates/test-group) crate t
 5. Create PR, wait for tests, then merge as normal feature branch
 6. On `master` tag the latest commit with a new version: `git tag vX.Y.Z`.
 7. Push the tag to the repo: `git push origin tag vX.Y.Z`
-8. Github Actions will pick up the new tag and create a new GitHub release from it
+8. GitHub Actions will pick up the new tag and create a new GitHub release from it
 
 ### Minor Dependencies Update
 1. Run `cargo update` to pull in any minor updates
@@ -286,7 +286,7 @@ We use the homegrown [`test-group`](https://crates.io/crates/test-group) crate t
 1. (Optional) Start by upgrading your local tools: `cargo install-update -a`
 2. Run `cargo update` to pull in any minor releases first
 3. Run `cargo upgrade --dry-run` and see which packages have major upgrades
-4. To perfom major upgrades You can go crate by crate or all at once - it's up to you
+4. To perform major upgrades You can go crate by crate or all at once - it's up to you
 5. The tricky part is usually `arrow` and `datafusion` family of crates, to upgrade them you need to:
    1. See what is the latest version of `datafusion`
    2. Go to [datafusion repo](https://github.com/apache/arrow-datafusion/), switch to corresponding tag, and check its `Cargo.toml` to see which version of `arrow` it depends on
@@ -296,7 +296,7 @@ We use the homegrown [`test-group`](https://crates.io/crates/test-group) crate t
        ```
    4. Note that [arrow-digest](https://github.com/kamu-data/arrow-digest) is our repo versioned in lockstep with `arrow`, so if the right version of it is missing - you should update it as well
 6. If some updates prove to be difficult - ticket them up and leave a `# TODO:` comment in `Cargo.toml`
-7. Run `cargo update` again to to pull in any minor releases that were affected by your upgrades
+7. Run `cargo update` again to pull in any minor releases that were affected by your upgrades
 8. Run `cargo deny check` to audit new dependencies for duplicates and security advisories
 9. (Optional) Periodically run `cargo clean` to prevent your `target` dir from growing too big
 

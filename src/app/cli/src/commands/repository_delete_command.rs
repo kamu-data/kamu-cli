@@ -45,16 +45,10 @@ impl RepositoryDeleteCommand {
         let answer: String = input()
             .repeat_msg(msg)
             .default("n".to_owned())
-            .add_test(|v| match v.as_ref() {
-                "n" | "N" | "no" | "y" | "Y" | "yes" => true,
-                _ => false,
-            })
+            .add_test(|v| matches!(v.as_ref(), "n" | "N" | "no" | "y" | "Y" | "yes"))
             .get();
 
-        match answer.as_ref() {
-            "n" | "N" | "no" => false,
-            _ => true,
-        }
+        !matches!(answer.as_ref(), "n" | "N" | "no")
     }
 }
 
@@ -82,7 +76,7 @@ impl Command for RepositoryDeleteCommand {
             true
         } else {
             self.prompt_yes_no(&format!(
-                "{}: {}\nDo you whish to continue? [y/N]: ",
+                "{}: {}\nDo you wish to continue? [y/N]: ",
                 console::style("You are about to delete following repository(s)").yellow(),
                 repo_names
                     .iter()

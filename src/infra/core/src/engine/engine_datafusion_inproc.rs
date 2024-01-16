@@ -18,7 +18,7 @@ use opendatafabric::*;
 ///
 /// Being in-process, this engine is not properly versioned and ODF-compliant.
 /// We use it only for ingest preprocessing queries, as ingestion is
-/// fundamentally non-verifieable / non-reproducible.
+/// fundamentally non-verifiable / non-reproducible.
 pub struct EngineDatafusionInproc;
 
 impl EngineDatafusionInproc {

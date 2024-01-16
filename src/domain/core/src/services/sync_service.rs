@@ -108,7 +108,7 @@ pub enum SyncStage {
 
 #[derive(Debug, Clone, Default)]
 pub struct SyncStats {
-    /// Statitsics for the source party of the exchange
+    /// Statistics for the source party of the exchange
     pub src: SyncPartyStats,
     /// Estimated totals for the source party of the exchange
     pub src_estimated: SyncPartyStats,
@@ -123,7 +123,7 @@ pub struct SyncPartyStats {
     /// Number of metadata blocks read from the party
     pub metadata_blocks_read: usize,
     /// Number of metadata blocks written to the party
-    pub metadata_blocks_writen: usize,
+    pub metadata_blocks_written: usize,
     /// Number of checkpoint files read from the party
     pub checkpoints_read: usize,
     /// Number of checkpoint files written to the party

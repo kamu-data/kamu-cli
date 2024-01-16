@@ -54,13 +54,13 @@ impl ServerAccessTokensRecord {
         }
     }
 
-    pub fn token_for_account<'a>(&'a self, account_name: &AccountName) -> Option<&'a AccessToken> {
+    pub fn token_for_account(&self, account_name: &AccountName) -> Option<&AccessToken> {
         self.token_position(account_name)
             .map(|i| self.tokens.get(i).unwrap())
     }
 
     fn token_position(&self, account_name: &AccountName) -> Option<usize> {
-        // Note: linear search is fine for CLI scenarios, we don't expact long lists.
+        // Note: linear search is fine for CLI scenarios, we don't expect long lists.
         // While storing a vector of records instead of map greatly simplifies
         // serialization
         self.tokens

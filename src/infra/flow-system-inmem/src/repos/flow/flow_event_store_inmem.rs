@@ -117,7 +117,7 @@ impl EventStore<FlowState> for FlowEventStoreInMem {
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(%query, ?opts))]
-    fn get_events<'a>(&'a self, query: &FlowID, opts: GetEventsOpts) -> EventStream<'a, FlowEvent> {
+    fn get_events(&self, query: &FlowID, opts: GetEventsOpts) -> EventStream<FlowEvent> {
         self.inner.get_events(query, opts)
     }
 
@@ -171,11 +171,11 @@ impl FlowEventStore for FlowEventStoreInMem {
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id, ?flow_type))]
-    fn get_flows_by_dataset_of_type<'a>(
-        &'a self,
+    fn get_flows_by_dataset_of_type(
+        &self,
         dataset_id: &DatasetID,
         flow_type: DatasetFlowType,
-    ) -> FlowIDStream<'a> {
+    ) -> FlowIDStream {
         let dataset_id = dataset_id.clone();
 
         // TODO: This should be a buffered stream so we don't lock per record
@@ -214,7 +214,7 @@ impl FlowEventStore for FlowEventStoreInMem {
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(?flow_type))]
-    fn get_system_flows_of_type<'a>(&'a self, flow_type: SystemFlowType) -> FlowIDStream<'a> {
+    fn get_system_flows_of_type(&self, flow_type: SystemFlowType) -> FlowIDStream {
         let mut pos = {
             let state = self.inner.as_state();
             let g = state.lock().unwrap();
@@ -252,7 +252,7 @@ impl FlowEventStore for FlowEventStoreInMem {
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id))]
-    fn get_all_flows_by_dataset<'a>(&'a self, dataset_id: &DatasetID) -> FlowIDStream<'a> {
+    fn get_all_flows_by_dataset(&self, dataset_id: &DatasetID) -> FlowIDStream {
         let dataset_id = dataset_id.clone();
 
         // TODO: This should be a buffered stream so we don't lock per record
@@ -289,7 +289,7 @@ impl FlowEventStore for FlowEventStoreInMem {
     }
 
     #[tracing::instrument(level = "debug", skip_all)]
-    fn get_all_flows<'a>(&'a self) -> FlowIDStream<'a> {
+    fn get_all_flows(&self) -> FlowIDStream {
         // TODO: This should be a buffered stream so we don't lock per record
         Box::pin(async_stream::try_stream! {
             let mut pos = {

@@ -177,7 +177,7 @@ impl CompleteCommand {
         // Establish command context
         for arg in args[1..].iter() {
             for s in last_cmd.get_subcommands() {
-                if s.get_name() == *arg || s.get_visible_aliases().any(|a| &a == arg) {
+                if s.get_name() == *arg || s.get_visible_aliases().any(|a| a == arg) {
                     last_cmd = s;
                     break;
                 }
@@ -221,7 +221,7 @@ impl CompleteCommand {
             }
         }
 
-        // Complete positionals
+        // Complete positions
         for pos in last_cmd.get_positionals() {
             match pos.get_id().as_str() {
                 "alias" => self.complete_alias(output, to_complete).await,

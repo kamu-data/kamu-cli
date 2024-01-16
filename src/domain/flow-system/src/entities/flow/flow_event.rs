@@ -23,7 +23,7 @@ pub enum FlowEvent {
     StartConditionDefined(FlowEventStartConditionDefined),
     /// Queued for time
     Queued(FlowEventQueued),
-    /// Secondary triger added
+    /// Secondary trigger added
     TriggerAdded(FlowEventTriggerAdded),
     /// Scheduled/Rescheduled a task
     TaskScheduled(FlowEventTaskScheduled),

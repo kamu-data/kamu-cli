@@ -276,7 +276,7 @@ async fn test_dataset_tail_common(catalog: dill::Catalog, tempdir: &TempDir) {
     )
     .await;
 
-    // Corsses block boundary
+    // Crosses block boundary
     let df = query_svc.tail(&dataset_ref, 1, 2).await.unwrap();
 
     kamu_data_utils::testing::assert_data_eq(
@@ -357,7 +357,7 @@ async fn test_dataset_tail_unauthorized_common(catalog: dill::Catalog, tempdir: 
 
 #[test_group::group(engine, datafusion)]
 #[test_log::test(tokio::test)]
-async fn test_dataset_tail_unauhtorized_local_fs() {
+async fn test_dataset_tail_unauthorized_local_fs() {
     let tempdir = tempfile::tempdir().unwrap();
     let catalog =
         create_catalog_with_local_workspace(tempdir.path(), MockDatasetActionAuthorizer::denying())
@@ -367,7 +367,7 @@ async fn test_dataset_tail_unauhtorized_local_fs() {
 
 #[test_group::group(containerized, engine, datafusion)]
 #[test_log::test(tokio::test)]
-async fn test_dataset_tail_unauthroized_s3() {
+async fn test_dataset_tail_unauthorized_s3() {
     let s3 = LocalS3Server::new().await;
     let catalog =
         create_catalog_with_s3_workspace(&s3, MockDatasetActionAuthorizer::denying()).await;
@@ -456,7 +456,7 @@ async fn test_dataset_sql_unauthorized_local_fs() {
 
 #[test_group::group(containerized, engine, datafusion)]
 #[test_log::test(tokio::test)]
-async fn test_dataset_sql_unauthroized_s3() {
+async fn test_dataset_sql_unauthorized_s3() {
     let s3 = LocalS3Server::new().await;
     let catalog =
         create_catalog_with_s3_workspace(&s3, MockDatasetActionAuthorizer::denying()).await;

@@ -39,6 +39,7 @@ impl From<domain::EngineDesc> for EngineDesc {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+#[allow(clippy::enum_variant_names)]
 #[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum QueryDialect {
     SqlSpark,

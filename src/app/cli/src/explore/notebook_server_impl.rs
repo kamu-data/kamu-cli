@@ -56,7 +56,7 @@ impl NotebookServerImpl {
     pub async fn run<StartedClb, ShutdownClb>(
         &self,
         datasets_dir: &PathBuf,
-        run_info_dir: &PathBuf,
+        run_info_dir: &Path,
         address: Option<IpAddr>,
         port: Option<u16>,
         environment_vars: Vec<(String, String)>,
