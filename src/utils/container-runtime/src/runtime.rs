@@ -474,7 +474,12 @@ impl ContainerRuntime {
             path
         } else {
             let s = path.to_str().unwrap();
-            let s_norm = if s.starts_with("\\\\?\\") { &s[4..] } else { s };
+            let s_norm = if let Some(end) = s.strip_prefix("\\\\?\\") {
+                end
+            } else {
+                s
+            };
+
             PathBuf::from(s_norm)
         }
     }

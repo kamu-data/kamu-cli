@@ -129,21 +129,21 @@ macro_rules! newtype_str {
             }
         }
 
+        impl From<$typ> for String {
+            fn from(v: $typ) -> String {
+                (*v.0).into()
+            }
+        }
+
+        impl From<&$typ> for String {
+            fn from(v: &$typ) -> String {
+                (*v.0).into()
+            }
+        }
+
         impl From<&$typ> for $typ {
             fn from(v: &$typ) -> Self {
                 v.clone()
-            }
-        }
-
-        impl Into<String> for $typ {
-            fn into(self) -> String {
-                (*self.0).into()
-            }
-        }
-
-        impl Into<String> for &$typ {
-            fn into(self) -> String {
-                (*self.0).into()
             }
         }
 

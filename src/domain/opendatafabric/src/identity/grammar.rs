@@ -37,11 +37,7 @@ impl Grammar {
     }
 
     fn match_str<'a>(s: &'a str, prefix: &str) -> Option<(&'a str, &'a str)> {
-        if s.starts_with(prefix) {
-            Some((&s[0..prefix.len()], &s[prefix.len()..]))
-        } else {
-            None
-        }
+        s.strip_prefix(prefix).map(|end| (&s[0..prefix.len()], end))
     }
 
     fn match_alphanums(s: &str) -> Option<(&str, &str)> {
@@ -66,24 +62,20 @@ impl Grammar {
     #[allow(dead_code)]
     // Multibase = [a-zA-Z0-9+/=]+
     fn match_multibase(s: &str) -> Option<(&str, &str)> {
-        Self::match_predicate(s, |b| match b {
-            b'a'..=b'z' | b'A'..=b'Z' | b'0'..=b'9' | b'+' | b'/' | b'=' => true,
-            _ => false,
-        })
+        Self::match_predicate(
+            s,
+            |b| matches!(b, b'a'..=b'z' | b'A'..=b'Z' | b'0'..=b'9' | b'+' | b'/' | b'='),
+        )
     }
 
     fn match_scheme(s: &str) -> Option<(&str, &str)> {
-        let (h, t) = Self::match_predicate(s, |b| match b {
-            b'a'..=b'z' | b'A'..=b'Z' | b'0'..=b'9' => true,
-            _ => false,
-        })?;
+        let (h, t) =
+            Self::match_predicate(s, |b| matches!(b, b'a'..=b'z' | b'A'..=b'Z' | b'0'..=b'9'))?;
 
         let (hh, tt) = Self::match_zero_or_many(t, |s| {
             let (_, t) = Self::match_char(s, '+')?;
-            let (h, tt) = Self::match_predicate(t, |b| match b {
-                b'a'..=b'z' | b'A'..=b'Z' | b'0'..=b'9' => true,
-                _ => false,
-            })?;
+            let (h, tt) =
+                Self::match_predicate(t, |b| matches!(b, b'a'..=b'z' | b'A'..=b'Z' | b'0'..=b'9'))?;
             Some((&s[0..h.len() + 1], tt))
         })?;
 

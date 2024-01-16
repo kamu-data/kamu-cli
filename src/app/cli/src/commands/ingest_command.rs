@@ -154,7 +154,7 @@ impl Command for IngestCommand {
         let listener = if !self.output_config.is_tty
             || self.output_config.quiet
             || self.output_config.verbosity_level != 0
-            || (self.output_config.is_tty && self.stdin)
+            || self.stdin
         {
             None
         } else {

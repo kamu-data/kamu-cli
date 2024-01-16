@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::Arc;
 
 use kamu::domain::*;
@@ -47,7 +47,7 @@ impl WorkspaceService {
         }
     }
 
-    fn try_read_workspace_from_env(cwd: &PathBuf) -> Option<WorkspaceLayout> {
+    fn try_read_workspace_from_env(cwd: &Path) -> Option<WorkspaceLayout> {
         std::env::var_os(ENV_VAR_KAMU_WORKSPACE)
             .map(|workspace| cwd.join(workspace).join(KAMU_WORKSPACE_DIR_NAME))
             .map(WorkspaceLayout::new)

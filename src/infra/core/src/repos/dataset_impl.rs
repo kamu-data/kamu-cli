@@ -133,12 +133,12 @@ where
         current_head: &Multihash,
         last_seen: Option<&Multihash>,
     ) -> Result<UpdateSummaryIncrement, GetSummaryError> {
+        use tokio_stream::StreamExt;
+
         let mut block_stream =
             self.metadata_chain
                 .iter_blocks_interval(current_head, last_seen, true);
-
-        use tokio_stream::StreamExt;
-        let mut increment: UpdateSummaryIncrement = UpdateSummaryIncrement {
+        let mut increment = UpdateSummaryIncrement {
             seen_head: Some(current_head.clone()),
             ..Default::default()
         };

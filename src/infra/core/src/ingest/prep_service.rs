@@ -38,7 +38,7 @@ impl PrepService {
         for step in prep_steps.iter() {
             stream = match step {
                 PrepStep::Pipe(p) => Box::new(
-                    PipeStream::new(&p.command, stream)
+                    PipeStream::new(p.command.clone(), stream)
                         .map_err(|e| PollingIngestError::pipe(p.command.clone(), e))?,
                 ),
                 PrepStep::Decompress(dc) => match dc.format {
@@ -50,7 +50,7 @@ impl PrepService {
             };
         }
 
-        let sink = Box::new(FileSink::new(File::create(target_path).int_err()?, stream));
+        let sink = FileSink::new(File::create(target_path).int_err()?, stream);
 
         sink.join()?;
 
@@ -100,7 +100,7 @@ struct PipeStream {
 }
 
 impl PipeStream {
-    fn new(cmd: &Vec<String>, mut input: Box<dyn Stream>) -> Result<Self, IOError> {
+    fn new(cmd: Vec<String>, mut input: Box<dyn Stream>) -> Result<Self, IOError> {
         let mut process = Command::new(cmd.first().unwrap())
             .args(&cmd[1..])
             .stdin(Stdio::piped())
@@ -109,7 +109,6 @@ impl PipeStream {
 
         let stdout = process.stdout.take().unwrap();
         let mut stdin = process.stdin.take().unwrap();
-        let cmd = cmd.clone();
         let ingress = std::thread::Builder::new()
             .name("pipe_stream".to_owned())
             .spawn(move || {
@@ -344,7 +343,7 @@ impl FileSink {
         Self { ingress }
     }
 
-    fn join(self: Box<Self>) -> Result<(), PollingIngestError> {
+    fn join(self) -> Result<(), PollingIngestError> {
         self.ingress.join().unwrap()
     }
 }

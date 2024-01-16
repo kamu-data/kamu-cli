@@ -103,7 +103,7 @@ fn write_output<T: serde::Serialize>(
     // output
     match output_format {
         "json" => serde_json::to_writer_pretty(std::io::stdout(), &value).int_err()?,
-        "shell" | "yaml" | _ => serde_yaml::to_writer(std::io::stdout(), &value).int_err()?,
+        _ => serde_yaml::to_writer(std::io::stdout(), &value).int_err()?,
     }
 
     Ok(())

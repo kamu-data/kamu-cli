@@ -156,17 +156,19 @@ impl ReaderEsriShapefile {
         } else {
             let shp_files = list_shp_files();
 
-            if shp_files.len() == 1 {
-                Ok(shp_files.into_iter().next().unwrap())
-            } else if shp_files.len() > 1 {
-                Err(bad_input!(
+            use std::cmp::Ordering;
+
+            match shp_files.len().cmp(&1) {
+                Ordering::Equal => Ok(shp_files.into_iter().next().unwrap()),
+                Ordering::Greater => Err(bad_input!(
                     "Archive contains multiple .shp files. Specify `subPath` argument to select \
                      one of:\n  - {}",
                     to_relative_paths(shp_files).join("\n  - ")
                 )
-                .into())
-            } else {
-                Err(BadInputError::new("Archive does not contain any .shp files").into())
+                .into()),
+                Ordering::Less => {
+                    Err(BadInputError::new("Archive does not contain any .shp files").into())
+                }
             }
         }
     }

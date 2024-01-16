@@ -410,15 +410,11 @@ where
                     false,
                 );
                 while let Some((_, block)) = blocks.try_next().await.int_err()? {
-                    match block.event {
-                        MetadataEvent::AddPushSource(e) => {
-                            invalid_event!(
-                                e.clone(),
-                                "Cannot add a polling source while some push sources are still \
-                                 active",
-                            );
-                        }
-                        _ => (),
+                    if let MetadataEvent::AddPushSource(e) = block.event {
+                        invalid_event!(
+                            e.clone(),
+                            "Cannot add a polling source while some push sources are still active",
+                        );
                     }
                 }
                 Ok(())
@@ -448,14 +444,11 @@ where
                     false,
                 );
                 while let Some((_, block)) = blocks.try_next().await.int_err()? {
-                    match block.event {
-                        MetadataEvent::SetPollingSource(e) => {
-                            invalid_event!(
-                                e.clone(),
-                                "Cannot add a push source while polling source is still active",
-                            );
-                        }
-                        _ => (),
+                    if let MetadataEvent::SetPollingSource(e) = block.event {
+                        invalid_event!(
+                            e.clone(),
+                            "Cannot add a push source while polling source is still active",
+                        );
                     }
                 }
 

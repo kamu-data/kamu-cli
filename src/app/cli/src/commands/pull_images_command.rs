@@ -23,7 +23,7 @@ pub struct PullImagesCommand {
 }
 
 impl PullImagesCommand {
-    pub fn new<'a>(
+    pub fn new(
         container_runtime: Arc<ContainerRuntime>,
         engine_config: Arc<EngineProvisionerLocalConfig>,
         jupyter_config: Arc<JupyterConfig>,

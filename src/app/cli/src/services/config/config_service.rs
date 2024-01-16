@@ -133,16 +133,14 @@ impl ConfigService {
 
         let mut buffer = String::new();
 
-        let mut nesting = 0;
-        for subkey in key.split('.') {
+        for (nesting, sub_key) in key.split('.').enumerate() {
             if nesting != 0 {
                 writeln!(buffer).unwrap();
             }
             for _ in 0..nesting {
                 write!(buffer, "  ").unwrap();
             }
-            write!(buffer, "{}:", subkey).unwrap();
-            nesting += 1;
+            write!(buffer, "{sub_key}:").unwrap();
         }
         write!(buffer, " {}", value).unwrap();
 

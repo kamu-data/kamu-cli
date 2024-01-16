@@ -279,9 +279,9 @@ async fn unpack_dataset_metadata_batch(objects_batch: ObjectsBatch) -> Vec<(Mult
         .map(|mut entry| {
             let entry_size = entry.size();
             let mut buf = vec![0_u8; entry_size as usize];
-            entry.read(buf.as_mut_slice()).unwrap();
+            entry.read_exact(buf.as_mut_slice()).unwrap();
 
-            let path = entry.path().unwrap().to_owned();
+            let path = entry.path().unwrap();
             let hash = Multihash::from_multibase(path.to_str().unwrap()).unwrap();
 
             (hash, buf)
