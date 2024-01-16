@@ -81,7 +81,7 @@ New to Rust? Check out these [IDE configuration tip](#ide-tips).
 ### Configure Podman as Default Runtime (Recommended)
 Set podman as preferred runtime for your user:
 ```shell
-cargo run --bin kamu-cli -- config set --user engine.runtime podman
+cargo run -- config set --user engine.runtime podman
 ```
 
 When you run tests or use `kamu` anywhere in your user directory you will now use `podman` runtime.
