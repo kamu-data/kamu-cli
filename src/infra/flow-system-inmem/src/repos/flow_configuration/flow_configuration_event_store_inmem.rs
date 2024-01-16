@@ -65,11 +65,11 @@ impl EventStore<FlowConfigurationState> for FlowConfigurationEventStoreInMem {
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(?query, ?opts))]
-    fn get_events<'a>(
-        &'a self,
+    fn get_events(
+        &self,
         query: &FlowKey,
         opts: GetEventsOpts,
-    ) -> EventStream<'a, FlowConfigurationEvent> {
+    ) -> EventStream<FlowConfigurationEvent> {
         self.inner.get_events(query, opts)
     }
 
@@ -93,7 +93,7 @@ impl EventStore<FlowConfigurationState> for FlowConfigurationEventStoreInMem {
 
 impl FlowConfigurationEventStore for FlowConfigurationEventStoreInMem {
     #[tracing::instrument(level = "debug", skip_all)]
-    fn list_all_dataset_ids<'a>(&'a self) -> DatasetIDStream<'a> {
+    fn list_all_dataset_ids(&self) -> DatasetIDStream {
         // TODO: re-consider performance impact
         Box::pin(tokio_stream::iter(
             self.inner.as_state().lock().unwrap().dataset_ids.clone(),

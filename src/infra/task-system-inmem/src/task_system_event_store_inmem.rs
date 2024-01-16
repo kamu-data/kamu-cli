@@ -83,11 +83,7 @@ impl EventStore<TaskState> for TaskSystemEventStoreInMemory {
         self.inner.len().await
     }
 
-    fn get_events<'a>(
-        &'a self,
-        task_id: &TaskID,
-        opts: GetEventsOpts,
-    ) -> EventStream<'a, TaskEvent> {
+    fn get_events(&self, task_id: &TaskID, opts: GetEventsOpts) -> EventStream<TaskEvent> {
         self.inner.get_events(task_id, opts)
     }
 
@@ -114,7 +110,7 @@ impl TaskSystemEventStore for TaskSystemEventStoreInMemory {
         self.inner.as_state().lock().unwrap().next_task_id()
     }
 
-    fn get_tasks_by_dataset<'a>(&'a self, dataset_id: &DatasetID) -> TaskIDStream<'a> {
+    fn get_tasks_by_dataset(&self, dataset_id: &DatasetID) -> TaskIDStream {
         let dataset_id = dataset_id.clone();
 
         // TODO: This should be a buffered stream so we don't lock per record

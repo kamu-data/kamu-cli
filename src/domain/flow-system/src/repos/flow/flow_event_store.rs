@@ -31,11 +31,11 @@ pub trait FlowEventStore: EventStore<FlowState> {
 
     /// Returns the flows of certain type associated with the specified dataset
     /// in reverse chronological order based on creation time
-    fn get_flows_by_dataset_of_type<'a>(
-        &'a self,
+    fn get_flows_by_dataset_of_type(
+        &self,
         dataset_id: &DatasetID,
         flow_type: DatasetFlowType,
-    ) -> FlowIDStream<'a>;
+    ) -> FlowIDStream;
 
     /// Returns the flows of certain type in reverse chronological order based
     /// on creation time
@@ -43,7 +43,7 @@ pub trait FlowEventStore: EventStore<FlowState> {
 
     /// Returns the flows of any type associated with the specified dataset
     /// in reverse chronological order based on creation time
-    fn get_all_flows_by_dataset<'a>(&'a self, dataset_id: &DatasetID) -> FlowIDStream<'a>;
+    fn get_all_flows_by_dataset(&self, dataset_id: &DatasetID) -> FlowIDStream;
 
     /// Returns the flows of any type in reverse chronological order
     /// based on creation time

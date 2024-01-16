@@ -54,7 +54,7 @@ impl ServerAccessTokensRecord {
         }
     }
 
-    pub fn token_for_account<'a>(&'a self, account_name: &AccountName) -> Option<&'a AccessToken> {
+    pub fn token_for_account(&self, account_name: &AccountName) -> Option<&AccessToken> {
         self.token_position(account_name)
             .map(|i| self.tokens.get(i).unwrap())
     }
