@@ -233,7 +233,7 @@ async fn test_crud_cron_root_dataset() {
         })
     );
 
-    let mutation_code = FlowConfigHarness::set_config_cron_expression_multation(
+    let mutation_code = FlowConfigHarness::set_config_cron_expression_mutation(
         &create_result.dataset_handle.id,
         "INGEST",
         false,
@@ -275,7 +275,7 @@ async fn test_crud_cron_root_dataset() {
         })
     );
 
-    let mutation_code = FlowConfigHarness::set_config_cron_expression_multation(
+    let mutation_code = FlowConfigHarness::set_config_cron_expression_mutation(
         &create_result.dataset_handle.id,
         "INGEST",
         true,
@@ -319,7 +319,7 @@ async fn test_crud_cron_root_dataset() {
 
     // Try to pass invalid cron expression
     let invalid_cron_expression = "0 0 */1 *";
-    let mutation_code = FlowConfigHarness::set_config_cron_expression_multation(
+    let mutation_code = FlowConfigHarness::set_config_cron_expression_mutation(
         &create_result.dataset_handle.id,
         "INGEST",
         true,
@@ -340,7 +340,7 @@ async fn test_crud_cron_root_dataset() {
 
     // Try to pass valid cron expression from past
     let past_cron_expression = "0 0 0 1 JAN ? 2024";
-    let mutation_code = FlowConfigHarness::set_config_cron_expression_multation(
+    let mutation_code = FlowConfigHarness::set_config_cron_expression_mutation(
         &create_result.dataset_handle.id,
         "INGEST",
         true,
@@ -521,7 +521,7 @@ async fn test_incorrect_dataset_kinds_for_flow_type() {
 
     ////
 
-    let mutation_code = FlowConfigHarness::set_config_cron_expression_multation(
+    let mutation_code = FlowConfigHarness::set_config_cron_expression_mutation(
         &create_derived_result.dataset_handle.id,
         "INGEST",
         false,
@@ -608,7 +608,7 @@ async fn test_anonymous_setters_fail() {
             30,
             "MINUTES",
         ),
-        FlowConfigHarness::set_config_cron_expression_multation(
+        FlowConfigHarness::set_config_cron_expression_mutation(
             &create_root_result.dataset_handle.id,
             "INGEST",
             false,
@@ -764,7 +764,7 @@ impl FlowConfigHarness {
         .replace("<unit>", unit)
     }
 
-    fn set_config_cron_expression_multation(
+    fn set_config_cron_expression_mutation(
         id: &DatasetID,
         dataset_flow_type: &str,
         paused: bool,
@@ -820,7 +820,7 @@ impl FlowConfigHarness {
         dataset_flow_type: &str,
         paused: bool,
         throttling_period: (u64, &str),
-        minimial_data_batch: u64,
+        minimal_data_batch: u64,
     ) -> String {
         indoc!(
             r#"
@@ -871,7 +871,7 @@ impl FlowConfigHarness {
         .replace("<paused>", if paused { "true" } else { "false" })
         .replace("<every>", &throttling_period.0.to_string())
         .replace("<unit>", throttling_period.1)
-        .replace("<min_data_batch>", &minimial_data_batch.to_string())
+        .replace("<min_data_batch>", &minimal_data_batch.to_string())
     }
 }
 

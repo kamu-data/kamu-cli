@@ -391,7 +391,7 @@ impl SimpleTransferProtocol {
         mut stats: SyncStats,
     ) -> Result<(), SyncError> {
         // Update stats estimates based on metadata
-        stats.dst_estimated.metadata_blocks_writen += blocks.len();
+        stats.dst_estimated.metadata_blocks_written += blocks.len();
         for block in blocks.iter().filter_map(|(_, b)| b.as_data_stream_block()) {
             if let Some(data_slice) = block.event.new_data {
                 stats.src_estimated.data_slices_read += 1;
@@ -500,7 +500,7 @@ impl SimpleTransferProtocol {
                 Err(AppendError::Internal(e)) => Err(SyncError::Internal(e)),
             }?;
 
-            stats.dst.metadata_blocks_writen += 1;
+            stats.dst.metadata_blocks_written += 1;
             listener.on_status(SyncStage::CommitBlocks, &stats);
         }
 

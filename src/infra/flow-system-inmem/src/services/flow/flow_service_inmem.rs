@@ -659,7 +659,7 @@ impl FlowService for FlowServiceInMemory {
     async fn get_last_system_flow_of_type(
         &self,
         flow_type: SystemFlowType,
-    ) -> Result<Option<FlowState>, GetLastSystemtFlowError> {
+    ) -> Result<Option<FlowState>, GetLastSystemFlowError> {
         let res = match self
             .flow_event_store
             .get_last_system_flow_of_type(flow_type)

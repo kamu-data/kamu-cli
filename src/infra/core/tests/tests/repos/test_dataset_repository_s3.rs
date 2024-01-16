@@ -214,7 +214,7 @@ async fn test_rename_unauthorized() {
     let s3 = LocalS3Server::new().await;
     let harness = S3RepoHarness::create(&s3, MockDatasetActionAuthorizer::denying(), true).await;
 
-    test_dataset_repository_shared::test_rename_dataset_unauthroized(
+    test_dataset_repository_shared::test_rename_dataset_unauthorized(
         harness.dataset_repo.as_ref(),
         None,
     )
@@ -260,7 +260,7 @@ async fn test_delete_unauthorized() {
     let harness = S3RepoHarness::create(&s3, MockDatasetActionAuthorizer::denying(), true).await;
     harness.dependencies_eager_initialization().await;
 
-    test_dataset_repository_shared::test_delete_dataset_unauthroized(
+    test_dataset_repository_shared::test_delete_dataset_unauthorized(
         harness.dataset_repo.as_ref(),
         None,
     )

@@ -36,7 +36,7 @@ pub struct ScheduleTimeDelta {
 #[derive(Error, Debug)]
 pub enum ScheduleError {
     #[error(transparent)]
-    InvalidCronExptression(#[from] InvalidCronExpressionError),
+    InvalidCronExpression(#[from] InvalidCronExpressionError),
 
     #[error(transparent)]
     CronExpressionIterationExceed(#[from] CronExpressionIterationError),
@@ -62,7 +62,7 @@ impl Schedule {
     ) -> Result<CronSchedule, ScheduleError> {
         let schedule = match CronSchedule::from_str(&cron_expression) {
             Err(_) => {
-                return Err(ScheduleError::InvalidCronExptression(
+                return Err(ScheduleError::InvalidCronExpression(
                     InvalidCronExpressionError {
                         expression: cron_expression.clone(),
                     },

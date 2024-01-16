@@ -144,7 +144,7 @@ where
         let (event_id, event) = match event_stream.next().await {
             Some(Ok(v)) => v,
             Some(Err(GetEventsError::Internal(err))) => return Err(err.into()),
-            None => return Err(AggrateNotFoundError::new(query).into()),
+            None => return Err(AggregateNotFoundError::new(query).into()),
         };
 
         let mut agg = Self::from_stored_event(query.clone(), event_id, event)?;
@@ -344,7 +344,7 @@ pub struct LoadOpts {
 #[derive(thiserror::Error, Debug)]
 pub enum LoadError<Proj: Projection> {
     #[error(transparent)]
-    NotFound(#[from] AggrateNotFoundError<Proj::Query>),
+    NotFound(#[from] AggregateNotFoundError<Proj::Query>),
     #[error(transparent)]
     ProjectionError(ProjectionError<Proj>),
     #[error(transparent)]
@@ -429,11 +429,11 @@ impl From<SaveEventsError> for SaveError {
 
 #[derive(thiserror::Error, Debug)]
 #[error("Aggregate {query:?} not found")]
-pub struct AggrateNotFoundError<Query> {
+pub struct AggregateNotFoundError<Query> {
     pub query: Query,
 }
 
-impl<Query> AggrateNotFoundError<Query> {
+impl<Query> AggregateNotFoundError<Query> {
     pub fn new(query: Query) -> Self {
         Self { query }
     }

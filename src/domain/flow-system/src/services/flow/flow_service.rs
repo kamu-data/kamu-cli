@@ -69,7 +69,7 @@ pub trait FlowService: Sync + Send {
     async fn get_last_system_flow_of_type(
         &self,
         flow_type: SystemFlowType,
-    ) -> Result<Option<FlowState>, GetLastSystemtFlowError>;
+    ) -> Result<Option<FlowState>, GetLastSystemFlowError>;
 
     /// Returns current state of a given flow
     async fn get_flow(&self, flow_id: FlowID) -> Result<FlowState, GetFlowError>;
@@ -113,7 +113,7 @@ pub enum GetLastDatasetFlowError {
 }
 
 #[derive(thiserror::Error, Debug)]
-pub enum GetLastSystemtFlowError {
+pub enum GetLastSystemFlowError {
     #[error(transparent)]
     Internal(#[from] InternalError),
 }

@@ -821,8 +821,8 @@ impl SyncListener for PrettySyncProgress {
                         .progress_chars("#>-");
                     pb.set_style(style);
                     pb.set_prefix(format!("({} > {})", self.remote_ref, self.local_ref));
-                    pb.set_length(stats.dst_estimated.metadata_blocks_writen as u64);
-                    pb.set_position(stats.dst.metadata_blocks_writen as u64);
+                    pb.set_length(stats.dst_estimated.metadata_blocks_written as u64);
+                    pb.set_position(stats.dst.metadata_blocks_written as u64);
                     pb.enable_steady_tick(Duration::from_millis(100));
                     pb
                 }
@@ -849,10 +849,10 @@ impl SyncListener for PrettySyncProgress {
             SyncStage::CommitBlocks => {
                 state
                     .progress
-                    .set_length(stats.dst_estimated.metadata_blocks_writen as u64);
+                    .set_length(stats.dst_estimated.metadata_blocks_written as u64);
                 state
                     .progress
-                    .set_position(stats.dst.metadata_blocks_writen as u64);
+                    .set_position(stats.dst.metadata_blocks_written as u64);
             }
         }
     }

@@ -40,8 +40,8 @@ impl Flow {
             fs::FlowKey::Dataset(fk_dataset) => {
                 FlowDescription::Dataset(self.dataset_flow_description(ctx, fk_dataset).await?)
             }
-            fs::FlowKey::System(fk_systen) => {
-                FlowDescription::System(self.system_flow_description(fk_systen))
+            fs::FlowKey::System(fk_system) => {
+                FlowDescription::System(self.system_flow_description(fk_system))
             }
         })
     }

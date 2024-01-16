@@ -71,7 +71,7 @@ struct C {
 }
 
 #[test]
-fn test_creates_backtrace_when_unavaiable() {
+fn test_creates_backtrace_when_unavailable() {
     let outer = C {
         source: A {
             backtrace: Backtrace::capture(),
