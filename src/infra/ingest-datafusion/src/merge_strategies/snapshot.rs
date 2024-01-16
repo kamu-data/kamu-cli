@@ -103,8 +103,10 @@ impl MergeStrategySnapshot {
             .alias(rank_col)])
             .int_err()?
             .filter(col(rank_col).eq(lit(1)).and(or(
-                col(&self.vocab.operation_type_column).eq(lit(Op::Append as u8)),
-                col(&self.vocab.operation_type_column).eq(lit(Op::CorrectTo as u8)),
+                // TODO: Cast to `u8` after Spark is updated
+                // See: https://github.com/kamu-data/kamu-cli/issues/445
+                col(&self.vocab.operation_type_column).eq(lit(Op::Append as i32)),
+                col(&self.vocab.operation_type_column).eq(lit(Op::CorrectTo as i32)),
             )))
             .int_err()?
             .without_columns(&[rank_col])
@@ -256,9 +258,11 @@ impl MergeStrategySnapshot {
         let pk = self.primary_key.first().unwrap().as_str();
         let mut select_app_retr_correct_to = Vec::new();
         select_app_retr_correct_to.push(
-            when(old_col(pk).is_null(), lit(Op::Append as u8))
-                .when(new_col(pk).is_null(), lit(Op::Retract as u8))
-                .otherwise(lit(Op::CorrectTo as u8))?
+            // TODO: Cast to `u8` after Spark is updated
+            // See: https://github.com/kamu-data/kamu-cli/issues/445
+            when(old_col(pk).is_null(), lit(Op::Append as i32))
+                .when(new_col(pk).is_null(), lit(Op::Retract as i32))
+                .otherwise(lit(Op::CorrectTo as i32))?
                 .alias(&self.vocab.operation_type_column),
         );
         select_app_retr_correct_to.extend(new.schema().fields().iter().map(|f| {
@@ -270,8 +274,10 @@ impl MergeStrategySnapshot {
 
         // Select expression for -C part of UNION ALL
         let mut select_correct_from = Vec::new();
+        // TODO: Cast to `u8` after Spark is updated
+        // See: https://github.com/kamu-data/kamu-cli/issues/445
         select_correct_from
-            .push(lit(Op::CorrectFrom as u8).alias(&self.vocab.operation_type_column));
+            .push(lit(Op::CorrectFrom as i32).alias(&self.vocab.operation_type_column));
         select_correct_from.extend(
             new.schema()
                 .fields()
@@ -336,7 +342,9 @@ impl MergeStrategy for MergeStrategySnapshot {
             let df = new
                 .with_column(
                     &self.vocab.operation_type_column,
-                    lit(odf::OperationType::Append as u8),
+                    // TODO: Cast to `u8` after Spark is updated
+                    // See: https://github.com/kamu-data/kamu-cli/issues/445
+                    lit(odf::OperationType::Append as i32),
                 )
                 .int_err()?
                 .columns_to_front(&[&self.vocab.operation_type_column])

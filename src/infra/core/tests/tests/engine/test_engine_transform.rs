@@ -13,9 +13,8 @@ use std::sync::Arc;
 
 use chrono::{TimeZone, Utc};
 use container_runtime::*;
-use datafusion::arrow::datatypes::DataType;
 use datafusion::arrow::record_batch::RecordBatch;
-use datafusion::common::{DFField, DFSchema};
+use datafusion::common::DFSchema;
 use dill::Component;
 use event_bus::EventBus;
 use futures::StreamExt;
@@ -372,8 +371,8 @@ async fn test_transform_common(transform: Transform) {
         indoc!(
             r#"
             message arrow_schema {
-              REQUIRED INT64 offset (INTEGER(64,false));
-              REQUIRED INT32 op (INTEGER(8,false));
+              REQUIRED INT64 offset;
+              REQUIRED INT32 op;
               REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
               REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
               OPTIONAL BYTE_ARRAY city (STRING);
@@ -444,8 +443,8 @@ async fn test_transform_common(transform: Transform) {
         indoc!(
             r#"
             message arrow_schema {
-              REQUIRED INT64 offset (INTEGER(64,false));
-              REQUIRED INT32 op (INTEGER(8,false));
+              REQUIRED INT64 offset;
+              REQUIRED INT32 op;
               REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
               REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
               OPTIONAL BYTE_ARRAY city (STRING);
@@ -559,34 +558,22 @@ fn normalize_schema(s: &DFSchema, engine: &str) -> DFSchema {
                         _ => f.clone(),
                     },
                     // Spark:
-                    // - `offset` and `op` don't have unsigned logical types
                     // - produces optional `offset` and `event_time`
                     "spark" => match f.name().as_str() {
                         "offset" => {
-                            assert_matches!(*f.data_type(), DataType::Int64);
                             assert!(f.is_nullable());
-                            DFField::new_unqualified(f.name(), DataType::UInt64, false)
+                            f.clone().with_nullable(false)
                         }
                         "op" => {
-                            assert_matches!(*f.data_type(), DataType::Int32);
                             assert!(f.is_nullable());
-                            DFField::new_unqualified(f.name(), DataType::UInt8, false)
+                            f.clone().with_nullable(false)
                         }
                         "event_time" => f.clone().with_nullable(false),
                         _ => f.clone(),
                     },
                     // Flink:
-                    // - `offset` and `op` don't have unsigned logical types
                     // - produces optional `event_time`
                     "flink" => match f.name().as_str() {
-                        "offset" => {
-                            assert_matches!(*f.data_type(), DataType::Int64);
-                            DFField::new_unqualified(f.name(), DataType::UInt64, f.is_nullable())
-                        }
-                        "op" => {
-                            assert_matches!(*f.data_type(), DataType::Int32);
-                            DFField::new_unqualified(f.name(), DataType::UInt8, f.is_nullable())
-                        }
                         "event_time" => f.clone().with_nullable(false),
                         _ => f.clone(),
                     },

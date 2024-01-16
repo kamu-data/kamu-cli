@@ -32,7 +32,9 @@ impl MergeStrategy for MergeStrategyAppend {
         let df = new
             .with_column(
                 &self.vocab.operation_type_column,
-                lit(odf::OperationType::Append as u8),
+                // TODO: Cast to `u8` after Spark is updated
+                // See: https://github.com/kamu-data/kamu-cli/issues/445
+                lit(odf::OperationType::Append as i32),
             )
             .int_err()?
             .columns_to_front(&[&self.vocab.operation_type_column])

@@ -346,7 +346,9 @@ impl DataWriterDataFusion {
                 &self.meta.vocab.offset_column,
                 cast(
                     col(&self.meta.vocab.offset_column as &str) + lit(start_offset as i64 - 1),
-                    DataType::UInt64,
+                    // TODO: Replace with UInt64 after Spark is updated
+                    // See: https://github.com/kamu-data/kamu-cli/issues/445
+                    DataType::Int64,
                 ),
             )
             .int_err()?;
@@ -462,12 +464,7 @@ impl DataWriterDataFusion {
         path: &Path,
         prev_watermark: Option<DateTime<Utc>>,
     ) -> Result<(odf::OffsetInterval, Option<DateTime<Utc>>), InternalError> {
-        use datafusion::arrow::array::{
-            Date32Array,
-            Date64Array,
-            TimestampMillisecondArray,
-            UInt64Array,
-        };
+        use datafusion::arrow::array::*;
 
         let df = self
             .ctx
@@ -506,23 +503,25 @@ impl DataWriterDataFusion {
         assert_eq!(batches.len(), 1);
         assert_eq!(batches[0].num_rows(), 1);
 
+        // TODO: Replace with UInt64Array after Spark is updated
+        // See: https://github.com/kamu-data/kamu-cli/issues/445
         let offset_min = batches[0]
             .column(0)
             .as_any()
-            .downcast_ref::<UInt64Array>()
+            .downcast_ref::<Int64Array>()
             .unwrap()
             .value(0);
 
         let offset_max = batches[0]
             .column(1)
             .as_any()
-            .downcast_ref::<UInt64Array>()
+            .downcast_ref::<Int64Array>()
             .unwrap()
             .value(0);
 
         let offset_interval = odf::OffsetInterval {
-            start: offset_min,
-            end: offset_max,
+            start: offset_min as u64,
+            end: offset_max as u64,
         };
 
         // Event time is either Date or Timestamp(Millisecond, UTC)
