@@ -67,7 +67,9 @@ where
     S: Into<String>,
 {
     let schema = Arc::new(Schema::new(vec![
-        Field::new("op", DataType::UInt8, false),
+        // TODO: Replace with UInt8 after Spark is updated
+        // See: https://github.com/kamu-data/kamu-cli/issues/445
+        Field::new("op", DataType::Int32, false),
         Field::new("year", DataType::Int32, false),
         Field::new("city", DataType::Utf8, false),
         Field::new("population", DataType::Int64, false),
@@ -79,7 +81,7 @@ where
     let mut population = Vec::new();
 
     for (o, y, c, p) in rows.into_iter() {
-        op.push(o as u8);
+        op.push(o as i32);
         year.push(y);
         city.push(c.into());
         population.push(p);
@@ -88,7 +90,7 @@ where
     let batch = RecordBatch::try_new(
         schema,
         vec![
-            Arc::new(array::UInt8Array::from(op)),
+            Arc::new(array::Int32Array::from(op)),
             Arc::new(array::Int32Array::from(year)),
             Arc::new(array::StringArray::from(city)),
             Arc::new(array::Int64Array::from(population)),

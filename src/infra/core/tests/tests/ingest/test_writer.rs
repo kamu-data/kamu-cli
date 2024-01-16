@@ -89,8 +89,8 @@ async fn test_data_writer_happy_path() {
         indoc!(
             r#"
             message arrow_schema {
-              OPTIONAL INT64 offset (INTEGER(64,false));
-              REQUIRED INT32 op (INTEGER(8,false));
+              OPTIONAL INT64 offset;
+              REQUIRED INT32 op;
               REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
               REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
               OPTIONAL BYTE_ARRAY city (STRING);
@@ -158,8 +158,8 @@ async fn test_data_writer_happy_path() {
         indoc!(
             r#"
             message arrow_schema {
-              OPTIONAL INT64 offset (INTEGER(64,false));
-              REQUIRED INT32 op (INTEGER(8,false));
+              OPTIONAL INT64 offset;
+              REQUIRED INT32 op;
               REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
               OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
               OPTIONAL BYTE_ARRAY city (STRING);
@@ -277,8 +277,8 @@ async fn test_data_writer_rejects_incompatible_schema() {
         indoc!(
             r#"
             message arrow_schema {
-              OPTIONAL INT64 offset (INTEGER(64,false));
-              REQUIRED INT32 op (INTEGER(8,false));
+              OPTIONAL INT64 offset;
+              REQUIRED INT32 op;
               REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
               REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
               OPTIONAL BYTE_ARRAY city (STRING);
@@ -328,8 +328,8 @@ async fn test_data_writer_rejects_incompatible_schema() {
         indoc!(
             r#"
             message arrow_schema {
-              OPTIONAL INT64 offset (INTEGER(64,false));
-              REQUIRED INT32 op (INTEGER(8,false));
+              OPTIONAL INT64 offset;
+              REQUIRED INT32 op;
               REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
               REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
               OPTIONAL BYTE_ARRAY city (STRING);
@@ -409,8 +409,8 @@ async fn test_data_writer_rejects_incompatible_schema() {
         indoc!(
             r#"
             message arrow_schema {
-              OPTIONAL INT64 offset (INTEGER(64,false));
-              REQUIRED INT32 op (INTEGER(8,false));
+              OPTIONAL INT64 offset;
+              REQUIRED INT32 op;
               REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
               REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
               OPTIONAL BYTE_ARRAY city (STRING);
@@ -468,8 +468,8 @@ async fn test_data_writer_ledger_orders_by_event_time() {
         indoc!(
             r#"
             message arrow_schema {
-              OPTIONAL INT64 offset (INTEGER(64,false));
-              REQUIRED INT32 op (INTEGER(8,false));
+              OPTIONAL INT64 offset;
+              REQUIRED INT32 op;
               REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
               OPTIONAL INT32 event_time (DATE);
               OPTIONAL BYTE_ARRAY city (STRING);
@@ -542,8 +542,8 @@ async fn test_data_writer_snapshot_orders_by_pk_and_operation_type() {
         indoc!(
             r#"
             message arrow_schema {
-              OPTIONAL INT64 offset (INTEGER(64,false));
-              REQUIRED INT32 op (INTEGER(8,false));
+              OPTIONAL INT64 offset;
+              REQUIRED INT32 op;
               REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
               REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
               OPTIONAL BYTE_ARRAY city (STRING);
@@ -605,8 +605,8 @@ async fn test_data_writer_snapshot_orders_by_pk_and_operation_type() {
         indoc!(
             r#"
             message arrow_schema {
-              OPTIONAL INT64 offset (INTEGER(64,false));
-              REQUIRED INT32 op (INTEGER(8,false));
+              OPTIONAL INT64 offset;
+              REQUIRED INT32 op;
               REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
               OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
               OPTIONAL BYTE_ARRAY city (STRING);
@@ -679,8 +679,8 @@ async fn test_data_writer_normalizes_timestamps_to_utc_millis() {
         indoc!(
             r#"
             message arrow_schema {
-              OPTIONAL INT64 offset (INTEGER(64,false));
-              REQUIRED INT32 op (INTEGER(8,false));
+              OPTIONAL INT64 offset;
+              REQUIRED INT32 op;
               REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
               OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
               OPTIONAL BYTE_ARRAY city (STRING);

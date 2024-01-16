@@ -115,8 +115,8 @@ async fn test_data_push_ingest_handler() {
                 indoc!(
                     r#"
                     message arrow_schema {
-                      OPTIONAL INT64 offset (INTEGER(64,false));
-                      REQUIRED INT32 op (INTEGER(8,false));
+                      OPTIONAL INT64 offset;
+                      REQUIRED INT32 op;
                       REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                       OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
                       OPTIONAL BYTE_ARRAY city (STRING);
@@ -226,8 +226,8 @@ async fn test_data_push_ingest_handler() {
                 indoc!(
                     r#"
                     message arrow_schema {
-                      OPTIONAL INT64 offset (INTEGER(64,false));
-                      REQUIRED INT32 op (INTEGER(8,false));
+                      OPTIONAL INT64 offset;
+                      REQUIRED INT32 op;
                       REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                       OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
                       OPTIONAL BYTE_ARRAY city (STRING);
@@ -287,8 +287,8 @@ async fn test_data_push_ingest_handler() {
                 indoc!(
                     r#"
                     message arrow_schema {
-                      OPTIONAL INT64 offset (INTEGER(64,false));
-                      REQUIRED INT32 op (INTEGER(8,false));
+                      OPTIONAL INT64 offset;
+                      REQUIRED INT32 op;
                       REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                       OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
                       OPTIONAL BYTE_ARRAY city (STRING);
