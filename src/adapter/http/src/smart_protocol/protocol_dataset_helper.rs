@@ -119,7 +119,7 @@ pub async fn prepare_dataset_transfer_estimate(
         num_blocks: blocks_count,
         num_objects: data_objects_count + checkpoint_objects_count,
         bytes_in_raw_blocks: bytes_in_blocks,
-        bytes_in_raw_objects: (bytes_in_data_objects + bytes_in_checkpoint_objects),
+        bytes_in_raw_objects: bytes_in_data_objects + bytes_in_checkpoint_objects,
     })
 }
 

@@ -521,8 +521,8 @@ impl DataWriterDataFusion {
             .value(0);
 
         let offset_interval = odf::OffsetInterval {
-            start: offset_min as u64,
-            end: offset_max as u64,
+            start: offset_min,
+            end: offset_max,
         };
 
         // Event time is either Date or Timestamp(Millisecond, UTC)

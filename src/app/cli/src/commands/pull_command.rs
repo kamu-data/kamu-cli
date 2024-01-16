@@ -84,7 +84,7 @@ impl PullCommand {
                     add_aliases: self.add_aliases,
                     ..Default::default()
                 },
-                listener.map(|v| v as Arc<dyn PullMultiListener>),
+                listener,
             )
             .await?)
     }

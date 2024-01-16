@@ -163,7 +163,7 @@ impl SimpleTransferProtocol {
                     message: "First metadata block is not Seed".to_owned(),
                     source: None,
                 })?;
-            let create_result = (dst_factory.unwrap())(seed_block).await?;
+            let create_result = dst_factory.unwrap()(seed_block).await?;
             (create_result.dataset, Some(create_result.head))
         };
 

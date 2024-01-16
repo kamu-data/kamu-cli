@@ -211,7 +211,7 @@ impl SyncServiceImpl {
         listener: Arc<dyn SyncListener>,
     ) -> Result<SyncResult, SyncError> {
         let odf_src_url = self.resolve_remote_dataset_url(src_ref).await?;
-        let http_src_url = Url::parse(&(odf_src_url.as_str())["odf+".len()..]).unwrap(); // odf+http, odf+https - cut odf+
+        let http_src_url = Url::parse(&odf_src_url.as_str()["odf+".len()..]).unwrap(); // odf+http, odf+https - cut odf+
 
         let (dst_dataset, dst_factory) = self
             .get_dataset_writer(dst_ref, opts.create_if_not_exists)
@@ -239,7 +239,7 @@ impl SyncServiceImpl {
         let src_dataset = self.get_dataset_reader(src).await?;
 
         let odf_dst_url = self.resolve_remote_dataset_url(odf_dst).await?;
-        let http_dst_url = Url::parse(&(odf_dst_url.as_str())[4..]).unwrap(); // odf+http, odf+https - cut odf+
+        let http_dst_url = Url::parse(&odf_dst_url.as_str()[4..]).unwrap(); // odf+http, odf+https - cut odf+
 
         let http_dst_ref = DatasetRefAny::Url(http_dst_url.clone().into());
         let maybe_dst_head = match self.get_dataset_reader(&http_dst_ref).await {

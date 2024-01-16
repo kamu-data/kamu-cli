@@ -113,7 +113,7 @@ where
                 .get::<DatasetRef>()
                 .expect("Dataset ref not found in http server extensions");
 
-            let action = (dataset_action_query)(&request);
+            let action = dataset_action_query(&request);
 
             match dataset_repo.resolve_dataset_ref(dataset_ref).await {
                 Ok(dataset_handle) => {

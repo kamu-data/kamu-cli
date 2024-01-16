@@ -551,7 +551,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
                         message: "First metadata block is not Seed".to_owned(),
                         source: None,
                     })?;
-                let create_result = (dst_factory.unwrap())(seed_block).await.int_err()?;
+                let create_result = dst_factory.unwrap()(seed_block).await.int_err()?;
                 assert_eq!(first_hash, create_result.head);
                 create_result.dataset
             };

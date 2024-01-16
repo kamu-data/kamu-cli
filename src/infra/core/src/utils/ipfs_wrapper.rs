@@ -11,15 +11,10 @@ use std::path::{Path, PathBuf};
 
 use kamu_core::*;
 
+#[derive(Default)]
 pub struct IpfsClient {
     ipfs_path: Option<PathBuf>,
     default_allow_offline: bool,
-}
-
-impl Default for IpfsClient {
-    fn default() -> Self {
-        Self::new(None as Option<PathBuf>, false)
-    }
 }
 
 impl IpfsClient {
