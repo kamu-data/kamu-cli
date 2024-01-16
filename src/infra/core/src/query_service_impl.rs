@@ -581,7 +581,7 @@ async fn read_data_slice_metadata(
         .map_err(|e| {
             tracing::error!(
                 error = ?e,
-                "QueryService::read_data_slice_metadata: Parquest reader get metadata failed"
+                "QueryService::read_data_slice_metadata: Parquet reader get metadata failed"
             );
             e
         })

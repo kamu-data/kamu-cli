@@ -79,8 +79,13 @@ publish = false
 
 
 [workspace.lints.clippy]
+# TODO enable back lint rules
+#      https://github.com/kamu-data/kamu-cli/issues/332
 new_without_default = "allow"
 too_many_arguments = "allow"
+large_enum_variant = "allow"
+result_large_err = "allow"
+module_inception = "allow"
 
 
 [profile.dev]

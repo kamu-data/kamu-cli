@@ -56,9 +56,9 @@ impl NamedObjectRepository for NamedObjectRepositoryIpfsHttp {
             // See: https://github.com/ipfs/kubo/issues/9514
             //
             // Note that we only do this in named repository as found / not-found matters most when
-            // we are checking for /refs/head to see if dataset exists. We prefer to get internall
+            // we are checking for /refs/head to see if dataset exists. We prefer to get internal
             // error on non existing block rather than risk confusing missing block with
-            // actuall server errors from Kubo.
+            // actual server errors from Kubo.
             Err(e)
                 if e.status() == Some(http::StatusCode::NOT_FOUND)
                     || e.status() == Some(http::StatusCode::INTERNAL_SERVER_ERROR) =>

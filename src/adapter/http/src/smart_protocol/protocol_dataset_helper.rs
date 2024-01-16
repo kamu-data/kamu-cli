@@ -119,7 +119,7 @@ pub async fn prepare_dataset_transfer_estimate(
         num_blocks: blocks_count,
         num_objects: data_objects_count + checkpoint_objects_count,
         bytes_in_raw_blocks: bytes_in_blocks,
-        bytes_in_raw_objects: (bytes_in_data_objects + bytes_in_checkpoint_objects),
+        bytes_in_raw_objects: bytes_in_data_objects + bytes_in_checkpoint_objects,
     })
 }
 
@@ -279,9 +279,9 @@ async fn unpack_dataset_metadata_batch(objects_batch: ObjectsBatch) -> Vec<(Mult
         .map(|mut entry| {
             let entry_size = entry.size();
             let mut buf = vec![0_u8; entry_size as usize];
-            entry.read(buf.as_mut_slice()).unwrap();
+            entry.read_exact(buf.as_mut_slice()).unwrap();
 
-            let path = entry.path().unwrap().to_owned();
+            let path = entry.path().unwrap();
             let hash = Multihash::from_multibase(path.to_str().unwrap()).unwrap();
 
             (hash, buf)

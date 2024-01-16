@@ -174,7 +174,7 @@ impl Command for AddCommand {
 
             if !already_exist.is_empty() {
                 let confirmed = common::prompt_yes_no(&format!(
-                    "{}: {}\n{}\nDo you whish to continue? [y/N]: ",
+                    "{}: {}\n{}\nDo you wish to continue? [y/N]: ",
                     console::style("You are about to replace following dataset(s)").yellow(),
                     already_exist
                         .iter()

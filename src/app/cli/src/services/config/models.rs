@@ -256,7 +256,6 @@ impl FrontendConfig {
     fn sample() -> Self {
         Self {
             jupyter: Some(JupyterConfig::sample()),
-            ..Self::default()
         }
     }
 }
@@ -365,10 +364,14 @@ fn merge_recursive<T>(left: &mut Option<T>, right: Option<T>)
 where
     T: Merge,
 {
-    if left.is_none() && right.is_some() {
-        left.replace(right.unwrap());
-    } else if left.is_some() && right.is_some() {
-        left.as_mut().unwrap().merge(right.unwrap());
+    let Some(r) = right else {
+        return;
+    };
+
+    if let Some(l) = left {
+        l.merge(r);
+    } else {
+        left.replace(r);
     }
 }
 

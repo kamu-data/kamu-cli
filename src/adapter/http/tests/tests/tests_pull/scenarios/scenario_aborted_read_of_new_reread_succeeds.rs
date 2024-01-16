@@ -72,8 +72,8 @@ impl<TServerHarness: ServerSideHarness>
             client_harness.dataset_layout(&server_create_result.dataset_handle.id, "foo");
 
         // Let's pretend that previous attempts uploaded some data files, but the rest
-        // was discarded. To mimic this, artifficially copy just the data folder,
-        // contaning a data block
+        // was discarded. To mimic this, artificially copy just the data folder,
+        // containing a data block
         copy_folder_recursively(
             &server_dataset_layout.data_dir,
             &client_dataset_layout.data_dir,

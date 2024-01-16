@@ -104,7 +104,7 @@ impl From<DidOdf> for DidKey {
     }
 }
 
-impl<'a> std::fmt::Debug for DidOdf {
+impl std::fmt::Debug for DidOdf {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_tuple(&format!("DidOdf<{:?}>", Multicodec::Ed25519Pub))
             .field(&self.as_multibase())

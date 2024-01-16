@@ -337,8 +337,7 @@ pub async fn test_rename_dataset_same_name_multiple_tenants(repo: &dyn DatasetRe
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
-
-pub async fn test_rename_dataset_unauthroized(
+pub async fn test_rename_dataset_unauthorized(
     repo: &dyn DatasetRepository,
     account_name: Option<AccountName>,
 ) {
@@ -417,8 +416,7 @@ pub async fn test_delete_dataset(repo: &dyn DatasetRepository, account_name: Opt
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
-
-pub async fn test_delete_dataset_unauthroized(
+pub async fn test_delete_dataset_unauthorized(
     repo: &dyn DatasetRepository,
     account_name: Option<AccountName>,
 ) {

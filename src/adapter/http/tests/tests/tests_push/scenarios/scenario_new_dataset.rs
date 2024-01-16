@@ -38,7 +38,7 @@ impl<TServerHarness: ServerSideHarness> SmartPushNewDatasetScenario<TServerHarne
         server_harness: TServerHarness,
     ) -> Self {
         let client_account_name = client_harness.operating_account_name();
-        let server_acount_name = server_harness.operating_account_name();
+        let server_account_name = server_harness.operating_account_name();
 
         let client_repo = client_harness.dataset_repository();
 
@@ -64,7 +64,7 @@ impl<TServerHarness: ServerSideHarness> SmartPushNewDatasetScenario<TServerHarne
 
         let server_dataset_layout = server_harness.dataset_layout(&DatasetHandle::new(
             client_create_result.dataset_handle.id.clone(),
-            DatasetAlias::new(server_acount_name.clone(), foo_name.clone()),
+            DatasetAlias::new(server_account_name.clone(), foo_name.clone()),
         ));
 
         let client_dataset_ref = make_dataset_ref(&client_account_name, "foo");
@@ -75,7 +75,7 @@ impl<TServerHarness: ServerSideHarness> SmartPushNewDatasetScenario<TServerHarne
         )
         .await;
 
-        let server_alias = DatasetAlias::new(server_acount_name, foo_name.clone());
+        let server_alias = DatasetAlias::new(server_account_name, foo_name.clone());
         let server_odf_url = server_harness.dataset_url(&server_alias);
         let server_dataset_ref = DatasetRefRemote::from(&server_odf_url);
 

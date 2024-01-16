@@ -2,6 +2,8 @@
 name = "kamu-cli"
 description = "Decentralized data management tool"
 categories = ["command-line-utilities"]
+# Run `kamu-cli` just with `cargo run`
+default-run = "kamu-cli"
 version = { workspace = true }
 homepage = { workspace = true }
 repository = { workspace = true }

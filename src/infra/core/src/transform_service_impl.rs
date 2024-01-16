@@ -733,7 +733,7 @@ impl TransformService for TransformServiceImpl {
     ) -> Result<Option<(Multihash, MetadataBlockTyped<SetTransform>)>, GetDatasetError> {
         let dataset = self.dataset_repo.get_dataset(dataset_ref).await?;
 
-        // TODO: Support tranform evolution
+        // TODO: Support transform evolution
         let source = dataset
             .as_metadata_chain()
             .iter_blocks()

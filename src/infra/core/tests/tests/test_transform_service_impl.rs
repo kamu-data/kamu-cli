@@ -593,14 +593,13 @@ async fn test_get_verification_plan_one_to_one() {
         deriv_chain.get_block(&deriv_head_t6).await.unwrap()
     );
 
-    assert_requests_eqivalent(&plan[0].request, deriv_req_t2);
-    assert_requests_eqivalent(&plan[1].request, deriv_req_t4);
-    assert_requests_eqivalent(&plan[2].request, deriv_req_t6);
+    assert_requests_equivalent(&plan[0].request, deriv_req_t2);
+    assert_requests_equivalent(&plan[1].request, deriv_req_t4);
+    assert_requests_equivalent(&plan[2].request, deriv_req_t6);
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
-
-fn assert_requests_eqivalent(lhs: &TransformRequestExt, mut rhs: TransformRequestExt) {
+fn assert_requests_equivalent(lhs: &TransformRequestExt, mut rhs: TransformRequestExt) {
     // Operation IDs are randomly generated, so ignoring them for this check
     rhs.operation_id = lhs.operation_id.clone();
 

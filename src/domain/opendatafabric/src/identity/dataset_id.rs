@@ -126,7 +126,7 @@ impl From<DatasetID> for DidKey {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-impl<'a> std::fmt::Debug for DatasetID {
+impl std::fmt::Debug for DatasetID {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_tuple(&format!("DatasetID<{:?}>", Multicodec::Ed25519Pub))
             .field(&self.did.as_multibase())
@@ -136,7 +136,7 @@ impl<'a> std::fmt::Debug for DatasetID {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-impl<'a> std::fmt::Display for DatasetID {
+impl std::fmt::Display for DatasetID {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.as_did_str())
     }

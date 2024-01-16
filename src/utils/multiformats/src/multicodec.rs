@@ -107,8 +107,7 @@ impl serde::Serialize for Multicodec {
 
 impl<'de> serde::Deserialize<'de> for Multicodec {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let s = deserializer.deserialize_string(MulticodecSerdeVisitor)?;
-        Self::try_from(s).map_err(serde::de::Error::custom)
+        deserializer.deserialize_string(MulticodecSerdeVisitor)
     }
 }
 

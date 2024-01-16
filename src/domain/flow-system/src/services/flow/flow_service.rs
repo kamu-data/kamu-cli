@@ -31,7 +31,7 @@ pub trait FlowService: Sync + Send {
         initiator_account_name: AccountName,
     ) -> Result<FlowState, RequestFlowError>;
 
-    /// Returns states of flows of certian type associated with a given dataset
+    /// Returns states of flows of certain type associated with a given dataset
     /// ordered by creation time from newest to oldest
     fn list_flows_by_dataset_of_type(
         &self,
@@ -39,7 +39,7 @@ pub trait FlowService: Sync + Send {
         flow_type: DatasetFlowType,
     ) -> Result<FlowStateStream, ListFlowsByDatasetError>;
 
-    /// Returns states of system flows of certian type
+    /// Returns states of system flows of certain type
     /// ordered by creation time from newest to oldest
     fn list_system_flows_of_type(
         &self,
@@ -65,11 +65,11 @@ pub trait FlowService: Sync + Send {
         flow_type: DatasetFlowType,
     ) -> Result<Option<FlowState>, GetLastDatasetFlowError>;
 
-    /// Returns state of the latest sstem flow of certain type
+    /// Returns state of the latest system flow of certain type
     async fn get_last_system_flow_of_type(
         &self,
         flow_type: SystemFlowType,
-    ) -> Result<Option<FlowState>, GetLastSystemtFlowError>;
+    ) -> Result<Option<FlowState>, GetLastSystemFlowError>;
 
     /// Returns current state of a given flow
     async fn get_flow(&self, flow_id: FlowID) -> Result<FlowState, GetFlowError>;
@@ -113,7 +113,7 @@ pub enum GetLastDatasetFlowError {
 }
 
 #[derive(thiserror::Error, Debug)]
-pub enum GetLastSystemtFlowError {
+pub enum GetLastSystemFlowError {
     #[error(transparent)]
     Internal(#[from] InternalError),
 }

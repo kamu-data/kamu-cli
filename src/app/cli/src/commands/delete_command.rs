@@ -72,7 +72,7 @@ impl Command for DeleteCommand {
             true
         } else {
             common::prompt_yes_no(&format!(
-                "{}: {}\n{}\nDo you whish to continue? [y/N]: ",
+                "{}: {}\n{}\nDo you wish to continue? [y/N]: ",
                 console::style("You are about to delete following dataset(s)").yellow(),
                 dataset_refs
                     .iter()

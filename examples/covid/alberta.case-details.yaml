@@ -11,7 +11,7 @@ content:
       fetch:
         kind: Url
         # Note: On July 15, 2023 Government of Alberta have stopped providing
-        # disaggregated data on COVID-19 cases. Another testament to how short-lived are the 
+        # disaggregated data on COVID-19 cases. Another testament to how short-lived are the
         # data pipelines that rely on constant human effort to keep running.
         # To keep the demo operational we have switched the source to use a last seen version of this dataset.
         #
@@ -34,7 +34,7 @@ content:
         kind: Ledger
         primaryKey:
           - id
-    # Tells kamu to use `date_reported` column as event time intead of the default `event_tume`
+    # Tells kamu to use `date_reported` column as event time instead of the default `event_time`
     - kind: SetVocab
       eventTimeColumn: date_reported
     - kind: SetInfo
@@ -67,7 +67,7 @@ content:
               - reporting Public Health Unit (PHU)
               - postal code, website, longitude, and latitude of PHU
 
-              This dataset is subject to change. Please review the daily epidemiologic summaries for information on variables, methodology, and technical considerations.
+              This dataset is subject to change. Please review the daily epidemiological summaries for information on variables, methodology, and technical considerations.
 
               **Related dataset(s)**:
               - [Daily aggregate count of confirmed positive cases of COVID-19 in Alberta](#todo)

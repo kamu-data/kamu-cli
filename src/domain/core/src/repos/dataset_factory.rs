@@ -57,7 +57,7 @@ impl std::fmt::Display for UnsupportedProtocolError {
         } else {
             write!(
                 f,
-                "Usupported protocol {} when accessing dataset at {}",
+                "Unsupported protocol {} when accessing dataset at {}",
                 self.url.scheme(),
                 self.url
             )

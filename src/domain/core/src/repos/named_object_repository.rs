@@ -21,7 +21,7 @@ pub trait NamedObjectRepository: Sync + Send {
     /// Resolves reference to the object hash it's pointing to
     async fn get(&self, name: &str) -> Result<Bytes, GetNamedError>;
 
-    /// Update referece to point at the specified object hash
+    /// Update reference to point at the specified object hash
     async fn set(&self, name: &str, data: &[u8]) -> Result<(), SetNamedError>;
 
     /// Deletes specified reference

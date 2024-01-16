@@ -25,7 +25,7 @@ pub trait RemoteAliases: Send + Sync {
         kind: RemoteAliasKind,
     ) -> Box<dyn Iterator<Item = &'a DatasetRefRemote> + 'a>;
 
-    fn contains(&self, remore_ref: &DatasetRefRemote, kind: RemoteAliasKind) -> bool;
+    fn contains(&self, remote_ref: &DatasetRefRemote, kind: RemoteAliasKind) -> bool;
 
     fn is_empty(&self, kind: RemoteAliasKind) -> bool;
 

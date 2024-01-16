@@ -22,7 +22,7 @@ pub trait ReferenceRepository {
     /// Resolves reference to the object hash it's pointing to
     async fn get(&self, r: &BlockRef) -> Result<Multihash, GetRefError>;
 
-    /// Update referece to point at the specified object hash
+    /// Update reference to point at the specified object hash
     async fn set(&self, r: &BlockRef, hash: &Multihash) -> Result<(), SetRefError>;
 
     /// Deletes specified reference

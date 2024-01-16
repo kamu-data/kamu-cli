@@ -211,7 +211,7 @@ impl SyncServiceImpl {
         listener: Arc<dyn SyncListener>,
     ) -> Result<SyncResult, SyncError> {
         let odf_src_url = self.resolve_remote_dataset_url(src_ref).await?;
-        let http_src_url = Url::parse(&(odf_src_url.as_str())["odf+".len()..]).unwrap(); // odf+http, odf+https - cut odf+
+        let http_src_url = Url::parse(&odf_src_url.as_str()["odf+".len()..]).unwrap(); // odf+http, odf+https - cut odf+
 
         let (dst_dataset, dst_factory) = self
             .get_dataset_writer(dst_ref, opts.create_if_not_exists)
@@ -239,7 +239,7 @@ impl SyncServiceImpl {
         let src_dataset = self.get_dataset_reader(src).await?;
 
         let odf_dst_url = self.resolve_remote_dataset_url(odf_dst).await?;
-        let http_dst_url = Url::parse(&(odf_dst_url.as_str())[4..]).unwrap(); // odf+http, odf+https - cut odf+
+        let http_dst_url = Url::parse(&odf_dst_url.as_str()[4..]).unwrap(); // odf+http, odf+https - cut odf+
 
         let http_dst_ref = DatasetRefAny::Url(http_dst_url.clone().into());
         let maybe_dst_head = match self.get_dataset_reader(&http_dst_ref).await {
@@ -304,7 +304,7 @@ impl SyncServiceImpl {
             .await
             .int_err()?;
 
-        // If we try to access the IPNS key via HTTP gateway rigt away this may take a
+        // If we try to access the IPNS key via HTTP gateway right away this may take a
         // very long time if the key does not exist, as IPFS will be reaching
         // out to remote nodes. To avoid long wait times on first push we make
         // an assumption that this key is owned by the local IPFS node and
@@ -313,7 +313,7 @@ impl SyncServiceImpl {
         let (old_cid, dst_head, chains_comparison) =
             match self.ipfs_client.name_resolve_local(&key.id).await? {
                 None => {
-                    tracing::info!("Key does not resolve locally - asumming it's unpublished");
+                    tracing::info!("Key does not resolve locally - assuming it's unpublished");
                     Ok((None, None, None))
                 }
                 Some(old_cid) => {

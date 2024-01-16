@@ -27,7 +27,7 @@ pub trait PushIngestService: Send + Sync {
         dataset_ref: &DatasetRef,
     ) -> Result<Vec<(Multihash, MetadataBlockTyped<AddPushSource>)>, GetDatasetError>;
 
-    /// Uses push source defenition in metadata to ingest data from the
+    /// Uses push source definition in metadata to ingest data from the
     /// specified source.
     ///
     /// See also [MediaType].
@@ -40,7 +40,7 @@ pub trait PushIngestService: Send + Sync {
         listener: Option<Arc<dyn PushIngestListener>>,
     ) -> Result<PushIngestResult, PushIngestError>;
 
-    /// Uses push source defenition in metadata to ingest data passessed
+    /// Uses push source definition in metadata to ingest data possessed
     /// in-band as a file stream.
     ///
     /// See also [MediaType].

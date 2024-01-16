@@ -159,13 +159,15 @@ impl Default for RecordsFormat {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+type ValueFormatterCallback = Box<dyn Fn(&ArrayRef, usize) -> String>;
+
 #[derive(Default)]
 pub struct ColumnFormat {
     style_spec: Option<String>,
     null_value: Option<String>,
     binary_placeholder: Option<String>,
     max_len: Option<usize>,
-    value_fmt: Option<Box<dyn Fn(&ArrayRef, usize) -> String>>,
+    value_fmt: Option<ValueFormatterCallback>,
 }
 
 impl ColumnFormat {

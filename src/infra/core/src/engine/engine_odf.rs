@@ -199,7 +199,7 @@ impl ODFEngine {
         } else {
             if new_data_path.exists() {
                 return Err(EngineError::contract_error(
-                    "Engine wrote data file while the ouput slice is empty",
+                    "Engine wrote data file while the output slice is empty",
                     Vec::new(),
                 ));
             }

@@ -155,7 +155,7 @@ main() {
                     return 1
                 fi
                 ;;
-            # installed < to_isntall
+            # installed < to_install
             -1)
                 # moving on
                 ;;
@@ -179,7 +179,7 @@ main() {
     local _tmpdir="$(ensure mktemp -d)"
     ensure mkdir -p "$_tmpdir"
     local _archive="${_tmpdir}/${_artifact}"
-    
+
     say "Downloading release from ${_url} ..."
     ensure download_file "$_url" "$_archive" "$_arch"
 
@@ -207,7 +207,7 @@ main() {
             warn "The $_install_dir directory is not on your PATH - you may need to add it manually to your shell's profile (.bashrc | .zshrc | ...)"
             ;;
     esac
-    
+
     # TODO: Install shell completions automatically
     warn "Consider installing shell completions (see: kamu completions --help)"
 }
@@ -942,7 +942,7 @@ semver_compare() {
     fi
   fi
 
-  # if we're here we know that the target verison cannot be less than or equal to
+  # if we're here we know that the target version cannot be less than or equal to
   # our current version, therefore we upgrade
 
   echo -1 && return 0

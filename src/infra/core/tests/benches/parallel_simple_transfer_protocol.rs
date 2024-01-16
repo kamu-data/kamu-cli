@@ -133,7 +133,7 @@ async fn do_test_sync(
         .await;
 
     // Generate additional 70 blocks in dataset to make sure next iteration will be
-    // the same as previos
+    // the same as previous
     append_data_to_dataset(
         AMOUNT_OF_BLOCKS_TO_APPEND,
         dataset_repo.as_ref(),
@@ -145,7 +145,7 @@ async fn do_test_sync(
 fn build_temp_dirs(rt: Arc<tokio::runtime::Runtime>) -> (DatasetAlias, Url, Url) {
     let tmp_repo_dir = tempfile::tempdir().unwrap();
 
-    // to perfrom multithreded operation (initialization server) rt.enter menthod
+    // to perform multithreading operation (initialization server) rt.enter method
     // need to be called
     let _guard = rt.enter();
     let server = HttpFileServer::new(tmp_repo_dir.path());

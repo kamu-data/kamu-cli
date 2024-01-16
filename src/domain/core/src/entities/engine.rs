@@ -83,7 +83,7 @@ pub struct TransformRequestExt {
     pub system_time: DateTime<Utc>,
     /// Expected data schema (if already defined)
     pub schema: Option<SchemaRef>,
-    /// Preceeding record offset, if any
+    /// Preceding record offset, if any
     pub prev_offset: Option<u64>,
     /// Defines the input data
     pub inputs: Vec<TransformRequestInputExt>,

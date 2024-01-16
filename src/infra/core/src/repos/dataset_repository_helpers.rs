@@ -253,7 +253,7 @@ fn normalize_transform(transform: &mut Transform) -> Result<(), CreateDatasetFro
 async fn resolve_transform_inputs(
     inputs: &mut [TransformInput],
     repo: &dyn DatasetRepository,
-    output_dataset_ailas: &DatasetAlias,
+    output_dataset_alias: &DatasetAlias,
 ) -> Result<(), CreateDatasetFromSnapshotError> {
     let mut missing_inputs = Vec::new();
 
@@ -278,7 +278,7 @@ async fn resolve_transform_inputs(
     if !missing_inputs.is_empty() {
         Err(CreateDatasetFromSnapshotError::MissingInputs(
             MissingInputsError {
-                dataset_ref: output_dataset_ailas.into(),
+                dataset_ref: output_dataset_alias.into(),
                 missing_inputs,
             },
         ))

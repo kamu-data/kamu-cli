@@ -237,13 +237,11 @@ where
 
         tracing::debug!(?key, "Inserting object");
 
-        match self.s3_context.put_object(key, data).await {
-            Ok(_) => {}
-            Err(err) => {
-                let err = err.into_service_error();
-                return Err(err.int_err().into());
-            }
-        }
+        self.s3_context
+            .put_object(key, data)
+            .await
+            // TODO: Detect credentials error
+            .map_err(|e| e.into_service_error().int_err())?;
 
         Ok(InsertResult { hash })
     }
@@ -273,19 +271,14 @@ where
         tracing::debug!(?key, size, "Inserting object stream");
 
         use tokio_util::io::ReaderStream;
+
         let stream = ReaderStream::new(src);
 
-        match self
-            .s3_context
+        self.s3_context
             .put_object_stream(key, stream, size as i64)
             .await
-        {
-            Ok(_) => {}
-            Err(err) => {
-                let err = err.into_service_error();
-                return Err(err.int_err().into());
-            }
-        }
+            // TODO: Detect credentials error
+            .map_err(|e| e.into_service_error().int_err())?;
 
         Ok(InsertResult { hash })
     }
@@ -306,13 +299,11 @@ where
 
         tracing::debug!(?key, "Deleting object");
 
-        match self.s3_context.delete_object(key).await {
-            Ok(_) => {}
-            Err(err) => {
-                let err = err.into_service_error();
-                return Err(err.int_err().into());
-            }
-        }
+        self.s3_context
+            .delete_object(key)
+            .await
+            // TODO: Detect credentials error
+            .map_err(|e| e.into_service_error().int_err())?;
 
         Ok(())
     }

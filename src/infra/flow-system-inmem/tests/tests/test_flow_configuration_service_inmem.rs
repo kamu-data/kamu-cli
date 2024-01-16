@@ -135,7 +135,7 @@ async fn test_pause_resume() {
         FlowConfigurationRule::Schedule(foo_ingest_schedule.clone())
     );
 
-    // Now, resume the configuraton
+    // Now, resume the configuration
     harness
         .resume_dataset_flow(foo_id.clone(), DatasetFlowType::Ingest)
         .await;

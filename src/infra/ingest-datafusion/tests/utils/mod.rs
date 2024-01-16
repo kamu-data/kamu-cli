@@ -45,7 +45,7 @@ pub async fn assert_dfs_equal(lhs: DataFrame, rhs: DataFrame) {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-// Checks for equivalence ingoring the order of rows and nullability of columns
+// Checks for equivalence ignoring the order of rows and nullability of columns
 pub async fn assert_dfs_equivalent(
     lhs: DataFrame,
     rhs: DataFrame,

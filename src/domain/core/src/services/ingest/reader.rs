@@ -27,9 +27,9 @@ pub trait Reader: Send + Sync {
     /// Returns a [DataFrame] with a logical plan set up to read the data.
     ///
     /// Note that [DataFrame] represents a logical plan, and data has not been
-    /// fully read yet when function returs, so you will need to handle read
+    /// fully read yet when function returns, so you will need to handle read
     /// errors when consuming the data. Some input data may be touched to
-    /// infer the schema if one was not specified explicilty.
+    /// infer the schema if one was not specified explicitly.
     async fn read(&self, path: &Path) -> Result<DataFrame, ReadError>;
 }
 

@@ -37,6 +37,6 @@ content:
         kind: Ledger
         primaryKey:
           - id
-    # Tells kamu to use `reported_date` column as event time intead of the default `event_tume`
+    # Tells kamu to use `reported_date` column as event time instead of the default `event_time`
     - kind: SetVocab
       eventTimeColumn: reported_date

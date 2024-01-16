@@ -52,7 +52,7 @@ impl Command for ResetCommand {
             true
         } else {
             common::prompt_yes_no(&format!(
-                "{}: {}\n{}\nDo you whish to continue? [y/N]: ",
+                "{}: {}\n{}\nDo you wish to continue? [y/N]: ",
                 console::style("You are about to reset the following dataset").yellow(),
                 self.dataset_ref,
                 console::style("This operation is irreversible!").yellow(),

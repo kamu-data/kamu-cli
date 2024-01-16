@@ -82,7 +82,7 @@ fn update_crates(new_version: &Version) {
         ])
         .status()
         .expect(
-            "Failed to execute `cargo set-version` - make sure `cago-edit` is installed (`cargo \
+            "Failed to execute `cargo set-version` - make sure `cargo-edit` is installed (`cargo \
              install cargo-edit`)",
         )
         .exit_ok()
@@ -111,12 +111,12 @@ fn update_license_text(
         new_version.major != current_version.major || new_version.minor != current_version.minor;
 
     eprintln!("Updating license version: {}", new_version);
-    let re = regex::Regex::new(r"(Licensed Work:[ ]+Kamu CLI Version )(\d+\.\d+\.\d+)").unwrap();
+    let re = regex::Regex::new(r"(Licensed Work: +Kamu CLI Version )(\d+\.\d+\.\d+)").unwrap();
     let text = re.replace(text, |c: &Captures| format!("{}{}", &c[1], new_version));
 
     if significant_version {
         let change_date = add_years(current_date, CHANGE_DATE_YEARS);
-        let re = regex::Regex::new(r"(Change Date:[ ]+)(\d+-\d+-\d+)").unwrap();
+        let re = regex::Regex::new(r"(Change Date: +)(\d+-\d+-\d+)").unwrap();
 
         eprintln!("Updating license change date: {}", change_date);
         re.replace(&text, |c: &Captures| format!("{}{}", &c[1], change_date))

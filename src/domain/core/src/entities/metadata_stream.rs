@@ -22,6 +22,12 @@ pub type DynMetadataStream<'a> = Pin<Box<dyn MetadataStream<'a> + Send + 'a>>;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+type MetadataStreamItem = Result<(Multihash, MetadataBlock), IterBlocksError>;
+type FilterDataStreamBlocksStreamItem =
+    Result<(Multihash, MetadataBlockDataStream), IterBlocksError>;
+type FilterDataStreamBlocksStream<'a> =
+    Pin<Box<dyn Stream<Item = FilterDataStreamBlocksStreamItem> + Send + 'a>>;
+
 /// Stream combinators specific to metadata chain.
 ///
 /// These combinators can be implemented differently by various metadata chains
@@ -30,40 +36,22 @@ pub type DynMetadataStream<'a> = Pin<Box<dyn MetadataStream<'a> + Send + 'a>>;
 ///   undesired blocks without constructing DTOs
 /// - Implementations can use skip lists and lookup tables to traverse the chain
 ///   faster.
-pub trait MetadataStream<'a>:
-    Stream<Item = Result<(Multihash, MetadataBlock), IterBlocksError>>
-{
+pub trait MetadataStream<'a>: Stream<Item = MetadataStreamItem> {
     // TODO: Reconsider this method as it may result in incorrect logic of
     // checkpoint propagation. In cases when AddData is followed by SetWatermark
     // the client may incorrectly assume that the checkpoint is missing when
     // inspecting SetWatermark event, while in fact they should've scanned the
     // chain further.
-    fn filter_data_stream_blocks(
-        self: Pin<Box<Self>>,
-    ) -> Pin<
-        Box<
-            dyn Stream<Item = Result<(Multihash, MetadataBlockDataStream), IterBlocksError>>
-                + Send
-                + 'a,
-        >,
-    >;
+    fn filter_data_stream_blocks(self: Pin<Box<Self>>) -> FilterDataStreamBlocksStream<'a>;
 }
 
 // TODO: This implementation should be moved to `infra` part of the crate
 impl<'a, T> MetadataStream<'a> for T
 where
-    T: Stream<Item = Result<(Multihash, MetadataBlock), IterBlocksError>>,
+    T: Stream<Item = MetadataStreamItem>,
     T: Send + 'a,
 {
-    fn filter_data_stream_blocks(
-        self: Pin<Box<Self>>,
-    ) -> Pin<
-        Box<
-            dyn Stream<Item = Result<(Multihash, MetadataBlockDataStream), IterBlocksError>>
-                + Send
-                + 'a,
-        >,
-    > {
+    fn filter_data_stream_blocks(self: Pin<Box<Self>>) -> FilterDataStreamBlocksStream<'a> {
         Box::pin(
             self.try_filter_map(|(h, b)| {
                 future::ready(Ok(b.into_data_stream_block().map(|b| (h, b))))
