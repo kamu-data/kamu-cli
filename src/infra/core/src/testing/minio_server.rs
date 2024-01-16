@@ -54,7 +54,7 @@ impl MinioServer {
         let server_port = 9000;
 
         if !server_dir.exists() {
-            std::fs::create_dir(&server_dir).unwrap();
+            std::fs::create_dir(server_dir).unwrap();
         }
 
         let container = container_runtime

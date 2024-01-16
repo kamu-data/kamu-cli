@@ -149,16 +149,14 @@ impl MergeStrategySnapshot {
 
                 // Event time in `new` can be null and this alone should not be the reason to
                 // consider the row changed
-                let expr = if c != self.vocab.event_time_column {
+                if c != self.vocab.event_time_column {
                     distinct
                 } else {
                     and(
                         col(Column::new(Some(new_qual.clone()), c)).is_not_null(),
                         distinct,
                     )
-                };
-
-                expr
+                }
             })
             .reduce(Expr::or)
             .unwrap_or(lit(false));

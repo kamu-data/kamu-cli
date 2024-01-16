@@ -13,8 +13,8 @@ use oso::PolarClass;
 
 ///////////////////////////////////////////////////////////////////////////////
 
-const ROLE_READER: &'static str = "Reader";
-const ROLE_EDITOR: &'static str = "Editor";
+const ROLE_READER: &str = "Reader";
+const ROLE_EDITOR: &str = "Editor";
 
 #[derive(PolarClass, Debug, Clone)]
 pub struct DatasetResource {

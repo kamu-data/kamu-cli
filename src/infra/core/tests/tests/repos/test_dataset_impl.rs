@@ -88,7 +88,6 @@ async fn test_summary_updates() {
     assert_eq!(
         ds.get_summary(GetSummaryOpts {
             update_if_stale: false,
-            ..Default::default()
         })
         .await
         .unwrap(),

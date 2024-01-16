@@ -263,7 +263,7 @@ impl PullServiceImpl {
                     .get_remote_aliases(&local_handle.as_local_ref())
                     .await
                     .int_err()?
-                    .contains(&remote_ref, RemoteAliasKind::Pull)
+                    .contains(remote_ref, RemoteAliasKind::Pull)
                 {
                     return Ok(Some(local_handle));
                 }
@@ -284,7 +284,7 @@ impl PullServiceImpl {
                     .get_remote_aliases(&dataset_handle.as_local_ref())
                     .await
                     .int_err()?
-                    .contains(&remote_ref, RemoteAliasKind::Pull)
+                    .contains(remote_ref, RemoteAliasKind::Pull)
                 {
                     return Ok(Some(dataset_handle));
                 }
@@ -314,7 +314,7 @@ impl PullServiceImpl {
     }
 
     fn infer_local_name_from_url(&self, url: &Url) -> Result<DatasetName, PullError> {
-        if let Some(last_segment) = url.path_segments().and_then(|s| s.rev().next()) {
+        if let Some(last_segment) = url.path_segments().and_then(|s| s.last()) {
             if let Ok(name) = DatasetName::try_from(last_segment) {
                 return Ok(name);
             }
@@ -406,7 +406,7 @@ impl PullServiceImpl {
                             .get_remote_aliases(res.local_ref.as_ref().unwrap())
                             .await
                             .int_err()?
-                            .add(&remote_ref, RemoteAliasKind::Pull)
+                            .add(remote_ref, RemoteAliasKind::Pull)
                             .await?;
                     }
                 }

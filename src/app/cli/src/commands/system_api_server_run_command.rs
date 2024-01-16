@@ -85,7 +85,7 @@ impl APIServerRunCommand {
         let auth_svc = self.catalog.get_one::<dyn AuthenticationService>().unwrap();
         let access_token = auth_svc
             .login(
-                &accounts::LOGIN_METHOD_PASSWORD.to_string(),
+                accounts::LOGIN_METHOD_PASSWORD,
                 serde_json::to_string::<accounts::PasswordLoginCredentials>(&login_credentials)
                     .int_err()?,
             )
@@ -137,7 +137,7 @@ impl Command for APIServerRunCommand {
             }
         }
 
-        api_server.run().await.map_err(|e| CLIError::critical(e))?;
+        api_server.run().await.map_err(CLIError::critical)?;
 
         Ok(())
     }

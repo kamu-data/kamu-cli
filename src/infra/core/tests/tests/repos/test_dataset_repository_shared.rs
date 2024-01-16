@@ -570,9 +570,9 @@ pub async fn test_iterate_datasets_multi_tenant(repo: &dyn DatasetRepository) {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-async fn check_expected_datasets<'s>(
+async fn check_expected_datasets(
     expected_aliases: Vec<DatasetAlias>,
-    actual_datasets_stream: DatasetHandleStream<'s>,
+    actual_datasets_stream: DatasetHandleStream<'_>,
 ) {
     use futures::TryStreamExt;
     let mut actual_datasets: Vec<_> = actual_datasets_stream.try_collect().await.unwrap();

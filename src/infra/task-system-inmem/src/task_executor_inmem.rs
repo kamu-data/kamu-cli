@@ -91,7 +91,7 @@ impl TaskExecutor for TaskExecutorInMemory {
                     end_with_outcome,
                 }) => {
                     if let Some(busy_time) = busy_time {
-                        tokio::time::sleep(busy_time.clone()).await;
+                        tokio::time::sleep(*busy_time).await;
                     }
                     end_with_outcome.unwrap_or(TaskOutcome::Success)
                 }

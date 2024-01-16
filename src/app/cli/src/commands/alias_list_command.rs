@@ -44,7 +44,7 @@ impl AliasListCommand {
         use std::io::Write;
 
         let mut out = std::io::stdout();
-        write!(out, "Dataset,Kind,Alias\n")?;
+        writeln!(out, "Dataset,Kind,Alias")?;
 
         for ds in datasets {
             let aliases = self
@@ -53,10 +53,10 @@ impl AliasListCommand {
                 .await?;
 
             for alias in aliases.get_by_kind(RemoteAliasKind::Pull) {
-                write!(out, "{},{},{}\n", &ds.alias, "pull", &alias)?;
+                writeln!(out, "{},pull,{}", &ds.alias, &alias)?;
             }
             for alias in aliases.get_by_kind(RemoteAliasKind::Push) {
-                write!(out, "{},{},{}\n", &ds.alias, "push", &alias)?;
+                writeln!(out, "{},push,{}", &ds.alias, &alias)?;
             }
         }
 

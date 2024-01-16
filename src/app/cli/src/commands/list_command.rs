@@ -261,7 +261,7 @@ impl Command for ListCommand {
                 let mut blocks_stream = dataset.as_metadata_chain().iter_blocks();
                 while let Some((_, b)) = blocks_stream.try_next().await? {
                     if num_blocks == 0 {
-                        num_blocks = b.sequence_number as u64 + 1;
+                        num_blocks = b.sequence_number + 1;
                     }
                     if let Some(b) = b.as_data_stream_block() {
                         last_watermark = b.event.new_watermark.cloned();

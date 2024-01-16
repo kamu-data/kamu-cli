@@ -90,10 +90,7 @@ pub fn get_command(
             cli_catalog.get_one()?,
             validate_many_dataset_refs(
                 cli_catalog,
-                submatches
-                    .get_many("dataset")
-                    .unwrap() // required
-                    .map(|r: &DatasetRef| r.clone()),
+                submatches.get_many("dataset").unwrap().cloned(),
             )?,
             submatches.get_flag("all"),
             submatches.get_flag("recursive"),
@@ -140,10 +137,7 @@ pub fn get_command(
                 cli_catalog.get_one()?,
                 validate_many_dataset_refs(
                     cli_catalog,
-                    lin_matches
-                        .get_many("dataset")
-                        .unwrap() // required
-                        .map(|r: &DatasetRef| r.clone()),
+                    lin_matches.get_many("dataset").unwrap().cloned(),
                 )?,
                 lin_matches.get_flag("browse"),
                 lin_matches.get_one("output-format").map(String::as_str),
@@ -240,20 +234,17 @@ pub fn get_command(
             cli_catalog.get_one()?,
             cli_catalog.get_one()?,
             cli_catalog.get_one()?,
-            submatches.get_one("address").map(|a| *a),
-            submatches.get_one("http-port").map(|p| *p),
+            submatches.get_one("address").copied(),
+            submatches.get_one("http-port").copied(),
             submatches
                 .get_many("env")
                 .unwrap_or_default() // optional
                 .map(String::as_str),
         )),
         Some(("pull", submatches)) => {
-            let datasets = submatches
-                .get_many("dataset")
-                .unwrap_or_default() // optional
-                .map(|r: &DatasetRefAny| r.clone());
+            let datasets = submatches.get_many("dataset").unwrap_or_default().cloned();
+
             if submatches.contains_id("set-watermark") {
-                if datasets.len() != 1 {}
                 Box::new(SetWatermarkCommand::new(
                     cli_catalog.get_one()?,
                     cli_catalog.get_one()?,
@@ -275,7 +266,7 @@ pub fn get_command(
                     submatches.get_flag("all"),
                     submatches.get_flag("recursive"),
                     submatches.get_flag("fetch-uncacheable"),
-                    submatches.get_one("as").map(|s: &DatasetName| s.clone()),
+                    submatches.get_one("as").cloned(),
                     !submatches.get_flag("no-alias"),
                     submatches.get_flag("force"),
                 ))
@@ -287,14 +278,12 @@ pub fn get_command(
             push_matches
                 .get_many("dataset")
                 .unwrap_or_default()
-                .map(|r: &DatasetRefAny| r.clone()),
+                .cloned(),
             push_matches.get_flag("all"),
             push_matches.get_flag("recursive"),
             !push_matches.get_flag("no-alias"),
             push_matches.get_flag("force"),
-            push_matches
-                .get_one("to")
-                .map(|t: &DatasetRefRemote| t.clone()),
+            push_matches.get_one("to").cloned(),
             cli_catalog.get_one()?,
         )),
         Some(("rename", rename_matches)) => Box::new(RenameCommand::new(
@@ -318,8 +307,8 @@ pub fn get_command(
                 cli_catalog.get_one()?,
                 delete_matches
                     .get_many("repository")
-                    .unwrap_or_default() // optional
-                    .map(|rn: &RepoName| rn.clone()),
+                    .unwrap_or_default()
+                    .cloned(),
                 delete_matches.get_flag("all"),
                 delete_matches.get_flag("yes"),
             )),
@@ -348,9 +337,7 @@ pub fn get_command(
                         .get_one::<DatasetRef>("dataset")
                         .unwrap()
                         .clone(),
-                    delete_matches
-                        .get_one("alias")
-                        .map(|a: &DatasetRefRemote| a.clone()),
+                    delete_matches.get_one("alias").cloned(),
                     delete_matches.get_flag("all"),
                     delete_matches.get_flag("pull"),
                     delete_matches.get_flag("push"),
@@ -359,9 +346,7 @@ pub fn get_command(
                     cli_catalog.get_one()?,
                     cli_catalog.get_one()?,
                     cli_catalog.get_one()?,
-                    list_matches
-                        .get_one("dataset")
-                        .map(|s: &DatasetRef| s.clone()),
+                    list_matches.get_one("dataset").cloned(),
                 )),
                 _ => return Err(CommandInterpretationFailed.into()),
             },
@@ -381,10 +366,7 @@ pub fn get_command(
             cli_catalog.get_one()?,
             cli_catalog.get_one()?,
             submatches.get_one("query").map(String::as_str),
-            submatches
-                .get_many("repo")
-                .unwrap_or_default() // optional
-                .map(|rn: &RepoName| rn.clone()),
+            submatches.get_many("repo").unwrap_or_default().cloned(),
         )),
         Some(("sql", submatches)) => match submatches.subcommand() {
             None => Box::new(SqlShellCommand::new(
@@ -439,8 +421,8 @@ pub fn get_command(
                         base_catalog.clone(),
                         workspace_svc.is_multi_tenant_workspace(),
                         cli_catalog.get_one()?,
-                        server_matches.get_one("address").map(|a| *a),
-                        server_matches.get_one("http-port").map(|p| *p),
+                        server_matches.get_one("address").copied(),
+                        server_matches.get_one("http-port").copied(),
                         server_matches.get_flag("get-token"),
                         cli_catalog.get_one()?,
                     ))
@@ -507,8 +489,8 @@ pub fn get_command(
                 workspace_svc.is_multi_tenant_workspace(),
                 current_account_name,
                 cli_catalog.get_one()?,
-                submatches.get_one("address").map(|a| *a),
-                submatches.get_one("http-port").map(|p| *p),
+                submatches.get_one("address").copied(),
+                submatches.get_one("http-port").copied(),
                 submatches.get_flag("get-token"),
             ))
         }
@@ -518,10 +500,7 @@ pub fn get_command(
             cli_catalog.get_one()?,
             validate_many_dataset_refs(
                 cli_catalog,
-                submatches
-                    .get_many("dataset")
-                    .unwrap() // required
-                    .map(|r: &DatasetRef| r.clone()),
+                submatches.get_many("dataset").unwrap().cloned(),
             )?
             .into_iter(),
             submatches.get_flag("recursive"),
@@ -550,7 +529,7 @@ fn validate_dataset_ref(
             .into());
         }
     }
-    return Ok(dataset_ref);
+    Ok(dataset_ref)
 }
 
 fn validate_many_dataset_refs<I>(
@@ -565,5 +544,5 @@ where
         result_refs.push(validate_dataset_ref(catalog, dataset_ref)?);
     }
 
-    return Ok(result_refs);
+    Ok(result_refs)
 }

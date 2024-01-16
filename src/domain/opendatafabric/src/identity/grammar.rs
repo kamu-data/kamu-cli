@@ -29,14 +29,14 @@ impl Grammar {
     }
 
     fn match_char(s: &str, c: char) -> Option<(&str, &str)> {
-        if s.len() > 0 && s.as_bytes()[0] == (c as u8) {
+        if !s.is_empty() && s.as_bytes()[0] == (c as u8) {
             Some((&s[0..1], &s[1..s.len()]))
         } else {
             None
         }
     }
 
-    fn match_str<'a, 'b>(s: &'a str, prefix: &'b str) -> Option<(&'a str, &'a str)> {
+    fn match_str<'a>(s: &'a str, prefix: &str) -> Option<(&'a str, &'a str)> {
         if s.starts_with(prefix) {
             Some((&s[0..prefix.len()], &s[prefix.len()..]))
         } else {

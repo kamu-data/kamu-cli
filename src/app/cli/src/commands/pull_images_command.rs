@@ -64,9 +64,9 @@ impl Command for PullImagesCommand {
             for img in images {
                 eprintln!("{}: {}", console::style("Pulling image").bold(), img);
                 self.container_runtime
-                    .pull_image(&img, None)
+                    .pull_image(img, None)
                     .await
-                    .map_err(|e| CLIError::failure(e))?;
+                    .map_err(CLIError::failure)?;
             }
         }
 

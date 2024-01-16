@@ -113,7 +113,7 @@ impl LoginCommand {
 
         self.access_token_registry_service
             .drop_access_token(self.scope, odf_server_frontend_url)
-            .map_err(|e| CLIError::critical(e))?;
+            .map_err(CLIError::critical)?;
 
         Ok(())
     }
@@ -125,7 +125,7 @@ impl LoginCommand {
     ) -> Result<(), CLIError> {
         self.access_token_registry_service
             .drop_access_token(self.scope, odf_server_frontend_url)
-            .map_err(|e| CLIError::critical(e))?;
+            .map_err(CLIError::critical)?;
 
         Err(CLIError::failure(e))
     }
@@ -137,7 +137,7 @@ impl Command for LoginCommand {
         let odf_server_frontend_url = self
             .server
             .as_ref()
-            .map(|u| u.clone())
+            .cloned()
             .unwrap_or_else(|| Url::parse(odf_server::DEFAULT_ODF_FRONTEND_URL).unwrap());
 
         if let Some(token_find_report) = self

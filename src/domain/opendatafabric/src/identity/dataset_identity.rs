@@ -294,7 +294,7 @@ impl std::str::FromStr for DatasetAlias {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match Grammar::match_dataset_alias(s) {
             Some((acc, ds, "")) => Ok(Self::new(
-                acc.map(|s| AccountName::new_unchecked(s)),
+                acc.map(AccountName::new_unchecked),
                 DatasetName::new_unchecked(ds),
             )),
             _ => Err(ParseError::new(s)),
@@ -374,7 +374,7 @@ impl std::str::FromStr for DatasetAliasRemote {
         match Grammar::match_dataset_alias_remote(s) {
             Some((repo, acc, ds, "")) => Ok(Self::new(
                 RepoName::new_unchecked(repo),
-                acc.map(|s| AccountName::new_unchecked(s)),
+                acc.map(AccountName::new_unchecked),
                 DatasetName::new_unchecked(ds),
             )),
             _ => Err(ParseError::new(s)),

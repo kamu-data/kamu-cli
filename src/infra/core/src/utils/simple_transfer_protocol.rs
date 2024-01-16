@@ -277,7 +277,6 @@ impl SimpleTransferProtocol {
                     },
                     expected_hash: Some(&data_slice.physical_hash),
                     size_hint: Some(data_slice.size as usize),
-                    ..Default::default()
                 },
             )
             .await
@@ -349,7 +348,6 @@ impl SimpleTransferProtocol {
                     // currently support streaming uploads
                     // without knowing Content-Length. We should remove it in future.
                     size_hint: Some(checkpoint.size as usize),
-                    ..Default::default()
                 },
             )
             .await
@@ -447,7 +445,7 @@ impl SimpleTransferProtocol {
             .map(Ok)
             .try_for_each_concurrent(
                 SimpleProtocolTransferOptions::default().max_parallel_transfers,
-                |future| async move { future.await },
+                |future| future,
             )
             .await?;
 
@@ -513,7 +511,7 @@ impl SimpleTransferProtocol {
             .as_metadata_chain()
             .set_ref(
                 &BlockRef::Head,
-                &src_head,
+                src_head,
                 SetRefOpts {
                     validate_block_present: false,
                     check_ref_is: Some(dst_head),

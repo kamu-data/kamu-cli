@@ -71,9 +71,9 @@ impl EngineContainer {
     }
 
     pub async fn connect_client(&self) -> Result<EngineGrpcClient, EngineError> {
-        Ok(EngineGrpcClient::connect(&self.host, self.port)
+        EngineGrpcClient::connect(&self.host, self.port)
             .await
-            .map_err(|e| EngineError::internal(e, self.logs_config.log_files()))?)
+            .map_err(|e| EngineError::internal(e, self.logs_config.log_files()))
     }
 
     pub async fn terminate(mut self) -> std::io::Result<TerminateStatus> {
@@ -113,7 +113,7 @@ impl LogsConfig {
     }
 
     fn log_files(&self) -> Vec<PathBuf> {
-        let mut logs = self.demux_logs().unwrap_or(Vec::new());
+        let mut logs = self.demux_logs().unwrap_or_default();
         logs.push(self.stdout_path.clone());
         logs.push(self.stderr_path.clone());
         logs

@@ -40,7 +40,7 @@ impl ResetService for ResetServiceImpl {
         block_hash: &Multihash,
     ) -> Result<(), ResetError> {
         self.dataset_action_authorizer
-            .check_action_allowed(&dataset_handle, auth::DatasetAction::Write)
+            .check_action_allowed(dataset_handle, auth::DatasetAction::Write)
             .await?;
 
         let dataset = self

@@ -29,7 +29,7 @@ impl PrepService {
 
     pub fn prepare(
         &self,
-        prep_steps: &Vec<PrepStep>,
+        prep_steps: &[PrepStep],
         src_path: &Path,
         target_path: &Path,
     ) -> Result<(), PollingIngestError> {
@@ -101,7 +101,7 @@ struct PipeStream {
 
 impl PipeStream {
     fn new(cmd: &Vec<String>, mut input: Box<dyn Stream>) -> Result<Self, IOError> {
-        let mut process = Command::new(cmd.get(0).unwrap())
+        let mut process = Command::new(cmd.first().unwrap())
             .args(&cmd[1..])
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())

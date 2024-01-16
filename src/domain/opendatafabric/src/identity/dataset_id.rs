@@ -112,15 +112,15 @@ impl From<DidKey> for DatasetID {
     }
 }
 
-impl Into<DidOdf> for DatasetID {
-    fn into(self) -> DidOdf {
-        self.did
+impl From<DatasetID> for DidOdf {
+    fn from(val: DatasetID) -> Self {
+        val.did
     }
 }
 
-impl Into<DidKey> for DatasetID {
-    fn into(self) -> DidKey {
-        self.did.into()
+impl From<DatasetID> for DidKey {
+    fn from(val: DatasetID) -> Self {
+        val.did.into()
     }
 }
 

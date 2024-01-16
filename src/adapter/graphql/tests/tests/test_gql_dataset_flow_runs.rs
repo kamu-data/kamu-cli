@@ -1066,7 +1066,7 @@ impl FlowRunsHarness {
             .unwrap();
     }
 
-    fn extract_flow_id_from_trigger_response<'a>(response_json: &serde_json::Value) -> &str {
+    fn extract_flow_id_from_trigger_response(response_json: &serde_json::Value) -> &str {
         response_json["datasets"]["byId"]["flows"]["runs"]["triggerFlow"]["flow"]["flowId"]
             .as_str()
             .unwrap()

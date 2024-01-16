@@ -1326,54 +1326,51 @@ pub fn cli() -> Command {
 fn value_parse_dataset_name(s: &str) -> Result<DatasetName, String> {
     match DatasetName::try_from(s) {
         Ok(v) => Ok(v),
-        Err(_) => Err(format!(
-            "Dataset name can only contain alphanumerics, dashes, and dots, e.g. `my.dataset-id`",
-        )),
+        Err(_) => Err(
+            "Dataset name can only contain alphanumerics, dashes, and dots, e.g. `my.dataset-id`"
+                .to_string(),
+        ),
     }
 }
 
 fn value_parse_dataset_ref_local(s: &str) -> Result<DatasetRef, String> {
     match DatasetRef::try_from(s) {
         Ok(v) => Ok(v),
-        Err(_) => Err(format!(
-            "Local reference should be in form: `did:odf:...` or `my.dataset.id`",
-        )),
+        Err(_) => {
+            Err("Local reference should be in form: `did:odf:...` or `my.dataset.id`".to_string())
+        }
     }
 }
 
 fn value_parse_dataset_ref_remote(s: &str) -> Result<DatasetRefRemote, String> {
     match DatasetRefRemote::try_from(s) {
         Ok(v) => Ok(v),
-        Err(_) => Err(format!(
-            "Remote reference should be in form: `did:odf:...` or `repository/account/dataset-id` \
-             or `scheme://some-url`",
-        )),
+        Err(_) => Err("Remote reference should be in form: `did:odf:...` or \
+                       `repository/account/dataset-id` or `scheme://some-url`"
+            .to_string()),
     }
 }
 
 fn value_parse_dataset_ref_any(s: &str) -> Result<DatasetRefAny, String> {
     match DatasetRefAny::try_from(s) {
         Ok(v) => Ok(v),
-        Err(_) => Err(format!(
-            "Dataset reference should be in form: `my.dataset.id` or \
-             `repository/account/dataset-id` or `did:odf:...` or `scheme://some-url`",
-        )),
+        Err(_) => Err("Dataset reference should be in form: `my.dataset.id` or \
+                       `repository/account/dataset-id` or `did:odf:...` or `scheme://some-url`"
+            .to_string()),
     }
 }
 
 fn value_parse_repo_name(s: &str) -> Result<RepoName, String> {
     match RepoName::try_from(s) {
         Ok(v) => Ok(v),
-        Err(_) => Err(format!(
-            "RepositoryID can only contain alphanumerics, dashes, and dots",
-        )),
+        Err(_) => Err("RepositoryID can only contain alphanumerics, dashes, and dots".to_string()),
     }
 }
 
 fn value_parse_multihash(s: &str) -> Result<Multihash, String> {
     match Multihash::from_multibase(s) {
         Ok(v) => Ok(v),
-        Err(_) => Err(format!("Block hash must be a valid multihash string")),
+        Err(_) => Err("Block hash must be a valid multihash string".to_string()),
     }
 }
 
@@ -1384,9 +1381,9 @@ fn validate_log_filter(s: &str) -> Result<String, String> {
             "source" => Ok(()),
             "watermark" => Ok(()),
             "data" => Ok(()),
-            _ => Err(format!(
-                "Filter should be a comma-separated list of values like: source,data,watermark"
-            )),
+            _ => Err("Filter should be a comma-separated list of values like: \
+                      source,data,watermark"
+                .to_string()),
         }?;
     }
     Ok(s.to_string())

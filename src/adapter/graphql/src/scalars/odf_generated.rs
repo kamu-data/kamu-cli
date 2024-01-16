@@ -13,6 +13,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 #![allow(unused_variables)]
+#![allow(clippy::all)]
 
 use chrono::{DateTime, Utc};
 use opendatafabric as odf;

@@ -89,12 +89,12 @@ impl VerificationServiceImpl {
                     .await
                     .int_err()?;
 
-                if size_actual != (output_slice.size as u64) {
+                if size_actual != output_slice.size {
                     return Err(VerificationError::DataDoesNotMatchMetadata(
                         DataDoesNotMatchMetadata {
                             block_hash,
                             error: DataVerificationError::SizeMismatch {
-                                expected: output_slice.size as u64,
+                                expected: output_slice.size,
                                 actual: size_actual,
                             },
                         },
@@ -147,12 +147,12 @@ impl VerificationServiceImpl {
                         .await
                         .int_err()?;
 
-                    if size_actual != (checkpoint.size as u64) {
+                    if size_actual != checkpoint.size {
                         return Err(VerificationError::CheckpointDoesNotMatchMetadata(
                             CheckpointDoesNotMatchMetadata {
                                 block_hash,
                                 error: CheckpointVerificationError::SizeMismatch {
-                                    expected: checkpoint.size as u64,
+                                    expected: checkpoint.size,
                                     actual: size_actual,
                                 },
                             },

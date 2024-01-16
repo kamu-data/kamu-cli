@@ -52,7 +52,8 @@ pub async fn create_dataset_from_snapshot_impl(
             MetadataEvent::SetPollingSource(e) => {
                 if snapshot.kind != DatasetKind::Root {
                     Err(InvalidSnapshotError {
-                        reason: format!("SetPollingSource event is only allowed on root datasets"),
+                        reason: "SetPollingSource event is only allowed on root datasets"
+                            .to_string(),
                     }
                     .into())
                 } else {
@@ -65,7 +66,7 @@ pub async fn create_dataset_from_snapshot_impl(
             MetadataEvent::AddPushSource(e) => {
                 if snapshot.kind != DatasetKind::Root {
                     Err(InvalidSnapshotError {
-                        reason: format!("AddPushSource event is only allowed on root datasets"),
+                        reason: "AddPushSource event is only allowed on root datasets".to_string(),
                     }
                     .into())
                 } else {
@@ -250,7 +251,7 @@ fn normalize_transform(transform: &mut Transform) -> Result<(), CreateDatasetFro
 /// - input datasets are always references by unique IDs
 /// - that query alias is populated (manually or from the initial reference)
 async fn resolve_transform_inputs(
-    inputs: &mut Vec<TransformInput>,
+    inputs: &mut [TransformInput],
     repo: &dyn DatasetRepository,
     output_dataset_ailas: &DatasetAlias,
 ) -> Result<(), CreateDatasetFromSnapshotError> {

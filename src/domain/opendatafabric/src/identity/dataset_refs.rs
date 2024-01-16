@@ -696,7 +696,7 @@ impl std::cmp::Ord for DatasetRefAny {
         ) {
             match v {
                 DatasetRefAny::ID(r, id) => {
-                    (r.as_ref().map(|v| v.as_str()), None, None, Some(&id), None)
+                    (r.as_ref().map(|v| v.as_str()), None, None, Some(id), None)
                 }
                 DatasetRefAny::LocalAlias(a, n) => {
                     (None, a.as_ref().map(|v| v.as_ref()), Some(n), None, None)

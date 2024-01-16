@@ -215,7 +215,7 @@ impl DataWriterDataFusion {
     // TODO: PERF: This will not scale well as number of blocks grows
     async fn get_all_previous_data(
         &self,
-        prev_data_slices: &Vec<odf::Multihash>,
+        prev_data_slices: &[odf::Multihash],
     ) -> Result<Option<DataFrame>, InternalError> {
         if prev_data_slices.is_empty() {
             return Ok(None);
@@ -656,7 +656,7 @@ impl DataWriter for DataWriterDataFusion {
             let prev_offset = self.meta.prev_offset;
             let prev_checkpoint = self.meta.prev_checkpoint.clone();
             let new_source_state = opts.new_source_state;
-            let prev_watermark = self.meta.prev_watermark.clone();
+            let prev_watermark = self.meta.prev_watermark;
 
             if data_file.is_none() {
                 // Empty result - carry watermark and propagate source state
@@ -697,7 +697,7 @@ impl DataWriter for DataWriterDataFusion {
                 prev_checkpoint: self.meta.prev_checkpoint.clone(),
                 prev_offset: self.meta.prev_offset,
                 new_offset_interval: None,
-                new_watermark: self.meta.prev_watermark.clone(),
+                new_watermark: self.meta.prev_watermark,
                 new_source_state: opts.new_source_state,
             };
 

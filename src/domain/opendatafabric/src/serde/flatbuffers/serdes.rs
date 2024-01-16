@@ -75,8 +75,7 @@ pub struct FlatbuffersMetadataBlockDeserializer;
 
 impl MetadataBlockDeserializer for FlatbuffersMetadataBlockDeserializer {
     fn read_manifest(&self, data: &[u8]) -> Result<MetadataBlock, Error> {
-        let manifest_proxy =
-            flatbuffers::root::<fbgen::Manifest>(data).map_err(|e| Error::serde(e))?;
+        let manifest_proxy = flatbuffers::root::<fbgen::Manifest>(data).map_err(Error::serde)?;
 
         // TODO: Better error handling
         let kind = Multicodec::try_from(manifest_proxy.kind() as u32).unwrap();
@@ -88,7 +87,7 @@ impl MetadataBlockDeserializer for FlatbuffersMetadataBlockDeserializer {
 
         let block_proxy =
             flatbuffers::root::<fbgen::MetadataBlock>(manifest_proxy.content().unwrap().bytes())
-                .map_err(|e| Error::serde(e))?;
+                .map_err(Error::serde)?;
 
         let block = MetadataBlock::deserialize(block_proxy);
         Ok(block)
@@ -149,15 +148,14 @@ impl EngineProtocolSerializer for FlatbuffersEngineProtocol {
 
 impl EngineProtocolDeserializer for FlatbuffersEngineProtocol {
     fn read_raw_query_request(&self, data: &[u8]) -> Result<RawQueryRequest, Error> {
-        let proxy =
-            flatbuffers::root::<fbgen::RawQueryRequest>(data).map_err(|e| Error::serde(e))?;
+        let proxy = flatbuffers::root::<fbgen::RawQueryRequest>(data).map_err(Error::serde)?;
 
         Ok(RawQueryRequest::deserialize(proxy))
     }
 
     fn read_raw_query_response(&self, data: &[u8]) -> Result<RawQueryResponse, Error> {
         let proxy = flatbuffers::root::<super::proxies_generated::RawQueryResponseRoot>(data)
-            .map_err(|e| Error::serde(e))?;
+            .map_err(Error::serde)?;
 
         Ok(RawQueryResponse::deserialize(
             proxy.value().unwrap(),
@@ -166,15 +164,14 @@ impl EngineProtocolDeserializer for FlatbuffersEngineProtocol {
     }
 
     fn read_transform_request(&self, data: &[u8]) -> Result<TransformRequest, Error> {
-        let proxy =
-            flatbuffers::root::<fbgen::TransformRequest>(data).map_err(|e| Error::serde(e))?;
+        let proxy = flatbuffers::root::<fbgen::TransformRequest>(data).map_err(Error::serde)?;
 
         Ok(TransformRequest::deserialize(proxy))
     }
 
     fn read_transform_response(&self, data: &[u8]) -> Result<TransformResponse, Error> {
         let proxy = flatbuffers::root::<super::proxies_generated::TransformResponseRoot>(data)
-            .map_err(|e| Error::serde(e))?;
+            .map_err(Error::serde)?;
 
         Ok(TransformResponse::deserialize(
             proxy.value().unwrap(),

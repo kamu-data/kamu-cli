@@ -138,7 +138,7 @@ impl Command for IngestCommand {
             .dataset_repo
             .resolve_dataset_ref(&self.dataset_ref)
             .await
-            .map_err(|e| CLIError::failure(e))?;
+            .map_err(CLIError::failure)?;
 
         self.ensure_valid_push_target(&dataset_handle).await?;
 
@@ -147,7 +147,7 @@ impl Command for IngestCommand {
         } else {
             self.files_refs
                 .iter()
-                .map(|path| Self::path_to_url(&path))
+                .map(|path| Self::path_to_url(path))
                 .collect::<Result<Vec<_>, _>>()?
         };
 
@@ -170,13 +170,13 @@ impl Command for IngestCommand {
                 .push_ingest_svc
                 .ingest_from_url(
                     &self.dataset_ref,
-                    self.source_name.as_ref().map(|s| s.as_str()),
+                    self.source_name.as_deref(),
                     url,
                     self.get_media_type()?,
                     listener.clone(),
                 )
                 .await
-                .map_err(|e| CLIError::failure(e))?;
+                .map_err(CLIError::failure)?;
 
             match result {
                 PushIngestResult::UpToDate { .. } => (),

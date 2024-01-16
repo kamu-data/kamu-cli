@@ -80,7 +80,7 @@ impl LoginService {
         let redirect_url = format!(
             "{}?callbackUrl=http://{}/",
             server_frontend_url.join("/v/login").unwrap(),
-            bound_addr.local_addr().to_string()
+            bound_addr.local_addr()
         );
 
         let app = axum::Router::new()
@@ -131,7 +131,7 @@ impl LoginService {
     pub async fn login(
         &self,
         odf_server_frontend_url: &Url,
-        web_server_started_callback: impl Fn(&String) -> (),
+        web_server_started_callback: impl Fn(&String),
     ) -> Result<FrontendLoginCallbackResponse, LoginError> {
         let (response_tx, response_rx) =
             tokio::sync::mpsc::channel::<FrontendLoginCallbackResponse>(1);
@@ -254,7 +254,7 @@ fn ctrlc_channel() -> Result<Arc<Notify>, ctrlc::Error> {
     let notify_rx = Arc::new(Notify::new());
     let notify_tx = notify_rx.clone();
     ctrlc::set_handler(move || {
-        let _ = notify_tx.notify_waiters();
+        notify_tx.notify_waiters();
     })?;
 
     Ok(notify_rx)

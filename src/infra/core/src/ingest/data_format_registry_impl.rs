@@ -142,7 +142,7 @@ impl DataFormatRegistry for DataFormatRegistryImpl {
                 ..Default::default()
             }
             .into()),
-            _ => Err(UnsupportedMediaTypeError::new(actual_media_type.clone()).into()),
+            _ => Err(UnsupportedMediaTypeError::new(actual_media_type.clone())),
         }
     }
 }

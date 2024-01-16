@@ -43,7 +43,7 @@ impl SearchServiceImpl {
                     .map_err(|_| "Invalid path URL")
                     .int_err()?;
                 let query = query.unwrap_or_default();
-                for entry in std::fs::read_dir(&path).int_err()? {
+                for entry in std::fs::read_dir(path).int_err()? {
                     if let Some(file_name) = entry.int_err()?.file_name().to_str() {
                         if query.is_empty() || file_name.contains(query) {
                             datasets.push(DatasetAlias::new(
@@ -55,7 +55,7 @@ impl SearchServiceImpl {
                 }
             }
             "s3" | "s3+http" | "s3+https" => {
-                let s3_context = S3Context::from_url(&url).await;
+                let s3_context = S3Context::from_url(url).await;
                 let folders_common_prefixes = s3_context.bucket_list_folders().await?;
 
                 let query = query.unwrap_or_default();
@@ -90,7 +90,7 @@ impl SearchServiceImpl {
         query: Option<&str>,
         repo_name: &RepoName,
     ) -> Result<SearchResult, SearchError> {
-        let repo = self.remote_repo_reg.get_repository(&repo_name)?;
+        let repo = self.remote_repo_reg.get_repository(repo_name)?;
 
         tracing::info!(repo_id = repo_name.as_str(), repo_url = ?repo.url, query = ?query, "Searching remote repository");
 

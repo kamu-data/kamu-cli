@@ -91,10 +91,10 @@ impl SearchCommand {
         search_result.datasets.sort();
 
         let mut out = std::io::stdout();
-        write!(out, "Name\n").unwrap();
+        writeln!(out, "Name").unwrap();
 
         for name in &search_result.datasets {
-            write!(out, "{}\n", name).unwrap();
+            writeln!(out, "{}", name).unwrap();
         }
     }
 }
@@ -111,7 +111,7 @@ impl Command for SearchCommand {
                 },
             )
             .await
-            .map_err(|e| CLIError::failure(e))?;
+            .map_err(CLIError::failure)?;
 
         // TODO: replace with formatters
         match self.output_config.format {

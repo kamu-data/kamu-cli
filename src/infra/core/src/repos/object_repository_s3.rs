@@ -82,7 +82,7 @@ where
             Err(err) => match err.into_service_error() {
                 // TODO: Detect credentials error
                 HeadObjectError::NotFound(_) => Ok(false),
-                err @ _ => return Err(err.int_err().into()),
+                err => return Err(err.int_err().into()),
             },
         }
     }
@@ -101,7 +101,7 @@ where
                 HeadObjectError::NotFound(_) => Err(GetError::NotFound(ObjectNotFoundError {
                     hash: hash.clone(),
                 })),
-                err @ _ => return Err(err.int_err().into()),
+                err => return Err(err.int_err().into()),
             },
         }
     }
@@ -128,7 +128,7 @@ where
                 GetObjectError::NoSuchKey(_) => Err(GetError::NotFound(ObjectNotFoundError {
                     hash: hash.clone(),
                 })),
-                err @ _ => return Err(err.int_err().into()),
+                err => return Err(err.int_err().into()),
             },
         }?;
 
@@ -177,7 +177,7 @@ where
             .int_err()?;
 
         Ok(GetExternalUrlResult {
-            url: Url::parse(&res.uri().to_string()).int_err()?,
+            url: Url::parse(res.uri()).int_err()?,
             header_map: Self::into_header_map(res.headers()),
             expires_at: Some(expires_at.into()),
         })
@@ -207,7 +207,7 @@ where
             .int_err()?;
 
         Ok(GetExternalUrlResult {
-            url: Url::parse(&res.uri().to_string()).int_err()?,
+            url: Url::parse(res.uri()).int_err()?,
             header_map: Self::into_header_map(res.headers()),
             expires_at: Some(expires_at.into()),
         })
@@ -239,10 +239,10 @@ where
 
         match self.s3_context.put_object(key, data).await {
             Ok(_) => {}
-            Err(err) => match err.into_service_error() {
-                // TODO: Detect credentials error
-                err @ _ => return Err(err.int_err().into()),
-            },
+            Err(err) => {
+                let err = err.into_service_error();
+                return Err(err.int_err().into());
+            }
         }
 
         Ok(InsertResult { hash })
@@ -281,10 +281,10 @@ where
             .await
         {
             Ok(_) => {}
-            Err(err) => match err.into_service_error() {
-                // TODO: Detect credentials error
-                err @ _ => return Err(err.int_err().into()),
-            },
+            Err(err) => {
+                let err = err.into_service_error();
+                return Err(err.int_err().into());
+            }
         }
 
         Ok(InsertResult { hash })
@@ -302,16 +302,16 @@ where
     }
 
     async fn delete(&self, hash: &Multihash) -> Result<(), DeleteError> {
-        let key = self.get_key(&hash);
+        let key = self.get_key(hash);
 
         tracing::debug!(?key, "Deleting object");
 
         match self.s3_context.delete_object(key).await {
             Ok(_) => {}
-            Err(err) => match err.into_service_error() {
-                // TODO: Detect credentials error
-                err @ _ => return Err(err.int_err().into()),
-            },
+            Err(err) => {
+                let err = err.into_service_error();
+                return Err(err.int_err().into());
+            }
         }
 
         Ok(())

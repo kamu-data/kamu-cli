@@ -70,7 +70,7 @@ impl PollingIngestServiceImpl {
         options: PollingIngestOptions,
         get_listener: impl FnOnce(&DatasetHandle) -> Option<Arc<dyn PollingIngestListener>>,
     ) -> Result<PollingIngestResult, PollingIngestError> {
-        let dataset_handle = self.dataset_repo.resolve_dataset_ref(&dataset_ref).await?;
+        let dataset_handle = self.dataset_repo.resolve_dataset_ref(dataset_ref).await?;
 
         self.dataset_action_authorizer
             .check_action_allowed(&dataset_handle, auth::DatasetAction::Write)
@@ -277,11 +277,8 @@ impl PollingIngestServiceImpl {
             .stage(
                 df,
                 WriteDataOpts {
-                    system_time: args.system_time.clone(),
-                    source_event_time: savepoint
-                        .source_event_time
-                        .clone()
-                        .unwrap_or(args.system_time.clone()),
+                    system_time: args.system_time,
+                    source_event_time: savepoint.source_event_time.unwrap_or(args.system_time),
                     new_watermark: None,
                     new_source_state,
                     data_staging_path,
@@ -337,7 +334,7 @@ impl PollingIngestServiceImpl {
         let prev_source_state = args
             .data_writer
             .prev_source_state()
-            .and_then(|ss| PollingSourceState::try_from_source_state(&ss));
+            .and_then(PollingSourceState::try_from_source_state);
 
         let savepoint_path = self.get_savepoint_path(fetch_step, prev_source_state.as_ref())?;
         let savepoint = self.read_fetch_savepoint(&savepoint_path)?;
@@ -390,7 +387,7 @@ impl PollingIngestServiceImpl {
                 };
 
                 let savepoint = FetchSavepoint {
-                    created_at: args.system_time.clone(),
+                    created_at: args.system_time,
                     source_state: upd.source_state,
                     source_event_time: upd.source_event_time,
                     data,

@@ -180,7 +180,7 @@ impl DatasetRepository for DatasetRepositoryS3 {
             DatasetRef::ID(id) => {
                 if self
                     .s3_context
-                    .bucket_path_exists(&id.as_multibase().to_stack_string().as_str())
+                    .bucket_path_exists(id.as_multibase().to_stack_string().as_str())
                     .await?
                 {
                     let dataset = self.get_dataset_impl(id).await?;
@@ -195,11 +195,11 @@ impl DatasetRepository for DatasetRepositoryS3 {
         }
     }
 
-    fn get_all_datasets<'s>(&'s self) -> DatasetHandleStream<'s> {
+    fn get_all_datasets(&self) -> DatasetHandleStream<'_> {
         self.stream_datasets_if(|_| true)
     }
 
-    fn get_datasets_by_owner<'s>(&'s self, account_name: AccountName) -> DatasetHandleStream<'s> {
+    fn get_datasets_by_owner(&self, account_name: AccountName) -> DatasetHandleStream<'_> {
         if !self.is_multi_tenant() && account_name != DEFAULT_ACCOUNT_NAME {
             return Box::pin(futures::stream::empty());
         }
@@ -299,7 +299,7 @@ impl DatasetRepository for DatasetRepositoryS3 {
             Err(err) => return Err(err.int_err().into()),
         };
 
-        let normalized_alias = self.normalize_alias(&dataset_alias);
+        let normalized_alias = self.normalize_alias(dataset_alias);
         self.save_dataset_alias(&dataset, normalized_alias).await?;
 
         let dataset_handle = DatasetHandle::new(dataset_id, dataset_alias.clone());
@@ -404,7 +404,7 @@ impl DatasetRepository for DatasetRepositoryS3 {
 
         self.delete_dataset_s3_objects(&dataset_handle.id)
             .await
-            .map_err(|e| DeleteDatasetError::Internal(e))?;
+            .map_err(DeleteDatasetError::Internal)?;
 
         self.event_bus
             .dispatch_event(events::DatasetEventDeleted {

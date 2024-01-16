@@ -339,8 +339,7 @@ async fn test_get_verification_plan_one_to_one() {
             },
         )
         .await
-        .unwrap()
-        .new_head;
+        .unwrap();
 
     let deriv_head_schema = deriv_create_result
         .dataset

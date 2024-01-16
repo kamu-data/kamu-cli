@@ -112,16 +112,16 @@ impl From<u32> for WorkspaceVersion {
     }
 }
 
-impl Into<u32> for WorkspaceVersion {
-    fn into(self) -> u32 {
-        match self {
-            Self::V0_Initial => 0,
-            Self::V1_WorkspaceCacheDir => 1,
-            Self::V2_DatasetConfig => 2,
-            Self::V3_SavepointCreatedAt => 3,
-            Self::V4_SavepointZeroCopy => 4,
-            Self::V5_BreakingMetadataChanges => 5,
-            Self::Unknown(value) => value,
+impl From<WorkspaceVersion> for u32 {
+    fn from(val: WorkspaceVersion) -> Self {
+        match val {
+            WorkspaceVersion::V0_Initial => 0,
+            WorkspaceVersion::V1_WorkspaceCacheDir => 1,
+            WorkspaceVersion::V2_DatasetConfig => 2,
+            WorkspaceVersion::V3_SavepointCreatedAt => 3,
+            WorkspaceVersion::V4_SavepointZeroCopy => 4,
+            WorkspaceVersion::V5_BreakingMetadataChanges => 5,
+            WorkspaceVersion::Unknown(value) => value,
         }
     }
 }
@@ -137,7 +137,7 @@ impl std::fmt::Display for WorkspaceVersion {
 
 const WORKSPACE_CONFIG_VERSION: i32 = 1;
 
-#[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Eq, PartialEq, Default)]
 pub struct WorkspaceConfig {
     pub multi_tenant: bool,
 }
@@ -176,14 +176,6 @@ impl WorkspaceConfig {
         };
 
         serde_yaml::to_writer(file, &manifest)
-    }
-}
-
-impl Default for WorkspaceConfig {
-    fn default() -> Self {
-        Self {
-            multi_tenant: false,
-        }
     }
 }
 

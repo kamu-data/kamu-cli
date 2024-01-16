@@ -138,7 +138,7 @@ impl FetchService {
         Ok(res)
     }
 
-    fn template_string<'a>(s: &'a str) -> Result<Cow<'a, str>, PollingIngestError> {
+    fn template_string(s: &str) -> Result<Cow<'_, str>, PollingIngestError> {
         let mut s = Cow::from(s);
         let re_tpl = regex::Regex::new(r"\$\{\{([^}]*)\}\}").unwrap();
         let re_env = regex::Regex::new(r"^env\.([a-zA-Z-_]+)$").unwrap();
@@ -429,9 +429,9 @@ impl FetchService {
         let (first_filename, first_path) = matched_files.pop().unwrap();
 
         let source_event_time = match &fglob.event_time {
-            None | Some(EventTimeSource::FromSystemTime(_)) => Some(system_time.clone()),
+            None | Some(EventTimeSource::FromSystemTime(_)) => Some(*system_time),
             Some(EventTimeSource::FromPath(src)) => {
-                Some(Self::extract_event_time_from_path(&first_filename, &src)?)
+                Some(Self::extract_event_time_from_path(&first_filename, src)?)
             }
             Some(EventTimeSource::FromMetadata(_)) => {
                 return Err(EventTimeSourceError::incompatible(
@@ -490,7 +490,7 @@ impl FetchService {
 
         let source_event_time = match event_time_source {
             None | Some(EventTimeSource::FromMetadata(_)) => Some(mod_time),
-            Some(EventTimeSource::FromSystemTime(_)) => Some(system_time.clone()),
+            Some(EventTimeSource::FromSystemTime(_)) => Some(*system_time),
             Some(EventTimeSource::FromPath(_)) => {
                 return Err(EventTimeSourceError::incompatible(
                     "File source does not supports fromPath event time source",
@@ -586,7 +586,7 @@ impl FetchService {
             ))
         } else if let Some(last_modified) = response.headers().get(reqwest::header::LAST_MODIFIED) {
             let last_modified = Self::parse_http_date_time(last_modified.to_str().int_err()?);
-            last_modified_time = Some(last_modified.clone());
+            last_modified_time = Some(last_modified);
             Some(PollingSourceState::LastModified(last_modified))
         } else {
             None
@@ -594,7 +594,7 @@ impl FetchService {
 
         let total_bytes = response
             .content_length()
-            .map(|b| TotalBytes::Exact(b))
+            .map(TotalBytes::Exact)
             .unwrap_or(TotalBytes::Unknown);
         let mut fetched_bytes = 0;
         let mut file = tokio::fs::File::create(target_path).await.int_err()?;
@@ -615,7 +615,7 @@ impl FetchService {
 
         let source_event_time = match event_time_source {
             None | Some(EventTimeSource::FromMetadata(_)) => last_modified_time,
-            Some(EventTimeSource::FromSystemTime(_)) => Some(system_time.clone()),
+            Some(EventTimeSource::FromSystemTime(_)) => Some(*system_time),
             Some(EventTimeSource::FromPath(_)) => {
                 return Err(EventTimeSourceError::incompatible(
                     "Url source does not support fromPath event time source",
@@ -750,7 +750,7 @@ impl FetchService {
             None => "%Y-%m-%d",
         };
 
-        if let Some(capture) = time_re.captures(&filename) {
+        if let Some(capture) = time_re.captures(filename) {
             if let Some(group) = capture.get(1) {
                 match DateTime::parse_from_str(group.as_str(), time_fmt) {
                     Ok(dt) => Ok(dt.into()),
