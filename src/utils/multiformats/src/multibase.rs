@@ -47,7 +47,7 @@ impl Multibase {
         Self::format(bytes, encoding).to_str()
     }
 
-    pub fn format<'a, const S: usize>(bytes: &'a [u8], encoding: Multibase) -> MultibaseFmt<'a, S> {
+    pub fn format<const S: usize>(bytes: &[u8], encoding: Multibase) -> MultibaseFmt<'_, S> {
         MultibaseFmt::new(bytes, encoding)
     }
 }
@@ -69,7 +69,7 @@ impl<'a, const S: usize> MultibaseFmt<'a, S> {
     }
 
     pub fn to_str(&self) -> StackString<S> {
-        let mut buf = [0 as u8; S];
+        let mut buf = [0_u8; S];
 
         let len = match self.encoding {
             Multibase::Base16 => {

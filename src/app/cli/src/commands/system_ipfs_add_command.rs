@@ -39,7 +39,7 @@ impl Command for SystemIpfsAddCommand {
             .sync_svc
             .ipfs_add(&self.dataset_ref)
             .await
-            .map_err(|e| CLIError::failure(e))?;
+            .map_err(CLIError::failure)?;
 
         println!("{}", cid);
 

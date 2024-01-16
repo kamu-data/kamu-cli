@@ -65,7 +65,7 @@ impl NamedObjectRepository for NamedObjectRepositoryLocalFS {
         tokio::fs::write(&staging_path, data).await.int_err()?;
 
         // Atomic move/replace
-        std::fs::rename(&staging_path, &self.root.join(name)).int_err()?;
+        std::fs::rename(&staging_path, self.root.join(name)).int_err()?;
         Ok(())
     }
 

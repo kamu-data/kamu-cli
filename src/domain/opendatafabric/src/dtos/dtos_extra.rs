@@ -282,7 +282,7 @@ impl SetDataSchema {
     #[cfg(feature = "arrow")]
     pub fn schema_as_arrow(&self) -> Result<arrow::datatypes::SchemaRef, crate::serde::Error> {
         let schema_proxy = flatbuffers::root::<arrow::ipc::gen::Schema::Schema>(&self.schema)
-            .map_err(|e| crate::serde::Error::serde(e))?;
+            .map_err(crate::serde::Error::serde)?;
         let schema = arrow::ipc::convert::fb_to_schema(schema_proxy);
         Ok(arrow::datatypes::SchemaRef::new(schema))
     }

@@ -187,24 +187,21 @@ impl ODFEngine {
                 return Err(EngineError::contract_error(
                     "Engine did not write a response data file",
                     Vec::new(),
-                )
-                .into());
+                ));
             }
             if new_data_path.is_symlink() || !new_data_path.is_file() {
                 return Err(EngineError::contract_error(
                     "Engine wrote data not as a plain file",
                     Vec::new(),
-                )
-                .into());
+                ));
             }
-            Some(OwnedFile::new(new_data_path).into())
+            Some(OwnedFile::new(new_data_path))
         } else {
             if new_data_path.exists() {
                 return Err(EngineError::contract_error(
                     "Engine wrote data file while the ouput slice is empty",
                     Vec::new(),
-                )
-                .into());
+                ));
             }
             None
         };
@@ -214,10 +211,9 @@ impl ODFEngine {
                 return Err(EngineError::contract_error(
                     "Engine wrote checkpoint not as a plain file",
                     Vec::new(),
-                )
-                .into());
+                ));
             }
-            Some(OwnedFile::new(new_checkpoint_path).into())
+            Some(OwnedFile::new(new_checkpoint_path))
         } else {
             None
         };

@@ -54,7 +54,7 @@ impl MetadataBlockSerializer for YamlMetadataBlockSerializer {
         };
 
         let buf = serde_yaml::to_string(&manifest)
-            .map_err(|e| Error::serde(e))?
+            .map_err(Error::serde)?
             .into_bytes();
 
         Ok(Buffer::new(0, buf.len(), buf))
@@ -71,7 +71,7 @@ impl MetadataBlockDeserializer for YamlMetadataBlockDeserializer {
     fn read_manifest(&self, data: &[u8]) -> Result<MetadataBlock, Error> {
         // Read short manifest first, with kind and version only
         let manifest_no_content: ContentFreeManifest =
-            serde_yaml::from_slice(data).map_err(|e| Error::serde(e))?;
+            serde_yaml::from_slice(data).map_err(Error::serde)?;
 
         assert_eq!(manifest_no_content.kind, "MetadataBlock");
 
@@ -82,7 +82,7 @@ impl MetadataBlockDeserializer for YamlMetadataBlockDeserializer {
 
         // Re-read full manifest with content definition
         let manifest: Manifest<MetadataBlockWrapper> =
-            serde_yaml::from_slice(data).map_err(|e| Error::serde(e))?;
+            serde_yaml::from_slice(data).map_err(Error::serde)?;
 
         Ok(manifest.content.0)
     }
@@ -102,7 +102,7 @@ impl YamlMetadataEventSerializer {
             content: MetadataEventWrapper(event.clone()),
         };
 
-        serde_yaml::to_string(&manifest).map_err(|e| Error::serde(e))
+        serde_yaml::to_string(&manifest).map_err(Error::serde)
     }
 
     pub fn write_manifest(&self, event: &MetadataEvent) -> Result<Buffer<u8>, Error> {
@@ -120,7 +120,7 @@ pub struct YamlMetadataEventDeserializer;
 impl YamlMetadataEventDeserializer {
     pub fn read_manifest(&self, data: &[u8]) -> Result<MetadataEvent, Error> {
         let manifest: Manifest<MetadataEventWrapper> =
-            serde_yaml::from_slice(data).map_err(|e| Error::serde(e))?;
+            serde_yaml::from_slice(data).map_err(Error::serde)?;
 
         // TODO: Handle conversions?
         assert_eq!(manifest.kind, "MetadataEvent");
@@ -144,7 +144,7 @@ impl YamlDatasetSnapshotSerializer {
             content: DatasetSnapshotWrapper(snapshot.clone()),
         };
 
-        serde_yaml::to_string(&manifest).map_err(|e| Error::serde(e))
+        serde_yaml::to_string(&manifest).map_err(Error::serde)
     }
 }
 
@@ -169,8 +169,8 @@ impl YamlDatasetSnapshotDeserializer {
         let mut ret = Vec::new();
 
         for document in serde_yaml::Deserializer::from_reader(reader) {
-            let manifest = Manifest::<DatasetSnapshotWrapper>::deserialize(document)
-                .map_err(|e| Error::serde(e))?;
+            let manifest =
+                Manifest::<DatasetSnapshotWrapper>::deserialize(document).map_err(Error::serde)?;
 
             assert_eq!(manifest.kind, "DatasetSnapshot");
             assert_eq!(manifest.version, 1);
@@ -185,7 +185,7 @@ impl YamlDatasetSnapshotDeserializer {
 impl DatasetSnapshotDeserializer for YamlDatasetSnapshotDeserializer {
     fn read_manifest(&self, data: &[u8]) -> Result<DatasetSnapshot, Error> {
         let manifest: Manifest<DatasetSnapshotWrapper> =
-            serde_yaml::from_slice(data).map_err(|e| Error::serde(e))?;
+            serde_yaml::from_slice(data).map_err(Error::serde)?;
 
         // TODO: Handle conversions?
         assert_eq!(manifest.kind, "DatasetSnapshot");
@@ -204,7 +204,7 @@ pub struct YamlEngineProtocol;
 impl EngineProtocolSerializer for YamlEngineProtocol {
     fn write_raw_query_request(&self, inst: &RawQueryRequest) -> Result<Buffer<u8>, Error> {
         let buf = serde_yaml::to_string(&RawQueryRequestWrapper(inst.clone()))
-            .map_err(|e| Error::serde(e))?
+            .map_err(Error::serde)?
             .into_bytes();
 
         Ok(Buffer::new(0, buf.len(), buf))
@@ -212,7 +212,7 @@ impl EngineProtocolSerializer for YamlEngineProtocol {
 
     fn write_raw_query_response(&self, inst: &RawQueryResponse) -> Result<Buffer<u8>, Error> {
         let buf = serde_yaml::to_string(&RawQueryResponseWrapper(inst.clone()))
-            .map_err(|e| Error::serde(e))?
+            .map_err(Error::serde)?
             .into_bytes();
 
         Ok(Buffer::new(0, buf.len(), buf))
@@ -220,7 +220,7 @@ impl EngineProtocolSerializer for YamlEngineProtocol {
 
     fn write_transform_request(&self, inst: &TransformRequest) -> Result<Buffer<u8>, Error> {
         let buf = serde_yaml::to_string(&TransformRequestWrapper(inst.clone()))
-            .map_err(|e| Error::serde(e))?
+            .map_err(Error::serde)?
             .into_bytes();
 
         Ok(Buffer::new(0, buf.len(), buf))
@@ -228,7 +228,7 @@ impl EngineProtocolSerializer for YamlEngineProtocol {
 
     fn write_transform_response(&self, inst: &TransformResponse) -> Result<Buffer<u8>, Error> {
         let buf = serde_yaml::to_string(&TransformResponseWrapper(inst.clone()))
-            .map_err(|e| Error::serde(e))?
+            .map_err(Error::serde)?
             .into_bytes();
 
         Ok(Buffer::new(0, buf.len(), buf))
@@ -237,29 +237,25 @@ impl EngineProtocolSerializer for YamlEngineProtocol {
 
 impl EngineProtocolDeserializer for YamlEngineProtocol {
     fn read_raw_query_request(&self, data: &[u8]) -> Result<RawQueryRequest, Error> {
-        let inst: RawQueryRequestWrapper =
-            serde_yaml::from_slice(data).map_err(|e| Error::serde(e))?;
+        let inst: RawQueryRequestWrapper = serde_yaml::from_slice(data).map_err(Error::serde)?;
 
         Ok(inst.0)
     }
 
     fn read_raw_query_response(&self, data: &[u8]) -> Result<RawQueryResponse, Error> {
-        let inst: RawQueryResponseWrapper =
-            serde_yaml::from_slice(data).map_err(|e| Error::serde(e))?;
+        let inst: RawQueryResponseWrapper = serde_yaml::from_slice(data).map_err(Error::serde)?;
 
         Ok(inst.0)
     }
 
     fn read_transform_request(&self, data: &[u8]) -> Result<TransformRequest, Error> {
-        let inst: TransformRequestWrapper =
-            serde_yaml::from_slice(data).map_err(|e| Error::serde(e))?;
+        let inst: TransformRequestWrapper = serde_yaml::from_slice(data).map_err(Error::serde)?;
 
         Ok(inst.0)
     }
 
     fn read_transform_response(&self, data: &[u8]) -> Result<TransformResponse, Error> {
-        let inst: TransformResponseWrapper =
-            serde_yaml::from_slice(data).map_err(|e| Error::serde(e))?;
+        let inst: TransformResponseWrapper = serde_yaml::from_slice(data).map_err(Error::serde)?;
 
         Ok(inst.0)
     }

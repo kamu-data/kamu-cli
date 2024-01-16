@@ -12,6 +12,8 @@
 // See: http://opendatafabric.org/
 ///////////////////////////////////////////////////////////////////////////////
 
+#![allow(clippy::all)]
+
 use std::path::Path;
 
 use chrono::{DateTime, Utc};

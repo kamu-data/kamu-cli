@@ -12,6 +12,8 @@
 // See: http://opendatafabric.org/
 ////////////////////////////////////////////////////////////////////////////////
 
+#![allow(clippy::all)]
+
 use std::path::PathBuf;
 
 use ::serde::{Deserialize, Deserializer, Serialize, Serializer};

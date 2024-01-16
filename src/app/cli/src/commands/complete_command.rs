@@ -177,7 +177,7 @@ impl CompleteCommand {
         // Establish command context
         for arg in args[1..].iter() {
             for s in last_cmd.get_subcommands() {
-                if s.get_name() == *arg || s.get_visible_aliases().find(|a| a == arg).is_some() {
+                if s.get_name() == *arg || s.get_visible_aliases().any(|a| &a == arg) {
                     last_cmd = s;
                     break;
                 }
@@ -235,7 +235,7 @@ impl CompleteCommand {
         }
 
         // Complete args
-        if to_complete.starts_with("-") {
+        if to_complete.starts_with('-') {
             for arg in last_cmd.get_arguments() {
                 let full_name = if let Some(long) = arg.get_long() {
                     format!("--{}", long)

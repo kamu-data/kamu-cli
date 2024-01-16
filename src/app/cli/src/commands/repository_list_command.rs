@@ -39,14 +39,14 @@ impl RepositoryListCommand {
         repos.sort();
 
         let mut out = std::io::stdout();
-        write!(out, "Name,URL\n")?;
+        writeln!(out, "Name,URL")?;
 
         for name in repos {
             let repo = self
                 .remote_repo_reg
                 .get_repository(&name)
                 .map_err(CLIError::failure)?;
-            write!(out, "{},\"{}\"\n", name, repo.url)?;
+            writeln!(out, "{},\"{}\"", name, repo.url)?;
         }
         Ok(())
     }
@@ -65,11 +65,11 @@ impl RepositoryListCommand {
         for name in repos.iter() {
             let repo = self
                 .remote_repo_reg
-                .get_repository(&name)
+                .get_repository(name)
                 .map_err(CLIError::failure)?;
             table.add_row(Row::new(vec![
-                Cell::new(&name),
-                Cell::new(&repo.url.to_string()),
+                Cell::new(name),
+                Cell::new(repo.url.as_ref()),
             ]));
         }
 

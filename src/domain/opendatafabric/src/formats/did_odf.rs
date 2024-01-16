@@ -98,9 +98,9 @@ impl From<DidKey> for DidOdf {
     }
 }
 
-impl Into<DidKey> for DidOdf {
-    fn into(self) -> DidKey {
-        self.did
+impl From<DidOdf> for DidKey {
+    fn from(val: DidOdf) -> Self {
+        val.did
     }
 }
 

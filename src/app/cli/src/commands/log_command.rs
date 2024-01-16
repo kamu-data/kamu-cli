@@ -88,7 +88,7 @@ impl Command for LogCommand {
             .await?;
 
         let mut renderer: Box<dyn MetadataRenderer> = match (
-            self.outout_format.as_ref().map(|s| s.as_str()),
+            self.outout_format.as_deref(),
             self.output_config.is_tty && self.output_config.verbosity_level == 0,
         ) {
             (None, true) => Box::new(PagedAsciiRenderer::new(id_to_alias_lookup, self.limit)),
@@ -281,21 +281,21 @@ impl AsciiRenderer {
                 }
 
                 if let Some(v) = prev_checkpoint {
-                    self.render_property(output, 0, "PrevCheckpoint", &v)?;
+                    self.render_property(output, 0, "PrevCheckpoint", v)?;
                 }
 
                 if let Some(v) = prev_offset {
-                    self.render_property(output, 0, "PrevOffset", &v)?;
+                    self.render_property(output, 0, "PrevOffset", v)?;
                 }
 
                 if let Some(new_data) = new_data {
                     self.render_section(output, 0, "NewData")?;
-                    self.render_data_slice(output, 1, &new_data)?;
+                    self.render_data_slice(output, 1, new_data)?;
                 }
 
                 if let Some(ocp) = new_checkpoint {
                     self.render_section(output, 0, "NewCheckpoint")?;
-                    self.render_checkpoint(output, 1, &ocp)?;
+                    self.render_checkpoint(output, 1, ocp)?;
                 }
 
                 if let Some(wm) = new_watermark {
@@ -363,15 +363,15 @@ impl AsciiRenderer {
                 merge: _,
             }) => {
                 self.render_property(output, 0, "Kind", "AddPushSource")?;
-                self.render_property(output, 0, "SourceName", &source_name)?;
+                self.render_property(output, 0, "SourceName", source_name)?;
                 self.render_property(output, 0, "Source", "...")?;
             }
             MetadataEvent::DisablePushSource(DisablePushSource { source_name }) => {
                 self.render_property(output, 0, "Kind", "DisablePushSource")?;
-                self.render_property(output, 0, "SourceName", &source_name)?
+                self.render_property(output, 0, "SourceName", source_name)?
             }
             MetadataEvent::SetTransform(_) => {
-                self.render_property(output, 0, "Kind", &"SetTransform")?;
+                self.render_property(output, 0, "Kind", "SetTransform")?;
                 self.render_property(output, 0, "Transform", "...")?
             }
             MetadataEvent::SetVocab(SetVocab {
@@ -380,7 +380,7 @@ impl AsciiRenderer {
                 system_time_column,
                 event_time_column,
             }) => {
-                self.render_property(output, 0, "Kind", &"SetVocab")?;
+                self.render_property(output, 0, "Kind", "SetVocab")?;
                 if let Some(offset_column) = offset_column {
                     self.render_property(output, 0, "OffsetColumn", offset_column)?;
                 }
@@ -405,17 +405,17 @@ impl AsciiRenderer {
         indent: i32,
         slice: &DataSlice,
     ) -> Result<(), std::io::Error> {
-        self.render_property(output, indent, "Offset.Start", &slice.offset_interval.start)?;
-        self.render_property(output, indent, "Offset.End", &slice.offset_interval.end)?;
+        self.render_property(output, indent, "Offset.Start", slice.offset_interval.start)?;
+        self.render_property(output, indent, "Offset.End", slice.offset_interval.end)?;
         self.render_property(
             output,
             indent,
             "NumRecords",
-            &(slice.offset_interval.end - slice.offset_interval.start + 1),
+            slice.offset_interval.end - slice.offset_interval.start + 1,
         )?;
         self.render_property(output, indent, "LogicalHash", &slice.logical_hash)?;
         self.render_property(output, indent, "PhysicalHash", &slice.physical_hash)?;
-        self.render_property(output, indent, "Size", &slice.size)?;
+        self.render_property(output, indent, "Size", slice.size)?;
         Ok(())
     }
 
@@ -426,7 +426,7 @@ impl AsciiRenderer {
         checkpoint: &Checkpoint,
     ) -> Result<(), std::io::Error> {
         self.render_property(output, indent, "PhysicalHash", &checkpoint.physical_hash)?;
-        self.render_property(output, indent, "Size", &checkpoint.size)?;
+        self.render_property(output, indent, "Size", checkpoint.size)?;
         Ok(())
     }
 
@@ -582,7 +582,7 @@ impl YamlRenderer {
         _hash: &Multihash,
         block: &MetadataBlock,
     ) -> Result<(), std::io::Error> {
-        let buf = YamlMetadataBlockSerializer.write_manifest(&block).unwrap();
+        let buf = YamlMetadataBlockSerializer.write_manifest(block).unwrap();
 
         writeln!(output, "{}", std::str::from_utf8(&buf).unwrap())
     }

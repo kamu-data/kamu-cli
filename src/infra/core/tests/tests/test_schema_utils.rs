@@ -40,20 +40,22 @@ fn test_write_schema_parquet_json_group() {
         .with_precision(19)
         .with_scale(4)
         .build();
-    let mut struct_fields = Vec::new();
-    struct_fields.push(Arc::new(f1.unwrap()));
-    struct_fields.push(Arc::new(f2.unwrap()));
-    struct_fields.push(Arc::new(f3.unwrap()));
+    let struct_fields = vec![
+        Arc::new(f1.unwrap()),
+        Arc::new(f2.unwrap()),
+        Arc::new(f3.unwrap()),
+    ];
     let field = Type::group_type_builder("field")
         .with_repetition(Repetition::OPTIONAL)
         .with_fields(struct_fields)
         .with_id(Some(1))
         .build()
         .unwrap();
-    let mut fields = Vec::new();
-    fields.push(Arc::new(field));
-    fields.push(Arc::new(f4.unwrap()));
-    fields.push(Arc::new(f5.unwrap()));
+    let fields = vec![
+        Arc::new(field),
+        Arc::new(f4.unwrap()),
+        Arc::new(f5.unwrap()),
+    ];
     let message = Type::group_type_builder("schema")
         .with_fields(fields)
         .with_id(Some(2))

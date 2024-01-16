@@ -123,7 +123,7 @@ impl PushCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for PushCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
-        if self.refs.len() == 0 && !self.all {
+        if self.refs.is_empty() && !self.all {
             return Err(CLIError::usage_error("Specify a dataset or pass --all"));
         }
 

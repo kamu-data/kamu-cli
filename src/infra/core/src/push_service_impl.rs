@@ -155,7 +155,7 @@ impl PushServiceImpl {
                     .get_remote_aliases(&local_handle.as_local_ref())
                     .await
                     .int_err()?
-                    .contains(&remote_ref, RemoteAliasKind::Push)
+                    .contains(remote_ref, RemoteAliasKind::Push)
                 {
                     return Ok(local_handle);
                 }
@@ -173,7 +173,7 @@ impl PushServiceImpl {
                 .get_remote_aliases(&dataset_handle.as_local_ref())
                 .await
                 .int_err()?
-                .contains(&remote_ref, RemoteAliasKind::Push)
+                .contains(remote_ref, RemoteAliasKind::Push)
             {
                 return Ok(dataset_handle);
             }

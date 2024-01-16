@@ -68,7 +68,7 @@ impl Multihash {
     }
 
     pub fn from_multibase(s: &str) -> Result<Self, ParseError<Multihash>> {
-        let mut buf = [0 as u8; MAX_MULTIHASH_BINARY_REPR_LEN];
+        let mut buf = [0_u8; MAX_MULTIHASH_BINARY_REPR_LEN];
         let len = Multibase::decode(s, &mut buf[..]).map_err(|e| ParseError::new_from(s, e))?;
         Self::from_bytes(&buf[..len]).map_err(|e| ParseError::new_from(s, e))
     }
@@ -86,14 +86,14 @@ impl Multihash {
     }
 
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, DeserializeError<Multihash>> {
-        let (code, rest) = uvar::decode::u32(bytes).map_err(|e| DeserializeError::new_from(e))?;
-        let code: Multicodec = code.try_into().map_err(|e| DeserializeError::new_from(e))?;
+        let (code, rest) = uvar::decode::u32(bytes).map_err(DeserializeError::new_from)?;
+        let code: Multicodec = code.try_into().map_err(DeserializeError::new_from)?;
 
-        let (len, rest) = uvar::decode::usize(rest).map_err(|e| DeserializeError::new_from(e))?;
+        let (len, rest) = uvar::decode::usize(rest).map_err(DeserializeError::new_from)?;
         if len != rest.len() {
             Err(DeserializeError::new())
         } else {
-            Self::new(code, rest).map_err(|e| DeserializeError::new_from(e))
+            Self::new(code, rest).map_err(DeserializeError::new_from)
         }
     }
 
@@ -169,7 +169,7 @@ impl MultihashBytes {
     fn new(value: &Multihash) -> Self {
         use std::io::Write;
 
-        let mut buf = [0 as u8; MAX_MULTIHASH_BINARY_REPR_LEN];
+        let mut buf = [0_u8; MAX_MULTIHASH_BINARY_REPR_LEN];
 
         let len = {
             let mut cursor = std::io::Cursor::new(&mut buf[..]);

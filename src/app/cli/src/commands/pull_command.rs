@@ -54,7 +54,7 @@ impl PullCommand {
             pull_svc,
             dataset_repo,
             output_config,
-            refs: refs.into_iter().map(|s| s.clone()).collect(),
+            refs: refs.into_iter().collect(),
             all,
             recursive,
             fetch_uncacheable,
@@ -148,7 +148,7 @@ impl PullCommand {
             }
             (None, Some(remote_ref)) => format!("sync dataset from {}", remote_ref),
             (Some(local_ref), None) => format!("pull {}", local_ref),
-            _ => format!("???"),
+            _ => "???".to_string(),
         }
     }
 }

@@ -1464,13 +1464,9 @@ pub struct TransformResponseUnionTableOffset {}
 ////////////////////////////////////////////////////////////////////////////////
 // struct Timestamp, aligned to 4
 #[repr(transparent)]
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Default)]
 pub struct Timestamp(pub [u8; 16]);
-impl Default for Timestamp {
-    fn default() -> Self {
-        Self([0; 16])
-    }
-}
+
 impl core::fmt::Debug for Timestamp {
     fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
         f.debug_struct("Timestamp")

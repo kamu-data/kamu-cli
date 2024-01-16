@@ -104,7 +104,7 @@ impl AddCommand {
             let line = line.trim();
 
             // Allow any number of comments in (what is supposedly) a YAML file
-            if line.is_empty() || line.starts_with("#") {
+            if line.is_empty() || line.starts_with('#') {
                 continue;
             }
 
@@ -148,8 +148,8 @@ impl Command for AddCommand {
             load_results.into_iter().partition(|(_, r)| r.is_ok());
         let snapshots: Vec<_> = snapshots.into_iter().map(|(_, r)| r.unwrap()).collect();
 
-        if errors.len() != 0 {
-            errors.sort_by(|(a, _), (b, _)| a.cmp(&b));
+        if !errors.is_empty() {
+            errors.sort_by(|(a, _), (b, _)| a.cmp(b));
             return Err(BatchError::new(
                 "Failed to load manifests",
                 errors
@@ -172,7 +172,7 @@ impl Command for AddCommand {
                 }
             }
 
-            if already_exist.len() != 0 {
+            if !already_exist.is_empty() {
                 let confirmed = common::prompt_yes_no(&format!(
                     "{}: {}\n{}\nDo you whish to continue? [y/N]: ",
                     console::style("You are about to replace following dataset(s)").yellow(),
@@ -202,7 +202,7 @@ impl Command for AddCommand {
             .create_datasets_from_snapshots(snapshots)
             .await;
 
-        add_results.sort_by(|(id_a, _), (id_b, _)| id_a.cmp(&id_b));
+        add_results.sort_by(|(id_a, _), (id_b, _)| id_a.cmp(id_b));
 
         let mut num_added = 0;
 
@@ -227,7 +227,7 @@ impl Command for AddCommand {
             }
         }
 
-        if errors_with_contexts.len() == 0 {
+        if errors_with_contexts.is_empty() {
             eprintln!(
                 "{}",
                 console::style(format!("Added {} dataset(s)", num_added))

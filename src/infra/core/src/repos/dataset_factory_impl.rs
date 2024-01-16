@@ -320,7 +320,7 @@ impl DatasetFactory for DatasetFactoryImpl {
             "http" | "https" | "odf+http" | "odf+https" => {
                 let ds = Self::get_http(
                     url.clone(),
-                    self.build_header_map(&url),
+                    self.build_header_map(url),
                     self.event_bus.clone(),
                 )?;
                 Ok(Arc::new(ds))

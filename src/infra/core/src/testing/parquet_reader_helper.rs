@@ -23,7 +23,7 @@ impl ParquetReaderHelper {
     }
 
     pub fn open(path: &Path) -> Self {
-        Self::new(SerializedFileReader::new(std::fs::File::open(&path).unwrap()).unwrap())
+        Self::new(SerializedFileReader::new(std::fs::File::open(path).unwrap()).unwrap())
     }
 
     pub fn get_schema(&self) -> &datafusion::parquet::schema::types::Type {

@@ -54,7 +54,7 @@ impl Command for ResetCommand {
             common::prompt_yes_no(&format!(
                 "{}: {}\n{}\nDo you whish to continue? [y/N]: ",
                 console::style("You are about to reset the following dataset").yellow(),
-                self.dataset_ref.to_string(),
+                self.dataset_ref,
                 console::style("This operation is irreversible!").yellow(),
             ))
         };
@@ -66,7 +66,7 @@ impl Command for ResetCommand {
         self.reset_svc
             .reset_dataset(&dataset_handle, &self.block_hash)
             .await
-            .map_err(|e| CLIError::failure(e))?;
+            .map_err(CLIError::failure)?;
 
         Ok(())
     }

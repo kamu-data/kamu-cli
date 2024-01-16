@@ -136,7 +136,7 @@ impl ConfigService {
         let mut nesting = 0;
         for subkey in key.split('.') {
             if nesting != 0 {
-                write!(buffer, "\n").unwrap();
+                writeln!(buffer).unwrap();
             }
             for _ in 0..nesting {
                 write!(buffer, "  ").unwrap();
@@ -171,7 +171,7 @@ impl ConfigService {
         let config = self.load_from(&config_path);
         let mut config_raw = self.to_raw(config);
 
-        if self.unset_recursive(key, &mut config_raw.as_mapping_mut().unwrap()) {
+        if self.unset_recursive(key, config_raw.as_mapping_mut().unwrap()) {
             let file = std::fs::OpenOptions::new()
                 .write(true)
                 .truncate(true)
@@ -207,7 +207,7 @@ impl ConfigService {
                     return true;
                 }
             }
-            return false;
+            false
         } else {
             value
                 .remove(&serde_yaml::Value::String(key.to_owned()))
@@ -244,7 +244,7 @@ impl ConfigService {
                     full_key.push_str(prefix);
                     full_key.push_str(key);
 
-                    full_key.push_str(".");
+                    full_key.push('.');
                     self.visit_keys_recursive(&full_key, v, fun);
 
                     full_key.pop();
@@ -258,8 +258,8 @@ impl ConfigService {
         match scope {
             ConfigScope::User => dirs::home_dir()
                 .expect("Cannot determine user home directory")
-                .join(&CONFIG_FILENAME),
-            ConfigScope::Workspace => self.workspace_kamu_dir.join(&CONFIG_FILENAME),
+                .join(CONFIG_FILENAME),
+            ConfigScope::Workspace => self.workspace_kamu_dir.join(CONFIG_FILENAME),
             _ => panic!(),
         }
     }

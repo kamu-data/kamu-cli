@@ -63,11 +63,11 @@ impl InspectSchemaCommand {
                 let typ = if *precision > 0 {
                     format!("DECIMAL({}, {})", precision, scale)
                 } else if basic_info.converted_type() == ConvertedType::UTF8 {
-                    format!("STRING")
+                    "STRING".to_string()
                 } else if basic_info.converted_type() != ConvertedType::NONE {
                     format!("{:?}", basic_info.converted_type())
                 } else if *physical_type == BasicType::INT96 {
-                    format!("TIMESTAMP")
+                    "TIMESTAMP".to_string()
                 } else {
                     format!("{:?}", physical_type)
                 };
@@ -127,7 +127,7 @@ impl Command for InspectSchemaCommand {
                 })?;
 
         match maybe_schema {
-            Some(schema) => match self.output_format.as_ref().map(|s| s.as_str()) {
+            Some(schema) => match self.output_format.as_deref() {
                 None | Some("ddl") => self.print_schema_ddl(&schema),
                 Some("parquet") => self.print_schema_parquet(&schema)?,
                 Some("json") => self.print_schema_json(&schema)?,

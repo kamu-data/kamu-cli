@@ -112,9 +112,9 @@ impl SqlShellCommand {
             .query_svc
             .sql_statement(self.command.as_ref().unwrap(), QueryOptions::default())
             .await
-            .map_err(|e| CLIError::failure(e))?;
+            .map_err(CLIError::failure)?;
 
-        let records = df.collect().await.map_err(|e| CLIError::failure(e))?;
+        let records = df.collect().await.map_err(CLIError::failure)?;
 
         let mut writer = self
             .output_config
@@ -129,11 +129,7 @@ impl SqlShellCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for SqlShellCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
-        match (
-            self.engine.as_ref().map(|s| s.as_str()),
-            &self.command,
-            &self.url,
-        ) {
+        match (self.engine.as_deref(), &self.command, &self.url) {
             (Some("datafusion"), Some(_), None) => self.run_datafusion_command().await,
             (Some("datafusion"), _, _) => Err(CLIError::usage_error(
                 "DataFusion engine currently doesn't have a shell and only supports single \

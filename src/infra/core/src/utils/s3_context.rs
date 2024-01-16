@@ -252,7 +252,7 @@ impl S3Context {
 
         match listing {
             Ok(resp) => Ok(resp.contents.is_some()),
-            Err(e) => Err(e.int_err().into()),
+            Err(e) => Err(e.int_err()),
         }
     }
 

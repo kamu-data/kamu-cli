@@ -100,7 +100,7 @@ where
 }
 
 fn make_output_empty(ctx: &SessionContext) -> DataFrame {
-    make_output::<[_; 0], &str>(&ctx, [])
+    make_output::<[_; 0], &str>(ctx, [])
 }
 
 ///////////////////////////////////////////////////////////////////////////////

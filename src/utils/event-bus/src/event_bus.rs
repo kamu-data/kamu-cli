@@ -154,6 +154,7 @@ impl State {
         }
     }
 
+    #[allow(clippy::unwrap_or_default)]
     pub fn take_closure_handlers_for<TEvent: 'static + Clone>(
         &mut self,
     ) -> &mut EventClosureHandlers<TEvent> {

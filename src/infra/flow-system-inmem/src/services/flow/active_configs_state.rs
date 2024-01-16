@@ -85,7 +85,7 @@ impl ActiveConfigsState {
         flow_type: DatasetFlowType,
     ) -> Option<StartConditionConfiguration> {
         self.dataset_start_conditions
-            .get(BorrowedFlowKeyDataset::new(&dataset_id, flow_type).as_trait())
+            .get(BorrowedFlowKeyDataset::new(dataset_id, flow_type).as_trait())
             .cloned()
     }
 }

@@ -455,8 +455,8 @@ impl TransformServiceImpl {
 
             if let Some(wm) = block.event.new_watermark {
                 explicit_watermarks.push(Watermark {
-                    system_time: block.system_time.clone(),
-                    event_time: wm.clone(),
+                    system_time: *block.system_time,
+                    event_time: *wm,
                 });
             }
         }
@@ -646,10 +646,7 @@ impl TransformServiceImpl {
                 .then(|slice| {
                     let alias = input_aliases.get(&slice.dataset_id).unwrap();
 
-                    let vocab = dataset_vocabs
-                        .get(&slice.dataset_id)
-                        .map(|v| v.clone())
-                        .unwrap();
+                    let vocab = dataset_vocabs.get(&slice.dataset_id).cloned().unwrap();
 
                     self.get_transform_input_from_query_input(
                         slice.clone(),

@@ -564,12 +564,12 @@ fn normalize_schema(s: &DFSchema, engine: &str) -> DFSchema {
                     "spark" => match f.name().as_str() {
                         "offset" => {
                             assert_matches!(*f.data_type(), DataType::Int64);
-                            assert_eq!(f.is_nullable(), true);
+                            assert!(f.is_nullable());
                             DFField::new_unqualified(f.name(), DataType::UInt64, false)
                         }
                         "op" => {
                             assert_matches!(*f.data_type(), DataType::Int32);
-                            assert_eq!(f.is_nullable(), true);
+                            assert!(f.is_nullable());
                             DFField::new_unqualified(f.name(), DataType::UInt8, false)
                         }
                         "event_time" => f.clone().with_nullable(false),

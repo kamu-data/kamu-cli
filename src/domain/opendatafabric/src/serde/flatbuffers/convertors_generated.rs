@@ -14,6 +14,7 @@
 
 #![allow(unused_variables)]
 #![allow(unused_mut)]
+#![allow(clippy::all)]
 
 use super::proxies_generated as fb;
 mod odf {

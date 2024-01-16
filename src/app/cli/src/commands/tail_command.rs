@@ -50,9 +50,9 @@ impl Command for TailCommand {
             .query_svc
             .tail(&self.dataset_ref, self.skip, self.limit)
             .await
-            .map_err(|e| CLIError::failure(e))?;
+            .map_err(CLIError::failure)?;
 
-        let record_batches = df.collect().await.map_err(|e| CLIError::failure(e))?;
+        let record_batches = df.collect().await.map_err(CLIError::failure)?;
 
         let mut writer =
             self.output_cfg

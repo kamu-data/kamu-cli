@@ -46,9 +46,9 @@ impl TryFrom<u8> for OperationType {
     }
 }
 
-impl Into<u8> for OperationType {
-    fn into(self) -> u8 {
-        self as u8
+impl From<OperationType> for u8 {
+    fn from(val: OperationType) -> Self {
+        val as u8
     }
 }
 
