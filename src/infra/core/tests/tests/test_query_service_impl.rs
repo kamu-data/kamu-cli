@@ -276,7 +276,7 @@ async fn test_dataset_tail_common(catalog: dill::Catalog, tempdir: &TempDir) {
     )
     .await;
 
-    // Corsses block boundary
+    // Crosses block boundary
     let df = query_svc.tail(&dataset_ref, 1, 2).await.unwrap();
 
     kamu_data_utils::testing::assert_data_eq(

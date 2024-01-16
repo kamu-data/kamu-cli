@@ -343,7 +343,7 @@ impl PollingIngestServiceImpl {
             if prev_source_state.is_none() && args.options.fetch_uncacheable {
                 tracing::info!(
                     ?savepoint_path,
-                    "Ingoring savepoint due to --fetch-uncacheable"
+                    "Ignoring savepoint due to --fetch-uncacheable"
                 );
             } else {
                 tracing::info!(?savepoint_path, "Resuming from savepoint");
@@ -399,7 +399,7 @@ impl PollingIngestServiceImpl {
         }
     }
 
-    /// Savepoint is considered valid only when it corresponts to the identical
+    /// Savepoint is considered valid only when it corresponds to the identical
     /// fetch step and the source state of the previous commit - this way
     /// savepoint is always based on next state increment after the previous
     /// run. We ensure validity by naming the savepoint based on a hash of the

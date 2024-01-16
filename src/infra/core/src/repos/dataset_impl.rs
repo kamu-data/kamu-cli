@@ -365,7 +365,7 @@ where
         event: MetadataEvent,
         opts: CommitOpts<'_>,
     ) -> Result<CommitResult, CommitError> {
-        // Validate refferential consistency
+        // Validate referential consistency
         if opts.check_object_refs {
             if let Some(event) = event.as_data_stream_event() {
                 if let Some(data_slice) = event.new_data {

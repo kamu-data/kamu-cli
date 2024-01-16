@@ -400,7 +400,7 @@ async fn test_append_watermark_non_monotonic() {
         .await
         .unwrap();
 
-    // output_watermart = None
+    // output_watermark = None
     let block = MetadataFactory::metadata_block(
         MetadataFactory::add_data()
             .some_new_data()
@@ -412,7 +412,7 @@ async fn test_append_watermark_non_monotonic() {
 
     let hash = chain.append(block, AppendOpts::default()).await.unwrap();
 
-    // output_watermart = Some(2000-01-01)
+    // output_watermark = Some(2000-01-01)
     let block = MetadataFactory::metadata_block(
         MetadataFactory::add_data()
             .some_new_data()
@@ -425,7 +425,7 @@ async fn test_append_watermark_non_monotonic() {
 
     let hash = chain.append(block, AppendOpts::default()).await.unwrap();
 
-    // output_watermart = None
+    // output_watermark = None
     let block = MetadataFactory::metadata_block(
         MetadataFactory::add_data()
             .some_new_data()
@@ -442,7 +442,7 @@ async fn test_append_watermark_non_monotonic() {
         ))
     );
 
-    // output_watermart = Some(1988-01-01)
+    // output_watermark = Some(1988-01-01)
     let block = MetadataFactory::metadata_block(
         MetadataFactory::add_data()
             .some_new_data()
@@ -460,7 +460,7 @@ async fn test_append_watermark_non_monotonic() {
         ))
     );
 
-    // output_watermart = Some(2020-01-01)
+    // output_watermark = Some(2020-01-01)
     let block = MetadataFactory::metadata_block(
         MetadataFactory::add_data()
             .some_new_data()

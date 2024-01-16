@@ -251,7 +251,7 @@ impl PushService for PushServiceImpl {
             })
             .collect();
 
-        // If no errors - add alliases to initial items
+        // If no errors - add aliases to initial items
         if options.add_aliases && results.iter().all(|r| r.result.is_ok()) {
             for request in &initial_requests {
                 if let PushRequest {

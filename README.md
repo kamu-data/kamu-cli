@@ -50,7 +50,7 @@ Data scientists, analysts, ML/AI researchers, and engineers can then:
 * Easily **keep datasets up-to-date**
 * Safely **reuse data** created by the hard work of the community
 
-The reuse is achieved by maintaining **unbreakable lineage and provenance trail** in **tamper-proof** metadata, which lets you assess the trustworthyness of data, no matter how many hands and transformation steps it went through.
+The reuse is achieved by maintaining **unbreakable lineage and provenance trail** in **tamper-proof** metadata, which lets you assess the trustworthiness of data, no matter how many hands and transformation steps it went through.
 
 In a larger context, `kamu` is a reference implementation of [Open Data Fabric](https://github.com/kamu-data/open-data-fabric) - a Web 3.0 protocol for providing timely, high-quality, and verifiable data for data science, smart contracts, web and applications.
 
@@ -68,7 +68,7 @@ Examples:
 <details>
 <summary><b>Open Data</b></summary>
 
-To share data **outside of your organization** today you have limited options:
+To share data **outside your organization** today you have limited options:
 
 - You can publish it on some open data portal, but lose ownership and control of your data
 - You can deploy and operate some open-source data portal (like CKAN or Dataverse), but you probably have neither time nor money to do so
@@ -88,7 +88,7 @@ As opposed to just the download counter you get on most data portals, `kamu` bri
 <details>
 <summary><b>Science & Research</b></summary>
 
-One of the driving forces behind `kamu`'s design was the [ongoing reproducibility crisis](https://www.nature.com/articles/533452a) in science, which we believe to a large extent is caused by our poor data management practices.
+One of the driving forces behind `kamu`'s design was the [ongoing reproducibility crisis](https://www.nature.com/articles/533452a) in science, which we believe in a large extent is caused by our poor data management practices.
 
 After incidents like [The Surgisphere scandal](https://www.the-scientist.com/features/the-surgisphere-scandal-what-went-wrong--67955) the sentiment in research is changing from assuming that all research is done in good faith, to considering any research unreliable until proven otherwise.
 
@@ -115,7 +115,7 @@ Data-driven journalism is on the rise and has proven to be extremely effective. 
 
 Unfortunately, too often data has issues that undermine its trustworthiness. And even if the data is correct, it's very easy to pose a question about its sources that will take too long to answer - the data will be dismissed, and the gut feelings will step in.
 
-This is why `kamu`'s goal is to make data **verifiably trustworthy** and make answering **provenance** questions a **matter of seconds**. Only when data cannot be easily dismissed we will start to pay proper attention to it.
+This is why `kamu`'s goal is to make data **verifiable trustworthy** and make answering **provenance** questions a **matter of seconds**. Only when data cannot be easily dismissed we will start to pay proper attention to it.
 
 And once we agree that source data can be trusted, we can build analyses and **real-time dashboards** that keep track of complex issues like corruption, inequality, climate, epidemics, refugee crises, etc.
 

@@ -317,7 +317,7 @@ impl AxumServerPushProtocolInstance {
                 PushServerError::ReadFailed(PushReadError::new(e, PushPhase::CompleteRequest))
             })?;
 
-        tracing::debug!("Push client sent a complete request. Commiting the dataset");
+        tracing::debug!("Push client sent a complete request. Committing the dataset");
 
         if !new_blocks.is_empty() {
             let dataset = self.dataset.as_ref().unwrap().as_ref();

@@ -52,7 +52,7 @@ pub trait Dataset: Send + Sync {
         opts: CommitOpts<'_>,
     ) -> Result<CommitResult, CommitError>;
 
-    /// Helper function to prepare [ExecuteTransform] event wihtout committing
+    /// Helper function to prepare [ExecuteTransform] event without committing
     /// it.
     async fn prepare_execute_transform(
         &self,
@@ -95,8 +95,8 @@ pub struct CommitOpts<'a> {
     pub system_time: Option<DateTime<Utc>>,
     /// Compare-and-swap semantics to ensure there were no concurrent updates
     pub prev_block_hash: Option<Option<&'a Multihash>>,
-    /// Whether to check for presence of linked objects like data and checkpoins
-    /// in the respective repos
+    /// Whether to check for presence of linked objects like data and
+    /// checkpoints in the respective repos
     pub check_object_refs: bool,
 }
 

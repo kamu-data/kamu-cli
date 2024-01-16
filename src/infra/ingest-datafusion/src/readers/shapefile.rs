@@ -88,7 +88,7 @@ impl ReaderEsriShapefile {
         Ok(temp_json_path)
     }
 
-    // TODO: PERF: Consider subPath argumemnt to skip extracting unrelated data
+    // TODO: PERF: Consider subPath argument to skip extracting unrelated data
     fn extract_zip(in_path: &Path, out_path: &Path) -> Result<(), InternalError> {
         std::fs::create_dir(out_path).int_err()?;
         let mut archive =
@@ -127,7 +127,7 @@ impl ReaderEsriShapefile {
             if path.is_file() {
                 Ok(path)
             } else {
-                // Try globbed match
+                // Try globed match
                 let matches: Vec<_> = glob::glob(path.to_str().unwrap())
                     .int_err()?
                     .filter_map(|e| e.ok())

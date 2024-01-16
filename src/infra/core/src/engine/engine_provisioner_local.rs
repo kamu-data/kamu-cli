@@ -164,7 +164,7 @@ impl EngineProvisionerLocal {
             (Some(multi), NetworkNamespaceType::Private) => multi,
             (Some(multi), NetworkNamespaceType::Host) => {
                 tracing::warn!(
-                    "Ingoring specified engine max concurrency of {} since running in the Host \
+                    "Ignoring specified engine max concurrency of {} since running in the Host \
                      networking mode",
                     multi
                 );

@@ -109,7 +109,7 @@ impl DatasetFactoryImpl {
     /// Creates new dataset proxy for an S3 URL
     ///
     /// WARNING: This function will create a new [S3Context] that will do
-    /// credental resolution from scratch which can be very expensive. If you
+    /// credential resolution from scratch which can be very expensive. If you
     /// already have an established [S3Context] use [get_s3_with_context]
     /// function instead.
     pub async fn get_s3_from_url(

@@ -76,7 +76,7 @@ impl Command for RepositoryDeleteCommand {
             true
         } else {
             self.prompt_yes_no(&format!(
-                "{}: {}\nDo you whish to continue? [y/N]: ",
+                "{}: {}\nDo you wish to continue? [y/N]: ",
                 console::style("You are about to delete following repository(s)").yellow(),
                 repo_names
                     .iter()

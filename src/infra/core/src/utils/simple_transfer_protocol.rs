@@ -248,7 +248,7 @@ impl SimpleTransferProtocol {
         listener: Arc<dyn SyncListener>,
         arc_stats: Arc<Mutex<SyncStats>>,
     ) -> Result<(), SyncError> {
-        tracing::info!(hash = ?data_slice.physical_hash, "Transfering data file");
+        tracing::info!(hash = ?data_slice.physical_hash, "Transferring data file");
 
         let stream = match src
             .as_data_repo()
@@ -316,7 +316,7 @@ impl SimpleTransferProtocol {
         listener: Arc<dyn SyncListener>,
         arc_stats: Arc<Mutex<SyncStats>>,
     ) -> Result<(), SyncError> {
-        tracing::info!(hash = ?checkpoint.physical_hash, "Transfering checkpoint file");
+        tracing::info!(hash = ?checkpoint.physical_hash, "Transferring checkpoint file");
 
         let stream = match src
             .as_checkpoint_repo()
@@ -504,7 +504,7 @@ impl SimpleTransferProtocol {
             listener.on_status(SyncStage::CommitBlocks, &stats);
         }
 
-        // Update reference, atomically commiting the sync operation
+        // Update reference, atomically committing the sync operation
         // Any failures before this point may result in dangling files but will keep the
         // destination dataset in its original logical state
         match dst

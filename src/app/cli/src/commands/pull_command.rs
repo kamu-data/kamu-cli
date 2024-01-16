@@ -478,7 +478,7 @@ impl PollingIngestListener for PrettyIngestProgress {
                                 .yellow()
                         } else if *uncacheable && !self.fetch_uncacheable {
                             console::style(
-                                "Dataset is uncachable (use --fetch-uncacheable to update)"
+                                "Dataset is uncacheable (use --fetch-uncacheable to update)"
                                     .to_owned(),
                             )
                             .yellow()

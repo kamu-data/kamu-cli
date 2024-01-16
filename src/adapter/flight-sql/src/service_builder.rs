@@ -73,7 +73,7 @@ impl KamuFlightSqlServiceBuilder {
             SqlInfo::FlightSqlServerTransaction,
             SqlSupportedTransactions::SqlTransactionUnspecified as i32,
         );
-        // don't yetsupport `CancelQuery` action
+        // don't yet support `CancelQuery` action
         builder.append(SqlInfo::FlightSqlServerCancel, false);
         builder.append(SqlInfo::FlightSqlServerStatementTimeout, 0i32);
         builder.append(SqlInfo::FlightSqlServerTransactionTimeout, 0i32);

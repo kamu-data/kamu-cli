@@ -1,5 +1,5 @@
 #!/bin/sh
-# Downloads cached root datasets from S3 repository for faster experimetation and testing
+# Downloads cached root datasets from S3 repository for faster experimentation and testing
 set -e
 
 S3_BASE_URL="https://s3.us-west-2.amazonaws.com/datasets.kamu.dev/odf/v1/example/"

@@ -658,7 +658,7 @@ async fn test_task_completions_trigger_next_loop_on_success() {
                 scheduled_tasks_by_dataset_id.insert(task_dataset_id, scheduled_task);
             };
 
-            // Send task runnung & finished events for each dataset with certain interval
+            // Send task running & finished events for each dataset with certain interval
             for dataset_id in [&foo_id, &bar_id, &baz_id] {
                 let dataset_task = scheduled_tasks_by_dataset_id.get(dataset_id).unwrap();
                 event_bus.dispatch_event(TaskEventRunning {

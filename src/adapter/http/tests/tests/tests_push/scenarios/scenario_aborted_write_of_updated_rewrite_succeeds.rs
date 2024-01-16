@@ -43,7 +43,7 @@ impl<TServerHarness: ServerSideHarness>
         server_harness: TServerHarness,
     ) -> Self {
         let client_account_name = client_harness.operating_account_name();
-        let server_acount_name = server_harness.operating_account_name();
+        let server_account_name = server_harness.operating_account_name();
 
         let client_repo = client_harness.dataset_repository();
 
@@ -69,7 +69,7 @@ impl<TServerHarness: ServerSideHarness>
 
         let server_dataset_layout = server_harness.dataset_layout(&DatasetHandle::new(
             client_create_result.dataset_handle.id.clone(),
-            DatasetAlias::new(server_acount_name.clone(), foo_name.clone()),
+            DatasetAlias::new(server_account_name.clone(), foo_name.clone()),
         ));
 
         // Hard folder synchronization
@@ -77,7 +77,7 @@ impl<TServerHarness: ServerSideHarness>
 
         write_dataset_alias(
             &server_dataset_layout,
-            &DatasetAlias::new(server_acount_name.clone(), foo_name.clone()),
+            &DatasetAlias::new(server_account_name.clone(), foo_name.clone()),
         )
         .await;
 
@@ -106,15 +106,15 @@ impl<TServerHarness: ServerSideHarness>
         .await;
 
         // Let's pretend that previous attempts uploaded new data files, but the commit
-        // did not succceed in general. To mimic this, artifficially copy just the
-        // data folder, contaning a data block
+        // did not succeed in general. To mimic this, artificially copy just the
+        // data folder, containing a data block
         copy_folder_recursively(
             &client_dataset_layout.data_dir,
             &server_dataset_layout.data_dir,
         )
         .unwrap();
 
-        let server_alias = DatasetAlias::new(server_acount_name, foo_name);
+        let server_alias = DatasetAlias::new(server_account_name, foo_name);
         let server_odf_url = server_harness.dataset_url(&server_alias);
         let server_dataset_ref = DatasetRefRemote::from(&server_odf_url);
 

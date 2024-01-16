@@ -304,7 +304,7 @@ impl SyncServiceImpl {
             .await
             .int_err()?;
 
-        // If we try to access the IPNS key via HTTP gateway rigt away this may take a
+        // If we try to access the IPNS key via HTTP gateway right away this may take a
         // very long time if the key does not exist, as IPFS will be reaching
         // out to remote nodes. To avoid long wait times on first push we make
         // an assumption that this key is owned by the local IPFS node and
@@ -313,7 +313,7 @@ impl SyncServiceImpl {
         let (old_cid, dst_head, chains_comparison) =
             match self.ipfs_client.name_resolve_local(&key.id).await? {
                 None => {
-                    tracing::info!("Key does not resolve locally - asumming it's unpublished");
+                    tracing::info!("Key does not resolve locally - assuming it's unpublished");
                     Ok((None, None, None))
                 }
                 Some(old_cid) => {

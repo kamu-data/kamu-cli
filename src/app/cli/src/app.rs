@@ -323,7 +323,7 @@ pub fn register_config_in_catalog(
 ) {
     let network_ns = config.engine.as_ref().unwrap().network_ns.unwrap();
 
-    // Registrer JupyterConfig used by some commands
+    // Register JupyterConfig used by some commands
     catalog_builder.add_value(config.frontend.as_ref().unwrap().jupyter.clone().unwrap());
 
     catalog_builder.add_value(ContainerRuntimeConfig {

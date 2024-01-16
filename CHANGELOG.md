@@ -24,7 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.150.1] - 2023-12-29
 ### Added
-- New flag `--get-token` for `kamu system api-server` cli command which additionaly prints
+- New flag `--get-token` for `kamu system api-server` cli command which additionally prints
   JWT token in console
 ### Fixed
 - Fixed async file flushing issues that could result in a race condition when using containerized ingest
@@ -43,11 +43,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.149.0] - 2023-12-23
 ### Added
 - Added `KAMU_WORKSPACE` env var to handle custom workspace path if needed
-- Added `event-bus` crate: an utility component based on Observer design pattern,
+- Added `event-bus` crate: a utility component based on Observer design pattern,
   which allows event producers and event consumers not to know about each other
 - Applied `event-bus` component to inform consumers of dataset removal, dependency changes,
   task completions
-- Added in-memory dataset dependency graph instead of continous rescanning of all datasets:
+- Added in-memory dataset dependency graph instead of continuous rescanning of all datasets:
    - the initial dependencies are computed on demand on first request 
    - using `petgraph` project to represent dataset dependencies in the form of directed acyclic graph
    - further events like new/removed dependency or dataset removal update the graph
@@ -142,7 +142,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ODF server handlers for simple/smart protocols correctly implement authentication & authorization checks
 - ODF server URLs vary depending on multi-tenancy vs single-tenancy of dataset repository
 ### Changed
-- Signifficantly reworked smart transfer protocol tests, support of multi-tenancy, authentication, authorization
+- Significantly reworked smart transfer protocol tests, support of multi-tenancy, authentication, authorization
 
 
 ## [0.144.1] - 2023-10-02
@@ -162,7 +162,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    - Added new endpoint for querying engine supported login methods
    - Added `AuthenticationService` and `AuthenticationProvider` concepts that implement login functionality
    - CLI authentication provider: login same as password with preconfigured accounts in `.kamucliconfig` files
-   - Login issues and interpets Kamu-specific JWT tokens
+   - Login issues and interprets Kamu-specific JWT tokens
    - GraphQL queries are expected to attach JWT tokens as Bearer authentication header
    - Modeling anonymous account sessions
    - Login guards in GraphQL write operations
@@ -173,7 +173,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Failing transform operations in multi-tenant workspaces due to invalid propagation of dataset aliases
 ### Changed
 - Updated WEB UI image to latest release 0.10.0
-- Github OAuth functionality isolated in a separate component `kamu-adapter-oauth`
+- GitHub OAuth functionality isolated in a separate component `kamu-adapter-oauth`
 - GraphQL: filtering datasets based on logged account
 - Unified and clarified namings in account-related data structures
 
@@ -186,7 +186,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.142.0] - 2023-09-01
 ### Fixed
 - Ignoring the downloads cache when `--fetch-uncacheable` flag is used
-- Restored pre-sorting of events by `event_time` within one data slice in DataFusion-baesd ingest
+- Restored pre-sorting of events by `event_time` within one data slice in DataFusion-based ingest
 - Performance degradation in local file copying due to async
 - Race condition in Zip decompress step that caused file truncation
 
@@ -205,7 +205,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - It supports all existing data formats (Parquet, CSV, NdJson, GeoJson, Shapefile)
     - Some advanced CSV / Json reader options are not yet implemented, most notably `timestampFormat`
   - `Spark` is still used by default for compatibility. To start using `DataFusion` declare (a potentially no-op) `preprocess` step in your root dataset manifest ([see example](examples/currency_conversion/ca.bankofcanada.exchange-rates.daily.yaml))
-  - `Spark`-based ingest will be remove in future versions with `DataFusion` becoming the default, however we are planning to support `Spark` and all other engines in the `preprocess` step, while `DataFusion` will still be handling the initial reading of data and merging of results
+  - `Spark`-based ingest will be removed in future versions with `DataFusion` becoming the default, however we are planning to support `Spark` and all other engines in the `preprocess` step, while `DataFusion` will still be handling the initial reading of data and merging of results
 ### Changed
 - All examples where possible are now using `DataFusion` ingest
 
@@ -243,7 +243,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.134.0] - 2023-07-27
 ### Changed
 - New engine I/O strategies allow ingest/transform to run over datasets in remote storage (e.g. S3) even when engine does not support remote inputs
-- Improved credental reuse in S3-based dataset repository
+- Improved credential reuse in S3-based dataset repository
 - Simplified S3 tests
 
 ## [0.133.0] - 2023-07-17
@@ -308,7 +308,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 -  Upgraded to new `spark` engine image that better follows the ODF spec regarding the timestamp formats. This may cause schema harmonization issues when querying the history of old datasets.
 ### Added
-- Experimental support for new [`datafusion` engine](https://github.com/kamu-data/kamu-engine-datafusion) based on [Apache Arrow DataFusion](https://github.com/apache/arrow-datafusion). Although its a batch-oriented engine it can provide a massive performance boost for simple filter/map operations. See the [updated documentation](https://docs.kamu.dev/cli/supported-engines/) for details and current limitations.
+- Experimental support for new [`datafusion` engine](https://github.com/kamu-data/kamu-engine-datafusion) based on [Apache Arrow DataFusion](https://github.com/apache/arrow-datafusion). Although it's a batch-oriented engine it can provide a massive performance boost for simple filter/map operations. See the [updated documentation](https://docs.kamu.dev/cli/supported-engines/) for details and current limitations.
 
 ## [0.126.2] - 2023-05-26
 ### Fixed
@@ -395,7 +395,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.119.0] - 2023-04-10
 ### Added
-- Smart Transfer Protocol: implemneted Push flow for S3-based dataset repository only.
+- Smart Transfer Protocol: implemented Push flow for S3-based dataset repository only.
   Does not work with the local workspace yet.
 
 ## [0.118.0] - 2023-04-06
@@ -407,7 +407,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Revised workspace dependencies management:
   - Sharing single definition of common dependencies between modules
   - Using `cargo-deny` utility for dependencies linting
-- Migrated to official S3 SDK (got rid of untamintained `Rusoto` package)
+- Migrated to official S3 SDK (got rid of unmaintained `Rusoto` package)
 - Moved developer's guide to this repository
 
 ## [0.116.0] - 2023-03-28
@@ -458,7 +458,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.110.1] - 2023-02-10
 ### Fixed
-- Fixed GraphQL API issues with TransformInput structures with the aliфs name that is different from dataset name
+- Fixed GraphQL API issues with TransformInput structures with the alias name that is different from dataset name
 
 ## [0.110.0] - 2023-02-09
 ### Changed
@@ -477,7 +477,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.107.0] - 2023-01-25 (**BREAKING**)
 ### Changed
 - Major upgrade of Apache Flink version
-- No updates to exisitng datasets needed, but the verifiability of some datasets may be broken (since we don't yet implement engine versioning as per ODF spec)
+- No updates to existing datasets needed, but the verifiability of some datasets may be broken (since we don't yet implement engine versioning as per ODF spec)
 ### Added
 - Flink now supports a much nicer temporal table join syntax:
   ```sql
@@ -509,7 +509,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.104.0] - 2022-12-28
 ### Added
 - Installer script that can be used via `curl -s "https://get.kamu.dev" | sh`
-- Unified table output allowsing commands like `kamu list` to output in `json` and other formats
+- Unified table output allowing commands like `kamu list` to output in `json` and other formats
 
 ## [0.103.0] - 2022-12-23
 ### Changed
@@ -546,7 +546,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - More elaborate SQL error messages propagated from DataFusion via GraphQL API
 ### Changed
-- Upgraded rusttoolchain to fix `thiserror` issues. Backtrace feature is now considered stable
+- Upgraded rust toolchain to fix `thiserror` issues. Backtrace feature is now considered stable
 - Fixed issues with `ringbuf` library updates
 - Updates related to breaking changes in `clap`
 - Utilized value parsing capabilities from `clap` to simplify argument conversions
@@ -584,7 +584,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New `kamu push --force` switch to overwrite diverged remote dataset with a local version
 - New `kamu pull --force` switch to overwrite diverged local dataset with a remote version
 ### Fixed
-- Improved the `kamu log` command's performance on datasets with high block counts and introruced a `--limit` parameter
+- Improved the `kamu log` command's performance on datasets with high block counts and introduced a `--limit` parameter
 
 ## [0.94.0] - 2022-06-22
 ### Added
@@ -593,11 +593,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.93.1] - 2022-06-17
 ### Fixed
-- Fixed `completions` command that paniced after we upgraded to new `clap` version
+- Fixed `completions` command that panicked after we upgraded to new `clap` version
 
 ## [0.93.0] - 2022-06-16
 ### Added
-- By default we will resolve IPNS DNSLink URLs (e.g. `ipns://dataset.example.org`) using DNS query instead of delegating to the gateway. This is helpful when some gateway does not support IPNS (e.g. Infura) and in general should be a little faster and provides more information for possible debugging
+- By default, we will resolve IPNS DNSLink URLs (e.g. `ipns://dataset.example.org`) using DNS query instead of delegating to the gateway. This is helpful when some gateway does not support IPNS (e.g. Infura) and in general should be a little faster and provides more information for possible debugging
 
 ## [0.92.0] - 2022-06-08
 ### Added
@@ -647,7 +647,7 @@ fetch:
 ## [0.86.0] - 2022-05-16 (**BREAKING**)
 ### Changed
 - Implements [ODF RFC-006](https://github.com/open-data-fabric/open-data-fabric/blob/master/rfcs/006-checkpoints-as-files.md) to store checkpoints as files and reference them using physical hashes
-- Data files are now named and stored accodring to their physical hashes, as per ODF spec
+- Data files are now named and stored according to their physical hashes, as per ODF spec
 - Above changes also affect the repository format
 - Upgraded to `rustc-1.62.0` and latest dependencies
 - Improved error handling and reporting
@@ -669,13 +669,13 @@ fetch:
 ## [0.85.0] - 2022-04-09
 ### Changed
 - Updated to latest ODF schemas
-- Unhacked dataset descriptions in GQL
+- Unpacked dataset descriptions in GQL
 - Updated Web UI
 - Extended GQL metadata block type with mock author information
 
 ## [0.84.1] - 2022-04-08
 ### Added
-- Web UI embedding into MacOS build
+- Web UI embedding into macOS build
 
 ## [0.84.0] - 2022-04-08
 ### Added
@@ -860,7 +860,7 @@ fetch:
 ## [0.60.0] - 2021-08-24
 ### Added
 - New `kamu tail` command allows to inspect last few records in a dataset
-- The `kamu sql` command now supports experimental [DataFusion](https://github.com/apache/arrow-datafusion) engine that can execute SQL queries extremely fast. It doesn't have a shell yet so can only be used in `--command` mode but we will be expanding its use in future.
+- The `kamu sql` command now supports experimental [DataFusion](https://github.com/apache/arrow-datafusion) engine that can execute SQL queries extremely fast. It doesn't have a shell yet so can only be used in `--command` mode, but we will be expanding its use in the future.
 
 ## [0.59.0] - 2021-08-18
 ### Added
@@ -903,7 +903,7 @@ fetch:
 ### Added
 - New `kamu verify` command that can attest that data in the dataset matches what's declared in metadata
 ### Fixed
-- Spark engines will not produce an empty block when there was no changes to data
+- Spark engines will not produce an empty block when there were no changes to data
 
 ## [0.51.0] - 2021-08-08
 ### Added
@@ -984,7 +984,7 @@ fetch:
 
 ## [0.40.1] - 2021-05-02
 ### Fixed
-- Improved error handling when `kamu sql` is ran in an empty workspace
+- Improved error handling when `kamu sql` is run in an empty workspace
 ### Changed
 - Upgraded to latest dependencies
 
@@ -1016,7 +1016,7 @@ fetch:
 - Upgraded to latest rust toolchain and dependencies
 - Updated `flatbuffers` version that includes support for optional fields - this changes binary layout making this new version incompatible with metadata generated by the previous ones
 ### Fixed
-- Uncacheable message will no longer obscure he commit message
+- Uncacheable message will no longer obscure the commit message
 
 ## [0.37.0] - 2020-12-30 (**BREAKING**)
 ### Changed

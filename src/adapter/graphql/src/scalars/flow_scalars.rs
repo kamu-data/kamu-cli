@@ -73,7 +73,7 @@ pub struct FlowTimingRecords {
     /// Recorded start of running (Running state seen at least once)
     running_since: Option<DateTime<Utc>>,
 
-    /// Recorded time of finish (succesfull or failed after retry) or abortion
+    /// Recorded time of finish (successful or failed after retry) or abortion
     /// (Finished state seen at least once)
     finished_at: Option<DateTime<Utc>>,
 }

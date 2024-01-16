@@ -36,7 +36,7 @@ pub struct IngestParams {
 // schedule an ingest task. Push ingest will be *asynchronous*. Successful
 // response from this endpoint will only guarantee that the input was persisted
 // in an input queue. We will offer a separate mechanism for the caller to wait
-// until their data was processed. We may still provice a "synchronous" version
+// until their data was processed. We may still provide a "synchronous" version
 // of push for convenience that waits for passed data to be flushed as part of
 // some block.
 pub async fn dataset_ingest_handler(
@@ -60,7 +60,7 @@ pub async fn dataset_ingest_handler(
         .await
     {
         // Per note above, we're not including any extra information about the result
-        // of the ingest operation at this point to accomodate async execution
+        // of the ingest operation at this point to accommodate async execution
         Ok(_) => Ok(()),
         Err(PushIngestError::SourceNotFound(e)) => Err(ApiError::bad_request(e)),
         Err(PushIngestError::UnsupportedMediaType(_)) => {

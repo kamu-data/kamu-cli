@@ -60,7 +60,7 @@ impl ServerAccessTokensRecord {
     }
 
     fn token_position(&self, account_name: &AccountName) -> Option<usize> {
-        // Note: linear search is fine for CLI scenarios, we don't expact long lists.
+        // Note: linear search is fine for CLI scenarios, we don't expect long lists.
         // While storing a vector of records instead of map greatly simplifies
         // serialization
         self.tokens

@@ -79,7 +79,7 @@ impl DatasetMetadataMut {
             });
 
         // TODO: Move this logic into a service once we have a better idea how we will
-        // manage readees and other attachments
+        // manage readmes and other attachments
         let new_attachments = match (content, old_attachments) {
             (None, None) => None,
             (None, Some(old)) if old.items.is_empty() => None,

@@ -23,7 +23,7 @@ async fn test_network_handle_free_not_called() {
     assert!(rt.has_network(&network_name).await.unwrap());
 
     // Network dropped without freeing
-    // Drop will complain loudly and perfor a blocking clean up
+    // Drop will complain loudly and perform a blocking clean up
     drop(network);
 
     assert!(!rt.has_network(&network_name).await.unwrap());

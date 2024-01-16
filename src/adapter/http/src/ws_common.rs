@@ -16,7 +16,7 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum ReadMessageError {
-    #[error("Client has disconnected unexpetedly")]
+    #[error("Client has disconnected unexpectedly")]
     ClientDisconnected,
 
     #[error("Close message received")]

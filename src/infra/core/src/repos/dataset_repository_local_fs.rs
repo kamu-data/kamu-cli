@@ -186,7 +186,7 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
         dataset_alias: &DatasetAlias,
         seed_block: MetadataBlockTyped<Seed>,
     ) -> Result<CreateDatasetResult, CreateDatasetError> {
-        // Check if a dataset with the same alias can be resolved succesfully
+        // Check if a dataset with the same alias can be resolved successfully
         let maybe_existing_dataset_handle = match self
             .resolve_dataset_ref(&dataset_alias.as_local_ref())
             .await
@@ -240,7 +240,7 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
 
         let dataset = DatasetFactoryImpl::get_local_fs(layout, self.event_bus.clone());
 
-        // There are three possiblities at this point:
+        // There are three possibilities at this point:
         // - Dataset did not exist before - continue normally
         // - Dataset was partially created before (no head yet) and was not GC'd - so we
         //   assume ownership

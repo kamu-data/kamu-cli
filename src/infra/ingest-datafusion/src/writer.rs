@@ -142,9 +142,10 @@ impl DataWriterDataFusion {
         Ok(())
     }
 
-    // TODO: This function currently ensures that all timestamps in the ouput are
-    // represeted as `Timestamp(Millis, "UTC")` for compatibility with other engines
-    // (e.g. Flink does not support event time with nanosecond precision).
+    // TODO: This function currently ensures that all timestamps in the output are
+    // represented as `Timestamp(Millis, "UTC")` for compatibility with other
+    // engines (e.g. Flink does not support event time with nanosecond
+    // precision).
     fn normalize_raw_result(&self, df: DataFrame) -> Result<DataFrame, InternalError> {
         let utc_tz: Arc<str> = Arc::from("UTC");
         let mut select: Vec<Expr> = Vec::new();
@@ -320,7 +321,7 @@ impl DataWriterDataFusion {
         // Note: ODF expects events within one chunk to be sorted by event time, so we
         // ensure data is held in one partition to avoid reordering when saving to
         // parquet.
-        // TODO: For some reason this adds two collumns: the expected
+        // TODO: For some reason this adds two columns: the expected
         // "offset", but also "ROW_NUMBER()" for now we simply filter out the
         // latter.
         let df = df
@@ -826,7 +827,7 @@ impl DataWriterDataFusionBuilder {
     }
 
     /// Use to specify all needed state for builder to avoid scanning the
-    /// metadatachain
+    /// metadata chain
     pub fn with_metadata_state(self, metadata_state: DataWriterMetadataState) -> Self {
         Self {
             metadata_state: Some(metadata_state),

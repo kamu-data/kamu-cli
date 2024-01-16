@@ -108,7 +108,7 @@ pub enum SyncStage {
 
 #[derive(Debug, Clone, Default)]
 pub struct SyncStats {
-    /// Statitsics for the source party of the exchange
+    /// Statistics for the source party of the exchange
     pub src: SyncPartyStats,
     /// Estimated totals for the source party of the exchange
     pub src_estimated: SyncPartyStats,

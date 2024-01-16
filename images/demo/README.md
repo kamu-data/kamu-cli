@@ -20,7 +20,7 @@ To run all demo components on your computer simply do:
 docker-compose up
 ```
 
-> If you've ran the environment before you might want to get latest versions of the images using `docker-compose pull` command.
+> If you've run the environment before you might want to get latest versions of the images using `docker-compose pull` command.
 
 This will run:
 * JupyterHub web notebooks with Kamu integration

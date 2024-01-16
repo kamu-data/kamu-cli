@@ -488,7 +488,7 @@ async fn test_ingest_polling_empty_data() {
     std::fs::write(&src_path, "").unwrap();
     harness.ingest(&dataset_alias).await.unwrap();
 
-    // Should only containe source state
+    // Should only contain source state
     let event = data_helper.get_last_block_typed::<AddData>().await.event;
     assert_eq!(event.new_data, None);
     assert_eq!(event.new_watermark, None);

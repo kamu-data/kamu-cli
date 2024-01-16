@@ -150,7 +150,7 @@ impl DependencyGraphServiceInMemory {
             .update_edge(upstream_node_index, downstream_node_index, ());
     }
 
-    /// Removes tracked dependency between updstream and downstream dataset
+    /// Removes tracked dependency between upstream and downstream dataset
     #[tracing::instrument(level = "trace", skip_all, fields(%dataset_upstream_id, %dataset_downstream_id))]
     fn remove_dependency(
         &self,

@@ -60,7 +60,7 @@ pub trait MetadataChain: Send + Sync {
         tail: Option<&'a BlockRef>,
     ) -> DynMetadataStream<'a>;
 
-    /// Update referece to point at the specified block
+    /// Update reference to point at the specified block
     async fn set_ref<'a>(
         &'a self,
         r: &BlockRef,
@@ -113,7 +113,7 @@ pub trait MetadataChainExt: MetadataChain {
         self.last_of_type_ref(&BlockRef::Head).await
     }
 
-    /// Finds the last block (chonologically) carrying an instance of the
+    /// Finds the last block (chronologically) carrying an instance of the
     /// specified event type
     async fn last_of_type_ref<E: VariantOf<MetadataEvent>>(
         &self,

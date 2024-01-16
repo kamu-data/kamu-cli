@@ -37,10 +37,10 @@ use kamu::domain::*;
 /// we want this conversion to be explicit - it's too easy to put a questionmark
 /// operator on a fallible operation without thinking what it will actually do.
 ///
-/// Note that in between handlers different errors have differen meaning, e.g.
+/// Note that in between handlers different errors have different meaning, e.g.
 /// an absence of a dataset in one handler should lead to `404 Not Found`, while
 /// in the other it can be `400 Bad Request` at first and then treated as `500
-/// Insternal Server Error` later. This is why it's not advisable to provide
+/// Internal Server Error` later. This is why it's not advisable to provide
 /// direct conversion via [IntoApiError], but rather by implementing the
 /// [ApiErrorCategorizable] trait instead. This trait only deals with high-level
 /// categories of errors like [AccessError] while mapping all other errors to

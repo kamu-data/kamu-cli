@@ -326,7 +326,7 @@ where
                 } else {
                     invalid_event!(
                         e.clone(),
-                        "ExecuteTransform must be preceeded by SetTransform event",
+                        "ExecuteTransform must be preceded by SetTransform event",
                     );
                 }
 

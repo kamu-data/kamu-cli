@@ -247,8 +247,8 @@ impl WorkspaceService {
              data schemas. In an effort to continue evolving the protocol we made a decision to \
              forgo an expensive and long transitional period and introduced these changes without \
              a migration procedure. Please delete `.kamu` directory manually and re-create your \
-             workspace. We apologise for the inconvenience and will work on improving stabiliy of \
-             our releases.",
+             workspace. We apologise for the inconvenience and will work on improving stability \
+             of our releases.",
         )
         .into())
     }

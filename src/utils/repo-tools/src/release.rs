@@ -82,7 +82,7 @@ fn update_crates(new_version: &Version) {
         ])
         .status()
         .expect(
-            "Failed to execute `cargo set-version` - make sure `cago-edit` is installed (`cargo \
+            "Failed to execute `cargo set-version` - make sure `cargo-edit` is installed (`cargo \
              install cargo-edit`)",
         )
         .exit_ok()

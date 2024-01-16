@@ -285,7 +285,7 @@ impl FlowServiceInMemory {
 
                         if let Some(throttling_period) = start_condition.throttling_period {
                             // TODO: throttle not from NOW,
-                            //  but from last flow of the dependent daataset
+                            //  but from last flow of the dependent dataset
                             let activation_time = start_time + throttling_period;
                             self.enqueue_flow(dependent_dataset_flow.flow_id, activation_time)?;
 
@@ -546,7 +546,7 @@ impl FlowService for FlowServiceInMemory {
         }
     }
 
-    /// Returns states of flows of certian type associated with a given dataset
+    /// Returns states of flows of certain type associated with a given dataset
     /// ordered by creation time from newest to oldest
     #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id, ?flow_type))]
     fn list_flows_by_dataset_of_type(
@@ -571,7 +571,7 @@ impl FlowService for FlowServiceInMemory {
         }))
     }
 
-    /// Returns states of system flows of certian type
+    /// Returns states of system flows of certain type
     /// ordered by creation time from newest to oldest
     #[tracing::instrument(level = "debug", skip_all, fields(?flow_type))]
     fn list_system_flows_of_type(
