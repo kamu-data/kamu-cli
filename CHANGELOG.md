@@ -4,6 +4,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.153.0] - 2024-01-17 (**BREAKING**)
+### Changed
+- This release contains major breaking changes and will require you to re-create your workspace (sorry!)
+- Changes primarily reflect the **major updates in ODF spec**:
+  - schema harmonization and scanning performance (see https://github.com/open-data-fabric/open-data-fabric/pull/71)
+  - and unified changelog schema to support **retractions and corrections** (see https://github.com/open-data-fabric/open-data-fabric/pull/72)
+- Metadata
+  - DIDs and hashes now use `base16` encoding (see [RFC-012](https://github.com/open-data-fabric/open-data-fabric/blob/master/rfcs/012-recommend-base16-encoding.md))
+  - Enum representation in YAML manifests now favors `PascalCase` (see [RFC-013](https://github.com/open-data-fabric/open-data-fabric/blob/master/rfcs/013-yaml-enum-representation.md))
+  - When defining transformation queries in `SetPollingSource`, `AddPushSource`, and `SetTransform` events, the output query is now considered to be the one without an alias
+  - the `inputs` in `SetTransform` now use only two fields `datasetRef` (for reference or ID of a dataset) and `alias` for referring to the input in SQL queries
+  - `Csv` reader format has been reduced to essential properties only
+- Data
+  - You will notice a new `op` column in all dataset which is used to signify **retractions and corrections** (see [RFC-015](https://github.com/open-data-fabric/open-data-fabric/blob/master/rfcs/015-unified-changelog-stream-schema.md))
+  - `Snapshot` merge strategy will no longer produce `obsv` column but instead use the new unified retraction/correction mechanism via `op` column
+- `tail` command now sorts events by `offset` in descending order
+- `multiformats` were extracted into a separate crate
+### Removed
+- Pure Spark ingest has been removed
+  - Datafusion ingest is now default option for polling and push sources
+  - Spark and other engines can still be used for `preprocess` step to perform transformations which Datafusion does not yet support (e.g. GIS projection conversion)
+- Dropped support for deprecated `JsonLines` format
+### Added
+- Engine protocol was extended with `execute_raw_query` operation
+- Metadata chain added a lot more strict validation rules
+- `setWatermark` mutation in GQL API
+
 ## [0.152.0] - 2024-01-17
 ### Added
 - Initial support for local predefined Admin users
