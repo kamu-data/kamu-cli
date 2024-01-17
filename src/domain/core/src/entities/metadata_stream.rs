@@ -23,10 +23,10 @@ pub type DynMetadataStream<'a> = Pin<Box<dyn MetadataStream<'a> + Send + 'a>>;
 /////////////////////////////////////////////////////////////////////////////////////////
 
 type MetadataStreamItem = Result<(Multihash, MetadataBlock), IterBlocksError>;
-type FilterDataStreamBlocksStreamItem =
+type FilteredDataStreamBlocksStreamItem =
     Result<(Multihash, MetadataBlockDataStream), IterBlocksError>;
-type FilterDataStreamBlocksStream<'a> =
-    Pin<Box<dyn Stream<Item = FilterDataStreamBlocksStreamItem> + Send + 'a>>;
+type FilteredDataStreamBlocksStream<'a> =
+    Pin<Box<dyn Stream<Item = FilteredDataStreamBlocksStreamItem> + Send + 'a>>;
 
 /// Stream combinators specific to metadata chain.
 ///
@@ -42,7 +42,7 @@ pub trait MetadataStream<'a>: Stream<Item = MetadataStreamItem> {
     // the client may incorrectly assume that the checkpoint is missing when
     // inspecting SetWatermark event, while in fact they should've scanned the
     // chain further.
-    fn filter_data_stream_blocks(self: Pin<Box<Self>>) -> FilterDataStreamBlocksStream<'a>;
+    fn filter_data_stream_blocks(self: Pin<Box<Self>>) -> FilteredDataStreamBlocksStream<'a>;
 }
 
 // TODO: This implementation should be moved to `infra` part of the crate
@@ -51,7 +51,7 @@ where
     T: Stream<Item = MetadataStreamItem>,
     T: Send + 'a,
 {
-    fn filter_data_stream_blocks(self: Pin<Box<Self>>) -> FilterDataStreamBlocksStream<'a> {
+    fn filter_data_stream_blocks(self: Pin<Box<Self>>) -> FilteredDataStreamBlocksStream<'a> {
         Box::pin(
             self.try_filter_map(|(h, b)| {
                 future::ready(Ok(b.into_data_stream_block().map(|b| (h, b))))
