@@ -221,7 +221,7 @@ impl CompleteCommand {
             }
         }
 
-        // Complete positions
+        // Complete positionals
         for pos in last_cmd.get_positionals() {
             match pos.get_id().as_str() {
                 "alias" => self.complete_alias(output, to_complete).await,
