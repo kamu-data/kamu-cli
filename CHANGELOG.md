@@ -4,14 +4,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [0.152.0] - 2024-01-17
 ### Added
 - Initial support for local predefined Admin users
 - New GraphQL APIs extending flows system capabilities:
    - ability to list summary information about flows
    - flow execution history function
 - New command `kamu system diagnose` to run checks for correct system work
-- Additional info about workpace and container version for `kamu system info` command
+- Additional info about workspace and container version for `kamu system info` command
 ### Fixed
 - Fixed bug in getting available dataset actions for a user, in case of `kamu ui`
 - `kamu add`: corrected a link in help examples
