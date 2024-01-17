@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e
 
-S3_BASE_URL="https://s3.us-west-2.amazonaws.com/datasets.kamu.dev/odf/v1/contrib/"
+S3_BASE_URL="https://s3.us-west-2.amazonaws.com/datasets.kamu.dev/odf/v2/contrib/"
 
 rm -rf .kamu
 kamu init

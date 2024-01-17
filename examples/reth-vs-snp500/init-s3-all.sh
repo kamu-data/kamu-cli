@@ -14,4 +14,9 @@ kamu pull "${S3_CONTRIB_URL}co.alphavantage.tickers.daily.spy"
 kamu pull "${S3_EXAMPLE_URL}account.transactions"
 kamu pull "${S3_EXAMPLE_URL}account.tokens.transfers"
 
-kamu add -r .
+# Deriv
+kamu pull "${S3_EXAMPLE_URL}account.tokens.portfolio"
+kamu pull "${S3_EXAMPLE_URL}account.tokens.portfolio.market-value"
+kamu pull "${S3_EXAMPLE_URL}account.tokens.portfolio.usd"
+kamu pull "${S3_EXAMPLE_URL}account.whatif.reth-vs-snp500.market-value"
+kamu pull "${S3_EXAMPLE_URL}account.whatif.reth-vs-snp500.portfolio"
