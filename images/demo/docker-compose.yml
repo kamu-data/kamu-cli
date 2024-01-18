@@ -5,7 +5,7 @@ networks:
 
 services:
   jupyter:
-    image: ghcr.io/kamu-data/kamu-cli-demo-jupyter:0.9.2
+    image: ghcr.io/kamu-data/kamu-cli-demo-jupyter:0.10.0
     command:
       - "jupyter"
       - "notebook"
@@ -30,7 +30,7 @@ services:
       - minio
 
   minio:
-    image: ghcr.io/kamu-data/kamu-cli-demo-minio:0.9.2
+    image: ghcr.io/kamu-data/kamu-cli-demo-minio:0.10.0
     command:
       - "server"
       - "--address"
