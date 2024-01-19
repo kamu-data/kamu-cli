@@ -593,9 +593,7 @@ pub fn cli() -> Command {
                             .action(ArgAction::SetTrue)
                             .help("Store access token in the user home folder rather than in the workspace"),
                         Arg::new("server")
-                            .short('s')
-                            .long("server")
-                            .action(ArgAction::Set)
+                            .index(1)
                             .value_parser(value_parse_url)
                             .help("Custom remote server front-end URL (Kamu web platform is used by default)")
                     ]),
@@ -607,9 +605,7 @@ pub fn cli() -> Command {
                             .action(ArgAction::SetTrue)
                             .help("Drop access token stored in the user home folder rather than in the workspace"),
                         Arg::new("server")
-                            .short('s')
-                            .long("server")
-                            .action(ArgAction::Set)
+                            .index(1)
                             .value_parser(value_parse_url)
                             .help("Custom remote server front-end URL (Kamu web platform is used by default)")
                     ]),
