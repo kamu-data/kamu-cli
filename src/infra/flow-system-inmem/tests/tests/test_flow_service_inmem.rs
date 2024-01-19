@@ -1314,7 +1314,12 @@ impl FlowHarness {
         }
 
         const TIME_INCREMENT: Duration = Duration::milliseconds(SCHEDULING_ALIGNMENT_MS);
-        const CONTEXT_SWITCHING_SLEEP_DURATION: StdDuration = StdDuration::from_millis(5);
+        const CONTEXT_SWITCHING_SLEEP_DURATION: StdDuration = if cfg!(windows) {
+            // Windows sleep() is accurate up to about ~20-50 milliseconds
+            StdDuration::from_millis(50)
+        } else {
+            StdDuration::from_millis(5)
+        };
 
         let time_increments_count = div_up(
             time_quantum.num_milliseconds(),
