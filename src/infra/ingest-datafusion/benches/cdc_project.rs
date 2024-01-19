@@ -43,8 +43,7 @@ async fn setup(tempdir: &Path, num_rows: usize) -> String {
         );
     }
 
-    let mut buf = Vec::with_capacity(num_rows);
-    buf.resize(num_rows, 0);
+    let mut buf = vec![0; num_rows];
 
     rng.try_fill(&mut buf[..]).unwrap();
     pk1.append_slice(&buf[..]);

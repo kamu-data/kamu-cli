@@ -93,7 +93,7 @@ fn test_prep_decompress_zip_single_file() {
 
         let options = FileOptions::default().compression_method(zip::CompressionMethod::Stored);
         zip.start_file("data.csv", options).unwrap();
-        zip.write(content.as_bytes()).unwrap();
+        zip.write_all(content.as_bytes()).unwrap();
         zip.finish().unwrap();
     }
 
@@ -156,7 +156,7 @@ fn test_prep_decompress_gzip() {
             std::fs::File::create(&src_path).unwrap(),
             Compression::fast(),
         );
-        gzip.write(content.as_bytes()).unwrap();
+        gzip.write_all(content.as_bytes()).unwrap();
     }
 
     let prep_svc = PrepService::new();

@@ -178,7 +178,7 @@ impl Kamu {
             .write_manifest(&dataset_snapshot)
             .unwrap();
         let mut f = tempfile::NamedTempFile::new().unwrap();
-        f.as_file().write(&content).unwrap();
+        f.as_file().write_all(&content).unwrap();
         f.flush().unwrap();
 
         self.execute(["add".as_ref(), f.path().as_os_str()]).await

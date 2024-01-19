@@ -53,8 +53,7 @@ async fn setup(
     let mut new_aux2 =
         array::PrimitiveBuilder::<Int64Type>::with_capacity(overlap_rows + added_rows);
 
-    let mut buf = Vec::with_capacity(orig_rows + added_rows);
-    buf.resize(orig_rows + added_rows, 0);
+    let mut buf = vec![0; orig_rows + added_rows];
 
     let mut rng = rand::rngs::SmallRng::seed_from_u64(123127986998);
 

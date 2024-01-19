@@ -63,8 +63,8 @@ async fn setup(
     let orig_range = ..orig_rows;
     let changed_range = removed_rows..removed_rows + changed_rows;
     let new_range = removed_rows..;
-    let mut buf = Vec::with_capacity(buf_len);
-    buf.resize(buf_len, 0);
+
+    let mut buf = vec![0; buf_len];
 
     let mut rng = rand::rngs::SmallRng::seed_from_u64(123127986998);
 
