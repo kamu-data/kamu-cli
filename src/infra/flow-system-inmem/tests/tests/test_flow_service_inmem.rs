@@ -9,8 +9,9 @@
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
+use std::time::Duration as StdDuration;
 
-use chrono::{DateTime, Duration, DurationRound, Utc};
+use chrono::{DateTime, Duration, DurationRound, TimeZone, Utc};
 use dill::*;
 use event_bus::{AsyncEventHandler, EventBus};
 use kamu::testing::MetadataFactory;
@@ -31,7 +32,7 @@ async fn test_read_initial_config_and_queue_properly() {
     let foo_id = harness.create_root_dataset("foo").await;
     harness
         .set_dataset_flow_schedule(
-            Utc::now(),
+            harness.now_datetime(),
             foo_id.clone(),
             DatasetFlowType::Ingest,
             Duration::milliseconds(60).into(),
@@ -41,7 +42,7 @@ async fn test_read_initial_config_and_queue_properly() {
     let bar_id = harness.create_root_dataset("bar").await;
     harness
         .set_dataset_flow_schedule(
-            Utc::now(),
+            harness.now_datetime(),
             bar_id.clone(),
             DatasetFlowType::Ingest,
             Duration::milliseconds(90).into(),
@@ -49,14 +50,15 @@ async fn test_read_initial_config_and_queue_properly() {
         .await;
 
     // Remember start time
-    let start_time = Utc::now()
+    let start_time = harness
+        .now_datetime()
         .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
         .unwrap();
 
     // Run scheduler concurrently with manual triggers script
     tokio::select! {
         res = harness.flow_service.run(start_time) => res.int_err(),
-        _ = tokio::time::sleep(std::time::Duration::from_millis(120)) => Ok(()),
+        _ = harness.simulate_time_passage(Duration::milliseconds(120)) => Ok(()),
     }
     .unwrap();
 
@@ -116,7 +118,7 @@ async fn test_manual_trigger() {
     // Note: only "foo" has auto-schedule, "bar" hasn't
     harness
         .set_dataset_flow_schedule(
-            Utc::now(),
+            harness.now_datetime(),
             foo_id.clone(),
             DatasetFlowType::Ingest,
             Duration::milliseconds(60).into(),
@@ -127,7 +129,8 @@ async fn test_manual_trigger() {
     let bar_flow_key: FlowKey = FlowKeyDataset::new(bar_id.clone(), DatasetFlowType::Ingest).into();
 
     // Remember start time
-    let start_time = Utc::now()
+    let start_time = harness
+        .now_datetime()
         .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
         .unwrap();
 
@@ -136,19 +139,19 @@ async fn test_manual_trigger() {
         res = harness.flow_service.run(start_time) => res.int_err(),
         _ = async {
             // Sleep < "foo" period
-            tokio::time::sleep(std::time::Duration::from_millis(40)).await;
+            harness.simulate_time_passage(Duration::milliseconds(40)).await;
             let new_time = start_time + Duration::milliseconds(40);
             harness.trigger_manual_flow(new_time, foo_flow_key.clone()).await; // "foo" pending already
             harness.trigger_manual_flow(new_time, bar_flow_key.clone()).await; // "bar" not queued, starts soon
 
             // Wake up after foo scheduling
-            tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+            harness.simulate_time_passage(Duration::milliseconds(20)).await;
             let new_time = new_time + Duration::milliseconds(20);
             harness.trigger_manual_flow(new_time, foo_flow_key.clone()).await; // "foo" pending already, even running
             harness.trigger_manual_flow(new_time, bar_flow_key.clone()).await; // "bar" pending already, event running
 
             // Make sure nothing got scheduled in near time
-            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+            harness.simulate_time_passage(Duration::milliseconds(20)).await;
 
          } => Ok(()),
     }
@@ -202,7 +205,7 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
     let bar_id: DatasetID = harness.create_root_dataset("bar").await;
     harness
         .set_dataset_flow_schedule(
-            Utc::now(),
+            harness.now_datetime(),
             foo_id.clone(),
             DatasetFlowType::Ingest,
             Duration::milliseconds(50).into(),
@@ -210,7 +213,7 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
         .await;
     harness
         .set_dataset_flow_schedule(
-            Utc::now(),
+            harness.now_datetime(),
             bar_id.clone(),
             DatasetFlowType::Ingest,
             Duration::milliseconds(40).into(),
@@ -223,7 +226,8 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
     let test_flow_listener = harness.catalog.get_one::<TestFlowSystemListener>().unwrap();
 
     // Remember start time
-    let start_time = Utc::now()
+    let start_time = harness
+        .now_datetime()
         .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
         .unwrap();
 
@@ -232,7 +236,7 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
         res = harness.flow_service.run(start_time) => res.int_err(),
         _ = async {
             // Sleep < "foo"/"bar" period
-            tokio::time::sleep(std::time::Duration::from_millis(25)).await;
+            harness.simulate_time_passage(Duration::milliseconds(25)).await;
             harness.pause_dataset_flow(start_time + Duration::milliseconds(25), foo_id.clone(), DatasetFlowType::Ingest).await;
             harness.pause_dataset_flow(start_time + Duration::milliseconds(25), bar_id.clone(), DatasetFlowType::Ingest).await;
             test_flow_listener
@@ -240,7 +244,7 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
                 .await;
 
             // Wake up after initially planned "bar" and "foo" scheduling
-            tokio::time::sleep(std::time::Duration::from_millis(30)).await;
+            harness.simulate_time_passage(Duration::milliseconds(30)).await;
             harness.resume_dataset_flow(start_time + Duration::milliseconds(55), foo_id.clone(), DatasetFlowType::Ingest).await;
             harness.set_dataset_flow_schedule(start_time + Duration::milliseconds(55), bar_id.clone(), DatasetFlowType::Ingest, Duration::milliseconds(30).into()).await;
 
@@ -249,7 +253,7 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
                 .await;
 
             // "foo" will get rescheduled in 50 ms, "bar" in 30ms, leave extra for stabilization
-            tokio::time::sleep(std::time::Duration::from_millis(70)).await;
+            harness.simulate_time_passage(Duration::milliseconds(70)).await;
          } => Ok(()),
     }
     .unwrap();
@@ -362,7 +366,7 @@ async fn test_dataset_deleted() {
 
     harness
         .set_dataset_flow_schedule(
-            Utc::now(),
+            harness.now_datetime(),
             foo_id.clone(),
             DatasetFlowType::Ingest,
             Duration::milliseconds(50).into(),
@@ -370,7 +374,7 @@ async fn test_dataset_deleted() {
         .await;
     harness
         .set_dataset_flow_schedule(
-            Utc::now(),
+            harness.now_datetime(),
             bar_id.clone(),
             DatasetFlowType::Ingest,
             Duration::milliseconds(70).into(),
@@ -381,7 +385,8 @@ async fn test_dataset_deleted() {
     let bar_flow_key: FlowKey = FlowKeyDataset::new(bar_id.clone(), DatasetFlowType::Ingest).into();
 
     // Remember start time
-    let start_time = Utc::now()
+    let start_time = harness
+        .now_datetime()
         .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
         .unwrap();
 
@@ -393,21 +398,21 @@ async fn test_dataset_deleted() {
         res = harness.flow_service.run(start_time) => res.int_err(),
         _ = async {
             // Sleep < "foo" period
-            tokio::time::sleep(std::time::Duration::from_millis(25)).await;
+            harness.simulate_time_passage(Duration::milliseconds(25)).await;
             harness.delete_dataset(&foo_id).await;
             test_flow_listener
                 .snapshot_flows(start_time + Duration::milliseconds(25))
                 .await;
 
             // Wake up after bar scheduling
-            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+            harness.simulate_time_passage(Duration::milliseconds(50)).await;
             harness.delete_dataset(&bar_id).await;
             test_flow_listener
                 .snapshot_flows(start_time + Duration::milliseconds(75))
                 .await;
 
             // Make sure nothing got scheduled in near time
-            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+            harness.simulate_time_passage(Duration::milliseconds(10)).await;
 
          } => Ok(()),
     }
@@ -486,7 +491,7 @@ async fn test_cron_task_completions_trigger_next_loop_on_success() {
     let foo_id = harness.create_root_dataset("foo").await;
     harness
         .set_dataset_flow_schedule(
-            Utc::now(),
+            harness.now_datetime(),
             foo_id.clone(),
             DatasetFlowType::Ingest,
             Duration::milliseconds(30).into(),
@@ -495,7 +500,7 @@ async fn test_cron_task_completions_trigger_next_loop_on_success() {
 
     harness
         .set_dataset_flow_schedule(
-            Utc::now(),
+            harness.now_datetime(),
             foo_id.clone(),
             DatasetFlowType::Ingest,
             Duration::milliseconds(40).into(),
@@ -506,7 +511,8 @@ async fn test_cron_task_completions_trigger_next_loop_on_success() {
     harness.eager_dependencies_graph_init().await;
 
     // Remember start time
-    let start_time = Utc::now()
+    let start_time = harness
+        .now_datetime()
         .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
         .unwrap();
 
@@ -522,7 +528,7 @@ async fn test_cron_task_completions_trigger_next_loop_on_success() {
         _ = async {
             // Each of 3 datasets should be scheduled after this time
             let mut next_time = start_time + Duration::milliseconds(1100);
-            tokio::time::sleep(std::time::Duration::from_millis(1100)).await;
+            harness.simulate_time_passage(Duration::milliseconds(1100)).await;
 
             // Plan different task execution outcomes for each dataset
             let mut planned_outcomes = HashMap::new();
@@ -550,12 +556,11 @@ async fn test_cron_task_completions_trigger_next_loop_on_success() {
                 task_id: dataset_task.task_id,
                 outcome: *(planned_outcomes.get(&foo_id).unwrap())
             }).await.unwrap();
-            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+            harness.simulate_time_passage(Duration::milliseconds(10)).await;
             next_time += Duration::milliseconds(10);
 
             // Let the succeeded dataset to schedule another update. 40s + 20s max waiting
-            tokio::time::sleep(std::time::Duration::from_millis(70)).await;
-
+            harness.simulate_time_passage(Duration::milliseconds(70)).await;
          } => Ok(()),
     }
     .unwrap();
@@ -611,7 +616,7 @@ async fn test_task_completions_trigger_next_loop_on_success() {
     for dataset_id in [&foo_id, &bar_id, &baz_id] {
         harness
             .set_dataset_flow_schedule(
-                Utc::now(),
+                harness.now_datetime(),
                 dataset_id.clone(),
                 DatasetFlowType::Ingest,
                 Duration::milliseconds(40).into(),
@@ -623,7 +628,8 @@ async fn test_task_completions_trigger_next_loop_on_success() {
     harness.eager_dependencies_graph_init().await;
 
     // Remember start time
-    let start_time = Utc::now()
+    let start_time = harness
+        .now_datetime()
         .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
         .unwrap();
 
@@ -639,7 +645,7 @@ async fn test_task_completions_trigger_next_loop_on_success() {
         _ = async {
             // Each of 3 datasets should be scheduled after this time
             let mut next_time = start_time + Duration::milliseconds(60);
-            tokio::time::sleep(std::time::Duration::from_millis(60)).await;
+            harness.simulate_time_passage(Duration::milliseconds(60)).await;
 
             // Plan different task execution outcomes for each dataset
             let mut planned_outcomes = HashMap::new();
@@ -670,13 +676,12 @@ async fn test_task_completions_trigger_next_loop_on_success() {
                     task_id: dataset_task.task_id,
                     outcome: *(planned_outcomes.get(dataset_id).unwrap())
                 }).await.unwrap();
-                tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+                harness.simulate_time_passage(Duration::milliseconds(10)).await;
                 next_time += Duration::milliseconds(10);
             }
 
             // Let the succeeded dataset to schedule another update. 40s + 20s max waiting
-            tokio::time::sleep(std::time::Duration::from_millis(70)).await;
-
+            harness.simulate_time_passage(Duration::milliseconds(70)).await;
          } => Ok(()),
     }
     .unwrap();
@@ -819,7 +824,7 @@ async fn test_update_success_triggers_update_of_derived_datasets() {
 
     harness
         .set_dataset_flow_schedule(
-            Utc::now(),
+            harness.now_datetime(),
             foo_id.clone(),
             DatasetFlowType::Ingest,
             Duration::milliseconds(30).into(),
@@ -829,7 +834,7 @@ async fn test_update_success_triggers_update_of_derived_datasets() {
     for dataset_id in [&bar_id, &baz_id] {
         harness
             .set_dataset_flow_start_condition(
-                Utc::now(),
+                harness.now_datetime(),
                 dataset_id.clone(),
                 DatasetFlowType::ExecuteTransform,
                 StartConditionConfiguration {
@@ -844,7 +849,8 @@ async fn test_update_success_triggers_update_of_derived_datasets() {
     harness.eager_dependencies_graph_init().await;
 
     // Remember start time
-    let start_time = Utc::now()
+    let start_time = harness
+        .now_datetime()
         .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
         .unwrap();
 
@@ -860,7 +866,7 @@ async fn test_update_success_triggers_update_of_derived_datasets() {
         _ = async {
             // "foo" is definitely scheduled now
             let next_time = start_time + Duration::milliseconds(50);
-            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+            harness.simulate_time_passage(Duration::milliseconds(50)).await;
 
             // Extract dataset tasks
             let scheduled_tasks = harness.take_scheduled_tasks().await;
@@ -882,8 +888,7 @@ async fn test_update_success_triggers_update_of_derived_datasets() {
                 outcome: TaskOutcome::Success,
             }).await.unwrap();
 
-            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
-
+            harness.simulate_time_passage(Duration::milliseconds(50)).await;
         } => Ok(())
     };
 
@@ -1082,6 +1087,7 @@ struct FlowHarness {
     flow_configuration_service: Arc<dyn FlowConfigurationService>,
     flow_service: Arc<dyn FlowService>,
     task_scheduler: Arc<dyn TaskScheduler>,
+    system_time_source_stub: SystemTimeSourceStub,
 }
 
 impl FlowHarness {
@@ -1090,6 +1096,8 @@ impl FlowHarness {
         let datasets_dir = tmp_dir.path().join("datasets");
         std::fs::create_dir(&datasets_dir).unwrap();
 
+        let system_time_source_stub =
+            SystemTimeSourceStub::new_set(Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap());
         let catalog = dill::CatalogBuilder::new()
             .add::<EventBus>()
             .add_value(FlowServiceRunConfig::new(Duration::milliseconds(
@@ -1099,7 +1107,8 @@ impl FlowHarness {
             .add::<FlowEventStoreInMem>()
             .add::<FlowConfigurationServiceInMemory>()
             .add::<FlowConfigurationEventStoreInMem>()
-            .add::<SystemTimeSourceDefault>()
+            .add_value(system_time_source_stub.clone())
+            .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
             .add_builder(
                 DatasetRepositoryLocalFs::builder()
                     .with_root(datasets_dir)
@@ -1126,6 +1135,7 @@ impl FlowHarness {
             flow_configuration_service,
             dataset_repo,
             task_scheduler,
+            system_time_source_stub,
         }
     }
 
@@ -1288,6 +1298,35 @@ impl FlowHarness {
             task_states.push(task_state);
         }
         task_states
+    }
+
+    fn now_datetime(&self) -> DateTime<Utc> {
+        self.system_time_source_stub.now()
+    }
+
+    async fn simulate_time_passage(&self, time_quantum: Duration) -> () {
+        // Examples:
+        // 12 ÷ 4 = 3
+        // 15 ÷ 4 = 4
+        // 16 ÷ 4 = 4
+        fn div_up(a: i64, b: i64) -> i64 {
+            (a + (b - 1)) / b
+        }
+
+        const TIME_INCREMENT: Duration = Duration::milliseconds(SCHEDULING_ALIGNMENT_MS);
+        const CONTEXT_SWITCHING_SLEEP_DURATION: StdDuration = StdDuration::from_millis(5);
+
+        let time_increments_count = div_up(
+            time_quantum.num_milliseconds(),
+            TIME_INCREMENT.num_milliseconds(),
+        );
+
+        for _ in 0..time_increments_count {
+            self.system_time_source_stub
+                .simulate_time_passage(TIME_INCREMENT);
+
+            tokio::time::sleep(CONTEXT_SWITCHING_SLEEP_DURATION).await;
+        }
     }
 }
 
