@@ -11,6 +11,7 @@ use std::net::IpAddr;
 
 use clap::{value_parser, Arg, ArgAction, Command};
 use opendatafabric::*;
+use url::Url;
 
 fn tabular_output_params(app: Command) -> Command {
     app.args([
@@ -592,10 +593,9 @@ pub fn cli() -> Command {
                             .action(ArgAction::SetTrue)
                             .help("Store access token in the user home folder rather than in the workspace"),
                         Arg::new("server")
-                            .short('s')
-                            .long("server")
-                            .action(ArgAction::Set)
-                            .help("Custom remote server front-end URL (Kamu web platform is used by default)")
+                            .index(1)
+                            .value_parser(value_parse_url)
+                            .help("Custom remote server front-end URL (Kamu web platform is used by default)"),
                     ]),
                 Command::new("logout")
                     .about("Logs out from a remote Kamu server")
@@ -605,10 +605,14 @@ pub fn cli() -> Command {
                             .action(ArgAction::SetTrue)
                             .help("Drop access token stored in the user home folder rather than in the workspace"),
                         Arg::new("server")
-                            .short('s')
-                            .long("server")
-                            .action(ArgAction::Set)
-                            .help("Custom remote server front-end URL (Kamu web platform is used by default)")
+                            .index(1)
+                            .value_parser(value_parse_url)
+                            .help("Custom remote server front-end URL (Kamu web platform is used by default)"),
+                        Arg::new("all")
+                            .short('a')
+                            .long("all")
+                            .action(ArgAction::SetTrue)
+                            .help("Log out of all logged in servers"),
                     ]),
                 Command::new("new")
                     .about("Creates a new dataset manifest from a template")
@@ -1387,4 +1391,21 @@ fn validate_log_filter(s: &str) -> Result<String, String> {
         }?;
     }
     Ok(s.to_string())
+}
+
+fn value_parse_url(url_str: &str) -> Result<Url, String> {
+    let parse_result = Url::parse(&url_str);
+    match parse_result {
+        Ok(url) => Ok(url),
+        Err(e) => {
+            // try attaching a default schema
+            if let url::ParseError::RelativeUrlWithoutBase = e {
+                let url_with_default_schema = format!("https://{url_str}");
+                let url = Url::parse(&url_with_default_schema).map_err(|e| e.to_string())?;
+                Ok(url)
+            } else {
+                Err(e.to_string())
+            }
+        }
+    }
 }

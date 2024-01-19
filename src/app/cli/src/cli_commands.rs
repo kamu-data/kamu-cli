@@ -206,10 +206,7 @@ pub fn get_command(
             } else {
                 odf_server::AccessTokenStoreScope::Workspace
             },
-            // TODO: improve URL parser
-            submatches
-                .get_one::<String>("server")
-                .map(|s| Url::parse(s).unwrap()),
+            submatches.get_one::<Url>("server").cloned(),
         )),
         Some(("logout", submatches)) => Box::new(LogoutCommand::new(
             cli_catalog.get_one()?,
@@ -218,10 +215,8 @@ pub fn get_command(
             } else {
                 odf_server::AccessTokenStoreScope::Workspace
             },
-            // TODO: improve URL parser
-            submatches
-                .get_one::<String>("server")
-                .map(|s| Url::parse(s).unwrap()),
+            submatches.get_one::<Url>("server").cloned(),
+            submatches.get_flag("all"),
         )),
         Some(("new", submatches)) => Box::new(NewDatasetCommand::new(
             submatches.get_one::<DatasetName>("name").unwrap().clone(),

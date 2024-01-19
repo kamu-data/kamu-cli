@@ -18,33 +18,78 @@ use crate::{odf_server, CLIError, Command};
 pub struct LogoutCommand {
     access_token_registry_service: Arc<odf_server::AccessTokenRegistryService>,
     scope: odf_server::AccessTokenStoreScope,
-    server: Option<Url>,
+    server_url: Option<Url>,
+    all: bool,
 }
 
 impl LogoutCommand {
     pub fn new(
         access_token_registry_service: Arc<odf_server::AccessTokenRegistryService>,
         scope: odf_server::AccessTokenStoreScope,
-        server: Option<Url>,
+        server_url: Option<Url>,
+        all: bool,
     ) -> Self {
         Self {
             access_token_registry_service,
             scope,
-            server,
+            server_url,
+            all,
         }
+    }
+
+    fn get_server_url(&self) -> Url {
+        self.server_url
+            .as_ref()
+            .cloned()
+            .unwrap_or_else(|| Url::parse(odf_server::DEFAULT_ODF_FRONTEND_URL).unwrap())
     }
 }
 
 #[async_trait::async_trait(?Send)]
 impl Command for LogoutCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
-        let odf_server_frontend_url = self
-            .server
-            .clone()
-            .unwrap_or_else(|| Url::parse(odf_server::DEFAULT_ODF_FRONTEND_URL).unwrap());
+        if self.server_url.is_some() && self.all {
+            return Err(CLIError::usage_error(
+                "Can't use --all and particular server name simultaneously",
+            ));
+        }
 
-        self.access_token_registry_service
-            .drop_access_token(self.scope, &odf_server_frontend_url)?;
+        if self.all {
+            let removed_any = self
+                .access_token_registry_service
+                .drop_all_access_tokens_in_scope(self.scope)?;
+            if removed_any {
+                eprintln!(
+                    "{}",
+                    console::style("Logged out of all servers").green().bold(),
+                );
+            } else {
+                eprintln!(
+                    "{}",
+                    console::style("Not logged in to any servers").yellow(),
+                );
+            }
+        } else {
+            let odf_server_frontend_url = self.get_server_url();
+
+            let removed = self
+                .access_token_registry_service
+                .drop_access_token(self.scope, &odf_server_frontend_url)?;
+
+            if removed {
+                eprintln!(
+                    "{} {}",
+                    console::style("Logged out of").green().bold(),
+                    odf_server_frontend_url
+                );
+            } else {
+                eprintln!(
+                    "{} {}",
+                    console::style("Not logged in to").yellow(),
+                    odf_server_frontend_url
+                );
+            }
+        }
 
         Ok(())
     }

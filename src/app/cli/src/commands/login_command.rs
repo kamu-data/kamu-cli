@@ -41,6 +41,13 @@ impl LoginCommand {
         }
     }
 
+    fn get_server_url(&self) -> Url {
+        self.server
+            .as_ref()
+            .cloned()
+            .unwrap_or_else(|| Url::parse(odf_server::DEFAULT_ODF_FRONTEND_URL).unwrap())
+    }
+
     async fn new_login(&self, odf_server_frontend_url: Url) -> Result<(), CLIError> {
         let login_callback_response = self
             .login_service
@@ -134,11 +141,7 @@ impl LoginCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for LoginCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
-        let odf_server_frontend_url = self
-            .server
-            .as_ref()
-            .cloned()
-            .unwrap_or_else(|| Url::parse(odf_server::DEFAULT_ODF_FRONTEND_URL).unwrap());
+        let odf_server_frontend_url = self.get_server_url();
 
         if let Some(token_find_report) = self
             .access_token_registry_service
