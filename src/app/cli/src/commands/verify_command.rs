@@ -121,7 +121,7 @@ impl VerifyCommand {
     ) -> GenericVerificationResult {
         let requests: Vec<_> = self
             .dataset_repo
-            .get_all_datasets(Some(dataset_ref_pattern))
+            .get_all_datasets_filtered(dataset_ref_pattern)
             .map_ok(|dsh| VerificationRequest {
                 dataset_ref: dsh.as_local_ref(),
                 block_range: (None, None),

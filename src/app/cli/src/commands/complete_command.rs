@@ -74,7 +74,7 @@ impl CompleteCommand {
 
     async fn complete_dataset(&self, output: &mut impl Write, prefix: &str) {
         if let Some(repo) = self.dataset_repo.as_ref() {
-            let mut datasets = repo.get_all_datasets(None);
+            let mut datasets = repo.get_all_datasets();
             while let Some(dataset_handle) = datasets.try_next().await.unwrap() {
                 if dataset_handle.alias.dataset_name.starts_with(prefix) {
                     writeln!(output, "{}", dataset_handle.alias).unwrap();
@@ -96,7 +96,7 @@ impl CompleteCommand {
     async fn complete_alias(&self, output: &mut impl Write, prefix: &str) {
         if let Some(repo) = self.dataset_repo.as_ref() {
             if let Some(reg) = self.remote_alias_reg.as_ref() {
-                let mut datasets = repo.get_all_datasets(None);
+                let mut datasets = repo.get_all_datasets();
                 while let Some(dataset_handle) = datasets.try_next().await.unwrap() {
                     let aliases = reg
                         .get_remote_aliases(&dataset_handle.as_local_ref())

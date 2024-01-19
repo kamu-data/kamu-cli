@@ -405,7 +405,7 @@ impl KamuSchema {
     async fn table_names_impl(&self) -> Vec<String> {
         if self.options.datasets.is_empty() {
             let mut res = Vec::new();
-            let mut dataset_handles = self.dataset_repo.get_all_datasets(None);
+            let mut dataset_handles = self.dataset_repo.get_all_datasets();
 
             while let Some(hdl) = dataset_handles.try_next().await.unwrap() {
                 if self

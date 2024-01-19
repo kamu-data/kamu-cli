@@ -37,7 +37,7 @@ impl Search {
         let per_page = per_page.unwrap_or(Self::DEFAULT_RESULTS_PER_PAGE);
 
         let mut datasets: Vec<_> = dataset_repo
-            .get_all_datasets(None)
+            .get_all_datasets()
             .filter_ok(|hdl| hdl.alias.dataset_name.contains(&query))
             .try_collect()
             .await?;

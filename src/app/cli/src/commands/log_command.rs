@@ -82,7 +82,7 @@ impl Command for LogCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
         let id_to_alias_lookup: BTreeMap<_, _> = self
             .dataset_repo
-            .get_all_datasets(None)
+            .get_all_datasets()
             .map_ok(|h| (h.id, h.alias))
             .try_collect()
             .await?;

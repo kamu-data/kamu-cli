@@ -87,10 +87,7 @@ impl Command for LineageCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
         use futures::{StreamExt, TryStreamExt};
         let mut dataset_handles: Vec<_> = if self.dataset_refs.is_empty() {
-            self.dataset_repo
-                .get_all_datasets(None)
-                .try_collect()
-                .await?
+            self.dataset_repo.get_all_datasets().try_collect().await?
         } else {
             futures::stream::iter(&self.dataset_refs)
                 .then(|r| self.dataset_repo.resolve_dataset_ref(r))

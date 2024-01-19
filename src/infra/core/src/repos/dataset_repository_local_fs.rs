@@ -14,6 +14,7 @@ use async_trait::async_trait;
 use dill::*;
 use domain::auth::{DatasetAction, DatasetActionAuthorizer, DEFAULT_ACCOUNT_NAME};
 use event_bus::EventBus;
+use futures::future;
 use kamu_core::*;
 use opendatafabric::*;
 use url::Url;
@@ -164,11 +165,25 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
     }
 
     // TODO: PERF: Resolving handles currently involves reading summary files
-    fn get_all_datasets<'s>(
+    fn get_all_datasets<'s>(&'s self) -> DatasetHandleStream<'s> {
+        self.storage_strategy.get_all_datasets()
+    }
+
+    fn get_all_datasets_filtered<'s>(
         &'s self,
-        dataset_ref_pattern: Option<DatasetRefPattern>,
+        dataset_ref_pattern: DatasetRefPattern,
     ) -> DatasetHandleStream<'s> {
-        self.storage_strategy.get_all_datasets(dataset_ref_pattern)
+        use futures::{StreamExt, TryStreamExt};
+        self.storage_strategy
+            .get_all_datasets()
+            .try_filter(move |dsh| {
+                let filter_res = match dataset_ref_pattern.match_pattern(dsh.to_string().as_str()) {
+                    Ok(res) => res,
+                    Err(_) => false,
+                };
+                future::ready(filter_res)
+            })
+            .boxed()
     }
 
     fn get_datasets_by_owner(&self, account_name: AccountName) -> DatasetHandleStream<'_> {
@@ -402,7 +417,7 @@ trait DatasetStorageStrategy: Sync + Send {
 
     fn get_dataset_path(&self, dataset_handle: &DatasetHandle) -> PathBuf;
 
-    fn get_all_datasets<'s>(&'s self, drp: Option<DatasetRefPattern>) -> DatasetHandleStream<'s>;
+    fn get_all_datasets<'s>(&'s self) -> DatasetHandleStream<'s>;
 
     fn get_datasets_by_owner(&self, account_name: AccountName) -> DatasetHandleStream<'_>;
 
@@ -501,7 +516,7 @@ impl DatasetStorageStrategy for DatasetSingleTenantStorageStrategy {
         self.dataset_path_impl(&dataset_handle.alias)
     }
 
-    fn get_all_datasets<'s>(&'s self, drp: Option<DatasetRefPattern>) -> DatasetHandleStream<'s> {
+    fn get_all_datasets<'s>(&'s self) -> DatasetHandleStream<'s> {
         Box::pin(async_stream::try_stream! {
             let read_dataset_dir = std::fs::read_dir(&self.root).int_err()?;
 
@@ -514,13 +529,6 @@ impl DatasetStorageStrategy for DatasetSingleTenantStorageStrategy {
                 }
                 let dataset_name = DatasetName::try_from(&dataset_dir_entry.file_name()).int_err()?;
                 let dataset_alias = DatasetAlias::new(None, dataset_name);
-                if let Some(ref datase_ref_pattern) = drp {
-                    if !like::Like::<false>::like(
-                        dataset_alias.to_string().as_str(), datase_ref_pattern.pattern.as_str(),
-                    ).unwrap() {
-                        continue
-                    }
-                }
                 match self.resolve_dataset_alias(&dataset_alias).await {
                     Ok(hdl) => { yield hdl; Ok(()) }
                     Err(ResolveDatasetError::NotFound(_)) => Ok(()),
@@ -532,7 +540,7 @@ impl DatasetStorageStrategy for DatasetSingleTenantStorageStrategy {
 
     fn get_datasets_by_owner(&self, account_name: AccountName) -> DatasetHandleStream<'_> {
         if account_name == DEFAULT_ACCOUNT_NAME {
-            self.get_all_datasets(None)
+            self.get_all_datasets()
         } else {
             Box::pin(futures::stream::empty())
         }
@@ -747,7 +755,7 @@ impl DatasetStorageStrategy for DatasetMultiTenantStorageStrategy {
             .join(dataset_handle.id.as_multibase().to_stack_string())
     }
 
-    fn get_all_datasets<'s>(&'s self, _drf: Option<DatasetRefPattern>) -> DatasetHandleStream<'s> {
+    fn get_all_datasets<'s>(&'s self) -> DatasetHandleStream<'s> {
         Box::pin(async_stream::try_stream! {
             let read_account_dir = std::fs::read_dir(&self.root).int_err()?;
 
