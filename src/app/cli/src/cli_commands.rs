@@ -216,6 +216,7 @@ pub fn get_command(
                 odf_server::AccessTokenStoreScope::Workspace
             },
             submatches.get_one::<Url>("server").cloned(),
+            submatches.get_flag("all"),
         )),
         Some(("new", submatches)) => Box::new(NewDatasetCommand::new(
             submatches.get_one::<DatasetName>("name").unwrap().clone(),

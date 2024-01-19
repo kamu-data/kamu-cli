@@ -159,6 +159,36 @@ impl AccessTokenRegistryService {
         self.storage.write_access_tokens_registry(scope, &registry)
     }
 
+    pub fn drop_all_access_tokens_in_scope(
+        &self,
+        scope: AccessTokenStoreScope,
+    ) -> Result<bool, InternalError> {
+        let account_name = self.account_name();
+
+        let registry_ptr = match scope {
+            AccessTokenStoreScope::User => &self.user_registry,
+            AccessTokenStoreScope::Workspace => &self.workspace_registry,
+        };
+
+        let mut registry = registry_ptr
+            .lock()
+            .expect("Could not lock access tokens registry");
+
+        let mut modified = false;
+        for record in registry.iter_mut() {
+            if record.drop_account_token(account_name).is_some() {
+                modified = true;
+            }
+        }
+
+        if modified {
+            self.storage
+                .write_access_tokens_registry(scope, &registry)?;
+        }
+
+        Ok(modified)
+    }
+
     pub fn drop_access_token(
         &self,
         scope: AccessTokenStoreScope,
