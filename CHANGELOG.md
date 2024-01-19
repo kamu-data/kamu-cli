@@ -4,18 +4,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+### Changed
+- Use artificial control over time in `FlowService` tests to stabilize their behavior
+
 ## [0.154.1] - 2024-01-24
 ### Fixed
 - Eliminated issue when launching transform flows for derived datasets after upstream dataset is updated.
 
 ## [0.154.0] - 2024-01-24
 ### Added
-- `kamu logout` command accepts `--all` switch to drop all current server sessions.
+- `kamu logout` command accepts `--all` switch to drop all current server sessions
 ### Changed
 - `kamu login` and `kamu logout` commands accept server URL as a positional argument, not as `-s` switch
 - Improved output reporting of `kamu logout` command
 ### Fixed
-- `kamu login` and `kamu logout` commands properly handle plaform URLs without an explicit schema (`https://` attached by default)
+- `kamu login` and `kamu logout` commands properly handle platform URLs without an explicit schema (`https://` attached by default)
 - Flow configuration API no longer crashes on specific input combinations when interval expressed in smaller time units 
    exceed minimal boundary that forms a bigger time unit
 - Fixed runtime crashes related to background execution of automatically scheduled tasks
