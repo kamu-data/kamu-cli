@@ -93,20 +93,16 @@ impl Command for SystemDiagnoseCommand {
         for diagnostic_check in diagnostic_checks.iter() {
             write!(out, "{}... ", diagnostic_check.name())?;
             match diagnostic_check.run().await {
-                Ok(_) => write!(out, "{}\n", style(SUCCESS_MESSAGE).green())?,
+                Ok(_) => writeln!(out, "{}", style(SUCCESS_MESSAGE).green())?,
                 Err(err) => {
-                    write!(out, "{}\n", style(FAILED_MESSAGE).red())?;
-                    write!(out, "{}\n", style(err.to_string()).red())?;
+                    writeln!(out, "{}", style(FAILED_MESSAGE).red())?;
+                    writeln!(out, "{}", style(err.to_string()).red())?;
                 }
             }
         }
 
         if !self.is_in_workpace {
-            write!(
-                out,
-                "{}\n",
-                style("Directory is not kamu workspace").yellow()
-            )?;
+            writeln!(out, "{}", style("Directory is not kamu workspace").yellow())?;
         }
         Ok(())
     }
