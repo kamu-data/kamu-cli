@@ -6,7 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 ### Fixed
-- `kamu login` command properly handles plaform URLs without an explicit schema (`https://` attached by default)
+- `kamu login` and `kamu logout` commands properly handle plaform URLs without an explicit schema (`https://` attached by default)
 
 ## [0.153.0] - 2024-01-17 (**BREAKING**)
 ### Changed

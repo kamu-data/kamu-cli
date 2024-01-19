@@ -21,7 +21,7 @@ pub struct LoginCommand {
     access_token_registry_service: Arc<odf_server::AccessTokenRegistryService>,
     output_config: Arc<OutputConfig>,
     scope: odf_server::AccessTokenStoreScope,
-    server: Option<String>,
+    server: Option<Url>,
 }
 
 impl LoginCommand {
@@ -30,7 +30,7 @@ impl LoginCommand {
         access_token_registry_service: Arc<odf_server::AccessTokenRegistryService>,
         output_config: Arc<OutputConfig>,
         scope: odf_server::AccessTokenStoreScope,
-        server: Option<String>,
+        server: Option<Url>,
     ) -> Self {
         Self {
             login_service,
@@ -41,30 +41,11 @@ impl LoginCommand {
         }
     }
 
-    fn parse_server_url(&self) -> Result<Url, CLIError> {
-        let maybe_url_str = self.server.as_ref();
-
-        let maybe_url = if let Some(url_str) = maybe_url_str {
-            let parse_result = Url::parse(&url_str);
-            match parse_result {
-                Ok(url) => Ok(Some(url)),
-                Err(e) => {
-                    // try attaching a default schema
-                    if let url::ParseError::RelativeUrlWithoutBase = e {
-                        let url_with_default_schema = format!("https://{url_str}");
-                        let url = Url::parse(&url_with_default_schema)
-                            .map_err(|e| CLIError::failure(e))?;
-                        Ok(Some(url))
-                    } else {
-                        Err(CLIError::failure(e))
-                    }
-                }
-            }?
-        } else {
-            None
-        };
-
-        Ok(maybe_url.unwrap_or_else(|| Url::parse(odf_server::DEFAULT_ODF_FRONTEND_URL).unwrap()))
+    fn get_server_url(&self) -> Url {
+        self.server
+            .as_ref()
+            .cloned()
+            .unwrap_or_else(|| Url::parse(odf_server::DEFAULT_ODF_FRONTEND_URL).unwrap())
     }
 
     async fn new_login(&self, odf_server_frontend_url: Url) -> Result<(), CLIError> {
@@ -160,7 +141,7 @@ impl LoginCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for LoginCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
-        let odf_server_frontend_url = self.parse_server_url()?;
+        let odf_server_frontend_url = self.get_server_url();
 
         if let Some(token_find_report) = self
             .access_token_registry_service

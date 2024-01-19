@@ -206,7 +206,7 @@ pub fn get_command(
             } else {
                 odf_server::AccessTokenStoreScope::Workspace
             },
-            submatches.get_one::<String>("server").cloned(),
+            parse_server_url(submatches.get_one::<String>("server"))?,
         )),
         Some(("logout", submatches)) => Box::new(LogoutCommand::new(
             cli_catalog.get_one()?,
@@ -215,10 +215,7 @@ pub fn get_command(
             } else {
                 odf_server::AccessTokenStoreScope::Workspace
             },
-            // TODO: improve URL parser
-            submatches
-                .get_one::<String>("server")
-                .map(|s| Url::parse(s).unwrap()),
+            parse_server_url(submatches.get_one::<String>("server"))?,
         )),
         Some(("new", submatches)) => Box::new(NewDatasetCommand::new(
             submatches.get_one::<DatasetName>("name").unwrap().clone(),
@@ -542,4 +539,26 @@ where
     }
 
     Ok(result_refs)
+}
+
+fn parse_server_url(maybe_url_str: Option<&String>) -> Result<Option<Url>, CLIError> {
+    Ok(if let Some(url_str) = maybe_url_str {
+        let parse_result = Url::parse(&url_str);
+        match parse_result {
+            Ok(url) => Ok(Some(url)),
+            Err(e) => {
+                // try attaching a default schema
+                if let url::ParseError::RelativeUrlWithoutBase = e {
+                    let url_with_default_schema = format!("https://{url_str}");
+                    let url =
+                        Url::parse(&url_with_default_schema).map_err(|e| CLIError::failure(e))?;
+                    Ok(Some(url))
+                } else {
+                    Err(CLIError::failure(e))
+                }
+            }
+        }?
+    } else {
+        None
+    })
 }

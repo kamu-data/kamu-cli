@@ -33,15 +33,19 @@ impl LogoutCommand {
             server,
         }
     }
+
+    fn get_server_url(&self) -> Url {
+        self.server
+            .as_ref()
+            .cloned()
+            .unwrap_or_else(|| Url::parse(odf_server::DEFAULT_ODF_FRONTEND_URL).unwrap())
+    }
 }
 
 #[async_trait::async_trait(?Send)]
 impl Command for LogoutCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
-        let odf_server_frontend_url = self
-            .server
-            .clone()
-            .unwrap_or_else(|| Url::parse(odf_server::DEFAULT_ODF_FRONTEND_URL).unwrap());
+        let odf_server_frontend_url = self.get_server_url();
 
         self.access_token_registry_service
             .drop_access_token(self.scope, &odf_server_frontend_url)?;
