@@ -163,7 +163,7 @@ impl AccessTokenRegistryService {
         &self,
         scope: AccessTokenStoreScope,
         odf_server_frontend_url: &Url,
-    ) -> Result<(), InternalError> {
+    ) -> Result<bool, InternalError> {
         let account_name = self.account_name();
 
         let registry_ptr = match scope {
@@ -180,11 +180,13 @@ impl AccessTokenRegistryService {
             .find(|c| &c.frontend_url == odf_server_frontend_url)
         {
             if token_map.drop_account_token(account_name).is_some() {
-                return self.storage.write_access_tokens_registry(scope, &registry);
+                self.storage
+                    .write_access_tokens_registry(scope, &registry)?;
+                return Ok(true);
             }
         }
 
-        Ok(())
+        Ok(false)
     }
 }
 

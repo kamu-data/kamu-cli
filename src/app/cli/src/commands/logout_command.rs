@@ -47,8 +47,23 @@ impl Command for LogoutCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
         let odf_server_frontend_url = self.get_server_url();
 
-        self.access_token_registry_service
+        let removed = self
+            .access_token_registry_service
             .drop_access_token(self.scope, &odf_server_frontend_url)?;
+
+        if removed {
+            eprintln!(
+                "{} {}",
+                console::style("Logged out of").green().bold(),
+                odf_server_frontend_url
+            );
+        } else {
+            eprintln!(
+                "{} {}",
+                console::style("Not logged in to").yellow(),
+                odf_server_frontend_url
+            );
+        }
 
         Ok(())
     }
