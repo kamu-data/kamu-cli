@@ -1394,7 +1394,7 @@ fn validate_log_filter(s: &str) -> Result<String, String> {
 }
 
 fn value_parse_url(url_str: &str) -> Result<Url, String> {
-    let parse_result = Url::parse(&url_str);
+    let parse_result = Url::parse(url_str);
     match parse_result {
         Ok(url) => Ok(url),
         Err(e) => {
