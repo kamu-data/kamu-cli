@@ -122,7 +122,7 @@ async fn test_ingest_polling_snapshot() {
                   OPTIONAL INT64 offset;
                   REQUIRED INT32 op;
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
-                  REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
+                  OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
                   OPTIONAL BYTE_ARRAY city (STRING);
                   OPTIONAL INT64 population;
                 }
@@ -130,13 +130,13 @@ async fn test_ingest_polling_snapshot() {
             ),
             indoc!(
                 r#"
-                +--------+----+----------------------+----------------------+------+------------+
-                | offset | op | system_time          | event_time           | city | population |
-                +--------+----+----------------------+----------------------+------+------------+
-                | 0      | 0  | 2050-01-01T12:00:00Z | 2050-01-01T12:00:00Z | A    | 10001      |
-                | 1      | 0  | 2050-01-01T12:00:00Z | 2050-01-01T12:00:00Z | B    | 20001      |
-                | 2      | 0  | 2050-01-01T12:00:00Z | 2050-01-01T12:00:00Z | C    | 30001      |
-                +--------+----+----------------------+----------------------+------+------------+
+                +--------+----+----------------------+------------+------+------------+
+                | offset | op | system_time          | event_time | city | population |
+                +--------+----+----------------------+------------+------+------------+
+                | 0      | 0  | 2050-01-01T12:00:00Z |            | A    | 10001      |
+                | 1      | 0  | 2050-01-01T12:00:00Z |            | B    | 20001      |
+                | 2      | 0  | 2050-01-01T12:00:00Z |            | C    | 30001      |
+                +--------+----+----------------------+------------+------+------------+
                 "#
             ),
         )
