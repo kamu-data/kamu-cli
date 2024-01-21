@@ -120,7 +120,6 @@ impl Reader for ReaderCsv {
             // re-compress it.
             file_compression_type: FileCompressionType::UNCOMPRESSED,
             file_sort_order: Vec::new(),
-            insert_mode: datafusion::datasource::listing::ListingTableInsertMode::Error,
             infinite: false,
         };
 

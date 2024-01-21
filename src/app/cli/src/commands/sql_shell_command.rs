@@ -9,6 +9,10 @@
 
 use std::sync::Arc;
 use std::time::Duration;
+use datafusion::error::DataFusionError;
+use datafusion_cli::exec;
+use datafusion_cli::print_format::PrintFormat;
+use datafusion_cli::print_options::{MaxRows, PrintOptions};
 
 use container_runtime::ContainerRuntime;
 use internal_error::*;
@@ -124,17 +128,34 @@ impl SqlShellCommand {
 
         Ok(())
     }
+
+    async fn run_datafusion_cli_command(&self) -> Result<(), CLIError> {
+        let mut print_options = PrintOptions {
+            format: PrintFormat::Table,
+            quiet: true,
+            maxrows: MaxRows::Unlimited,
+        };
+
+        let mut ctx = self
+            .query_svc
+            .create_session()
+            .await
+            .unwrap();
+
+        exec::exec_from_repl(&mut ctx, &mut print_options)
+            .await
+            .map_err(|e| DataFusionError::External(Box::new(e)));
+
+        Ok(())
+    }
 }
 
 #[async_trait::async_trait(?Send)]
 impl Command for SqlShellCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
         match (self.engine.as_deref(), &self.command, &self.url) {
+            (Some("datafusion"), None, None) => self.run_datafusion_cli_command().await,
             (Some("datafusion"), Some(_), None) => self.run_datafusion_command().await,
-            (Some("datafusion"), _, _) => Err(CLIError::usage_error(
-                "DataFusion engine currently doesn't have a shell and only supports single \
-                 command execution",
-            )),
             (Some("spark") | None, _, _) => self.run_spark_shell().await,
             _ => unreachable!(),
         }
