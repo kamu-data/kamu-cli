@@ -48,7 +48,7 @@ impl Reader for ReaderParquet {
             table_partition_cols: Vec::new(),
             parquet_pruning: None,
             skip_metadata: None,
-            file_sort_order: Vec::new()
+            file_sort_order: Vec::new(),
         };
 
         let df = self

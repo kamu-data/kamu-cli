@@ -9,12 +9,11 @@
 
 use std::sync::Arc;
 use std::time::Duration;
+use container_runtime::ContainerRuntime;
 use datafusion::error::DataFusionError;
 use datafusion_cli::exec;
 use datafusion_cli::print_format::PrintFormat;
 use datafusion_cli::print_options::{MaxRows, PrintOptions};
-
-use container_runtime::ContainerRuntime;
 use internal_error::*;
 use kamu::domain::{QueryOptions, QueryService};
 use kamu::*;
@@ -136,11 +135,7 @@ impl SqlShellCommand {
             maxrows: MaxRows::Unlimited,
         };
 
-        let mut ctx = self
-            .query_svc
-            .create_session()
-            .await
-            .unwrap();
+        let mut ctx = self.query_svc.create_session().await.unwrap();
 
         exec::exec_from_repl(&mut ctx, &mut print_options)
             .await
