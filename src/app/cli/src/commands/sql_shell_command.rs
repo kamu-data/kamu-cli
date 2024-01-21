@@ -9,6 +9,7 @@
 
 use std::sync::Arc;
 use std::time::Duration;
+
 use container_runtime::ContainerRuntime;
 use datafusion::error::DataFusionError;
 use datafusion_cli::exec;
