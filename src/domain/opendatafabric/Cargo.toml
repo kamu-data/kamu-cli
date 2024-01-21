@@ -57,4 +57,4 @@ prost = "0.12"
 tonic = "0.10"
 
 # Optional
-arrow = { optional = true, version = "48", default-features = false, features = ["ipc"] }
+arrow = { optional = true, version = "49", default-features = false, features = ["ipc"] }

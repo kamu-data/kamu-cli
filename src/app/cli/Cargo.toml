@@ -66,7 +66,7 @@ read_input = "0.8"  # Basic user input
 webbrowser = "0.8"  # For opening URLs in default system browser
 
 # APIs
-arrow-flight = { version = "48", features = ["flight-sql-experimental"] }
+arrow-flight = { version = "49", features = ["flight-sql-experimental"] }
 async-graphql = { version = "6", features = ["chrono", "url", "apollo_tracing"] }
 async-graphql-axum = "6"
 axum = { version = "0.6", features = ["ws"] }
@@ -103,7 +103,8 @@ tracing-bunyan-formatter = "0.3"
 async-trait = "0.1"
 chrono = "0.4"
 cfg-if = "1"  # Conditional compilation
-datafusion = "33"
+datafusion = "34"
+datafusion-cli = "34"
 dill = "0.8"
 dirs = "5"
 fs_extra = "1.3"

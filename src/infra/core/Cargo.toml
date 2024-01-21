@@ -57,8 +57,8 @@ tar = "0.4"  # Checkpoint archival
 zip = "0.6"
 
 # Data
-datafusion = "33"
-object_store = { version = "0.7", features = ["aws"] }
+datafusion = "34"
+object_store = { version = "0.8.0", features = ["aws"] }
 digest = "0.10"
 sha3 = "0.10"
 
