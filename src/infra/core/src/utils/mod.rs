@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 pub mod cached_object;
+pub mod dataset_stream_modification;
 pub mod docker_images;
 pub mod ipfs_wrapper;
 pub mod s3_context;

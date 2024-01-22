@@ -13,7 +13,13 @@ use url::Url;
 
 use crate::commands::*;
 use crate::config::UsersConfig;
-use crate::{accounts, odf_server, CommandInterpretationFailed, WorkspaceService};
+use crate::{
+    accounts,
+    odf_server,
+    CommandInterpretationFailed,
+    DatasetPatternValidationRes,
+    WorkspaceService,
+};
 
 pub fn get_command(
     base_catalog: &dill::Catalog,
@@ -547,14 +553,14 @@ where
 fn validate_many_dataset_wildcards<I>(
     _catalog: &dill::Catalog,
     dataset_refs: I,
-) -> Result<Vec<String>, CLIError>
+) -> Result<Vec<DatasetPatternValidationRes>, CLIError>
 where
-    I: IntoIterator<Item = String>,
+    I: IntoIterator<Item = DatasetPatternValidationRes>,
 {
     let mut result_refs = Vec::new();
     for dataset_ref in dataset_refs.into_iter() {
         result_refs.push(dataset_ref);
     }
 
-    return Ok(result_refs);
+    Ok(result_refs)
 }

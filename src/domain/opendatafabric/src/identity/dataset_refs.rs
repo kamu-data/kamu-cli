@@ -742,14 +742,10 @@ impl std::cmp::PartialOrd for DatasetRefAny {
     }
 }
 
-////////////////////////////////////////////////////////////////////////////////
-// DatasetRefPattern
-////////////////////////////////////////////////////////////////////////////////
-
 #[derive(Debug, Clone)]
 pub struct DatasetRefPattern {
     pub wildcard: char,
-    pub pattern: String,
+    pub pattern: DatasetPattern,
 }
 
 impl DatasetRefPattern {
@@ -765,7 +761,7 @@ impl Default for DatasetRefPattern {
     fn default() -> Self {
         Self {
             wildcard: '%',
-            pattern: "".to_string(),
+            pattern: DatasetPattern::new_unchecked(""),
         }
     }
 }

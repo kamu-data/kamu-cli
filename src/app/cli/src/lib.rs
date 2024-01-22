@@ -23,6 +23,9 @@ pub use cli_commands::*;
 pub mod cli_parser;
 pub use cli_parser::*;
 
+pub mod cli_validation;
+pub use cli_validation::*;
+
 pub mod commands;
 pub use commands::*;
 

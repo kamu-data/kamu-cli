@@ -114,6 +114,18 @@ impl Grammar {
         Some((&s[0..h.len() + hh.len()], tt))
     }
 
+    // Hostname with wildcard symbol
+    pub fn match_wildcard_pattern(s: &str) -> Option<(&str, &str)> {
+        // replace wildcard symbol by w(wildcard) to make possible run
+        // a dataset_name validation
+        let arg_string = s.replace('%', "w");
+        let res = Self::match_dataset_name(arg_string.as_str())?;
+        if res.0.len() != s.len() || !res.1.is_empty() {
+            return None;
+        }
+        Some((s, ""))
+    }
+
     // DatasetID = "did:odf:" Multibase
     pub fn match_dataset_id(s: &str) -> Option<(&str, &str)> {
         let (h, t) = Self::match_str(s, "did:odf:")?;
@@ -124,6 +136,11 @@ impl Grammar {
     // DatasetName = Hostname
     pub fn match_dataset_name(s: &str) -> Option<(&str, &str)> {
         Self::match_hostname(s)
+    }
+
+    // DatasetPattern = Hostname with possible wildcard symbols
+    pub fn match_dataset_pattern(s: &str) -> Option<(&str, &str)> {
+        Self::match_wildcard_pattern(s)
     }
 
     // AccountName = Hostname

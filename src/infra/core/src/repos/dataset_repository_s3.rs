@@ -195,14 +195,7 @@ impl DatasetRepository for DatasetRepositoryS3 {
         }
     }
 
-    fn get_all_datasets<'s>(&'s self) -> DatasetHandleStream<'s> {
-        self.stream_datasets_if(|_| true)
-    }
-
-    fn get_all_datasets_filtered<'s>(
-        &'s self,
-        _dataset_ref_pattern: DatasetRefPattern,
-    ) -> DatasetHandleStream<'s> {
+    fn get_all_datasets(&self) -> DatasetHandleStream<'_> {
         self.stream_datasets_if(|_| true)
     }
 

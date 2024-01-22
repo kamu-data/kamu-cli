@@ -83,11 +83,11 @@ async fn test_verify_data_consistency() {
             .verify(
                 &dataset_alias.as_local_ref(),
                 (None, None),
-                Arc::new(VerificationOptions {
+                VerificationOptions {
                     check_integrity: true,
                     check_logical_hashes: true,
                     replay_transformations: false
-                }),
+                },
                 None,
             )
             .await,
@@ -154,11 +154,11 @@ async fn test_verify_data_consistency() {
             .verify(
                 &dataset_alias.as_local_ref(),
                 (None, None),
-                Arc::new(VerificationOptions {
+                VerificationOptions {
                     check_integrity: true,
                     check_logical_hashes: true,
                     replay_transformations: false
-                }),
+                },
                 None,
             )
             .await,
@@ -185,9 +185,7 @@ async fn test_verify_data_consistency() {
         verification_svc.verify(
             &dataset_alias.as_local_ref(),
             (None, None),
-            Arc::new(
-                VerificationOptions {check_integrity: true, check_logical_hashes: true, replay_transformations: false}
-            ),
+            VerificationOptions {check_integrity: true, check_logical_hashes: true, replay_transformations: false},
             None,
         ).await,
         Err(VerificationError::DataDoesNotMatchMetadata(

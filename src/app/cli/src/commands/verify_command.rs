@@ -11,19 +11,15 @@ use std::sync::Arc;
 
 use futures::TryStreamExt;
 use kamu::domain::*;
+use kamu::utils::dataset_stream_modification::filter_dataset_stream;
 use opendatafabric::*;
 
 use super::{BatchError, CLIError, Command};
 use crate::output::OutputConfig;
-use crate::VerificationMultiProgress;
+use crate::{DatasetPatternValidationRes, VerificationMultiProgress};
 
-type GenericVerificationResult = Result<
-    Vec<(
-        DatasetRef,
-        Arc<Result<VerificationResult, VerificationError>>,
-    )>,
-    CLIError,
->;
+type GenericVerificationResult =
+    Result<Vec<Result<VerificationMultiResult, InternalError>>, CLIError>;
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -31,7 +27,7 @@ pub struct VerifyCommand {
     dataset_repo: Arc<dyn DatasetRepository>,
     verification_svc: Arc<dyn VerificationService>,
     output_config: Arc<OutputConfig>,
-    refs: Vec<String>,
+    refs: Vec<DatasetPatternValidationRes>,
     recursive: bool,
     integrity: bool,
 }
@@ -46,7 +42,7 @@ impl VerifyCommand {
         integrity: bool,
     ) -> Self
     where
-        I: Iterator<Item = String>,
+        I: Iterator<Item = DatasetPatternValidationRes>,
     {
         Self {
             dataset_repo,
@@ -60,7 +56,7 @@ impl VerifyCommand {
 
     async fn verify_with_progress(
         &self,
-        options: Arc<VerificationOptions>,
+        options: VerificationOptions,
     ) -> GenericVerificationResult {
         let progress = VerificationMultiProgress::new();
         let listener = Arc::new(progress.clone());
@@ -79,19 +75,12 @@ impl VerifyCommand {
 
     async fn verify(
         &self,
-        options: Arc<VerificationOptions>,
+        options: VerificationOptions,
         listener: Option<Arc<VerificationMultiProgress>>,
     ) -> GenericVerificationResult {
         let dataset_ref_arg = self.refs.first().unwrap();
-        let dataset_ref_pattern = DatasetRefPattern {
-            pattern: dataset_ref_arg.to_string(),
-            ..DatasetRefPattern::default()
-        };
-        if !dataset_ref_arg
-            .to_string()
-            .contains(dataset_ref_pattern.wildcard)
-        {
-            let dataset_ref = DatasetRef::try_from(dataset_ref_arg.as_str()).unwrap();
+        if dataset_ref_arg.is_dataset_ref {
+            let dataset_ref = DatasetRef::try_from(dataset_ref_arg.pattern.as_str()).unwrap();
             let dataset_handle = self.dataset_repo.resolve_dataset_ref(&dataset_ref).await?;
 
             let listener = listener.and_then(|l| l.begin_verify(&dataset_handle));
@@ -106,8 +95,15 @@ impl VerifyCommand {
                 )
                 .await;
 
-            Ok(vec![(dataset_handle.into(), Arc::new(res))])
+            Ok(vec![Ok(VerificationMultiResult {
+                dataset_handle,
+                verification_result: res,
+            })])
         } else {
+            let dataset_ref_pattern = DatasetRefPattern {
+                pattern: dataset_ref_arg.pattern.clone(),
+                ..DatasetRefPattern::default()
+            };
             self.verify_multi(options, dataset_ref_pattern, listener)
                 .await
         }
@@ -115,37 +111,26 @@ impl VerifyCommand {
 
     async fn verify_multi(
         &self,
-        options: Arc<VerificationOptions>,
+        options: VerificationOptions,
         dataset_ref_pattern: DatasetRefPattern,
         listener: Option<Arc<VerificationMultiProgress>>,
     ) -> GenericVerificationResult {
-        let requests: Vec<_> = self
-            .dataset_repo
-            .get_all_datasets_filtered(dataset_ref_pattern)
-            .map_ok(|dsh| VerificationRequest {
-                dataset_ref: dsh.as_local_ref(),
-                block_range: (None, None),
-            })
-            .try_collect()
-            .await?;
+        let requests: Vec<_> =
+            filter_dataset_stream(self.dataset_repo.get_all_datasets(), dataset_ref_pattern)
+                .map_ok(|dsh| VerificationRequest {
+                    dataset_ref: dsh.as_local_ref(),
+                    block_range: (None, None),
+                })
+                .try_collect()
+                .await?;
 
         let listener = listener.and_then(|l| l.begin_multi_verify());
 
-        let res: Vec<_> = self
+        Ok(self
             .verification_svc
             .clone()
             .verify_multi(requests, options, listener)
-            .await
-            .iter()
-            .map(|res| {
-                (
-                    res.dataset_handle.clone().into(),
-                    res.verification_result.clone(),
-                )
-            })
-            .collect();
-
-        Ok(res)
+            .await)
     }
 }
 
@@ -165,17 +150,17 @@ impl Command for VerifyCommand {
         }
 
         let options = if self.integrity {
-            Arc::new(VerificationOptions {
+            VerificationOptions {
                 check_integrity: true,
                 check_logical_hashes: true,
                 replay_transformations: false,
-            })
+            }
         } else {
-            Arc::new(VerificationOptions {
+            VerificationOptions {
                 check_integrity: true,
                 check_logical_hashes: true,
                 replay_transformations: true,
-            })
+            }
         };
 
         let verification_results = if self.output_config.is_tty
@@ -205,32 +190,22 @@ impl Command for VerifyCommand {
                     .bold()
             );
         }
-<<<<<<< HEAD
         if errors != 0 {
             Err(BatchError::new(
-                format!("Failed to verify {errors} dataset(s)"),
-                verification_results.into_iter().filter_map(|(id, res)| {
-                    res.err().map(|e| (e, format!("Failed to verify {id}")))
+                format!("Failed to verify {} dataset(s)", errors),
+                verification_results.into_iter().filter_map(|multi_result| {
+                    let single_result = multi_result.unwrap();
+                    single_result.verification_result.err().map(|e| {
+                        (
+                            e,
+                            format!("Failed to verify {}", single_result.dataset_handle),
+                        )
+                    })
                 }),
             )
             .into())
         } else {
             Ok(())
         }
-=======
-        // if errors != 0 {
-        // Err(BatchError::new(
-        //     format!("Failed to verify {} dataset(s)", errors),
-        //     verification_results.into_iter().filter_map(|(id, res)| {
-        //         res.as_mut()
-        //             .err()
-        //             .map(|e| (e, format!("Failed to verify {}", id)))
-        //     }),
-        // )
-        // .into())
-        // } else {
-        Ok(())
-        // }
->>>>>>> 8b702387 (Add verify pattern logic)
     }
 }
