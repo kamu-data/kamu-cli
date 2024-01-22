@@ -95,8 +95,7 @@ pub enum TimeUnit {
 impl From<chrono::Duration> for TimeDelta {
     fn from(value: chrono::Duration) -> Self {
         let num_weeks = value.num_weeks();
-        if num_weeks > 0 {
-            assert!((value - chrono::Duration::weeks(num_weeks)).is_zero());
+        if (value - chrono::Duration::weeks(num_weeks)).is_zero() {
             return Self {
                 every: num_weeks as u32,
                 unit: TimeUnit::Weeks,
@@ -104,8 +103,7 @@ impl From<chrono::Duration> for TimeDelta {
         }
 
         let num_days = value.num_days();
-        if num_days > 0 {
-            assert!((value - chrono::Duration::days(num_days)).is_zero());
+        if (value - chrono::Duration::days(num_days)).is_zero() {
             return Self {
                 every: num_days as u32,
                 unit: TimeUnit::Days,
@@ -113,8 +111,7 @@ impl From<chrono::Duration> for TimeDelta {
         }
 
         let num_hours = value.num_hours();
-        if num_hours > 0 {
-            assert!((value - chrono::Duration::hours(num_hours)).is_zero());
+        if (value - chrono::Duration::hours(num_hours)).is_zero() {
             return Self {
                 every: num_hours as u32,
                 unit: TimeUnit::Hours,
@@ -122,15 +119,16 @@ impl From<chrono::Duration> for TimeDelta {
         }
 
         let num_minutes = value.num_minutes();
-        if num_minutes > 0 {
-            assert!((value - chrono::Duration::minutes(num_minutes)).is_zero());
+        if (value - chrono::Duration::minutes(num_minutes)).is_zero() {
             return Self {
                 every: num_minutes as u32,
                 unit: TimeUnit::Minutes,
             };
         }
 
-        unreachable!("Expecting intervals not tinier than 1 minute");
+        unreachable!(
+            "Expecting intervals not tinier than 1 minute that are clearly dividable by unit"
+        );
     }
 }
 
