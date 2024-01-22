@@ -13,7 +13,7 @@ lint:
 	cargo fmt --check
 	cargo test -p kamu-repo-tools
 	cargo deny check
-	cargo clippy all
+	cargo clippy --workspace --all-targets
 
 
 ###############################################################################
@@ -22,7 +22,7 @@ lint:
 
 .PHONY: lint-fix
 lint-fix:
-	cargo clippy --fix --allow-dirty --allow-staged --broken-code
+	cargo clippy --workspace --all-targets --fix --allow-dirty --allow-staged --broken-code
 	cargo fmt --all
 
 

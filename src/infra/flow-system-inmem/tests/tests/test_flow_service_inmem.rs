@@ -1018,9 +1018,11 @@ struct TestFlowSystemListener {
     state: Arc<Mutex<TestFlowSystemListenerState>>,
 }
 
+type FlowSnapshot = (DateTime<Utc>, HashMap<FlowKey, Vec<FlowState>>);
+
 #[derive(Default)]
 struct TestFlowSystemListenerState {
-    snapshots: Vec<(DateTime<Utc>, HashMap<FlowKey, Vec<FlowState>>)>,
+    snapshots: Vec<FlowSnapshot>,
 }
 
 #[component(pub)]

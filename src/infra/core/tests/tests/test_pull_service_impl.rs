@@ -977,6 +977,7 @@ pub enum PullBatch {
 
 impl PullBatch {
     fn cmp_ref(lhs: &DatasetRefAny, rhs: &DatasetRefAny) -> bool {
+        #[allow(clippy::type_complexity)]
         fn tuplify(
             v: &DatasetRefAny,
         ) -> (

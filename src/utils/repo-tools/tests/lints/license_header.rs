@@ -65,6 +65,6 @@ fn check_all_files_have_license_header() {
         for f in bad_files {
             eprintln!("- {}", f.display());
         }
-        assert!(false, "License file is missing in some files");
+        panic!("License file is missing in some files");
     }
 }
