@@ -34,7 +34,7 @@ async fn setup(tempdir: &Path, num_rows: usize) -> String {
     let mut aux1 = array::PrimitiveBuilder::<Int64Type>::with_capacity(num_rows);
     let mut aux2 = array::PrimitiveBuilder::<Int64Type>::with_capacity(num_rows);
 
-    let mut rng = rand::rngs::SmallRng::seed_from_u64(123127986998);
+    let mut rng = rand::rngs::SmallRng::seed_from_u64(123_127_986_998);
 
     for i in 0..num_rows {
         offset.append_value(i as u64);

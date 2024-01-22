@@ -34,7 +34,7 @@ use kamu::{
 use opendatafabric::*;
 use url::Url;
 
-const FILE_DATA_ARRAY_SIZE: usize = 1572864;
+const FILE_DATA_ARRAY_SIZE: usize = 1_572_864;
 const AMOUNT_OF_BLOCKS_TO_APPEND: usize = 70;
 
 /////////////////////////////////////////////////////////////////////////////////////////

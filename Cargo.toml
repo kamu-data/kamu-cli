@@ -88,6 +88,9 @@ large_enum_variant = "allow"
 result_large_err = "allow"
 module_inception = "allow"
 
+# clippy::pedantic
+unreadable_literal = { level = "warn", priority = 1 }
+
 # clippy::cargo
 cargo = { level = "warn", priority = 0 }
 multiple_crate_versions = { level = "allow", priority = 1 }
