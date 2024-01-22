@@ -56,8 +56,7 @@ pub fn value_parse_dataset_ref_pattern_local(
         Ok(dp) => dp,
         Err(_) => {
             return Err(ValidationDatasetRefError::Failed(ValidationError {
-                message: "Local reference pattern be in form: `did:odf:...` or `my.dataset.%`"
-                    .to_string(),
+                message: "Local reference pattern be in `my.dataset.%`".to_string(),
             }));
         }
     };
