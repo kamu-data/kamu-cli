@@ -21,7 +21,7 @@ impl Default for ContainerRuntimeConfig {
             .map(|val| match val.as_str() {
                 "docker" => ContainerRuntimeType::Docker,
                 "podman" => ContainerRuntimeType::Podman,
-                _ => panic!("Unrecognized runtime type: {}", val),
+                _ => panic!("Unrecognized runtime type: {val}"),
             })
             .unwrap_or(ContainerRuntimeType::Podman);
 
@@ -49,7 +49,7 @@ impl std::fmt::Display for ContainerRuntimeType {
     }
 }
 
-/// Corresponds to podman's containers.conf::netns
+/// Corresponds to podman's `containers.conf::netns`
 /// We podman is used inside containers (e.g. podman-in-docker or podman-in-k8s)
 /// it usually runs uses host network namespace.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

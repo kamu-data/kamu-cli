@@ -83,7 +83,7 @@ impl std::fmt::Display for Multicodec {
             Multicodec::ODFMetadataBlock => "odf-metadata-block",
             Multicodec::ODFDatasetSnapshot => "odf-dataset-snapshot",
         };
-        write!(f, "{}", s)
+        write!(f, "{s}")
     }
 }
 

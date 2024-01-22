@@ -15,8 +15,8 @@ use crate::formats::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-/// Same as [MetadataBlock] struct but holds a specific variant of the
-/// [MetadataEvent]
+/// Same as [`MetadataBlock`] struct but holds a specific variant of the
+/// [`MetadataEvent`]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MetadataBlockTyped<T> {
     /// System time when this block was written.
@@ -61,7 +61,7 @@ where
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-/// Allows "casting" a generic MetadataBlock into one containing a specific
+/// Allows "casting" a generic `MetadataBlock` into one containing a specific
 /// event type
 pub trait AsTypedBlock {
     fn into_typed<T: VariantOf<MetadataEvent>>(self) -> Option<MetadataBlockTyped<T>>;

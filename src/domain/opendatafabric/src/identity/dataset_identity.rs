@@ -305,7 +305,7 @@ impl std::str::FromStr for DatasetAlias {
 impl fmt::Display for DatasetAlias {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if let Some(acc) = &self.account_name {
-            write!(f, "{}/", acc)?;
+            write!(f, "{acc}/")?;
         }
         write!(f, "{}", self.dataset_name)
     }
@@ -386,7 +386,7 @@ impl fmt::Display for DatasetAliasRemote {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}/", self.repo_name)?;
         if let Some(acc) = &self.account_name {
-            write!(f, "{}/", acc)?;
+            write!(f, "{acc}/")?;
         }
         write!(f, "{}", self.dataset_name)
     }

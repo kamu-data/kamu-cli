@@ -15,10 +15,10 @@ use crate::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-/// Aggregate wraps the state reconstructed by [crate::Projection] from series
+/// Aggregate wraps the state reconstructed by [`crate::Projection`] from series
 /// of events and provides ability to mutate this state through commands.
 /// Updates can then be saved into a persistent storage represented by
-/// [crate::EventStore].
+/// [`crate::EventStore`].
 ///
 /// To define your own aggregate use `Aggregate` derive macro as:
 /// ```ignore
@@ -281,9 +281,7 @@ where
         if let Some(last_stored_event) = self.last_stored_event {
             assert!(
                 last_stored_event < event_id,
-                "Attempting to mutate with event {} while state is already synced to {}",
-                event_id,
-                last_stored_event,
+                "Attempting to mutate with event {event_id} while state is already synced to {last_stored_event}",
             );
         }
 
@@ -491,7 +489,7 @@ where
             tracing::error!(
                 pending_events = ?self.0,
                 "Aggregate is dropped with unsaved events",
-            )
+            );
         }
     }
 }

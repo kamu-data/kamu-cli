@@ -47,13 +47,13 @@ impl<Proj: Projection, State: EventStoreState<Proj>> EventStore<Proj>
 
         // TODO: This should be a buffered stream so we don't lock per event
         Box::pin(async_stream::try_stream! {
-            let mut seen = opts.from.map(|id| (id.into_inner() + 1) as usize).unwrap_or(0);
+            let mut seen = opts.from.map_or(0, |id| (id.into_inner() + 1) as usize);
 
             loop {
                 let next = {
                     let g = self.state.lock().unwrap();
 
-                    let to = opts.to.map(|id| (id.into_inner() + 1) as usize).unwrap_or(g.events_count());
+                    let to = opts.to.map_or(g.events_count(), |id| (id.into_inner() + 1) as usize);
 
                     g.get_events()[..to]
                         .iter()

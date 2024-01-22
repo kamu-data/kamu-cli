@@ -76,7 +76,7 @@ impl Grammar {
             let (_, t) = Self::match_char(s, '+')?;
             let (h, tt) =
                 Self::match_predicate(t, |b| matches!(b, b'a'..=b'z' | b'A'..=b'Z' | b'0'..=b'9'))?;
-            Some((&s[0..h.len() + 1], tt))
+            Some((&s[0..=h.len()], tt))
         })?;
 
         Some((&s[0..h.len() + hh.len()], tt))
@@ -95,7 +95,7 @@ impl Grammar {
         let (hh, tt) = Self::match_zero_or_many(t, |s| {
             let (_, t) = Self::match_char(s, '-')?;
             let (h, tt) = Self::match_alphanums(t)?;
-            Some((&s[0..h.len() + 1], tt))
+            Some((&s[0..=h.len()], tt))
         })?;
 
         Some((&s[0..h.len() + hh.len()], tt))
@@ -108,7 +108,7 @@ impl Grammar {
         let (hh, tt) = Self::match_zero_or_many(t, |s| {
             let (_, t) = Self::match_char(s, '.')?;
             let (h, tt) = Self::match_subdomain(t)?;
-            Some((&s[0..h.len() + 1], tt))
+            Some((&s[0..=h.len()], tt))
         })?;
 
         Some((&s[0..h.len() + hh.len()], tt))

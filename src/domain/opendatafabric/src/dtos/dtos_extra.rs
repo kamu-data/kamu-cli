@@ -233,7 +233,7 @@ impl Display for RawQueryResponseInternalError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", &self.message)?;
         if let Some(bt) = &self.backtrace {
-            write!(f, "\n\n--- Engine Backtrace ---\n{}", bt)?;
+            write!(f, "\n\n--- Engine Backtrace ---\n{bt}")?;
         }
         Ok(())
     }
@@ -253,7 +253,7 @@ impl Display for TransformResponseInternalError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", &self.message)?;
         if let Some(bt) = &self.backtrace {
-            write!(f, "\n\n--- Engine Backtrace ---\n{}", bt)?;
+            write!(f, "\n\n--- Engine Backtrace ---\n{bt}")?;
         }
         Ok(())
     }

@@ -75,7 +75,7 @@ impl Default for RunArgs {
             expose_port_map_addr: Vec::new(),
             expose_port_map_range: Vec::new(),
             hostname: None,
-            image: "".to_owned(),
+            image: String::new(),
             init: false,
             interactive: false,
             network: None,

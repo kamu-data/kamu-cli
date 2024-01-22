@@ -146,29 +146,29 @@ impl ContainerRuntime {
             cmd.arg("-d");
         }
         args.container_name
-            .map(|v| cmd.arg(format!("--name={}", v)));
-        args.hostname.map(|v| cmd.arg(format!("--hostname={}", v)));
-        args.network.map(|v| cmd.arg(format!("--network={}", v)));
+            .map(|v| cmd.arg(format!("--name={v}")));
+        args.hostname.map(|v| cmd.arg(format!("--hostname={v}")));
+        args.network.map(|v| cmd.arg(format!("--network={v}")));
         if args.expose_all_ports {
             cmd.arg("-P");
         }
         args.expose_ports.iter().for_each(|v| {
             cmd.arg("-p");
-            cmd.arg(format!("{}", v));
+            cmd.arg(format!("{v}"));
         });
         args.expose_port_map.iter().for_each(|(h, c)| {
             cmd.arg("-p");
-            cmd.arg(format!("{}:{}", h, c));
+            cmd.arg(format!("{h}:{c}"));
         });
         args.expose_port_map_addr.iter().for_each(|(addr, h, c)| {
             cmd.arg("-p");
-            cmd.arg(format!("{}:{}:{}", addr, h, c));
+            cmd.arg(format!("{addr}:{h}:{c}"));
         });
         args.expose_port_map_range
             .iter()
             .for_each(|((hl, hr), (cl, cr))| {
                 cmd.arg("-p");
-                cmd.arg(format!("{}-{}:{}-{}", hl, hr, cl, cr));
+                cmd.arg(format!("{hl}-{hr}:{cl}-{cr}"));
             });
         args.volumes.into_iter().for_each(|v| {
             cmd.arg("-v");
@@ -185,15 +185,15 @@ impl ContainerRuntime {
                 )),
             };
         });
-        args.user.map(|v| cmd.arg(format!("--user={}", v)));
+        args.user.map(|v| cmd.arg(format!("--user={v}")));
         args.work_dir
             .map(|v| cmd.arg(format!("--workdir={}", v.display())));
         args.environment_vars.iter().for_each(|(n, v)| {
             cmd.arg("-e");
-            cmd.arg(format!("{}={}", n, v));
+            cmd.arg(format!("{n}={v}"));
         });
         args.entry_point
-            .map(|v| cmd.arg(format!("--entrypoint={}", v)));
+            .map(|v| cmd.arg(format!("--entrypoint={v}")));
         cmd.arg(args.image);
         cmd.args(args.args);
         cmd
@@ -306,8 +306,7 @@ impl ContainerRuntime {
         }
 
         let format = format!(
-            "--format={{{{ (index (index .NetworkSettings.Ports \"{}/tcp\") 0).HostPort }}}}",
-            container_port
+            "--format={{{{ (index (index .NetworkSettings.Ports \"{container_port}/tcp\") 0).HostPort }}}}"
         );
 
         let output = self
@@ -355,8 +354,7 @@ impl ContainerRuntime {
                     "created" => {}
                     _ => {
                         return Err(ResourceFailedError::new(format!(
-                            "Container transitioned into '{}' state",
-                            stdout
+                            "Container transitioned into '{stdout}' state"
                         ))
                         .into())
                     }
@@ -400,8 +398,7 @@ impl ContainerRuntime {
             ContainerRuntimeType::Docker => std::env::var("DOCKER_HOST")
                 .ok()
                 .and_then(|s| url::Url::parse(&s).ok())
-                .map(|url| format!("{}", url.host().unwrap()))
-                .unwrap_or("127.0.0.1".to_owned()),
+                .map_or("127.0.0.1".to_owned(), |url| format!("{}", url.host().unwrap())),
         }
     }
 

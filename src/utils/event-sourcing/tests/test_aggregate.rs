@@ -18,7 +18,7 @@ enum CalcEvents {
 }
 
 impl ProjectionEvent<()> for CalcEvents {
-    fn matches_query(&self, _: &()) -> bool {
+    fn matches_query(&self, (): &()) -> bool {
         true
     }
 }

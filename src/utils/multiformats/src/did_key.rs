@@ -59,7 +59,7 @@ impl DidKey {
         (keypair, id)
     }
 
-    /// For testing purposes only. Use [DidKey::new_generated_ed25519] for
+    /// For testing purposes only. Use [`DidKey::new_generated_ed25519`] for
     /// cryptographically secure generation
     pub fn new_seeded_ed25519(seed: &[u8]) -> Self {
         use rand::rngs::SmallRng;
@@ -140,7 +140,7 @@ pub enum DidKeyError {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/// Represents [DidKey] in a canonical binary layout
+/// Represents [`DidKey`] in a canonical binary layout
 pub struct DidKeyBytes {
     buf: [u8; MAX_DID_BINARY_REPR_LEN],
     len: usize,
@@ -194,7 +194,7 @@ impl AsRef<[u8]> for DidKeyBytes {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/// Formats [DidKey] as a canonical `did:key:<multibase>` string
+/// Formats [`DidKey`] as a canonical `did:key:<multibase>` string
 pub struct DidKeyFmt<'a> {
     inner: DidKeyMultibaseFmt<'a>,
 }
@@ -218,7 +218,7 @@ impl<'a> DidKeyFmt<'a> {
 
         let len = {
             let mut c = std::io::Cursor::new(&mut buf[..]);
-            write!(c, "{}", self).unwrap();
+            write!(c, "{self}").unwrap();
             c.position() as usize
         };
 
@@ -228,7 +228,7 @@ impl<'a> DidKeyFmt<'a> {
 
 impl<'a> std::fmt::Debug for DidKeyFmt<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self)
+        write!(f, "{self}")
     }
 }
 
@@ -240,7 +240,7 @@ impl<'a> std::fmt::Display for DidKeyFmt<'a> {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/// Formats [DidKey] as a multibase string (without `did:key:`) prefix
+/// Formats [`DidKey`] as a multibase string (without `did:key:`) prefix
 pub struct DidKeyMultibaseFmt<'a> {
     value: &'a DidKey,
     encoding: Multibase,
@@ -265,7 +265,7 @@ impl<'a> DidKeyMultibaseFmt<'a> {
 
 impl<'a> std::fmt::Debug for DidKeyMultibaseFmt<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self)
+        write!(f, "{self}")
     }
 }
 

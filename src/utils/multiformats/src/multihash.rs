@@ -255,7 +255,7 @@ impl<'a> MultihashFmt<'a> {
 
         let len = {
             let mut c = std::io::Cursor::new(&mut buf[..]);
-            write!(c, "{}", self).unwrap();
+            write!(c, "{self}").unwrap();
             c.position() as usize
         };
 
@@ -273,14 +273,14 @@ impl<'a> std::fmt::Display for MultihashFmt<'a> {
         if let Some(short_len) = self.short_len {
             write!(f, "{}", &s[s.len() - short_len..])
         } else {
-            write!(f, "{}", s)
+            write!(f, "{s}")
         }
     }
 }
 
 impl<'a> std::fmt::Debug for MultihashFmt<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_fmt(format_args!("{}", self))
+        f.write_fmt(format_args!("{self}"))
     }
 }
 

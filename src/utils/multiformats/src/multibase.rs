@@ -75,7 +75,7 @@ impl<'a, const S: usize> MultibaseFmt<'a, S> {
             Multibase::Base16 => {
                 buf[0] = b'f';
                 let str_len = self.bytes.len() * 2;
-                hex::encode_to_slice(self.bytes, &mut buf[1..str_len + 1]).unwrap();
+                hex::encode_to_slice(self.bytes, &mut buf[1..=str_len]).unwrap();
                 1 + str_len
             }
             Multibase::Base58Btc => {

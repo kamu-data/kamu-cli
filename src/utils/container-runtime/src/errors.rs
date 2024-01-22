@@ -89,10 +89,10 @@ impl std::fmt::Display for ProcessError {
         writeln!(f, "Process exited with code {}", self.code)?;
         writeln!(f, "- {:?}", self.command)?;
         if let Some(stdout) = &self.stdout {
-            writeln!(f, "- STDOUT: {}", stdout)?;
+            writeln!(f, "- STDOUT: {stdout}")?;
         }
         if let Some(stderr) = &self.stderr {
-            writeln!(f, "- STDERR: {}", stderr)?;
+            writeln!(f, "- STDERR: {stderr}")?;
         }
         Ok(())
     }

@@ -103,7 +103,7 @@ where
             id: None,
             args: None,
             scope: None,
-        })
+        });
     }
 
     fn on_exit(&self, _id: &span::Id, _ctx: layer::Context<'_, S>) {
@@ -116,7 +116,7 @@ where
             id: None,
             args: None,
             scope: None,
-        })
+        });
     }
 
     fn on_new_span(
@@ -137,7 +137,7 @@ where
             id: Some(id.into_u64()),
             args: Some(Visitable::Span(attrs)),
             scope: None,
-        })
+        });
     }
 
     fn on_close(&self, id: span::Id, _ctx: layer::Context<'_, S>) {
@@ -150,7 +150,7 @@ where
             id: Some(id.into_u64()),
             args: None,
             scope: None,
-        })
+        });
     }
 
     fn on_event(&self, event: &Event<'_>, ctx: layer::Context<'_, S>) {
@@ -163,7 +163,7 @@ where
             id: ctx.current_span().id().map(|id| id.into_u64()),
             args: Some(Visitable::Event(event)),
             scope: None,
-        })
+        });
     }
 }
 
