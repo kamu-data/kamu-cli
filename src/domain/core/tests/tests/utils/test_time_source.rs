@@ -38,8 +38,7 @@ async fn test_stub_wake_after_with_lacking_simulate_time_passage() {
 
         let wake_up_result_or_timeout = {
             let wake_after_60_sec_fut = system_time_source.wake_after(Duration::seconds(60));
-            let simulate_30_sec_passage_fut =
-                Box::pin(async { system_time_source.simulate_time_passage(dt1) });
+            let simulate_30_sec_passage_fut = Box::pin(async { system_time_source.advance(dt1) });
             let wake_after_fut =
                 futures::future::join(wake_after_60_sec_fut, simulate_30_sec_passage_fut);
 
@@ -75,7 +74,7 @@ async fn test_stub_wake_after_with_several_simulate_time_passage() {
             let dt1 = Duration::seconds(30);
             let t1 = t0 + dt1;
 
-            let woke_up_callers_ids = system_time_source.simulate_time_passage(dt1);
+            let woke_up_callers_ids = system_time_source.advance(dt1);
 
             assert!(woke_up_callers_ids.is_empty());
             assert_eq!(system_time_source.now(), t1);
@@ -91,7 +90,7 @@ async fn test_stub_wake_after_with_several_simulate_time_passage() {
             let dt2 = Duration::seconds(30);
             let t2 = t1 + dt2;
 
-            let woke_up_callers_ids = system_time_source.simulate_time_passage(dt2);
+            let woke_up_callers_ids = system_time_source.advance(dt2);
 
             assert_eq!(woke_up_callers_ids, [1]);
             assert_eq!(system_time_source.now(), t2);
@@ -107,7 +106,7 @@ async fn test_stub_wake_after_with_several_simulate_time_passage() {
             let dt3 = Duration::seconds(30);
             let t3 = t2 + dt3;
 
-            let woke_up_callers_ids = system_time_source.simulate_time_passage(dt3);
+            let woke_up_callers_ids = system_time_source.advance(dt3);
 
             assert_eq!(woke_up_callers_ids, [2]);
             assert_eq!(system_time_source.now(), t3);
@@ -123,7 +122,7 @@ async fn test_stub_wake_after_with_several_simulate_time_passage() {
             let dt4 = Duration::seconds(30);
             let t2 = t3 + dt4;
 
-            let woke_up_callers_ids = system_time_source.simulate_time_passage(dt4);
+            let woke_up_callers_ids = system_time_source.advance(dt4);
 
             assert_eq!(woke_up_callers_ids, [3, 4]);
             assert_eq!(system_time_source.now(), t2);
@@ -159,7 +158,7 @@ async fn test_stub_wake_after_with_simulate_exceeding_passage() {
         let dt1 = Duration::seconds(90);
         let t1 = t0 + dt1;
 
-        let woke_up_callers_ids = system_time_source.simulate_time_passage(dt1);
+        let woke_up_callers_ids = system_time_source.advance(dt1);
 
         assert_eq!(woke_up_callers_ids, [1, 2]);
         assert_eq!(system_time_source.now(), t1);

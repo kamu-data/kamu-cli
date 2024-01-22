@@ -1304,7 +1304,7 @@ impl FlowHarness {
         self.system_time_source_stub.now()
     }
 
-    async fn simulate_time_passage(&self, time_quantum: Duration) -> () {
+    async fn simulate_time_passage(&self, time_quantum: Duration) {
         // Examples:
         // 12 ÷ 4 = 3
         // 15 ÷ 4 = 4
@@ -1327,8 +1327,7 @@ impl FlowHarness {
         );
 
         for _ in 0..time_increments_count {
-            self.system_time_source_stub
-                .simulate_time_passage(TIME_INCREMENT);
+            self.system_time_source_stub.advance(TIME_INCREMENT);
 
             tokio::time::sleep(CONTEXT_SWITCHING_SLEEP_DURATION).await;
         }

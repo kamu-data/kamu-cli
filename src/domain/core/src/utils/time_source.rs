@@ -96,7 +96,7 @@ impl SystemTimeSourceStub {
         state.t = None;
     }
 
-    pub fn simulate_time_passage(&self, time_quantum: Duration) -> WokeUpCallersIds {
+    pub fn advance(&self, time_quantum: Duration) -> WokeUpCallersIds {
         let mut state = self.state.lock().unwrap();
         let mut woke_up_callers_ids = vec![];
 
