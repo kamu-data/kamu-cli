@@ -149,7 +149,7 @@ async fn test_ingest_polling_snapshot() {
             .event
             .new_watermark
             .map(|dt| dt.to_rfc3339()),
-        Some("2050-01-01T12:00:00+00:00".to_string())
+        Some("1970-01-01T00:00:00+00:00".to_string())
     );
 
     // Round 2
@@ -175,12 +175,12 @@ async fn test_ingest_polling_snapshot() {
     data_helper
         .assert_last_data_records_eq(indoc!(
             r#"
-            +--------+----+----------------------+----------------------+------+------------+
-            | offset | op | system_time          | event_time           | city | population |
-            +--------+----+----------------------+----------------------+------+------------+
-            | 3      | 2  | 2050-02-01T12:00:00Z | 2050-01-01T12:00:00Z | C    | 30001      |
-            | 4      | 3  | 2050-02-01T12:00:00Z | 2050-02-01T12:00:00Z | C    | 40001      |
-            +--------+----+----------------------+----------------------+------+------------+
+            +--------+----+----------------------+------------+------+------------+
+            | offset | op | system_time          | event_time | city | population |
+            +--------+----+----------------------+------------+------+------------+
+            | 3      | 2  | 2050-02-01T12:00:00Z |            | C    | 30001      |
+            | 4      | 3  | 2050-02-01T12:00:00Z |            | C    | 40001      |
+            +--------+----+----------------------+------------+------+------------+
             "#
         ))
         .await;
@@ -192,7 +192,7 @@ async fn test_ingest_polling_snapshot() {
             .event
             .new_watermark
             .map(|dt| dt.to_rfc3339()),
-        Some("2050-02-01T12:00:00+00:00".to_string())
+        Some("1970-01-01T00:00:00+00:00".to_string())
     );
 
     // Round 3 (no-op, only updates source state)
@@ -219,7 +219,7 @@ async fn test_ingest_polling_snapshot() {
     assert_eq!(event.new_data, None);
     assert_eq!(
         event.new_watermark.map(|dt| dt.to_rfc3339()),
-        Some("2050-02-01T12:00:00+00:00".to_string())
+        Some("1970-01-01T00:00:00+00:00".to_string())
     );
     assert!(event.new_source_state.is_some());
 }

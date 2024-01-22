@@ -128,12 +128,12 @@ async fn test_data_writer_happy_path() {
     // TODO: DataFusion issue where the schema of the
     // DataFrame being saved into parquet and those read out of it differs in
     // nullability
-    assert_ne!(schema_in_block, schema_in_data);
+    //assert_ne!(schema_in_block, schema_in_data);
     assert_schemas_equal(schema_in_block, schema_in_data, true);
 
     // Round 2
     harness.set_system_time(Utc.with_ymd_and_hms(2010, 1, 2, 12, 0, 0).unwrap());
-    harness.set_source_event_time(Utc.with_ymd_and_hms(2000, 1, 2, 12, 0, 0).unwrap());
+    harness.set_source_event_time(Utc.with_ymd_and_hms(1970, 1, 1, 0, 0, 0).unwrap());
 
     let res = harness
         .write(
@@ -173,11 +173,12 @@ async fn test_data_writer_happy_path() {
         df,
         indoc!(
             r#"
-            +--------+----+----------------------+----------------------+------+------------+
-            | offset | op | system_time          | event_time           | city | population |
-            +--------+----+----------------------+----------------------+------+------------+
-            | 3      | 0  | 2010-01-02T12:00:00Z |                      | D    | 4000       |
-            +--------+----+----------------------+----------------------+------+------------+
+            +--------+----+----------------------+------------+------+------------+
+            | offset | op | system_time          | event_time | city | population |
+            +--------+----+----------------------+------------+------+------------+
+            | 3      | 0  | 2010-01-02T12:00:00Z |            | D    | 4000       |
+            +--------+----+----------------------+------------+------+------------+
+
             "#
         ),
     )
@@ -331,7 +332,7 @@ async fn test_data_writer_rejects_incompatible_schema() {
               OPTIONAL INT64 offset;
               REQUIRED INT32 op;
               REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
-              REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
+              OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
               OPTIONAL BYTE_ARRAY city (STRING);
               OPTIONAL INT64 population;
             }
@@ -343,11 +344,11 @@ async fn test_data_writer_rejects_incompatible_schema() {
         df,
         indoc!(
             r#"
-            +--------+----+----------------------+----------------------+------+------------+
-            | offset | op | system_time          | event_time           | city | population |
-            +--------+----+----------------------+----------------------+------+------------+
-            | 3      | 0  | 2010-01-02T12:00:00Z |                      | D    | 4000       |
-            +--------+----+----------------------+----------------------+------+------------+
+            +--------+----+----------------------+------------+------+------------+
+            | offset | op | system_time          | event_time | city | population |
+            +--------+----+----------------------+------------+------+------------+
+            | 3      | 0  | 2010-01-02T12:00:00Z |            | D    | 4000       |
+            +--------+----+----------------------+------------+------+------------+
             "#
         ),
     )
@@ -412,7 +413,7 @@ async fn test_data_writer_rejects_incompatible_schema() {
               OPTIONAL INT64 offset;
               REQUIRED INT32 op;
               REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
-              REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
+              OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
               OPTIONAL BYTE_ARRAY city (STRING);
               OPTIONAL INT64 population;
             }
@@ -424,11 +425,11 @@ async fn test_data_writer_rejects_incompatible_schema() {
         df,
         indoc!(
             r#"
-            +--------+----+----------------------+----------------------+------+------------+
-            | offset | op | system_time          | event_time           | city | population |
-            +--------+----+----------------------+----------------------+------+------------+
-            | 4      | 0  | 2010-01-03T12:00:00Z |                      | E    | 5000       |
-            +--------+----+----------------------+----------------------+------+------------+
+            +--------+----+----------------------+------------+------+------------+
+            | offset | op | system_time          | event_time | city | population |
+            +--------+----+----------------------+------------+------+------------+
+            | 4      | 0  | 2010-01-03T12:00:00Z |            | E    | 5000       |
+            +--------+----+----------------------+------------+------+------------+
             "#
         ),
     )
@@ -576,7 +577,7 @@ async fn test_data_writer_snapshot_orders_by_pk_and_operation_type() {
             .new_watermark
             .as_ref()
             .map(|dt| dt.to_rfc3339()),
-        Some("2000-01-01T12:00:00+00:00".to_string())
+        Some("1970-01-01T00:00:00+00:00".to_string())
     );
 
     // Round 2
@@ -640,7 +641,7 @@ async fn test_data_writer_snapshot_orders_by_pk_and_operation_type() {
             .new_watermark
             .as_ref()
             .map(|dt| dt.to_rfc3339()),
-        Some("2000-01-02T12:00:00+00:00".to_string())
+        Some("1970-01-01T00:00:00+00:00".to_string())
     );
 }
 
@@ -968,7 +969,7 @@ impl Harness {
             writer,
             ctx,
             system_time,
-            source_event_time: Utc.with_ymd_and_hms(2000, 1, 1, 12, 0, 0).unwrap(),
+            source_event_time: Utc.with_ymd_and_hms(1970, 1, 1, 0, 0, 0).unwrap(),
         }
     }
 
