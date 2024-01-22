@@ -47,7 +47,7 @@ impl FromStr for DatasetAction {
         } else if s == "write" {
             Ok(DatasetAction::Write)
         } else {
-            Err(format!("Invalid DatasetAction: {}", s).int_err())
+            Err(format!("Invalid DatasetAction: {s}").int_err())
         }
     }
 }

@@ -119,7 +119,7 @@ pub(crate) fn make_dataset_ref(
 ) -> DatasetRef {
     match account_name {
         Some(account_name) => {
-            DatasetRef::from_str(format!("{}/{}", account_name, dataset_name).as_str()).unwrap()
+            DatasetRef::from_str(format!("{account_name}/{dataset_name}").as_str()).unwrap()
         }
         None => DatasetRef::from_str(dataset_name).unwrap(),
     }

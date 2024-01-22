@@ -195,11 +195,13 @@ impl DatasetMetadata {
         Ok(self
             .get_last_block_of_type::<odf::SetInfo>(ctx)
             .await?
-            .map(|b| b.event.into())
-            .unwrap_or(SetInfo {
-                description: None,
-                keywords: None,
-            }))
+            .map_or(
+                SetInfo {
+                    description: None,
+                    keywords: None,
+                },
+                |b| b.event.into(),
+            ))
     }
 
     /// Current readme file as discovered from attachments associated with the

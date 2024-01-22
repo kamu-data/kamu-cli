@@ -57,8 +57,7 @@ impl OsoDatasetAuthorizer {
         let creator = dataset_alias
             .account_name
             .as_ref()
-            .map(|a| a.as_str())
-            .unwrap_or(DEFAULT_ACCOUNT_NAME);
+            .map_or(DEFAULT_ACCOUNT_NAME, |a| a.as_str());
 
         // TODO: for now let's treat all datasets as public
         // TODO: explicit read/write permissions

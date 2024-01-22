@@ -129,7 +129,7 @@ impl From<WorkspaceVersion> for u32 {
 impl std::fmt::Display for WorkspaceVersion {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let value: u32 = (*self).into();
-        write!(f, "{}", value)
+        write!(f, "{value}")
     }
 }
 

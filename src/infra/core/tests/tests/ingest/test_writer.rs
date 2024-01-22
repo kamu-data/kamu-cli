@@ -70,12 +70,12 @@ async fn test_data_writer_happy_path() {
     let res = harness
         .write(
             indoc!(
-                r#"
+                r"
                 city,population
                 A,1000
                 B,2000
                 C,3000
-                "#
+                "
             ),
             "city STRING, population BIGINT",
         )
@@ -87,7 +87,7 @@ async fn test_data_writer_happy_path() {
     assert_schema_eq(
         df.schema(),
         indoc!(
-            r#"
+            r"
             message arrow_schema {
               OPTIONAL INT64 offset;
               REQUIRED INT32 op;
@@ -96,14 +96,14 @@ async fn test_data_writer_happy_path() {
               OPTIONAL BYTE_ARRAY city (STRING);
               OPTIONAL INT64 population;
             }
-            "#
+            "
         ),
     );
 
     assert_data_eq(
         df.clone(),
         indoc!(
-            r#"
+            r"
             +--------+----+----------------------+----------------------+------+------------+
             | offset | op | system_time          | event_time           | city | population |
             +--------+----+----------------------+----------------------+------+------------+
@@ -111,7 +111,7 @@ async fn test_data_writer_happy_path() {
             | 1      | 0  | 2010-01-01T12:00:00Z | 2000-01-01T12:00:00Z | B    | 2000       |
             | 2      | 0  | 2010-01-01T12:00:00Z | 2000-01-01T12:00:00Z | C    | 3000       |
             +--------+----+----------------------+----------------------+------+------------+
-            "#
+            "
         ),
     )
     .await;
@@ -138,13 +138,13 @@ async fn test_data_writer_happy_path() {
     let res = harness
         .write(
             indoc!(
-                r#"
+                r"
                 city,population
                 A,1000
                 B,2000
                 C,3000
                 D,4000
-                "#
+                "
             ),
             "city STRING, population BIGINT",
         )
@@ -156,7 +156,7 @@ async fn test_data_writer_happy_path() {
     assert_schema_eq(
         df.schema(),
         indoc!(
-            r#"
+            r"
             message arrow_schema {
               OPTIONAL INT64 offset;
               REQUIRED INT32 op;
@@ -165,20 +165,20 @@ async fn test_data_writer_happy_path() {
               OPTIONAL BYTE_ARRAY city (STRING);
               OPTIONAL INT64 population;
             }
-            "#
+            "
         ),
     );
 
     assert_data_eq(
         df,
         indoc!(
-            r#"
+            r"
             +--------+----+----------------------+----------------------+------+------------+
             | offset | op | system_time          | event_time           | city | population |
             +--------+----+----------------------+----------------------+------+------------+
             | 3      | 0  | 2010-01-02T12:00:00Z | 2000-01-02T12:00:00Z | D    | 4000       |
             +--------+----+----------------------+----------------------+------+------------+
-            "#
+            "
         ),
     )
     .await;
@@ -199,13 +199,13 @@ async fn test_data_writer_happy_path() {
     let res = harness
         .write(
             indoc!(
-                r#"
+                r"
                 city,population
                 A,1000
                 B,2000
                 C,3000
                 D,4000
-                "#
+                "
             ),
             "city STRING, population BIGINT",
         )
@@ -226,13 +226,13 @@ async fn test_data_writer_happy_path() {
     let res = harness
         .write_opts(
             indoc!(
-                r#"
+                r"
                 city,population
                 A,1000
                 B,2000
                 C,3000
                 D,4000
-                "#
+                "
             ),
             "city STRING, population BIGINT",
             Some(source_state.clone()),
@@ -258,12 +258,12 @@ async fn test_data_writer_rejects_incompatible_schema() {
     harness
         .write(
             indoc!(
-                r#"
+                r"
                 city,population
                 A,1000
                 B,2000
                 C,3000
-                "#
+                "
             ),
             "city STRING, population BIGINT",
         )
@@ -275,7 +275,7 @@ async fn test_data_writer_rejects_incompatible_schema() {
     assert_schema_eq(
         df.schema(),
         indoc!(
-            r#"
+            r"
             message arrow_schema {
               OPTIONAL INT64 offset;
               REQUIRED INT32 op;
@@ -284,14 +284,14 @@ async fn test_data_writer_rejects_incompatible_schema() {
               OPTIONAL BYTE_ARRAY city (STRING);
               OPTIONAL INT64 population;
             }
-            "#
+            "
         ),
     );
 
     assert_data_eq(
         df.clone(),
         indoc!(
-            r#"
+            r"
             +--------+----+----------------------+----------------------+------+------------+
             | offset | op | system_time          | event_time           | city | population |
             +--------+----+----------------------+----------------------+------+------------+
@@ -299,7 +299,7 @@ async fn test_data_writer_rejects_incompatible_schema() {
             | 1      | 0  | 2010-01-01T12:00:00Z | 2000-01-01T12:00:00Z | B    | 2000       |
             | 2      | 0  | 2010-01-01T12:00:00Z | 2000-01-01T12:00:00Z | C    | 3000       |
             +--------+----+----------------------+----------------------+------+------------+
-            "#
+            "
         ),
     )
     .await;
@@ -311,10 +311,10 @@ async fn test_data_writer_rejects_incompatible_schema() {
     harness
         .write(
             indoc!(
-                r#"
+                r"
                 city,population
                 D,4000
-                "#
+                "
             ),
             "city STRING, population BIGINT",
         )
@@ -326,7 +326,7 @@ async fn test_data_writer_rejects_incompatible_schema() {
     assert_schema_eq(
         df.schema(),
         indoc!(
-            r#"
+            r"
             message arrow_schema {
               OPTIONAL INT64 offset;
               REQUIRED INT32 op;
@@ -335,20 +335,20 @@ async fn test_data_writer_rejects_incompatible_schema() {
               OPTIONAL BYTE_ARRAY city (STRING);
               OPTIONAL INT64 population;
             }
-            "#
+            "
         ),
     );
 
     assert_data_eq(
         df,
         indoc!(
-            r#"
+            r"
             +--------+----+----------------------+----------------------+------+------------+
             | offset | op | system_time          | event_time           | city | population |
             +--------+----+----------------------+----------------------+------+------------+
             | 3      | 0  | 2010-01-02T12:00:00Z | 2000-01-02T12:00:00Z | D    | 4000       |
             +--------+----+----------------------+----------------------+------+------------+
-            "#
+            "
         ),
     )
     .await;
@@ -360,10 +360,10 @@ async fn test_data_writer_rejects_incompatible_schema() {
     let res = harness
         .write(
             indoc!(
-                r#"
+                r"
                 city,state,population
                 E,X,5000
-                "#
+                "
             ),
             "city STRING, state STRING, population BIGINT",
         )
@@ -377,10 +377,10 @@ async fn test_data_writer_rejects_incompatible_schema() {
     let res = harness
         .write(
             indoc!(
-                r#"
+                r"
                 city,state,population
                 E,X,5000
-                "#
+                "
             ),
             "city STRING, state STRING, population BIGINT",
         )
@@ -392,10 +392,10 @@ async fn test_data_writer_rejects_incompatible_schema() {
     harness
         .write(
             indoc!(
-                r#"
+                r"
                 city,population
                 E,5000
-                "#
+                "
             ),
             "city STRING, population BIGINT",
         )
@@ -407,7 +407,7 @@ async fn test_data_writer_rejects_incompatible_schema() {
     assert_schema_eq(
         df.schema(),
         indoc!(
-            r#"
+            r"
             message arrow_schema {
               OPTIONAL INT64 offset;
               REQUIRED INT32 op;
@@ -416,20 +416,20 @@ async fn test_data_writer_rejects_incompatible_schema() {
               OPTIONAL BYTE_ARRAY city (STRING);
               OPTIONAL INT64 population;
             }
-            "#
+            "
         ),
     );
 
     assert_data_eq(
         df,
         indoc!(
-            r#"
+            r"
             +--------+----+----------------------+----------------------+------+------------+
             | offset | op | system_time          | event_time           | city | population |
             +--------+----+----------------------+----------------------+------+------------+
             | 4      | 0  | 2010-01-03T12:00:00Z | 2000-01-03T12:00:00Z | E    | 5000       |
             +--------+----+----------------------+----------------------+------+------------+
-            "#
+            "
         ),
     )
     .await;
@@ -449,12 +449,12 @@ async fn test_data_writer_ledger_orders_by_event_time() {
     let res = harness
         .write(
             indoc!(
-                r#"
+                r"
                 event_time,city,population
                 2021-01-01,A,1000
                 2023-01-01,B,2000
                 2022-01-01,C,3000
-                "#
+                "
             ),
             "event_time DATE, city STRING, population BIGINT",
         )
@@ -466,7 +466,7 @@ async fn test_data_writer_ledger_orders_by_event_time() {
     assert_schema_eq(
         df.schema(),
         indoc!(
-            r#"
+            r"
             message arrow_schema {
               OPTIONAL INT64 offset;
               REQUIRED INT32 op;
@@ -475,14 +475,14 @@ async fn test_data_writer_ledger_orders_by_event_time() {
               OPTIONAL BYTE_ARRAY city (STRING);
               OPTIONAL INT64 population;
             }
-            "#
+            "
         ),
     );
 
     assert_data_eq(
         df,
         indoc!(
-            r#"
+            r"
             +--------+----+----------------------+------------+------+------------+
             | offset | op | system_time          | event_time | city | population |
             +--------+----+----------------------+------------+------+------------+
@@ -490,7 +490,7 @@ async fn test_data_writer_ledger_orders_by_event_time() {
             | 1      | 0  | 2010-01-01T12:00:00Z | 2022-01-01 | C    | 3000       |
             | 2      | 0  | 2010-01-01T12:00:00Z | 2023-01-01 | B    | 2000       |
             +--------+----+----------------------+------------+------+------------+
-            "#
+            "
         ),
     )
     .await;
@@ -522,13 +522,13 @@ async fn test_data_writer_snapshot_orders_by_pk_and_operation_type() {
     let res = harness
         .write(
             indoc!(
-                r#"
+                r"
                 city,population
                 C,3000
                 A,1000
                 D,4000
                 B,2000
-                "#
+                "
             ),
             "city STRING, population BIGINT",
         )
@@ -540,7 +540,7 @@ async fn test_data_writer_snapshot_orders_by_pk_and_operation_type() {
     assert_schema_eq(
         df.schema(),
         indoc!(
-            r#"
+            r"
             message arrow_schema {
               OPTIONAL INT64 offset;
               REQUIRED INT32 op;
@@ -549,14 +549,14 @@ async fn test_data_writer_snapshot_orders_by_pk_and_operation_type() {
               OPTIONAL BYTE_ARRAY city (STRING);
               OPTIONAL INT64 population;
             }
-            "#
+            "
         ),
     );
 
     assert_data_eq(
         df,
         indoc!(
-            r#"
+            r"
             +--------+----+----------------------+----------------------+------+------------+
             | offset | op | system_time          | event_time           | city | population |
             +--------+----+----------------------+----------------------+------+------------+
@@ -565,7 +565,7 @@ async fn test_data_writer_snapshot_orders_by_pk_and_operation_type() {
             | 2      | 0  | 2010-01-01T12:00:00Z | 2000-01-01T12:00:00Z | C    | 3000       |
             | 3      | 0  | 2010-01-01T12:00:00Z | 2000-01-01T12:00:00Z | D    | 4000       |
             +--------+----+----------------------+----------------------+------+------------+
-            "#
+            "
         ),
     )
     .await;
@@ -586,12 +586,12 @@ async fn test_data_writer_snapshot_orders_by_pk_and_operation_type() {
     let res = harness
         .write(
             indoc!(
-                r#"
+                r"
                 city,population
                 C,3000
                 B,4000
                 D,5000
-                "#
+                "
             ),
             "city STRING, population BIGINT",
         )
@@ -603,7 +603,7 @@ async fn test_data_writer_snapshot_orders_by_pk_and_operation_type() {
     assert_schema_eq(
         df.schema(),
         indoc!(
-            r#"
+            r"
             message arrow_schema {
               OPTIONAL INT64 offset;
               REQUIRED INT32 op;
@@ -612,14 +612,14 @@ async fn test_data_writer_snapshot_orders_by_pk_and_operation_type() {
               OPTIONAL BYTE_ARRAY city (STRING);
               OPTIONAL INT64 population;
             }
-            "#
+            "
         ),
     );
 
     assert_data_eq(
         df,
         indoc!(
-            r#"
+            r"
             +--------+----+----------------------+----------------------+------+------------+
             | offset | op | system_time          | event_time           | city | population |
             +--------+----+----------------------+----------------------+------+------------+
@@ -629,7 +629,7 @@ async fn test_data_writer_snapshot_orders_by_pk_and_operation_type() {
             | 7      | 2  | 2010-01-02T12:00:00Z | 2000-01-01T12:00:00Z | D    | 4000       |
             | 8      | 3  | 2010-01-02T12:00:00Z | 2000-01-02T12:00:00Z | D    | 5000       |
             +--------+----+----------------------+----------------------+------+------------+
-            "#
+            "
         ),
     )
     .await;
@@ -660,12 +660,12 @@ async fn test_data_writer_normalizes_timestamps_to_utc_millis() {
     harness
         .write(
             indoc!(
-                r#"
+                r"
                 event_time,city,population
                 2000-01-01,A,1000
                 2000-01-01,B,2000
                 2000-01-01,C,3000
-                "#
+                "
             ),
             "event_time TIMESTAMP, city STRING, population BIGINT",
         )
@@ -677,7 +677,7 @@ async fn test_data_writer_normalizes_timestamps_to_utc_millis() {
     assert_schema_eq(
         df.schema(),
         indoc!(
-            r#"
+            r"
             message arrow_schema {
               OPTIONAL INT64 offset;
               REQUIRED INT32 op;
@@ -686,14 +686,14 @@ async fn test_data_writer_normalizes_timestamps_to_utc_millis() {
               OPTIONAL BYTE_ARRAY city (STRING);
               OPTIONAL INT64 population;
             }
-            "#
+            "
         ),
     );
 
     assert_data_eq(
         df,
         indoc!(
-            r#"
+            r"
             +--------+----+----------------------+----------------------+------+------------+
             | offset | op | system_time          | event_time           | city | population |
             +--------+----+----------------------+----------------------+------+------------+
@@ -701,7 +701,7 @@ async fn test_data_writer_normalizes_timestamps_to_utc_millis() {
             | 1      | 0  | 2010-01-01T12:00:00Z | 2000-01-01T00:00:00Z | B    | 2000       |
             | 2      | 0  | 2010-01-01T12:00:00Z | 2000-01-01T00:00:00Z | C    | 3000       |
             +--------+----+----------------------+----------------------+------+------------+
-            "#
+            "
         ),
     )
     .await;
@@ -726,12 +726,12 @@ async fn test_data_writer_optimal_parquet_encoding() {
     harness
         .write(
             indoc!(
-                r#"
+                r"
                 event_time,city,population
                 2020-01-01,A,1000
                 2020-01-01,B,2000
                 2020-01-01,C,3000
-                "#
+                "
             ),
             "event_time TIMESTAMP, city STRING, population BIGINT",
         )

@@ -106,7 +106,7 @@ impl VerificationProgress {
         block: Option<&Multihash>,
     ) -> String {
         let step_str = if out_of != 0 {
-            format!("[{}/{}]", step, out_of)
+            format!("[{step}/{out_of}]")
         } else {
             "[-/-]".to_string()
         };
@@ -147,7 +147,7 @@ impl VerificationProgress {
 impl VerificationListener for VerificationProgress {
     fn begin(&self) {
         self.curr_progress
-            .set_message(self.spinner_message(0, 0, "Verifying dataset", None))
+            .set_message(self.spinner_message(0, 0, "Verifying dataset", None));
     }
 
     fn success(&self, result: &VerificationResult) {
@@ -159,7 +159,7 @@ impl VerificationListener for VerificationProgress {
                     s.num_blocks,
                     console::style("Dataset is valid".to_owned()).green(),
                     None,
-                ))
+                ));
             }
         }
     }
@@ -210,7 +210,7 @@ impl VerificationListener for VerificationProgress {
                     num_blocks,
                     "Verifying data integrity",
                     Some(block_hash),
-                ))
+                ));
             }
             VerificationPhase::ReplayTransform => {
                 self.curr_progress.set_message(self.spinner_message(
@@ -218,7 +218,7 @@ impl VerificationListener for VerificationProgress {
                     num_blocks,
                     "Replaying transformation",
                     Some(block_hash),
-                ))
+                ));
             }
         }
     }
@@ -251,9 +251,9 @@ impl EngineProvisioningListener for VerificationProgress {
         self.curr_progress.set_message(self.spinner_message(
             s.block_index + 1,
             s.num_blocks,
-            format!("Waiting for engine {}", engine_id),
+            format!("Waiting for engine {engine_id}"),
             s.block_hash.as_ref(),
-        ))
+        ));
     }
 
     fn success(&self) {
@@ -263,7 +263,7 @@ impl EngineProvisioningListener for VerificationProgress {
             s.num_blocks,
             "Replaying transformation",
             s.block_hash.as_ref(),
-        ))
+        ));
     }
 
     fn get_pull_image_listener(self: Arc<Self>) -> Option<Arc<dyn PullImageListener>> {
@@ -277,9 +277,9 @@ impl PullImageListener for VerificationProgress {
         self.curr_progress.set_message(self.spinner_message(
             s.block_index + 1,
             s.num_blocks,
-            format!("Pulling engine image {}", image),
+            format!("Pulling engine image {image}"),
             s.block_hash.as_ref(),
-        ))
+        ));
     }
 
     fn success(&self) {
@@ -289,7 +289,7 @@ impl PullImageListener for VerificationProgress {
             s.num_blocks,
             "Replaying transformation",
             s.block_hash.as_ref(),
-        ))
+        ));
     }
 }
 

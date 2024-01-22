@@ -43,16 +43,16 @@ async fn test_read_shapefile_with_schema() {
             std::fs::copy("tests/data/ukraine.zip", path).unwrap();
         },
         indoc!(
-            r#"
+            r"
             message arrow_schema {
               REQUIRED BYTE_ARRAY iso (STRING);
               REQUIRED BYTE_ARRAY name_0 (STRING);
               REQUIRED BYTE_ARRAY name_1 (STRING);
             }
-            "#
+            "
         ),
         indoc!(
-            r#"
+            r"
             +-----+---------+------------------+
             | iso | name_0  | name_1           |
             +-----+---------+------------------+
@@ -84,7 +84,7 @@ async fn test_read_shapefile_with_schema() {
             | UKR | Ukraine | Zaporizhzhya     |
             | UKR | Ukraine | Zhytomyr         |
             +-----+---------+------------------+
-            "#
+            "
         ),
     )
     .await;
@@ -116,7 +116,7 @@ async fn test_read_shapefile_infer_schema() {
             kamu_data_utils::testing::assert_schema_eq(
                 df.schema(),
                 indoc!(
-                    r#"
+                    r"
                     message arrow_schema {
                       OPTIONAL INT32 cca_1 (UNKNOWN);
                       OPTIONAL DOUBLE ccn_1;
@@ -132,7 +132,7 @@ async fn test_read_shapefile_infer_schema() {
                       OPTIONAL BYTE_ARRAY type_1 (STRING);
                       OPTIONAL BYTE_ARRAY varname_1 (STRING);
                     }
-                    "#
+                    "
                 ),
             );
         },

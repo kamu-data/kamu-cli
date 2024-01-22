@@ -58,7 +58,7 @@ impl DatasetMut {
             .rename_dataset(&self.dataset_handle.as_local_ref(), &new_name)
             .await
         {
-            Ok(_) => Ok(RenameResult::Success(RenameResultSuccess {
+            Ok(()) => Ok(RenameResult::Success(RenameResultSuccess {
                 old_name: self.dataset_handle.alias.dataset_name.clone().into(),
                 new_name,
             })),
@@ -85,7 +85,7 @@ impl DatasetMut {
             .delete_dataset(&self.dataset_handle.as_local_ref())
             .await
         {
-            Ok(_) => Ok(DeleteResult::Success(DeleteResultSuccess {
+            Ok(()) => Ok(DeleteResult::Success(DeleteResultSuccess {
                 deleted_dataset: self.dataset_handle.alias.clone().into(),
             })),
             Err(DeleteDatasetError::DanglingReference(e)) => Ok(DeleteResult::DanglingReference(

@@ -45,14 +45,14 @@ async fn test_read_geojson_with_schema() {
             "#
         ),
         indoc!(
-            r#"
+            r"
             message arrow_schema {
               REQUIRED INT32 id;
               REQUIRED BYTE_ARRAY zipcode (STRING);
               REQUIRED BYTE_ARRAY name (STRING);
               REQUIRED BYTE_ARRAY geometry (STRING);
             }
-            "#
+            "
         ),
         indoc!(
             r#"
@@ -94,14 +94,14 @@ async fn test_read_geojson_infer_schema() {
             "#
         ),
         indoc!(
-            r#"
+            r"
             message arrow_schema {
               OPTIONAL BYTE_ARRAY geometry (STRING);
               OPTIONAL INT64 id;
               OPTIONAL BYTE_ARRAY name (STRING);
               OPTIONAL BYTE_ARRAY zipcode (STRING);
             }
-            "#
+            "
         ),
         indoc!(
             r#"

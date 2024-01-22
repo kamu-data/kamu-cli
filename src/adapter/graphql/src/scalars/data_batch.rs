@@ -29,7 +29,7 @@ impl DataBatch {
         DataBatch {
             format,
             content: match format {
-                DataBatchFormat::Csv => String::from(""),
+                DataBatchFormat::Csv => String::new(),
                 DataBatchFormat::Json | DataBatchFormat::JsonLD | DataBatchFormat::JsonSOA => {
                     String::from("{}")
                 }

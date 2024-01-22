@@ -74,7 +74,7 @@ impl LoginService {
         let addr = SocketAddr::from((IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 0));
 
         let bound_addr = hyper::server::conn::AddrIncoming::bind(&addr).unwrap_or_else(|e| {
-            panic!("error binding to {}: {}", addr, e);
+            panic!("error binding to {addr}: {e}");
         });
 
         let redirect_url = format!(
@@ -117,7 +117,7 @@ impl LoginService {
                 tracing::info!(?maybe_login_response, "Shutting down web server, as obtained callback response");
                 Ok(maybe_login_response)
             }
-            _ = ctrlc_rx.notified() => {
+            () = ctrlc_rx.notified() => {
                 tracing::info!("Shutting down web server, as Ctrl+C pressed");
                 Ok(None)
             }

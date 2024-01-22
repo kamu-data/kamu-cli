@@ -30,7 +30,7 @@ pub async fn test_reader_success_textual<R: Reader>(
         expected_schema,
         expected_data,
     )
-    .await
+    .await;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -47,7 +47,7 @@ where
         },
         check_result,
     )
-    .await
+    .await;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

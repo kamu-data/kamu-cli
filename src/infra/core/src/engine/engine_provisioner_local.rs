@@ -201,7 +201,7 @@ impl EngineProvisioner for EngineProvisionerLocal {
                 self.datafusion_engine.clone(),
                 &self.config.datafusion_image,
             )),
-            _ => Err(format!("Unsupported engine {}", engine_id).int_err()),
+            _ => Err(format!("Unsupported engine {engine_id}").int_err()),
         }?;
 
         self.ensure_image(image, listener.clone()).await?;

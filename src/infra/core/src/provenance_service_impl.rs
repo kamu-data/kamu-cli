@@ -67,7 +67,7 @@ impl ProvenanceServiceImpl {
                     // TODO: This likely needs to be changed into query alias
                     name: handle.alias.dataset_name.clone(),
                     handle,
-                })
+                });
             }
 
             let dataset_info = NodeInfo::Local {

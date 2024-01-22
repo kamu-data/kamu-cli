@@ -701,7 +701,7 @@ impl DatasetMultiTenantStorageStrategy {
                 let dataset_file_name = String::from(dataset_dir_entry.file_name().to_str().unwrap());
 
                 let dataset_id =
-                    DatasetID::from_did_str(format!("did:odf:{}", dataset_file_name).as_str())
+                    DatasetID::from_did_str(format!("did:odf:{dataset_file_name}").as_str())
                         .int_err()?;
 
                 let dataset_path = dataset_dir_entry.path();
@@ -801,7 +801,7 @@ impl DatasetStorageStrategy for DatasetMultiTenantStorageStrategy {
                     String::from(dataset_dir_entry.file_name().to_str().unwrap());
 
                 let dataset_id =
-                    DatasetID::from_did_str(format!("did:odf:{}", dataset_file_name).as_str())
+                    DatasetID::from_did_str(format!("did:odf:{dataset_file_name}").as_str())
                         .int_err()?;
 
                 let dataset_path = dataset_dir_entry.path();

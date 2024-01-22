@@ -56,7 +56,7 @@ async fn test_task_get_non_existing() {
             .data(cat),
         )
         .await;
-    assert!(res.is_ok(), "{:?}", res);
+    assert!(res.is_ok(), "{res:?}");
     assert_eq!(
         res.data,
         value!({
@@ -113,7 +113,7 @@ async fn test_task_get_existing() {
             .data(cat),
         )
         .await;
-    assert!(res.is_ok(), "{:?}", res);
+    assert!(res.is_ok(), "{res:?}");
     assert_eq!(
         res.data,
         value!({
@@ -167,7 +167,7 @@ async fn test_task_list_by_dataset() {
             async_graphql::Request::new(format!(
                 r#"{{
                     tasks {{
-                        listTasksByDataset (datasetId: "{}") {{
+                        listTasksByDataset (datasetId: "{dataset_id}") {{
                             nodes {{
                                 taskId
                                 status
@@ -182,12 +182,11 @@ async fn test_task_list_by_dataset() {
                         }}
                     }}
                 }}"#,
-                dataset_id,
             ))
             .data(cat),
         )
         .await;
-    assert!(res.is_ok(), "{:?}", res);
+    assert!(res.is_ok(), "{res:?}");
     assert_eq!(
         res.data,
         value!({
@@ -248,13 +247,12 @@ async fn test_task_create_update_dataset() {
         r#"
         mutation {{
             tasks {{
-                createUpdateDatasetTask (datasetId: "{}") {{
+                createUpdateDatasetTask (datasetId: "{dataset_id}") {{
                     taskId
                 }}
             }}
         }}
         "#,
-        dataset_id,
     );
 
     let res = schema
@@ -265,7 +263,7 @@ async fn test_task_create_update_dataset() {
     let res = schema
         .execute(async_graphql::Request::new(request_code).data(cat_authorized))
         .await;
-    assert!(res.is_ok(), "{:?}", res);
+    assert!(res.is_ok(), "{res:?}");
     assert_eq!(
         res.data,
         value!({
@@ -315,12 +313,11 @@ async fn test_task_create_probe() {
     let request_code = format!(
         r#"mutation {{
                 tasks {{
-                    createProbeTask (datasetId: "{}", busyTimeMs: 500, endWithOutcome: FAILED) {{
+                    createProbeTask (datasetId: "{dataset_id}", busyTimeMs: 500, endWithOutcome: FAILED) {{
                         taskId
                     }}
                 }}
-            }}"#,
-        dataset_id
+            }}"#
     );
 
     let schema = kamu_adapter_graphql::schema_quiet();
@@ -333,7 +330,7 @@ async fn test_task_create_probe() {
     let res = schema
         .execute(async_graphql::Request::new(request_code).data(cat_authorized))
         .await;
-    assert!(res.is_ok(), "{:?}", res);
+    assert!(res.is_ok(), "{res:?}");
     assert_eq!(
         res.data,
         value!({

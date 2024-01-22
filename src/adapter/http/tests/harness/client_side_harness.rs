@@ -215,7 +215,7 @@ impl ClientSideHarness {
         match &(results.first().unwrap().result) {
             Ok(sync_result) => sync_result.clone(),
             Err(e) => {
-                println!("Error: {:#?}", e);
+                println!("Error: {e:#?}");
                 panic!("Failure")
             }
         }

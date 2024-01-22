@@ -39,19 +39,18 @@ async fn test_account_by_name() {
                 r#"
                 query {{
                     accounts {{
-                        byName (name: "{}") {{
+                        byName (name: "{DEFAULT_ACCOUNT_NAME}") {{
                             accountName
                         }}
                     }}
                 }}
                 "#,
-                DEFAULT_ACCOUNT_NAME,
             ))
             .data(cat.clone()),
         )
         .await;
 
-    assert!(res.is_ok(), "{:?}", res);
+    assert!(res.is_ok(), "{res:?}");
     assert_eq!(
         res.data,
         value!({
@@ -81,7 +80,7 @@ async fn test_account_by_name() {
         )
         .await;
 
-    assert!(res.is_ok(), "{:?}", res);
+    assert!(res.is_ok(), "{res:?}");
     assert_eq!(
         res.data,
         value!({

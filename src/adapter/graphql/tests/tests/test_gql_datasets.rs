@@ -37,7 +37,7 @@ async fn dataset_by_id_does_not_exist() {
             "#
         ))
         .await;
-    assert!(res.is_ok(), "{:?}", res);
+    assert!(res.is_ok(), "{res:?}");
     assert_eq!(
         res.data,
         value!({
@@ -77,7 +77,7 @@ async fn dataset_by_id() {
             ),
         )
         .await;
-    assert!(res.is_ok(), "{:?}", res);
+    assert!(res.is_ok(), "{res:?}");
     assert_eq!(
         res.data,
         value!({
@@ -116,7 +116,7 @@ async fn dataset_create_empty() {
     expect_anonymous_access_error(harness.execute_anonymous_query(request_code).await);
 
     let res = harness.execute_authorized_query(request_code).await;
-    assert!(res.is_ok(), "{:?}", res);
+    assert!(res.is_ok(), "{res:?}");
     assert_eq!(
         res.data,
         value!({
@@ -172,7 +172,7 @@ async fn dataset_create_from_snapshot() {
     expect_anonymous_access_error(harness.execute_anonymous_query(request_code.clone()).await);
 
     let res = harness.execute_authorized_query(request_code).await;
-    assert!(res.is_ok(), "{:?}", res);
+    assert!(res.is_ok(), "{res:?}");
     assert_eq!(
         res.data,
         value!({
@@ -209,7 +209,7 @@ async fn dataset_create_from_snapshot_malformed() {
         "#
         ))
         .await;
-    assert!(res.is_ok(), "{:?}", res);
+    assert!(res.is_ok(), "{res:?}");
     assert_eq!(
         res.data,
         value!({
@@ -256,7 +256,7 @@ async fn dataset_rename_success() {
     expect_anonymous_access_error(harness.execute_anonymous_query(request_code.clone()).await);
 
     let res = harness.execute_authorized_query(request_code).await;
-    assert!(res.is_ok(), "{:?}", res);
+    assert!(res.is_ok(), "{res:?}");
     assert_eq!(
         res.data,
         value!({
@@ -307,7 +307,7 @@ async fn dataset_rename_no_changes() {
             .replace("<newName>", "foo"),
         )
         .await;
-    assert!(res.is_ok(), "{:?}", res);
+    assert!(res.is_ok(), "{res:?}");
     assert_eq!(
         res.data,
         value!({
@@ -360,7 +360,7 @@ async fn dataset_rename_name_collision() {
             .replace("<newName>", "bar"),
         )
         .await;
-    assert!(res.is_ok(), "{:?}", res);
+    assert!(res.is_ok(), "{res:?}");
     assert_eq!(
         res.data,
         value!({
@@ -410,7 +410,7 @@ async fn dataset_delete_success() {
     expect_anonymous_access_error(harness.execute_anonymous_query(request_code.clone()).await);
 
     let res = harness.execute_authorized_query(request_code).await;
-    assert!(res.is_ok(), "{:?}", res);
+    assert!(res.is_ok(), "{res:?}");
     assert_eq!(
         res.data,
         value!({
@@ -467,7 +467,7 @@ async fn dataset_delete_dangling_ref() {
             .replace("<id>", &foo_result.dataset_handle.id.to_string()),
         )
         .await;
-    assert!(res.is_ok(), "{:?}", res);
+    assert!(res.is_ok(), "{res:?}");
     assert_eq!(
         res.data,
         value!({
@@ -515,7 +515,7 @@ async fn dataset_view_permissions() {
     .replace("<id>", &foo_result.dataset_handle.id.to_string());
 
     let res = harness.execute_authorized_query(request_code).await;
-    assert!(res.is_ok(), "{:?}", res);
+    assert!(res.is_ok(), "{res:?}");
     assert_eq!(
         res.data,
         value!({

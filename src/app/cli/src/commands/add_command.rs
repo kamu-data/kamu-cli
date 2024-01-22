@@ -49,7 +49,7 @@ impl AddCommand {
         let mut res = Vec::new();
         for r in &self.snapshot_refs {
             let load = self.resource_loader.load_dataset_snapshot_from_ref(r).await;
-            res.push((r.clone(), load))
+            res.push((r.clone(), load));
         }
         res
     }
@@ -75,7 +75,7 @@ impl AddCommand {
                 .resource_loader
                 .load_dataset_snapshot_from_path(&path)
                 .await;
-            res.push((path.to_str().unwrap().to_owned(), load))
+            res.push((path.to_str().unwrap().to_owned(), load));
         }
         res
     }
@@ -87,7 +87,7 @@ impl AddCommand {
             Ok(v) => v
                 .into_iter()
                 .enumerate()
-                .map(|(i, ds)| (format!("STDIN[{}]", i), Ok(ds)))
+                .map(|(i, ds)| (format!("STDIN[{i}]"), Ok(ds)))
                 .collect(),
             Err(e) => vec![("STDIN".to_string(), Err(ResourceError::serde(e)))],
         }
@@ -154,7 +154,7 @@ impl Command for AddCommand {
                 "Failed to load manifests",
                 errors
                     .into_iter()
-                    .map(|(p, r)| (r.unwrap_err(), format!("Failed to load from {}", p))),
+                    .map(|(p, r)| (r.unwrap_err(), format!("Failed to load from {p}"))),
             )
             .into());
         }
@@ -222,7 +222,7 @@ impl Command for AddCommand {
                     );
                 }
                 Err(err) => {
-                    errors_with_contexts.push((err, format!("Failed to add dataset {}", id)));
+                    errors_with_contexts.push((err, format!("Failed to add dataset {id}")));
                 }
             }
         }
@@ -230,7 +230,7 @@ impl Command for AddCommand {
         if errors_with_contexts.is_empty() {
             eprintln!(
                 "{}",
-                console::style(format!("Added {} dataset(s)", num_added))
+                console::style(format!("Added {num_added} dataset(s)"))
                     .green()
                     .bold()
             );

@@ -196,7 +196,7 @@ impl std::fmt::Display for InvalidQueryError {
 
         if !self.log_files.is_empty() {
             write!(f, "\nSee log files for details:\n")?;
-            for path in self.log_files.iter() {
+            for path in &self.log_files {
                 writeln!(f, "- {}", path.display())?;
             }
         }
@@ -229,13 +229,13 @@ impl std::fmt::Display for ProcessError {
         write!(f, "Process error: ")?;
 
         match self.exit_code {
-            Some(c) => write!(f, "Process exited with code {}", c)?,
+            Some(c) => write!(f, "Process exited with code {c}")?,
             None => write!(f, "Process terminated by a signal")?,
         }
 
         if !self.log_files.is_empty() {
             writeln!(f, ", see log files for details:")?;
-            for path in self.log_files.iter() {
+            for path in &self.log_files {
                 writeln!(f, "- {}", path.display())?;
             }
         }
@@ -259,7 +259,7 @@ impl std::fmt::Display for ContractError {
 
         if !self.log_files.is_empty() {
             writeln!(f, ", see log files for details:")?;
-            for path in self.log_files.iter() {
+            for path in &self.log_files {
                 writeln!(f, "- {}", path.display())?;
             }
         }
@@ -281,7 +281,7 @@ impl std::fmt::Display for InternalEngineError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if !self.log_files.is_empty() {
             write!(f, "Internal engine error, see log files for details:")?;
-            for path in self.log_files.iter() {
+            for path in &self.log_files {
                 write!(f, "\n- {}", path.display())?;
             }
         }

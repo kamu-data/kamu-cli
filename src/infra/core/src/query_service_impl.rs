@@ -415,7 +415,7 @@ impl KamuSchema {
                     .is_ok()
                     && self.has_data(&hdl).await.unwrap()
                 {
-                    res.push(hdl.alias.to_string())
+                    res.push(hdl.alias.to_string());
                 }
             }
 
@@ -502,7 +502,7 @@ impl SchemaProvider for KamuSchema {
             .check_action_allowed(&dataset_handle, auth::DatasetAction::Read)
             .await
         {
-            Ok(_) => {}
+            Ok(()) => {}
             Err(_) => return None,
         }
 

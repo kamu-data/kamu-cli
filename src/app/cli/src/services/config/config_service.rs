@@ -64,7 +64,7 @@ impl ConfigService {
         loop {
             let conf = current.join(CONFIG_FILENAME);
             if conf.exists() {
-                to_load.push(conf)
+                to_load.push(conf);
             }
             if let Some(parent) = current.parent() {
                 current = parent;
@@ -109,7 +109,7 @@ impl ConfigService {
     pub fn get(&self, key: &str, scope: ConfigScope, with_defaults: bool) -> Option<String> {
         let mut config = self.load(scope);
         if with_defaults {
-            config.merge(CLIConfig::default())
+            config.merge(CLIConfig::default());
         }
         let config_raw = self.to_raw(config);
 
@@ -142,7 +142,7 @@ impl ConfigService {
             }
             write!(buffer, "{sub_key}:").unwrap();
         }
-        write!(buffer, " {}", value).unwrap();
+        write!(buffer, " {value}").unwrap();
 
         let mut delta: CLIConfig =
             serde_yaml::from_str(&buffer).map_err(|e| CLIError::usage_error(e.to_string()))?;
@@ -163,7 +163,7 @@ impl ConfigService {
 
         let config_path = self.path_for_scope(scope);
         if !config_path.exists() {
-            return Err(CLIError::usage_error(format!("Key {} not found", key)));
+            return Err(CLIError::usage_error(format!("Key {key} not found")));
         }
 
         let config = self.load_from(&config_path);
@@ -189,7 +189,7 @@ impl ConfigService {
 
             Ok(())
         } else {
-            Err(CLIError::usage_error(format!("Key {} not found", key)))
+            Err(CLIError::usage_error(format!("Key {key} not found")))
         }
     }
 
@@ -217,7 +217,7 @@ impl ConfigService {
     pub fn list(&self, scope: ConfigScope, with_defaults: bool) -> String {
         let mut config = self.load(scope);
         if with_defaults {
-            config.merge(CLIConfig::default())
+            config.merge(CLIConfig::default());
         }
         serde_yaml::to_string(&config).unwrap()
     }
@@ -238,7 +238,7 @@ impl ConfigService {
         fun: &mut impl FnMut(String),
     ) {
         if let Some(mapping) = value.as_mapping() {
-            for (k, v) in mapping.iter() {
+            for (k, v) in mapping {
                 if let Some(key) = k.as_str() {
                     let mut full_key = String::with_capacity(prefix.len() + key.len());
                     full_key.push_str(prefix);

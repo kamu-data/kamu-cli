@@ -71,7 +71,7 @@ impl PartialEq for (dyn BorrowedFlowKeyDatasetHelper + '_) {
 
 impl<'a> Hash for (dyn BorrowedFlowKeyDatasetHelper + 'a) {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.borrowed_key().hash(state)
+        self.borrowed_key().hash(state);
     }
 }
 

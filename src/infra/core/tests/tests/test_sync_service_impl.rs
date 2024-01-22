@@ -466,7 +466,7 @@ async fn test_sync_to_from_ipfs() {
     let ipfs_daemon = IpfsDaemon::new().await;
     let ipfs_client = ipfs_daemon.client();
     let key_id = ipfs_client.key_gen("test").await.unwrap();
-    let ipns_url = Url::from_str(&format!("ipns://{}", key_id)).unwrap();
+    let ipns_url = Url::from_str(&format!("ipns://{key_id}")).unwrap();
 
     do_test_sync(
         tmp_workspace_dir.path(),

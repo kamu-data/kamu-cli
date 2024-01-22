@@ -32,8 +32,8 @@ use kamu::domain::*;
 /// }
 /// ````
 ///
-/// A conversion between the domain error and [ApiError] has to exist. We on
-/// purpose avoid [From] and [Into] traits and using [IntoApiError] instead as
+/// A conversion between the domain error and [`ApiError`] has to exist. We on
+/// purpose avoid [From] and [Into] traits and using [`IntoApiError`] instead as
 /// we want this conversion to be explicit - it's too easy to put a questionmark
 /// operator on a fallible operation without thinking what it will actually do.
 ///
@@ -41,10 +41,10 @@ use kamu::domain::*;
 /// an absence of a dataset in one handler should lead to `404 Not Found`, while
 /// in the other it can be `400 Bad Request` at first and then treated as `500
 /// Internal Server Error` later. This is why it's not advisable to provide
-/// direct conversion via [IntoApiError], but rather by implementing the
-/// [ApiErrorCategorizable] trait instead. This trait only deals with high-level
-/// categories of errors like [AccessError] while mapping all other errors to
-/// `500 Internal Server Error` response.
+/// direct conversion via [`IntoApiError`], but rather by implementing the
+/// [`ApiErrorCategorizable`] trait instead. This trait only deals with
+/// high-level categories of errors like [`AccessError`] while mapping all other
+/// errors to `500 Internal Server Error` response.
 ///
 /// When you need to return different status codes you can still take advantage
 /// of uniform error handling using this pattern:
@@ -129,9 +129,9 @@ impl axum::response::IntoResponse for ApiError {
 
 /////////////////////////////////////////////////////////////////////////////////
 
-/// Provides explicit conversion into [ApiError].
+/// Provides explicit conversion into [`ApiError`].
 ///
-/// See also [ApiErrorCategorizable].
+/// See also [`ApiErrorCategorizable`].
 pub trait IntoApiError {
     fn api_err(self) -> ApiError;
 }
@@ -163,8 +163,8 @@ enum ApiErrorCategory<'a> {
     Other,
 }
 
-/// Categorizes an error into a certain group. As explained in [ApiError] docs -
-/// these categories are very general in order to be applicable regardless of
+/// Categorizes an error into a certain group. As explained in [`ApiError`] docs
+/// - these categories are very general in order to be applicable regardless of
 /// context.
 trait ApiErrorCategorizable {
     fn categorize(&self) -> ApiErrorCategory<'_>;

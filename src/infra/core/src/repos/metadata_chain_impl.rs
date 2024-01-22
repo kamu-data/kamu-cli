@@ -193,7 +193,7 @@ where
                 while let Some((_, block)) = blocks.try_next().await.int_err()? {
                     match block.event {
                         MetadataEvent::SetDataSchema(e) if prev_schema.is_none() => {
-                            prev_schema = Some(e)
+                            prev_schema = Some(e);
                         }
                         MetadataEvent::AddData(e) => {
                             if prev_add_data.is_none() {
@@ -276,7 +276,7 @@ where
                 while let Some((_, block)) = blocks.try_next().await.int_err()? {
                     match block.event {
                         MetadataEvent::SetDataSchema(e) if prev_schema.is_none() => {
-                            prev_schema = Some(e)
+                            prev_schema = Some(e);
                         }
                         MetadataEvent::SetTransform(e) if prev_transform.is_none() => {
                             prev_transform = Some(e);
@@ -581,7 +581,7 @@ where
 
             // Validate internal offset consistency
             if let Some(new_data) = e.new_data {
-                let expected_start_offset = e.prev_offset.map(|v| v + 1).unwrap_or(0);
+                let expected_start_offset = e.prev_offset.map_or(0, |v| v + 1);
                 if new_data.offset_interval.start != expected_start_offset {
                     return Err(AppendValidationError::OffsetsAreNotSequential(
                         OffsetsNotSequentialError::new(

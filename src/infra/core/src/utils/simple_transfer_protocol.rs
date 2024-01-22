@@ -426,7 +426,7 @@ impl SimpleTransferProtocol {
                         listener.clone(),
                         arc_stats.clone(),
                     ))
-                        as Pin<Box<dyn Future<Output = Result<(), SyncError>> + Send>>)
+                        as Pin<Box<dyn Future<Output = Result<(), SyncError>> + Send>>);
                 }
                 if let Some(checkpoint) = block_stream.event.new_checkpoint {
                     block_download_tasks.push(Box::pin(self.download_block_checkpoint(
@@ -436,7 +436,7 @@ impl SimpleTransferProtocol {
                         trust_source_hashes,
                         listener.clone(),
                         arc_stats.clone(),
-                    )))
+                    )));
                 }
             }
         });
@@ -489,8 +489,8 @@ impl SimpleTransferProtocol {
                 }
                 Err(AppendError::InvalidBlock(e)) => Err(CorruptedSourceError {
                     message: format!(
-                        "Source metadata chain is logically inconsistent at block {}[{}]",
-                        hash, sequence_number
+                        "Source metadata chain is logically inconsistent at block \
+                         {hash}[{sequence_number}]"
                     ),
                     source: Some(e.into()),
                 }

@@ -29,8 +29,8 @@ use internal_error::InternalError;
 ///   - must include operation type and event time columns
 ///   - event time column may still contain null values if input did not have
 ///     this column
-/// - Sort order after [MergeStrategy::merge] is arbitrary and must be restored
-///   using [MergeStrategy::sort_order] at the end of processing
+/// - Sort order after [`MergeStrategy::merge`] is arbitrary and must be
+///   restored using [`MergeStrategy::sort_order`] at the end of processing
 pub trait MergeStrategy: Send + Sync {
     /// Reduces newly seen data `new` to a minimal update to previously
     /// ledgerized `prev` data.

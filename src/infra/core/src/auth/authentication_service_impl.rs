@@ -70,12 +70,10 @@ impl AuthenticationServiceImpl {
             let insert_result = authentication_providers_by_method
                 .insert(login_method, authentication_provider.clone());
 
-            if insert_result.is_some() {
-                panic!(
-                    "Duplicate authentication provider for method {}",
-                    login_method
-                );
-            }
+            assert!(
+                insert_result.is_none(),
+                "Duplicate authentication provider for method {login_method}"
+            );
         }
 
         Self {
@@ -150,7 +148,7 @@ impl AuthenticationService for AuthenticationServiceImpl {
     fn supported_login_methods(&self) -> Vec<&'static str> {
         self.authentication_providers_by_method
             .keys()
-            .cloned()
+            .copied()
             .collect()
     }
 
@@ -203,7 +201,7 @@ impl AuthenticationService for AuthenticationServiceImpl {
         &'a self,
         account_name: &'a AccountName,
     ) -> Result<Option<AccountInfo>, InternalError> {
-        for provider in self.authentication_providers.iter() {
+        for provider in &self.authentication_providers {
             let maybe_account_info = provider.find_account_info_by_name(account_name).await?;
             if maybe_account_info.is_some() {
                 return Ok(maybe_account_info);

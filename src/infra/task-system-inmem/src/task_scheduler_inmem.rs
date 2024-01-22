@@ -105,7 +105,7 @@ impl TaskScheduler for TaskSchedulerInMemory {
                 .try_collect()
                 .await?;
 
-            for task_id in relevant_tasks.into_iter() {
+            for task_id in relevant_tasks {
                 let task = Task::load(task_id, self.event_store.as_ref()).await.int_err()?;
 
                 yield task.into();

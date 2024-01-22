@@ -212,7 +212,7 @@ fn bench(c: &mut Criterion) {
     let mut group = c.benchmark_group("merge");
     group.sample_size(10);
     group.bench_function("snapshot", |b| {
-        b.iter(|| rt.block_on(merge_snapshot(&prev, &new, expected_rows)))
+        b.iter(|| rt.block_on(merge_snapshot(&prev, &new, expected_rows)));
     });
 }
 

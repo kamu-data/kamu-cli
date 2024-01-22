@@ -65,7 +65,7 @@ impl Command for DeleteCommand {
                 Ok(_) => Ok(()),
                 Err(GetDatasetError::NotFound(e)) => Err(CLIError::usage_error_from(e)),
                 Err(GetDatasetError::Internal(e)) => Err(e.into()),
-            }?
+            }?;
         }
 
         let confirmed = if self.no_confirmation {
@@ -89,11 +89,11 @@ impl Command for DeleteCommand {
 
         for dataset_ref in &dataset_refs {
             match self.dataset_repo.delete_dataset(dataset_ref).await {
-                Ok(_) => Ok(()),
+                Ok(()) => Ok(()),
                 Err(DeleteDatasetError::DanglingReference(e)) => Err(CLIError::failure(e)),
                 Err(DeleteDatasetError::Access(e)) => Err(CLIError::failure(e)),
                 Err(e) => Err(CLIError::critical(e)),
-            }?
+            }?;
         }
 
         eprintln!(

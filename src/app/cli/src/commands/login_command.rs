@@ -52,7 +52,7 @@ impl LoginCommand {
         let login_callback_response = self
             .login_service
             .login(&odf_server_frontend_url, |u| {
-                self.report_web_server_started(u)
+                self.report_web_server_started(u);
             })
             .await
             .map_err(|e| match e {
@@ -148,7 +148,7 @@ impl Command for LoginCommand {
             .find_by_frontend_url(self.scope, &odf_server_frontend_url)
         {
             match self.validate_login(token_find_report).await {
-                Ok(_) => {
+                Ok(()) => {
                     eprintln!(
                         "{}: {}",
                         console::style("Access token valid").green().bold(),

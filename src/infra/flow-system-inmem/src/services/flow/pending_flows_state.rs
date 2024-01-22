@@ -71,15 +71,15 @@ impl PendingFlowsState {
                     BorrowedFlowKeyDataset::new(&flow_key.dataset_id, flow_key.flow_type)
                         .as_trait(),
                 )
-                .cloned(),
+                .copied(),
             FlowKey::System(flow_key) => {
-                self.pending_system_flows.get(&flow_key.flow_type).cloned()
+                self.pending_system_flows.get(&flow_key.flow_type).copied()
             }
         }
     }
 
     pub fn try_get_flow_id_by_task(&self, task_id: TaskID) -> Option<FlowID> {
-        self.pending_flows_by_tasks.get(&task_id).cloned()
+        self.pending_flows_by_tasks.get(&task_id).copied()
     }
 }
 

@@ -61,7 +61,7 @@ impl InspectSchemaCommand {
             } => {
                 print!("{} ", console::style(basic_info.name()).bold());
                 let typ = if *precision > 0 {
-                    format!("DECIMAL({}, {})", precision, scale)
+                    format!("DECIMAL({precision}, {scale})")
                 } else if basic_info.converted_type() == ConvertedType::UTF8 {
                     "STRING".to_string()
                 } else if basic_info.converted_type() != ConvertedType::NONE {
@@ -69,7 +69,7 @@ impl InspectSchemaCommand {
                 } else if *physical_type == BasicType::INT96 {
                     "TIMESTAMP".to_string()
                 } else {
-                    format!("{:?}", physical_type)
+                    format!("{physical_type:?}")
                 };
                 print!("{}", console::style(typ).cyan());
             }

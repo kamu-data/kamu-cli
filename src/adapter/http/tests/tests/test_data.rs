@@ -82,7 +82,7 @@ async fn test_data_push_ingest_handler() {
     let client = async move {
         let cl: reqwest::Client = reqwest::Client::new();
         let dataset_helper = DatasetDataHelper::new(create_result.dataset.clone());
-        let ingest_url = format!("{}/ingest", dataset_url);
+        let ingest_url = format!("{dataset_url}/ingest");
         tracing::info!(%ingest_url, "Client request");
 
         // OK - uses the only push source
@@ -113,7 +113,7 @@ async fn test_data_push_ingest_handler() {
         dataset_helper
             .assert_last_data_eq(
                 indoc!(
-                    r#"
+                    r"
                     message arrow_schema {
                       OPTIONAL INT64 offset;
                       REQUIRED INT32 op;
@@ -122,17 +122,17 @@ async fn test_data_push_ingest_handler() {
                       OPTIONAL BYTE_ARRAY city (STRING);
                       OPTIONAL INT64 population;
                     }
-                   "#
+                   "
                 ),
                 indoc!(
-                    r#"
+                    r"
                     +--------+----+----------------------+----------------------+------+------------+
                     | offset | op | system_time          | event_time           | city | population |
                     +--------+----+----------------------+----------------------+------+------------+
                     | 0      | 0  | 2050-01-01T12:00:00Z | 2020-01-01T00:00:00Z | A    | 100        |
                     | 1      | 0  | 2050-01-01T12:00:00Z | 2020-01-02T00:00:00Z | B    | 200        |
                     +--------+----+----------------------+----------------------+------+------------+
-                    "#
+                    "
                 ),
             )
             .await;
@@ -224,7 +224,7 @@ async fn test_data_push_ingest_handler() {
         dataset_helper
             .assert_last_data_eq(
                 indoc!(
-                    r#"
+                    r"
                     message arrow_schema {
                       OPTIONAL INT64 offset;
                       REQUIRED INT32 op;
@@ -233,16 +233,16 @@ async fn test_data_push_ingest_handler() {
                       OPTIONAL BYTE_ARRAY city (STRING);
                       OPTIONAL INT64 population;
                     }
-                   "#
+                   "
                 ),
                 indoc!(
-                    r#"
+                    r"
                     +--------+----+----------------------+----------------------+------+------------+
                     | offset | op | system_time          | event_time           | city | population |
                     +--------+----+----------------------+----------------------+------+------------+
                     | 2      | 0  | 2050-01-01T12:00:00Z | 2020-01-03T00:00:00Z | C    | 301        |
                     +--------+----+----------------------+----------------------+------+------------+
-                    "#
+                    "
                 ),
             )
             .await;
@@ -285,7 +285,7 @@ async fn test_data_push_ingest_handler() {
         dataset_helper
             .assert_last_data_eq(
                 indoc!(
-                    r#"
+                    r"
                     message arrow_schema {
                       OPTIONAL INT64 offset;
                       REQUIRED INT32 op;
@@ -294,16 +294,16 @@ async fn test_data_push_ingest_handler() {
                       OPTIONAL BYTE_ARRAY city (STRING);
                       OPTIONAL INT64 population;
                     }
-                   "#
+                   "
                 ),
                 indoc!(
-                    r#"
+                    r"
                     +--------+----+----------------------+----------------------+------+------------+
                     | offset | op | system_time          | event_time           | city | population |
                     +--------+----+----------------------+----------------------+------+------------+
                     | 3      | 0  | 2050-01-01T12:00:00Z | 2020-01-04T00:00:00Z | D    | 400        |
                     +--------+----+----------------------+----------------------+------+------------+
-                    "#
+                    "
                 ),
             )
             .await;

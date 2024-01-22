@@ -96,7 +96,7 @@ pub trait ObjectRepository: Send + Sync {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-/// Describes the protocol implemented by an [ObjectRepository]
+/// Describes the protocol implemented by an [`ObjectRepository`]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ObjectRepositoryProtocol {
     Memory,

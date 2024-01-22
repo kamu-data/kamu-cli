@@ -73,7 +73,7 @@ pub(crate) async fn test_smart_push_existing_up_to_date_dataset<
         );
     };
 
-    await_client_server_flow!(api_server_handle, client_handle)
+    await_client_server_flow!(api_server_handle, client_handle);
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -108,7 +108,7 @@ pub(crate) async fn test_smart_push_existing_evolved_dataset<TServerHarness: Ser
         );
     };
 
-    await_client_server_flow!(api_server_handle, client_handle)
+    await_client_server_flow!(api_server_handle, client_handle);
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -136,7 +136,7 @@ pub(crate) async fn test_smart_push_existing_dataset_fails_as_server_advanced<
         assert!(push_responses[0].result.is_err());
     };
 
-    await_client_server_flow!(api_server_handle, client_handle)
+    await_client_server_flow!(api_server_handle, client_handle);
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -172,7 +172,7 @@ pub(crate) async fn test_smart_push_aborted_write_of_new_rewrite_succeeds<
         );
     };
 
-    await_client_server_flow!(api_server_handle, client_handle)
+    await_client_server_flow!(api_server_handle, client_handle);
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -209,7 +209,7 @@ pub(crate) async fn test_smart_push_aborted_write_of_updated_rewrite_succeeds<
         );
     };
 
-    await_client_server_flow!(api_server_handle, client_handle)
+    await_client_server_flow!(api_server_handle, client_handle);
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

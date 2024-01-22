@@ -145,8 +145,7 @@ impl ContainerRuntime {
         if args.detached {
             cmd.arg("-d");
         }
-        args.container_name
-            .map(|v| cmd.arg(format!("--name={v}")));
+        args.container_name.map(|v| cmd.arg(format!("--name={v}")));
         args.hostname.map(|v| cmd.arg(format!("--hostname={v}")));
         args.network.map(|v| cmd.arg(format!("--network={v}")));
         if args.expose_all_ports {
@@ -306,7 +305,8 @@ impl ContainerRuntime {
         }
 
         let format = format!(
-            "--format={{{{ (index (index .NetworkSettings.Ports \"{container_port}/tcp\") 0).HostPort }}}}"
+            "--format={{{{ (index (index .NetworkSettings.Ports \"{container_port}/tcp\") \
+             0).HostPort }}}}"
         );
 
         let output = self
@@ -398,7 +398,9 @@ impl ContainerRuntime {
             ContainerRuntimeType::Docker => std::env::var("DOCKER_HOST")
                 .ok()
                 .and_then(|s| url::Url::parse(&s).ok())
-                .map_or("127.0.0.1".to_owned(), |url| format!("{}", url.host().unwrap())),
+                .map_or("127.0.0.1".to_owned(), |url| {
+                    format!("{}", url.host().unwrap())
+                }),
         }
     }
 

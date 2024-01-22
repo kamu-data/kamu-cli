@@ -57,7 +57,7 @@ impl APIServerRunCommand {
 
     fn check_required_env_vars(&self) -> Result<(), CLIError> {
         match check_env_var_set(ENV_VAR_KAMU_JWT_SECRET) {
-            Ok(_) => {}
+            Ok(()) => {}
             Err(_) => set_random_jwt_secret(),
         };
 

@@ -61,24 +61,24 @@ async fn test_ingest_polling_snapshot() {
                         SqlQueryStep {
                             alias: Some("step1".to_string()),
                             query: indoc::indoc!(
-                                r#"
+                                r"
                                 select
                                     city,
                                     population * 10 as population
                                 from input
-                                "#
+                                "
                             )
                             .to_string(),
                         },
                         SqlQueryStep {
                             alias: None,
                             query: indoc::indoc!(
-                                r#"
+                                r"
                                 select
                                     city,
                                     population + 1 as population
                                 from step1
-                                "#
+                                "
                             )
                             .to_string(),
                         },
@@ -117,7 +117,7 @@ async fn test_ingest_polling_snapshot() {
     data_helper
         .assert_last_data_eq(
             indoc!(
-                r#"
+                r"
                 message arrow_schema {
                   OPTIONAL INT64 offset;
                   REQUIRED INT32 op;
@@ -126,10 +126,10 @@ async fn test_ingest_polling_snapshot() {
                   OPTIONAL BYTE_ARRAY city (STRING);
                   OPTIONAL INT64 population;
                 }
-                "#
+                "
             ),
             indoc!(
-                r#"
+                r"
                 +--------+----+----------------------+----------------------+------+------------+
                 | offset | op | system_time          | event_time           | city | population |
                 +--------+----+----------------------+----------------------+------+------------+
@@ -137,7 +137,7 @@ async fn test_ingest_polling_snapshot() {
                 | 1      | 0  | 2050-01-01T12:00:00Z | 2050-01-01T12:00:00Z | B    | 20001      |
                 | 2      | 0  | 2050-01-01T12:00:00Z | 2050-01-01T12:00:00Z | C    | 30001      |
                 +--------+----+----------------------+----------------------+------+------------+
-                "#
+                "
             ),
         )
         .await;
@@ -174,14 +174,14 @@ async fn test_ingest_polling_snapshot() {
 
     data_helper
         .assert_last_data_records_eq(indoc!(
-            r#"
+            r"
             +--------+----+----------------------+----------------------+------+------------+
             | offset | op | system_time          | event_time           | city | population |
             +--------+----+----------------------+----------------------+------+------------+
             | 3      | 2  | 2050-02-01T12:00:00Z | 2050-01-01T12:00:00Z | C    | 30001      |
             | 4      | 3  | 2050-02-01T12:00:00Z | 2050-02-01T12:00:00Z | C    | 40001      |
             +--------+----+----------------------+----------------------+------+------------+
-            "#
+            "
         ))
         .await;
 
@@ -251,7 +251,7 @@ async fn test_ingest_polling_ledger() {
                     schema: Some(
                         ["date TIMESTAMP", "city STRING", "population BIGINT"]
                             .iter()
-                            .map(|s| s.to_string())
+                            .map(|s| (*s).to_string())
                             .collect(),
                     ),
                     ..ReadStepCsv::default()
@@ -290,7 +290,7 @@ async fn test_ingest_polling_ledger() {
     data_helper
         .assert_last_data_eq(
             indoc!(
-                r#"
+                r"
                 message arrow_schema {
                   OPTIONAL INT64 offset;
                   REQUIRED INT32 op;
@@ -299,10 +299,10 @@ async fn test_ingest_polling_ledger() {
                   OPTIONAL BYTE_ARRAY city (STRING);
                   OPTIONAL INT64 population;
                 }
-                "#
+                "
             ),
             indoc!(
-                r#"
+                r"
                 +--------+----+----------------------+----------------------+------+------------+
                 | offset | op | system_time          | date                 | city | population |
                 +--------+----+----------------------+----------------------+------+------------+
@@ -310,7 +310,7 @@ async fn test_ingest_polling_ledger() {
                 | 1      | 0  | 2050-01-01T12:00:00Z | 2020-01-01T00:00:00Z | B    | 2000       |
                 | 2      | 0  | 2050-01-01T12:00:00Z | 2020-01-01T00:00:00Z | C    | 3000       |
                 +--------+----+----------------------+----------------------+------+------------+
-                "#
+                "
             ),
         )
         .await;
@@ -343,13 +343,13 @@ async fn test_ingest_polling_ledger() {
 
     data_helper
         .assert_last_data_records_eq(indoc!(
-            r#"
+            r"
             +--------+----+----------------------+----------------------+------+------------+
             | offset | op | system_time          | date                 | city | population |
             +--------+----+----------------------+----------------------+------+------------+
             | 3      | 0  | 2050-01-01T12:00:00Z | 2021-01-01T00:00:00Z | C    | 4000       |
             +--------+----+----------------------+----------------------+------+------------+
-            "#
+            "
         ))
         .await;
 
@@ -379,13 +379,13 @@ async fn test_ingest_polling_ledger() {
 
     data_helper
         .assert_last_data_records_eq(indoc!(
-            r#"
+            r"
             +--------+----+----------------------+----------------------+------+------------+
             | offset | op | system_time          | date                 | city | population |
             +--------+----+----------------------+----------------------+------+------------+
             | 4      | 0  | 2050-01-01T12:00:00Z | 2020-01-01T00:00:00Z | D    | 4000       |
             +--------+----+----------------------+----------------------+------+------------+
-            "#
+            "
         ))
         .await;
 
@@ -522,7 +522,7 @@ async fn test_ingest_polling_event_time_as_date() {
                     schema: Some(
                         ["date DATE", "city STRING", "population BIGINT"]
                             .iter()
-                            .map(|s| s.to_string())
+                            .map(|s| (*s).to_string())
                             .collect(),
                     ),
                     ..ReadStepCsv::default()
@@ -562,7 +562,7 @@ async fn test_ingest_polling_event_time_as_date() {
     data_helper
         .assert_last_data_eq(
             indoc!(
-                r#"
+                r"
                 message arrow_schema {
                   OPTIONAL INT64 offset;
                   REQUIRED INT32 op;
@@ -571,10 +571,10 @@ async fn test_ingest_polling_event_time_as_date() {
                   OPTIONAL BYTE_ARRAY city (STRING);
                   OPTIONAL INT64 population;
                 }
-                "#
+                "
             ),
             indoc!(
-                r#"
+                r"
                 +--------+----+----------------------+------------+------+------------+
                 | offset | op | system_time          | date       | city | population |
                 +--------+----+----------------------+------------+------+------------+
@@ -582,7 +582,7 @@ async fn test_ingest_polling_event_time_as_date() {
                 | 1      | 0  | 2050-01-01T12:00:00Z | 2020-01-01 | B    | 2000       |
                 | 2      | 0  | 2050-01-01T12:00:00Z | 2020-01-01 | C    | 3000       |
                 +--------+----+----------------------+------------+------+------------+
-                "#
+                "
             ),
         )
         .await;
@@ -717,7 +717,7 @@ async fn test_ingest_polling_bad_column_names_preserve() {
     data_helper
         .assert_last_data_eq(
             indoc!(
-                r#"
+                r"
                 message arrow_schema {
                   OPTIONAL INT64 offset;
                   REQUIRED INT32 op;
@@ -726,10 +726,10 @@ async fn test_ingest_polling_bad_column_names_preserve() {
                   REQUIRED BYTE_ARRAY City Name (STRING);
                   REQUIRED INT64 Population;
                 }
-                "#
+                "
             ),
             indoc!(
-                r#"
+                r"
                 +--------+----+----------------------+------------+-----------+------------+
                 | offset | op | system_time          | Date (UTC) | City Name | Population |
                 +--------+----+----------------------+------------+-----------+------------+
@@ -737,7 +737,7 @@ async fn test_ingest_polling_bad_column_names_preserve() {
                 | 1      | 0  | 2050-01-01T12:00:00Z | 2020-01-01 | B         | 2000       |
                 | 2      | 0  | 2050-01-01T12:00:00Z | 2020-01-01 | C         | 3000       |
                 +--------+----+----------------------+------------+-----------+------------+
-                "#
+                "
             ),
         )
         .await;
@@ -810,7 +810,7 @@ async fn test_ingest_polling_bad_column_names_rename() {
     data_helper
         .assert_last_data_eq(
             indoc!(
-                r#"
+                r"
                 message arrow_schema {
                   OPTIONAL INT64 offset;
                   REQUIRED INT32 op;
@@ -819,10 +819,10 @@ async fn test_ingest_polling_bad_column_names_rename() {
                   OPTIONAL BYTE_ARRAY city (STRING);
                   OPTIONAL INT64 population;
                 }
-                "#
+                "
             ),
             indoc!(
-                r#"
+                r"
                 +--------+----+----------------------+----------------------+------+------------+
                 | offset | op | system_time          | event_time           | city | population |
                 +--------+----+----------------------+----------------------+------+------------+
@@ -830,7 +830,7 @@ async fn test_ingest_polling_bad_column_names_rename() {
                 | 1      | 0  | 2050-01-01T12:00:00Z | 2020-01-01T12:00:00Z | B    | 2000       |
                 | 2      | 0  | 2050-01-01T12:00:00Z | 2020-01-01T12:00:00Z | C    | 3000       |
                 +--------+----+----------------------+----------------------+------+------------+
-                "#
+                "
             ),
         )
         .await;
@@ -876,12 +876,12 @@ async fn test_ingest_polling_preprocess_with_spark() {
                     version: None,
                     query: Some(
                         indoc::indoc!(
-                            r#"
+                            r"
                             select
                                 city,
                                 population * 10 as population
                             from input
-                            "#
+                            "
                         )
                         .to_string(),
                     ),
@@ -902,7 +902,7 @@ async fn test_ingest_polling_preprocess_with_spark() {
     data_helper
         .assert_last_data_eq(
             indoc!(
-                r#"
+                r"
                 message arrow_schema {
                   OPTIONAL INT64 offset;
                   REQUIRED INT32 op;
@@ -911,10 +911,10 @@ async fn test_ingest_polling_preprocess_with_spark() {
                   OPTIONAL BYTE_ARRAY city (STRING);
                   OPTIONAL INT64 population;
                 }
-                "#
+                "
             ),
             indoc!(
-                r#"
+                r"
                 +--------+----+----------------------+----------------------+------+------------+
                 | offset | op | system_time          | event_time           | city | population |
                 +--------+----+----------------------+----------------------+------+------------+
@@ -922,7 +922,7 @@ async fn test_ingest_polling_preprocess_with_spark() {
                 | 1      | 0  | 2050-01-01T12:00:00Z | 2050-01-01T12:00:00Z | B    | 20000      |
                 | 2      | 0  | 2050-01-01T12:00:00Z | 2050-01-01T12:00:00Z | C    | 30000      |
                 +--------+----+----------------------+----------------------+------+------------+
-                "#
+                "
             ),
         )
         .await;
@@ -968,12 +968,12 @@ async fn test_ingest_polling_preprocess_with_flink() {
                     version: None,
                     query: Some(
                         indoc::indoc!(
-                            r#"
+                            r"
                             select
                                 city,
                                 population * 10 as population
                             from input
-                            "#
+                            "
                         )
                         .to_string(),
                     ),
@@ -994,7 +994,7 @@ async fn test_ingest_polling_preprocess_with_flink() {
     data_helper
         .assert_last_data_eq(
             indoc!(
-                r#"
+                r"
                 message arrow_schema {
                   OPTIONAL INT64 offset;
                   REQUIRED INT32 op;
@@ -1003,10 +1003,10 @@ async fn test_ingest_polling_preprocess_with_flink() {
                   OPTIONAL BYTE_ARRAY city (STRING);
                   OPTIONAL INT64 population;
                 }
-                "#
+                "
             ),
             indoc!(
-                r#"
+                r"
                 +--------+----+----------------------+----------------------+------+------------+
                 | offset | op | system_time          | event_time           | city | population |
                 +--------+----+----------------------+----------------------+------+------------+
@@ -1014,7 +1014,7 @@ async fn test_ingest_polling_preprocess_with_flink() {
                 | 1      | 0  | 2050-01-01T12:00:00Z | 2050-01-01T12:00:00Z | B    | 20000      |
                 | 2      | 0  | 2050-01-01T12:00:00Z | 2050-01-01T12:00:00Z | C    | 30000      |
                 +--------+----+----------------------+----------------------+------+------------+
-                "#
+                "
             ),
         )
         .await;

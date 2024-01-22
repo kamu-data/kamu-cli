@@ -66,7 +66,7 @@ impl PullServiceImpl {
         let mut visited = HashMap::new();
         let mut errors = Vec::new();
 
-        for pr in requests.into_iter() {
+        for pr in requests {
             match self
                 .collect_pull_graph_depth_first(pr, true, options, &mut visited)
                 .await
@@ -167,7 +167,7 @@ impl PullServiceImpl {
         if let Some(pi) = visited.get_mut(&local_alias) {
             tracing::debug!("Already visited - continuing");
             if referenced_explicitly {
-                pi.original_request = Some(request.clone())
+                pi.original_request = Some(request.clone());
             }
             return Ok(pi.depth);
         }

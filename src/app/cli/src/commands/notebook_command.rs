@@ -84,7 +84,7 @@ impl Command for NotebookCommand {
                     .clone()
                     .or_else(|| std::env::var(name).ok())
                     .ok_or_else(|| {
-                        CLIError::usage_error(format!("Environment variable {} is not set", name))
+                        CLIError::usage_error(format!("Environment variable {name} is not set"))
                     })
                     .map(|v| (name.to_owned(), v))
             })
@@ -119,7 +119,7 @@ impl Command for NotebookCommand {
                 self.output_config.verbosity_level > 0,
                 move |url| {
                     if let Some(s) = spinner {
-                        s.finish_and_clear()
+                        s.finish_and_clear();
                     }
                     eprintln!(
                         "{}\n  {}",

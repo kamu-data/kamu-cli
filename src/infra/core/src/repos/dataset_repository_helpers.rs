@@ -42,7 +42,7 @@ pub async fn create_dataset_from_snapshot_impl(
     mut snapshot: DatasetSnapshot,
 ) -> Result<CreateDatasetResult, CreateDatasetFromSnapshotError> {
     // Validate / resolve events
-    for event in snapshot.metadata.iter_mut() {
+    for event in &mut snapshot.metadata {
         match event {
             MetadataEvent::Seed(_) => Err(CreateDatasetFromSnapshotError::InvalidSnapshot(
                 InvalidSnapshotError::new(
@@ -102,8 +102,7 @@ pub async fn create_dataset_from_snapshot_impl(
             | MetadataEvent::ExecuteTransform(_)
             | MetadataEvent::DisablePollingSource(_)
             | MetadataEvent::DisablePushSource(_) => Err(InvalidSnapshotError::new(format!(
-                "Event is not allowed to appear in a DatasetSnapshot: {:?}",
-                event
+                "Event is not allowed to appear in a DatasetSnapshot: {event:?}"
             ))
             .into()),
         }?;

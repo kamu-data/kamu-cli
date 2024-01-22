@@ -159,7 +159,7 @@ impl LineageVisitor for ShellVisitor {
         self.buffer.push(fmt);
 
         if let &NodeInfo::Remote { .. } = dataset {
-            self.buffer.push(format!("{}", console::style("???").dim()))
+            self.buffer.push(format!("{}", console::style("???").dim()));
         }
 
         true
@@ -202,7 +202,7 @@ impl LineageVisitor for ShellVisitor {
 
     fn done(&mut self) {
         for line in &self.buffer {
-            println!("{}", line);
+            println!("{line}");
         }
     }
 }
@@ -278,7 +278,7 @@ impl<W: Write> HtmlVisitor<W> {
 
 impl<W: Write + Send> LineageVisitor for HtmlVisitor<W> {
     fn begin(&mut self) {
-        self.dot_visitor.begin()
+        self.dot_visitor.begin();
     }
 
     fn enter(&mut self, dataset: &NodeInfo<'_>) -> bool {
@@ -286,7 +286,7 @@ impl<W: Write + Send> LineageVisitor for HtmlVisitor<W> {
     }
 
     fn exit(&mut self, dataset: &NodeInfo<'_>) {
-        self.dot_visitor.exit(dataset)
+        self.dot_visitor.exit(dataset);
     }
 
     fn done(&mut self) {
@@ -297,7 +297,7 @@ impl<W: Write + Send> LineageVisitor for HtmlVisitor<W> {
         let dot_encoded = urlencoding::encode(&dot);
 
         let html = Self::TEMPLATE.replace("<URL_ENCODED_DOT>", &dot_encoded);
-        write!(self.writer, "{}", html).unwrap();
+        write!(self.writer, "{html}").unwrap();
     }
 }
 
@@ -337,7 +337,7 @@ impl HtmlBrowseVisitor {
 
 impl LineageVisitor for HtmlBrowseVisitor {
     fn begin(&mut self) {
-        self.html_visitor.begin()
+        self.html_visitor.begin();
     }
 
     fn enter(&mut self, dataset: &NodeInfo<'_>) -> bool {
@@ -345,7 +345,7 @@ impl LineageVisitor for HtmlBrowseVisitor {
     }
 
     fn exit(&mut self, dataset: &NodeInfo<'_>) {
-        self.html_visitor.exit(dataset)
+        self.html_visitor.exit(dataset);
     }
 
     fn done(&mut self) {
@@ -365,6 +365,6 @@ struct WriteAdapter<W>(W);
 
 impl<W: std::io::Write> Write for WriteAdapter<W> {
     fn write_str(&mut self, s: &str) -> std::fmt::Result {
-        write!(self.0, "{}", s).map_err(|_| std::fmt::Error)
+        write!(self.0, "{s}").map_err(|_| std::fmt::Error)
     }
 }

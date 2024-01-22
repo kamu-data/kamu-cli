@@ -35,7 +35,7 @@ fn main() {
         .get_matches();
 
     let current_version = get_current_version();
-    eprintln!("Current version: {}", current_version);
+    eprintln!("Current version: {current_version}");
 
     let new_version: Version = if let Some(v) = matches.get_one::<String>("version") {
         v.strip_prefix('v').unwrap_or(v).parse().unwrap()
@@ -54,7 +54,7 @@ fn main() {
         panic!("Specify a --version or --minor flag");
     };
 
-    eprintln!("New version: {}", new_version);
+    eprintln!("New version: {new_version}");
 
     update_crates(&new_version);
 
@@ -110,7 +110,7 @@ fn update_license_text(
     let significant_version =
         new_version.major != current_version.major || new_version.minor != current_version.minor;
 
-    eprintln!("Updating license version: {}", new_version);
+    eprintln!("Updating license version: {new_version}");
     let re = regex::Regex::new(r"(Licensed Work: +Kamu CLI Version )(\d+\.\d+\.\d+)").unwrap();
     let text = re.replace(text, |c: &Captures| format!("{}{}", &c[1], new_version));
 
@@ -118,7 +118,7 @@ fn update_license_text(
         let change_date = add_years(current_date, CHANGE_DATE_YEARS);
         let re = regex::Regex::new(r"(Change Date: +)(\d+-\d+-\d+)").unwrap();
 
-        eprintln!("Updating license change date: {}", change_date);
+        eprintln!("Updating license change date: {change_date}");
         re.replace(&text, |c: &Captures| format!("{}{}", &c[1], change_date))
     } else {
         text
@@ -151,7 +151,7 @@ mod tests {
         // During patch release the Change Date stays the same
 
         let orig_text = indoc::indoc!(
-            r#"
+            r"
             ...
             Licensor:                  Kamu Data, Inc.
             Licensed Work:             Kamu CLI Version 0.63.0
@@ -159,7 +159,7 @@ mod tests {
             Change Date:               2025-01-01
             Change License:            Apache License, Version 2.0
             ...
-            "#
+            "
         );
 
         let new_text = update_license_text(
@@ -172,7 +172,7 @@ mod tests {
         assert_eq!(
             new_text,
             indoc::indoc!(
-                r#"
+                r"
                 ...
                 Licensor:                  Kamu Data, Inc.
                 Licensed Work:             Kamu CLI Version 0.63.1
@@ -180,9 +180,9 @@ mod tests {
                 Change Date:               2025-01-01
                 Change License:            Apache License, Version 2.0
                 ...
-                "#
+                "
             )
-        )
+        );
     }
 
     #[test]
@@ -190,7 +190,7 @@ mod tests {
         // During patch release the Change Date stays the same
 
         let orig_text = indoc::indoc!(
-            r#"
+            r"
             ...
             Licensor:                  Kamu Data, Inc.
             Licensed Work:             Kamu CLI Version 0.63.0
@@ -198,7 +198,7 @@ mod tests {
             Change Date:               2025-01-01
             Change License:            Apache License, Version 2.0
             ...
-            "#
+            "
         );
 
         let new_text = update_license_text(
@@ -211,7 +211,7 @@ mod tests {
         assert_eq!(
             new_text,
             indoc::indoc!(
-                r#"
+                r"
                 ...
                 Licensor:                  Kamu Data, Inc.
                 Licensed Work:             Kamu CLI Version 0.64.0
@@ -219,8 +219,8 @@ mod tests {
                 Change Date:               2025-09-01
                 Change License:            Apache License, Version 2.0
                 ...
-                "#
+                "
             )
-        )
+        );
     }
 }

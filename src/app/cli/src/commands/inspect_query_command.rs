@@ -150,7 +150,7 @@ impl InspectQueryCommand {
                             .unwrap_or_else(|| dataset_handle.alias.to_string());
                         writeln!(output, "{} {}", style("Query:").dim(), style(alias).bold(),)?;
                         for line in query.query.trim_end().split('\n') {
-                            writeln!(output, "  {}", line)?;
+                            writeln!(output, "  {line}")?;
                         }
                     }
                 }
@@ -163,7 +163,7 @@ impl InspectQueryCommand {
                         style(&dataset_handle.alias).bold(),
                     )?;
                     for line in query.trim_end().split('\n') {
-                        writeln!(output, "  {}", line)?;
+                        writeln!(output, "  {line}")?;
                     }
                 }
             }

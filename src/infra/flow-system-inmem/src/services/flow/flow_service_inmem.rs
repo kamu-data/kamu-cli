@@ -563,7 +563,7 @@ impl FlowService for FlowServiceInMemory {
                 .try_collect()
                 .await?;
 
-            for flow_id in relevant_flows.into_iter() {
+            for flow_id in relevant_flows {
                 let flow = Flow::load(flow_id, self.flow_event_store.as_ref()).await.int_err()?;
 
                 yield flow.into();
@@ -585,7 +585,7 @@ impl FlowService for FlowServiceInMemory {
                 .try_collect()
                 .await?;
 
-            for flow_id in relevant_flows.into_iter() {
+            for flow_id in relevant_flows {
                 let flow = Flow::load(flow_id, self.flow_event_store.as_ref()).await.int_err()?;
 
                 yield flow.into();
@@ -609,7 +609,7 @@ impl FlowService for FlowServiceInMemory {
                 .try_collect()
                 .await?;
 
-            for flow_id in relevant_flows.into_iter() {
+            for flow_id in relevant_flows {
                 let flow = Flow::load(flow_id, self.flow_event_store.as_ref()).await.int_err()?;
 
                 yield flow.into();
@@ -628,7 +628,7 @@ impl FlowService for FlowServiceInMemory {
                 .try_collect()
                 .await?;
 
-            for flow_id in all_flows.into_iter() {
+            for flow_id in all_flows {
                 let flow = Flow::load(flow_id, self.flow_event_store.as_ref()).await.int_err()?;
 
                 yield flow.into();
@@ -883,7 +883,7 @@ impl AsyncEventHandler<FlowConfigurationEventModified> for FlowServiceInMemory {
                 event.flow_key.clone(),
                 event.rule.clone(),
             )
-            .await?
+            .await?;
         }
 
         Ok(())

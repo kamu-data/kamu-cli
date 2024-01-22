@@ -73,7 +73,7 @@ pub(crate) async fn test_smart_pull_existing_up_to_date_dataset<
         );
     };
 
-    await_client_server_flow!(api_server_handle, client_handle)
+    await_client_server_flow!(api_server_handle, client_handle);
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -107,7 +107,7 @@ pub(crate) async fn test_smart_pull_existing_evolved_dataset<TServerHarness: Ser
         );
     };
 
-    await_client_server_flow!(api_server_handle, client_handle)
+    await_client_server_flow!(api_server_handle, client_handle);
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -133,7 +133,7 @@ pub(crate) async fn test_smart_pull_existing_advanced_dataset_fails<
         assert!(pull_responses[0].result.is_err());
     };
 
-    await_client_server_flow!(api_server_handle, client_handle)
+    await_client_server_flow!(api_server_handle, client_handle);
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -211,7 +211,7 @@ pub(crate) async fn test_smart_pull_aborted_read_of_existing_evolved_dataset_rer
         );
     };
 
-    await_client_server_flow!(api_server_handle, client_handle)
+    await_client_server_flow!(api_server_handle, client_handle);
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

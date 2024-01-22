@@ -100,7 +100,7 @@ async fn test_read_parquet() {
             write_test_data(path);
         },
         indoc!(
-            r#"
+            r"
             message arrow_schema {
               REQUIRED INT64 offset (INTEGER(64,false));
               REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
@@ -108,10 +108,10 @@ async fn test_read_parquet() {
               REQUIRED BYTE_ARRAY city (STRING);
               REQUIRED INT64 population;
             }
-            "#
+            "
         ),
         indoc!(
-            r#"
+            r"
             +--------+----------------------+----------------------+-----------+------------+
             | offset | system_time          | event_time           | city      | population |
             +--------+----------------------+----------------------+-----------+------------+
@@ -119,7 +119,7 @@ async fn test_read_parquet() {
             | 1      | 2023-02-01T00:00:00Z | 2023-01-01T00:00:00Z | seattle   | 733000     |
             | 2      | 2023-02-01T00:00:00Z | 2023-01-01T00:00:00Z | kyiv      | 2884000    |
             +--------+----------------------+----------------------+-----------+------------+
-            "#
+            "
         ),
     )
     .await;
@@ -147,16 +147,16 @@ async fn test_read_parquet_schema_coercion() {
             write_test_data(path);
         },
         indoc!(
-            r#"
+            r"
             message arrow_schema {
               REQUIRED BYTE_ARRAY event_time (STRING);
               REQUIRED BYTE_ARRAY city (STRING);
               REQUIRED INT32 population;
             }
-            "#
+            "
         ),
         indoc!(
-            r#"
+            r"
             +----------------------+-----------+------------+
             | event_time           | city      | population |
             +----------------------+-----------+------------+
@@ -164,7 +164,7 @@ async fn test_read_parquet_schema_coercion() {
             | 2023-01-01T00:00:00Z | seattle   | 733000     |
             | 2023-01-01T00:00:00Z | kyiv      | 2884000    |
             +----------------------+-----------+------------+
-            "#
+            "
         ),
     )
     .await;

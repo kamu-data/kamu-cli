@@ -44,7 +44,7 @@ impl EngineContainer {
 
         let container = container_runtime
             .run_attached(image)
-            .container_name(format!("kamu-engine-{}", operation_id))
+            .container_name(format!("kamu-engine-{operation_id}"))
             .volumes(volumes)
             .expose_port(Self::ADAPTER_PORT)
             .stdout(stdout_file)
@@ -161,6 +161,6 @@ impl LogsConfig {
     }
 
     fn demuxed_filename(&self, process: &str, stream: &str) -> String {
-        format!("engine-{}.{}.txt", process, stream)
+        format!("engine-{process}.{stream}.txt")
     }
 }

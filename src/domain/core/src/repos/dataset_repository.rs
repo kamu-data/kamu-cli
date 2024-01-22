@@ -252,7 +252,7 @@ impl std::fmt::Display for MissingInputsError {
             if i != 0 {
                 write!(f, ", ")?;
             }
-            write!(f, "{}", h)?;
+            write!(f, "{h}")?;
         }
         Ok(())
     }
@@ -273,7 +273,7 @@ impl std::fmt::Display for DanglingReferenceError {
             if i != 0 {
                 write!(f, ", ")?;
             }
-            write!(f, "{}", h)?;
+            write!(f, "{h}")?;
         }
         Ok(())
     }

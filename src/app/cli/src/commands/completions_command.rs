@@ -44,9 +44,14 @@ impl Command for CompletionsCommand {
         // See: https://github.com/clap-rs/clap/issues/568
         let bin_name = self.cli.get_name().to_owned();
         match self.shell {
-            clap_complete::Shell::Bash => print!("{}", BASH_COMPLETIONS),
+            clap_complete::Shell::Bash => print!("{BASH_COMPLETIONS}"),
             _ => {
-                clap_complete::generate(self.shell, &mut self.cli, bin_name, &mut std::io::stdout())
+                clap_complete::generate(
+                    self.shell,
+                    &mut self.cli,
+                    bin_name,
+                    &mut std::io::stdout(),
+                );
             }
         };
         Ok(())

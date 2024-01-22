@@ -67,8 +67,7 @@ impl Command for TailCommand {
                                 .as_any()
                                 .downcast_ref::<UInt8Array>()
                                 .map(|a| a.value(row))
-                                .map(OperationType::try_from)
-                                .unwrap_or(err),
+                                .map_or(err, OperationType::try_from),
                             // Compatibility fallback
                             DataType::Int32 => array
                                 .as_any()

@@ -33,7 +33,7 @@ async fn test_enabled_login_methods() {
     let authentication_service = catalog.get_one::<dyn AuthenticationService>().unwrap();
 
     let mut supported_login_methods = authentication_service.supported_login_methods();
-    supported_login_methods.sort();
+    supported_login_methods.sort_unstable();
     assert_eq!(supported_login_methods, vec!["method-A", "method-B"]);
 }
 

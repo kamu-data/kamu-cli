@@ -74,7 +74,7 @@ async fn test_fetch_url_file() {
         .await
         .unwrap();
     let FetchResult::Updated(update) = res else {
-        panic!("Unexpected result: {:#?}", res);
+        panic!("Unexpected result: {res:#?}");
     };
     assert!(!target_path.exists()); // Uses zero-copy path
     assert_eq!(update.zero_copy_path.as_ref(), Some(&src_path));
@@ -484,7 +484,7 @@ async fn test_fetch_files_glob() {
         .await
         .unwrap();
     let FetchResult::Updated(update) = res else {
-        panic!("Unexpected result: {:#?}", res);
+        panic!("Unexpected result: {res:#?}");
     };
     assert!(!target_path.exists()); // Uses zero-copy path
     assert_eq!(update.zero_copy_path.as_ref(), Some(&src_path_1));
@@ -581,7 +581,7 @@ async fn test_fetch_files_glob() {
         .await
         .unwrap();
     let FetchResult::Updated(update5) = res5 else {
-        panic!("Unexpected result: {:#?}", res5);
+        panic!("Unexpected result: {res5:#?}");
     };
     assert!(!target_path.exists()); // Uses zero-copy path
     assert_eq!(update5.zero_copy_path.as_ref(), Some(&src_path_2));
@@ -607,7 +607,7 @@ async fn test_fetch_files_glob() {
         .await
         .unwrap();
     let FetchResult::Updated(update6) = res6 else {
-        panic!("Unexpected result: {:#?}", res6);
+        panic!("Unexpected result: {res6:#?}");
     };
     assert!(!target_path.exists()); // Uses zero-copy path
     assert_eq!(update6.zero_copy_path.as_ref(), Some(&src_path_3));

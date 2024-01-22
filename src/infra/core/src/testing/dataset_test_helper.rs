@@ -56,7 +56,7 @@ impl DatasetTestHelper {
 
         let mut v = DatasetTestHelper::_list_files_rec(dir);
 
-        for path in v.iter_mut() {
+        for path in &mut v {
             *path = path.strip_prefix(dir).unwrap().to_owned();
         }
 
@@ -113,7 +113,7 @@ impl DatasetTestHelper {
         let prev_offset = prev_data.as_ref().and_then(|e| e.last_offset());
 
         let num_records = 10;
-        let start = prev_offset.map(|v| v + 1).unwrap_or(0);
+        let start = prev_offset.map_or(0, |v| v + 1);
         let new_offset_interval = OffsetInterval {
             start,
             end: start + num_records - 1,

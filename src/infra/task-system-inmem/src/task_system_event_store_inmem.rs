@@ -71,7 +71,7 @@ impl TaskSystemEventStoreInMemory {
                     Entry::Occupied(v) => v.into_mut(),
                     Entry::Vacant(v) => v.insert(Vec::default()),
                 };
-                entries.push(event.task_id())
+                entries.push(event.task_id());
             }
         }
     }
@@ -118,7 +118,7 @@ impl TaskSystemEventStore for TaskSystemEventStoreInMemory {
             let mut pos = {
                 let state = self.inner.as_state();
                 let g = state.lock().unwrap();
-                g.tasks_by_dataset.get(&dataset_id).map(|tasks| tasks.len()).unwrap_or(0)
+                g.tasks_by_dataset.get(&dataset_id).map_or(0, |tasks| tasks.len())
             };
 
             loop {
@@ -133,7 +133,7 @@ impl TaskSystemEventStore for TaskSystemEventStoreInMemory {
                     let g = state.lock().unwrap();
                     g.tasks_by_dataset
                         .get(&dataset_id)
-                        .and_then(|tasks| tasks.get(pos).cloned())
+                        .and_then(|tasks| tasks.get(pos).copied())
                 };
 
                 let task_id = match next {

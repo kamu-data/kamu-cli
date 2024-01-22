@@ -56,15 +56,15 @@ async fn test_single_tenant_repository() {
     assert_eq!(
         DependencyGraphHarness::all_dependencies_report(all_dependencies),
         indoc::indoc!(
-            r#"
+            r"
             bar -> foo-bar
             baz -> foo-baz
             foo -> foo-bar
             foo -> foo-baz
             foo-bar -> foo-bar-foo-baz
-            foo-baz -> foo-bar-foo-baz"#
+            foo-baz -> foo-bar-foo-baz"
         ),
-    )
+    );
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -85,15 +85,15 @@ async fn test_multi_tenant_repository() {
     assert_eq!(
         DependencyGraphHarness::all_dependencies_report(all_dependencies),
         indoc::indoc!(
-            r#"
+            r"
             alice/bar -> alice/foo-bar
             alice/foo -> alice/foo-bar
             alice/foo -> bob/foo-baz
             alice/foo-bar -> eve/foo-bar-foo-baz
             bob/baz -> bob/foo-baz
-            bob/foo-baz -> eve/foo-bar-foo-baz"#
+            bob/foo-baz -> eve/foo-bar-foo-baz"
         ),
-    )
+    );
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

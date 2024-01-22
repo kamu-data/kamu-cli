@@ -90,10 +90,10 @@ impl Command for SystemDiagnoseCommand {
             }));
         }
 
-        for diagnostic_check in diagnostic_checks.iter() {
+        for diagnostic_check in &diagnostic_checks {
             write!(out, "{}... ", diagnostic_check.name())?;
             match diagnostic_check.run().await {
-                Ok(_) => writeln!(out, "{}", style(SUCCESS_MESSAGE).green())?,
+                Ok(()) => writeln!(out, "{}", style(SUCCESS_MESSAGE).green())?,
                 Err(err) => {
                     writeln!(out, "{}", style(FAILED_MESSAGE).red())?;
                     writeln!(out, "{}", style(err.to_string()).red())?;

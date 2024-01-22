@@ -28,7 +28,7 @@ impl<'a> PrettyCLIError<'a> {
             err_ref = e.source();
         }
 
-        let mut error_messages: Vec<_> = error_chain.iter().map(|e| format!("{}", e)).collect();
+        let mut error_messages: Vec<_> = error_chain.iter().map(|e| format!("{e}")).collect();
         Self::unchain_error_messages(&mut error_messages);
 
         if error_messages.len() == 1 {
@@ -42,7 +42,7 @@ impl<'a> PrettyCLIError<'a> {
             writeln!(f, "{}:", console::style("Error").red().bold())?;
 
             for (i, e) in error_messages.iter().enumerate() {
-                writeln!(f, "  {} {}", console::style(format!("{}:", i)).dim(), e)?;
+                writeln!(f, "  {} {}", console::style(format!("{i}:")).dim(), e)?;
             }
         }
 
@@ -95,7 +95,7 @@ impl<'a> PrettyCLIError<'a> {
                 err_ref = e.source();
             }
 
-            let mut error_messages: Vec<_> = error_chain.iter().map(|e| format!("{}", e)).collect();
+            let mut error_messages: Vec<_> = error_chain.iter().map(|e| format!("{e}")).collect();
             Self::unchain_error_messages(&mut error_messages);
 
             if error_messages.len() == 1 {
@@ -115,7 +115,7 @@ impl<'a> PrettyCLIError<'a> {
                 )?;
 
                 for (i, e) in error_messages.iter().enumerate() {
-                    writeln!(f, "  {} {}", console::style(format!("{}:", i)).dim(), e)?;
+                    writeln!(f, "  {} {}", console::style(format!("{i}:")).dim(), e)?;
                 }
             }
 

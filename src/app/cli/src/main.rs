@@ -15,7 +15,7 @@ fn main() {
     let result = runtime.block_on(kamu_cli::run(workspace_layout, matches));
 
     match result {
-        Ok(_) => (),
+        Ok(()) => (),
         Err(_) => {
             std::process::exit(1);
         }

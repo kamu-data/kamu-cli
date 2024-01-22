@@ -37,7 +37,7 @@ async fn test_ingest_push_url_stream() {
                     schema: Some(
                         ["date TIMESTAMP", "city STRING", "population BIGINT"]
                             .iter()
-                            .map(|s| s.to_string())
+                            .map(|s| (*s).to_string())
                             .collect(),
                     ),
                     ..ReadStepCsv::default()
@@ -89,7 +89,7 @@ async fn test_ingest_push_url_stream() {
     data_helper
         .assert_last_data_eq(
             indoc!(
-                r#"
+                r"
                 message arrow_schema {
                   OPTIONAL INT64 offset;
                   REQUIRED INT32 op;
@@ -98,10 +98,10 @@ async fn test_ingest_push_url_stream() {
                   OPTIONAL BYTE_ARRAY city (STRING);
                   OPTIONAL INT64 population;
                 }
-                "#
+                "
             ),
             indoc!(
-                r#"
+                r"
                 +--------+----+----------------------+----------------------+------+------------+
                 | offset | op | system_time          | date                 | city | population |
                 +--------+----+----------------------+----------------------+------+------------+
@@ -109,7 +109,7 @@ async fn test_ingest_push_url_stream() {
                 | 1      | 0  | 2050-01-01T12:00:00Z | 2020-01-01T00:00:00Z | B    | 2000       |
                 | 2      | 0  | 2050-01-01T12:00:00Z | 2020-01-01T00:00:00Z | C    | 3000       |
                 +--------+----+----------------------+----------------------+------+------------+
-                "#
+                "
             ),
         )
         .await;
@@ -142,13 +142,13 @@ async fn test_ingest_push_url_stream() {
 
     data_helper
         .assert_last_data_records_eq(indoc!(
-            r#"
+            r"
             +--------+----+----------------------+----------------------+------+------------+
             | offset | op | system_time          | date                 | city | population |
             +--------+----+----------------------+----------------------+------+------------+
             | 3      | 0  | 2050-01-01T12:00:00Z | 2021-01-01T00:00:00Z | C    | 4000       |
             +--------+----+----------------------+----------------------+------+------------+
-            "#
+            "
         ))
         .await;
 
@@ -179,7 +179,7 @@ async fn test_ingest_push_media_type_override() {
                     schema: Some(
                         ["date TIMESTAMP", "city STRING", "population BIGINT"]
                             .iter()
-                            .map(|s| s.to_string())
+                            .map(|s| (*s).to_string())
                             .collect(),
                     ),
                     ..Default::default()
@@ -228,7 +228,7 @@ async fn test_ingest_push_media_type_override() {
     data_helper
         .assert_last_data_eq(
             indoc!(
-                r#"
+                r"
                 message arrow_schema {
                   OPTIONAL INT64 offset;
                   REQUIRED INT32 op;
@@ -237,16 +237,16 @@ async fn test_ingest_push_media_type_override() {
                   OPTIONAL BYTE_ARRAY city (STRING);
                   OPTIONAL INT64 population;
                 }
-                "#
+                "
             ),
             indoc!(
-                r#"
+                r"
                 +--------+----+----------------------+----------------------+------+------------+
                 | offset | op | system_time          | date                 | city | population |
                 +--------+----+----------------------+----------------------+------+------------+
                 | 0      | 0  | 2050-01-01T12:00:00Z | 2020-01-01T00:00:00Z | A    | 1000       |
                 +--------+----+----------------------+----------------------+------+------------+
-                "#
+                "
             ),
         )
         .await;
@@ -278,7 +278,7 @@ async fn test_ingest_push_media_type_override() {
     data_helper
         .assert_last_data_eq(
             indoc!(
-                r#"
+                r"
                 message arrow_schema {
                   OPTIONAL INT64 offset;
                   REQUIRED INT32 op;
@@ -287,16 +287,16 @@ async fn test_ingest_push_media_type_override() {
                   OPTIONAL BYTE_ARRAY city (STRING);
                   OPTIONAL INT64 population;
                 }
-                "#
+                "
             ),
             indoc!(
-                r#"
+                r"
                 +--------+----+----------------------+----------------------+------+------------+
                 | offset | op | system_time          | date                 | city | population |
                 +--------+----+----------------------+----------------------+------+------------+
                 | 1      | 0  | 2050-01-01T12:00:00Z | 2020-01-01T00:00:00Z | B    | 2000       |
                 +--------+----+----------------------+----------------------+------+------------+
-                "#
+                "
             ),
         )
         .await;
@@ -330,7 +330,7 @@ async fn test_ingest_push_media_type_override() {
     data_helper
         .assert_last_data_eq(
             indoc!(
-                r#"
+                r"
                 message arrow_schema {
                   OPTIONAL INT64 offset;
                   REQUIRED INT32 op;
@@ -339,16 +339,16 @@ async fn test_ingest_push_media_type_override() {
                   OPTIONAL BYTE_ARRAY city (STRING);
                   OPTIONAL INT64 population;
                 }
-                "#
+                "
             ),
             indoc!(
-                r#"
+                r"
                 +--------+----+----------------------+----------------------+------+------------+
                 | offset | op | system_time          | date                 | city | population |
                 +--------+----+----------------------+----------------------+------+------------+
                 | 2      | 0  | 2050-01-01T12:00:00Z | 2020-01-01T00:00:00Z | C    | 3000       |
                 +--------+----+----------------------+----------------------+------+------------+
-                "#
+                "
             ),
         )
         .await;
@@ -371,7 +371,7 @@ async fn test_ingest_push_schema_stability() {
                     schema: Some(
                         ["event_time TIMESTAMP", "city STRING", "population BIGINT"]
                             .iter()
-                            .map(|s| s.to_string())
+                            .map(|s| (*s).to_string())
                             .collect(),
                     ),
                     ..ReadStepCsv::default()

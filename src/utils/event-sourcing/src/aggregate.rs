@@ -281,7 +281,8 @@ where
         if let Some(last_stored_event) = self.last_stored_event {
             assert!(
                 last_stored_event < event_id,
-                "Attempting to mutate with event {event_id} while state is already synced to {last_stored_event}",
+                "Attempting to mutate with event {event_id} while state is already synced to \
+                 {last_stored_event}",
             );
         }
 

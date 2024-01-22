@@ -53,7 +53,7 @@ pub struct UnsupportedProtocolError {
 impl std::fmt::Display for UnsupportedProtocolError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(msg) = &self.message {
-            write!(f, "{}", msg)
+            write!(f, "{msg}")
         } else {
             write!(
                 f,

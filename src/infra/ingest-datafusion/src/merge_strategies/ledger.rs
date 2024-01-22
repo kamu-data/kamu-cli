@@ -16,7 +16,7 @@ use crate::*;
 
 /// Ledger merge strategy.
 ///
-/// See [opendatafabric::MergeStrategyLedger] for details.
+/// See [`opendatafabric::MergeStrategyLedger`] for details.
 pub struct MergeStrategyLedger {
     vocab: odf::DatasetVocabulary,
     primary_key: Vec<String>,

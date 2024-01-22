@@ -183,7 +183,7 @@ impl WsSmartTransferProtocolClient {
                     pull_strategy = ? s.pull_strategy,
                     expires_at = ? s.download_from.expires_at,
                     "Detailed file download strategy",
-                )
+                );
             });
 
         Ok(dataset_objects_pull_response)
@@ -387,7 +387,7 @@ impl WsSmartTransferProtocolClient {
         tracing::debug!("Uploading group of files finished");
 
         match self.push_send_objects_upload_complete(socket).await {
-            Ok(_) => {}
+            Ok(()) => {}
             Err(e) => {
                 tracing::debug!("Push process aborted with error: {}", e);
                 return Err(SyncError::Internal(e.int_err()));
@@ -492,7 +492,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
         if let Some(access_token) = maybe_access_token {
             request.headers_mut().append(
                 http::header::AUTHORIZATION,
-                http::HeaderValue::from_str(format!("Bearer {}", access_token).as_str()).unwrap(),
+                http::HeaderValue::from_str(format!("Bearer {access_token}").as_str()).unwrap(),
             );
         }
 
@@ -694,7 +694,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
         if let Some(access_token) = maybe_access_token {
             request.headers_mut().append(
                 http::header::AUTHORIZATION,
-                http::HeaderValue::from_str(format!("Bearer {}", access_token).as_str()).unwrap(),
+                http::HeaderValue::from_str(format!("Bearer {access_token}").as_str()).unwrap(),
             );
         }
 
@@ -824,7 +824,7 @@ async fn write_payload<TMessagePayload: Serialize>(
     let message = Message::Text(payload_as_json_string);
     let send_result = socket.send(message).await;
     match send_result {
-        Ok(_) => Ok(()),
+        Ok(()) => Ok(()),
         Err(e) => Err(WriteMessageError::SocketError(Box::new(e))),
     }
 }

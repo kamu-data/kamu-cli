@@ -62,7 +62,7 @@ impl RepositoryListCommand {
 
         table.set_titles(row![bc->"Name", bc->"URL"]);
 
-        for name in repos.iter() {
+        for name in &repos {
             let repo = self
                 .remote_repo_reg
                 .get_repository(name)

@@ -152,7 +152,7 @@ fn serde_set_data_schema() {
         .unwrap();
 
     let expected_data = indoc!(
-        r#"
+        r"
         kind: MetadataBlock
         version: 2
         content:
@@ -162,7 +162,7 @@ fn serde_set_data_schema() {
           event:
             kind: SetDataSchema
             schema: DAAAAAgACAAAAAQACAAAAAQAAAACAAAAQAAAAAQAAADY////GAAAAAwAAAAAAAAGEAAAAAAAAAAEAAQABAAAAAEAAABiAAAAEAAUABAAAAAPAAQAAAAIABAAAAAYAAAAIAAAAAAAAAIcAAAACAAMAAQACwAIAAAAQAAAAAAAAAEAAAAAAQAAAGEAAAA=
-        "#
+        "
     );
 
     assert_eq!(expected_data, std::str::from_utf8(&actual_data).unwrap());
@@ -186,7 +186,7 @@ fn serde_set_data_schema() {
 #[test]
 fn serde_dataset_snapshot_root() {
     let data = indoc!(
-        r#"
+        r"
         kind: DatasetSnapshot
         version: 1
         content:
@@ -214,7 +214,7 @@ fn serde_dataset_snapshot_root() {
               kind: Snapshot
               primaryKey:
               - id
-        "#
+        "
     );
 
     let expected = DatasetSnapshot {
@@ -273,7 +273,7 @@ fn serde_dataset_snapshot_root() {
 #[test]
 fn serde_dataset_snapshot_derivative() {
     let data = indoc!(
-        r#"
+        r"
         kind: DatasetSnapshot
         version: 1
         content:
@@ -288,7 +288,7 @@ fn serde_dataset_snapshot_derivative() {
               kind: Sql
               engine: spark
               query: SOME_SQL
-        "#
+        "
     );
 
     let expected = DatasetSnapshot {
@@ -335,7 +335,7 @@ fn serde_dataset_snapshot_derivative() {
 #[test]
 fn serde_dataset_snapshot_derivative_with_multi_tenant_ref() {
     let data = indoc!(
-        r#"
+        r"
         kind: DatasetSnapshot
         version: 1
         content:
@@ -350,7 +350,7 @@ fn serde_dataset_snapshot_derivative_with_multi_tenant_ref() {
               kind: Sql
               engine: spark
               query: SOME_SQL
-        "#
+        "
     );
 
     let expected = DatasetSnapshot {

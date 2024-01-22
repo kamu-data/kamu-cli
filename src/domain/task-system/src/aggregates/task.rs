@@ -18,7 +18,7 @@ use crate::*;
 pub struct Task(Aggregate<TaskState, (dyn TaskSystemEventStore + 'static)>);
 
 impl Task {
-    /// Creates a task with a pending TaskCreated event
+    /// Creates a task with a pending `TaskCreated` event
     pub fn new(now: DateTime<Utc>, task_id: TaskID, logical_plan: LogicalPlan) -> Self {
         Self(
             Aggregate::new(

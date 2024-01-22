@@ -39,7 +39,7 @@ where
     let mut city = Vec::new();
     let mut population = Vec::new();
 
-    for (y, c, p) in rows.into_iter() {
+    for (y, c, p) in rows {
         year.push(y);
         city.push(c.into());
         population.push(p);
@@ -79,7 +79,7 @@ where
     let mut city = Vec::new();
     let mut population = Vec::new();
 
-    for (o, y, c, p) in rows.into_iter() {
+    for (o, y, c, p) in rows {
         op.push(o as i32);
         year.push(y);
         city.push(c.into());

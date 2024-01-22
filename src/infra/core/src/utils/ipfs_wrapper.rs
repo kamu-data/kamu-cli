@@ -60,7 +60,7 @@ impl IpfsClient {
             if let Some((id, name)) = line.split_once(' ') {
                 keys.push(IpfsKey::new(id.trim(), name.trim()));
             } else {
-                return Err(format!("Failed to parse IPFS output: {}", stdout).int_err());
+                return Err(format!("Failed to parse IPFS output: {stdout}").int_err());
             }
         }
 
@@ -123,7 +123,7 @@ impl IpfsClient {
             "1s",
         ]);
 
-        cmd.arg(format!("/ipns/{}", key));
+        cmd.arg(format!("/ipns/{key}"));
 
         tracing::info!(?cmd, "Running process");
 
@@ -165,7 +165,7 @@ impl IpfsClient {
                 "--resolve=false"
             });
         }
-        cmd.arg(format!("/ipfs/{}", cid));
+        cmd.arg(format!("/ipfs/{cid}"));
 
         tracing::info!(?cmd, "Running process");
 

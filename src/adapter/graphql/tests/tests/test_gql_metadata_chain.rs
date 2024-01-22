@@ -126,7 +126,7 @@ async fn test_metadata_chain_events() {
     let res = schema
         .execute(async_graphql::Request::new(request_code.clone()).data(catalog_authorized))
         .await;
-    assert!(res.is_ok(), "{:?}", res);
+    assert!(res.is_ok(), "{res:?}");
 
     let expected_schema = r#"{"name": "arrow_schema", "type": "struct", "fields": [{"name": "city", "repetition": "REQUIRED", "type": "BYTE_ARRAY", "logicalType": "STRING"}, {"name": "population", "repetition": "REQUIRED", "type": "INT64"}]}"#;
 
@@ -250,7 +250,7 @@ async fn metadata_chain_append_event() {
     let res = schema
         .execute(async_graphql::Request::new(request_code.clone()).data(catalog_authorized))
         .await;
-    assert!(res.is_ok(), "{:?}", res);
+    assert!(res.is_ok(), "{res:?}");
     assert_eq!(
         res.data,
         value!({
@@ -341,7 +341,7 @@ async fn metadata_update_readme_new() {
         .await;
 
     let assert_result = |res: async_graphql::Response, expected: &str| {
-        assert!(res.is_ok(), "{:?}", res);
+        assert!(res.is_ok(), "{res:?}");
         assert_eq!(
             res.data,
             value!({

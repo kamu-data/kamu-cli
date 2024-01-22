@@ -25,8 +25,8 @@ impl DatasetID {
         Self { did }
     }
 
-    /// Creates `DatasetID` from generated key pair using cryptographically secure
-    /// RNG
+    /// Creates `DatasetID` from generated key pair using cryptographically
+    /// secure RNG
     pub fn new_generated_ed25519() -> (SigningKey, Self) {
         let (key, did) = DidOdf::new_generated_ed25519();
         (key, Self::new(did))

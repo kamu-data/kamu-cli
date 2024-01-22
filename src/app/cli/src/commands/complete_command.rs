@@ -67,7 +67,7 @@ impl CompleteCommand {
     fn complete_env_var(&self, output: &mut impl Write, prefix: &str) {
         for (k, _) in std::env::vars() {
             if k.starts_with(prefix) {
-                writeln!(output, "{}", k).unwrap();
+                writeln!(output, "{k}").unwrap();
             }
         }
     }
@@ -87,7 +87,7 @@ impl CompleteCommand {
         if let Some(reg) = self.remote_repo_reg.as_ref() {
             for repo_id in reg.get_all_repositories() {
                 if repo_id.starts_with(prefix) {
-                    writeln!(output, "{}", repo_id).unwrap();
+                    writeln!(output, "{repo_id}").unwrap();
                 }
             }
         }
@@ -104,12 +104,12 @@ impl CompleteCommand {
                         .unwrap();
                     for alias in aliases.get_by_kind(RemoteAliasKind::Pull) {
                         if alias.to_string().starts_with(prefix) {
-                            writeln!(output, "{}", alias).unwrap();
+                            writeln!(output, "{alias}").unwrap();
                         }
                     }
                     for alias in aliases.get_by_kind(RemoteAliasKind::Push) {
                         if alias.to_string().starts_with(prefix) {
-                            writeln!(output, "{}", alias).unwrap();
+                            writeln!(output, "{alias}").unwrap();
                         }
                     }
                 }
@@ -120,7 +120,7 @@ impl CompleteCommand {
     fn complete_config_key(&self, output: &mut impl Write, prefix: &str) {
         for key in self.config_service.all_keys() {
             if key.starts_with(prefix) {
-                writeln!(output, "{}", key).unwrap();
+                writeln!(output, "{key}").unwrap();
             }
         }
     }
@@ -175,7 +175,7 @@ impl CompleteCommand {
         let mut last_cmd = &self.cli;
 
         // Establish command context
-        for arg in args[1..].iter() {
+        for arg in &args[1..] {
             for s in last_cmd.get_subcommands() {
                 if s.get_name() == *arg || s.get_visible_aliases().any(|a| a == arg) {
                     last_cmd = s;
@@ -184,7 +184,7 @@ impl CompleteCommand {
             }
         }
 
-        let empty = "".to_owned();
+        let empty = String::new();
         let prev = args.get(self.current - 1).unwrap_or(&empty);
         let to_complete = args.get(self.current).unwrap_or(&empty);
 
@@ -238,14 +238,14 @@ impl CompleteCommand {
         if to_complete.starts_with('-') {
             for arg in last_cmd.get_arguments() {
                 let full_name = if let Some(long) = arg.get_long() {
-                    format!("--{}", long)
+                    format!("--{long}")
                 } else if let Some(short) = arg.get_short() {
-                    format!("-{}", short)
+                    format!("-{short}")
                 } else {
-                    "".into()
+                    String::new()
                 };
                 if full_name.starts_with(to_complete) {
-                    writeln!(output, "{}", full_name).int_err()?;
+                    writeln!(output, "{full_name}").int_err()?;
                 }
             }
         }

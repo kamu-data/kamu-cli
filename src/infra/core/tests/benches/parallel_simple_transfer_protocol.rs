@@ -184,7 +184,7 @@ fn bench_with_1_parallel(c: &mut Criterion) {
                 &DatasetRefRemote::from(&pull_repo_url),
                 &DatasetRefRemote::from(&push_repo_url),
                 dataset_repo.clone(),
-            ))
+            ));
         });
     });
 }
@@ -213,7 +213,7 @@ fn bench_with_10_parallels(c: &mut Criterion) {
                 &DatasetRefRemote::from(&pull_repo_url),
                 &DatasetRefRemote::from(&push_repo_url),
                 dataset_repo.clone(),
-            ))
+            ));
         });
     });
 }

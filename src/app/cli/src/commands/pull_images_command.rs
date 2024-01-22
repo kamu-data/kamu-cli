@@ -53,12 +53,12 @@ impl Command for PullImagesCommand {
             self.jupyter_config.livy_image.as_ref().unwrap().as_str(),
         ];
 
-        images.sort();
+        images.sort_unstable();
         images.dedup();
 
         if self.list_only {
             for img in images {
-                println!("{}", img);
+                println!("{img}");
             }
         } else {
             for img in images {

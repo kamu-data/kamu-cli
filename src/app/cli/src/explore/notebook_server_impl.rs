@@ -68,9 +68,10 @@ impl NotebookServerImpl {
         StartedClb: FnOnce(&str) + Send + 'static,
         ShutdownClb: FnOnce() + Send + 'static,
     {
-        if address.is_some() {
-            panic!("Exposing Notebook server on a host network interface is not yet supported");
-        }
+        assert!(
+            address.is_none(),
+            "Exposing Notebook server on a host network interface is not yet supported"
+        );
 
         let network_name = "kamu";
 
@@ -156,7 +157,7 @@ impl NotebookServerImpl {
             .int_err()?;
 
         let token_clb = move |token: &str| {
-            let url = format!("http://{}:{}/?token={}", docker_host, jupyter_port, token);
+            let url = format!("http://{docker_host}:{jupyter_port}/?token={token}");
             on_started(&url);
         };
 

@@ -28,7 +28,7 @@ impl HttpFileServer {
         let addr = SocketAddr::from((IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 0));
 
         let bound_addr = AddrIncoming::bind(&addr).unwrap_or_else(|e| {
-            panic!("error binding to {}: {}", addr, e);
+            panic!("error binding to {addr}: {e}");
         });
 
         let app = axum::Router::new()

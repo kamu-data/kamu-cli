@@ -19,11 +19,11 @@ async fn test_parse_ddl() {
     .unwrap();
     kamu_data_utils::testing::assert_schema_eq(
         &schema,
-        r#"
+        r"
 message arrow_schema {
   REQUIRED INT64 ts (TIMESTAMP(NANOS,false));
 }
-        "#,
+        ",
     );
 }
 
@@ -39,10 +39,10 @@ async fn test_parse_ddl_with_force_utc() {
     .unwrap();
     kamu_data_utils::testing::assert_schema_eq(
         &schema,
-        r#"
+        r"
 message arrow_schema {
   REQUIRED INT64 ts (TIMESTAMP(NANOS,true));
 }
-        "#,
+        ",
     );
 }

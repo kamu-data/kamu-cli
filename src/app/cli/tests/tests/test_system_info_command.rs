@@ -46,5 +46,5 @@ async fn test_system_info() {
             },
             container_runtime: ContainerRuntimeInfo { info: _ },
         }
-    )
+    );
 }

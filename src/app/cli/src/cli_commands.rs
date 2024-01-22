@@ -535,7 +535,7 @@ where
     I: IntoIterator<Item = DatasetRef>,
 {
     let mut result_refs = Vec::new();
-    for dataset_ref in dataset_refs.into_iter() {
+    for dataset_ref in dataset_refs {
         result_refs.push(validate_dataset_ref(catalog, dataset_ref)?);
     }
 

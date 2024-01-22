@@ -72,7 +72,7 @@ impl Command for AliasDeleteCommand {
 
         eprintln!(
             "{}",
-            console::style(format!("Deleted {} alias(es)", count))
+            console::style(format!("Deleted {count} alias(es)"))
                 .green()
                 .bold()
         );

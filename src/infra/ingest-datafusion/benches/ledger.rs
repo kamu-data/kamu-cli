@@ -185,7 +185,7 @@ fn bench(c: &mut Criterion) {
     let mut group = c.benchmark_group("merge");
     group.sample_size(10);
     group.bench_function("ledger", |b| {
-        b.iter(|| rt.block_on(merge(&prev, &new, added_rows)))
+        b.iter(|| rt.block_on(merge(&prev, &new, added_rows)));
     });
 }
 

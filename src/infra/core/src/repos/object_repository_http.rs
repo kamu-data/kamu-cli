@@ -36,8 +36,7 @@ impl ObjectRepositoryHttp {
         assert!(
             !base_url.cannot_be_a_base()
                 && (base_url.path().is_empty() || base_url.path().ends_with('/')),
-            "Invalid base url: {}",
-            base_url
+            "Invalid base url: {base_url}"
         );
         Self {
             client,
