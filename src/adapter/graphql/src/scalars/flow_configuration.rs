@@ -127,7 +127,7 @@ impl From<chrono::Duration> for TimeDelta {
         }
 
         unreachable!(
-            "Expecting intervals not tinier than 1 minute that are clearly dividable by unit"
+            "Expecting intervals not smaller than 1 minute that are clearly dividable by unit"
         );
     }
 }
