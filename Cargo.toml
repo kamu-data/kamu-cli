@@ -89,7 +89,17 @@ result_large_err = "allow"
 module_inception = "allow"
 
 # clippy::pedantic
+# TODO: reactivate after polishing
+# pedantic = { level = "warn", priority = 0 }
+
 unreadable_literal = { level = "warn", priority = 1 }
+return_self_not_must_use = { level = "allow", priority = 1 }
+missing_errors_doc = { level = "allow", priority = 1 }
+missing_panics_doc = { level = "allow", priority = 1 }
+module_name_repetitions = { level = "allow", priority = 1 }
+wildcard_imports = { level = "allow", priority = 1 }
+must_use_candidate = { level = "allow", priority = 1 }
+redundant_closure_for_method_calls = { level = "allow", priority = 1 }
 
 # clippy::cargo
 cargo = { level = "warn", priority = 0 }
