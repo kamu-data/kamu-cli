@@ -175,6 +175,77 @@ async fn test_crud_time_delta_root_dataset() {
 ////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_time_delta_validation() {
+    let harness = FlowConfigHarness::new();
+
+    let create_result = harness.create_root_dataset().await;
+
+    let schema = kamu_adapter_graphql::schema_quiet();
+
+    // These cases exceed unit boundary, but must return the same "every" & "unit"
+    for test_case in [
+        (63, "MINUTES"),
+        (30, "HOURS"),
+        (8, "DAYS"),
+        (169, "DAYS"),
+        (169, "WEEKS"),
+    ] {
+        let mutation_code = FlowConfigHarness::set_config_time_delta_mutation(
+            &create_result.dataset_handle.id,
+            "INGEST",
+            true,
+            test_case.0,
+            test_case.1,
+        );
+
+        let response = schema
+            .execute(
+                async_graphql::Request::new(mutation_code.clone())
+                    .data(harness.catalog_authorized.clone()),
+            )
+            .await;
+        assert!(response.is_ok(), "{response:?}");
+
+        let response_json = response.data.into_json().unwrap();
+        assert_eq!(
+            (test_case.0, test_case.1,),
+            FlowConfigHarness::extract_time_delta_from_response(&response_json)
+        );
+    }
+
+    // These cases exceed unit boundary, but can be compacted to higher level unit
+    for test_case in [
+        (360, "MINUTES", 6, "HOURS"),
+        (48, "HOURS", 2, "DAYS"),
+        (7, "DAYS", 1, "WEEKS"),
+    ] {
+        let mutation_code = FlowConfigHarness::set_config_time_delta_mutation(
+            &create_result.dataset_handle.id,
+            "INGEST",
+            true,
+            test_case.0,
+            test_case.1,
+        );
+
+        let response = schema
+            .execute(
+                async_graphql::Request::new(mutation_code.clone())
+                    .data(harness.catalog_authorized.clone()),
+            )
+            .await;
+        assert!(response.is_ok(), "{response:?}");
+
+        let response_json = response.data.into_json().unwrap();
+        assert_eq!(
+            (test_case.2, test_case.3,),
+            FlowConfigHarness::extract_time_delta_from_response(&response_json)
+        );
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_crud_cron_root_dataset() {
     let harness = FlowConfigHarness::new();
 
@@ -708,6 +779,16 @@ impl FlowConfigHarness {
             )
             .await
             .unwrap()
+    }
+
+    fn extract_time_delta_from_response(response_json: &serde_json::Value) -> (u64, &str) {
+        let schedule_json = &response_json["datasets"]["byId"]["flows"]["configs"]
+            ["setConfigSchedule"]["config"]["schedule"];
+
+        (
+            schedule_json["every"].as_u64().unwrap(),
+            schedule_json["unit"].as_str().unwrap(),
+        )
     }
 
     fn set_config_time_delta_mutation(
