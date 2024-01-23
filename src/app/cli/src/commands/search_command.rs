@@ -94,7 +94,7 @@ impl SearchCommand {
         writeln!(out, "Name").unwrap();
 
         for name in &search_result.datasets {
-            writeln!(out, "{}", name).unwrap();
+            writeln!(out, "{name}").unwrap();
         }
     }
 }

@@ -21,14 +21,14 @@ pub fn write_schema_parquet(output: &mut dyn Write, schema: &Type) -> Result<(),
     Ok(())
 }
 
-/// Same as [write_schema_parquet] but outputs into a String
+/// Same as [`write_schema_parquet`] but outputs into a String
 pub fn format_schema_parquet(schema: &Type) -> String {
     let mut buf = Vec::new();
     write_schema_parquet(&mut buf, schema).unwrap();
     String::from_utf8(buf).unwrap()
 }
 
-/// Similar to [write_schema_parquet], but uses JSON format that does not
+/// Similar to [`write_schema_parquet`], but uses JSON format that does not
 /// require a custom parser
 pub fn write_schema_parquet_json(
     output: &mut dyn Write,
@@ -49,7 +49,7 @@ pub fn write_schema_arrow(output: &mut dyn Write, schema: &Schema) -> Result<(),
     write_schema_parquet(output, &parquet_schema)
 }
 
-/// Same as [write_schema_arrow] but outputs into a String
+/// Same as [`write_schema_arrow`] but outputs into a String
 pub fn format_schema_arrow(schema: &Schema) -> String {
     let mut buf = Vec::new();
     write_schema_arrow(&mut buf, schema).unwrap();
@@ -84,12 +84,10 @@ impl<'a> ParquetJsonSchemaWriter<'a> {
                 )?;
 
                 match physical_type {
-                    PhysicalType::FIXED_LEN_BYTE_ARRAY => write!(
-                        self.output,
-                        r#", "type": "{}({})""#,
-                        physical_type, type_length
-                    )?,
-                    _ => write!(self.output, r#", "type": "{}""#, physical_type)?,
+                    PhysicalType::FIXED_LEN_BYTE_ARRAY => {
+                        write!(self.output, r#", "type": "{physical_type}({type_length})""#)?
+                    }
+                    _ => write!(self.output, r#", "type": "{physical_type}""#)?,
                 };
 
                 // Also print logical type if it is available
@@ -102,7 +100,7 @@ impl<'a> ParquetJsonSchemaWriter<'a> {
                 );
 
                 if !logical_type_str.is_empty() {
-                    write!(self.output, r#", "logicalType": "{}""#, logical_type_str)?;
+                    write!(self.output, r#", "logicalType": "{logical_type_str}""#)?;
                 }
 
                 write!(self.output, "}}")?;
@@ -152,10 +150,10 @@ impl<'a> ParquetJsonSchemaWriter<'a> {
                     bit_width,
                     is_signed,
                 } => {
-                    format!("INTEGER({},{})", bit_width, is_signed)
+                    format!("INTEGER({bit_width},{is_signed})")
                 }
                 LogicalType::Decimal { precision, scale } => {
-                    format!("DECIMAL({},{})", precision, scale)
+                    format!("DECIMAL({precision},{scale})")
                 }
                 LogicalType::Timestamp {
                     is_adjusted_to_u_t_c,
@@ -197,15 +195,15 @@ impl<'a> ParquetJsonSchemaWriter<'a> {
                         // DECIMAL(9) - DECIMAL
                         let precision_scale = match (precision, scale) {
                             (p, s) if p > 0 && s > 0 => {
-                                format!("({},{})", p, s)
+                                format!("({p},{s})")
                             }
-                            (p, 0) if p > 0 => format!("({})", p),
+                            (p, 0) if p > 0 => format!("({p})"),
                             _ => String::new(),
                         };
-                        format!("{}{}", decimal, precision_scale)
+                        format!("{decimal}{precision_scale}")
                     }
                     other_converted_type => {
-                        format!("{}", other_converted_type)
+                        format!("{other_converted_type}")
                     }
                 }
             }

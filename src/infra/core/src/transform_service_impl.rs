@@ -134,7 +134,7 @@ impl TransformServiceImpl {
             // Validate schema
             if let Some(new_schema) = new_schema {
                 DataWriterDataFusion::validate_output_schema_equivalence(&prev_schema, &new_schema)
-                    .int_err()?
+                    .int_err()?;
             }
         } else {
             // Set schema upon first transform
@@ -217,7 +217,7 @@ impl TransformServiceImpl {
                 match block.event {
                     MetadataEvent::SetVocab(e) => {
                         if set_vocab.is_none() {
-                            set_vocab = Some(e)
+                            set_vocab = Some(e);
                         }
                     }
                     MetadataEvent::SetTransform(e) => {
@@ -229,12 +229,12 @@ impl TransformServiceImpl {
                     }
                     MetadataEvent::SetDataSchema(e) => {
                         if schema.is_none() {
-                            schema = Some(e.schema_as_arrow().int_err()?)
+                            schema = Some(e.schema_as_arrow().int_err()?);
                         }
                     }
                     MetadataEvent::ExecuteTransform(e) => {
                         if prev_query.is_none() {
-                            prev_query = Some(e)
+                            prev_query = Some(e);
                         }
                     }
                     MetadataEvent::Seed(_)
@@ -564,12 +564,12 @@ impl TransformServiceImpl {
                     }
                     MetadataEvent::SetVocab(sv) => {
                         if set_vocab.is_none() {
-                            set_vocab = Some(sv)
+                            set_vocab = Some(sv);
                         }
                     }
                     MetadataEvent::SetDataSchema(e) => {
                         if schema.is_none() {
-                            schema = Some(e.schema_as_arrow().int_err()?)
+                            schema = Some(e.schema_as_arrow().int_err()?);
                         }
                     }
                     MetadataEvent::ExecuteTransform(_) => {

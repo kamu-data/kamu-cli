@@ -138,7 +138,7 @@ impl Command for VerifyCommand {
         let mut valid = 0;
         let mut errors = 0;
 
-        for (_, res) in verification_results.iter() {
+        for (_, res) in &verification_results {
             match res {
                 Ok(_) => valid += 1,
                 Err(_) => errors += 1,
@@ -148,16 +148,16 @@ impl Command for VerifyCommand {
         if valid != 0 {
             eprintln!(
                 "{}",
-                console::style(format!("{} dataset(s) are valid", valid))
+                console::style(format!("{valid} dataset(s) are valid"))
                     .green()
                     .bold()
             );
         }
         if errors != 0 {
             Err(BatchError::new(
-                format!("Failed to verify {} dataset(s)", errors),
+                format!("Failed to verify {errors} dataset(s)"),
                 verification_results.into_iter().filter_map(|(id, res)| {
-                    res.err().map(|e| (e, format!("Failed to verify {}", id)))
+                    res.err().map(|e| (e, format!("Failed to verify {id}")))
                 }),
             )
             .into())

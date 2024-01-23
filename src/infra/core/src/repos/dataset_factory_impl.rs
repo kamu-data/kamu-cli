@@ -138,32 +138,32 @@ impl DatasetFactoryImpl {
                     client.clone(),
                     endpoint.clone(),
                     bucket.clone(),
-                    format!("{}blocks/", key_prefix),
+                    format!("{key_prefix}blocks/"),
                 )),
                 ReferenceRepositoryImpl::new(NamedObjectRepositoryS3::new(S3Context::new(
                     client.clone(),
                     endpoint.clone(),
                     bucket.clone(),
-                    format!("{}refs/", key_prefix),
+                    format!("{key_prefix}refs/"),
                 ))),
             ),
             ObjectRepositoryS3::<sha3::Sha3_256, 0x16>::new(S3Context::new(
                 client.clone(),
                 endpoint.clone(),
                 bucket.clone(),
-                format!("{}data/", key_prefix),
+                format!("{key_prefix}data/"),
             )),
             ObjectRepositoryS3::<sha3::Sha3_256, 0x16>::new(S3Context::new(
                 client.clone(),
                 endpoint.clone(),
                 bucket.clone(),
-                format!("{}checkpoints/", key_prefix),
+                format!("{key_prefix}checkpoints/"),
             )),
             NamedObjectRepositoryS3::new(S3Context::new(
                 client.clone(),
                 endpoint.clone(),
                 bucket.clone(),
-                format!("{}info/", key_prefix),
+                format!("{key_prefix}info/"),
             )),
         ))
     }
@@ -254,7 +254,7 @@ impl DatasetFactoryImpl {
 
     async fn resolve_ipns_dnslink(&self, domain: &str) -> Result<String, InternalError> {
         let r = trust_dns_resolver::TokioAsyncResolver::tokio_from_system_conf().int_err()?;
-        let query = format!("_dnslink.{}", domain);
+        let query = format!("_dnslink.{domain}");
         let result = r.txt_lookup(&query).await.int_err()?;
 
         let dnslink_re = regex::Regex::new(r"_?dnslink=/ipfs/(.*)").unwrap();
@@ -280,8 +280,7 @@ impl DatasetFactoryImpl {
                 let mut header_map = http::HeaderMap::new();
                 header_map.append(
                     http::header::AUTHORIZATION,
-                    http::HeaderValue::from_str(format!("Bearer {}", access_token).as_str())
-                        .unwrap(),
+                    http::HeaderValue::from_str(format!("Bearer {access_token}").as_str()).unwrap(),
                 );
                 header_map
             }

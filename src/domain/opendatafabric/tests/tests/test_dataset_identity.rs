@@ -103,8 +103,8 @@ fn test_dataset_name_newtype() {
 fn test_dataset_name_fmt() {
     let id = DatasetName::try_from("valid.dataset.id").unwrap();
 
-    assert_eq!(format!("{}", id), "valid.dataset.id");
-    assert_eq!(format!("{:?}", id), "DatasetName(\"valid.dataset.id\")");
+    assert_eq!(format!("{id}"), "valid.dataset.id");
+    assert_eq!(format!("{id:?}"), "DatasetName(\"valid.dataset.id\")");
 }
 
 #[test]

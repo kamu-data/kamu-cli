@@ -95,8 +95,7 @@ impl S3Context {
 
         assert!(
             key_prefix.is_empty() || key_prefix.ends_with('/'),
-            "Base URL does not contain a trailing slash: {}",
-            url
+            "Base URL does not contain a trailing slash: {url}"
         );
 
         Self::from_items(endpoint, bucket, key_prefix).await
@@ -115,18 +114,18 @@ impl S3Context {
                     )
                 }
                 ("s3+http", Some(host), None, path) => {
-                    (Some(format!("http://{}", host)), path.to_owned())
+                    (Some(format!("http://{host}")), path.to_owned())
                 }
                 ("s3+http", Some(host), Some(port), path) => {
-                    (Some(format!("http://{}:{}", host, port)), path.to_owned())
+                    (Some(format!("http://{host}:{port}")), path.to_owned())
                 }
                 ("s3+https", Some(host), None, path) => {
-                    (Some(format!("https://{}", host)), path.to_owned())
+                    (Some(format!("https://{host}")), path.to_owned())
                 }
                 ("s3+https", Some(host), Some(port), path) => {
-                    (Some(format!("https://{}:{}", host, port)), path.to_owned())
+                    (Some(format!("https://{host}:{port}")), path.to_owned())
                 }
-                _ => panic!("Unsupported S3 url format: {}", url),
+                _ => panic!("Unsupported S3 url format: {url}"),
             };
 
         let (bucket, key_prefix) = match path.trim_start_matches('/').split_once('/') {

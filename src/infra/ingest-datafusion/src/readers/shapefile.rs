@@ -98,7 +98,7 @@ impl ReaderEsriShapefile {
     }
 
     fn locate_shp_file(dir: &Path, subpath: Option<&str>) -> Result<PathBuf, ReadError> {
-        let is_shp_file = |p: &Path| -> bool { p.extension().map(|s| s == "shp").unwrap_or(false) };
+        let is_shp_file = |p: &Path| -> bool { p.extension().is_some_and(|s| s == "shp") };
 
         let list_shp_files = || -> Vec<PathBuf> {
             walkdir::WalkDir::new(dir)
@@ -191,9 +191,9 @@ impl ReaderEsriShapefile {
                 ShpValue::Date(v) => {
                     v.map(|v| JsonValue::String(format!("{}-{}-{}", v.year(), v.month(), v.day())))
                 }
-                ShpValue::Float(v) => {
-                    v.map(|v| JsonValue::Number(serde_json::Number::from_f64(v as f64).unwrap()))
-                }
+                ShpValue::Float(v) => v.map(|v| {
+                    JsonValue::Number(serde_json::Number::from_f64(f64::from(v)).unwrap())
+                }),
                 ShpValue::Integer(v) => Some(JsonValue::Number(v.into())),
                 ShpValue::Currency(v) => {
                     Some(JsonValue::Number(serde_json::Number::from_f64(v).unwrap()))

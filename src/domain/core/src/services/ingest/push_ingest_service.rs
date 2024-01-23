@@ -223,7 +223,7 @@ impl std::fmt::Display for PushSourceNotFoundError {
                 "Dataset does not define a default push source, consider specifying the source \
                  name"
             ),
-            Some(s) => write!(f, "Dataset does not define a push source '{}'", s),
+            Some(s) => write!(f, "Dataset does not define a push source '{s}'"),
         }
     }
 }

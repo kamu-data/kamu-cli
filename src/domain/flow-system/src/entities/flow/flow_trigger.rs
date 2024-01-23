@@ -32,7 +32,7 @@ impl FlowTrigger {
 
     pub fn push_source_name(&self) -> Option<String> {
         if let FlowTrigger::Push(trigger_push) = self {
-            trigger_push.source_name.to_owned()
+            trigger_push.source_name.clone()
         } else {
             panic!("Any trigger kind except Push unexpected")
         }

@@ -146,7 +146,7 @@ impl Command for PushCommand {
         let mut up_to_date = 0;
         let mut errors = 0;
 
-        for res in push_results.iter() {
+        for res in &push_results {
             match &res.result {
                 Ok(r) => match r {
                     SyncResult::UpToDate => up_to_date += 1,
@@ -159,7 +159,7 @@ impl Command for PushCommand {
         if updated != 0 {
             eprintln!(
                 "{}",
-                console::style(format!("{} dataset(s) pushed", updated))
+                console::style(format!("{updated} dataset(s) pushed"))
                     .green()
                     .bold()
             );
@@ -167,14 +167,14 @@ impl Command for PushCommand {
         if up_to_date != 0 {
             eprintln!(
                 "{}",
-                console::style(format!("{} dataset(s) up-to-date", up_to_date))
+                console::style(format!("{up_to_date} dataset(s) up-to-date"))
                     .yellow()
                     .bold()
             );
         }
         if errors != 0 {
             Err(BatchError::new(
-                format!("Failed to push {} dataset(s)", errors),
+                format!("Failed to push {errors} dataset(s)"),
                 push_results
                     .into_iter()
                     .filter(|res| res.result.is_err())
@@ -264,7 +264,7 @@ impl PrettySyncProgress {
             .template("{spinner:.cyan} {msg} {prefix:.dim}")
             .unwrap();
         spinner.set_style(style);
-        spinner.set_prefix(format!("({} > {})", local_ref, remote_ref));
+        spinner.set_prefix(format!("({local_ref} > {remote_ref})"));
         spinner.set_message("Syncing dataset to repository".to_owned());
         spinner.enable_steady_tick(Duration::from_millis(100));
         spinner

@@ -218,7 +218,7 @@ pub async fn dataset_append_metadata(
         if let opendatafabric::MetadataEvent::SetTransform(transform) = &block.event {
             // Collect only the latest upstream dataset IDs
             new_upstream_ids.clear();
-            for new_input in transform.inputs.iter() {
+            for new_input in &transform.inputs {
                 if let Some(id) = new_input.dataset_ref.id() {
                     new_upstream_ids.push(id.clone());
                 } else {
@@ -258,17 +258,23 @@ pub async fn dataset_append_metadata(
 /////////////////////////////////////////////////////////////////////////////////////////
 
 async fn unpack_dataset_metadata_batch(objects_batch: ObjectsBatch) -> Vec<(Multihash, Vec<u8>)> {
-    if !objects_batch.media_type.eq(MEDIA_TAR_GZ) {
-        panic!("Unsupported media type {}", objects_batch.media_type);
-    }
+    assert!(
+        objects_batch.media_type.eq(MEDIA_TAR_GZ),
+        "Unsupported media type {}",
+        objects_batch.media_type
+    );
 
-    if !objects_batch.encoding.eq(ENCODING_RAW) {
-        panic!("Unsupported batch encoding type {}", objects_batch.encoding);
-    }
+    assert!(
+        objects_batch.encoding.eq(ENCODING_RAW),
+        "Unsupported batch encoding type {}",
+        objects_batch.encoding
+    );
 
-    if objects_batch.object_type != ObjectType::MetadataBlock {
-        panic!("Unexpected object type {:?}", objects_batch.object_type);
-    }
+    assert!(
+        !(objects_batch.object_type != ObjectType::MetadataBlock),
+        "Unexpected object type {:?}",
+        objects_batch.object_type
+    );
 
     let decoder = flate2::read::GzDecoder::new(objects_batch.payload.as_slice());
     let mut archive = tar::Archive::new(decoder);
@@ -357,7 +363,7 @@ pub async fn collect_object_references_from_metadata(
             &mut res_references,
             missing_files_only,
         )
-        .await
+        .await;
     }
 
     res_references
@@ -555,7 +561,7 @@ fn get_simple_transfer_protocol_headers(
 fn primitivize_header_map(header_map: http::HeaderMap) -> Vec<HeaderRow> {
     let mut res = Vec::new();
 
-    for (name, value) in header_map.iter() {
+    for (name, value) in &header_map {
         res.push(HeaderRow {
             name: name.to_string(),
             value: value.to_str().unwrap().to_string(),
@@ -570,7 +576,7 @@ fn primitivize_header_map(header_map: http::HeaderMap) -> Vec<HeaderRow> {
 fn reconstruct_header_map(headers_as_primitives: Vec<HeaderRow>) -> http::HeaderMap {
     let mut res = http::HeaderMap::new();
 
-    for HeaderRow { name, value } in headers_as_primitives.into_iter() {
+    for HeaderRow { name, value } in headers_as_primitives {
         res.append(
             http::HeaderName::from_str(name.as_str()).unwrap(),
             http::HeaderValue::from_str(value.as_str()).unwrap(),
@@ -646,12 +652,11 @@ pub async fn dataset_import_object_file(
     dataset: &dyn Dataset,
     object_transfer_strategy: PullObjectTransferStrategy,
 ) -> Result<(), SyncError> {
-    if object_transfer_strategy.pull_strategy != ObjectPullStrategy::HttpDownload {
-        panic!(
-            "Unsupported pull strategy {:?}",
-            object_transfer_strategy.pull_strategy
-        );
-    }
+    assert!(
+        !(object_transfer_strategy.pull_strategy != ObjectPullStrategy::HttpDownload),
+        "Unsupported pull strategy {:?}",
+        object_transfer_strategy.pull_strategy
+    );
 
     let object_file_reference = &object_transfer_strategy.object_file;
 
@@ -722,15 +727,15 @@ pub async fn dataset_export_object_file(
         );
         return Ok(());
     }
-    if object_transfer_strategy.push_strategy != ObjectPushStrategy::HttpUpload {
-        panic!(
-            "Unsupported push strategy {:?}",
-            object_transfer_strategy.push_strategy
-        );
-    }
-    if object_transfer_strategy.upload_to.is_none() {
-        panic!("Expected URL for upload strategy")
-    }
+    assert!(
+        !(object_transfer_strategy.push_strategy != ObjectPushStrategy::HttpUpload),
+        "Unsupported push strategy {:?}",
+        object_transfer_strategy.push_strategy
+    );
+    assert!(
+        object_transfer_strategy.upload_to.is_some(),
+        "Expected URL for upload strategy"
+    );
 
     let object_file_reference = &object_transfer_strategy.object_file;
 

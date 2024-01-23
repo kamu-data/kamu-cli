@@ -173,7 +173,7 @@ impl std::str::FromStr for BlockRef {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "head" => Ok(Self::Head),
-            _ => Err(format!("Invalid block reference: {}", s).int_err()),
+            _ => Err(format!("Invalid block reference: {s}").int_err()),
         }
     }
 }

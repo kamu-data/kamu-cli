@@ -130,7 +130,7 @@ async fn test_dataset_schema_local_fs() {
             .data(catalog),
         )
         .await;
-    assert!(res.is_ok(), "{:?}", res);
+    assert!(res.is_ok(), "{res:?}");
     let json = serde_json::to_string(&res.data).unwrap();
     let json = serde_json::from_str::<serde_json::Value>(&json).unwrap();
     let data_schema = &json["datasets"]["byOwnerAndName"]["data"]["tail"]["schema"]["content"];
@@ -189,7 +189,7 @@ async fn test_dataset_tail_local_fs() {
             .data(catalog),
         )
         .await;
-    assert!(res.is_ok(), "{:?}", res);
+    assert!(res.is_ok(), "{res:?}");
     let json = serde_json::to_string(&res.data).unwrap();
     let json = serde_json::from_str::<serde_json::Value>(&json).unwrap();
     let data = &json["datasets"]["byOwnerAndName"]["data"]["tail"]["data"]["content"];
@@ -230,7 +230,7 @@ async fn test_dataset_tail_empty_local_fs() {
             .data(catalog),
         )
         .await;
-    assert!(res.is_ok(), "{:?}", res);
+    assert!(res.is_ok(), "{res:?}");
     let json = serde_json::to_string(&res.data).unwrap();
     let json = serde_json::from_str::<serde_json::Value>(&json).unwrap();
     let data = &json["datasets"]["byOwnerAndName"]["data"]["tail"]["data"]["content"];

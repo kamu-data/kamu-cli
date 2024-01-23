@@ -16,7 +16,7 @@ use crate::*;
 
 /// Append merge strategy.
 ///
-/// See [opendatafabric::MergeStrategy] for details.
+/// See [`opendatafabric::MergeStrategy`] for details.
 pub struct MergeStrategyAppend {
     vocab: odf::DatasetVocabulary,
 }

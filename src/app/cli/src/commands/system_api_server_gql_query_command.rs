@@ -42,13 +42,13 @@ impl Command for APIServerGqlQueryCommand {
             serde_json::to_string_pretty(&response.data).unwrap()
         } else {
             for err in &response.errors {
-                eprintln!("{}", err)
+                eprintln!("{err}");
             }
             // TODO: Error should be propagated as bad exit code
-            "".to_owned()
+            String::new()
         };
 
-        println!("{}", data);
+        println!("{data}");
 
         if response.is_ok() {
             Ok(())

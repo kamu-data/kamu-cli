@@ -41,7 +41,7 @@ impl Command for SystemIpfsAddCommand {
             .await
             .map_err(CLIError::failure)?;
 
-        println!("{}", cid);
+        println!("{cid}");
 
         Ok(())
     }

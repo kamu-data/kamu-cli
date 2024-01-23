@@ -48,7 +48,7 @@ impl Command for ConfigListCommand {
             self.with_defaults,
         );
 
-        println!("{}", result);
+        println!("{result}");
 
         Ok(())
     }
@@ -95,7 +95,7 @@ impl Command for ConfigGetCommand {
         };
 
         if let Some(value) = self.config_svc.get(&self.key, scope, self.with_defaults) {
-            println!("{}", value);
+            println!("{value}");
         } else {
             return Err(CLIError::usage_error(format!("Key {} not found", self.key)));
         }
@@ -154,7 +154,7 @@ impl Command for ConfigSetCommand {
                 console::style("to").green().bold(),
                 value,
                 console::style("in").green().bold(),
-                format!("{:?}", scope).to_lowercase(),
+                format!("{scope:?}").to_lowercase(),
                 console::style("scope").green().bold(),
             );
         } else {
@@ -165,7 +165,7 @@ impl Command for ConfigSetCommand {
                 console::style("Removed").green().bold(),
                 self.key,
                 console::style("from").green().bold(),
-                format!("{:?}", scope).to_lowercase(),
+                format!("{scope:?}").to_lowercase(),
                 console::style("scope").green().bold(),
             );
         }

@@ -14,7 +14,7 @@ use datafusion::common::{DFField, DFSchema};
 use datafusion::error::DataFusionError;
 use datafusion::prelude::SessionContext;
 
-/// Parses data type declarations into a DataFusion schema.
+/// Parses data type declarations into a `DataFusion` schema.
 ///
 /// Expects input is in form of CREATE TABLE parameters, e.g.:
 ///
@@ -23,7 +23,7 @@ use datafusion::prelude::SessionContext;
 /// `force_utc_time` parameter is related to:
 ///     https://github.com/apache/arrow-datafusion/issues/686
 ///
-/// DataFusion currently has inconsistent timezone handling behavior. It will
+/// `DataFusion` currently has inconsistent timezone handling behavior. It will
 /// ensure that all times are parsed and adjusted if necessary to UTC timezone.
 pub async fn parse_ddl_to_datafusion_schema(
     ctx: &SessionContext,
@@ -31,7 +31,7 @@ pub async fn parse_ddl_to_datafusion_schema(
     force_utc_time: bool,
 ) -> Result<DFSchema, DataFusionError> {
     // TODO: SEC: should we worry about SQL injections?
-    let sql = format!("create table x ({})", ddl);
+    let sql = format!("create table x ({ddl})");
 
     let plan = ctx.state().create_logical_plan(&sql).await?;
 
@@ -58,7 +58,7 @@ pub async fn parse_ddl_to_datafusion_schema(
 /// `force_utc_time` parameter is related to:
 ///     https://github.com/apache/arrow-datafusion/issues/686
 ///
-/// DataFusion currently has inconsistent timezone handling behavior. It will
+/// `DataFusion` currently has inconsistent timezone handling behavior. It will
 /// ensure that all times are parsed and adjusted if necessary to UTC timezone.
 pub async fn parse_ddl_to_arrow_schema(
     ctx: &SessionContext,
@@ -86,7 +86,7 @@ fn do_force_utc_time(schema: DFSchema) -> DFSchema {
 
     let utc = Arc::from("UTC");
 
-    for field in fields.iter_mut() {
+    for field in &mut fields {
         force_utc_time_rec(field, &utc);
     }
 

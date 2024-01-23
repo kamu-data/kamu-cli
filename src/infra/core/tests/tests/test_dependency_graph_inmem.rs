@@ -64,7 +64,7 @@ async fn test_single_tenant_repository() {
             foo-bar -> foo-bar-foo-baz
             foo-baz -> foo-bar-foo-baz"#
         ),
-    )
+    );
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -93,7 +93,7 @@ async fn test_multi_tenant_repository() {
             bob/baz -> bob/foo-baz
             bob/foo-baz -> eve/foo-bar-foo-baz"#
         ),
-    )
+    );
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

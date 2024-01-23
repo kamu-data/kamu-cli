@@ -124,8 +124,8 @@ impl fmt::Display for DatasetRef {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::ID(v) => write!(f, "{}", v.as_did_str()),
-            Self::Alias(v) => write!(f, "{}", v),
-            Self::Handle(v) => write!(f, "{}", v),
+            Self::Alias(v) => write!(f, "{v}"),
+            Self::Handle(v) => write!(f, "{v}"),
         }
     }
 }
@@ -294,9 +294,9 @@ impl fmt::Display for DatasetRefRemote {
         match self {
             DatasetRefRemote::ID(None, id) => write!(f, "{}", id.as_did_str()),
             DatasetRefRemote::ID(Some(repo), id) => write!(f, "{}/{}", repo, id.as_did_str()),
-            DatasetRefRemote::Alias(v) => write!(f, "{}", v),
-            DatasetRefRemote::Url(v) => write!(f, "{}", v),
-            DatasetRefRemote::Handle(v) => write!(f, "{}", v),
+            DatasetRefRemote::Alias(v) => write!(f, "{v}"),
+            DatasetRefRemote::Url(v) => write!(f, "{v}"),
+            DatasetRefRemote::Handle(v) => write!(f, "{v}"),
         }
     }
 }
@@ -484,18 +484,18 @@ impl fmt::Display for DatasetRefAny {
         match self {
             Self::ID(None, id) => write!(f, "{}", id.as_did_str()),
             Self::ID(Some(repo), id) => write!(f, "{}/{}", repo, id.as_did_str()),
-            Self::LocalAlias(None, name) => write!(f, "{}", name),
-            Self::LocalAlias(Some(account), name) => write!(f, "{}/{}", account, name),
-            Self::RemoteAlias(repo, None, name) => write!(f, "{}/{}", repo, name),
+            Self::LocalAlias(None, name) => write!(f, "{name}"),
+            Self::LocalAlias(Some(account), name) => write!(f, "{account}/{name}"),
+            Self::RemoteAlias(repo, None, name) => write!(f, "{repo}/{name}"),
             Self::RemoteAlias(repo, Some(account), name) => {
-                write!(f, "{}/{}/{}", repo, account, name)
+                write!(f, "{repo}/{account}/{name}")
             }
             Self::AmbiguousAlias(repo_or_account, name) => {
-                write!(f, "{}/{}", repo_or_account, name)
+                write!(f, "{repo_or_account}/{name}")
             }
-            Self::Url(v) => write!(f, "{}", v),
-            Self::LocalHandle(v) => write!(f, "{}", v),
-            Self::RemoteHandle(v) => write!(f, "{}", v),
+            Self::Url(v) => write!(f, "{v}"),
+            Self::LocalHandle(v) => write!(f, "{v}"),
+            Self::RemoteHandle(v) => write!(f, "{v}"),
         }
     }
 }

@@ -145,7 +145,7 @@ struct TimeDeltaInput {
 
 impl From<TimeDeltaInput> for chrono::Duration {
     fn from(value: TimeDeltaInput) -> Self {
-        let every = value.every as i64;
+        let every = i64::from(value.every);
         match value.unit {
             TimeUnit::Weeks => chrono::Duration::weeks(every),
             TimeUnit::Days => chrono::Duration::days(every),

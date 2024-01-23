@@ -17,10 +17,10 @@ use url::Url;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-/// Replicates behavior of datafusion's DefaultObjectStoreRegistry but creates
-/// stores lazily using [ObjectStoreBuilder]s registered in DI catalog.
+/// Replicates behavior of datafusion's `DefaultObjectStoreRegistry` but creates
+/// stores lazily using [`ObjectStoreBuilder`]s registered in DI catalog.
 ///
-/// This type is meant to be passed directly into DataFusion.
+/// This type is meant to be passed directly into `DataFusion`.
 pub struct ObjectStoreRegistryImpl {
     builders: DashMap<String, Arc<dyn ObjectStoreBuilder>>,
     object_stores: DashMap<String, Arc<dyn ObjectStore>>,

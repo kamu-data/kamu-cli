@@ -132,7 +132,7 @@ impl PollingIngestServiceImpl {
             iteration += 1;
             let operation_id = ingest_common::next_operation_id();
 
-            let operation_dir = self.run_info_dir.join(format!("ingest-{}", operation_id));
+            let operation_dir = self.run_info_dir.join(format!("ingest-{operation_id}"));
             std::fs::create_dir_all(&operation_dir).int_err()?;
 
             let new_ctx = ingest_common::new_session_context(self.object_store_registry.clone());
@@ -427,7 +427,7 @@ impl PollingIngestServiceImpl {
 
         let hash = Multihash::from_digest_sha3_256(fb.finished_data());
 
-        Ok(self.cache_dir.join(format!("fetch-savepoint-{}", hash)))
+        Ok(self.cache_dir.join(format!("fetch-savepoint-{hash}")))
     }
 
     fn read_fetch_savepoint(

@@ -37,7 +37,7 @@ async fn test_ingest_push_url_stream() {
                     schema: Some(
                         ["date TIMESTAMP", "city STRING", "population BIGINT"]
                             .iter()
-                            .map(|s| s.to_string())
+                            .map(|s| (*s).to_string())
                             .collect(),
                     ),
                     ..ReadStepCsv::default()
@@ -179,7 +179,7 @@ async fn test_ingest_push_media_type_override() {
                     schema: Some(
                         ["date TIMESTAMP", "city STRING", "population BIGINT"]
                             .iter()
-                            .map(|s| s.to_string())
+                            .map(|s| (*s).to_string())
                             .collect(),
                     ),
                     ..Default::default()
@@ -371,7 +371,7 @@ async fn test_ingest_push_schema_stability() {
                     schema: Some(
                         ["event_time TIMESTAMP", "city STRING", "population BIGINT"]
                             .iter()
-                            .map(|s| s.to_string())
+                            .map(|s| (*s).to_string())
                             .collect(),
                     ),
                     ..ReadStepCsv::default()

@@ -79,9 +79,7 @@ impl SqlShellImpl {
 
             container_builder = if let Some(p) = port {
                 container_builder.network("host").map_port_with_address(
-                    address
-                        .map(|a| a.to_string())
-                        .unwrap_or(String::from("127.0.0.1")),
+                    address.map_or(String::from("127.0.0.1"), |a| a.to_string()),
                     p,
                     10000,
                 )
@@ -163,11 +161,11 @@ impl SqlShellImpl {
                 String::from("--color=true"),
                 match command {
                     Some(s) => format!("-e '{}'", s.as_ref()),
-                    None => "".to_owned(),
+                    None => String::new(),
                 },
                 match output_format {
                     Some(s) => format!("--outputformat={}", s.as_ref()),
-                    None => "".to_owned(),
+                    None => String::new(),
                 },
             ],
             ..RunArgs::default()
@@ -218,11 +216,11 @@ impl SqlShellImpl {
                  --color=true{}{}",
                 match command {
                     Some(s) => format!("-e '{}'", s.as_ref()),
-                    None => "".to_owned(),
+                    None => String::new(),
                 },
                 match output_format {
                     Some(s) => format!("--outputformat={}", s.as_ref()),
-                    None => "".to_owned(),
+                    None => String::new(),
                 },
             );
 
@@ -284,8 +282,8 @@ impl SqlShellImpl {
                 if layout.data_dir.exists() {
                     writeln!(
                         ret,
-                        "CREATE TEMP VIEW `{0}` AS (SELECT * FROM parquet.`kamu_data/{0}/data`);",
-                        name
+                        "CREATE TEMP VIEW `{name}` AS (SELECT * FROM \
+                         parquet.`kamu_data/{name}/data`);"
                     )
                     .unwrap();
                 }

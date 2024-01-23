@@ -16,7 +16,7 @@ use url::Url;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-/// Holds a mapping between base URLs and the [object_store::ObjectStore]
+/// Holds a mapping between base URLs and the [`object_store::ObjectStore`]
 /// instances that serve data from corresponding locations.
 pub trait ObjectStoreRegistry: Send + Sync {
     fn as_datafusion_registry(self: Arc<Self>) -> Arc<dyn ObjectStoreRegistryDatafusion>;
@@ -24,7 +24,7 @@ pub trait ObjectStoreRegistry: Send + Sync {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-/// Allows lazily creating [ObjectStore] instances
+/// Allows lazily creating [`ObjectStore`] instances
 pub trait ObjectStoreBuilder: Send + Sync {
     fn object_store_url(&self) -> Url;
     fn build_object_store(&self) -> Result<Arc<dyn ObjectStore>, InternalError>;

@@ -77,7 +77,7 @@ impl PushIngestServiceImpl {
             .await?;
 
         let operation_id = ingest_common::next_operation_id();
-        let operation_dir = self.run_info_dir.join(format!("ingest-{}", operation_id));
+        let operation_dir = self.run_info_dir.join(format!("ingest-{operation_id}"));
         std::fs::create_dir_all(&operation_dir).int_err()?;
 
         let ctx: SessionContext =
@@ -225,7 +225,7 @@ impl PushIngestServiceImpl {
                     "file" => {
                         let p = url
                             .to_file_path()
-                            .map_err(|_| format!("Invalid file URL {}", url).int_err())?;
+                            .map_err(|_| format!("Invalid file URL {url}").int_err())?;
 
                         // TODO: In case of STDIN (/dev/fd/0) or other pipes and special device
                         // files we have to copy data into a temporary file,
@@ -250,7 +250,7 @@ impl PushIngestServiceImpl {
                             }
                         }
                     }
-                    _ => Err(format!("Unsupported source: {}", url).int_err().into()),
+                    _ => Err(format!("Unsupported source: {url}").int_err().into()),
                 }
             }
             DataSource::Stream(stream) => {

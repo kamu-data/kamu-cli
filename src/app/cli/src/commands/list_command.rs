@@ -235,7 +235,7 @@ impl Command for ListCommand {
         let mut datasets: Vec<_> = self.stream_datasets().try_collect().await?;
         datasets.sort_by(|a, b| a.alias.cmp(&b.alias));
 
-        for hdl in datasets.iter() {
+        for hdl in &datasets {
             let dataset = self.dataset_repo.get_dataset(&hdl.as_local_ref()).await?;
             let current_head = dataset.as_metadata_chain().get_ref(&BlockRef::Head).await?;
             let summary = dataset.get_summary(GetSummaryOpts::default()).await?;
@@ -264,7 +264,7 @@ impl Command for ListCommand {
                         num_blocks = b.sequence_number + 1;
                     }
                     if let Some(b) = b.as_data_stream_block() {
-                        last_watermark = b.event.new_watermark.cloned();
+                        last_watermark = b.event.new_watermark.copied();
                         break;
                     }
                 }

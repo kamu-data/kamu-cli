@@ -41,7 +41,7 @@ impl TraceServer {
     ) -> impl std::future::Future<Output = Result<(), hyper::Error>> {
         let addr = SocketAddr::from((IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), Self::HTTP_PORT));
         let bound_addr = AddrIncoming::bind(&addr).unwrap_or_else(|e| {
-            panic!("error binding to {}: {}", addr, e);
+            panic!("error binding to {addr}: {e}");
         });
 
         let (shutdown_sender, shutdown_receiver) = tokio::sync::oneshot::channel::<()>();
@@ -120,7 +120,7 @@ async fn download_trace(
         Err(err) => {
             return Err((
                 http::StatusCode::NOT_FOUND,
-                format!("File not found: {}", err),
+                format!("File not found: {err}"),
             ))
         }
     };

@@ -73,7 +73,7 @@ async fn test_trigger_ingest_root_dataset() {
         )
         .await;
 
-    assert!(response.is_ok(), "{:?}", response);
+    assert!(response.is_ok(), "{response:?}");
     assert_eq!(
         response.data,
         value!({
@@ -106,7 +106,7 @@ async fn test_trigger_ingest_root_dataset() {
         )
         .await;
 
-    assert!(response.is_ok(), "{:?}", response);
+    assert!(response.is_ok(), "{response:?}");
     assert_eq!(
         response.data,
         value!({
@@ -180,7 +180,7 @@ async fn test_trigger_execute_transform_derived_dataset() {
         )
         .await;
 
-    assert!(response.is_ok(), "{:?}", response);
+    assert!(response.is_ok(), "{response:?}");
     assert_eq!(
         response.data,
         value!({
@@ -213,7 +213,7 @@ async fn test_trigger_execute_transform_derived_dataset() {
         )
         .await;
 
-    assert!(response.is_ok(), "{:?}", response);
+    assert!(response.is_ok(), "{response:?}");
     assert_eq!(
         response.data,
         value!({
@@ -291,7 +291,7 @@ async fn test_incorrect_dataset_kinds_for_flow_type() {
         )
         .await;
 
-    assert!(response.is_ok(), "{:?}", response);
+    assert!(response.is_ok(), "{response:?}");
     assert_eq!(
         response.data,
         value!({
@@ -322,7 +322,7 @@ async fn test_incorrect_dataset_kinds_for_flow_type() {
         )
         .await;
 
-    assert!(response.is_ok(), "{:?}", response);
+    assert!(response.is_ok(), "{response:?}");
     assert_eq!(
         response.data,
         value!({
@@ -360,7 +360,7 @@ async fn test_cancel_ingest_root_dataset() {
         )
         .await;
 
-    assert!(response.is_ok(), "{:?}", response);
+    assert!(response.is_ok(), "{response:?}");
     let response_json = response.data.into_json().unwrap();
     let flow_id = FlowRunsHarness::extract_flow_id_from_trigger_response(&response_json);
 
@@ -376,7 +376,7 @@ async fn test_cancel_ingest_root_dataset() {
         )
         .await;
 
-    assert!(res.is_ok(), "{:?}", res);
+    assert!(res.is_ok(), "{res:?}");
     assert_eq!(
         res.data,
         value!({
@@ -423,7 +423,7 @@ async fn test_cancel_transform_derived_dataset() {
         )
         .await;
 
-    assert!(response.is_ok(), "{:?}", response);
+    assert!(response.is_ok(), "{response:?}");
     let response_json = response.data.into_json().unwrap();
     let flow_id = FlowRunsHarness::extract_flow_id_from_trigger_response(&response_json);
 
@@ -441,7 +441,7 @@ async fn test_cancel_transform_derived_dataset() {
         )
         .await;
 
-    assert!(response.is_ok(), "{:?}", response);
+    assert!(response.is_ok(), "{response:?}");
     assert_eq!(
         response.data,
         value!({
@@ -485,7 +485,7 @@ async fn test_cancel_wrong_flow_id_fails() {
         )
         .await;
 
-    assert!(response.is_ok(), "{:?}", response);
+    assert!(response.is_ok(), "{response:?}");
     assert_eq!(
         response.data,
         value!({
@@ -524,7 +524,7 @@ async fn test_cancel_foreign_flow_fails() {
         )
         .await;
 
-    assert!(response.is_ok(), "{:?}", response);
+    assert!(response.is_ok(), "{response:?}");
     let response_json = response.data.into_json().unwrap();
     let flow_id = FlowRunsHarness::extract_flow_id_from_trigger_response(&response_json);
 
@@ -540,7 +540,7 @@ async fn test_cancel_foreign_flow_fails() {
         )
         .await;
 
-    assert!(response.is_ok(), "{:?}", response);
+    assert!(response.is_ok(), "{response:?}");
     assert_eq!(
         response.data,
         value!({
@@ -578,7 +578,7 @@ async fn test_cancel_queued_flow_fails() {
         )
         .await;
 
-    assert!(response.is_ok(), "{:?}", response);
+    assert!(response.is_ok(), "{response:?}");
     let res_json = response.data.into_json().unwrap();
     let flow_id = res_json["datasets"]["byId"]["flows"]["runs"]["triggerFlow"]["flow"]["flowId"]
         .as_str()
@@ -596,7 +596,7 @@ async fn test_cancel_queued_flow_fails() {
         )
         .await;
 
-    assert!(response.is_ok(), "{:?}", response);
+    assert!(response.is_ok(), "{response:?}");
     assert_eq!(
         response.data,
         value!({
@@ -634,7 +634,7 @@ async fn test_cancel_already_cancelled_flow() {
         )
         .await;
 
-    assert!(response.is_ok(), "{:?}", response);
+    assert!(response.is_ok(), "{response:?}");
     let res_json = response.data.into_json().unwrap();
     let flow_id = res_json["datasets"]["byId"]["flows"]["runs"]["triggerFlow"]["flow"]["flowId"]
         .as_str()
@@ -652,7 +652,7 @@ async fn test_cancel_already_cancelled_flow() {
         )
         .await;
 
-    assert!(response.is_ok(), "{:?}", response);
+    assert!(response.is_ok(), "{response:?}");
 
     // Apply 2nd time
     let response = schema
@@ -662,7 +662,7 @@ async fn test_cancel_already_cancelled_flow() {
         )
         .await;
 
-    assert!(response.is_ok(), "{:?}", response);
+    assert!(response.is_ok(), "{response:?}");
 
     assert_eq!(
         response.data,
@@ -712,7 +712,7 @@ async fn test_cancel_already_succeeded_flow() {
         )
         .await;
 
-    assert!(response.is_ok(), "{:?}", response);
+    assert!(response.is_ok(), "{response:?}");
     let response_json = response.data.into_json().unwrap();
     let flow_id = FlowRunsHarness::extract_flow_id_from_trigger_response(&response_json);
 
@@ -730,7 +730,7 @@ async fn test_cancel_already_succeeded_flow() {
         )
         .await;
 
-    assert!(response.is_ok(), "{:?}", response);
+    assert!(response.is_ok(), "{response:?}");
     assert_eq!(
         response.data,
         value!({
@@ -779,7 +779,7 @@ async fn test_history_of_completed_flow() {
         )
         .await;
 
-    assert!(response.is_ok(), "{:?}", response);
+    assert!(response.is_ok(), "{response:?}");
     let response_json = response.data.into_json().unwrap();
     let flow_id = FlowRunsHarness::extract_flow_id_from_trigger_response(&response_json);
     harness
@@ -798,7 +798,7 @@ async fn test_history_of_completed_flow() {
         )
         .await;
 
-    assert!(response.is_ok(), "{:?}", response);
+    assert!(response.is_ok(), "{response:?}");
     assert_eq!(
         response.data,
         value!({

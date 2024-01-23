@@ -34,7 +34,7 @@ async fn logged_in_guard_logged() {
         )
         .await;
 
-    assert!(query_response.is_ok(), "{:?}", query_response);
+    assert!(query_response.is_ok(), "{query_response:?}");
     assert_eq!(
         query_response.data,
         value!({
@@ -54,7 +54,7 @@ async fn logged_in_guard_logged() {
         )
         .await;
 
-    assert!(mutation_response.is_ok(), "{:?}", mutation_response);
+    assert!(mutation_response.is_ok(), "{mutation_response:?}");
     assert_eq!(
         mutation_response.data,
         value!({
@@ -106,8 +106,7 @@ async fn logged_in_guard_anonymous() {
 
     assert!(
         unguarded_query_response.is_ok(),
-        "{:?}",
-        unguarded_query_response
+        "{unguarded_query_response:?}"
     );
     assert_eq!(
         unguarded_query_response.data,
@@ -144,8 +143,7 @@ async fn logged_in_guard_anonymous() {
 
     assert!(
         unguarded_mutation_response.is_ok(),
-        "{:?}",
-        unguarded_mutation_response
+        "{unguarded_mutation_response:?}"
     );
     assert_eq!(
         unguarded_mutation_response.data,

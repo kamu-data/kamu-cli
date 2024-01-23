@@ -22,7 +22,7 @@ type Op = odf::OperationType;
 
 /// Snapshot merge strategy.
 ///
-/// See [odf::MergeStrategySnapshot] for details.
+/// See [`odf::MergeStrategySnapshot`] for details.
 pub struct MergeStrategySnapshot {
     vocab: odf::DatasetVocabulary,
     primary_key: Vec<String>,

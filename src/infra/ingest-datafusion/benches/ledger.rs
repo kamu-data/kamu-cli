@@ -55,7 +55,7 @@ async fn setup(
 
     let mut buf = vec![0; orig_rows + added_rows];
 
-    let mut rng = rand::rngs::SmallRng::seed_from_u64(123127986998);
+    let mut rng = rand::rngs::SmallRng::seed_from_u64(123_127_986_998);
 
     rng.try_fill(&mut buf[..]).unwrap();
     pk1.append_slice(&buf[..orig_rows]);
@@ -185,7 +185,7 @@ fn bench(c: &mut Criterion) {
     let mut group = c.benchmark_group("merge");
     group.sample_size(10);
     group.bench_function("ledger", |b| {
-        b.iter(|| rt.block_on(merge(&prev, &new, added_rows)))
+        b.iter(|| rt.block_on(merge(&prev, &new, added_rows)));
     });
 }
 

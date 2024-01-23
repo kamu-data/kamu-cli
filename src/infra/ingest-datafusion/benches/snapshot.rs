@@ -66,7 +66,7 @@ async fn setup(
 
     let mut buf = vec![0; buf_len];
 
-    let mut rng = rand::rngs::SmallRng::seed_from_u64(123127986998);
+    let mut rng = rand::rngs::SmallRng::seed_from_u64(123_127_986_998);
 
     rng.try_fill(&mut buf[..]).unwrap();
     pk1.append_slice(&buf[orig_range]);
@@ -212,7 +212,7 @@ fn bench(c: &mut Criterion) {
     let mut group = c.benchmark_group("merge");
     group.sample_size(10);
     group.bench_function("snapshot", |b| {
-        b.iter(|| rt.block_on(merge_snapshot(&prev, &new, expected_rows)))
+        b.iter(|| rt.block_on(merge_snapshot(&prev, &new, expected_rows)));
     });
 }
 

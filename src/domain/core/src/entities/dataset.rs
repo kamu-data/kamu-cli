@@ -170,7 +170,7 @@ pub enum CommitError {
 // Commit helpers
 /////////////////////////////////////////////////////////////////////////////////////////
 
-/// Replicates [AddData] event prior to hashing of data and checkpoint
+/// Replicates [`AddData`] event prior to hashing of data and checkpoint
 #[derive(Debug, Clone)]
 pub struct AddDataParams {
     /// Hash of the checkpoint file used to restore ingestion state, if any.
@@ -195,7 +195,8 @@ pub struct AddDataParams {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-/// Replicates [ExecuteTransform] event prior to hashing of data and checkpoint
+/// Replicates [`ExecuteTransform`] event prior to hashing of data and
+/// checkpoint
 #[derive(Debug, Clone)]
 pub struct ExecuteTransformParams {
     /// Defines inputs used in this transaction. Slices corresponding to every

@@ -603,7 +603,7 @@ impl KamuFlightSqlService {
         let mut batches = df
             .collect()
             .await
-            .map_err(|e| Status::internal(format!("Error executing plan: {}", e)))?;
+            .map_err(|e| Status::internal(format!("Error executing plan: {e}")))?;
 
         // TODO: FIXME: There seems to be some issue with JDBC connector where a
         // non-empty result that consists of some empty batches is considered
@@ -615,7 +615,7 @@ impl KamuFlightSqlService {
 
         // Add an empty batch back if entire result is empty
         if batches.is_empty() {
-            batches.push(first_batch)
+            batches.push(first_batch);
         }
 
         let flights = batches_to_flight_data(&schema, batches)
@@ -727,7 +727,7 @@ impl FlightSqlService for KamuFlightSqlService {
         let df = ctx
             .execute_logical_plan(plan)
             .await
-            .map_err(|e| Status::internal(format!("Error executing plan: {}", e)))?;
+            .map_err(|e| Status::internal(format!("Error executing plan: {e}")))?;
 
         let ticket = TicketStatementQuery {
             statement_handle: query.encode_to_vec().into(),
@@ -750,7 +750,7 @@ impl FlightSqlService for KamuFlightSqlService {
         let df = ctx
             .execute_logical_plan(plan)
             .await
-            .map_err(|e| Status::internal(format!("Error executing plan: {}", e)))?;
+            .map_err(|e| Status::internal(format!("Error executing plan: {e}")))?;
         let resp = self.df_to_flight_info(&df, query.as_any())?;
         Ok(resp)
     }
@@ -875,7 +875,7 @@ impl FlightSqlService for KamuFlightSqlService {
         let ctx = self.get_ctx(&request)?;
 
         let query = CommandStatementQuery::decode(ticket.statement_handle)
-            .map_err(|e| Status::internal(format!("Invalid ticket: {}", e)))?;
+            .map_err(|e| Status::internal(format!("Invalid ticket: {e}")))?;
 
         tracing::debug!(?query, "Decoded query");
 
@@ -883,7 +883,7 @@ impl FlightSqlService for KamuFlightSqlService {
         let df = ctx
             .execute_logical_plan(plan)
             .await
-            .map_err(|e| Status::internal(format!("Error executing plan: {}", e)))?;
+            .map_err(|e| Status::internal(format!("Error executing plan: {e}")))?;
 
         self.df_to_stream(df).await
     }
@@ -904,7 +904,7 @@ impl FlightSqlService for KamuFlightSqlService {
         let df = ctx
             .execute_logical_plan(plan)
             .await
-            .map_err(|e| Status::internal(format!("Error executing plan: {}", e)))?;
+            .map_err(|e| Status::internal(format!("Error executing plan: {e}")))?;
 
         self.df_to_stream(df).await
     }

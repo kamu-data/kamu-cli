@@ -35,7 +35,7 @@ impl PrepService {
     ) -> Result<(), PollingIngestError> {
         let mut stream: Box<dyn Stream> = Box::new(File::open(src_path).int_err()?);
 
-        for step in prep_steps.iter() {
+        for step in prep_steps {
             stream = match step {
                 PrepStep::Pipe(p) => Box::new(
                     PipeStream::new(p.command.clone(), stream)

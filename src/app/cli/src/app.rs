@@ -393,9 +393,10 @@ pub fn register_config_in_catalog(
         catalog_builder.add_value(config.users.clone().unwrap());
     } else {
         if let Some(users) = &config.users {
-            if !users.predefined.is_empty() {
-                panic!("There cannot be predefined users in a single-tenant workspace");
-            }
+            assert!(
+                users.predefined.is_empty(),
+                "There cannot be predefined users in a single-tenant workspace"
+            );
         }
 
         catalog_builder.add_value(config::UsersConfig::single_tenant());

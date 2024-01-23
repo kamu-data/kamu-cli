@@ -140,7 +140,7 @@ async fn test_engine_io_common(
         .unwrap()
     {
         TransformResult::Updated { new_head, .. } => new_head,
-        v => panic!("Unexpected result: {:?}", v),
+        v => panic!("Unexpected result: {v:?}"),
     };
 
     let block = dataset_deriv
@@ -190,7 +190,7 @@ async fn test_engine_io_common(
         .unwrap()
     {
         TransformResult::Updated { new_head, .. } => new_head,
-        v => panic!("Unexpected result: {:?}", v),
+        v => panic!("Unexpected result: {v:?}"),
     };
 
     let block = dataset_deriv
@@ -253,7 +253,7 @@ async fn test_engine_io_local_file_mount() {
             )
             .build(),
     )
-    .await
+    .await;
 }
 
 #[test_group::group(containerized, engine, transform, datafusion)]
@@ -300,5 +300,5 @@ async fn test_engine_io_s3_to_local_file_mount_proxy() {
             )
             .build(),
     )
-    .await
+    .await;
 }

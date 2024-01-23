@@ -79,6 +79,7 @@ publish = false
 
 
 [workspace.lints.clippy]
+# clippy::all (clippy::сorrectness, clippy::suspicious, clippy::style, clippy::complexity, clippy::perf)
 # TODO enable back lint rules
 #      https://github.com/kamu-data/kamu-cli/issues/332
 new_without_default = "allow"
@@ -86,6 +87,25 @@ too_many_arguments = "allow"
 large_enum_variant = "allow"
 result_large_err = "allow"
 module_inception = "allow"
+
+# clippy::pedantic
+# TODO: reactivate after polishing
+# pedantic = { level = "warn", priority = 0 }
+
+unreadable_literal = { level = "warn", priority = 1 }
+return_self_not_must_use = { level = "allow", priority = 1 }
+missing_errors_doc = { level = "allow", priority = 1 }
+missing_panics_doc = { level = "allow", priority = 1 }
+module_name_repetitions = { level = "allow", priority = 1 }
+wildcard_imports = { level = "allow", priority = 1 }
+must_use_candidate = { level = "allow", priority = 1 }
+redundant_closure_for_method_calls = { level = "allow", priority = 1 }
+ignored_unit_patterns = { level = "allow", priority = 1 }
+needless_raw_string_hashes = { level = "allow", priority = 1 }
+
+# clippy::cargo
+cargo = { level = "warn", priority = 0 }
+multiple_crate_versions = { level = "allow", priority = 1 }
 
 
 [profile.dev]

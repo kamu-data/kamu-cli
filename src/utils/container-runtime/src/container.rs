@@ -73,7 +73,7 @@ impl ContainerRunCommand {
         I: IntoIterator<Item = S>,
         S: Into<String>,
     {
-        for arg in v.into_iter() {
+        for arg in v {
             self.args.args.push(arg.into());
         }
         self
@@ -95,7 +95,7 @@ impl ContainerRunCommand {
         S1: Into<String>,
         S2: Into<String>,
     {
-        for (name, value) in v.into_iter() {
+        for (name, value) in v {
             self.args.environment_vars.push((name.into(), value.into()));
         }
         self
@@ -112,7 +112,7 @@ impl ContainerRunCommand {
     }
 
     pub fn expose_ports(mut self, v: impl IntoIterator<Item = u16>) -> Self {
-        for port in v.into_iter() {
+        for port in v {
             self.args.expose_ports.push(port);
         }
         self
@@ -124,7 +124,7 @@ impl ContainerRunCommand {
     }
 
     pub fn map_ports(mut self, v: impl IntoIterator<Item = (u16, u16)>) -> Self {
-        for (host, container) in v.into_iter() {
+        for (host, container) in v {
             self.args.expose_port_map.push((host, container));
         }
         self
@@ -140,7 +140,7 @@ impl ContainerRunCommand {
         I: IntoIterator<Item = (S, u16, u16)>,
         S: Into<String>,
     {
-        for (addr, host, container) in v.into_iter() {
+        for (addr, host, container) in v {
             self.args
                 .expose_port_map_addr
                 .push((addr.into(), host, container));
@@ -164,7 +164,7 @@ impl ContainerRunCommand {
         mut self,
         v: impl IntoIterator<Item = ((u16, u16), (u16, u16))>,
     ) -> Self {
-        for (host, container) in v.into_iter() {
+        for (host, container) in v {
             self.args.expose_port_map_range.push((host, container));
         }
         self
@@ -218,7 +218,7 @@ impl ContainerRunCommand {
         I: IntoIterator<Item = V>,
         V: Into<VolumeSpec>,
     {
-        for spec in v.into_iter() {
+        for spec in v {
             self.args.volumes.push(spec.into());
         }
         self
@@ -403,7 +403,7 @@ impl ContainerProcess {
 
         let host_port = self.wait_for_host_port(container_port, timeout).await?;
 
-        let elapsed = std::time::Instant::now() - start;
+        let elapsed = start.elapsed();
         if elapsed >= timeout {
             return Err(TimeoutError::new(timeout).into());
         }

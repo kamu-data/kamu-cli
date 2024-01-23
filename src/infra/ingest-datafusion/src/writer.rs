@@ -25,7 +25,8 @@ use opendatafabric as odf;
 
 ///////////////////////////////////////////////////////////////////////////////
 
-/// Implementation of the [DataWriter] interface using Apache DataFusion engine
+/// Implementation of the [`DataWriter`] interface using Apache `DataFusion`
+/// engine
 pub struct DataWriterDataFusion {
     dataset: Arc<dyn Dataset>,
     merge_strategy: Arc<dyn MergeStrategy>,
@@ -38,7 +39,7 @@ pub struct DataWriterDataFusion {
     ctx: SessionContext,
 }
 
-/// Contains a projection of the metadata needed for [DataWriter] to function
+/// Contains a projection of the metadata needed for [`DataWriter`] to function
 #[derive(Debug, Clone)]
 pub struct DataWriterMetadataState {
     pub head: odf::Multihash,
@@ -60,7 +61,7 @@ impl DataWriterDataFusion {
         DataWriterDataFusionBuilder::new(dataset, ctx)
     }
 
-    /// Use [Self::builder] to create an instance
+    /// Use [`Self::builder`] to create an instance
     fn new(
         ctx: SessionContext,
         dataset: Arc<dyn Dataset>,
@@ -108,8 +109,7 @@ impl DataWriterDataFusion {
                     format!(
                         "Data contains a column that conflicts with the system column name, you \
                          should either rename the data column or configure the dataset vocabulary \
-                         to use a different name: {}",
-                        system_column
+                         to use a different name: {system_column}"
                     ),
                     SchemaRef::new(df.schema().into()),
                 ));
@@ -193,11 +193,10 @@ impl DataWriterDataFusion {
                     s.field_with_unqualified_name(&self.meta.vocab.event_time_column)
                         .ok()
                 })
-                .map(|f| f.data_type().clone())
-                .unwrap_or(DataType::Timestamp(
-                    TimeUnit::Millisecond,
-                    Some(Arc::from("UTC")),
-                ));
+                .map_or(
+                    DataType::Timestamp(TimeUnit::Millisecond, Some(Arc::from("UTC"))),
+                    |f| f.data_type().clone(),
+                );
 
             tracing::debug!("Event time column is missing - source fallback time will be used");
             df.with_column(
@@ -637,7 +636,7 @@ impl DataWriter for DataWriterDataFusion {
                     df,
                     opts.system_time,
                     opts.source_event_time,
-                    self.meta.prev_offset.map(|e| e + 1).unwrap_or(0),
+                    self.meta.prev_offset.map_or(0, |e| e + 1),
                 )
                 .await?;
 
@@ -969,7 +968,7 @@ impl DataWriterDataFusionBuilder {
             // Source expected but not found
             (None, Some(source)) => Err(SourceNotFoundError::new(
                 Some(source),
-                format!("Source '{}' not found", source),
+                format!("Source '{source}' not found"),
             )),
         }?;
 

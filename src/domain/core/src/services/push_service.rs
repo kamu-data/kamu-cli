@@ -81,9 +81,9 @@ impl Default for PushMultiOptions {
 impl std::fmt::Display for PushRequest {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match (&self.local_ref, &self.remote_ref) {
-            (Some(l), None) => write!(f, "{}", l),
-            (None, Some(r)) => write!(f, "{}", r),
-            (Some(l), Some(r)) => write!(f, "{} to {}", l, r),
+            (Some(l), None) => write!(f, "{l}"),
+            (None, Some(r)) => write!(f, "{r}"),
+            (Some(l), Some(r)) => write!(f, "{l} to {r}"),
             (None, None) => write!(f, "???"),
         }
     }

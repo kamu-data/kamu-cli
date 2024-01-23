@@ -90,7 +90,7 @@ impl Command for SystemDiagnoseCommand {
             }));
         }
 
-        for diagnostic_check in diagnostic_checks.iter() {
+        for diagnostic_check in &diagnostic_checks {
             write!(out, "{}... ", diagnostic_check.name())?;
             match diagnostic_check.run().await {
                 Ok(_) => writeln!(out, "{}", style(SUCCESS_MESSAGE).green())?,

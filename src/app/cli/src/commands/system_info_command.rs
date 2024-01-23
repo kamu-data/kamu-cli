@@ -197,13 +197,13 @@ impl WorkspaceInfo {
         if !workspace_svc.is_in_workspace() {
             return Self {
                 version: 0,
-                root_dir: "".to_string(),
+                root_dir: String::new(),
             };
         }
 
         let root_dir = match workspace_svc.layout() {
             Some(wl) => wl.root_dir.to_str().map(String::from).unwrap(),
-            None => "".to_string(),
+            None => String::new(),
         };
 
         let workspace_version = workspace_svc

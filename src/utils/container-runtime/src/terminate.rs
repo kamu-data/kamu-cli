@@ -52,7 +52,7 @@ impl Terminate for tokio::process::Child {
                     unsafe { libc::kill(id as libc::pid_t, libc::SIGTERM); }
 
                     let start = Instant::now();
-                    while (Instant::now() - start) < timeout {
+                    while start.elapsed() < timeout {
                         match self.try_wait()? {
                             None => std::thread::sleep(Self::BLOCKING_TICK_TIMEOUT),
                             Some(status) => return Ok(TerminateStatus::Exited(status)),
@@ -67,7 +67,7 @@ impl Terminate for tokio::process::Child {
         self.start_kill()?;
 
         let start = Instant::now();
-        while (Instant::now() - start) < Self::KILL_TIMEOUT {
+        while start.elapsed() < Self::KILL_TIMEOUT {
             match self.try_wait()? {
                 None => std::thread::sleep(Self::BLOCKING_TICK_TIMEOUT),
                 Some(_) => break,

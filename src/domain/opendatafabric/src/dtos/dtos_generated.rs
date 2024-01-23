@@ -13,6 +13,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 #![allow(clippy::all)]
+#![allow(clippy::pedantic)]
 
 use std::path::PathBuf;
 
@@ -884,7 +885,7 @@ pub struct SetInfo {
 /// Defines a license that applies to this dataset.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct SetLicense {
-    /// Abbriviated name of the license.
+    /// Abbreviated name of the license.
     pub short_name: String,
     /// Full name of the license.
     pub name: String,
@@ -898,7 +899,7 @@ pub struct SetLicense {
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setpollingsource-schema
 ////////////////////////////////////////////////////////////////////////////////
 
-/// Contains information on how extenrally-hosted data can be ingested into the
+/// Contains information on how externally-hosted data can be ingested into the
 /// root dataset.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct SetPollingSource {

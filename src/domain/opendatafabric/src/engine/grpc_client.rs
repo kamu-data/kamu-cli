@@ -36,7 +36,7 @@ pub struct EngineGrpcClient {
 
 impl EngineGrpcClient {
     pub async fn connect(host: &str, port: u16) -> Result<Self, tonic::transport::Error> {
-        let client = EngineClientGRPC::connect(format!("http://{}:{}", host, port)).await?;
+        let client = EngineClientGRPC::connect(format!("http://{host}:{port}")).await?;
 
         Ok(Self { client })
     }

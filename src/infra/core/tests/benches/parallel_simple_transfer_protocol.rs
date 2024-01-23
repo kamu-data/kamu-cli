@@ -34,7 +34,7 @@ use kamu::{
 use opendatafabric::*;
 use url::Url;
 
-const FILE_DATA_ARRAY_SIZE: usize = 1572864;
+const FILE_DATA_ARRAY_SIZE: usize = 1_572_864;
 const AMOUNT_OF_BLOCKS_TO_APPEND: usize = 70;
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -184,7 +184,7 @@ fn bench_with_1_parallel(c: &mut Criterion) {
                 &DatasetRefRemote::from(&pull_repo_url),
                 &DatasetRefRemote::from(&push_repo_url),
                 dataset_repo.clone(),
-            ))
+            ));
         });
     });
 }
@@ -213,7 +213,7 @@ fn bench_with_10_parallels(c: &mut Criterion) {
                 &DatasetRefRemote::from(&pull_repo_url),
                 &DatasetRefRemote::from(&push_repo_url),
                 dataset_repo.clone(),
-            ))
+            ));
         });
     });
 }

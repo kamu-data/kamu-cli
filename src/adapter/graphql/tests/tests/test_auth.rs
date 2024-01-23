@@ -18,7 +18,7 @@ fn make_login_request() -> async_graphql::Request {
         r#"
         mutation {{
             auth {{
-                login (loginMethod: "{}", loginCredentialsJson: "dummy") {{
+                login (loginMethod: "{DUMMY_LOGIN_METHOD}", loginCredentialsJson: "dummy") {{
                     accessToken
                     account {{
                         accountName
@@ -27,7 +27,6 @@ fn make_login_request() -> async_graphql::Request {
             }}
         }}
         "#,
-        DUMMY_LOGIN_METHOD,
     ))
 }
 
@@ -78,7 +77,7 @@ async fn test_enabled_login_methods() {
         )
         .await;
 
-    assert!(res.is_ok(), "{:?}", res);
+    assert!(res.is_ok(), "{res:?}");
     assert_eq!(
         res.data,
         value!({
@@ -101,7 +100,7 @@ async fn test_login() {
     let schema = kamu_adapter_graphql::schema_quiet();
     let res = schema.execute(make_login_request().data(cat)).await;
 
-    assert!(res.is_ok(), "{:?}", res);
+    assert!(res.is_ok(), "{res:?}");
     assert_eq!(
         res.data,
         value!({
@@ -133,7 +132,7 @@ async fn test_login_bad_method() {
     assert_eq!(res.errors.len(), 1);
     assert_eq!(
         res.errors[0].message,
-        format!("Unsupported login method '{}'", DUMMY_LOGIN_METHOD)
+        format!("Unsupported login method '{DUMMY_LOGIN_METHOD}'")
     );
 }
 
@@ -151,7 +150,7 @@ async fn test_account_details() {
         .execute(make_account_details_request().data(cat))
         .await;
 
-    assert!(res.is_ok(), "{:?}", res);
+    assert!(res.is_ok(), "{res:?}");
     assert_eq!(
         res.data,
         value!({

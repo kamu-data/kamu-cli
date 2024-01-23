@@ -204,7 +204,7 @@ where
     let mut city = Vec::new();
     let mut population = Vec::new();
 
-    for (c, p) in rows.into_iter() {
+    for (c, p) in rows {
         city.push(c.into());
         population.push(p);
     }

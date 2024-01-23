@@ -43,7 +43,7 @@ impl CachedObject {
         if let Ok(local_path) = object_file_url.to_file_path() {
             Ok(Self {
                 object_state: ObjectState::Local {
-                    path: local_path.to_path_buf(),
+                    path: local_path.clone(),
                 },
             })
         } else {

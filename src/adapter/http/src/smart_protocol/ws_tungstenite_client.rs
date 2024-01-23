@@ -183,7 +183,7 @@ impl WsSmartTransferProtocolClient {
                     pull_strategy = ? s.pull_strategy,
                     expires_at = ? s.download_from.expires_at,
                     "Detailed file download strategy",
-                )
+                );
             });
 
         Ok(dataset_objects_pull_response)
@@ -492,7 +492,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
         if let Some(access_token) = maybe_access_token {
             request.headers_mut().append(
                 http::header::AUTHORIZATION,
-                http::HeaderValue::from_str(format!("Bearer {}", access_token).as_str()).unwrap(),
+                http::HeaderValue::from_str(format!("Bearer {access_token}").as_str()).unwrap(),
             );
         }
 
@@ -694,7 +694,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
         if let Some(access_token) = maybe_access_token {
             request.headers_mut().append(
                 http::header::AUTHORIZATION,
-                http::HeaderValue::from_str(format!("Bearer {}", access_token).as_str()).unwrap(),
+                http::HeaderValue::from_str(format!("Bearer {access_token}").as_str()).unwrap(),
             );
         }
 

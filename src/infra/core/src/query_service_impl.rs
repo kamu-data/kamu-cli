@@ -415,7 +415,7 @@ impl KamuSchema {
                     .is_ok()
                     && self.has_data(&hdl).await.unwrap()
                 {
-                    res.push(hdl.alias.to_string())
+                    res.push(hdl.alias.to_string());
                 }
             }
 

@@ -23,7 +23,10 @@ fn test_prep_pipe() {
     let target_path = tempdir.path().join("prepared.bin");
 
     let prep_steps = vec![PrepStep::Pipe(PrepStepPipe {
-        command: ["jq", "-c", ".[]"].iter().map(|s| s.to_string()).collect(),
+        command: ["jq", "-c", ".[]"]
+            .iter()
+            .map(|s| (*s).to_string())
+            .collect(),
     })];
 
     let prep_svc = PrepService::new();

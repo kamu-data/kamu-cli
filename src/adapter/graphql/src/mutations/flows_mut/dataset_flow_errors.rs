@@ -23,7 +23,7 @@ pub(crate) struct FlowNotFound {
 impl FlowNotFound {
     pub async fn message(&self) -> String {
         let flow_id: fs::FlowID = self.flow_id.into();
-        format!("Flow '{}' was not found", flow_id)
+        format!("Flow '{flow_id}' was not found")
     }
 }
 
@@ -39,7 +39,7 @@ pub(crate) struct FlowNotScheduled {
 impl FlowNotScheduled {
     pub async fn message(&self) -> String {
         let flow_id: fs::FlowID = self.flow_id.into();
-        format!("Flow '{}' was not scheduled yet", flow_id)
+        format!("Flow '{flow_id}' was not scheduled yet")
     }
 }
 

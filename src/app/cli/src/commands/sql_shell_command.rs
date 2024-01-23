@@ -98,7 +98,7 @@ impl SqlShellCommand {
                 self.command.as_ref(),
                 || {
                     if let Some(s) = spinner {
-                        s.finish_and_clear()
+                        s.finish_and_clear();
                     }
                 },
             )

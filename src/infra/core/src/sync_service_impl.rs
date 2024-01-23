@@ -286,7 +286,7 @@ impl SyncServiceImpl {
         let key = if let Some(key) = keys.into_iter().find(|k| k.id == key_id) {
             Ok(key)
         } else {
-            Err(format!("IPFS does not have a key with ID {}", key_id).int_err())
+            Err(format!("IPFS does not have a key with ID {key_id}").int_err())
         }?;
 
         tracing::info!(key_name = %key.name, key_id = %key.id, "Resolved the key to use for IPNS publishing");
@@ -405,8 +405,9 @@ impl SyncServiceImpl {
             Some(CompareChainsResult::Equal) => unreachable!(),
             Some(CompareChainsResult::LhsAhead { lhs_ahead_blocks }) => lhs_ahead_blocks.len(),
             None
-            | Some(CompareChainsResult::LhsBehind { .. })
-            | Some(CompareChainsResult::Divergence { .. }) => match src_dataset
+            | Some(
+                CompareChainsResult::LhsBehind { .. } | CompareChainsResult::Divergence { .. },
+            ) => match src_dataset
                 .as_metadata_chain()
                 .iter_blocks_interval(&src_head, None, false)
                 .try_count()

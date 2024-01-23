@@ -257,8 +257,8 @@ impl ColumnFormat {
                         .downcast_ref::<fn(DateTime<Utc>) -> String>()
                         .unwrap_or_else(|| {
                             panic!(
-                                "Expected formatter for type DateTime<Utc> but for {} instead",
-                                type_name,
+                                "Expected formatter for type DateTime<Utc> but for {type_name} \
+                                 instead",
                             )
                         });
                     let value = t_array.value_as_datetime(row).unwrap();

@@ -92,12 +92,12 @@ impl ObjectStoreBuilder for ObjectStoreBuilderS3 {
 // AwsSdkCredentialProvider
 /////////////////////////////////////////////////////////////////////////////////////////
 
-/// The [object_store] crate doesn't use the official AWS SDK and has its
+/// The [`object_store`] crate doesn't use the official AWS SDK and has its
 /// own credential resolution mechanisms. We want to avoid using two paths to
 /// source credentials as they sometimes don't agree with one another. We also
 /// want to reuse credentials between the two subsystems. This type
 /// implements a bridge between the credentials cache in SDK and credentials
-/// provider in [object_store] crate.
+/// provider in [`object_store`] crate.
 #[derive(Debug)]
 struct AwsSdkCredentialProvider {
     credentials_provider: SharedCredentialsProvider,

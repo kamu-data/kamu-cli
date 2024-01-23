@@ -413,7 +413,7 @@ pub async fn test_delete_dataset(repo: &dyn DatasetRepository, account_name: Opt
             .err()
             .unwrap(),
         GetDatasetError::NotFound(_),
-    )
+    );
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

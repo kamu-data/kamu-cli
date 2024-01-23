@@ -91,7 +91,7 @@ pub struct WriteDataResult {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-/// Do not create directly, only use with [DataWriter::stage].
+/// Do not create directly, only use with [`DataWriter::stage`].
 #[derive(Debug)]
 pub struct StageDataResult {
     pub system_time: DateTime<Utc>,
@@ -246,6 +246,6 @@ impl<'a> std::fmt::Display for FmtSchema<'a> {
         datafusion::parquet::schema::printer::print_schema(&mut buf, parquet_schema.root_schema());
         let schema = String::from_utf8(buf).unwrap();
 
-        write!(f, "{}", schema)
+        write!(f, "{schema}")
     }
 }

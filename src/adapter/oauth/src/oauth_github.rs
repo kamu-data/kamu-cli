@@ -41,15 +41,12 @@ impl OAuthGithub {
 
     fn get_client_id() -> String {
         std::env::var(ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_ID)
-            .unwrap_or_else(|_| panic!("{} env var is not set", ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_ID))
+            .unwrap_or_else(|_| panic!("{ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_ID} env var is not set"))
     }
 
     fn get_client_secret() -> String {
         std::env::var(ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_SECRET).unwrap_or_else(|_| {
-            panic!(
-                "{} env var is not set",
-                ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_SECRET
-            )
+            panic!("{ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_SECRET} env var is not set")
         })
     }
 
@@ -159,7 +156,7 @@ impl OAuthGithub {
         let client = self.get_client().int_err()?;
 
         let response = client
-            .get(format!("https://api.github.com/users/{}", login))
+            .get(format!("https://api.github.com/users/{login}"))
             .header(http::header::ACCEPT, "application/vnd.github.v3+json")
             .send()
             .await

@@ -68,7 +68,7 @@ impl<'a> std::fmt::Display for ErrorMessageFormatter<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut error = Some(self.0);
         while let Some(e) = error {
-            write!(f, "{}", e)?;
+            write!(f, "{e}")?;
             error = e.source();
             if error.is_some() {
                 write!(f, ": ")?;
@@ -97,7 +97,7 @@ impl<'a> std::fmt::Display for ErrorBacktraceFormatter<'a> {
         }
 
         if let Some(backtrace) = backtrace {
-            write!(f, "{}", backtrace)
+            write!(f, "{backtrace}")
         } else {
             write!(f, "<unavailable>")
         }

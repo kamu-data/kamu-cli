@@ -80,7 +80,7 @@ async fn run_server(service: KamuFlightSqlService) -> FlightServer {
 }
 
 async fn get_client(addr: &SocketAddr) -> FlightSqlServiceClient<Channel> {
-    let channel = Channel::from_shared(format!("http://{}", addr))
+    let channel = Channel::from_shared(format!("http://{addr}"))
         .unwrap()
         .connect()
         .await

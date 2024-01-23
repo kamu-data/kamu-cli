@@ -74,7 +74,7 @@ impl LoginService {
         let addr = SocketAddr::from((IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 0));
 
         let bound_addr = hyper::server::conn::AddrIncoming::bind(&addr).unwrap_or_else(|e| {
-            panic!("error binding to {}: {}", addr, e);
+            panic!("error binding to {addr}: {e}");
         });
 
         let redirect_url = format!(

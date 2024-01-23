@@ -48,8 +48,8 @@ impl GcService {
         tracing::info!(%bytes_freed, %entries_freed, "Purged cache");
 
         Ok(GcResult {
-            bytes_freed,
             entries_freed,
+            bytes_freed,
         })
     }
 
@@ -87,8 +87,8 @@ impl GcService {
         }
 
         Ok(GcResult {
-            bytes_freed,
             entries_freed,
+            bytes_freed,
         })
     }
 }

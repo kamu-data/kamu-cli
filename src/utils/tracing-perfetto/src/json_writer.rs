@@ -145,7 +145,7 @@ where
         write!(self.out, ":").unwrap();
 
         // TODO: avoid allocating
-        let value = format!("{:?}", value);
+        let value = format!("{value:?}");
         write_str_escaped(&mut self.out, &value);
 
         self.entries += 1;
@@ -162,6 +162,6 @@ where
     W: std::io::Write,
 {
     fn drop(&mut self) {
-        self.finish()
+        self.finish();
     }
 }

@@ -144,10 +144,10 @@ impl PullCommand {
             .and_then(|r| r.remote_ref.as_ref()));
         match (local_ref, remote_ref) {
             (Some(local_ref), Some(remote_ref)) => {
-                format!("sync {} from {}", local_ref, remote_ref)
+                format!("sync {local_ref} from {remote_ref}")
             }
-            (None, Some(remote_ref)) => format!("sync dataset from {}", remote_ref),
-            (Some(local_ref), None) => format!("pull {}", local_ref),
+            (None, Some(remote_ref)) => format!("sync dataset from {remote_ref}"),
+            (Some(local_ref), None) => format!("pull {local_ref}"),
             _ => "???".to_string(),
         }
     }
@@ -180,7 +180,7 @@ impl Command for PullCommand {
         let mut up_to_date = 0;
         let mut errors = 0;
 
-        for res in pull_results.iter() {
+        for res in &pull_results {
             match &res.result {
                 Ok(r) => match r {
                     PullResult::UpToDate => up_to_date += 1,
@@ -193,7 +193,7 @@ impl Command for PullCommand {
         if updated != 0 {
             eprintln!(
                 "{}",
-                console::style(format!("{} dataset(s) updated", updated))
+                console::style(format!("{updated} dataset(s) updated"))
                     .green()
                     .bold()
             );
@@ -201,14 +201,14 @@ impl Command for PullCommand {
         if up_to_date != 0 {
             eprintln!(
                 "{}",
-                console::style(format!("{} dataset(s) up-to-date", up_to_date))
+                console::style(format!("{up_to_date} dataset(s) up-to-date"))
                     .yellow()
                     .bold()
             );
         }
         if errors != 0 {
             Err(BatchError::new(
-                format!("Failed to update {} dataset(s)", errors),
+                format!("Failed to update {errors} dataset(s)"),
                 pull_results
                     .into_iter()
                     .filter(|res| res.result.is_err())
@@ -549,7 +549,7 @@ impl EngineProvisioningListener for PrettyIngestProgress {
         state.curr_progress.set_message(Self::spinner_message(
             &self.dataset_handle,
             PollingIngestStage::Read as u32,
-            format!("Waiting for engine {}", engine_id),
+            format!("Waiting for engine {engine_id}"),
         ));
     }
 
@@ -570,7 +570,7 @@ impl PullImageListener for PrettyIngestProgress {
         state.curr_progress.set_message(Self::spinner_message(
             &self.dataset_handle,
             PollingIngestStage::Read as u32,
-            format!("Pulling image {}", image),
+            format!("Pulling image {image}"),
         ));
     }
 
@@ -679,7 +679,7 @@ impl EngineProvisioningListener for PrettyTransformProgress {
             .set_message(Self::spinner_message(
                 &self.dataset_handle,
                 0,
-                format!("Waiting for engine {}", engine_id),
+                format!("Waiting for engine {engine_id}"),
             ));
     }
 
@@ -705,7 +705,7 @@ impl PullImageListener for PrettyTransformProgress {
             .set_message(Self::spinner_message(
                 &self.dataset_handle,
                 0,
-                format!("Pulling engine image {}", image),
+                format!("Pulling engine image {image}"),
             ));
     }
 
@@ -762,7 +762,7 @@ impl PrettySyncProgress {
             .template("{spinner:.cyan} {msg} {prefix:.dim}")
             .unwrap();
         spinner.set_style(style);
-        spinner.set_prefix(format!("({} > {})", remote_ref, local_ref));
+        spinner.set_prefix(format!("({remote_ref} > {local_ref})"));
         spinner.set_message("Syncing remote dataset".to_owned());
         spinner.enable_steady_tick(Duration::from_millis(100));
         spinner

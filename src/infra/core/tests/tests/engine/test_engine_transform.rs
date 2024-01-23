@@ -196,14 +196,14 @@ impl DatasetHelper {
 
     async fn rewrite_last_data_block_with_equivalent_different_encoding(&self) {
         self.rewrite_last_data_block_with_different_encoding(None)
-            .await
+            .await;
     }
 
     async fn rewrite_last_data_block_with_different_data(&self) {
         self.rewrite_last_data_block_with_different_encoding(Some(Box::new(|b| {
             b.slice(1, b.num_rows() - 1)
         })))
-        .await
+        .await;
     }
 }
 
@@ -502,7 +502,7 @@ async fn test_transform_with_engine_spark() {
             )
             .build(),
     )
-    .await
+    .await;
 }
 
 #[test_group::group(containerized, engine, transform, flink)]
@@ -523,7 +523,7 @@ async fn test_transform_with_engine_flink() {
             )
             .build(),
     )
-    .await
+    .await;
 }
 
 #[test_group::group(containerized, engine, transform, datafusion)]
@@ -542,7 +542,7 @@ async fn test_transform_with_engine_datafusion() {
             )
             .build(),
     )
-    .await
+    .await;
 }
 
 /// Accounts for engine-specific quirks in the schema

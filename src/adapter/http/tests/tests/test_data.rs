@@ -82,7 +82,7 @@ async fn test_data_push_ingest_handler() {
     let client = async move {
         let cl: reqwest::Client = reqwest::Client::new();
         let dataset_helper = DatasetDataHelper::new(create_result.dataset.clone());
-        let ingest_url = format!("{}/ingest", dataset_url);
+        let ingest_url = format!("{dataset_url}/ingest");
         tracing::info!(%ingest_url, "Client request");
 
         // OK - uses the only push source

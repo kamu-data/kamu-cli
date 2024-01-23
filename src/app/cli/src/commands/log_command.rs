@@ -258,7 +258,7 @@ impl AsciiRenderer {
                 self.render_property(output, 0, "Kind", "ExecuteTransform")?;
                 self.render_section(output, 0, "Inputs")?;
                 for (i, s) in query_inputs.iter().enumerate() {
-                    self.render_section(output, 1, &format!("QueryInput[{}]", i))?;
+                    self.render_section(output, 1, &format!("QueryInput[{i}]"))?;
 
                     self.render_property(output, 2, "ID", &s.dataset_id)?;
 
@@ -318,7 +318,7 @@ impl AsciiRenderer {
                     Attachments::Embedded(e) => {
                         self.render_section(output, 0, "Embedded")?;
                         for (i, item) in e.items.iter().enumerate() {
-                            self.render_section(output, 1, &format!("Item[{}]", i))?;
+                            self.render_section(output, 1, &format!("Item[{i}]"))?;
                             self.render_property(output, 2, "Path", &item.path)?;
                             self.render_property(output, 2, "Content", "...")?;
                         }
@@ -351,7 +351,7 @@ impl AsciiRenderer {
                 merge: _,
             }) => {
                 self.render_property(output, 0, "Kind", "SetPollingSource")?;
-                self.render_property(output, 0, "Source", "...")?
+                self.render_property(output, 0, "Source", "...")?;
             }
             MetadataEvent::DisablePollingSource(_) => {
                 self.render_property(output, 0, "Kind", "DisablePollingSource")?;
@@ -368,11 +368,11 @@ impl AsciiRenderer {
             }
             MetadataEvent::DisablePushSource(DisablePushSource { source_name }) => {
                 self.render_property(output, 0, "Kind", "DisablePushSource")?;
-                self.render_property(output, 0, "SourceName", source_name)?
+                self.render_property(output, 0, "SourceName", source_name)?;
             }
             MetadataEvent::SetTransform(_) => {
                 self.render_property(output, 0, "Kind", "SetTransform")?;
-                self.render_property(output, 0, "Transform", "...")?
+                self.render_property(output, 0, "Transform", "...")?;
             }
             MetadataEvent::SetVocab(SetVocab {
                 offset_column,
@@ -568,7 +568,7 @@ impl YamlRenderer {
         while let Some((hash, block)) = blocks.try_next().await? {
             buf.clear();
             writeln!(buf, "---")?;
-            writeln!(buf, "# Block: {}", hash)?;
+            writeln!(buf, "# Block: {hash}")?;
             Self::render_block(&mut buf, &hash, &block)?;
             writeln!(buf)?;
 

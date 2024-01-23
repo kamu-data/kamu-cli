@@ -251,7 +251,7 @@ async fn test_ingest_polling_ledger() {
                     schema: Some(
                         ["date TIMESTAMP", "city STRING", "population BIGINT"]
                             .iter()
-                            .map(|s| s.to_string())
+                            .map(|s| (*s).to_string())
                             .collect(),
                     ),
                     ..ReadStepCsv::default()
@@ -522,7 +522,7 @@ async fn test_ingest_polling_event_time_as_date() {
                     schema: Some(
                         ["date DATE", "city STRING", "population BIGINT"]
                             .iter()
-                            .map(|s| s.to_string())
+                            .map(|s| (*s).to_string())
                             .collect(),
                     ),
                     ..ReadStepCsv::default()

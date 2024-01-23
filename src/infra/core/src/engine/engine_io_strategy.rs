@@ -156,7 +156,7 @@ impl EngineIoStrategy for EngineIoStrategyLocalVolume {
 
             let offset_interval = if let Some(new_offset) = input.new_offset {
                 Some(OffsetInterval {
-                    start: input.prev_offset.map(|v| v + 1).unwrap_or(0),
+                    start: input.prev_offset.map_or(0, |v| v + 1),
                     end: new_offset,
                 })
             } else {
@@ -172,14 +172,14 @@ impl EngineIoStrategy for EngineIoStrategyLocalVolume {
                 data_paths,
                 schema_file,
                 explicit_watermarks: input.explicit_watermarks,
-            })
+            });
         }
 
         let engine_request = TransformRequest {
             dataset_id: request.dataset_handle.id,
             dataset_alias: request.dataset_handle.alias,
             system_time: request.system_time,
-            next_offset: request.prev_offset.map(|v| v + 1).unwrap_or(0),
+            next_offset: request.prev_offset.map_or(0, |v| v + 1),
             vocab: request.vocab,
             transform: request.transform,
             query_inputs,
@@ -341,7 +341,7 @@ impl EngineIoStrategy for EngineIoStrategyRemoteProxy {
 
             let offset_interval = if let Some(new_offset) = input.new_offset {
                 Some(OffsetInterval {
-                    start: input.prev_offset.map(|v| v + 1).unwrap_or(0),
+                    start: input.prev_offset.map_or(0, |v| v + 1),
                     end: new_offset,
                 })
             } else {
@@ -357,14 +357,14 @@ impl EngineIoStrategy for EngineIoStrategyRemoteProxy {
                 data_paths,
                 schema_file,
                 explicit_watermarks: input.explicit_watermarks,
-            })
+            });
         }
 
         let engine_request = TransformRequest {
             dataset_id: request.dataset_handle.id,
             dataset_alias: request.dataset_handle.alias,
             system_time: request.system_time,
-            next_offset: request.prev_offset.map(|v| v + 1).unwrap_or(0),
+            next_offset: request.prev_offset.map_or(0, |v| v + 1),
             vocab: request.vocab,
             transform: request.transform,
             query_inputs,

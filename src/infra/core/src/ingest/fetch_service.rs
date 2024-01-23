@@ -67,7 +67,7 @@ impl FetchService {
                     "file" => {
                         Self::fetch_file(
                             &url.to_file_path()
-                                .map_err(|_| format!("Invalid url: {}", url).int_err())?,
+                                .map_err(|_| format!("Invalid url: {url}").int_err())?,
                             furl.event_time.as_ref(),
                             prev_source_state,
                             target_path,
@@ -152,7 +152,7 @@ impl FetchService {
                     let env_value = match std::env::var(env_name) {
                         Ok(v) => Ok(v),
                         Err(_) => {
-                            Err(format!("Environment variable {} is not set", env_name).int_err())
+                            Err(format!("Environment variable {env_name} is not set").int_err())
                         }
                     }?;
                     s.to_mut().replace_range(tpl_range, &env_value);
@@ -201,9 +201,7 @@ impl FetchService {
         });
 
         // Setup logging
-        let out_dir = self
-            .container_log_dir
-            .join(format!("fetch-{}", operation_id));
+        let out_dir = self.container_log_dir.join(format!("fetch-{operation_id}"));
         std::fs::create_dir_all(&out_dir).int_err()?;
 
         let stderr_path = self.container_log_dir.join("fetch.err.txt");
@@ -227,7 +225,7 @@ impl FetchService {
         let mut container_builder = self
             .container_runtime
             .run_attached(&fetch.image)
-            .container_name(format!("kamu-fetch-{}", operation_id))
+            .container_name(format!("kamu-fetch-{operation_id}"))
             .args(fetch.args.clone().unwrap_or_default())
             .volume((&out_dir, "/opt/odf/out"))
             .stdout(Stdio::piped())
@@ -380,10 +378,7 @@ impl FetchService {
         match &fglob.order {
             None => (),
             Some(SourceOrdering::ByName) => (),
-            Some(ord) => panic!(
-                "Files glob source can only be ordered by name, found: {:?}",
-                ord
-            ),
+            Some(ord) => panic!("Files glob source can only be ordered by name, found: {ord:?}"),
         }
 
         let last_filename = match prev_source_state {
@@ -574,7 +569,7 @@ impl FetchService {
             code => {
                 return Err(PollingIngestError::unreachable(
                     url.as_str(),
-                    Some(HttpStatusError::new(code.as_u16() as u32).into()),
+                    Some(HttpStatusError::new(u32::from(code.as_u16())).into()),
                 ));
             }
         }
@@ -594,8 +589,7 @@ impl FetchService {
 
         let total_bytes = response
             .content_length()
-            .map(TotalBytes::Exact)
-            .unwrap_or(TotalBytes::Unknown);
+            .map_or(TotalBytes::Unknown, TotalBytes::Exact);
         let mut fetched_bytes = 0;
         let mut file = tokio::fs::File::create(target_path).await.int_err()?;
 
@@ -735,7 +729,7 @@ impl FetchService {
 
     fn parse_http_date_time(val: &str) -> DateTime<Utc> {
         DateTime::parse_from_rfc2822(val)
-            .unwrap_or_else(|e| panic!("Failed to parse Last-Modified header {}: {}", val, e))
+            .unwrap_or_else(|e| panic!("Failed to parse Last-Modified header {val}: {e}"))
             .into()
     }
 

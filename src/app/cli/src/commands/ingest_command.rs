@@ -114,8 +114,7 @@ impl IngestCommand {
         }
 
         Err(CLIError::usage_error(format!(
-            "Unsupported format {}",
-            short_name
+            "Unsupported format {short_name}"
         )))
     }
 }
@@ -343,7 +342,7 @@ impl EngineProvisioningListener for PushIngestProgress {
         state.curr_progress.set_message(Self::spinner_message(
             &self.dataset_handle,
             PollingIngestStage::Read as u32,
-            format!("Waiting for engine {}", engine_id),
+            format!("Waiting for engine {engine_id}"),
         ));
     }
 
@@ -364,7 +363,7 @@ impl PullImageListener for PushIngestProgress {
         state.curr_progress.set_message(Self::spinner_message(
             &self.dataset_handle,
             PollingIngestStage::Read as u32,
-            format!("Pulling image {}", image),
+            format!("Pulling image {image}"),
         ));
     }
 

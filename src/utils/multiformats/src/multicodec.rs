@@ -19,10 +19,10 @@ pub enum Multicodec {
     Ed25519Pub = 0xed,
     // -- Private use area --
     // Arrow hashes range
-    Arrow0_Sha3_256 = 0x300016,
+    Arrow0_Sha3_256 = 0x0030_0016,
     // ODF resources range
-    ODFMetadataBlock = 0x400000,
-    ODFDatasetSnapshot = 0x400001,
+    ODFMetadataBlock = 0x0040_0000,
+    ODFDatasetSnapshot = 0x0040_0001,
     // When adding codes don't forget to add them into traits below
 }
 
@@ -38,9 +38,9 @@ impl TryFrom<u32> for Multicodec {
             0x12 => Ok(Multicodec::Sha2_256),
             0x16 => Ok(Multicodec::Sha3_256),
             0xed => Ok(Multicodec::Ed25519Pub),
-            0x300016 => Ok(Multicodec::Arrow0_Sha3_256),
-            0x400000 => Ok(Multicodec::ODFMetadataBlock),
-            0x400001 => Ok(Multicodec::ODFDatasetSnapshot),
+            0x0030_0016 => Ok(Multicodec::Arrow0_Sha3_256),
+            0x0040_0000 => Ok(Multicodec::ODFMetadataBlock),
+            0x0040_0001 => Ok(Multicodec::ODFDatasetSnapshot),
             _ => Err(MulticodecUnsupportedCode(value)),
         }
     }
@@ -83,7 +83,7 @@ impl std::fmt::Display for Multicodec {
             Multicodec::ODFMetadataBlock => "odf-metadata-block",
             Multicodec::ODFDatasetSnapshot => "odf-dataset-snapshot",
         };
-        write!(f, "{}", s)
+        write!(f, "{s}")
     }
 }
 

@@ -81,7 +81,7 @@ async fn test_current_push_sources() {
     let res = schema
         .execute(async_graphql::Request::new(request_code.clone()).data(catalog_authorized.clone()))
         .await;
-    assert!(res.is_ok(), "{:?}", res);
+    assert!(res.is_ok(), "{res:?}");
 
     assert_eq!(
         res.data,
@@ -131,7 +131,7 @@ async fn test_current_push_sources() {
     let res = schema
         .execute(async_graphql::Request::new(request_code.clone()).data(catalog_authorized))
         .await;
-    assert!(res.is_ok(), "{:?}", res);
+    assert!(res.is_ok(), "{res:?}");
 
     assert_eq!(
         res.data,

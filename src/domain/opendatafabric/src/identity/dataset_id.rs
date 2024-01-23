@@ -25,14 +25,14 @@ impl DatasetID {
         Self { did }
     }
 
-    /// Creates DatasetID from generated key pair using cryptographically secure
-    /// RNG
+    /// Creates `DatasetID` from generated key pair using cryptographically
+    /// secure RNG
     pub fn new_generated_ed25519() -> (SigningKey, Self) {
         let (key, did) = DidOdf::new_generated_ed25519();
         (key, Self::new(did))
     }
 
-    /// For testing purposes only. Use [DatasetID::new_generated_ed25519] for
+    /// For testing purposes only. Use [`DatasetID::new_generated_ed25519`] for
     /// cryptographically secure generation
     pub fn new_seeded_ed25519(seed: &[u8]) -> Self {
         Self::new(DidOdf::new_seeded_ed25519(seed))
@@ -42,17 +42,17 @@ impl DatasetID {
         &self.did
     }
 
-    /// Reads DatasetID from canonical byte representation
+    /// Reads `DatasetID` from canonical byte representation
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, DeserializeError<DidKey>> {
         Ok(Self::new(DidOdf::from_bytes(bytes)?))
     }
 
-    /// Parses DatasetID from a canonical `did:odf:<multibase>` string
+    /// Parses `DatasetID` from a canonical `did:odf:<multibase>` string
     pub fn from_did_str(s: &str) -> Result<Self, ParseError<DidOdf>> {
         Ok(Self::new(DidOdf::from_did_str(s)?))
     }
 
-    /// Parses DatasetID from a multibase string (without `did:odf:`) prefix
+    /// Parses `DatasetID` from a multibase string (without `did:odf:`) prefix
     pub fn from_multibase_string(s: &str) -> Result<Self, ParseError<DidOdf>> {
         Ok(Self::new(DidOdf::from_multibase(s)?))
     }
@@ -144,7 +144,7 @@ impl std::fmt::Display for DatasetID {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/// Formats [DatasetID] as a canonical `did:odf:<multibase>` string
+/// Formats [`DatasetID`] as a canonical `did:odf:<multibase>` string
 pub struct DatasetIDFmt<'a> {
     inner: DidKeyMultibaseFmt<'a>,
 }
@@ -165,7 +165,7 @@ impl<'a> DatasetIDFmt<'a> {
 
 impl<'a> std::fmt::Debug for DatasetIDFmt<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self)
+        write!(f, "{self}")
     }
 }
 

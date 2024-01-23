@@ -280,7 +280,7 @@ fn get_base_dataset_url(
 
 fn get_api_server_url(host: String) -> Url {
     let scheme = std::env::var("KAMU_PROTOCOL_SCHEME").unwrap_or_else(|_| String::from("http"));
-    Url::parse(&format!("{}://{}", scheme, host)).unwrap()
+    Url::parse(&format!("{scheme}://{host}")).unwrap()
 }
 
 /////////////////////////////////////////////////////////////////////////////////

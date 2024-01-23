@@ -158,7 +158,7 @@ impl FlowEventStore for FlowEventStoreInMem {
         let g = state.lock().unwrap();
         g.typed_flows_by_dataset
             .get(BorrowedFlowKeyDataset::new(dataset_id, flow_type).as_trait())
-            .and_then(|flows| flows.last().cloned())
+            .and_then(|flows| flows.last().copied())
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(?flow_type))]
@@ -167,7 +167,7 @@ impl FlowEventStore for FlowEventStoreInMem {
         let g = state.lock().unwrap();
         g.system_flows_by_type
             .get(&flow_type)
-            .and_then(|flows| flows.last().cloned())
+            .and_then(|flows| flows.last().copied())
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id, ?flow_type))]
@@ -185,7 +185,7 @@ impl FlowEventStore for FlowEventStoreInMem {
             let mut pos = {
                 let state = self.inner.as_state();
                 let g = state.lock().unwrap();
-                g.typed_flows_by_dataset.get(borrowed_key.as_trait()).map(|flows| flows.len()).unwrap_or(0)
+                g.typed_flows_by_dataset.get(borrowed_key.as_trait()).map_or(0, |flows| flows.len())
             };
 
             loop {
@@ -200,7 +200,7 @@ impl FlowEventStore for FlowEventStoreInMem {
                     let g = state.lock().unwrap();
                     g.typed_flows_by_dataset
                         .get(borrowed_key.as_trait())
-                        .and_then(|flows| flows.get(pos).cloned())
+                        .and_then(|flows| flows.get(pos).copied())
                 };
 
                 let flow_id = match next {
@@ -220,8 +220,7 @@ impl FlowEventStore for FlowEventStoreInMem {
             let g = state.lock().unwrap();
             g.system_flows_by_type
                 .get(&flow_type)
-                .map(|flows| flows.len())
-                .unwrap_or(0)
+                .map_or(0, |flows| flows.len())
         };
 
         // TODO: This should be a buffered stream so we don't lock per record
@@ -238,7 +237,7 @@ impl FlowEventStore for FlowEventStoreInMem {
                     let g: std::sync::MutexGuard<'_, State> = state.lock().unwrap();
                     g.system_flows_by_type
                         .get(&flow_type)
-                        .and_then(|flows| flows.get(pos).cloned())
+                        .and_then(|flows| flows.get(pos).copied())
                 };
 
                 let flow_id = match next {
@@ -260,7 +259,7 @@ impl FlowEventStore for FlowEventStoreInMem {
             let mut pos = {
                 let state = self.inner.as_state();
                 let g = state.lock().unwrap();
-                g.all_flows_by_dataset.get(&dataset_id).map(|flows| flows.len()).unwrap_or(0)
+                g.all_flows_by_dataset.get(&dataset_id).map_or(0, |flows| flows.len())
             };
 
             loop {
@@ -275,7 +274,7 @@ impl FlowEventStore for FlowEventStoreInMem {
                     let g = state.lock().unwrap();
                     g.all_flows_by_dataset
                         .get(&dataset_id)
-                        .and_then(|flows| flows.get(pos).cloned())
+                        .and_then(|flows| flows.get(pos).copied())
                 };
 
                 let flow_id = match next {
@@ -308,7 +307,7 @@ impl FlowEventStore for FlowEventStoreInMem {
                 let next = {
                     let state = self.inner.as_state();
                     let g = state.lock().unwrap();
-                    g.all_flows.get(pos).cloned()
+                    g.all_flows.get(pos).copied()
                 };
 
                 let flow_id = match next {

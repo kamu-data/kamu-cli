@@ -67,7 +67,7 @@ async fn test_crud_time_delta_root_dataset() {
         )
         .await;
 
-    assert!(res.is_ok(), "{:?}", res);
+    assert!(res.is_ok(), "{res:?}");
     assert_eq!(
         res.data,
         value!({
@@ -98,7 +98,7 @@ async fn test_crud_time_delta_root_dataset() {
         )
         .await;
 
-    assert!(res.is_ok(), "{:?}", res);
+    assert!(res.is_ok(), "{res:?}");
     assert_eq!(
         res.data,
         value!({
@@ -142,7 +142,7 @@ async fn test_crud_time_delta_root_dataset() {
         )
         .await;
 
-    assert!(res.is_ok(), "{:?}", res);
+    assert!(res.is_ok(), "{res:?}");
     assert_eq!(
         res.data,
         value!({
@@ -288,7 +288,7 @@ async fn test_crud_cron_root_dataset() {
         )
         .await;
 
-    assert!(res.is_ok(), "{:?}", res);
+    assert!(res.is_ok(), "{res:?}");
     assert_eq!(
         res.data,
         value!({
@@ -318,7 +318,7 @@ async fn test_crud_cron_root_dataset() {
         )
         .await;
 
-    assert!(res.is_ok(), "{:?}", res);
+    assert!(res.is_ok(), "{res:?}");
     assert_eq!(
         res.data,
         value!({
@@ -360,7 +360,7 @@ async fn test_crud_cron_root_dataset() {
         )
         .await;
 
-    assert!(res.is_ok(), "{:?}", res);
+    assert!(res.is_ok(), "{res:?}");
     assert_eq!(
         res.data,
         value!({
@@ -403,7 +403,7 @@ async fn test_crud_cron_root_dataset() {
                 .data(harness.catalog_authorized.clone()),
         )
         .await;
-    assert!(res.is_err(), "{:?}", res);
+    assert!(res.is_err(), "{res:?}");
     assert_eq!(
         res.errors[0].message,
         format!("Cron expression {invalid_cron_expression} is invalid")
@@ -424,7 +424,7 @@ async fn test_crud_cron_root_dataset() {
                 .data(harness.catalog_authorized.clone()),
         )
         .await;
-    assert!(res.is_err(), "{:?}", res);
+    assert!(res.is_err(), "{res:?}");
     assert_eq!(
         res.errors[0].message,
         format!("Cron expression {past_cron_expression} iteration has been exceeded",)
@@ -479,7 +479,7 @@ async fn test_crud_batching_derived_dataset() {
         )
         .await;
 
-    assert!(res.is_ok(), "{:?}", res);
+    assert!(res.is_ok(), "{res:?}");
     assert_eq!(
         res.data,
         value!({
@@ -510,7 +510,7 @@ async fn test_crud_batching_derived_dataset() {
         )
         .await;
 
-    assert!(res.is_ok(), "{:?}", res);
+    assert!(res.is_ok(), "{res:?}");
     assert_eq!(
         res.data,
         value!({
@@ -571,7 +571,7 @@ async fn test_incorrect_dataset_kinds_for_flow_type() {
         )
         .await;
 
-    assert!(res.is_ok(), "{:?}", res);
+    assert!(res.is_ok(), "{res:?}");
     assert_eq!(
         res.data,
         value!({
@@ -606,7 +606,7 @@ async fn test_incorrect_dataset_kinds_for_flow_type() {
         )
         .await;
 
-    assert!(res.is_ok(), "{:?}", res);
+    assert!(res.is_ok(), "{res:?}");
     assert_eq!(
         res.data,
         value!({
@@ -642,7 +642,7 @@ async fn test_incorrect_dataset_kinds_for_flow_type() {
         )
         .await;
 
-    assert!(res.is_ok(), "{:?}", res);
+    assert!(res.is_ok(), "{res:?}");
     assert_eq!(
         res.data,
         value!({

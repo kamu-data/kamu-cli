@@ -992,7 +992,7 @@ fn assert_flow_test_checks(flow_test_checks: &[FlowTestCheck<'_>]) {
         let snapshot_total_flows: usize = test_check.snapshot.values().map(|v| v.len()).sum();
         assert_eq!(snapshot_total_flows, test_check.patterns.len());
 
-        for pattern in test_check.patterns.iter() {
+        for pattern in &test_check.patterns {
             let flow_states = test_check.snapshot.get(pattern.0).unwrap();
 
             let index = if let Some(index) = pattern_idx_per_key.get_mut(pattern.0) {

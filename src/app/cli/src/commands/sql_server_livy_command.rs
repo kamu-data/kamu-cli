@@ -92,7 +92,7 @@ impl Command for SqlServerLivyCommand {
                 self.output_config.verbosity_level > 0,
                 move || {
                     if let Some(s) = spinner {
-                        s.finish_and_clear()
+                        s.finish_and_clear();
                     }
                     eprintln!(
                         "{} {}",
