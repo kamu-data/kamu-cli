@@ -46,6 +46,15 @@ pub struct CronExpressionSource {
     pub day_of_week: String,
 }
 
+impl CronExpressionSource {
+    pub fn as_cron_expression_string_with_sec(&self) -> String {
+        format!(
+            "0 {} {} {} {} {}",
+            self.min, self.hour, self.day_of_month, self.month, self.day_of_week
+        )
+    }
+}
+
 impl Default for CronExpressionSource {
     fn default() -> Self {
         // Means run every 1 minute
@@ -96,10 +105,7 @@ pub struct CronExpressionIterationError {
 
 impl Schedule {
     pub fn new_cron_schedule(source: CronExpressionSource) -> Result<Schedule, ScheduleError> {
-        let cron_as_string_with_dummy_seconds = format!(
-            "0 {} {} {} {} {}",
-            source.min, source.hour, source.day_of_month, source.month, source.day_of_week
-        );
+        let cron_as_string_with_dummy_seconds = source.as_cron_expression_string_with_sec();
 
         let schedule = match CronSchedule::from_str(&cron_as_string_with_dummy_seconds) {
             Err(_) => {
