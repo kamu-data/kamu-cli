@@ -317,7 +317,7 @@ async fn test_crud_cron_root_dataset() {
             hour: "*/2",
             dayOfMonth: "*",
             month: "*",
-            dayOfWeek: "*" 
+            dayOfWeek: "*"
         }"#,
     );
 
@@ -348,7 +348,7 @@ async fn test_crud_cron_root_dataset() {
                                         "hour": "*/2",
                                         "dayOfMonth": "*",
                                         "month": "*",
-                                        "dayOfWeek": "*" 
+                                        "dayOfWeek": "*"
                                     },
                                     "batching": null
                                 }
@@ -369,8 +369,8 @@ async fn test_crud_cron_root_dataset() {
             hour: "*/1",
             dayOfMonth: "*",
             month: "*",
-            dayOfWeek: "*" 
-        }"#,        
+            dayOfWeek: "*"
+        }"#,
     );
 
     let res = schema
@@ -400,7 +400,7 @@ async fn test_crud_cron_root_dataset() {
                                         "hour": "*/1",
                                         "dayOfMonth": "*",
                                         "month": "*",
-                                        "dayOfWeek": "*" 
+                                        "dayOfWeek": "*"
                                     },
                                     "batching": null
                                 }
@@ -417,14 +417,14 @@ async fn test_crud_cron_root_dataset() {
         &create_result.dataset_handle.id,
         "INGEST",
         true,
-         // invalid day of week
+        // invalid day of week
         r#"{
             min: "0",
             hour: "*/1",
             dayOfMonth: "*",
             month: "*",
-            dayOfWeek: "PIATNICA"  
-        }"#,    
+            dayOfWeek: "PIATNICA"
+        }"#,
     );
 
     let res = schema
@@ -438,7 +438,6 @@ async fn test_crud_cron_root_dataset() {
         res.errors[0].message,
         format!("Cron expression 0 */1 * * PIATNICA is invalid")
     );
-
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
@@ -611,8 +610,8 @@ async fn test_incorrect_dataset_kinds_for_flow_type() {
             hour: "*/2",
             dayOfMonth: "*",
             month: "*",
-            dayOfWeek: "*" 
-        }"#
+            dayOfWeek: "*"
+        }"#,
     );
 
     let res = schema
@@ -704,7 +703,7 @@ async fn test_anonymous_setters_fail() {
                 hour: "*/2",
                 dayOfMonth: "*",
                 month: "*",
-                dayOfWeek: "*" 
+                dayOfWeek: "*"
             }"#,
         ),
         FlowConfigHarness::set_config_batching_mutation(
