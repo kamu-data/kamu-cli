@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `kamu login` and `kamu logout` commands properly handle plaform URLs without an explicit schema (`https://` attached by default)
 - Flow configuration API no longer crashes on specific input combinations when interval expressed in smaller time units 
    exceed minimal boundary that forms a bigger time unit
+- Fixed runtime crashes related to background execution of automatically scheduled tasks
 
 ## [0.153.0] - 2024-01-17 (**BREAKING**)
 ### Changed
