@@ -22,7 +22,7 @@ use kamu_core::auth::{
     ProviderLoginError,
     ProviderLoginResponse,
 };
-use kamu_core::{SystemTimeSource, SystemTimeSourceStub};
+use kamu_core::{FakeSystemTimeSource, SystemTimeSource};
 use opendatafabric::AccountName;
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -133,8 +133,8 @@ fn make_catalog() -> dill::Catalog {
         .add::<DummyAuthenticationProviderA>()
         .add::<DummyAuthenticationProviderB>()
         .add::<AuthenticationServiceImpl>()
-        .add_value(SystemTimeSourceStub::new_set(Utc::now()))
-        .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
+        .add_value(FakeSystemTimeSource::new_set(Utc::now()))
+        .bind::<dyn SystemTimeSource, FakeSystemTimeSource>()
         .build()
 }
 

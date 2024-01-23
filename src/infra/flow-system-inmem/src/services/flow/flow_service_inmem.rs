@@ -501,9 +501,7 @@ impl FlowService for FlowServiceInMemory {
                     .int_err()?;
             }
 
-            self.time_source
-                .wake_after(self.run_config.awaiting_step)
-                .await;
+            self.time_source.sleep(self.run_config.awaiting_step).await;
         }
     }
 

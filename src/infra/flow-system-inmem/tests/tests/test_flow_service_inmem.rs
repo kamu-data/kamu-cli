@@ -9,7 +9,6 @@
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-use std::time::Duration as StdDuration;
 
 use chrono::{DateTime, Duration, DurationRound, TimeZone, Utc};
 use dill::*;
@@ -22,6 +21,7 @@ use kamu_flow_system_inmem::*;
 use kamu_task_system::*;
 use kamu_task_system_inmem::{TaskSchedulerInMemory, TaskSystemEventStoreInMemory};
 use opendatafabric::*;
+use tokio::task::yield_now;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -1087,7 +1087,7 @@ struct FlowHarness {
     flow_configuration_service: Arc<dyn FlowConfigurationService>,
     flow_service: Arc<dyn FlowService>,
     task_scheduler: Arc<dyn TaskScheduler>,
-    system_time_source_stub: SystemTimeSourceStub,
+    system_time_source_stub: FakeSystemTimeSource,
 }
 
 impl FlowHarness {
@@ -1097,7 +1097,7 @@ impl FlowHarness {
         std::fs::create_dir(&datasets_dir).unwrap();
 
         let system_time_source_stub =
-            SystemTimeSourceStub::new_set(Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap());
+            FakeSystemTimeSource::new_set(Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap());
         let catalog = dill::CatalogBuilder::new()
             .add::<EventBus>()
             .add_value(FlowServiceRunConfig::new(Duration::milliseconds(
@@ -1108,7 +1108,7 @@ impl FlowHarness {
             .add::<FlowConfigurationServiceInMemory>()
             .add::<FlowConfigurationEventStoreInMem>()
             .add_value(system_time_source_stub.clone())
-            .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
+            .bind::<dyn SystemTimeSource, FakeSystemTimeSource>()
             .add_builder(
                 DatasetRepositoryLocalFs::builder()
                     .with_root(datasets_dir)
@@ -1314,12 +1314,6 @@ impl FlowHarness {
         }
 
         const TIME_INCREMENT: Duration = Duration::milliseconds(SCHEDULING_ALIGNMENT_MS);
-        const CONTEXT_SWITCHING_SLEEP_DURATION: StdDuration = if cfg!(windows) {
-            // Windows sleep() is accurate up to about ~20-50 milliseconds
-            StdDuration::from_millis(50)
-        } else {
-            StdDuration::from_millis(5)
-        };
 
         let time_increments_count = div_up(
             time_quantum.num_milliseconds(),
@@ -1329,7 +1323,7 @@ impl FlowHarness {
         for _ in 0..time_increments_count {
             self.system_time_source_stub.advance(TIME_INCREMENT);
 
-            tokio::time::sleep(CONTEXT_SWITCHING_SLEEP_DURATION).await;
+            yield_now().await;
         }
     }
 }

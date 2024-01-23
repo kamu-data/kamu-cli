@@ -1070,7 +1070,7 @@ struct IngestTestHarness {
     temp_dir: TempDir,
     dataset_repo: Arc<dyn DatasetRepository>,
     ingest_svc: Arc<dyn PollingIngestService>,
-    time_source: Arc<SystemTimeSourceStub>,
+    time_source: Arc<FakeSystemTimeSource>,
     ctx: SessionContext,
 }
 
@@ -1110,10 +1110,10 @@ impl IngestTestHarness {
                     .with_run_info_dir(run_info_dir.clone()),
             )
             .bind::<dyn EngineProvisioner, EngineProvisionerLocal>()
-            .add_value(SystemTimeSourceStub::new_set(
+            .add_value(FakeSystemTimeSource::new_set(
                 Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap(),
             ))
-            .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
+            .bind::<dyn SystemTimeSource, FakeSystemTimeSource>()
             .add::<DataFormatRegistryImpl>()
             .add_builder(
                 PollingIngestServiceImpl::builder()
@@ -1125,7 +1125,7 @@ impl IngestTestHarness {
 
         let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
         let ingest_svc = catalog.get_one::<dyn PollingIngestService>().unwrap();
-        let time_source = catalog.get_one::<SystemTimeSourceStub>().unwrap();
+        let time_source = catalog.get_one::<FakeSystemTimeSource>().unwrap();
 
         Self {
             temp_dir,

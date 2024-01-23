@@ -17,10 +17,10 @@ use event_bus::EventBus;
 use kamu::domain::{
     auth,
     DatasetRepository,
+    FakeSystemTimeSource,
     InternalError,
     ResultIntoInternal,
     SystemTimeSource,
-    SystemTimeSourceStub,
 };
 use kamu::testing::{LocalS3Server, MockAuthenticationService};
 use kamu::utils::s3_context::S3Context;
@@ -46,7 +46,7 @@ pub(crate) struct ServerSideS3Harness {
     base_catalog: dill::Catalog,
     api_server: TestAPIServer,
     options: ServerSideHarnessOptions,
-    time_source: SystemTimeSourceStub,
+    time_source: FakeSystemTimeSource,
 }
 
 impl ServerSideS3Harness {
@@ -54,12 +54,12 @@ impl ServerSideS3Harness {
         let s3 = LocalS3Server::new().await;
         let s3_context = S3Context::from_url(&s3.url).await;
 
-        let time_source = SystemTimeSourceStub::new();
+        let time_source = FakeSystemTimeSource::new();
 
         let mut base_catalog_builder = dill::CatalogBuilder::new();
         base_catalog_builder
             .add_value(time_source.clone())
-            .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
+            .bind::<dyn SystemTimeSource, FakeSystemTimeSource>()
             .add::<EventBus>()
             .add::<DependencyGraphServiceInMemory>()
             .add_builder(
@@ -143,7 +143,7 @@ impl ServerSideHarness for ServerSideS3Harness {
         )
     }
 
-    fn system_time_source(&self) -> &SystemTimeSourceStub {
+    fn system_time_source(&self) -> &FakeSystemTimeSource {
         &self.time_source
     }
 
