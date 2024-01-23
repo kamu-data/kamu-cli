@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - `kamu login` and `kamu logout` commands accept server URL as a positional argument, not as `-s` switch
 - Improved output reporting of `kamu logout` command
+- API for CRON expressions is using struct with explicit CRON part fields instead of raw string
 ### Fixed
 - `kamu login` and `kamu logout` commands properly handle plaform URLs without an explicit schema (`https://` attached by default)
 - Flow configuration API no longer crashes on specific input combinations when interval expressed in smaller time units 
