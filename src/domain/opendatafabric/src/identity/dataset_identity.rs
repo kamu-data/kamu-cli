@@ -226,9 +226,9 @@ impl DatasetName {
 ///////////////////////////////////////////////////////////////////////////////
 
 newtype_str!(
-    DatasetPattern,
-    Grammar::match_dataset_pattern,
-    DatasetPatternSerdeVisitor
+    DatasetNamePattern,
+    Grammar::match_dataset_name_pattern,
+    DatasetNamePatternSerdeVisitor
 );
 
 ////////////////////////////////////////////////////////////////////////////////

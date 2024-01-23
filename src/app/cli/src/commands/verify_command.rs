@@ -16,7 +16,7 @@ use opendatafabric::*;
 
 use super::{BatchError, CLIError, Command};
 use crate::output::OutputConfig;
-use crate::{DatasetPatternValidationRes, VerificationMultiProgress};
+use crate::VerificationMultiProgress;
 
 type GenericVerificationResult =
     Result<Vec<Result<VerificationMultiResult, InternalError>>, CLIError>;
@@ -27,7 +27,7 @@ pub struct VerifyCommand {
     dataset_repo: Arc<dyn DatasetRepository>,
     verification_svc: Arc<dyn VerificationService>,
     output_config: Arc<OutputConfig>,
-    refs: Vec<DatasetPatternValidationRes>,
+    refs: Vec<DatasetRefPattern>,
     recursive: bool,
     integrity: bool,
 }
@@ -42,7 +42,7 @@ impl VerifyCommand {
         integrity: bool,
     ) -> Self
     where
-        I: Iterator<Item = DatasetPatternValidationRes>,
+        I: Iterator<Item = DatasetRefPattern>,
     {
         Self {
             dataset_repo,
@@ -78,9 +78,9 @@ impl VerifyCommand {
         options: VerificationOptions,
         listener: Option<Arc<VerificationMultiProgress>>,
     ) -> GenericVerificationResult {
-        let dataset_ref_arg = self.refs.first().unwrap();
-        if dataset_ref_arg.is_dataset_ref {
-            let dataset_ref = DatasetRef::try_from(dataset_ref_arg.pattern.as_str()).unwrap();
+        let dataset_ref_pattern = self.refs.first().unwrap();
+        if !dataset_ref_pattern.has_wildcards() {
+            let dataset_ref = DatasetRef::try_from(dataset_ref_pattern.pattern.as_str()).unwrap();
             let dataset_handle = self.dataset_repo.resolve_dataset_ref(&dataset_ref).await?;
 
             let listener = listener.and_then(|l| l.begin_verify(&dataset_handle));
@@ -100,11 +100,7 @@ impl VerifyCommand {
                 verification_result: res,
             })])
         } else {
-            let dataset_ref_pattern = DatasetRefPattern {
-                pattern: dataset_ref_arg.pattern.clone(),
-                ..DatasetRefPattern::default()
-            };
-            self.verify_multi(options, dataset_ref_pattern, listener)
+            self.verify_multi(options, dataset_ref_pattern.clone(), listener)
                 .await
         }
     }

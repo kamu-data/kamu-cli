@@ -10,7 +10,7 @@
 use internal_error::InternalError;
 use opendatafabric::{
     DatasetName,
-    DatasetPattern,
+    DatasetNamePattern,
     DatasetRef,
     DatasetRefAny,
     DatasetRefPattern,
@@ -23,7 +23,7 @@ use url::Url;
 
 #[derive(Clone)]
 pub struct DatasetPatternValidationRes {
-    pub pattern: DatasetPattern,
+    pub pattern: DatasetNamePattern,
     pub is_dataset_ref: bool,
 }
 
@@ -51,8 +51,8 @@ pub struct ValidationError {
 
 pub fn value_parse_dataset_ref_pattern_local(
     s: &str,
-) -> Result<DatasetPatternValidationRes, ValidationDatasetRefError> {
-    let dataset_pattern = match DatasetPattern::try_from(s) {
+) -> Result<DatasetRefPattern, ValidationDatasetRefError> {
+    let dataset_pattern = match DatasetNamePattern::try_from(s) {
         Ok(dp) => dp,
         Err(_) => {
             return Err(ValidationDatasetRefError::Failed(ValidationError {
@@ -65,8 +65,7 @@ pub fn value_parse_dataset_ref_pattern_local(
         pattern: dataset_pattern,
         ..Default::default()
     };
-    let is_dataset_ref = !s.to_string().contains(dataset_ref_patter.wildcard);
-    if is_dataset_ref {
+    if !dataset_ref_patter.has_wildcards() {
         match DatasetRef::try_from(s) {
             Ok(_dsr) => _dsr,
             Err(_) => {
@@ -77,10 +76,7 @@ pub fn value_parse_dataset_ref_pattern_local(
             }
         };
     }
-    Ok(DatasetPatternValidationRes {
-        pattern: dataset_ref_patter.pattern,
-        is_dataset_ref,
-    })
+    Ok(dataset_ref_patter)
 }
 
 pub fn value_parse_dataset_name(s: &str) -> Result<DatasetName, String> {

@@ -117,53 +117,6 @@ impl ScalarType for DatasetName {
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
-// DatasetPatter
-/////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct DatasetPattern(odf::DatasetPattern);
-
-impl From<odf::DatasetPattern> for DatasetPattern {
-    fn from(value: odf::DatasetPattern) -> Self {
-        DatasetPattern(value)
-    }
-}
-
-impl From<DatasetPattern> for odf::DatasetPattern {
-    fn from(val: DatasetPattern) -> Self {
-        val.0
-    }
-}
-
-impl From<DatasetPattern> for String {
-    fn from(val: DatasetPattern) -> Self {
-        val.0.into()
-    }
-}
-
-impl std::fmt::Display for DatasetPattern {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-#[Scalar]
-impl ScalarType for DatasetPattern {
-    fn parse(value: Value) -> InputValueResult<Self> {
-        if let Value::String(value) = &value {
-            let val = odf::DatasetPattern::try_from(value.as_str())?;
-            Ok(val.into())
-        } else {
-            Err(InputValueError::expected_type(value))
-        }
-    }
-
-    fn to_value(&self) -> Value {
-        Value::String(self.0.to_string())
-    }
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
 // DatasetRefAny
 /////////////////////////////////////////////////////////////////////////////////////////
 

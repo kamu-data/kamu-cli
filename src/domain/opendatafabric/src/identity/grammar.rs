@@ -138,8 +138,8 @@ impl Grammar {
         Self::match_hostname(s)
     }
 
-    // DatasetPattern = Hostname with possible wildcard symbols
-    pub fn match_dataset_pattern(s: &str) -> Option<(&str, &str)> {
+    // DatasetNamePattern = Hostname with possible wildcard symbols
+    pub fn match_dataset_name_pattern(s: &str) -> Option<(&str, &str)> {
         Self::match_wildcard_pattern(s)
     }
 

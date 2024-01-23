@@ -745,7 +745,7 @@ impl std::cmp::PartialOrd for DatasetRefAny {
 #[derive(Debug, Clone)]
 pub struct DatasetRefPattern {
     pub wildcard: char,
-    pub pattern: DatasetPattern,
+    pub pattern: DatasetNamePattern,
 }
 
 impl DatasetRefPattern {
@@ -755,13 +755,24 @@ impl DatasetRefPattern {
             _ => unimplemented!(),
         }
     }
+
+    pub fn as_dataset_ref(&self) -> Option<DatasetRef> {
+        match DatasetRef::try_from(self.pattern.as_str()) {
+            Ok(dsr) => Some(dsr),
+            Err(_) => None,
+        }
+    }
+
+    pub fn has_wildcards(&self) -> bool {
+        self.pattern.contains(self.wildcard)
+    }
 }
 
 impl Default for DatasetRefPattern {
     fn default() -> Self {
         Self {
             wildcard: '%',
-            pattern: DatasetPattern::new_unchecked(""),
+            pattern: DatasetNamePattern::new_unchecked(""),
         }
     }
 }
