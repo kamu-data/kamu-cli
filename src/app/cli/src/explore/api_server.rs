@@ -31,13 +31,16 @@ pub struct APIServer {
 impl APIServer {
     pub fn new(
         base_catalog: Catalog,
+        cli_catalog: Catalog,
         multi_tenant_workspace: bool,
         address: Option<IpAddr>,
         port: Option<u16>,
     ) -> Self {
         use axum::extract::Extension;
 
-        let task_executor = base_catalog.get_one().unwrap();
+        // Background task executor must run with server privileges to execute tasks on
+        // behalf of the system, as they are automatically scheduled
+        let task_executor = cli_catalog.get_one().unwrap();
 
         let flow_service = base_catalog.get_one().unwrap();
 

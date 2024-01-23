@@ -414,6 +414,7 @@ pub fn get_command(
 
                     Box::new(APIServerRunCommand::new(
                         base_catalog.clone(),
+                        cli_catalog.clone(),
                         workspace_svc.is_multi_tenant_workspace(),
                         cli_catalog.get_one()?,
                         server_matches.get_one("address").copied(),

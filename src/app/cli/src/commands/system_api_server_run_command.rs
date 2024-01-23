@@ -25,7 +25,8 @@ use super::{CLIError, Command};
 use crate::{accounts, check_env_var_set, OutputConfig};
 
 pub struct APIServerRunCommand {
-    catalog: Catalog,
+    base_catalog: Catalog,
+    cli_catalog: Catalog,
     multi_tenant_workspace: bool,
     output_config: Arc<OutputConfig>,
     address: Option<IpAddr>,
@@ -36,7 +37,8 @@ pub struct APIServerRunCommand {
 
 impl APIServerRunCommand {
     pub fn new(
-        catalog: Catalog,
+        base_catalog: Catalog,
+        cli_catalog: Catalog,
         multi_tenant_workspace: bool,
         output_config: Arc<OutputConfig>,
         address: Option<IpAddr>,
@@ -45,7 +47,8 @@ impl APIServerRunCommand {
         account_subject: Arc<CurrentAccountSubject>,
     ) -> Self {
         Self {
-            catalog,
+            base_catalog,
+            cli_catalog,
             multi_tenant_workspace,
             output_config,
             address,
@@ -82,7 +85,10 @@ impl APIServerRunCommand {
             password: current_account_name.to_string(),
         };
 
-        let auth_svc = self.catalog.get_one::<dyn AuthenticationService>().unwrap();
+        let auth_svc = self
+            .base_catalog
+            .get_one::<dyn AuthenticationService>()
+            .unwrap();
         let access_token = auth_svc
             .login(
                 accounts::LOGIN_METHOD_PASSWORD,
@@ -106,7 +112,8 @@ impl Command for APIServerRunCommand {
 
         // TODO: Cloning catalog is too expensive currently
         let api_server = crate::explore::APIServer::new(
-            self.catalog.clone(),
+            self.base_catalog.clone(),
+            self.cli_catalog.clone(),
             self.multi_tenant_workspace,
             self.address,
             self.port,
