@@ -13,6 +13,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 #![allow(clippy::all)]
+#![allow(clippy::pedantic)]
 
 use std::path::PathBuf;
 
@@ -716,7 +717,7 @@ pub struct ReadStepCsv {
 
 impl_enum_variant!(ReadStep::Csv(ReadStepCsv));
 
-/// Reader for `GeoJSON` files. It expects one `FeatureCollection` object in the
+/// Reader for GeoJSON files. It expects one `FeatureCollection` object in the
 /// root and will create a record per each `Feature` inside it extracting the
 /// properties into individual columns and leaving the feature geometry in its
 /// own column.
@@ -796,7 +797,7 @@ pub struct ReadStepNdJson {
 
 impl_enum_variant!(ReadStep::NdJson(ReadStepNdJson));
 
-/// Reader for Newline-delimited `GeoJSON` files. It is similar to `GeoJson`
+/// Reader for Newline-delimited GeoJSON files. It is similar to `GeoJson`
 /// format but instead of `FeatureCollection` object in the root it expects
 /// every individual feature object to appear on its own line.
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -884,7 +885,7 @@ pub struct SetInfo {
 /// Defines a license that applies to this dataset.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct SetLicense {
-    /// Abbriviated name of the license.
+    /// Abbreviated name of the license.
     pub short_name: String,
     /// Full name of the license.
     pub name: String,
@@ -898,7 +899,7 @@ pub struct SetLicense {
 // https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setpollingsource-schema
 ////////////////////////////////////////////////////////////////////////////////
 
-/// Contains information on how extenrally-hosted data can be ingested into the
+/// Contains information on how externally-hosted data can be ingested into the
 /// root dataset.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct SetPollingSource {

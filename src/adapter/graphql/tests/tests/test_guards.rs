@@ -25,12 +25,12 @@ async fn logged_in_guard_logged() {
 
     let query_response = schema
         .execute(
-            r"
+            r#"
             query {
                 guardedQuery,
                 unguardedQuery,
             }
-            ",
+            "#,
         )
         .await;
 
@@ -45,12 +45,12 @@ async fn logged_in_guard_logged() {
 
     let mutation_response = schema
         .execute(
-            r"
+            r#"
             mutation {
                 guardedMutation,
                 unguardedMutation,
             }
-            ",
+            "#,
         )
         .await;
 
@@ -80,21 +80,21 @@ async fn logged_in_guard_anonymous() {
 
     let guarded_query_response = schema
         .execute(
-            r"
+            r#"
             query {
                 guardedQuery,
             }
-            ",
+            "#,
         )
         .await;
 
     let unguarded_query_response = schema
         .execute(
-            r"
+            r#"
             query {
                 unguardedQuery,
             }
-            ",
+            "#,
         )
         .await;
 
@@ -117,21 +117,21 @@ async fn logged_in_guard_anonymous() {
 
     let guarded_mutation_response = schema
         .execute(
-            r"
+            r#"
             mutation {
                 guardedMutation,
             }
-            ",
+            "#,
         )
         .await;
 
     let unguarded_mutation_response = schema
         .execute(
-            r"
+            r#"
             mutation {
                 unguardedMutation,
             }
-            ",
+            "#,
         )
         .await;
 

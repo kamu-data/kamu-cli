@@ -40,7 +40,7 @@ impl SearchServiceImpl {
             "file" => {
                 let path = url
                     .to_file_path()
-                    .map_err(|()| "Invalid path URL")
+                    .map_err(|_| "Invalid path URL")
                     .int_err()?;
                 let query = query.unwrap_or_default();
                 for entry in std::fs::read_dir(path).int_err()? {

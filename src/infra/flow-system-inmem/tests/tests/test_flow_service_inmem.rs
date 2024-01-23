@@ -56,7 +56,7 @@ async fn test_read_initial_config_and_queue_properly() {
     // Run scheduler concurrently with manual triggers script
     tokio::select! {
         res = harness.flow_service.run(start_time) => res.int_err(),
-        () = tokio::time::sleep(std::time::Duration::from_millis(120)) => Ok(()),
+        _ = tokio::time::sleep(std::time::Duration::from_millis(120)) => Ok(()),
     }
     .unwrap();
 
@@ -134,7 +134,7 @@ async fn test_manual_trigger() {
     // Run scheduler concurrently with manual triggers script
     tokio::select! {
         res = harness.flow_service.run(start_time) => res.int_err(),
-        () = async {
+        _ = async {
             // Sleep < "foo" period
             tokio::time::sleep(std::time::Duration::from_millis(40)).await;
             let new_time = start_time + Duration::milliseconds(40);
@@ -230,7 +230,7 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
     // Run scheduler concurrently with manual triggers script
     tokio::select! {
         res = harness.flow_service.run(start_time) => res.int_err(),
-        () = async {
+        _ = async {
             // Sleep < "foo"/"bar" period
             tokio::time::sleep(std::time::Duration::from_millis(25)).await;
             harness.pause_dataset_flow(start_time + Duration::milliseconds(25), foo_id.clone(), DatasetFlowType::Ingest).await;
@@ -391,7 +391,7 @@ async fn test_dataset_deleted() {
     // Run scheduler concurrently with manual triggers script
     tokio::select! {
         res = harness.flow_service.run(start_time) => res.int_err(),
-        () = async {
+        _ = async {
             // Sleep < "foo" period
             tokio::time::sleep(std::time::Duration::from_millis(25)).await;
             harness.delete_dataset(&foo_id).await;
@@ -519,7 +519,7 @@ async fn test_cron_task_completions_trigger_next_loop_on_success() {
     // Run scheduler concurrently with manual triggers script
     tokio::select! {
         res = harness.flow_service.run(start_time) => res.int_err(),
-        () = async {
+        _ = async {
             // Each of 3 datasets should be scheduled after this time
             let mut next_time = start_time + Duration::milliseconds(1100);
             tokio::time::sleep(std::time::Duration::from_millis(1100)).await;
@@ -636,7 +636,7 @@ async fn test_task_completions_trigger_next_loop_on_success() {
     // Run scheduler concurrently with manual triggers script
     tokio::select! {
         res = harness.flow_service.run(start_time) => res.int_err(),
-        () = async {
+        _ = async {
             // Each of 3 datasets should be scheduled after this time
             let mut next_time = start_time + Duration::milliseconds(60);
             tokio::time::sleep(std::time::Duration::from_millis(60)).await;
@@ -857,7 +857,7 @@ async fn test_update_success_triggers_update_of_derived_datasets() {
     // Run scheduler concurrently with manual triggers script
     let _ = tokio::select! {
         res = harness.flow_service.run(start_time) => res.int_err(),
-        () = async {
+        _ = async {
             // "foo" is definitely schedule now
             let next_time = start_time + Duration::milliseconds(50);
             tokio::time::sleep(std::time::Duration::from_millis(50)).await;

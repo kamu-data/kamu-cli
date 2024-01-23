@@ -502,7 +502,7 @@ impl SchemaProvider for KamuSchema {
             .check_action_allowed(&dataset_handle, auth::DatasetAction::Read)
             .await
         {
-            Ok(()) => {}
+            Ok(_) => {}
             Err(_) => return None,
         }
 

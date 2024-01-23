@@ -225,7 +225,7 @@ impl PushIngestServiceImpl {
                     "file" => {
                         let p = url
                             .to_file_path()
-                            .map_err(|()| format!("Invalid file URL {url}").int_err())?;
+                            .map_err(|_| format!("Invalid file URL {url}").int_err())?;
 
                         // TODO: In case of STDIN (/dev/fd/0) or other pipes and special device
                         // files we have to copy data into a temporary file,

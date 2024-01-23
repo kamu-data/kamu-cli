@@ -387,7 +387,7 @@ impl WsSmartTransferProtocolClient {
         tracing::debug!("Uploading group of files finished");
 
         match self.push_send_objects_upload_complete(socket).await {
-            Ok(()) => {}
+            Ok(_) => {}
             Err(e) => {
                 tracing::debug!("Push process aborted with error: {}", e);
                 return Err(SyncError::Internal(e.int_err()));
@@ -824,7 +824,7 @@ async fn write_payload<TMessagePayload: Serialize>(
     let message = Message::Text(payload_as_json_string);
     let send_result = socket.send(message).await;
     match send_result {
-        Ok(()) => Ok(()),
+        Ok(_) => Ok(()),
         Err(e) => Err(WriteMessageError::SocketError(Box::new(e))),
     }
 }

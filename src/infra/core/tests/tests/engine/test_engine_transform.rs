@@ -354,7 +354,7 @@ async fn test_transform_common(transform: Transform) {
     kamu_data_utils::testing::assert_data_eq(
         df.clone(),
         indoc!(
-            r"
+            r#"
             +--------+----+----------------------+----------------------+------+----------------+
             | offset | op | system_time          | event_time           | city | population_x10 |
             +--------+----+----------------------+----------------------+------+----------------+
@@ -362,14 +362,14 @@ async fn test_transform_common(transform: Transform) {
             | 1      | 0  | 2050-01-02T12:00:00Z | 2050-01-01T12:00:00Z | B    | 200            |
             | 2      | 0  | 2050-01-02T12:00:00Z | 2050-01-01T12:00:00Z | C    | 300            |
             +--------+----+----------------------+----------------------+------+----------------+
-            "
+            "#
         ),
     )
     .await;
     kamu_data_utils::testing::assert_schema_eq(
         &normalize_schema(df.schema(), transform.engine()),
         indoc!(
-            r"
+            r#"
             message arrow_schema {
               REQUIRED INT64 offset;
               REQUIRED INT32 op;
@@ -378,7 +378,7 @@ async fn test_transform_common(transform: Transform) {
               OPTIONAL BYTE_ARRAY city (STRING);
               OPTIONAL INT32 population_x10;
             }
-            "
+            "#
         ),
     );
 
@@ -424,7 +424,7 @@ async fn test_transform_common(transform: Transform) {
     kamu_data_utils::testing::assert_data_eq(
         df.clone(),
         indoc!(
-            r"
+            r#"
             +--------+----+----------------------+----------------------+------+----------------+
             | offset | op | system_time          | event_time           | city | population_x10 |
             +--------+----+----------------------+----------------------+------+----------------+
@@ -434,14 +434,14 @@ async fn test_transform_common(transform: Transform) {
             | 6      | 0  | 2050-01-03T12:00:00Z | 2050-01-02T12:00:00Z | D    | 400            |
             | 7      | 0  | 2050-01-03T12:00:00Z | 2050-01-02T12:00:00Z | E    | 500            |
             +--------+----+----------------------+----------------------+------+----------------+
-            "
+            "#
         ),
     )
     .await;
     kamu_data_utils::testing::assert_schema_eq(
         &normalize_schema(df.schema(), transform.engine()),
         indoc!(
-            r"
+            r#"
             message arrow_schema {
               REQUIRED INT64 offset;
               REQUIRED INT32 op;
@@ -450,7 +450,7 @@ async fn test_transform_common(transform: Transform) {
               OPTIONAL BYTE_ARRAY city (STRING);
               OPTIONAL INT32 population_x10;
             }
-            "
+            "#
         ),
     );
 

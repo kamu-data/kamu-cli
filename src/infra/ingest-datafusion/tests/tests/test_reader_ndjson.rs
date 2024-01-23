@@ -43,15 +43,15 @@ async fn test_read_ndjson_with_schema() {
             "#
         ),
         indoc!(
-            r"
+            r#"
             message arrow_schema {
               REQUIRED BYTE_ARRAY city (STRING);
               REQUIRED INT32 population;
             }
-            "
+            "#
         ),
         indoc!(
-            r"
+            r#"
             +------+------------+
             | city | population |
             +------+------------+
@@ -59,7 +59,7 @@ async fn test_read_ndjson_with_schema() {
             | B    | 2000       |
             | C    | 3000       |
             +------+------------+
-            "
+            "#
         ),
     )
     .await;
@@ -87,15 +87,15 @@ async fn test_read_ndjson_infer_schema() {
             "#
         ),
         indoc!(
-            r"
+            r#"
             message arrow_schema {
               OPTIONAL BYTE_ARRAY city (STRING);
               OPTIONAL INT64 population;
             }
-            "
+            "#
         ),
         indoc!(
-            r"
+            r#"
             +------+------------+
             | city | population |
             +------+------------+
@@ -103,7 +103,7 @@ async fn test_read_ndjson_infer_schema() {
             | B    | 2000       |
             | C    | 3000       |
             +------+------------+
-            "
+            "#
         ),
     )
     .await;
@@ -130,20 +130,20 @@ async fn test_read_ndjson_format_date() {
             "#
         ),
         indoc!(
-            r"
+            r#"
             message arrow_schema {
               REQUIRED INT32 date (DATE);
             }
-            "
+            "#
         ),
         indoc!(
-            r"
+            r#"
             +------------+
             | date       |
             +------------+
             | 2022-09-25 |
             +------------+
-            "
+            "#
         ),
     )
     .await;
@@ -179,14 +179,14 @@ async fn test_read_ndjson_format_timestamp() {
             "#
         ),
         indoc!(
-            r"
+            r#"
             message arrow_schema {
               REQUIRED INT64 event_time (TIMESTAMP(NANOS,true));
             }
-            "
+            "#
         ),
         indoc!(
-            r"
+            r#"
             +----------------------+
             | event_time           |
             +----------------------+
@@ -195,7 +195,7 @@ async fn test_read_ndjson_format_timestamp() {
             | 2022-09-25T01:02:03Z |
             | 2022-09-25T02:02:03Z |
             +----------------------+
-            "
+            "#
         ),
     )
     .await;

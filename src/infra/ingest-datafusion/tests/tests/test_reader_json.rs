@@ -50,15 +50,15 @@ async fn test_read_json_object() {
             "#
         ),
         indoc!(
-            r"
+            r#"
             message arrow_schema {
               REQUIRED BYTE_ARRAY city (STRING);
               REQUIRED INT32 population;
             }
-            "
+            "#
         ),
         indoc!(
-            r"
+            r#"
             +------+------------+
             | city | population |
             +------+------------+
@@ -66,7 +66,7 @@ async fn test_read_json_object() {
             | B    | 2000       |
             | C    | 3000       |
             +------+------------+
-            "
+            "#
         ),
     )
     .await;
@@ -104,15 +104,15 @@ async fn test_read_json_array() {
             "#
         ),
         indoc!(
-            r"
+            r#"
             message arrow_schema {
               REQUIRED BYTE_ARRAY city (STRING);
               REQUIRED INT32 population;
             }
-            "
+            "#
         ),
         indoc!(
-            r"
+            r#"
             +------+------------+
             | city | population |
             +------+------------+
@@ -120,7 +120,7 @@ async fn test_read_json_array() {
             | B    | 2000       |
             | C    | 3000       |
             +------+------------+
-            "
+            "#
         ),
     )
     .await;

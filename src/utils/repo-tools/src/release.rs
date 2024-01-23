@@ -151,7 +151,7 @@ mod tests {
         // During patch release the Change Date stays the same
 
         let orig_text = indoc::indoc!(
-            r"
+            r#"
             ...
             Licensor:                  Kamu Data, Inc.
             Licensed Work:             Kamu CLI Version 0.63.0
@@ -159,7 +159,7 @@ mod tests {
             Change Date:               2025-01-01
             Change License:            Apache License, Version 2.0
             ...
-            "
+            "#
         );
 
         let new_text = update_license_text(
@@ -172,7 +172,7 @@ mod tests {
         assert_eq!(
             new_text,
             indoc::indoc!(
-                r"
+                r#"
                 ...
                 Licensor:                  Kamu Data, Inc.
                 Licensed Work:             Kamu CLI Version 0.63.1
@@ -180,7 +180,7 @@ mod tests {
                 Change Date:               2025-01-01
                 Change License:            Apache License, Version 2.0
                 ...
-                "
+                "#
             )
         );
     }
@@ -190,7 +190,7 @@ mod tests {
         // During patch release the Change Date stays the same
 
         let orig_text = indoc::indoc!(
-            r"
+            r#"
             ...
             Licensor:                  Kamu Data, Inc.
             Licensed Work:             Kamu CLI Version 0.63.0
@@ -198,7 +198,7 @@ mod tests {
             Change Date:               2025-01-01
             Change License:            Apache License, Version 2.0
             ...
-            "
+            "#
         );
 
         let new_text = update_license_text(
@@ -211,7 +211,7 @@ mod tests {
         assert_eq!(
             new_text,
             indoc::indoc!(
-                r"
+                r#"
                 ...
                 Licensor:                  Kamu Data, Inc.
                 Licensed Work:             Kamu CLI Version 0.64.0
@@ -219,7 +219,7 @@ mod tests {
                 Change Date:               2025-09-01
                 Change License:            Apache License, Version 2.0
                 ...
-                "
+                "#
             )
         );
     }

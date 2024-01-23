@@ -304,7 +304,7 @@ impl DatasetFactory for DatasetFactoryImpl {
             "file" => {
                 let path = url
                     .to_file_path()
-                    .map_err(|()| "Invalid file url".int_err())?;
+                    .map_err(|_| "Invalid file url".int_err())?;
                 let layout = if create_if_not_exists
                     && (!path.exists() || path.read_dir().int_err()?.next().is_none())
                 {

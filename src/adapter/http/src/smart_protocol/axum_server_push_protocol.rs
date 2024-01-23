@@ -70,7 +70,7 @@ impl AxumServerPushProtocolInstance {
 
     pub async fn serve(self) {
         match self.push_main_flow().await {
-            Ok(()) => {
+            Ok(_) => {
                 tracing::debug!("Push process success");
             }
             Err(e) => {

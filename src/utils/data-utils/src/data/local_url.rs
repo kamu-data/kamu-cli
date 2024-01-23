@@ -21,7 +21,7 @@ pub struct NonLocalPathError {
 }
 
 pub fn into_local_path(url: Url) -> Result<PathBuf, NonLocalPathError> {
-    url.to_file_path().map_err(|()| NonLocalPathError { url })
+    url.to_file_path().map_err(|_| NonLocalPathError { url })
 }
 
 ///////////////////////////////////////////////////////////////////////////////

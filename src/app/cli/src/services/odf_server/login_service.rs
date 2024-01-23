@@ -117,7 +117,7 @@ impl LoginService {
                 tracing::info!(?maybe_login_response, "Shutting down web server, as obtained callback response");
                 Ok(maybe_login_response)
             }
-            () = ctrlc_rx.notified() => {
+            _ = ctrlc_rx.notified() => {
                 tracing::info!("Shutting down web server, as Ctrl+C pressed");
                 Ok(None)
             }

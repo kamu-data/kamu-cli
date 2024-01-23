@@ -148,7 +148,7 @@ impl Command for LoginCommand {
             .find_by_frontend_url(self.scope, &odf_server_frontend_url)
         {
             match self.validate_login(token_find_report).await {
-                Ok(()) => {
+                Ok(_) => {
                     eprintln!(
                         "{}: {}",
                         console::style("Access token valid").green().bold(),

@@ -49,7 +49,7 @@ async fn test_container_terminate_not_called() {
         container
             .wait_for_container(Duration::from_millis(5000))
             .await,
-        Ok(())
+        Ok(_)
     );
 
     dump_state("<<<<<<<<< State pre-drop:");
@@ -88,7 +88,7 @@ async fn test_container_terminate_awaited() {
         container
             .wait_for_container(Duration::from_millis(5000))
             .await,
-        Ok(())
+        Ok(_)
     );
 
     dump_state("<<<<<<<<< State pre-terminate:");

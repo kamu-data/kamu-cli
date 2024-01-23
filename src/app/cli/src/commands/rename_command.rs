@@ -46,7 +46,7 @@ impl Command for RenameCommand {
             .rename_dataset(&self.dataset_ref, &self.new_name)
             .await
         {
-            Ok(()) => Ok(()),
+            Ok(_) => Ok(()),
             Err(RenameDatasetError::NotFound(e)) => Err(CLIError::failure(e)),
             Err(RenameDatasetError::NameCollision(e)) => Err(CLIError::failure(e)),
             Err(RenameDatasetError::Access(e)) => Err(CLIError::failure(e)),

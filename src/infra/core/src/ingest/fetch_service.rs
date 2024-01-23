@@ -67,7 +67,7 @@ impl FetchService {
                     "file" => {
                         Self::fetch_file(
                             &url.to_file_path()
-                                .map_err(|()| format!("Invalid url: {url}").int_err())?,
+                                .map_err(|_| format!("Invalid url: {url}").int_err())?,
                             furl.event_time.as_ref(),
                             prev_source_state,
                             target_path,

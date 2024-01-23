@@ -71,7 +71,7 @@ impl NamedObjectRepository for NamedObjectRepositoryLocalFS {
 
     async fn delete(&self, name: &str) -> Result<(), DeleteNamedError> {
         match std::fs::remove_file(self.root.join(name)) {
-            Ok(()) => Ok(()),
+            Ok(_) => Ok(()),
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
             Err(e) => Err(e.int_err().into()),
         }

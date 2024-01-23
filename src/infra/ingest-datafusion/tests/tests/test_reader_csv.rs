@@ -34,23 +34,23 @@ async fn test_read_csv_with_schema() {
         .await
         .unwrap(),
         indoc!(
-            r"
+            r#"
             city,population
             A,1000
             B,2000
             C,3000
-            "
+            "#
         ),
         indoc!(
-            r"
+            r#"
             message arrow_schema {
               REQUIRED BYTE_ARRAY city (STRING);
               REQUIRED INT32 population;
             }
-            "
+            "#
         ),
         indoc!(
-            r"
+            r#"
             +------+------------+
             | city | population |
             +------+------------+
@@ -58,7 +58,7 @@ async fn test_read_csv_with_schema() {
             | B    | 2000       |
             | C    | 3000       |
             +------+------------+
-            "
+            "#
         ),
     )
     .await;
@@ -80,23 +80,23 @@ async fn test_read_csv_no_schema_no_infer() {
         .await
         .unwrap(),
         indoc!(
-            r"
+            r#"
             city,population
             A,1000
             B,2000
             C,3000
-            "
+            "#
         ),
         indoc!(
-            r"
+            r#"
             message arrow_schema {
               OPTIONAL BYTE_ARRAY city (STRING);
               OPTIONAL BYTE_ARRAY population (STRING);
             }
-            "
+            "#
         ),
         indoc!(
-            r"
+            r#"
             +------+------------+
             | city | population |
             +------+------------+
@@ -104,7 +104,7 @@ async fn test_read_csv_no_schema_no_infer() {
             | B    | 2000       |
             | C    | 3000       |
             +------+------------+
-            "
+            "#
         ),
     )
     .await;
@@ -127,23 +127,23 @@ async fn test_read_csv_no_schema_infer() {
         .await
         .unwrap(),
         indoc!(
-            r"
+            r#"
             city,population
             A,1000
             B,2000
             C,3000
-            "
+            "#
         ),
         indoc!(
-            r"
+            r#"
             message arrow_schema {
               OPTIONAL BYTE_ARRAY city (STRING);
               OPTIONAL INT64 population;
             }
-            "
+            "#
         ),
         indoc!(
-            r"
+            r#"
             +------+------------+
             | city | population |
             +------+------------+
@@ -151,7 +151,7 @@ async fn test_read_csv_no_schema_infer() {
             | B    | 2000       |
             | C    | 3000       |
             +------+------------+
-            "
+            "#
         ),
     )
     .await;
@@ -176,22 +176,22 @@ async fn test_read_csv_no_header() {
         .await
         .unwrap(),
         indoc!(
-            r"
+            r#"
             A,1000
             B,2000
             C,3000
-            "
+            "#
         ),
         indoc!(
-            r"
+            r#"
             message arrow_schema {
               OPTIONAL BYTE_ARRAY city (STRING);
               OPTIONAL INT64 population;
             }
-            "
+            "#
         ),
         indoc!(
-            r"
+            r#"
             +------+------------+
             | city | population |
             +------+------------+
@@ -199,7 +199,7 @@ async fn test_read_csv_no_header() {
             | B    | 2000       |
             | C    | 3000       |
             +------+------------+
-            "
+            "#
         ),
     )
     .await;
@@ -222,23 +222,23 @@ async fn test_read_csv_null_values() {
         .await
         .unwrap(),
         indoc!(
-            r"
+            r#"
             city,population
             A,1000
             B,
             C,3000
-            "
+            "#
         ),
         indoc!(
-            r"
+            r#"
             message arrow_schema {
               OPTIONAL BYTE_ARRAY city (STRING);
               OPTIONAL INT64 population;
             }
-            "
+            "#
         ),
         indoc!(
-            r"
+            r#"
             +------+------------+
             | city | population |
             +------+------------+
@@ -246,7 +246,7 @@ async fn test_read_csv_null_values() {
             | B    |            |
             | C    | 3000       |
             +------+------------+
-            "
+            "#
         ),
     )
     .await;
@@ -283,17 +283,17 @@ async fn test_read_tsv_null_values() {
             "
         ),
         indoc!(
-            r"
+            r#"
             message arrow_schema {
               OPTIONAL INT32 a;
               OPTIONAL INT32 b;
               OPTIONAL INT32 c;
               OPTIONAL INT32 d;
             }
-            "
+            "#
         ),
         indoc!(
-            r"
+            r#"
             +---+---+---+---+
             | a | b | c | d |
             +---+---+---+---+
@@ -302,7 +302,7 @@ async fn test_read_tsv_null_values() {
             | 1 | 2 |   |   |
             |   |   | 3 | 4 |
             +---+---+---+---+
-            "
+            "#
         ),
     )
     .await;

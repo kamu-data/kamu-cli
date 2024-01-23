@@ -42,7 +42,7 @@ pub(crate) async fn axum_write_payload<TMessagePayload: Serialize>(
     let message = axum::extract::ws::Message::Text(payload_as_json_string);
     let send_result = socket.send(message).await;
     match send_result {
-        Ok(()) => Ok(()),
+        Ok(_) => Ok(()),
         Err(e) => Err(WriteMessageError::SocketError(Box::new(e))),
     }
 }

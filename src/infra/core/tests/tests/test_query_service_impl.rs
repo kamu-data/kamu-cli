@@ -265,13 +265,13 @@ async fn test_dataset_tail_common(catalog: dill::Catalog, tempdir: &TempDir) {
     kamu_data_utils::testing::assert_data_eq(
         df,
         indoc::indoc!(
-            r"
+            r#"
             +--------+------+
             | offset | blah |
             +--------+------+
             | 2      | c    |
             +--------+------+
-            "
+            "#
         ),
     )
     .await;
@@ -282,14 +282,14 @@ async fn test_dataset_tail_common(catalog: dill::Catalog, tempdir: &TempDir) {
     kamu_data_utils::testing::assert_data_eq(
         df,
         indoc::indoc!(
-            r"
+            r#"
             +--------+------+
             | offset | blah |
             +--------+------+
             | 1      | b    |
             | 2      | c    |
             +--------+------+
-            "
+            "#
         ),
     )
     .await;
@@ -389,13 +389,13 @@ async fn test_dataset_sql_authorized_common(catalog: dill::Catalog, tempdir: &Te
     kamu_data_utils::testing::assert_data_eq(
         df,
         indoc::indoc!(
-            r"
+            r#"
             +-------------+
             | num_records |
             +-------------+
             | 4           |
             +-------------+
-            "
+            "#
         ),
     )
     .await;

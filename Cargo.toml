@@ -100,6 +100,8 @@ module_name_repetitions = { level = "allow", priority = 1 }
 wildcard_imports = { level = "allow", priority = 1 }
 must_use_candidate = { level = "allow", priority = 1 }
 redundant_closure_for_method_calls = { level = "allow", priority = 1 }
+ignored_unit_patterns = { level = "allow", priority = 1 }
+needless_raw_string_hashes = { level = "allow", priority = 1 }
 
 # clippy::cargo
 cargo = { level = "warn", priority = 0 }

@@ -65,13 +65,13 @@ async fn test_enabled_login_methods() {
     let res = schema
         .execute(
             async_graphql::Request::new(
-                r"
+                r#"
                 query {
                     auth {
                         enabledLoginMethods
                     }
                 }
-                ",
+                "#,
             )
             .data(cat),
         )
