@@ -42,6 +42,15 @@ impl TaskExecutorInMemory {
         }
     }
 
+    async fn publish_task_running(&self, task_id: TaskID) -> Result<(), InternalError> {
+        self.event_bus
+            .dispatch_event(TaskEventRunning {
+                event_time: self.time_source.now(),
+                task_id,
+            })
+            .await
+    }
+
     async fn publish_task_finished(
         &self,
         task_id: TaskID,
@@ -72,6 +81,8 @@ impl TaskExecutor for TaskExecutorInMemory {
                 logical_plan = ?task.logical_plan,
                 "Executing task",
             );
+
+            self.publish_task_running(task.task_id).await?;
 
             let outcome = match &task.logical_plan {
                 LogicalPlan::UpdateDataset(upd) => {
