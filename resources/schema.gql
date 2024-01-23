@@ -164,7 +164,19 @@ type CreateDatasetResultSuccess implements CreateDatasetResult & CreateDatasetFr
 }
 
 type CronExpression {
-	cronExpression: String!
+	min: String!
+	hour: String!
+	dayOfMonth: String!
+	month: String!
+	dayOfWeek: String!
+}
+
+input CronExpressionInput {
+	min: String!
+	hour: String!
+	dayOfMonth: String!
+	month: String!
+	dayOfWeek: String!
 }
 
 type DataBatch {
@@ -1139,7 +1151,7 @@ type RequestHeader {
 
 input ScheduleInput @oneOf {
 	timeDelta: TimeDeltaInput
-	cronExpression: String
+	cronExpression: CronExpressionInput
 }
 
 type Search {

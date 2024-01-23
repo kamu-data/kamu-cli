@@ -264,7 +264,11 @@ async fn test_crud_cron_root_dataset() {
                                 schedule {
                                     __typename
                                     ... on CronExpression {
-                                        cronExpression
+                                        min
+                                        hour
+                                        dayOfMonth
+                                        month
+                                        dayOfWeek
                                     }
                                 }
                                 batching {
@@ -308,7 +312,13 @@ async fn test_crud_cron_root_dataset() {
         &create_result.dataset_handle.id,
         "INGEST",
         false,
-        "0 */2 * * * *",
+        r#"{
+            min: "0",
+            hour: "*/2",
+            dayOfMonth: "*",
+            month: "*",
+            dayOfWeek: "*" 
+        }"#,
     );
 
     let res = schema
@@ -334,7 +344,11 @@ async fn test_crud_cron_root_dataset() {
                                     "paused": false,
                                     "schedule": {
                                         "__typename": "CronExpression",
-                                        "cronExpression": "0 */2 * * * *",
+                                        "min": "0",
+                                        "hour": "*/2",
+                                        "dayOfMonth": "*",
+                                        "month": "*",
+                                        "dayOfWeek": "*" 
                                     },
                                     "batching": null
                                 }
@@ -350,7 +364,13 @@ async fn test_crud_cron_root_dataset() {
         &create_result.dataset_handle.id,
         "INGEST",
         true,
-        "0 0 */1 * * *",
+        r#"{
+            min: "0",
+            hour: "*/1",
+            dayOfMonth: "*",
+            month: "*",
+            dayOfWeek: "*" 
+        }"#,        
     );
 
     let res = schema
@@ -376,7 +396,11 @@ async fn test_crud_cron_root_dataset() {
                                     "paused": true,
                                     "schedule": {
                                         "__typename": "CronExpression",
-                                        "cronExpression": "0 0 */1 * * *",
+                                        "min": "0",
+                                        "hour": "*/1",
+                                        "dayOfMonth": "*",
+                                        "month": "*",
+                                        "dayOfWeek": "*" 
                                     },
                                     "batching": null
                                 }
@@ -389,12 +413,18 @@ async fn test_crud_cron_root_dataset() {
     );
 
     // Try to pass invalid cron expression
-    let invalid_cron_expression = "0 0 */1 *";
     let mutation_code = FlowConfigHarness::set_config_cron_expression_mutation(
         &create_result.dataset_handle.id,
         "INGEST",
         true,
-        invalid_cron_expression,
+         // invalid day of week
+        r#"{
+            min: "0",
+            hour: "*/1",
+            dayOfMonth: "*",
+            month: "*",
+            dayOfWeek: "PIATNICA"  
+        }"#,    
     );
 
     let res = schema
@@ -406,29 +436,9 @@ async fn test_crud_cron_root_dataset() {
     assert!(res.is_err(), "{:?}", res);
     assert_eq!(
         res.errors[0].message,
-        format!("Cron expression {invalid_cron_expression} is invalid")
+        format!("Cron expression 0 */1 * * PIATNICA is invalid")
     );
 
-    // Try to pass valid cron expression from past
-    let past_cron_expression = "0 0 0 1 JAN ? 2024";
-    let mutation_code = FlowConfigHarness::set_config_cron_expression_mutation(
-        &create_result.dataset_handle.id,
-        "INGEST",
-        true,
-        past_cron_expression,
-    );
-
-    let res = schema
-        .execute(
-            async_graphql::Request::new(mutation_code.clone())
-                .data(harness.catalog_authorized.clone()),
-        )
-        .await;
-    assert!(res.is_err(), "{:?}", res);
-    assert_eq!(
-        res.errors[0].message,
-        format!("Cron expression {past_cron_expression} iteration has been exceeded",)
-    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
@@ -596,7 +606,13 @@ async fn test_incorrect_dataset_kinds_for_flow_type() {
         &create_derived_result.dataset_handle.id,
         "INGEST",
         false,
-        "0 */2 * * *",
+        r#"{
+            min: "0",
+            hour: "*/2",
+            dayOfMonth: "*",
+            month: "*",
+            dayOfWeek: "*" 
+        }"#
     );
 
     let res = schema
@@ -683,7 +699,13 @@ async fn test_anonymous_setters_fail() {
             &create_root_result.dataset_handle.id,
             "INGEST",
             false,
-            "* */2 * * *",
+            r#"{
+                min: "0",
+                hour: "*/2",
+                dayOfMonth: "*",
+                month: "*",
+                dayOfWeek: "*" 
+            }"#,
         ),
         FlowConfigHarness::set_config_batching_mutation(
             &create_derived_result.dataset_handle.id,
@@ -862,7 +884,7 @@ impl FlowConfigHarness {
                                     datasetFlowType: "<dataset_flow_type>",
                                     paused: <paused>,
                                     schedule: {
-                                        cronExpression: "<cron_expression>"
+                                        cronExpression: <cron_expression>
                                     }
                                 ) {
                                     __typename,
@@ -874,7 +896,11 @@ impl FlowConfigHarness {
                                             schedule {
                                                 __typename
                                                 ... on CronExpression {
-                                                    cronExpression
+                                                    min
+                                                    hour
+                                                    dayOfMonth
+                                                    month
+                                                    dayOfWeek
                                                 }
                                             }
                                             batching {

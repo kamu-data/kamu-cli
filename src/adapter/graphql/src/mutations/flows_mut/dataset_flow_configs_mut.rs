@@ -61,10 +61,9 @@ impl DatasetFlowConfigsMut {
             ScheduleInput::TimeDelta(td) => {
                 Schedule::TimeDelta(ScheduleTimeDelta { every: td.into() })
             }
-            ScheduleInput::CronExpression(cron_expression) => {
-                let cron_struct = Schedule::validate_cron_expression(cron_expression)
-                    .map_err(|e| GqlError::Gql(e.into()))?;
-                Schedule::CronExpression(cron_struct)
+            ScheduleInput::CronExpression(cron_input) => {
+                let cron_source = cron_input.into();
+                Schedule::new_cron_schedule(cron_source).map_err(|e| GqlError::Gql(e.into()))?
             }
         };
 
@@ -132,7 +131,7 @@ impl DatasetFlowConfigsMut {
 #[derive(OneofObject)]
 enum ScheduleInput {
     TimeDelta(TimeDeltaInput),
-    CronExpression(String),
+    CronExpression(CronExpressionInput),
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -151,6 +150,29 @@ impl From<TimeDeltaInput> for chrono::Duration {
             TimeUnit::Days => chrono::Duration::days(every),
             TimeUnit::Hours => chrono::Duration::hours(every),
             TimeUnit::Minutes => chrono::Duration::minutes(every),
+        }
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+#[derive(InputObject)]
+struct CronExpressionInput {
+    pub min: String,
+    pub hour: String,
+    pub day_of_month: String,
+    pub month: String,
+    pub day_of_week: String,
+}
+
+impl From<CronExpressionInput> for kamu_flow_system::CronExpressionSource {
+    fn from(value: CronExpressionInput) -> Self {
+        Self {
+            min: value.min,
+            hour: value.hour,
+            day_of_month: value.day_of_month,
+            month: value.month,
+            day_of_week: value.day_of_week,
         }
     }
 }

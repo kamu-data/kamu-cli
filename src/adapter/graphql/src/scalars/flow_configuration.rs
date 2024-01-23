@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use cron::Schedule as CronSchedule;
 use kamu_flow_system::{FlowConfigurationRule, Schedule};
 
 use crate::prelude::*;
@@ -65,13 +64,21 @@ pub struct FlowConfigurationBatching {
 
 #[derive(SimpleObject, Clone, PartialEq, Eq)]
 pub struct CronExpression {
-    pub cron_expression: String,
+    pub min: String,
+    pub hour: String,
+    pub day_of_month: String,
+    pub month: String,
+    pub day_of_week: String,
 }
 
-impl From<CronSchedule> for CronExpression {
-    fn from(value: CronSchedule) -> Self {
+impl From<kamu_flow_system::ScheduleCronExpression> for CronExpression {
+    fn from(value: kamu_flow_system::ScheduleCronExpression) -> Self {
         Self {
-            cron_expression: value.to_string(),
+            min: value.source.min,
+            hour: value.source.hour,
+            day_of_month: value.source.day_of_month,
+            month: value.source.month,
+            day_of_week: value.source.day_of_week,
         }
     }
 }

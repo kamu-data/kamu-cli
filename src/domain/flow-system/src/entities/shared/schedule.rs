@@ -21,7 +21,7 @@ pub enum Schedule {
     /// Time-delta based schedule
     TimeDelta(ScheduleTimeDelta),
     /// Cron-based schedule
-    CronExpression(CronSchedule),
+    CronExpression(ScheduleCronExpression),
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -29,6 +29,44 @@ pub enum Schedule {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ScheduleTimeDelta {
     pub every: chrono::Duration,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ScheduleCronExpression {
+    pub source: CronExpressionSource,
+    pub schedule: CronSchedule,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CronExpressionSource {
+    pub min: String,
+    pub hour: String,
+    pub day_of_month: String,
+    pub month: String,
+    pub day_of_week: String,
+}
+
+impl Default for CronExpressionSource {
+    fn default() -> Self {
+        // Means run every 1 minute
+        Self {
+            min: "*".to_string(),
+            hour: "*".to_string(),
+            day_of_month: "*".to_string(),
+            month: "*".to_string(),
+            day_of_week: "*".to_string(),
+        }
+    }
+}
+
+impl std::fmt::Display for CronExpressionSource {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "{} {} {} {} {}",
+            self.min, self.hour, self.day_of_month, self.month, self.day_of_week
+        )
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -57,24 +95,31 @@ pub struct CronExpressionIterationError {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 impl Schedule {
-    pub fn validate_cron_expression(
-        cron_expression: String,
-    ) -> Result<CronSchedule, ScheduleError> {
-        let schedule = match CronSchedule::from_str(&cron_expression) {
+    pub fn new_cron_schedule(source: CronExpressionSource) -> Result<Schedule, ScheduleError> {
+        let cron_as_string_with_dummy_seconds = format!(
+            "0 {} {} {} {} {}",
+            source.min, source.hour, source.day_of_month, source.month, source.day_of_week
+        );
+
+        let schedule = match CronSchedule::from_str(&cron_as_string_with_dummy_seconds) {
             Err(_) => {
                 return Err(ScheduleError::InvalidCronExpression(
                     InvalidCronExpressionError {
-                        expression: cron_expression.clone(),
+                        expression: source.to_string(),
                     },
                 ));
             }
             Ok(cron_schedule) => cron_schedule,
         };
+
         match schedule.upcoming(Utc).next() {
-            Some(_) => Ok(schedule),
+            Some(_) => Ok(Schedule::CronExpression(ScheduleCronExpression {
+                source,
+                schedule,
+            })),
             None => Err(ScheduleError::CronExpressionIterationExceed(
                 CronExpressionIterationError {
-                    expression: cron_expression.clone(),
+                    expression: source.to_string(),
                 },
             )),
         }
@@ -83,7 +128,7 @@ impl Schedule {
     pub fn next_activation_time(&self, now: DateTime<Utc>) -> Option<DateTime<Utc>> {
         match self {
             Schedule::TimeDelta(td) => Some(now + td.every),
-            Schedule::CronExpression(ce) => ce.upcoming(Utc).next(),
+            Schedule::CronExpression(ce) => ce.schedule.upcoming(Utc).next(),
         }
     }
 }
@@ -93,12 +138,6 @@ impl Schedule {
 impl From<chrono::Duration> for Schedule {
     fn from(value: chrono::Duration) -> Self {
         Self::TimeDelta(ScheduleTimeDelta { every: value })
-    }
-}
-
-impl From<String> for Schedule {
-    fn from(value: String) -> Self {
-        Self::CronExpression(CronSchedule::from_str(&value).unwrap())
     }
 }
 
@@ -113,52 +152,36 @@ mod tests {
     #[test]
     fn test_validate_invalid_expression() {
         // Try to pass invalid cron expression
-        let invalid_cron_expression = "invalid".to_string();
+        let source_with_invalid_parts = CronExpressionSource {
+            min: "invalid".to_string(),
+            ..Default::default()
+        };
         let err_result =
-            Schedule::validate_cron_expression(invalid_cron_expression.clone()).unwrap_err();
+            Schedule::new_cron_schedule(source_with_invalid_parts.clone()).unwrap_err();
 
         assert_eq!(
             err_result.to_string(),
-            format!("Cron expression {} is invalid", &invalid_cron_expression),
-        );
-    }
-
-    #[test]
-    fn test_validate_expired_expression() {
-        // Try to pass invalid cron expression
-        let expired_cron_expression = "0 0 0 1 JAN ? 2024".to_string();
-        let err_result =
-            Schedule::validate_cron_expression(expired_cron_expression.clone()).unwrap_err();
-
-        assert_eq!(
-            err_result.to_string(),
-            format!(
-                "Cron expression {} iteration has been exceeded",
-                &expired_cron_expression
-            ),
+            format!("Cron expression {} is invalid", source_with_invalid_parts),
         );
     }
 
     #[test]
     fn test_get_next_time_from_expression() {
-        let cron_expression: Schedule = "0 0 0 1 JAN ? *".to_string().into();
+        let cron_source = CronExpressionSource {
+            min: "0".to_string(),
+            hour: "0".to_string(),
+            day_of_month: "1".to_string(),
+            month: "JAN".to_string(),
+            day_of_week: "?".to_string(),
+        };
+        let cron_schedule = Schedule::new_cron_schedule(cron_source).unwrap();
 
         let current_year = Utc::now().year();
         let expected_time = Utc
             .with_ymd_and_hms(current_year + 1, 1, 1, 0, 0, 0)
             .unwrap();
 
-        let cron_time = cron_expression.next_activation_time(Utc::now()).unwrap();
-
+        let cron_time = cron_schedule.next_activation_time(Utc::now()).unwrap();
         assert_eq!(cron_time, expected_time);
-    }
-
-    // Should return None if cron expression has no more iteration
-    #[test]
-    fn test_get_next_time_from_expired_expression() {
-        let cron_expression: Schedule = "0 0 0 1 JAN ? 2024".to_string().into();
-        let cron_time = cron_expression.next_activation_time(Utc::now());
-
-        assert_eq!(cron_time, None);
     }
 }
