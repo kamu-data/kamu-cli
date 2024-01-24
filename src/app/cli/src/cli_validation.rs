@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::str::FromStr;
+
 use internal_error::InternalError;
 use opendatafabric::{
     DatasetName,
@@ -52,31 +54,14 @@ pub struct ValidationError {
 pub fn value_parse_dataset_ref_pattern_local(
     s: &str,
 ) -> Result<DatasetRefPattern, ValidationDatasetRefError> {
-    let dataset_pattern = match DatasetNamePattern::try_from(s) {
-        Ok(dp) => dp,
-        Err(_) => {
-            return Err(ValidationDatasetRefError::Failed(ValidationError {
-                message: "Local reference pattern be in `my.dataset.%`".to_string(),
-            }));
-        }
-    };
-
-    let dataset_ref_patter = DatasetRefPattern {
-        pattern: dataset_pattern,
-        ..Default::default()
-    };
-    if !dataset_ref_patter.has_wildcards() {
-        match DatasetRef::try_from(s) {
-            Ok(_dsr) => _dsr,
-            Err(_) => {
-                return Err(ValidationDatasetRefError::Failed(ValidationError {
-                    message: "Local reference should be in form: `did:odf:...` or `my.dataset.id`"
-                        .to_string(),
-                }))
-            }
-        };
+    match DatasetRefPattern::from_str(s) {
+        Ok(drp) => Ok(drp),
+        Err(_) => Err(ValidationDatasetRefError::Failed(ValidationError {
+            message: "Local reference should be in form: `did:odf:...`, `my.dataset.id`, or a \
+                      wildcard pattern `my.dataset.%`"
+                .to_string(),
+        })),
     }
-    Ok(dataset_ref_patter)
 }
 
 pub fn value_parse_dataset_name(s: &str) -> Result<DatasetName, String> {

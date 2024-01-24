@@ -249,7 +249,7 @@ pub struct NotInMultiTenantWorkspace;
 #[derive(Error, Clone, PartialEq, Eq, Debug)]
 #[error("Multi-tenant reference is unexpected in single-tenant workspace: {dataset_ref}")]
 pub struct MultiTenantRefUnexpectedError {
-    pub dataset_ref: opendatafabric::DatasetRef,
+    pub dataset_ref: String,
 }
 
 #[derive(Debug, Error)]

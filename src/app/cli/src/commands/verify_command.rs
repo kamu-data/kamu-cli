@@ -79,40 +79,41 @@ impl VerifyCommand {
         listener: Option<Arc<VerificationMultiProgress>>,
     ) -> GenericVerificationResult {
         let dataset_ref_pattern = self.refs.first().unwrap();
-        if !dataset_ref_pattern.has_wildcards() {
-            let dataset_ref = DatasetRef::try_from(dataset_ref_pattern.pattern.as_str()).unwrap();
-            let dataset_handle = self.dataset_repo.resolve_dataset_ref(&dataset_ref).await?;
+        match dataset_ref_pattern {
+            DatasetRefPattern::Ref(dataset_ref) => {
+                let dataset_handle = self.dataset_repo.resolve_dataset_ref(dataset_ref).await?;
 
-            let listener = listener.and_then(|l| l.begin_verify(&dataset_handle));
+                let listener = listener.and_then(|l| l.begin_verify(&dataset_handle));
 
-            let res = self
-                .verification_svc
-                .verify(
-                    &dataset_handle.as_local_ref(),
-                    (None, None),
-                    options,
-                    listener,
-                )
-                .await;
+                let res = self
+                    .verification_svc
+                    .verify(
+                        &dataset_handle.as_local_ref(),
+                        (None, None),
+                        options,
+                        listener,
+                    )
+                    .await;
 
-            Ok(vec![Ok(VerificationMultiResult {
-                dataset_handle,
-                verification_result: res,
-            })])
-        } else {
-            self.verify_multi(options, dataset_ref_pattern.clone(), listener)
-                .await
+                Ok(vec![Ok(VerificationMultiResult {
+                    dataset_handle,
+                    verification_result: res,
+                })])
+            }
+            DatasetRefPattern::Pattern(_account_name, pattern) => {
+                self.verify_multi(options, pattern.clone(), listener).await
+            }
         }
     }
 
     async fn verify_multi(
         &self,
         options: VerificationOptions,
-        dataset_ref_pattern: DatasetRefPattern,
+        dataset_name_pattern: DatasetNamePattern,
         listener: Option<Arc<VerificationMultiProgress>>,
     ) -> GenericVerificationResult {
         let requests: Vec<_> =
-            filter_dataset_stream(self.dataset_repo.get_all_datasets(), dataset_ref_pattern)
+            filter_dataset_stream(self.dataset_repo.get_all_datasets(), dataset_name_pattern)
                 .map_ok(|dsh| VerificationRequest {
                     dataset_ref: dsh.as_local_ref(),
                     block_range: (None, None),
@@ -171,9 +172,12 @@ impl Command for VerifyCommand {
         let mut valid = 0;
         let mut errors = 0;
 
-        for (_, res) in &verification_results {
+        for res in &verification_results {
             match res {
-                Ok(_) => valid += 1,
+                Ok(mutli_result) => match mutli_result.verification_result {
+                    Ok(_) => valid += 1,
+                    Err(_) => errors += 1,
+                },
                 Err(_) => errors += 1,
             }
         }

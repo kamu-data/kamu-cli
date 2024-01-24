@@ -520,12 +520,34 @@ fn validate_dataset_ref(
         let workspace_svc = catalog.get_one::<WorkspaceService>()?;
         if !workspace_svc.is_multi_tenant_workspace() && alias.is_multi_tenant() {
             return Err(MultiTenantRefUnexpectedError {
-                dataset_ref: dataset_ref.clone(),
+                dataset_ref: dataset_ref.to_string(),
             }
             .into());
         }
     }
     Ok(dataset_ref)
+}
+
+fn validate_dataset_ref_wildcard(
+    catalog: &dill::Catalog,
+    dataset_ref_pattern: DatasetRefPattern,
+) -> Result<DatasetRefPattern, CLIError> {
+    match dataset_ref_pattern {
+        DatasetRefPattern::Ref(dsr) => {
+            let valid_ref = validate_dataset_ref(catalog, dsr)?;
+            Ok(DatasetRefPattern::Ref(valid_ref))
+        }
+        DatasetRefPattern::Pattern(an, drp) => {
+            let workspace_svc = catalog.get_one::<WorkspaceService>()?;
+            if !workspace_svc.is_multi_tenant_workspace() && an.is_some() {
+                return Err(MultiTenantRefUnexpectedError {
+                    dataset_ref: drp.to_string(),
+                }
+                .into());
+            }
+            Ok(DatasetRefPattern::Pattern(an, drp))
+        }
+    }
 }
 
 fn validate_many_dataset_refs<I>(
@@ -545,15 +567,15 @@ where
 
 // ToDo add validation for DatasetRefPattern and DatasetRef expresion
 fn validate_many_dataset_wildcards<I>(
-    _catalog: &dill::Catalog,
-    dataset_refs: I,
+    catalog: &dill::Catalog,
+    dataset_ref_patterns: I,
 ) -> Result<Vec<DatasetRefPattern>, CLIError>
 where
     I: IntoIterator<Item = DatasetRefPattern>,
 {
     let mut result_refs = Vec::new();
-    for dataset_ref in dataset_refs.into_iter() {
-        result_refs.push(dataset_ref);
+    for dataset_ref_pattern in dataset_ref_patterns.into_iter() {
+        result_refs.push(validate_dataset_ref_wildcard(catalog, dataset_ref_pattern)?);
     }
 
     Ok(result_refs)
