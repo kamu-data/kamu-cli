@@ -474,7 +474,6 @@ impl FlowService for FlowServiceInMemory {
         // Main scanning loop
         let main_loop_span = tracing::debug_span!("FlowService main loop");
         let _ = main_loop_span.enter();
-        let std_awaiting_step = self.run_config.awaiting_step.to_std().int_err()?;
 
         loop {
             // Do we have a timeslot scheduled?
@@ -502,8 +501,7 @@ impl FlowService for FlowServiceInMemory {
                     .int_err()?;
             }
 
-            tokio::time::sleep(std_awaiting_step).await;
-            continue;
+            self.time_source.sleep(self.run_config.awaiting_step).await;
         }
     }
 
