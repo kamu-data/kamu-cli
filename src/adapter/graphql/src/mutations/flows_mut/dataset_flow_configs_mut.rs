@@ -61,10 +61,9 @@ impl DatasetFlowConfigsMut {
             ScheduleInput::TimeDelta(td) => {
                 Schedule::TimeDelta(ScheduleTimeDelta { every: td.into() })
             }
-            ScheduleInput::CronExpression(cron_expression) => {
-                let cron_struct = Schedule::validate_cron_expression(cron_expression)
-                    .map_err(|e| GqlError::Gql(e.into()))?;
-                Schedule::CronExpression(cron_struct)
+            ScheduleInput::Cron5ComponentExpression(cron_5component_expression) => {
+                Schedule::try_from_5component_cron_expression(&cron_5component_expression)
+                    .map_err(|e| GqlError::Gql(e.into()))?
             }
         };
 
@@ -132,7 +131,8 @@ impl DatasetFlowConfigsMut {
 #[derive(OneofObject)]
 enum ScheduleInput {
     TimeDelta(TimeDeltaInput),
-    CronExpression(String),
+    /// Supported CRON syntax: min hour dayOfMonth month dayOfWeek
+    Cron5ComponentExpression(String),
 }
 
 ///////////////////////////////////////////////////////////////////////////////

@@ -163,8 +163,8 @@ type CreateDatasetResultSuccess implements CreateDatasetResult & CreateDatasetFr
 	message: String!
 }
 
-type CronExpression {
-	cronExpression: String!
+type Cron5ComponentExpression {
+	cron5ComponentExpression: String!
 }
 
 type DataBatch {
@@ -678,7 +678,7 @@ type FlowConfigurationBatching {
 	minimalDataBatch: Int
 }
 
-union FlowConfigurationSchedule = TimeDelta | CronExpression
+union FlowConfigurationSchedule = TimeDelta | Cron5ComponentExpression
 
 type FlowConnection {
 	"""
@@ -1139,7 +1139,7 @@ type RequestHeader {
 
 input ScheduleInput @oneOf {
 	timeDelta: TimeDeltaInput
-	cronExpression: String
+	cron5ComponentExpression: String
 }
 
 type Search {

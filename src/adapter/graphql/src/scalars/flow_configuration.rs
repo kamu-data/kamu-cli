@@ -7,8 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use cron::Schedule as CronSchedule;
-use kamu_flow_system::{FlowConfigurationRule, Schedule};
+use kamu_flow_system::{FlowConfigurationRule, Schedule, ScheduleCron};
 
 use crate::prelude::*;
 
@@ -38,9 +37,7 @@ impl From<kamu_flow_system::FlowConfigurationState> for FlowConfiguration {
                     Schedule::TimeDelta(time_delta) => Some(FlowConfigurationSchedule::TimeDelta(
                         time_delta.every.into(),
                     )),
-                    Schedule::CronExpression(cron) => {
-                        Some(FlowConfigurationSchedule::Cron(cron.into()))
-                    }
+                    Schedule::Cron(cron) => Some(FlowConfigurationSchedule::Cron(cron.into())),
                 }
             } else {
                 None
@@ -52,7 +49,7 @@ impl From<kamu_flow_system::FlowConfigurationState> for FlowConfiguration {
 #[derive(Union, Clone, PartialEq, Eq)]
 pub enum FlowConfigurationSchedule {
     TimeDelta(TimeDelta),
-    Cron(CronExpression),
+    Cron(Cron5ComponentExpression),
 }
 
 #[derive(SimpleObject, Clone, PartialEq, Eq)]
@@ -64,14 +61,14 @@ pub struct FlowConfigurationBatching {
 /////////////////////////////////////////////////////////////////////////////////
 
 #[derive(SimpleObject, Clone, PartialEq, Eq)]
-pub struct CronExpression {
-    pub cron_expression: String,
+pub struct Cron5ComponentExpression {
+    pub cron_5component_expression: String,
 }
 
-impl From<CronSchedule> for CronExpression {
-    fn from(value: CronSchedule) -> Self {
+impl From<ScheduleCron> for Cron5ComponentExpression {
+    fn from(value: ScheduleCron) -> Self {
         Self {
-            cron_expression: value.to_string(),
+            cron_5component_expression: value.source_5component_cron_expression,
         }
     }
 }
