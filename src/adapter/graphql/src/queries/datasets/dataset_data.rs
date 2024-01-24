@@ -82,21 +82,21 @@ impl DatasetData {
         let limit = limit.unwrap_or(Self::DEFAULT_TAIL_LIMIT);
 
         let query_svc = from_catalog::<dyn domain::QueryService>(ctx).unwrap();
-        let df = match query_svc
+        let tail_result = query_svc
             .tail(
                 &self.dataset_handle.as_local_ref(),
                 skip.unwrap_or(0) as usize,
                 limit as usize,
             )
-            .await
-        {
+            .await;
+        let df = match tail_result {
             Ok(r) => r,
             Err(err) => {
-                if let QueryError::DatasetSchemaNotAvailable(_) = err {
-                    return Ok(DataQueryResult::no_schema_yet(data_format, limit));
+                return if let QueryError::DatasetSchemaNotAvailable(_) = err {
+                    Ok(DataQueryResult::no_schema_yet(data_format, limit))
                 } else {
                     tracing::debug!(?err, "Query error");
-                    return Ok(err.into());
+                    Ok(err.into())
                 }
             }
         };

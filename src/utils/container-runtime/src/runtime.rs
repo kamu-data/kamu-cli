@@ -386,9 +386,9 @@ impl ContainerRuntime {
                 break Ok(hp);
             } else if start.elapsed() >= timeout {
                 break Err(TimeoutError::new(timeout).into());
-            } else {
-                tokio::time::sleep(Self::TICK_INTERVAL).await;
             }
+
+            tokio::time::sleep(Self::TICK_INTERVAL).await;
         }
     }
 
@@ -445,9 +445,9 @@ impl ContainerRuntime {
                 break Ok(());
             } else if start.elapsed() >= timeout {
                 break Err(TimeoutError::new(timeout).into());
-            } else {
-                tokio::time::sleep(Self::TICK_INTERVAL).await;
             }
+
+            tokio::time::sleep(Self::TICK_INTERVAL).await;
         }
     }
 
