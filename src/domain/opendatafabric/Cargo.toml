@@ -36,6 +36,9 @@ digest = "0.10"
 indoc = "2"
 futures-core = "0.3"
 thiserror = { version = "1", default-features = false }
+
+# Multiformats
+like = { version = "0.3", default-features = false }
 sha3 = "0.10"
 url = "2"
 

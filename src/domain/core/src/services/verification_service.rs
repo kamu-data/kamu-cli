@@ -26,16 +26,16 @@ pub trait VerificationService: Send + Sync {
         &self,
         dataset_ref: &DatasetRef,
         block_range: (Option<Multihash>, Option<Multihash>),
-        options: VerificationOptions,
+        options: Arc<VerificationOptions>,
         listener: Option<Arc<dyn VerificationListener>>,
     ) -> Result<VerificationResult, VerificationError>;
 
     async fn verify_multi(
-        &self,
+        self: Arc<Self>,
         requests: Vec<VerificationRequest>,
-        options: VerificationOptions,
+        options: Arc<VerificationOptions>,
         listener: Option<Arc<dyn VerificationMultiListener>>,
-    ) -> Result<VerificationResult, VerificationError>;
+    ) -> Vec<VerificationMultiResult>;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -53,6 +53,12 @@ pub struct VerificationRequest {
 #[derive(Debug)]
 pub enum VerificationResult {
     Valid,
+}
+
+#[derive(Debug)]
+pub struct VerificationMultiResult {
+    pub verification_result: Arc<Result<VerificationResult, VerificationError>>,
+    pub dataset_handle: DatasetHandle,
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -138,6 +144,9 @@ impl VerificationListener for NullVerificationListener {}
 
 pub trait VerificationMultiListener: Send + Sync {
     fn begin_verify(&self, _dataset: &DatasetHandle) -> Option<Arc<dyn VerificationListener>> {
+        None
+    }
+    fn begin_multi_verify(&self) -> Option<Arc<dyn VerificationMultiListener>> {
         None
     }
 }

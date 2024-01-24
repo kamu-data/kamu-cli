@@ -164,8 +164,11 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
     }
 
     // TODO: PERF: Resolving handles currently involves reading summary files
-    fn get_all_datasets(&self) -> DatasetHandleStream<'_> {
-        self.storage_strategy.get_all_datasets()
+    fn get_all_datasets<'s>(
+        &'s self,
+        dataset_ref_pattern: Option<DatasetRefPattern>,
+    ) -> DatasetHandleStream<'s> {
+        self.storage_strategy.get_all_datasets(dataset_ref_pattern)
     }
 
     fn get_datasets_by_owner(&self, account_name: AccountName) -> DatasetHandleStream<'_> {
@@ -399,7 +402,7 @@ trait DatasetStorageStrategy: Sync + Send {
 
     fn get_dataset_path(&self, dataset_handle: &DatasetHandle) -> PathBuf;
 
-    fn get_all_datasets(&self) -> DatasetHandleStream<'_>;
+    fn get_all_datasets<'s>(&'s self, drp: Option<DatasetRefPattern>) -> DatasetHandleStream<'s>;
 
     fn get_datasets_by_owner(&self, account_name: AccountName) -> DatasetHandleStream<'_>;
 
@@ -498,7 +501,7 @@ impl DatasetStorageStrategy for DatasetSingleTenantStorageStrategy {
         self.dataset_path_impl(&dataset_handle.alias)
     }
 
-    fn get_all_datasets(&self) -> DatasetHandleStream<'_> {
+    fn get_all_datasets<'s>(&'s self, drp: Option<DatasetRefPattern>) -> DatasetHandleStream<'s> {
         Box::pin(async_stream::try_stream! {
             let read_dataset_dir = std::fs::read_dir(&self.root).int_err()?;
 
@@ -511,6 +514,13 @@ impl DatasetStorageStrategy for DatasetSingleTenantStorageStrategy {
                 }
                 let dataset_name = DatasetName::try_from(&dataset_dir_entry.file_name()).int_err()?;
                 let dataset_alias = DatasetAlias::new(None, dataset_name);
+                if let Some(ref datase_ref_pattern) = drp {
+                    if !like::Like::<false>::like(
+                        dataset_alias.to_string().as_str(), datase_ref_pattern.pattern.as_str(),
+                    ).unwrap() {
+                        continue
+                    }
+                }
                 match self.resolve_dataset_alias(&dataset_alias).await {
                     Ok(hdl) => { yield hdl; Ok(()) }
                     Err(ResolveDatasetError::NotFound(_)) => Ok(()),
@@ -522,7 +532,7 @@ impl DatasetStorageStrategy for DatasetSingleTenantStorageStrategy {
 
     fn get_datasets_by_owner(&self, account_name: AccountName) -> DatasetHandleStream<'_> {
         if account_name == DEFAULT_ACCOUNT_NAME {
-            self.get_all_datasets()
+            self.get_all_datasets(None)
         } else {
             Box::pin(futures::stream::empty())
         }
@@ -737,7 +747,7 @@ impl DatasetStorageStrategy for DatasetMultiTenantStorageStrategy {
             .join(dataset_handle.id.as_multibase().to_stack_string())
     }
 
-    fn get_all_datasets(&self) -> DatasetHandleStream<'_> {
+    fn get_all_datasets<'s>(&'s self, _drf: Option<DatasetRefPattern>) -> DatasetHandleStream<'s> {
         Box::pin(async_stream::try_stream! {
             let read_account_dir = std::fs::read_dir(&self.root).int_err()?;
 

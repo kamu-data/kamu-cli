@@ -185,10 +185,12 @@ impl ListCommand {
                 } => self
                     .dataset_repo
                     .get_datasets_by_owner(AccountName::from_str(user_name.as_str()).unwrap()),
-                accounts::TargetAccountSelection::AllUsers => self.dataset_repo.get_all_datasets(),
+                accounts::TargetAccountSelection::AllUsers => {
+                    self.dataset_repo.get_all_datasets(None)
+                }
             }
         } else {
-            self.dataset_repo.get_all_datasets()
+            self.dataset_repo.get_all_datasets(None)
         }
     }
 }

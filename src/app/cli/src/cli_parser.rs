@@ -1281,7 +1281,7 @@ pub fn cli() -> Command {
                             .index(1)
                             .num_args(1..)
                             .required(true)
-                            .value_parser(value_parse_dataset_ref_local)
+                            .value_parser(value_parse_dataset_ref_pattern_local)
                             .help("Local dataset reference(s)"),
                     ])
                     .after_help(indoc::indoc!(
@@ -1338,11 +1338,29 @@ fn value_parse_dataset_name(s: &str) -> Result<DatasetName, String> {
 }
 
 fn value_parse_dataset_ref_local(s: &str) -> Result<DatasetRef, String> {
-    match DatasetRef::try_from(s) {
+    let dataset_ref_pattern = DatasetRefPattern {
+        pattern: s.to_string(),
+        ..DatasetRefPattern::default()
+    };
+    let dataset_ref = s.to_string().replace(dataset_ref_pattern.wildcard, "ref");
+    match DatasetRef::try_from(dataset_ref.as_str()) {
         Ok(v) => Ok(v),
         Err(_) => {
             Err("Local reference should be in form: `did:odf:...` or `my.dataset.id`".to_string())
         }
+    }
+}
+
+fn value_parse_dataset_ref_pattern_local(s: &str) -> Result<String, String> {
+    let arg = s.to_string();
+    if arg.contains(DatasetRefPattern::default().wildcard) {
+        return Ok(arg);
+    }
+    match DatasetRef::try_from(s) {
+        Ok(_v) => Ok(arg),
+        Err(_) => Err(format!(
+            "Local reference should be in form: `did:odf:...` or `my.dataset.id`",
+        )),
     }
 }
 

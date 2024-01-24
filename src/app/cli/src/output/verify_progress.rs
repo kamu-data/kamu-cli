@@ -54,6 +54,9 @@ impl VerificationMultiListener for VerificationMultiProgress {
             self.multi_progress.clone(),
         )))
     }
+    fn begin_multi_verify(&self) -> Option<Arc<dyn VerificationMultiListener>> {
+        Some(Arc::new(VerificationMultiProgress::new()))
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////

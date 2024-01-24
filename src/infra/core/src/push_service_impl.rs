@@ -164,7 +164,7 @@ impl PushServiceImpl {
 
         // No luck - now have to search through aliases
         use tokio_stream::StreamExt;
-        let mut datasets = self.dataset_repo.get_all_datasets();
+        let mut datasets = self.dataset_repo.get_all_datasets(None);
         while let Some(dataset_handle) = datasets.next().await {
             let dataset_handle = dataset_handle?;
 

@@ -494,7 +494,7 @@ pub fn get_command(
             cli_catalog.get_one()?,
             cli_catalog.get_one()?,
             cli_catalog.get_one()?,
-            validate_many_dataset_refs(
+            validate_many_dataset_wildcards(
                 cli_catalog,
                 submatches.get_many("dataset").unwrap().cloned(),
             )?
@@ -541,4 +541,20 @@ where
     }
 
     Ok(result_refs)
+}
+
+// ToDo add validation for DatasetRefPattern and DatasetRef expresion
+fn validate_many_dataset_wildcards<I>(
+    _catalog: &dill::Catalog,
+    dataset_refs: I,
+) -> Result<Vec<String>, CLIError>
+where
+    I: IntoIterator<Item = String>,
+{
+    let mut result_refs = Vec::new();
+    for dataset_ref in dataset_refs.into_iter() {
+        result_refs.push(dataset_ref);
+    }
+
+    return Ok(result_refs);
 }

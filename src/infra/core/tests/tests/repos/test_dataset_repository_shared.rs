@@ -466,7 +466,7 @@ pub async fn test_iterate_datasets(repo: &dyn DatasetRepository) {
     // All
     check_expected_datasets(
         vec![alias_bar.clone(), alias_foo.clone()],
-        repo.get_all_datasets(),
+        repo.get_all_datasets(None),
     )
     .await;
 
@@ -543,7 +543,7 @@ pub async fn test_iterate_datasets_multi_tenant(repo: &dyn DatasetRepository) {
             alias_my_baz.clone(),
             alias_my_foo.clone(),
         ],
-        repo.get_all_datasets(),
+        repo.get_all_datasets(None),
     )
     .await;
 

@@ -512,7 +512,7 @@ impl PullService for PullServiceImpl {
         } else {
             use futures::TryStreamExt;
             self.dataset_repo
-                .get_all_datasets()
+                .get_all_datasets(None)
                 .map_ok(|hdl| PullRequest {
                     local_ref: Some(hdl.into()),
                     remote_ref: None,

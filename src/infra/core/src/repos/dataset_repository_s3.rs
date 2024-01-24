@@ -166,7 +166,7 @@ impl DatasetRepository for DatasetRepositoryS3 {
                 // TODO: this is really really slow and expensive!
                 let normalized_alias = self.normalize_alias(alias);
                 use futures::StreamExt;
-                let mut datasets = self.get_all_datasets();
+                let mut datasets = self.get_all_datasets(None);
                 while let Some(hdl) = datasets.next().await {
                     let hdl = hdl?;
                     if hdl.alias == normalized_alias {
@@ -195,7 +195,10 @@ impl DatasetRepository for DatasetRepositoryS3 {
         }
     }
 
-    fn get_all_datasets(&self) -> DatasetHandleStream<'_> {
+    fn get_all_datasets<'s>(
+        &'s self,
+        _dataset_ref_pattern: Option<DatasetRefPattern>,
+    ) -> DatasetHandleStream<'s> {
         self.stream_datasets_if(|_| true)
     }
 

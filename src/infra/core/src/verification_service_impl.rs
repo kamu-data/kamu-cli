@@ -10,6 +10,7 @@
 use std::sync::Arc;
 
 use dill::*;
+use futures::future::join_all;
 use futures::TryStreamExt;
 use kamu_core::*;
 use opendatafabric::*;
@@ -260,7 +261,7 @@ impl VerificationService for VerificationServiceImpl {
         &self,
         dataset_ref: &DatasetRef,
         block_range: (Option<Multihash>, Option<Multihash>),
-        options: VerificationOptions,
+        options: Arc<VerificationOptions>,
         maybe_listener: Option<Arc<dyn VerificationListener>>,
     ) -> Result<VerificationResult, VerificationError> {
         let dataset_handle = self.dataset_repo.resolve_dataset_ref(dataset_ref).await?;
@@ -324,11 +325,50 @@ impl VerificationService for VerificationServiceImpl {
     }
 
     async fn verify_multi(
-        &self,
-        _requests: Vec<VerificationRequest>,
-        _options: VerificationOptions,
-        _listener: Option<Arc<dyn VerificationMultiListener>>,
-    ) -> Result<VerificationResult, VerificationError> {
-        unimplemented!()
+        self: Arc<Self>,
+        requests: Vec<VerificationRequest>,
+        options: Arc<VerificationOptions>,
+        maybe_listener: Option<Arc<dyn VerificationMultiListener>>,
+    ) -> Vec<VerificationMultiResult> {
+        let listener = maybe_listener.unwrap_or(Arc::new(NullVerificationMultiListener {}));
+
+        let handles: Vec<_> = requests
+            .into_iter()
+            .map(|r| {
+                let me = Arc::clone(&self);
+                let clone_options = Arc::clone(&options);
+                let clone_listener = Arc::clone(&listener);
+
+                // Move the asynchronous part outside the map closure
+                async move {
+                    let dataset_handle = me
+                        .dataset_repo
+                        .resolve_dataset_ref(&r.dataset_ref)
+                        .await
+                        .unwrap(); // Handle the Result properly in your code
+
+                    tokio::task::spawn(async move {
+                        let res = Arc::new(
+                            Arc::clone(&me)
+                                .verify(
+                                    &r.dataset_ref,
+                                    r.block_range.clone(),
+                                    clone_options.clone(),
+                                    clone_listener.begin_verify(&dataset_handle),
+                                )
+                                .await,
+                        );
+                        VerificationMultiResult {
+                            verification_result: res,
+                            dataset_handle: dataset_handle.clone(),
+                        }
+                    })
+                    .await // Now you can await the result of spawn_blocking
+                    .unwrap() // Handle the Result properly in your code
+                }
+            })
+            .collect();
+
+        join_all(handles).await
     }
 }

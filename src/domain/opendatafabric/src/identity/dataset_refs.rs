@@ -10,6 +10,7 @@
 use std::fmt;
 use std::sync::Arc;
 
+use like::{InvalidPatternError, Like};
 use url::Url;
 
 use super::grammar::Grammar;
@@ -738,5 +739,33 @@ impl std::cmp::Ord for DatasetRefAny {
 impl std::cmp::PartialOrd for DatasetRefAny {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// DatasetRefPattern
+////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone)]
+pub struct DatasetRefPattern {
+    pub wildcard: char,
+    pub pattern: String,
+}
+
+impl DatasetRefPattern {
+    pub fn match_pattern(&self, dataset_ref: &str) -> Result<bool, InvalidPatternError> {
+        match self.wildcard {
+            '%' => Like::<false>::like(dataset_ref, self.pattern.as_str()),
+            _ => unimplemented!(),
+        }
+    }
+}
+
+impl Default for DatasetRefPattern {
+    fn default() -> Self {
+        Self {
+            wildcard: '%',
+            pattern: "".to_string(),
+        }
     }
 }

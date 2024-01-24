@@ -275,13 +275,17 @@ impl DiagnosticCheck for CheckWorkspaceConsistent {
         let draw_thread = std::thread::spawn(move || {
             progress.draw();
         });
-        let datasets: Vec<_> = self.dataset_repo.get_all_datasets().try_collect().await?;
+        let datasets: Vec<_> = self
+            .dataset_repo
+            .get_all_datasets(None)
+            .try_collect()
+            .await?;
 
-        let verify_options = VerificationOptions {
+        let verify_options = Arc::new(VerificationOptions {
             check_integrity: true,
             check_logical_hashes: false,
             replay_transformations: false,
-        };
+        });
 
         for dataset in datasets {
             let listener = Some(listener_option.clone()).and_then(|l| l.begin_verify(&dataset));

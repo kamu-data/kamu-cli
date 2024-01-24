@@ -124,7 +124,10 @@ impl Command for AliasListCommand {
             let hdl = self.dataset_repo.resolve_dataset_ref(dataset_ref).await?;
             vec![hdl]
         } else {
-            self.dataset_repo.get_all_datasets().try_collect().await?
+            self.dataset_repo
+                .get_all_datasets(None)
+                .try_collect()
+                .await?
         };
 
         datasets.sort_by(|a, b| a.alias.cmp(&b.alias));
