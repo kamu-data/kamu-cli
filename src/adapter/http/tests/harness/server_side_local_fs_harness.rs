@@ -17,10 +17,10 @@ use event_bus::EventBus;
 use kamu::domain::{
     auth,
     DatasetRepository,
-    FakeSystemTimeSource,
     InternalError,
     ResultIntoInternal,
     SystemTimeSource,
+    SystemTimeSourceStub,
 };
 use kamu::testing::MockAuthenticationService;
 use kamu::{DatasetLayout, DatasetRepositoryLocalFs, DependencyGraphServiceInMemory};
@@ -46,7 +46,7 @@ pub(crate) struct ServerSideLocalFsHarness {
     base_catalog: dill::Catalog,
     api_server: TestAPIServer,
     options: ServerSideHarnessOptions,
-    time_source: FakeSystemTimeSource,
+    time_source: SystemTimeSourceStub,
 }
 
 impl ServerSideLocalFsHarness {
@@ -60,12 +60,12 @@ impl ServerSideLocalFsHarness {
             Some(c) => dill::CatalogBuilder::new_chained(c),
         };
 
-        let time_source = FakeSystemTimeSource::new();
+        let time_source = SystemTimeSourceStub::new();
 
         base_catalog_builder
             .add::<EventBus>()
             .add_value(time_source.clone())
-            .bind::<dyn SystemTimeSource, FakeSystemTimeSource>()
+            .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
             .add::<DependencyGraphServiceInMemory>()
             .add_builder(
                 DatasetRepositoryLocalFs::builder()
@@ -162,7 +162,7 @@ impl ServerSideHarness for ServerSideLocalFsHarness {
         DatasetLayout::new(root_path.as_path())
     }
 
-    fn system_time_source(&self) -> &FakeSystemTimeSource {
+    fn system_time_source(&self) -> &SystemTimeSourceStub {
         &self.time_source
     }
 

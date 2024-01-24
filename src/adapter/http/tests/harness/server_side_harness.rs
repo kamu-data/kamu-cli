@@ -16,8 +16,8 @@ use kamu::domain::{
     auth,
     CurrentAccountSubject,
     DatasetRepository,
-    FakeSystemTimeSource,
     InternalError,
+    SystemTimeSourceStub,
 };
 use kamu::testing::{MockAuthenticationService, MockDatasetActionAuthorizer};
 use kamu::DatasetLayout;
@@ -44,7 +44,7 @@ pub(crate) trait ServerSideHarness {
         self.dataset_url_with_scheme(dataset_alias, "odf+http")
     }
 
-    fn system_time_source(&self) -> &FakeSystemTimeSource;
+    fn system_time_source(&self) -> &SystemTimeSourceStub;
 
     async fn api_server_run(self) -> Result<(), InternalError>;
 }

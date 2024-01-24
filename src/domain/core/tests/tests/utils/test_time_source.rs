@@ -18,9 +18,40 @@ use kamu_core::{FakeSystemTimeSource, SystemTimeSource};
 use tokio::time::timeout;
 
 #[tokio::test]
-async fn test_stub_wake_after_without_simulate_time_passage() {
+async fn test_fake_sleep_stable_order() {
     let t0 = point_in_time_in_a_parallel_universe();
-    let system_time_source = FakeSystemTimeSource::new_set(t0);
+    let system_time_source = FakeSystemTimeSource::new(t0);
+
+    let mut sleep_futures = vec![
+        Some(system_time_source.sleep(Duration::seconds(120))), // 1
+        Some(system_time_source.sleep(Duration::seconds(60))),  // 2
+        Some(system_time_source.sleep(Duration::seconds(90))),  // 3
+        Some(system_time_source.sleep(Duration::seconds(120))), // 4
+        Some(system_time_source.sleep(Duration::seconds(150))), // 5
+        Some(system_time_source.sleep(Duration::seconds(60))),  // 6
+    ];
+
+    assert_eq!(
+        check_futures_for_completion(&mut sleep_futures),
+        [false, false, false, false, false, false]
+    );
+
+    let dt = Duration::seconds(150);
+    let t = t0 + dt;
+    let ready_future_ids = system_time_source.advance(Duration::seconds(150));
+
+    assert_eq!(
+        check_futures_for_completion(&mut sleep_futures),
+        [true, true, true, true, true, true]
+    );
+    assert_eq!(ready_future_ids, [2, 6, 3, 1, 4, 5]);
+    assert_eq!(system_time_source.now(), t);
+}
+
+#[tokio::test]
+async fn test_fake_sleep_without_simulate_time_passage() {
+    let t0 = point_in_time_in_a_parallel_universe();
+    let system_time_source = FakeSystemTimeSource::new(t0);
 
     let wake_after_1_sec_fut = system_time_source.sleep(Duration::seconds(1));
     let sleep_result_or_timeout = timeout(StdDuration::from_millis(50), wake_after_1_sec_fut).await;
@@ -30,9 +61,9 @@ async fn test_stub_wake_after_without_simulate_time_passage() {
 }
 
 #[tokio::test]
-async fn test_stub_wake_after_with_lacking_simulate_time_passage() {
+async fn test_fake_sleep_with_lacking_simulate_time_passage() {
     let t0 = point_in_time_in_a_parallel_universe();
-    let system_time_source = FakeSystemTimeSource::new_set(t0);
+    let system_time_source = FakeSystemTimeSource::new(t0);
 
     let mut sleep_futures = vec![Some(system_time_source.sleep(Duration::seconds(60)))];
 
@@ -48,9 +79,9 @@ async fn test_stub_wake_after_with_lacking_simulate_time_passage() {
 }
 
 #[tokio::test]
-async fn test_stub_wake_after_with_several_simulate_time_passage() {
+async fn test_fake_sleep_with_several_simulate_time_passage() {
     let t0 = point_in_time_in_a_parallel_universe();
-    let system_time_source = FakeSystemTimeSource::new_set(t0);
+    let system_time_source = FakeSystemTimeSource::new(t0);
 
     // 1. Start waiting 4 parallel futures:
     //    - a)  60 seconds
@@ -135,9 +166,9 @@ async fn test_stub_wake_after_with_several_simulate_time_passage() {
 }
 
 #[tokio::test]
-async fn test_stub_wake_after_with_simulate_exceeding_passage() {
+async fn test_fake_sleep_with_simulate_exceeding_passage() {
     let t0 = point_in_time_in_a_parallel_universe();
-    let system_time_source = FakeSystemTimeSource::new_set(t0);
+    let system_time_source = FakeSystemTimeSource::new(t0);
     // 1. Start waiting 2 parallel futures:
     //    - a) 60 seconds
     //    - b) 90 seconds

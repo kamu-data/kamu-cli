@@ -1087,7 +1087,7 @@ struct FlowHarness {
     flow_configuration_service: Arc<dyn FlowConfigurationService>,
     flow_service: Arc<dyn FlowService>,
     task_scheduler: Arc<dyn TaskScheduler>,
-    system_time_source_stub: FakeSystemTimeSource,
+    fake_system_time_source: FakeSystemTimeSource,
 }
 
 impl FlowHarness {
@@ -1096,8 +1096,8 @@ impl FlowHarness {
         let datasets_dir = tmp_dir.path().join("datasets");
         std::fs::create_dir(&datasets_dir).unwrap();
 
-        let system_time_source_stub =
-            FakeSystemTimeSource::new_set(Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap());
+        let t = Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap();
+        let fake_system_time_source = FakeSystemTimeSource::new(t);
         let catalog = dill::CatalogBuilder::new()
             .add::<EventBus>()
             .add_value(FlowServiceRunConfig::new(Duration::milliseconds(
@@ -1107,7 +1107,7 @@ impl FlowHarness {
             .add::<FlowEventStoreInMem>()
             .add::<FlowConfigurationServiceInMemory>()
             .add::<FlowConfigurationEventStoreInMem>()
-            .add_value(system_time_source_stub.clone())
+            .add_value(fake_system_time_source.clone())
             .bind::<dyn SystemTimeSource, FakeSystemTimeSource>()
             .add_builder(
                 DatasetRepositoryLocalFs::builder()
@@ -1135,7 +1135,7 @@ impl FlowHarness {
             flow_configuration_service,
             dataset_repo,
             task_scheduler,
-            system_time_source_stub,
+            fake_system_time_source,
         }
     }
 
@@ -1301,7 +1301,7 @@ impl FlowHarness {
     }
 
     fn now_datetime(&self) -> DateTime<Utc> {
-        self.system_time_source_stub.now()
+        self.fake_system_time_source.now()
     }
 
     async fn simulate_time_passage(&self, time_quantum: Duration) {
@@ -1321,7 +1321,7 @@ impl FlowHarness {
         );
 
         for _ in 0..time_increments_count {
-            self.system_time_source_stub.advance(TIME_INCREMENT);
+            self.fake_system_time_source.advance(TIME_INCREMENT);
 
             yield_now().await;
         }

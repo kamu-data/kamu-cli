@@ -245,10 +245,10 @@ async fn test_transform_common(transform: Transform) {
         )
         .bind::<dyn PollingIngestService, PollingIngestServiceImpl>()
         .add::<TransformServiceImpl>()
-        .add_value(FakeSystemTimeSource::new_set(
+        .add_value(SystemTimeSourceStub::new_set(
             Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap(),
         ))
-        .bind::<dyn SystemTimeSource, FakeSystemTimeSource>()
+        .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
         .build();
 
     let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
@@ -338,7 +338,7 @@ async fn test_transform_common(transform: Transform) {
     let deriv_helper = DatasetHelper::new(dataset.clone(), tempdir.path());
     let deriv_data_helper = DatasetDataHelper::new(dataset);
 
-    let time_source = catalog.get_one::<FakeSystemTimeSource>().unwrap();
+    let time_source = catalog.get_one::<SystemTimeSourceStub>().unwrap();
     time_source.set(Utc.with_ymd_and_hms(2050, 1, 2, 12, 0, 0).unwrap());
 
     let res = transform_svc

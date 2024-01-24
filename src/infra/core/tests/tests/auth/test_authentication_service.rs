@@ -9,7 +9,6 @@
 
 use std::assert_matches::assert_matches;
 
-use chrono::Utc;
 use internal_error::InternalError;
 use kamu::{set_random_jwt_secret, AuthenticationServiceImpl};
 use kamu_core::auth::{
@@ -22,7 +21,7 @@ use kamu_core::auth::{
     ProviderLoginError,
     ProviderLoginResponse,
 };
-use kamu_core::{FakeSystemTimeSource, SystemTimeSource};
+use kamu_core::{SystemTimeSource, SystemTimeSourceStub};
 use opendatafabric::AccountName;
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -133,8 +132,8 @@ fn make_catalog() -> dill::Catalog {
         .add::<DummyAuthenticationProviderA>()
         .add::<DummyAuthenticationProviderB>()
         .add::<AuthenticationServiceImpl>()
-        .add_value(FakeSystemTimeSource::new_set(Utc::now()))
-        .bind::<dyn SystemTimeSource, FakeSystemTimeSource>()
+        .add_value(SystemTimeSourceStub::new())
+        .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
         .build()
 }
 

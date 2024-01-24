@@ -488,10 +488,10 @@ impl IngestTestHarness {
                     .with_multi_tenant(false),
             )
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-            .add_value(FakeSystemTimeSource::new_set(
+            .add_value(SystemTimeSourceStub::new_set(
                 Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap(),
             ))
-            .bind::<dyn SystemTimeSource, FakeSystemTimeSource>()
+            .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
             .add::<EngineProvisionerNull>()
             .add_builder(
                 PushIngestServiceImpl::builder()
