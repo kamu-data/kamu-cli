@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+### Added
+- Datafusion-based interactive SQL shell
+### Changed
+- Datafusion is now the default engine for `kamu sql` command
+
 ## [0.154.2] - 2024-01-25
 ### Changed
 - Use artificial control over time in `FlowService` tests to stabilize their behavior

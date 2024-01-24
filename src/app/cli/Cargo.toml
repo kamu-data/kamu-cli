@@ -104,6 +104,7 @@ async-trait = "0.1"
 chrono = "0.4"
 cfg-if = "1"  # Conditional compilation
 datafusion = "33"
+datafusion-cli = "33"
 dill = "0.8"
 dirs = "5"
 fs_extra = "1.3"

@@ -11,6 +11,9 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use container_runtime::ContainerRuntime;
+use datafusion_cli::exec;
+use datafusion_cli::print_format::PrintFormat;
+use datafusion_cli::print_options::{MaxRows, PrintOptions};
 use internal_error::*;
 use kamu::domain::{QueryOptions, QueryService};
 use kamu::*;
@@ -20,6 +23,8 @@ use super::{CLIError, Command};
 use crate::explore::SqlShellImpl;
 use crate::output::*;
 use crate::WorkspaceLayout;
+
+pub const DEFAULT_MAX_ROWS_FOR_OUTPUT: usize = 40;
 
 pub struct SqlShellCommand {
     query_svc: Arc<dyn QueryService>,
@@ -124,18 +129,33 @@ impl SqlShellCommand {
 
         Ok(())
     }
+
+    async fn run_datafusion_cli_command(&self) -> Result<(), CLIError> {
+        let mut print_options = PrintOptions {
+            format: PrintFormat::Table,
+            quiet: false,
+            maxrows: MaxRows::Limited(DEFAULT_MAX_ROWS_FOR_OUTPUT),
+        };
+
+        let mut ctx = self.query_svc.create_session().await.unwrap();
+
+        exec::exec_from_repl(&mut ctx, &mut print_options)
+            .await
+            .map_err(CLIError::failure)?;
+
+        Ok(())
+    }
 }
 
 #[async_trait::async_trait(?Send)]
 impl Command for SqlShellCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
-        match (self.engine.as_deref(), &self.command, &self.url) {
-            (Some("datafusion"), Some(_), None) => self.run_datafusion_command().await,
-            (Some("datafusion"), _, _) => Err(CLIError::usage_error(
-                "DataFusion engine currently doesn't have a shell and only supports single \
-                 command execution",
-            )),
-            (Some("spark") | None, _, _) => self.run_spark_shell().await,
+        let engine = self.engine.as_deref().unwrap_or("datafusion");
+
+        match (engine, &self.command, &self.url) {
+            ("datafusion", None, None) => self.run_datafusion_cli_command().await,
+            ("datafusion", Some(_), None) => self.run_datafusion_command().await,
+            ("spark", _, _) => self.run_spark_shell().await,
             _ => unreachable!(),
         }
     }
