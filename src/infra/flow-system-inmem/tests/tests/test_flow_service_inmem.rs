@@ -831,7 +831,7 @@ async fn test_update_success_triggers_update_of_derived_datasets() {
             .set_dataset_flow_start_condition(
                 Utc::now(),
                 dataset_id.clone(),
-                DatasetFlowType::Ingest,
+                DatasetFlowType::ExecuteTransform,
                 StartConditionConfiguration {
                     throttling_period: None,
                     minimal_data_batch: None,
@@ -858,7 +858,7 @@ async fn test_update_success_triggers_update_of_derived_datasets() {
     let _ = tokio::select! {
         res = harness.flow_service.run(start_time) => res.int_err(),
         _ = async {
-            // "foo" is definitely schedule now
+            // "foo" is definitely scheduled now
             let next_time = start_time + Duration::milliseconds(50);
             tokio::time::sleep(std::time::Duration::from_millis(50)).await;
 
@@ -912,8 +912,10 @@ async fn test_update_success_triggers_update_of_derived_datasets() {
     );
 
     let foo_flow_key: FlowKey = FlowKeyDataset::new(foo_id.clone(), DatasetFlowType::Ingest).into();
-    let bar_flow_key: FlowKey = FlowKeyDataset::new(bar_id.clone(), DatasetFlowType::Ingest).into();
-    let baz_flow_key: FlowKey = FlowKeyDataset::new(baz_id.clone(), DatasetFlowType::Ingest).into();
+    let bar_flow_key: FlowKey =
+        FlowKeyDataset::new(bar_id.clone(), DatasetFlowType::ExecuteTransform).into();
+    let baz_flow_key: FlowKey =
+        FlowKeyDataset::new(baz_id.clone(), DatasetFlowType::ExecuteTransform).into();
 
     assert_flow_test_checks(&[
         // Snapshot 0: after initial queueing

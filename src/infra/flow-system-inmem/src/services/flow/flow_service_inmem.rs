@@ -803,7 +803,7 @@ impl AsyncEventHandler<TaskEventFinished> for FlowServiceInMemory {
                 self.enqueue_dependent_dataset_flows(
                     finish_time,
                     &flow_key.dataset_id,
-                    flow_key.flow_type,
+                    DatasetFlowType::ExecuteTransform,
                     flow.flow_id,
                 )
                 .await?;

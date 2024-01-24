@@ -217,7 +217,7 @@ dependencies = [
  "arrow-data",
  "arrow-schema",
  "chrono",
- "half 2.3.1",
+ "half",
  "num",
 ]
 
@@ -233,7 +233,7 @@ dependencies = [
  "arrow-schema",
  "chrono",
  "chrono-tz",
- "half 2.3.1",
+ "half",
  "hashbrown 0.14.3",
  "num",
 ]
@@ -245,7 +245,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "55512d988c6fbd76e514fd3ff537ac50b0a675da5a245e4fdad77ecfd654205f"
 dependencies = [
  "bytes",
- "half 2.3.1",
+ "half",
  "num",
 ]
 
@@ -262,7 +262,7 @@ dependencies = [
  "arrow-select",
  "chrono",
  "comfy-table",
- "half 2.3.1",
+ "half",
  "lexical-core",
  "num",
 ]
@@ -294,7 +294,7 @@ checksum = "6dc2b9fec74763427e2e5575b8cc31ce96ba4c9b4eb05ce40e0616d9fad12461"
 dependencies = [
  "arrow-buffer",
  "arrow-schema",
- "half 2.3.1",
+ "half",
  "num",
 ]
 
@@ -361,7 +361,7 @@ dependencies = [
  "arrow-data",
  "arrow-schema",
  "chrono",
- "half 2.3.1",
+ "half",
  "indexmap 2.1.0",
  "lexical-core",
  "num",
@@ -380,7 +380,7 @@ dependencies = [
  "arrow-data",
  "arrow-schema",
  "arrow-select",
- "half 2.3.1",
+ "half",
  "num",
 ]
 
@@ -395,7 +395,7 @@ dependencies = [
  "arrow-buffer",
  "arrow-data",
  "arrow-schema",
- "half 2.3.1",
+ "half",
  "hashbrown 0.14.3",
 ]
 
@@ -1358,9 +1358,9 @@ dependencies = [
 
 [[package]]
 name = "ciborium"
-version = "0.2.1"
+version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "effd91f6c78e5a4ace8a5d3c0b6bfaec9e2baaef55f3efc00e45fb2e477ee926"
+checksum = "42e69ffd6f0917f5c029256a24d0161db17cea3997d185db0d35926308770f0e"
 dependencies = [
  "ciborium-io",
  "ciborium-ll",
@@ -1369,18 +1369,18 @@ dependencies = [
 
 [[package]]
 name = "ciborium-io"
-version = "0.2.1"
+version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cdf919175532b369853f5d5e20b26b43112613fd6fe7aee757e35f7a44642656"
+checksum = "05afea1e0a06c9be33d539b876f1ce3692f4afea2cb41f740e7743225ed1c757"
 
 [[package]]
 name = "ciborium-ll"
-version = "0.2.1"
+version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "defaa24ecc093c77630e6c15e17c51f5e187bf35ee514f4e2d67baaa96dae22b"
+checksum = "57663b653d948a338bfb3eeba9bb2fd5fcfaecb9e199e87e1eda4d9e8b240fd9"
 dependencies = [
  "ciborium-io",
- "half 1.8.2",
+ "half",
 ]
 
 [[package]]
@@ -1509,7 +1509,7 @@ checksum = "f7144d30dcf0fafbce74250a3963025d8d52177934239851c917d29f1df280c2"
 
 [[package]]
 name = "container-runtime"
-version = "0.154.0"
+version = "0.154.1"
 dependencies = [
  "async-trait",
  "cfg-if",
@@ -1877,7 +1877,7 @@ dependencies = [
  "flate2",
  "futures",
  "glob",
- "half 2.3.1",
+ "half",
  "hashbrown 0.14.3",
  "indexmap 2.1.0",
  "itertools 0.11.0",
@@ -1910,7 +1910,7 @@ dependencies = [
  "arrow-buffer",
  "arrow-schema",
  "chrono",
- "half 2.3.1",
+ "half",
  "num_cpus",
  "object_store",
  "parquet",
@@ -1989,7 +1989,7 @@ dependencies = [
  "chrono",
  "datafusion-common",
  "datafusion-expr",
- "half 2.3.1",
+ "half",
  "hashbrown 0.14.3",
  "hex",
  "indexmap 2.1.0",
@@ -2024,7 +2024,7 @@ dependencies = [
  "datafusion-expr",
  "datafusion-physical-expr",
  "futures",
- "half 2.3.1",
+ "half",
  "hashbrown 0.14.3",
  "indexmap 2.1.0",
  "itertools 0.11.0",
@@ -2306,7 +2306,7 @@ dependencies = [
 
 [[package]]
 name = "enum-variants"
-version = "0.154.0"
+version = "0.154.1"
 
 [[package]]
 name = "env_logger"
@@ -2339,7 +2339,7 @@ dependencies = [
 
 [[package]]
 name = "event-bus"
-version = "0.154.0"
+version = "0.154.1"
 dependencies = [
  "async-trait",
  "dill",
@@ -2355,7 +2355,7 @@ dependencies = [
 
 [[package]]
 name = "event-sourcing"
-version = "0.154.0"
+version = "0.154.1"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -2371,7 +2371,7 @@ dependencies = [
 
 [[package]]
 name = "event-sourcing-macros"
-version = "0.154.0"
+version = "0.154.1"
 dependencies = [
  "quote",
  "syn 2.0.48",
@@ -2669,12 +2669,6 @@ dependencies = [
  "tokio-util",
  "tracing",
 ]
-
-[[package]]
-name = "half"
-version = "1.8.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eabb4a44450da02c90444cf74558da904edde8fb4e9035a9a6a4e15445af0bd7"
 
 [[package]]
 name = "half"
@@ -3062,7 +3056,7 @@ checksum = "8bb03732005da905c88227371639bf1ad885cc712789c011c31c5fb3ab3ccf02"
 
 [[package]]
 name = "internal-error"
-version = "0.154.0"
+version = "0.154.1"
 dependencies = [
  "test-log",
  "thiserror",
@@ -3178,7 +3172,7 @@ dependencies = [
 
 [[package]]
 name = "kamu"
-version = "0.154.0"
+version = "0.154.1"
 dependencies = [
  "async-recursion",
  "async-stream",
@@ -3255,7 +3249,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-adapter-auth-oso"
-version = "0.154.0"
+version = "0.154.1"
 dependencies = [
  "async-trait",
  "dill",
@@ -3276,7 +3270,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-adapter-flight-sql"
-version = "0.154.0"
+version = "0.154.1"
 dependencies = [
  "arrow-flight",
  "async-trait",
@@ -3300,7 +3294,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-adapter-graphql"
-version = "0.154.0"
+version = "0.154.1"
 dependencies = [
  "async-graphql",
  "async-trait",
@@ -3338,7 +3332,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-adapter-http"
-version = "0.154.0"
+version = "0.154.1"
 dependencies = [
  "async-trait",
  "axum",
@@ -3382,7 +3376,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-adapter-oauth"
-version = "0.154.0"
+version = "0.154.1"
 dependencies = [
  "async-trait",
  "dill",
@@ -3405,7 +3399,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-cli"
-version = "0.154.0"
+version = "0.154.1"
 dependencies = [
  "arrow-flight",
  "async-graphql",
@@ -3490,7 +3484,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-core"
-version = "0.154.0"
+version = "0.154.1"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -3517,7 +3511,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-data-utils"
-version = "0.154.0"
+version = "0.154.1"
 dependencies = [
  "arrow-digest",
  "async-trait",
@@ -3537,7 +3531,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-flow-system"
-version = "0.154.0"
+version = "0.154.1"
 dependencies = [
  "async-trait",
  "chrono",
@@ -3559,7 +3553,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-flow-system-inmem"
-version = "0.154.0"
+version = "0.154.1"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -3590,7 +3584,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-ingest-datafusion"
-version = "0.154.0"
+version = "0.154.1"
 dependencies = [
  "async-trait",
  "chrono",
@@ -3628,7 +3622,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-repo-tools"
-version = "0.154.0"
+version = "0.154.1"
 dependencies = [
  "chrono",
  "clap",
@@ -3642,7 +3636,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-task-system"
-version = "0.154.0"
+version = "0.154.1"
 dependencies = [
  "async-trait",
  "chrono",
@@ -3661,7 +3655,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-task-system-inmem"
-version = "0.154.0"
+version = "0.154.1"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -4089,7 +4083,7 @@ dependencies = [
 
 [[package]]
 name = "multiformats"
-version = "0.154.0"
+version = "0.154.1"
 dependencies = [
  "bs58",
  "digest",
@@ -4345,7 +4339,7 @@ checksum = "0ab1bc2a289d34bd04a330323ac98a1b4bc82c9d9fcb1e66b63caa84da26b575"
 
 [[package]]
 name = "opendatafabric"
-version = "0.154.0"
+version = "0.154.1"
 dependencies = [
  "arrow",
  "base64 0.21.7",
@@ -6376,7 +6370,7 @@ dependencies = [
 
 [[package]]
 name = "tracing-perfetto"
-version = "0.154.0"
+version = "0.154.1"
 dependencies = [
  "env_logger",
  "serde",
