@@ -263,8 +263,8 @@ async fn test_crud_cron_root_dataset() {
                                 paused
                                 schedule {
                                     __typename
-                                    ... on CronExpression {
-                                        cronExpression
+                                    ... on Cron5ComponentExpression {
+                                        cron5ComponentExpression
                                     }
                                 }
                                 batching {
@@ -308,7 +308,7 @@ async fn test_crud_cron_root_dataset() {
         &create_result.dataset_handle.id,
         "INGEST",
         false,
-        "0 */2 * * * *",
+        "*/2 * * * *",
     );
 
     let res = schema
@@ -333,8 +333,8 @@ async fn test_crud_cron_root_dataset() {
                                     "__typename": "FlowConfiguration",
                                     "paused": false,
                                     "schedule": {
-                                        "__typename": "CronExpression",
-                                        "cronExpression": "0 */2 * * * *",
+                                        "__typename": "Cron5ComponentExpression",
+                                        "cron5ComponentExpression": "*/2 * * * *",
                                     },
                                     "batching": null
                                 }
@@ -350,7 +350,7 @@ async fn test_crud_cron_root_dataset() {
         &create_result.dataset_handle.id,
         "INGEST",
         true,
-        "0 0 */1 * * *",
+        "0 */1 * * *",
     );
 
     let res = schema
@@ -375,8 +375,8 @@ async fn test_crud_cron_root_dataset() {
                                     "__typename": "FlowConfiguration",
                                     "paused": true,
                                     "schedule": {
-                                        "__typename": "CronExpression",
-                                        "cronExpression": "0 0 */1 * * *",
+                                        "__typename": "Cron5ComponentExpression",
+                                        "cron5ComponentExpression": "0 */1 * * *",
                                     },
                                     "batching": null
                                 }
@@ -409,8 +409,8 @@ async fn test_crud_cron_root_dataset() {
         format!("Cron expression {invalid_cron_expression} is invalid")
     );
 
-    // Try to pass valid cron expression from past
-    let past_cron_expression = "0 0 0 1 JAN ? 2024";
+    // Try to pass valid cron expression with year (not supported)
+    let past_cron_expression = "0 0 1 JAN ? 2024";
     let mutation_code = FlowConfigHarness::set_config_cron_expression_mutation(
         &create_result.dataset_handle.id,
         "INGEST",
@@ -427,7 +427,7 @@ async fn test_crud_cron_root_dataset() {
     assert!(res.is_err(), "{res:?}");
     assert_eq!(
         res.errors[0].message,
-        format!("Cron expression {past_cron_expression} iteration has been exceeded",)
+        format!("Cron expression {past_cron_expression} is invalid",)
     );
 }
 
@@ -862,7 +862,7 @@ impl FlowConfigHarness {
                                     datasetFlowType: "<dataset_flow_type>",
                                     paused: <paused>,
                                     schedule: {
-                                        cronExpression: "<cron_expression>"
+                                        cron5ComponentExpression: "<cron_expression>"
                                     }
                                 ) {
                                     __typename,
@@ -873,8 +873,8 @@ impl FlowConfigHarness {
                                             paused
                                             schedule {
                                                 __typename
-                                                ... on CronExpression {
-                                                    cronExpression
+                                                ... on Cron5ComponentExpression {
+                                                    cron5ComponentExpression
                                                 }
                                             }
                                             batching {

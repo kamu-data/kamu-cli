@@ -4,9 +4,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [Unreleased]
 ### Changed
 - Use artificial control over time in `FlowService` tests to stabilize their behavior
+- CRON expressions API should allow only classic 5-component syntax
 
 ## [0.154.1] - 2024-01-24
 ### Fixed
