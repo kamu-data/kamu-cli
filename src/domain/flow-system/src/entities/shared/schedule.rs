@@ -61,7 +61,7 @@ pub struct CronExpressionIterationError {
 }
 
 // Classic CRON expression has 5 components: min hour dayOfMonth month dayOfWeek
-const CLASSIC_CRONTAB_COMPONENTS_COUNT: i32 = 5;
+const CLASSIC_CRONTAB_COMPONENTS_COUNT: usize = 5;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -70,10 +70,7 @@ impl Schedule {
         source_5component_cron_expression: &str,
     ) -> Result<Schedule, ScheduleCronError> {
         // Ensure we obtained classic 5-component CRONTAB expression
-        let mut components_count = 0;
-        for _ in source_5component_cron_expression.split_whitespace() {
-            components_count += 1;
-        }
+        let components_count = source_5component_cron_expression.split_whitespace().count();
         if components_count != CLASSIC_CRONTAB_COMPONENTS_COUNT {
             return Err(ScheduleCronError::InvalidCronExpression(
                 InvalidCronExpressionError {
