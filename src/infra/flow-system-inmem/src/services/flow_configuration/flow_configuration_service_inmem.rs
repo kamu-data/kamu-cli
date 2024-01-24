@@ -87,7 +87,7 @@ impl FlowConfigurationService for FlowConfigurationServiceInMemory {
         let maybe_flow_configuration =
             FlowConfiguration::try_load(flow_key.clone(), self.event_store.as_ref()).await?;
 
-        match maybe_flow_configuration {
+        let mut flow_configuration = match maybe_flow_configuration {
             // Modification
             Some(mut flow_configuration) => {
                 flow_configuration
@@ -95,31 +95,20 @@ impl FlowConfigurationService for FlowConfigurationServiceInMemory {
                     .int_err()?;
 
                 flow_configuration
-                    .save(self.event_store.as_ref())
-                    .await
-                    .int_err()?;
-
-                self.publish_flow_configuration_modified(&flow_configuration, request_time)
-                    .await?;
-
-                Ok(flow_configuration.into())
             }
             // New configuration
-            None => {
-                let mut flow_configuration =
-                    FlowConfiguration::new(self.time_source.now(), flow_key.clone(), paused, rule);
+            None => FlowConfiguration::new(self.time_source.now(), flow_key.clone(), paused, rule),
+        };
 
-                flow_configuration
-                    .save(self.event_store.as_ref())
-                    .await
-                    .int_err()?;
+        flow_configuration
+            .save(self.event_store.as_ref())
+            .await
+            .int_err()?;
 
-                self.publish_flow_configuration_modified(&flow_configuration, request_time)
-                    .await?;
+        self.publish_flow_configuration_modified(&flow_configuration, request_time)
+            .await?;
 
-                Ok(flow_configuration.into())
-            }
-        }
+        Ok(flow_configuration.into())
     }
 
     /// Lists all enabled configurations
