@@ -305,9 +305,9 @@ where
             if let Some(iter) = this.iter.as_mut() {
                 if let Some(next) = iter.next() {
                     break Poll::Ready(Some(Ok(next)));
-                } else {
-                    *this.iter = None;
                 }
+
+                *this.iter = None;
             }
             match this.inner.as_mut().poll_next(cx) {
                 Poll::Pending => break Poll::Pending,
@@ -361,9 +361,9 @@ where
                 Poll::Ready(None) => {
                     if let Some(v) = this.accum.take() {
                         break Poll::Ready(Ok(v));
-                    } else {
-                        panic!("Any polled after completion")
                     }
+
+                    panic!("Any polled after completion")
                 }
                 Poll::Ready(Some(Ok(v))) => {
                     let acc = (this.f)(&v) || this.accum.unwrap();
@@ -481,9 +481,9 @@ where
                 Poll::Ready(None) => {
                     if let Some(v) = this.accum.take() {
                         break Poll::Ready(Ok(v));
-                    } else {
-                        panic!("Any polled after completion")
                     }
+
+                    panic!("Any polled after completion")
                 }
                 Poll::Ready(Some(Ok(_))) => {
                     *this.accum = Some(this.accum.unwrap() + 1);

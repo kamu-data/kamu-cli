@@ -116,13 +116,11 @@ impl TaskScheduler for TaskSchedulerInMemory {
     // TODO: Use signaling instead of a loop
     async fn take(&self) -> Result<TaskID, TakeTaskError> {
         loop {
-            match self.try_take().await? {
-                Some(task_id) => return Ok(task_id),
-                None => {
-                    tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-                    continue;
-                }
+            if let Some(task_id) = self.try_take().await? {
+                return Ok(task_id);
             }
+
+            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
         }
     }
 
