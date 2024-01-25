@@ -127,6 +127,7 @@ from_iter_instead_of_collect = "warn"
 linkedlist = "warn"
 match_bool = "warn"
 should_panic_without_expect = "warn"
+unused_async = "warn"
 
 # clippy::cargo
 cargo = { level = "warn", priority = 0 }

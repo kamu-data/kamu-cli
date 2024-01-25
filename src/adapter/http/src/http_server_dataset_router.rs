@@ -79,6 +79,7 @@ pub fn add_dataset_resolver_layer(
 
 /////////////////////////////////////////////////////////////////////////////////
 
+#[allow(clippy::unused_async)]
 pub async fn platform_token_validate_handler(
     catalog: axum::extract::Extension<dill::Catalog>,
 ) -> axum::response::Response {

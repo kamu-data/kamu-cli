@@ -536,9 +536,8 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
                     }
                 }?;
 
-            let mut new_blocks = decode_metadata_batch(dataset_pull_metadata_response.blocks)
-                .await
-                .int_err()?;
+            let mut new_blocks =
+                decode_metadata_batch(dataset_pull_metadata_response.blocks).int_err()?;
 
             // Create destination dataset if not exists
             let dst = if let Some(dst) = dst {

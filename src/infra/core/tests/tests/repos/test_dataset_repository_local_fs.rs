@@ -27,7 +27,7 @@ struct LocalFsRepoHarness {
 }
 
 impl LocalFsRepoHarness {
-    pub async fn create<TDatasetActionAuthorizer: auth::DatasetActionAuthorizer + 'static>(
+    pub fn create<TDatasetActionAuthorizer: auth::DatasetActionAuthorizer + 'static>(
         tempdir: &TempDir,
         dataset_action_authorizer: TDatasetActionAuthorizer,
         multi_tenant: bool,
@@ -77,8 +77,7 @@ async fn test_create_dataset() {
         &tempdir,
         auth::AlwaysHappyDatasetActionAuthorizer::new(),
         false,
-    )
-    .await;
+    );
 
     test_dataset_repository_shared::test_create_dataset(harness.dataset_repo.as_ref(), None).await;
 }
@@ -92,8 +91,7 @@ async fn test_create_dataset_multi_tenant() {
         &tempdir,
         auth::AlwaysHappyDatasetActionAuthorizer::new(),
         true,
-    )
-    .await;
+    );
 
     test_dataset_repository_shared::test_create_dataset(
         harness.dataset_repo.as_ref(),
@@ -111,8 +109,7 @@ async fn test_create_dataset_same_name_multiple_tenants() {
         &tempdir,
         auth::AlwaysHappyDatasetActionAuthorizer::new(),
         true,
-    )
-    .await;
+    );
 
     test_dataset_repository_shared::test_create_dataset_same_name_multiple_tenants(
         harness.dataset_repo.as_ref(),
@@ -129,8 +126,7 @@ async fn test_create_dataset_from_snapshot() {
         &tempdir,
         auth::AlwaysHappyDatasetActionAuthorizer::new(),
         false,
-    )
-    .await;
+    );
 
     test_dataset_repository_shared::test_create_dataset_from_snapshot(
         harness.dataset_repo.as_ref(),
@@ -148,8 +144,7 @@ async fn test_create_dataset_from_snapshot_multi_tenant() {
         &tempdir,
         auth::AlwaysHappyDatasetActionAuthorizer::new(),
         true,
-    )
-    .await;
+    );
 
     test_dataset_repository_shared::test_create_dataset_from_snapshot(
         harness.dataset_repo.as_ref(),
@@ -167,8 +162,7 @@ async fn test_rename_dataset() {
         &tempdir,
         MockDatasetActionAuthorizer::new().expect_check_write_a_dataset(1),
         false,
-    )
-    .await;
+    );
 
     test_dataset_repository_shared::test_rename_dataset(harness.dataset_repo.as_ref(), None).await;
 }
@@ -182,8 +176,7 @@ async fn test_rename_dataset_multi_tenant() {
         &tempdir,
         MockDatasetActionAuthorizer::new().expect_check_write_a_dataset(1),
         true,
-    )
-    .await;
+    );
 
     test_dataset_repository_shared::test_rename_dataset(
         harness.dataset_repo.as_ref(),
@@ -201,8 +194,7 @@ async fn test_rename_dataset_same_name_multiple_tenants() {
         &tempdir,
         MockDatasetActionAuthorizer::new().expect_check_write_a_dataset(1),
         true,
-    )
-    .await;
+    );
 
     test_dataset_repository_shared::test_rename_dataset_same_name_multiple_tenants(
         harness.dataset_repo.as_ref(),
@@ -216,7 +208,7 @@ async fn test_rename_dataset_same_name_multiple_tenants() {
 async fn test_rename_unauthorized() {
     let tempdir = tempfile::tempdir().unwrap();
     let harness =
-        LocalFsRepoHarness::create(&tempdir, MockDatasetActionAuthorizer::denying(), true).await;
+        LocalFsRepoHarness::create(&tempdir, MockDatasetActionAuthorizer::denying(), true);
 
     test_dataset_repository_shared::test_rename_dataset_unauthorized(
         harness.dataset_repo.as_ref(),
@@ -234,8 +226,7 @@ async fn test_delete_dataset() {
         &tempdir,
         auth::AlwaysHappyDatasetActionAuthorizer::new(),
         false,
-    )
-    .await;
+    );
     harness.dependencies_eager_initialization().await;
 
     test_dataset_repository_shared::test_delete_dataset(harness.dataset_repo.as_ref(), None).await;
@@ -250,8 +241,7 @@ async fn test_delete_dataset_multi_tenant() {
         &tempdir,
         auth::AlwaysHappyDatasetActionAuthorizer::new(),
         true,
-    )
-    .await;
+    );
     harness.dependencies_eager_initialization().await;
 
     test_dataset_repository_shared::test_delete_dataset(
@@ -267,7 +257,7 @@ async fn test_delete_dataset_multi_tenant() {
 async fn test_delete_unauthorized() {
     let tempdir = tempfile::tempdir().unwrap();
     let harness =
-        LocalFsRepoHarness::create(&tempdir, MockDatasetActionAuthorizer::denying(), true).await;
+        LocalFsRepoHarness::create(&tempdir, MockDatasetActionAuthorizer::denying(), true);
     harness.dependencies_eager_initialization().await;
 
     test_dataset_repository_shared::test_delete_dataset_unauthorized(
@@ -286,8 +276,7 @@ async fn test_iterate_datasets() {
         &tempdir,
         auth::AlwaysHappyDatasetActionAuthorizer::new(),
         false,
-    )
-    .await;
+    );
 
     test_dataset_repository_shared::test_iterate_datasets(harness.dataset_repo.as_ref()).await;
 }
@@ -301,8 +290,7 @@ async fn test_iterate_datasets_multi_tenant() {
         &tempdir,
         auth::AlwaysHappyDatasetActionAuthorizer::new(),
         true,
-    )
-    .await;
+    );
 
     test_dataset_repository_shared::test_iterate_datasets_multi_tenant(
         harness.dataset_repo.as_ref(),

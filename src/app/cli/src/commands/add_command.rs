@@ -80,7 +80,7 @@ impl AddCommand {
         res
     }
 
-    async fn load_stdin(&self) -> Vec<(String, Result<DatasetSnapshot, ResourceError>)> {
+    fn load_stdin(&self) -> Vec<(String, Result<DatasetSnapshot, ResourceError>)> {
         match opendatafabric::serde::yaml::YamlDatasetSnapshotDeserializer
             .read_manifests(std::io::stdin())
         {
@@ -139,7 +139,7 @@ impl Command for AddCommand {
         let load_results = if self.recursive {
             self.load_recursive().await
         } else if self.stdin {
-            self.load_stdin().await
+            self.load_stdin()
         } else {
             self.load_specific().await
         };

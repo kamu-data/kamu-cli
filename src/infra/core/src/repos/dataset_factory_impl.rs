@@ -119,10 +119,10 @@ impl DatasetFactoryImpl {
         // TODO: We should ensure optimal credential reuse. Perhaps in future we should
         // create a cache of S3Contexts keyed by an endpoint.
         let s3_context = S3Context::from_url(&base_url).await;
-        Self::get_s3_from_context(s3_context, event_bus).await
+        Self::get_s3_from_context(s3_context, event_bus)
     }
 
-    pub async fn get_s3_from_context(
+    pub fn get_s3_from_context(
         s3_context: S3Context,
         event_bus: Arc<EventBus>,
     ) -> Result<impl Dataset, InternalError> {

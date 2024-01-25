@@ -176,10 +176,10 @@ pub async fn prepare_dataset_metadata_batch(
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn decode_metadata_batch(
+pub fn decode_metadata_batch(
     objects_batch: ObjectsBatch,
 ) -> Result<VecDeque<(Multihash, MetadataBlock)>, GetBlockError> {
-    let blocks_data = unpack_dataset_metadata_batch(objects_batch).await;
+    let blocks_data = unpack_dataset_metadata_batch(objects_batch);
     blocks_data
         .into_iter()
         .map(|(hash, bytes)| {
@@ -257,7 +257,7 @@ pub async fn dataset_append_metadata(
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-async fn unpack_dataset_metadata_batch(objects_batch: ObjectsBatch) -> Vec<(Multihash, Vec<u8>)> {
+fn unpack_dataset_metadata_batch(objects_batch: ObjectsBatch) -> Vec<(Multihash, Vec<u8>)> {
     assert!(
         objects_batch.media_type.eq(MEDIA_TAR_GZ),
         "Unsupported media type {}",

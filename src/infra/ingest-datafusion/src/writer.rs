@@ -252,7 +252,7 @@ impl DataWriterDataFusion {
         Ok(Some(df))
     }
 
-    async fn with_system_columns(
+    fn with_system_columns(
         &self,
         df: DataFrame,
         system_time: DateTime<Utc>,
@@ -631,14 +631,12 @@ impl DataWriter for DataWriterDataFusion {
             );
 
             // Add system columns
-            let df = self
-                .with_system_columns(
-                    df,
-                    opts.system_time,
-                    opts.source_event_time,
-                    self.meta.prev_offset.map_or(0, |e| e + 1),
-                )
-                .await?;
+            let df = self.with_system_columns(
+                df,
+                opts.system_time,
+                opts.source_event_time,
+                self.meta.prev_offset.map_or(0, |e| e + 1),
+            )?;
 
             // Validate schema matches the declared one
             let new_schema = SchemaRef::new(df.schema().into());

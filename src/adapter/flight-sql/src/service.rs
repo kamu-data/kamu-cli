@@ -133,7 +133,7 @@ impl KamuFlightSqlService {
         .map_err(|e| Status::internal(format!("Error: {e}")))
     }
 
-    async fn get_catalogs(
+    fn get_catalogs(
         &self,
         ctx: Arc<SessionContext>,
         _query: &CommandGetCatalogs,
@@ -155,7 +155,7 @@ impl KamuFlightSqlService {
         Ok(rb)
     }
 
-    async fn get_schemas(
+    fn get_schemas(
         &self,
         ctx: Arc<SessionContext>,
         query: &CommandGetDbSchemas,
@@ -294,7 +294,7 @@ impl KamuFlightSqlService {
     }
 
     // TODO: Get keys from externalized metadata
-    async fn get_primary_keys(
+    fn get_primary_keys(
         &self,
         _ctx: Arc<SessionContext>,
         _query: &CommandGetPrimaryKeys,
@@ -325,7 +325,7 @@ impl KamuFlightSqlService {
     }
 
     // TODO: Get keys from externalized metadata
-    async fn get_exported_keys(
+    fn get_exported_keys(
         &self,
         _ctx: Arc<SessionContext>,
         _query: &CommandGetExportedKeys,
@@ -370,7 +370,7 @@ impl KamuFlightSqlService {
     }
 
     // TODO: Get keys from externalized metadata
-    async fn get_imported_keys(
+    fn get_imported_keys(
         &self,
         _ctx: Arc<SessionContext>,
         _query: &CommandGetImportedKeys,
@@ -580,7 +580,7 @@ impl KamuFlightSqlService {
         Ok(Response::new(info))
     }
 
-    async fn record_batch_to_stream(
+    fn record_batch_to_stream(
         &self,
         rb: RecordBatch,
     ) -> Result<Response<<Self as FlightService>::DoGetStream>, Status> {
@@ -761,7 +761,7 @@ impl FlightSqlService for KamuFlightSqlService {
         request: Request<FlightDescriptor>,
     ) -> Result<Response<FlightInfo>, Status> {
         let ctx = self.get_ctx(&request)?;
-        let data = self.get_catalogs(ctx, &query).await?;
+        let data = self.get_catalogs(ctx, &query)?;
         self.record_batch_to_flight_info(&data, &query.as_any())
     }
 
@@ -772,7 +772,7 @@ impl FlightSqlService for KamuFlightSqlService {
         request: Request<FlightDescriptor>,
     ) -> Result<Response<FlightInfo>, Status> {
         let ctx = self.get_ctx(&request)?;
-        let data = self.get_schemas(ctx, &query).await?;
+        let data = self.get_schemas(ctx, &query)?;
         self.record_batch_to_flight_info(&data, &query.as_any())
     }
 
@@ -816,7 +816,7 @@ impl FlightSqlService for KamuFlightSqlService {
         request: Request<FlightDescriptor>,
     ) -> Result<Response<FlightInfo>, Status> {
         let ctx = self.get_ctx(&request)?;
-        let data = self.get_primary_keys(ctx, &query).await?;
+        let data = self.get_primary_keys(ctx, &query)?;
         self.record_batch_to_flight_info(&data, &query.as_any())
     }
 
@@ -827,7 +827,7 @@ impl FlightSqlService for KamuFlightSqlService {
         request: Request<FlightDescriptor>,
     ) -> Result<Response<FlightInfo>, Status> {
         let ctx = self.get_ctx(&request)?;
-        let data = self.get_exported_keys(ctx, &query).await?;
+        let data = self.get_exported_keys(ctx, &query)?;
         self.record_batch_to_flight_info(&data, &query.as_any())
     }
 
@@ -838,7 +838,7 @@ impl FlightSqlService for KamuFlightSqlService {
         request: Request<FlightDescriptor>,
     ) -> Result<Response<FlightInfo>, Status> {
         let ctx = self.get_ctx(&request)?;
-        let data = self.get_imported_keys(ctx, &query).await?;
+        let data = self.get_imported_keys(ctx, &query)?;
         self.record_batch_to_flight_info(&data, &query.as_any())
     }
 
@@ -915,8 +915,8 @@ impl FlightSqlService for KamuFlightSqlService {
         request: Request<Ticket>,
     ) -> Result<Response<<Self as FlightService>::DoGetStream>, Status> {
         let ctx = self.get_ctx(&request)?;
-        let data = self.get_catalogs(ctx, &query).await?;
-        self.record_batch_to_stream(data).await
+        let data = self.get_catalogs(ctx, &query)?;
+        self.record_batch_to_stream(data)
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(?query))]
@@ -926,8 +926,8 @@ impl FlightSqlService for KamuFlightSqlService {
         request: Request<Ticket>,
     ) -> Result<Response<<Self as FlightService>::DoGetStream>, Status> {
         let ctx = self.get_ctx(&request)?;
-        let data = self.get_schemas(ctx, &query).await?;
-        self.record_batch_to_stream(data).await
+        let data = self.get_schemas(ctx, &query)?;
+        self.record_batch_to_stream(data)
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(?query))]
@@ -938,7 +938,7 @@ impl FlightSqlService for KamuFlightSqlService {
     ) -> Result<Response<<Self as FlightService>::DoGetStream>, Status> {
         let ctx = self.get_ctx(&request)?;
         let data = self.get_tables(ctx, &query).await?;
-        self.record_batch_to_stream(data).await
+        self.record_batch_to_stream(data)
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(?query))]
@@ -949,7 +949,7 @@ impl FlightSqlService for KamuFlightSqlService {
     ) -> Result<Response<<Self as FlightService>::DoGetStream>, Status> {
         let _ctx = self.get_ctx(&request)?;
         let data = self.get_table_types()?;
-        self.record_batch_to_stream(data).await
+        self.record_batch_to_stream(data)
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(?query))]
@@ -960,7 +960,7 @@ impl FlightSqlService for KamuFlightSqlService {
     ) -> Result<Response<<Self as FlightService>::DoGetStream>, Status> {
         let _ctx = self.get_ctx(&request)?;
         let data = self.get_sql_info(&query)?;
-        self.record_batch_to_stream(data).await
+        self.record_batch_to_stream(data)
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(?query))]
@@ -970,8 +970,8 @@ impl FlightSqlService for KamuFlightSqlService {
         request: Request<Ticket>,
     ) -> Result<Response<<Self as FlightService>::DoGetStream>, Status> {
         let ctx = self.get_ctx(&request)?;
-        let data = self.get_primary_keys(ctx, &query).await?;
-        self.record_batch_to_stream(data).await
+        let data = self.get_primary_keys(ctx, &query)?;
+        self.record_batch_to_stream(data)
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(?query))]
@@ -981,8 +981,8 @@ impl FlightSqlService for KamuFlightSqlService {
         request: Request<Ticket>,
     ) -> Result<Response<<Self as FlightService>::DoGetStream>, Status> {
         let ctx = self.get_ctx(&request)?;
-        let data = self.get_exported_keys(ctx, &query).await?;
-        self.record_batch_to_stream(data).await
+        let data = self.get_exported_keys(ctx, &query)?;
+        self.record_batch_to_stream(data)
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(?query))]
@@ -992,8 +992,8 @@ impl FlightSqlService for KamuFlightSqlService {
         request: Request<Ticket>,
     ) -> Result<Response<<Self as FlightService>::DoGetStream>, Status> {
         let ctx = self.get_ctx(&request)?;
-        let data = self.get_imported_keys(ctx, &query).await?;
-        self.record_batch_to_stream(data).await
+        let data = self.get_imported_keys(ctx, &query)?;
+        self.record_batch_to_stream(data)
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(?query))]

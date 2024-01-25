@@ -404,7 +404,7 @@ impl ContainerRuntime {
         }
     }
 
-    pub async fn check_socket(&self, host_port: u16) -> Result<bool, ContainerRuntimeError> {
+    pub fn check_socket(&self, host_port: u16) -> Result<bool, ContainerRuntimeError> {
         use std::io::Read;
         use std::net::{TcpStream, ToSocketAddrs};
 
@@ -440,7 +440,7 @@ impl ContainerRuntime {
         let start = Instant::now();
 
         loop {
-            if self.check_socket(host_port).await? {
+            if self.check_socket(host_port)? {
                 break Ok(());
             } else if start.elapsed() >= timeout {
                 break Err(TimeoutError::new(timeout).into());

@@ -111,7 +111,7 @@ async fn create_test_dataset(catalog: &dill::Catalog, tempdir: &Path) -> Dataset
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-async fn create_catalog_with_local_workspace(
+fn create_catalog_with_local_workspace(
     tempdir: &Path,
     dataset_action_authorizer: MockDatasetActionAuthorizer,
 ) -> dill::Catalog {
@@ -205,8 +205,7 @@ async fn test_dataset_schema_local_fs() {
     let catalog = create_catalog_with_local_workspace(
         tempdir.path(),
         MockDatasetActionAuthorizer::new().expect_check_read_a_dataset(1),
-    )
-    .await;
+    );
     test_dataset_schema_common(catalog, &tempdir).await;
 }
 
@@ -238,8 +237,7 @@ async fn test_dataset_schema_unauthorized_common(catalog: dill::Catalog, tempdir
 async fn test_dataset_schema_unauthorized_local_fs() {
     let tempdir = tempfile::tempdir().unwrap();
     let catalog =
-        create_catalog_with_local_workspace(tempdir.path(), MockDatasetActionAuthorizer::denying())
-            .await;
+        create_catalog_with_local_workspace(tempdir.path(), MockDatasetActionAuthorizer::denying());
     test_dataset_schema_unauthorized_common(catalog, &tempdir).await;
 }
 
@@ -302,8 +300,7 @@ async fn test_dataset_tail_local_fs() {
     let catalog = create_catalog_with_local_workspace(
         tempdir.path(),
         MockDatasetActionAuthorizer::new().expect_check_read_a_dataset(4),
-    )
-    .await;
+    );
     test_dataset_tail_common(catalog, &tempdir).await;
 }
 
@@ -327,8 +324,7 @@ async fn test_dataset_tail_empty_dataset() {
     let catalog = create_catalog_with_local_workspace(
         tempdir.path(),
         MockDatasetActionAuthorizer::new().expect_check_read_a_dataset(2),
-    )
-    .await;
+    );
 
     let dataset_repo = catalog.get_one::<dyn DatasetRepository>().unwrap();
     dataset_repo
@@ -360,8 +356,7 @@ async fn test_dataset_tail_unauthorized_common(catalog: dill::Catalog, tempdir: 
 async fn test_dataset_tail_unauthorized_local_fs() {
     let tempdir = tempfile::tempdir().unwrap();
     let catalog =
-        create_catalog_with_local_workspace(tempdir.path(), MockDatasetActionAuthorizer::denying())
-            .await;
+        create_catalog_with_local_workspace(tempdir.path(), MockDatasetActionAuthorizer::denying());
     test_dataset_tail_unauthorized_common(catalog, &tempdir).await;
 }
 
@@ -408,8 +403,7 @@ async fn test_dataset_sql_authorized_local_fs() {
     let catalog = create_catalog_with_local_workspace(
         tempdir.path(),
         MockDatasetActionAuthorizer::new().expect_check_read_a_dataset(1),
-    )
-    .await;
+    );
     test_dataset_sql_authorized_common(catalog, &tempdir).await;
 }
 
@@ -449,8 +443,7 @@ async fn test_dataset_sql_unauthorized_common(catalog: dill::Catalog, tempdir: &
 async fn test_dataset_sql_unauthorized_local_fs() {
     let tempdir = tempfile::tempdir().unwrap();
     let catalog =
-        create_catalog_with_local_workspace(tempdir.path(), MockDatasetActionAuthorizer::denying())
-            .await;
+        create_catalog_with_local_workspace(tempdir.path(), MockDatasetActionAuthorizer::denying());
     test_dataset_sql_unauthorized_common(catalog, &tempdir).await;
 }
 

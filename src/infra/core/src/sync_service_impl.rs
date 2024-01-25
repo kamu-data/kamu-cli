@@ -55,10 +55,7 @@ impl SyncServiceImpl {
         }
     }
 
-    async fn resolve_remote_dataset_url(
-        &self,
-        remote_ref: &DatasetRefRemote,
-    ) -> Result<Url, SyncError> {
+    fn resolve_remote_dataset_url(&self, remote_ref: &DatasetRefRemote) -> Result<Url, SyncError> {
         // TODO: REMOTE ID
         match remote_ref {
             DatasetRefRemote::ID(_, _) => {
@@ -94,7 +91,7 @@ impl SyncServiceImpl {
             }
             Err(remote_ref) => {
                 // TODO: implement authorization checks somehow
-                let url = self.resolve_remote_dataset_url(&remote_ref).await?;
+                let url = self.resolve_remote_dataset_url(&remote_ref)?;
                 self.dataset_factory.get_dataset(&url, false).await?
             }
         };
@@ -139,7 +136,7 @@ impl SyncServiceImpl {
             },
             Err(remote_ref) => {
                 // TODO: implement authorization checks somehow
-                let url = self.resolve_remote_dataset_url(&remote_ref).await?;
+                let url = self.resolve_remote_dataset_url(&remote_ref)?;
                 let dataset = self
                     .dataset_factory
                     .get_dataset(&url, create_if_not_exists)
@@ -210,7 +207,7 @@ impl SyncServiceImpl {
         opts: SyncOptions,
         listener: Arc<dyn SyncListener>,
     ) -> Result<SyncResult, SyncError> {
-        let odf_src_url = self.resolve_remote_dataset_url(src_ref).await?;
+        let odf_src_url = self.resolve_remote_dataset_url(src_ref)?;
         let http_src_url = Url::parse(&odf_src_url.as_str()["odf+".len()..]).unwrap(); // odf+http, odf+https - cut odf+
 
         let (dst_dataset, dst_factory) = self
@@ -238,7 +235,7 @@ impl SyncServiceImpl {
     ) -> Result<SyncResult, SyncError> {
         let src_dataset = self.get_dataset_reader(src).await?;
 
-        let odf_dst_url = self.resolve_remote_dataset_url(odf_dst).await?;
+        let odf_dst_url = self.resolve_remote_dataset_url(odf_dst)?;
         let http_dst_url = Url::parse(&odf_dst_url.as_str()[4..]).unwrap(); // odf+http, odf+https - cut odf+
 
         let http_dst_ref = DatasetRefAny::Url(http_dst_url.clone().into());
@@ -318,9 +315,8 @@ impl SyncServiceImpl {
                 }
                 Some(old_cid) => {
                     tracing::info!(%old_cid, "Attempting to read remote head");
-                    let dst_http_url = self
-                        .resolve_remote_dataset_url(&DatasetRefRemote::from(dst_url))
-                        .await?;
+                    let dst_http_url =
+                        self.resolve_remote_dataset_url(&DatasetRefRemote::from(dst_url))?;
                     let dst_dataset = self
                         .dataset_factory
                         .get_dataset(&dst_http_url, false)

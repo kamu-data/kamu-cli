@@ -103,7 +103,7 @@ where
         Ok(())
     }
 
-    async fn validate_append_seed_block_order(
+    fn validate_append_seed_block_order(
         &self,
         new_block: &MetadataBlock,
         _block_cache: &mut [MetadataBlock],
@@ -786,8 +786,7 @@ where
                 .await?;
             self.validate_append_sequence_numbers_integrity(&block, &mut block_cache)
                 .await?;
-            self.validate_append_seed_block_order(&block, &mut block_cache)
-                .await?;
+            self.validate_append_seed_block_order(&block, &mut block_cache)?;
             self.validate_append_system_time_is_monotonic(&block, &mut block_cache)
                 .await?;
             self.validate_append_watermark_is_monotonic(&block, &mut block_cache)
