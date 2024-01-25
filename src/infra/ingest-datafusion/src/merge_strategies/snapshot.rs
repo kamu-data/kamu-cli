@@ -128,7 +128,7 @@ impl MergeStrategySnapshot {
         new_schema: &DFSchema,
         old_qual: TableReference<'static>,
         new_qual: TableReference<'static>,
-    ) -> Result<Expr, DataFusionErrorWrapped> {
+    ) -> Expr {
         let columns: Vec<_> = if let Some(compare_columns) = &self.compare_columns {
             compare_columns.iter().map(|s| s.as_str()).collect()
         } else {
@@ -140,7 +140,7 @@ impl MergeStrategySnapshot {
                 .collect()
         };
 
-        let expr = columns
+        columns
             .into_iter()
             .map(move |c| {
                 let distinct = binary_expr(
@@ -161,9 +161,7 @@ impl MergeStrategySnapshot {
                 }
             })
             .reduce(Expr::or)
-            .unwrap_or(lit(false));
-
-        Ok(expr)
+            .unwrap_or(lit(false))
     }
 
     /// Performs Change Data Capture diff between old and new states.
@@ -290,7 +288,7 @@ impl MergeStrategySnapshot {
         let old = LogicalPlanBuilder::from(old).alias(a_old.clone())?;
         let new = LogicalPlanBuilder::from(new).alias(a_new.clone())?;
 
-        let filter = self.get_cdc_filter(new.schema().as_ref(), a_old.clone(), a_new.clone())?;
+        let filter = self.get_cdc_filter(new.schema().as_ref(), a_old.clone(), a_new.clone());
 
         let cdc = old
             .join(

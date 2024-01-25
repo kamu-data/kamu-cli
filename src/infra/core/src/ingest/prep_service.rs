@@ -43,7 +43,7 @@ impl PrepService {
                 ),
                 PrepStep::Decompress(dc) => match dc.format {
                     CompressionFormat::Zip => {
-                        Box::new(DecompressZipStream::new(stream, dc.sub_path.clone()).int_err()?)
+                        Box::new(DecompressZipStream::new(stream, dc.sub_path.clone()))
                     }
                     CompressionFormat::Gzip => Box::new(DecompressGzipStream::new(stream)),
                 },
@@ -189,7 +189,7 @@ struct DecompressZipStream {
 }
 
 impl DecompressZipStream {
-    fn new(mut input: Box<dyn Stream>, sub_path: Option<String>) -> Result<Self, IOError> {
+    fn new(mut input: Box<dyn Stream>, sub_path: Option<String>) -> Self {
         let (mut producer, consumer) = ringbuf::HeapRb::<u8>::new(BUFFER_SIZE).split();
 
         let (tx, rx) = std::sync::mpsc::sync_channel(1);
@@ -238,11 +238,11 @@ impl DecompressZipStream {
             })
             .unwrap();
 
-        Ok(Self {
+        Self {
             ingress,
             consumer,
             done_recvr: rx,
-        })
+        }
     }
 }
 

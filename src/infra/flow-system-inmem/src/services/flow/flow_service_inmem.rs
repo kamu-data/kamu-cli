@@ -372,7 +372,7 @@ impl FlowServiceInMemory {
             .lock()
             .unwrap()
             .time_wheel
-            .activate_at(activation_time, flow_id)?;
+            .activate_at(activation_time, flow_id);
         Ok(())
     }
 

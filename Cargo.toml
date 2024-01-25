@@ -114,6 +114,7 @@ if_not_else = { level = "allow", priority = 1 }
 redundant_else = "warn"
 manual_let_else = "warn"
 needless_pass_by_value = "warn"
+unnecessary_wraps = "warn"
 
 # clippy::cargo
 cargo = { level = "warn", priority = 0 }

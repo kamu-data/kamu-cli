@@ -49,7 +49,7 @@ impl QueryServiceImpl {
         }
     }
 
-    fn session_context(&self, options: QueryOptions) -> Result<SessionContext, InternalError> {
+    fn session_context(&self, options: QueryOptions) -> SessionContext {
         let cfg = SessionConfig::new()
             .with_information_schema(true)
             .with_default_catalog_and_schema("kamu", "kamu");
@@ -70,7 +70,7 @@ impl QueryServiceImpl {
                 options,
             )))),
         );
-        Ok(session_context)
+        session_context
     }
 
     #[tracing::instrument(level = "debug", skip_all)]
@@ -136,7 +136,7 @@ impl QueryServiceImpl {
 impl QueryService for QueryServiceImpl {
     #[tracing::instrument(level = "info", skip_all)]
     async fn create_session(&self) -> Result<SessionContext, CreateSessionError> {
-        Ok(self.session_context(QueryOptions::default())?)
+        Ok(self.session_context(QueryOptions::default()))
     }
 
     #[tracing::instrument(
@@ -185,20 +185,12 @@ impl QueryService for QueryServiceImpl {
             .unwrap_or_default()
             .into();
 
-        let ctx = self
-            .session_context(QueryOptions {
-                datasets: vec![DatasetQueryOptions {
-                    dataset_ref: dataset_handle.as_local_ref(),
-                    last_records_to_consider: Some(skip + limit),
-                }],
-            })
-            .map_err(|e| {
-                tracing::error!(
-                    error = ?e,
-                    "QueryService::tail: session context failed to construct"
-                );
-                QueryError::Internal(e)
-            })?;
+        let ctx = self.session_context(QueryOptions {
+            datasets: vec![DatasetQueryOptions {
+                dataset_ref: dataset_handle.as_local_ref(),
+                last_records_to_consider: Some(skip + limit),
+            }],
+        });
 
         let df = ctx
             .table(TableReference::bare(dataset_handle.alias.to_string()))
@@ -218,17 +210,13 @@ impl QueryService for QueryServiceImpl {
         statement: &str,
         options: QueryOptions,
     ) -> Result<DataFrame, QueryError> {
-        let ctx = self
-            .session_context(options)
-            .map_err(QueryError::Internal)?;
+        let ctx = self.session_context(options);
         Ok(ctx.sql(statement).await?)
     }
 
     #[tracing::instrument(level = "info", skip_all, fields(dataset_ref))]
     async fn get_schema(&self, dataset_ref: &DatasetRef) -> Result<Option<Type>, QueryError> {
-        let ctx = self
-            .session_context(QueryOptions::default())
-            .map_err(QueryError::Internal)?;
+        let ctx = self.session_context(QueryOptions::default());
         self.get_schema_impl(&ctx, dataset_ref).await
     }
 

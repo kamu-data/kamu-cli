@@ -459,10 +459,10 @@ impl KamuFlightSqlService {
         Ok(plan)
     }
 
-    fn cache_plan(&self, plan: LogicalPlan) -> Result<Uuid, Status> {
+    fn cache_plan(&self, plan: LogicalPlan) -> Uuid {
         let handle = Uuid::new_v4();
         self.statements.insert(handle, plan);
-        Ok(handle)
+        handle
     }
 
     fn get_plan(&self, handle: &Uuid) -> Result<LogicalPlan, Status> {
@@ -475,9 +475,8 @@ impl KamuFlightSqlService {
         }
     }
 
-    fn remove_plan(&self, handle: Uuid) -> Result<(), Status> {
+    fn remove_plan(&self, handle: Uuid) {
         self.statements.remove(&handle);
-        Ok(())
     }
 
     fn df_schema_to_arrow(&self, schema: &DFSchema) -> Result<Vec<u8>, Status> {
@@ -1046,7 +1045,7 @@ impl FlightSqlService for KamuFlightSqlService {
         let ctx = self.get_ctx(&request)?;
         let plan = Self::prepare_statement(&query.query, &ctx).await?;
         let schema_bytes = self.df_schema_to_arrow(plan.schema())?;
-        let handle = self.cache_plan(plan)?;
+        let handle = self.cache_plan(plan);
         tracing::debug!(%handle, "Prepared statement");
         let res = ActionCreatePreparedStatementResult {
             prepared_statement_handle: handle.as_bytes().to_vec().into(),
@@ -1065,7 +1064,9 @@ impl FlightSqlService for KamuFlightSqlService {
         let handle = Uuid::from_slice(handle.prepared_statement_handle.as_ref())
             .map_err(|e| Status::internal(format!("Failed to parse handle: {e:?}")))?;
 
-        self.remove_plan(handle)
+        self.remove_plan(handle);
+
+        Ok(())
     }
 
     /// Get a FlightInfo for executing a substrait plan.
