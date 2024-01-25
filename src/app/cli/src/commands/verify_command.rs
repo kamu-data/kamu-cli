@@ -19,7 +19,7 @@ use crate::output::OutputConfig;
 use crate::VerificationMultiProgress;
 
 type GenericVerificationResult =
-    Result<Vec<Result<VerificationMultiResult, InternalError>>, CLIError>;
+    Result<Vec<Result<VerificationDatasetResult, InternalError>>, CLIError>;
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -93,12 +93,10 @@ impl VerifyCommand {
                         options,
                         listener,
                     )
-                    .await;
+                    .await
+                    .int_err();
 
-                Ok(vec![Ok(VerificationMultiResult {
-                    dataset_handle,
-                    verification_result: res,
-                })])
+                Ok(vec![res])
             }
             DatasetRefPattern::Pattern(_account_name, pattern) => {
                 self.verify_multi(options, pattern.clone(), listener).await
@@ -120,6 +118,9 @@ impl VerifyCommand {
                 })
                 .try_collect()
                 .await?;
+        if requests.is_empty() {
+            return Ok(vec![]);
+        }
 
         let listener = listener.and_then(|l| l.begin_multi_verify());
 
@@ -171,6 +172,16 @@ impl Command for VerifyCommand {
 
         let mut valid = 0;
         let mut errors = 0;
+
+        if verification_results.is_empty() {
+            eprintln!(
+                "{}",
+                console::style("There are no datasets matching patter")
+                    .yellow()
+                    .bold()
+            );
+            return Ok(());
+        }
 
         for res in &verification_results {
             match res {

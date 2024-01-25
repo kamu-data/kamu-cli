@@ -263,7 +263,7 @@ impl VerificationService for VerificationServiceImpl {
         block_range: (Option<Multihash>, Option<Multihash>),
         options: VerificationOptions,
         maybe_listener: Option<Arc<dyn VerificationListener>>,
-    ) -> Result<VerificationResult, VerificationError> {
+    ) -> Result<VerificationDatasetResult, VerificationError> {
         let dataset_handle = self.dataset_repo.resolve_dataset_ref(dataset_ref).await?;
 
         self.dataset_authorizer
@@ -321,7 +321,10 @@ impl VerificationService for VerificationServiceImpl {
             Err(error) => listener.error(error),
         }
 
-        res
+        Ok(VerificationDatasetResult {
+            verification_result: res,
+            dataset_handle,
+        })
     }
 
     async fn verify_multi(
@@ -329,7 +332,7 @@ impl VerificationService for VerificationServiceImpl {
         requests: Vec<VerificationRequest>,
         options: VerificationOptions,
         maybe_listener: Option<Arc<dyn VerificationMultiListener>>,
-    ) -> Vec<Result<VerificationMultiResult, InternalError>> {
+    ) -> Vec<Result<VerificationDatasetResult, InternalError>> {
         let listener = maybe_listener.unwrap_or(Arc::new(NullVerificationMultiListener {}));
 
         let handles: Vec<_> = requests
@@ -347,18 +350,15 @@ impl VerificationService for VerificationServiceImpl {
                         .unwrap();
 
                     tokio::task::spawn(async move {
-                        let res = Arc::clone(&me)
+                        Arc::clone(&me)
                             .verify(
                                 &r.dataset_ref,
                                 r.block_range.clone(),
                                 clone_options.clone(),
                                 clone_listener.begin_verify(&dataset_handle),
                             )
-                            .await;
-                        VerificationMultiResult {
-                            verification_result: res,
-                            dataset_handle: dataset_handle.clone(),
-                        }
+                            .await
+                            .unwrap()
                     })
                     .await
                     .int_err()

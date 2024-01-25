@@ -565,7 +565,6 @@ where
     Ok(result_refs)
 }
 
-// ToDo add validation for DatasetRefPattern and DatasetRef expresion
 fn validate_many_dataset_wildcards<I>(
     catalog: &dill::Catalog,
     dataset_ref_patterns: I,
@@ -573,10 +572,10 @@ fn validate_many_dataset_wildcards<I>(
 where
     I: IntoIterator<Item = DatasetRefPattern>,
 {
-    let mut result_refs = Vec::new();
+    let mut result_ref_patterns = Vec::new();
     for dataset_ref_pattern in dataset_ref_patterns.into_iter() {
-        result_refs.push(validate_dataset_ref_wildcard(catalog, dataset_ref_pattern)?);
+        result_ref_patterns.push(validate_dataset_ref_wildcard(catalog, dataset_ref_pattern)?);
     }
 
-    Ok(result_refs)
+    Ok(result_ref_patterns)
 }

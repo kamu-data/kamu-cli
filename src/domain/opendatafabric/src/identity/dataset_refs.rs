@@ -749,10 +749,6 @@ pub enum DatasetRefPattern {
 }
 
 impl DatasetRefPattern {
-    pub fn has_wildcard(s: &str, wildcard_symbol: char) -> bool {
-        s.contains(wildcard_symbol)
-    }
-
     pub fn match_pattern(dataset_ref: &str, pattern: &str) -> Result<bool, InvalidPatternError> {
         Like::<false>::like(dataset_ref, pattern)
     }
@@ -762,8 +758,8 @@ impl std::str::FromStr for DatasetRefPattern {
     type Err = ParseError<Self>;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match DatasetRefPattern::has_wildcard(s, '%') {
-            true => match s.split_once('/') {
+        if s.contains('%') {
+            return match s.split_once('/') {
                 Some((account, dn)) => match DatasetNamePattern::try_from(dn) {
                     Ok(dnp) => match AccountName::try_from(account) {
                         Ok(an) => Ok(Self::Pattern(Some(an), dnp)),
@@ -775,11 +771,11 @@ impl std::str::FromStr for DatasetRefPattern {
                     Ok(dnp) => Ok(Self::Pattern(None, dnp)),
                     Err(_) => Err(Self::Err::new(s)),
                 },
-            },
-            false => match DatasetRef::from_str(s) {
-                Ok(dr) => Ok(Self::Ref(dr)),
-                Err(_) => Err(Self::Err::new(s)),
-            },
+            };
+        }
+        match DatasetRef::from_str(s) {
+            Ok(dr) => Ok(Self::Ref(dr)),
+            Err(_) => Err(Self::Err::new(s)),
         }
     }
 }

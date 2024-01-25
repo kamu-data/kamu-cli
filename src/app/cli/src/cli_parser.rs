@@ -11,7 +11,7 @@ use std::net::IpAddr;
 
 use clap::{value_parser, Arg, ArgAction, Command};
 
-use super::cli_validation::*;
+use super::cli_value_parser::*;
 
 fn tabular_output_params(app: Command) -> Command {
     app.args([
