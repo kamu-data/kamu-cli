@@ -9,7 +9,7 @@
 
 pub struct Grammar;
 
-/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#dataset-identity
+/// See: <https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#dataset-identity>
 impl Grammar {
     fn match_zero_or_many(
         s: &str,
