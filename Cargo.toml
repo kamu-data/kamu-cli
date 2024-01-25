@@ -119,6 +119,7 @@ manual_let_else = "warn"
 needless_pass_by_value = "warn"
 unnecessary_wraps = "warn"
 doc_markdown = "warn"
+trivially_copy_pass_by_ref = "warn"
 
 # clippy::cargo
 cargo = { level = "warn", priority = 0 }
