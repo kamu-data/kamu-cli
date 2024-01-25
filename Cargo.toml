@@ -3,6 +3,7 @@ members = [
     # Utils
     "src/utils/container-runtime",
     "src/utils/data-utils",
+    "src/utils/datafusion-cli",
     "src/utils/enum-variants",
     "src/utils/event-bus",
     "src/utils/event-sourcing",
@@ -43,6 +44,7 @@ event-sourcing-macros = { version = "0.154.2", path = "src/utils/event-sourcing-
 internal-error = { version = "0.154.2", path = "src/utils/internal-error", default-features = false }
 multiformats = { version = "0.154.2", path = "src/utils/multiformats", default-features = false }
 kamu-data-utils = { version = "0.154.2", path = "src/utils/data-utils", default-features = false }
+kamu-datafusion-cli = { version = "0.154.2", path = "src/utils/datafusion-cli", default-features = false }
 tracing-perfetto = { version = "0.154.2", path = "src/utils/tracing-perfetto", default-features = false }
 # Domain
 opendatafabric = { version = "0.154.2", path = "src/domain/opendatafabric", default-features = false }

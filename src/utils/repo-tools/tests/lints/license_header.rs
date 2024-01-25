@@ -9,6 +9,8 @@
 
 use std::path::PathBuf;
 
+const IGNORE_CRATES: &[&str] = &["src/utils/datafusion-cli"];
+
 fn get_repo_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../../")
@@ -31,6 +33,7 @@ fn get_all_crates() -> Vec<PathBuf> {
         .unwrap()
         .iter()
         .map(|v| v.as_str().unwrap())
+        .filter(|s| !IGNORE_CRATES.contains(s))
         .map(|s| repo_root.join(s))
         .collect()
 }

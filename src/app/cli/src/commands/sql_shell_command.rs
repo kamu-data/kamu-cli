@@ -11,12 +11,12 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use container_runtime::ContainerRuntime;
-use datafusion_cli::exec;
-use datafusion_cli::print_format::PrintFormat;
-use datafusion_cli::print_options::{MaxRows, PrintOptions};
 use internal_error::*;
 use kamu::domain::{QueryOptions, QueryService};
 use kamu::*;
+use kamu_datafusion_cli::exec;
+use kamu_datafusion_cli::print_format::PrintFormat;
+use kamu_datafusion_cli::print_options::{MaxRows, PrintOptions};
 
 use super::common::PullImageProgress;
 use super::{CLIError, Command};
@@ -138,6 +138,11 @@ impl SqlShellCommand {
         };
 
         let mut ctx = self.query_svc.create_session().await.unwrap();
+
+        eprintln!(
+            "{}",
+            console::style("Kamu + DataFusion SQL shell. Type \\? for help.").dim()
+        );
 
         exec::exec_from_repl(&mut ctx, &mut print_options)
             .await
