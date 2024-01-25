@@ -107,6 +107,7 @@ needless_raw_string_hashes = { level = "allow", priority = 1 }
 default_trait_access = { level = "allow", priority = 1 }
 single_match_else = { level = "allow", priority = 1 }
 items_after_statements = { level = "allow", priority = 1 }
+unused_self = { level = "allow", priority = 1 }
 
 redundant_else = "warn"
 
