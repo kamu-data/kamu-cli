@@ -122,6 +122,7 @@ doc_markdown = "warn"
 trivially_copy_pass_by_ref = "warn"
 from_iter_instead_of_collect = "warn"
 linkedlist = "warn"
+match_bool = "warn"
 
 # clippy::cargo
 cargo = { level = "warn", priority = 0 }
