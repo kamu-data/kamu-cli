@@ -207,7 +207,7 @@ impl AxumServerPushProtocolInstance {
             push_metadata_request.new_blocks.objects_count
         );
 
-        let new_blocks = decode_metadata_batch(push_metadata_request.new_blocks).int_err()?;
+        let new_blocks = decode_metadata_batch(&push_metadata_request.new_blocks).int_err()?;
 
         axum_write_payload::<DatasetPushMetadataAccepted>(
             &mut self.socket,
