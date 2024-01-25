@@ -109,6 +109,7 @@ single_match_else = { level = "allow", priority = 1 }
 items_after_statements = { level = "allow", priority = 1 }
 unused_self = { level = "allow", priority = 1 }
 match_same_arms = { level = "allow", priority = 1 }
+if_not_else = { level = "allow", priority = 1 }
 
 redundant_else = "warn"
 
