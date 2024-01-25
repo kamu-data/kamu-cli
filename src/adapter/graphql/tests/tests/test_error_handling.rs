@@ -108,7 +108,9 @@ async fn test_internal_error() {
 }
 
 #[test_log::test(tokio::test)]
-#[should_panic]
+// We use the substring part because we have a dynamic panic message part.
+#[should_panic(expected = "called `Result::unwrap()` on an `Err` value: \
+                           Unregistered(UnregisteredTypeError { type_id: TypeId { t: ")]
 async fn test_handler_panics() {
     // Not expecting panic to be trapped - that's the job of an HTTP server
     let schema = kamu_adapter_graphql::schema_quiet();
