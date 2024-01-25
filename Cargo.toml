@@ -113,6 +113,7 @@ if_not_else = { level = "allow", priority = 1 }
 struct_excessive_bools = { level = "allow", priority = 1 }
 match_wildcard_for_single_variants = { level = "allow", priority = 1 }
 struct_field_names = { level = "allow", priority = 1 }
+fn_params_excessive_bools = { level = "allow", priority = 1 }
 
 redundant_else = "warn"
 manual_let_else = "warn"
