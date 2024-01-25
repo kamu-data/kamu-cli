@@ -165,9 +165,8 @@ impl CompleteCommand {
     }
 
     pub async fn complete(&mut self, output: &mut impl Write) -> Result<(), CLIError> {
-        let mut args = match shlex::split(&self.input) {
-            Some(v) => v,
-            _ => return Ok(()),
+        let Some(mut args) = shlex::split(&self.input) else {
+            return Ok(());
         };
 
         args.truncate(self.current + 1);

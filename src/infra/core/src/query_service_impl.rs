@@ -430,9 +430,8 @@ impl KamuSchema {
     }
 
     async fn table_exist_impl(&self, name: &str) -> bool {
-        let dataset_name = match DatasetName::try_from(name) {
-            Ok(name) => name,
-            Err(_) => return false,
+        let Ok(dataset_name) = DatasetName::try_from(name) else {
+            return false;
         };
 
         let maybe_dataset_handle = self
@@ -483,18 +482,16 @@ impl SchemaProvider for KamuSchema {
     }
 
     async fn table(&self, name: &str) -> Option<Arc<dyn TableProvider>> {
-        let dataset_alias = match DatasetAlias::try_from(name) {
-            Ok(alias) => alias,
-            Err(_) => return None,
+        let Ok(dataset_alias) = DatasetAlias::try_from(name) else {
+            return None;
         };
 
-        let dataset_handle = match self
+        let Ok(dataset_handle) = self
             .dataset_repo
             .resolve_dataset_ref(&dataset_alias.as_local_ref())
             .await
-        {
-            Ok(hdl) => hdl,
-            Err(_) => return None,
+        else {
+            return None;
         };
 
         match self

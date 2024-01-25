@@ -257,9 +257,7 @@ where
             panic!("Writing steam into s3 only supports pre-computed hashes")
         };
 
-        let size = if let Some(size) = options.size_hint {
-            size
-        } else {
+        let Some(size) = options.size_hint else {
             panic!(
                 "Writing stream into s3 requires knowing the total size (until we implement \
                  multi-part uploads)"

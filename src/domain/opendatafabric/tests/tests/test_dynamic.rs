@@ -53,9 +53,8 @@ fn test_accessors() {
         Multihash::from_digest_sha3_256(b"prev")
     );
     assert_eq!(block.sequence_number(), TEST_SEQUENCE_NUMBER);
-    let transform = match block.event() {
-        dynamic::MetadataEvent::SetTransform(t) => t,
-        _ => panic!(),
+    let dynamic::MetadataEvent::SetTransform(transform) = block.event() else {
+        panic!()
     };
     let inputs: Vec<TransformInput> = transform.inputs().map(|i| i.into()).collect();
     assert_eq!(

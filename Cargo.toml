@@ -112,6 +112,7 @@ match_same_arms = { level = "allow", priority = 1 }
 if_not_else = { level = "allow", priority = 1 }
 
 redundant_else = "warn"
+manual_let_else = "warn"
 
 # clippy::cargo
 cargo = { level = "warn", priority = 0 }

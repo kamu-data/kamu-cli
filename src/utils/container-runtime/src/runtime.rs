@@ -414,9 +414,8 @@ impl ContainerRuntime {
             .next()
             .expect("Couldn't resolve local sockaddr");
 
-        let mut stream = match TcpStream::connect_timeout(&addr, Duration::from_millis(100)) {
-            Ok(s) => s,
-            _ => return Ok(false),
+        let Ok(mut stream) = TcpStream::connect_timeout(&addr, Duration::from_millis(100)) else {
+            return Ok(false);
         };
 
         stream.set_read_timeout(Some(Duration::from_millis(1000)))?;
