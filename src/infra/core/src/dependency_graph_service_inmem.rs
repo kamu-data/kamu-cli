@@ -317,8 +317,7 @@ impl AsyncEventHandler<DatasetEventDependenciesUpdated> for DependencyGraphServi
             })
             .collect();
 
-        let new_upstream_ids: HashSet<_> =
-            HashSet::from_iter(event.new_upstream_ids.iter().cloned());
+        let new_upstream_ids: HashSet<_> = event.new_upstream_ids.iter().cloned().collect();
 
         for obsolete_upstream_id in existing_upstream_ids.difference(&new_upstream_ids) {
             self.remove_dependency(&mut state, obsolete_upstream_id, &event.dataset_id);

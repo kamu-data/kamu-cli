@@ -120,6 +120,7 @@ needless_pass_by_value = "warn"
 unnecessary_wraps = "warn"
 doc_markdown = "warn"
 trivially_copy_pass_by_ref = "warn"
+from_iter_instead_of_collect = "warn"
 
 # clippy::cargo
 cargo = { level = "warn", priority = 0 }
