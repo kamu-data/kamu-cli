@@ -125,13 +125,13 @@ impl AuthenticationServiceImpl {
 
     fn decode_access_token(
         &self,
-        access_token: String,
+        access_token: &str,
     ) -> Result<KamuAccessCredentials, AccessTokenError> {
         let mut validation = Validation::new(KAMU_JWT_ALGORITHM);
         validation.set_issuer(vec![KAMU_JWT_ISSUER].as_slice());
 
         let token_data =
-            decode::<KamuAccessTokenClaims>(&access_token, &self.decoding_key, &validation)
+            decode::<KamuAccessTokenClaims>(access_token, &self.decoding_key, &validation)
                 .map_err(|e| match *e.kind() {
                     ErrorKind::ExpiredSignature => AccessTokenError::Expired,
                     _ => AccessTokenError::Invalid(Box::new(e)),
@@ -182,7 +182,7 @@ impl AuthenticationService for AuthenticationServiceImpl {
         access_token: String,
     ) -> Result<AccountInfo, GetAccountInfoError> {
         let decoded_access_token = self
-            .decode_access_token(access_token)
+            .decode_access_token(&access_token)
             .map_err(GetAccountInfoError::AccessToken)?;
 
         let provider = self

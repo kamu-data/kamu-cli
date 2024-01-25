@@ -31,7 +31,7 @@ pub struct APIServer {
 impl APIServer {
     pub fn new(
         base_catalog: Catalog,
-        cli_catalog: Catalog,
+        cli_catalog: &Catalog,
         multi_tenant_workspace: bool,
         address: Option<IpAddr>,
         port: Option<u16>,

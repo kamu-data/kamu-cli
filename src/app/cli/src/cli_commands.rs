@@ -18,7 +18,7 @@ use crate::{accounts, odf_server, CommandInterpretationFailed, WorkspaceService}
 pub fn get_command(
     base_catalog: &dill::Catalog,
     cli_catalog: &dill::Catalog,
-    arg_matches: clap::ArgMatches,
+    arg_matches: &clap::ArgMatches,
 ) -> Result<Box<dyn Command>, CLIError> {
     let command: Box<dyn Command> = match arg_matches.subcommand() {
         Some(("add", submatches)) => Box::new(AddCommand::new(
@@ -176,7 +176,7 @@ pub fn get_command(
                 cli_catalog.get_one()?,
                 cli_catalog.get_one()?,
                 accounts::AccountService::current_account_indication(
-                    &arg_matches,
+                    arg_matches,
                     workspace_svc.is_multi_tenant_workspace(),
                     user_config.as_ref(),
                 ),

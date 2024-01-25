@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::time::{Duration, Instant};
 
@@ -175,12 +175,12 @@ impl ContainerRuntime {
                 VolumeAccess::ReadOnly => cmd.arg(format!(
                     "{}:{}:ro",
                     Self::format_host_path(v.source),
-                    Self::format_container_path(v.dest),
+                    Self::format_container_path(&v.dest),
                 )),
                 VolumeAccess::ReadWrite => cmd.arg(format!(
                     "{}:{}",
                     Self::format_host_path(v.source),
-                    Self::format_container_path(v.dest),
+                    Self::format_container_path(&v.dest),
                 )),
             };
         });
@@ -465,7 +465,7 @@ impl ContainerRuntime {
         }
     }
 
-    pub fn format_container_path(path: PathBuf) -> String {
+    pub fn format_container_path(path: &Path) -> String {
         if !cfg!(windows) {
             path.to_str().unwrap().to_owned()
         } else {
@@ -491,6 +491,7 @@ impl ContainerRuntime {
     }
 }
 
+#[derive(Copy, Clone)]
 pub enum Signal {
     TERM,
     KILL,

@@ -142,7 +142,7 @@ async fn do_test_sync(
     .await;
 }
 
-fn build_temp_dirs(rt: Arc<tokio::runtime::Runtime>) -> (DatasetAlias, Url, Url) {
+fn build_temp_dirs(rt: &Arc<tokio::runtime::Runtime>) -> (DatasetAlias, Url, Url) {
     let tmp_repo_dir = tempfile::tempdir().unwrap();
 
     // to perform multithreading operation (initialization server) rt.enter method
@@ -165,7 +165,7 @@ fn bench_with_1_parallel(c: &mut Criterion) {
     let rt = Arc::new(tokio::runtime::Runtime::new().unwrap());
     let tmp_workspace_dir = tempfile::tempdir().unwrap();
 
-    let (dataset_alias, pull_repo_url, push_repo_url) = build_temp_dirs(rt.clone());
+    let (dataset_alias, pull_repo_url, push_repo_url) = build_temp_dirs(&rt);
 
     let (sync_service_impl, dataset_repo) = rt.block_on(setup_dataset(
         tmp_workspace_dir.path(),
@@ -194,7 +194,7 @@ fn bench_with_10_parallels(c: &mut Criterion) {
     let rt: Arc<tokio::runtime::Runtime> = Arc::new(tokio::runtime::Runtime::new().unwrap());
     let tmp_workspace_dir = tempfile::tempdir().unwrap();
 
-    let (dataset_alias, pull_repo_url, push_repo_url) = build_temp_dirs(rt.clone());
+    let (dataset_alias, pull_repo_url, push_repo_url) = build_temp_dirs(&rt);
 
     let (sync_service_impl, dataset_repo) = rt.block_on(setup_dataset(
         tmp_workspace_dir.path(),

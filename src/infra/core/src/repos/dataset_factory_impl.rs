@@ -69,7 +69,7 @@ impl DatasetFactoryImpl {
     }
 
     fn get_http(
-        base_url: Url,
+        base_url: &Url,
         header_map: http::HeaderMap,
         event_bus: Arc<EventBus>,
     ) -> Result<impl Dataset, InternalError> {
@@ -317,11 +317,7 @@ impl DatasetFactory for DatasetFactoryImpl {
                 Ok(Arc::new(ds) as Arc<dyn Dataset>)
             }
             "http" | "https" | "odf+http" | "odf+https" => {
-                let ds = Self::get_http(
-                    url.clone(),
-                    self.build_header_map(url),
-                    self.event_bus.clone(),
-                )?;
+                let ds = Self::get_http(url, self.build_header_map(url), self.event_bus.clone())?;
                 Ok(Arc::new(ds))
             }
             "ipfs" | "ipns" | "ipfs+http" | "ipfs+https" | "ipns+http" | "ipns+https" => {

@@ -31,7 +31,7 @@ pub struct WorkspaceService {
 #[dill::component(pub)]
 impl WorkspaceService {
     pub fn new(workspace_layout: Arc<WorkspaceLayout>) -> Self {
-        let workspace_config = WorkspaceService::init_workspace_config(workspace_layout.clone());
+        let workspace_config = WorkspaceService::init_workspace_config(&workspace_layout);
 
         Self {
             workspace_layout,
@@ -39,7 +39,7 @@ impl WorkspaceService {
         }
     }
 
-    fn init_workspace_config(workspace_layout: Arc<WorkspaceLayout>) -> WorkspaceConfig {
+    fn init_workspace_config(workspace_layout: &Arc<WorkspaceLayout>) -> WorkspaceConfig {
         if workspace_layout.config_path.is_file() {
             WorkspaceConfig::load_from(&workspace_layout.config_path).unwrap()
         } else {

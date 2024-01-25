@@ -42,9 +42,9 @@ impl FlowEvent {
         match event {
             fs::FlowEvent::Initiated(e) => Self::Initiated(FlowEventInitiated::new(event_id, e)),
             fs::FlowEvent::StartConditionDefined(e) => {
-                Self::StartConditionDefined(FlowEventStartConditionDefined::new(event_id, e))
+                Self::StartConditionDefined(FlowEventStartConditionDefined::new(event_id, &e))
             }
-            fs::FlowEvent::Queued(e) => Self::Queued(FlowEventQueued::new(event_id, e)),
+            fs::FlowEvent::Queued(e) => Self::Queued(FlowEventQueued::new(event_id, &e)),
             fs::FlowEvent::TriggerAdded(e) => {
                 Self::TriggerAdded(FlowEventTriggerAdded::new(event_id, e))
             }
@@ -66,7 +66,7 @@ impl FlowEvent {
                 e.task_id,
                 TaskStatus::Finished,
             )),
-            fs::FlowEvent::Aborted(e) => Self::Aborted(FlowEventAborted::new(event_id, e)),
+            fs::FlowEvent::Aborted(e) => Self::Aborted(FlowEventAborted::new(event_id, &e)),
         }
     }
 }
@@ -100,7 +100,7 @@ pub struct FlowEventStartConditionDefined {
 }
 
 impl FlowEventStartConditionDefined {
-    fn new(event_id: evs::EventID, event: fs::FlowEventStartConditionDefined) -> Self {
+    fn new(event_id: evs::EventID, event: &fs::FlowEventStartConditionDefined) -> Self {
         Self {
             event_id: event_id.into(),
             event_time: event.event_time,
@@ -119,7 +119,7 @@ pub struct FlowEventQueued {
 }
 
 impl FlowEventQueued {
-    fn new(event_id: evs::EventID, event: fs::FlowEventQueued) -> Self {
+    fn new(event_id: evs::EventID, event: &fs::FlowEventQueued) -> Self {
         Self {
             event_id: event_id.into(),
             event_time: event.event_time,
@@ -190,7 +190,7 @@ pub struct FlowEventAborted {
 }
 
 impl FlowEventAborted {
-    fn new(event_id: evs::EventID, event: fs::FlowEventAborted) -> Self {
+    fn new(event_id: evs::EventID, event: &fs::FlowEventAborted) -> Self {
         Self {
             event_id: event_id.into(),
             event_time: event.event_time,

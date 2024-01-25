@@ -44,6 +44,7 @@ struct State {
 
 #[component(pub)]
 impl EngineProvisionerLocal {
+    #[allow(clippy::needless_pass_by_value)]
     pub fn new(
         config: EngineProvisionerLocalConfig,
         container_runtime: Arc<ContainerRuntime>,

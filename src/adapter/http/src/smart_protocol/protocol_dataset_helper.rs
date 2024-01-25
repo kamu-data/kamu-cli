@@ -492,7 +492,7 @@ pub async fn prepare_pull_object_transfer_strategy(
     let transfer_url_result = match get_download_url_result {
         Ok(result) => Ok(TransferUrl {
             url: result.url,
-            headers: primitivize_header_map(result.header_map),
+            headers: primitivize_header_map(&result.header_map),
             expires_at: result.expires_at,
         }),
         Err(error) => match error {
@@ -558,10 +558,10 @@ fn get_simple_transfer_protocol_headers(
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-fn primitivize_header_map(header_map: http::HeaderMap) -> Vec<HeaderRow> {
+fn primitivize_header_map(header_map: &http::HeaderMap) -> Vec<HeaderRow> {
     let mut res = Vec::new();
 
-    for (name, value) in &header_map {
+    for (name, value) in header_map {
         res.push(HeaderRow {
             name: name.to_string(),
             value: value.to_str().unwrap().to_string(),
@@ -621,7 +621,7 @@ pub async fn prepare_push_object_transfer_strategy(
         let transfer_url_result = match get_upload_url_result {
             Ok(result) => Ok(TransferUrl {
                 url: result.url,
-                headers: primitivize_header_map(result.header_map),
+                headers: primitivize_header_map(&result.header_map),
                 expires_at: result.expires_at,
             }),
             Err(error) => match error {

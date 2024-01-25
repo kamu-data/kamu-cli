@@ -21,7 +21,7 @@ async fn test_system_info() {
     )));
 
     assert_matches!(
-        SystemInfo::collect(container_runtime, workpace_svc).await,
+        SystemInfo::collect(container_runtime, &workpace_svc).await,
         SystemInfo {
             build: BuildInfo {
                 app_version: kamu_cli::VERSION,

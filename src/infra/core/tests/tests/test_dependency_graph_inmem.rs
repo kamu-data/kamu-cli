@@ -46,7 +46,7 @@ async fn test_single_tenant_repository() {
 
     let all_dependencies: Vec<_> = harness.list_all_dependencies().await;
     assert_eq!(
-        DependencyGraphHarness::all_dependencies_report(all_dependencies),
+        DependencyGraphHarness::all_dependencies_report(&all_dependencies),
         ""
     );
 
@@ -54,7 +54,7 @@ async fn test_single_tenant_repository() {
 
     let all_dependencies: Vec<_> = harness.list_all_dependencies().await;
     assert_eq!(
-        DependencyGraphHarness::all_dependencies_report(all_dependencies),
+        DependencyGraphHarness::all_dependencies_report(&all_dependencies),
         indoc::indoc!(
             r#"
             bar -> foo-bar
@@ -75,7 +75,7 @@ async fn test_multi_tenant_repository() {
 
     let all_dependencies: Vec<_> = harness.list_all_dependencies().await;
     assert_eq!(
-        DependencyGraphHarness::all_dependencies_report(all_dependencies),
+        DependencyGraphHarness::all_dependencies_report(&all_dependencies),
         ""
     );
 
@@ -83,7 +83,7 @@ async fn test_multi_tenant_repository() {
 
     let all_dependencies: Vec<_> = harness.list_all_dependencies().await;
     assert_eq!(
-        DependencyGraphHarness::all_dependencies_report(all_dependencies),
+        DependencyGraphHarness::all_dependencies_report(&all_dependencies),
         indoc::indoc!(
             r#"
             alice/bar -> alice/foo-bar
@@ -395,7 +395,7 @@ impl DependencyGraphHarness {
         res
     }
 
-    fn all_dependencies_report(dependencies: Vec<(String, String)>) -> String {
+    fn all_dependencies_report(dependencies: &[(String, String)]) -> String {
         dependencies
             .iter()
             .map(|(name1, name2)| format!("{name1} -> {name2}"))

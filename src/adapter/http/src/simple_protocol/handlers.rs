@@ -266,7 +266,7 @@ fn get_base_dataset_url(
     axum::extract::OriginalUri(uri): axum::extract::OriginalUri,
     depth: usize,
 ) -> Url {
-    let api_server_url = get_api_server_url(host);
+    let api_server_url = get_api_server_url(&host);
 
     let mut path: Vec<_> = uri.path().split('/').collect();
     for _ in 0..depth {
@@ -278,7 +278,7 @@ fn get_base_dataset_url(
 
 /////////////////////////////////////////////////////////////////////////////////
 
-fn get_api_server_url(host: String) -> Url {
+fn get_api_server_url(host: &str) -> Url {
     let scheme = std::env::var("KAMU_PROTOCOL_SCHEME").unwrap_or_else(|_| String::from("http"));
     Url::parse(&format!("{scheme}://{host}")).unwrap()
 }

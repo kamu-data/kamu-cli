@@ -77,7 +77,7 @@ impl PerfettoLayer {
             self.writer
                 .lock()
                 .unwrap()
-                .write_metadata(PerfettoMetadata::ThreadName { tid, name: &name });
+                .write_metadata(&PerfettoMetadata::ThreadName { tid, name: &name });
         }
 
         tid
