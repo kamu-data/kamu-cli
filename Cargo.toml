@@ -92,7 +92,7 @@ module_inception = "allow"
 
 # clippy::pedantic
 # TODO: reactivate after polishing
-# pedantic = { level = "warn", priority = 0 }
+pedantic = { level = "warn", priority = 0 }
 
 default_trait_access = { level = "allow", priority = 1 }
 fn_params_excessive_bools = { level = "allow", priority = 1 }
@@ -115,22 +115,6 @@ unreadable_literal = { level = "warn", priority = 1 }
 unused_self = { level = "allow", priority = 1 }
 wildcard_imports = { level = "allow", priority = 1 }
 
-cast_possible_truncation = "warn"
-cast_precision_loss = "warn"
-cast_sign_loss = "warn"
-doc_markdown = "warn"
-from_iter_instead_of_collect = "warn"
-linkedlist = "warn"
-manual_let_else = "warn"
-match_bool = "warn"
-match_same_arms = "warn"
-needless_pass_by_value = "warn"
-redundant_closure_for_method_calls = "warn"
-redundant_else = "warn"
-should_panic_without_expect = "warn"
-trivially_copy_pass_by_ref = "warn"
-unnecessary_wraps = "warn"
-unused_async = "warn"
 
 # clippy::cargo
 cargo = { level = "warn", priority = 0 }
