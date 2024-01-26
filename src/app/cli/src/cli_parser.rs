@@ -325,7 +325,7 @@ pub fn cli() -> Command {
 
                             kamu delete my.dataset
 
-                        Delete a local datasets matching pattern:
+                        Delete local datasets matching pattern:
 
                             kamu delete my.dataset.%
                         "#
@@ -1309,7 +1309,7 @@ pub fn cli() -> Command {
 
                             kamu verify com.example.deriv
 
-                        Verify the data in a datasets matching pattern:
+                        Verify the data in datasets matching pattern:
 
                             kamu verify com.example.%
 

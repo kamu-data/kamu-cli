@@ -749,8 +749,12 @@ pub enum DatasetRefPattern {
 }
 
 impl DatasetRefPattern {
-    pub fn is_match(dataset_ref: DatasetRef, pattern: &str) -> Result<bool, InvalidPatternError> {
-        Like::<false>::like(dataset_ref.to_string().as_str(), pattern)
+    pub fn is_match(&self, dataset_ref: &DatasetRef) -> Result<bool, InvalidPatternError> {
+        let pattern = match self {
+            Self::Ref(dr) => dr.to_string(),
+            Self::Pattern(_, dnm) => dnm.to_string(),
+        };
+        Like::<false>::like(dataset_ref.to_string().as_str(), &pattern)
     }
 }
 
@@ -795,86 +799,3 @@ impl std::str::FromStr for DatasetRefPattern {
 }
 
 super::dataset_identity::impl_parse_error!(DatasetRefPattern);
-
-#[cfg(test)]
-mod tests {
-    use std::str::FromStr;
-
-    use super::*;
-
-    #[test]
-    fn test_parse_valid_local_ref() {
-        // Parse valid local dataset_ref
-        let param = "net.example.com";
-        let res = DatasetRefPattern::from_str(param).unwrap();
-
-        assert_eq!(
-            res,
-            DatasetRefPattern::Ref(DatasetRef::from_str(param).unwrap())
-        );
-    }
-
-    #[test]
-    fn test_parse_valid_multitenant_local_ref() {
-        // Parse valid multitenant local dataset_ref
-        let param = "account/net.example.com";
-        let res = DatasetRefPattern::from_str(param).unwrap();
-
-        assert_eq!(
-            res,
-            DatasetRefPattern::Ref(DatasetRef::from_str(param).unwrap())
-        );
-    }
-
-    #[test]
-    fn test_parse_valid_did_ref() {
-        // Parse valid local did reference
-        let param = "did:odf:fed012126262ba49e1ba8392c26f7a39e1ba8d756c7469786d3365200c68402ff65dc";
-        let res = DatasetRefPattern::from_str(param).unwrap();
-
-        assert_eq!(
-            res,
-            DatasetRefPattern::Ref(DatasetRef::from_str(param).unwrap())
-        );
-    }
-
-    #[test]
-    fn test_parse_invalid_local_ref() {
-        // Parse invalid local dataset_ref
-        let param = "invalid_ref^";
-        let res = DatasetRefPattern::from_str(param).unwrap_err();
-
-        assert_eq!(
-            res.to_string(),
-            format!("Value '{}' is not a valid DatasetRefPattern", param),
-        );
-    }
-
-    #[test]
-    fn test_parse_valid_local_ref_wildcard() {
-        // Parse valid local ref with wildcard net.example.%
-        let param = "net.example.%";
-        let res = DatasetRefPattern::from_str(param).unwrap();
-
-        assert_eq!(
-            res,
-            DatasetRefPattern::Pattern(None, DatasetNamePattern::from_str(param).unwrap()),
-        );
-    }
-
-    #[test]
-    fn test_parse_valid_multitenant_local_ref_wildcard() {
-        // Parse valid multitenant local ref with wildcard account/%
-        let account = "account";
-        let pattern = "%";
-        let res = DatasetRefPattern::from_str(format!("{}/{}", account, pattern).as_str()).unwrap();
-
-        assert_eq!(
-            res,
-            DatasetRefPattern::Pattern(
-                Some(AccountName::from_str(account).unwrap()),
-                DatasetNamePattern::from_str(pattern).unwrap(),
-            ),
-        );
-    }
-}

@@ -8,16 +8,17 @@
 // by the Apache License, Version 2.0.
 
 use kamu_core::DatasetHandleStream;
-use opendatafabric::{DatasetNamePattern, DatasetRefPattern};
+use opendatafabric::DatasetRefPattern;
 
 pub fn filter_dataset_stream(
     dhs: DatasetHandleStream,
-    dataset_name_pattern: DatasetNamePattern,
+    dataset_ref_pattern: DatasetRefPattern,
 ) -> DatasetHandleStream<'_> {
     use futures::{future, StreamExt, TryStreamExt};
     dhs.try_filter(move |dsh| {
         future::ready(
-            DatasetRefPattern::is_match(dsh.as_local_ref(), dataset_name_pattern.as_str())
+            dataset_ref_pattern
+                .is_match(&dsh.as_local_ref())
                 .unwrap_or(false),
         )
     })

@@ -97,8 +97,9 @@ impl VerifyCommand {
 
                 Ok(vec![res])
             }
-            DatasetRefPattern::Pattern(_account_name, pattern) => {
-                self.verify_multi(options, pattern.clone(), listener).await
+            DatasetRefPattern::Pattern(_account_name, _pattern) => {
+                self.verify_multi(options, dataset_ref_pattern.clone(), listener)
+                    .await
             }
         }
     }
@@ -106,11 +107,11 @@ impl VerifyCommand {
     async fn verify_multi(
         &self,
         options: VerificationOptions,
-        dataset_name_pattern: DatasetNamePattern,
+        dataset_ref_pattern: DatasetRefPattern,
         listener: Option<Arc<VerificationMultiProgress>>,
     ) -> GenericVerificationResult {
         let requests: Vec<_> =
-            filter_dataset_stream(self.dataset_repo.get_all_datasets(), dataset_name_pattern)
+            filter_dataset_stream(self.dataset_repo.get_all_datasets(), dataset_ref_pattern)
                 .map_ok(|dsh| VerificationRequest {
                     dataset_ref: dsh.as_local_ref(),
                     block_range: (None, None),
@@ -175,7 +176,7 @@ impl Command for VerifyCommand {
         if verification_results.is_empty() {
             eprintln!(
                 "{}",
-                console::style("There are no datasets matching patter")
+                console::style("There are no datasets matching pattern")
                     .yellow()
                     .bold()
             );

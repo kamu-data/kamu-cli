@@ -72,10 +72,10 @@ impl Command for DeleteCommand {
                             Err(GetDatasetError::Internal(e)) => Err(e.into()),
                         }?;
                     }
-                    DatasetRefPattern::Pattern(_, dataset_name_pattern) => {
+                    DatasetRefPattern::Pattern(_, _) => {
                         let dataset_refs_match: Vec<_> = filter_dataset_stream(
                             self.dataset_repo.get_all_datasets(),
-                            dataset_name_pattern.clone(),
+                            dataset_ref_pattern.clone(),
                         )
                         .map_ok(|dsh| dsh.as_local_ref())
                         .try_collect()
