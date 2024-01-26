@@ -17,11 +17,8 @@ pub fn filter_dataset_stream(
     use futures::{future, StreamExt, TryStreamExt};
     dhs.try_filter(move |dsh| {
         future::ready(
-            DatasetRefPattern::match_pattern(
-                dsh.to_string().as_str(),
-                dataset_name_pattern.as_str(),
-            )
-            .unwrap_or(false),
+            DatasetRefPattern::is_match(dsh.as_local_ref(), dataset_name_pattern.as_str())
+                .unwrap_or(false),
         )
     })
     .boxed()

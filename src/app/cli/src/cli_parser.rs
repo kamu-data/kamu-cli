@@ -303,7 +303,7 @@ pub fn cli() -> Command {
                             .action(ArgAction::Append)
                             .index(1)
                             .required(true)
-                            .value_parser(value_parse_dataset_ref_local)
+                            .value_parser(value_parse_dataset_ref_pattern_local)
                             .help("Local dataset reference(s)"),
                         Arg::new("yes")
                             .short('y')
@@ -324,6 +324,10 @@ pub fn cli() -> Command {
                         Delete a local dataset:
 
                             kamu delete my.dataset
+
+                        Delete a local datasets matching pattern:
+
+                            kamu delete my.dataset.%
                         "#
                     )),
                 Command::new("ingest")
@@ -967,7 +971,7 @@ pub fn cli() -> Command {
                                         Arg::new("dataset")
                                             .required(true)
                                             .index(1)
-                                            .value_parser(value_parse_dataset_ref_local)
+                                            .value_parser(value_parse_dataset_ref_pattern_local)
                                             .help("Local dataset reference"),
                                         Arg::new("alias")
                                             .index(2)
@@ -1304,6 +1308,10 @@ pub fn cli() -> Command {
                         Verify the data in a dataset starting from its immediate inputs:
 
                             kamu verify com.example.deriv
+
+                        Verify the data in a datasets matching pattern:
+
+                            kamu verify com.example.%
 
                         Verify the entire transformation chain starting with root datasets (may download a lot of data):
 

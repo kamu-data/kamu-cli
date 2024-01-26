@@ -11,6 +11,7 @@ use std::backtrace::Backtrace;
 use std::fmt::Display;
 
 use kamu::domain::*;
+use opendatafabric::DatasetRefPattern;
 use thiserror::Error;
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -247,9 +248,9 @@ pub struct NotInWorkspace;
 pub struct NotInMultiTenantWorkspace;
 
 #[derive(Error, Clone, PartialEq, Eq, Debug)]
-#[error("Multi-tenant reference is unexpected in single-tenant workspace: {dataset_ref}")]
+#[error("Multi-tenant reference is unexpected in single-tenant workspace: {dataset_ref_pattern}")]
 pub struct MultiTenantRefUnexpectedError {
-    pub dataset_ref: String,
+    pub dataset_ref_pattern: DatasetRefPattern,
 }
 
 #[derive(Debug, Error)]

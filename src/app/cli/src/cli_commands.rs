@@ -88,7 +88,7 @@ pub fn get_command(
         },
         Some(("delete", submatches)) => Box::new(DeleteCommand::new(
             cli_catalog.get_one()?,
-            validate_many_dataset_refs(
+            validate_many_dataset_wildcards(
                 cli_catalog,
                 submatches.get_many("dataset").unwrap().cloned(),
             )?,
@@ -520,7 +520,7 @@ fn validate_dataset_ref(
         let workspace_svc = catalog.get_one::<WorkspaceService>()?;
         if !workspace_svc.is_multi_tenant_workspace() && alias.is_multi_tenant() {
             return Err(MultiTenantRefUnexpectedError {
-                dataset_ref: dataset_ref.to_string(),
+                dataset_ref_pattern: DatasetRefPattern::Ref(dataset_ref),
             }
             .into());
         }
@@ -541,7 +541,7 @@ fn validate_dataset_ref_wildcard(
             let workspace_svc = catalog.get_one::<WorkspaceService>()?;
             if !workspace_svc.is_multi_tenant_workspace() && an.is_some() {
                 return Err(MultiTenantRefUnexpectedError {
-                    dataset_ref: drp.to_string(),
+                    dataset_ref_pattern: DatasetRefPattern::Pattern(an, drp),
                 }
                 .into());
             }
@@ -572,10 +572,8 @@ fn validate_many_dataset_wildcards<I>(
 where
     I: IntoIterator<Item = DatasetRefPattern>,
 {
-    let mut result_ref_patterns = Vec::new();
-    for dataset_ref_pattern in dataset_ref_patterns.into_iter() {
-        result_ref_patterns.push(validate_dataset_ref_wildcard(catalog, dataset_ref_pattern)?);
-    }
-
-    Ok(result_ref_patterns)
+    dataset_ref_patterns
+        .into_iter()
+        .map(|p| validate_dataset_ref_wildcard(catalog, p))
+        .collect()
 }

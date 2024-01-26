@@ -23,8 +23,7 @@ pub use cli_commands::*;
 pub mod cli_parser;
 pub use cli_parser::*;
 
-pub mod cli_value_parser;
-pub use cli_value_parser::*;
+pub(crate) mod cli_value_parser;
 
 pub mod commands;
 pub use commands::*;

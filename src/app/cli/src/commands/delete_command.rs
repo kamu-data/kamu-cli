@@ -9,14 +9,16 @@
 
 use std::sync::Arc;
 
+use futures::TryStreamExt;
 use kamu::domain::*;
+use kamu::utils::dataset_stream_modification::filter_dataset_stream;
 use opendatafabric::*;
 
 use super::{common, CLIError, Command};
 
 pub struct DeleteCommand {
     dataset_repo: Arc<dyn DatasetRepository>,
-    dataset_refs: Vec<DatasetRef>,
+    dataset_ref_patterns: Vec<DatasetRefPattern>,
     all: bool,
     recursive: bool,
     no_confirmation: bool,
@@ -25,17 +27,17 @@ pub struct DeleteCommand {
 impl DeleteCommand {
     pub fn new<I>(
         dataset_repo: Arc<dyn DatasetRepository>,
-        dataset_refs: I,
+        dataset_ref_patterns: I,
         all: bool,
         recursive: bool,
         no_confirmation: bool,
     ) -> Self
     where
-        I: IntoIterator<Item = DatasetRef>,
+        I: IntoIterator<Item = DatasetRefPattern>,
     {
         Self {
             dataset_repo,
-            dataset_refs: dataset_refs.into_iter().collect(),
+            dataset_ref_patterns: dataset_ref_patterns.into_iter().collect(),
             all,
             recursive,
             no_confirmation,
@@ -46,7 +48,7 @@ impl DeleteCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for DeleteCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
-        if self.dataset_refs.is_empty() && !self.all {
+        if self.dataset_ref_patterns.is_empty() && !self.all {
             return Err(CLIError::usage_error("Specify a dataset or use --all flag"));
         }
 
@@ -55,18 +57,35 @@ impl Command for DeleteCommand {
         } else if self.recursive {
             unimplemented!("Recursive deletion is not yet supported")
         } else {
-            self.dataset_refs.clone()
+            let mut res = vec![];
+            for dataset_ref_pattern in &self.dataset_ref_patterns {
+                match dataset_ref_pattern {
+                    DatasetRefPattern::Ref(dataset_ref) => {
+                        // Check references exist
+                        // TODO: PERF: Create a batch version of `resolve_dataset_ref
+                        match self.dataset_repo.resolve_dataset_ref(dataset_ref).await {
+                            Ok(_) => {
+                                res.push(dataset_ref.clone());
+                                Ok(())
+                            }
+                            Err(GetDatasetError::NotFound(e)) => Err(CLIError::usage_error_from(e)),
+                            Err(GetDatasetError::Internal(e)) => Err(e.into()),
+                        }?;
+                    }
+                    DatasetRefPattern::Pattern(_, dataset_name_pattern) => {
+                        let dataset_refs_match: Vec<_> = filter_dataset_stream(
+                            self.dataset_repo.get_all_datasets(),
+                            dataset_name_pattern.clone(),
+                        )
+                        .map_ok(|dsh| dsh.as_local_ref())
+                        .try_collect()
+                        .await?;
+                        res.extend(dataset_refs_match);
+                    }
+                }
+            }
+            res
         };
-
-        // Check references exist
-        // TODO: PERF: Create a batch version of `resolve_dataset_ref`
-        for dataset_ref in &self.dataset_refs {
-            match self.dataset_repo.resolve_dataset_ref(dataset_ref).await {
-                Ok(_) => Ok(()),
-                Err(GetDatasetError::NotFound(e)) => Err(CLIError::usage_error_from(e)),
-                Err(GetDatasetError::Internal(e)) => Err(e.into()),
-            }?;
-        }
 
         let confirmed = if self.no_confirmation {
             true

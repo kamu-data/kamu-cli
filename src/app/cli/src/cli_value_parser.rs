@@ -9,10 +9,8 @@
 
 use std::str::FromStr;
 
-use internal_error::InternalError;
 use opendatafabric::{
     DatasetName,
-    DatasetNamePattern,
     DatasetRef,
     DatasetRefAny,
     DatasetRefPattern,
@@ -20,51 +18,20 @@ use opendatafabric::{
     Multihash,
     RepoName,
 };
-use thiserror::Error;
 use url::Url;
 
-#[derive(Clone)]
-pub struct DatasetPatternValidationRes {
-    pub pattern: DatasetNamePattern,
-    pub is_dataset_ref: bool,
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-#[derive(Error, Debug)]
-pub enum ValidationDatasetRefError {
-    #[error(transparent)]
-    Failed(#[from] ValidationError),
-    #[error(transparent)]
-    Internal(
-        #[from]
-        #[backtrace]
-        InternalError,
-    ),
-}
-
-#[derive(Error, Debug)]
-#[error("{message}")]
-pub struct ValidationError {
-    pub message: String,
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-pub fn value_parse_dataset_ref_pattern_local(
-    s: &str,
-) -> Result<DatasetRefPattern, ValidationDatasetRefError> {
+pub(crate) fn value_parse_dataset_ref_pattern_local(s: &str) -> Result<DatasetRefPattern, String> {
     match DatasetRefPattern::from_str(s) {
         Ok(drp) => Ok(drp),
-        Err(_) => Err(ValidationDatasetRefError::Failed(ValidationError {
-            message: "Local reference should be in form: `did:odf:...`, `my.dataset.id`, or a \
-                      wildcard pattern `my.dataset.%`"
+        Err(_) => Err(
+            "Local reference should be in form: `did:odf:...`, `my.dataset.id`, or a wildcard \
+             pattern `my.dataset.%`"
                 .to_string(),
-        })),
+        ),
     }
 }
 
-pub fn value_parse_dataset_name(s: &str) -> Result<DatasetName, String> {
+pub(crate) fn value_parse_dataset_name(s: &str) -> Result<DatasetName, String> {
     match DatasetName::try_from(s) {
         Ok(v) => Ok(v),
         Err(_) => Err(
@@ -74,7 +41,7 @@ pub fn value_parse_dataset_name(s: &str) -> Result<DatasetName, String> {
     }
 }
 
-pub fn value_parse_dataset_ref_local(s: &str) -> Result<DatasetRef, String> {
+pub(crate) fn value_parse_dataset_ref_local(s: &str) -> Result<DatasetRef, String> {
     match DatasetRef::try_from(s) {
         Ok(v) => Ok(v),
         Err(_) => {
@@ -83,7 +50,7 @@ pub fn value_parse_dataset_ref_local(s: &str) -> Result<DatasetRef, String> {
     }
 }
 
-pub fn value_parse_dataset_ref_remote(s: &str) -> Result<DatasetRefRemote, String> {
+pub(crate) fn value_parse_dataset_ref_remote(s: &str) -> Result<DatasetRefRemote, String> {
     match DatasetRefRemote::try_from(s) {
         Ok(v) => Ok(v),
         Err(_) => Err("Remote reference should be in form: `did:odf:...` or \
@@ -92,7 +59,7 @@ pub fn value_parse_dataset_ref_remote(s: &str) -> Result<DatasetRefRemote, Strin
     }
 }
 
-pub fn value_parse_dataset_ref_any(s: &str) -> Result<DatasetRefAny, String> {
+pub(crate) fn value_parse_dataset_ref_any(s: &str) -> Result<DatasetRefAny, String> {
     match DatasetRefAny::try_from(s) {
         Ok(v) => Ok(v),
         Err(_) => Err("Dataset reference should be in form: `my.dataset.id` or \
@@ -101,21 +68,21 @@ pub fn value_parse_dataset_ref_any(s: &str) -> Result<DatasetRefAny, String> {
     }
 }
 
-pub fn value_parse_repo_name(s: &str) -> Result<RepoName, String> {
+pub(crate) fn value_parse_repo_name(s: &str) -> Result<RepoName, String> {
     match RepoName::try_from(s) {
         Ok(v) => Ok(v),
         Err(_) => Err("RepositoryID can only contain alphanumerics, dashes, and dots".to_string()),
     }
 }
 
-pub fn value_parse_multihash(s: &str) -> Result<Multihash, String> {
+pub(crate) fn value_parse_multihash(s: &str) -> Result<Multihash, String> {
     match Multihash::from_multibase(s) {
         Ok(v) => Ok(v),
         Err(_) => Err("Block hash must be a valid multihash string".to_string()),
     }
 }
 
-pub fn validate_log_filter(s: &str) -> Result<String, String> {
+pub(crate) fn validate_log_filter(s: &str) -> Result<String, String> {
     let items: Vec<_> = s.split(',').collect();
     for item in items {
         match item {
@@ -130,7 +97,7 @@ pub fn validate_log_filter(s: &str) -> Result<String, String> {
     Ok(s.to_string())
 }
 
-pub fn value_parse_url(url_str: &str) -> Result<Url, String> {
+pub(crate) fn value_parse_url(url_str: &str) -> Result<Url, String> {
     let parse_result = Url::parse(url_str);
     match parse_result {
         Ok(url) => Ok(url),

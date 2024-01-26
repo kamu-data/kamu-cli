@@ -749,8 +749,22 @@ pub enum DatasetRefPattern {
 }
 
 impl DatasetRefPattern {
-    pub fn match_pattern(dataset_ref: &str, pattern: &str) -> Result<bool, InvalidPatternError> {
-        Like::<false>::like(dataset_ref, pattern)
+    pub fn is_match(dataset_ref: DatasetRef, pattern: &str) -> Result<bool, InvalidPatternError> {
+        Like::<false>::like(dataset_ref.to_string().as_str(), pattern)
+    }
+}
+
+impl fmt::Display for DatasetRefPattern {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Ref(v) => write!(f, "{v}"),
+            Self::Pattern(an, dnp) => {
+                if let Some(account) = an {
+                    write!(f, "{account}/")?;
+                }
+                write!(f, "{}", dnp)
+            }
+        }
     }
 }
 

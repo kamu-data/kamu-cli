@@ -17,3 +17,4 @@ pub use dataset_handles::*;
 pub use dataset_id::*;
 pub use dataset_identity::*;
 pub use dataset_refs::*;
+pub use grammar::*;
