@@ -175,14 +175,17 @@ impl MultihashBytes {
             let mut cursor = std::io::Cursor::new(&mut buf[..]);
 
             let mut varint_buf = uvar::encode::u32_buffer();
-            let varint = uvar::encode::u32(value.code as u32, &mut varint_buf);
+            let varint = uvar::encode::u32(u32::try_from(value.code).unwrap(), &mut varint_buf);
             cursor.write_all(varint).unwrap();
 
-            let varint = uvar::encode::u32(value.len as u32, &mut varint_buf);
+            let varint = uvar::encode::u32(u32::try_from(value.len).unwrap(), &mut varint_buf);
             cursor.write_all(varint).unwrap();
 
             cursor.write_all(value.digest()).unwrap();
-            cursor.position() as usize
+            #[cfg_attr(target_pointer_width = "64", allow(clippy::cast_possible_truncation))]
+            {
+                cursor.position() as usize
+            }
         };
 
         Self { buf, len }
@@ -256,7 +259,10 @@ impl<'a> MultihashFmt<'a> {
         let len = {
             let mut c = std::io::Cursor::new(&mut buf[..]);
             write!(c, "{self}").unwrap();
-            c.position() as usize
+            #[cfg_attr(target_pointer_width = "64", allow(clippy::cast_possible_truncation))]
+            {
+                c.position() as usize
+            }
         };
 
         StackString::new(buf, len)

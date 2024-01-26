@@ -63,6 +63,7 @@ impl MetadataChainComparator {
 
         let Some(rhs_head) = rhs_head else {
             // LHS chain is unconditionally ahead - simply return all of its blocks
+            #[cfg_attr(target_pointer_width = "64", allow(clippy::cast_possible_truncation))]
             lhs_chain.expecting_to_read_blocks(lhs_sequence_number as usize + 1);
             return Ok(CompareChainsResult::LhsAhead {
                 lhs_ahead_blocks: lhs_chain
@@ -162,7 +163,8 @@ impl MetadataChainComparator {
         expected_common_sequence_number: u64,
         expected_common_ancestor_hash: &Multihash,
     ) -> Result<CommonAncestorCheck, CompareChainsError> {
-        let ahead_size: usize = (ahead_sequence_number - expected_common_sequence_number) as usize;
+        #[cfg_attr(target_pointer_width = "64", allow(clippy::cast_possible_truncation))]
+        let ahead_size = (ahead_sequence_number - expected_common_sequence_number) as usize;
         ahead_chain.expecting_to_read_blocks(ahead_size);
 
         let ahead_blocks: Vec<(Multihash, MetadataBlock)> = ahead_chain
@@ -202,14 +204,18 @@ impl MetadataChainComparator {
     ) -> CompareChainsResult {
         if let Some(last_common_sequence_number) = last_common_sequence_number {
             CompareChainsResult::Divergence {
+                #[cfg_attr(target_pointer_width = "64", allow(clippy::cast_possible_truncation))]
                 uncommon_blocks_in_lhs: (lhs_sequence_number - last_common_sequence_number)
                     as usize,
+                #[cfg_attr(target_pointer_width = "64", allow(clippy::cast_possible_truncation))]
                 uncommon_blocks_in_rhs: (rhs_sequence_number - last_common_sequence_number)
                     as usize,
             }
         } else {
             CompareChainsResult::Divergence {
+                #[cfg_attr(target_pointer_width = "64", allow(clippy::cast_possible_truncation))]
                 uncommon_blocks_in_lhs: (lhs_sequence_number + 1) as usize,
+                #[cfg_attr(target_pointer_width = "64", allow(clippy::cast_possible_truncation))]
                 uncommon_blocks_in_rhs: (rhs_sequence_number + 1) as usize,
             }
         }
@@ -224,10 +230,12 @@ impl MetadataChainComparator {
         rhs_start_block_sequence_number: u64,
     ) -> Result<Option<u64>, CompareChainsError> {
         if lhs_start_block_sequence_number > rhs_start_block_sequence_number {
+            #[cfg_attr(target_pointer_width = "64", allow(clippy::cast_possible_truncation))]
             lhs_chain.expecting_to_read_blocks(
                 (lhs_start_block_sequence_number - rhs_start_block_sequence_number) as usize,
             );
         } else {
+            #[cfg_attr(target_pointer_width = "64", allow(clippy::cast_possible_truncation))]
             rhs_chain.expecting_to_read_blocks(
                 (rhs_start_block_sequence_number - lhs_start_block_sequence_number) as usize,
             );

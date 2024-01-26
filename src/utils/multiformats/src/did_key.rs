@@ -159,7 +159,10 @@ impl DidKeyBytes {
 
             cursor.write_all(varint).unwrap();
             cursor.write_all(&value.public_key).unwrap();
-            cursor.position() as usize
+            #[cfg_attr(target_pointer_width = "64", allow(clippy::cast_possible_truncation))]
+            {
+                cursor.position() as usize
+            }
         };
 
         Self { buf, len }
@@ -219,7 +222,10 @@ impl<'a> DidKeyFmt<'a> {
         let len = {
             let mut c = std::io::Cursor::new(&mut buf[..]);
             write!(c, "{self}").unwrap();
-            c.position() as usize
+            #[cfg_attr(target_pointer_width = "64", allow(clippy::cast_possible_truncation))]
+            {
+                c.position() as usize
+            }
         };
 
         StackString::new(buf, len)

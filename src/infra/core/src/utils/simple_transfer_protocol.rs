@@ -276,6 +276,10 @@ impl SimpleTransferProtocol {
                         Some(&data_slice.physical_hash)
                     },
                     expected_hash: Some(&data_slice.physical_hash),
+                    #[cfg_attr(
+                        target_pointer_width = "64",
+                        allow(clippy::cast_possible_truncation)
+                    )]
                     size_hint: Some(data_slice.size as usize),
                 },
             )
@@ -300,8 +304,14 @@ impl SimpleTransferProtocol {
 
         stats.src.data_slices_read += 1;
         stats.dst.data_slices_written += 1;
-        stats.src.bytes_read += data_slice.size as usize;
-        stats.dst.bytes_written += data_slice.size as usize;
+        #[cfg_attr(target_pointer_width = "64", allow(clippy::cast_possible_truncation))]
+        {
+            stats.src.bytes_read += data_slice.size as usize;
+        }
+        #[cfg_attr(target_pointer_width = "64", allow(clippy::cast_possible_truncation))]
+        {
+            stats.dst.bytes_written += data_slice.size as usize;
+        }
         listener.on_status(SyncStage::TransferData, &stats);
 
         Ok(())
@@ -347,6 +357,10 @@ impl SimpleTransferProtocol {
                     // This hint is necessary only for S3 implementation that does not
                     // currently support streaming uploads
                     // without knowing Content-Length. We should remove it in future.
+                    #[cfg_attr(
+                        target_pointer_width = "64",
+                        allow(clippy::cast_possible_truncation)
+                    )]
                     size_hint: Some(checkpoint.size as usize),
                 },
             )
@@ -371,8 +385,14 @@ impl SimpleTransferProtocol {
 
         stats.src.checkpoints_read += 1;
         stats.dst.checkpoints_written += 1;
-        stats.src.bytes_read += checkpoint.size as usize;
-        stats.dst.bytes_written += checkpoint.size as usize;
+        #[cfg_attr(target_pointer_width = "64", allow(clippy::cast_possible_truncation))]
+        {
+            stats.src.bytes_read += checkpoint.size as usize;
+        }
+        #[cfg_attr(target_pointer_width = "64", allow(clippy::cast_possible_truncation))]
+        {
+            stats.dst.bytes_written += checkpoint.size as usize;
+        }
         listener.on_status(SyncStage::TransferData, &stats);
 
         Ok(())
@@ -395,15 +415,27 @@ impl SimpleTransferProtocol {
         for block in blocks.iter().filter_map(|(_, b)| b.as_data_stream_block()) {
             if let Some(data_slice) = block.event.new_data {
                 stats.src_estimated.data_slices_read += 1;
-                stats.src_estimated.bytes_read += data_slice.size as usize;
+                #[cfg_attr(target_pointer_width = "64", allow(clippy::cast_possible_truncation))]
+                {
+                    stats.src_estimated.bytes_read += data_slice.size as usize;
+                }
                 stats.dst_estimated.data_slices_written += 1;
-                stats.dst_estimated.bytes_written += data_slice.size as usize;
+                #[cfg_attr(target_pointer_width = "64", allow(clippy::cast_possible_truncation))]
+                {
+                    stats.dst_estimated.bytes_written += data_slice.size as usize;
+                }
             }
             if let Some(checkpoint) = block.event.new_checkpoint {
                 stats.src_estimated.checkpoints_read += 1;
-                stats.src_estimated.bytes_read += checkpoint.size as usize;
+                #[cfg_attr(target_pointer_width = "64", allow(clippy::cast_possible_truncation))]
+                {
+                    stats.src_estimated.bytes_read += checkpoint.size as usize;
+                }
                 stats.dst_estimated.checkpoints_written += 1;
-                stats.dst_estimated.bytes_written += checkpoint.size as usize;
+                #[cfg_attr(target_pointer_width = "64", allow(clippy::cast_possible_truncation))]
+                {
+                    stats.dst_estimated.bytes_written += checkpoint.size as usize;
+                }
             }
         }
 

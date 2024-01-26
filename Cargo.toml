@@ -115,6 +115,7 @@ unreadable_literal = { level = "warn", priority = 1 }
 unused_self = { level = "allow", priority = 1 }
 wildcard_imports = { level = "allow", priority = 1 }
 
+cast_possible_truncation = "warn"
 cast_precision_loss = "warn"
 cast_sign_loss = "warn"
 doc_markdown = "warn"

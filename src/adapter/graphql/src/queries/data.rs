@@ -37,6 +37,7 @@ impl DataQueries {
 
         let query_svc = from_catalog::<dyn domain::QueryService>(ctx).unwrap();
 
+        #[cfg_attr(target_pointer_width = "64", allow(clippy::cast_possible_truncation))]
         let df = match query_dialect {
             QueryDialect::SqlDataFusion => {
                 let sql_result = query_svc

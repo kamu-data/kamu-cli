@@ -47,12 +47,14 @@ impl<Proj: Projection, State: EventStoreState<Proj>> EventStore<Proj>
 
         // TODO: This should be a buffered stream so we don't lock per event
         Box::pin(async_stream::try_stream! {
+            #[cfg_attr(target_pointer_width = "64", allow(clippy::cast_possible_truncation))]
             let mut seen = opts.from.map_or(0, |id| (id.into_inner() + 1) as usize);
 
             loop {
                 let next = {
                     let g = self.state.lock().unwrap();
 
+                    #[cfg_attr(target_pointer_width = "64", allow(clippy::cast_possible_truncation))]
                     let to = opts.to.map_or(g.events_count(), |id| (id.into_inner() + 1) as usize);
 
                     g.get_events()[..to]

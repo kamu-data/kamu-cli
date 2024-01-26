@@ -54,7 +54,7 @@ impl PerfettoLayer {
     }
 
     fn get_ts(&self) -> f64 {
-        let nanos = self.start.elapsed().as_nanos() as u64;
+        let nanos = u64::try_from(self.start.elapsed().as_nanos()).unwrap();
 
         nanos.value_as::<f64>().unwrap() / 1000.0
     }

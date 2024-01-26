@@ -284,6 +284,7 @@ fn unpack_dataset_metadata_batch(objects_batch: &ObjectsBatch) -> Vec<(Multihash
         .filter_map(Result::ok)
         .map(|mut entry| {
             let entry_size = entry.size();
+            #[cfg_attr(target_pointer_width = "64", allow(clippy::cast_possible_truncation))]
             let mut buf = vec![0_u8; entry_size as usize];
             entry.read_exact(buf.as_mut_slice()).unwrap();
 
@@ -691,6 +692,7 @@ pub async fn dataset_import_object_file(
             InsertOpts {
                 precomputed_hash: None,
                 expected_hash: Some(&object_file_reference.physical_hash),
+                #[cfg_attr(target_pointer_width = "64", allow(clippy::cast_possible_truncation))]
                 size_hint: Some(object_file_reference.size as usize),
             },
         )
