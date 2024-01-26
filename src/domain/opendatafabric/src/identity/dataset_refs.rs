@@ -63,33 +63,33 @@ pub enum DatasetRefAny {
 impl DatasetRef {
     pub fn id(&self) -> Option<&DatasetID> {
         match self {
-            Self::ID(id) => Some(id),
+            Self::ID(id) | Self::Handle(DatasetHandle { id, .. }) => Some(id),
             Self::Alias(_) => None,
-            Self::Handle(DatasetHandle { id, .. }) => Some(id),
         }
     }
 
     pub fn alias(&self) -> Option<&DatasetAlias> {
         match self {
             Self::ID(_) => None,
-            Self::Alias(alias) => Some(alias),
-            Self::Handle(DatasetHandle { alias, .. }) => Some(alias),
+            Self::Alias(alias) | Self::Handle(DatasetHandle { alias, .. }) => Some(alias),
         }
     }
 
     pub fn account_name(&self) -> Option<&AccountName> {
         match self {
             Self::ID(_) => None,
-            Self::Alias(alias) => alias.account_name.as_ref(),
-            Self::Handle(DatasetHandle { alias, .. }) => alias.account_name.as_ref(),
+            Self::Alias(alias) | Self::Handle(DatasetHandle { alias, .. }) => {
+                alias.account_name.as_ref()
+            }
         }
     }
 
     pub fn dataset_name(&self) -> Option<&DatasetName> {
         match self {
             Self::ID(_) => None,
-            Self::Alias(alias) => Some(&alias.dataset_name),
-            Self::Handle(DatasetHandle { alias, .. }) => Some(&alias.dataset_name),
+            Self::Alias(alias) | Self::Handle(DatasetHandle { alias, .. }) => {
+                Some(&alias.dataset_name)
+            }
         }
     }
 
@@ -202,44 +202,38 @@ impl DatasetRefRemote {
     pub fn id(&self) -> Option<&DatasetID> {
         match self {
             Self::ID(_, id) => Some(id),
-            Self::Alias(_) => None,
-            Self::Url(_) => None,
+            Self::Alias(_) | Self::Url(_) => None,
             Self::Handle(hdl) => Some(&hdl.id),
         }
     }
 
     pub fn alias(&self) -> Option<&DatasetAliasRemote> {
         match self {
-            Self::ID(_, _) => None,
+            Self::ID(_, _) | Self::Url(_) => None,
             Self::Alias(alias) => Some(alias),
-            Self::Url(_) => None,
             Self::Handle(hdl) => Some(&hdl.alias),
         }
     }
 
     pub fn url(&self) -> Option<&Url> {
         match self {
-            Self::ID(_, _) => None,
-            Self::Alias(_) => None,
+            Self::ID(_, _) | Self::Alias(_) | Self::Handle(_) => None,
             Self::Url(url) => Some(url.as_ref()),
-            Self::Handle(_) => None,
         }
     }
 
     pub fn dataset_name(&self) -> Option<&DatasetName> {
         match self {
-            Self::ID(_, _) => None,
+            Self::ID(_, _) | Self::Url(_) => None,
             Self::Alias(alias) => Some(&alias.dataset_name),
-            Self::Url(_) => None,
             Self::Handle(hdl) => Some(&hdl.alias.dataset_name),
         }
     }
 
     pub fn account_name(&self) -> Option<&AccountName> {
         match self {
-            Self::ID(_, _) => None,
+            Self::ID(_, _) | Self::Url(_) => None,
             Self::Alias(alias) => alias.account_name.as_ref(),
-            Self::Url(_) => None,
             Self::Handle(hdl) => hdl.alias.account_name.as_ref(),
         }
     }

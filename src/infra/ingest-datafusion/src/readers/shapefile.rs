@@ -195,7 +195,7 @@ impl ReaderEsriShapefile {
                     JsonValue::Number(serde_json::Number::from_f64(f64::from(v)).unwrap())
                 }),
                 ShpValue::Integer(v) => Some(JsonValue::Number(v.into())),
-                ShpValue::Currency(v) => {
+                ShpValue::Currency(v) | ShpValue::Double(v) => {
                     Some(JsonValue::Number(serde_json::Number::from_f64(v).unwrap()))
                 }
                 ShpValue::DateTime(v) => Some(JsonValue::String(format!(
@@ -207,9 +207,6 @@ impl ReaderEsriShapefile {
                     v.time().minutes(),
                     v.time().seconds(),
                 ))),
-                ShpValue::Double(v) => {
-                    Some(JsonValue::Number(serde_json::Number::from_f64(v).unwrap()))
-                }
                 ShpValue::Memo(v) => Some(JsonValue::String(v)),
             }
             .unwrap_or(JsonValue::Null);

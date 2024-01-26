@@ -560,11 +560,7 @@ fn normalize_schema(s: &DFSchema, engine: &str) -> DFSchema {
                     // Spark:
                     // - produces optional `offset` and `event_time`
                     "spark" => match f.name().as_str() {
-                        "offset" => {
-                            assert!(f.is_nullable());
-                            f.clone().with_nullable(false)
-                        }
-                        "op" => {
+                        "offset" | "op" => {
                             assert!(f.is_nullable());
                             f.clone().with_nullable(false)
                         }

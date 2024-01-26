@@ -458,7 +458,6 @@ where
                 // TODO: Ensure has previous push source with matching name
                 unimplemented!("Disabling sources is not yet fully supported")
             }
-            MetadataEvent::Seed(_) => Ok(()),
             MetadataEvent::SetTransform(e) => {
                 // Ensure has inputs
                 if e.inputs.is_empty() {
@@ -480,10 +479,11 @@ where
 
                 Ok(())
             }
-            MetadataEvent::SetVocab(_) => Ok(()),
-            MetadataEvent::SetAttachments(_) => Ok(()),
-            MetadataEvent::SetInfo(_) => Ok(()),
-            MetadataEvent::SetLicense(_) => Ok(()),
+            MetadataEvent::Seed(_)
+            | MetadataEvent::SetVocab(_)
+            | MetadataEvent::SetAttachments(_)
+            | MetadataEvent::SetInfo(_)
+            | MetadataEvent::SetLicense(_) => Ok(()),
         }
     }
 

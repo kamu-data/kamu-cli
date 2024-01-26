@@ -370,8 +370,7 @@ impl FetchService {
         listener: &Arc<dyn FetchProgressListener>,
     ) -> Result<FetchResult, PollingIngestError> {
         match &fglob.order {
-            None => (),
-            Some(SourceOrdering::ByName) => (),
+            None | Some(SourceOrdering::ByName) => (),
             Some(ord) => panic!("Files glob source can only be ordered by name, found: {ord:?}"),
         }
 

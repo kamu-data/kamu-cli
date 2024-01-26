@@ -99,7 +99,6 @@ fn_params_excessive_bools = { level = "allow", priority = 1 }
 if_not_else = { level = "allow", priority = 1 }
 ignored_unit_patterns = { level = "allow", priority = 1 }
 items_after_statements = { level = "allow", priority = 1 }
-match_same_arms = { level = "allow", priority = 1 }
 match_wildcard_for_single_variants = { level = "allow", priority = 1 }
 missing_errors_doc = { level = "allow", priority = 1 }
 missing_panics_doc = { level = "allow", priority = 1 }
@@ -122,6 +121,7 @@ from_iter_instead_of_collect = "warn"
 linkedlist = "warn"
 manual_let_else = "warn"
 match_bool = "warn"
+match_same_arms = "warn"
 needless_pass_by_value = "warn"
 redundant_else = "warn"
 should_panic_without_expect = "warn"

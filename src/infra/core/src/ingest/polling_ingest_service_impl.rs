@@ -536,8 +536,7 @@ impl PollingIngestServiceImpl {
         new_result: PollingIngestResult,
     ) -> PollingIngestResult {
         match (combined_result, new_result) {
-            (None, n) => n,
-            (Some(PollingIngestResult::UpToDate { .. }), n) => n,
+            (None, n) | (Some(PollingIngestResult::UpToDate { .. }), n) => n,
             (
                 Some(PollingIngestResult::Updated {
                     old_head,

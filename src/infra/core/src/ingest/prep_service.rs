@@ -250,9 +250,8 @@ impl Read for DecompressZipStream {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize, IOError> {
         while self.consumer.is_empty() {
             match self.done_recvr.recv() {
-                Ok(0) => break,
+                Ok(0) | Err(_) => break,
                 Ok(_) => (),
-                Err(_) => break,
             }
         }
 

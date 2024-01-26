@@ -170,31 +170,23 @@ impl From<GetAliasesError> for CLIError {
 impl From<DeleteDatasetError> for CLIError {
     fn from(v: DeleteDatasetError) -> Self {
         match v {
-            e @ DeleteDatasetError::NotFound(_) => Self::failure(e),
-            e @ DeleteDatasetError::DanglingReference(_) => Self::failure(e),
-            e @ DeleteDatasetError::Access(_) => Self::failure(e),
+            e @ DeleteDatasetError::NotFound(_)
+            | e @ DeleteDatasetError::DanglingReference(_)
+            | e @ DeleteDatasetError::Access(_) => Self::failure(e),
             e @ DeleteDatasetError::Internal(_) => Self::critical(e),
         }
     }
 }
 
 impl From<GetSummaryError> for CLIError {
-    fn from(v: GetSummaryError) -> Self {
-        match v {
-            e @ GetSummaryError::EmptyDataset => Self::critical(e),
-            e @ GetSummaryError::Access(_) => Self::critical(e),
-            e @ GetSummaryError::Internal(_) => Self::critical(e),
-        }
+    fn from(e: GetSummaryError) -> Self {
+        Self::critical(e)
     }
 }
 
 impl From<GetRefError> for CLIError {
-    fn from(v: GetRefError) -> Self {
-        match v {
-            e @ GetRefError::NotFound(_) => Self::critical(e),
-            e @ GetRefError::Access(_) => Self::critical(e),
-            e @ GetRefError::Internal(_) => Self::critical(e),
-        }
+    fn from(e: GetRefError) -> Self {
+        Self::critical(e)
     }
 }
 

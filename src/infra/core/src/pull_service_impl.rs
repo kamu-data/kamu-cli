@@ -642,10 +642,12 @@ impl PullService for PullServiceImpl {
                 new_head: res.new_head,
                 num_blocks: 1,
             }),
-            Err(WriteWatermarkError::EmptyCommit(_)) => Ok(PullResult::UpToDate),
-            Err(WriteWatermarkError::CommitError(CommitError::MetadataAppendError(
-                AppendError::InvalidBlock(AppendValidationError::WatermarkIsNotMonotonic),
-            ))) => Ok(PullResult::UpToDate),
+            Err(
+                WriteWatermarkError::EmptyCommit(_)
+                | WriteWatermarkError::CommitError(CommitError::MetadataAppendError(
+                    AppendError::InvalidBlock(AppendValidationError::WatermarkIsNotMonotonic),
+                )),
+            ) => Ok(PullResult::UpToDate),
             Err(e) => Err(e.int_err().into()),
         }
     }

@@ -226,8 +226,7 @@ impl CompleteCommand {
                 "alias" => self.complete_alias(output, to_complete).await,
                 "cfgkey" => self.complete_config_key(output, to_complete),
                 "dataset" => self.complete_dataset(output, to_complete).await,
-                "file" => self.complete_path(output, to_complete),
-                "manifest" => self.complete_path(output, to_complete),
+                "file" | "manifest" => self.complete_path(output, to_complete),
                 "repository" => self.complete_repository(output, to_complete),
                 _ => (),
             }
