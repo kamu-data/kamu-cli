@@ -11,6 +11,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use chrono::{DateTime, TimeZone, Utc};
+use conv::ConvUtil;
 use datafusion::arrow::array::Array;
 use datafusion::arrow::datatypes::{DataType, Field, SchemaRef, TimeUnit};
 use datafusion::common::DFSchema;
@@ -509,18 +510,22 @@ impl DataWriterDataFusion {
             .as_any()
             .downcast_ref::<Int64Array>()
             .unwrap()
-            .value(0);
+            .value(0)
+            .value_as::<u64>()
+            .unwrap();
 
         let offset_max = batches[0]
             .column(1)
             .as_any()
             .downcast_ref::<Int64Array>()
             .unwrap()
-            .value(0);
+            .value(0)
+            .value_as::<u64>()
+            .unwrap();
 
         let offset_interval = odf::OffsetInterval {
-            start: offset_min as u64,
-            end: offset_max as u64,
+            start: offset_min,
+            end: offset_max,
         };
 
         // Event time is either Date or Timestamp(Millisecond, UTC)

@@ -116,6 +116,7 @@ unused_self = { level = "allow", priority = 1 }
 wildcard_imports = { level = "allow", priority = 1 }
 
 cast_precision_loss = "warn"
+cast_sign_loss = "warn"
 doc_markdown = "warn"
 from_iter_instead_of_collect = "warn"
 linkedlist = "warn"

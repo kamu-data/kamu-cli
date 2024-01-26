@@ -9,6 +9,7 @@
 
 use std::sync::Arc;
 
+use conv::ConvUtil;
 use datafusion::arrow::array::{ArrayRef, Int32Array, UInt8Array};
 use datafusion::arrow::datatypes::DataType;
 use kamu::domain::QueryService;
@@ -72,7 +73,7 @@ impl Command for TailCommand {
                             DataType::Int32 => array
                                 .as_any()
                                 .downcast_ref::<Int32Array>()
-                                .map(|a| a.value(row) as u8)
+                                .and_then(|a| a.value(row).value_as::<u8>().ok())
                                 .map(OperationType::try_from)
                                 .unwrap_or(err),
                             _ => err,

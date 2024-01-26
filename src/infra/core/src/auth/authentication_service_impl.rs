@@ -11,7 +11,7 @@ use core::panic;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use chrono::Duration;
+use conv::ConvUtil;
 use dill::*;
 use internal_error::{ErrorIntoInternal, InternalError};
 use jsonwebtoken::errors::ErrorKind;
@@ -103,10 +103,14 @@ impl AuthenticationServiceImpl {
         login_method: &str,
         provider_credentials_json: String,
     ) -> Result<String, InternalError> {
+        const EXPIRE_AFTER_SEC: usize = 24 * 60 * 60; // 1 day in seconds
+
         let current_time = self.time_source.now();
+        let iat = current_time.timestamp().value_as::<usize>().unwrap();
+        let exp = iat + EXPIRE_AFTER_SEC;
         let claims = KamuAccessTokenClaims {
-            iat: current_time.timestamp() as usize,
-            exp: (current_time + Duration::days(1)).timestamp() as usize,
+            iat,
+            exp,
             iss: String::from(KAMU_JWT_ISSUER),
             sub: subject,
             access_credentials: KamuAccessCredentials {

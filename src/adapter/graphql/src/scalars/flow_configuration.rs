@@ -91,8 +91,13 @@ pub enum TimeUnit {
 
 impl From<chrono::Duration> for TimeDelta {
     fn from(value: chrono::Duration) -> Self {
+        if value.num_seconds() <= 0 {
+            panic!("Positive interval expected, but received [{value}]")
+        }
+
         let num_weeks = value.num_weeks();
         if (value - chrono::Duration::weeks(num_weeks)).is_zero() {
+            #[allow(clippy::cast_sign_loss)]
             return Self {
                 every: num_weeks as u32,
                 unit: TimeUnit::Weeks,
@@ -101,6 +106,7 @@ impl From<chrono::Duration> for TimeDelta {
 
         let num_days = value.num_days();
         if (value - chrono::Duration::days(num_days)).is_zero() {
+            #[allow(clippy::cast_sign_loss)]
             return Self {
                 every: num_days as u32,
                 unit: TimeUnit::Days,
@@ -109,6 +115,7 @@ impl From<chrono::Duration> for TimeDelta {
 
         let num_hours = value.num_hours();
         if (value - chrono::Duration::hours(num_hours)).is_zero() {
+            #[allow(clippy::cast_sign_loss)]
             return Self {
                 every: num_hours as u32,
                 unit: TimeUnit::Hours,
@@ -117,14 +124,16 @@ impl From<chrono::Duration> for TimeDelta {
 
         let num_minutes = value.num_minutes();
         if (value - chrono::Duration::minutes(num_minutes)).is_zero() {
+            #[allow(clippy::cast_sign_loss)]
             return Self {
                 every: num_minutes as u32,
                 unit: TimeUnit::Minutes,
             };
         }
 
-        unreachable!(
-            "Expecting intervals not smaller than 1 minute that are clearly dividable by unit"
+        panic!(
+            "Expecting intervals not smaller than 1 minute that are clearly dividable by unit, \
+             but received [{value}]"
         );
     }
 }

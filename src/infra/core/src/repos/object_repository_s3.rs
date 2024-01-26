@@ -15,6 +15,7 @@ use aws_sdk_s3::operation::get_object::GetObjectError;
 use aws_sdk_s3::operation::head_object::HeadObjectError;
 use aws_sdk_s3::presigning::PresigningConfig;
 use bytes::Bytes;
+use conv::ConvUtil;
 use kamu_core::*;
 use opendatafabric::{Multicodec, Multihash};
 use url::Url;
@@ -93,15 +94,16 @@ where
         tracing::debug!(?key, "Checking for object");
 
         match self.s3_context.head_object(key).await {
-            Ok(output) => {
-                return Ok(output.content_length as u64);
-            }
+            Ok(output) => output
+                .content_length
+                .value_as::<u64>()
+                .map_err(|err| err.int_err().into()),
             Err(err) => match err.into_service_error() {
                 // TODO: Detect credentials error
                 HeadObjectError::NotFound(_) => Err(GetError::NotFound(ObjectNotFoundError {
                     hash: hash.clone(),
                 })),
-                err => return Err(err.int_err().into()),
+                err => Err(err.int_err().into()),
             },
         }
     }

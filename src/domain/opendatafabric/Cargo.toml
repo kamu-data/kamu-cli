@@ -51,6 +51,7 @@ hex = "0.4"
 serde = { version = "1", features = ["derive"] }
 serde_with = "3"
 serde_yaml = "0.9"
+conv = "0.3"
 
 # gRPC
 prost = "0.12"
