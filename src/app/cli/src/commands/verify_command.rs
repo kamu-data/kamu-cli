@@ -19,7 +19,7 @@ use crate::output::OutputConfig;
 use crate::VerificationMultiProgress;
 
 type GenericVerificationResult =
-    Result<Vec<Result<VerificationDatasetResult, InternalError>>, CLIError>;
+    Result<Vec<Result<VerificationDatasetResult, VerificationError>>, CLIError>;
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -93,8 +93,7 @@ impl VerifyCommand {
                         options,
                         listener,
                     )
-                    .await
-                    .int_err();
+                    .await;
 
                 Ok(vec![res])
             }

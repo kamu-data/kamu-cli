@@ -332,7 +332,7 @@ impl VerificationService for VerificationServiceImpl {
         requests: Vec<VerificationRequest>,
         options: VerificationOptions,
         maybe_listener: Option<Arc<dyn VerificationMultiListener>>,
-    ) -> Vec<Result<VerificationDatasetResult, InternalError>> {
+    ) -> Vec<Result<VerificationDatasetResult, VerificationError>> {
         let listener = maybe_listener.unwrap_or(Arc::new(NullVerificationMultiListener {}));
 
         let handles: Vec<_> = requests
@@ -358,10 +358,9 @@ impl VerificationService for VerificationServiceImpl {
                                 clone_listener.begin_verify(&dataset_handle),
                             )
                             .await
-                            .unwrap()
                     })
                     .await
-                    .int_err()
+                    .int_err()?
                 }
             })
             .collect();

@@ -35,7 +35,7 @@ pub trait VerificationService: Send + Sync {
         requests: Vec<VerificationRequest>,
         options: VerificationOptions,
         listener: Option<Arc<dyn VerificationMultiListener>>,
-    ) -> Vec<Result<VerificationDatasetResult, InternalError>>;
+    ) -> Vec<Result<VerificationDatasetResult, VerificationError>>;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

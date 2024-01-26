@@ -88,7 +88,7 @@ pub fn get_command(
         },
         Some(("delete", submatches)) => Box::new(DeleteCommand::new(
             cli_catalog.get_one()?,
-            validate_many_dataset_wildcards(
+            validate_many_dataset_patterns(
                 cli_catalog,
                 submatches.get_many("dataset").unwrap().cloned(),
             )?,
@@ -494,7 +494,7 @@ pub fn get_command(
             cli_catalog.get_one()?,
             cli_catalog.get_one()?,
             cli_catalog.get_one()?,
-            validate_many_dataset_wildcards(
+            validate_many_dataset_patterns(
                 cli_catalog,
                 submatches.get_many("dataset").unwrap().cloned(),
             )?
@@ -528,7 +528,7 @@ fn validate_dataset_ref(
     Ok(dataset_ref)
 }
 
-fn validate_dataset_ref_wildcard(
+fn validate_dataset_ref_pattern(
     catalog: &dill::Catalog,
     dataset_ref_pattern: DatasetRefPattern,
 ) -> Result<DatasetRefPattern, CLIError> {
@@ -565,7 +565,7 @@ where
     Ok(result_refs)
 }
 
-fn validate_many_dataset_wildcards<I>(
+fn validate_many_dataset_patterns<I>(
     catalog: &dill::Catalog,
     dataset_ref_patterns: I,
 ) -> Result<Vec<DatasetRefPattern>, CLIError>
@@ -574,6 +574,6 @@ where
 {
     dataset_ref_patterns
         .into_iter()
-        .map(|p| validate_dataset_ref_wildcard(catalog, p))
+        .map(|p| validate_dataset_ref_pattern(catalog, p))
         .collect()
 }
