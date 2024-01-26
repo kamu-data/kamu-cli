@@ -12,6 +12,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
+use conv::ConvUtil;
 use tracing::*;
 use tracing_subscriber::*;
 
@@ -53,7 +54,9 @@ impl PerfettoLayer {
     }
 
     fn get_ts(&self) -> f64 {
-        self.start.elapsed().as_nanos() as f64 / 1000.0
+        let nanos = self.start.elapsed().as_nanos() as u64;
+
+        nanos.value_as::<f64>().unwrap() / 1000.0
     }
 
     fn get_tid(&self) -> u64 {
