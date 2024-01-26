@@ -309,7 +309,7 @@ impl TransformServiceImpl {
             transform: source.transform,
             system_time,
             schema,
-            prev_offset: prev_query.as_ref().and_then(|q| q.last_offset()),
+            prev_offset: prev_query.as_ref().and_then(ExecuteTransform::last_offset),
             vocab: set_vocab.unwrap_or_default().into(),
             inputs,
             prev_checkpoint: prev_query.and_then(|q| q.new_checkpoint.map(|c| c.physical_hash)),
@@ -371,7 +371,7 @@ impl TransformServiceImpl {
 
         // Determine last processed input block and offset
         let last_processed_block = input_state.and_then(|i| i.last_block_hash());
-        let last_processed_offset = input_state.and_then(|i| i.last_offset());
+        let last_processed_offset = input_state.and_then(ExecuteTransformInput::last_offset);
 
         // Determine unprocessed block and offset range
         let last_unprocessed_block = input_chain.get_ref(&BlockRef::Head).await.int_err()?;

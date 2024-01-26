@@ -143,7 +143,7 @@ impl AxumServerPushProtocolInstance {
             push_request
                 .current_head
                 .as_ref()
-                .map(|ba| ba.to_string())
+                .map(ToString::to_string)
                 .ok_or("None"),
             push_request.size_estimate
         );

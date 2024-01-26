@@ -26,7 +26,7 @@ impl From<kamu_flow_system::FlowConfigurationState> for FlowConfiguration {
             paused: !value.is_active(),
             batching: if let FlowConfigurationRule::StartCondition(condition) = &value.rule {
                 Some(FlowConfigurationBatching {
-                    throttling_period: condition.throttling_period.map(|tp| tp.into()),
+                    throttling_period: condition.throttling_period.map(Into::into),
                     minimal_data_batch: condition.minimal_data_batch,
                 })
             } else {

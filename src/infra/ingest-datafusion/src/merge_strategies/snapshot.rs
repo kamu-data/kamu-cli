@@ -130,7 +130,7 @@ impl MergeStrategySnapshot {
         new_qual: TableReference<'static>,
     ) -> Expr {
         let columns: Vec<_> = if let Some(compare_columns) = &self.compare_columns {
-            compare_columns.iter().map(|s| s.as_str()).collect()
+            compare_columns.iter().map(String::as_str).collect()
         } else {
             new_schema
                 .fields()

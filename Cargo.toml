@@ -105,7 +105,6 @@ missing_panics_doc = { level = "allow", priority = 1 }
 module_name_repetitions = { level = "allow", priority = 1 }
 must_use_candidate = { level = "allow", priority = 1 }
 needless_raw_string_hashes = { level = "allow", priority = 1 }
-redundant_closure_for_method_calls = { level = "allow", priority = 1 }
 return_self_not_must_use = { level = "allow", priority = 1 }
 similar_names = { level = "allow", priority = 1 }
 single_match_else = { level = "allow", priority = 1 }
@@ -123,6 +122,7 @@ manual_let_else = "warn"
 match_bool = "warn"
 match_same_arms = "warn"
 needless_pass_by_value = "warn"
+redundant_closure_for_method_calls = "warn"
 redundant_else = "warn"
 should_panic_without_expect = "warn"
 trivially_copy_pass_by_ref = "warn"

@@ -284,7 +284,7 @@ impl AsyncEventHandler<DatasetEventDeleted> for DependencyGraphServiceInMemory {
 
         let node_index = state
             .get_dataset_node(&event.dataset_id)
-            .map_err(|e| e.int_err())?;
+            .map_err(ErrorIntoInternal::int_err)?;
 
         state.datasets_graph.remove_node(node_index);
         state.dataset_node_indices.remove(&event.dataset_id);
@@ -303,7 +303,7 @@ impl AsyncEventHandler<DatasetEventDependenciesUpdated> for DependencyGraphServi
 
         let node_index = state
             .get_dataset_node(&event.dataset_id)
-            .map_err(|e| e.int_err())?;
+            .map_err(ErrorIntoInternal::int_err)?;
 
         let existing_upstream_ids: HashSet<_> = state
             .datasets_graph

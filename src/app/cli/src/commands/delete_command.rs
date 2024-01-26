@@ -76,7 +76,7 @@ impl Command for DeleteCommand {
                 console::style("You are about to delete following dataset(s)").yellow(),
                 dataset_refs
                     .iter()
-                    .map(|r| r.to_string())
+                    .map(ToString::to_string)
                     .collect::<Vec<_>>()
                     .join(", "),
                 console::style("This operation is irreversible!").yellow(),

@@ -39,7 +39,7 @@ impl SystemInfoCommand {
             output_config,
             container_runtime,
             workspace_svc,
-            output_format: output_format.map(|s| s.into()),
+            output_format: output_format.map(Into::into),
         }
     }
 }
@@ -74,7 +74,7 @@ impl VersionCommand {
     {
         Self {
             output_config,
-            output_format: output_format.map(|s| s.into()),
+            output_format: output_format.map(Into::into),
         }
     }
 }

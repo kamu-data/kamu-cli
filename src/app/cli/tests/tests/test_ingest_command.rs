@@ -85,7 +85,7 @@ async fn test_push_ingest_from_file() {
     assert_eq!(
         parquet
             .get_row_iter()
-            .map(|r| r.unwrap())
+            .map(Result::unwrap)
             .map(|r| (r.get_string(4).unwrap().clone(), r.get_long(5).unwrap()))
             .sorted()
             .collect::<Vec<_>>(),

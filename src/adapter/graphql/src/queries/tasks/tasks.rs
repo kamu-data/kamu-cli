@@ -50,7 +50,7 @@ impl Tasks {
 
         let tasks_stream = task_sched
             .list_tasks_by_dataset(&dataset_id)
-            .map_err(|e| e.int_err())?;
+            .map_err(ErrorIntoInternal::int_err)?;
 
         let mut nodes: Vec<_> = tasks_stream
             .skip(page * per_page)

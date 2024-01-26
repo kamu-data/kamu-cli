@@ -620,7 +620,7 @@ impl DataWriter for DataWriterDataFusion {
             let prev = self.get_all_previous_data(&self.meta.data_slices).await?;
 
             // Populate event time with nulls if missing, using matching type to prev data
-            let df = self.ensure_event_time_column(df, prev.as_ref().map(|p| p.schema()))?;
+            let df = self.ensure_event_time_column(df, prev.as_ref().map(DataFrame::schema))?;
 
             let df = self.merge_strategy.merge(prev, df)?;
 
@@ -1051,7 +1051,7 @@ pub struct SourceNotFoundError {
 impl SourceNotFoundError {
     pub fn new(source_name: Option<impl Into<String>>, message: impl Into<String>) -> Self {
         Self {
-            source_name: source_name.map(|v| v.into()),
+            source_name: source_name.map(std::convert::Into::into),
             message: message.into(),
         }
     }

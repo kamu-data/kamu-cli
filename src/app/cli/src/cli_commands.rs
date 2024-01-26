@@ -57,7 +57,7 @@ pub fn get_command(
                 crate::cli_parser::cli(),
                 submatches
                     .get_one::<String>("input")
-                    .map(|s| s.to_string())
+                    .map(ToString::to_string)
                     .unwrap(),
                 *(submatches.get_one("current").unwrap()),
             ))

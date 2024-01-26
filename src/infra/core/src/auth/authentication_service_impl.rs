@@ -120,7 +120,7 @@ impl AuthenticationServiceImpl {
             &claims,
             &self.encoding_key,
         )
-        .map_err(|e| e.int_err())
+        .map_err(ErrorIntoInternal::int_err)
     }
 
     fn decode_access_token(

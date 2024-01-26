@@ -500,7 +500,7 @@ async fn test_data_writer_ledger_orders_by_event_time() {
             .event
             .new_watermark
             .as_ref()
-            .map(|dt| dt.to_rfc3339()),
+            .map(DateTime::to_rfc3339),
         Some("2023-01-01T00:00:00+00:00".to_string())
     );
 }
@@ -575,7 +575,7 @@ async fn test_data_writer_snapshot_orders_by_pk_and_operation_type() {
             .event
             .new_watermark
             .as_ref()
-            .map(|dt| dt.to_rfc3339()),
+            .map(DateTime::to_rfc3339),
         Some("2000-01-01T12:00:00+00:00".to_string())
     );
 
@@ -639,7 +639,7 @@ async fn test_data_writer_snapshot_orders_by_pk_and_operation_type() {
             .event
             .new_watermark
             .as_ref()
-            .map(|dt| dt.to_rfc3339()),
+            .map(DateTime::to_rfc3339),
         Some("2000-01-02T12:00:00+00:00".to_string())
     );
 }
@@ -749,7 +749,7 @@ async fn test_data_writer_optimal_parquet_encoding() {
             .unwrap()
             .get_column_page_reader(col)
             .unwrap()
-            .map(|p| p.unwrap())
+            .map(Result::unwrap)
             .find(|p| p.page_type() == PageType::DATA_PAGE)
             .unwrap();
 
@@ -1004,7 +1004,7 @@ impl Harness {
                 self.ctx.clone(),
                 odf::ReadStepCsv {
                     header: Some(true),
-                    schema: Some(schema.split(',').map(|s| s.to_string()).collect()),
+                    schema: Some(schema.split(',').map(ToString::to_string).collect()),
                     ..Default::default()
                 },
             )

@@ -991,13 +991,13 @@ impl PullBatch {
                 DatasetRefAny::ID(_, id) => (Some(id), None, None, None, None),
                 DatasetRefAny::Url(url) => (None, Some(url), None, None, None),
                 DatasetRefAny::LocalAlias(a, n) => {
-                    (None, None, None, a.as_ref().map(|v| v.as_ref()), Some(n))
+                    (None, None, None, a.as_ref().map(AsRef::as_ref), Some(n))
                 }
                 DatasetRefAny::RemoteAlias(r, a, n) => (
                     None,
                     None,
                     Some(r.as_ref()),
-                    a.as_ref().map(|v| v.as_ref()),
+                    a.as_ref().map(AsRef::as_ref),
                     Some(n),
                 ),
                 DatasetRefAny::AmbiguousAlias(ra, n) => {
@@ -1007,14 +1007,14 @@ impl PullBatch {
                     None,
                     None,
                     None,
-                    h.alias.account_name.as_ref().map(|v| v.as_str()),
+                    h.alias.account_name.as_ref().map(AccountName::as_str),
                     Some(&h.alias.dataset_name),
                 ),
                 DatasetRefAny::RemoteHandle(h) => (
                     None,
                     None,
                     Some(h.alias.repo_name.as_str()),
-                    h.alias.account_name.as_ref().map(|v| v.as_str()),
+                    h.alias.account_name.as_ref().map(AccountName::as_str),
                     Some(&h.alias.dataset_name),
                 ),
             }
@@ -1102,7 +1102,7 @@ impl PollingIngestService for TestIngestService {
             })
             .collect();
         self.calls.lock().unwrap().push(PullBatch::Ingest(
-            dataset_refs.into_iter().map(|r| r.into()).collect(),
+            dataset_refs.into_iter().map(Into::into).collect(),
         ));
         results
     }
@@ -1147,7 +1147,7 @@ impl TransformService for TestTransformService {
             .map(|r| (r.clone(), Ok(TransformResult::UpToDate)))
             .collect();
         self.calls.lock().unwrap().push(PullBatch::Transform(
-            dataset_refs.into_iter().map(|i| i.into()).collect(),
+            dataset_refs.into_iter().map(Into::into).collect(),
         ));
         results
     }

@@ -103,9 +103,9 @@ impl ReaderEsriShapefile {
         let list_shp_files = || -> Vec<PathBuf> {
             walkdir::WalkDir::new(dir)
                 .into_iter()
-                .filter_map(|e| e.ok())
+                .filter_map(Result::ok)
                 .filter(|e| is_shp_file(e.path()))
-                .map(|e| e.into_path())
+                .map(walkdir::DirEntry::into_path)
                 .collect()
         };
 
@@ -130,7 +130,7 @@ impl ReaderEsriShapefile {
                 // Try globed match
                 let matches: Vec<_> = glob::glob(path.to_str().unwrap())
                     .int_err()?
-                    .filter_map(|e| e.ok())
+                    .filter_map(Result::ok)
                     .filter(|p| is_shp_file(p))
                     .collect();
 

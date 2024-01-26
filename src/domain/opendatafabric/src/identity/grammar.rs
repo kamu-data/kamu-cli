@@ -41,7 +41,7 @@ impl Grammar {
     }
 
     fn match_alphanums(s: &str) -> Option<(&str, &str)> {
-        let alnums = s.bytes().take_while(|b| b.is_ascii_alphanumeric()).count();
+        let alnums = s.bytes().take_while(u8::is_ascii_alphanumeric).count();
 
         if alnums == 0 {
             None

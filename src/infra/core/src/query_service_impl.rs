@@ -512,7 +512,7 @@ impl SchemaProvider for KamuSchema {
         let object_repo = dataset.as_data_repo();
         let file_urls: Vec<String> = stream::iter(files)
             .then(|h| async move { object_repo.get_internal_url(&h).await })
-            .map(|url| url.into())
+            .map(Into::into)
             .collect()
             .await;
 

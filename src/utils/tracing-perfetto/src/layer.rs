@@ -160,7 +160,7 @@ where
             tid: self.get_tid(),
             phase: Phase::InstantAsync,
             name: Some(event.metadata().name()),
-            id: ctx.current_span().id().map(|id| id.into_u64()),
+            id: ctx.current_span().id().map(Id::into_u64),
             args: Some(Visitable::Event(event)),
             scope: None,
         });

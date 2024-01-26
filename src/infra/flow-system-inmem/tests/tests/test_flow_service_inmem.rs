@@ -996,7 +996,7 @@ fn assert_flow_test_checks(flow_test_checks: &[FlowTestCheck<'_>]) {
     for test_check in flow_test_checks {
         let mut pattern_idx_per_key = HashMap::new();
 
-        let snapshot_total_flows: usize = test_check.snapshot.values().map(|v| v.len()).sum();
+        let snapshot_total_flows: usize = test_check.snapshot.values().map(Vec::len).sum();
         assert_eq!(snapshot_total_flows, test_check.patterns.len());
 
         for pattern in &test_check.patterns {

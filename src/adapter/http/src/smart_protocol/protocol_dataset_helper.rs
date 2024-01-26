@@ -281,7 +281,7 @@ fn unpack_dataset_metadata_batch(objects_batch: &ObjectsBatch) -> Vec<(Multihash
     let blocks_data: Vec<(Multihash, Vec<u8>)> = archive
         .entries()
         .unwrap()
-        .filter_map(|e| e.ok())
+        .filter_map(Result::ok)
         .map(|mut entry| {
             let entry_size = entry.size();
             let mut buf = vec![0_u8; entry_size as usize];
@@ -603,7 +603,7 @@ pub async fn prepare_push_object_transfer_strategy(
     let contains = object_repo
         .contains(&object_file_ref.physical_hash)
         .await
-        .map_err(|e| e.int_err())?;
+        .map_err(ErrorIntoInternal::int_err)?;
 
     if contains {
         Ok(PushObjectTransferStrategy {
@@ -669,7 +669,7 @@ pub async fn dataset_import_object_file(
         ))
         .send()
         .await
-        .map_err(|e| e.int_err())?;
+        .map_err(ErrorIntoInternal::int_err)?;
 
     let stream = response.bytes_stream();
 

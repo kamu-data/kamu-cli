@@ -47,7 +47,7 @@ impl S3Context {
     {
         Self {
             client,
-            endpoint: endpoint.map(|e| e.into()),
+            endpoint: endpoint.map(Into::into),
             bucket: bucket.into(),
             key_prefix: key_prefix.into(),
         }
@@ -155,7 +155,7 @@ impl S3Context {
     }
 
     pub fn region(&self) -> Option<&str> {
-        self.client.config().region().map(|r| r.as_ref())
+        self.client.config().region().map(AsRef::as_ref)
     }
 
     pub fn get_key(&self, sub_key: &str) -> String {

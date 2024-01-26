@@ -170,9 +170,9 @@ impl From<GetAliasesError> for CLIError {
 impl From<DeleteDatasetError> for CLIError {
     fn from(v: DeleteDatasetError) -> Self {
         match v {
-            e @ DeleteDatasetError::NotFound(_)
-            | e @ DeleteDatasetError::DanglingReference(_)
-            | e @ DeleteDatasetError::Access(_) => Self::failure(e),
+            e @ (DeleteDatasetError::NotFound(_)
+            | DeleteDatasetError::DanglingReference(_)
+            | DeleteDatasetError::Access(_)) => Self::failure(e),
             e @ DeleteDatasetError::Internal(_) => Self::critical(e),
         }
     }

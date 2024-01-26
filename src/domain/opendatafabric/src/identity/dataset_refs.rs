@@ -691,14 +691,18 @@ impl std::cmp::Ord for DatasetRefAny {
         ) {
             match v {
                 DatasetRefAny::ID(r, id) => {
-                    (r.as_ref().map(|v| v.as_str()), None, None, Some(id), None)
+                    (r.as_ref().map(RepoName::as_str), None, None, Some(id), None)
                 }
-                DatasetRefAny::LocalAlias(a, n) => {
-                    (None, a.as_ref().map(|v| v.as_ref()), Some(n), None, None)
-                }
+                DatasetRefAny::LocalAlias(a, n) => (
+                    None,
+                    a.as_ref().map(AccountName::as_str),
+                    Some(n),
+                    None,
+                    None,
+                ),
                 DatasetRefAny::RemoteAlias(r, a, n) => (
                     Some(r.as_ref()),
-                    a.as_ref().map(|v| v.as_ref()),
+                    a.as_ref().map(AccountName::as_str),
                     Some(n),
                     None,
                     None,
@@ -709,14 +713,14 @@ impl std::cmp::Ord for DatasetRefAny {
                 DatasetRefAny::Url(url) => (None, None, None, None, Some(url.as_ref())),
                 DatasetRefAny::LocalHandle(hdl) => (
                     None,
-                    hdl.alias.account_name.as_ref().map(|v| v.as_str()),
+                    hdl.alias.account_name.as_ref().map(AccountName::as_str),
                     Some(&hdl.alias.dataset_name),
                     Some(&hdl.id),
                     None,
                 ),
                 DatasetRefAny::RemoteHandle(hdl) => (
                     Some(hdl.alias.repo_name.as_str()),
-                    hdl.alias.account_name.as_ref().map(|v| v.as_str()),
+                    hdl.alias.account_name.as_ref().map(AccountName::as_str),
                     Some(&hdl.alias.dataset_name),
                     Some(&hdl.id),
                     None,

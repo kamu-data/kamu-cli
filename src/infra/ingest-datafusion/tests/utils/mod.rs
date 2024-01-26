@@ -23,8 +23,8 @@ pub async fn assert_dfs_equal(lhs: DataFrame, rhs: DataFrame) {
     let lhs_batches = lhs.collect().await.unwrap();
     let rhs_batches = rhs.collect().await.unwrap();
 
-    let lhs_count: usize = lhs_batches.iter().map(|b| b.num_rows()).sum();
-    let rhs_count: usize = rhs_batches.iter().map(|b| b.num_rows()).sum();
+    let lhs_count: usize = lhs_batches.iter().map(RecordBatch::num_rows).sum();
+    let rhs_count: usize = rhs_batches.iter().map(RecordBatch::num_rows).sum();
 
     // This is a workaround for the situation where collect returns an empty vec vs.
     // a vec containing an empty batch
@@ -104,8 +104,8 @@ pub async fn assert_dfs_equivalent(
     let lhs_batches = lhs.collect().await.unwrap();
     let rhs_batches = rhs.collect().await.unwrap();
 
-    let lhs_count: usize = lhs_batches.iter().map(|b| b.num_rows()).sum();
-    let rhs_count: usize = rhs_batches.iter().map(|b| b.num_rows()).sum();
+    let lhs_count: usize = lhs_batches.iter().map(RecordBatch::num_rows).sum();
+    let rhs_count: usize = rhs_batches.iter().map(RecordBatch::num_rows).sum();
 
     // This is a workaround for the situation where collect returns an empty vec vs.
     // a vec containing an empty batch

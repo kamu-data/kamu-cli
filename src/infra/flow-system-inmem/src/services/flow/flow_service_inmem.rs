@@ -110,7 +110,7 @@ impl FlowServiceInMemory {
         let results = futures::future::join_all(planned_task_futures).await;
         results
             .into_iter()
-            .filter(|res| res.is_err())
+            .filter(Result::is_err)
             .map(|e| e.err().unwrap())
             .for_each(|e: InternalError| {
                 tracing::error!(error=?e, "Scheduling flow failed");

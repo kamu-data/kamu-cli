@@ -79,7 +79,7 @@ impl SqlShellImpl {
 
             container_builder = if let Some(p) = port {
                 container_builder.network("host").map_port_with_address(
-                    address.map_or(String::from("127.0.0.1"), |a| a.to_string()),
+                    address.map_or(String::from("127.0.0.1"), ToString::to_string),
                     p,
                     10000,
                 )

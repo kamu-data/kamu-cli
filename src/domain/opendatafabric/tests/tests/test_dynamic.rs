@@ -56,7 +56,7 @@ fn test_accessors() {
     let dynamic::MetadataEvent::SetTransform(transform) = block.event() else {
         panic!()
     };
-    let inputs: Vec<TransformInput> = transform.inputs().map(|i| i.into()).collect();
+    let inputs: Vec<TransformInput> = transform.inputs().map(Into::into).collect();
     assert_eq!(
         inputs,
         vec![

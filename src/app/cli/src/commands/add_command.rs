@@ -38,7 +38,7 @@ impl AddCommand {
         Self {
             resource_loader,
             dataset_repo,
-            snapshot_refs: snapshot_refs_iter.map(|s| s.to_owned()).collect(),
+            snapshot_refs: snapshot_refs_iter.map(ToOwned::to_owned).collect(),
             recursive,
             replace,
             stdin,
@@ -63,7 +63,7 @@ impl AddCommand {
                 glob::glob(p.to_str().unwrap())
                     .unwrap_or_else(|e| panic!("Failed to read glob {}: {}", p.display(), e))
             })
-            .map(|e| e.unwrap())
+            .map(Result::unwrap)
             .filter(|p| {
                 self.is_snapshot_file(p)
                     .unwrap_or_else(|e| panic!("Error while reading file {}: {}", p.display(), e))

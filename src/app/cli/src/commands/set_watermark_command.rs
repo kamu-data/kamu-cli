@@ -82,7 +82,7 @@ impl Command for SetWatermarkCommand {
             .map_err(CLIError::failure)?;
         let pull_aliases: Vec<_> = aliases
             .get_by_kind(RemoteAliasKind::Pull)
-            .map(|r| r.to_string())
+            .map(ToString::to_string)
             .collect();
 
         if !pull_aliases.is_empty() {
@@ -115,10 +115,10 @@ impl Command for SetWatermarkCommand {
                 Ok(())
             }
             Err(
-                e @ SetWatermarkError::IsDerivative
-                | e @ SetWatermarkError::IsRemote
-                | e @ SetWatermarkError::NotFound(_)
-                | e @ SetWatermarkError::Access(_),
+                e @ (SetWatermarkError::IsDerivative
+                | SetWatermarkError::IsRemote
+                | SetWatermarkError::NotFound(_)
+                | SetWatermarkError::Access(_)),
             ) => Err(CLIError::failure(e)),
             Err(e @ SetWatermarkError::Internal(_)) => Err(CLIError::critical(e)),
         }

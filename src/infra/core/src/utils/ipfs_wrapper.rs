@@ -20,7 +20,7 @@ pub struct IpfsClient {
 impl IpfsClient {
     pub fn new(ipfs_path: Option<impl Into<PathBuf>>, default_allow_offline: bool) -> Self {
         Self {
-            ipfs_path: ipfs_path.map(|p| p.into()),
+            ipfs_path: ipfs_path.map(Into::into),
             default_allow_offline,
         }
     }

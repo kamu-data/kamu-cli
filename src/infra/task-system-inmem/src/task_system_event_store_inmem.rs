@@ -118,7 +118,7 @@ impl TaskSystemEventStore for TaskSystemEventStoreInMemory {
             let mut pos = {
                 let state = self.inner.as_state();
                 let g = state.lock().unwrap();
-                g.tasks_by_dataset.get(&dataset_id).map_or(0, |tasks| tasks.len())
+                g.tasks_by_dataset.get(&dataset_id).map_or(0, Vec::len)
             };
 
             loop {
