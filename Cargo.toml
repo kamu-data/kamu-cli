@@ -94,39 +94,39 @@ module_inception = "allow"
 # TODO: reactivate after polishing
 # pedantic = { level = "warn", priority = 0 }
 
-unreadable_literal = { level = "warn", priority = 1 }
-return_self_not_must_use = { level = "allow", priority = 1 }
+default_trait_access = { level = "allow", priority = 1 }
+fn_params_excessive_bools = { level = "allow", priority = 1 }
+if_not_else = { level = "allow", priority = 1 }
+ignored_unit_patterns = { level = "allow", priority = 1 }
+items_after_statements = { level = "allow", priority = 1 }
+match_same_arms = { level = "allow", priority = 1 }
+match_wildcard_for_single_variants = { level = "allow", priority = 1 }
 missing_errors_doc = { level = "allow", priority = 1 }
 missing_panics_doc = { level = "allow", priority = 1 }
 module_name_repetitions = { level = "allow", priority = 1 }
-wildcard_imports = { level = "allow", priority = 1 }
 must_use_candidate = { level = "allow", priority = 1 }
-redundant_closure_for_method_calls = { level = "allow", priority = 1 }
-ignored_unit_patterns = { level = "allow", priority = 1 }
 needless_raw_string_hashes = { level = "allow", priority = 1 }
-default_trait_access = { level = "allow", priority = 1 }
-single_match_else = { level = "allow", priority = 1 }
-items_after_statements = { level = "allow", priority = 1 }
-unused_self = { level = "allow", priority = 1 }
-match_same_arms = { level = "allow", priority = 1 }
-if_not_else = { level = "allow", priority = 1 }
-struct_excessive_bools = { level = "allow", priority = 1 }
-match_wildcard_for_single_variants = { level = "allow", priority = 1 }
-struct_field_names = { level = "allow", priority = 1 }
-fn_params_excessive_bools = { level = "allow", priority = 1 }
-too_many_lines = { level = "allow", priority = 1 }
+redundant_closure_for_method_calls = { level = "allow", priority = 1 }
+return_self_not_must_use = { level = "allow", priority = 1 }
 similar_names = { level = "allow", priority = 1 }
+single_match_else = { level = "allow", priority = 1 }
+struct_excessive_bools = { level = "allow", priority = 1 }
+struct_field_names = { level = "allow", priority = 1 }
+too_many_lines = { level = "allow", priority = 1 }
+unreadable_literal = { level = "warn", priority = 1 }
+unused_self = { level = "allow", priority = 1 }
+wildcard_imports = { level = "allow", priority = 1 }
 
-redundant_else = "warn"
-manual_let_else = "warn"
-needless_pass_by_value = "warn"
-unnecessary_wraps = "warn"
 doc_markdown = "warn"
-trivially_copy_pass_by_ref = "warn"
 from_iter_instead_of_collect = "warn"
 linkedlist = "warn"
+manual_let_else = "warn"
 match_bool = "warn"
+needless_pass_by_value = "warn"
+redundant_else = "warn"
 should_panic_without_expect = "warn"
+trivially_copy_pass_by_ref = "warn"
+unnecessary_wraps = "warn"
 unused_async = "warn"
 
 # clippy::cargo

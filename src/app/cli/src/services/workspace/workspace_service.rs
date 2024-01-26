@@ -39,7 +39,7 @@ impl WorkspaceService {
         }
     }
 
-    fn init_workspace_config(workspace_layout: &Arc<WorkspaceLayout>) -> WorkspaceConfig {
+    fn init_workspace_config(workspace_layout: &WorkspaceLayout) -> WorkspaceConfig {
         if workspace_layout.config_path.is_file() {
             WorkspaceConfig::load_from(&workspace_layout.config_path).unwrap()
         } else {

@@ -135,7 +135,7 @@ impl KamuFlightSqlService {
 
     fn get_catalogs(
         &self,
-        ctx: &Arc<SessionContext>,
+        ctx: &SessionContext,
         _query: &CommandGetCatalogs,
     ) -> Result<RecordBatch, Status> {
         let batch_schema = Arc::new(Schema::new(vec![Field::new(
@@ -157,7 +157,7 @@ impl KamuFlightSqlService {
 
     fn get_schemas(
         &self,
-        ctx: &Arc<SessionContext>,
+        ctx: &SessionContext,
         query: &CommandGetDbSchemas,
     ) -> Result<RecordBatch, Status> {
         let db_schema_filter_pattern = if let Some(pat) = &query.db_schema_filter_pattern {
@@ -447,10 +447,7 @@ impl KamuFlightSqlService {
         }
     }
 
-    async fn prepare_statement(
-        query: &str,
-        ctx: &Arc<SessionContext>,
-    ) -> Result<LogicalPlan, Status> {
+    async fn prepare_statement(query: &str, ctx: &SessionContext) -> Result<LogicalPlan, Status> {
         let plan = ctx
             .sql(query)
             .await

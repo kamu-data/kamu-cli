@@ -52,7 +52,7 @@ impl Command for SystemInfoCommand {
 
     async fn run(&mut self) -> Result<(), CLIError> {
         write_output(
-            SystemInfo::collect(self.container_runtime.clone(), &self.workspace_svc).await,
+            SystemInfo::collect(&self.container_runtime, &self.workspace_svc).await,
             &self.output_config,
             &self.output_format.as_ref(),
         )?;
@@ -132,8 +132,8 @@ pub struct SystemInfo {
 
 impl SystemInfo {
     pub async fn collect(
-        container_runtime_svc: Arc<ContainerRuntime>,
-        workspace_svc: &Arc<WorkspaceService>,
+        container_runtime_svc: &ContainerRuntime,
+        workspace_svc: &WorkspaceService,
     ) -> Self {
         Self {
             build: BuildInfo::collect(),
@@ -193,7 +193,7 @@ pub struct WorkspaceInfo {
 }
 
 impl WorkspaceInfo {
-    pub fn collect(workspace_svc: &Arc<WorkspaceService>) -> Self {
+    pub fn collect(workspace_svc: &WorkspaceService) -> Self {
         if !workspace_svc.is_in_workspace() {
             return Self {
                 version: 0,
@@ -227,7 +227,7 @@ pub struct ContainerRuntimeInfo {
 }
 
 impl ContainerRuntimeInfo {
-    pub async fn collect(container_runtime: Arc<ContainerRuntime>) -> Self {
+    pub async fn collect(container_runtime: &ContainerRuntime) -> Self {
         let container_info_output = match container_runtime.info().output().await {
             Ok(container_info) => {
                 if container_info.status.success() {
