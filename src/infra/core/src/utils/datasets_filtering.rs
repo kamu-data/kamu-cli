@@ -6,7 +6,7 @@
 // As of the Change Date specified in that file, in accordance with
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
-use kamu_core::{DatasetHandleStream, DatasetRepository, ResultIntoInternal};
+use kamu_core::{DatasetHandleStream, DatasetRepository};
 use opendatafabric::DatasetRefPattern;
 
 pub fn filter_datasets_by_pattern(
@@ -26,18 +26,23 @@ pub fn filter_datasets_by_pattern(
         false => {
             let all_datasets_stream = dataset_repo.get_all_datasets();
             all_datasets_stream
-                .try_filter(move |dsh| {
+                .try_filter(move |dataset_handle| {
                     future::ready(
-                        dataset_ref_patterns
-                            .iter()
-                            .any(|dataset_ref_pattern| dataset_ref_pattern.is_match(dsh)),
+                        dataset_ref_patterns.iter().any(|dataset_ref_pattern| {
+                            dataset_ref_pattern.is_match(dataset_handle)
+                        }),
                     )
                 })
                 .boxed()
         }
         true => Box::pin(async_stream::try_stream! {
             for dataset_ref_pattern in dataset_ref_patterns.iter() {
-                yield dataset_repo.resolve_dataset_ref(dataset_ref_pattern.dataset_ref().unwrap()).await.int_err()?;
+                // Check references exist
+                // TODO: PERF: Create a batch version of `resolve_dataset_ref`
+                match dataset_repo.resolve_dataset_ref(dataset_ref_pattern.dataset_ref().unwrap()).await {
+                    Ok(dataset_handle) => yield dataset_handle,
+                    Err(_) => continue,
+                };
             }
         }),
     }

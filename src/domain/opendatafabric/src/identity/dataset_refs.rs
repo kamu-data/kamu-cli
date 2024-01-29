@@ -747,18 +747,18 @@ pub enum DatasetRefPattern {
     Pattern(Option<AccountName>, DatasetNamePattern),
 }
 
-// ToDO remove Result
 impl DatasetRefPattern {
     pub fn is_match(&self, dataset_hande: &DatasetHandle) -> bool {
         match self {
-            Self::Ref(dr) => match dr {
-                DatasetRef::ID(dsi) => *dsi == dataset_hande.id,
-                DatasetRef::Alias(dra) => *dra == dataset_hande.alias,
-                DatasetRef::Handle(drh) => drh == dataset_hande,
+            Self::Ref(dataset_ref) => match dataset_ref {
+                DatasetRef::ID(dataset_id) => *dataset_id == dataset_hande.id,
+                DatasetRef::Alias(dataset_alias) => *dataset_alias == dataset_hande.alias,
+                DatasetRef::Handle(dataset_handle_res) => dataset_handle_res == dataset_hande,
             },
-            Self::Pattern(an, dnm) => {
-                (an.is_none() || *an == dataset_hande.alias.account_name)
-                    && dnm.is_match(&dataset_hande.alias.dataset_name)
+            Self::Pattern(account_name_maybe, dataset_name_pattern) => {
+                (account_name_maybe.is_none()
+                    || *account_name_maybe == dataset_hande.alias.account_name)
+                    && dataset_name_pattern.is_match(&dataset_hande.alias.dataset_name)
             }
         }
     }
@@ -774,12 +774,12 @@ impl DatasetRefPattern {
 impl fmt::Display for DatasetRefPattern {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Ref(v) => write!(f, "{v}"),
-            Self::Pattern(an, dnp) => {
-                if let Some(account) = an {
-                    write!(f, "{account}/")?;
+            Self::Ref(dataset_ref) => write!(f, "{dataset_ref}"),
+            Self::Pattern(account_name_maybe, dataset_name_pattern) => {
+                if let Some(account_name) = account_name_maybe {
+                    write!(f, "{account_name}/")?;
                 }
-                write!(f, "{}", dnp)
+                write!(f, "{}", dataset_name_pattern)
             }
         }
     }
@@ -791,21 +791,23 @@ impl std::str::FromStr for DatasetRefPattern {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if s.contains('%') {
             return match s.split_once('/') {
-                Some((account, dn)) => match DatasetNamePattern::try_from(dn) {
-                    Ok(dnp) => match AccountName::try_from(account) {
-                        Ok(an) => Ok(Self::Pattern(Some(an), dnp)),
+                Some((account, dataset_name)) => match DatasetNamePattern::try_from(dataset_name) {
+                    Ok(dataset_name_pattern) => match AccountName::try_from(account) {
+                        Ok(account_name) => {
+                            Ok(Self::Pattern(Some(account_name), dataset_name_pattern))
+                        }
                         Err(_) => Err(Self::Err::new(s)),
                     },
                     Err(_) => Err(Self::Err::new(s)),
                 },
                 None => match DatasetNamePattern::try_from(s) {
-                    Ok(dnp) => Ok(Self::Pattern(None, dnp)),
+                    Ok(dataset_name_pattern) => Ok(Self::Pattern(None, dataset_name_pattern)),
                     Err(_) => Err(Self::Err::new(s)),
                 },
             };
         }
         match DatasetRef::from_str(s) {
-            Ok(dr) => Ok(Self::Ref(dr)),
+            Ok(dataset_ref) => Ok(Self::Ref(dataset_ref)),
             Err(_) => Err(Self::Err::new(s)),
         }
     }

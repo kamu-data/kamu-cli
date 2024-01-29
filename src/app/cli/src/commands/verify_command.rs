@@ -84,8 +84,8 @@ impl VerifyCommand {
             self.dataset_repo.as_ref(),
             vec![dataset_ref_pattern.clone()],
         )
-        .map_ok(|dsh| VerificationRequest {
-            dataset_ref: dsh.as_local_ref(),
+        .map_ok(|dataset_handle| VerificationRequest {
+            dataset_ref: dataset_handle.as_local_ref(),
             block_range: (None, None),
         })
         .try_collect()
