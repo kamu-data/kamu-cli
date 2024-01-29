@@ -31,7 +31,7 @@ pub fn filter_datasets_by_pattern(
 
     if glob_dataset_ref_patterns.is_empty() {
         Box::pin(async_stream::try_stream! {
-            for dataset_ref_pattern in dataset_ref_patterns.iter() {
+            for dataset_ref_pattern in &dataset_ref_patterns {
                 // Check references exist
                 // TODO: PERF: Create a batch version of `resolve_dataset_ref`
                 yield dataset_repo.resolve_dataset_ref(dataset_ref_pattern.as_dataset_ref().unwrap()).await?;
@@ -47,7 +47,7 @@ pub fn filter_datasets_by_pattern(
                         .any(|dataset_ref_pattern| dataset_ref_pattern.is_match(dataset_handle)),
                 )
             })
-            .map_err(|err| err.into())
+            .map_err(Into::into)
             .boxed()
     }
 }

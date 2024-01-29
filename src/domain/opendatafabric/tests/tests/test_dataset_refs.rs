@@ -46,7 +46,7 @@ fn test_dataset_ref_patterns() {
 
     assert_eq!(
         res.to_string(),
-        format!("Value '{}' is not a valid DatasetRefPattern", param),
+        format!("Value '{param}' is not a valid DatasetRefPattern"),
     );
 
     // Parse valid local ref with wildcard net.example.%
@@ -61,7 +61,7 @@ fn test_dataset_ref_patterns() {
     // Parse valid multitenant local ref with wildcard account/%
     let account = "account";
     let pattern = "%";
-    let res = DatasetRefPattern::from_str(format!("{}/{}", account, pattern).as_str()).unwrap();
+    let res = DatasetRefPattern::from_str(format!("{account}/{pattern}").as_str()).unwrap();
 
     assert_eq!(
         res,
@@ -119,7 +119,7 @@ fn test_dataset_ref_pattern_match() {
     let dataset_name_pattern = "net%";
     let dataset_name = "net.example.com";
 
-    let expression = format!("{}/{}", dataset_account, dataset_name_pattern);
+    let expression = format!("{dataset_account}/{dataset_name_pattern}");
     let pattern = DatasetRefPattern::from_str(expression.as_str()).unwrap();
     let dataset_handle = DatasetHandle {
         id: default_dataset_id.clone(),

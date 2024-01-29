@@ -777,7 +777,7 @@ impl fmt::Display for DatasetRefPattern {
                 if let Some(account_name) = account_name_maybe {
                     write!(f, "{account_name}/")?;
                 }
-                write!(f, "{}", dataset_name_pattern)
+                write!(f, "{dataset_name_pattern}")
             }
         }
     }

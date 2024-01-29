@@ -176,7 +176,7 @@ impl Command for VerifyCommand {
         }
         if errors != 0 {
             Err(BatchError::new(
-                format!("Failed to verify {} dataset(s)", errors),
+                format!("Failed to verify {errors} dataset(s)"),
                 verification_results.into_iter().filter_map(|multi_result| {
                     let single_result = multi_result.unwrap();
                     single_result.verification_result.err().map(|e| {

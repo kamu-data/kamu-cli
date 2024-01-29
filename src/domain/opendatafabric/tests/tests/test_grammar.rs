@@ -68,21 +68,21 @@ fn test_invalid_patterns() {
     // Invalid pattern "net.example.%-" should fail and return valid part
     let valid_part = "net.example.%";
     let invalid_part = "-";
-    let invalid_param = format!("{}{}", valid_part, invalid_part);
+    let invalid_param = format!("{valid_part}{invalid_part}");
     let res = Grammar::match_dataset_name_pattern(&invalid_param);
     assert_eq!(res, Some((valid_part, invalid_part)));
 
     // Invalid pattern "net.exa^mple.%" should fail and return valid part
     let valid_part = "net.exa";
     let invalid_part = "^mple.%";
-    let invalid_param = format!("{}{}", valid_part, invalid_part);
+    let invalid_param = format!("{valid_part}{invalid_part}");
     let res = Grammar::match_dataset_name_pattern(&invalid_param);
     assert_eq!(res, Some((valid_part, invalid_part)));
 
     // Invalid patter "&net%.exa%mple.net" should fail and reutnr None
     let valid_part = "";
     let invalid_part = "&net%.exa%mple.net";
-    let invalid_param = format!("{}{}", valid_part, invalid_part);
+    let invalid_param = format!("{valid_part}{invalid_part}");
     let res = Grammar::match_dataset_name_pattern(&invalid_param);
     assert_eq!(res, None);
 
@@ -91,7 +91,7 @@ fn test_invalid_patterns() {
     // should fail
     let valid_part = "did";
     let invalid_part = ":odf:fed012126262ba49e1ba8392c26f7a39e1ba8d756c7469786d3365200c68402ff65%";
-    let invalid_param = format!("{}{}", valid_part, invalid_part);
+    let invalid_param = format!("{valid_part}{invalid_part}");
     let res = Grammar::match_dataset_name_pattern(&invalid_param);
     assert_eq!(res, Some((valid_part, invalid_part)));
 }
