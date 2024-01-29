@@ -17,13 +17,15 @@ fn test_datafusion_cli() {
 
     let assert = cmd.arg("sql").write_stdin("select 1;").assert();
 
-    //let output = assert.get_output();
+    let output = assert.get_output();
 
     //not using assert.stdout("expected text") as time of query execution may
     // differ
-    //let string_result = String::from_utf8_lossy(&output.stdout);
+    let string_result = String::from_utf8_lossy(&output.stdout);
 
-    //simplified output comparison for diff OS's output
+    print!("{}", string_result);
+
+    //simplified output comparison as diff OS
     // assert!(
     //     string_result.contains("1 row in set."),
     //     "Output does not contain expected result."
