@@ -73,4 +73,96 @@ fn test_dataset_ref_patterns() {
 }
 
 #[test]
-fn test_dataset_ref_pattern_match() {}
+fn test_dataset_ref_pattern_match() {
+    let dataset_id_str =
+        "did:odf:fed012126262ba49e1ba8392c26f7a39e1ba8d756c7469786d3365200c68402ff65dc";
+    let default_dataset_id = DatasetID::from_did_str(dataset_id_str).unwrap();
+    let expression = "%odf%";
+    let pattern = DatasetRefPattern::from_str(expression).unwrap();
+
+    // Test match of DatasetRefPattern is Pattern type
+    let dataset_name = "net.example.com";
+    let dataset_handle = DatasetHandle {
+        id: default_dataset_id.clone(),
+        alias: DatasetAlias {
+            account_name: None,
+            dataset_name: DatasetName::from_str(dataset_name).unwrap(),
+        },
+    };
+
+    assert!(!pattern.is_match(&dataset_handle));
+
+    let dataset_name = "net.example.odf";
+    let dataset_handle = DatasetHandle {
+        id: default_dataset_id.clone(),
+        alias: DatasetAlias {
+            account_name: None,
+            dataset_name: DatasetName::from_str(dataset_name).unwrap(),
+        },
+    };
+
+    assert!(pattern.is_match(&dataset_handle));
+
+    let dataset_name = "net.example.odf";
+    let dataset_account = "account1";
+    let dataset_handle = DatasetHandle {
+        id: default_dataset_id.clone(),
+        alias: DatasetAlias {
+            account_name: Some(AccountName::from_str(dataset_account).unwrap()),
+            dataset_name: DatasetName::from_str(dataset_name).unwrap(),
+        },
+    };
+
+    assert!(pattern.is_match(&dataset_handle));
+
+    let dataset_account = "account1";
+    let dataset_name_pattern = "net%";
+    let dataset_name = "net.example.com";
+
+    let expression = format!("{}/{}", dataset_account, dataset_name_pattern);
+    let pattern = DatasetRefPattern::from_str(expression.as_str()).unwrap();
+    let dataset_handle = DatasetHandle {
+        id: default_dataset_id.clone(),
+        alias: DatasetAlias {
+            account_name: Some(AccountName::from_str(dataset_account).unwrap()),
+            dataset_name: DatasetName::from_str(dataset_name).unwrap(),
+        },
+    };
+
+    assert!(pattern.is_match(&dataset_handle));
+
+    let dataset_account = "account2";
+    let dataset_handle = DatasetHandle {
+        id: default_dataset_id.clone(),
+        alias: DatasetAlias {
+            account_name: Some(AccountName::from_str(dataset_account).unwrap()),
+            dataset_name: DatasetName::from_str(dataset_name).unwrap(),
+        },
+    };
+
+    assert!(!pattern.is_match(&dataset_handle));
+
+    // Test match of DatasetRefPattern is Ref type
+    let pattern = DatasetRefPattern::from_str(dataset_id_str).unwrap();
+    let dataset_name = "net.example.com";
+    let dataset_handle = DatasetHandle {
+        id: default_dataset_id.clone(),
+        alias: DatasetAlias {
+            account_name: None,
+            dataset_name: DatasetName::from_str(dataset_name).unwrap(),
+        },
+    };
+
+    assert!(pattern.is_match(&dataset_handle));
+
+    let expression = "net.example.com";
+    let pattern = DatasetRefPattern::from_str(expression).unwrap();
+    let dataset_handle = DatasetHandle {
+        id: default_dataset_id.clone(),
+        alias: DatasetAlias {
+            account_name: None,
+            dataset_name: DatasetName::from_str(expression).unwrap(),
+        },
+    };
+    assert!(pattern.is_match(&dataset_handle));
+}

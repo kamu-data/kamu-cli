@@ -10,7 +10,6 @@
 use std::fmt;
 use std::sync::Arc;
 
-use like::{InvalidPatternError, Like};
 use url::Url;
 
 use super::grammar::Grammar;
@@ -748,13 +747,27 @@ pub enum DatasetRefPattern {
     Pattern(Option<AccountName>, DatasetNamePattern),
 }
 
+// ToDO remove Result
 impl DatasetRefPattern {
-    pub fn is_match(&self, dataset_ref: &DatasetRef) -> Result<bool, InvalidPatternError> {
-        let pattern = match self {
-            Self::Ref(dr) => dr.to_string(),
-            Self::Pattern(_, dnm) => dnm.to_string(),
-        };
-        Like::<false>::like(dataset_ref.to_string().as_str(), &pattern)
+    pub fn is_match(&self, dataset_hande: &DatasetHandle) -> bool {
+        match self {
+            Self::Ref(dr) => match dr {
+                DatasetRef::ID(dsi) => *dsi == dataset_hande.id,
+                DatasetRef::Alias(dra) => *dra == dataset_hande.alias,
+                DatasetRef::Handle(drh) => drh == dataset_hande,
+            },
+            Self::Pattern(an, dnm) => {
+                (an.is_none() || *an == dataset_hande.alias.account_name)
+                    && dnm.is_match(&dataset_hande.alias.dataset_name)
+            }
+        }
+    }
+
+    pub fn dataset_ref(&self) -> Option<&DatasetRef> {
+        match self {
+            Self::Pattern(_, _) => None,
+            Self::Ref(dataset_ref) => Some(dataset_ref),
+        }
     }
 }
 

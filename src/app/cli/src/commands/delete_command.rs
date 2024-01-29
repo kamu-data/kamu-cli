@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use futures::TryStreamExt;
 use kamu::domain::*;
-use kamu::utils::dataset_stream_modification::filter_dataset_stream;
+use kamu::utils::datasets_filtering::filter_datasets_by_pattern;
 use opendatafabric::*;
 
 use super::{common, CLIError, Command};
@@ -52,39 +52,18 @@ impl Command for DeleteCommand {
             return Err(CLIError::usage_error("Specify a dataset or use --all flag"));
         }
 
-        let dataset_refs = if self.all {
+        let dataset_refs: Vec<_> = if self.all {
             unimplemented!("Recursive deletion is not yet supported")
         } else if self.recursive {
             unimplemented!("Recursive deletion is not yet supported")
         } else {
-            let mut res = vec![];
-            for dataset_ref_pattern in &self.dataset_ref_patterns {
-                match dataset_ref_pattern {
-                    DatasetRefPattern::Ref(dataset_ref) => {
-                        // Check references exist
-                        // TODO: PERF: Create a batch version of `resolve_dataset_ref
-                        match self.dataset_repo.resolve_dataset_ref(dataset_ref).await {
-                            Ok(_) => {
-                                res.push(dataset_ref.clone());
-                                Ok(())
-                            }
-                            Err(GetDatasetError::NotFound(e)) => Err(CLIError::usage_error_from(e)),
-                            Err(GetDatasetError::Internal(e)) => Err(e.into()),
-                        }?;
-                    }
-                    DatasetRefPattern::Pattern(_, _) => {
-                        let dataset_refs_match: Vec<_> = filter_dataset_stream(
-                            self.dataset_repo.get_all_datasets(),
-                            dataset_ref_pattern.clone(),
-                        )
-                        .map_ok(|dsh| dsh.as_local_ref())
-                        .try_collect()
-                        .await?;
-                        res.extend(dataset_refs_match);
-                    }
-                }
-            }
-            res
+            filter_datasets_by_pattern(
+                self.dataset_repo.as_ref(),
+                self.dataset_ref_patterns.clone(),
+            )
+            .map_ok(|dsh| dsh.as_local_ref())
+            .try_collect()
+            .await?
         };
 
         let confirmed = if self.no_confirmation {

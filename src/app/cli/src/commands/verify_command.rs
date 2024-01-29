@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use futures::TryStreamExt;
 use kamu::domain::*;
-use kamu::utils::dataset_stream_modification::filter_dataset_stream;
+use kamu::utils::datasets_filtering::filter_datasets_by_pattern;
 use opendatafabric::*;
 
 use super::{BatchError, CLIError, Command};
@@ -79,45 +79,18 @@ impl VerifyCommand {
         listener: Option<Arc<VerificationMultiProgress>>,
     ) -> GenericVerificationResult {
         let dataset_ref_pattern = self.refs.first().unwrap();
-        match dataset_ref_pattern {
-            DatasetRefPattern::Ref(dataset_ref) => {
-                let dataset_handle = self.dataset_repo.resolve_dataset_ref(dataset_ref).await?;
 
-                let listener = listener.and_then(|l| l.begin_verify(&dataset_handle));
+        let requests: Vec<_> = filter_datasets_by_pattern(
+            self.dataset_repo.as_ref(),
+            vec![dataset_ref_pattern.clone()],
+        )
+        .map_ok(|dsh| VerificationRequest {
+            dataset_ref: dsh.as_local_ref(),
+            block_range: (None, None),
+        })
+        .try_collect()
+        .await?;
 
-                let res = self
-                    .verification_svc
-                    .verify(
-                        &dataset_handle.as_local_ref(),
-                        (None, None),
-                        options,
-                        listener,
-                    )
-                    .await;
-
-                Ok(vec![res])
-            }
-            DatasetRefPattern::Pattern(_account_name, _pattern) => {
-                self.verify_multi(options, dataset_ref_pattern.clone(), listener)
-                    .await
-            }
-        }
-    }
-
-    async fn verify_multi(
-        &self,
-        options: VerificationOptions,
-        dataset_ref_pattern: DatasetRefPattern,
-        listener: Option<Arc<VerificationMultiProgress>>,
-    ) -> GenericVerificationResult {
-        let requests: Vec<_> =
-            filter_dataset_stream(self.dataset_repo.get_all_datasets(), dataset_ref_pattern)
-                .map_ok(|dsh| VerificationRequest {
-                    dataset_ref: dsh.as_local_ref(),
-                    block_range: (None, None),
-                })
-                .try_collect()
-                .await?;
         if requests.is_empty() {
             return Ok(vec![]);
         }
