@@ -15,5 +15,5 @@ use assert_cmd::Command;
 fn test_datafusion_cli() {
     let mut cmd = Command::cargo_bin("kamu-cli").unwrap();
 
-    cmd.arg("sql").assert().success();
+    cmd.arg("-- sql").assert().success();
 }
