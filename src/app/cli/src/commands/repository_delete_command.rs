@@ -80,7 +80,7 @@ impl Command for RepositoryDeleteCommand {
                 console::style("You are about to delete following repository(s)").yellow(),
                 repo_names
                     .iter()
-                    .map(|name| name.as_str())
+                    .map(RepoName::as_str)
                     .collect::<Vec<&str>>()
                     .join(", "),
             ))

@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::time::{Duration, Instant};
 
@@ -175,12 +175,12 @@ impl ContainerRuntime {
                 VolumeAccess::ReadOnly => cmd.arg(format!(
                     "{}:{}:ro",
                     Self::format_host_path(v.source),
-                    Self::format_container_path(v.dest),
+                    Self::format_container_path(&v.dest),
                 )),
                 VolumeAccess::ReadWrite => cmd.arg(format!(
                     "{}:{}",
                     Self::format_host_path(v.source),
-                    Self::format_container_path(v.dest),
+                    Self::format_container_path(&v.dest),
                 )),
             };
         });
@@ -404,7 +404,7 @@ impl ContainerRuntime {
         }
     }
 
-    pub async fn check_socket(&self, host_port: u16) -> Result<bool, ContainerRuntimeError> {
+    pub fn check_socket(&self, host_port: u16) -> Result<bool, ContainerRuntimeError> {
         use std::io::Read;
         use std::net::{TcpStream, ToSocketAddrs};
 
@@ -414,9 +414,8 @@ impl ContainerRuntime {
             .next()
             .expect("Couldn't resolve local sockaddr");
 
-        let mut stream = match TcpStream::connect_timeout(&addr, Duration::from_millis(100)) {
-            Ok(s) => s,
-            _ => return Ok(false),
+        let Ok(mut stream) = TcpStream::connect_timeout(&addr, Duration::from_millis(100)) else {
+            return Ok(false);
         };
 
         stream.set_read_timeout(Some(Duration::from_millis(1000)))?;
@@ -441,7 +440,7 @@ impl ContainerRuntime {
         let start = Instant::now();
 
         loop {
-            if self.check_socket(host_port).await? {
+            if self.check_socket(host_port)? {
                 break Ok(());
             } else if start.elapsed() >= timeout {
                 break Err(TimeoutError::new(timeout).into());
@@ -466,7 +465,7 @@ impl ContainerRuntime {
         }
     }
 
-    pub fn format_container_path(path: PathBuf) -> String {
+    pub fn format_container_path(path: &Path) -> String {
         if !cfg!(windows) {
             path.to_str().unwrap().to_owned()
         } else {
@@ -492,6 +491,7 @@ impl ContainerRuntime {
     }
 }
 
+#[derive(Copy, Clone)]
 pub enum Signal {
     TERM,
     KILL,

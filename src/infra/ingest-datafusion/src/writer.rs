@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::convert::TryFrom;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -252,7 +253,7 @@ impl DataWriterDataFusion {
         Ok(Some(df))
     }
 
-    async fn with_system_columns(
+    fn with_system_columns(
         &self,
         df: DataFrame,
         system_time: DateTime<Utc>,
@@ -344,7 +345,8 @@ impl DataWriterDataFusion {
             .with_column(
                 &self.meta.vocab.offset_column,
                 cast(
-                    col(&self.meta.vocab.offset_column as &str) + lit(start_offset as i64 - 1),
+                    col(&self.meta.vocab.offset_column as &str)
+                        + lit(i64::try_from(start_offset).unwrap() - 1),
                     // TODO: Replace with UInt64 after Spark is updated
                     // See: https://github.com/kamu-data/kamu-cli/issues/445
                     DataType::Int64,
@@ -519,8 +521,8 @@ impl DataWriterDataFusion {
             .value(0);
 
         let offset_interval = odf::OffsetInterval {
-            start: offset_min as u64,
-            end: offset_max as u64,
+            start: u64::try_from(offset_min).unwrap(),
+            end: u64::try_from(offset_max).unwrap(),
         };
 
         // Event time is either Date or Timestamp(Millisecond, UTC)
@@ -620,7 +622,7 @@ impl DataWriter for DataWriterDataFusion {
             let prev = self.get_all_previous_data(&self.meta.data_slices).await?;
 
             // Populate event time with nulls if missing, using matching type to prev data
-            let df = self.ensure_event_time_column(df, prev.as_ref().map(|p| p.schema()))?;
+            let df = self.ensure_event_time_column(df, prev.as_ref().map(DataFrame::schema))?;
 
             let df = self.merge_strategy.merge(prev, df)?;
 
@@ -631,14 +633,12 @@ impl DataWriter for DataWriterDataFusion {
             );
 
             // Add system columns
-            let df = self
-                .with_system_columns(
-                    df,
-                    opts.system_time,
-                    opts.source_event_time,
-                    self.meta.prev_offset.map_or(0, |e| e + 1),
-                )
-                .await?;
+            let df = self.with_system_columns(
+                df,
+                opts.system_time,
+                opts.source_event_time,
+                self.meta.prev_offset.map_or(0, |e| e + 1),
+            )?;
 
             // Validate schema matches the declared one
             let new_schema = SchemaRef::new(df.schema().into());
@@ -1053,7 +1053,7 @@ pub struct SourceNotFoundError {
 impl SourceNotFoundError {
     pub fn new(source_name: Option<impl Into<String>>, message: impl Into<String>) -> Self {
         Self {
-            source_name: source_name.map(|v| v.into()),
+            source_name: source_name.map(std::convert::Into::into),
             message: message.into(),
         }
     }

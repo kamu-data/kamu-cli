@@ -54,15 +54,12 @@ impl DatasetRepositoryS3 {
         }
     }
 
-    async fn get_dataset_impl(
-        &self,
-        dataset_id: &DatasetID,
-    ) -> Result<impl Dataset, InternalError> {
+    fn get_dataset_impl(&self, dataset_id: &DatasetID) -> Result<impl Dataset, InternalError> {
         let s3_context = self
             .s3_context
             .sub_context(&format!("{}/", &dataset_id.as_multibase()));
 
-        DatasetFactoryImpl::get_s3_from_context(s3_context, self.event_bus.clone()).await
+        DatasetFactoryImpl::get_s3_from_context(s3_context, self.event_bus.clone())
     }
 
     async fn delete_dataset_s3_objects(&self, dataset_id: &DatasetID) -> Result<(), InternalError> {
@@ -109,7 +106,7 @@ impl DatasetRepositoryS3 {
                 }
 
                 if let Ok(id) = DatasetID::from_multibase_string(&prefix) {
-                    let dataset = self.get_dataset_impl(&id).await?;
+                    let dataset = self.get_dataset_impl(&id)?;
                     let dataset_alias = self.resolve_dataset_alias(&dataset).await?;
                     if alias_filter(&dataset_alias) {
                         let hdl = DatasetHandle::new(id, dataset_alias);
@@ -183,7 +180,7 @@ impl DatasetRepository for DatasetRepositoryS3 {
                     .bucket_path_exists(id.as_multibase().to_stack_string().as_str())
                     .await?
                 {
-                    let dataset = self.get_dataset_impl(id).await?;
+                    let dataset = self.get_dataset_impl(id)?;
                     let dataset_alias = self.resolve_dataset_alias(&dataset).await?;
                     Ok(DatasetHandle::new(id.clone(), dataset_alias))
                 } else {
@@ -218,7 +215,7 @@ impl DatasetRepository for DatasetRepositoryS3 {
         dataset_ref: &DatasetRef,
     ) -> Result<Arc<dyn Dataset>, GetDatasetError> {
         let dataset_handle = self.resolve_dataset_ref(dataset_ref).await?;
-        let dataset = self.get_dataset_impl(&dataset_handle.id).await?;
+        let dataset = self.get_dataset_impl(&dataset_handle.id)?;
         Ok(Arc::new(dataset))
     }
 
@@ -274,7 +271,7 @@ impl DatasetRepository for DatasetRepositoryS3 {
         // It's okay to create a new dataset by this point
 
         let dataset_id = seed_block.event.dataset_id.clone();
-        let dataset = self.get_dataset_impl(&dataset_id).await?;
+        let dataset = self.get_dataset_impl(&dataset_id)?;
 
         // There are three possibilities at this point:
         // - Dataset did not exist before - continue normally
@@ -338,7 +335,7 @@ impl DatasetRepository for DatasetRepositoryS3 {
     ) -> Result<(), RenameDatasetError> {
         let dataset_handle = self.resolve_dataset_ref(dataset_ref).await?;
 
-        let dataset = self.get_dataset_impl(&dataset_handle.id).await?;
+        let dataset = self.get_dataset_impl(&dataset_handle.id)?;
 
         let new_alias =
             DatasetAlias::new(dataset_handle.alias.account_name.clone(), new_name.clone());

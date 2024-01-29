@@ -50,7 +50,7 @@ impl MergeStrategy for MergeStrategyLedger {
 
             new
         } else {
-            let cols: Vec<_> = self.primary_key.iter().map(|s| s.as_str()).collect();
+            let cols: Vec<_> = self.primary_key.iter().map(String::as_str).collect();
 
             new.join(prev.unwrap(), JoinType::LeftAnti, &cols, &cols, None)
                 .int_err()?

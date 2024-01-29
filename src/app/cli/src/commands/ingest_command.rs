@@ -61,11 +61,11 @@ impl IngestCommand {
             output_config,
             remote_alias_reg,
             dataset_ref,
-            files_refs: files_refs.map(|s| s.to_string()).collect(),
-            source_name: source_name.map(|s| s.into()),
+            files_refs: files_refs.map(ToString::to_string).collect(),
+            source_name: source_name.map(Into::into),
             stdin,
             recursive,
-            input_format: input_format.map(|s| s.into()),
+            input_format: input_format.map(Into::into),
         }
     }
 
@@ -88,7 +88,7 @@ impl IngestCommand {
             .map_err(CLIError::failure)?;
         let pull_aliases: Vec<_> = aliases
             .get_by_kind(RemoteAliasKind::Pull)
-            .map(|r| r.to_string())
+            .map(ToString::to_string)
             .collect();
         if !pull_aliases.is_empty() {
             return Err(CLIError::usage_error(format!(

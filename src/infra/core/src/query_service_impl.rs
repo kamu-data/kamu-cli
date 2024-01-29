@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::convert::TryFrom;
 use std::sync::Arc;
 
 use datafusion::catalog::schema::SchemaProvider;
@@ -49,7 +50,7 @@ impl QueryServiceImpl {
         }
     }
 
-    fn session_context(&self, options: QueryOptions) -> Result<SessionContext, InternalError> {
+    fn session_context(&self, options: QueryOptions) -> SessionContext {
         let cfg = SessionConfig::new()
             .with_information_schema(true)
             .with_default_catalog_and_schema("kamu", "kamu");
@@ -70,7 +71,7 @@ impl QueryServiceImpl {
                 options,
             )))),
         );
-        Ok(session_context)
+        session_context
     }
 
     #[tracing::instrument(level = "debug", skip_all)]
@@ -136,7 +137,7 @@ impl QueryServiceImpl {
 impl QueryService for QueryServiceImpl {
     #[tracing::instrument(level = "info", skip_all)]
     async fn create_session(&self) -> Result<SessionContext, CreateSessionError> {
-        Ok(self.session_context(QueryOptions::default())?)
+        Ok(self.session_context(QueryOptions::default()))
     }
 
     #[tracing::instrument(
@@ -148,8 +149,8 @@ impl QueryService for QueryServiceImpl {
     async fn tail(
         &self,
         dataset_ref: &DatasetRef,
-        skip: usize,
-        limit: usize,
+        skip: u64,
+        limit: u64,
     ) -> Result<DataFrame, QueryError> {
         let dataset_handle = self.dataset_repo.resolve_dataset_ref(dataset_ref).await?;
 
@@ -185,20 +186,12 @@ impl QueryService for QueryServiceImpl {
             .unwrap_or_default()
             .into();
 
-        let ctx = self
-            .session_context(QueryOptions {
-                datasets: vec![DatasetQueryOptions {
-                    dataset_ref: dataset_handle.as_local_ref(),
-                    last_records_to_consider: Some(skip + limit),
-                }],
-            })
-            .map_err(|e| {
-                tracing::error!(
-                    error = ?e,
-                    "QueryService::tail: session context failed to construct"
-                );
-                QueryError::Internal(e)
-            })?;
+        let ctx = self.session_context(QueryOptions {
+            datasets: vec![DatasetQueryOptions {
+                dataset_ref: dataset_handle.as_local_ref(),
+                last_records_to_consider: Some(skip + limit),
+            }],
+        });
 
         let df = ctx
             .table(TableReference::bare(dataset_handle.alias.to_string()))
@@ -206,7 +199,10 @@ impl QueryService for QueryServiceImpl {
 
         let df = df
             .sort(vec![col(&vocab.offset_column).sort(false, true)])?
-            .limit(skip, Some(limit))?
+            .limit(
+                usize::try_from(skip).unwrap(),
+                Some(usize::try_from(limit).unwrap()),
+            )?
             .sort(vec![col(&vocab.offset_column).sort(true, false)])?;
 
         Ok(df)
@@ -218,17 +214,13 @@ impl QueryService for QueryServiceImpl {
         statement: &str,
         options: QueryOptions,
     ) -> Result<DataFrame, QueryError> {
-        let ctx = self
-            .session_context(options)
-            .map_err(QueryError::Internal)?;
+        let ctx = self.session_context(options);
         Ok(ctx.sql(statement).await?)
     }
 
     #[tracing::instrument(level = "info", skip_all, fields(dataset_ref))]
     async fn get_schema(&self, dataset_ref: &DatasetRef) -> Result<Option<Type>, QueryError> {
-        let ctx = self
-            .session_context(QueryOptions::default())
-            .map_err(QueryError::Internal)?;
+        let ctx = self.session_context(QueryOptions::default());
         self.get_schema_impl(&ctx, dataset_ref).await
     }
 
@@ -363,7 +355,7 @@ impl KamuSchema {
     async fn collect_data_file_hashes(
         &self,
         dataset: &dyn Dataset,
-        last_records_to_consider: Option<usize>,
+        last_records_to_consider: Option<u64>,
     ) -> Result<Vec<Multihash>, InternalError> {
         let mut files = Vec::new();
         let mut num_records = 0;
@@ -430,9 +422,8 @@ impl KamuSchema {
     }
 
     async fn table_exist_impl(&self, name: &str) -> bool {
-        let dataset_name = match DatasetName::try_from(name) {
-            Ok(name) => name,
-            Err(_) => return false,
+        let Ok(dataset_name) = DatasetName::try_from(name) else {
+            return false;
         };
 
         let maybe_dataset_handle = self
@@ -483,18 +474,16 @@ impl SchemaProvider for KamuSchema {
     }
 
     async fn table(&self, name: &str) -> Option<Arc<dyn TableProvider>> {
-        let dataset_alias = match DatasetAlias::try_from(name) {
-            Ok(alias) => alias,
-            Err(_) => return None,
+        let Ok(dataset_alias) = DatasetAlias::try_from(name) else {
+            return None;
         };
 
-        let dataset_handle = match self
+        let Ok(dataset_handle) = self
             .dataset_repo
             .resolve_dataset_ref(&dataset_alias.as_local_ref())
             .await
-        {
-            Ok(hdl) => hdl,
-            Err(_) => return None,
+        else {
+            return None;
         };
 
         match self
@@ -527,7 +516,7 @@ impl SchemaProvider for KamuSchema {
         let object_repo = dataset.as_data_repo();
         let file_urls: Vec<String> = stream::iter(files)
             .then(|h| async move { object_repo.get_internal_url(&h).await })
-            .map(|url| url.into())
+            .map(Into::into)
             .collect()
             .await;
 

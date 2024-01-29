@@ -30,7 +30,7 @@ impl InspectSchemaCommand {
         Self {
             query_svc,
             dataset_ref,
-            output_format: output_format.map(|s| s.to_owned()),
+            output_format: output_format.map(ToOwned::to_owned),
         }
     }
 
@@ -121,8 +121,9 @@ impl Command for InspectSchemaCommand {
                 .map_err(|e| match e {
                     QueryError::DatasetNotFound(e) => CLIError::usage_error_from(e),
                     QueryError::DatasetSchemaNotAvailable(_) => unreachable!(),
-                    e @ QueryError::DataFusionError(_) => CLIError::failure(e),
-                    e @ QueryError::Access(_) => CLIError::failure(e),
+                    e @ (QueryError::DataFusionError(_) | QueryError::Access(_)) => {
+                        CLIError::failure(e)
+                    }
                     e @ QueryError::Internal(_) => CLIError::critical(e),
                 })?;
 

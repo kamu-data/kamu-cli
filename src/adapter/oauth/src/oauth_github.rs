@@ -280,7 +280,7 @@ impl kamu_core::auth::AuthenticationProvider for OAuthGithub {
         let maybe_account_info = self
             .github_find_account_info_by_login(&github_login)
             .await?;
-        Ok(maybe_account_info.map(|github_ai| github_ai.into()))
+        Ok(maybe_account_info.map(Into::into))
     }
 }
 

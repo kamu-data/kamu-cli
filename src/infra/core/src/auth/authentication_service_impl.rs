@@ -9,11 +9,11 @@
 
 use core::panic;
 use std::collections::HashMap;
+use std::convert::TryFrom;
 use std::sync::Arc;
 
-use chrono::Duration;
 use dill::*;
-use internal_error::{ErrorIntoInternal, InternalError};
+use internal_error::*;
 use jsonwebtoken::errors::ErrorKind;
 use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
 use kamu_core::auth::*;
@@ -103,10 +103,14 @@ impl AuthenticationServiceImpl {
         login_method: &str,
         provider_credentials_json: String,
     ) -> Result<String, InternalError> {
+        const EXPIRE_AFTER_SEC: usize = 24 * 60 * 60; // 1 day in seconds
+
         let current_time = self.time_source.now();
+        let iat = usize::try_from(current_time.timestamp()).unwrap();
+        let exp = iat + EXPIRE_AFTER_SEC;
         let claims = KamuAccessTokenClaims {
-            iat: current_time.timestamp() as usize,
-            exp: (current_time + Duration::days(1)).timestamp() as usize,
+            iat,
+            exp,
             iss: String::from(KAMU_JWT_ISSUER),
             sub: subject,
             access_credentials: KamuAccessCredentials {
@@ -120,18 +124,18 @@ impl AuthenticationServiceImpl {
             &claims,
             &self.encoding_key,
         )
-        .map_err(|e| e.int_err())
+        .int_err()
     }
 
     fn decode_access_token(
         &self,
-        access_token: String,
+        access_token: &str,
     ) -> Result<KamuAccessCredentials, AccessTokenError> {
         let mut validation = Validation::new(KAMU_JWT_ALGORITHM);
         validation.set_issuer(vec![KAMU_JWT_ISSUER].as_slice());
 
         let token_data =
-            decode::<KamuAccessTokenClaims>(&access_token, &self.decoding_key, &validation)
+            decode::<KamuAccessTokenClaims>(access_token, &self.decoding_key, &validation)
                 .map_err(|e| match *e.kind() {
                     ErrorKind::ExpiredSignature => AccessTokenError::Expired,
                     _ => AccessTokenError::Invalid(Box::new(e)),
@@ -182,7 +186,7 @@ impl AuthenticationService for AuthenticationServiceImpl {
         access_token: String,
     ) -> Result<AccountInfo, GetAccountInfoError> {
         let decoded_access_token = self
-            .decode_access_token(access_token)
+            .decode_access_token(&access_token)
             .map_err(GetAccountInfoError::AccessToken)?;
 
         let provider = self

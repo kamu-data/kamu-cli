@@ -44,6 +44,7 @@ struct State {
 
 #[component(pub)]
 impl EngineProvisionerLocal {
+    #[allow(clippy::needless_pass_by_value)]
     pub fn new(
         config: EngineProvisionerLocalConfig,
         container_runtime: Arc<ContainerRuntime>,
@@ -157,10 +158,9 @@ impl EngineProvisionerLocal {
             self.config.max_concurrency,
             self.container_runtime.config.network_ns,
         ) {
-            (None | Some(0), NetworkNamespaceType::Host) => 1,
+            (None | Some(0), NetworkNamespaceType::Host) | (Some(1), _) => 1,
             // TODO: Use available memory to deretmine the optimal limit
             (None | Some(0), NetworkNamespaceType::Private) => outstanding_handles + 1,
-            (Some(1), _) => 1,
             (Some(multi), NetworkNamespaceType::Private) => multi,
             (Some(multi), NetworkNamespaceType::Host) => {
                 tracing::warn!(

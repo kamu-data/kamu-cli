@@ -80,7 +80,7 @@ impl Schedule {
         }
 
         // The `cron` crate requires seconds, which we won't use, but have to provide
-        let cron_expression_with_sec = format!("0 {}", source_5component_cron_expression);
+        let cron_expression_with_sec = format!("0 {source_5component_cron_expression}");
         let cron_schedule = match cron::Schedule::from_str(&cron_expression_with_sec) {
             Err(_) => {
                 return Err(ScheduleCronError::InvalidCronExpression(

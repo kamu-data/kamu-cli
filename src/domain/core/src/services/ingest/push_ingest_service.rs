@@ -210,7 +210,7 @@ pub struct PushSourceNotFoundError {
 impl PushSourceNotFoundError {
     pub fn new(source_name: Option<impl Into<String>>) -> Self {
         Self {
-            source_name: source_name.map(|v| v.into()),
+            source_name: source_name.map(Into::into),
         }
     }
 }

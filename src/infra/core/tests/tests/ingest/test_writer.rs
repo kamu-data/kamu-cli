@@ -32,7 +32,7 @@ use opendatafabric as odf;
 // crate.
 ///////////////////////////////////////////////////////////////
 
-fn assert_schemas_equal(lhs: SchemaRef, rhs: SchemaRef, ignore_nullability: bool) {
+fn assert_schemas_equal(lhs: &SchemaRef, rhs: &SchemaRef, ignore_nullability: bool) {
     let map_field = |f: &Arc<Field>| -> Arc<Field> {
         if ignore_nullability {
             Arc::new(f.as_ref().clone().with_nullable(true))
@@ -129,7 +129,7 @@ async fn test_data_writer_happy_path() {
     // DataFrame being saved into parquet and those read out of it differs in
     // nullability
     assert_ne!(schema_in_block, schema_in_data);
-    assert_schemas_equal(schema_in_block, schema_in_data, true);
+    assert_schemas_equal(&schema_in_block, &schema_in_data, true);
 
     // Round 2
     harness.set_system_time(Utc.with_ymd_and_hms(2010, 1, 2, 12, 0, 0).unwrap());
@@ -500,7 +500,7 @@ async fn test_data_writer_ledger_orders_by_event_time() {
             .event
             .new_watermark
             .as_ref()
-            .map(|dt| dt.to_rfc3339()),
+            .map(DateTime::to_rfc3339),
         Some("2023-01-01T00:00:00+00:00".to_string())
     );
 }
@@ -575,7 +575,7 @@ async fn test_data_writer_snapshot_orders_by_pk_and_operation_type() {
             .event
             .new_watermark
             .as_ref()
-            .map(|dt| dt.to_rfc3339()),
+            .map(DateTime::to_rfc3339),
         Some("2000-01-01T12:00:00+00:00".to_string())
     );
 
@@ -639,7 +639,7 @@ async fn test_data_writer_snapshot_orders_by_pk_and_operation_type() {
             .event
             .new_watermark
             .as_ref()
-            .map(|dt| dt.to_rfc3339()),
+            .map(DateTime::to_rfc3339),
         Some("2000-01-02T12:00:00+00:00".to_string())
     );
 }
@@ -749,7 +749,7 @@ async fn test_data_writer_optimal_parquet_encoding() {
             .unwrap()
             .get_column_page_reader(col)
             .unwrap()
-            .map(|p| p.unwrap())
+            .map(Result::unwrap)
             .find(|p| p.page_type() == PageType::DATA_PAGE)
             .unwrap();
 
@@ -1004,7 +1004,7 @@ impl Harness {
                 self.ctx.clone(),
                 odf::ReadStepCsv {
                     header: Some(true),
-                    schema: Some(schema.split(',').map(|s| s.to_string()).collect()),
+                    schema: Some(schema.split(',').map(ToString::to_string).collect()),
                     ..Default::default()
                 },
             )

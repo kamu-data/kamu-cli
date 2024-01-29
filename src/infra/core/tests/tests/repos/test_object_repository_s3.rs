@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::assert_matches::assert_matches;
+use std::convert::TryFrom;
 
 use kamu::domain::*;
 use kamu::testing::LocalS3Server;
@@ -126,7 +127,7 @@ async fn test_insert_stream_long() {
             Box::new(std::io::Cursor::new(Vec::from(data))),
             InsertOpts {
                 precomputed_hash: Some(&hash),
-                size_hint: Some(data.len()),
+                size_hint: Some(u64::try_from(data.len()).unwrap()),
                 ..Default::default()
             }
         )

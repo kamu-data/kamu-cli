@@ -46,7 +46,7 @@ struct AuthorizationExpectations {
 }
 
 fn construct_authorizer(
-    authorization_expectations: AuthorizationExpectations,
+    authorization_expectations: &AuthorizationExpectations,
     d1_alias: &DatasetAlias,
     d2_alias: &DatasetAlias,
 ) -> impl auth::DatasetActionAuthorizer {
@@ -73,7 +73,7 @@ async fn do_test_sync(
     let (ipfs_gateway, ipfs_client) = ipfs.unwrap_or_default();
 
     let dataset_authorizer = construct_authorizer(
-        AuthorizationExpectations {
+        &AuthorizationExpectations {
             d1_reads: 8,
             d2_reads: 2,
             d1_writes: 1,

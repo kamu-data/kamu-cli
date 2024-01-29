@@ -44,7 +44,10 @@ impl DataBatch {
     ) -> Result<DataBatch> {
         use kamu_data_utils::data::format::*;
 
-        let num_records: usize = record_batches.iter().map(|b| b.num_rows()).sum();
+        let num_records: usize = record_batches
+            .iter()
+            .map(datafusion::arrow::array::RecordBatch::num_rows)
+            .sum();
 
         let mut buf = Vec::new();
         {

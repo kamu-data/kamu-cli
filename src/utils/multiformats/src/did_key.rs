@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::convert::TryFrom;
+
 use {ed25519_dalek as ed25519, unsigned_varint as uvar};
 
 use super::*;
@@ -159,7 +161,8 @@ impl DidKeyBytes {
 
             cursor.write_all(varint).unwrap();
             cursor.write_all(&value.public_key).unwrap();
-            cursor.position() as usize
+
+            usize::try_from(cursor.position()).unwrap()
         };
 
         Self { buf, len }
@@ -219,7 +222,7 @@ impl<'a> DidKeyFmt<'a> {
         let len = {
             let mut c = std::io::Cursor::new(&mut buf[..]);
             write!(c, "{self}").unwrap();
-            c.position() as usize
+            usize::try_from(c.position()).unwrap()
         };
 
         StackString::new(buf, len)

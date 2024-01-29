@@ -111,7 +111,7 @@ impl DatasetFlowConfigsMut {
                     .into(),
                 paused,
                 FlowConfigurationRule::StartCondition(StartConditionConfiguration {
-                    throttling_period: throttling_period.map(|tp| tp.into()),
+                    throttling_period: throttling_period.map(Into::into),
                     minimal_data_batch,
                 }),
             )

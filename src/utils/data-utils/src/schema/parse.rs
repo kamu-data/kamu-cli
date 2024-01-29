@@ -21,7 +21,7 @@ use datafusion::prelude::SessionContext;
 ///   "a STRING, b INT NOT NULL, c TIMESTAMP"
 ///
 /// `force_utc_time` parameter is related to:
-///     https://github.com/apache/arrow-datafusion/issues/686
+///     <https://github.com/apache/arrow-datafusion/issues/686>
 ///
 /// `DataFusion` currently has inconsistent timezone handling behavior. It will
 /// ensure that all times are parsed and adjusted if necessary to UTC timezone.
@@ -56,7 +56,7 @@ pub async fn parse_ddl_to_datafusion_schema(
 ///   "a STRING, b INT NOT NULL, c TIMESTAMP"
 ///
 /// `force_utc_time` parameter is related to:
-///     https://github.com/apache/arrow-datafusion/issues/686
+///     <https://github.com/apache/arrow-datafusion/issues/686>
 ///
 /// `DataFusion` currently has inconsistent timezone handling behavior. It will
 /// ensure that all times are parsed and adjusted if necessary to UTC timezone.
@@ -73,7 +73,7 @@ pub async fn parse_ddl_to_arrow_schema(
 // TZ coercion
 //
 // This code should go away once this issue is resolved:
-// https://github.com/apache/arrow-datafusion/issues/686
+// <https://github.com/apache/arrow-datafusion/issues/686>
 ///////////////////////////////////////////////////////////////////////////////
 
 fn do_force_utc_time(schema: DFSchema) -> DFSchema {

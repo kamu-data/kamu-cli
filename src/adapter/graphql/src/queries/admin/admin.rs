@@ -14,6 +14,7 @@ pub struct Admin;
 
 #[Object]
 impl Admin {
+    #[allow(clippy::unused_async)]
     #[graphql(guard = "AdminGuard::new()")]
     async fn self_test(&self, _ctx: &Context<'_>) -> Result<String> {
         Ok("OK".to_string())

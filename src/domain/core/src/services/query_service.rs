@@ -39,8 +39,8 @@ pub trait QueryService: Send + Sync {
     async fn tail(
         &self,
         dataset_ref: &DatasetRef,
-        skip: usize,
-        limit: usize,
+        skip: u64,
+        limit: u64,
     ) -> Result<DataFrame, QueryError>;
 
     /// Prepares an execution plan for the SQL statement and returns a
@@ -74,7 +74,7 @@ pub struct DatasetQueryOptions {
     /// number of part files examined, e.g. if limit is 100 and last data part
     /// file contains 150 records - only this file will be considered for the
     /// query and the rest of data will be completely ignored.
-    pub last_records_to_consider: Option<usize>,
+    pub last_records_to_consider: Option<u64>,
 }
 
 ///////////////////////////////////////////////////////////////////////////////

@@ -336,7 +336,7 @@ impl PollingIngestServiceImpl {
             .prev_source_state()
             .and_then(PollingSourceState::try_from_source_state);
 
-        let savepoint_path = self.get_savepoint_path(fetch_step, prev_source_state.as_ref())?;
+        let savepoint_path = self.get_savepoint_path(fetch_step, prev_source_state.as_ref());
         let savepoint = self.read_fetch_savepoint(&savepoint_path)?;
 
         if let Some(savepoint) = savepoint {
@@ -408,7 +408,7 @@ impl PollingIngestServiceImpl {
         &self,
         fetch_step: &FetchStep,
         source_state: Option<&PollingSourceState>,
-    ) -> Result<PathBuf, InternalError> {
+    ) -> PathBuf {
         use opendatafabric::serde::flatbuffers::{
             FlatbuffersEnumSerializable,
             FlatbuffersSerializable,
@@ -427,7 +427,7 @@ impl PollingIngestServiceImpl {
 
         let hash = Multihash::from_digest_sha3_256(fb.finished_data());
 
-        Ok(self.cache_dir.join(format!("fetch-savepoint-{hash}")))
+        self.cache_dir.join(format!("fetch-savepoint-{hash}"))
     }
 
     fn read_fetch_savepoint(
@@ -536,8 +536,7 @@ impl PollingIngestServiceImpl {
         new_result: PollingIngestResult,
     ) -> PollingIngestResult {
         match (combined_result, new_result) {
-            (None, n) => n,
-            (Some(PollingIngestResult::UpToDate { .. }), n) => n,
+            (None | Some(PollingIngestResult::UpToDate { .. }), n) => n,
             (
                 Some(PollingIngestResult::Updated {
                     old_head,

@@ -34,8 +34,9 @@ pub struct AccountService {
 #[component(pub)]
 #[interface(dyn auth::AuthenticationProvider)]
 impl AccountService {
+    #[allow(clippy::needless_pass_by_value)]
     pub fn new(users_config: Arc<UsersConfig>) -> Self {
-        let mut predefined_accounts: HashMap<String, AccountInfo> = HashMap::new();
+        let mut predefined_accounts = HashMap::new();
 
         for predefined_account in &users_config.predefined {
             predefined_accounts.insert(

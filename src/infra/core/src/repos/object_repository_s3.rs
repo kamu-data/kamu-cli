@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::convert::TryFrom;
 use std::marker::PhantomData;
 use std::path::Path;
 
@@ -93,15 +94,13 @@ where
         tracing::debug!(?key, "Checking for object");
 
         match self.s3_context.head_object(key).await {
-            Ok(output) => {
-                return Ok(output.content_length as u64);
-            }
+            Ok(output) => u64::try_from(output.content_length).map_err(|err| err.int_err().into()),
             Err(err) => match err.into_service_error() {
                 // TODO: Detect credentials error
                 HeadObjectError::NotFound(_) => Err(GetError::NotFound(ObjectNotFoundError {
                     hash: hash.clone(),
                 })),
-                err => return Err(err.int_err().into()),
+                err => Err(err.int_err().into()),
             },
         }
     }
@@ -257,9 +256,7 @@ where
             panic!("Writing steam into s3 only supports pre-computed hashes")
         };
 
-        let size = if let Some(size) = options.size_hint {
-            size
-        } else {
+        let Some(size) = options.size_hint else {
             panic!(
                 "Writing stream into s3 requires knowing the total size (until we implement \
                  multi-part uploads)"
@@ -275,7 +272,7 @@ where
         let stream = ReaderStream::new(src);
 
         self.s3_context
-            .put_object_stream(key, stream, size as i64)
+            .put_object_stream(key, stream, size)
             .await
             // TODO: Detect credentials error
             .map_err(|e| e.into_service_error().int_err())?;

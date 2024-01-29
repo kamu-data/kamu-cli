@@ -72,7 +72,7 @@ impl FlowConfigurationService for FlowConfigurationServiceInMemory {
     ) -> Result<Option<FlowConfigurationState>, FindFlowConfigurationError> {
         let maybe_flow_configuration =
             FlowConfiguration::try_load(flow_key, self.event_store.as_ref()).await?;
-        Ok(maybe_flow_configuration.map(|fcfg| fcfg.into()))
+        Ok(maybe_flow_configuration.map(Into::into))
     }
 
     /// Set or modify dataset update schedule

@@ -115,7 +115,7 @@ impl Kamu {
         S: Into<OsString>,
     {
         let mut full_cmd = vec![OsStr::new("kamu").to_owned(), OsStr::new("-q").to_owned()];
-        full_cmd.extend(cmd.into_iter().map(|i| i.into()));
+        full_cmd.extend(cmd.into_iter().map(Into::into));
 
         let app = kamu_cli::cli();
         let matches = app.try_get_matches_from(&full_cmd).unwrap();
@@ -169,7 +169,7 @@ impl Kamu {
         Ok(output
             .trim_end()
             .split('\n')
-            .map(|s| s.to_string())
+            .map(ToString::to_string)
             .collect())
     }
 

@@ -6,6 +6,7 @@
 // As of the Change Date specified in that file, in accordance with
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
+use std::convert::TryFrom;
 
 use kamu_core as domain;
 
@@ -50,7 +51,10 @@ impl DataQueries {
             _ => unimplemented!(),
         }
         // TODO: Sanity limits
-        .limit(skip.unwrap_or(0) as usize, Some(limit as usize))
+        .limit(
+            usize::try_from(skip.unwrap_or(0)).unwrap(),
+            Some(usize::try_from(limit).unwrap()),
+        )
         .int_err()?;
 
         let schema = DataSchema::from_data_frame_schema(df.schema(), schema_format)?;

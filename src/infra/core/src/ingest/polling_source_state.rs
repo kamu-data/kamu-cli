@@ -30,7 +30,7 @@ impl PollingSourceState {
             Ok(Some(Self::ETag(source_state.value.clone())))
         } else if source_state.kind == SourceState::KIND_LAST_MODIFIED {
             let dt = DateTime::parse_from_rfc3339(&source_state.value)
-                .map(|dt| dt.into())
+                .map(Into::into)
                 .int_err()?;
             Ok(Some(Self::LastModified(dt)))
         } else {

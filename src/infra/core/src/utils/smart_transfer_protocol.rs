@@ -28,7 +28,7 @@ impl Default for ObjectTransferOptions {
         // Run single-threaded transfer as a fallback, if the parallelism grade cannot
         // be determined
         let max_parallel_transfers = std::thread::available_parallelism()
-            .map(|nz| nz.get())
+            .map(std::num::NonZeroUsize::get)
             .unwrap_or(1_usize);
 
         Self {

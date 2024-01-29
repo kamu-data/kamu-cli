@@ -103,7 +103,7 @@ where
         Ok(())
     }
 
-    async fn validate_append_seed_block_order(
+    fn validate_append_seed_block_order(
         &self,
         new_block: &MetadataBlock,
         _block_cache: &mut [MetadataBlock],
@@ -458,7 +458,6 @@ where
                 // TODO: Ensure has previous push source with matching name
                 unimplemented!("Disabling sources is not yet fully supported")
             }
-            MetadataEvent::Seed(_) => Ok(()),
             MetadataEvent::SetTransform(e) => {
                 // Ensure has inputs
                 if e.inputs.is_empty() {
@@ -480,10 +479,11 @@ where
 
                 Ok(())
             }
-            MetadataEvent::SetVocab(_) => Ok(()),
-            MetadataEvent::SetAttachments(_) => Ok(()),
-            MetadataEvent::SetInfo(_) => Ok(()),
-            MetadataEvent::SetLicense(_) => Ok(()),
+            MetadataEvent::Seed(_)
+            | MetadataEvent::SetVocab(_)
+            | MetadataEvent::SetAttachments(_)
+            | MetadataEvent::SetInfo(_)
+            | MetadataEvent::SetLicense(_) => Ok(()),
         }
     }
 
@@ -786,8 +786,7 @@ where
                 .await?;
             self.validate_append_sequence_numbers_integrity(&block, &mut block_cache)
                 .await?;
-            self.validate_append_seed_block_order(&block, &mut block_cache)
-                .await?;
+            self.validate_append_seed_block_order(&block, &mut block_cache)?;
             self.validate_append_system_time_is_monotonic(&block, &mut block_cache)
                 .await?;
             self.validate_append_watermark_is_monotonic(&block, &mut block_cache)

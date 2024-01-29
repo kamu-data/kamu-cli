@@ -78,7 +78,7 @@ where
         self.entries += 1;
     }
 
-    pub fn write_metadata(&mut self, event: PerfettoMetadata<'_>) {
+    pub fn write_metadata(&mut self, event: &PerfettoMetadata<'_>) {
         if self.entries != 0 {
             writeln!(self.out, ",").unwrap();
         }

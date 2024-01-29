@@ -306,21 +306,20 @@ impl DiagnosticCheck for CheckWorkspaceConsistent {
 ///////////////////////////////////////////////////////////////////////////////
 
 fn handle_output_result(result: Output) -> Result<(), DiagnosticCheckError> {
-    match result.status.success() {
-        true => Ok(()),
-        false => {
-            let err_msg = String::from_utf8(result.stderr).map_err(|e| {
-                DiagnosticCheckError::Failed(CommandExecError {
-                    message: "Cannot parse command execution error".to_string(),
-                    error_log: e.to_string(),
-                })
-            })?;
+    if result.status.success() {
+        Ok(())
+    } else {
+        let err_msg = String::from_utf8(result.stderr).map_err(|e| {
+            DiagnosticCheckError::Failed(CommandExecError {
+                message: "Cannot parse command execution error".to_string(),
+                error_log: e.to_string(),
+            })
+        })?;
 
-            Err(DiagnosticCheckError::Failed(CommandExecError {
-                message: "Container runtime command unavailable".to_string(),
-                error_log: err_msg,
-            }))
-        }
+        Err(DiagnosticCheckError::Failed(CommandExecError {
+            message: "Container runtime command unavailable".to_string(),
+            error_log: err_msg,
+        }))
     }
 }
 

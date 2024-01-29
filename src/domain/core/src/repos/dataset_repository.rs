@@ -186,6 +186,7 @@ where
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+#[allow(clippy::linkedlist)]
 fn sort_snapshots_in_dependency_order(
     mut snapshots: LinkedList<DatasetSnapshot>,
 ) -> Vec<DatasetSnapshot> {

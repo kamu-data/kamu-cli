@@ -110,7 +110,7 @@ impl DatasetTestHelper {
             .and_then(|e| e.new_checkpoint.as_ref())
             .map(|c| c.physical_hash.clone());
 
-        let prev_offset = prev_data.as_ref().and_then(|e| e.last_offset());
+        let prev_offset = prev_data.as_ref().and_then(AddData::last_offset);
 
         let num_records = 10;
         let start = prev_offset.map_or(0, |v| v + 1);
