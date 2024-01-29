@@ -10,6 +10,7 @@
 mod test_access_token_registry_svc;
 mod test_add_command;
 mod test_complete_command;
+mod test_datafusion_cli;
 mod test_di_graph;
 mod test_ingest_command;
 mod test_new_dataset_command;

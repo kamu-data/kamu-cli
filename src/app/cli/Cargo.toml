@@ -101,6 +101,7 @@ tracing-log = "0.2"
 tracing-bunyan-formatter = "0.3"
 
 # Utils
+assert_cmd = "2.0.13"
 async-trait = "0.1"
 chrono = "0.4"
 cfg-if = "1"  # Conditional compilation
