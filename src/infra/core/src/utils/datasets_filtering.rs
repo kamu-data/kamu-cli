@@ -22,20 +22,8 @@ pub fn filter_datasets_by_pattern(
         })
         .collect();
 
-    match glob_dataset_ref_patterns.is_empty() {
-        false => {
-            let all_datasets_stream = dataset_repo.get_all_datasets();
-            all_datasets_stream
-                .try_filter(move |dataset_handle| {
-                    future::ready(
-                        dataset_ref_patterns.iter().any(|dataset_ref_pattern| {
-                            dataset_ref_pattern.is_match(dataset_handle)
-                        }),
-                    )
-                })
-                .boxed()
-        }
-        true => Box::pin(async_stream::try_stream! {
+    if glob_dataset_ref_patterns.is_empty() {
+        Box::pin(async_stream::try_stream! {
             for dataset_ref_pattern in dataset_ref_patterns.iter() {
                 // Check references exist
                 // TODO: PERF: Create a batch version of `resolve_dataset_ref`
@@ -44,6 +32,17 @@ pub fn filter_datasets_by_pattern(
                     Err(_) => continue,
                 };
             }
-        }),
+        })
+    } else {
+        dataset_repo
+            .get_all_datasets()
+            .try_filter(move |dataset_handle| {
+                future::ready(
+                    dataset_ref_patterns
+                        .iter()
+                        .any(|dataset_ref_pattern| dataset_ref_pattern.is_match(dataset_handle)),
+                )
+            })
+            .boxed()
     }
 }
