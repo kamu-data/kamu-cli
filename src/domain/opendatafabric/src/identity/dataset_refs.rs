@@ -761,10 +761,20 @@ impl DatasetRefPattern {
         }
     }
 
+    /// Convert into a [`DatasetRef`] when value is not a glob pattern
     pub fn as_dataset_ref(&self) -> Option<&DatasetRef> {
         match self {
             Self::Pattern(_, _) => None,
             Self::Ref(dataset_ref) => Some(dataset_ref),
+        }
+    }
+
+    /// Returns `false` if value is a reference to some specific dataset rather
+    /// than a glob pattern
+    pub fn is_pattern(&self) -> bool {
+        match self {
+            DatasetRefPattern::Ref(_) => false,
+            DatasetRefPattern::Pattern(_, _) => true,
         }
     }
 }

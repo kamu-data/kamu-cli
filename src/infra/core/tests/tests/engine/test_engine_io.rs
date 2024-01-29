@@ -214,7 +214,7 @@ async fn test_engine_io_common(
         .verify_transform(&deriv_alias.as_local_ref(), (None, None), None)
         .await;
 
-    assert_matches!(verify_result, Ok(VerificationResult::Valid));
+    assert_matches!(verify_result, Ok(()));
 }
 
 #[test_group::group(containerized, engine, transform, datafusion)]

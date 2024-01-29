@@ -19,8 +19,8 @@ use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::{
     DatasetRepository,
     OwnedFile,
-    VerificationMultiListener,
     VerificationOptions,
+    VerificationRequest,
     VerificationService,
 };
 use kamu::utils::docker_images::BUSYBOX;
@@ -269,13 +269,22 @@ impl DiagnosticCheck for CheckWorkspaceConsistent {
         "workspace consistent".to_string()
     }
     async fn run(&self) -> Result<(), DiagnosticCheckError> {
-        let progress = VerificationMultiProgress::new();
-        let listener_option = Arc::new(progress.clone());
+        let progress = Arc::new(VerificationMultiProgress::new());
 
+        let progress_cloned = progress.clone();
         let draw_thread = std::thread::spawn(move || {
-            progress.draw();
+            progress_cloned.draw();
         });
-        let datasets: Vec<_> = self.dataset_repo.get_all_datasets().try_collect().await?;
+
+        let verification_requests: Vec<_> = self
+            .dataset_repo
+            .get_all_datasets()
+            .map_ok(|hdl| VerificationRequest {
+                dataset_ref: hdl.as_local_ref(),
+                block_range: (None, None),
+            })
+            .try_collect()
+            .await?;
 
         let verify_options = VerificationOptions {
             check_integrity: true,
@@ -283,20 +292,22 @@ impl DiagnosticCheck for CheckWorkspaceConsistent {
             replay_transformations: false,
         };
 
-        for dataset in datasets {
-            let listener = Some(listener_option.clone()).and_then(|l| l.begin_verify(&dataset));
-            self.verification_svc
-                .verify(
-                    &dataset.as_local_ref(),
-                    (None, None),
-                    verify_options.clone(),
-                    listener,
-                )
-                .await
-                .int_err()?;
+        let results = self
+            .verification_svc
+            .verify_multi(
+                verification_requests,
+                verify_options.clone(),
+                Some(progress.clone()),
+            )
+            .await;
+
+        for result in results {
+            // TODO: This will currently not show which dataset validation failed for
+            // We need to improve `verify_multi` signature.
+            result.outcome.int_err()?;
         }
 
-        listener_option.finish();
+        progress.finish();
         draw_thread.join().unwrap();
 
         Ok(())

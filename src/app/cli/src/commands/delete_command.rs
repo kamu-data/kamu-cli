@@ -69,9 +69,7 @@ impl Command for DeleteCommand {
         if dataset_refs.is_empty() {
             eprintln!(
                 "{}",
-                console::style("There are no datasets matching pattern")
-                    .yellow()
-                    .bold()
+                console::style("There are no datasets matching the pattern").yellow()
             );
             return Ok(());
         }

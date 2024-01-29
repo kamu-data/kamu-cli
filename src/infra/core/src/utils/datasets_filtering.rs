@@ -9,6 +9,7 @@
 
 use std::pin::Pin;
 
+use futures::{future, StreamExt, TryStreamExt};
 use kamu_core::{DatasetRepository, GetDatasetError};
 use opendatafabric::{DatasetHandle, DatasetRefPattern};
 use tokio_stream::Stream;
@@ -20,19 +21,15 @@ pub fn filter_datasets_by_pattern(
     dataset_repo: &dyn DatasetRepository,
     dataset_ref_patterns: Vec<DatasetRefPattern>,
 ) -> FilteredDatasetHandleStream<'_> {
-    use futures::{future, StreamExt, TryStreamExt};
-    let glob_dataset_ref_patterns: Vec<_> = dataset_ref_patterns
+    // We assume here that resolving specific references one by one is more
+    // efficient than iterating all datasets, so we iterate only if one of the
+    // inputs is a glob pattern
+    if !dataset_ref_patterns
         .iter()
-        .filter(|dataset_ref_pattern| match dataset_ref_pattern {
-            DatasetRefPattern::Ref(_) => false,
-            DatasetRefPattern::Pattern(_, _) => true,
-        })
-        .collect();
-
-    if glob_dataset_ref_patterns.is_empty() {
+        .any(DatasetRefPattern::is_pattern)
+    {
         Box::pin(async_stream::try_stream! {
             for dataset_ref_pattern in &dataset_ref_patterns {
-                // Check references exist
                 // TODO: PERF: Create a batch version of `resolve_dataset_ref`
                 yield dataset_repo.resolve_dataset_ref(dataset_ref_pattern.as_dataset_ref().unwrap()).await?;
             }

@@ -18,8 +18,7 @@ use super::{BatchError, CLIError, Command};
 use crate::output::OutputConfig;
 use crate::VerificationMultiProgress;
 
-type GenericVerificationResult =
-    Result<Vec<Result<VerificationDatasetResult, VerificationError>>, CLIError>;
+type GenericVerificationResult = Result<Vec<VerificationResult>, CLIError>;
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -143,53 +142,44 @@ impl Command for VerifyCommand {
             self.verify(options, None).await?
         };
 
-        let mut valid = 0;
-        let mut errors = 0;
-
         if verification_results.is_empty() {
             eprintln!(
                 "{}",
-                console::style("There are no datasets matching pattern")
-                    .yellow()
-                    .bold()
+                console::style("There are no datasets matching the pattern").yellow()
             );
             return Ok(());
         }
 
-        for res in &verification_results {
-            match res {
-                Ok(mutli_result) => match mutli_result.verification_result {
-                    Ok(_) => valid += 1,
-                    Err(_) => errors += 1,
-                },
-                Err(_) => errors += 1,
-            }
-        }
+        let total_results = verification_results.len();
 
-        if valid != 0 {
+        let errors: Vec<_> = verification_results
+            .into_iter()
+            .filter_map(|result| match result.outcome {
+                Ok(_) => None,
+                Err(e) => Some((
+                    e,
+                    match result.dataset_handle {
+                        None => "Failed to initiate verification".to_string(),
+                        Some(hdl) => format!("Failed to verify {hdl}"),
+                    },
+                )),
+            })
+            .collect();
+
+        if errors.is_empty() {
             eprintln!(
                 "{}",
-                console::style(format!("{valid} dataset(s) are valid"))
+                console::style(format!("{total_results} dataset(s) are valid"))
                     .green()
                     .bold()
             );
-        }
-        if errors != 0 {
+            Ok(())
+        } else {
             Err(BatchError::new(
-                format!("Failed to verify {errors} dataset(s)"),
-                verification_results.into_iter().filter_map(|multi_result| {
-                    let single_result = multi_result.unwrap();
-                    single_result.verification_result.err().map(|e| {
-                        (
-                            e,
-                            format!("Failed to verify {}", single_result.dataset_handle),
-                        )
-                    })
-                }),
+                format!("Failed to verify {} dataset(s)", errors.len()),
+                errors,
             )
             .into())
-        } else {
-            Ok(())
         }
     }
 }
