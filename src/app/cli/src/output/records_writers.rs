@@ -72,7 +72,7 @@ impl RecordsFormat {
             .get(column)
             .and_then(|cf| cf.style_spec.as_ref())
             .or(self.default_column_format.style_spec.as_ref())
-            .map(|s| s.as_str())
+            .map(String::as_str)
             .unwrap()
     }
 

@@ -121,21 +121,21 @@ pub struct SyncStats {
 #[derive(Debug, Clone, Default)]
 pub struct SyncPartyStats {
     /// Number of metadata blocks read from the party
-    pub metadata_blocks_read: usize,
+    pub metadata_blocks_read: u64,
     /// Number of metadata blocks written to the party
-    pub metadata_blocks_written: usize,
+    pub metadata_blocks_written: u64,
     /// Number of checkpoint files read from the party
-    pub checkpoints_read: usize,
+    pub checkpoints_read: u64,
     /// Number of checkpoint files written to the party
-    pub checkpoints_written: usize,
+    pub checkpoints_written: u64,
     /// Number of data files read from the party
-    pub data_slices_read: usize,
+    pub data_slices_read: u64,
     /// Number of data files written to the party
-    pub data_slices_written: usize,
+    pub data_slices_written: u64,
     /// Number of bytes read from the party
-    pub bytes_read: usize,
+    pub bytes_read: u64,
     /// Number of bytes written to the party
-    pub bytes_written: usize,
+    pub bytes_written: u64,
 }
 
 pub struct NullSyncListener;
@@ -224,8 +224,8 @@ impl DatasetNotFoundError {
 pub struct DatasetsDivergedError {
     pub src_head: Multihash,
     pub dst_head: Multihash,
-    pub uncommon_blocks_in_src: usize,
-    pub uncommon_blocks_in_dst: usize,
+    pub uncommon_blocks_in_src: u64,
+    pub uncommon_blocks_in_dst: u64,
 }
 
 ///////////////////////////////////////////////////////////////////////////////

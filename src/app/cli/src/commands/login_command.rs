@@ -109,7 +109,7 @@ impl LoginCommand {
         Ok(())
     }
 
-    async fn handle_token_expired(&self, odf_server_frontend_url: &Url) -> Result<(), CLIError> {
+    fn handle_token_expired(&self, odf_server_frontend_url: &Url) -> Result<(), CLIError> {
         eprintln!(
             "{}: {}",
             console::style("Dropping expired access token")
@@ -157,7 +157,7 @@ impl Command for LoginCommand {
                     Ok(())
                 }
                 Err(odf_server::ValidateAccessTokenError::ExpiredToken(_)) => {
-                    self.handle_token_expired(&odf_server_frontend_url).await?;
+                    self.handle_token_expired(&odf_server_frontend_url)?;
                     self.new_login(odf_server_frontend_url).await
                 }
                 Err(odf_server::ValidateAccessTokenError::InvalidToken(e)) => {

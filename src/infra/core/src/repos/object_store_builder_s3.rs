@@ -148,7 +148,7 @@ impl CredentialProvider for AwsSdkCredentialProvider {
         let converted_creds = Arc::new(AwsCredential {
             key_id: new_creds.access_key_id().to_string(),
             secret_key: new_creds.secret_access_key().to_string(),
-            token: new_creds.session_token().map(|s| s.to_string()),
+            token: new_creds.session_token().map(ToString::to_string),
         });
 
         state.cached_creds = Some(new_creds);

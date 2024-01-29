@@ -276,7 +276,7 @@ impl SimpleTransferProtocol {
                         Some(&data_slice.physical_hash)
                     },
                     expected_hash: Some(&data_slice.physical_hash),
-                    size_hint: Some(data_slice.size as usize),
+                    size_hint: Some(data_slice.size),
                 },
             )
             .await
@@ -300,8 +300,9 @@ impl SimpleTransferProtocol {
 
         stats.src.data_slices_read += 1;
         stats.dst.data_slices_written += 1;
-        stats.src.bytes_read += data_slice.size as usize;
-        stats.dst.bytes_written += data_slice.size as usize;
+        stats.src.bytes_read += data_slice.size;
+        stats.dst.bytes_written += data_slice.size;
+
         listener.on_status(SyncStage::TransferData, &stats);
 
         Ok(())
@@ -347,7 +348,7 @@ impl SimpleTransferProtocol {
                     // This hint is necessary only for S3 implementation that does not
                     // currently support streaming uploads
                     // without knowing Content-Length. We should remove it in future.
-                    size_hint: Some(checkpoint.size as usize),
+                    size_hint: Some(checkpoint.size),
                 },
             )
             .await
@@ -371,8 +372,9 @@ impl SimpleTransferProtocol {
 
         stats.src.checkpoints_read += 1;
         stats.dst.checkpoints_written += 1;
-        stats.src.bytes_read += checkpoint.size as usize;
-        stats.dst.bytes_written += checkpoint.size as usize;
+        stats.src.bytes_read += checkpoint.size;
+        stats.dst.bytes_written += checkpoint.size;
+
         listener.on_status(SyncStage::TransferData, &stats);
 
         Ok(())
@@ -391,19 +393,22 @@ impl SimpleTransferProtocol {
         mut stats: SyncStats,
     ) -> Result<(), SyncError> {
         // Update stats estimates based on metadata
-        stats.dst_estimated.metadata_blocks_written += blocks.len();
+        stats.dst_estimated.metadata_blocks_written += blocks.len() as u64;
+
         for block in blocks.iter().filter_map(|(_, b)| b.as_data_stream_block()) {
             if let Some(data_slice) = block.event.new_data {
                 stats.src_estimated.data_slices_read += 1;
-                stats.src_estimated.bytes_read += data_slice.size as usize;
+                stats.src_estimated.bytes_read += data_slice.size;
+
                 stats.dst_estimated.data_slices_written += 1;
-                stats.dst_estimated.bytes_written += data_slice.size as usize;
+                stats.dst_estimated.bytes_written += data_slice.size;
             }
             if let Some(checkpoint) = block.event.new_checkpoint {
                 stats.src_estimated.checkpoints_read += 1;
-                stats.src_estimated.bytes_read += checkpoint.size as usize;
+                stats.src_estimated.bytes_read += checkpoint.size;
+
                 stats.dst_estimated.checkpoints_written += 1;
-                stats.dst_estimated.bytes_written += checkpoint.size as usize;
+                stats.dst_estimated.bytes_written += checkpoint.size;
             }
         }
 
@@ -551,25 +556,25 @@ impl CompareChainsListenerAdapter {
 }
 
 impl CompareChainsListener for CompareChainsListenerAdapter {
-    fn on_lhs_expected_reads(&self, num_blocks: usize) {
+    fn on_lhs_expected_reads(&self, num_blocks: u64) {
         let mut s = self.stats.lock().unwrap();
         s.src_estimated.metadata_blocks_read += num_blocks;
         self.l.on_status(SyncStage::ReadMetadata, &s);
     }
 
-    fn on_lhs_read(&self, num_blocks: usize) {
+    fn on_lhs_read(&self, num_blocks: u64) {
         let mut s = self.stats.lock().unwrap();
         s.src.metadata_blocks_read += num_blocks;
         self.l.on_status(SyncStage::ReadMetadata, &s);
     }
 
-    fn on_rhs_expected_reads(&self, num_blocks: usize) {
+    fn on_rhs_expected_reads(&self, num_blocks: u64) {
         let mut s = self.stats.lock().unwrap();
         s.dst_estimated.metadata_blocks_read += num_blocks;
         self.l.on_status(SyncStage::ReadMetadata, &s);
     }
 
-    fn on_rhs_read(&self, num_blocks: usize) {
+    fn on_rhs_read(&self, num_blocks: u64) {
         let mut s = self.stats.lock().unwrap();
         s.dst.metadata_blocks_read += num_blocks;
         self.l.on_status(SyncStage::ReadMetadata, &s);

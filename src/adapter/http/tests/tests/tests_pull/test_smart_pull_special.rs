@@ -43,8 +43,7 @@ async fn test_smart_pull_unauthenticated() {
             multi_tenant: false,
             authorized_writes: true,
             base_catalog: None,
-        })
-        .await,
+        }),
     )
     .await;
 

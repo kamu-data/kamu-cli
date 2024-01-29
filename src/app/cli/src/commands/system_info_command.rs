@@ -39,7 +39,7 @@ impl SystemInfoCommand {
             output_config,
             container_runtime,
             workspace_svc,
-            output_format: output_format.map(|s| s.into()),
+            output_format: output_format.map(Into::into),
         }
     }
 }
@@ -52,9 +52,9 @@ impl Command for SystemInfoCommand {
 
     async fn run(&mut self) -> Result<(), CLIError> {
         write_output(
-            SystemInfo::collect(self.container_runtime.clone(), self.workspace_svc.clone()).await,
+            SystemInfo::collect(&self.container_runtime, &self.workspace_svc).await,
             &self.output_config,
-            self.output_format.as_ref(),
+            &self.output_format.as_ref(),
         )?;
         Ok(())
     }
@@ -74,7 +74,7 @@ impl VersionCommand {
     {
         Self {
             output_config,
-            output_format: output_format.map(|s| s.into()),
+            output_format: output_format.map(Into::into),
         }
     }
 }
@@ -89,7 +89,7 @@ impl Command for VersionCommand {
         write_output(
             BuildInfo::collect(),
             &self.output_config,
-            self.output_format.as_ref(),
+            &self.output_format.as_ref(),
         )?;
         Ok(())
     }
@@ -100,9 +100,9 @@ impl Command for VersionCommand {
 fn write_output<T: serde::Serialize>(
     value: T,
     output_config: &OutputConfig,
-    output_format: Option<impl AsRef<str>>,
+    output_format: &Option<impl AsRef<str>>,
 ) -> Result<(), InternalError> {
-    let output_format = if let Some(fmt) = &output_format {
+    let output_format = if let Some(fmt) = output_format {
         fmt.as_ref()
     } else if output_config.is_tty {
         "shell"
@@ -132,8 +132,8 @@ pub struct SystemInfo {
 
 impl SystemInfo {
     pub async fn collect(
-        container_runtime_svc: Arc<ContainerRuntime>,
-        workspace_svc: Arc<WorkspaceService>,
+        container_runtime_svc: &ContainerRuntime,
+        workspace_svc: &WorkspaceService,
     ) -> Self {
         Self {
             build: BuildInfo::collect(),
@@ -193,7 +193,7 @@ pub struct WorkspaceInfo {
 }
 
 impl WorkspaceInfo {
-    pub fn collect(workspace_svc: Arc<WorkspaceService>) -> Self {
+    pub fn collect(workspace_svc: &WorkspaceService) -> Self {
         if !workspace_svc.is_in_workspace() {
             return Self {
                 version: 0,
@@ -227,7 +227,7 @@ pub struct ContainerRuntimeInfo {
 }
 
 impl ContainerRuntimeInfo {
-    pub async fn collect(container_runtime: Arc<ContainerRuntime>) -> Self {
+    pub async fn collect(container_runtime: &ContainerRuntime) -> Self {
         let container_info_output = match container_runtime.info().output().await {
             Ok(container_info) => {
                 if container_info.status.success() {

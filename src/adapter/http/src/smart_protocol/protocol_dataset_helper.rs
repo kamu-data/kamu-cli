@@ -176,10 +176,10 @@ pub async fn prepare_dataset_metadata_batch(
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn decode_metadata_batch(
-    objects_batch: ObjectsBatch,
+pub fn decode_metadata_batch(
+    objects_batch: &ObjectsBatch,
 ) -> Result<VecDeque<(Multihash, MetadataBlock)>, GetBlockError> {
-    let blocks_data = unpack_dataset_metadata_batch(objects_batch).await;
+    let blocks_data = unpack_dataset_metadata_batch(objects_batch);
     blocks_data
         .into_iter()
         .map(|(hash, bytes)| {
@@ -257,7 +257,7 @@ pub async fn dataset_append_metadata(
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-async fn unpack_dataset_metadata_batch(objects_batch: ObjectsBatch) -> Vec<(Multihash, Vec<u8>)> {
+fn unpack_dataset_metadata_batch(objects_batch: &ObjectsBatch) -> Vec<(Multihash, Vec<u8>)> {
     assert!(
         objects_batch.media_type.eq(MEDIA_TAR_GZ),
         "Unsupported media type {}",
@@ -281,10 +281,10 @@ async fn unpack_dataset_metadata_batch(objects_batch: ObjectsBatch) -> Vec<(Mult
     let blocks_data: Vec<(Multihash, Vec<u8>)> = archive
         .entries()
         .unwrap()
-        .filter_map(|e| e.ok())
+        .filter_map(Result::ok)
         .map(|mut entry| {
             let entry_size = entry.size();
-            let mut buf = vec![0_u8; entry_size as usize];
+            let mut buf = vec![0_u8; usize::try_from(entry_size).unwrap()];
             entry.read_exact(buf.as_mut_slice()).unwrap();
 
             let path = entry.path().unwrap();
@@ -492,7 +492,7 @@ pub async fn prepare_pull_object_transfer_strategy(
     let transfer_url_result = match get_download_url_result {
         Ok(result) => Ok(TransferUrl {
             url: result.url,
-            headers: primitivize_header_map(result.header_map),
+            headers: primitivize_header_map(&result.header_map),
             expires_at: result.expires_at,
         }),
         Err(error) => match error {
@@ -558,10 +558,10 @@ fn get_simple_transfer_protocol_headers(
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-fn primitivize_header_map(header_map: http::HeaderMap) -> Vec<HeaderRow> {
+fn primitivize_header_map(header_map: &http::HeaderMap) -> Vec<HeaderRow> {
     let mut res = Vec::new();
 
-    for (name, value) in &header_map {
+    for (name, value) in header_map {
         res.push(HeaderRow {
             name: name.to_string(),
             value: value.to_str().unwrap().to_string(),
@@ -603,7 +603,7 @@ pub async fn prepare_push_object_transfer_strategy(
     let contains = object_repo
         .contains(&object_file_ref.physical_hash)
         .await
-        .map_err(|e| e.int_err())?;
+        .int_err()?;
 
     if contains {
         Ok(PushObjectTransferStrategy {
@@ -621,7 +621,7 @@ pub async fn prepare_push_object_transfer_strategy(
         let transfer_url_result = match get_upload_url_result {
             Ok(result) => Ok(TransferUrl {
                 url: result.url,
-                headers: primitivize_header_map(result.header_map),
+                headers: primitivize_header_map(&result.header_map),
                 expires_at: result.expires_at,
             }),
             Err(error) => match error {
@@ -669,7 +669,7 @@ pub async fn dataset_import_object_file(
         ))
         .send()
         .await
-        .map_err(|e| e.int_err())?;
+        .int_err()?;
 
     let stream = response.bytes_stream();
 
@@ -691,7 +691,7 @@ pub async fn dataset_import_object_file(
             InsertOpts {
                 precomputed_hash: None,
                 expected_hash: Some(&object_file_reference.physical_hash),
-                size_hint: Some(object_file_reference.size as usize),
+                size_hint: Some(object_file_reference.size),
             },
         )
         .await;

@@ -11,7 +11,6 @@ use std::cmp::Reverse;
 use std::collections::{BinaryHeap, HashMap};
 
 use chrono::{DateTime, Utc};
-use kamu_core::InternalError;
 use kamu_flow_system::FlowID;
 use thiserror::Error;
 
@@ -72,22 +71,16 @@ impl FlowTimeWheel {
 
     // TODO: maybe round activation time by a reasonable interval, like a minute, so
     // that scoring logic might be inserted
-    pub fn activate_at(
-        &mut self,
-        activation_time: DateTime<Utc>,
-        flow_id: FlowID,
-    ) -> Result<(), InternalError> {
+    pub fn activate_at(&mut self, activation_time: DateTime<Utc>, flow_id: FlowID) {
         match self.flow_activation_times_by_id.get(&flow_id) {
             Some(earlier_activation_time) => {
                 if activation_time < *earlier_activation_time {
                     self.unplan_flow(flow_id);
                     self.plan_flow(FlowRecord::new(activation_time, flow_id));
                 }
-                Ok(())
             }
             None => {
                 self.plan_flow(FlowRecord::new(activation_time, flow_id));
-                Ok(())
             }
         }
     }
@@ -235,7 +228,7 @@ mod tests {
     }
 
     fn schedule_flow(timewheel: &mut FlowTimeWheel, moment: DateTime<Utc>, flow_id: u64) {
-        timewheel.activate_at(moment, FlowID::new(flow_id)).unwrap();
+        timewheel.activate_at(moment, FlowID::new(flow_id));
     }
 
     fn check_next_time_slot(

@@ -187,7 +187,7 @@ impl PullServiceImpl {
                 original_request: None, // May be set below
                 depth: 0,
                 local_ref: local_handle
-                    .map(|h| h.into())
+                    .map(Into::into)
                     .unwrap_or(local_alias.clone().into()),
                 remote_ref,
             }
@@ -314,7 +314,7 @@ impl PullServiceImpl {
     }
 
     fn infer_local_name_from_url(&self, url: &Url) -> Result<DatasetName, PullError> {
-        if let Some(last_segment) = url.path_segments().and_then(|s| s.last()) {
+        if let Some(last_segment) = url.path_segments().and_then(Iterator::last) {
             if let Ok(name) = DatasetName::try_from(last_segment) {
                 return Ok(name);
             }
@@ -642,10 +642,12 @@ impl PullService for PullServiceImpl {
                 new_head: res.new_head,
                 num_blocks: 1,
             }),
-            Err(WriteWatermarkError::EmptyCommit(_)) => Ok(PullResult::UpToDate),
-            Err(WriteWatermarkError::CommitError(CommitError::MetadataAppendError(
-                AppendError::InvalidBlock(AppendValidationError::WatermarkIsNotMonotonic),
-            ))) => Ok(PullResult::UpToDate),
+            Err(
+                WriteWatermarkError::EmptyCommit(_)
+                | WriteWatermarkError::CommitError(CommitError::MetadataAppendError(
+                    AppendError::InvalidBlock(AppendValidationError::WatermarkIsNotMonotonic),
+                )),
+            ) => Ok(PullResult::UpToDate),
             Err(e) => Err(e.int_err().into()),
         }
     }

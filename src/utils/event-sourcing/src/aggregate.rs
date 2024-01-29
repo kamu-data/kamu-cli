@@ -286,7 +286,7 @@ where
             );
         }
 
-        match Proj::apply(self.state.take(), event.clone()) {
+        match Proj::apply(self.state.take(), event) {
             Ok(state) => {
                 self.state = Some(state);
                 Ok(())

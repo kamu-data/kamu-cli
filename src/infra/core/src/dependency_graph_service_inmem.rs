@@ -282,9 +282,7 @@ impl AsyncEventHandler<DatasetEventDeleted> for DependencyGraphServiceInMemory {
     async fn handle(&self, event: &DatasetEventDeleted) -> Result<(), InternalError> {
         let mut state = self.state.lock().await;
 
-        let node_index = state
-            .get_dataset_node(&event.dataset_id)
-            .map_err(|e| e.int_err())?;
+        let node_index = state.get_dataset_node(&event.dataset_id).int_err()?;
 
         state.datasets_graph.remove_node(node_index);
         state.dataset_node_indices.remove(&event.dataset_id);
@@ -301,9 +299,7 @@ impl AsyncEventHandler<DatasetEventDependenciesUpdated> for DependencyGraphServi
     async fn handle(&self, event: &DatasetEventDependenciesUpdated) -> Result<(), InternalError> {
         let mut state = self.state.lock().await;
 
-        let node_index = state
-            .get_dataset_node(&event.dataset_id)
-            .map_err(|e| e.int_err())?;
+        let node_index = state.get_dataset_node(&event.dataset_id).int_err()?;
 
         let existing_upstream_ids: HashSet<_> = state
             .datasets_graph
@@ -317,8 +313,7 @@ impl AsyncEventHandler<DatasetEventDependenciesUpdated> for DependencyGraphServi
             })
             .collect();
 
-        let new_upstream_ids: HashSet<_> =
-            HashSet::from_iter(event.new_upstream_ids.iter().cloned());
+        let new_upstream_ids: HashSet<_> = event.new_upstream_ids.iter().cloned().collect();
 
         for obsolete_upstream_id in existing_upstream_ids.difference(&new_upstream_ids) {
             self.remove_dependency(&mut state, obsolete_upstream_id, &event.dataset_id);

@@ -103,9 +103,9 @@ impl ReaderEsriShapefile {
         let list_shp_files = || -> Vec<PathBuf> {
             walkdir::WalkDir::new(dir)
                 .into_iter()
-                .filter_map(|e| e.ok())
+                .filter_map(Result::ok)
                 .filter(|e| is_shp_file(e.path()))
-                .map(|e| e.into_path())
+                .map(walkdir::DirEntry::into_path)
                 .collect()
         };
 
@@ -130,7 +130,7 @@ impl ReaderEsriShapefile {
                 // Try globed match
                 let matches: Vec<_> = glob::glob(path.to_str().unwrap())
                     .int_err()?
-                    .filter_map(|e| e.ok())
+                    .filter_map(Result::ok)
                     .filter(|p| is_shp_file(p))
                     .collect();
 
@@ -195,7 +195,7 @@ impl ReaderEsriShapefile {
                     JsonValue::Number(serde_json::Number::from_f64(f64::from(v)).unwrap())
                 }),
                 ShpValue::Integer(v) => Some(JsonValue::Number(v.into())),
-                ShpValue::Currency(v) => {
+                ShpValue::Currency(v) | ShpValue::Double(v) => {
                     Some(JsonValue::Number(serde_json::Number::from_f64(v).unwrap()))
                 }
                 ShpValue::DateTime(v) => Some(JsonValue::String(format!(
@@ -207,9 +207,6 @@ impl ReaderEsriShapefile {
                     v.time().minutes(),
                     v.time().seconds(),
                 ))),
-                ShpValue::Double(v) => {
-                    Some(JsonValue::Number(serde_json::Number::from_f64(v).unwrap()))
-                }
                 ShpValue::Memo(v) => Some(JsonValue::String(v)),
             }
             .unwrap_or(JsonValue::Null);

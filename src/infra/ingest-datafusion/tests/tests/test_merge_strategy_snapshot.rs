@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::assert_matches::assert_matches;
+use std::convert::TryFrom;
 use std::sync::Arc;
 
 use datafusion::arrow::array;
@@ -126,7 +127,7 @@ where
     let mut population = Vec::new();
 
     for (i, (o, y, c, p)) in rows.into_iter().enumerate() {
-        offset.push(i as i64);
+        offset.push(i64::try_from(i).unwrap());
         op.push(o as i32);
         year.push(y);
         city.push(c.into());

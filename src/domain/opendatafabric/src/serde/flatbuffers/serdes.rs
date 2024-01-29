@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::convert::TryFrom;
+
 use ::flatbuffers;
 
 pub use super::convertors_generated::*;
@@ -78,7 +80,8 @@ impl MetadataBlockDeserializer for FlatbuffersMetadataBlockDeserializer {
         let manifest_proxy = flatbuffers::root::<fbgen::Manifest>(data).map_err(Error::serde)?;
 
         // TODO: Better error handling
-        let kind = Multicodec::try_from(manifest_proxy.kind() as u32).unwrap();
+        let manifest_kind = u32::try_from(manifest_proxy.kind()).unwrap();
+        let kind = Multicodec::try_from(manifest_kind).unwrap();
         assert_eq!(kind, Multicodec::ODFMetadataBlock);
 
         // TODO: Handle conversions for compatible versions

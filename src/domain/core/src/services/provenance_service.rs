@@ -52,15 +52,13 @@ pub enum NodeInfo<'a> {
 impl<'a> NodeInfo<'a> {
     pub fn id(&self) -> &DatasetID {
         match self {
-            NodeInfo::Local { id, .. } => id,
-            NodeInfo::Remote { id, .. } => id,
+            NodeInfo::Local { id, .. } | NodeInfo::Remote { id, .. } => id,
         }
     }
 
     pub fn alias(&self) -> &DatasetAlias {
         match self {
-            NodeInfo::Local { alias, .. } => alias,
-            NodeInfo::Remote { alias, .. } => alias,
+            NodeInfo::Local { alias, .. } | NodeInfo::Remote { alias, .. } => alias,
         }
     }
 }

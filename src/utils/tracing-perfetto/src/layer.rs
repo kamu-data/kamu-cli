@@ -12,6 +12,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
+use conv::ConvUtil;
 use tracing::*;
 use tracing_subscriber::*;
 
@@ -53,7 +54,9 @@ impl PerfettoLayer {
     }
 
     fn get_ts(&self) -> f64 {
-        self.start.elapsed().as_nanos() as f64 / 1000.0
+        let nanos = u64::try_from(self.start.elapsed().as_nanos()).unwrap();
+
+        nanos.value_as::<f64>().unwrap() / 1000.0
     }
 
     fn get_tid(&self) -> u64 {
@@ -77,7 +80,7 @@ impl PerfettoLayer {
             self.writer
                 .lock()
                 .unwrap()
-                .write_metadata(PerfettoMetadata::ThreadName { tid, name: &name });
+                .write_metadata(&PerfettoMetadata::ThreadName { tid, name: &name });
         }
 
         tid
@@ -160,7 +163,7 @@ where
             tid: self.get_tid(),
             phase: Phase::InstantAsync,
             name: Some(event.metadata().name()),
-            id: ctx.current_span().id().map(|id| id.into_u64()),
+            id: ctx.current_span().id().map(Id::into_u64),
             args: Some(Visitable::Event(event)),
             scope: None,
         });

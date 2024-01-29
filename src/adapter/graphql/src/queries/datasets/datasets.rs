@@ -84,6 +84,7 @@ impl Datasets {
 
     /// Returns datasets belonging to the specified account
     #[allow(unused_variables)]
+    #[allow(clippy::unused_async)]
     async fn by_account_id(
         &self,
         ctx: &Context<'_>,

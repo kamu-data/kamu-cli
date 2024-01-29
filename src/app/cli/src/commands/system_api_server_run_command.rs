@@ -113,7 +113,7 @@ impl Command for APIServerRunCommand {
         // TODO: Cloning catalog is too expensive currently
         let api_server = crate::explore::APIServer::new(
             self.base_catalog.clone(),
-            self.cli_catalog.clone(),
+            &self.cli_catalog,
             self.multi_tenant_workspace,
             self.address,
             self.port,

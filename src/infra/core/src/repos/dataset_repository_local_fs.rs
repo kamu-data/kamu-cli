@@ -83,15 +83,10 @@ impl DatasetRepositoryLocalFs {
     }
 
     // TODO: Make dataset factory (and thus the hashing algo) configurable
-    fn get_dataset_impl(
-        &self,
-        dataset_handle: &DatasetHandle,
-    ) -> Result<impl Dataset, InternalError> {
+    fn get_dataset_impl(&self, dataset_handle: &DatasetHandle) -> impl Dataset {
         let layout = DatasetLayout::new(self.storage_strategy.get_dataset_path(dataset_handle));
-        Ok(DatasetFactoryImpl::get_local_fs(
-            layout,
-            self.event_bus.clone(),
-        ))
+
+        DatasetFactoryImpl::get_local_fs(layout, self.event_bus.clone())
     }
 
     // TODO: Used only for testing, but should be removed it in future to discourage
@@ -177,7 +172,7 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
         dataset_ref: &DatasetRef,
     ) -> Result<Arc<dyn Dataset>, GetDatasetError> {
         let dataset_handle = self.resolve_dataset_ref(dataset_ref).await?;
-        let dataset = self.get_dataset_impl(&dataset_handle)?;
+        let dataset = self.get_dataset_impl(&dataset_handle);
         Ok(Arc::new(dataset))
     }
 

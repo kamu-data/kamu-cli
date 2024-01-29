@@ -180,10 +180,7 @@ where
             ApiErrorCategory::Access(AccessError::Unauthorized(_)) => {
                 ApiError::new(self, http::StatusCode::UNAUTHORIZED)
             }
-            ApiErrorCategory::Access(AccessError::Forbidden(_)) => {
-                ApiError::new(self, http::StatusCode::FORBIDDEN)
-            }
-            ApiErrorCategory::Access(AccessError::ReadOnly(_)) => {
+            ApiErrorCategory::Access(AccessError::Forbidden(_) | AccessError::ReadOnly(_)) => {
                 ApiError::new(self, http::StatusCode::FORBIDDEN)
             }
             ApiErrorCategory::Internal(_) => {

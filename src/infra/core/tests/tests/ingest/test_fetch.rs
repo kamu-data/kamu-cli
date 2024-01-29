@@ -222,9 +222,8 @@ async fn test_fetch_url_http_ok() {
         .unwrap();
 
     assert_matches!(res, FetchResult::Updated(_));
-    let update = match res {
-        FetchResult::Updated(upd) => upd,
-        _ => unreachable!(),
+    let FetchResult::Updated(update) = res else {
+        unreachable!()
     };
     assert_matches!(&update.source_state, Some(PollingSourceState::ETag(_)));
     assert!(!update.has_more);

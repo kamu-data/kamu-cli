@@ -86,9 +86,7 @@ pub(crate) fn validate_log_filter(s: &str) -> Result<String, String> {
     let items: Vec<_> = s.split(',').collect();
     for item in items {
         match item {
-            "source" => Ok(()),
-            "watermark" => Ok(()),
-            "data" => Ok(()),
+            "source" | "watermark" | "data" => Ok(()),
             _ => Err("Filter should be a comma-separated list of values like: \
                       source,data,watermark"
                 .to_string()),

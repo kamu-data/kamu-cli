@@ -20,8 +20,8 @@ impl FlowConfigurationStatus {
     pub fn is_active(&self) -> bool {
         match self {
             FlowConfigurationStatus::Active => true,
-            FlowConfigurationStatus::PausedTemporarily => false,
-            FlowConfigurationStatus::StoppedPermanently => false,
+            FlowConfigurationStatus::PausedTemporarily
+            | FlowConfigurationStatus::StoppedPermanently => false,
         }
     }
 }

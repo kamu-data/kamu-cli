@@ -50,7 +50,7 @@ pub(crate) struct ServerSideLocalFsHarness {
 }
 
 impl ServerSideLocalFsHarness {
-    pub async fn new(options: ServerSideHarnessOptions) -> Self {
+    pub fn new(options: ServerSideHarnessOptions) -> Self {
         let tempdir = tempfile::tempdir().unwrap();
         let datasets_dir = tempdir.path().join("datasets");
         std::fs::create_dir(&datasets_dir).unwrap();

@@ -48,7 +48,7 @@ impl LineageCommand {
             workspace_layout,
             dataset_refs: dataset_refs.into_iter().collect(),
             browse,
-            output_format: output_format.map(|s| s.to_owned()),
+            output_format: output_format.map(ToOwned::to_owned),
             output_config,
         }
     }

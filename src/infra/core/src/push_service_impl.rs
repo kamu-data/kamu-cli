@@ -288,7 +288,7 @@ impl PushItem {
             original_request: self.original_request,
             local_handle: Some(self.local_handle),
             remote_ref: Some(self.remote_ref),
-            result: result.map_err(|e| e.into()),
+            result: result.map_err(Into::into),
         }
     }
 }

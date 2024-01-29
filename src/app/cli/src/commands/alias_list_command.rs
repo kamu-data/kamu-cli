@@ -79,11 +79,11 @@ impl AliasListCommand {
                 .await?;
             let mut pull_aliases: Vec<_> = aliases
                 .get_by_kind(RemoteAliasKind::Pull)
-                .map(|a| a.to_string())
+                .map(ToString::to_string)
                 .collect();
             let mut push_aliases: Vec<_> = aliases
                 .get_by_kind(RemoteAliasKind::Push)
-                .map(|a| a.to_string())
+                .map(ToString::to_string)
                 .collect();
             pull_aliases.sort();
             push_aliases.sort();

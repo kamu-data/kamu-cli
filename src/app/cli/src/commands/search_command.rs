@@ -37,7 +37,7 @@ impl SearchCommand {
         Self {
             search_svc,
             output_config,
-            query: query.map(|s| s.into()),
+            query: query.map(Into::into),
             repository_names: repository_names.into_iter().collect(),
         }
     }
