@@ -66,6 +66,16 @@ impl Command for DeleteCommand {
             .await?
         };
 
+        if dataset_refs.is_empty() {
+            eprintln!(
+                "{}",
+                console::style("There are no datasets matching pattern")
+                    .yellow()
+                    .bold()
+            );
+            return Ok(());
+        }
+
         let confirmed = if self.no_confirmation {
             true
         } else {

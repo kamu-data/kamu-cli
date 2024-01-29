@@ -95,12 +95,12 @@ impl VerifyCommand {
             return Ok(vec![]);
         }
 
-        let listener = listener.and_then(|l| l.begin_multi_verify());
+        let listener = listener.unwrap();
 
         Ok(self
             .verification_svc
             .clone()
-            .verify_multi(requests, options, listener)
+            .verify_multi(requests, options, Some(listener))
             .await)
     }
 }

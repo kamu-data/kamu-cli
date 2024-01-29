@@ -763,7 +763,7 @@ impl DatasetRefPattern {
         }
     }
 
-    pub fn dataset_ref(&self) -> Option<&DatasetRef> {
+    pub fn as_dataset_ref(&self) -> Option<&DatasetRef> {
         match self {
             Self::Pattern(_, _) => None,
             Self::Ref(dataset_ref) => Some(dataset_ref),

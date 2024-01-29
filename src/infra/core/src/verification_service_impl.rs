@@ -348,6 +348,7 @@ impl VerificationService for VerificationServiceImpl {
                         .resolve_dataset_ref(&r.dataset_ref)
                         .await
                         .unwrap();
+                    let listener_progress = clone_listener.begin_verify(&dataset_handle);
 
                     tokio::task::spawn(async move {
                         Arc::clone(&me)
@@ -355,7 +356,7 @@ impl VerificationService for VerificationServiceImpl {
                                 &r.dataset_ref,
                                 r.block_range.clone(),
                                 clone_options.clone(),
-                                clone_listener.begin_verify(&dataset_handle),
+                                listener_progress.clone(),
                             )
                             .await
                     })

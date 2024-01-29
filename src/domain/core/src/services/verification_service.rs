@@ -146,10 +146,6 @@ pub trait VerificationMultiListener: Send + Sync {
     fn begin_verify(&self, _dataset: &DatasetHandle) -> Option<Arc<dyn VerificationListener>> {
         None
     }
-
-    fn begin_multi_verify(&self) -> Option<Arc<dyn VerificationMultiListener>> {
-        None
-    }
 }
 
 pub struct NullVerificationMultiListener;

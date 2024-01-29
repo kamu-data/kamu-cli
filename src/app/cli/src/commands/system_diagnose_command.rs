@@ -275,7 +275,12 @@ impl DiagnosticCheck for CheckWorkspaceConsistent {
         let draw_thread = std::thread::spawn(move || {
             progress.draw();
         });
-        let datasets: Vec<_> = self.dataset_repo.get_all_datasets().try_collect().await?;
+        let datasets: Vec<_> = self
+            .dataset_repo
+            .get_all_datasets()
+            .try_collect()
+            .await
+            .int_err()?;
 
         let verify_options = VerificationOptions {
             check_integrity: true,
