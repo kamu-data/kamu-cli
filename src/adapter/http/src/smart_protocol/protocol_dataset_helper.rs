@@ -284,8 +284,7 @@ fn unpack_dataset_metadata_batch(objects_batch: &ObjectsBatch) -> Vec<(Multihash
         .filter_map(Result::ok)
         .map(|mut entry| {
             let entry_size = entry.size();
-            #[cfg_attr(target_pointer_width = "64", allow(clippy::cast_possible_truncation))]
-            let mut buf = vec![0_u8; entry_size as usize];
+            let mut buf = vec![0_u8; usize::try_from(entry_size).unwrap()];
             entry.read_exact(buf.as_mut_slice()).unwrap();
 
             let path = entry.path().unwrap();
@@ -604,7 +603,7 @@ pub async fn prepare_push_object_transfer_strategy(
     let contains = object_repo
         .contains(&object_file_ref.physical_hash)
         .await
-        .map_err(ErrorIntoInternal::int_err)?;
+        .int_err()?;
 
     if contains {
         Ok(PushObjectTransferStrategy {
@@ -670,7 +669,7 @@ pub async fn dataset_import_object_file(
         ))
         .send()
         .await
-        .map_err(ErrorIntoInternal::int_err)?;
+        .int_err()?;
 
     let stream = response.bytes_stream();
 
@@ -692,8 +691,7 @@ pub async fn dataset_import_object_file(
             InsertOpts {
                 precomputed_hash: None,
                 expected_hash: Some(&object_file_reference.physical_hash),
-                #[cfg_attr(target_pointer_width = "64", allow(clippy::cast_possible_truncation))]
-                size_hint: Some(object_file_reference.size as usize),
+                size_hint: Some(object_file_reference.size),
             },
         )
         .await;

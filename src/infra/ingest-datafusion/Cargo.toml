@@ -48,7 +48,6 @@ thiserror = "1"
 tokio = { version = "1", default-features = false, features=["fs", "process"] }
 tracing = "0.1"
 url = { version = "2", features = ["serde"] }
-conv = "0.3"
 
 
 [dev-dependencies]

@@ -9,7 +9,6 @@
 
 use std::sync::Arc;
 
-use conv::ConvUtil;
 use datafusion::arrow::array::{ArrayRef, Int32Array, UInt8Array};
 use datafusion::arrow::datatypes::DataType;
 use kamu::domain::QueryService;
@@ -21,8 +20,8 @@ use crate::output::*;
 pub struct TailCommand {
     query_svc: Arc<dyn QueryService>,
     dataset_ref: DatasetRef,
-    skip: usize,
-    limit: usize,
+    skip: u64,
+    limit: u64,
     output_cfg: Arc<OutputConfig>,
 }
 
@@ -30,8 +29,8 @@ impl TailCommand {
     pub fn new(
         query_svc: Arc<dyn QueryService>,
         dataset_ref: DatasetRef,
-        skip: usize,
-        limit: usize,
+        skip: u64,
+        limit: u64,
         output_cfg: Arc<OutputConfig>,
     ) -> Self {
         Self {
@@ -73,7 +72,7 @@ impl Command for TailCommand {
                             DataType::Int32 => array
                                 .as_any()
                                 .downcast_ref::<Int32Array>()
-                                .and_then(|a| a.value(row).value_as::<u8>().ok())
+                                .and_then(|a| u8::try_from(a.value(row)).ok())
                                 .map(OperationType::try_from)
                                 .unwrap_or(err),
                             _ => err,

@@ -65,7 +65,7 @@ impl DatasetFlowRuns {
         // TODO: consider pushing pagination control down to service/repository levels
         let flows_stream = flow_service
             .list_all_flows_by_dataset(&self.dataset_handle.id)
-            .map_err(ErrorIntoInternal::int_err)?;
+            .int_err()?;
 
         let all_flows: Vec<_> = flows_stream.try_collect().await?;
         let total_count = all_flows.len();

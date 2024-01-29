@@ -138,11 +138,10 @@ pub async fn dataset_data_put_handler(
     axum::TypedHeader(content_length): axum::TypedHeader<axum::headers::ContentLength>,
     body_stream: axum::extract::BodyStream,
 ) -> Result<(), ApiError> {
-    #[cfg_attr(target_pointer_width = "64", allow(clippy::cast_possible_truncation))]
     dataset_put_object_common(
         dataset.as_data_repo(),
         hash_param.physical_hash,
-        content_length.0 as usize,
+        content_length.0,
         body_stream,
     )
     .await
@@ -156,11 +155,10 @@ pub async fn dataset_checkpoints_put_handler(
     axum::TypedHeader(content_length): axum::TypedHeader<axum::headers::ContentLength>,
     body_stream: axum::extract::BodyStream,
 ) -> Result<(), ApiError> {
-    #[cfg_attr(target_pointer_width = "64", allow(clippy::cast_possible_truncation))]
     dataset_put_object_common(
         dataset.as_checkpoint_repo(),
         hash_param.physical_hash,
-        content_length.0 as usize,
+        content_length.0,
         body_stream,
     )
     .await
@@ -171,7 +169,7 @@ pub async fn dataset_checkpoints_put_handler(
 async fn dataset_put_object_common(
     object_repository: &dyn ObjectRepository,
     physical_hash: Multihash,
-    content_length: usize,
+    content_length: u64,
     body_stream: axum::extract::BodyStream,
 ) -> Result<(), ApiError> {
     let src = Box::new(crate::axum_utils::body_into_async_read(body_stream));

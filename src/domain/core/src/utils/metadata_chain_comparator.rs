@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::convert::TryFrom;
+
 use async_trait::async_trait;
 use futures::{StreamExt, TryStreamExt};
 use internal_error::*;
@@ -63,8 +65,7 @@ impl MetadataChainComparator {
 
         let Some(rhs_head) = rhs_head else {
             // LHS chain is unconditionally ahead - simply return all of its blocks
-            #[cfg_attr(target_pointer_width = "64", allow(clippy::cast_possible_truncation))]
-            lhs_chain.expecting_to_read_blocks(lhs_sequence_number as usize + 1);
+            lhs_chain.expecting_to_read_blocks(lhs_sequence_number + 1);
             return Ok(CompareChainsResult::LhsAhead {
                 lhs_ahead_blocks: lhs_chain
                     .iter_blocks_interval(lhs_head, None, false)
@@ -163,13 +164,12 @@ impl MetadataChainComparator {
         expected_common_sequence_number: u64,
         expected_common_ancestor_hash: &Multihash,
     ) -> Result<CommonAncestorCheck, CompareChainsError> {
-        #[cfg_attr(target_pointer_width = "64", allow(clippy::cast_possible_truncation))]
-        let ahead_size = (ahead_sequence_number - expected_common_sequence_number) as usize;
+        let ahead_size = ahead_sequence_number - expected_common_sequence_number;
         ahead_chain.expecting_to_read_blocks(ahead_size);
 
         let ahead_blocks: Vec<(Multihash, MetadataBlock)> = ahead_chain
             .iter_blocks_interval(ahead_head, None, false)
-            .take(ahead_size)
+            .take(usize::try_from(ahead_size).unwrap())
             .try_collect()
             .await?;
 
@@ -183,7 +183,7 @@ impl MetadataChainComparator {
             let common_ancestor_sequence_number = Self::find_common_ancestor_sequence_number(
                 ahead_chain,
                 boundary_block_prev_hash.unwrap(),
-                ahead_sequence_number - ahead_size as u64,
+                ahead_sequence_number - ahead_size,
                 reference_chain,
                 expected_common_ancestor_hash,
                 expected_common_sequence_number,
@@ -204,19 +204,13 @@ impl MetadataChainComparator {
     ) -> CompareChainsResult {
         if let Some(last_common_sequence_number) = last_common_sequence_number {
             CompareChainsResult::Divergence {
-                #[cfg_attr(target_pointer_width = "64", allow(clippy::cast_possible_truncation))]
-                uncommon_blocks_in_lhs: (lhs_sequence_number - last_common_sequence_number)
-                    as usize,
-                #[cfg_attr(target_pointer_width = "64", allow(clippy::cast_possible_truncation))]
-                uncommon_blocks_in_rhs: (rhs_sequence_number - last_common_sequence_number)
-                    as usize,
+                uncommon_blocks_in_lhs: lhs_sequence_number - last_common_sequence_number,
+                uncommon_blocks_in_rhs: rhs_sequence_number - last_common_sequence_number,
             }
         } else {
             CompareChainsResult::Divergence {
-                #[cfg_attr(target_pointer_width = "64", allow(clippy::cast_possible_truncation))]
-                uncommon_blocks_in_lhs: (lhs_sequence_number + 1) as usize,
-                #[cfg_attr(target_pointer_width = "64", allow(clippy::cast_possible_truncation))]
-                uncommon_blocks_in_rhs: (rhs_sequence_number + 1) as usize,
+                uncommon_blocks_in_lhs: lhs_sequence_number + 1,
+                uncommon_blocks_in_rhs: rhs_sequence_number + 1,
             }
         }
     }
@@ -230,14 +224,12 @@ impl MetadataChainComparator {
         rhs_start_block_sequence_number: u64,
     ) -> Result<Option<u64>, CompareChainsError> {
         if lhs_start_block_sequence_number > rhs_start_block_sequence_number {
-            #[cfg_attr(target_pointer_width = "64", allow(clippy::cast_possible_truncation))]
             lhs_chain.expecting_to_read_blocks(
-                (lhs_start_block_sequence_number - rhs_start_block_sequence_number) as usize,
+                lhs_start_block_sequence_number - rhs_start_block_sequence_number,
             );
         } else {
-            #[cfg_attr(target_pointer_width = "64", allow(clippy::cast_possible_truncation))]
             rhs_chain.expecting_to_read_blocks(
-                (rhs_start_block_sequence_number - lhs_start_block_sequence_number) as usize,
+                rhs_start_block_sequence_number - lhs_start_block_sequence_number,
             );
         }
 
@@ -292,8 +284,8 @@ pub enum CompareChainsResult {
         rhs_ahead_blocks: Vec<(Multihash, MetadataBlock)>,
     },
     Divergence {
-        uncommon_blocks_in_lhs: usize,
-        uncommon_blocks_in_rhs: usize,
+        uncommon_blocks_in_lhs: u64,
+        uncommon_blocks_in_rhs: u64,
     },
 }
 
@@ -383,15 +375,15 @@ impl From<IterBlocksError> for CompareChainsError {
 
 struct MetadataChainWithStats<'a> {
     chain: &'a dyn MetadataChain,
-    on_expected: Box<dyn Fn(usize) + Send + Sync + 'a>,
-    on_read: Box<dyn Fn(usize) + Send + Sync + 'a>,
+    on_expected: Box<dyn Fn(u64) + Send + Sync + 'a>,
+    on_read: Box<dyn Fn(u64) + Send + Sync + 'a>,
 }
 
 impl<'a> MetadataChainWithStats<'a> {
     fn new(
         chain: &'a dyn MetadataChain,
-        on_expected: impl Fn(usize) + Send + Sync + 'a,
-        on_read: impl Fn(usize) + Send + Sync + 'a,
+        on_expected: impl Fn(u64) + Send + Sync + 'a,
+        on_read: impl Fn(u64) + Send + Sync + 'a,
     ) -> Self {
         Self {
             chain,
@@ -400,7 +392,7 @@ impl<'a> MetadataChainWithStats<'a> {
         }
     }
 
-    fn expecting_to_read_blocks(&self, num_blocks: usize) {
+    fn expecting_to_read_blocks(&self, num_blocks: u64) {
         (self.on_expected)(num_blocks);
     }
 }
@@ -488,10 +480,10 @@ impl<'a> MetadataChain for MetadataChainWithStats<'a> {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub trait CompareChainsListener: Send + Sync {
-    fn on_lhs_expected_reads(&self, _num_blocks: usize) {}
-    fn on_lhs_read(&self, _num_blocks: usize) {}
-    fn on_rhs_expected_reads(&self, _num_blocks: usize) {}
-    fn on_rhs_read(&self, _num_blocks: usize) {}
+    fn on_lhs_expected_reads(&self, _num_blocks: u64) {}
+    fn on_lhs_read(&self, _num_blocks: u64) {}
+    fn on_rhs_expected_reads(&self, _num_blocks: u64) {}
+    fn on_rhs_read(&self, _num_blocks: u64) {}
 }
 pub struct NullCompareChainsListener;
 impl CompareChainsListener for NullCompareChainsListener {}

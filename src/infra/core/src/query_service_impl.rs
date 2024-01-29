@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::convert::TryFrom;
 use std::sync::Arc;
 
 use datafusion::catalog::schema::SchemaProvider;
@@ -148,8 +149,8 @@ impl QueryService for QueryServiceImpl {
     async fn tail(
         &self,
         dataset_ref: &DatasetRef,
-        skip: usize,
-        limit: usize,
+        skip: u64,
+        limit: u64,
     ) -> Result<DataFrame, QueryError> {
         let dataset_handle = self.dataset_repo.resolve_dataset_ref(dataset_ref).await?;
 
@@ -198,7 +199,10 @@ impl QueryService for QueryServiceImpl {
 
         let df = df
             .sort(vec![col(&vocab.offset_column).sort(false, true)])?
-            .limit(skip, Some(limit))?
+            .limit(
+                usize::try_from(skip).unwrap(),
+                Some(usize::try_from(limit).unwrap()),
+            )?
             .sort(vec![col(&vocab.offset_column).sort(true, false)])?;
 
         Ok(df)
@@ -351,7 +355,7 @@ impl KamuSchema {
     async fn collect_data_file_hashes(
         &self,
         dataset: &dyn Dataset,
-        last_records_to_consider: Option<usize>,
+        last_records_to_consider: Option<u64>,
     ) -> Result<Vec<Multihash>, InternalError> {
         let mut files = Vec::new();
         let mut num_records = 0;

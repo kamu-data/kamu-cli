@@ -9,11 +9,11 @@
 
 use core::panic;
 use std::collections::HashMap;
+use std::convert::TryFrom;
 use std::sync::Arc;
 
-use conv::ConvUtil;
 use dill::*;
-use internal_error::{ErrorIntoInternal, InternalError};
+use internal_error::*;
 use jsonwebtoken::errors::ErrorKind;
 use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
 use kamu_core::auth::*;
@@ -106,7 +106,7 @@ impl AuthenticationServiceImpl {
         const EXPIRE_AFTER_SEC: usize = 24 * 60 * 60; // 1 day in seconds
 
         let current_time = self.time_source.now();
-        let iat = current_time.timestamp().value_as::<usize>().unwrap();
+        let iat = usize::try_from(current_time.timestamp()).unwrap();
         let exp = iat + EXPIRE_AFTER_SEC;
         let claims = KamuAccessTokenClaims {
             iat,
@@ -124,7 +124,7 @@ impl AuthenticationServiceImpl {
             &claims,
             &self.encoding_key,
         )
-        .map_err(ErrorIntoInternal::int_err)
+        .int_err()
     }
 
     fn decode_access_token(

@@ -46,7 +46,6 @@ tokio = { version = "1", default-features = false, features = [] }
 tokio-stream = { version = "0.1", default-features = false }
 tracing = "0.1"
 thiserror = { version = "1", default-features = false }
-conv = "0.3"
 
 
 [dev-dependencies]

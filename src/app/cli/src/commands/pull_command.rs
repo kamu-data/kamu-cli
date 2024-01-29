@@ -788,8 +788,8 @@ impl SyncListener for PrettySyncProgress {
                         .progress_chars("#>-");
                     pb.set_style(style);
                     pb.set_prefix(format!("({} > {})", self.remote_ref, self.local_ref));
-                    pb.set_length(stats.src_estimated.metadata_blocks_read as u64);
-                    pb.set_position(stats.src.metadata_blocks_read as u64);
+                    pb.set_length(stats.src_estimated.metadata_blocks_read);
+                    pb.set_position(stats.src.metadata_blocks_read);
                     pb.enable_steady_tick(Duration::from_millis(100));
                     pb
                 }
@@ -805,8 +805,8 @@ impl SyncListener for PrettySyncProgress {
                         .progress_chars("#>-");
                     pb.set_style(style);
                     pb.set_prefix(format!("({} > {})", self.remote_ref, self.local_ref));
-                    pb.set_length(stats.src_estimated.bytes_read as u64);
-                    pb.set_position(stats.src.bytes_read as u64);
+                    pb.set_length(stats.src_estimated.bytes_read);
+                    pb.set_position(stats.src.bytes_read);
                     pb.enable_steady_tick(Duration::from_millis(100));
                     pb
                 }
@@ -821,8 +821,8 @@ impl SyncListener for PrettySyncProgress {
                         .progress_chars("#>-");
                     pb.set_style(style);
                     pb.set_prefix(format!("({} > {})", self.remote_ref, self.local_ref));
-                    pb.set_length(stats.dst_estimated.metadata_blocks_written as u64);
-                    pb.set_position(stats.dst.metadata_blocks_written as u64);
+                    pb.set_length(stats.dst_estimated.metadata_blocks_written);
+                    pb.set_position(stats.dst.metadata_blocks_written);
                     pb.enable_steady_tick(Duration::from_millis(100));
                     pb
                 }
@@ -835,24 +835,20 @@ impl SyncListener for PrettySyncProgress {
             SyncStage::ReadMetadata => {
                 state
                     .progress
-                    .set_length(stats.src_estimated.metadata_blocks_read as u64);
-                state
-                    .progress
-                    .set_position(stats.src.metadata_blocks_read as u64);
+                    .set_length(stats.src_estimated.metadata_blocks_read);
+                state.progress.set_position(stats.src.metadata_blocks_read);
             }
             SyncStage::TransferData => {
-                state
-                    .progress
-                    .set_length(stats.src_estimated.bytes_read as u64);
-                state.progress.set_position(stats.src.bytes_read as u64);
+                state.progress.set_length(stats.src_estimated.bytes_read);
+                state.progress.set_position(stats.src.bytes_read);
             }
             SyncStage::CommitBlocks => {
                 state
                     .progress
-                    .set_length(stats.dst_estimated.metadata_blocks_written as u64);
+                    .set_length(stats.dst_estimated.metadata_blocks_written);
                 state
                     .progress
-                    .set_position(stats.dst.metadata_blocks_written as u64);
+                    .set_position(stats.dst.metadata_blocks_written);
             }
         }
     }

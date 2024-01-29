@@ -127,7 +127,7 @@ pub struct InsertOpts<'a> {
     pub expected_hash: Option<&'a Multihash>,
 
     /// Hints the size of an object
-    pub size_hint: Option<usize>,
+    pub size_hint: Option<u64>,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

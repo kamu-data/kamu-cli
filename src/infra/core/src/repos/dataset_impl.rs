@@ -272,11 +272,7 @@ where
                     InsertOpts {
                         precomputed_hash: Some(&data_slice.physical_hash),
                         expected_hash: None,
-                        #[cfg_attr(
-                            target_pointer_width = "64",
-                            allow(clippy::cast_possible_truncation)
-                        )]
-                        size_hint: Some(data_slice.size as usize),
+                        size_hint: Some(data_slice.size),
                     },
                 )
                 .await
@@ -290,11 +286,7 @@ where
                     InsertOpts {
                         precomputed_hash: Some(&checkpoint_meta.physical_hash),
                         expected_hash: None,
-                        #[cfg_attr(
-                            target_pointer_width = "64",
-                            allow(clippy::cast_possible_truncation)
-                        )]
-                        size_hint: Some(checkpoint_meta.size as usize),
+                        size_hint: Some(checkpoint_meta.size),
                     },
                 )
                 .await

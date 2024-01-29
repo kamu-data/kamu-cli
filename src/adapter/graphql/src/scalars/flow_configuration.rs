@@ -77,7 +77,7 @@ impl From<ScheduleCron> for Cron5ComponentExpression {
 
 #[derive(SimpleObject, Clone, PartialEq, Eq)]
 pub struct TimeDelta {
-    pub every: u32,
+    pub every: i64,
     pub unit: TimeUnit,
 }
 
@@ -91,42 +91,39 @@ pub enum TimeUnit {
 
 impl From<chrono::Duration> for TimeDelta {
     fn from(value: chrono::Duration) -> Self {
-        if value.num_seconds() <= 0 {
-            panic!("Positive interval expected, but received [{value}]")
-        }
+        assert!(
+            value.num_seconds() > 0,
+            "Positive interval expected, but received [{value}]"
+        );
 
         let num_weeks = value.num_weeks();
         if (value - chrono::Duration::weeks(num_weeks)).is_zero() {
-            #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
             return Self {
-                every: num_weeks as u32,
+                every: num_weeks,
                 unit: TimeUnit::Weeks,
             };
         }
 
         let num_days = value.num_days();
         if (value - chrono::Duration::days(num_days)).is_zero() {
-            #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
             return Self {
-                every: num_days as u32,
+                every: num_days,
                 unit: TimeUnit::Days,
             };
         }
 
         let num_hours = value.num_hours();
         if (value - chrono::Duration::hours(num_hours)).is_zero() {
-            #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
             return Self {
-                every: num_hours as u32,
+                every: num_hours,
                 unit: TimeUnit::Hours,
             };
         }
 
         let num_minutes = value.num_minutes();
         if (value - chrono::Duration::minutes(num_minutes)).is_zero() {
-            #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
             return Self {
-                every: num_minutes as u32,
+                every: num_minutes,
                 unit: TimeUnit::Minutes,
             };
         }

@@ -62,15 +62,12 @@ impl ExecuteTransformInput {
 
     /// Helper for determining the number of records included in the transaction
     /// from this input
-    pub fn num_records(&self) -> usize {
+    pub fn num_records(&self) -> u64 {
         if let Some(new_offset) = self.new_offset {
-            #[cfg_attr(target_pointer_width = "64", allow(clippy::cast_possible_truncation))]
-            {
-                if let Some(prev_offset) = self.prev_offset {
-                    (new_offset - prev_offset) as usize
-                } else {
-                    (new_offset + 1) as usize
-                }
+            if let Some(prev_offset) = self.prev_offset {
+                new_offset - prev_offset
+            } else {
+                new_offset + 1
             }
         } else {
             0
@@ -267,11 +264,8 @@ impl Display for TransformResponseInternalError {
 ////////////////////////////////////////////////////////////////////////////////
 
 impl DataSlice {
-    pub fn num_records(&self) -> usize {
-        #[cfg_attr(target_pointer_width = "64", allow(clippy::cast_possible_truncation))]
-        {
-            (self.offset_interval.end - self.offset_interval.start + 1) as usize
-        }
+    pub fn num_records(&self) -> u64 {
+        self.offset_interval.end - self.offset_interval.start + 1
     }
 }
 

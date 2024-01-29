@@ -82,12 +82,11 @@ impl DatasetData {
         let limit = limit.unwrap_or(Self::DEFAULT_TAIL_LIMIT);
 
         let query_svc = from_catalog::<dyn domain::QueryService>(ctx).unwrap();
-        #[cfg_attr(target_pointer_width = "64", allow(clippy::cast_possible_truncation))]
         let tail_result = query_svc
             .tail(
                 &self.dataset_handle.as_local_ref(),
-                skip.unwrap_or(0) as usize,
-                limit as usize,
+                skip.unwrap_or(0),
+                limit,
             )
             .await;
         let df = match tail_result {

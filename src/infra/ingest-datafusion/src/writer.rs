@@ -7,11 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::convert::TryFrom;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use chrono::{DateTime, TimeZone, Utc};
-use conv::ConvUtil;
 use datafusion::arrow::array::Array;
 use datafusion::arrow::datatypes::{DataType, Field, SchemaRef, TimeUnit};
 use datafusion::common::DFSchema;
@@ -345,7 +345,8 @@ impl DataWriterDataFusion {
             .with_column(
                 &self.meta.vocab.offset_column,
                 cast(
-                    col(&self.meta.vocab.offset_column as &str) + lit(start_offset as i64 - 1),
+                    col(&self.meta.vocab.offset_column as &str)
+                        + lit(i64::try_from(start_offset).unwrap() - 1),
                     // TODO: Replace with UInt64 after Spark is updated
                     // See: https://github.com/kamu-data/kamu-cli/issues/445
                     DataType::Int64,
@@ -510,22 +511,18 @@ impl DataWriterDataFusion {
             .as_any()
             .downcast_ref::<Int64Array>()
             .unwrap()
-            .value(0)
-            .value_as::<u64>()
-            .unwrap();
+            .value(0);
 
         let offset_max = batches[0]
             .column(1)
             .as_any()
             .downcast_ref::<Int64Array>()
             .unwrap()
-            .value(0)
-            .value_as::<u64>()
-            .unwrap();
+            .value(0);
 
         let offset_interval = odf::OffsetInterval {
-            start: offset_min,
-            end: offset_max,
+            start: u64::try_from(offset_min).unwrap(),
+            end: u64::try_from(offset_max).unwrap(),
         };
 
         // Event time is either Date or Timestamp(Millisecond, UTC)

@@ -500,9 +500,11 @@ impl KamuFlightSqlService {
     ) -> Result<Response<FlightInfo>, Status> {
         let ticket: prost::bytes::Bytes = ticket.encode_to_vec().into();
 
-        let num_bytes = data.get_array_memory_size() as i64;
+        let num_bytes = i64::try_from(data.get_array_memory_size())
+            .map_err(|e| Status::internal(format!("\"num_bytes\" convert error: {e}")))?;
         let schema = data.schema();
-        let num_rows = data.num_rows() as i64;
+        let num_rows = i64::try_from(data.num_rows())
+            .map_err(|e| Status::internal(format!("\"num_rows\" convert error: {e}")))?;
 
         let schema_bytes = self.schema_to_arrow(&schema)?;
 
