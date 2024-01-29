@@ -40,8 +40,7 @@ impl Search {
             .get_all_datasets()
             .filter_ok(|hdl| hdl.alias.dataset_name.contains(&query))
             .try_collect()
-            .await
-            .int_err()?;
+            .await?;
 
         datasets.sort_by(|a, b| a.alias.cmp(&b.alias));
         let total_count = datasets.len();

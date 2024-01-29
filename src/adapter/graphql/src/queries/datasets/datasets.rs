@@ -68,8 +68,7 @@ impl Datasets {
         let mut all_datasets: Vec<_> = dataset_repo
             .get_datasets_by_owner(account_name.to_owned().into())
             .try_collect()
-            .await
-            .int_err()?;
+            .await?;
         let total_count = all_datasets.len();
         all_datasets.sort_by(|a, b| a.alias.cmp(&b.alias));
 

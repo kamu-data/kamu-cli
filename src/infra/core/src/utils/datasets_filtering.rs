@@ -7,13 +7,19 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_core::{DatasetHandleStream, DatasetRepository};
-use opendatafabric::DatasetRefPattern;
+use std::pin::Pin;
+
+use kamu_core::{DatasetRepository, GetDatasetError};
+use opendatafabric::{DatasetHandle, DatasetRefPattern};
+use tokio_stream::Stream;
+
+type FilteredDatasetHandleStream<'a> =
+    Pin<Box<dyn Stream<Item = Result<DatasetHandle, GetDatasetError>> + Send + 'a>>;
 
 pub fn filter_datasets_by_pattern(
     dataset_repo: &dyn DatasetRepository,
     dataset_ref_patterns: Vec<DatasetRefPattern>,
-) -> DatasetHandleStream<'_> {
+) -> FilteredDatasetHandleStream<'_> {
     use futures::{future, StreamExt, TryStreamExt};
     let glob_dataset_ref_patterns: Vec<_> = dataset_ref_patterns
         .iter()
@@ -41,6 +47,7 @@ pub fn filter_datasets_by_pattern(
                         .any(|dataset_ref_pattern| dataset_ref_pattern.is_match(dataset_handle)),
                 )
             })
+            .map_err(|err| err.into())
             .boxed()
     }
 }

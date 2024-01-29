@@ -82,7 +82,7 @@ pub trait DatasetRepository: DatasetRegistry + Sync + Send {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub type DatasetHandleStream<'a> =
-    Pin<Box<dyn Stream<Item = Result<DatasetHandle, GetDatasetError>> + Send + 'a>>;
+    Pin<Box<dyn Stream<Item = Result<DatasetHandle, InternalError>> + Send + 'a>>;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 // Extensions

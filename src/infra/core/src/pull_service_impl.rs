@@ -277,7 +277,7 @@ impl PullServiceImpl {
                 .dataset_repo
                 .get_datasets_by_owner(l.account_name.clone());
             while let Some(dataset_handle) = datasets.next().await {
-                let dataset_handle = dataset_handle.int_err()?;
+                let dataset_handle = dataset_handle?;
 
                 if self
                     .remote_alias_reg
@@ -518,8 +518,7 @@ impl PullService for PullServiceImpl {
                     remote_ref: None,
                 })
                 .try_collect()
-                .await
-                .int_err()?
+                .await?
         };
 
         tracing::info!(?requests, ?options, "Performing pull");
