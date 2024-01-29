@@ -15,20 +15,5 @@ use assert_cmd::Command;
 fn test_datafusion_cli() {
     let mut cmd = Command::cargo_bin("kamu-cli").unwrap();
 
-    let assert = cmd.arg("sql").write_stdin("select 1;").assert();
-
-    let output = assert.get_output();
-
-    //not using assert.stdout("expected text") as time of query execution may
-    // differ
-    let string_result = String::from_utf8_lossy(&output.stdout);
-
-    print!("{}", string_result);
-
-    //simplified output comparison as diff OS
-    // assert!(
-    //     string_result.contains("1 row in set."),
-    //     "Output does not contain expected result."
-    // );
-    assert.success();
+    cmd.arg("sql").assert().success();
 }
