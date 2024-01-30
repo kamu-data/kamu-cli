@@ -28,14 +28,14 @@ pub trait VerificationService: Send + Sync {
         block_range: (Option<Multihash>, Option<Multihash>),
         options: VerificationOptions,
         listener: Option<Arc<dyn VerificationListener>>,
-    ) -> Result<VerificationResult, VerificationError>;
+    ) -> VerificationResult;
 
     async fn verify_multi(
         &self,
         requests: Vec<VerificationRequest>,
         options: VerificationOptions,
         listener: Option<Arc<dyn VerificationMultiListener>>,
-    ) -> Result<VerificationResult, VerificationError>;
+    ) -> Vec<VerificationResult>;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -51,8 +51,26 @@ pub struct VerificationRequest {
 ///////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug)]
-pub enum VerificationResult {
-    Valid,
+pub struct VerificationResult {
+    /// Handle of the dataset, if were able to resolve the requested reference
+    pub dataset_handle: Option<DatasetHandle>,
+    pub outcome: Result<(), VerificationError>,
+}
+
+impl VerificationResult {
+    pub fn err(dataset_handle: DatasetHandle, e: impl Into<VerificationError>) -> Self {
+        Self {
+            dataset_handle: Some(dataset_handle),
+            outcome: Err(e.into()),
+        }
+    }
+
+    pub fn err_no_handle(e: impl Into<VerificationError>) -> Self {
+        Self {
+            dataset_handle: None,
+            outcome: Err(e.into()),
+        }
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////

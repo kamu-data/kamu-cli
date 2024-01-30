@@ -150,18 +150,14 @@ impl VerificationListener for VerificationProgress {
             .set_message(self.spinner_message(0, 0, "Verifying dataset", None));
     }
 
-    fn success(&self, result: &VerificationResult) {
-        match result {
-            VerificationResult::Valid => {
-                let s = self.state.lock().unwrap();
-                self.curr_progress.finish_with_message(self.spinner_message(
-                    s.num_blocks,
-                    s.num_blocks,
-                    console::style("Dataset is valid".to_owned()).green(),
-                    None,
-                ));
-            }
-        }
+    fn success(&self, _result: &VerificationResult) {
+        let s = self.state.lock().unwrap();
+        self.curr_progress.finish_with_message(self.spinner_message(
+            s.num_blocks,
+            s.num_blocks,
+            console::style("Dataset is valid".to_owned()).green(),
+            None,
+        ));
     }
 
     fn error(&self, error: &VerificationError) {

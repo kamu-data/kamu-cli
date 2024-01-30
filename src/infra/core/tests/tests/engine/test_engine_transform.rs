@@ -466,7 +466,7 @@ async fn test_transform_common(transform: Transform) {
         .verify_transform(&deriv_alias.as_local_ref(), (None, None), None)
         .await;
 
-    assert_matches!(verify_result, Ok(VerificationResult::Valid));
+    assert_matches!(verify_result, Ok(()));
 
     ///////////////////////////////////////////////////////////////////////////
     // Verify - mismatching data with different logical hash

@@ -738,3 +738,87 @@ impl std::cmp::PartialOrd for DatasetRefAny {
         Some(self.cmp(other))
     }
 }
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum DatasetRefPattern {
+    Ref(DatasetRef),
+    Pattern(Option<AccountName>, DatasetNamePattern),
+}
+
+impl DatasetRefPattern {
+    pub fn is_match(&self, dataset_hande: &DatasetHandle) -> bool {
+        match self {
+            Self::Ref(dataset_ref) => match dataset_ref {
+                DatasetRef::ID(dataset_id) => *dataset_id == dataset_hande.id,
+                DatasetRef::Alias(dataset_alias) => *dataset_alias == dataset_hande.alias,
+                DatasetRef::Handle(dataset_handle_res) => dataset_handle_res == dataset_hande,
+            },
+            Self::Pattern(account_name_maybe, dataset_name_pattern) => {
+                (account_name_maybe.is_none()
+                    || *account_name_maybe == dataset_hande.alias.account_name)
+                    && dataset_name_pattern.is_match(&dataset_hande.alias.dataset_name)
+            }
+        }
+    }
+
+    /// Convert into a [`DatasetRef`] when value is not a glob pattern
+    pub fn as_dataset_ref(&self) -> Option<&DatasetRef> {
+        match self {
+            Self::Pattern(_, _) => None,
+            Self::Ref(dataset_ref) => Some(dataset_ref),
+        }
+    }
+
+    /// Returns `false` if value is a reference to some specific dataset rather
+    /// than a glob pattern
+    pub fn is_pattern(&self) -> bool {
+        match self {
+            DatasetRefPattern::Ref(_) => false,
+            DatasetRefPattern::Pattern(_, _) => true,
+        }
+    }
+}
+
+impl fmt::Display for DatasetRefPattern {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Ref(dataset_ref) => write!(f, "{dataset_ref}"),
+            Self::Pattern(account_name_maybe, dataset_name_pattern) => {
+                if let Some(account_name) = account_name_maybe {
+                    write!(f, "{account_name}/")?;
+                }
+                write!(f, "{dataset_name_pattern}")
+            }
+        }
+    }
+}
+
+impl std::str::FromStr for DatasetRefPattern {
+    type Err = ParseError<Self>;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s.contains('%') {
+            return match s.split_once('/') {
+                Some((account, dataset_name)) => match DatasetNamePattern::try_from(dataset_name) {
+                    Ok(dataset_name_pattern) => match AccountName::try_from(account) {
+                        Ok(account_name) => {
+                            Ok(Self::Pattern(Some(account_name), dataset_name_pattern))
+                        }
+                        Err(_) => Err(Self::Err::new(s)),
+                    },
+                    Err(_) => Err(Self::Err::new(s)),
+                },
+                None => match DatasetNamePattern::try_from(s) {
+                    Ok(dataset_name_pattern) => Ok(Self::Pattern(None, dataset_name_pattern)),
+                    Err(_) => Err(Self::Err::new(s)),
+                },
+            };
+        }
+        match DatasetRef::from_str(s) {
+            Ok(dataset_ref) => Ok(Self::Ref(dataset_ref)),
+            Err(_) => Err(Self::Err::new(s)),
+        }
+    }
+}
+
+super::dataset_identity::impl_parse_error!(DatasetRefPattern);

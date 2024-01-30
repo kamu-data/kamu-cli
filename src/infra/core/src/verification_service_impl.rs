@@ -46,7 +46,7 @@ impl VerificationServiceImpl {
         block_range: (Option<Multihash>, Option<Multihash>),
         check_logical_hashes: bool,
         listener: Arc<dyn VerificationListener>,
-    ) -> Result<VerificationResult, VerificationError> {
+    ) -> Result<(), VerificationError> {
         let dataset = self
             .dataset_repo
             .get_dataset(&dataset_handle.as_local_ref())
@@ -191,7 +191,7 @@ impl VerificationServiceImpl {
 
         listener.end_phase(VerificationPhase::DataIntegrity);
 
-        Ok(VerificationResult::Valid)
+        Ok(())
     }
 
     #[tracing::instrument(level = "info", skip_all)]
@@ -200,7 +200,7 @@ impl VerificationServiceImpl {
         dataset_handle: &'a DatasetHandle,
         block_range: (Option<Multihash>, Option<Multihash>),
         listener: Arc<dyn VerificationListener>,
-    ) -> Result<VerificationResult, VerificationError> {
+    ) -> Result<(), VerificationError> {
         let dataset = self
             .dataset_repo
             .get_dataset(&dataset_handle.as_local_ref())
@@ -249,7 +249,7 @@ impl VerificationServiceImpl {
 
         listener.end_phase(VerificationPhase::MetadataIntegrity);
 
-        Ok(VerificationResult::Valid)
+        Ok(())
     }
 }
 
@@ -262,28 +262,39 @@ impl VerificationService for VerificationServiceImpl {
         block_range: (Option<Multihash>, Option<Multihash>),
         options: VerificationOptions,
         maybe_listener: Option<Arc<dyn VerificationListener>>,
-    ) -> Result<VerificationResult, VerificationError> {
-        let dataset_handle = self.dataset_repo.resolve_dataset_ref(dataset_ref).await?;
+    ) -> VerificationResult {
+        let dataset_handle = match self.dataset_repo.resolve_dataset_ref(dataset_ref).await {
+            Ok(v) => v,
+            Err(e) => return VerificationResult::err_no_handle(e),
+        };
 
-        self.dataset_authorizer
+        match self
+            .dataset_authorizer
             .check_action_allowed(&dataset_handle, domain::auth::DatasetAction::Read)
-            .await?;
+            .await
+        {
+            Ok(_) => {}
+            Err(e) => return VerificationResult::err(dataset_handle, e),
+        };
 
-        let dataset = self
+        let dataset = match self
             .dataset_repo
             .get_dataset(&dataset_handle.as_local_ref())
-            .await?;
-
-        let dataset_kind = dataset
-            .get_summary(GetSummaryOpts::default())
             .await
-            .int_err()?
-            .kind;
+        {
+            Ok(v) => v,
+            Err(e) => return VerificationResult::err(dataset_handle, e),
+        };
+
+        let dataset_kind = match dataset.get_summary(GetSummaryOpts::default()).await {
+            Ok(summary) => summary.kind,
+            Err(e) => return VerificationResult::err(dataset_handle, e.int_err()),
+        };
 
         let listener = maybe_listener.unwrap_or(Arc::new(NullVerificationListener {}));
         listener.begin();
 
-        let res = try {
+        let outcome = try {
             if options.check_integrity {
                 self.check_metadata_integrity(
                     &dataset_handle,
@@ -311,24 +322,51 @@ impl VerificationService for VerificationServiceImpl {
                     )
                     .await?;
             }
-
-            VerificationResult::Valid
         };
 
-        match &res {
-            Ok(result) => listener.success(result),
+        let result = VerificationResult {
+            dataset_handle: Some(dataset_handle),
+            outcome,
+        };
+
+        match &result.outcome {
+            Ok(_) => listener.success(&result),
             Err(error) => listener.error(error),
         }
 
-        res
+        result
     }
 
     async fn verify_multi(
         &self,
-        _requests: Vec<VerificationRequest>,
-        _options: VerificationOptions,
-        _listener: Option<Arc<dyn VerificationMultiListener>>,
-    ) -> Result<VerificationResult, VerificationError> {
-        unimplemented!()
+        requests: Vec<VerificationRequest>,
+        options: VerificationOptions,
+        maybe_listener: Option<Arc<dyn VerificationMultiListener>>,
+    ) -> Vec<VerificationResult> {
+        let listener = maybe_listener.unwrap_or(Arc::new(NullVerificationMultiListener {}));
+
+        let mut results = Vec::new();
+        for request in requests {
+            let res = match self
+                .dataset_repo
+                .resolve_dataset_ref(&request.dataset_ref)
+                .await
+            {
+                Ok(dataset_handle) => {
+                    self.verify(
+                        &request.dataset_ref,
+                        request.block_range,
+                        options.clone(),
+                        listener.begin_verify(&dataset_handle),
+                    )
+                    .await
+                }
+                Err(e) => VerificationResult::err_no_handle(e),
+            };
+
+            results.push(res);
+        }
+
+        results
     }
 }

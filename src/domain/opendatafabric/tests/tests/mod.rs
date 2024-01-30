@@ -9,7 +9,9 @@
 
 mod test_dataset_id;
 mod test_dataset_identity;
+mod test_dataset_refs;
 mod test_dynamic;
+mod test_grammar;
 mod test_serde_buffer;
 mod test_serde_flatbuffers;
 mod test_serde_yaml;

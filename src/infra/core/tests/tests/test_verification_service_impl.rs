@@ -91,7 +91,10 @@ async fn test_verify_data_consistency() {
                 None,
             )
             .await,
-        Ok(VerificationResult::Valid)
+        VerificationResult {
+            dataset_handle: _,
+            outcome: Ok(()),
+        }
     );
 
     // Write data
@@ -162,7 +165,10 @@ async fn test_verify_data_consistency() {
                 None,
             )
             .await,
-        Ok(VerificationResult::Valid)
+        VerificationResult {
+            dataset_handle: _,
+            outcome: Ok(()),
+        }
     );
 
     // Overwrite with different data
@@ -188,11 +194,14 @@ async fn test_verify_data_consistency() {
             VerificationOptions {check_integrity: true, check_logical_hashes: true, replay_transformations: false},
             None,
         ).await,
-        Err(VerificationError::DataDoesNotMatchMetadata(
-            DataDoesNotMatchMetadata {
-                block_hash,
-                error: DataVerificationError::LogicalHashMismatch { expected, .. },
-            }
-        )) if block_hash == head && expected == data_logical_hash,
+        VerificationResult {
+            outcome: Err(VerificationError::DataDoesNotMatchMetadata(
+                DataDoesNotMatchMetadata {
+                    block_hash,
+                    error: DataVerificationError::LogicalHashMismatch { expected, .. },
+                }
+            )),
+            dataset_handle: _
+        } if block_hash == head && expected == data_logical_hash,
     );
 }

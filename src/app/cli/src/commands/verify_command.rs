@@ -9,15 +9,16 @@
 
 use std::sync::Arc;
 
+use futures::TryStreamExt;
 use kamu::domain::*;
+use kamu::utils::datasets_filtering::filter_datasets_by_pattern;
 use opendatafabric::*;
 
 use super::{BatchError, CLIError, Command};
 use crate::output::OutputConfig;
 use crate::VerificationMultiProgress;
 
-type GenericVerificationResult =
-    Result<Vec<(DatasetRef, Result<VerificationResult, VerificationError>)>, CLIError>;
+type GenericVerificationResult = Result<Vec<VerificationResult>, CLIError>;
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -25,7 +26,7 @@ pub struct VerifyCommand {
     dataset_repo: Arc<dyn DatasetRepository>,
     verification_svc: Arc<dyn VerificationService>,
     output_config: Arc<OutputConfig>,
-    refs: Vec<DatasetRef>,
+    refs: Vec<DatasetRefPattern>,
     recursive: bool,
     integrity: bool,
 }
@@ -40,7 +41,7 @@ impl VerifyCommand {
         integrity: bool,
     ) -> Self
     where
-        I: Iterator<Item = DatasetRef>,
+        I: Iterator<Item = DatasetRefPattern>,
     {
         Self {
             dataset_repo,
@@ -76,24 +77,30 @@ impl VerifyCommand {
         options: VerificationOptions,
         listener: Option<Arc<VerificationMultiProgress>>,
     ) -> GenericVerificationResult {
-        let dataset_handle = self
-            .dataset_repo
-            .resolve_dataset_ref(self.refs.first().unwrap())
-            .await?;
+        let dataset_ref_pattern = self.refs.first().unwrap();
 
-        let listener = listener.and_then(|l| l.begin_verify(&dataset_handle));
+        let requests: Vec<_> = filter_datasets_by_pattern(
+            self.dataset_repo.as_ref(),
+            vec![dataset_ref_pattern.clone()],
+        )
+        .map_ok(|dataset_handle| VerificationRequest {
+            dataset_ref: dataset_handle.as_local_ref(),
+            block_range: (None, None),
+        })
+        .try_collect()
+        .await?;
 
-        let res = self
+        if requests.is_empty() {
+            return Ok(vec![]);
+        }
+
+        let listener = listener.unwrap();
+
+        Ok(self
             .verification_svc
-            .verify(
-                &dataset_handle.as_local_ref(),
-                (None, None),
-                options,
-                listener,
-            )
-            .await;
-
-        Ok(vec![(dataset_handle.into(), res)])
+            .clone()
+            .verify_multi(requests, options, Some(listener))
+            .await)
     }
 }
 
@@ -135,34 +142,44 @@ impl Command for VerifyCommand {
             self.verify(options, None).await?
         };
 
-        let mut valid = 0;
-        let mut errors = 0;
-
-        for (_, res) in &verification_results {
-            match res {
-                Ok(_) => valid += 1,
-                Err(_) => errors += 1,
-            }
-        }
-
-        if valid != 0 {
+        if verification_results.is_empty() {
             eprintln!(
                 "{}",
-                console::style(format!("{valid} dataset(s) are valid"))
+                console::style("There are no datasets matching the pattern").yellow()
+            );
+            return Ok(());
+        }
+
+        let total_results = verification_results.len();
+
+        let errors: Vec<_> = verification_results
+            .into_iter()
+            .filter_map(|result| match result.outcome {
+                Ok(_) => None,
+                Err(e) => Some((
+                    e,
+                    match result.dataset_handle {
+                        None => "Failed to initiate verification".to_string(),
+                        Some(hdl) => format!("Failed to verify {hdl}"),
+                    },
+                )),
+            })
+            .collect();
+
+        if errors.is_empty() {
+            eprintln!(
+                "{}",
+                console::style(format!("{total_results} dataset(s) are valid"))
                     .green()
                     .bold()
             );
-        }
-        if errors != 0 {
+            Ok(())
+        } else {
             Err(BatchError::new(
-                format!("Failed to verify {errors} dataset(s)"),
-                verification_results.into_iter().filter_map(|(id, res)| {
-                    res.err().map(|e| (e, format!("Failed to verify {id}")))
-                }),
+                format!("Failed to verify {} dataset(s)", errors.len()),
+                errors,
             )
             .into())
-        } else {
-            Ok(())
         }
     }
 }

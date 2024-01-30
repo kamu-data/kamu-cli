@@ -45,13 +45,7 @@ pub trait TransformService: Send + Sync {
         dataset_ref: &DatasetRef,
         block_range: (Option<Multihash>, Option<Multihash>),
         listener: Option<Arc<dyn VerificationListener>>,
-    ) -> Result<VerificationResult, VerificationError>;
-
-    async fn verify_transform_multi(
-        &self,
-        datasets: Vec<VerificationRequest>,
-        listener: Option<Arc<dyn VerificationMultiListener>>,
-    ) -> Result<VerificationResult, VerificationError>;
+    ) -> Result<(), VerificationError>;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

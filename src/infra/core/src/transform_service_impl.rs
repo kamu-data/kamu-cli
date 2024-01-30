@@ -790,7 +790,7 @@ impl TransformService for TransformServiceImpl {
         dataset_ref: &DatasetRef,
         block_range: (Option<Multihash>, Option<Multihash>),
         maybe_listener: Option<Arc<dyn VerificationListener>>,
-    ) -> Result<VerificationResult, VerificationError> {
+    ) -> Result<(), VerificationError> {
         let listener = maybe_listener.unwrap_or(Arc::new(NullVerificationListener {}));
 
         let dataset_handle = self.dataset_repo.resolve_dataset_ref(dataset_ref).await?;
@@ -919,15 +919,7 @@ impl TransformService for TransformServiceImpl {
         }
 
         listener.end_phase(VerificationPhase::ReplayTransform);
-        Ok(VerificationResult::Valid)
-    }
-
-    async fn verify_transform_multi(
-        &self,
-        _datasets: Vec<VerificationRequest>,
-        _listener: Option<Arc<dyn VerificationMultiListener>>,
-    ) -> Result<VerificationResult, VerificationError> {
-        unimplemented!()
+        Ok(())
     }
 }
 

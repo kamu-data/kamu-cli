@@ -103,6 +103,7 @@ macro_rules! impl_serde {
 }
 
 pub(crate) use impl_serde;
+use like::Like;
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -218,6 +219,22 @@ impl DatasetName {
 
     pub fn into_local_ref(self) -> DatasetRef {
         DatasetRef::Alias(DatasetAlias::new(None, self))
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+///////////////////////////////////////////////////////////////////////////////
+
+newtype_str!(
+    DatasetNamePattern,
+    Grammar::match_dataset_name_pattern,
+    DatasetNamePatternSerdeVisitor
+);
+
+impl DatasetNamePattern {
+    pub fn is_match(&self, dataset_name: &DatasetName) -> bool {
+        Like::<false>::like(dataset_name.as_str(), self).unwrap()
     }
 }
 

@@ -87,6 +87,7 @@ indoc = "2"
 itertools = "0.11"
 jsonwebtoken = "9"
 libc = "0.2"  # Signal names
+like = { version = "0.3", default-features = false }
 mockall = "0.11"
 pin-project = "1"
 petgraph = { version = "0.6.4", default-features = false }

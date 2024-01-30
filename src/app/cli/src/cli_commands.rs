@@ -88,7 +88,7 @@ pub fn get_command(
         },
         Some(("delete", submatches)) => Box::new(DeleteCommand::new(
             cli_catalog.get_one()?,
-            validate_many_dataset_refs(
+            validate_many_dataset_patterns(
                 cli_catalog,
                 submatches.get_many("dataset").unwrap().cloned(),
             )?,
@@ -494,7 +494,7 @@ pub fn get_command(
             cli_catalog.get_one()?,
             cli_catalog.get_one()?,
             cli_catalog.get_one()?,
-            validate_many_dataset_refs(
+            validate_many_dataset_patterns(
                 cli_catalog,
                 submatches.get_many("dataset").unwrap().cloned(),
             )?
@@ -520,12 +520,34 @@ fn validate_dataset_ref(
         let workspace_svc = catalog.get_one::<WorkspaceService>()?;
         if !workspace_svc.is_multi_tenant_workspace() && alias.is_multi_tenant() {
             return Err(MultiTenantRefUnexpectedError {
-                dataset_ref: dataset_ref.clone(),
+                dataset_ref_pattern: DatasetRefPattern::Ref(dataset_ref),
             }
             .into());
         }
     }
     Ok(dataset_ref)
+}
+
+fn validate_dataset_ref_pattern(
+    catalog: &dill::Catalog,
+    dataset_ref_pattern: DatasetRefPattern,
+) -> Result<DatasetRefPattern, CLIError> {
+    match dataset_ref_pattern {
+        DatasetRefPattern::Ref(dsr) => {
+            let valid_ref = validate_dataset_ref(catalog, dsr)?;
+            Ok(DatasetRefPattern::Ref(valid_ref))
+        }
+        DatasetRefPattern::Pattern(an, drp) => {
+            let workspace_svc = catalog.get_one::<WorkspaceService>()?;
+            if !workspace_svc.is_multi_tenant_workspace() && an.is_some() {
+                return Err(MultiTenantRefUnexpectedError {
+                    dataset_ref_pattern: DatasetRefPattern::Pattern(an, drp),
+                }
+                .into());
+            }
+            Ok(DatasetRefPattern::Pattern(an, drp))
+        }
+    }
 }
 
 fn validate_many_dataset_refs<I>(
@@ -541,4 +563,17 @@ where
     }
 
     Ok(result_refs)
+}
+
+fn validate_many_dataset_patterns<I>(
+    catalog: &dill::Catalog,
+    dataset_ref_patterns: I,
+) -> Result<Vec<DatasetRefPattern>, CLIError>
+where
+    I: IntoIterator<Item = DatasetRefPattern>,
+{
+    dataset_ref_patterns
+        .into_iter()
+        .map(|p| validate_dataset_ref_pattern(catalog, p))
+        .collect()
 }

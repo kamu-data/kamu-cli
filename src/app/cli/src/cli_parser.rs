@@ -10,8 +10,8 @@
 use std::net::IpAddr;
 
 use clap::{value_parser, Arg, ArgAction, Command};
-use opendatafabric::*;
-use url::Url;
+
+use super::cli_value_parser::*;
 
 fn tabular_output_params(app: Command) -> Command {
     app.args([
@@ -303,7 +303,7 @@ pub fn cli() -> Command {
                             .action(ArgAction::Append)
                             .index(1)
                             .required(true)
-                            .value_parser(value_parse_dataset_ref_local)
+                            .value_parser(value_parse_dataset_ref_pattern_local)
                             .help("Local dataset reference(s)"),
                         Arg::new("yes")
                             .short('y')
@@ -324,6 +324,10 @@ pub fn cli() -> Command {
                         Delete a local dataset:
 
                             kamu delete my.dataset
+
+                        Delete local datasets matching pattern:
+
+                            kamu delete my.dataset.%
                         "#
                     )),
                 Command::new("ingest")
@@ -967,7 +971,7 @@ pub fn cli() -> Command {
                                         Arg::new("dataset")
                                             .required(true)
                                             .index(1)
-                                            .value_parser(value_parse_dataset_ref_local)
+                                            .value_parser(value_parse_dataset_ref_pattern_local)
                                             .help("Local dataset reference"),
                                         Arg::new("alias")
                                             .index(2)
@@ -1281,7 +1285,7 @@ pub fn cli() -> Command {
                             .index(1)
                             .num_args(1..)
                             .required(true)
-                            .value_parser(value_parse_dataset_ref_local)
+                            .value_parser(value_parse_dataset_ref_pattern_local)
                             .help("Local dataset reference(s)"),
                     ])
                     .after_help(indoc::indoc!(
@@ -1305,6 +1309,10 @@ pub fn cli() -> Command {
 
                             kamu verify com.example.deriv
 
+                        Verify the data in datasets matching pattern:
+
+                            kamu verify com.example.%
+
                         Verify the entire transformation chain starting with root datasets (may download a lot of data):
 
                             kamu pull --recursive com.example.deriv
@@ -1325,85 +1333,4 @@ pub fn cli() -> Command {
                     ]),
             ],
         )
-}
-
-fn value_parse_dataset_name(s: &str) -> Result<DatasetName, String> {
-    match DatasetName::try_from(s) {
-        Ok(v) => Ok(v),
-        Err(_) => Err(
-            "Dataset name can only contain alphanumerics, dashes, and dots, e.g. `my.dataset-id`"
-                .to_string(),
-        ),
-    }
-}
-
-fn value_parse_dataset_ref_local(s: &str) -> Result<DatasetRef, String> {
-    match DatasetRef::try_from(s) {
-        Ok(v) => Ok(v),
-        Err(_) => {
-            Err("Local reference should be in form: `did:odf:...` or `my.dataset.id`".to_string())
-        }
-    }
-}
-
-fn value_parse_dataset_ref_remote(s: &str) -> Result<DatasetRefRemote, String> {
-    match DatasetRefRemote::try_from(s) {
-        Ok(v) => Ok(v),
-        Err(_) => Err("Remote reference should be in form: `did:odf:...` or \
-                       `repository/account/dataset-id` or `scheme://some-url`"
-            .to_string()),
-    }
-}
-
-fn value_parse_dataset_ref_any(s: &str) -> Result<DatasetRefAny, String> {
-    match DatasetRefAny::try_from(s) {
-        Ok(v) => Ok(v),
-        Err(_) => Err("Dataset reference should be in form: `my.dataset.id` or \
-                       `repository/account/dataset-id` or `did:odf:...` or `scheme://some-url`"
-            .to_string()),
-    }
-}
-
-fn value_parse_repo_name(s: &str) -> Result<RepoName, String> {
-    match RepoName::try_from(s) {
-        Ok(v) => Ok(v),
-        Err(_) => Err("RepositoryID can only contain alphanumerics, dashes, and dots".to_string()),
-    }
-}
-
-fn value_parse_multihash(s: &str) -> Result<Multihash, String> {
-    match Multihash::from_multibase(s) {
-        Ok(v) => Ok(v),
-        Err(_) => Err("Block hash must be a valid multihash string".to_string()),
-    }
-}
-
-fn validate_log_filter(s: &str) -> Result<String, String> {
-    let items: Vec<_> = s.split(',').collect();
-    for item in items {
-        match item {
-            "source" | "watermark" | "data" => Ok(()),
-            _ => Err("Filter should be a comma-separated list of values like: \
-                      source,data,watermark"
-                .to_string()),
-        }?;
-    }
-    Ok(s.to_string())
-}
-
-fn value_parse_url(url_str: &str) -> Result<Url, String> {
-    let parse_result = Url::parse(url_str);
-    match parse_result {
-        Ok(url) => Ok(url),
-        Err(e) => {
-            // try attaching a default schema
-            if let url::ParseError::RelativeUrlWithoutBase = e {
-                let url_with_default_schema = format!("https://{url_str}");
-                let url = Url::parse(&url_with_default_schema).map_err(|e| e.to_string())?;
-                Ok(url)
-            } else {
-                Err(e.to_string())
-            }
-        }
-    }
 }

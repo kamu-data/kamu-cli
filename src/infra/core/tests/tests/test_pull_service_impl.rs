@@ -1157,15 +1157,7 @@ impl TransformService for TestTransformService {
         _dataset_ref: &DatasetRef,
         _block_range: (Option<Multihash>, Option<Multihash>),
         _listener: Option<Arc<dyn VerificationListener>>,
-    ) -> Result<VerificationResult, VerificationError> {
-        unimplemented!()
-    }
-
-    async fn verify_transform_multi(
-        &self,
-        _datasets: Vec<VerificationRequest>,
-        _listener: Option<Arc<dyn VerificationMultiListener>>,
-    ) -> Result<VerificationResult, VerificationError> {
+    ) -> Result<(), VerificationError> {
         unimplemented!()
     }
 }
