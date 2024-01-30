@@ -101,7 +101,6 @@ tracing-log = "0.2"
 tracing-bunyan-formatter = "0.3"
 
 # Utils
-assert_cmd = "2.0.13"
 async-trait = "0.1"
 chrono = "0.4"
 cfg-if = "1"  # Conditional compilation
@@ -133,6 +132,7 @@ libc = "0.2"  # For getting uid:gid
 
 
 [dev-dependencies]
+assert_cmd = "2.0.13"
 env_logger = "0.10"
 test-group = { version = "1" }
 test-log = { version = "0.2", features = ["trace"] }
