@@ -138,7 +138,7 @@ pub fn cli() -> Command {
 
                         In future versions the add command will allow you to modify the structure of already existing datasets (e.g. changing schema in a compatible way).
 
-                        ### Examples ###
+                        **Examples:**
 
                         Add a root/derivative dataset from local manifest:
 
@@ -169,7 +169,7 @@ pub fn cli() -> Command {
                         r#"
                         This hidden command is called by shell completions to use domain knowledge to complete commands and arguments.
 
-                        ### Examples ###
+                        **Examples:**
 
                         Should complete to "new":
 
@@ -188,7 +188,7 @@ pub fn cli() -> Command {
 
                         Here are some common set ups:
 
-                        #### BASH ####
+                        **Bash:**
 
                         Append the following to your `~/.bashrc`:
 
@@ -196,7 +196,7 @@ pub fn cli() -> Command {
 
                         You will need to reload your shell session (or execute the same command in your current one) for changes to take effect.
 
-                        #### ZSH ####
+                        **Zsh:**
 
                         Append the following to your `~/.zshrc`:
 
@@ -262,7 +262,7 @@ pub fn cli() -> Command {
 
                         Most commonly you will have a workspace-scoped config inside the `.kamu` directory and the user-scoped config residing in your home directory.
 
-                        ### Examples ###
+                        **Examples:**
 
                         List current configuration as combined view of config files:
 
@@ -319,7 +319,7 @@ pub fn cli() -> Command {
 
                         Deleting a derivative dataset is usually not a big deal, since they can always be reconstructed, but it will disrupt downstream consumers.
 
-                        ### Examples ###
+                        **Examples:**
 
                         Delete a local dataset:
 
@@ -371,7 +371,7 @@ pub fn cli() -> Command {
                             .help("Overrides the media type of the data expected by the push source"),
                     ]).after_help(indoc::indoc!(
                         r#"
-                        ### Examples ###
+                        **Examples:**
 
                         Ingest data from files:
 
@@ -443,7 +443,7 @@ pub fn cli() -> Command {
                                 r#"
                                 Presents the dataset-level lineage that includes current and past dependencies.
 
-                                ### Examples ###
+                                **Examples:**
 
                                 Show lineage of a single dataset:
 
@@ -489,7 +489,7 @@ pub fn cli() -> Command {
                                 r#"
                                 Displays the schema of the dataset. Note that dataset schemas can evolve over time and by default the latest schema will be shown.
 
-                                ### Examples ###
+                                **Examples:**
 
                                 Show logical schema of a dataset in the DDL format:
 
@@ -522,7 +522,7 @@ pub fn cli() -> Command {
                         ])
                         .after_help(indoc::indoc!(
                             r#"
-                            ### Examples ###
+                            **Examples:**
 
                             To see a human-friendly list of datasets in your workspace:
 
@@ -574,7 +574,7 @@ pub fn cli() -> Command {
 
                         Use this command to explore how dataset evolved over time.
 
-                        ### Examples ###
+                        **Examples:**
 
                         Show brief summaries of individual metadata blocks:
 
@@ -639,7 +639,7 @@ pub fn cli() -> Command {
                         r#"
                         This command will create a dataset manifest from a template allowing you to customize the most relevant parts without having to remember the exact structure of the yaml file.
 
-                        ### Examples ###
+                        **Examples:**
 
                         Create `org.example.data.yaml` file from template in the current directory:
 
@@ -720,7 +720,7 @@ pub fn cli() -> Command {
                         - Pull dataset from a remote repository into your workspace
                         - Update watermark on a dataset
 
-                        ### Examples ###
+                        **Examples:**
 
                         Fetch latest data in a specific dataset:
 
@@ -788,7 +788,7 @@ pub fn cli() -> Command {
 
                         Similarly to git, if someone else modified the dataset concurrently with you - your push will be rejected and you will have to resolve the conflict.
 
-                        ### Examples ###
+                        **Examples:**
 
                         Sync dataset to a destination URL (see `kamu repo add -h` for supported protocols):
 
@@ -825,7 +825,7 @@ pub fn cli() -> Command {
                         r#"
                         Use this command to rename a dataset in your local workspace. Renaming is safe in terms of downstream derivative datasets as they use stable dataset IDs to define their inputs.
 
-                        ### Examples ###
+                        **Examples:**
 
                         Renaming is often useful when you pull a remote dataset by URL and it gets auto-assigned not the most convenient name:
 
@@ -991,7 +991,7 @@ pub fn cli() -> Command {
                                 r#"
                                 When you pull and push datasets from repositories kamu uses aliases to let you avoid specifying the full remote referente each time. Aliases are usually created the first time you do a push or pull and saved for later. If you have an unusual setup (e.g. pushing to multiple repositories) you can use this command to manage the aliases.
 
-                                ### Examples ###
+                                **Examples:**
 
                                 List all aliases:
 
@@ -1011,7 +1011,7 @@ pub fn cli() -> Command {
                         r#"
                         Repositories are nodes on the network that let users exchange datasets. In the most basic form, a repository can simply be a location where the dataset files are hosted over one of the supported file or object-based data transfer protocols. The owner of a dataset will have push privileges to this location, while other participants can pull data from it.
 
-                        ### Examples ###
+                        **Examples:**
 
                         Show available repositories:
 
@@ -1041,7 +1041,7 @@ pub fn cli() -> Command {
                             r#"
                             Search is delegated to the repository implementations and its capabilities depend on the type of the repo. Whereas smart repos may support advanced full-text search, simple storage-only repos may be limited to a substring search by dataset name.
 
-                            ### Examples ###
+                            **Examples:**
 
                             Search all repositories:
 
@@ -1105,7 +1105,7 @@ pub fn cli() -> Command {
                             r#"
                             SQL shell allows you to explore data of all dataset in your workspace using one of the supported data processing engines. This can be a great way to prepare and test a query that you cal later turn into derivative dataset.
 
-                            ### Examples ###
+                            **Examples:**
 
                             Drop into SQL shell:
 
@@ -1168,7 +1168,7 @@ pub fn cli() -> Command {
                             ])
                             .after_help(indoc::indoc!(
                                 r#"
-                                ### Examples ###
+                                **Examples:**
 
                                 Run API server on a specified port:
 
@@ -1257,7 +1257,7 @@ pub fn cli() -> Command {
                         r#"
                         Starts a built-in HTTP + GraphQL server and opens a pre-packaged Web UI application in your browser.
 
-                        ### Examples ###
+                        **Examples:**
 
                         Starts server and opens UI in your default browser:
 
@@ -1303,7 +1303,7 @@ pub fn cli() -> Command {
 
                         When called on a root dataset the command will only perform the integrity check of comparing data hashes to metadata.
 
-                        ### Examples ###
+                        **Examples:**
 
                         Verify the data in a dataset starting from its immediate inputs:
 
