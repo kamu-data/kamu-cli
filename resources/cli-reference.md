@@ -245,6 +245,10 @@ Delete a local dataset:
 
     kamu delete my.dataset
 
+Delete local datasets matching pattern:
+
+    kamu delete my.dataset.%
+
 
 
 
@@ -1217,6 +1221,10 @@ When called on a root dataset the command will only perform the integrity check 
 Verify the data in a dataset starting from its immediate inputs:
 
     kamu verify com.example.deriv
+
+Verify the data in datasets matching pattern:
+
+    kamu verify com.example.%
 
 Verify the entire transformation chain starting with root datasets (may download a lot of data):
 
