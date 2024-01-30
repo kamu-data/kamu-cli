@@ -1,12 +1,14 @@
 name: build
 on:
   push:
-    paths-ignore:
-      - "docs/**"
-      - "examples/**"
-      - "images/**"
-      - "**.md"
-      - "**.ipynb"
+    paths:
+      - "**"
+      - "!docs/**"
+      - "!examples/**"
+      - "!images/**"
+      - "!**.md"
+      - "!**.ipynb"
+      - "resources/**"
   # manual trigger
   workflow_dispatch: {}
 env:
