@@ -25,10 +25,9 @@ async fn test_datafusion_cli() {
 
     let seconds = Regex::new(r"took (.*?) seconds.")
         .unwrap()
-        .captures(&*string_result)
+        .captures(&string_result)
         .and_then(|caps| caps.get(1))
-        .map(|m| m.as_str())
-        .unwrap_or("Seconds not found.");
+        .map_or("Seconds not found.", |m| m.as_str());
 
     let expected_output = format!(
         indoc::indoc! {r#"
