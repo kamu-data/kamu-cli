@@ -376,7 +376,7 @@ pub enum AppendError {
     #[error(transparent)]
     RefCASFailed(#[from] RefCASError),
     #[error(transparent)]
-    InvalidBlock(#[from] AppendValidationError),
+    InvalidBlock(#[from] Box<AppendValidationError>),
     #[error(transparent)]
     Access(
         #[from]
@@ -389,6 +389,12 @@ pub enum AppendError {
         #[backtrace]
         InternalError,
     ),
+}
+
+impl From<AppendValidationError> for AppendError {
+    fn from(e: AppendValidationError) -> Self {
+        Self::InvalidBlock(Box::new(e))
+    }
 }
 
 impl From<SetRefErrorRepo> for AppendError {
@@ -487,16 +493,14 @@ pub enum AppendValidationError {
 ///////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, PartialEq, Eq, Debug)]
-#[error("Invalid event: {message}: {event:?}")]
+#[error("Invalid event: {message}")]
 pub struct InvalidEventError {
-    event: MetadataEvent,
     message: String,
 }
 
 impl InvalidEventError {
-    pub fn new(event: impl Into<MetadataEvent>, message: impl Into<String>) -> Self {
+    pub fn new(message: impl Into<String>) -> Self {
         Self {
-            event: event.into(),
             message: message.into(),
         }
     }

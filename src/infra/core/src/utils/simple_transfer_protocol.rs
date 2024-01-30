@@ -478,9 +478,9 @@ impl SimpleTransferProtocol {
                 .await
             {
                 Ok(_) => Ok(()),
-                Err(AppendError::InvalidBlock(AppendValidationError::HashMismatch(e))) => {
-                    Err(CorruptedSourceError {
-                        message: format!(
+                Err(AppendError::InvalidBlock(append_validation_error)) => {
+                    let message = match append_validation_error.as_ref() {
+                        AppendValidationError::HashMismatch(e) => format!(
                             concat!(
                                 "Block hash declared by the source {} didn't match ",
                                 "the computed {} at block {} - this may be an indication ",
@@ -488,18 +488,17 @@ impl SimpleTransferProtocol {
                             ),
                             e.actual, e.expected, sequence_number
                         ),
-                        source: Some(e.into()),
+                        _ => format!(
+                            "Source metadata chain is logically inconsistent at block \
+                             {hash}[{sequence_number}]"
+                        ),
+                    };
+                    Err(CorruptedSourceError {
+                        message,
+                        source: Some(append_validation_error),
                     }
                     .into())
                 }
-                Err(AppendError::InvalidBlock(e)) => Err(CorruptedSourceError {
-                    message: format!(
-                        "Source metadata chain is logically inconsistent at block \
-                         {hash}[{sequence_number}]"
-                    ),
-                    source: Some(e.into()),
-                }
-                .into()),
                 Err(AppendError::RefNotFound(_) | AppendError::RefCASFailed(_)) => unreachable!(),
                 Err(AppendError::Access(e)) => Err(SyncError::Access(e)),
                 Err(AppendError::Internal(e)) => Err(SyncError::Internal(e)),

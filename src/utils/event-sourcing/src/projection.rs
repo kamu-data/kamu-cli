@@ -42,13 +42,16 @@ where
 
 #[derive(thiserror::Error, Debug)]
 pub struct ProjectionError<Proj: Projection> {
-    pub state: Option<Proj>,
+    pub state: Option<Box<Proj>>,
     pub event: <Proj as Projection>::Event,
 }
 
 impl<Proj: Projection> ProjectionError<Proj> {
     pub fn new(state: Option<Proj>, event: <Proj as Projection>::Event) -> Self {
-        Self { state, event }
+        Self {
+            state: state.map(Box::new),
+            event,
+        }
     }
 }
 

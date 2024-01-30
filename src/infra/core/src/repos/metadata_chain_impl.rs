@@ -18,7 +18,8 @@ use opendatafabric::*;
 
 macro_rules! invalid_event {
     ($e:expr, $msg:expr $(,)?) => {
-        return Err(AppendValidationError::InvalidEvent(InvalidEventError::new($e, $msg)).into())
+        let message = format!("{}: {:?}", $msg, $e);
+        return Err(AppendValidationError::InvalidEvent(InvalidEventError::new(message)).into())
     };
 }
 
@@ -81,9 +82,9 @@ where
             let block_hash = new_block.prev_block_hash.as_ref().unwrap();
             let block = match self.get_block(block_hash).await {
                 Ok(block) => Ok(block),
-                Err(GetBlockError::NotFound(e)) => Err(AppendError::InvalidBlock(
-                    AppendValidationError::PrevBlockNotFound(e),
-                )),
+                Err(GetBlockError::NotFound(e)) => {
+                    Err(AppendValidationError::PrevBlockNotFound(e).into())
+                }
                 Err(GetBlockError::BlockVersion(e)) => Err(AppendError::Internal(e.int_err())),
                 Err(GetBlockError::BlockMalformed(e)) => Err(AppendError::Internal(e.int_err())),
                 Err(GetBlockError::Access(e)) => Err(AppendError::Access(e)),
@@ -133,9 +134,9 @@ where
                     block_cache.push(b);
                     Ok(block_cache.first())
                 }
-                Err(GetBlockError::NotFound(e)) => Err(AppendError::InvalidBlock(
-                    AppendValidationError::PrevBlockNotFound(e),
-                )),
+                Err(GetBlockError::NotFound(e)) => {
+                    Err(AppendValidationError::PrevBlockNotFound(e).into())
+                }
                 Err(GetBlockError::BlockVersion(e)) => Err(AppendError::Internal(e.int_err())),
                 Err(GetBlockError::BlockMalformed(e)) => Err(AppendError::Internal(e.int_err())),
                 Err(GetBlockError::Access(e)) => Err(AppendError::Access(e)),
@@ -835,9 +836,7 @@ where
             )
             .await
             .map_err(|e| match e {
-                InsertError::HashMismatch(e) => {
-                    AppendError::InvalidBlock(AppendValidationError::HashMismatch(e))
-                }
+                InsertError::HashMismatch(e) => AppendValidationError::HashMismatch(e).into(),
                 InsertError::Access(e) => AppendError::Access(e),
                 InsertError::Internal(e) => AppendError::Internal(e),
             })?;
