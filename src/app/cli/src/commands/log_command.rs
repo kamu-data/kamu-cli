@@ -47,8 +47,8 @@ impl LogCommand {
             dataset_repo,
             dataset_action_authorizer,
             dataset_ref,
-            outout_format: outout_format.map(|s| s.to_owned()),
-            filter: filter.map(|s| s.to_owned()),
+            outout_format: outout_format.map(ToOwned::to_owned),
+            filter: filter.map(ToOwned::to_owned),
             limit,
             output_config,
         }

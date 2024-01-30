@@ -69,7 +69,7 @@ impl MediaType {
     pub const GEOJSON: MediaTypeRef<'static> = MediaTypeRef("application/geo+json");
     /// No standard found
     pub const NDGEOJSON: MediaTypeRef<'static> = MediaTypeRef("application/x-ndgeojson");
-    /// See: https://issues.apache.org/jira/browse/PARQUET-1889
+    /// See: <https://issues.apache.org/jira/browse/PARQUET-1889>
     pub const PARQUET: MediaTypeRef<'static> = MediaTypeRef("application/vnd.apache.parquet");
     /// No standard found
     pub const ESRI_SHAPEFILE: MediaTypeRef<'static> =

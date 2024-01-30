@@ -94,12 +94,12 @@ impl AxumServerPullProtocolInstance {
             pull_request
                 .begin_after
                 .as_ref()
-                .map(|ba| ba.to_string())
+                .map(ToString::to_string)
                 .ok_or("None"),
             pull_request
                 .stop_at
                 .as_ref()
-                .map(|sa| sa.to_string())
+                .map(ToString::to_string)
                 .ok_or("None")
         );
 

@@ -141,7 +141,7 @@ pub async fn dataset_data_put_handler(
     dataset_put_object_common(
         dataset.as_data_repo(),
         hash_param.physical_hash,
-        content_length.0 as usize,
+        content_length.0,
         body_stream,
     )
     .await
@@ -158,7 +158,7 @@ pub async fn dataset_checkpoints_put_handler(
     dataset_put_object_common(
         dataset.as_checkpoint_repo(),
         hash_param.physical_hash,
-        content_length.0 as usize,
+        content_length.0,
         body_stream,
     )
     .await
@@ -169,7 +169,7 @@ pub async fn dataset_checkpoints_put_handler(
 async fn dataset_put_object_common(
     object_repository: &dyn ObjectRepository,
     physical_hash: Multihash,
-    content_length: usize,
+    content_length: u64,
     body_stream: axum::extract::BodyStream,
 ) -> Result<(), ApiError> {
     let src = Box::new(crate::axum_utils::body_into_async_read(body_stream));
@@ -266,7 +266,7 @@ fn get_base_dataset_url(
     axum::extract::OriginalUri(uri): axum::extract::OriginalUri,
     depth: usize,
 ) -> Url {
-    let api_server_url = get_api_server_url(host);
+    let api_server_url = get_api_server_url(&host);
 
     let mut path: Vec<_> = uri.path().split('/').collect();
     for _ in 0..depth {
@@ -278,7 +278,7 @@ fn get_base_dataset_url(
 
 /////////////////////////////////////////////////////////////////////////////////
 
-fn get_api_server_url(host: String) -> Url {
+fn get_api_server_url(host: &str) -> Url {
     let scheme = std::env::var("KAMU_PROTOCOL_SCHEME").unwrap_or_else(|_| String::from("http"));
     Url::parse(&format!("{scheme}://{host}")).unwrap()
 }

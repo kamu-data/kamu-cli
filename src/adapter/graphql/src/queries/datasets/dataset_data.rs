@@ -85,8 +85,8 @@ impl DatasetData {
         let tail_result = query_svc
             .tail(
                 &self.dataset_handle.as_local_ref(),
-                skip.unwrap_or(0) as usize,
-                limit as usize,
+                skip.unwrap_or(0),
+                limit,
             )
             .await;
         let df = match tail_result {

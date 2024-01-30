@@ -34,7 +34,7 @@ macro_rules! test_client_server_local_fs_harness_permutations {
                         multi_tenant: false,
                         authorized_writes: true,
                         base_catalog: None,
-                    }).await,
+                    }),
                 )
                 .await;
             }
@@ -49,7 +49,7 @@ macro_rules! test_client_server_local_fs_harness_permutations {
                         multi_tenant: true,
                         authorized_writes: true,
                         base_catalog: None,
-                    }).await,
+                    }),
                 )
                 .await;
             }
@@ -64,7 +64,7 @@ macro_rules! test_client_server_local_fs_harness_permutations {
                         multi_tenant: false,
                         authorized_writes: true,
                         base_catalog: None,
-                    }).await,
+                    }),
                 )
                 .await;
             }
@@ -79,7 +79,7 @@ macro_rules! test_client_server_local_fs_harness_permutations {
                         multi_tenant: true,
                         authorized_writes: true,
                         base_catalog: None,
-                    }).await,
+                    }),
                 )
                 .await;
             }

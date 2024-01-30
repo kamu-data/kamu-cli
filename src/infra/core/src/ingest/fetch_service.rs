@@ -64,18 +64,15 @@ impl FetchService {
                 let headers = Self::template_headers(&furl.headers)?;
 
                 match url.scheme() {
-                    "file" => {
-                        Self::fetch_file(
-                            &url.to_file_path()
-                                .map_err(|_| format!("Invalid url: {url}").int_err())?,
-                            furl.event_time.as_ref(),
-                            prev_source_state,
-                            target_path,
-                            system_time,
-                            &listener,
-                        )
-                        .await
-                    }
+                    "file" => Self::fetch_file(
+                        &url.to_file_path()
+                            .map_err(|_| format!("Invalid url: {url}").int_err())?,
+                        furl.event_time.as_ref(),
+                        prev_source_state,
+                        target_path,
+                        system_time,
+                        &listener,
+                    ),
                     "http" | "https" => {
                         self.fetch_http(
                             url,
@@ -105,16 +102,13 @@ impl FetchService {
                 )
                 .await
             }
-            FetchStep::FilesGlob(fglob) => {
-                Self::fetch_files_glob(
-                    fglob,
-                    prev_source_state,
-                    target_path,
-                    system_time,
-                    &listener,
-                )
-                .await
-            }
+            FetchStep::FilesGlob(fglob) => Self::fetch_files_glob(
+                fglob,
+                prev_source_state,
+                target_path,
+                system_time,
+                &listener,
+            ),
         }
     }
 
@@ -368,7 +362,7 @@ impl FetchService {
         }
     }
 
-    async fn fetch_files_glob(
+    fn fetch_files_glob(
         fglob: &FetchStepFilesGlob,
         prev_source_state: Option<&PollingSourceState>,
         target_path: &Path,
@@ -376,8 +370,7 @@ impl FetchService {
         listener: &Arc<dyn FetchProgressListener>,
     ) -> Result<FetchResult, PollingIngestError> {
         match &fglob.order {
-            None => (),
-            Some(SourceOrdering::ByName) => (),
+            None | Some(SourceOrdering::ByName) => (),
             Some(ord) => panic!("Files glob source can only be ordered by name, found: {ord:?}"),
         }
 
@@ -438,7 +431,7 @@ impl FetchService {
         };
 
         let FetchResult::Updated(fetch_res) =
-            Self::fetch_file(&first_path, None, None, target_path, system_time, listener).await?
+            Self::fetch_file(&first_path, None, None, target_path, system_time, listener)?
         else {
             panic!("Glob rule should be caching individual files")
         };
@@ -454,7 +447,7 @@ impl FetchService {
     // TODO: Validate event_time_source
     // TODO: Support event time from ctime/modtime
     // TODO: Resolve symlinks
-    async fn fetch_file(
+    fn fetch_file(
         path: &Path,
         event_time_source: Option<&EventTimeSource>,
         prev_source_state: Option<&PollingSourceState>,
@@ -627,6 +620,7 @@ impl FetchService {
     }
 
     #[allow(unused_variables)]
+    #[allow(clippy::unused_async)]
     async fn fetch_ftp(
         url: Url,
         target_path: &Path,

@@ -22,6 +22,7 @@ doctest = false
 
 
 [dependencies]
+conv = "0.3"
 serde = { version = "1", default-features = false }
 serde_json = { version = "1", default-features = false, features = ["std"] }
 tracing = "0.1"

@@ -79,6 +79,7 @@ pub fn add_dataset_resolver_layer(
 
 /////////////////////////////////////////////////////////////////////////////////
 
+#[allow(clippy::unused_async)]
 pub async fn platform_token_validate_handler(
     catalog: axum::extract::Extension<dill::Catalog>,
 ) -> axum::response::Response {
@@ -92,8 +93,8 @@ pub async fn platform_token_validate_handler(
         CurrentAccountSubject::Anonymous(reason) => axum::response::Response::builder()
             .status(match reason {
                 AnonymousAccountReason::AuthenticationExpired => http::StatusCode::UNAUTHORIZED,
-                AnonymousAccountReason::AuthenticationInvalid => http::StatusCode::BAD_REQUEST,
-                AnonymousAccountReason::NoAuthenticationProvided => http::StatusCode::BAD_REQUEST,
+                AnonymousAccountReason::AuthenticationInvalid
+                | AnonymousAccountReason::NoAuthenticationProvided => http::StatusCode::BAD_REQUEST,
             })
             .body(Default::default())
             .unwrap(),

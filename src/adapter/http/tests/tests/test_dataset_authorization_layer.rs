@@ -333,10 +333,12 @@ impl ServerHarness {
         Url::from_str(format!("http://{}/{}", self.server.local_addr(), path).as_str()).unwrap()
     }
 
+    #[allow(clippy::unused_async)]
     async fn foo_handler() -> http::StatusCode {
         http::StatusCode::OK
     }
 
+    #[allow(clippy::unused_async)]
     async fn bar_handler() -> http::StatusCode {
         http::StatusCode::OK
     }

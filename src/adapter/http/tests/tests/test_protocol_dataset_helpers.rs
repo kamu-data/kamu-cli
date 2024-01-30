@@ -35,8 +35,7 @@ async fn test_object_url_local_fs() {
         multi_tenant: false,
         authorized_writes: true,
         base_catalog: None,
-    })
-    .await;
+    });
 
     let test_case = create_test_case(&server_harness).await;
 

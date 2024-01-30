@@ -116,7 +116,7 @@ impl DatasetsMut {
             }
             Err(domain::CreateDatasetFromSnapshotError::NameCollision(e)) => {
                 CreateDatasetFromSnapshotResult::NameCollision(CreateDatasetResultNameCollision {
-                    account_name: e.alias.account_name.map(|a| a.into()),
+                    account_name: e.alias.account_name.map(Into::into),
                     dataset_name: e.alias.dataset_name.into(),
                 })
             }

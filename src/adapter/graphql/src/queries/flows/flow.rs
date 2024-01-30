@@ -108,7 +108,7 @@ impl Flow {
 
     /// Outcome of the flow (Finished state only)
     async fn outcome(&self) -> Option<FlowOutcome> {
-        self.flow_state.outcome.map(|o| o.into())
+        self.flow_state.outcome.map(Into::into)
     }
 
     /// Timing records associated with the flow lifecycle
@@ -158,7 +158,7 @@ impl Flow {
 
     /// Start condition
     async fn start_condition(&self) -> Option<FlowStartCondition> {
-        self.flow_state.start_condition.map(|sc| sc.into())
+        self.flow_state.start_condition.map(Into::into)
     }
 }
 

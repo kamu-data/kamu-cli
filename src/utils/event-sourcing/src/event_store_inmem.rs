@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::convert::TryFrom;
 use std::marker::PhantomData;
 use std::sync::{Arc, Mutex};
 
@@ -47,13 +48,12 @@ impl<Proj: Projection, State: EventStoreState<Proj>> EventStore<Proj>
 
         // TODO: This should be a buffered stream so we don't lock per event
         Box::pin(async_stream::try_stream! {
-            let mut seen = opts.from.map_or(0, |id| (id.into_inner() + 1) as usize);
+            let mut seen = opts.from.map_or(0, |id| usize::try_from(id.into_inner() + 1).unwrap());
 
             loop {
                 let next = {
                     let g = self.state.lock().unwrap();
-
-                    let to = opts.to.map_or(g.events_count(), |id| (id.into_inner() + 1) as usize);
+                    let to = opts.to.map_or(g.events_count(), |id| usize::try_from(id.into_inner() + 1).unwrap());
 
                     g.get_events()[..to]
                         .iter()

@@ -20,6 +20,7 @@ pub struct Accounts;
 impl Accounts {
     /// Returns account by its ID
     #[allow(unused_variables)]
+    #[allow(clippy::unused_async)]
     async fn by_id(&self, _ctx: &Context<'_>, account_id: AccountID) -> Result<Option<Account>> {
         panic!("Resolving accounts by ID is not supported yet");
     }

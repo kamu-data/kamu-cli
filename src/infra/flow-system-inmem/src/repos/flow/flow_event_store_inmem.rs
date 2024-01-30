@@ -185,7 +185,7 @@ impl FlowEventStore for FlowEventStoreInMem {
             let mut pos = {
                 let state = self.inner.as_state();
                 let g = state.lock().unwrap();
-                g.typed_flows_by_dataset.get(borrowed_key.as_trait()).map_or(0, |flows| flows.len())
+                g.typed_flows_by_dataset.get(borrowed_key.as_trait()).map_or(0, Vec::len)
             };
 
             loop {
@@ -218,9 +218,7 @@ impl FlowEventStore for FlowEventStoreInMem {
         let mut pos = {
             let state = self.inner.as_state();
             let g = state.lock().unwrap();
-            g.system_flows_by_type
-                .get(&flow_type)
-                .map_or(0, |flows| flows.len())
+            g.system_flows_by_type.get(&flow_type).map_or(0, Vec::len)
         };
 
         // TODO: This should be a buffered stream so we don't lock per record
@@ -259,7 +257,7 @@ impl FlowEventStore for FlowEventStoreInMem {
             let mut pos = {
                 let state = self.inner.as_state();
                 let g = state.lock().unwrap();
-                g.all_flows_by_dataset.get(&dataset_id).map_or(0, |flows| flows.len())
+                g.all_flows_by_dataset.get(&dataset_id).map_or(0, Vec::len)
             };
 
             loop {

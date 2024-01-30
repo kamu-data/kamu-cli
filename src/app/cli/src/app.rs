@@ -107,7 +107,7 @@ pub async fn run(
         cli_catalog.get_one::<GcService>()?.evict_cache()?;
     }
 
-    let result = match cli_commands::get_command(&base_catalog, &cli_catalog, matches) {
+    let result = match cli_commands::get_command(&base_catalog, &cli_catalog, &matches) {
         Ok(mut command) => {
             if command.needs_workspace() && !workspace_svc.is_in_workspace() {
                 Err(CLIError::usage_error_from(NotInWorkspace))

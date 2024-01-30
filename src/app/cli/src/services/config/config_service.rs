@@ -111,7 +111,7 @@ impl ConfigService {
         if with_defaults {
             config.merge(CLIConfig::default());
         }
-        let config_raw = self.to_raw(config);
+        let config_raw = self.to_raw(&config);
 
         let mut current = &config_raw;
 
@@ -167,7 +167,7 @@ impl ConfigService {
         }
 
         let config = self.load_from(&config_path);
-        let mut config_raw = self.to_raw(config);
+        let mut config_raw = self.to_raw(&config);
 
         if self.unset_recursive(key, config_raw.as_mapping_mut().unwrap()) {
             let file = std::fs::OpenOptions::new()
@@ -225,7 +225,7 @@ impl ConfigService {
     pub fn all_keys(&self) -> Vec<String> {
         let mut result = Vec::new();
         let full_config = CLIConfig::sample();
-        let raw_config = self.to_raw(full_config);
+        let raw_config = self.to_raw(&full_config);
         self.visit_keys_recursive("", &raw_config, &mut |key| result.push(key));
         result
     }
@@ -279,8 +279,8 @@ impl ConfigService {
         manifest.content
     }
 
-    fn to_raw(&self, config: CLIConfig) -> serde_yaml::Value {
-        let s = serde_yaml::to_string(&config).unwrap();
+    fn to_raw(&self, config: &CLIConfig) -> serde_yaml::Value {
+        let s = serde_yaml::to_string(config).unwrap();
         serde_yaml::from_str(&s).unwrap()
     }
 }

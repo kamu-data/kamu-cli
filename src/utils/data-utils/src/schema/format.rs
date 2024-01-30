@@ -85,7 +85,7 @@ impl<'a> ParquetJsonSchemaWriter<'a> {
 
                 match physical_type {
                     PhysicalType::FIXED_LEN_BYTE_ARRAY => {
-                        write!(self.output, r#", "type": "{physical_type}({type_length})""#)?
+                        write!(self.output, r#", "type": "{physical_type}({type_length})""#)?;
                     }
                     _ => write!(self.output, r#", "type": "{physical_type}""#)?,
                 };

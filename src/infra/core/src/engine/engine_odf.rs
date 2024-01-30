@@ -176,7 +176,7 @@ impl ODFEngine {
         })
     }
 
-    pub async fn materialize_response(
+    pub fn materialize_response(
         &self,
         engine_response: TransformResponseSuccess,
         new_data_path: PathBuf,
@@ -383,6 +383,5 @@ impl Engine for ODFEngine {
             materialized_request.out_data_path,
             materialized_request.out_checkpoint_path,
         )
-        .await
     }
 }

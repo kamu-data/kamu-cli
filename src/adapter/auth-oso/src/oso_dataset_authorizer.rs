@@ -33,6 +33,7 @@ pub struct OsoDatasetAuthorizer {
 #[component(pub)]
 #[interface(dyn DatasetActionAuthorizer)]
 impl OsoDatasetAuthorizer {
+    #[allow(clippy::needless_pass_by_value)]
     pub fn new(
         kamu_auth_oso: Arc<KamuAuthOso>,
         current_account_subject: Arc<CurrentAccountSubject>,

@@ -43,7 +43,7 @@ impl DatasetFlowConfigs {
             .await
             .int_err()?;
 
-        Ok(maybe_flow_config.map(|flow_config| flow_config.into()))
+        Ok(maybe_flow_config.map(Into::into))
     }
 }
 

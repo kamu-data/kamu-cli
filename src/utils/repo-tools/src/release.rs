@@ -95,7 +95,7 @@ fn update_license(license_path: &Path, current_version: &Version, new_version: &
         &text,
         current_version,
         new_version,
-        &chrono::Utc::now().naive_utc().date(),
+        chrono::Utc::now().naive_utc().date(),
     );
     assert_ne!(text, new_text);
     std::fs::write(license_path, new_text).expect("Failed to write to license file");
@@ -105,7 +105,7 @@ fn update_license_text(
     text: &str,
     current_version: &Version,
     new_version: &Version,
-    current_date: &NaiveDate,
+    current_date: NaiveDate,
 ) -> String {
     let significant_version =
         new_version.major != current_version.major || new_version.minor != current_version.minor;
@@ -126,9 +126,9 @@ fn update_license_text(
     .to_string()
 }
 
-fn add_years(d: &NaiveDate, years: i32) -> NaiveDate {
+fn add_years(d: NaiveDate, years: i32) -> NaiveDate {
     NaiveDate::from_ymd_opt(d.year() + years, d.month(), d.day()).unwrap_or_else(|| {
-        *d + (NaiveDate::from_ymd_opt(d.year() + years, 1, 1).unwrap()
+        d + (NaiveDate::from_ymd_opt(d.year() + years, 1, 1).unwrap()
             - NaiveDate::from_ymd_opt(d.year(), 1, 1).unwrap())
     })
 }
@@ -166,7 +166,7 @@ mod tests {
             orig_text,
             &Version::new(0, 63, 0),
             &Version::new(0, 63, 1),
-            &NaiveDate::from_str("2021-09-01").unwrap(),
+            NaiveDate::from_str("2021-09-01").unwrap(),
         );
 
         assert_eq!(
@@ -205,7 +205,7 @@ mod tests {
             orig_text,
             &Version::new(0, 63, 0),
             &Version::new(0, 64, 0),
-            &NaiveDate::from_str("2021-09-01").unwrap(),
+            NaiveDate::from_str("2021-09-01").unwrap(),
         );
 
         assert_eq!(

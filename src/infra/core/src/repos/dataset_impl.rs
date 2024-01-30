@@ -272,7 +272,7 @@ where
                     InsertOpts {
                         precomputed_hash: Some(&data_slice.physical_hash),
                         expected_hash: None,
-                        size_hint: Some(data_slice.size as usize),
+                        size_hint: Some(data_slice.size),
                     },
                 )
                 .await
@@ -286,7 +286,7 @@ where
                     InsertOpts {
                         precomputed_hash: Some(&checkpoint_meta.physical_hash),
                         expected_hash: None,
-                        size_hint: Some(checkpoint_meta.size as usize),
+                        size_hint: Some(checkpoint_meta.size),
                     },
                 )
                 .await

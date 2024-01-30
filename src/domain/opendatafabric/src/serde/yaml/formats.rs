@@ -44,7 +44,7 @@ pub mod datetime_rfc3339 {
     ) -> Result<DateTime<Utc>, D::Error> {
         let s = String::deserialize(deserializer)?;
         DateTime::parse_from_rfc3339(&s)
-            .map(|dt| dt.into())
+            .map(Into::into)
             .map_err(serde::de::Error::custom)
     }
 }

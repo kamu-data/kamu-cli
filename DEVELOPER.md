@@ -306,6 +306,14 @@ We use the homegrown [`test-group`](https://crates.io/crates/test-group) crate t
 ### IDE Configuration
 When using VSCode we recommend following extensions:
 - `rust-analyzer` - Rust language server
+  - Setting up `clippy`:
+    ```json5
+    // settings.json
+    {
+        // other settings
+        "rust-analyzer.check.overrideCommand": "cargo clippy --workspace --all-targets"
+    }  
+    ```
 - `Error Lens` - to display errors inline with code
 - `Even Better TOML` - for editing TOML files
 - `crates` - displays dependency version status in `Cargo.toml`

@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::convert::TryFrom;
+
 use aws_credential_types::Credentials;
 use aws_sdk_s3::error::SdkError;
 use aws_sdk_s3::operation::delete_object::{DeleteObjectError, DeleteObjectOutput};
@@ -47,7 +49,7 @@ impl S3Context {
     {
         Self {
             client,
-            endpoint: endpoint.map(|e| e.into()),
+            endpoint: endpoint.map(Into::into),
             bucket: bucket.into(),
             key_prefix: key_prefix.into(),
         }
@@ -155,7 +157,7 @@ impl S3Context {
     }
 
     pub fn region(&self) -> Option<&str> {
-        self.client.config().region().map(|r| r.as_ref())
+        self.client.config().region().map(AsRef::as_ref)
     }
 
     pub fn get_key(&self, sub_key: &str) -> String {
@@ -195,13 +197,15 @@ impl S3Context {
         key: String,
         data: &[u8],
     ) -> Result<PutObjectOutput, SdkError<PutObjectError>> {
+        let size = i64::try_from(data.len()).unwrap();
+
         self.client
             .put_object()
             .bucket(&self.bucket)
             .key(key)
             // TODO: PERF: Avoid copying data into a buffer
             .body(Vec::from(data).into())
-            .content_length(data.len() as i64)
+            .content_length(size)
             .send()
             .await
     }
@@ -210,13 +214,15 @@ impl S3Context {
         &self,
         key: String,
         stream: ReaderStream<Box<AsyncReadObj>>,
-        size: i64,
+        size: u64,
     ) -> Result<PutObjectOutput, SdkError<PutObjectError>> {
         use aws_smithy_types::body::SdkBody;
         use aws_smithy_types::byte_stream::ByteStream;
 
         let body = hyper::Body::wrap_stream(stream);
         let stream = ByteStream::new(SdkBody::from_body_0_4(body));
+        let size = i64::try_from(size).unwrap();
+
         self.client
             .put_object()
             .bucket(&self.bucket)

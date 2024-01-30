@@ -189,6 +189,7 @@ impl ServerHarness {
             .unwrap()
     }
 
+    #[allow(clippy::unused_async)]
     async fn foo_handler(
         axum::extract::Extension(catalog): axum::extract::Extension<dill::Catalog>,
     ) -> Result<String, http::StatusCode> {

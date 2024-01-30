@@ -31,6 +31,7 @@ impl Terminate for tokio::process::Child {
         cfg_if::cfg_if! {
             if #[cfg(unix)] {
                 if let Some(id) = self.id() {
+                    #[allow(clippy::cast_possible_wrap)]
                     unsafe { libc::kill(id as libc::pid_t, libc::SIGTERM); }
 
                     match tokio::time::timeout(timeout, self.wait()).await {
@@ -49,6 +50,7 @@ impl Terminate for tokio::process::Child {
         cfg_if::cfg_if! {
             if #[cfg(unix)] {
                 if let Some(id) = self.id() {
+                    #[allow(clippy::cast_possible_wrap)]
                     unsafe { libc::kill(id as libc::pid_t, libc::SIGTERM); }
 
                     let start = Instant::now();

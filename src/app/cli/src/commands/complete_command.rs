@@ -165,9 +165,8 @@ impl CompleteCommand {
     }
 
     pub async fn complete(&mut self, output: &mut impl Write) -> Result<(), CLIError> {
-        let mut args = match shlex::split(&self.input) {
-            Some(v) => v,
-            _ => return Ok(()),
+        let Some(mut args) = shlex::split(&self.input) else {
+            return Ok(());
         };
 
         args.truncate(self.current + 1);
@@ -227,8 +226,7 @@ impl CompleteCommand {
                 "alias" => self.complete_alias(output, to_complete).await,
                 "cfgkey" => self.complete_config_key(output, to_complete),
                 "dataset" => self.complete_dataset(output, to_complete).await,
-                "file" => self.complete_path(output, to_complete),
-                "manifest" => self.complete_path(output, to_complete),
+                "file" | "manifest" => self.complete_path(output, to_complete),
                 "repository" => self.complete_repository(output, to_complete),
                 _ => (),
             }

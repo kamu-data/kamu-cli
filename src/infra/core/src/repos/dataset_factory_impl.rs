@@ -69,12 +69,12 @@ impl DatasetFactoryImpl {
     }
 
     fn get_http(
-        base_url: Url,
+        base_url: &Url,
         header_map: http::HeaderMap,
         event_bus: Arc<EventBus>,
-    ) -> Result<impl Dataset, InternalError> {
+    ) -> impl Dataset {
         let client = reqwest::Client::new();
-        Ok(DatasetImpl::new(
+        DatasetImpl::new(
             event_bus,
             MetadataChainImpl::new(
                 ObjectRepositoryHttp::new(
@@ -103,7 +103,7 @@ impl DatasetFactoryImpl {
                 base_url.join("info/").unwrap(),
                 header_map,
             ),
-        ))
+        )
     }
 
     /// Creates new dataset proxy for an S3 URL
@@ -119,10 +119,10 @@ impl DatasetFactoryImpl {
         // TODO: We should ensure optimal credential reuse. Perhaps in future we should
         // create a cache of S3Contexts keyed by an endpoint.
         let s3_context = S3Context::from_url(&base_url).await;
-        Self::get_s3_from_context(s3_context, event_bus).await
+        Self::get_s3_from_context(s3_context, event_bus)
     }
 
-    pub async fn get_s3_from_context(
+    pub fn get_s3_from_context(
         s3_context: S3Context,
         event_bus: Arc<EventBus>,
     ) -> Result<impl Dataset, InternalError> {
@@ -317,11 +317,7 @@ impl DatasetFactory for DatasetFactoryImpl {
                 Ok(Arc::new(ds) as Arc<dyn Dataset>)
             }
             "http" | "https" | "odf+http" | "odf+https" => {
-                let ds = Self::get_http(
-                    url.clone(),
-                    self.build_header_map(url),
-                    self.event_bus.clone(),
-                )?;
+                let ds = Self::get_http(url, self.build_header_map(url), self.event_bus.clone());
                 Ok(Arc::new(ds))
             }
             "ipfs" | "ipns" | "ipfs+http" | "ipfs+https" | "ipns+http" | "ipns+https" => {

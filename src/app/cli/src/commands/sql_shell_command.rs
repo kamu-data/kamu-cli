@@ -54,9 +54,9 @@ impl SqlShellCommand {
             engine_prov_config,
             output_config,
             container_runtime,
-            command: command.map(|v| v.to_owned()),
-            url: url.map(|v| v.to_owned()),
-            engine: engine.map(|v| v.to_owned()),
+            command: command.map(ToOwned::to_owned),
+            url: url.map(ToOwned::to_owned),
+            engine: engine.map(ToOwned::to_owned),
         }
     }
 
