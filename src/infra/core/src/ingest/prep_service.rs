@@ -32,7 +32,7 @@ impl PrepService {
         prep_steps: &[PrepStep],
         src_path: &Path,
         target_path: &Path,
-        run_info_dir: &PathBuf,
+        run_info_dir: &Path,
     ) -> Result<(), PollingIngestError> {
         let mut stream: Box<dyn Stream> = Box::new(File::open(src_path).int_err()?);
         let stderr_file_path = run_info_dir.join("kamu.stderr");

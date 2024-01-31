@@ -21,6 +21,7 @@ fn test_prep_pipe() {
 
     let src_path = tempdir.path().join("data.json");
     let target_path = tempdir.path().join("prepared.bin");
+    let run_info_dir = tempdir.path();
 
     let prep_steps = vec![PrepStep::Pipe(PrepStepPipe {
         command: ["jq", "-c", ".[]"]
@@ -55,7 +56,7 @@ fn test_prep_pipe() {
     .unwrap();
 
     prep_svc
-        .prepare(&prep_steps, &src_path, &target_path)
+        .prepare(&prep_steps, &src_path, &target_path, run_info_dir)
         .unwrap();
 
     assert!(target_path.exists());
@@ -74,6 +75,7 @@ fn test_prep_decompress_zip_single_file() {
 
     let src_path = tempdir.path().join("data.zip");
     let target_path = tempdir.path().join("prepared.bin");
+    let run_info_dir = tempdir.path();
 
     let prep_steps = vec![PrepStep::Decompress(PrepStepDecompress {
         format: CompressionFormat::Zip,
@@ -103,7 +105,7 @@ fn test_prep_decompress_zip_single_file() {
     let prep_svc = PrepService::new();
 
     prep_svc
-        .prepare(&prep_steps, &src_path, &target_path)
+        .prepare(&prep_steps, &src_path, &target_path, run_info_dir)
         .unwrap();
 
     assert!(target_path.exists());
@@ -116,6 +118,7 @@ fn test_prep_decompress_zip_bad_file() {
 
     let src_path = tempdir.path().join("data.zip");
     let target_path = tempdir.path().join("prepared.bin");
+    let run_info_dir = tempdir.path();
 
     let prep_steps = vec![PrepStep::Decompress(PrepStepDecompress {
         format: CompressionFormat::Zip,
@@ -126,7 +129,7 @@ fn test_prep_decompress_zip_bad_file() {
 
     let prep_svc = PrepService::new();
 
-    let res = prep_svc.prepare(&prep_steps, &src_path, &target_path);
+    let res = prep_svc.prepare(&prep_steps, &src_path, &target_path, run_info_dir);
     assert_matches!(res, Err(PollingIngestError::Internal(_)));
 }
 
@@ -136,6 +139,7 @@ fn test_prep_decompress_gzip() {
 
     let src_path = tempdir.path().join("data.gz");
     let target_path = tempdir.path().join("prepared.bin");
+    let run_info_dir = tempdir.path();
 
     let prep_steps = vec![PrepStep::Decompress(PrepStepDecompress {
         format: CompressionFormat::Gzip,
@@ -165,7 +169,7 @@ fn test_prep_decompress_gzip() {
     let prep_svc = PrepService::new();
 
     prep_svc
-        .prepare(&prep_steps, &src_path, &target_path)
+        .prepare(&prep_steps, &src_path, &target_path, run_info_dir)
         .unwrap();
 
     assert!(target_path.exists());
