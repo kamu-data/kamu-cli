@@ -17,5 +17,5 @@ async fn test_datafusion_cli() {
     let mut cmd = Command::cargo_bin("kamu-cli").unwrap();
 
     let assert = cmd.arg("sql").write_stdin("select 1;").assert();
-    assert.failure().code(0).stderr("hello\n");
+    assert.failure().stderr("");
 }
