@@ -16,6 +16,7 @@ use futures::StreamExt;
 use kamu_core::events::DatasetEventDeleted;
 use kamu_core::SystemTimeSource;
 use kamu_flow_system::*;
+use opendatafabric::DatasetID;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -57,6 +58,50 @@ impl FlowConfigurationServiceInMemory {
         };
         self.event_bus.dispatch_event(event).await
     }
+
+    fn get_dataset_flow_keys(dataset_id: &DatasetID, maybe_dataset_flow_type: Option<DatasetFlowType>) -> Vec<FlowKey> {
+        if let Some(dataset_flow_type) = maybe_dataset_flow_type {
+            vec![FlowKey::Dataset(FlowKeyDataset { dataset_id: dataset_id.clone(), flow_type: dataset_flow_type })]
+        } else {
+            DatasetFlowType::all().iter()
+                .map(|dft| FlowKey::Dataset(FlowKeyDataset { dataset_id: dataset_id.clone(), flow_type: *dft}))
+                .collect()
+        }
+    }
+
+    fn get_system_flow_keys(maybe_system_flow_type: Option<SystemFlowType>) -> Vec<FlowKey> {
+        if let Some(system_flow_type) = maybe_system_flow_type {
+            vec![FlowKey::System(FlowKeySystem { flow_type: system_flow_type })]
+        } else {
+            SystemFlowType::all().iter()
+                .map(|sft| FlowKey::System(FlowKeySystem { flow_type: *sft}))
+                .collect()
+        }
+    }
+
+    async fn pause_flow_configuration(&self, flow_key: FlowKey) -> Result<(), InternalError> {
+        let maybe_flow_configuration =
+            FlowConfiguration::try_load(flow_key.clone(), self.event_store.as_ref()).await.int_err()?;
+
+        if let Some(mut flow_configuration) = maybe_flow_configuration {
+            flow_configuration.pause(self.time_source.now()).int_err()?;
+            flow_configuration.save(self.event_store.as_ref()).await.int_err()?;
+        }
+
+        Ok(())
+    }
+
+    async fn resume_flow_configuration(&self, flow_key: FlowKey) -> Result<(), InternalError> {
+        let maybe_flow_configuration =
+            FlowConfiguration::try_load(flow_key.clone(), self.event_store.as_ref()).await.int_err()?;
+
+        if let Some(mut flow_configuration) = maybe_flow_configuration {
+            flow_configuration.resume(self.time_source.now()).int_err()?;
+            flow_configuration.save(self.event_store.as_ref()).await.int_err()?;
+        }
+
+        Ok(())
+    }    
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -134,6 +179,68 @@ impl FlowConfigurationService for FlowConfigurationServiceInMemory {
             }
         })
     }
+
+    /// Pauses dataset flows of given type for given dataset.
+    /// If type is omitted, all possible dataset flow types are paused
+    async fn pause_dataset_flows(
+        &self,
+        dataset_id: &DatasetID,
+        maybe_dataset_flow_type: Option<DatasetFlowType>,
+    ) -> Result<(), InternalError> {
+        let flow_keys = Self::get_dataset_flow_keys(dataset_id, maybe_dataset_flow_type);
+
+        for flow_key in flow_keys {
+            self.pause_flow_configuration(flow_key).await.int_err()?;
+        }
+
+        Ok(())
+    }
+
+    /// Pauses system flows of given type.
+    /// If type is omitted, all possible system flow types are paused    
+    async fn pause_system_flows(
+        &self,
+        maybe_system_flow_type: Option<SystemFlowType>,
+    ) -> Result<(), InternalError> {
+        let flow_keys = Self::get_system_flow_keys(maybe_system_flow_type);
+
+        for flow_key in flow_keys {
+            self.pause_flow_configuration(flow_key).await.int_err()?;
+        }
+
+        Ok(())
+    }
+
+    /// Resumes dataset flows of given type for given dataset.
+    /// If type is omitted, all possible types are resumed (where configured)
+    async fn resume_dataset_flows(
+        &self,
+        dataset_id: &DatasetID,
+        maybe_dataset_flow_type: Option<DatasetFlowType>,
+    ) -> Result<(), InternalError> {
+        let flow_keys = Self::get_dataset_flow_keys(dataset_id, maybe_dataset_flow_type);
+        
+        for flow_key in flow_keys {
+            self.resume_flow_configuration(flow_key).await.int_err()?;
+        }
+
+        Ok(())
+    }
+
+    /// Resumes system flows of given type.
+    /// If type is omitted, all possible system flow types are resumed (where configured)
+    async fn resume_system_flows(
+        &self,
+        maybe_system_flow_type: Option<SystemFlowType>,
+    ) -> Result<(), InternalError> {
+        let flow_keys = Self::get_system_flow_keys(maybe_system_flow_type);
+
+        for flow_key in flow_keys {
+            self.resume_flow_configuration(flow_key).await.int_err()?;
+        }
+
+        Ok(())
+    }    
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

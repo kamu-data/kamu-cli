@@ -10,9 +10,10 @@
 use chrono::{DateTime, Utc};
 use event_sourcing::TryLoadError;
 use internal_error::{ErrorIntoInternal, InternalError};
+use opendatafabric::DatasetID;
 use tokio_stream::Stream;
 
-use crate::{FlowConfigurationRule, FlowConfigurationState, FlowKey};
+use crate::{DatasetFlowType, FlowConfigurationRule, FlowConfigurationState, FlowKey, SystemFlowType};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -35,6 +36,36 @@ pub trait FlowConfigurationService: Sync + Send {
 
     /// Lists all flow configurations, which are currently enabled
     fn list_enabled_configurations(&self) -> FlowConfigurationStateStream;
+
+    /// Pauses dataset flows of given type for given dataset.
+    /// If type is omitted, all possible dataset flow types are paused
+    async fn pause_dataset_flows(
+        &self,
+        dataset_id: &DatasetID,
+        maybe_dataset_flow_type: Option<DatasetFlowType>,
+    ) -> Result<(), InternalError>;
+
+    /// Pauses system flows of given type.
+    /// If type is omitted, all possible system flow types are paused    
+    async fn pause_system_flows(
+        &self,
+        maybe_system_flow_type: Option<SystemFlowType>,
+    ) -> Result<(), InternalError>;
+
+    /// Resumes dataset flows of given type for given dataset.
+    /// If type is omitted, all possible types are resumed (where configured)
+    async fn resume_dataset_flows(
+        &self,
+        dataset_id: &DatasetID,
+        maybe_dataset_flow_type: Option<DatasetFlowType>,
+    ) -> Result<(), InternalError>;
+
+    /// Resumes system flows of given type.
+    /// If type is omitted, all possible system flow types are resumed (where configured)
+    async fn resume_system_flows(
+        &self,
+        maybe_system_flow_type: Option<SystemFlowType>,
+    ) -> Result<(), InternalError>;    
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
