@@ -174,11 +174,9 @@ where
                     && e.new_watermark.is_none()
                     && e.new_source_state.is_none()
                 {
-                    return Err(AppendValidationError::NoOpEvent(NoOpEventError::new(
-                        e.clone(),
-                        "Event is empty",
-                    ))
-                    .into());
+                    return Err(
+                        AppendValidationError::no_op_event(e.clone(), "Event is empty").into(),
+                    );
                 }
 
                 let mut prev_schema = None;
@@ -242,11 +240,11 @@ where
                     && e.new_watermark.as_ref() == prev_watermark
                     && e.new_source_state.as_ref() == prev_source_state
                 {
-                    return Err(AppendValidationError::NoOpEvent(NoOpEventError::new(
+                    return Err(AppendValidationError::no_op_event(
                         e.clone(),
                         "Event neither has data nor it advances checkpoint, watermark, or source \
                          state",
-                    ))
+                    )
                     .into());
                 }
 
@@ -256,11 +254,9 @@ where
             MetadataEvent::ExecuteTransform(e) => {
                 // Validate event is not empty
                 if e.new_data.is_none() && e.new_checkpoint.is_none() && e.new_watermark.is_none() {
-                    return Err(AppendValidationError::NoOpEvent(NoOpEventError::new(
-                        e.clone(),
-                        "Event is empty",
-                    ))
-                    .into());
+                    return Err(
+                        AppendValidationError::no_op_event(e.clone(), "Event is empty").into(),
+                    );
                 }
 
                 let mut prev_transform = None;
@@ -389,10 +385,10 @@ where
                         == e.prev_checkpoint.as_ref()
                     && e.new_watermark.as_ref() == prev_watermark
                 {
-                    return Err(AppendValidationError::NoOpEvent(NoOpEventError::new(
+                    return Err(AppendValidationError::no_op_event(
                         e.clone(),
                         "Event neither has data nor it advances checkpoint or watermark",
-                    ))
+                    )
                     .into());
                 }
 

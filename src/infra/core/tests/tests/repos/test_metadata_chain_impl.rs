@@ -146,7 +146,9 @@ async fn test_append_hash_mismatch() {
                 }
             )
             .await,
-        Err(AppendError::InvalidBlock(e)) if matches!(*e, AppendValidationError::HashMismatch(_))
+        Err(AppendError::InvalidBlock(
+            AppendValidationError::HashMismatch(_)
+        ))
     );
 }
 
@@ -172,7 +174,9 @@ async fn test_append_prev_block_not_found() {
 
     assert_matches!(
         chain.append(block_2, AppendOpts::default()).await,
-        Err(AppendError::InvalidBlock(e)) if matches!(*e, AppendValidationError::PrevBlockNotFound(_))
+        Err(AppendError::InvalidBlock(
+            AppendValidationError::PrevBlockNotFound(_)
+        ))
     );
 
     assert_eq!(chain.get_ref(&BlockRef::Head).await.unwrap(), hash_1);
@@ -227,14 +231,14 @@ async fn test_append_prev_block_sequence_integrity_broken() {
 
     assert_matches!(
         chain.append(block_too_low, AppendOpts::default()).await,
-        Err(AppendError::InvalidBlock(e)) if matches!(*e, AppendValidationError::SequenceIntegrity(SequenceIntegrityError {
-            ref prev_block_hash,
-            ref prev_block_sequence_number,
-            ref next_block_sequence_number
-        }) if prev_block_hash.as_ref() == Some(&hash)
-            && prev_block_sequence_number.as_ref() == Some(&2)
-            && next_block_sequence_number == &2
-        )
+        Err(AppendError::InvalidBlock(
+            AppendValidationError::SequenceIntegrity(SequenceIntegrityError {
+                prev_block_hash,
+                prev_block_sequence_number,
+                next_block_sequence_number
+            })
+        ))
+        if prev_block_hash.as_ref() == Some(&hash) && prev_block_sequence_number == Some(2) && next_block_sequence_number == 2
     );
 
     let block_too_high = MetadataFactory::metadata_block(
@@ -247,14 +251,14 @@ async fn test_append_prev_block_sequence_integrity_broken() {
 
     assert_matches!(
         chain.append(block_too_high, AppendOpts::default()).await,
-        Err(AppendError::InvalidBlock(e)) if matches!(*e, AppendValidationError::SequenceIntegrity(SequenceIntegrityError {
-            ref prev_block_hash,
-            ref prev_block_sequence_number,
-            ref next_block_sequence_number
-        }) if prev_block_hash.as_ref() == Some(&hash)
-            && prev_block_sequence_number.as_ref() == Some(&2)
-            && next_block_sequence_number == &4
-        )
+        Err(AppendError::InvalidBlock(
+            AppendValidationError::SequenceIntegrity(SequenceIntegrityError {
+                prev_block_hash,
+                prev_block_sequence_number,
+                next_block_sequence_number
+            })
+        ))
+        if prev_block_hash.as_ref() == Some(&hash) && prev_block_sequence_number == Some(2) && next_block_sequence_number == 4
     );
 
     let block_just_right = MetadataFactory::metadata_block(
@@ -319,7 +323,9 @@ async fn test_append_first_block_not_seed() {
 
     assert_matches!(
         chain.append(block_1, AppendOpts::default()).await,
-        Err(AppendError::InvalidBlock(e)) if matches!(*e, AppendValidationError::FirstBlockMustBeSeed)
+        Err(AppendError::InvalidBlock(
+            AppendValidationError::FirstBlockMustBeSeed
+        ))
     );
 }
 
@@ -340,7 +346,9 @@ async fn test_append_seed_block_not_first() {
 
     assert_matches!(
         chain.append(block_2, AppendOpts::default()).await,
-        Err(AppendError::InvalidBlock(e)) if matches!(*e, AppendValidationError::AppendingSeedBlockToNonEmptyChain)
+        Err(AppendError::InvalidBlock(
+            AppendValidationError::AppendingSeedBlockToNonEmptyChain
+        ))
     );
 }
 
@@ -362,7 +370,9 @@ async fn test_append_system_time_non_monotonic() {
 
     assert_matches!(
         chain.append(block_2, AppendOpts::default()).await,
-        Err(AppendError::InvalidBlock(e)) if matches!(*e, AppendValidationError::SystemTimeIsNotMonotonic)
+        Err(AppendError::InvalidBlock(
+            AppendValidationError::SystemTimeIsNotMonotonic
+        ))
     );
 }
 
@@ -427,7 +437,9 @@ async fn test_append_watermark_non_monotonic() {
 
     assert_matches!(
         chain.append(block, AppendOpts::default()).await,
-        Err(AppendError::InvalidBlock(e)) if matches!(*e, AppendValidationError::WatermarkIsNotMonotonic)
+        Err(AppendError::InvalidBlock(
+            AppendValidationError::WatermarkIsNotMonotonic
+        ))
     );
 
     // output_watermark = Some(1988-01-01)
@@ -443,7 +455,9 @@ async fn test_append_watermark_non_monotonic() {
 
     assert_matches!(
         chain.append(block, AppendOpts::default()).await,
-        Err(AppendError::InvalidBlock(e)) if matches!(*e, AppendValidationError::WatermarkIsNotMonotonic)
+        Err(AppendError::InvalidBlock(
+            AppendValidationError::WatermarkIsNotMonotonic
+        ))
     );
 
     // output_watermark = Some(2020-01-01)
@@ -517,7 +531,9 @@ async fn test_append_add_data_empty_commit() {
 
     assert_matches!(
         chain.append(block, AppendOpts::default()).await,
-        Err(AppendError::InvalidBlock(e)) if matches!(*e, AppendValidationError::NoOpEvent(_))
+        Err(AppendError::InvalidBlock(AppendValidationError::NoOpEvent(
+            _
+        )))
     );
 }
 
@@ -593,7 +609,9 @@ async fn test_append_execute_transform_empty_commit() {
 
     assert_matches!(
         chain.append(block, AppendOpts::default()).await,
-        Err(AppendError::InvalidBlock(e)) if matches!(*e, AppendValidationError::NoOpEvent(_))
+        Err(AppendError::InvalidBlock(AppendValidationError::NoOpEvent(
+            _
+        )))
     );
 }
 
@@ -621,7 +639,9 @@ async fn test_append_add_push_source_requires_explicit_schema() {
         .await;
     assert_matches!(
         res,
-        Err(AppendError::InvalidBlock(e)) if matches!(*e, AppendValidationError::InvalidEvent(_))
+        Err(AppendError::InvalidBlock(
+            AppendValidationError::InvalidEvent(_)
+        ))
     );
 
     chain
@@ -685,7 +705,9 @@ async fn test_append_add_data_must_be_preseeded_by_schema() {
                 AppendOpts::default(),
             )
             .await,
-        Err(AppendError::InvalidBlock(e)) if matches!(*e, AppendValidationError::InvalidEvent(_))
+        Err(AppendError::InvalidBlock(
+            AppendValidationError::InvalidEvent(..)
+        ))
     );
 
     // Schema is now set
@@ -785,7 +807,9 @@ async fn test_append_execute_transform_must_be_preseeded_by_schema() {
                 AppendOpts::default(),
             )
             .await,
-        Err(AppendError::InvalidBlock(e)) if matches!(*e, AppendValidationError::InvalidEvent(_))
+        Err(AppendError::InvalidBlock(
+            AppendValidationError::InvalidEvent(..)
+        ))
     );
 
     // Schema is now set

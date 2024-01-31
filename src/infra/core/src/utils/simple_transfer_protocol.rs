@@ -479,8 +479,8 @@ impl SimpleTransferProtocol {
             {
                 Ok(_) => Ok(()),
                 Err(AppendError::InvalidBlock(append_validation_error)) => {
-                    let message = match append_validation_error.as_ref() {
-                        AppendValidationError::HashMismatch(e) => format!(
+                    let message = match append_validation_error {
+                        AppendValidationError::HashMismatch(ref e) => format!(
                             concat!(
                                 "Block hash declared by the source {} didn't match ",
                                 "the computed {} at block {} - this may be an indication ",
@@ -493,9 +493,10 @@ impl SimpleTransferProtocol {
                              {hash}[{sequence_number}]"
                         ),
                     };
+
                     Err(CorruptedSourceError {
                         message,
-                        source: Some(append_validation_error),
+                        source: Some(append_validation_error.into()),
                     }
                     .into())
                 }

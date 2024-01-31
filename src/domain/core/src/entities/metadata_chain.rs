@@ -376,7 +376,7 @@ pub enum AppendError {
     #[error(transparent)]
     RefCASFailed(#[from] RefCASError),
     #[error(transparent)]
-    InvalidBlock(#[from] Box<AppendValidationError>),
+    InvalidBlock(#[from] AppendValidationError),
     #[error(transparent)]
     Access(
         #[from]
@@ -389,12 +389,6 @@ pub enum AppendError {
         #[backtrace]
         InternalError,
     ),
-}
-
-impl From<AppendValidationError> for AppendError {
-    fn from(e: AppendValidationError) -> Self {
-        Self::InvalidBlock(Box::new(e))
-    }
 }
 
 impl From<SetRefErrorRepo> for AppendError {
@@ -487,7 +481,13 @@ pub enum AppendValidationError {
     #[error(transparent)]
     InvalidEvent(#[from] InvalidEventError),
     #[error(transparent)]
-    NoOpEvent(#[from] NoOpEventError),
+    NoOpEvent(#[from] Box<NoOpEventError>),
+}
+
+impl AppendValidationError {
+    pub fn no_op_event(event: impl Into<MetadataEvent>, message: impl Into<String>) -> Self {
+        Self::NoOpEvent(Box::new(NoOpEventError::new(event, message)))
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -495,10 +495,13 @@ pub enum AppendValidationError {
 #[derive(Error, PartialEq, Eq, Debug)]
 #[error("Invalid event: {message}")]
 pub struct InvalidEventError {
+    /// This field includes a full debug trace of an event already
+    /// (see `invalid_event!` macro)
     message: String,
 }
 
 impl InvalidEventError {
+    /// To create this error, please use `invalid_event!` macro
     pub fn new(message: impl Into<String>) -> Self {
         Self {
             message: message.into(),
