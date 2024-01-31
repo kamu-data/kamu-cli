@@ -546,6 +546,260 @@ async fn test_crud_batching_derived_dataset() {
 ////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_pause_resume_dataset_flows() {
+    async fn check_flow_status(
+        harness: &FlowConfigHarness,
+        schema: &kamu_adapter_graphql::Schema,
+        dataset_id: &DatasetID,
+        dataset_flow_type: &str,
+        expect_paused: bool,
+    ) {
+        let query = FlowConfigHarness::quick_flow_config_query(dataset_id, dataset_flow_type);
+
+        let res = schema
+            .execute(async_graphql::Request::new(query).data(harness.catalog_authorized.clone()))
+            .await;
+        assert!(res.is_ok(), "{res:?}");
+        assert_eq!(
+            res.data,
+            value!({
+                "datasets": {
+                    "byId": {
+                        "flows": {
+                            "configs": {
+                                "byType": {
+                                    "__typename": "FlowConfiguration",
+                                    "paused": expect_paused,
+                                }
+                            }
+                        }
+                    }
+                }
+            })
+        );
+    }
+
+    // Setup initial flow configs for datasets
+
+    let harness = FlowConfigHarness::new();
+
+    let create_root_result = harness.create_root_dataset().await;
+    let create_derived_result = harness.create_derived_dataset().await;
+
+    let schema = kamu_adapter_graphql::schema_quiet();
+
+    let mutation_set_ingest = FlowConfigHarness::set_config_time_delta_mutation(
+        &create_root_result.dataset_handle.id,
+        "INGEST",
+        false,
+        1,
+        "DAYS",
+    );
+
+    let res = schema
+        .execute(
+            async_graphql::Request::new(mutation_set_ingest)
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+    assert!(res.is_ok(), "{res:?}");
+
+    let mutation_set_compacting = FlowConfigHarness::set_config_time_delta_mutation(
+        &create_root_result.dataset_handle.id,
+        "COMPACTION",
+        false,
+        1,
+        "WEEKS",
+    );
+
+    let res = schema
+        .execute(
+            async_graphql::Request::new(mutation_set_compacting)
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+    assert!(res.is_ok(), "{res:?}");
+
+    let mutation_set_transform = FlowConfigHarness::set_config_batching_mutation(
+        &create_derived_result.dataset_handle.id,
+        "EXECUTE_TRANSFORM",
+        false,
+        (30, "MINUTES"),
+        100,
+    );
+
+    let res = schema
+        .execute(
+            async_graphql::Request::new(mutation_set_transform)
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+    assert!(res.is_ok(), "{res:?}");
+
+    let cases = [
+        (&create_root_result.dataset_handle.id, "INGEST"),
+        (&create_root_result.dataset_handle.id, "COMPACTION"),
+        (
+            &create_derived_result.dataset_handle.id,
+            "EXECUTE_TRANSFORM",
+        ),
+    ];
+
+    // Ensure all flow configs are not paused
+    for ((dataset_id, dataset_flow_type), expect_paused) in
+        cases.iter().zip(vec![false, false, false])
+    {
+        check_flow_status(
+            &harness,
+            &schema,
+            dataset_id,
+            dataset_flow_type,
+            expect_paused,
+        )
+        .await;
+    }
+
+    // Pause compaction of root
+
+    let mutation_pause_root_compacting = FlowConfigHarness::pause_flows_of_type_mutation(
+        &create_root_result.dataset_handle.id,
+        "COMPACTION",
+    );
+
+    let res = schema
+        .execute(
+            async_graphql::Request::new(mutation_pause_root_compacting)
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+    assert!(res.is_ok(), "{res:?}");
+
+    // Compaction should be paused
+    for ((dataset_id, dataset_flow_type), expect_paused) in
+        cases.iter().zip(vec![false, true, false])
+    {
+        check_flow_status(
+            &harness,
+            &schema,
+            dataset_id,
+            dataset_flow_type,
+            expect_paused,
+        )
+        .await;
+    }
+
+    // Pause all of root
+    let mutation_pause_all_root =
+        FlowConfigHarness::pause_all_flows_mutation(&create_root_result.dataset_handle.id);
+
+    let res = schema
+        .execute(
+            async_graphql::Request::new(mutation_pause_all_root)
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+    assert!(res.is_ok(), "{res:?}");
+
+    // Root flows should be paused
+    for ((dataset_id, dataset_flow_type), expect_paused) in
+        cases.iter().zip(vec![true, true, false])
+    {
+        check_flow_status(
+            &harness,
+            &schema,
+            dataset_id,
+            dataset_flow_type,
+            expect_paused,
+        )
+        .await;
+    }
+
+    // Resume ingestion
+    let mutation_resume_ingest = FlowConfigHarness::resume_flows_of_type_mutation(
+        &create_root_result.dataset_handle.id,
+        "INGEST",
+    );
+
+    let res = schema
+        .execute(
+            async_graphql::Request::new(mutation_resume_ingest)
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+    assert!(res.is_ok(), "{res:?}");
+
+    // Only compacting of root should be paused
+    for ((dataset_id, dataset_flow_type), expect_paused) in
+        cases.iter().zip(vec![false, true, false])
+    {
+        check_flow_status(
+            &harness,
+            &schema,
+            dataset_id,
+            dataset_flow_type,
+            expect_paused,
+        )
+        .await;
+    }
+
+    // Pause derived transform
+    let mutation_pause_derived_transform = FlowConfigHarness::pause_flows_of_type_mutation(
+        &create_derived_result.dataset_handle.id,
+        "EXECUTE_TRANSFORM",
+    );
+
+    let res = schema
+        .execute(
+            async_graphql::Request::new(mutation_pause_derived_transform)
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+    assert!(res.is_ok(), "{res:?}");
+
+    // Observe status change
+    for ((dataset_id, dataset_flow_type), expect_paused) in
+        cases.iter().zip(vec![false, true, true])
+    {
+        check_flow_status(
+            &harness,
+            &schema,
+            dataset_id,
+            dataset_flow_type,
+            expect_paused,
+        )
+        .await;
+    }
+
+    // Resume all derived
+    let mutation_resume_derived_all =
+        FlowConfigHarness::resume_all_flows_mutation(&create_derived_result.dataset_handle.id);
+
+    let res = schema
+        .execute(
+            async_graphql::Request::new(mutation_resume_derived_all)
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+    assert!(res.is_ok(), "{res:?}");
+
+    // Observe status change
+    for ((dataset_id, dataset_flow_type), expect_paused) in
+        cases.iter().zip(vec![false, true, false])
+    {
+        check_flow_status(
+            &harness,
+            &schema,
+            dataset_id,
+            dataset_flow_type,
+            expect_paused,
+        )
+        .await;
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_incorrect_dataset_kinds_for_flow_type() {
     let harness = FlowConfigHarness::new();
 
@@ -691,6 +945,14 @@ async fn test_anonymous_setters_fail() {
             false,
             (30, "MINUTES"),
             100,
+        ),
+        FlowConfigHarness::pause_flows_of_type_mutation(
+            &create_root_result.dataset_handle.id,
+            "INGEST",
+        ),
+        FlowConfigHarness::resume_flows_of_type_mutation(
+            &create_root_result.dataset_handle.id,
+            "INGEST",
         ),
     ];
 
@@ -953,6 +1215,111 @@ impl FlowConfigHarness {
         .replace("<every>", &throttling_period.0.to_string())
         .replace("<unit>", throttling_period.1)
         .replace("<min_data_batch>", &minimal_data_batch.to_string())
+    }
+
+    fn quick_flow_config_query(id: &DatasetID, dataset_flow_type: &str) -> String {
+        indoc!(
+            r#"
+            {
+                datasets {
+                    byId (datasetId: "<id>") {
+                        flows {
+                            configs {
+                                byType (datasetFlowType: "<dataset_flow_type>") {
+                                    __typename
+                                    paused
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            "#
+        )
+        .replace("<id>", &id.to_string())
+        .replace("<dataset_flow_type>", dataset_flow_type)
+    }
+
+    fn pause_flows_of_type_mutation(id: &DatasetID, dataset_flow_type: &str) -> String {
+        indoc!(
+            r#"
+            mutation {
+                datasets {
+                    byId (datasetId: "<id>") {
+                        flows {
+                            configs {
+                                pauseFlows (
+                                    datasetFlowType: "<dataset_flow_type>",
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+            "#
+        )
+        .replace("<id>", &id.to_string())
+        .replace("<dataset_flow_type>", dataset_flow_type)
+    }
+
+    fn resume_flows_of_type_mutation(id: &DatasetID, dataset_flow_type: &str) -> String {
+        indoc!(
+            r#"
+            mutation {
+                datasets {
+                    byId (datasetId: "<id>") {
+                        flows {
+                            configs {
+                                resumeFlows (
+                                    datasetFlowType: "<dataset_flow_type>",
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+            "#
+        )
+        .replace("<id>", &id.to_string())
+        .replace("<dataset_flow_type>", dataset_flow_type)
+    }
+
+    fn pause_all_flows_mutation(id: &DatasetID) -> String {
+        indoc!(
+            r#"
+            mutation {
+                datasets {
+                    byId (datasetId: "<id>") {
+                        flows {
+                            configs {
+                                pauseFlows
+                            }
+                        }
+                    }
+                }
+            }
+            "#
+        )
+        .replace("<id>", &id.to_string())
+    }
+
+    fn resume_all_flows_mutation(id: &DatasetID) -> String {
+        indoc!(
+            r#"
+            mutation {
+                datasets {
+                    byId (datasetId: "<id>") {
+                        flows {
+                            configs {
+                                resumeFlows
+                            }
+                        }
+                    }
+                }
+            }
+            "#
+        )
+        .replace("<id>", &id.to_string())
     }
 }
 

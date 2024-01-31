@@ -124,6 +124,40 @@ impl DatasetFlowConfigsMut {
             config: res.into(),
         }))
     }
+
+    #[graphql(guard = "LoggedInGuard::new()")]
+    async fn pause_flows(
+        &self,
+        ctx: &Context<'_>,
+        dataset_flow_type: Option<DatasetFlowType>,
+    ) -> Result<bool> {
+        ensure_scheduling_permission(ctx, &self.dataset_handle).await?;
+
+        let flow_config_service = from_catalog::<dyn FlowConfigurationService>(ctx).unwrap();
+
+        flow_config_service
+            .pause_dataset_flows(&self.dataset_handle.id, dataset_flow_type.map(Into::into))
+            .await?;
+
+        Ok(true)
+    }
+
+    #[graphql(guard = "LoggedInGuard::new()")]
+    async fn resume_flows(
+        &self,
+        ctx: &Context<'_>,
+        dataset_flow_type: Option<DatasetFlowType>,
+    ) -> Result<bool> {
+        ensure_scheduling_permission(ctx, &self.dataset_handle).await?;
+
+        let flow_config_service = from_catalog::<dyn FlowConfigurationService>(ctx).unwrap();
+
+        flow_config_service
+            .resume_dataset_flows(&self.dataset_handle.id, dataset_flow_type.map(Into::into))
+            .await?;
+
+        Ok(true)
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////

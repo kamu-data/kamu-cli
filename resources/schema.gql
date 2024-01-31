@@ -337,6 +337,8 @@ type DatasetFlowConfigs {
 type DatasetFlowConfigsMut {
 	setConfigSchedule(datasetFlowType: DatasetFlowType!, paused: Boolean!, schedule: ScheduleInput!): SetFlowConfigResult!
 	setConfigBatching(datasetFlowType: DatasetFlowType!, paused: Boolean!, throttlingPeriod: TimeDeltaInput, minimalDataBatch: Int): SetFlowConfigResult!
+	pauseFlows(datasetFlowType: DatasetFlowType): Boolean!
+	resumeFlows(datasetFlowType: DatasetFlowType): Boolean!
 }
 
 type DatasetFlowRuns {
