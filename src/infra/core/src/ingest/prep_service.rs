@@ -10,7 +10,7 @@
 use std::fs::File;
 use std::io::prelude::*;
 use std::io::Error as IOError;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::Arc;
 
@@ -32,14 +32,21 @@ impl PrepService {
         prep_steps: &[PrepStep],
         src_path: &Path,
         target_path: &Path,
+        run_info_dir: &PathBuf,
     ) -> Result<(), PollingIngestError> {
         let mut stream: Box<dyn Stream> = Box::new(File::open(src_path).int_err()?);
+        let stderr_file_path = run_info_dir.join("kamu.stderr");
 
         for step in prep_steps {
             stream = match step {
                 PrepStep::Pipe(p) => Box::new(
-                    PipeStream::new(p.command.clone(), stream)
-                        .map_err(|e| PollingIngestError::pipe(p.command.clone(), e))?,
+                    PipeStream::new(p.command.clone(), stream, stderr_file_path.clone()).map_err(
+                        |e| {
+                            PollingIngestError::PipeError({
+                                PipeError::new(vec![stderr_file_path.clone()], p.command.clone(), e)
+                            })
+                        },
+                    )?,
                 ),
                 PrepStep::Decompress(dc) => match dc.format {
                     CompressionFormat::Zip => {
@@ -100,11 +107,16 @@ struct PipeStream {
 }
 
 impl PipeStream {
-    fn new(cmd: Vec<String>, mut input: Box<dyn Stream>) -> Result<Self, IOError> {
+    fn new(
+        cmd: Vec<String>,
+        mut input: Box<dyn Stream>,
+        stderr_file_path: PathBuf,
+    ) -> Result<Self, IOError> {
         let mut process = Command::new(cmd.first().unwrap())
             .args(&cmd[1..])
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
+            .stderr(File::create(&stderr_file_path)?)
             .spawn()?;
 
         let stdout = process.stdout.take().unwrap();
@@ -128,12 +140,23 @@ impl PipeStream {
                 let status = process.wait().unwrap();
 
                 if !status.success() {
-                    Err(PollingIngestError::pipe(
+                    // let mut stdout_buf = [0; BUFFER_SIZE];
+                    // let stdout_file_path = run_info_dir.join("kamu.stdout");
+                    // let mut stdout_file = File::create(stdout_file_path).unwrap();
+                    // loop {
+                    //     let read = stdout.read(&mut stdout_buf).unwrap();
+                    //     if read == 0 {
+                    //         break;
+                    //     }
+                    //     stdout_file.write_all(&stdout_buf[..read]).unwrap();
+                    // }
+                    Err(PollingIngestError::PipeError(PipeError::new(
+                        vec![stderr_file_path],
                         cmd,
                         BadStatusCode {
                             code: status.code().unwrap(),
                         },
-                    ))
+                    )))
                 } else {
                     Ok(())
                 }

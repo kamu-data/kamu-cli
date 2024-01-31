@@ -236,7 +236,9 @@ impl PollingIngestServiceImpl {
         args.listener
             .on_stage_progress(PollingIngestStage::Prepare, 0, TotalSteps::Exact(1));
 
-        let prepare_result = self.prepare(&args, &savepoint).await?;
+        let prepare_result = self
+            .prepare(&args, &savepoint, self.run_info_dir.clone())
+            .await?;
 
         args.listener
             .on_stage_progress(PollingIngestStage::Read, 0, TotalSteps::Exact(1));
@@ -466,6 +468,7 @@ impl PollingIngestServiceImpl {
         &self,
         args: &IngestIterationArgs<'_>,
         fetch_result: &FetchSavepoint,
+        run_info_dir: PathBuf,
     ) -> Result<PrepStepResult, PollingIngestError> {
         let prep_steps = args.polling_source.prepare.clone().unwrap_or_default();
 
@@ -489,7 +492,7 @@ impl PollingIngestServiceImpl {
             // TODO: Make async
             tokio::task::spawn_blocking(move || {
                 let prep_service = PrepService::new();
-                prep_service.prepare(&prep_steps, &src_path, &target_path)
+                prep_service.prepare(&prep_steps, &src_path, &target_path, &run_info_dir)
             })
             .await
             .int_err()??;

@@ -338,7 +338,7 @@ impl From<InternalError> for EngineError {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-fn normalize_logs(log_files: Vec<PathBuf>) -> Vec<PathBuf> {
+pub fn normalize_logs(log_files: Vec<PathBuf>) -> Vec<PathBuf> {
     let cwd = std::env::current_dir().unwrap_or_default();
     log_files
         .into_iter()
