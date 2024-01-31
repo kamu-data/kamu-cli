@@ -134,6 +134,7 @@ libc = "0.2"  # For getting uid:gid
 [dev-dependencies]
 assert_cmd = "2.0.13"
 env_logger = "0.10"
+predicates = "2.1.5"
 test-group = { version = "1" }
 test-log = { version = "0.2", features = ["trace"] }
 
