@@ -62,13 +62,17 @@ impl FlowConfiguration {
         &mut self,
         now: DateTime<Utc>,
     ) -> Result<(), ProjectionError<FlowConfigurationState>> {
-        let event = FlowConfigurationEventModified {
-            event_time: now,
-            flow_key: self.flow_key.clone(),
-            paused: true,
-            rule: self.rule.clone(),
-        };
-        self.apply(event)
+        if self.is_active() {
+            let event = FlowConfigurationEventModified {
+                event_time: now,
+                flow_key: self.flow_key.clone(),
+                paused: true,
+                rule: self.rule.clone(),
+            };
+            self.apply(event)
+        } else {
+            Ok(())
+        }
     }
 
     /// Resume configuration
@@ -76,13 +80,17 @@ impl FlowConfiguration {
         &mut self,
         now: DateTime<Utc>,
     ) -> Result<(), ProjectionError<FlowConfigurationState>> {
-        let event = FlowConfigurationEventModified {
-            event_time: now,
-            flow_key: self.flow_key.clone(),
-            paused: false,
-            rule: self.rule.clone(),
-        };
-        self.apply(event)
+        if self.is_active() {
+            Ok(())
+        } else {
+            let event = FlowConfigurationEventModified {
+                event_time: now,
+                flow_key: self.flow_key.clone(),
+                paused: false,
+                rule: self.rule.clone(),
+            };
+            self.apply(event)
+        }
     }
 
     /// Handle dataset removal
