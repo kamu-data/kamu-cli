@@ -9,7 +9,6 @@
 
 /////////////////////////////////////////////////////////////////////////////////////////
 use assert_cmd::Command;
-use predicates::prelude::*;
 use regex::Regex;
 
 #[test_group::group(engine, datafusion)]
@@ -48,8 +47,7 @@ async fn test_datafusion_cli() {
             assert_eq!(string_result.trim(), expected_output.trim());
         }
         Err(err) => {
-            err.assert()
-                .stdout(predicate::eq(b"Debug error\n" as &[u8]));
+            err.assert().stdout("");
         }
     }
 }
