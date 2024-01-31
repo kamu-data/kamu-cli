@@ -13,7 +13,13 @@ use internal_error::{ErrorIntoInternal, InternalError};
 use opendatafabric::DatasetID;
 use tokio_stream::Stream;
 
-use crate::{DatasetFlowType, FlowConfigurationRule, FlowConfigurationState, FlowKey, SystemFlowType};
+use crate::{
+    DatasetFlowType,
+    FlowConfigurationRule,
+    FlowConfigurationState,
+    FlowKey,
+    SystemFlowType,
+};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -46,7 +52,7 @@ pub trait FlowConfigurationService: Sync + Send {
     ) -> Result<(), InternalError>;
 
     /// Pauses system flows of given type.
-    /// If type is omitted, all possible system flow types are paused    
+    /// If type is omitted, all possible system flow types are paused
     async fn pause_system_flows(
         &self,
         maybe_system_flow_type: Option<SystemFlowType>,
@@ -61,11 +67,12 @@ pub trait FlowConfigurationService: Sync + Send {
     ) -> Result<(), InternalError>;
 
     /// Resumes system flows of given type.
-    /// If type is omitted, all possible system flow types are resumed (where configured)
+    /// If type is omitted, all possible system flow types are resumed (where
+    /// configured)
     async fn resume_system_flows(
         &self,
         maybe_system_flow_type: Option<SystemFlowType>,
-    ) -> Result<(), InternalError>;    
+    ) -> Result<(), InternalError>;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

@@ -59,33 +59,53 @@ impl FlowConfigurationServiceInMemory {
         self.event_bus.dispatch_event(event).await
     }
 
-    fn get_dataset_flow_keys(dataset_id: &DatasetID, maybe_dataset_flow_type: Option<DatasetFlowType>) -> Vec<FlowKey> {
+    fn get_dataset_flow_keys(
+        dataset_id: &DatasetID,
+        maybe_dataset_flow_type: Option<DatasetFlowType>,
+    ) -> Vec<FlowKey> {
         if let Some(dataset_flow_type) = maybe_dataset_flow_type {
-            vec![FlowKey::Dataset(FlowKeyDataset { dataset_id: dataset_id.clone(), flow_type: dataset_flow_type })]
+            vec![FlowKey::Dataset(FlowKeyDataset {
+                dataset_id: dataset_id.clone(),
+                flow_type: dataset_flow_type,
+            })]
         } else {
-            DatasetFlowType::all().iter()
-                .map(|dft| FlowKey::Dataset(FlowKeyDataset { dataset_id: dataset_id.clone(), flow_type: *dft}))
+            DatasetFlowType::all()
+                .iter()
+                .map(|dft| {
+                    FlowKey::Dataset(FlowKeyDataset {
+                        dataset_id: dataset_id.clone(),
+                        flow_type: *dft,
+                    })
+                })
                 .collect()
         }
     }
 
     fn get_system_flow_keys(maybe_system_flow_type: Option<SystemFlowType>) -> Vec<FlowKey> {
         if let Some(system_flow_type) = maybe_system_flow_type {
-            vec![FlowKey::System(FlowKeySystem { flow_type: system_flow_type })]
+            vec![FlowKey::System(FlowKeySystem {
+                flow_type: system_flow_type,
+            })]
         } else {
-            SystemFlowType::all().iter()
-                .map(|sft| FlowKey::System(FlowKeySystem { flow_type: *sft}))
+            SystemFlowType::all()
+                .iter()
+                .map(|sft| FlowKey::System(FlowKeySystem { flow_type: *sft }))
                 .collect()
         }
     }
 
     async fn pause_flow_configuration(&self, flow_key: FlowKey) -> Result<(), InternalError> {
         let maybe_flow_configuration =
-            FlowConfiguration::try_load(flow_key.clone(), self.event_store.as_ref()).await.int_err()?;
+            FlowConfiguration::try_load(flow_key.clone(), self.event_store.as_ref())
+                .await
+                .int_err()?;
 
         if let Some(mut flow_configuration) = maybe_flow_configuration {
             flow_configuration.pause(self.time_source.now()).int_err()?;
-            flow_configuration.save(self.event_store.as_ref()).await.int_err()?;
+            flow_configuration
+                .save(self.event_store.as_ref())
+                .await
+                .int_err()?;
         }
 
         Ok(())
@@ -93,15 +113,22 @@ impl FlowConfigurationServiceInMemory {
 
     async fn resume_flow_configuration(&self, flow_key: FlowKey) -> Result<(), InternalError> {
         let maybe_flow_configuration =
-            FlowConfiguration::try_load(flow_key.clone(), self.event_store.as_ref()).await.int_err()?;
+            FlowConfiguration::try_load(flow_key.clone(), self.event_store.as_ref())
+                .await
+                .int_err()?;
 
         if let Some(mut flow_configuration) = maybe_flow_configuration {
-            flow_configuration.resume(self.time_source.now()).int_err()?;
-            flow_configuration.save(self.event_store.as_ref()).await.int_err()?;
+            flow_configuration
+                .resume(self.time_source.now())
+                .int_err()?;
+            flow_configuration
+                .save(self.event_store.as_ref())
+                .await
+                .int_err()?;
         }
 
         Ok(())
-    }    
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -197,7 +224,7 @@ impl FlowConfigurationService for FlowConfigurationServiceInMemory {
     }
 
     /// Pauses system flows of given type.
-    /// If type is omitted, all possible system flow types are paused    
+    /// If type is omitted, all possible system flow types are paused
     async fn pause_system_flows(
         &self,
         maybe_system_flow_type: Option<SystemFlowType>,
@@ -219,7 +246,7 @@ impl FlowConfigurationService for FlowConfigurationServiceInMemory {
         maybe_dataset_flow_type: Option<DatasetFlowType>,
     ) -> Result<(), InternalError> {
         let flow_keys = Self::get_dataset_flow_keys(dataset_id, maybe_dataset_flow_type);
-        
+
         for flow_key in flow_keys {
             self.resume_flow_configuration(flow_key).await.int_err()?;
         }
@@ -228,7 +255,8 @@ impl FlowConfigurationService for FlowConfigurationServiceInMemory {
     }
 
     /// Resumes system flows of given type.
-    /// If type is omitted, all possible system flow types are resumed (where configured)
+    /// If type is omitted, all possible system flow types are resumed (where
+    /// configured)
     async fn resume_system_flows(
         &self,
         maybe_system_flow_type: Option<SystemFlowType>,
@@ -240,7 +268,7 @@ impl FlowConfigurationService for FlowConfigurationServiceInMemory {
         }
 
         Ok(())
-    }    
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
