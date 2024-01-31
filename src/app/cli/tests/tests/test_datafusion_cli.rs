@@ -11,19 +11,12 @@
 
 use assert_cmd::Command;
 
+#[test_group::group(engine, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_datafusion_cli() {
     let mut cmd = Command::cargo_bin("kamu-cli").unwrap();
 
-    let assert = cmd.arg("sql").write_stdin("select 1;");
+    let assert = cmd.arg("sql").write_stdin("select 1;").assert();
 
-    let output = assert.output().unwrap();
-
-    let string_result = String::from_utf8_lossy(&output.stdout);
-    let string_error = String::from_utf8_lossy(&output.stderr);
-    let string_status = output.status.to_string();
-
-    println!("Subprocess stdout: {:?}", string_result);
-    println!("Subprocess stderror: {:?}", string_error);
-    println!("Subprocess stdstatus: {:?}", string_status);
+    assert.success().code(0);
 }
