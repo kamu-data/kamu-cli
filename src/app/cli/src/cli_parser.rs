@@ -1217,14 +1217,14 @@ pub fn cli() -> Command {
                             Arg::new("num-records")
                                 .long("num-records")
                                 .short('n')
-                                .value_parser(value_parser!(usize))
+                                .value_parser(value_parser!(u64))
                                 .default_value("10")
                                 .value_name("NUM")
                                 .help("Number of records to display"),
                             Arg::new("skip-records")
                                 .long("skip-records")
                                 .short('s')
-                                .value_parser(value_parser!(usize))
+                                .value_parser(value_parser!(u64))
                                 .default_value("0")
                                 .value_name("NUM")
                                 .help("Number of initial records to skip before applying the limit"),
