@@ -493,17 +493,16 @@ impl AppendValidationError {
 ///////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, PartialEq, Eq, Debug)]
-#[error("Invalid event: {message}")]
+#[error("Invalid event: {message}: {event:?}")]
 pub struct InvalidEventError {
-    /// This field includes a full debug trace of an event already
-    /// (see `invalid_event!` macro)
+    event: Box<MetadataEvent>,
     message: String,
 }
 
 impl InvalidEventError {
-    /// To create this error, please use `invalid_event!` macro
-    pub fn new(message: impl Into<String>) -> Self {
+    pub fn new(event: impl Into<MetadataEvent>, message: impl Into<String>) -> Self {
         Self {
+            event: Box::new(event.into()),
             message: message.into(),
         }
     }

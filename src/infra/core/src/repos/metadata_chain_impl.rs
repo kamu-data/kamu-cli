@@ -18,8 +18,7 @@ use opendatafabric::*;
 
 macro_rules! invalid_event {
     ($e:expr, $msg:expr $(,)?) => {
-        let message = format!("{}: {:?}", $msg, $e);
-        return Err(AppendValidationError::InvalidEvent(InvalidEventError::new(message)).into())
+        return Err(AppendValidationError::InvalidEvent(InvalidEventError::new($e, $msg)).into())
     };
 }
 
