@@ -54,6 +54,9 @@ impl DatasetFlowRuns {
         ctx: &Context<'_>,
         page: Option<usize>,
         per_page: Option<usize>,
+        filter_by_flow_type: Option<DatasetFlowType>,
+        filter_by_status: Option<FlowStatus>,
+        filter_by_initiator: Option<AccountName>, // TODO: replace on AccountID
     ) -> Result<FlowConnection> {
         utils::check_dataset_read_access(ctx, &self.dataset_handle).await?;
 
@@ -64,7 +67,14 @@ impl DatasetFlowRuns {
 
         // TODO: consider pushing pagination control down to service/repository levels
         let flows_stream = flow_service
-            .list_all_flows_by_dataset(&self.dataset_handle.id)
+            .list_all_flows_by_dataset(
+                &self.dataset_handle.id,
+                fs::DatasetFlowFilters {
+                    by_flow_type: filter_by_flow_type.map(Into::into),
+                    by_flow_status: filter_by_status.map(Into::into),
+                    by_initiator: filter_by_initiator.map(Into::into),
+                },
+            )
             .int_err()?;
 
         let all_flows: Vec<_> = flows_stream.try_collect().await?;

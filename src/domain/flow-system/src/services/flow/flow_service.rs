@@ -13,7 +13,7 @@ use internal_error::{ErrorIntoInternal, InternalError};
 use opendatafabric::{AccountID, AccountName, DatasetID};
 use tokio_stream::Stream;
 
-use crate::{DatasetFlowType, FlowID, FlowKey, FlowState, SystemFlowType};
+use crate::{DatasetFlowFilters, DatasetFlowType, FlowID, FlowKey, FlowState, SystemFlowFilters, SystemFlowType};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -31,31 +31,26 @@ pub trait FlowService: Sync + Send {
         initiator_account_name: AccountName,
     ) -> Result<FlowState, RequestFlowError>;
 
-    /// Returns states of flows of certain type associated with a given dataset
-    /// ordered by creation time from newest to oldest
-    fn list_flows_by_dataset_of_type(
-        &self,
-        dataset_id: &DatasetID,
-        flow_type: DatasetFlowType,
-    ) -> Result<FlowStateStream, ListFlowsByDatasetError>;
-
-    /// Returns states of system flows of certain type
-    /// ordered by creation time from newest to oldest
-    fn list_system_flows_of_type(
-        &self,
-        flow_type: SystemFlowType,
-    ) -> Result<FlowStateStream, ListSystemFlowsError>;
-
-    /// Returns states of flows of any type associated with a given dataset
-    /// ordered by creation time from newest to oldest
+    /// Returns states of flows associated with a given dataset
+    /// ordered by creation time from newest to oldest.
+    /// Applies specified filters
     fn list_all_flows_by_dataset(
         &self,
         dataset_id: &DatasetID,
+        filters: DatasetFlowFilters,
     ) -> Result<FlowStateStream, ListFlowsByDatasetError>;
+
+    /// Returns states of system flows associated with a given dataset
+    /// ordered by creation time from newest to oldest.
+    /// Applies specified filters    
+    fn list_all_system_flows(
+        &self,
+        filters: SystemFlowFilters,
+    ) -> Result<FlowStateStream, ListSystemFlowsError>;
 
     /// Returns state of all flows, whether they are system-level or
     /// dataset-bound, ordered by creation time from newest to oldest
-    fn list_all_flows(&self) -> Result<FlowStateStream, ListSystemFlowsError>;
+    fn list_all_flows(&self) -> Result<FlowStateStream, ListFlowsError>;
 
     /// Returns state of the latest flow of certain type created for the given
     /// dataset
@@ -105,6 +100,13 @@ pub enum ListSystemFlowsError {
     #[error(transparent)]
     Internal(#[from] InternalError),
 }
+
+#[derive(thiserror::Error, Debug)]
+pub enum ListFlowsError {
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+
 
 #[derive(thiserror::Error, Debug)]
 pub enum GetLastDatasetFlowError {

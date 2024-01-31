@@ -12,7 +12,7 @@ use std::collections::HashMap;
 
 use dill::*;
 use kamu_flow_system::*;
-use opendatafabric::DatasetID;
+use opendatafabric::{AccountName, DatasetID};
 
 use crate::dataset_flow_key::BorrowedFlowKeyDataset;
 
@@ -30,6 +30,9 @@ struct State {
     typed_flows_by_dataset: HashMap<FlowKeyDataset, Vec<FlowID>>,
     all_flows_by_dataset: HashMap<DatasetID, Vec<FlowID>>,
     system_flows_by_type: HashMap<SystemFlowType, Vec<FlowID>>,
+    all_system_flows: Vec<FlowID>,
+    dataset_flows_index: HashMap<FlowID, FlowIndexEntry<DatasetFlowType>>,
+    system_flows_index: HashMap<FlowID, FlowIndexEntry<SystemFlowType>>,
     all_flows: Vec<FlowID>,
     last_flow_id: Option<FlowID>,
 }
@@ -45,6 +48,22 @@ impl State {
         self.last_flow_id = Some(next_flow_id);
         next_flow_id
     }
+
+    fn is_matching_dataset_flow(&self, flow_id: FlowID, filters: &DatasetFlowFilters) -> bool {
+        if let Some(index_entry) = self.dataset_flows_index.get(&flow_id) {
+            index_entry.matches(filters)
+        } else {
+            false
+        }
+    }
+
+    fn is_matching_system_flow(&self, flow_id: FlowID, filters: &SystemFlowFilters) -> bool {
+        if let Some(index_entry) = self.system_flows_index.get(&flow_id) {
+            index_entry.matches(filters)
+        } else {
+            false
+        }
+    }
 }
 
 impl EventStoreState<FlowState> for State {
@@ -58,6 +77,64 @@ impl EventStoreState<FlowState> for State {
 
     fn add_event(&mut self, event: FlowEvent) {
         self.events.push(event);
+    }
+}
+
+struct FlowIndexEntry<TFlowType: Copy> {
+    pub flow_type: TFlowType,
+    pub flow_status: FlowStatus,
+    pub initiator: Option<AccountName>,
+}
+
+impl FlowIndexEntry<DatasetFlowType> {
+    pub fn matches(&self, filters: &DatasetFlowFilters) -> bool {
+        if let Some(filter_flow_type) = filters.by_flow_type {
+            if filter_flow_type != self.flow_type {
+                return false;
+            }
+        }
+
+        if let Some(filter_flow_status) = filters.by_flow_status {
+            if filter_flow_status != self.flow_status {
+                return false;
+            }
+        }
+
+        // TODO: system initiators
+        if let Some(filter_initiator) = &filters.by_initiator {
+            if let Some(initiator) = &self.initiator {
+                return filter_initiator == initiator;
+            }
+            return false;
+        }
+
+        true
+    }
+}
+
+impl FlowIndexEntry<SystemFlowType> {
+    pub fn matches(&self, filters: &SystemFlowFilters) -> bool {
+        if let Some(flow_type) = filters.by_flow_type {
+            if flow_type != self.flow_type {
+                return false;
+            }
+        }
+
+        if let Some(flow_status) = filters.by_flow_status {
+            if flow_status != self.flow_status {
+                return false;
+            }
+        }
+
+        // TODO: system initiators
+        if let Some(filter_initiator) = &filters.by_initiator {
+            if let Some(initiator) = &self.initiator {
+                return filter_initiator == initiator;
+            }
+            return false;
+        }
+
+        true
     }
 }
 
@@ -91,18 +168,52 @@ impl FlowEventStoreInMem {
                         Entry::Vacant(v) => v.insert(Vec::default()),
                     };
                     all_dataset_entries.push(event.flow_id());
+
+                    state.dataset_flows_index.insert(
+                        event.flow_id(),
+                        FlowIndexEntry::<DatasetFlowType> {
+                            flow_type: flow_key.flow_type,
+                            flow_status: FlowStatus::Waiting,
+                            initiator: e.trigger.initiator_account_name().cloned(),
+                        },
+                    );
                 }
 
                 FlowKey::System(flow_key) => {
-                    let entries = match state.system_flows_by_type.entry(flow_key.flow_type) {
+                    let typed_entries = match state.system_flows_by_type.entry(flow_key.flow_type) {
                         Entry::Occupied(v) => v.into_mut(),
                         Entry::Vacant(v) => v.insert(Vec::default()),
                     };
-                    entries.push(event.flow_id());
+                    typed_entries.push(event.flow_id());
+
+                    state.all_system_flows.push(event.flow_id());
+
+                    state.system_flows_index.insert(
+                        event.flow_id(),
+                        FlowIndexEntry::<SystemFlowType> {
+                            flow_type: flow_key.flow_type,
+                            flow_status: FlowStatus::Waiting,
+                            initiator: e.trigger.initiator_account_name().cloned(),
+                        },
+                    );
                 }
             }
 
             state.all_flows.push(event.flow_id());
+        }
+        /* Existing flow must have been indexed, update status */
+        else if let Some(new_status) = event.new_status() {
+            if let Entry::Vacant(_) = state
+                .dataset_flows_index
+                .entry(event.flow_id())
+                .and_modify(|e| e.flow_status = new_status)
+            {
+                state
+                    .system_flows_index
+                    .get_mut(&event.flow_id())
+                    .expect("Neither system nor dataset flow")
+                    .flow_status = new_status;
+            }
         }
     }
 }
@@ -149,7 +260,7 @@ impl FlowEventStore for FlowEventStoreInMem {
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id, ?flow_type))]
-    fn get_last_dataset_flow_of_type(
+    fn get_last_dataset_flow_id_of_type(
         &self,
         dataset_id: &DatasetID,
         flow_type: DatasetFlowType,
@@ -162,7 +273,7 @@ impl FlowEventStore for FlowEventStoreInMem {
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(?flow_type))]
-    fn get_last_system_flow_of_type(&self, flow_type: SystemFlowType) -> Option<FlowID> {
+    fn get_last_system_flow_id_of_type(&self, flow_type: SystemFlowType) -> Option<FlowID> {
         let state = self.inner.as_state();
         let g = state.lock().unwrap();
         g.system_flows_by_type
@@ -170,86 +281,12 @@ impl FlowEventStore for FlowEventStoreInMem {
             .and_then(|flows| flows.last().copied())
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id, ?flow_type))]
-    fn get_flows_by_dataset_of_type(
+    #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id, ?filters))]
+    fn get_all_flow_ids_by_dataset(
         &self,
         dataset_id: &DatasetID,
-        flow_type: DatasetFlowType,
+        filters: DatasetFlowFilters,
     ) -> FlowIDStream {
-        let dataset_id = dataset_id.clone();
-
-        // TODO: This should be a buffered stream so we don't lock per record
-        Box::pin(async_stream::try_stream! {
-            let borrowed_key = BorrowedFlowKeyDataset::new(&dataset_id, flow_type);
-
-            let mut pos = {
-                let state = self.inner.as_state();
-                let g = state.lock().unwrap();
-                g.typed_flows_by_dataset.get(borrowed_key.as_trait()).map_or(0, Vec::len)
-            };
-
-            loop {
-                if pos == 0 {
-                    break;
-                }
-
-                pos -= 1;
-
-                let next = {
-                    let state = self.inner.as_state();
-                    let g = state.lock().unwrap();
-                    g.typed_flows_by_dataset
-                        .get(borrowed_key.as_trait())
-                        .and_then(|flows| flows.get(pos).copied())
-                };
-
-                let flow_id = match next {
-                    None => break,
-                    Some(flow_id) => flow_id,
-                };
-
-                yield flow_id;
-            }
-        })
-    }
-
-    #[tracing::instrument(level = "debug", skip_all, fields(?flow_type))]
-    fn get_system_flows_of_type(&self, flow_type: SystemFlowType) -> FlowIDStream {
-        let mut pos = {
-            let state = self.inner.as_state();
-            let g = state.lock().unwrap();
-            g.system_flows_by_type.get(&flow_type).map_or(0, Vec::len)
-        };
-
-        // TODO: This should be a buffered stream so we don't lock per record
-        Box::pin(async_stream::try_stream! {
-            loop {
-                if pos == 0 {
-                    break;
-                }
-
-                pos -= 1;
-
-                let next = {
-                    let state = self.inner.as_state();
-                    let g: std::sync::MutexGuard<'_, State> = state.lock().unwrap();
-                    g.system_flows_by_type
-                        .get(&flow_type)
-                        .and_then(|flows| flows.get(pos).copied())
-                };
-
-                let flow_id = match next {
-                    None => break,
-                    Some(flow_id) => flow_id,
-                };
-
-                yield flow_id;
-            }
-        })
-    }
-
-    #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id))]
-    fn get_all_flows_by_dataset(&self, dataset_id: &DatasetID) -> FlowIDStream {
         let dataset_id = dataset_id.clone();
 
         // TODO: This should be a buffered stream so we don't lock per record
@@ -267,12 +304,21 @@ impl FlowEventStore for FlowEventStoreInMem {
 
                 pos -= 1;
 
-                let next = {
+                let (next, matches_filters) = {
                     let state = self.inner.as_state();
                     let g = state.lock().unwrap();
-                    g.all_flows_by_dataset
+
+                    let maybe_flow_id = g.all_flows_by_dataset
                         .get(&dataset_id)
-                        .and_then(|flows| flows.get(pos).copied())
+                        .and_then(|flows| flows.get(pos).copied());
+
+                    let matches_filters = if let Some(flow_id) = maybe_flow_id {
+                        g.is_matching_dataset_flow(flow_id, &filters)
+                    } else {
+                        false
+                    };
+
+                    (maybe_flow_id, matches_filters)
                 };
 
                 let flow_id = match next {
@@ -280,13 +326,59 @@ impl FlowEventStore for FlowEventStoreInMem {
                     Some(flow_id) => flow_id,
                 };
 
-                yield flow_id;
+                if matches_filters {
+                    yield flow_id;
+                }
+            }
+        })
+    }
+
+    #[tracing::instrument(level = "debug", skip_all, fields(?filters))]
+    fn get_all_system_flow_ids(&self, filters: SystemFlowFilters) -> FlowIDStream {
+        // TODO: This should be a buffered stream so we don't lock per record
+        Box::pin(async_stream::try_stream! {
+            let mut pos = {
+                let state = self.inner.as_state();
+                let g = state.lock().unwrap();
+                g.all_system_flows.len()
+            };
+
+            loop {
+                if pos == 0 {
+                    break;
+                }
+
+                pos -= 1;
+
+                let (next, matches_filters) = {
+                    let state = self.inner.as_state();
+                    let g = state.lock().unwrap();
+
+                    let maybe_flow_id = g.all_system_flows.get(pos).copied();
+
+                    let matches_filters = if let Some(flow_id) = maybe_flow_id {
+                        g.is_matching_system_flow(flow_id, &filters)
+                    } else {
+                        false
+                    };
+
+                    (maybe_flow_id, matches_filters)
+                };
+
+                let flow_id = match next {
+                    None => break,
+                    Some(flow_id) => flow_id,
+                };
+
+                if matches_filters {
+                    yield flow_id;
+                }
             }
         })
     }
 
     #[tracing::instrument(level = "debug", skip_all)]
-    fn get_all_flows(&self) -> FlowIDStream {
+    fn get_all_flow_ids(&self) -> FlowIDStream {
         // TODO: This should be a buffered stream so we don't lock per record
         Box::pin(async_stream::try_stream! {
             let mut pos = {

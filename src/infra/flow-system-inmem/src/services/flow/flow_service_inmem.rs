@@ -544,70 +544,48 @@ impl FlowService for FlowServiceInMemory {
         }
     }
 
-    /// Returns states of flows of certain type associated with a given dataset
+    /// Returns states of flows associated with a given dataset
     /// ordered by creation time from newest to oldest
-    #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id, ?flow_type))]
-    fn list_flows_by_dataset_of_type(
-        &self,
-        dataset_id: &DatasetID,
-        flow_type: DatasetFlowType,
-    ) -> Result<FlowStateStream, ListFlowsByDatasetError> {
-        let dataset_id = dataset_id.clone();
-
-        Ok(Box::pin(async_stream::try_stream! {
-            let relevant_flows: Vec<_> = self
-                .flow_event_store
-                .get_flows_by_dataset_of_type(&dataset_id, flow_type)
-                .try_collect()
-                .await?;
-
-            for flow_id in relevant_flows {
-                let flow = Flow::load(flow_id, self.flow_event_store.as_ref()).await.int_err()?;
-
-                yield flow.into();
-            }
-        }))
-    }
-
-    /// Returns states of system flows of certain type
-    /// ordered by creation time from newest to oldest
-    #[tracing::instrument(level = "debug", skip_all, fields(?flow_type))]
-    fn list_system_flows_of_type(
-        &self,
-        flow_type: SystemFlowType,
-    ) -> Result<FlowStateStream, ListSystemFlowsError> {
-        Ok(Box::pin(async_stream::try_stream! {
-            let relevant_flows: Vec<_> = self
-                .flow_event_store
-                .get_system_flows_of_type(flow_type)
-                .try_collect()
-                .await?;
-
-            for flow_id in relevant_flows {
-                let flow = Flow::load(flow_id, self.flow_event_store.as_ref()).await.int_err()?;
-
-                yield flow.into();
-            }
-        }))
-    }
-
-    /// Returns states of flows of any type associated with a given dataset
-    /// ordered by creation time from newest to oldest
-    #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id))]
+    /// Applies specified filters
+    #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id, ?filters))]
     fn list_all_flows_by_dataset(
         &self,
         dataset_id: &DatasetID,
+        filters: DatasetFlowFilters,
     ) -> Result<FlowStateStream, ListFlowsByDatasetError> {
         let dataset_id = dataset_id.clone();
 
         Ok(Box::pin(async_stream::try_stream! {
-            let relevant_flows: Vec<_> = self
+            let relevant_flow_ids: Vec<_> = self
                 .flow_event_store
-                .get_all_flows_by_dataset(&dataset_id)
+                .get_all_flow_ids_by_dataset(&dataset_id, filters)
                 .try_collect()
                 .await?;
 
-            for flow_id in relevant_flows {
+            for flow_id in relevant_flow_ids {
+                let flow = Flow::load(flow_id, self.flow_event_store.as_ref()).await.int_err()?;
+
+                yield flow.into();
+            }
+        }))
+    }
+
+    /// Returns states of system flows
+    /// ordered by creation time from newest to oldest
+    /// Applies specified filters
+    #[tracing::instrument(level = "debug", skip_all, fields(?filters))]
+    fn list_all_system_flows(
+        &self,
+        filters: SystemFlowFilters,
+    ) -> Result<FlowStateStream, ListSystemFlowsError> {
+        Ok(Box::pin(async_stream::try_stream! {
+            let relevant_flow_ids: Vec<_> = self
+                .flow_event_store
+                .get_all_system_flow_ids(filters)
+                .try_collect()
+                .await?;
+
+            for flow_id in relevant_flow_ids {
                 let flow = Flow::load(flow_id, self.flow_event_store.as_ref()).await.int_err()?;
 
                 yield flow.into();
@@ -618,11 +596,11 @@ impl FlowService for FlowServiceInMemory {
     /// Returns state of all flows, whether they are system-level or
     /// dataset-bound, ordered by creation time from newest to oldest
     #[tracing::instrument(level = "debug", skip_all)]
-    fn list_all_flows(&self) -> Result<FlowStateStream, ListSystemFlowsError> {
+    fn list_all_flows(&self) -> Result<FlowStateStream, ListFlowsError> {
         Ok(Box::pin(async_stream::try_stream! {
             let all_flows: Vec<_> = self
                 .flow_event_store
-                .get_all_flows()
+                .get_all_flow_ids()
                 .try_collect()
                 .await?;
 
@@ -644,7 +622,7 @@ impl FlowService for FlowServiceInMemory {
     ) -> Result<Option<FlowState>, GetLastDatasetFlowError> {
         let res = match self
             .flow_event_store
-            .get_last_dataset_flow_of_type(dataset_id, flow_type)
+            .get_last_dataset_flow_id_of_type(dataset_id, flow_type)
         {
             Some(flow_id) => Some(self.get_flow(flow_id).await.int_err()?),
             None => None,
@@ -660,7 +638,7 @@ impl FlowService for FlowServiceInMemory {
     ) -> Result<Option<FlowState>, GetLastSystemFlowError> {
         let res = match self
             .flow_event_store
-            .get_last_system_flow_of_type(flow_type)
+            .get_last_system_flow_id_of_type(flow_type)
         {
             Some(flow_id) => Some(self.get_flow(flow_id).await.int_err()?),
             None => None,
