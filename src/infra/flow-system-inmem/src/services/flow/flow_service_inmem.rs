@@ -552,21 +552,36 @@ impl FlowService for FlowServiceInMemory {
         &self,
         dataset_id: &DatasetID,
         filters: DatasetFlowFilters,
-    ) -> Result<FlowStateStream, ListFlowsByDatasetError> {
-        let dataset_id = dataset_id.clone();
+        pagination: FlowPaginationOpts,
+    ) -> Result<FlowStateListing, ListFlowsByDatasetError> {
+        let dataset_id_clone_1 = dataset_id.clone();
+        let dataset_id_clone_2 = dataset_id.clone();
 
-        Ok(Box::pin(async_stream::try_stream! {
+        let filters_clone = filters.clone();
+
+        let matched_stream = Box::pin(async_stream::try_stream! {
             let relevant_flow_ids: Vec<_> = self
                 .flow_event_store
-                .get_all_flow_ids_by_dataset(&dataset_id, filters)
+                .get_all_flow_ids_by_dataset(dataset_id_clone_1, filters, pagination)
                 .try_collect()
                 .await?;
 
+            // TODO: implement batch loading
             for flow_id in relevant_flow_ids {
                 let flow = Flow::load(flow_id, self.flow_event_store.as_ref()).await.int_err()?;
                 yield flow.into();
             }
-        }))
+        });
+
+        let total_count_future = Box::pin(
+            self.flow_event_store
+                .get_count_flows_by_dataset(dataset_id_clone_2, filters_clone),
+        );
+
+        Ok(FlowStateListing {
+            matched_stream,
+            total_count_future,
+        })
     }
 
     /// Returns states of system flows
@@ -576,37 +591,57 @@ impl FlowService for FlowServiceInMemory {
     fn list_all_system_flows(
         &self,
         filters: SystemFlowFilters,
-    ) -> Result<FlowStateStream, ListSystemFlowsError> {
-        Ok(Box::pin(async_stream::try_stream! {
+        pagination: FlowPaginationOpts,
+    ) -> Result<FlowStateListing, ListSystemFlowsError> {
+        let filters_clone = filters.clone();
+
+        let matched_stream = Box::pin(async_stream::try_stream! {
             let relevant_flow_ids: Vec<_> = self
                 .flow_event_store
-                .get_all_system_flow_ids(filters)
+                .get_all_system_flow_ids(filters, pagination)
                 .try_collect()
                 .await?;
 
+            // TODO: implement batch loading
             for flow_id in relevant_flow_ids {
                 let flow = Flow::load(flow_id, self.flow_event_store.as_ref()).await.int_err()?;
                 yield flow.into();
             }
-        }))
+        });
+
+        let total_count_future =
+            Box::pin(self.flow_event_store.get_count_system_flows(filters_clone));
+
+        Ok(FlowStateListing {
+            matched_stream,
+            total_count_future,
+        })
     }
 
     /// Returns state of all flows, whether they are system-level or
     /// dataset-bound, ordered by creation time from newest to oldest
     #[tracing::instrument(level = "debug", skip_all)]
-    fn list_all_flows(&self) -> Result<FlowStateStream, ListFlowsError> {
-        Ok(Box::pin(async_stream::try_stream! {
+    fn list_all_flows(&self) -> Result<FlowStateListing, ListFlowsError> {
+        let matched_stream = Box::pin(async_stream::try_stream! {
             let all_flows: Vec<_> = self
                 .flow_event_store
                 .get_all_flow_ids()
                 .try_collect()
                 .await?;
 
+            // TODO: implement batch loading
             for flow_id in all_flows {
                 let flow = Flow::load(flow_id, self.flow_event_store.as_ref()).await.int_err()?;
                 yield flow.into();
             }
-        }))
+        });
+
+        let total_count_future = Box::pin(self.flow_event_store.get_count_all_flows());
+
+        Ok(FlowStateListing {
+            matched_stream,
+            total_count_future,
+        })
     }
 
     /// Returns state of the latest flow of certain type created for the given

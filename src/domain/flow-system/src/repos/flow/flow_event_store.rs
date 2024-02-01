@@ -31,40 +31,65 @@ pub trait FlowEventStore: EventStore<FlowState> {
 
     /// Returns IDs of the flows associated with the specified
     /// dataset in reverse chronological order based on creation time.
-    /// Applies filters, if specified
+    /// Applies filters/pagination, if specified
     fn get_all_flow_ids_by_dataset(
         &self,
-        dataset_id: &DatasetID,
+        dataset_id: DatasetID,
         filters: DatasetFlowFilters,
+        pagination: FlowPaginationOpts,
     ) -> FlowIDStream;
+
+    /// Returns number of flows associated with the specified dataset and
+    /// matching filters, if specified
+    fn get_count_flows_by_dataset(
+        &self,
+        dataset_id: DatasetID,
+        filters: DatasetFlowFilters,
+    ) -> FlowIDCountFuture;
 
     /// Returns IDs of the system flows  in reverse chronological order based on
     /// creation time
-    /// Applies filters, if specified///
-    fn get_all_system_flow_ids(&self, filters: SystemFlowFilters) -> FlowIDStream;
+    /// Applies filters/pagination, if specified
+    fn get_all_system_flow_ids(
+        &self,
+        filters: SystemFlowFilters,
+        pagination: FlowPaginationOpts,
+    ) -> FlowIDStream;
+
+    /// Returns number of system flows matching filters, if specified
+    fn get_count_system_flows(&self, filters: SystemFlowFilters) -> FlowIDCountFuture;
 
     /// Returns IDs of the flows of any type in reverse chronological order
     /// based on creation time
+    /// TODO: not used yet, evaluate need in filters and pagination
     fn get_all_flow_ids(&self) -> FlowIDStream<'_>;
+
+    /// Returns number of all flows
+    fn get_count_all_flows(&self) -> FlowIDCountFuture;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Default, Debug)]
+pub struct FlowPaginationOpts {
+    pub page: usize,
+    pub per_page: usize,
+}
+
+#[derive(Default, Debug, Clone)]
 pub struct DatasetFlowFilters {
     pub by_flow_type: Option<DatasetFlowType>,
     pub by_flow_status: Option<FlowStatus>,
-    pub by_initiator: Option<InitiatorFilter>, // TODO: replace on AccountID
+    pub by_initiator: Option<InitiatorFilter>,
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 pub struct SystemFlowFilters {
     pub by_flow_type: Option<SystemFlowType>,
     pub by_flow_status: Option<FlowStatus>,
     pub by_initiator: Option<InitiatorFilter>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum InitiatorFilter {
     System,
     Account(AccountName), // TODO: replace on AccountID

@@ -40,4 +40,7 @@ impl From<FlowID> for u64 {
 pub type FlowIDStream<'a> =
     std::pin::Pin<Box<dyn tokio_stream::Stream<Item = Result<FlowID, InternalError>> + Send + 'a>>;
 
+pub type FlowIDCountFuture<'a> =
+    std::pin::Pin<Box<dyn std::future::Future<Output = usize> + Send + 'a>>;
+
 /////////////////////////////////////////////////////////////////////////////////////////

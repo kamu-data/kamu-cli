@@ -1049,6 +1049,7 @@ impl TestFlowSystemListener {
             .flow_service
             .list_all_flows()
             .unwrap()
+            .matched_stream
             .try_collect()
             .await
             .unwrap();

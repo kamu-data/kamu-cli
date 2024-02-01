@@ -7,13 +7,24 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::future::Future;
+
 use chrono::{DateTime, Utc};
 use event_sourcing::LoadError;
 use internal_error::{ErrorIntoInternal, InternalError};
 use opendatafabric::{AccountID, AccountName, DatasetID};
 use tokio_stream::Stream;
 
-use crate::{DatasetFlowFilters, DatasetFlowType, FlowID, FlowKey, FlowState, SystemFlowFilters, SystemFlowType};
+use crate::{
+    DatasetFlowFilters,
+    DatasetFlowType,
+    FlowID,
+    FlowKey,
+    FlowPaginationOpts,
+    FlowState,
+    SystemFlowFilters,
+    SystemFlowType,
+};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -33,24 +44,26 @@ pub trait FlowService: Sync + Send {
 
     /// Returns states of flows associated with a given dataset
     /// ordered by creation time from newest to oldest.
-    /// Applies specified filters
+    /// Applies specified filters/pagination
     fn list_all_flows_by_dataset(
         &self,
         dataset_id: &DatasetID,
         filters: DatasetFlowFilters,
-    ) -> Result<FlowStateStream, ListFlowsByDatasetError>;
+        pagination: FlowPaginationOpts,
+    ) -> Result<FlowStateListing, ListFlowsByDatasetError>;
 
     /// Returns states of system flows associated with a given dataset
     /// ordered by creation time from newest to oldest.
-    /// Applies specified filters    
+    /// Applies specified filters/pagination
     fn list_all_system_flows(
         &self,
         filters: SystemFlowFilters,
-    ) -> Result<FlowStateStream, ListSystemFlowsError>;
+        pagination: FlowPaginationOpts,
+    ) -> Result<FlowStateListing, ListSystemFlowsError>;
 
     /// Returns state of all flows, whether they are system-level or
     /// dataset-bound, ordered by creation time from newest to oldest
-    fn list_all_flows(&self) -> Result<FlowStateStream, ListFlowsError>;
+    fn list_all_flows(&self) -> Result<FlowStateListing, ListFlowsError>;
 
     /// Returns state of the latest flow of certain type created for the given
     /// dataset
@@ -78,8 +91,15 @@ pub trait FlowService: Sync + Send {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+pub struct FlowStateListing<'a> {
+    pub matched_stream: FlowStateStream<'a>,
+    pub total_count_future: FlowCountFuture<'a>,
+}
+
 pub type FlowStateStream<'a> =
     std::pin::Pin<Box<dyn Stream<Item = Result<FlowState, InternalError>> + Send + 'a>>;
+
+pub type FlowCountFuture<'a> = std::pin::Pin<Box<dyn Future<Output = usize> + Send + 'a>>;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -106,7 +126,6 @@ pub enum ListFlowsError {
     #[error(transparent)]
     Internal(#[from] InternalError),
 }
-
 
 #[derive(thiserror::Error, Debug)]
 pub enum GetLastDatasetFlowError {

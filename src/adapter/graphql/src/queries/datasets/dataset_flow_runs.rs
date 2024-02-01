@@ -54,9 +54,7 @@ impl DatasetFlowRuns {
         ctx: &Context<'_>,
         page: Option<usize>,
         per_page: Option<usize>,
-        filter_by_flow_type: Option<DatasetFlowType>,
-        filter_by_status: Option<FlowStatus>,
-        filter_by_initiator: Option<InitiatorFilterInput>,
+        filters: Option<DatasetFlowFilters>,
     ) -> Result<FlowConnection> {
         utils::check_dataset_read_access(ctx, &self.dataset_handle).await?;
 
@@ -65,27 +63,21 @@ impl DatasetFlowRuns {
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_PER_PAGE);
 
-        // TODO: consider pushing pagination control down to service/repository levels
-        let flows_stream = flow_service
+        let flows_state_listing = flow_service
             .list_all_flows_by_dataset(
                 &self.dataset_handle.id,
-                fs::DatasetFlowFilters {
-                    by_flow_type: filter_by_flow_type.map(Into::into),
-                    by_flow_status: filter_by_status.map(Into::into),
-                    by_initiator: filter_by_initiator.map(Into::into),
+                match filters {
+                    Some(filters) => filters.into(),
+                    None => Default::default(),
                 },
+                fs::FlowPaginationOpts { page, per_page },
             )
             .int_err()?;
 
-        let all_flows: Vec<_> = flows_stream.try_collect().await?;
-        let total_count = all_flows.len();
+        let matched_flows: Vec<_> = flows_state_listing.matched_stream.try_collect().await?;
+        let total_count = flows_state_listing.total_count_future.await;
 
-        let nodes = all_flows
-            .into_iter()
-            .skip(page * per_page)
-            .take(per_page)
-            .map(Flow::new)
-            .collect();
+        let nodes = matched_flows.into_iter().map(Flow::new).collect();
 
         Ok(FlowConnection::new(nodes, page, per_page, total_count))
     }
@@ -118,6 +110,23 @@ impl GetFlowSuccess {
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+
+#[derive(InputObject)]
+pub struct DatasetFlowFilters {
+    by_flow_type: Option<DatasetFlowType>,
+    by_status: Option<FlowStatus>,
+    by_initiator: Option<InitiatorFilterInput>,
+}
+
+impl From<DatasetFlowFilters> for fs::DatasetFlowFilters {
+    fn from(value: DatasetFlowFilters) -> Self {
+        Self {
+            by_flow_type: value.by_flow_type.map(Into::into),
+            by_flow_status: value.by_status.map(Into::into),
+            by_initiator: value.by_initiator.map(Into::into),
+        }
+    }
+}
 
 #[derive(OneofObject)]
 enum InitiatorFilterInput {

@@ -341,9 +341,15 @@ type DatasetFlowConfigsMut {
 	resumeFlows(datasetFlowType: DatasetFlowType): Boolean!
 }
 
+input DatasetFlowFilters {
+	byFlowType: DatasetFlowType
+	byStatus: FlowStatus
+	byInitiator: InitiatorFilterInput
+}
+
 type DatasetFlowRuns {
 	getFlow(flowId: FlowID!): GetFlowResult!
-	listFlows(page: Int, perPage: Int, filterByFlowType: DatasetFlowType, filterByStatus: FlowStatus, filterByInitiator: InitiatorFilterInput): FlowConnection!
+	listFlows(page: Int, perPage: Int, filters: DatasetFlowFilters): FlowConnection!
 }
 
 type DatasetFlowRunsMut {

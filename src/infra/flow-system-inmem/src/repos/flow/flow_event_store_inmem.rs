@@ -48,7 +48,7 @@ impl State {
         next_flow_id
     }
 
-    fn is_matching_dataset_flow(&self, flow_id: FlowID, filters: &DatasetFlowFilters) -> bool {
+    fn matches_dataset_flow(&self, flow_id: FlowID, filters: &DatasetFlowFilters) -> bool {
         if let Some(index_entry) = self.flow_search_index.get(&flow_id) {
             index_entry.matches_dataset_flow_filters(filters)
         } else {
@@ -56,7 +56,7 @@ impl State {
         }
     }
 
-    fn is_matching_system_flow(&self, flow_id: FlowID, filters: &SystemFlowFilters) -> bool {
+    fn matches_system_flow(&self, flow_id: FlowID, filters: &SystemFlowFilters) -> bool {
         if let Some(index_entry) = self.flow_search_index.get(&flow_id) {
             index_entry.matches_system_flow_filters(filters)
         } else {
@@ -292,11 +292,10 @@ impl FlowEventStore for FlowEventStoreInMem {
     #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id, ?filters))]
     fn get_all_flow_ids_by_dataset(
         &self,
-        dataset_id: &DatasetID,
+        dataset_id: DatasetID,
         filters: DatasetFlowFilters,
+        pagination: FlowPaginationOpts,
     ) -> FlowIDStream {
-        let dataset_id = dataset_id.clone();
-
         // TODO: This should be a buffered stream so we don't lock per record
         Box::pin(async_stream::try_stream! {
             let mut pos = {
@@ -305,8 +304,11 @@ impl FlowEventStore for FlowEventStoreInMem {
                 g.all_flows_by_dataset.get(&dataset_id).map_or(0, Vec::len)
             };
 
+            pos -= pagination.page * pagination.per_page;
+            let page_boundary_pos = if pos > pagination.per_page { pos - pagination.per_page } else { 0 };
+
             loop {
-                if pos == 0 {
+                if pos == page_boundary_pos {
                     break;
                 }
 
@@ -321,7 +323,7 @@ impl FlowEventStore for FlowEventStoreInMem {
                         .and_then(|flows| flows.get(pos).copied());
 
                     let matches_filters = if let Some(flow_id) = maybe_flow_id {
-                        g.is_matching_dataset_flow(flow_id, &filters)
+                        g.matches_dataset_flow(flow_id, &filters)
                     } else {
                         false
                     };
@@ -341,8 +343,31 @@ impl FlowEventStore for FlowEventStoreInMem {
         })
     }
 
+    fn get_count_flows_by_dataset(
+        &self,
+        dataset_id: DatasetID,
+        filters: DatasetFlowFilters,
+    ) -> FlowIDCountFuture {
+        Box::pin(async move {
+            let state = self.inner.as_state();
+            let g = state.lock().unwrap();
+            if let Some(dataset_flow_ids) = g.all_flows_by_dataset.get(&dataset_id) {
+                dataset_flow_ids
+                    .iter()
+                    .filter(|flow_id| g.matches_dataset_flow(**flow_id, &filters))
+                    .count()
+            } else {
+                0
+            }
+        })
+    }
+
     #[tracing::instrument(level = "debug", skip_all, fields(?filters))]
-    fn get_all_system_flow_ids(&self, filters: SystemFlowFilters) -> FlowIDStream {
+    fn get_all_system_flow_ids(
+        &self,
+        filters: SystemFlowFilters,
+        pagination: FlowPaginationOpts,
+    ) -> FlowIDStream {
         // TODO: This should be a buffered stream so we don't lock per record
         Box::pin(async_stream::try_stream! {
             let mut pos = {
@@ -350,9 +375,11 @@ impl FlowEventStore for FlowEventStoreInMem {
                 let g = state.lock().unwrap();
                 g.all_system_flows.len()
             };
+            pos -= pagination.page * pagination.per_page;
+            let page_boundary_pos = if pos > pagination.per_page { pos - pagination.per_page } else { 0 };
 
             loop {
-                if pos == 0 {
+                if pos == page_boundary_pos {
                     break;
                 }
 
@@ -365,7 +392,7 @@ impl FlowEventStore for FlowEventStoreInMem {
                     let maybe_flow_id = g.all_system_flows.get(pos).copied();
 
                     let matches_filters = if let Some(flow_id) = maybe_flow_id {
-                        g.is_matching_system_flow(flow_id, &filters)
+                        g.matches_system_flow(flow_id, &filters)
                     } else {
                         false
                     };
@@ -382,6 +409,17 @@ impl FlowEventStore for FlowEventStoreInMem {
                     yield flow_id;
                 }
             }
+        })
+    }
+
+    fn get_count_system_flows(&self, filters: SystemFlowFilters) -> FlowIDCountFuture {
+        Box::pin(async move {
+            let state = self.inner.as_state();
+            let g = state.lock().unwrap();
+            g.all_system_flows
+                .iter()
+                .filter(|flow_id| g.matches_system_flow(**flow_id, &filters))
+                .count()
         })
     }
 
@@ -415,6 +453,14 @@ impl FlowEventStore for FlowEventStoreInMem {
 
                 yield flow_id;
             }
+        })
+    }
+
+    fn get_count_all_flows(&self) -> FlowIDCountFuture {
+        Box::pin(async {
+            let state = self.inner.as_state();
+            let g = state.lock().unwrap();
+            g.all_flows.len()
         })
     }
 }
