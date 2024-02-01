@@ -344,7 +344,7 @@ pub fn normalize_logs(log_files: Vec<PathBuf>) -> Vec<PathBuf> {
         .into_iter()
         .filter(|p| match std::fs::metadata(p) {
             Ok(m) => m.len() > 0,
-            Err(_) => true,
+            Err(err) => !matches!(err.kind(), std::io::ErrorKind::NotFound),
         })
         .map(|p| {
             if let Some(relpath) = pathdiff::diff_paths(&p, &cwd) {
