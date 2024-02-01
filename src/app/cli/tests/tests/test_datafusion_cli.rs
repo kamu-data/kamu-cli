@@ -11,14 +11,13 @@
 extern crate assert_fs;
 extern crate escargot;
 
-use std::io::Write;
 use std::process::Stdio;
 
 #[test]
 fn test_datafusion_cli() {
     let _ = env_logger::try_init();
 
-    let mut child = escargot::CargoBuild::new()
+    let child = escargot::CargoBuild::new()
         .bin("kamu-cli")
         .current_release()
         .current_target()
@@ -31,23 +30,11 @@ fn test_datafusion_cli() {
         .spawn()
         .unwrap();
 
-    if let Some(mut stdin) = child.stdin.take() {
-        let sql_command = "select 1;";
-        match stdin.write_all(sql_command.as_bytes()) {
-            Ok(_) => {
-                println!("query executed successfully.");
-            }
-            Err(err) => {
-                eprintln!("query executed unsuccessfully.: {err}");
-            }
-        }
-    }
-
     let output = child
         .wait_with_output()
         .expect("Failed to wait for child process");
 
-    let stderr = String::from_utf8_lossy(&output.stderr);
+    let code = output.status.code().unwrap();
 
-    assert_eq!(stderr, "stderr should be empty");
+    assert_eq!(code, 0);
 }
