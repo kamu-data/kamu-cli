@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 ### Added
 - New type `DatasetRefPattern` which allows CLI command to accept global pattern
+- New GraphQL APIs for quick pausing/resuming of dataset flow configs preserving the scheduling rules
 ### Changed
 - `kamu deleted` and `kamu verify` now accepts global pattern expression
 
