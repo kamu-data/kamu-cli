@@ -564,7 +564,6 @@ impl FlowService for FlowServiceInMemory {
 
             for flow_id in relevant_flow_ids {
                 let flow = Flow::load(flow_id, self.flow_event_store.as_ref()).await.int_err()?;
-
                 yield flow.into();
             }
         }))
@@ -587,7 +586,6 @@ impl FlowService for FlowServiceInMemory {
 
             for flow_id in relevant_flow_ids {
                 let flow = Flow::load(flow_id, self.flow_event_store.as_ref()).await.int_err()?;
-
                 yield flow.into();
             }
         }))
@@ -606,7 +604,6 @@ impl FlowService for FlowServiceInMemory {
 
             for flow_id in all_flows {
                 let flow = Flow::load(flow_id, self.flow_event_store.as_ref()).await.int_err()?;
-
                 yield flow.into();
             }
         }))

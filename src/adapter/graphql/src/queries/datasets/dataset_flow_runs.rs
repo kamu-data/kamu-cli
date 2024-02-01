@@ -56,7 +56,7 @@ impl DatasetFlowRuns {
         per_page: Option<usize>,
         filter_by_flow_type: Option<DatasetFlowType>,
         filter_by_status: Option<FlowStatus>,
-        filter_by_initiator: Option<AccountName>, // TODO: replace on AccountID
+        filter_by_initiator: Option<InitiatorFilterInput>,
     ) -> Result<FlowConnection> {
         utils::check_dataset_read_access(ctx, &self.dataset_handle).await?;
 
@@ -114,6 +114,23 @@ struct GetFlowSuccess {
 impl GetFlowSuccess {
     pub async fn message(&self) -> String {
         "Success".to_string()
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+#[derive(OneofObject)]
+enum InitiatorFilterInput {
+    System(bool),
+    Account(AccountName), // TODO: replace on AccountID
+}
+
+impl From<InitiatorFilterInput> for fs::InitiatorFilter {
+    fn from(value: InitiatorFilterInput) -> Self {
+        match value {
+            InitiatorFilterInput::System(_) => Self::System,
+            InitiatorFilterInput::Account(account_name) => Self::Account(account_name.into()),
+        }
     }
 }
 

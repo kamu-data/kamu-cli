@@ -31,8 +31,7 @@ struct State {
     all_flows_by_dataset: HashMap<DatasetID, Vec<FlowID>>,
     system_flows_by_type: HashMap<SystemFlowType, Vec<FlowID>>,
     all_system_flows: Vec<FlowID>,
-    dataset_flows_index: HashMap<FlowID, FlowIndexEntry<DatasetFlowType>>,
-    system_flows_index: HashMap<FlowID, FlowIndexEntry<SystemFlowType>>,
+    flow_search_index: HashMap<FlowID, FlowIndexEntry>,
     all_flows: Vec<FlowID>,
     last_flow_id: Option<FlowID>,
 }
@@ -50,16 +49,16 @@ impl State {
     }
 
     fn is_matching_dataset_flow(&self, flow_id: FlowID, filters: &DatasetFlowFilters) -> bool {
-        if let Some(index_entry) = self.dataset_flows_index.get(&flow_id) {
-            index_entry.matches(filters)
+        if let Some(index_entry) = self.flow_search_index.get(&flow_id) {
+            index_entry.matches_dataset_flow_filters(filters)
         } else {
             false
         }
     }
 
     fn is_matching_system_flow(&self, flow_id: FlowID, filters: &SystemFlowFilters) -> bool {
-        if let Some(index_entry) = self.system_flows_index.get(&flow_id) {
-            index_entry.matches(filters)
+        if let Some(index_entry) = self.flow_search_index.get(&flow_id) {
+            index_entry.matches_system_flow_filters(filters)
         } else {
             false
         }
@@ -80,61 +79,76 @@ impl EventStoreState<FlowState> for State {
     }
 }
 
-struct FlowIndexEntry<TFlowType: Copy> {
-    pub flow_type: TFlowType,
+struct FlowIndexEntry {
+    pub flow_type: AnyFlowType,
     pub flow_status: FlowStatus,
     pub initiator: Option<AccountName>,
 }
 
-impl FlowIndexEntry<DatasetFlowType> {
-    pub fn matches(&self, filters: &DatasetFlowFilters) -> bool {
-        if let Some(filter_flow_type) = filters.by_flow_type {
-            if filter_flow_type != self.flow_type {
-                return false;
-            }
-        }
-
-        if let Some(filter_flow_status) = filters.by_flow_status {
-            if filter_flow_status != self.flow_status {
-                return false;
-            }
-        }
-
-        // TODO: system initiators
-        if let Some(filter_initiator) = &filters.by_initiator {
-            if let Some(initiator) = &self.initiator {
-                return filter_initiator == initiator;
-            }
-            return false;
-        }
-
-        true
-    }
+enum AnyFlowType {
+    Dataset(DatasetFlowType),
+    System(SystemFlowType),
 }
 
-impl FlowIndexEntry<SystemFlowType> {
-    pub fn matches(&self, filters: &SystemFlowFilters) -> bool {
-        if let Some(flow_type) = filters.by_flow_type {
-            if flow_type != self.flow_type {
-                return false;
+impl FlowIndexEntry {
+    pub fn matches_dataset_flow_filters(&self, filters: &DatasetFlowFilters) -> bool {
+        self.dataset_flow_type_matches(filters.by_flow_type)
+            && self.flow_status_matches(filters.by_flow_status)
+            && self.initiator_matches(filters.by_initiator.as_ref())
+    }
+
+    pub fn matches_system_flow_filters(&self, filters: &SystemFlowFilters) -> bool {
+        self.system_flow_type_matches(filters.by_flow_type)
+            && self.flow_status_matches(filters.by_flow_status)
+            && self.initiator_matches(filters.by_initiator.as_ref())
+    }
+
+    fn dataset_flow_type_matches(
+        &self,
+        maybe_dataset_flow_type_filter: Option<DatasetFlowType>,
+    ) -> bool {
+        match self.flow_type {
+            AnyFlowType::Dataset(dft) => match maybe_dataset_flow_type_filter {
+                Some(flow_type_filter) => flow_type_filter == dft,
+                None => true,
+            },
+            AnyFlowType::System(_) => false,
+        }
+    }
+
+    fn system_flow_type_matches(
+        &self,
+        maybe_system_flow_type_filter: Option<SystemFlowType>,
+    ) -> bool {
+        match self.flow_type {
+            AnyFlowType::Dataset(_) => false,
+            AnyFlowType::System(sft) => match maybe_system_flow_type_filter {
+                Some(flow_type_filter) => flow_type_filter == sft,
+                None => true,
+            },
+        }
+    }
+
+    fn flow_status_matches(&self, maybe_flow_status_filter: Option<FlowStatus>) -> bool {
+        if let Some(flow_status_filter) = maybe_flow_status_filter {
+            flow_status_filter == self.flow_status
+        } else {
+            true
+        }
+    }
+
+    fn initiator_matches(&self, maybe_initiator_filter: Option<&InitiatorFilter>) -> bool {
+        match maybe_initiator_filter {
+            None => true,
+            Some(InitiatorFilter::System) => self.initiator.is_none(),
+            Some(InitiatorFilter::Account(filter_initiator)) => {
+                if let Some(initiator) = &self.initiator {
+                    filter_initiator == initiator
+                } else {
+                    false
+                }
             }
         }
-
-        if let Some(flow_status) = filters.by_flow_status {
-            if flow_status != self.flow_status {
-                return false;
-            }
-        }
-
-        // TODO: system initiators
-        if let Some(filter_initiator) = &filters.by_initiator {
-            if let Some(initiator) = &self.initiator {
-                return filter_initiator == initiator;
-            }
-            return false;
-        }
-
-        true
     }
 }
 
@@ -169,10 +183,10 @@ impl FlowEventStoreInMem {
                     };
                     all_dataset_entries.push(event.flow_id());
 
-                    state.dataset_flows_index.insert(
+                    state.flow_search_index.insert(
                         event.flow_id(),
-                        FlowIndexEntry::<DatasetFlowType> {
-                            flow_type: flow_key.flow_type,
+                        FlowIndexEntry {
+                            flow_type: AnyFlowType::Dataset(flow_key.flow_type),
                             flow_status: FlowStatus::Waiting,
                             initiator: e.trigger.initiator_account_name().cloned(),
                         },
@@ -188,10 +202,10 @@ impl FlowEventStoreInMem {
 
                     state.all_system_flows.push(event.flow_id());
 
-                    state.system_flows_index.insert(
+                    state.flow_search_index.insert(
                         event.flow_id(),
-                        FlowIndexEntry::<SystemFlowType> {
-                            flow_type: flow_key.flow_type,
+                        FlowIndexEntry {
+                            flow_type: AnyFlowType::System(flow_key.flow_type),
                             flow_status: FlowStatus::Waiting,
                             initiator: e.trigger.initiator_account_name().cloned(),
                         },
@@ -203,17 +217,11 @@ impl FlowEventStoreInMem {
         }
         /* Existing flow must have been indexed, update status */
         else if let Some(new_status) = event.new_status() {
-            if let Entry::Vacant(_) = state
-                .dataset_flows_index
-                .entry(event.flow_id())
-                .and_modify(|e| e.flow_status = new_status)
-            {
-                state
-                    .system_flows_index
-                    .get_mut(&event.flow_id())
-                    .expect("Neither system nor dataset flow")
-                    .flow_status = new_status;
-            }
+            state
+                .flow_search_index
+                .get_mut(&event.flow_id())
+                .expect("Previously unseen flow ID")
+                .flow_status = new_status;
         }
     }
 }

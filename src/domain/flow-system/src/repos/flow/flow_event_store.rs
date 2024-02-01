@@ -54,14 +54,20 @@ pub trait FlowEventStore: EventStore<FlowState> {
 pub struct DatasetFlowFilters {
     pub by_flow_type: Option<DatasetFlowType>,
     pub by_flow_status: Option<FlowStatus>,
-    pub by_initiator: Option<AccountName>, // TODO: replace on AccountID
+    pub by_initiator: Option<InitiatorFilter>, // TODO: replace on AccountID
 }
 
 #[derive(Default, Debug)]
 pub struct SystemFlowFilters {
     pub by_flow_type: Option<SystemFlowType>,
     pub by_flow_status: Option<FlowStatus>,
-    pub by_initiator: Option<AccountName>, // TODO: replace on AccountID
+    pub by_initiator: Option<InitiatorFilter>,
+}
+
+#[derive(Debug)]
+pub enum InitiatorFilter {
+    System,
+    Account(AccountName), // TODO: replace on AccountID
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
