@@ -11,9 +11,9 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::io::Error as IOError;
 use std::path::{Path, PathBuf};
+use std::process;
 use std::process::{Command, Stdio};
 use std::sync::Arc;
-use std::{fs, process};
 
 use kamu_core::*;
 use opendatafabric::*;
@@ -36,28 +36,18 @@ impl PrepService {
         run_info_dir: &Path,
     ) -> Result<(), PollingIngestError> {
         let mut stream: Box<dyn Stream> = Box::new(File::open(src_path).int_err()?);
-        let stdout_file_path = run_info_dir.join(format!("kamu.stdout.log-{}", process::id()));
         let stderr_file_path = run_info_dir.join(format!("kamu.stderr.log-{}", process::id()));
 
         for step in prep_steps {
             stream = match step {
                 PrepStep::Pipe(p) => Box::new(
-                    PipeStream::new(
-                        p.command.clone(),
-                        stream,
-                        stderr_file_path.clone(),
-                        stdout_file_path.clone(),
-                    )
-                    .map_err(|e| {
-                        PollingIngestError::PipeError({
-                            PipeError::new(
-                                &[stderr_file_path.clone()],
-                                stdout_file_path.clone(),
-                                p.command.clone(),
-                                e,
-                            )
-                        })
-                    })?,
+                    PipeStream::new(p.command.clone(), stream, stderr_file_path.clone()).map_err(
+                        |e| {
+                            PollingIngestError::PipeError({
+                                PipeError::new(vec![stderr_file_path.clone()], p.command.clone(), e)
+                            })
+                        },
+                    )?,
                 ),
                 PrepStep::Decompress(dc) => match dc.format {
                     CompressionFormat::Zip => {
@@ -70,8 +60,6 @@ impl PrepService {
 
         let sink = FileSink::new(File::create(target_path).int_err()?, stream);
         sink.join()?;
-
-        fs::copy(target_path, stdout_file_path).int_err()?;
 
         Ok(())
     }
@@ -123,7 +111,6 @@ impl PipeStream {
         cmd: Vec<String>,
         mut input: Box<dyn Stream>,
         stderr_file_path: PathBuf,
-        stdout_file_path: PathBuf,
     ) -> Result<Self, IOError> {
         let mut process = Command::new(cmd.first().unwrap())
             .args(&cmd[1..])
@@ -137,6 +124,17 @@ impl PipeStream {
         let ingress = std::thread::Builder::new()
             .name("pipe_stream".to_owned())
             .spawn(move || {
+                let status = process.wait().unwrap();
+
+                if !status.success() {
+                    return Err(PollingIngestError::PipeError(PipeError::new(
+                        vec![stderr_file_path],
+                        cmd,
+                        BadStatusCode {
+                            code: status.code().unwrap(),
+                        },
+                    )));
+                }
                 let mut buf = [0; BUFFER_SIZE];
 
                 loop {
@@ -150,20 +148,7 @@ impl PipeStream {
                 drop(stdin);
                 input.join()?;
 
-                let status = process.wait().unwrap();
-
-                if !status.success() {
-                    Err(PollingIngestError::PipeError(PipeError::new(
-                        &[stderr_file_path],
-                        stdout_file_path,
-                        cmd,
-                        BadStatusCode {
-                            code: status.code().unwrap(),
-                        },
-                    )))
-                } else {
-                    Ok(())
-                }
+                Ok(())
             })
             .unwrap();
 

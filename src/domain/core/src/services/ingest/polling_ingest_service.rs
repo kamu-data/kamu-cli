@@ -8,8 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use std::backtrace::Backtrace;
-use std::fs::File;
-use std::io::Read;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -332,23 +330,18 @@ pub struct PipeError {
     commands: Vec<String>,
     source: BoxedError,
     backtrace: Backtrace,
-    stdout_file_path: PathBuf,
     log_files: Vec<PathBuf>,
 }
 
 impl PipeError {
     pub fn new(
-        log_files: &[PathBuf],
-        stdout_file_path: PathBuf,
+        log_files: Vec<PathBuf>,
         commands: Vec<String>,
         e: impl std::error::Error + Send + Sync + 'static,
     ) -> Self {
-        let mut log_file_list = log_files.to_owned();
-        log_file_list.push(stdout_file_path.clone());
         Self {
             commands,
-            log_files: normalize_logs(log_file_list),
-            stdout_file_path,
+            log_files: normalize_logs(log_files),
             source: e.into(),
             backtrace: Backtrace::capture(),
         }
@@ -365,19 +358,6 @@ impl std::fmt::Display for PipeError {
             writeln!(f, ", see log files for details:")?;
             for path in &self.log_files {
                 writeln!(f, "- {}", path.display())?;
-                if path == &self.stdout_file_path {
-                    let mut file = File::open(path).unwrap();
-                    let mut buffer = [0; 2048];
-                    writeln!(f, "process stdout:")?;
-                    for _ in 0..100 {
-                        let count = file.read(&mut buffer).unwrap();
-
-                        if count == 0 {
-                            break;
-                        }
-                        writeln!(f, "{}", String::from_utf8_lossy(&buffer[..count]))?;
-                    }
-                }
             }
         }
 
