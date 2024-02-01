@@ -24,7 +24,7 @@ fn test_datafusion_cli() {
         .run()
         .unwrap()
         .command()
-        .arg("sql")
+        .arg("-- sql")
         .stdout(Stdio::piped())
         .stdin(Stdio::piped())
         .spawn()
