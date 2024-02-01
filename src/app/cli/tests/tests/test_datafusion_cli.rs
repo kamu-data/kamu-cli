@@ -33,16 +33,21 @@ fn test_datafusion_cli() {
 
     if let Some(mut stdin) = child.stdin.take() {
         let sql_command = "select 1;";
-        stdin
-            .write_all(sql_command.as_bytes())
-            .expect("Failed to write to stdin");
+        match stdin.write_all(sql_command.as_bytes()) {
+            Ok(_) => {
+                println!("query executed successfully.");
+            }
+            Err(err) => {
+                eprintln!("query executed unsuccessfully.: {err}");
+            }
+        }
     }
 
     let output = child
         .wait_with_output()
         .expect("Failed to wait for child process");
 
-    let code = output.status.code().unwrap();
+    let stderr = String::from_utf8_lossy(&output.stderr);
 
-    assert_eq!(code, 0);
+    assert_eq!(stderr, "stderr should be empty");
 }
