@@ -63,7 +63,7 @@ impl SqlShellImpl {
                 .run_attached(&self.image)
                 .init(true)
                 .shell_cmd("sleep 999999")
-                .container_name("kamu-spark")
+                .container_name_prefix("kamu-spark-")
                 .user("root")
                 .volumes([
                     (cwd, "/opt/bitnami/spark/kamu_shell"),
@@ -148,7 +148,7 @@ impl SqlShellImpl {
 
         let mut cmd = self.container_runtime.run_cmd(RunArgs {
             image: self.image.clone(),
-            container_name: Some("kamu-spark-shell".to_owned()),
+            container_name: Some(get_random_name("kamu-spark-shell-")),
             user: Some("root".to_owned()),
             network: Some("host".to_owned()),
             tty: true,

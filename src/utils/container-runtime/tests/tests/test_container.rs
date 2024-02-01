@@ -79,6 +79,7 @@ async fn test_container_terminate_awaited() {
 
     let mut container = rt
         .run_attached(TEST_IMAGE)
+        .container_name_prefix("kamu-busy-box-")
         .args(["sleep", "4999"])
         .init(true)
         .spawn()
@@ -110,6 +111,7 @@ async fn test_volume_mount_read_write() {
 
     let mut container = rt
         .run_attached(TEST_IMAGE)
+        .container_name_prefix("kamu-busy-box-")
         .volume((tempdir.path(), "/out"))
         .args(["touch", "/out/test"])
         .init(true)
@@ -131,6 +133,7 @@ async fn test_volume_mount_read_only() {
 
     let mut container = rt
         .run_attached(TEST_IMAGE)
+        .container_name_prefix("kamu-busy-box-")
         .volume((tempdir.path(), "/out", VolumeAccess::ReadOnly))
         .args(["touch", "/out/test"])
         .init(true)

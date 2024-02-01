@@ -59,7 +59,7 @@ impl LivyServerImpl {
         let mut livy = self
             .container_runtime
             .run_attached(&self.image)
-            .container_name("kamu-livy")
+            .container_name_prefix("kamu-livy-")
             .entry_point("/opt/livy/bin/livy-server")
             .user("root")
             .map_port_with_address(addr, host_port, LIVY_PORT)

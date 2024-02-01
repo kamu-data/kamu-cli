@@ -10,5 +10,4 @@
 #![feature(assert_matches)]
 #![feature(exit_status_error)]
 
-pub mod common;
 mod tests;

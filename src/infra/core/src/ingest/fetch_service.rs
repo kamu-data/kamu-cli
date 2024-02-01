@@ -313,6 +313,7 @@ impl FetchService {
                 if #[cfg(unix)] {
                     self.container_runtime
                         .run_attached(&fetch.image)
+                        .container_name_prefix("kamu-permissions-")
                         .shell_cmd(format!(
                             "chown -Rf {}:{} {}",
                             unsafe { libc::geteuid() },

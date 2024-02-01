@@ -7,16 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use container_runtime::ContainerRuntime;
-
-use crate::common;
+use container_runtime::{get_random_name, ContainerRuntime};
 
 #[test_group::group(containerized)]
 #[tokio::test]
 async fn test_network_handle_free_not_called() {
     let rt = ContainerRuntime::default();
 
-    let network_name = common::get_random_name("kamu-test-network-");
+    let network_name = get_random_name("kamu-test-network-");
 
     let network = rt.create_network(&network_name).await.unwrap();
 
@@ -35,7 +33,7 @@ async fn test_network_handle_free_awaited() {
     let rt = ContainerRuntime::default();
 
     let network = rt
-        .create_network(&common::get_random_name("kamu-test-network-"))
+        .create_network(&get_random_name("kamu-test-network-"))
         .await
         .unwrap();
 

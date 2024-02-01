@@ -73,12 +73,12 @@ impl NotebookServerImpl {
             "Exposing Notebook server on a host network interface is not yet supported"
         );
 
-        let network_name = "kamu";
+        let network_name = get_random_name("kamu-");
 
         // Delete network if exists from previous run
         let _ = self
             .container_runtime
-            .remove_network_cmd(network_name)
+            .remove_network_cmd(&network_name)
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::null())
             .output()
@@ -86,7 +86,7 @@ impl NotebookServerImpl {
 
         let network = self
             .container_runtime
-            .create_network(network_name)
+            .create_network(&network_name)
             .await
             .int_err()?;
 
@@ -100,9 +100,9 @@ impl NotebookServerImpl {
         let mut livy = self
             .container_runtime
             .run_attached(self.jupyter_config.livy_image.as_ref().unwrap())
-            .container_name("kamu-livy")
+            .container_name_prefix("kamu-livy-")
             .hostname("kamu-livy")
-            .network(network_name)
+            .network(&network_name)
             .user("root")
             .work_dir("/opt/bitnami/spark/work-dir")
             .volume((&datasets_dir, "/opt/bitnami/spark/work-dir"))
@@ -123,8 +123,8 @@ impl NotebookServerImpl {
         let mut jupyter = self
             .container_runtime
             .run_attached(self.jupyter_config.image.as_ref().unwrap())
-            .container_name("kamu-jupyter")
-            .network(network_name)
+            .container_name_prefix("kamu-jupyter-")
+            .network(&network_name)
             .user("root")
             .work_dir("/opt/workdir")
             .expose_port(80)
@@ -200,6 +200,7 @@ impl NotebookServerImpl {
                 if #[cfg(unix)] {
                     self.container_runtime
                         .run_attached(self.jupyter_config.image.as_ref().unwrap())
+                        .container_name_prefix("kamu-jupyter-permissions-")
                         .shell_cmd(format!(
                             "chown -Rf {}:{} {}",
                             unsafe { libc::geteuid() },
