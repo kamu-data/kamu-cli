@@ -63,7 +63,7 @@ impl SqlShellImpl {
                 .run_attached(&self.image)
                 .init(true)
                 .shell_cmd("sleep 999999")
-                .container_name_prefix("kamu-spark-")
+                .random_container_name_with_prefix("kamu-spark-")
                 .user("root")
                 .volumes([
                     (cwd, "/opt/bitnami/spark/kamu_shell"),
@@ -78,11 +78,13 @@ impl SqlShellImpl {
                 .stderr(std::fs::File::create(&spark_stderr_path).int_err()?);
 
             container_builder = if let Some(p) = port {
-                container_builder.network("host").map_port_with_address(
-                    address.map_or(String::from("127.0.0.1"), ToString::to_string),
-                    p,
-                    10000,
-                )
+                container_builder
+                    .random_container_network_with_prefix("host-")
+                    .map_port_with_address(
+                        address.map_or(String::from("127.0.0.1"), ToString::to_string),
+                        p,
+                        10000,
+                    )
             } else {
                 container_builder.expose_port(10000)
             };
@@ -148,7 +150,7 @@ impl SqlShellImpl {
 
         let mut cmd = self.container_runtime.run_cmd(RunArgs {
             image: self.image.clone(),
-            container_name: Some(get_random_name("kamu-spark-shell-")),
+            container_name: Some(get_random_name_with_prefix("kamu-spark-shell-")),
             user: Some("root".to_owned()),
             network: Some("host".to_owned()),
             tty: true,

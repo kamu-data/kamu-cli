@@ -73,7 +73,7 @@ impl NotebookServerImpl {
             "Exposing Notebook server on a host network interface is not yet supported"
         );
 
-        let network_name = get_random_name("kamu-");
+        let network_name = get_random_name_with_prefix("kamu-");
 
         // Delete network if exists from previous run
         let _ = self
@@ -100,7 +100,7 @@ impl NotebookServerImpl {
         let mut livy = self
             .container_runtime
             .run_attached(self.jupyter_config.livy_image.as_ref().unwrap())
-            .container_name_prefix("kamu-livy-")
+            .random_container_name_with_prefix("kamu-livy-")
             .hostname("kamu-livy")
             .network(&network_name)
             .user("root")
@@ -123,7 +123,7 @@ impl NotebookServerImpl {
         let mut jupyter = self
             .container_runtime
             .run_attached(self.jupyter_config.image.as_ref().unwrap())
-            .container_name_prefix("kamu-jupyter-")
+            .random_container_name_with_prefix("kamu-jupyter-")
             .network(&network_name)
             .user("root")
             .work_dir("/opt/workdir")
@@ -200,7 +200,7 @@ impl NotebookServerImpl {
                 if #[cfg(unix)] {
                     self.container_runtime
                         .run_attached(self.jupyter_config.image.as_ref().unwrap())
-                        .container_name_prefix("kamu-jupyter-permissions-")
+                        .random_container_name_with_prefix("kamu-jupyter-permissions-")
                         .shell_cmd(format!(
                             "chown -Rf {}:{} {}",
                             unsafe { libc::geteuid() },

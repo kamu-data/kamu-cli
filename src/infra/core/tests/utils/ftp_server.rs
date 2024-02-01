@@ -40,7 +40,7 @@ impl FtpServer {
         // FTP is a crazy protocol :(
         let container = container_runtime
             .run_attached(Self::IMAGE)
-            .container_name_prefix("kamu-test-ftp-")
+            .random_container_name_with_prefix("kamu-test-ftp-")
             .expose_port(21)
             .map_port_range((47400, 47470), (47400, 47470))
             .volume((server_dir, "/home/vsftpd"))
