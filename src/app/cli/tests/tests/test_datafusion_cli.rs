@@ -8,12 +8,12 @@
 // by the Apache License, Version 2.0.
 
 /////////////////////////////////////////////////////////////////////////////////////////
-extern crate escargot;
 extern crate assert_fs;
-use std::process::{Stdio};
+extern crate escargot;
+use std::process::Stdio;
 
-#[test_log::test(tokio::test)]
-async fn test_datafusion_cli() {
+#[test]
+fn test_datafusion_cli() {
     let run = escargot::CargoBuild::new()
         .bin("kamu-cli")
         .current_release()
@@ -26,5 +26,5 @@ async fn test_datafusion_cli() {
         .status()
         .unwrap();
 
-    assert_eq!(run.success(), true);
+    assert!(run.success());
 }
