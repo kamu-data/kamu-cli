@@ -484,19 +484,25 @@ pub enum AppendValidationError {
     NoOpEvent(#[from] NoOpEventError),
 }
 
+impl AppendValidationError {
+    pub fn no_op_event(event: impl Into<MetadataEvent>, message: impl Into<String>) -> Self {
+        Self::NoOpEvent(NoOpEventError::new(event, message))
+    }
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, PartialEq, Eq, Debug)]
 #[error("Invalid event: {message}: {event:?}")]
 pub struct InvalidEventError {
-    event: MetadataEvent,
+    event: Box<MetadataEvent>,
     message: String,
 }
 
 impl InvalidEventError {
     pub fn new(event: impl Into<MetadataEvent>, message: impl Into<String>) -> Self {
         Self {
-            event: event.into(),
+            event: Box::new(event.into()),
             message: message.into(),
         }
     }
@@ -507,14 +513,14 @@ impl InvalidEventError {
 #[derive(Error, PartialEq, Eq, Debug)]
 #[error("No-op event: {message}: {event:?}")]
 pub struct NoOpEventError {
-    event: MetadataEvent,
+    event: Box<MetadataEvent>,
     message: String,
 }
 
 impl NoOpEventError {
     pub fn new(event: impl Into<MetadataEvent>, message: impl Into<String>) -> Self {
         Self {
-            event: event.into(),
+            event: Box::new(event.into()),
             message: message.into(),
         }
     }

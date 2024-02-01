@@ -87,7 +87,6 @@ publish = false
 new_without_default = "allow"
 too_many_arguments = "allow"
 large_enum_variant = "allow"
-result_large_err = "allow"
 module_inception = "allow"
 
 # clippy::pedantic
