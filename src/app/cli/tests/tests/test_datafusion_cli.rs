@@ -46,3 +46,14 @@ async fn test_datafusion_cli() {
 
     assert.success();
 }
+
+#[test_group::group(engine, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_datafusion_cli_not_launched_in_root_ws() {
+    // this test checks that workspace was not created in root directory
+    Command::cargo_bin(env!("CARGO_PKG_NAME"))
+        .unwrap()
+        .arg("list")
+        .assert()
+        .failure();
+}
