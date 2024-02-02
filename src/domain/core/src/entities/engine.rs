@@ -338,13 +338,13 @@ impl From<InternalError> for EngineError {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-fn normalize_logs(log_files: Vec<PathBuf>) -> Vec<PathBuf> {
+pub fn normalize_logs(log_files: Vec<PathBuf>) -> Vec<PathBuf> {
     let cwd = std::env::current_dir().unwrap_or_default();
     log_files
         .into_iter()
         .filter(|p| match std::fs::metadata(p) {
             Ok(m) => m.len() > 0,
-            Err(_) => true,
+            Err(err) => !matches!(err.kind(), std::io::ErrorKind::NotFound),
         })
         .map(|p| {
             if let Some(relpath) = pathdiff::diff_paths(&p, &cwd) {
