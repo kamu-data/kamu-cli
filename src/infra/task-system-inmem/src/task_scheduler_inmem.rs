@@ -11,7 +11,6 @@ use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 
 use dill::*;
-use futures::TryStreamExt;
 use kamu_core::SystemTimeSource;
 use kamu_task_system::*;
 use opendatafabric::DatasetID;
@@ -91,26 +90,37 @@ impl TaskScheduler for TaskSchedulerInMemory {
     }
 
     #[tracing::instrument(level = "info", skip_all, fields(%dataset_id))]
-    fn list_tasks_by_dataset(
+    async fn list_tasks_by_dataset(
         &self,
         dataset_id: &DatasetID,
-    ) -> Result<TaskStateStream, ListTasksByDatasetError> {
+        pagination: TaskPaginationOpts,
+    ) -> Result<TaskStateListing, ListTasksByDatasetError> {
+        let total_count = self
+            .event_store
+            .get_count_tasks_by_dataset(dataset_id)
+            .await;
+
         let dataset_id = dataset_id.clone();
 
-        // TODO: This requires a lot more thinking on how to make this performant
-        Ok(Box::pin(async_stream::try_stream! {
-            let relevant_tasks: Vec<_> = self
+        use futures::StreamExt;
+        let stream = Box::pin(async_stream::stream! {
+            let relevant_task_ids: Vec<_> = self
                 .event_store
-                .get_tasks_by_dataset(&dataset_id)
-                .try_collect()
-                .await?;
+                .get_tasks_by_dataset(&dataset_id, pagination)
+                .collect()
+                .await;
 
-            for task_id in relevant_tasks {
+            // TODO: implement batch loading
+            for task_id in relevant_task_ids {
                 let task = Task::load(task_id, self.event_store.as_ref()).await.int_err()?;
-
-                yield task.into();
+                yield Ok(task.into());
             }
-        }))
+        });
+
+        Ok(TaskStateListing {
+            stream,
+            total_count,
+        })
     }
 
     // TODO: Use signaling instead of a loop

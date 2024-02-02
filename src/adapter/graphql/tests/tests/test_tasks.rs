@@ -19,7 +19,7 @@ mockall::mock! {
     #[async_trait::async_trait]
     impl TaskScheduler for TaskScheduler {
         async fn get_task(&self, task_id: TaskID) -> Result<TaskState, GetTaskError>;
-        fn list_tasks_by_dataset<'a>(&'a self, dataset_id: &DatasetID) -> Result<TaskStateStream<'a>, ListTasksByDatasetError>;
+        async fn list_tasks_by_dataset<'a>(&'a self, dataset_id: &DatasetID, pagination: TaskPaginationOpts) -> Result<TaskStateListing<'a>, ListTasksByDatasetError>;
         async fn create_task(&self, plan: LogicalPlan) -> Result<TaskState, CreateTaskError>;
         async fn cancel_task(&self, task_id: TaskID) -> Result<TaskState, CancelTaskError>;
         async fn take(&self) -> Result<TaskID, TakeTaskError>;
@@ -150,10 +150,11 @@ async fn test_task_list_by_dataset() {
     let mut task_sched_mock = MockTaskScheduler::new();
     task_sched_mock
         .expect_list_tasks_by_dataset()
-        .return_once(move |_| {
-            Ok(Box::pin(futures::stream::iter(
-                [Ok(returned_task)].into_iter(),
-            )))
+        .return_once(move |_, _| {
+            Ok(TaskStateListing {
+                stream: Box::pin(futures::stream::iter([Ok(returned_task)].into_iter())),
+                total_count: 1,
+            })
         });
 
     let cat = dill::CatalogBuilder::new()

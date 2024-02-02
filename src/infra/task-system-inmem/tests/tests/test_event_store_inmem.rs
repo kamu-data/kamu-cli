@@ -25,11 +25,18 @@ async fn test_event_store_empty() {
 
     assert_eq!(events, []);
 
+    use futures::StreamExt;
+
     let tasks: Vec<_> = event_store
-        .get_tasks_by_dataset(&DatasetID::new_seeded_ed25519(b"foo"))
-        .try_collect()
-        .await
-        .unwrap();
+        .get_tasks_by_dataset(
+            &DatasetID::new_seeded_ed25519(b"foo"),
+            TaskPaginationOpts {
+                limit: 100,
+                offset: 0,
+            },
+        )
+        .collect()
+        .await;
 
     assert_eq!(tasks, []);
 }
@@ -89,11 +96,18 @@ async fn test_event_store_get_streams() {
 
     assert_eq!(&events[..], [event_1.into(), event_3.into()]);
 
+    use futures::StreamExt;
+
     let tasks: Vec<_> = event_store
-        .get_tasks_by_dataset(&dataset_id)
-        .try_collect()
-        .await
-        .unwrap();
+        .get_tasks_by_dataset(
+            &dataset_id,
+            TaskPaginationOpts {
+                limit: 100,
+                offset: 0,
+            },
+        )
+        .collect()
+        .await;
 
     // Ensure reverse chronological order
     assert_eq!(&tasks[..], [task_id_2, task_id_1]);

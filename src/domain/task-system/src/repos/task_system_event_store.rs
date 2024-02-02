@@ -19,12 +19,26 @@ pub trait TaskSystemEventStore: EventStore<TaskState> {
     /// Generates new unique task identifier
     fn new_task_id(&self) -> TaskID;
 
-    /// Returns the tasks associated with the specified dataset in reverse
-    /// chronological order based on creation time
-    fn get_tasks_by_dataset(&self, dataset_id: &DatasetID) -> TaskIDStream;
+    /// Returns page of the tasks associated with the specified dataset in
+    /// reverse chronological order based on creation time
+    fn get_tasks_by_dataset(
+        &self,
+        dataset_id: &DatasetID,
+        pagination: TaskPaginationOpts,
+    ) -> TaskIDStream;
+
+    /// Returns total number of tasks associated  with the specified dataset
+    async fn get_count_tasks_by_dataset(&self, dataset_id: &DatasetID) -> usize;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub type TaskIDStream<'a> =
-    std::pin::Pin<Box<dyn tokio_stream::Stream<Item = Result<TaskID, InternalError>> + Send + 'a>>;
+pub type TaskIDStream<'a> = std::pin::Pin<Box<dyn tokio_stream::Stream<Item = TaskID> + Send + 'a>>;
+
+#[derive(Debug)]
+pub struct TaskPaginationOpts {
+    pub offset: usize,
+    pub limit: usize,
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
