@@ -124,6 +124,31 @@ impl PipeStream {
         let ingress = std::thread::Builder::new()
             .name("pipe_stream".to_owned())
             .spawn(move || {
+                let mut buf = [0; BUFFER_SIZE];
+
+                loop {
+                    let read = input.read(&mut buf).unwrap();
+                    if read == 0 {
+                        break;
+                    }
+                    if stdin.write_all(&buf[..read]).is_err() {
+                        // Error here can be caused when process returned
+                        // stderr with invalid data which will cause pipe broke
+                        let status = process.wait().unwrap();
+
+                        Err(PollingIngestError::PipeError(PipeError::new(
+                            vec![stderr_file_path],
+                            cmd,
+                            BadStatusCode {
+                                code: status.code().unwrap(),
+                            },
+                        )))
+                    }
+                }
+
+                drop(stdin);
+                input.join()?;
+
                 let status = process.wait().unwrap();
 
                 if !status.success() {
@@ -134,21 +159,9 @@ impl PipeStream {
                             code: status.code().unwrap(),
                         },
                     )));
+                } else {
+                    Ok(())
                 }
-                let mut buf = [0; BUFFER_SIZE];
-
-                loop {
-                    let read = input.read(&mut buf).unwrap();
-                    if read == 0 {
-                        break;
-                    }
-                    stdin.write_all(&buf[..read]).unwrap();
-                }
-
-                drop(stdin);
-                input.join()?;
-
-                Ok(())
             })
             .unwrap();
 
