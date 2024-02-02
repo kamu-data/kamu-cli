@@ -19,9 +19,10 @@ use kamu::domain::{
     DatasetRepository,
     ErrorIntoInternal,
     GetSummaryOpts,
+    MetadataBlockPair,
     ResultIntoInternal,
 };
-use opendatafabric::{AsTypedBlock, DatasetRef, MetadataBlock, Multihash};
+use opendatafabric::{AsTypedBlock, DatasetRef};
 use url::Url;
 
 use super::errors::*;
@@ -183,7 +184,7 @@ impl AxumServerPushProtocolInstance {
     async fn try_handle_push_metadata_request(
         &mut self,
         push_request: DatasetPushRequest,
-    ) -> Result<VecDeque<(Multihash, MetadataBlock)>, PushServerError> {
+    ) -> Result<VecDeque<MetadataBlockPair>, PushServerError> {
         let push_metadata_request =
             match axum_read_payload::<DatasetPushMetadataRequest>(&mut self.socket).await {
                 Ok(push_metadata_request) => Ok(push_metadata_request),
@@ -306,7 +307,7 @@ impl AxumServerPushProtocolInstance {
 
     async fn try_handle_push_complete(
         &mut self,
-        new_blocks: VecDeque<(Multihash, MetadataBlock)>,
+        new_blocks: VecDeque<MetadataBlockPair>,
     ) -> Result<(), PushServerError> {
         axum_read_payload::<DatasetPushComplete>(&mut self.socket)
             .await

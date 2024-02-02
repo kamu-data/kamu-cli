@@ -225,9 +225,11 @@ impl VerificationServiceImpl {
         // To verify sequence integrity, let's build a temporary chain from the same
         // blocks in memory. Here we reuse validations implemented in append
         // rules when adding blocks to new chain.
+        let obj_repo = Arc::new(ObjectRepositoryInMemory::new());
         let in_memory_chain = MetadataChainImpl::new(
-            ObjectRepositoryInMemory::new(),
+            obj_repo.clone(),
             ReferenceRepositoryImpl::new(NamedObjectRepositoryInMemory::new()),
+            GetMetadataBlockStrategyImpl::new_boxed(obj_repo),
         );
 
         for (block_hash, block) in blocks.into_iter().rev() {

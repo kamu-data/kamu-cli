@@ -11,6 +11,8 @@ use std::fmt::Display;
 
 use async_trait::async_trait;
 use internal_error::*;
+use opendatafabric::serde::flatbuffers::FlatbuffersMetadataBlockDeserializer;
+use opendatafabric::serde::{Error, MetadataBlockDeserializer};
 use opendatafabric::{MetadataBlock, MetadataBlockTyped, MetadataEvent, Multihash, VariantOf};
 use thiserror::Error;
 
@@ -154,7 +156,7 @@ impl<T> MetadataChainExt for T where T: MetadataChain + ?Sized {}
 /////////////////////////////////////////////////////////////////////////////////////////
 
 /// References are named pointers to metadata blocks
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug, Hash)]
 pub enum BlockRef {
     Head,
 }
@@ -391,6 +393,18 @@ pub enum AppendError {
     ),
 }
 
+impl From<GetBlockError> for AppendError {
+    fn from(v: GetBlockError) -> Self {
+        match v {
+            GetBlockError::NotFound(e) => AppendValidationError::PrevBlockNotFound(e).into(),
+            GetBlockError::BlockVersion(e) => Self::Internal(e.int_err()),
+            GetBlockError::BlockMalformed(e) => Self::Internal(e.int_err()),
+            GetBlockError::Access(e) => Self::Access(e),
+            GetBlockError::Internal(e) => Self::Internal(e.int_err()),
+        }
+    }
+}
+
 impl From<SetRefErrorRepo> for AppendError {
     fn from(v: SetRefErrorRepo) -> Self {
         match v {
@@ -584,3 +598,23 @@ impl Display for OffsetsNotSequentialError {
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+// Helpers
+///////////////////////////////////////////////////////////////////////////////
+
+pub fn deserialize_metadata_block(
+    hash: &Multihash,
+    block_bytes: &[u8],
+) -> Result<MetadataBlock, GetBlockError> {
+    FlatbuffersMetadataBlockDeserializer
+        .read_manifest(block_bytes)
+        .map_err(|e| match e {
+            Error::UnsupportedVersion { .. } => GetBlockError::BlockVersion(BlockVersionError {
+                hash: hash.clone(),
+                source: e.into(),
+            }),
+            _ => GetBlockError::BlockMalformed(BlockMalformedError {
+                hash: hash.clone(),
+                source: e.into(),
+            }),
+        })
+}

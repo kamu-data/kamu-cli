@@ -23,6 +23,9 @@ use super::dataset_repository_helpers as helpers;
 
 type AsyncReadObj = dyn AsyncRead + Send + Unpin;
 
+pub type ObjectRepositoryLocalFSSha3 =
+    ObjectRepositoryLocalFS<sha3::Sha3_256, { Multicodec::Sha3_256 as u32 }>;
+
 /////////////////////////////////////////////////////////////////////////////////////////
 
 // TODO: Pass a single type that configures digest algo, multicodec, and hash

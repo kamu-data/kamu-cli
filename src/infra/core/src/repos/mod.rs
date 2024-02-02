@@ -57,7 +57,21 @@ pub use dataset_factory_impl::*;
 
 mod object_store_registy_impl;
 pub use object_store_registy_impl::*;
+
 mod object_store_builder_s3;
 pub use object_store_builder_s3::*;
+
 mod object_store_builder_local_fs;
 pub use object_store_builder_local_fs::*;
+
+mod get_metadata_block_strategy;
+pub use get_metadata_block_strategy::*;
+
+mod get_metadata_block_strategy_impl;
+pub use get_metadata_block_strategy_impl::*;
+
+mod get_metadata_block_strategy_cache_inmem_facade;
+pub use get_metadata_block_strategy_cache_inmem_facade::*;
+
+mod metadata_chain_cache_inmen_facade;
+pub use metadata_chain_cache_inmen_facade::*;

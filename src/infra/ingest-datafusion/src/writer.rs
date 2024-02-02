@@ -843,7 +843,7 @@ impl DataWriterDataFusionBuilder {
         source_name: Option<&str>,
     ) -> Result<Self, ScanMetadataError> {
         // TODO: PERF: Full metadata scan below - this is expensive and should be
-        // improved using skip lists and caching.
+        //       improved using skip lists.
 
         let head = self
             .dataset

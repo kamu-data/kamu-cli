@@ -24,6 +24,11 @@ use crate::utils::s3_context::{AsyncReadObj, S3Context};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+pub type ObjectRepositoryS3Sha3 =
+    ObjectRepositoryS3<sha3::Sha3_256, { Multicodec::Sha3_256 as u32 }>;
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
 // TODO: Pass a single type that configures digest algo, multicodec, and hash
 // base TODO: Verify atomic behavior
 pub struct ObjectRepositoryS3<D, const C: u32> {

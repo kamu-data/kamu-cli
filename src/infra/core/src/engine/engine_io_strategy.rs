@@ -15,7 +15,7 @@ use kamu_core::engine::*;
 use kamu_core::*;
 use opendatafabric::*;
 
-use crate::ObjectRepositoryLocalFS;
+use crate::ObjectRepositoryLocalFSSha3;
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -221,9 +221,7 @@ impl EngineIoStrategyRemoteProxy {
         container_in_dir: &Path,
         volumes: &mut Vec<VolumeSpec>,
     ) -> Result<PathBuf, InternalError> {
-        let tmp_repo =
-            ObjectRepositoryLocalFS::<sha3::Sha3_256, 0x16>::new(host_in_dir.to_path_buf());
-
+        let tmp_repo = ObjectRepositoryLocalFSSha3::new(host_in_dir.to_path_buf());
         let stream = repo.get_stream(hash).await.int_err()?;
 
         tmp_repo

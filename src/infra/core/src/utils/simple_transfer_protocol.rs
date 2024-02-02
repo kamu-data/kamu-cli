@@ -75,9 +75,11 @@ impl SimpleTransferProtocol {
     ) -> Result<SyncResult, SyncError> {
         listener.begin();
 
+        let obj_repo = Arc::new(ObjectRepositoryInMemory::new());
         let empty_chain = MetadataChainImpl::new(
-            ObjectRepositoryInMemory::new(),
+            obj_repo.clone(),
             ReferenceRepositoryImpl::new(NamedObjectRepositoryInMemory::new()),
+            GetMetadataBlockStrategyImpl::new_boxed(obj_repo),
         );
 
         let src_chain = src.as_metadata_chain();
@@ -386,7 +388,7 @@ impl SimpleTransferProtocol {
 
     async fn synchronize_blocks<'a>(
         &'a self,
-        blocks: Vec<(Multihash, MetadataBlock)>,
+        blocks: Vec<MetadataBlockPair>,
         src: &'a dyn Dataset,
         dst: &'a dyn Dataset,
         src_head: &'a Multihash,
