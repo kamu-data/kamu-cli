@@ -136,13 +136,13 @@ impl PipeStream {
                         // stderr with invalid data which will cause pipe broke
                         let status = process.wait().unwrap();
 
-                        Err(PollingIngestError::PipeError(PipeError::new(
+                        return Err(PollingIngestError::PipeError(PipeError::new(
                             vec![stderr_file_path],
                             cmd,
                             BadStatusCode {
                                 code: status.code().unwrap(),
                             },
-                        )))
+                        )));
                     }
                 }
 
@@ -159,9 +159,8 @@ impl PipeStream {
                             code: status.code().unwrap(),
                         },
                     )));
-                } else {
-                    Ok(())
                 }
+                Ok(())
             })
             .unwrap();
 
