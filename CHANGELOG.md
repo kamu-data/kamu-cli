@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New GraphQL APIs for quick pausing/resuming of dataset flow configs preserving the scheduling rules
 ### Changed
 - `kamu deleted` and `kamu verify` now accepts global pattern expression
+- Error handling for pipe subprocesses with file output
 
 ## [0.155.0] - 2024-01-25
 ### Added
