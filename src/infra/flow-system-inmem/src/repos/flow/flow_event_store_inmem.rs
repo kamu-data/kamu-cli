@@ -292,7 +292,7 @@ impl FlowEventStore for FlowEventStoreInMem {
     #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id, ?filters, ?pagination))]
     fn get_all_flow_ids_by_dataset(
         &self,
-        dataset_id: DatasetID,
+        dataset_id: &DatasetID,
         filters: DatasetFlowFilters,
         pagination: FlowPaginationOpts,
     ) -> FlowIDStream {
@@ -300,7 +300,7 @@ impl FlowEventStore for FlowEventStoreInMem {
             let state = self.inner.as_state();
             let g = state.lock().unwrap();
             g.all_flows_by_dataset
-                .get(&dataset_id)
+                .get(dataset_id)
                 .map(|dataset_flow_ids| {
                     dataset_flow_ids
                         .iter()

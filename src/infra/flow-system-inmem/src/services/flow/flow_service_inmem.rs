@@ -559,12 +559,12 @@ impl FlowService for FlowServiceInMemory {
             .get_count_flows_by_dataset(dataset_id, &filters)
             .await;
 
-        let dataset_id_clone = dataset_id.clone();
+        let dataset_id = dataset_id.clone();
 
         let matched_stream = Box::pin(async_stream::try_stream! {
             let relevant_flow_ids: Vec<_> = self
                 .flow_event_store
-                .get_all_flow_ids_by_dataset(dataset_id_clone, filters, pagination)
+                .get_all_flow_ids_by_dataset(&dataset_id, filters, pagination)
                 .collect()
                 .await;
 

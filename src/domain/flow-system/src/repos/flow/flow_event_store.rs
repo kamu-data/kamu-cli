@@ -34,7 +34,7 @@ pub trait FlowEventStore: EventStore<FlowState> {
     /// Applies filters/pagination, if specified
     fn get_all_flow_ids_by_dataset(
         &self,
-        dataset_id: DatasetID,
+        dataset_id: &DatasetID,
         filters: DatasetFlowFilters,
         pagination: FlowPaginationOpts,
     ) -> FlowIDStream;
@@ -70,7 +70,7 @@ pub trait FlowEventStore: EventStore<FlowState> {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct FlowPaginationOpts {
     pub offset: usize,
     pub limit: usize,

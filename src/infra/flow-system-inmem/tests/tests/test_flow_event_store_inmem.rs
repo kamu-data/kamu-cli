@@ -1,0 +1,697 @@
+// Copyright Kamu Data, Inc. and contributors. All rights reserved.
+//
+// Use of this software is governed by the Business Source License
+// included in the LICENSE file.
+//
+// As of the Change Date specified in that file, in accordance with
+// the Business Source License, use of this software will be governed
+// by the Apache License, Version 2.0.
+
+use std::sync::Arc;
+
+use chrono::{Duration, Utc};
+use futures::StreamExt;
+use kamu_flow_system::*;
+use kamu_flow_system_inmem::FlowEventStoreInMem;
+use kamu_task_system::TaskSystemEventStore;
+use kamu_task_system_inmem::TaskSystemEventStoreInMemory;
+use opendatafabric::{AccountName, DatasetID, FAKE_ACCOUNT_ID};
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_dataset_flow_empty_filters_distingush_dataset() {
+    let (flow_event_store, task_event_store) = make_event_stores();
+
+    let always_happy_filters = DatasetFlowFilters::default();
+
+    let foo_cases =
+        make_dataset_test_case(flow_event_store.clone(), task_event_store.clone()).await;
+    let bar_cases =
+        make_dataset_test_case(flow_event_store.clone(), task_event_store.clone()).await;
+
+    assert_flow_expectaitons(
+        flow_event_store.clone(),
+        &foo_cases,
+        always_happy_filters.clone(),
+        FlowPaginationOpts {
+            offset: 0,
+            limit: 100,
+        },
+        10,
+        vec![
+            foo_cases.compacting_flow_ids.flow_id_finished,
+            foo_cases.compacting_flow_ids.flow_id_running,
+            foo_cases.compacting_flow_ids.flow_id_scheduled,
+            foo_cases.compacting_flow_ids.flow_id_queued,
+            foo_cases.compacting_flow_ids.flow_id_waiting,
+            foo_cases.ingest_flow_ids.flow_id_finished,
+            foo_cases.ingest_flow_ids.flow_id_running,
+            foo_cases.ingest_flow_ids.flow_id_scheduled,
+            foo_cases.ingest_flow_ids.flow_id_queued,
+            foo_cases.ingest_flow_ids.flow_id_waiting,
+        ],
+    )
+    .await;
+
+    assert_flow_expectaitons(
+        flow_event_store.clone(),
+        &bar_cases,
+        always_happy_filters.clone(),
+        FlowPaginationOpts {
+            offset: 0,
+            limit: 100,
+        },
+        10,
+        vec![
+            bar_cases.compacting_flow_ids.flow_id_finished,
+            bar_cases.compacting_flow_ids.flow_id_running,
+            bar_cases.compacting_flow_ids.flow_id_scheduled,
+            bar_cases.compacting_flow_ids.flow_id_queued,
+            bar_cases.compacting_flow_ids.flow_id_waiting,
+            bar_cases.ingest_flow_ids.flow_id_finished,
+            bar_cases.ingest_flow_ids.flow_id_running,
+            bar_cases.ingest_flow_ids.flow_id_scheduled,
+            bar_cases.ingest_flow_ids.flow_id_queued,
+            bar_cases.ingest_flow_ids.flow_id_waiting,
+        ],
+    )
+    .await;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_dataset_flow_filter_by_status() {
+    let (flow_event_store, task_event_store) = make_event_stores();
+
+    let foo_cases =
+        make_dataset_test_case(flow_event_store.clone(), task_event_store.clone()).await;
+
+    let cases = vec![
+        (
+            DatasetFlowFilters {
+                by_flow_status: Some(FlowStatus::Waiting),
+                ..Default::default()
+            },
+            vec![
+                foo_cases.compacting_flow_ids.flow_id_waiting,
+                foo_cases.ingest_flow_ids.flow_id_waiting,
+            ],
+        ),
+        (
+            DatasetFlowFilters {
+                by_flow_status: Some(FlowStatus::Queued),
+                ..Default::default()
+            },
+            vec![
+                foo_cases.compacting_flow_ids.flow_id_queued,
+                foo_cases.ingest_flow_ids.flow_id_queued,
+            ],
+        ),
+        (
+            DatasetFlowFilters {
+                by_flow_status: Some(FlowStatus::Scheduled),
+                ..Default::default()
+            },
+            vec![
+                foo_cases.compacting_flow_ids.flow_id_scheduled,
+                foo_cases.ingest_flow_ids.flow_id_scheduled,
+            ],
+        ),
+        (
+            DatasetFlowFilters {
+                by_flow_status: Some(FlowStatus::Running),
+                ..Default::default()
+            },
+            vec![
+                foo_cases.compacting_flow_ids.flow_id_running,
+                foo_cases.ingest_flow_ids.flow_id_running,
+            ],
+        ),
+        (
+            DatasetFlowFilters {
+                by_flow_status: Some(FlowStatus::Finished),
+                ..Default::default()
+            },
+            vec![
+                foo_cases.compacting_flow_ids.flow_id_finished,
+                foo_cases.ingest_flow_ids.flow_id_finished,
+            ],
+        ),
+    ];
+
+    for (filters, expected_flow_ids) in cases {
+        assert_flow_expectaitons(
+            flow_event_store.clone(),
+            &foo_cases,
+            filters,
+            FlowPaginationOpts {
+                offset: 0,
+                limit: 100,
+            },
+            expected_flow_ids.len(),
+            expected_flow_ids,
+        )
+        .await;
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_dataset_flow_filter_by_flow_type() {
+    let (flow_event_store, task_event_store) = make_event_stores();
+
+    let foo_cases =
+        make_dataset_test_case(flow_event_store.clone(), task_event_store.clone()).await;
+
+    let cases = vec![
+        (
+            DatasetFlowFilters {
+                by_flow_type: Some(DatasetFlowType::Ingest),
+                ..Default::default()
+            },
+            vec![
+                foo_cases.ingest_flow_ids.flow_id_finished,
+                foo_cases.ingest_flow_ids.flow_id_running,
+                foo_cases.ingest_flow_ids.flow_id_scheduled,
+                foo_cases.ingest_flow_ids.flow_id_queued,
+                foo_cases.ingest_flow_ids.flow_id_waiting,
+            ],
+        ),
+        (
+            DatasetFlowFilters {
+                by_flow_type: Some(DatasetFlowType::Compaction),
+                ..Default::default()
+            },
+            vec![
+                foo_cases.compacting_flow_ids.flow_id_finished,
+                foo_cases.compacting_flow_ids.flow_id_running,
+                foo_cases.compacting_flow_ids.flow_id_scheduled,
+                foo_cases.compacting_flow_ids.flow_id_queued,
+                foo_cases.compacting_flow_ids.flow_id_waiting,
+            ],
+        ),
+        (
+            DatasetFlowFilters {
+                by_flow_type: Some(DatasetFlowType::ExecuteTransform),
+                ..Default::default()
+            },
+            vec![],
+        ),
+    ];
+
+    for (filters, expected_flow_ids) in cases {
+        assert_flow_expectaitons(
+            flow_event_store.clone(),
+            &foo_cases,
+            filters,
+            FlowPaginationOpts {
+                offset: 0,
+                limit: 100,
+            },
+            expected_flow_ids.len(),
+            expected_flow_ids,
+        )
+        .await;
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_dataset_flow_filter_by_initiator() {
+    let (flow_event_store, task_event_store) = make_event_stores();
+
+    let foo_cases =
+        make_dataset_test_case(flow_event_store.clone(), task_event_store.clone()).await;
+
+    let cases = vec![
+        (
+            DatasetFlowFilters {
+                by_initiator: Some(InitiatorFilter::Account(AccountName::new_unchecked(
+                    "wasya",
+                ))),
+                ..Default::default()
+            },
+            vec![
+                foo_cases.compacting_flow_ids.flow_id_queued,
+                foo_cases.compacting_flow_ids.flow_id_waiting,
+                foo_cases.ingest_flow_ids.flow_id_queued,
+                foo_cases.ingest_flow_ids.flow_id_waiting,
+            ],
+        ),
+        (
+            DatasetFlowFilters {
+                by_initiator: Some(InitiatorFilter::Account(AccountName::new_unchecked(
+                    "petya",
+                ))),
+                ..Default::default()
+            },
+            vec![
+                foo_cases.compacting_flow_ids.flow_id_scheduled,
+                foo_cases.ingest_flow_ids.flow_id_scheduled,
+            ],
+        ),
+        (
+            DatasetFlowFilters {
+                by_initiator: Some(InitiatorFilter::System),
+                ..Default::default()
+            },
+            vec![
+                foo_cases.compacting_flow_ids.flow_id_finished,
+                foo_cases.compacting_flow_ids.flow_id_running,
+                foo_cases.ingest_flow_ids.flow_id_finished,
+                foo_cases.ingest_flow_ids.flow_id_running,
+            ],
+        ),
+    ];
+
+    for (filters, expected_flow_ids) in cases {
+        assert_flow_expectaitons(
+            flow_event_store.clone(),
+            &foo_cases,
+            filters,
+            FlowPaginationOpts {
+                offset: 0,
+                limit: 100,
+            },
+            expected_flow_ids.len(),
+            expected_flow_ids,
+        )
+        .await;
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_dataset_flow_filter_combinations() {
+    let (flow_event_store, task_event_store) = make_event_stores();
+
+    let foo_cases =
+        make_dataset_test_case(flow_event_store.clone(), task_event_store.clone()).await;
+
+    let cases = vec![
+        (
+            DatasetFlowFilters {
+                by_flow_status: Some(FlowStatus::Finished),
+                by_flow_type: Some(DatasetFlowType::Ingest),
+                by_initiator: Some(InitiatorFilter::System),
+            },
+            vec![foo_cases.ingest_flow_ids.flow_id_finished],
+        ),
+        (
+            DatasetFlowFilters {
+                by_flow_status: Some(FlowStatus::Waiting),
+                by_flow_type: Some(DatasetFlowType::Compaction),
+                by_initiator: Some(InitiatorFilter::Account(AccountName::new_unchecked(
+                    "wasya",
+                ))),
+            },
+            vec![foo_cases.compacting_flow_ids.flow_id_waiting],
+        ),
+        (
+            DatasetFlowFilters {
+                by_flow_status: Some(FlowStatus::Queued),
+                by_flow_type: Some(DatasetFlowType::Ingest),
+                by_initiator: Some(InitiatorFilter::System),
+            },
+            vec![],
+        ),
+    ];
+
+    for (filters, expected_flow_ids) in cases {
+        assert_flow_expectaitons(
+            flow_event_store.clone(),
+            &foo_cases,
+            filters,
+            FlowPaginationOpts {
+                offset: 0,
+                limit: 100,
+            },
+            expected_flow_ids.len(),
+            expected_flow_ids,
+        )
+        .await;
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_dataset_flow_pagination() {
+    let (flow_event_store, task_event_store) = make_event_stores();
+
+    let foo_cases =
+        make_dataset_test_case(flow_event_store.clone(), task_event_store.clone()).await;
+
+    let cases = vec![
+        (
+            FlowPaginationOpts {
+                offset: 0,
+                limit: 2,
+            },
+            vec![
+                foo_cases.compacting_flow_ids.flow_id_finished,
+                foo_cases.compacting_flow_ids.flow_id_running,
+            ],
+        ),
+        (
+            FlowPaginationOpts {
+                offset: 3,
+                limit: 4,
+            },
+            vec![
+                foo_cases.compacting_flow_ids.flow_id_queued,
+                foo_cases.compacting_flow_ids.flow_id_waiting,
+                foo_cases.ingest_flow_ids.flow_id_finished,
+                foo_cases.ingest_flow_ids.flow_id_running,
+            ],
+        ),
+        (
+            FlowPaginationOpts {
+                offset: 8,
+                limit: 2,
+            },
+            vec![
+                foo_cases.ingest_flow_ids.flow_id_queued,
+                foo_cases.ingest_flow_ids.flow_id_waiting,
+            ],
+        ),
+        (
+            FlowPaginationOpts {
+                offset: 9,
+                limit: 2,
+            },
+            vec![foo_cases.ingest_flow_ids.flow_id_waiting],
+        ),
+        (
+            FlowPaginationOpts {
+                offset: 10,
+                limit: 5,
+            },
+            vec![],
+        ),
+    ];
+
+    for (pagination, expected_flow_ids) in cases {
+        assert_flow_expectaitons(
+            flow_event_store.clone(),
+            &foo_cases,
+            Default::default(),
+            pagination,
+            10,
+            expected_flow_ids,
+        )
+        .await;
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_dataset_flow_pagination_with_filters() {
+    let (flow_event_store, task_event_store) = make_event_stores();
+
+    let foo_cases =
+        make_dataset_test_case(flow_event_store.clone(), task_event_store.clone()).await;
+
+    let cases = vec![
+        (
+            FlowPaginationOpts {
+                offset: 0,
+                limit: 2,
+            },
+            DatasetFlowFilters {
+                by_flow_type: Some(DatasetFlowType::Ingest),
+                ..Default::default()
+            },
+            5,
+            vec![
+                foo_cases.ingest_flow_ids.flow_id_finished,
+                foo_cases.ingest_flow_ids.flow_id_running,
+            ],
+        ),
+        (
+            FlowPaginationOpts {
+                offset: 1,
+                limit: 2,
+            },
+            DatasetFlowFilters {
+                by_flow_status: Some(FlowStatus::Queued),
+                ..Default::default()
+            },
+            2,
+            vec![foo_cases.ingest_flow_ids.flow_id_queued],
+        ),
+        (
+            FlowPaginationOpts {
+                offset: 1,
+                limit: 2,
+            },
+            DatasetFlowFilters {
+                by_initiator: Some(InitiatorFilter::System),
+                ..Default::default()
+            },
+            4,
+            vec![
+                foo_cases.compacting_flow_ids.flow_id_running,
+                foo_cases.ingest_flow_ids.flow_id_finished,
+            ],
+        ),
+        (
+            FlowPaginationOpts {
+                offset: 3,
+                limit: 5,
+            },
+            DatasetFlowFilters {
+                by_flow_status: Some(FlowStatus::Scheduled),
+                ..Default::default()
+            },
+            2,
+            vec![],
+        ),
+    ];
+
+    for (pagination, filters, expected_total_count, expected_flow_ids) in cases {
+        assert_flow_expectaitons(
+            flow_event_store.clone(),
+            &foo_cases,
+            filters,
+            pagination,
+            expected_total_count,
+            expected_flow_ids,
+        )
+        .await;
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+fn make_event_stores() -> (Arc<dyn FlowEventStore>, Arc<dyn TaskSystemEventStore>) {
+    (
+        Arc::new(FlowEventStoreInMem::new()),
+        Arc::new(TaskSystemEventStoreInMemory::new()),
+    )
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+struct DatasetTestCase {
+    dataset_id: DatasetID,
+    ingest_flow_ids: TestFlowIDs,
+    compacting_flow_ids: TestFlowIDs,
+}
+
+struct TestFlowIDs {
+    flow_id_waiting: FlowID,   // Initiator: wasya
+    flow_id_queued: FlowID,    // Initiator: wasya
+    flow_id_scheduled: FlowID, // Initiator: petya
+    flow_id_running: FlowID,   // Initiator: system
+    flow_id_finished: FlowID,  // Initiator: system
+}
+
+async fn make_dataset_test_case(
+    flow_event_store: Arc<dyn FlowEventStore>,
+    task_event_store: Arc<dyn TaskSystemEventStore>,
+) -> DatasetTestCase {
+    let (_, dataset_id) = DatasetID::new_generated_ed25519();
+
+    DatasetTestCase {
+        dataset_id: dataset_id.clone(),
+        ingest_flow_ids: make_dataset_test_flows(
+            &dataset_id,
+            DatasetFlowType::Ingest,
+            flow_event_store.clone(),
+            task_event_store.clone(),
+        )
+        .await,
+        compacting_flow_ids: make_dataset_test_flows(
+            &dataset_id,
+            DatasetFlowType::Compaction,
+            flow_event_store,
+            task_event_store,
+        )
+        .await,
+    }
+}
+
+async fn make_dataset_test_flows(
+    dataset_id: &DatasetID,
+    dataset_flow_type: DatasetFlowType,
+    flow_event_store: Arc<dyn FlowEventStore>,
+    task_event_store: Arc<dyn TaskSystemEventStore>,
+) -> TestFlowIDs {
+    let flow_generator =
+        DatasetFlowGenerator::new(dataset_id, flow_event_store.clone(), task_event_store);
+
+    let wasya_manual_trigger = FlowTrigger::Manual(FlowTriggerManual {
+        initiator_account_id: FAKE_ACCOUNT_ID.to_string(),
+        initiator_account_name: AccountName::new_unchecked("wasya"),
+    });
+
+    let petya_manual_trigger = FlowTrigger::Manual(FlowTriggerManual {
+        initiator_account_id: FAKE_ACCOUNT_ID.to_string(),
+        initiator_account_name: AccountName::new_unchecked("petya"),
+    });
+
+    let automatic_trigger = FlowTrigger::AutoPolling(FlowTriggerAutoPolling {});
+
+    let flow_id_waiting = flow_generator
+        .make_new_flow(
+            dataset_flow_type,
+            FlowStatus::Waiting,
+            wasya_manual_trigger.clone(),
+        )
+        .await;
+    let flow_id_queued = flow_generator
+        .make_new_flow(dataset_flow_type, FlowStatus::Queued, wasya_manual_trigger)
+        .await;
+    let flow_id_scheduled = flow_generator
+        .make_new_flow(
+            dataset_flow_type,
+            FlowStatus::Scheduled,
+            petya_manual_trigger.clone(),
+        )
+        .await;
+    let flow_id_running = flow_generator
+        .make_new_flow(
+            dataset_flow_type,
+            FlowStatus::Running,
+            automatic_trigger.clone(),
+        )
+        .await;
+    let flow_id_finished = flow_generator
+        .make_new_flow(dataset_flow_type, FlowStatus::Finished, automatic_trigger)
+        .await;
+
+    TestFlowIDs {
+        flow_id_waiting,
+        flow_id_queued,
+        flow_id_scheduled,
+        flow_id_running,
+        flow_id_finished,
+    }
+}
+
+async fn assert_flow_expectaitons(
+    flow_event_store: Arc<dyn FlowEventStore>,
+    dataset_test_case: &DatasetTestCase,
+    filters: DatasetFlowFilters,
+    pagination: FlowPaginationOpts,
+    expected_total_count: usize,
+    expected_flow_ids: Vec<FlowID>,
+) {
+    let total_flows_count = flow_event_store
+        .get_count_flows_by_dataset(&dataset_test_case.dataset_id, &filters)
+        .await;
+    assert_eq!(expected_total_count, total_flows_count);
+
+    let flow_ids: Vec<_> = flow_event_store
+        .get_all_flow_ids_by_dataset(&dataset_test_case.dataset_id, filters, pagination)
+        .collect()
+        .await;
+    assert_eq!(flow_ids, expected_flow_ids);
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+struct DatasetFlowGenerator<'a> {
+    dataset_id: &'a DatasetID,
+    flow_event_store: Arc<dyn FlowEventStore>,
+    task_event_store: Arc<dyn TaskSystemEventStore>,
+}
+
+impl<'a> DatasetFlowGenerator<'a> {
+    fn new(
+        dataset_id: &'a DatasetID,
+        flow_event_store: Arc<dyn FlowEventStore>,
+        task_event_store: Arc<dyn TaskSystemEventStore>,
+    ) -> Self {
+        Self {
+            dataset_id,
+            flow_event_store,
+            task_event_store,
+        }
+    }
+
+    async fn make_new_flow(
+        &self,
+        flow_type: DatasetFlowType,
+        expected_status: FlowStatus,
+        initial_trigger: FlowTrigger,
+    ) -> FlowID {
+        let flow_id = self.flow_event_store.new_flow_id();
+
+        let creation_moment = Utc::now();
+
+        let mut flow = Flow::new(
+            creation_moment,
+            flow_id,
+            FlowKeyDataset {
+                dataset_id: self.dataset_id.clone(),
+                flow_type,
+            }
+            .into(),
+            initial_trigger,
+        );
+
+        if expected_status != FlowStatus::Waiting {
+            flow.activate_at_time(
+                creation_moment + Duration::seconds(1),
+                creation_moment + Duration::minutes(1),
+            )
+            .unwrap();
+
+            if expected_status != FlowStatus::Queued {
+                let task_id = self.task_event_store.new_task_id();
+                flow.on_task_scheduled(creation_moment + Duration::minutes(5), task_id)
+                    .unwrap();
+
+                if expected_status != FlowStatus::Scheduled {
+                    flow.on_task_running(creation_moment + Duration::minutes(7), task_id)
+                        .unwrap();
+
+                    if expected_status == FlowStatus::Finished {
+                        flow.on_task_finished(
+                            creation_moment + Duration::minutes(10),
+                            task_id,
+                            kamu_task_system::TaskOutcome::Success,
+                        )
+                        .unwrap();
+                    } else if expected_status != FlowStatus::Running {
+                        panic!("Not expecting flow status {expected_status:?}");
+                    }
+                }
+            }
+        }
+
+        flow.save(self.flow_event_store.as_ref()).await.unwrap();
+
+        flow_id
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
