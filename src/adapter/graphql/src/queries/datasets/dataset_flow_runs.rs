@@ -70,12 +70,16 @@ impl DatasetFlowRuns {
                     Some(filters) => filters.into(),
                     None => Default::default(),
                 },
-                fs::FlowPaginationOpts { page, per_page },
+                fs::FlowPaginationOpts {
+                    offset: page * per_page,
+                    limit: per_page,
+                },
             )
+            .await
             .int_err()?;
 
         let matched_flows: Vec<_> = flows_state_listing.matched_stream.try_collect().await?;
-        let total_count = flows_state_listing.total_count_future.await;
+        let total_count = flows_state_listing.total_count;
 
         let nodes = matched_flows.into_iter().map(Flow::new).collect();
 

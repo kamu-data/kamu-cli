@@ -547,24 +547,26 @@ impl FlowService for FlowServiceInMemory {
     /// Returns states of flows associated with a given dataset
     /// ordered by creation time from newest to oldest
     /// Applies specified filters
-    #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id, ?filters))]
-    fn list_all_flows_by_dataset(
+    #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id, ?filters, ?pagination))]
+    async fn list_all_flows_by_dataset(
         &self,
         dataset_id: &DatasetID,
         filters: DatasetFlowFilters,
         pagination: FlowPaginationOpts,
     ) -> Result<FlowStateListing, ListFlowsByDatasetError> {
-        let dataset_id_clone_1 = dataset_id.clone();
-        let dataset_id_clone_2 = dataset_id.clone();
+        let total_count = self
+            .flow_event_store
+            .get_count_flows_by_dataset(dataset_id, &filters)
+            .await;
 
-        let filters_clone = filters.clone();
+        let dataset_id_clone = dataset_id.clone();
 
         let matched_stream = Box::pin(async_stream::try_stream! {
             let relevant_flow_ids: Vec<_> = self
                 .flow_event_store
-                .get_all_flow_ids_by_dataset(dataset_id_clone_1, filters, pagination)
-                .try_collect()
-                .await?;
+                .get_all_flow_ids_by_dataset(dataset_id_clone, filters, pagination)
+                .collect()
+                .await;
 
             // TODO: implement batch loading
             for flow_id in relevant_flow_ids {
@@ -573,34 +575,29 @@ impl FlowService for FlowServiceInMemory {
             }
         });
 
-        let total_count_future = Box::pin(
-            self.flow_event_store
-                .get_count_flows_by_dataset(dataset_id_clone_2, filters_clone),
-        );
-
         Ok(FlowStateListing {
             matched_stream,
-            total_count_future,
+            total_count,
         })
     }
 
     /// Returns states of system flows
     /// ordered by creation time from newest to oldest
     /// Applies specified filters
-    #[tracing::instrument(level = "debug", skip_all, fields(?filters))]
-    fn list_all_system_flows(
+    #[tracing::instrument(level = "debug", skip_all, fields(?filters, ?pagination))]
+    async fn list_all_system_flows(
         &self,
         filters: SystemFlowFilters,
         pagination: FlowPaginationOpts,
     ) -> Result<FlowStateListing, ListSystemFlowsError> {
-        let filters_clone = filters.clone();
+        let total_count = self.flow_event_store.get_count_system_flows(&filters).await;
 
         let matched_stream = Box::pin(async_stream::try_stream! {
             let relevant_flow_ids: Vec<_> = self
                 .flow_event_store
                 .get_all_system_flow_ids(filters, pagination)
-                .try_collect()
-                .await?;
+                .collect()
+                .await;
 
             // TODO: implement batch loading
             for flow_id in relevant_flow_ids {
@@ -609,25 +606,27 @@ impl FlowService for FlowServiceInMemory {
             }
         });
 
-        let total_count_future =
-            Box::pin(self.flow_event_store.get_count_system_flows(filters_clone));
-
         Ok(FlowStateListing {
             matched_stream,
-            total_count_future,
+            total_count,
         })
     }
 
     /// Returns state of all flows, whether they are system-level or
     /// dataset-bound, ordered by creation time from newest to oldest
-    #[tracing::instrument(level = "debug", skip_all)]
-    fn list_all_flows(&self) -> Result<FlowStateListing, ListFlowsError> {
+    #[tracing::instrument(level = "debug", skip_all, fields(?pagination))]
+    async fn list_all_flows(
+        &self,
+        pagination: FlowPaginationOpts,
+    ) -> Result<FlowStateListing, ListFlowsError> {
+        let total_count = self.flow_event_store.get_count_all_flows().await;
+
         let matched_stream = Box::pin(async_stream::try_stream! {
             let all_flows: Vec<_> = self
                 .flow_event_store
-                .get_all_flow_ids()
-                .try_collect()
-                .await?;
+                .get_all_flow_ids(pagination)
+                .collect()
+                .await;
 
             // TODO: implement batch loading
             for flow_id in all_flows {
@@ -636,11 +635,9 @@ impl FlowService for FlowServiceInMemory {
             }
         });
 
-        let total_count_future = Box::pin(self.flow_event_store.get_count_all_flows());
-
         Ok(FlowStateListing {
             matched_stream,
-            total_count_future,
+            total_count,
         })
     }
 

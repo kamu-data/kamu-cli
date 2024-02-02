@@ -41,11 +41,11 @@ pub trait FlowEventStore: EventStore<FlowState> {
 
     /// Returns number of flows associated with the specified dataset and
     /// matching filters, if specified
-    fn get_count_flows_by_dataset(
+    async fn get_count_flows_by_dataset(
         &self,
-        dataset_id: DatasetID,
-        filters: DatasetFlowFilters,
-    ) -> FlowIDCountFuture;
+        dataset_id: &DatasetID,
+        filters: &DatasetFlowFilters,
+    ) -> usize;
 
     /// Returns IDs of the system flows  in reverse chronological order based on
     /// creation time
@@ -57,22 +57,23 @@ pub trait FlowEventStore: EventStore<FlowState> {
     ) -> FlowIDStream;
 
     /// Returns number of system flows matching filters, if specified
-    fn get_count_system_flows(&self, filters: SystemFlowFilters) -> FlowIDCountFuture;
+    async fn get_count_system_flows(&self, filters: &SystemFlowFilters) -> usize;
 
     /// Returns IDs of the flows of any type in reverse chronological order
     /// based on creation time
-    /// TODO: not used yet, evaluate need in filters and pagination
-    fn get_all_flow_ids(&self) -> FlowIDStream<'_>;
+    /// TODO: not used yet, evaluate need in filters
+    fn get_all_flow_ids(&self, pagination: FlowPaginationOpts) -> FlowIDStream<'_>;
 
     /// Returns number of all flows
-    fn get_count_all_flows(&self) -> FlowIDCountFuture;
+    async fn get_count_all_flows(&self) -> usize;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Debug)]
 pub struct FlowPaginationOpts {
-    pub page: usize,
-    pub per_page: usize,
+    pub offset: usize,
+    pub limit: usize,
 }
 
 #[derive(Default, Debug, Clone)]

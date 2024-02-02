@@ -7,8 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::future::Future;
-
 use chrono::{DateTime, Utc};
 use event_sourcing::LoadError;
 use internal_error::{ErrorIntoInternal, InternalError};
@@ -45,7 +43,7 @@ pub trait FlowService: Sync + Send {
     /// Returns states of flows associated with a given dataset
     /// ordered by creation time from newest to oldest.
     /// Applies specified filters/pagination
-    fn list_all_flows_by_dataset(
+    async fn list_all_flows_by_dataset(
         &self,
         dataset_id: &DatasetID,
         filters: DatasetFlowFilters,
@@ -55,7 +53,7 @@ pub trait FlowService: Sync + Send {
     /// Returns states of system flows associated with a given dataset
     /// ordered by creation time from newest to oldest.
     /// Applies specified filters/pagination
-    fn list_all_system_flows(
+    async fn list_all_system_flows(
         &self,
         filters: SystemFlowFilters,
         pagination: FlowPaginationOpts,
@@ -63,7 +61,10 @@ pub trait FlowService: Sync + Send {
 
     /// Returns state of all flows, whether they are system-level or
     /// dataset-bound, ordered by creation time from newest to oldest
-    fn list_all_flows(&self) -> Result<FlowStateListing, ListFlowsError>;
+    async fn list_all_flows(
+        &self,
+        pagination: FlowPaginationOpts,
+    ) -> Result<FlowStateListing, ListFlowsError>;
 
     /// Returns state of the latest flow of certain type created for the given
     /// dataset
@@ -93,13 +94,11 @@ pub trait FlowService: Sync + Send {
 
 pub struct FlowStateListing<'a> {
     pub matched_stream: FlowStateStream<'a>,
-    pub total_count_future: FlowCountFuture<'a>,
+    pub total_count: usize,
 }
 
 pub type FlowStateStream<'a> =
     std::pin::Pin<Box<dyn Stream<Item = Result<FlowState, InternalError>> + Send + 'a>>;
-
-pub type FlowCountFuture<'a> = std::pin::Pin<Box<dyn Future<Output = usize> + Send + 'a>>;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 

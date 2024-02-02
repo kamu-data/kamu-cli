@@ -1047,7 +1047,11 @@ impl TestFlowSystemListener {
         use futures::TryStreamExt;
         let flows: Vec<_> = self
             .flow_service
-            .list_all_flows()
+            .list_all_flows(FlowPaginationOpts {
+                limit: 100,
+                offset: 0,
+            })
+            .await
             .unwrap()
             .matched_stream
             .try_collect()

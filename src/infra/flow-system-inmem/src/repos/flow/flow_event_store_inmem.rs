@@ -289,179 +289,107 @@ impl FlowEventStore for FlowEventStoreInMem {
             .and_then(|flows| flows.last().copied())
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id, ?filters))]
+    #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id, ?filters, ?pagination))]
     fn get_all_flow_ids_by_dataset(
         &self,
         dataset_id: DatasetID,
         filters: DatasetFlowFilters,
         pagination: FlowPaginationOpts,
     ) -> FlowIDStream {
-        // TODO: This should be a buffered stream so we don't lock per record
-        Box::pin(async_stream::try_stream! {
-            let mut pos = {
-                let state = self.inner.as_state();
-                let g = state.lock().unwrap();
-                g.all_flows_by_dataset.get(&dataset_id).map_or(0, Vec::len)
-            };
-
-            pos -= pagination.page * pagination.per_page;
-            let page_boundary_pos = if pos > pagination.per_page { pos - pagination.per_page } else { 0 };
-
-            loop {
-                if pos == page_boundary_pos {
-                    break;
-                }
-
-                pos -= 1;
-
-                let (next, matches_filters) = {
-                    let state = self.inner.as_state();
-                    let g = state.lock().unwrap();
-
-                    let maybe_flow_id = g.all_flows_by_dataset
-                        .get(&dataset_id)
-                        .and_then(|flows| flows.get(pos).copied());
-
-                    let matches_filters = if let Some(flow_id) = maybe_flow_id {
-                        g.matches_dataset_flow(flow_id, &filters)
-                    } else {
-                        false
-                    };
-
-                    (maybe_flow_id, matches_filters)
-                };
-
-                let flow_id = match next {
-                    None => break,
-                    Some(flow_id) => flow_id,
-                };
-
-                if matches_filters {
-                    yield flow_id;
-                }
-            }
-        })
-    }
-
-    fn get_count_flows_by_dataset(
-        &self,
-        dataset_id: DatasetID,
-        filters: DatasetFlowFilters,
-    ) -> FlowIDCountFuture {
-        Box::pin(async move {
+        let flow_ids_page: Option<Vec<_>> = {
             let state = self.inner.as_state();
             let g = state.lock().unwrap();
-            if let Some(dataset_flow_ids) = g.all_flows_by_dataset.get(&dataset_id) {
-                dataset_flow_ids
-                    .iter()
-                    .filter(|flow_id| g.matches_dataset_flow(**flow_id, &filters))
-                    .count()
-            } else {
-                0
-            }
-        })
+            g.all_flows_by_dataset
+                .get(&dataset_id)
+                .map(|dataset_flow_ids| {
+                    dataset_flow_ids
+                        .iter()
+                        .rev()
+                        .filter(|flow_id| g.matches_dataset_flow(**flow_id, &filters))
+                        .skip(pagination.offset)
+                        .take(pagination.limit)
+                        .copied()
+                        .collect()
+                })
+        };
+
+        match flow_ids_page {
+            Some(flow_ids_page) => Box::pin(futures::stream::iter(flow_ids_page)),
+            None => Box::pin(futures::stream::empty()),
+        }
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(?filters))]
+    #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id, ?filters))]
+    async fn get_count_flows_by_dataset(
+        &self,
+        dataset_id: &DatasetID,
+        filters: &DatasetFlowFilters,
+    ) -> usize {
+        let state = self.inner.as_state();
+        let g = state.lock().unwrap();
+        if let Some(dataset_flow_ids) = g.all_flows_by_dataset.get(dataset_id) {
+            dataset_flow_ids
+                .iter()
+                .filter(|flow_id| g.matches_dataset_flow(**flow_id, filters))
+                .count()
+        } else {
+            0
+        }
+    }
+
+    #[tracing::instrument(level = "debug", skip_all, fields(?filters, ?pagination))]
     fn get_all_system_flow_ids(
         &self,
         filters: SystemFlowFilters,
         pagination: FlowPaginationOpts,
     ) -> FlowIDStream {
-        // TODO: This should be a buffered stream so we don't lock per record
-        Box::pin(async_stream::try_stream! {
-            let mut pos = {
-                let state = self.inner.as_state();
-                let g = state.lock().unwrap();
-                g.all_system_flows.len()
-            };
-            pos -= pagination.page * pagination.per_page;
-            let page_boundary_pos = if pos > pagination.per_page { pos - pagination.per_page } else { 0 };
-
-            loop {
-                if pos == page_boundary_pos {
-                    break;
-                }
-
-                pos -= 1;
-
-                let (next, matches_filters) = {
-                    let state = self.inner.as_state();
-                    let g = state.lock().unwrap();
-
-                    let maybe_flow_id = g.all_system_flows.get(pos).copied();
-
-                    let matches_filters = if let Some(flow_id) = maybe_flow_id {
-                        g.matches_system_flow(flow_id, &filters)
-                    } else {
-                        false
-                    };
-
-                    (maybe_flow_id, matches_filters)
-                };
-
-                let flow_id = match next {
-                    None => break,
-                    Some(flow_id) => flow_id,
-                };
-
-                if matches_filters {
-                    yield flow_id;
-                }
-            }
-        })
-    }
-
-    fn get_count_system_flows(&self, filters: SystemFlowFilters) -> FlowIDCountFuture {
-        Box::pin(async move {
+        let flow_ids_page: Vec<_> = {
             let state = self.inner.as_state();
             let g = state.lock().unwrap();
             g.all_system_flows
                 .iter()
+                .rev()
                 .filter(|flow_id| g.matches_system_flow(**flow_id, &filters))
-                .count()
-        })
+                .skip(pagination.offset)
+                .take(pagination.limit)
+                .copied()
+                .collect()
+        };
+        Box::pin(futures::stream::iter(flow_ids_page))
+    }
+
+    #[tracing::instrument(level = "debug", skip_all, fields(?filters))]
+    async fn get_count_system_flows(&self, filters: &SystemFlowFilters) -> usize {
+        let state = self.inner.as_state();
+        let g = state.lock().unwrap();
+        g.all_system_flows
+            .iter()
+            .filter(|flow_id| g.matches_system_flow(**flow_id, filters))
+            .count()
+    }
+
+    #[tracing::instrument(level = "debug", skip_all, fields(?pagination))]
+    fn get_all_flow_ids(&self, pagination: FlowPaginationOpts) -> FlowIDStream {
+        let flow_ids_page: Vec<_> = {
+            let state = self.inner.as_state();
+            let g = state.lock().unwrap();
+            g.all_flows
+                .iter()
+                .rev()
+                .skip(pagination.offset)
+                .take(pagination.limit)
+                .copied()
+                .collect()
+        };
+
+        Box::pin(futures::stream::iter(flow_ids_page))
     }
 
     #[tracing::instrument(level = "debug", skip_all)]
-    fn get_all_flow_ids(&self) -> FlowIDStream {
-        // TODO: This should be a buffered stream so we don't lock per record
-        Box::pin(async_stream::try_stream! {
-            let mut pos = {
-                let state = self.inner.as_state();
-                let g = state.lock().unwrap();
-                g.all_flows.len()
-            };
-
-            loop {
-                if pos == 0 {
-                    break;
-                }
-
-                pos -= 1;
-
-                let next = {
-                    let state = self.inner.as_state();
-                    let g = state.lock().unwrap();
-                    g.all_flows.get(pos).copied()
-                };
-
-                let flow_id = match next {
-                    None => break,
-                    Some(flow_id) => flow_id,
-                };
-
-                yield flow_id;
-            }
-        })
-    }
-
-    fn get_count_all_flows(&self) -> FlowIDCountFuture {
-        Box::pin(async {
-            let state = self.inner.as_state();
-            let g = state.lock().unwrap();
-            g.all_flows.len()
-        })
+    async fn get_count_all_flows(&self) -> usize {
+        let state = self.inner.as_state();
+        let g = state.lock().unwrap();
+        g.all_flows.len()
     }
 }
 

@@ -9,8 +9,6 @@
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-use internal_error::InternalError;
-
 /// Uniquely identifies a flow
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct FlowID(u64);
@@ -37,10 +35,6 @@ impl From<FlowID> for u64 {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub type FlowIDStream<'a> =
-    std::pin::Pin<Box<dyn tokio_stream::Stream<Item = Result<FlowID, InternalError>> + Send + 'a>>;
-
-pub type FlowIDCountFuture<'a> =
-    std::pin::Pin<Box<dyn std::future::Future<Output = usize> + Send + 'a>>;
+pub type FlowIDStream<'a> = std::pin::Pin<Box<dyn tokio_stream::Stream<Item = FlowID> + Send + 'a>>;
 
 /////////////////////////////////////////////////////////////////////////////////////////
