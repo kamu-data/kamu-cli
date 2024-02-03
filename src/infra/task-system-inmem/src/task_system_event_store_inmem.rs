@@ -110,39 +110,34 @@ impl TaskSystemEventStore for TaskSystemEventStoreInMemory {
         self.inner.as_state().lock().unwrap().next_task_id()
     }
 
-    fn get_tasks_by_dataset(&self, dataset_id: &DatasetID) -> TaskIDStream {
-        let dataset_id = dataset_id.clone();
+    fn get_tasks_by_dataset(
+        &self,
+        dataset_id: &DatasetID,
+        pagination: TaskPaginationOpts,
+    ) -> TaskIDStream {
+        let task_ids_page: Option<Vec<_>> = {
+            let state = self.inner.as_state();
+            let g = state.lock().unwrap();
+            g.tasks_by_dataset.get(dataset_id).map(|dataset_task_ids| {
+                dataset_task_ids
+                    .iter()
+                    .rev()
+                    .skip(pagination.offset)
+                    .take(pagination.limit)
+                    .copied()
+                    .collect()
+            })
+        };
 
-        // TODO: This should be a buffered stream so we don't lock per record
-        Box::pin(async_stream::try_stream! {
-            let mut pos = {
-                let state = self.inner.as_state();
-                let g = state.lock().unwrap();
-                g.tasks_by_dataset.get(&dataset_id).map_or(0, Vec::len)
-            };
+        match task_ids_page {
+            Some(task_ids_page) => Box::pin(futures::stream::iter(task_ids_page)),
+            None => Box::pin(futures::stream::empty()),
+        }
+    }
 
-            loop {
-                if pos == 0 {
-                    break;
-                }
-
-                pos -= 1;
-
-                let next = {
-                    let state = self.inner.as_state();
-                    let g = state.lock().unwrap();
-                    g.tasks_by_dataset
-                        .get(&dataset_id)
-                        .and_then(|tasks| tasks.get(pos).copied())
-                };
-
-                let task_id = match next {
-                    None => break,
-                    Some(task_id) => task_id,
-                };
-
-                yield task_id;
-            }
-        })
+    async fn get_count_tasks_by_dataset(&self, dataset_id: &DatasetID) -> usize {
+        let state = self.inner.as_state();
+        let g = state.lock().unwrap();
+        g.tasks_by_dataset.get(dataset_id).map_or(0, Vec::len)
     }
 }

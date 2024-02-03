@@ -13,7 +13,16 @@ use internal_error::{ErrorIntoInternal, InternalError};
 use opendatafabric::{AccountID, AccountName, DatasetID};
 use tokio_stream::Stream;
 
-use crate::{DatasetFlowType, FlowID, FlowKey, FlowState, SystemFlowType};
+use crate::{
+    DatasetFlowFilters,
+    DatasetFlowType,
+    FlowID,
+    FlowKey,
+    FlowPaginationOpts,
+    FlowState,
+    SystemFlowFilters,
+    SystemFlowType,
+};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -31,31 +40,31 @@ pub trait FlowService: Sync + Send {
         initiator_account_name: AccountName,
     ) -> Result<FlowState, RequestFlowError>;
 
-    /// Returns states of flows of certain type associated with a given dataset
-    /// ordered by creation time from newest to oldest
-    fn list_flows_by_dataset_of_type(
+    /// Returns states of flows associated with a given dataset
+    /// ordered by creation time from newest to oldest.
+    /// Applies specified filters/pagination
+    async fn list_all_flows_by_dataset(
         &self,
         dataset_id: &DatasetID,
-        flow_type: DatasetFlowType,
-    ) -> Result<FlowStateStream, ListFlowsByDatasetError>;
+        filters: DatasetFlowFilters,
+        pagination: FlowPaginationOpts,
+    ) -> Result<FlowStateListing, ListFlowsByDatasetError>;
 
-    /// Returns states of system flows of certain type
-    /// ordered by creation time from newest to oldest
-    fn list_system_flows_of_type(
+    /// Returns states of system flows associated with a given dataset
+    /// ordered by creation time from newest to oldest.
+    /// Applies specified filters/pagination
+    async fn list_all_system_flows(
         &self,
-        flow_type: SystemFlowType,
-    ) -> Result<FlowStateStream, ListSystemFlowsError>;
-
-    /// Returns states of flows of any type associated with a given dataset
-    /// ordered by creation time from newest to oldest
-    fn list_all_flows_by_dataset(
-        &self,
-        dataset_id: &DatasetID,
-    ) -> Result<FlowStateStream, ListFlowsByDatasetError>;
+        filters: SystemFlowFilters,
+        pagination: FlowPaginationOpts,
+    ) -> Result<FlowStateListing, ListSystemFlowsError>;
 
     /// Returns state of all flows, whether they are system-level or
     /// dataset-bound, ordered by creation time from newest to oldest
-    fn list_all_flows(&self) -> Result<FlowStateStream, ListSystemFlowsError>;
+    async fn list_all_flows(
+        &self,
+        pagination: FlowPaginationOpts,
+    ) -> Result<FlowStateListing, ListFlowsError>;
 
     /// Returns state of the latest flow of certain type created for the given
     /// dataset
@@ -83,6 +92,11 @@ pub trait FlowService: Sync + Send {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+pub struct FlowStateListing<'a> {
+    pub matched_stream: FlowStateStream<'a>,
+    pub total_count: usize,
+}
+
 pub type FlowStateStream<'a> =
     std::pin::Pin<Box<dyn Stream<Item = Result<FlowState, InternalError>> + Send + 'a>>;
 
@@ -102,6 +116,12 @@ pub enum ListFlowsByDatasetError {
 
 #[derive(thiserror::Error, Debug)]
 pub enum ListSystemFlowsError {
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum ListFlowsError {
     #[error(transparent)]
     Internal(#[from] InternalError),
 }

@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use event_sourcing::EventStore;
-use opendatafabric::DatasetID;
+use opendatafabric::{AccountName, DatasetID};
 
 use crate::*;
 
@@ -19,35 +19,87 @@ pub trait FlowEventStore: EventStore<FlowState> {
     /// Generates new unique flow identifier
     fn new_flow_id(&self) -> FlowID;
 
-    /// Returns the last dataset flow of certain type
-    fn get_last_dataset_flow_of_type(
+    /// Returns ID of the last dataset flow of certain type
+    fn get_last_dataset_flow_id_of_type(
         &self,
         dataset_id: &DatasetID,
         flow_type: DatasetFlowType,
-    ) -> Option<FlowID>;
+    ) -> Result<Option<FlowID>, InternalError>;
 
-    /// Returns the last system flow of certain type
-    fn get_last_system_flow_of_type(&self, flow_type: SystemFlowType) -> Option<FlowID>;
+    /// Returns ID of the last system flow of certain type
+    fn get_last_system_flow_id_of_type(
+        &self,
+        flow_type: SystemFlowType,
+    ) -> Result<Option<FlowID>, InternalError>;
 
-    /// Returns the flows of certain type associated with the specified dataset
-    /// in reverse chronological order based on creation time
-    fn get_flows_by_dataset_of_type(
+    /// Returns IDs of the flows associated with the specified
+    /// dataset in reverse chronological order based on creation time.
+    /// Applies filters/pagination, if specified
+    fn get_all_flow_ids_by_dataset(
         &self,
         dataset_id: &DatasetID,
-        flow_type: DatasetFlowType,
+        filters: DatasetFlowFilters,
+        pagination: FlowPaginationOpts,
     ) -> FlowIDStream;
 
-    /// Returns the flows of certain type in reverse chronological order based
-    /// on creation time
-    fn get_system_flows_of_type(&self, flow_type: SystemFlowType) -> FlowIDStream<'_>;
+    /// Returns number of flows associated with the specified dataset and
+    /// matching filters, if specified
+    async fn get_count_flows_by_dataset(
+        &self,
+        dataset_id: &DatasetID,
+        filters: &DatasetFlowFilters,
+    ) -> Result<usize, InternalError>;
 
-    /// Returns the flows of any type associated with the specified dataset
-    /// in reverse chronological order based on creation time
-    fn get_all_flows_by_dataset(&self, dataset_id: &DatasetID) -> FlowIDStream;
+    /// Returns IDs of the system flows  in reverse chronological order based on
+    /// creation time
+    /// Applies filters/pagination, if specified
+    fn get_all_system_flow_ids(
+        &self,
+        filters: SystemFlowFilters,
+        pagination: FlowPaginationOpts,
+    ) -> FlowIDStream;
 
-    /// Returns the flows of any type in reverse chronological order
+    /// Returns number of system flows matching filters, if specified
+    async fn get_count_system_flows(
+        &self,
+        filters: &SystemFlowFilters,
+    ) -> Result<usize, InternalError>;
+
+    /// Returns IDs of the flows of any type in reverse chronological order
     /// based on creation time
-    fn get_all_flows(&self) -> FlowIDStream<'_>;
+    /// TODO: not used yet, evaluate need in filters
+    fn get_all_flow_ids(&self, pagination: FlowPaginationOpts) -> FlowIDStream<'_>;
+
+    /// Returns number of all flows
+    async fn get_count_all_flows(&self) -> Result<usize, InternalError>;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Copy, Clone)]
+pub struct FlowPaginationOpts {
+    pub offset: usize,
+    pub limit: usize,
+}
+
+#[derive(Default, Debug, Clone)]
+pub struct DatasetFlowFilters {
+    pub by_flow_type: Option<DatasetFlowType>,
+    pub by_flow_status: Option<FlowStatus>,
+    pub by_initiator: Option<InitiatorFilter>,
+}
+
+#[derive(Default, Debug, Clone)]
+pub struct SystemFlowFilters {
+    pub by_flow_type: Option<SystemFlowType>,
+    pub by_flow_status: Option<FlowStatus>,
+    pub by_initiator: Option<InitiatorFilter>,
+}
+
+#[derive(Debug, Clone)]
+pub enum InitiatorFilter {
+    System,
+    Account(AccountName), // TODO: replace on AccountID
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

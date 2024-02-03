@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use futures::{StreamExt, TryStreamExt};
+use futures::TryStreamExt;
 use kamu_task_system as ts;
 
 use super::Task;
@@ -48,22 +48,22 @@ impl Tasks {
         let page = page.unwrap_or(0);
         let per_page = per_page.unwrap_or(Self::DEFAULT_PER_PAGE);
 
-        let tasks_stream = task_sched.list_tasks_by_dataset(&dataset_id).int_err()?;
+        let tasks_listing = task_sched
+            .list_tasks_by_dataset(
+                &dataset_id,
+                ts::TaskPaginationOpts {
+                    offset: page * per_page,
+                    limit: per_page,
+                },
+            )
+            .await
+            .int_err()?;
 
-        let mut nodes: Vec<_> = tasks_stream
-            .skip(page * per_page)
-            .take(per_page + 1) // Take one extra to see if next page exists
-            .map_ok(Task::new)
-            .try_collect()
-            .await?;
+        let nodes: Vec<_> = tasks_listing.stream.map_ok(Task::new).try_collect().await?;
+        let total_count = tasks_listing.total_count;
 
         // TODO: We set total to len + 1 to indicate there is a next page.
         // We should replace this with unbounded size connection.
-        let total_count = page * per_page + nodes.len();
-        if nodes.len() > per_page {
-            nodes.pop();
-        }
-
         Ok(TaskConnection::new(nodes, page, per_page, total_count))
     }
 }

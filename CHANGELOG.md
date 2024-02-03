@@ -4,13 +4,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [0.156.0] - 2024-02-03
 ### Added
 - New type `DatasetRefPattern` which allows CLI command to accept global pattern
 - New GraphQL APIs for quick pausing/resuming of dataset flow configs preserving the scheduling rules
+- New GraphQL APIs for server-side filtering of flow listings (by type, by status, and by initiator)
 ### Changed
 - `kamu deleted` and `kamu verify` now accepts global pattern expression
 - Error handling for pipe subprocesses with file output
+- Pagination implementation made more effecient for flows and tasks event stores
 
 ## [0.155.0] - 2024-01-25
 ### Added

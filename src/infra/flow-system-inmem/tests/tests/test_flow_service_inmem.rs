@@ -605,6 +605,8 @@ async fn test_cron_task_completions_trigger_next_loop_on_success() {
     ]);
 }
 
+/////////////////////////////////////////////////////////////////////////////////////////
+
 #[test_log::test(tokio::test)]
 async fn test_task_completions_trigger_next_loop_on_success() {
     let harness = FlowHarness::new();
@@ -1047,8 +1049,13 @@ impl TestFlowSystemListener {
         use futures::TryStreamExt;
         let flows: Vec<_> = self
             .flow_service
-            .list_all_flows()
+            .list_all_flows(FlowPaginationOpts {
+                limit: 100,
+                offset: 0,
+            })
+            .await
             .unwrap()
+            .matched_stream
             .try_collect()
             .await
             .unwrap();
