@@ -12,7 +12,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use chrono::{DateTime, TimeZone, Utc};
-use datafusion::arrow::datatypes::{Field, Schema, SchemaRef};
+use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::prelude::*;
 use dill::Component;
 use event_bus::EventBus;
@@ -31,28 +31,6 @@ use opendatafabric as odf;
 // function. We should move it there once we further decompose the kamu core
 // crate.
 ///////////////////////////////////////////////////////////////
-
-fn assert_schemas_equal(lhs: &SchemaRef, rhs: &SchemaRef, ignore_nullability: bool) {
-    let map_field = |f: &Arc<Field>| -> Arc<Field> {
-        if ignore_nullability {
-            Arc::new(f.as_ref().clone().with_nullable(true))
-        } else {
-            f.clone()
-        }
-    };
-
-    let lhs = Schema::new_with_metadata(
-        lhs.fields().iter().map(map_field).collect::<Vec<_>>(),
-        lhs.metadata().clone(),
-    );
-    let rhs = Schema::new_with_metadata(
-        rhs.fields().iter().map(map_field).collect::<Vec<_>>(),
-        rhs.metadata().clone(),
-    );
-    assert_eq!(lhs, rhs);
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
@@ -92,7 +70,7 @@ async fn test_data_writer_happy_path() {
               OPTIONAL INT64 offset;
               REQUIRED INT32 op;
               REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
-              REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
+              OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
               OPTIONAL BYTE_ARRAY city (STRING);
               OPTIONAL INT64 population;
             }
@@ -125,11 +103,7 @@ async fn test_data_writer_happy_path() {
     let (schema_block_hash, schema_block) = harness.get_last_schema_block().await;
     let schema_in_block = schema_block.event.schema_as_arrow().unwrap();
     let schema_in_data = SchemaRef::new(df.schema().into());
-    // TODO: DataFusion issue where the schema of the
-    // DataFrame being saved into parquet and those read out of it differs in
-    // nullability
-    assert_ne!(schema_in_block, schema_in_data);
-    assert_schemas_equal(&schema_in_block, &schema_in_data, true);
+    assert_eq!(schema_in_block, schema_in_data);
 
     // Round 2
     harness.set_system_time(Utc.with_ymd_and_hms(2010, 1, 2, 12, 0, 0).unwrap());
@@ -280,7 +254,7 @@ async fn test_data_writer_rejects_incompatible_schema() {
               OPTIONAL INT64 offset;
               REQUIRED INT32 op;
               REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
-              REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
+              OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
               OPTIONAL BYTE_ARRAY city (STRING);
               OPTIONAL INT64 population;
             }
@@ -331,7 +305,7 @@ async fn test_data_writer_rejects_incompatible_schema() {
               OPTIONAL INT64 offset;
               REQUIRED INT32 op;
               REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
-              REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
+              OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
               OPTIONAL BYTE_ARRAY city (STRING);
               OPTIONAL INT64 population;
             }
@@ -412,7 +386,7 @@ async fn test_data_writer_rejects_incompatible_schema() {
               OPTIONAL INT64 offset;
               REQUIRED INT32 op;
               REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
-              REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
+              OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
               OPTIONAL BYTE_ARRAY city (STRING);
               OPTIONAL INT64 population;
             }
@@ -545,7 +519,7 @@ async fn test_data_writer_snapshot_orders_by_pk_and_operation_type() {
               OPTIONAL INT64 offset;
               REQUIRED INT32 op;
               REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
-              REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
+              OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
               OPTIONAL BYTE_ARRAY city (STRING);
               OPTIONAL INT64 population;
             }

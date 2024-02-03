@@ -146,6 +146,7 @@ impl<'a> ParquetJsonSchemaWriter<'a> {
     ) -> String {
         match logical_type {
             Some(logical_type) => match logical_type {
+                LogicalType::Float16 => "FLOAT16".to_string(),
                 LogicalType::Integer {
                     bit_width,
                     is_signed,

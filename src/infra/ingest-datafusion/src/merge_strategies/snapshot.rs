@@ -91,13 +91,13 @@ impl MergeStrategySnapshot {
         let state = ledger
             .window(vec![Expr::WindowFunction(
                 datafusion::logical_expr::expr::WindowFunction {
-                    fun: datafusion::logical_expr::WindowFunction::BuiltInWindowFunction(
+                    fun: datafusion::logical_expr::WindowFunctionDefinition::BuiltInWindowFunction(
                         datafusion::logical_expr::BuiltInWindowFunction::RowNumber,
                     ),
                     args: Vec::new(),
                     partition_by: self.primary_key.iter().map(col).collect(),
                     order_by: vec![col(&self.vocab.offset_column).sort(false, false)],
-                    window_frame: datafusion::logical_expr::WindowFrame::new(true),
+                    window_frame: datafusion::logical_expr::WindowFrame::new(Some(false)),
                 },
             )
             .alias(rank_col)])

@@ -19,6 +19,8 @@
 //! validation, and auto-completion for file name during creating external
 //! table.
 
+use std::borrow::Cow;
+
 use datafusion::common::sql_err;
 use datafusion::error::DataFusionError;
 use datafusion::sql::parser::{DFParser, Statement};
@@ -31,16 +33,25 @@ use rustyline::hint::Hinter;
 use rustyline::validate::{ValidationContext, ValidationResult, Validator};
 use rustyline::{Context, Helper, Result};
 
+use crate::highlighter::{NoSyntaxHighlighter, SyntaxHighlighter};
+
 pub struct CliHelper {
     completer: FilenameCompleter,
     dialect: String,
+    highlighter: Box<dyn Highlighter>,
 }
 
 impl CliHelper {
-    pub fn new(dialect: &str) -> Self {
+    pub fn new(dialect: &str, color: bool) -> Self {
+        let highlighter: Box<dyn Highlighter> = if !color {
+            Box::new(NoSyntaxHighlighter {})
+        } else {
+            Box::new(SyntaxHighlighter::new(dialect))
+        };
         Self {
             completer: FilenameCompleter::new(),
             dialect: dialect.into(),
+            highlighter,
         }
     }
 
@@ -91,11 +102,19 @@ impl CliHelper {
 
 impl Default for CliHelper {
     fn default() -> Self {
-        Self::new("generic")
+        Self::new("generic", false)
     }
 }
 
-impl Highlighter for CliHelper {}
+impl Highlighter for CliHelper {
+    fn highlight<'l>(&self, line: &'l str, pos: usize) -> Cow<'l, str> {
+        self.highlighter.highlight(line, pos)
+    }
+
+    fn highlight_char(&self, line: &str, pos: usize) -> bool {
+        self.highlighter.highlight_char(line, pos)
+    }
+}
 
 impl Hinter for CliHelper {
     type Hint = String;

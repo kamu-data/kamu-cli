@@ -23,16 +23,19 @@ use std::io::BufReader;
 use std::sync::Arc;
 use std::time::Instant;
 
-use datafusion::common::plan_datafusion_err;
+use datafusion::common::{exec_datafusion_err, plan_datafusion_err};
 use datafusion::datasource::listing::ListingTableUrl;
+use datafusion::datasource::physical_plan::is_plan_streaming;
 use datafusion::error::{DataFusionError, Result};
 use datafusion::logical_expr::{CreateExternalTable, DdlStatement, LogicalPlan};
+use datafusion::physical_plan::{collect, execute_stream};
 use datafusion::prelude::SessionContext;
 use datafusion::sql::parser::DFParser;
 use datafusion::sql::sqlparser::dialect::dialect_from_str;
 use object_store::ObjectStore;
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
+use tokio::signal;
 use url::Url;
 
 use crate::command::{Command, OutputFormat};
@@ -42,21 +45,21 @@ use crate::object_storage::{
     get_oss_object_store_builder,
     get_s3_object_store_builder,
 };
+use crate::print_format::PrintFormat;
 use crate::print_options::{MaxRows, PrintOptions};
 
 /// run and execute SQL statements and commands, against a context with the
 /// given print options
 pub async fn exec_from_commands(
     ctx: &mut SessionContext,
-    print_options: &PrintOptions,
     commands: Vec<String>,
-) {
+    print_options: &PrintOptions,
+) -> Result<()> {
     for sql in commands {
-        match exec_and_print(ctx, print_options, sql).await {
-            Ok(_) => {}
-            Err(err) => println!("{err}"),
-        }
+        exec_and_print(ctx, print_options, sql).await?;
     }
+
+    Ok(())
 }
 
 /// run and execute SQL statements and commands from a file, against a context
@@ -65,7 +68,7 @@ pub async fn exec_from_lines(
     ctx: &mut SessionContext,
     reader: &mut BufReader<File>,
     print_options: &PrintOptions,
-) {
+) -> Result<()> {
     let mut query = "".to_owned();
 
     for line in reader.lines() {
@@ -95,26 +98,28 @@ pub async fn exec_from_lines(
     // run the left over query if the last statement doesn't contain ‘;’
     // ignore if it only consists of '\n'
     if query.contains(|c| c != '\n') {
-        match exec_and_print(ctx, print_options, query).await {
-            Ok(_) => {}
-            Err(err) => println!("{err}"),
-        }
+        exec_and_print(ctx, print_options, query).await?;
     }
+
+    Ok(())
 }
 
 pub async fn exec_from_files(
-    files: Vec<String>,
     ctx: &mut SessionContext,
+    files: Vec<String>,
     print_options: &PrintOptions,
-) {
+) -> Result<()> {
     let files = files
         .into_iter()
         .map(|file_path| File::open(file_path).unwrap())
         .collect::<Vec<_>>();
+
     for file in files {
         let mut reader = BufReader::new(file);
-        exec_from_lines(ctx, &mut reader, print_options).await;
+        exec_from_lines(ctx, &mut reader, print_options).await?;
     }
+
+    Ok(())
 }
 
 /// run and execute SQL statements and commands against a context with the given
@@ -126,10 +131,9 @@ pub async fn exec_from_repl(
     let mut rl = Editor::new()?;
     rl.set_helper(Some(CliHelper::new(
         &ctx.task_ctx().session_config().options().sql_parser.dialect,
+        print_options.color,
     )));
     rl.load_history(".history").ok();
-
-    let mut print_options = print_options.clone();
 
     loop {
         match rl.readline("❯ ") {
@@ -142,7 +146,7 @@ pub async fn exec_from_repl(
                         Command::OutputFormat(subcommand) => {
                             if let Some(subcommand) = subcommand {
                                 if let Ok(command) = subcommand.parse::<OutputFormat>() {
-                                    if let Err(e) = command.execute(&mut print_options).await {
+                                    if let Err(e) = command.execute(print_options).await {
                                         eprintln!("{e}")
                                     }
                                 } else {
@@ -153,7 +157,7 @@ pub async fn exec_from_repl(
                             }
                         }
                         _ => {
-                            if let Err(e) = cmd.execute(ctx, &mut print_options).await {
+                            if let Err(e) = cmd.execute(ctx, print_options).await {
                                 eprintln!("{e}")
                             }
                         }
@@ -164,9 +168,15 @@ pub async fn exec_from_repl(
             }
             Ok(line) => {
                 rl.add_history_entry(line.trim_end())?;
-                match exec_and_print(ctx, &print_options, line).await {
-                    Ok(_) => {}
-                    Err(err) => eprintln!("{err}"),
+                tokio::select! {
+                    res = exec_and_print(ctx, print_options, line) => match res {
+                        Ok(_) => {}
+                        Err(err) => eprintln!("{err}"),
+                    },
+                    _ = signal::ctrl_c() => {
+                        println!("^C");
+                        continue
+                    },
                 }
                 // dialect might have changed
                 rl.helper_mut()
@@ -197,7 +207,6 @@ async fn exec_and_print(
     sql: String,
 ) -> Result<()> {
     let now = Instant::now();
-
     let sql = unescape_input(&sql)?;
     let task_ctx = ctx.task_ctx();
     let dialect = &task_ctx.session_config().options().sql_parser.dialect;
@@ -207,9 +216,10 @@ async fn exec_and_print(
              Hive, SQLite, Snowflake, Redshift, MsSQL, ClickHouse, BigQuery, Ansi."
         )
     })?;
+
     let statements = DFParser::parse_sql_with_dialect(&sql, dialect.as_ref())?;
     for statement in statements {
-        let plan = ctx.state().statement_to_plan(statement).await?;
+        let mut plan = ctx.state().statement_to_plan(statement).await?;
 
         // For plans like `Explain` ignore `MaxRows` option and always display all rows
         let should_ignore_maxrows = matches!(
@@ -217,31 +227,36 @@ async fn exec_and_print(
             LogicalPlan::Explain(_) | LogicalPlan::DescribeTable(_) | LogicalPlan::Analyze(_)
         );
 
-        let df = match &plan {
-            LogicalPlan::Ddl(DdlStatement::CreateExternalTable(cmd)) => {
-                create_external_table(ctx, cmd).await?;
-                ctx.execute_logical_plan(plan).await?
-            }
-            _ => ctx.execute_logical_plan(plan).await?,
-        };
+        // Note that cmd is a mutable reference so that create_external_table function
+        // can remove all datafusion-cli specific options before passing through
+        // to datafusion. Otherwise, datafusion will raise Configuration errors.
+        if let LogicalPlan::Ddl(DdlStatement::CreateExternalTable(cmd)) = &mut plan {
+            create_external_table(ctx, cmd).await?;
+        }
 
-        let results = df.collect().await?;
+        let df = ctx.execute_logical_plan(plan).await?;
+        let physical_plan = df.create_physical_plan().await?;
 
-        let print_options = if should_ignore_maxrows {
-            PrintOptions {
-                maxrows: MaxRows::Unlimited,
-                ..print_options.clone()
-            }
+        if is_plan_streaming(&physical_plan)? {
+            let stream = execute_stream(physical_plan, task_ctx.clone())?;
+            print_options.print_stream(stream, now).await?;
         } else {
-            print_options.clone()
-        };
-        print_options.print_batches(&results, now)?;
+            let mut print_options = print_options.clone();
+            if should_ignore_maxrows {
+                print_options.maxrows = MaxRows::Unlimited;
+            }
+            if print_options.format == PrintFormat::Automatic {
+                print_options.format = PrintFormat::Table;
+            }
+            let results = collect(physical_plan, task_ctx.clone()).await?;
+            print_options.print_batches(&results, now)?;
+        }
     }
 
     Ok(())
 }
 
-async fn create_external_table(ctx: &SessionContext, cmd: &CreateExternalTable) -> Result<()> {
+async fn create_external_table(ctx: &SessionContext, cmd: &mut CreateExternalTable) -> Result<()> {
     let table_path = ListingTableUrl::parse(&cmd.location)?;
     let scheme = table_path.scheme();
     let url: &Url = table_path.as_ref();
@@ -265,12 +280,7 @@ async fn create_external_table(ctx: &SessionContext, cmd: &CreateExternalTable) 
             ctx.runtime_env()
                 .object_store_registry
                 .get_store(url)
-                .map_err(|_| {
-                    DataFusionError::Execution(format!(
-                        "Unsupported object store scheme: {}",
-                        scheme
-                    ))
-                })?
+                .map_err(|_| exec_datafusion_err!("Unsupported object store scheme: {}", scheme))?
         }
     };
 
@@ -281,16 +291,32 @@ async fn create_external_table(ctx: &SessionContext, cmd: &CreateExternalTable) 
 
 #[cfg(test)]
 mod tests {
-    use datafusion::common::plan_err;
+    use std::str::FromStr;
+
+    use datafusion::common::file_options::StatementOptions;
+    use datafusion::common::{plan_err, FileTypeWriterOptions};
 
     use super::*;
 
     async fn create_external_table_test(location: &str, sql: &str) -> Result<()> {
         let ctx = SessionContext::new();
-        let plan = ctx.state().create_logical_plan(sql).await?;
+        let mut plan = ctx.state().create_logical_plan(sql).await?;
 
-        if let LogicalPlan::Ddl(DdlStatement::CreateExternalTable(cmd)) = &plan {
+        if let LogicalPlan::Ddl(DdlStatement::CreateExternalTable(cmd)) = &mut plan {
             create_external_table(&ctx, cmd).await?;
+            let options: Vec<_> = cmd
+                .options
+                .iter()
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect();
+            let statement_options = StatementOptions::new(options);
+            let file_type = datafusion::common::FileType::from_str(cmd.file_type.as_str())?;
+
+            let _file_type_writer_options = FileTypeWriterOptions::build(
+                &file_type,
+                ctx.state().config_options(),
+                &statement_options,
+            )?;
         } else {
             return plan_err!("LogicalPlan is not a CreateExternalTable");
         }
@@ -309,16 +335,13 @@ mod tests {
         let session_token = "fake_session_token";
         let location = "s3://bucket/path/file.parquet";
 
-        // Missing region
+        // Missing region, use object_store defaults
         let sql = format!(
             "CREATE EXTERNAL TABLE test STORED AS PARQUET
             OPTIONS('access_key_id' '{access_key_id}', 'secret_access_key' '{secret_access_key}') \
              LOCATION '{location}'"
         );
-        let err = create_external_table_test(location, &sql)
-            .await
-            .unwrap_err();
-        assert!(err.to_string().contains("Missing region"));
+        create_external_table_test(location, &sql).await?;
 
         // Should be OK
         let sql = format!(
@@ -352,8 +375,9 @@ mod tests {
     #[tokio::test]
     async fn create_object_store_table_gcs() -> Result<()> {
         let service_account_path = "fake_service_account_path";
-        let service_account_key =
-            "{\"private_key\": \"fake_private_key.pem\",\"client_email\":\"fake_client_email\"}";
+        let service_account_key = "{\"private_key\": \
+                                   \"fake_private_key.pem\",\"client_email\":\"fake_client_email\"\
+                                   , \"private_key_id\":\"id\"}";
         let application_credentials_path = "fake_application_credentials_path";
         let location = "gcs://bucket/path/file.parquet";
 
@@ -374,8 +398,9 @@ mod tests {
         );
         let err = create_external_table_test(location, &sql)
             .await
-            .unwrap_err();
-        assert!(err.to_string().contains("No RSA key found in pem file"));
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("No RSA key found in pem file"), "{err}");
 
         // for application_credentials_path
         let sql = format!(
@@ -397,15 +422,7 @@ mod tests {
 
         // Ensure that local files are also registered
         let sql = format!("CREATE EXTERNAL TABLE test STORED AS PARQUET LOCATION '{location}'");
-        let err = create_external_table_test(location, &sql)
-            .await
-            .unwrap_err();
-
-        if let DataFusionError::IoError(e) = err {
-            assert_eq!(e.kind(), std::io::ErrorKind::NotFound);
-        } else {
-            return Err(err);
-        }
+        create_external_table_test(location, &sql).await.unwrap();
 
         Ok(())
     }

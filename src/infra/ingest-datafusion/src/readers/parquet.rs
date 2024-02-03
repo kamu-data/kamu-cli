@@ -49,7 +49,6 @@ impl Reader for ReaderParquet {
             parquet_pruning: None,
             skip_metadata: None,
             file_sort_order: Vec::new(),
-            insert_mode: datafusion::datasource::listing::ListingTableInsertMode::Error,
         };
 
         let df = self

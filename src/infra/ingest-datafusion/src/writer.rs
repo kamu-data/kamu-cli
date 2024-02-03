@@ -244,7 +244,6 @@ impl DataWriterDataFusion {
                     table_partition_cols: Vec::new(),
                     parquet_pruning: None,
                     skip_metadata: None,
-                    insert_mode: datafusion::datasource::listing::ListingTableInsertMode::Error,
                 },
             )
             .await
@@ -330,13 +329,13 @@ impl DataWriterDataFusion {
             .with_column(
                 &self.meta.vocab.offset_column,
                 Expr::WindowFunction(WindowFunction {
-                    fun: expr::WindowFunction::BuiltInWindowFunction(
+                    fun: expr::WindowFunctionDefinition::BuiltInWindowFunction(
                         expr::BuiltInWindowFunction::RowNumber,
                     ),
                     args: vec![],
                     partition_by: vec![],
                     order_by: self.merge_strategy.sort_order(),
-                    window_frame: expr::WindowFrame::new(false),
+                    window_frame: expr::WindowFrame::new(Some(false)),
                 }),
             )
             .int_err()?;
@@ -478,7 +477,6 @@ impl DataWriterDataFusion {
                     table_partition_cols: Vec::new(),
                     parquet_pruning: None,
                     skip_metadata: None,
-                    insert_mode: datafusion::datasource::listing::ListingTableInsertMode::Error,
                 },
             )
             .await

@@ -72,7 +72,6 @@ impl Reader for ReaderNdJson {
             file_compression_type: FileCompressionType::UNCOMPRESSED,
             file_sort_order: Vec::new(),
             infinite: false,
-            insert_mode: datafusion::datasource::listing::ListingTableInsertMode::Error,
         };
 
         let df = self

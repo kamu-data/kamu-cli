@@ -434,7 +434,7 @@ async fn test_dataset_sql_unauthorized_common(catalog: dill::Catalog, tempdir: &
         result,
         Err(QueryError::DataFusionError(
             datafusion::common::DataFusionError::Plan(s)
-        ))  if s.eq("table 'kamu.kamu.foo' not found")
+        ))  if s.contains("table 'kamu.kamu.foo' not found")
     );
 }
 

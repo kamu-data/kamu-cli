@@ -107,6 +107,10 @@ async fn test_internal_error() {
     );
 }
 
+// TODO: There seems to be an issue with libunwind in a version of XCode used on
+// GitHub's M1 runners which results in error:
+//   libunwind: stepWithCompactEncoding - invalid compact unwind encoding
+#[cfg(not(target_os = "macos"))]
 #[test_log::test(tokio::test)]
 // We use the substring part because we have a dynamic panic message part.
 #[should_panic(expected = "called `Result::unwrap()` on an `Err` value: \
