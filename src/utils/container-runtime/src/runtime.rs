@@ -280,6 +280,22 @@ impl ContainerRuntime {
         Ok(NetworkHandle::new(self.clone(), network_name.to_string()))
     }
 
+    pub async fn create_random_network_with_prefix(
+        &self,
+        network_prefix: &str,
+    ) -> Result<NetworkHandle, ContainerRuntimeError> {
+        let network_name = get_random_name_with_prefix(network_prefix);
+        let output = self.create_network_cmd(&network_name).output().await?;
+
+        if !output.status.success() {
+            // Replicating command construction as Command does not implement Clone
+            let command = self.create_network_cmd(&network_name);
+            return Err(ProcessError::from_output(command, output).into());
+        }
+
+        Ok(NetworkHandle::new(self.clone(), network_name))
+    }
+
     pub async fn has_network(&self, name: &str) -> Result<bool, ContainerRuntimeError> {
         let status = self
             .new_command()

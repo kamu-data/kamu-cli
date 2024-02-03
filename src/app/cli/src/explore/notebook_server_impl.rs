@@ -73,22 +73,12 @@ impl NotebookServerImpl {
             "Exposing Notebook server on a host network interface is not yet supported"
         );
 
-        let network_name = get_random_name_with_prefix("kamu-");
-
-        // Delete network if exists from previous run
-        let _ = self
-            .container_runtime
-            .remove_network_cmd(&network_name)
-            .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null())
-            .output()
-            .await;
-
         let network = self
             .container_runtime
-            .create_network(&network_name)
+            .create_random_network_with_prefix("kamu-")
             .await
             .int_err()?;
+        let network_name = network.name().unwrap();
 
         let cwd = Path::new(".").canonicalize().unwrap();
 

@@ -30,6 +30,10 @@ impl NetworkHandle {
         }
     }
 
+    pub fn name(&self) -> Option<String> {
+        self.network_name.clone()
+    }
+
     pub async fn free(mut self) -> Result<(), ContainerRuntimeError> {
         if let Some(network_name) = self.network_name.take() {
             self.runtime
