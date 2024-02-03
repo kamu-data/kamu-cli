@@ -152,7 +152,7 @@ async fn test_task_list_by_dataset() {
         .expect_list_tasks_by_dataset()
         .return_once(move |_, _| {
             Ok(TaskStateListing {
-                stream: Box::pin(futures::stream::iter([Ok(returned_task)].into_iter())),
+                stream: Box::pin(futures::stream::once(async { Ok(returned_task) })),
                 total_count: 1,
             })
         });

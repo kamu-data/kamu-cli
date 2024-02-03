@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use internal_error::InternalError;
+
 /////////////////////////////////////////////////////////////////////////////////////////
 
 /// Uniquely identifies a flow
@@ -35,6 +37,7 @@ impl From<FlowID> for u64 {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub type FlowIDStream<'a> = std::pin::Pin<Box<dyn tokio_stream::Stream<Item = FlowID> + Send + 'a>>;
+pub type FlowIDStream<'a> =
+    std::pin::Pin<Box<dyn tokio_stream::Stream<Item = Result<FlowID, InternalError>> + Send + 'a>>;
 
 /////////////////////////////////////////////////////////////////////////////////////////

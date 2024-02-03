@@ -24,10 +24,13 @@ pub trait FlowEventStore: EventStore<FlowState> {
         &self,
         dataset_id: &DatasetID,
         flow_type: DatasetFlowType,
-    ) -> Option<FlowID>;
+    ) -> Result<Option<FlowID>, InternalError>;
 
     /// Returns ID of the last system flow of certain type
-    fn get_last_system_flow_id_of_type(&self, flow_type: SystemFlowType) -> Option<FlowID>;
+    fn get_last_system_flow_id_of_type(
+        &self,
+        flow_type: SystemFlowType,
+    ) -> Result<Option<FlowID>, InternalError>;
 
     /// Returns IDs of the flows associated with the specified
     /// dataset in reverse chronological order based on creation time.
@@ -45,7 +48,7 @@ pub trait FlowEventStore: EventStore<FlowState> {
         &self,
         dataset_id: &DatasetID,
         filters: &DatasetFlowFilters,
-    ) -> usize;
+    ) -> Result<usize, InternalError>;
 
     /// Returns IDs of the system flows  in reverse chronological order based on
     /// creation time
@@ -57,7 +60,10 @@ pub trait FlowEventStore: EventStore<FlowState> {
     ) -> FlowIDStream;
 
     /// Returns number of system flows matching filters, if specified
-    async fn get_count_system_flows(&self, filters: &SystemFlowFilters) -> usize;
+    async fn get_count_system_flows(
+        &self,
+        filters: &SystemFlowFilters,
+    ) -> Result<usize, InternalError>;
 
     /// Returns IDs of the flows of any type in reverse chronological order
     /// based on creation time
@@ -65,7 +71,7 @@ pub trait FlowEventStore: EventStore<FlowState> {
     fn get_all_flow_ids(&self, pagination: FlowPaginationOpts) -> FlowIDStream<'_>;
 
     /// Returns number of all flows
-    async fn get_count_all_flows(&self) -> usize;
+    async fn get_count_all_flows(&self) -> Result<usize, InternalError>;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

@@ -78,12 +78,19 @@ impl DatasetFlowRuns {
             .await
             .int_err()?;
 
-        let matched_flows: Vec<_> = flows_state_listing.matched_stream.try_collect().await?;
+        let matched_flows: Vec<_> = flows_state_listing
+            .matched_stream
+            .map_ok(Flow::new)
+            .try_collect()
+            .await?;
         let total_count = flows_state_listing.total_count;
 
-        let nodes = matched_flows.into_iter().map(Flow::new).collect();
-
-        Ok(FlowConnection::new(nodes, page, per_page, total_count))
+        Ok(FlowConnection::new(
+            matched_flows,
+            page,
+            per_page,
+            total_count,
+        ))
     }
 }
 

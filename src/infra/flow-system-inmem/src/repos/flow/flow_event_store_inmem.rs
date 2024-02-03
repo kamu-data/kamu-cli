@@ -272,21 +272,24 @@ impl FlowEventStore for FlowEventStoreInMem {
         &self,
         dataset_id: &DatasetID,
         flow_type: DatasetFlowType,
-    ) -> Option<FlowID> {
+    ) -> Result<Option<FlowID>, InternalError> {
         let state = self.inner.as_state();
         let g = state.lock().unwrap();
-        g.typed_flows_by_dataset
+        Ok(g.typed_flows_by_dataset
             .get(BorrowedFlowKeyDataset::new(dataset_id, flow_type).as_trait())
-            .and_then(|flows| flows.last().copied())
+            .and_then(|flows| flows.last().copied()))
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(?flow_type))]
-    fn get_last_system_flow_id_of_type(&self, flow_type: SystemFlowType) -> Option<FlowID> {
+    fn get_last_system_flow_id_of_type(
+        &self,
+        flow_type: SystemFlowType,
+    ) -> Result<Option<FlowID>, InternalError> {
         let state = self.inner.as_state();
         let g = state.lock().unwrap();
-        g.system_flows_by_type
+        Ok(g.system_flows_by_type
             .get(&flow_type)
-            .and_then(|flows| flows.last().copied())
+            .and_then(|flows| flows.last().copied()))
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id, ?filters, ?pagination))]
@@ -296,7 +299,7 @@ impl FlowEventStore for FlowEventStoreInMem {
         filters: DatasetFlowFilters,
         pagination: FlowPaginationOpts,
     ) -> FlowIDStream {
-        let flow_ids_page: Option<Vec<_>> = {
+        let flow_ids_page: Vec<_> = {
             let state = self.inner.as_state();
             let g = state.lock().unwrap();
             g.all_flows_by_dataset
@@ -308,15 +311,13 @@ impl FlowEventStore for FlowEventStoreInMem {
                         .filter(|flow_id| g.matches_dataset_flow(**flow_id, &filters))
                         .skip(pagination.offset)
                         .take(pagination.limit)
-                        .copied()
+                        .map(|flow_id| Ok(*flow_id))
                         .collect()
                 })
+                .unwrap_or_default()
         };
 
-        match flow_ids_page {
-            Some(flow_ids_page) => Box::pin(futures::stream::iter(flow_ids_page)),
-            None => Box::pin(futures::stream::empty()),
-        }
+        Box::pin(futures::stream::iter(flow_ids_page))
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id, ?filters))]
@@ -324,17 +325,19 @@ impl FlowEventStore for FlowEventStoreInMem {
         &self,
         dataset_id: &DatasetID,
         filters: &DatasetFlowFilters,
-    ) -> usize {
+    ) -> Result<usize, InternalError> {
         let state = self.inner.as_state();
         let g = state.lock().unwrap();
-        if let Some(dataset_flow_ids) = g.all_flows_by_dataset.get(dataset_id) {
-            dataset_flow_ids
-                .iter()
-                .filter(|flow_id| g.matches_dataset_flow(**flow_id, filters))
-                .count()
-        } else {
-            0
-        }
+        Ok(
+            if let Some(dataset_flow_ids) = g.all_flows_by_dataset.get(dataset_id) {
+                dataset_flow_ids
+                    .iter()
+                    .filter(|flow_id| g.matches_dataset_flow(**flow_id, filters))
+                    .count()
+            } else {
+                0
+            },
+        )
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(?filters, ?pagination))]
@@ -352,20 +355,23 @@ impl FlowEventStore for FlowEventStoreInMem {
                 .filter(|flow_id| g.matches_system_flow(**flow_id, &filters))
                 .skip(pagination.offset)
                 .take(pagination.limit)
-                .copied()
+                .map(|flow_id| Ok(*flow_id))
                 .collect()
         };
         Box::pin(futures::stream::iter(flow_ids_page))
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(?filters))]
-    async fn get_count_system_flows(&self, filters: &SystemFlowFilters) -> usize {
+    async fn get_count_system_flows(
+        &self,
+        filters: &SystemFlowFilters,
+    ) -> Result<usize, InternalError> {
         let state = self.inner.as_state();
         let g = state.lock().unwrap();
-        g.all_system_flows
+        Ok(g.all_system_flows
             .iter()
             .filter(|flow_id| g.matches_system_flow(**flow_id, filters))
-            .count()
+            .count())
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(?pagination))]
@@ -378,7 +384,7 @@ impl FlowEventStore for FlowEventStoreInMem {
                 .rev()
                 .skip(pagination.offset)
                 .take(pagination.limit)
-                .copied()
+                .map(|flow_id| Ok(*flow_id))
                 .collect()
         };
 
@@ -386,10 +392,10 @@ impl FlowEventStore for FlowEventStoreInMem {
     }
 
     #[tracing::instrument(level = "debug", skip_all)]
-    async fn get_count_all_flows(&self) -> usize {
+    async fn get_count_all_flows(&self) -> Result<usize, InternalError> {
         let state = self.inner.as_state();
         let g = state.lock().unwrap();
-        g.all_flows.len()
+        Ok(g.all_flows.len())
     }
 }
 

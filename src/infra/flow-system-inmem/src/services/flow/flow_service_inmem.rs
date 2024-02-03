@@ -557,7 +557,8 @@ impl FlowService for FlowServiceInMemory {
         let total_count = self
             .flow_event_store
             .get_count_flows_by_dataset(dataset_id, &filters)
-            .await;
+            .await
+            .int_err()?;
 
         let dataset_id = dataset_id.clone();
 
@@ -565,8 +566,9 @@ impl FlowService for FlowServiceInMemory {
             let relevant_flow_ids: Vec<_> = self
                 .flow_event_store
                 .get_all_flow_ids_by_dataset(&dataset_id, filters, pagination)
-                .collect()
-                .await;
+                .try_collect()
+                .await
+                .int_err()?;
 
             // TODO: implement batch loading
             for flow_id in relevant_flow_ids {
@@ -590,14 +592,19 @@ impl FlowService for FlowServiceInMemory {
         filters: SystemFlowFilters,
         pagination: FlowPaginationOpts,
     ) -> Result<FlowStateListing, ListSystemFlowsError> {
-        let total_count = self.flow_event_store.get_count_system_flows(&filters).await;
+        let total_count = self
+            .flow_event_store
+            .get_count_system_flows(&filters)
+            .await
+            .int_err()?;
 
         let matched_stream = Box::pin(async_stream::try_stream! {
             let relevant_flow_ids: Vec<_> = self
                 .flow_event_store
                 .get_all_system_flow_ids(filters, pagination)
-                .collect()
-                .await;
+                .try_collect()
+                .await
+                .int_err()?;
 
             // TODO: implement batch loading
             for flow_id in relevant_flow_ids {
@@ -619,14 +626,19 @@ impl FlowService for FlowServiceInMemory {
         &self,
         pagination: FlowPaginationOpts,
     ) -> Result<FlowStateListing, ListFlowsError> {
-        let total_count = self.flow_event_store.get_count_all_flows().await;
+        let total_count = self
+            .flow_event_store
+            .get_count_all_flows()
+            .await
+            .int_err()?;
 
         let matched_stream = Box::pin(async_stream::try_stream! {
             let all_flows: Vec<_> = self
                 .flow_event_store
                 .get_all_flow_ids(pagination)
-                .collect()
-                .await;
+                .try_collect()
+                .await
+                .int_err()?;
 
             // TODO: implement batch loading
             for flow_id in all_flows {
@@ -652,6 +664,7 @@ impl FlowService for FlowServiceInMemory {
         let res = match self
             .flow_event_store
             .get_last_dataset_flow_id_of_type(dataset_id, flow_type)
+            .int_err()?
         {
             Some(flow_id) => Some(self.get_flow(flow_id).await.int_err()?),
             None => None,
@@ -668,6 +681,7 @@ impl FlowService for FlowServiceInMemory {
         let res = match self
             .flow_event_store
             .get_last_system_flow_id_of_type(flow_type)
+            .int_err()?
         {
             Some(flow_id) => Some(self.get_flow(flow_id).await.int_err()?),
             None => None,

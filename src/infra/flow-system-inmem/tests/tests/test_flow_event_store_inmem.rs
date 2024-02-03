@@ -10,7 +10,7 @@
 use std::sync::Arc;
 
 use chrono::{Duration, Utc};
-use futures::StreamExt;
+use futures::TryStreamExt;
 use kamu_flow_system::*;
 use kamu_flow_system_inmem::FlowEventStoreInMem;
 use kamu_task_system::TaskSystemEventStore;
@@ -1034,13 +1034,15 @@ async fn assert_dataset_flow_expectaitons(
 ) {
     let total_flows_count = flow_event_store
         .get_count_flows_by_dataset(&dataset_test_case.dataset_id, &filters)
-        .await;
+        .await
+        .unwrap();
     assert_eq!(expected_total_count, total_flows_count);
 
     let flow_ids: Vec<_> = flow_event_store
         .get_all_flow_ids_by_dataset(&dataset_test_case.dataset_id, filters, pagination)
-        .collect()
-        .await;
+        .try_collect()
+        .await
+        .unwrap();
     assert_eq!(flow_ids, expected_flow_ids);
 }
 
@@ -1051,13 +1053,17 @@ async fn assert_system_flow_expectaitons(
     expected_total_count: usize,
     expected_flow_ids: Vec<FlowID>,
 ) {
-    let total_flows_count = flow_event_store.get_count_system_flows(&filters).await;
+    let total_flows_count = flow_event_store
+        .get_count_system_flows(&filters)
+        .await
+        .unwrap();
     assert_eq!(expected_total_count, total_flows_count);
 
     let flow_ids: Vec<_> = flow_event_store
         .get_all_system_flow_ids(filters, pagination)
-        .collect()
-        .await;
+        .try_collect()
+        .await
+        .unwrap();
     assert_eq!(flow_ids, expected_flow_ids);
 }
 
