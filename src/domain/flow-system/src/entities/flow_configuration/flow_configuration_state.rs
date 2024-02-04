@@ -41,10 +41,10 @@ impl Projection for FlowConfigurationState {
         match (state, event) {
             (None, event) => match event {
                 E::Created(FlowConfigurationEventCreated {
-                    event_time: _,
                     flow_key,
                     paused,
                     rule,
+                    ..
                 }) => Ok(Self {
                     flow_key,
                     status: if paused {
@@ -62,12 +62,7 @@ impl Projection for FlowConfigurationState {
                 match &event {
                     E::Created(_) => Err(ProjectionError::new(Some(s), event)),
 
-                    E::Modified(FlowConfigurationEventModified {
-                        event_time: _,
-                        flow_key: _,
-                        paused,
-                        rule,
-                    }) => {
+                    E::Modified(FlowConfigurationEventModified { paused, rule, .. }) => {
                         // Note: when deleted dataset is re-added with the same id, we have to
                         // gracefully react on this, as if it wasn't a terminal state
                         Ok(FlowConfigurationState {

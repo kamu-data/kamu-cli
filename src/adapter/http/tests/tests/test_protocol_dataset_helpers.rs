@@ -107,13 +107,13 @@ async fn test_object_url_local_fs() {
             object_file: messages::ObjectFileReference {
                 object_type,
                 physical_hash,
-                size: _,
+                ..
             },
             pull_strategy: messages::ObjectPullStrategy::HttpDownload,
             download_from: messages::TransferUrl {
                 url: download_from_url,
                 headers: download_from_headers,
-                expires_at: _
+                ..
             }
         } if
             object_type == messages::ObjectType::DataSlice &&
@@ -133,13 +133,13 @@ async fn test_object_url_local_fs() {
             object_file: messages::ObjectFileReference {
                 object_type,
                 physical_hash,
-                size: _,
+                ..
             },
             pull_strategy: messages::ObjectPullStrategy::HttpDownload,
             download_from: messages::TransferUrl {
                 url: download_from_url,
                 headers: download_from_headers,
-                expires_at: _
+                ..
             }
         } if
             object_type == messages::ObjectType::Checkpoint &&
@@ -158,8 +158,7 @@ async fn test_object_url_local_fs() {
         messages::PushObjectTransferStrategy {
             object_file: messages::ObjectFileReference {
                 object_type: messages::ObjectType::DataSlice,
-                physical_hash: _,
-                size: _,
+                ..
             },
             push_strategy: messages::ObjectPushStrategy::SkipUpload,
             upload_to: None
@@ -171,8 +170,7 @@ async fn test_object_url_local_fs() {
         messages::PushObjectTransferStrategy {
             object_file: messages::ObjectFileReference {
                 object_type: messages::ObjectType::Checkpoint,
-                physical_hash: _,
-                size: _,
+                ..
             },
             push_strategy: messages::ObjectPushStrategy::SkipUpload,
             upload_to: None
@@ -185,13 +183,13 @@ async fn test_object_url_local_fs() {
             object_file: messages::ObjectFileReference {
                 object_type,
                 physical_hash,
-                size: _,
+                ..
             },
             push_strategy: messages::ObjectPushStrategy::HttpUpload,
             upload_to: Some(messages::TransferUrl {
                 url: upload_to_url,
                 headers: upload_to_headers,
-                expires_at: _
+                ..
             })
         } if
             object_type == messages::ObjectType::DataSlice &&
@@ -210,13 +208,13 @@ async fn test_object_url_local_fs() {
             object_file: messages::ObjectFileReference {
                 object_type,
                 physical_hash,
-                size: _,
+                ..
             },
             push_strategy: messages::ObjectPushStrategy::HttpUpload,
             upload_to: Some(messages::TransferUrl {
                 url: upload_to_url,
                 headers: upload_to_headers,
-                expires_at: _
+                ..
             })
         } if
             object_type == messages::ObjectType::Checkpoint &&
@@ -312,13 +310,13 @@ async fn test_pull_object_url_s3() {
             object_file: messages::ObjectFileReference {
                 object_type,
                 physical_hash,
-                size: _,
+                ..
             },
             pull_strategy: messages::ObjectPullStrategy::HttpDownload,
             download_from: messages::TransferUrl {
                 url: download_from_url,
                 headers: download_from_headers,
-                expires_at: _
+                ..
             }
         } if
             object_type == messages::ObjectType::DataSlice &&
@@ -338,13 +336,13 @@ async fn test_pull_object_url_s3() {
             object_file: messages::ObjectFileReference {
                 object_type,
                 physical_hash,
-                size: _,
+                ..
             },
             pull_strategy: messages::ObjectPullStrategy::HttpDownload,
             download_from: messages::TransferUrl {
                 url: download_from_url,
                 headers: download_from_headers,
-                expires_at: _
+                ..
             }
         } if
             object_type == messages::ObjectType::Checkpoint &&
@@ -364,8 +362,7 @@ async fn test_pull_object_url_s3() {
         messages::PushObjectTransferStrategy {
             object_file: messages::ObjectFileReference {
                 object_type: messages::ObjectType::DataSlice,
-                physical_hash: _,
-                size: _,
+                ..
             },
             push_strategy: messages::ObjectPushStrategy::SkipUpload,
             upload_to: None
@@ -377,8 +374,7 @@ async fn test_pull_object_url_s3() {
         messages::PushObjectTransferStrategy {
             object_file: messages::ObjectFileReference {
                 object_type: messages::ObjectType::Checkpoint,
-                physical_hash: _,
-                size: _,
+                ..
             },
             push_strategy: messages::ObjectPushStrategy::SkipUpload,
             upload_to: None
@@ -391,13 +387,13 @@ async fn test_pull_object_url_s3() {
             object_file: messages::ObjectFileReference {
                 object_type,
                 physical_hash,
-                size: _,
+                ..
             },
             push_strategy: messages::ObjectPushStrategy::HttpUpload,
             upload_to: Some(messages::TransferUrl {
                 url: upload_to_url,
                 headers: upload_to_headers,
-                expires_at: _
+                ..
             })
         } if
             object_type == messages::ObjectType::DataSlice &&
@@ -416,13 +412,13 @@ async fn test_pull_object_url_s3() {
             object_file: messages::ObjectFileReference {
                 object_type,
                 physical_hash,
-                size: _,
+                ..
             },
             push_strategy: messages::ObjectPushStrategy::HttpUpload,
             upload_to: Some(messages::TransferUrl {
                 url: upload_to_url,
                 headers: upload_to_headers,
-                expires_at: _
+                ..
             })
         } if
             object_type == messages::ObjectType::Checkpoint &&

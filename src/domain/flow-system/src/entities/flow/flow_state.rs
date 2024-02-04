@@ -70,10 +70,10 @@ impl Projection for FlowState {
         match (state, event) {
             (None, event) => match event {
                 E::Initiated(FlowEventInitiated {
-                    event_time: _,
                     flow_id,
                     flow_key,
                     trigger,
+                    ..
                 }) => Ok(Self {
                     flow_id,
                     flow_key,
@@ -95,9 +95,8 @@ impl Projection for FlowState {
                 match &event {
                     E::Initiated(_) => Err(ProjectionError::new(Some(s), event)),
                     E::StartConditionDefined(FlowEventStartConditionDefined {
-                        event_time: _,
-                        flow_id: _,
                         start_condition,
+                        ..
                     }) => {
                         if s.outcome.is_some() || !s.task_ids.is_empty() {
                             Err(ProjectionError::new(Some(s), event))
@@ -108,11 +107,7 @@ impl Projection for FlowState {
                             })
                         }
                     }
-                    E::Queued(FlowEventQueued {
-                        event_time: _,
-                        flow_id: _,
-                        activate_at,
-                    }) => {
+                    E::Queued(FlowEventQueued { activate_at, .. }) => {
                         if s.outcome.is_some() || !s.task_ids.is_empty() {
                             Err(ProjectionError::new(Some(s), event))
                         } else {
@@ -125,22 +120,14 @@ impl Projection for FlowState {
                             })
                         }
                     }
-                    E::TriggerAdded(FlowEventTriggerAdded {
-                        event_time: _,
-                        flow_id: _,
-                        trigger: _,
-                    }) => {
+                    E::TriggerAdded(_) => {
                         if s.outcome.is_some() {
                             Err(ProjectionError::new(Some(s), event))
                         } else {
                             Ok(s)
                         }
                     }
-                    E::TaskScheduled(FlowEventTaskScheduled {
-                        event_time: _,
-                        flow_id: _,
-                        task_id,
-                    }) => {
+                    E::TaskScheduled(FlowEventTaskScheduled { task_id, .. }) => {
                         if s.outcome.is_some() || s.timing.activate_at.is_none() {
                             Err(ProjectionError::new(Some(s), event))
                         } else {
@@ -152,8 +139,8 @@ impl Projection for FlowState {
                     }
                     E::TaskRunning(FlowEventTaskRunning {
                         event_time,
-                        flow_id: _,
                         task_id,
+                        ..
                     }) => {
                         if s.outcome.is_some()
                             || s.timing.activate_at.is_none()
@@ -172,9 +159,9 @@ impl Projection for FlowState {
                     }
                     E::TaskFinished(FlowEventTaskFinished {
                         event_time,
-                        flow_id: _,
                         task_id,
                         task_outcome,
+                        ..
                     }) => {
                         if !s.task_ids.contains(task_id) || s.timing.running_since.is_none() {
                             Err(ProjectionError::new(Some(s), event))
@@ -207,10 +194,7 @@ impl Projection for FlowState {
                             }
                         }
                     }
-                    E::Aborted(FlowEventAborted {
-                        event_time,
-                        flow_id: _,
-                    }) => {
+                    E::Aborted(FlowEventAborted { event_time, .. }) => {
                         if let Some(outcome) = s.outcome {
                             if outcome == FlowOutcome::Success {
                                 Err(ProjectionError::new(Some(s), event))

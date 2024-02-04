@@ -40,11 +40,8 @@ async fn test_system_info() {
                 cargo_features: Some(_),
                 cargo_opt_level: Some(_),
             },
-            workspace: WorkspaceInfo {
-                version: _,
-                root_dir: _,
-            },
-            container_runtime: ContainerRuntimeInfo { info: _ },
+            workspace: WorkspaceInfo { .. },
+            container_runtime: ContainerRuntimeInfo { .. },
         }
     );
 }

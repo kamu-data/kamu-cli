@@ -292,11 +292,7 @@ impl PushIngestListener for PushIngestProgress {
                         console::style("Dataset is up-to-date".to_owned()).yellow(),
                     ));
             }
-            PushIngestResult::Updated {
-                old_head: _,
-                ref new_head,
-                num_blocks: _,
-            } => {
+            PushIngestResult::Updated { ref new_head, .. } => {
                 state
                     .curr_progress
                     .finish_with_message(Self::spinner_message(

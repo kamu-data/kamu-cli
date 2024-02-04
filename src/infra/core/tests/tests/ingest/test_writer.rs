@@ -810,11 +810,11 @@ async fn test_data_writer_builder_scan_no_source() {
             source_event: None,
             merge_strategy: odf::MergeStrategy::Append(_),
             vocab,
-            data_slices: _,
             prev_offset: None,
             prev_checkpoint: None,
             prev_watermark: None,
             prev_source_state: None,
+            ..
         } if *h == head && vocab.event_time_column == "foo"
 
     );
@@ -840,16 +840,15 @@ async fn test_data_writer_builder_scan_polling_source() {
     assert_matches!(
         b.metadata_state().unwrap(),
         DataWriterMetadataState {
-            head: _,
             schema: None,
             source_event: Some(_),
             merge_strategy: odf::MergeStrategy::Ledger(_),
             vocab,
-            data_slices: _,
             prev_offset: None,
             prev_checkpoint: None,
             prev_watermark: None,
             prev_source_state: None,
+            ..
         } if *vocab == odf::DatasetVocabulary::default()
     );
 }
@@ -882,16 +881,15 @@ async fn test_data_writer_builder_scan_push_source() {
     assert_matches!(
         b.metadata_state().unwrap(),
         DataWriterMetadataState {
-            head: _,
             schema: None,
             source_event: Some(_),
             merge_strategy: odf::MergeStrategy::Ledger(_),
             vocab,
-            data_slices: _,
             prev_offset: None,
             prev_checkpoint: None,
             prev_watermark: None,
             prev_source_state: None,
+            ..
         } if *vocab == odf::DatasetVocabulary::default()
     );
 }

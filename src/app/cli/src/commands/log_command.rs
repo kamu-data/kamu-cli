@@ -196,7 +196,7 @@ impl AsciiRenderer {
         )?;
 
         match &block.event {
-            MetadataEvent::SetDataSchema(e @ SetDataSchema { schema: _ }) => {
+            MetadataEvent::SetDataSchema(e @ SetDataSchema { .. }) => {
                 let schema = e.schema_as_arrow().unwrap();
                 let schema_str = kamu_data_utils::schema::format::format_schema_arrow(&schema);
 
@@ -343,25 +343,14 @@ impl AsciiRenderer {
                 }
                 self.render_property(output, 0, "WebsiteURL", &e.website_url)?;
             }
-            MetadataEvent::SetPollingSource(SetPollingSource {
-                fetch: _,
-                prepare: _,
-                read: _,
-                preprocess: _,
-                merge: _,
-            }) => {
+            MetadataEvent::SetPollingSource(SetPollingSource { .. }) => {
                 self.render_property(output, 0, "Kind", "SetPollingSource")?;
                 self.render_property(output, 0, "Source", "...")?;
             }
             MetadataEvent::DisablePollingSource(_) => {
                 self.render_property(output, 0, "Kind", "DisablePollingSource")?;
             }
-            MetadataEvent::AddPushSource(AddPushSource {
-                source_name,
-                read: _,
-                preprocess: _,
-                merge: _,
-            }) => {
+            MetadataEvent::AddPushSource(AddPushSource { source_name, .. }) => {
                 self.render_property(output, 0, "Kind", "AddPushSource")?;
                 self.render_property(output, 0, "SourceName", source_name)?;
                 self.render_property(output, 0, "Source", "...")?;

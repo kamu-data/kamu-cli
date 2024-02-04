@@ -520,8 +520,8 @@ async fn test_sync_from() {
         PullResponse {
             result: Ok(PullResult::Updated {
                 old_head: None,
-                new_head: _,
                 num_blocks: 1,
+                ..
             }),
             ..
         }
@@ -567,8 +567,8 @@ async fn test_sync_from_url_and_local_ref() {
         PullResponse {
             result: Ok(PullResult::Updated {
                 old_head: None,
-                new_head: _,
                 num_blocks: 1,
+                ..
             }),
             ..
         }
@@ -614,8 +614,8 @@ async fn test_sync_from_url_and_local_multi_tenant_ref() {
         PullResponse {
             result: Ok(PullResult::Updated {
                 old_head: None,
-                new_head: _,
                 num_blocks: 1,
+                ..
             }),
             ..
         }
@@ -661,8 +661,8 @@ async fn test_sync_from_url_only() {
         PullResponse {
             result: Ok(PullResult::Updated {
                 old_head: None,
-                new_head: _,
                 num_blocks: 1,
+                ..
             }),
             ..
         }
@@ -708,8 +708,8 @@ async fn test_sync_from_url_only_multi_tenant_case() {
         PullResponse {
             result: Ok(PullResult::Updated {
                 old_head: None,
-                new_head: _,
                 num_blocks: 1,
+                ..
             }),
             ..
         }
