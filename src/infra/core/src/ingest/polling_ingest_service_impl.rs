@@ -547,10 +547,7 @@ impl PollingIngestServiceImpl {
                     num_blocks,
                     ..
                 }),
-                PollingIngestResult::UpToDate {
-                    no_source_defined: _,
-                    uncacheable,
-                },
+                PollingIngestResult::UpToDate { uncacheable, .. },
             ) => PollingIngestResult::Updated {
                 old_head,
                 new_head,

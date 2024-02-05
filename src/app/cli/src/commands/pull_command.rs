@@ -488,11 +488,9 @@ impl PollingIngestListener for PrettyIngestProgress {
                     ));
             }
             PollingIngestResult::Updated {
-                old_head: _,
                 ref new_head,
-                num_blocks: _,
-                has_more: _,
                 uncacheable,
+                ..
             } => {
                 if *uncacheable {
                     state
@@ -637,11 +635,7 @@ impl TransformListener for PrettyTransformProgress {
             TransformResult::UpToDate => {
                 console::style("Dataset is up-to-date".to_owned()).yellow()
             }
-            TransformResult::Updated {
-                old_head: _,
-                ref new_head,
-                num_blocks: _,
-            } => console::style(format!(
+            TransformResult::Updated { ref new_head, .. } => console::style(format!(
                 "Committed new block {}",
                 new_head.as_multibase().short()
             ))
@@ -857,9 +851,9 @@ impl SyncListener for PrettySyncProgress {
         let msg = match result {
             SyncResult::UpToDate => console::style("Dataset is up-to-date".to_owned()).yellow(),
             SyncResult::Updated {
-                old_head: _,
                 ref new_head,
                 num_blocks,
+                ..
             } => console::style(format!(
                 "Updated to {} ({} block(s))",
                 new_head.as_multibase().short(),

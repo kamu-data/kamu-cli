@@ -517,9 +517,9 @@ impl FlowConfigurationHarness {
         assert_matches!(
             enabled_configurations.get(&(system_flow_type.into())),
             Some(FlowConfigurationState {
-                flow_key: _,
                 status: FlowConfigurationStatus::Active,
-                rule: FlowConfigurationRule::Schedule(actual_schedule)
+                rule: FlowConfigurationRule::Schedule(actual_schedule),
+                ..
             }) if actual_schedule == expected_schedule
         );
     }
@@ -534,9 +534,9 @@ impl FlowConfigurationHarness {
         assert_matches!(
             enabled_configurations.get(&(FlowKeyDataset::new(dataset_id, dataset_flow_type).into())),
             Some(FlowConfigurationState {
-                flow_key: _,
                 status: FlowConfigurationStatus::Active,
-                rule: FlowConfigurationRule::Schedule(actual_schedule)
+                rule: FlowConfigurationRule::Schedule(actual_schedule),
+                ..
             }) if actual_schedule == expected_schedule
         );
     }

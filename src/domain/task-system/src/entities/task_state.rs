@@ -68,19 +68,18 @@ impl Projection for TaskState {
 
                 match event {
                     E::TaskCreated(_) => Err(ProjectionError::new(Some(s), event)),
-                    E::TaskRunning(TaskEventRunning {
-                        event_time,
-                        task_id: _,
-                    }) if s.status == TaskStatus::Queued => Ok(Self {
-                        status: TaskStatus::Running,
-                        ran_at: Some(event_time),
-                        ..s
-                    }),
-                    E::TaskCancelled(TaskEventCancelled {
-                        event_time,
-                        task_id: _,
-                    }) if s.status == TaskStatus::Queued
-                        || s.status == TaskStatus::Running && !s.cancellation_requested =>
+                    E::TaskRunning(TaskEventRunning { event_time, .. })
+                        if s.status == TaskStatus::Queued =>
+                    {
+                        Ok(Self {
+                            status: TaskStatus::Running,
+                            ran_at: Some(event_time),
+                            ..s
+                        })
+                    }
+                    E::TaskCancelled(TaskEventCancelled { event_time, .. })
+                        if s.status == TaskStatus::Queued
+                            || s.status == TaskStatus::Running && !s.cancellation_requested =>
                     {
                         Ok(Self {
                             cancellation_requested: true,
@@ -90,8 +89,8 @@ impl Projection for TaskState {
                     }
                     E::TaskFinished(TaskEventFinished {
                         event_time,
-                        task_id: _,
                         outcome,
+                        ..
                     }) if s.status == TaskStatus::Queued || s.status == TaskStatus::Running => {
                         Ok(Self {
                             status: TaskStatus::Finished(outcome),
