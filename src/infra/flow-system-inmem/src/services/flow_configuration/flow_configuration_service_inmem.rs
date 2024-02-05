@@ -94,37 +94,49 @@ impl FlowConfigurationServiceInMemory {
         }
     }
 
-    async fn pause_flow_configuration(&self, flow_key: FlowKey) -> Result<(), InternalError> {
+    async fn pause_flow_configuration(
+        &self,
+        request_time: DateTime<Utc>,
+        flow_key: FlowKey,
+    ) -> Result<(), InternalError> {
         let maybe_flow_configuration =
             FlowConfiguration::try_load(flow_key.clone(), self.event_store.as_ref())
                 .await
                 .int_err()?;
 
         if let Some(mut flow_configuration) = maybe_flow_configuration {
-            flow_configuration.pause(self.time_source.now()).int_err()?;
+            flow_configuration.pause(request_time).int_err()?;
             flow_configuration
                 .save(self.event_store.as_ref())
                 .await
                 .int_err()?;
+
+            self.publish_flow_configuration_modified(&flow_configuration, request_time)
+                .await?;
         }
 
         Ok(())
     }
 
-    async fn resume_flow_configuration(&self, flow_key: FlowKey) -> Result<(), InternalError> {
+    async fn resume_flow_configuration(
+        &self,
+        request_time: DateTime<Utc>,
+        flow_key: FlowKey,
+    ) -> Result<(), InternalError> {
         let maybe_flow_configuration =
             FlowConfiguration::try_load(flow_key.clone(), self.event_store.as_ref())
                 .await
                 .int_err()?;
 
         if let Some(mut flow_configuration) = maybe_flow_configuration {
-            flow_configuration
-                .resume(self.time_source.now())
-                .int_err()?;
+            flow_configuration.resume(request_time).int_err()?;
             flow_configuration
                 .save(self.event_store.as_ref())
                 .await
                 .int_err()?;
+
+            self.publish_flow_configuration_modified(&flow_configuration, request_time)
+                .await?;
         }
 
         Ok(())
@@ -211,13 +223,16 @@ impl FlowConfigurationService for FlowConfigurationServiceInMemory {
     /// If type is omitted, all possible dataset flow types are paused
     async fn pause_dataset_flows(
         &self,
+        request_time: DateTime<Utc>,
         dataset_id: &DatasetID,
         maybe_dataset_flow_type: Option<DatasetFlowType>,
     ) -> Result<(), InternalError> {
         let flow_keys = Self::get_dataset_flow_keys(dataset_id, maybe_dataset_flow_type);
 
         for flow_key in flow_keys {
-            self.pause_flow_configuration(flow_key).await.int_err()?;
+            self.pause_flow_configuration(request_time, flow_key)
+                .await
+                .int_err()?;
         }
 
         Ok(())
@@ -227,12 +242,15 @@ impl FlowConfigurationService for FlowConfigurationServiceInMemory {
     /// If type is omitted, all possible system flow types are paused
     async fn pause_system_flows(
         &self,
+        request_time: DateTime<Utc>,
         maybe_system_flow_type: Option<SystemFlowType>,
     ) -> Result<(), InternalError> {
         let flow_keys = Self::get_system_flow_keys(maybe_system_flow_type);
 
         for flow_key in flow_keys {
-            self.pause_flow_configuration(flow_key).await.int_err()?;
+            self.pause_flow_configuration(request_time, flow_key)
+                .await
+                .int_err()?;
         }
 
         Ok(())
@@ -242,13 +260,16 @@ impl FlowConfigurationService for FlowConfigurationServiceInMemory {
     /// If type is omitted, all possible types are resumed (where configured)
     async fn resume_dataset_flows(
         &self,
+        request_time: DateTime<Utc>,
         dataset_id: &DatasetID,
         maybe_dataset_flow_type: Option<DatasetFlowType>,
     ) -> Result<(), InternalError> {
         let flow_keys = Self::get_dataset_flow_keys(dataset_id, maybe_dataset_flow_type);
 
         for flow_key in flow_keys {
-            self.resume_flow_configuration(flow_key).await.int_err()?;
+            self.resume_flow_configuration(request_time, flow_key)
+                .await
+                .int_err()?;
         }
 
         Ok(())
@@ -259,12 +280,15 @@ impl FlowConfigurationService for FlowConfigurationServiceInMemory {
     /// configured)
     async fn resume_system_flows(
         &self,
+        request_time: DateTime<Utc>,
         maybe_system_flow_type: Option<SystemFlowType>,
     ) -> Result<(), InternalError> {
         let flow_keys = Self::get_system_flow_keys(maybe_system_flow_type);
 
         for flow_key in flow_keys {
-            self.resume_flow_configuration(flow_key).await.int_err()?;
+            self.resume_flow_configuration(request_time, flow_key)
+                .await
+                .int_err()?;
         }
 
         Ok(())

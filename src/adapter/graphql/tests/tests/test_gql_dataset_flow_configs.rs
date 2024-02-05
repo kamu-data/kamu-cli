@@ -547,7 +547,7 @@ async fn test_crud_batching_derived_dataset() {
 
 #[test_log::test(tokio::test)]
 async fn test_pause_resume_dataset_flows() {
-    async fn check_flow_status(
+    async fn check_flow_config_status(
         harness: &FlowConfigHarness,
         schema: &kamu_adapter_graphql::Schema,
         dataset_id: &DatasetID,
@@ -649,7 +649,7 @@ async fn test_pause_resume_dataset_flows() {
     for ((dataset_id, dataset_flow_type), expect_paused) in
         cases.iter().zip(vec![false, false, false])
     {
-        check_flow_status(
+        check_flow_config_status(
             &harness,
             &schema,
             dataset_id,
@@ -678,7 +678,7 @@ async fn test_pause_resume_dataset_flows() {
     for ((dataset_id, dataset_flow_type), expect_paused) in
         cases.iter().zip(vec![false, true, false])
     {
-        check_flow_status(
+        check_flow_config_status(
             &harness,
             &schema,
             dataset_id,
@@ -704,7 +704,7 @@ async fn test_pause_resume_dataset_flows() {
     for ((dataset_id, dataset_flow_type), expect_paused) in
         cases.iter().zip(vec![true, true, false])
     {
-        check_flow_status(
+        check_flow_config_status(
             &harness,
             &schema,
             dataset_id,
@@ -732,7 +732,7 @@ async fn test_pause_resume_dataset_flows() {
     for ((dataset_id, dataset_flow_type), expect_paused) in
         cases.iter().zip(vec![false, true, false])
     {
-        check_flow_status(
+        check_flow_config_status(
             &harness,
             &schema,
             dataset_id,
@@ -760,7 +760,7 @@ async fn test_pause_resume_dataset_flows() {
     for ((dataset_id, dataset_flow_type), expect_paused) in
         cases.iter().zip(vec![false, true, true])
     {
-        check_flow_status(
+        check_flow_config_status(
             &harness,
             &schema,
             dataset_id,
@@ -786,7 +786,7 @@ async fn test_pause_resume_dataset_flows() {
     for ((dataset_id, dataset_flow_type), expect_paused) in
         cases.iter().zip(vec![false, true, false])
     {
-        check_flow_status(
+        check_flow_config_status(
             &harness,
             &schema,
             dataset_id,

@@ -1559,7 +1559,7 @@ checksum = "f7144d30dcf0fafbce74250a3963025d8d52177934239851c917d29f1df280c2"
 
 [[package]]
 name = "container-runtime"
-version = "0.156.0"
+version = "0.156.1"
 dependencies = [
  "async-trait",
  "cfg-if",
@@ -2377,7 +2377,7 @@ dependencies = [
 
 [[package]]
 name = "enum-variants"
-version = "0.156.0"
+version = "0.156.1"
 
 [[package]]
 name = "env_logger"
@@ -2420,7 +2420,7 @@ dependencies = [
 
 [[package]]
 name = "event-bus"
-version = "0.156.0"
+version = "0.156.1"
 dependencies = [
  "async-trait",
  "dill",
@@ -2436,7 +2436,7 @@ dependencies = [
 
 [[package]]
 name = "event-sourcing"
-version = "0.156.0"
+version = "0.156.1"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -2452,7 +2452,7 @@ dependencies = [
 
 [[package]]
 name = "event-sourcing-macros"
-version = "0.156.0"
+version = "0.156.1"
 dependencies = [
  "quote",
  "syn 2.0.48",
@@ -2496,9 +2496,9 @@ dependencies = [
 
 [[package]]
 name = "fiat-crypto"
-version = "0.2.5"
+version = "0.2.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "27573eac26f4dd11e2b1916c3fe1baa56407c83c71a773a8ba17ec0bca03b6b7"
+checksum = "1676f435fc1dadde4d03e43f5d62b259e1ce5f40bd4ffb21db2b42ebe59c1382"
 
 [[package]]
 name = "filetime"
@@ -3148,7 +3148,7 @@ checksum = "8bb03732005da905c88227371639bf1ad885cc712789c011c31c5fb3ab3ccf02"
 
 [[package]]
 name = "internal-error"
-version = "0.156.0"
+version = "0.156.1"
 dependencies = [
  "test-log",
  "thiserror",
@@ -3264,7 +3264,7 @@ dependencies = [
 
 [[package]]
 name = "kamu"
-version = "0.156.0"
+version = "0.156.1"
 dependencies = [
  "async-recursion",
  "async-stream",
@@ -3342,7 +3342,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-adapter-auth-oso"
-version = "0.156.0"
+version = "0.156.1"
 dependencies = [
  "async-trait",
  "dill",
@@ -3363,7 +3363,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-adapter-flight-sql"
-version = "0.156.0"
+version = "0.156.1"
 dependencies = [
  "arrow-flight",
  "async-trait",
@@ -3387,7 +3387,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-adapter-graphql"
-version = "0.156.0"
+version = "0.156.1"
 dependencies = [
  "async-graphql",
  "async-trait",
@@ -3425,7 +3425,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-adapter-http"
-version = "0.156.0"
+version = "0.156.1"
 dependencies = [
  "async-trait",
  "axum",
@@ -3469,7 +3469,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-adapter-oauth"
-version = "0.156.0"
+version = "0.156.1"
 dependencies = [
  "async-trait",
  "dill",
@@ -3492,7 +3492,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-cli"
-version = "0.156.0"
+version = "0.156.1"
 dependencies = [
  "arrow-flight",
  "assert_cmd",
@@ -3579,7 +3579,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-core"
-version = "0.156.0"
+version = "0.156.1"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -3606,7 +3606,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-data-utils"
-version = "0.156.0"
+version = "0.156.1"
 dependencies = [
  "arrow-digest",
  "async-trait",
@@ -3626,7 +3626,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-datafusion-cli"
-version = "0.156.0"
+version = "0.156.1"
 dependencies = [
  "arrow",
  "async-trait",
@@ -3646,7 +3646,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-flow-system"
-version = "0.156.0"
+version = "0.156.1"
 dependencies = [
  "async-trait",
  "chrono",
@@ -3668,7 +3668,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-flow-system-inmem"
-version = "0.156.0"
+version = "0.156.1"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -3699,7 +3699,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-ingest-datafusion"
-version = "0.156.0"
+version = "0.156.1"
 dependencies = [
  "async-trait",
  "chrono",
@@ -3737,7 +3737,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-repo-tools"
-version = "0.156.0"
+version = "0.156.1"
 dependencies = [
  "chrono",
  "clap",
@@ -3751,7 +3751,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-task-system"
-version = "0.156.0"
+version = "0.156.1"
 dependencies = [
  "async-trait",
  "chrono",
@@ -3770,7 +3770,7 @@ dependencies = [
 
 [[package]]
 name = "kamu-task-system-inmem"
-version = "0.156.0"
+version = "0.156.1"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -4117,9 +4117,9 @@ checksum = "68354c5c6bd36d73ff3feceb05efa59b6acb7626617f4962be322a825e61f79a"
 
 [[package]]
 name = "miniz_oxide"
-version = "0.7.1"
+version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e7810e0be55b428ada41041c41f32c9f1a42817901b4ccf45fa3d4b6561e74c7"
+checksum = "9d811f3e15f28568be3407c8e7fdb6514c1cda3cb30683f15b6a1a1dc4ea14a7"
 dependencies = [
  "adler",
 ]
@@ -4198,7 +4198,7 @@ dependencies = [
 
 [[package]]
 name = "multiformats"
-version = "0.156.0"
+version = "0.156.1"
 dependencies = [
  "bs58",
  "digest",
@@ -4481,7 +4481,7 @@ checksum = "0ab1bc2a289d34bd04a330323ac98a1b4bc82c9d9fcb1e66b63caa84da26b575"
 
 [[package]]
 name = "opendatafabric"
-version = "0.156.0"
+version = "0.156.1"
 dependencies = [
  "arrow",
  "base64 0.21.7",
@@ -4718,9 +4718,9 @@ checksum = "e3148f5046208a5d56bcfc03053e3ca6334e51da8dfb19b6cdc8b306fae3283e"
 
 [[package]]
 name = "pest"
-version = "2.7.6"
+version = "2.7.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1f200d8d83c44a45b21764d1916299752ca035d15ecd46faca3e9a2a2bf6ad06"
+checksum = "219c0dcc30b6a27553f9cc242972b67f75b60eb0db71f0b5462f38b058c41546"
 dependencies = [
  "memchr",
  "thiserror",
@@ -4729,9 +4729,9 @@ dependencies = [
 
 [[package]]
 name = "pest_derive"
-version = "2.7.6"
+version = "2.7.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bcd6ab1236bbdb3a49027e920e693192ebfe8913f6d60e294de57463a493cfde"
+checksum = "22e1288dbd7786462961e69bfd4df7848c1e37e8b74303dbdab82c3a9cdd2809"
 dependencies = [
  "pest",
  "pest_generator",
@@ -4739,9 +4739,9 @@ dependencies = [
 
 [[package]]
 name = "pest_generator"
-version = "2.7.6"
+version = "2.7.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2a31940305ffc96863a735bef7c7994a00b325a7138fdbc5bda0f1a0476d3275"
+checksum = "1381c29a877c6d34b8c176e734f35d7f7f5b3adaefe940cb4d1bb7af94678e2e"
 dependencies = [
  "pest",
  "pest_meta",
@@ -4752,9 +4752,9 @@ dependencies = [
 
 [[package]]
 name = "pest_meta"
-version = "2.7.6"
+version = "2.7.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a7ff62f5259e53b78d1af898941cdcdccfae7385cf7d793a6e55de5d05bb4b7d"
+checksum = "d0934d6907f148c22a3acbda520c7eed243ad7487a30f51f6ce52b58b7077a8a"
 dependencies = [
  "once_cell",
  "pest",
@@ -6197,9 +6197,9 @@ dependencies = [
 
 [[package]]
 name = "time"
-version = "0.3.33"
+version = "0.3.34"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "00b24b79b7a07f10209f19e683ca1e289d80b1e76ffa8c2b779718566a083679"
+checksum = "c8248b6521bb14bc45b4067159b9b6ad792e2d6d754d6c41fb50e29fefe38749"
 dependencies = [
  "deranged",
  "itoa",
@@ -6566,7 +6566,7 @@ dependencies = [
 
 [[package]]
 name = "tracing-perfetto"
-version = "0.156.0"
+version = "0.156.1"
 dependencies = [
  "conv",
  "env_logger",
