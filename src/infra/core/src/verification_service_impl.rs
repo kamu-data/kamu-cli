@@ -229,7 +229,7 @@ impl VerificationServiceImpl {
         let in_memory_chain = MetadataChainImpl::new(
             obj_repo.clone(),
             ReferenceRepositoryImpl::new(NamedObjectRepositoryInMemory::new()),
-            GetMetadataBlockStrategyImpl::new_boxed(obj_repo),
+            GetMetadataBlockStrategyImpl::new(obj_repo),
         );
 
         for (block_hash, block) in blocks.into_iter().rev() {

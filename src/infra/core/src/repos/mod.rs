@@ -70,8 +70,8 @@ pub use get_metadata_block_strategy::*;
 mod get_metadata_block_strategy_impl;
 pub use get_metadata_block_strategy_impl::*;
 
-mod get_metadata_block_strategy_cache_inmem_facade;
-pub use get_metadata_block_strategy_cache_inmem_facade::*;
+mod get_metadata_block_strategy_caching_inmem;
+pub use get_metadata_block_strategy_caching_inmem::*;
 
-mod metadata_chain_cache_inmen_facade;
-pub use metadata_chain_cache_inmen_facade::*;
+mod reference_repository_caching_inmem;
+pub use reference_repository_caching_inmem::*;

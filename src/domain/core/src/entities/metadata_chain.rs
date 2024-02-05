@@ -393,18 +393,6 @@ pub enum AppendError {
     ),
 }
 
-impl From<GetBlockError> for AppendError {
-    fn from(v: GetBlockError) -> Self {
-        match v {
-            GetBlockError::NotFound(e) => AppendValidationError::PrevBlockNotFound(e).into(),
-            GetBlockError::BlockVersion(e) => Self::Internal(e.int_err()),
-            GetBlockError::BlockMalformed(e) => Self::Internal(e.int_err()),
-            GetBlockError::Access(e) => Self::Access(e),
-            GetBlockError::Internal(e) => Self::Internal(e.int_err()),
-        }
-    }
-}
-
 impl From<SetRefErrorRepo> for AppendError {
     fn from(v: SetRefErrorRepo) -> Self {
         match v {

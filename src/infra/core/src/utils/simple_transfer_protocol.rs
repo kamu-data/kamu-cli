@@ -79,7 +79,7 @@ impl SimpleTransferProtocol {
         let empty_chain = MetadataChainImpl::new(
             obj_repo.clone(),
             ReferenceRepositoryImpl::new(NamedObjectRepositoryInMemory::new()),
-            GetMetadataBlockStrategyImpl::new_boxed(obj_repo),
+            GetMetadataBlockStrategyImpl::new(obj_repo),
         );
 
         let src_chain = src.as_metadata_chain();
@@ -388,7 +388,7 @@ impl SimpleTransferProtocol {
 
     async fn synchronize_blocks<'a>(
         &'a self,
-        blocks: Vec<MetadataBlockPair>,
+        blocks: Vec<HashedMetadataBlock>,
         src: &'a dyn Dataset,
         dst: &'a dyn Dataset,
         src_head: &'a Multihash,

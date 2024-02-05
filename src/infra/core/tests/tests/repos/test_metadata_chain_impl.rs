@@ -27,7 +27,7 @@ fn init_chain(root: &Path) -> impl MetadataChain {
         blocks_dir, /* unknown yet */
     ));
     let ref_repo = ReferenceRepositoryImpl::new(NamedObjectRepositoryLocalFS::new(refs_dir));
-    let get_metadata_block_strategy = GetMetadataBlockStrategyImpl::new_boxed(obj_repo.clone());
+    let get_metadata_block_strategy = GetMetadataBlockStrategyImpl::new(obj_repo.clone());
 
     MetadataChainImpl::new(obj_repo, ref_repo, get_metadata_block_strategy)
 }

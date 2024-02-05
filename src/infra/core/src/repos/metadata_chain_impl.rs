@@ -28,28 +28,29 @@ macro_rules! invalid_event {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct MetadataChainImpl<ObjRepo, RefRepo> {
+pub struct MetadataChainImpl<ObjRepo, RefRepo, MetaBlockStrategy> {
     obj_repo: Arc<ObjRepo>,
     ref_repo: RefRepo,
-    get_block_strategy: Box<dyn GetMetadataBlockStrategy>,
+    get_meta_block_strategy: MetaBlockStrategy,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-impl<ObjRepo, RefRepo> MetadataChainImpl<ObjRepo, RefRepo>
+impl<ObjRepo, RefRepo, MetaBlockStrategy> MetadataChainImpl<ObjRepo, RefRepo, MetaBlockStrategy>
 where
     ObjRepo: ObjectRepository + Sync + Send,
     RefRepo: ReferenceRepository + Sync + Send,
+    MetaBlockStrategy: GetMetadataBlockStrategy + Sync + Send,
 {
     pub fn new(
         obj_repo: Arc<ObjRepo>,
         ref_repo: RefRepo,
-        get_block_strategy: Box<dyn GetMetadataBlockStrategy>,
+        get_meta_block_strategy: MetaBlockStrategy,
     ) -> Self {
         Self {
             obj_repo,
             ref_repo,
-            get_block_strategy,
+            get_meta_block_strategy,
         }
     }
 
@@ -93,7 +94,7 @@ where
             let block = self
                 .get_block(block_hash)
                 .await
-                .map_err(Into::<AppendError>::into)?;
+                .map_err(map_validate_append_block_error)?;
 
             if block.sequence_number != (new_block.sequence_number - 1) {
                 return Err(
@@ -133,7 +134,7 @@ where
             self.get_block(prev_hash)
                 .await
                 .map(Some)
-                .map_err(Into::<AppendError>::into)
+                .map_err(map_validate_append_block_error)
         } else {
             Ok(None)
         }?;
@@ -586,17 +587,19 @@ where
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait]
-impl<ObjRepo, RefRepo> MetadataChain for MetadataChainImpl<ObjRepo, RefRepo>
+impl<ObjRepo, RefRepo, MetaBlockStrategy> MetadataChain
+    for MetadataChainImpl<ObjRepo, RefRepo, MetaBlockStrategy>
 where
     ObjRepo: ObjectRepository + Sync + Send,
     RefRepo: ReferenceRepository + Sync + Send,
+    MetaBlockStrategy: GetMetadataBlockStrategy + Sync + Send,
 {
     async fn get_ref(&self, r: &BlockRef) -> Result<Multihash, GetRefError> {
         self.ref_repo.get(r).await
     }
 
     async fn get_block(&self, hash: &Multihash) -> Result<MetadataBlock, GetBlockError> {
-        self.get_block_strategy.get(hash).await
+        self.get_meta_block_strategy.get(hash).await
     }
 
     fn iter_blocks_interval<'a>(
@@ -796,5 +799,19 @@ where
 
     fn as_reference_repo(&self) -> &dyn ReferenceRepository {
         &self.ref_repo
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+// Helper functions
+/////////////////////////////////////////////////////////////////////////////////////////
+
+fn map_validate_append_block_error(v: GetBlockError) -> AppendError {
+    match v {
+        GetBlockError::NotFound(e) => AppendValidationError::PrevBlockNotFound(e).into(),
+        GetBlockError::BlockVersion(e) => AppendError::Internal(e.int_err()),
+        GetBlockError::BlockMalformed(e) => AppendError::Internal(e.int_err()),
+        GetBlockError::Access(e) => AppendError::Access(e),
+        GetBlockError::Internal(e) => AppendError::Internal(e.int_err()),
     }
 }

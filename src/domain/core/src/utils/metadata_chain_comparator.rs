@@ -167,7 +167,7 @@ impl MetadataChainComparator {
         let ahead_size = ahead_sequence_number - expected_common_sequence_number;
         ahead_chain.expecting_to_read_blocks(ahead_size);
 
-        let ahead_blocks: Vec<MetadataBlockPair> = ahead_chain
+        let ahead_blocks: Vec<HashedMetadataBlock> = ahead_chain
             .iter_blocks_interval(ahead_head, None, false)
             .take(usize::try_from(ahead_size).unwrap())
             .try_collect()
@@ -278,10 +278,10 @@ impl MetadataChainComparator {
 pub enum CompareChainsResult {
     Equal,
     LhsAhead {
-        lhs_ahead_blocks: Vec<MetadataBlockPair>,
+        lhs_ahead_blocks: Vec<HashedMetadataBlock>,
     },
     LhsBehind {
-        rhs_ahead_blocks: Vec<MetadataBlockPair>,
+        rhs_ahead_blocks: Vec<HashedMetadataBlock>,
     },
     Divergence {
         uncommon_blocks_in_lhs: u64,
@@ -294,7 +294,7 @@ pub enum CompareChainsResult {
 #[derive(Debug)]
 enum CommonAncestorCheck {
     Success {
-        ahead_blocks: Vec<MetadataBlockPair>,
+        ahead_blocks: Vec<HashedMetadataBlock>,
     },
     Failure {
         common_ancestor_sequence_number: Option<u64>,

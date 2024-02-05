@@ -11,39 +11,47 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use dashmap::DashMap;
-use kamu_core::GetBlockError;
+use kamu_core::{GetBlockError, ObjectRepository};
 use opendatafabric::{MetadataBlock, Multihash};
 
-use crate::GetMetadataBlockStrategy;
+use crate::{GetMetadataBlockStrategy, GetMetadataBlockStrategyImpl};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub type HashMetadataBlockCacheMap = DashMap<Multihash, MetadataBlock>;
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-pub struct GetMetadataBlockStrategyCacheInMemoryFacade {
-    strategy: Box<dyn GetMetadataBlockStrategy>,
-    cache: Arc<HashMetadataBlockCacheMap>,
+pub struct GetMetadataBlockStrategyCachingInMem<ObjRepo> {
+    wrapped: GetMetadataBlockStrategyImpl<ObjRepo>,
+    cache: DashMap<Multihash, MetadataBlock>,
 }
 
-impl GetMetadataBlockStrategyCacheInMemoryFacade {
-    pub fn new_boxed(
-        strategy: Box<dyn GetMetadataBlockStrategy>,
-        cache: Arc<HashMetadataBlockCacheMap>,
-    ) -> Box<Self> {
-        Box::new(Self { strategy, cache })
+/////////////////////////////////////////////////////////////////////////////////////////
+
+impl<ObjRepo> GetMetadataBlockStrategyCachingInMem<ObjRepo>
+where
+    ObjRepo: ObjectRepository + Sync + Send,
+{
+    pub fn new(obj_repo: Arc<ObjRepo>) -> Self {
+        let wrapped = GetMetadataBlockStrategyImpl::new(obj_repo);
+
+        Self {
+            wrapped,
+            cache: DashMap::new(),
+        }
     }
 }
 
+/////////////////////////////////////////////////////////////////////////////////////////
+
 #[async_trait]
-impl GetMetadataBlockStrategy for GetMetadataBlockStrategyCacheInMemoryFacade {
+impl<ObjRepo> GetMetadataBlockStrategy for GetMetadataBlockStrategyCachingInMem<ObjRepo>
+where
+    ObjRepo: ObjectRepository + Sync + Send,
+{
     async fn get(&self, hash: &Multihash) -> Result<MetadataBlock, GetBlockError> {
         if let Some(cached_result) = self.cache.get(hash) {
             return Ok(cached_result.clone());
         };
 
-        let get_result = self.strategy.get(hash).await;
+        let get_result = self.wrapped.get(hash).await;
 
         if let Ok(block) = &get_result {
             self.cache.insert(hash.clone(), block.clone());

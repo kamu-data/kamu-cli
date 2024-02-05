@@ -139,7 +139,7 @@ pub async fn prepare_dataset_metadata_batch(
     let encoder = flate2::write::GzEncoder::new(Vec::new(), Compression::default());
     let mut tarball_builder = tar::Builder::new(encoder);
 
-    let blocks_for_transfer: Vec<MetadataBlockPair> = metadata_chain
+    let blocks_for_transfer: Vec<HashedMetadataBlock> = metadata_chain
         .iter_blocks_interval(stop_at, begin_after, false)
         .try_collect()
         .await

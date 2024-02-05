@@ -27,14 +27,18 @@ pub struct GetMetadataBlockStrategyImpl<ObjRepo> {
     obj_repo: Arc<ObjRepo>,
 }
 
+/////////////////////////////////////////////////////////////////////////////////////////
+
 impl<ObjRepo> GetMetadataBlockStrategyImpl<ObjRepo>
 where
     ObjRepo: ObjectRepository + Sync + Send,
 {
-    pub fn new_boxed(obj_repo: Arc<ObjRepo>) -> Box<Self> {
-        Box::new(Self { obj_repo })
+    pub fn new(obj_repo: Arc<ObjRepo>) -> Self {
+        Self { obj_repo }
     }
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait]
 impl<ObjRepo> GetMetadataBlockStrategy for GetMetadataBlockStrategyImpl<ObjRepo>
