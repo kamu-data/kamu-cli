@@ -86,7 +86,6 @@ publish = false
 #      https://github.com/kamu-data/kamu-cli/issues/332
 new_without_default = "allow"
 too_many_arguments = "allow"
-large_enum_variant = "allow"
 module_inception = "allow"
 
 # clippy::pedantic

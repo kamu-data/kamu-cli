@@ -902,8 +902,8 @@ impl TransformService for TransformServiceImpl {
 
                 let err = VerificationError::DataNotReproducible(DataNotReproducible {
                     block_hash,
-                    expected_event: expected_event.into(),
-                    actual_event: actual_event.into(),
+                    expected_event: Box::new(expected_event.into()),
+                    actual_event: Box::new(actual_event.into()),
                 });
                 listener.error(&err);
                 return Err(err);
