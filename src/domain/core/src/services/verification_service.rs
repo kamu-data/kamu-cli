@@ -336,8 +336,8 @@ impl Display for DataDoesNotMatchMetadata {
 #[derive(Error, Debug)]
 pub struct DataNotReproducible {
     pub block_hash: Multihash,
-    pub expected_event: MetadataEvent,
-    pub actual_event: MetadataEvent,
+    pub expected_event: Box<MetadataEvent>,
+    pub actual_event: Box<MetadataEvent>,
 }
 
 impl Display for DataNotReproducible {
