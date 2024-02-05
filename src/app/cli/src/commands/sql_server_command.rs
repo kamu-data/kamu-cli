@@ -85,7 +85,8 @@ impl Command for SqlServerCommand {
                 Some(&self.address),
                 Some(self.port),
             )
-            .await?;
+            .await
+            .int_err()?;
 
         if let Some(s) = spinner {
             s.finish_and_clear();

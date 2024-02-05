@@ -437,15 +437,12 @@ pub fn get_command(
                 cli_catalog.get_one()?,
                 info_matches.get_one("output-format").map(String::as_str),
             )),
-            Some(("diagnose", _)) => {
-                let workspace_svc = cli_catalog.get_one::<WorkspaceService>()?;
-                Box::new(SystemDiagnoseCommand::new(
-                    cli_catalog.get_one()?,
-                    cli_catalog.get_one()?,
-                    cli_catalog.get_one()?,
-                    workspace_svc.is_in_workspace(),
-                ))
-            }
+            Some(("diagnose", _)) => Box::new(SystemDiagnoseCommand::new(
+                cli_catalog.get_one()?,
+                cli_catalog.get_one()?,
+                cli_catalog.get_one()?,
+                &cli_catalog.get_one()?,
+            )),
             Some(("ipfs", ipfs_matches)) => match ipfs_matches.subcommand() {
                 Some(("add", add_matches)) => Box::new(SystemIpfsAddCommand::new(
                     cli_catalog.get_one()?,

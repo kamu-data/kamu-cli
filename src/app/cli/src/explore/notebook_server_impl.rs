@@ -18,6 +18,7 @@ use container_runtime::*;
 use internal_error::*;
 
 use crate::config::JupyterConfig;
+use crate::error::{CommandRunError, SubprocessError};
 
 pub struct NotebookServerImpl {
     container_runtime: Arc<ContainerRuntime>,
@@ -63,7 +64,7 @@ impl NotebookServerImpl {
         inherit_stdio: bool,
         on_started: StartedClb,
         on_shutdown: ShutdownClb,
-    ) -> Result<(), InternalError>
+    ) -> Result<(), CommandRunError>
     where
         StartedClb: FnOnce(&str) + Send + 'static,
         ShutdownClb: FnOnce() + Send + 'static,
@@ -108,7 +109,12 @@ impl NotebookServerImpl {
                 Stdio::from(std::fs::File::create(&livy_stderr_path).int_err()?)
             })
             .spawn()
-            .int_err()?;
+            .map_err(|err| {
+                CommandRunError::SubprocessError(SubprocessError::new(
+                    vec![livy_stderr_path, livy_stdout_path],
+                    err,
+                ))
+            })?;
 
         let mut jupyter = self
             .container_runtime
@@ -162,7 +168,12 @@ impl NotebookServerImpl {
                 jupyter.take_stderr().unwrap(),
                 tokio::fs::File::create(&jupyter_stderr_path)
                     .await
-                    .int_err()?,
+                    .map_err(|err| {
+                        CommandRunError::SubprocessError(SubprocessError::new(
+                            vec![jupyter_stderr_path, jupyter_stdout_path],
+                            err,
+                        ))
+                    })?,
                 Some(token_clb),
             )
         };
