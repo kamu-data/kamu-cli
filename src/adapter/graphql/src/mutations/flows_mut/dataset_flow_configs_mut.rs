@@ -136,7 +136,11 @@ impl DatasetFlowConfigsMut {
         let flow_config_service = from_catalog::<dyn FlowConfigurationService>(ctx).unwrap();
 
         flow_config_service
-            .pause_dataset_flows(&self.dataset_handle.id, dataset_flow_type.map(Into::into))
+            .pause_dataset_flows(
+                Utc::now(),
+                &self.dataset_handle.id,
+                dataset_flow_type.map(Into::into),
+            )
             .await?;
 
         Ok(true)
@@ -153,7 +157,11 @@ impl DatasetFlowConfigsMut {
         let flow_config_service = from_catalog::<dyn FlowConfigurationService>(ctx).unwrap();
 
         flow_config_service
-            .resume_dataset_flows(&self.dataset_handle.id, dataset_flow_type.map(Into::into))
+            .resume_dataset_flows(
+                Utc::now(),
+                &self.dataset_handle.id,
+                dataset_flow_type.map(Into::into),
+            )
             .await?;
 
         Ok(true)

@@ -47,6 +47,7 @@ pub trait FlowConfigurationService: Sync + Send {
     /// If type is omitted, all possible dataset flow types are paused
     async fn pause_dataset_flows(
         &self,
+        request_time: DateTime<Utc>,
         dataset_id: &DatasetID,
         maybe_dataset_flow_type: Option<DatasetFlowType>,
     ) -> Result<(), InternalError>;
@@ -55,6 +56,7 @@ pub trait FlowConfigurationService: Sync + Send {
     /// If type is omitted, all possible system flow types are paused
     async fn pause_system_flows(
         &self,
+        request_time: DateTime<Utc>,
         maybe_system_flow_type: Option<SystemFlowType>,
     ) -> Result<(), InternalError>;
 
@@ -62,6 +64,7 @@ pub trait FlowConfigurationService: Sync + Send {
     /// If type is omitted, all possible types are resumed (where configured)
     async fn resume_dataset_flows(
         &self,
+        request_time: DateTime<Utc>,
         dataset_id: &DatasetID,
         maybe_dataset_flow_type: Option<DatasetFlowType>,
     ) -> Result<(), InternalError>;
@@ -71,6 +74,7 @@ pub trait FlowConfigurationService: Sync + Send {
     /// configured)
     async fn resume_system_flows(
         &self,
+        request_time: DateTime<Utc>,
         maybe_system_flow_type: Option<SystemFlowType>,
     ) -> Result<(), InternalError>;
 }
