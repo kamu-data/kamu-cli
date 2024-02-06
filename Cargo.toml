@@ -82,35 +82,32 @@ publish = false
 
 [workspace.lints.clippy]
 # clippy::all (clippy::сorrectness, clippy::suspicious, clippy::style, clippy::complexity, clippy::perf)
-# TODO enable back lint rules
-#      https://github.com/kamu-data/kamu-cli/issues/332
 new_without_default = "allow"
 too_many_arguments = "allow"
 module_inception = "allow"
 
 # clippy::pedantic
-# TODO: reactivate after polishing
-pedantic = { level = "warn", priority = 0 }
+pedantic = { level = "warn", priority = -1 }
 
-default_trait_access = { level = "allow", priority = 1 }
-fn_params_excessive_bools = { level = "allow", priority = 1 }
-if_not_else = { level = "allow", priority = 1 }
-ignored_unit_patterns = { level = "allow", priority = 1 }
-items_after_statements = { level = "allow", priority = 1 }
-match_wildcard_for_single_variants = { level = "allow", priority = 1 }
-missing_errors_doc = { level = "allow", priority = 1 }
-missing_panics_doc = { level = "allow", priority = 1 }
-module_name_repetitions = { level = "allow", priority = 1 }
-must_use_candidate = { level = "allow", priority = 1 }
-needless_raw_string_hashes = { level = "allow", priority = 1 }
-return_self_not_must_use = { level = "allow", priority = 1 }
-similar_names = { level = "allow", priority = 1 }
-single_match_else = { level = "allow", priority = 1 }
-struct_excessive_bools = { level = "allow", priority = 1 }
-struct_field_names = { level = "allow", priority = 1 }
-too_many_lines = { level = "allow", priority = 1 }
-unused_self = { level = "allow", priority = 1 }
-wildcard_imports = { level = "allow", priority = 1 }
+default_trait_access = "allow"
+fn_params_excessive_bools = "allow"
+if_not_else = "allow"
+ignored_unit_patterns = "allow"
+items_after_statements = "allow"
+match_wildcard_for_single_variants = "allow"
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+module_name_repetitions = "allow"
+must_use_candidate = "allow"
+needless_raw_string_hashes = "allow"
+return_self_not_must_use = "allow"
+similar_names = "allow"
+single_match_else = "allow"
+struct_excessive_bools = "allow"
+struct_field_names = "allow"
+too_many_lines = "allow"
+unused_self = "allow"
+wildcard_imports = "allow"
 
 
 # clippy::cargo
