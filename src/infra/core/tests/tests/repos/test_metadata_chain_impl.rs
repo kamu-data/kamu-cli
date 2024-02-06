@@ -9,7 +9,6 @@
 
 use std::assert_matches::assert_matches;
 use std::path::Path;
-use std::sync::Arc;
 
 use chrono::{TimeZone, Utc};
 use kamu::domain::*;
@@ -23,13 +22,12 @@ fn init_chain(root: &Path) -> impl MetadataChain {
     std::fs::create_dir(&blocks_dir).unwrap();
     std::fs::create_dir(&refs_dir).unwrap();
 
-    let obj_repo = Arc::new(ObjectRepositoryLocalFSSha3::new(
+    let meta_block_repo = MetadataBlockRepositoryImpl::new(ObjectRepositoryLocalFSSha3::new(
         blocks_dir, /* unknown yet */
     ));
     let ref_repo = ReferenceRepositoryImpl::new(NamedObjectRepositoryLocalFS::new(refs_dir));
-    let get_metadata_block_strategy = GetMetadataBlockStrategyImpl::new(obj_repo.clone());
 
-    MetadataChainImpl::new(obj_repo, ref_repo, get_metadata_block_strategy)
+    MetadataChainImpl::new(meta_block_repo, ref_repo)
 }
 
 #[tokio::test]

@@ -7,16 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::sync::Arc;
-
 use async_trait::async_trait;
 use futures::TryStreamExt;
 use kamu_core::*;
-use opendatafabric::serde::flatbuffers::*;
-use opendatafabric::serde::*;
 use opendatafabric::*;
-
-use crate::GetMetadataBlockStrategy;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -28,29 +22,22 @@ macro_rules! invalid_event {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct MetadataChainImpl<ObjRepo, RefRepo, MetaBlockStrategy> {
-    obj_repo: Arc<ObjRepo>,
+pub struct MetadataChainImpl<MetaBlockRepo, RefRepo> {
+    meta_block_repo: MetaBlockRepo,
     ref_repo: RefRepo,
-    get_meta_block_strategy: MetaBlockStrategy,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-impl<ObjRepo, RefRepo, MetaBlockStrategy> MetadataChainImpl<ObjRepo, RefRepo, MetaBlockStrategy>
+impl<MetaBlockRepo, RefRepo> MetadataChainImpl<MetaBlockRepo, RefRepo>
 where
-    ObjRepo: ObjectRepository + Sync + Send,
+    MetaBlockRepo: MetadataBlockRepository + Sync + Send,
     RefRepo: ReferenceRepository + Sync + Send,
-    MetaBlockStrategy: GetMetadataBlockStrategy + Sync + Send,
 {
-    pub fn new(
-        obj_repo: Arc<ObjRepo>,
-        ref_repo: RefRepo,
-        get_meta_block_strategy: MetaBlockStrategy,
-    ) -> Self {
+    pub fn new(meta_block_repo: MetaBlockRepo, ref_repo: RefRepo) -> Self {
         Self {
-            obj_repo,
+            meta_block_repo,
             ref_repo,
-            get_meta_block_strategy,
         }
     }
 
@@ -59,7 +46,7 @@ where
         new_block: &MetadataBlock,
     ) -> Result<(), AppendError> {
         if let Some(prev) = &new_block.prev_block_hash {
-            match self.obj_repo.contains(prev).await {
+            match self.meta_block_repo.contains(prev).await {
                 Ok(true) => Ok(()),
                 Ok(false) => Err(
                     AppendValidationError::PrevBlockNotFound(BlockNotFoundError {
@@ -587,19 +574,17 @@ where
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait]
-impl<ObjRepo, RefRepo, MetaBlockStrategy> MetadataChain
-    for MetadataChainImpl<ObjRepo, RefRepo, MetaBlockStrategy>
+impl<MetaBlockRepo, RefRepo> MetadataChain for MetadataChainImpl<MetaBlockRepo, RefRepo>
 where
-    ObjRepo: ObjectRepository + Sync + Send,
+    MetaBlockRepo: MetadataBlockRepository + Sync + Send,
     RefRepo: ReferenceRepository + Sync + Send,
-    MetaBlockStrategy: GetMetadataBlockStrategy + Sync + Send,
 {
     async fn get_ref(&self, r: &BlockRef) -> Result<Multihash, GetRefError> {
         self.ref_repo.get(r).await
     }
 
     async fn get_block(&self, hash: &Multihash) -> Result<MetadataBlock, GetBlockError> {
-        self.get_meta_block_strategy.get(hash).await
+        self.meta_block_repo.get(hash).await
     }
 
     fn iter_blocks_interval<'a>(
@@ -693,7 +678,7 @@ where
         opts: SetRefOpts<'a>,
     ) -> Result<(), SetRefError> {
         if opts.validate_block_present {
-            match self.obj_repo.contains(hash).await {
+            match self.meta_block_repo.contains(hash).await {
                 Ok(true) => Ok(()),
                 Ok(false) => Err(SetRefError::BlockNotFound(BlockNotFoundError {
                     hash: hash.clone(),
@@ -765,14 +750,10 @@ where
             }
         }
 
-        let data = FlatbuffersMetadataBlockSerializer
-            .write_manifest(&block)
-            .int_err()?;
-
         let res = self
-            .obj_repo
-            .insert_bytes(
-                &data,
+            .meta_block_repo
+            .insert(
+                &block,
                 InsertOpts {
                     precomputed_hash: opts.precomputed_hash,
                     expected_hash: opts.expected_hash,
@@ -794,7 +775,7 @@ where
     }
 
     fn as_object_repo(&self) -> &dyn ObjectRepository {
-        self.obj_repo.as_ref()
+        self.meta_block_repo.as_object_repo()
     }
 
     fn as_reference_repo(&self) -> &dyn ReferenceRepository {

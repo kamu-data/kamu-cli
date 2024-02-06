@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use std::assert_matches::assert_matches;
-use std::sync::Arc;
 
 use kamu::testing::MetadataFactory;
 use kamu::*;
@@ -19,11 +18,10 @@ use opendatafabric::*;
 /////////////////////////////////////////////////////////////////////////////////////////
 
 fn init_chain() -> impl MetadataChain {
-    let obj_repo = Arc::new(ObjectRepositoryInMemory::new());
+    let meta_block_repo = MetadataBlockRepositoryImpl::new(ObjectRepositoryInMemory::new());
     let ref_repo = ReferenceRepositoryImpl::new(NamedObjectRepositoryInMemory::new());
-    let get_metadata_block_strategy = GetMetadataBlockStrategyImpl::new(obj_repo.clone());
 
-    MetadataChainImpl::new(obj_repo, ref_repo, get_metadata_block_strategy)
+    MetadataChainImpl::new(meta_block_repo, ref_repo)
 }
 
 async fn push_block(chain: &dyn MetadataChain, block: MetadataBlock) -> Multihash {

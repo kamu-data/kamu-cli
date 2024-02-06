@@ -7,30 +7,36 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::sync::Arc;
-
 use async_trait::async_trait;
 use dashmap::DashMap;
-use kamu_core::{GetBlockError, ObjectRepository};
+use kamu_core::{
+    ContainsError,
+    GetBlockError,
+    InsertError,
+    InsertOpts,
+    InsertResult,
+    MetadataBlockRepository,
+    ObjectRepository,
+};
 use opendatafabric::{MetadataBlock, Multihash};
 
-use crate::{GetMetadataBlockStrategy, GetMetadataBlockStrategyImpl};
+use crate::MetadataBlockRepositoryImpl;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct GetMetadataBlockStrategyCachingInMem<ObjRepo> {
-    wrapped: GetMetadataBlockStrategyImpl<ObjRepo>,
+pub struct MetadataBlockRepositoryCachingInMem<ObjRepo> {
+    wrapped: MetadataBlockRepositoryImpl<ObjRepo>,
     cache: DashMap<Multihash, MetadataBlock>,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-impl<ObjRepo> GetMetadataBlockStrategyCachingInMem<ObjRepo>
+impl<ObjRepo> MetadataBlockRepositoryCachingInMem<ObjRepo>
 where
     ObjRepo: ObjectRepository + Sync + Send,
 {
-    pub fn new(obj_repo: Arc<ObjRepo>) -> Self {
-        let wrapped = GetMetadataBlockStrategyImpl::new(obj_repo);
+    pub fn new(obj_repo: ObjRepo) -> Self {
+        let wrapped = MetadataBlockRepositoryImpl::new(obj_repo);
 
         Self {
             wrapped,
@@ -42,10 +48,18 @@ where
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait]
-impl<ObjRepo> GetMetadataBlockStrategy for GetMetadataBlockStrategyCachingInMem<ObjRepo>
+impl<ObjRepo> MetadataBlockRepository for MetadataBlockRepositoryCachingInMem<ObjRepo>
 where
     ObjRepo: ObjectRepository + Sync + Send,
 {
+    async fn contains(&self, hash: &Multihash) -> Result<bool, ContainsError> {
+        if self.cache.contains_key(hash) {
+            return Ok(true);
+        }
+
+        self.wrapped.contains(hash).await
+    }
+
     async fn get(&self, hash: &Multihash) -> Result<MetadataBlock, GetBlockError> {
         if let Some(cached_result) = self.cache.get(hash) {
             return Ok(cached_result.clone());
@@ -58,5 +72,23 @@ where
         }
 
         get_result
+    }
+
+    async fn insert<'a>(
+        &'a self,
+        block: &MetadataBlock,
+        options: InsertOpts<'a>,
+    ) -> Result<InsertResult, InsertError> {
+        let insert_result = self.wrapped.insert(block, options).await;
+
+        if let Ok(result) = &insert_result {
+            self.cache.insert(result.hash.clone(), block.clone());
+        }
+
+        insert_result
+    }
+
+    fn as_object_repo(&self) -> &dyn ObjectRepository {
+        self.wrapped.as_object_repo()
     }
 }

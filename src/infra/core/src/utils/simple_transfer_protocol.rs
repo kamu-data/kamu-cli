@@ -75,11 +75,9 @@ impl SimpleTransferProtocol {
     ) -> Result<SyncResult, SyncError> {
         listener.begin();
 
-        let obj_repo = Arc::new(ObjectRepositoryInMemory::new());
         let empty_chain = MetadataChainImpl::new(
-            obj_repo.clone(),
+            MetadataBlockRepositoryCachingInMem::new(ObjectRepositoryInMemory::new()),
             ReferenceRepositoryImpl::new(NamedObjectRepositoryInMemory::new()),
-            GetMetadataBlockStrategyImpl::new(obj_repo),
         );
 
         let src_chain = src.as_metadata_chain();

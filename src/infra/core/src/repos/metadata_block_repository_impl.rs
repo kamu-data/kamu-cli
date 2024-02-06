@@ -7,33 +7,37 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::sync::Arc;
-
 use async_trait::async_trait;
+use internal_error::ResultIntoInternal;
 use kamu_core::{
     deserialize_metadata_block,
     BlockNotFoundError,
+    ContainsError,
     GetBlockError,
     GetError,
+    InsertError,
+    InsertOpts,
+    InsertResult,
+    MetadataBlockRepository,
     ObjectRepository,
 };
+use opendatafabric::serde::flatbuffers::FlatbuffersMetadataBlockSerializer;
+use opendatafabric::serde::MetadataBlockSerializer;
 use opendatafabric::{MetadataBlock, Multihash};
-
-use crate::GetMetadataBlockStrategy;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct GetMetadataBlockStrategyImpl<ObjRepo> {
-    obj_repo: Arc<ObjRepo>,
+pub struct MetadataBlockRepositoryImpl<ObjRepo> {
+    obj_repo: ObjRepo,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-impl<ObjRepo> GetMetadataBlockStrategyImpl<ObjRepo>
+impl<ObjRepo> MetadataBlockRepositoryImpl<ObjRepo>
 where
     ObjRepo: ObjectRepository + Sync + Send,
 {
-    pub fn new(obj_repo: Arc<ObjRepo>) -> Self {
+    pub fn new(obj_repo: ObjRepo) -> Self {
         Self { obj_repo }
     }
 }
@@ -41,10 +45,14 @@ where
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait]
-impl<ObjRepo> GetMetadataBlockStrategy for GetMetadataBlockStrategyImpl<ObjRepo>
+impl<ObjRepo> MetadataBlockRepository for MetadataBlockRepositoryImpl<ObjRepo>
 where
     ObjRepo: ObjectRepository + Sync + Send,
 {
+    async fn contains(&self, hash: &Multihash) -> Result<bool, ContainsError> {
+        self.obj_repo.contains(hash).await
+    }
+
     async fn get(&self, hash: &Multihash) -> Result<MetadataBlock, GetBlockError> {
         let data = match self.obj_repo.get_bytes(hash).await {
             Ok(data) => Ok(data),
@@ -56,5 +64,21 @@ where
         }?;
 
         deserialize_metadata_block(hash, &data)
+    }
+
+    async fn insert<'a>(
+        &'a self,
+        block: &MetadataBlock,
+        options: InsertOpts<'a>,
+    ) -> Result<InsertResult, InsertError> {
+        let data = FlatbuffersMetadataBlockSerializer
+            .write_manifest(block)
+            .int_err()?;
+
+        self.obj_repo.insert_bytes(&data, options).await
+    }
+
+    fn as_object_repo(&self) -> &dyn ObjectRepository {
+        &self.obj_repo
     }
 }

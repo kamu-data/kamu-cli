@@ -55,7 +55,7 @@ impl ResetService for ResetServiceImpl {
                 block_hash,
                 SetRefOpts {
                     validate_block_present: true,
-                    check_ref_is: Option::None,
+                    check_ref_is: None,
                 },
             )
             .await?;

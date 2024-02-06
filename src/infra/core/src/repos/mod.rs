@@ -64,14 +64,11 @@ pub use object_store_builder_s3::*;
 mod object_store_builder_local_fs;
 pub use object_store_builder_local_fs::*;
 
-mod get_metadata_block_strategy;
-pub use get_metadata_block_strategy::*;
-
-mod get_metadata_block_strategy_impl;
-pub use get_metadata_block_strategy_impl::*;
-
-mod get_metadata_block_strategy_caching_inmem;
-pub use get_metadata_block_strategy_caching_inmem::*;
-
 mod reference_repository_caching_inmem;
 pub use reference_repository_caching_inmem::*;
+
+mod metadata_block_repository_impl;
+pub use metadata_block_repository_impl::*;
+
+mod metadata_block_repository_caching_inmem;
+pub use metadata_block_repository_caching_inmem::*;

@@ -329,14 +329,12 @@ async fn test_transform_common(transform: Transform) {
 
     let deriv_alias = deriv_snapshot.name.clone();
 
-    let dataset = dataset_repo
+    let dataset_ref = dataset_repo
         .create_dataset_from_snapshot(deriv_snapshot)
         .await
         .unwrap()
-        .dataset;
-
-    let deriv_helper = DatasetHelper::new(dataset.clone(), tempdir.path());
-    let deriv_data_helper = DatasetDataHelper::new(dataset);
+        .dataset_handle
+        .as_local_ref();
 
     let time_source = catalog.get_one::<SystemTimeSourceStub>().unwrap();
     time_source.set(Utc.with_ymd_and_hms(2050, 1, 2, 12, 0, 0).unwrap());
@@ -348,8 +346,12 @@ async fn test_transform_common(transform: Transform) {
     assert_matches!(res, TransformResult::Updated { .. });
 
     // First transform writes two blocks: SetDataSchema, ExecuteTransform
+    let dataset = dataset_repo.get_dataset(&dataset_ref).await.unwrap();
+    let deriv_helper = DatasetHelper::new(dataset.clone(), tempdir.path());
+
     assert_eq!(deriv_helper.block_count().await, 4);
 
+    let deriv_data_helper = DatasetDataHelper::new(dataset);
     let df = deriv_data_helper.get_last_data().await;
     kamu_data_utils::testing::assert_data_eq(
         df.clone(),
@@ -418,9 +420,14 @@ async fn test_transform_common(transform: Transform) {
     assert_matches!(res, TransformResult::Updated { .. });
 
     // Only one block written this time
+    let dataset = dataset_repo.get_dataset(&dataset_ref).await.unwrap();
+    let deriv_helper = DatasetHelper::new(dataset.clone(), tempdir.path());
+
     assert_eq!(deriv_helper.block_count().await, 5);
 
+    let deriv_data_helper = DatasetDataHelper::new(dataset);
     let df = deriv_data_helper.get_last_data().await;
+
     kamu_data_utils::testing::assert_data_eq(
         df.clone(),
         indoc!(

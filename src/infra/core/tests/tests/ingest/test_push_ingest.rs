@@ -57,7 +57,6 @@ async fn test_ingest_push_url_stream() {
     let dataset_ref = dataset_alias.as_local_ref();
 
     harness.create_dataset(dataset_snapshot).await;
-    let data_helper = harness.dataset_data_helper(&dataset_alias).await;
 
     // Round 1: Push from URL
     let src_path = harness.temp_dir.path().join("data.csv");
@@ -85,6 +84,8 @@ async fn test_ingest_push_url_stream() {
         )
         .await
         .unwrap();
+
+    let data_helper = harness.dataset_data_helper(&dataset_alias).await;
 
     data_helper
         .assert_last_data_eq(
@@ -139,6 +140,8 @@ async fn test_ingest_push_url_stream() {
         .ingest_from_file_stream(&dataset_ref, None, Box::new(data), None, None)
         .await
         .unwrap();
+
+    let data_helper = harness.dataset_data_helper(&dataset_alias).await;
 
     data_helper
         .assert_last_data_records_eq(indoc!(
@@ -199,7 +202,6 @@ async fn test_ingest_push_media_type_override() {
     let dataset_ref = dataset_alias.as_local_ref();
 
     harness.create_dataset(dataset_snapshot).await;
-    let data_helper = harness.dataset_data_helper(&dataset_alias).await;
 
     // Push CSV conversion
     let src_path = harness.temp_dir.path().join("data.csv");
@@ -224,6 +226,8 @@ async fn test_ingest_push_media_type_override() {
         )
         .await
         .unwrap();
+
+    let data_helper = harness.dataset_data_helper(&dataset_alias).await;
 
     data_helper
         .assert_last_data_eq(
@@ -274,6 +278,8 @@ async fn test_ingest_push_media_type_override() {
         )
         .await
         .unwrap();
+
+    let data_helper = harness.dataset_data_helper(&dataset_alias).await;
 
     data_helper
         .assert_last_data_eq(
@@ -326,6 +332,8 @@ async fn test_ingest_push_media_type_override() {
         )
         .await
         .unwrap();
+
+    let data_helper = harness.dataset_data_helper(&dataset_alias).await;
 
     data_helper
         .assert_last_data_eq(

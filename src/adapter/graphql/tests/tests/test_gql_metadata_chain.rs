@@ -302,7 +302,7 @@ async fn metadata_update_readme_new() {
         .await
         .unwrap();
 
-    let dataset = create_result.dataset.clone();
+    let dataset_ref = create_result.dataset_handle.as_local_ref();
 
     let schema = kamu_adapter_graphql::schema_quiet();
 
@@ -360,8 +360,10 @@ async fn metadata_update_readme_new() {
 
     assert_result(res, "CommitResultSuccess");
 
+    let dataset = dataset_repo.get_dataset(&dataset_ref).await.unwrap();
+
     assert_attachments_eq(
-        dataset.clone(),
+        dataset,
         SetAttachments {
             attachments: Attachments::Embedded(AttachmentsEmbedded {
                 items: vec![AttachmentEmbedded {
@@ -403,8 +405,10 @@ async fn metadata_update_readme_new() {
 
     assert_result(res, "CommitResultSuccess");
 
+    let dataset = dataset_repo.get_dataset(&dataset_ref).await.unwrap();
+
     assert_attachments_eq(
-        dataset.clone(),
+        dataset,
         SetAttachments {
             attachments: Attachments::Embedded(AttachmentsEmbedded { items: vec![] }),
         },
@@ -494,8 +498,10 @@ async fn metadata_update_readme_new() {
 
     assert_result(res, "CommitResultSuccess");
 
+    let dataset = dataset_repo.get_dataset(&dataset_ref).await.unwrap();
+
     assert_attachments_eq(
-        dataset.clone(),
+        dataset,
         SetAttachments {
             attachments: Attachments::Embedded(AttachmentsEmbedded {
                 items: vec![
