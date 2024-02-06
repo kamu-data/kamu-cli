@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use futures::TryStreamExt;
+use futures::{StreamExt, TryStreamExt};
 use kamu::domain::*;
 use kamu::utils::datasets_filtering::filter_datasets_by_pattern;
 use opendatafabric::*;
@@ -25,6 +25,7 @@ type GenericVerificationResult = Result<Vec<VerificationResult>, CLIError>;
 pub struct VerifyCommand {
     dataset_repo: Arc<dyn DatasetRepository>,
     verification_svc: Arc<dyn VerificationService>,
+    dependency_graph_service: Arc<dyn DependencyGraphService>,
     output_config: Arc<OutputConfig>,
     refs: Vec<DatasetRefPattern>,
     recursive: bool,
@@ -35,6 +36,7 @@ impl VerifyCommand {
     pub fn new<I>(
         dataset_repo: Arc<dyn DatasetRepository>,
         verification_svc: Arc<dyn VerificationService>,
+        dependency_graph_service: Arc<dyn DependencyGraphService>,
         output_config: Arc<OutputConfig>,
         refs: I,
         recursive: bool,
@@ -46,6 +48,7 @@ impl VerifyCommand {
         Self {
             dataset_repo,
             verification_svc,
+            dependency_graph_service,
             output_config,
             refs: refs.collect(),
             recursive,
@@ -79,16 +82,34 @@ impl VerifyCommand {
     ) -> GenericVerificationResult {
         let dataset_ref_pattern = self.refs.first().unwrap();
 
-        let requests: Vec<_> = filter_datasets_by_pattern(
+        let dataset_ids: Vec<_> = filter_datasets_by_pattern(
             self.dataset_repo.as_ref(),
             vec![dataset_ref_pattern.clone()],
         )
-        .map_ok(|dataset_handle| VerificationRequest {
-            dataset_ref: dataset_handle.as_local_ref(),
-            block_range: (None, None),
-        })
+        .map_ok(|dataset_handle| dataset_handle.as_local_ref().id().unwrap().clone())
         .try_collect()
         .await?;
+
+        let requests: Vec<_> = if self.recursive {
+            self.dependency_graph_service
+                .get_all_upstream_dependencies(dataset_ids)
+                .await
+                .int_err()?
+                .map(|dataset_id| VerificationRequest {
+                    dataset_ref: DatasetRef::ID(dataset_id),
+                    block_range: (None, None),
+                })
+                .collect()
+                .await
+        } else {
+            dataset_ids
+                .iter()
+                .map(|dataset_id| VerificationRequest {
+                    dataset_ref: DatasetRef::ID(dataset_id.clone()),
+                    block_range: (None, None),
+                })
+                .collect()
+        };
 
         if requests.is_empty() {
             return Ok(vec![]);
@@ -110,12 +131,6 @@ impl Command for VerifyCommand {
         if self.refs.len() != 1 {
             return Err(CLIError::usage_error(
                 "Verifying multiple datasets at once is not yet supported",
-            ));
-        }
-
-        if self.recursive {
-            return Err(CLIError::usage_error(
-                "Verifying datasets recursively is not yet supported",
             ));
         }
 

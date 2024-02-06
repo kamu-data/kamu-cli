@@ -495,6 +495,7 @@ pub fn get_command(
             cli_catalog.get_one()?,
             cli_catalog.get_one()?,
             cli_catalog.get_one()?,
+            cli_catalog.get_one()?,
             validate_many_dataset_patterns(
                 cli_catalog,
                 submatches.get_many("dataset").unwrap().cloned(),

@@ -36,6 +36,11 @@ pub trait DependencyGraphService: Sync + Send {
         &self,
         dataset_id: &DatasetID,
     ) -> Result<DatasetIDStream, GetUpstreamDependenciesError>;
+
+    async fn get_all_upstream_dependencies(
+        &self,
+        dataset_ids: Vec<DatasetID>,
+    ) -> Result<DatasetIDStream, GetUpstreamDependenciesError>;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
