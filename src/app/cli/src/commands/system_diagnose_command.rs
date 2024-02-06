@@ -121,6 +121,7 @@ impl Command for SystemDiagnoseCommand {
 enum DiagnosticCheckError {
     #[error(transparent)]
     Failed(#[from] CommandExecError),
+
     #[error(transparent)]
     Internal(
         #[from]
@@ -179,11 +180,14 @@ impl std::fmt::Display for CommandExecError {
 #[async_trait::async_trait]
 trait DiagnosticCheck {
     fn name(&self) -> String;
+
     async fn run(&self) -> Result<(), DiagnosticCheckError>;
+
     fn stderr_file_path(&self) -> PathBuf;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+
 struct CheckContainerRuntimeIsInstalled {
     container_runtime: Arc<ContainerRuntime>,
     run_info_dir: PathBuf,
@@ -194,9 +198,11 @@ impl DiagnosticCheck for CheckContainerRuntimeIsInstalled {
     fn name(&self) -> String {
         format!("{} installed", self.container_runtime.config.runtime)
     }
+
     fn stderr_file_path(&self) -> PathBuf {
         self.run_info_dir.join("kamu.diagnose-stderr-installed.log")
     }
+
     async fn run(&self) -> Result<(), DiagnosticCheckError> {
         let command_res = self
             .container_runtime
@@ -220,9 +226,11 @@ impl DiagnosticCheck for CheckContainerRuntimeImagePull {
     fn name(&self) -> String {
         format!("{} can pull images", self.container_runtime.config.runtime)
     }
+
     fn stderr_file_path(&self) -> PathBuf {
         unimplemented!()
     }
+
     async fn run(&self) -> Result<(), DiagnosticCheckError> {
         self.container_runtime
             .pull_image(BUSYBOX, None)
@@ -248,9 +256,11 @@ impl DiagnosticCheck for CheckContainerRuntimeRootlessRun {
             self.container_runtime.config.runtime
         )
     }
+
     fn stderr_file_path(&self) -> PathBuf {
         self.run_info_dir.join("kamu.diagnose-stderr-rootless.log")
     }
+
     async fn run(&self) -> Result<(), DiagnosticCheckError> {
         let run_args = RunArgs {
             image: BUSYBOX.to_string(),
@@ -285,9 +295,11 @@ impl DiagnosticCheck for CheckContainerRuntimeVolumeMount {
             self.container_runtime.config.runtime
         )
     }
+
     fn stderr_file_path(&self) -> PathBuf {
         self.run_info_dir.join("kamu.diagnose-stderr-volume.log")
     }
+
     async fn run(&self) -> Result<(), DiagnosticCheckError> {
         let dir_to_mount = std::env::current_dir()?;
         let file_path = dir_to_mount.join("tmp.txt");
@@ -323,9 +335,11 @@ impl DiagnosticCheck for CheckWorkspaceConsistent {
     fn name(&self) -> String {
         "workspace consistent".to_string()
     }
+
     fn stderr_file_path(&self) -> PathBuf {
         unimplemented!()
     }
+
     async fn run(&self) -> Result<(), DiagnosticCheckError> {
         let progress = Arc::new(VerificationMultiProgress::new());
 
