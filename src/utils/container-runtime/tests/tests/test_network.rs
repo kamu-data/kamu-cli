@@ -18,7 +18,7 @@ async fn test_network_handle_free_not_called() {
         .create_random_network_with_prefix("kamu-test-network-")
         .await
         .unwrap();
-    let network_name = network.name().unwrap();
+    let network_name = network.name().to_owned();
 
     assert!(rt.has_network(&network_name).await.unwrap());
 

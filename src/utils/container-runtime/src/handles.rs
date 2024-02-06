@@ -30,8 +30,11 @@ impl NetworkHandle {
         }
     }
 
-    pub fn name(&self) -> Option<String> {
-        self.network_name.clone()
+    pub fn name(&self) -> &str {
+        self.network_name
+            .as_ref()
+            .map(|v| -> &str { v.as_ref() })
+            .unwrap()
     }
 
     pub async fn free(mut self) -> Result<(), ContainerRuntimeError> {

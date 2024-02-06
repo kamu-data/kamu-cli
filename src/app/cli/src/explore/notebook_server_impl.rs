@@ -78,7 +78,7 @@ impl NotebookServerImpl {
             .create_random_network_with_prefix("kamu-")
             .await
             .int_err()?;
-        let network_name = network.name().unwrap();
+        let network_name = network.name();
 
         let cwd = Path::new(".").canonicalize().unwrap();
 
@@ -92,7 +92,7 @@ impl NotebookServerImpl {
             .run_attached(self.jupyter_config.livy_image.as_ref().unwrap())
             .random_container_name_with_prefix("kamu-livy-")
             .hostname("kamu-livy")
-            .network(&network_name)
+            .network(network_name)
             .user("root")
             .work_dir("/opt/bitnami/spark/work-dir")
             .volume((&datasets_dir, "/opt/bitnami/spark/work-dir"))
@@ -114,7 +114,7 @@ impl NotebookServerImpl {
             .container_runtime
             .run_attached(self.jupyter_config.image.as_ref().unwrap())
             .random_container_name_with_prefix("kamu-jupyter-")
-            .network(&network_name)
+            .network(network_name)
             .user("root")
             .work_dir("/opt/workdir")
             .expose_port(80)
