@@ -29,7 +29,7 @@ use kamu::utils::docker_images::BUSYBOX;
 use thiserror::Error;
 
 use super::{CLIError, Command};
-use crate::{VerificationMultiProgress, WorkspaceService};
+use crate::VerificationMultiProgress;
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -51,14 +51,15 @@ impl SystemDiagnoseCommand {
         dataset_repo: Arc<dyn DatasetRepository>,
         verification_svc: Arc<dyn VerificationService>,
         container_runtime: Arc<ContainerRuntime>,
-        workpace_svc: &Arc<WorkspaceService>,
+        is_in_workpace: bool,
+        run_info_dir: PathBuf,
     ) -> Self {
         Self {
             dataset_repo,
             verification_svc,
             container_runtime,
-            is_in_workpace: workpace_svc.is_in_workspace(),
-            run_info_dir: workpace_svc.layout().unwrap().run_info_dir.clone(),
+            is_in_workpace,
+            run_info_dir,
         }
     }
 }
