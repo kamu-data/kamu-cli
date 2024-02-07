@@ -21,7 +21,7 @@ use kamu_core::events::{
 use kamu_core::*;
 use opendatafabric::DatasetID;
 use petgraph::stable_graph::{NodeIndex, StableDiGraph};
-use petgraph::visit::{Bfs, Dfs, Walker};
+use petgraph::visit::{depth_first_search, Bfs, DfsEvent, Walker};
 use petgraph::Direction;
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -263,30 +263,29 @@ impl DependencyGraphService for DependencyGraphServiceInMemory {
             })
             .collect::<Result<Vec<_>, _>>()?;
         let mut node_indexes_result = HashSet::new();
+        let mut result = vec![];
 
         for node_index in &nodes_to_search {
-            let mut bfs = Dfs::new(&state.datasets_graph, *node_index);
-            while let Some(ni) = bfs.walk_next(&state.datasets_graph) {
-                // Insert current node_index into HashSet
-                // if it return false it means we already have such value
-                // skip searching
-                if !node_indexes_result.insert(ni) {
-                    break;
+            let mut current_node_result = vec![];
+            depth_first_search(&state.datasets_graph, Some(*node_index), |event| {
+                if let DfsEvent::Discover(node_index_event, _) = event {
+                    if !node_indexes_result.contains(&node_index_event) {
+                        node_indexes_result.insert(node_index_event);
+
+                        current_node_result.push(
+                            state
+                                .datasets_graph
+                                .node_weight(node_index_event)
+                                .unwrap()
+                                .clone(),
+                        );
+                    }
                 }
-            }
+            });
+
+            current_node_result.reverse();
+            result.extend(current_node_result);
         }
-
-        let result: Vec<_> = node_indexes_result
-            .iter()
-            .map(|node_index| {
-                state
-                    .datasets_graph
-                    .node_weight(*node_index)
-                    .unwrap()
-                    .clone()
-            })
-            .collect();
-
         Ok(Box::pin(tokio_stream::iter(result)))
     }
 
