@@ -167,3 +167,20 @@ impl<'a> std::fmt::Display for PrettyCLIError<'a> {
         }
     }
 }
+
+///////////////////////////////////////////////////////////////////////////////
+
+impl std::fmt::Display for SubprocessError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Failed to run subprocess: \n {}", self.source)?;
+
+        if !self.log_files.is_empty() {
+            writeln!(f, ", see log files for details:")?;
+            for path in &self.log_files {
+                writeln!(f, "- {}", path.display())?;
+            }
+        }
+
+        Ok(())
+    }
+}

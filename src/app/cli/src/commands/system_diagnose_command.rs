@@ -9,6 +9,7 @@
 
 use std::fs::File;
 use std::io::Write;
+use std::path::PathBuf;
 use std::process::Output;
 use std::sync::Arc;
 
@@ -16,6 +17,7 @@ use console::style;
 use container_runtime::{get_random_name_with_prefix, ContainerRuntime, RunArgs};
 use futures::TryStreamExt;
 use internal_error::{InternalError, ResultIntoInternal};
+use kamu::domain::engine::normalize_logs;
 use kamu::domain::{
     DatasetRepository,
     OwnedFile,
@@ -41,6 +43,7 @@ pub struct SystemDiagnoseCommand {
     verification_svc: Arc<dyn VerificationService>,
     container_runtime: Arc<ContainerRuntime>,
     is_in_workpace: bool,
+    run_info_dir: PathBuf,
 }
 
 impl SystemDiagnoseCommand {
@@ -49,12 +52,14 @@ impl SystemDiagnoseCommand {
         verification_svc: Arc<dyn VerificationService>,
         container_runtime: Arc<ContainerRuntime>,
         is_in_workpace: bool,
+        run_info_dir: PathBuf,
     ) -> Self {
         Self {
             dataset_repo,
             verification_svc,
             container_runtime,
             is_in_workpace,
+            run_info_dir,
         }
     }
 }
@@ -71,15 +76,18 @@ impl Command for SystemDiagnoseCommand {
         let mut diagnostic_checks: Vec<Box<dyn DiagnosticCheck>> = vec![
             Box::new(CheckContainerRuntimeIsInstalled {
                 container_runtime: self.container_runtime.clone(),
+                run_info_dir: self.run_info_dir.clone(),
             }),
             Box::new(CheckContainerRuntimeImagePull {
                 container_runtime: self.container_runtime.clone(),
             }),
             Box::new(CheckContainerRuntimeRootlessRun {
                 container_runtime: self.container_runtime.clone(),
+                run_info_dir: self.run_info_dir.clone(),
             }),
             Box::new(CheckContainerRuntimeVolumeMount {
                 container_runtime: self.container_runtime.clone(),
+                run_info_dir: self.run_info_dir.clone(),
             }),
         ];
         // Add checks which required workspace initialization
@@ -114,6 +122,7 @@ impl Command for SystemDiagnoseCommand {
 enum DiagnosticCheckError {
     #[error(transparent)]
     Failed(#[from] CommandExecError),
+
     #[error(transparent)]
     Internal(
         #[from]
@@ -123,23 +132,47 @@ enum DiagnosticCheckError {
 }
 
 #[derive(Error, Debug)]
-#[error(
-    "{message} \n {error_log}
-    Make sure to follow kamu installation instructions to correctly configure \
-     docker or podman:
-        https://docs.kamu.dev/cli/get-started/installation/"
-)]
-pub struct CommandExecError {
+struct CommandExecError {
     pub message: String,
     pub error_log: String,
+    pub log_files: Vec<PathBuf>,
+}
+
+impl CommandExecError {
+    pub fn new(log_files: Vec<PathBuf>, message: String, error_log: String) -> Self {
+        Self {
+            log_files: normalize_logs(log_files),
+            message,
+            error_log,
+        }
+    }
 }
 
 impl From<std::io::Error> for DiagnosticCheckError {
     fn from(e: std::io::Error) -> Self {
-        Self::Failed(CommandExecError {
-            message: "Unable to perform io operation".to_string(),
-            error_log: e.to_string(),
-        })
+        Self::Failed(CommandExecError::new(
+            vec![],
+            "Unable to perform io operation".to_string(),
+            e.to_string(),
+        ))
+    }
+}
+
+impl std::fmt::Display for CommandExecError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} \n {}", self.message, self.error_log)?;
+
+        if !self.log_files.is_empty() {
+            writeln!(f, ", see log files for details:")?;
+            for path in &self.log_files {
+                writeln!(f, "- {}", path.display())?;
+            }
+        }
+        writeln!(f, "Make sure to follow kamu installation instructions to correctly configure \
+            docker or podman:
+            https://docs.kamu.dev/cli/get-started/installation/")?;
+
+        Ok(())
     }
 }
 
@@ -148,12 +181,17 @@ impl From<std::io::Error> for DiagnosticCheckError {
 #[async_trait::async_trait]
 trait DiagnosticCheck {
     fn name(&self) -> String;
+
     async fn run(&self) -> Result<(), DiagnosticCheckError>;
+
+    fn stderr_file_path(&self) -> PathBuf;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+
 struct CheckContainerRuntimeIsInstalled {
     container_runtime: Arc<ContainerRuntime>,
+    run_info_dir: PathBuf,
 }
 
 #[async_trait::async_trait]
@@ -161,9 +199,20 @@ impl DiagnosticCheck for CheckContainerRuntimeIsInstalled {
     fn name(&self) -> String {
         format!("{} installed", self.container_runtime.config.runtime)
     }
+
+    fn stderr_file_path(&self) -> PathBuf {
+        self.run_info_dir.join("kamu.diagnose-stderr-installed.log")
+    }
+
     async fn run(&self) -> Result<(), DiagnosticCheckError> {
-        let command_res = self.container_runtime.info().output().await.int_err()?;
-        handle_output_result(command_res)
+        let command_res = self
+            .container_runtime
+            .info()
+            .stderr(File::create(&self.stderr_file_path())?)
+            .output()
+            .await
+            .int_err()?;
+        handle_output_result(command_res, vec![self.stderr_file_path()])
     }
 }
 
@@ -178,6 +227,11 @@ impl DiagnosticCheck for CheckContainerRuntimeImagePull {
     fn name(&self) -> String {
         format!("{} can pull images", self.container_runtime.config.runtime)
     }
+
+    fn stderr_file_path(&self) -> PathBuf {
+        unimplemented!()
+    }
+
     async fn run(&self) -> Result<(), DiagnosticCheckError> {
         self.container_runtime
             .pull_image(BUSYBOX, None)
@@ -192,6 +246,7 @@ impl DiagnosticCheck for CheckContainerRuntimeImagePull {
 
 struct CheckContainerRuntimeRootlessRun {
     container_runtime: Arc<ContainerRuntime>,
+    run_info_dir: PathBuf,
 }
 
 #[async_trait::async_trait]
@@ -202,6 +257,11 @@ impl DiagnosticCheck for CheckContainerRuntimeRootlessRun {
             self.container_runtime.config.runtime
         )
     }
+
+    fn stderr_file_path(&self) -> PathBuf {
+        self.run_info_dir.join("kamu.diagnose-stderr-rootless.log")
+    }
+
     async fn run(&self) -> Result<(), DiagnosticCheckError> {
         let run_args = RunArgs {
             image: BUSYBOX.to_string(),
@@ -212,11 +272,12 @@ impl DiagnosticCheck for CheckContainerRuntimeRootlessRun {
         let command_res = self
             .container_runtime
             .run_cmd(run_args)
+            .stderr(File::create(&self.stderr_file_path())?)
             .output()
             .await
             .int_err()?;
 
-        handle_output_result(command_res)
+        handle_output_result(command_res, vec![self.stderr_file_path()])
     }
 }
 
@@ -224,6 +285,7 @@ impl DiagnosticCheck for CheckContainerRuntimeRootlessRun {
 
 struct CheckContainerRuntimeVolumeMount {
     container_runtime: Arc<ContainerRuntime>,
+    run_info_dir: PathBuf,
 }
 
 #[async_trait::async_trait]
@@ -234,6 +296,11 @@ impl DiagnosticCheck for CheckContainerRuntimeVolumeMount {
             self.container_runtime.config.runtime
         )
     }
+
+    fn stderr_file_path(&self) -> PathBuf {
+        self.run_info_dir.join("kamu.diagnose-stderr-volume.log")
+    }
+
     async fn run(&self) -> Result<(), DiagnosticCheckError> {
         let dir_to_mount = std::env::current_dir()?;
         let file_path = dir_to_mount.join("tmp.txt");
@@ -248,11 +315,12 @@ impl DiagnosticCheck for CheckContainerRuntimeVolumeMount {
         let command_res = self
             .container_runtime
             .run_cmd(run_args)
+            .stderr(File::create(self.stderr_file_path())?)
             .output()
             .await
             .int_err()?;
 
-        handle_output_result(command_res)
+        handle_output_result(command_res, vec![self.stderr_file_path()])
     }
 }
 
@@ -268,6 +336,11 @@ impl DiagnosticCheck for CheckWorkspaceConsistent {
     fn name(&self) -> String {
         "workspace consistent".to_string()
     }
+
+    fn stderr_file_path(&self) -> PathBuf {
+        unimplemented!()
+    }
+
     async fn run(&self) -> Result<(), DiagnosticCheckError> {
         let progress = Arc::new(VerificationMultiProgress::new());
 
@@ -316,21 +389,26 @@ impl DiagnosticCheck for CheckWorkspaceConsistent {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-fn handle_output_result(result: Output) -> Result<(), DiagnosticCheckError> {
+fn handle_output_result(
+    result: Output,
+    stderr_file_path: Vec<PathBuf>,
+) -> Result<(), DiagnosticCheckError> {
     if result.status.success() {
         Ok(())
     } else {
         let err_msg = String::from_utf8(result.stderr).map_err(|e| {
-            DiagnosticCheckError::Failed(CommandExecError {
-                message: "Cannot parse command execution error".to_string(),
-                error_log: e.to_string(),
-            })
+            DiagnosticCheckError::Failed(CommandExecError::new(
+                stderr_file_path.clone(),
+                "Cannot parse command execution error".to_string(),
+                e.to_string(),
+            ))
         })?;
 
-        Err(DiagnosticCheckError::Failed(CommandExecError {
-            message: "Container runtime command unavailable".to_string(),
-            error_log: err_msg,
-        }))
+        Err(DiagnosticCheckError::Failed(CommandExecError::new(
+            stderr_file_path,
+            "Container runtime command unavailable".to_string(),
+            err_msg,
+        )))
     }
 }
 

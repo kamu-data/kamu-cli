@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 ### Changed
 - Usage of unique container and network names
+- Error handling for all subprocesses with file output
 
 ## [0.156.1] - 2024-02-05
 ### Fixed
