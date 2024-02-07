@@ -7,8 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::HashSet;
-
 use dill::*;
 use kamu_core::DatasetIDStream;
 use kamu_flow_system::*;
@@ -25,7 +23,7 @@ pub struct FlowConfigurationEventStoreInMem {
 #[derive(Default)]
 struct State {
     events: Vec<FlowConfigurationEvent>,
-    dataset_ids: HashSet<DatasetID>,
+    dataset_ids: Vec<DatasetID>,
 }
 
 impl EventStoreState<FlowConfigurationState> for State {
@@ -82,7 +80,7 @@ impl EventStore<FlowConfigurationState> for FlowConfigurationEventStoreInMem {
         if let FlowKey::Dataset(flow_key) = query {
             let state = self.inner.as_state();
             let mut g = state.lock().unwrap();
-            g.dataset_ids.insert(flow_key.dataset_id.clone());
+            g.dataset_ids.push(flow_key.dataset_id.clone());
         }
 
         self.inner.save_events(query, events).await

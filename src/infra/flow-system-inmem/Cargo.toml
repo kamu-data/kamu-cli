@@ -50,7 +50,9 @@ kamu-task-system-inmem = { workspace = true }
 
 cron = { version = "0.12.0", default-features = false }
 env_logger = "0.10"
+indoc = "2"
 mockall = "0.11"
+pretty_assertions = "1"
 tempfile = "3"
 test-log = { version = "0.2", features = ["trace"] }
 tokio = { version = "1", default-features = false, features=["rt", "macros"] }

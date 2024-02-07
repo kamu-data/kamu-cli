@@ -19,15 +19,15 @@ pub trait FlowEventStore: EventStore<FlowState> {
     /// Generates new unique flow identifier
     fn new_flow_id(&self) -> FlowID;
 
-    /// Returns ID of the last dataset flow of certain type
-    fn get_last_dataset_flow_id_of_type(
+    /// Returns ID of the last succeeded dataset flow of certain type
+    async fn get_last_succeeded_dataset_flow_id(
         &self,
         dataset_id: &DatasetID,
         flow_type: DatasetFlowType,
     ) -> Result<Option<FlowID>, InternalError>;
 
-    /// Returns ID of the last system flow of certain type
-    fn get_last_system_flow_id_of_type(
+    /// Returns ID of the last succeeded system flow of certain type
+    async fn get_last_succeded_system_flow_id(
         &self,
         flow_type: SystemFlowType,
     ) -> Result<Option<FlowID>, InternalError>;

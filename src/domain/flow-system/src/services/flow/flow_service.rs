@@ -15,13 +15,11 @@ use tokio_stream::Stream;
 
 use crate::{
     DatasetFlowFilters,
-    DatasetFlowType,
     FlowID,
     FlowKey,
     FlowPaginationOpts,
     FlowState,
     SystemFlowFilters,
-    SystemFlowType,
 };
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -65,20 +63,6 @@ pub trait FlowService: Sync + Send {
         &self,
         pagination: FlowPaginationOpts,
     ) -> Result<FlowStateListing, ListFlowsError>;
-
-    /// Returns state of the latest flow of certain type created for the given
-    /// dataset
-    async fn get_last_flow_by_dataset_of_type(
-        &self,
-        dataset_id: &DatasetID,
-        flow_type: DatasetFlowType,
-    ) -> Result<Option<FlowState>, GetLastDatasetFlowError>;
-
-    /// Returns state of the latest system flow of certain type
-    async fn get_last_system_flow_of_type(
-        &self,
-        flow_type: SystemFlowType,
-    ) -> Result<Option<FlowState>, GetLastSystemFlowError>;
 
     /// Returns current state of a given flow
     async fn get_flow(&self, flow_id: FlowID) -> Result<FlowState, GetFlowError>;

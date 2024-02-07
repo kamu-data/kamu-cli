@@ -125,6 +125,7 @@ struct SystemTimeSourceStubState {
 
 #[derive(Debug, Clone)]
 pub struct FakeSystemTimeSource {
+    pub initial_time: DateTime<Utc>,
     state: Arc<Mutex<SystemTimeSourceStubState>>,
 }
 
@@ -137,6 +138,7 @@ impl FakeSystemTimeSource {
         };
 
         Self {
+            initial_time: t,
             state: Arc::new(Mutex::new(state)),
         }
     }

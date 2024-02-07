@@ -214,16 +214,19 @@ impl FlowServiceInMemory {
 
             // Otherwise, initiate a new flow, and enqueue it in the time wheel
             None => {
+                // Take the time of last similar flow run into account and generate next
+                // activation time suggestion
+                let maybe_last_flow_success_time = self.last_flow_run_time(flow_key).await?;
+                let next_activation_time =
+                    schedule.next_activation_time(start_time, maybe_last_flow_success_time);
+
                 let mut flow = self.make_new_flow(flow_key.clone(), trigger).await?;
+                self.enqueue_flow(flow.flow_id, next_activation_time)?;
 
-                if let Some(next_activation_time) = schedule.next_activation_time(start_time) {
-                    self.enqueue_flow(flow.flow_id, next_activation_time)?;
+                flow.activate_at_time(self.time_source.now(), next_activation_time)
+                    .int_err()?;
 
-                    flow.activate_at_time(self.time_source.now(), next_activation_time)
-                        .int_err()?;
-
-                    flow.save(self.flow_event_store.as_ref()).await.int_err()?;
-                }
+                flow.save(self.flow_event_store.as_ref()).await.int_err()?;
 
                 Ok(flow.into())
             }
@@ -362,6 +365,34 @@ impl FlowServiceInMemory {
         Ok(flow.into())
     }
 
+    async fn last_flow_run_time(
+        &self,
+        flow_key: &FlowKey,
+    ) -> Result<Option<DateTime<Utc>>, InternalError> {
+        let maybe_last_flow_id = match flow_key {
+            FlowKey::Dataset(fk_dataset) => self
+                .flow_event_store
+                .get_last_succeeded_dataset_flow_id(&fk_dataset.dataset_id, fk_dataset.flow_type)
+                .await
+                .int_err()?,
+            FlowKey::System(fk_system) => self
+                .flow_event_store
+                .get_last_succeded_system_flow_id(fk_system.flow_type)
+                .await
+                .int_err()?,
+        };
+
+        if let Some(last_flow_id) = maybe_last_flow_id {
+            let last_flow = Flow::load(last_flow_id, self.flow_event_store.as_ref())
+                .await
+                .int_err()?;
+            assert!(last_flow.timing.finished_at.is_some());
+            Ok(last_flow.timing.finished_at)
+        } else {
+            Ok(None)
+        }
+    }
+
     #[tracing::instrument(level = "trace", skip_all, fields(%flow_id, %activation_time))]
     fn enqueue_flow(
         &self,
@@ -476,6 +507,8 @@ impl FlowService for FlowServiceInMemory {
         let _ = main_loop_span.enter();
 
         loop {
+            let current_time = self.time_source.now();
+
             // Do we have a timeslot scheduled?
             let maybe_nearest_activation_time = {
                 let state = self.state.lock().unwrap();
@@ -483,7 +516,6 @@ impl FlowService for FlowServiceInMemory {
             };
 
             // Is it time to execute it yet?
-            let current_time = self.time_source.now();
             if let Some(nearest_activation_time) = maybe_nearest_activation_time
                 && nearest_activation_time <= current_time
             {
@@ -653,42 +685,6 @@ impl FlowService for FlowServiceInMemory {
         })
     }
 
-    /// Returns state of the latest flow of certain type created for the given
-    /// dataset
-    #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id, ?flow_type))]
-    async fn get_last_flow_by_dataset_of_type(
-        &self,
-        dataset_id: &DatasetID,
-        flow_type: DatasetFlowType,
-    ) -> Result<Option<FlowState>, GetLastDatasetFlowError> {
-        let res = match self
-            .flow_event_store
-            .get_last_dataset_flow_id_of_type(dataset_id, flow_type)
-            .int_err()?
-        {
-            Some(flow_id) => Some(self.get_flow(flow_id).await.int_err()?),
-            None => None,
-        };
-        Ok(res)
-    }
-
-    /// Returns state of the latest system flow of certain type
-    #[tracing::instrument(level = "debug", skip_all, fields(?flow_type))]
-    async fn get_last_system_flow_of_type(
-        &self,
-        flow_type: SystemFlowType,
-    ) -> Result<Option<FlowState>, GetLastSystemFlowError> {
-        let res = match self
-            .flow_event_store
-            .get_last_system_flow_id_of_type(flow_type)
-            .int_err()?
-        {
-            Some(flow_id) => Some(self.get_flow(flow_id).await.int_err()?),
-            None => None,
-        };
-        Ok(res)
-    }
-
     /// Returns current state of a given flow
     #[tracing::instrument(level = "debug", skip_all, fields(%flow_id))]
     async fn get_flow(&self, flow_id: FlowID) -> Result<FlowState, GetFlowError> {
@@ -782,6 +778,14 @@ impl AsyncEventHandler<TaskEventRunning> for FlowServiceInMemory {
                 .int_err()?;
             flow.save(self.flow_event_store.as_ref()).await.int_err()?;
         }
+
+        // Publish progress event
+        self.event_bus
+            .dispatch_event(FlowServiceEvent::FlowRunning(FlowServiceEventFlowRunning {
+                event_time: event.event_time,
+            }))
+            .await
+            .int_err()?;
 
         Ok(())
     }

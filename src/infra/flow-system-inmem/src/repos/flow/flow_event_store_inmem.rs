@@ -12,6 +12,7 @@ use std::collections::HashMap;
 
 use dill::*;
 use kamu_flow_system::*;
+use kamu_task_system::TaskOutcome;
 use opendatafabric::{AccountName, DatasetID};
 
 use crate::dataset_flow_key::BorrowedFlowKeyDataset;
@@ -27,13 +28,14 @@ pub struct FlowEventStoreInMem {
 #[derive(Default)]
 struct State {
     events: Vec<FlowEvent>,
-    typed_flows_by_dataset: HashMap<FlowKeyDataset, Vec<FlowID>>,
-    all_flows_by_dataset: HashMap<DatasetID, Vec<FlowID>>,
-    system_flows_by_type: HashMap<SystemFlowType, Vec<FlowID>>,
-    all_system_flows: Vec<FlowID>,
-    flow_search_index: HashMap<FlowID, FlowIndexEntry>,
-    all_flows: Vec<FlowID>,
     last_flow_id: Option<FlowID>,
+    all_flows_by_dataset: HashMap<DatasetID, Vec<FlowID>>,
+    all_system_flows: Vec<FlowID>,
+    all_flows: Vec<FlowID>,
+    flow_search_index: HashMap<FlowID, FlowIndexEntry>,
+    flow_key_by_flow_id: HashMap<FlowID, FlowKey>,
+    last_succeeded_dataset_flow_ids: HashMap<FlowKeyDataset, FlowID>,
+    last_sycceeded_system_flow_ids: HashMap<SystemFlowType, FlowID>,
 }
 
 impl State {
@@ -166,14 +168,12 @@ impl FlowEventStoreInMem {
 
     fn update_index(state: &mut State, event: &FlowEvent) {
         if let FlowEvent::Initiated(e) = &event {
+            state
+                .flow_key_by_flow_id
+                .insert(e.flow_id, e.flow_key.clone());
+
             match &e.flow_key {
                 FlowKey::Dataset(flow_key) => {
-                    let typed_entries = match state.typed_flows_by_dataset.entry(flow_key.clone()) {
-                        Entry::Occupied(v) => v.into_mut(),
-                        Entry::Vacant(v) => v.insert(Vec::default()),
-                    };
-                    typed_entries.push(event.flow_id());
-
                     let all_dataset_entries = match state
                         .all_flows_by_dataset
                         .entry(flow_key.dataset_id.clone())
@@ -194,12 +194,6 @@ impl FlowEventStoreInMem {
                 }
 
                 FlowKey::System(flow_key) => {
-                    let typed_entries = match state.system_flows_by_type.entry(flow_key.flow_type) {
-                        Entry::Occupied(v) => v.into_mut(),
-                        Entry::Vacant(v) => v.insert(Vec::default()),
-                    };
-                    typed_entries.push(event.flow_id());
-
                     state.all_system_flows.push(event.flow_id());
 
                     state.flow_search_index.insert(
@@ -222,6 +216,29 @@ impl FlowEventStoreInMem {
                 .get_mut(&event.flow_id())
                 .expect("Previously unseen flow ID")
                 .flow_status = new_status;
+
+            // Record last succeeded flows
+            if let FlowEvent::TaskFinished(e) = &event
+                && e.task_outcome == TaskOutcome::Success
+            {
+                let flow_key = state
+                    .flow_key_by_flow_id
+                    .get(&e.flow_id)
+                    .expect("Previously unseen flow ID");
+
+                match flow_key {
+                    FlowKey::Dataset(flow_key) => state
+                        .last_succeeded_dataset_flow_ids
+                        .entry(flow_key.clone())
+                        .and_modify(|flow_id_mut_ref| *flow_id_mut_ref = e.flow_id)
+                        .or_insert(e.flow_id),
+                    FlowKey::System(flow_key) => state
+                        .last_sycceeded_system_flow_ids
+                        .entry(flow_key.flow_type)
+                        .and_modify(|flow_id_mut_ref| *flow_id_mut_ref = e.flow_id)
+                        .or_insert(e.flow_id),
+                };
+            }
         }
     }
 }
@@ -268,28 +285,26 @@ impl FlowEventStore for FlowEventStoreInMem {
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id, ?flow_type))]
-    fn get_last_dataset_flow_id_of_type(
+    async fn get_last_succeeded_dataset_flow_id(
         &self,
         dataset_id: &DatasetID,
         flow_type: DatasetFlowType,
     ) -> Result<Option<FlowID>, InternalError> {
         let state = self.inner.as_state();
         let g = state.lock().unwrap();
-        Ok(g.typed_flows_by_dataset
+        Ok(g.last_succeeded_dataset_flow_ids
             .get(BorrowedFlowKeyDataset::new(dataset_id, flow_type).as_trait())
-            .and_then(|flows| flows.last().copied()))
+            .copied())
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(?flow_type))]
-    fn get_last_system_flow_id_of_type(
+    async fn get_last_succeded_system_flow_id(
         &self,
         flow_type: SystemFlowType,
     ) -> Result<Option<FlowID>, InternalError> {
         let state = self.inner.as_state();
         let g = state.lock().unwrap();
-        Ok(g.system_flows_by_type
-            .get(&flow_type)
-            .and_then(|flows| flows.last().copied()))
+        Ok(g.last_sycceeded_system_flow_ids.get(&flow_type).copied())
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id, ?filters, ?pagination))]
