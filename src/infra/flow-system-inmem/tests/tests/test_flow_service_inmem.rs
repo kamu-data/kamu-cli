@@ -58,6 +58,7 @@ async fn test_read_initial_config_and_queue_without_waiting() {
                 // Task 0: start running at 10ms, finish at 20ms
                 let foo_task0_driver = harness.task_driver(TaskDriverArgs {
                     task_id: TaskID::new(0),
+                    dataset_id: Some(foo_id.clone()),
                     run_since_start: Duration::milliseconds(10),
                     finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success)),
                 });
@@ -66,6 +67,7 @@ async fn test_read_initial_config_and_queue_without_waiting() {
                 // Task 1: start running at 90ms, finish at 100ms
                 let foo_task1_driver = harness.task_driver(TaskDriverArgs {
                     task_id: TaskID::new(1),
+                    dataset_id: Some(foo_id.clone()),
                     run_since_start: Duration::milliseconds(90),
                     finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success)),
                 });
@@ -76,7 +78,7 @@ async fn test_read_initial_config_and_queue_without_waiting() {
                 //  - "task 0" will take action and complete, this will enqueue the next flow
                 //    run for "foo" after full scheduling period
                 //  - when that period is over, "task 1" should be scheduled
-                //  - "task 1" will take action and complete, enqueing another flow                
+                //  - "task 1" will take action and complete, enqueing another flow
                 let sim_handle = harness.advance_time(Duration::milliseconds(120));
                 tokio::join!(foo_task0_handle, foo_task1_handle, sim_handle)
             } => Ok(())
@@ -97,36 +99,35 @@ async fn test_read_initial_config_and_queue_without_waiting() {
             #1: +0ms:
               "foo" Ingest:
                 Flow ID = 0 Scheduled
-            
+
             #2: +10ms:
               "foo" Ingest:
                 Flow ID = 0 Running
-            
+
             #3: +20ms:
               "foo" Ingest:
                 Flow ID = 1 Queued
                 Flow ID = 0 Finished Success
-            
+
             #4: +80ms:
               "foo" Ingest:
                 Flow ID = 1 Scheduled
                 Flow ID = 0 Finished Success
-            
+
             #5: +90ms:
               "foo" Ingest:
                 Flow ID = 1 Running
                 Flow ID = 0 Finished Success
-            
+
             #6: +100ms:
               "foo" Ingest:
                 Flow ID = 2 Queued
                 Flow ID = 1 Finished Success
                 Flow ID = 0 Finished Success
-            
+
             "#
         )
     );
-
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -134,9 +135,11 @@ async fn test_read_initial_config_and_queue_without_waiting() {
 #[test_log::test(tokio::test)]
 async fn test_cron_config() {
     // Note: this test runs with 1s step, CRON does not apply to milliseconds
-    let harness = FlowHarness::new_custom_alignment(Duration::seconds(1));
+    let harness =
+        FlowHarness::new_custom_time_properties(Duration::seconds(1), Duration::seconds(1));
 
-    // Create a "foo" root dataset, and configure ingestion cron schedule of every 5s
+    // Create a "foo" root dataset, and configure ingestion cron schedule of every
+    // 5s
     let foo_id = harness.create_root_dataset("foo").await;
     harness
         .set_dataset_flow_schedule(
@@ -145,7 +148,7 @@ async fn test_cron_config() {
             DatasetFlowType::Ingest,
             Schedule::Cron(ScheduleCron {
                 source_5component_cron_expression: String::from("<irrelevant>"),
-                cron_schedule: cron::Schedule::from_str("*/5 * * * * *").unwrap()
+                cron_schedule: cron::Schedule::from_str("*/5 * * * * *").unwrap(),
             }),
         )
         .await;
@@ -167,6 +170,7 @@ async fn test_cron_config() {
                 // Task 0: start running at 6s, finish at 7s
                 let foo_task0_driver = harness.task_driver(TaskDriverArgs {
                     task_id: TaskID::new(0),
+                    dataset_id: Some(foo_id.clone()),
                     run_since_start: Duration::seconds(6),
                     finish_in_with: Some((Duration::seconds(1), TaskOutcome::Success)),
                 });
@@ -189,29 +193,28 @@ async fn test_cron_config() {
             #0: +0ms:
               "foo" Ingest:
                 Flow ID = 0 Queued
-          
+
             #1: +5000ms:
               "foo" Ingest:
                 Flow ID = 0 Scheduled
-            
+
             #2: +6000ms:
               "foo" Ingest:
                 Flow ID = 0 Running
-            
+
             #3: +7000ms:
               "foo" Ingest:
                 Flow ID = 1 Queued
                 Flow ID = 0 Finished Success
-            
+
             #4: +10000ms:
               "foo" Ingest:
                 Flow ID = 1 Scheduled
                 Flow ID = 0 Finished Success
-            
+
             "#
         )
     );
-
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -237,6 +240,10 @@ async fn test_manual_trigger() {
     let foo_flow_key: FlowKey = FlowKeyDataset::new(foo_id.clone(), DatasetFlowType::Ingest).into();
     let bar_flow_key: FlowKey = FlowKeyDataset::new(bar_id.clone(), DatasetFlowType::Ingest).into();
 
+    let test_flow_listener = harness.catalog.get_one::<TestFlowSystemListener>().unwrap();
+    test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
+    test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
+
     // Remember start time
     let start_time = harness
         .now_datetime()
@@ -253,26 +260,43 @@ async fn test_manual_trigger() {
                 // Task 0: "foo" start running at 10ms, finish at 20ms
                 let task0_driver = harness.task_driver(TaskDriverArgs {
                     task_id: TaskID::new(0),
+                    dataset_id: Some(foo_id.clone()),
                     run_since_start: Duration::milliseconds(10),
                     finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success)),
                 });
                 let task0_handle = task0_driver.run();
 
-                // Task 1: "bar" start running at 70ms, finish at 80ms
+                // Task 1: "for" start running at 60ms, finish at 70ms
                 let task1_driver = harness.task_driver(TaskDriverArgs {
                     task_id: TaskID::new(1),
-                    run_since_start: Duration::milliseconds(70),
+                    dataset_id: Some(foo_id.clone()),
+                    run_since_start: Duration::milliseconds(60),
                     finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success)),
                 });
                 let task1_handle = task1_driver.run();
-                
-                // Task 2: "foo" start running at 120ms, finish at 130ms
+
+                // Task 2: "bar" start running at 100ms, finish at 110ms
                 let task2_driver = harness.task_driver(TaskDriverArgs {
                     task_id: TaskID::new(2),
-                    run_since_start: Duration::milliseconds(120),
+                    dataset_id: Some(bar_id.clone()),
+                    run_since_start: Duration::milliseconds(100),
                     finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success)),
                 });
                 let task2_handle = task2_driver.run();
+
+                // Manual trigger for "foo" at 40ms
+                let trigger0_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
+                    flow_key: foo_flow_key,
+                    run_since_start: Duration::milliseconds(40),
+                });
+                let trigger0_handle = trigger0_driver.run();
+
+                // Manual trigger for "bar" at 80ms
+                let trigger1_driver = harness.manual_flow_trigger_driver(ManualFlowTriggerArgs {
+                    flow_key: bar_flow_key,
+                    run_since_start: Duration::milliseconds(80),
+                });
+                let trigger1_handle = trigger1_driver.run();
 
                 // Main simulation script
                 let main_handle = async {
@@ -282,40 +306,26 @@ async fn test_manual_trigger() {
                     //  - next flow => enqueued at 20ms to trigger in 1 period of 90ms - at 110ms
                     // "bar": silent
 
-                    // Stop at 40ms: 
-                    //  - "foo": flow 0 finished, next flow still queued for 110ms
+                    // Moment 40ms - manual foo trigger happens here:
+                    //  - flow 1 gets a 2nd trigger and is rescheduled to 40ms (20ms finish + 20ms throttling <= 40ms now)
+                    //  - task 1 starts at 60ms, finishes at 70ms (leave some gap to fight with random order)
+                    //  - flow 3 queued for 70 + 90 = 160ms
                     //  - "bar": still silent
-                    harness.advance_time(Duration::milliseconds(40)).await;
-                    let new_time = start_time + Duration::milliseconds(40);
-                    //  Trigger "foo"
-                    //  "foo":
-                    //  - flow 1 just gets a 2nd trigger, but will still be scheduled at 110ms
-                    harness.trigger_manual_flow(new_time, foo_flow_key.clone()).await;
 
-                    // Stop at 50ms:
-                    harness.advance_time(Duration::milliseconds(10)).await;
-                    let new_time = start_time + Duration::milliseconds(50);                    
-                    // Trigger "bar":
-                    // "bar":
+                    // Moment 80ms - manual bar trigger happens here:
                     //  - flow 2 immediately scheduled
-                    //  - task 1 gets scheduled at 50ms
-                    //  - task 1 starts at 70ms and finishes at 80ms (gap for stability)
+                    //  - task 2 gets scheduled at 80ms
+                    //  - task 2 starts at 100ms and finishes at 110ms (ensure gap to fight against task execution order)
                     //  - no next flow enqueued
-                    harness.trigger_manual_flow(new_time, bar_flow_key.clone()).await;
 
-                    // Stop at 150ms
-                    // Make sure nothing got scheduled in near time
-                    harness.advance_time(Duration::milliseconds(100)).await;
+                    // Stop at 180ms: "foo" flow 3 gets scheduled at 160ms
+                    harness.advance_time(Duration::milliseconds(180)).await;
                 };
 
-                tokio::join!(task0_handle, task1_handle, task2_handle, main_handle)
+                tokio::join!(task0_handle, task1_handle, task2_handle, trigger0_handle, trigger1_handle, main_handle)
             } => Ok(())
     }
     .unwrap();
-
-    let test_flow_listener = harness.catalog.get_one::<TestFlowSystemListener>().unwrap();
-    test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
-    test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
 
     pretty_assertions::assert_eq!(
         format!("{}", test_flow_listener.as_ref()),
@@ -324,66 +334,71 @@ async fn test_manual_trigger() {
             #0: +0ms:
               "foo" Ingest:
                 Flow ID = 0 Queued
-            
+
             #1: +0ms:
               "foo" Ingest:
                 Flow ID = 0 Scheduled
-          
+
             #2: +10ms:
               "foo" Ingest:
                 Flow ID = 0 Running
-          
+
             #3: +20ms:
               "foo" Ingest:
                 Flow ID = 1 Queued
                 Flow ID = 0 Finished Success
-          
-            #4: +50ms:
-              "bar" Ingest:
-                Flow ID = 2 Scheduled
-              "foo" Ingest:
-                Flow ID = 1 Queued
-                Flow ID = 0 Finished Success
-            
-            #5: +70ms:
-              "bar" Ingest:
-                Flow ID = 2 Running
-              "foo" Ingest:
-                Flow ID = 1 Queued
-                Flow ID = 0 Finished Success
-          
-            #6: +80ms:
-              "bar" Ingest:
-                Flow ID = 2 Finished Success
-              "foo" Ingest:
-                Flow ID = 1 Queued
-                Flow ID = 0 Finished Success
-          
-            #7: +110ms:
-              "bar" Ingest:
-                Flow ID = 2 Finished Success
+
+            #4: +40ms:
               "foo" Ingest:
                 Flow ID = 1 Scheduled
                 Flow ID = 0 Finished Success
 
-            #8: +120ms:
-              "bar" Ingest:
-                Flow ID = 2 Finished Success
+            #5: +60ms:
               "foo" Ingest:
                 Flow ID = 1 Running
                 Flow ID = 0 Finished Success
-          
-            #9: +130ms:
-              "bar" Ingest:
-                Flow ID = 2 Finished Success
+
+            #6: +70ms:
               "foo" Ingest:
-                Flow ID = 3 Queued
+                Flow ID = 2 Queued
                 Flow ID = 1 Finished Success
                 Flow ID = 0 Finished Success
-            
+
+            #7: +80ms:
+              "bar" Ingest:
+                Flow ID = 3 Scheduled
+              "foo" Ingest:
+                Flow ID = 2 Queued
+                Flow ID = 1 Finished Success
+                Flow ID = 0 Finished Success
+
+            #8: +100ms:
+              "bar" Ingest:
+                Flow ID = 3 Running
+              "foo" Ingest:
+                Flow ID = 2 Queued
+                Flow ID = 1 Finished Success
+                Flow ID = 0 Finished Success
+
+            #9: +110ms:
+              "bar" Ingest:
+                Flow ID = 3 Finished Success
+              "foo" Ingest:
+                Flow ID = 2 Queued
+                Flow ID = 1 Finished Success
+                Flow ID = 0 Finished Success
+
+            #10: +160ms:
+              "bar" Ingest:
+                Flow ID = 3 Finished Success
+              "foo" Ingest:
+                Flow ID = 2 Scheduled
+                Flow ID = 1 Finished Success
+                Flow ID = 0 Finished Success
+
             "#
         )
-    );    
+    );
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -429,17 +444,19 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
 
         // Run simulation script and task drivers
         _ = async {
-            // Task 0: "bar" start running at 10ms, finish at 20ms
+            // Task 0: "foo" start running at 10ms, finish at 20ms
             let task0_driver = harness.task_driver(TaskDriverArgs {
                 task_id: TaskID::new(0),
+                dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::milliseconds(10),
                 finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success)),
             });
             let task0_handle = task0_driver.run();
 
-            // Task 1: "foo" start running at 20ms, finish at 30ms
+            // Task 1: "bar" start running at 20ms, finish at 30ms
             let task1_driver = harness.task_driver(TaskDriverArgs {
                 task_id: TaskID::new(1),
+                dataset_id: Some(bar_id.clone()),
                 run_since_start: Duration::milliseconds(20),
                 finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success)),
             });
@@ -449,10 +466,10 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
             let main_handle = async {
                 // Initially both "foo" and "bar" are scheduled without waiting.
                 // "bar":
-                //  - flow 0: task 0 starts at 20ms, finishes at 30sms
+                //  - flow 0: task 1 starts at 20ms, finishes at 30sms
                 //  - next flow 2 queued for 110ms (30+80)
                 // "foo":
-                //  - flow 1: task 1 starts at 10ms, finishes at 20ms
+                //  - flow 1: task 0 starts at 10ms, finishes at 20ms
                 //  - next flow 3 queued for 70ms (20+50)
 
                 // 50ms: Pause both flow configs in between completion 2 first tasks and queing
@@ -481,7 +498,7 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
                 harness.advance_time(Duration::milliseconds(40)).await;
             };
 
-            tokio::join!(task0_handle, task1_handle, main_handle)                
+            tokio::join!(task0_handle, task1_handle, main_handle)
 
          } => Ok(()),
     }
@@ -496,33 +513,33 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
                 Flow ID = 1 Queued
               "foo" Ingest:
                 Flow ID = 0 Queued
-            
+
             #1: +0ms:
               "bar" Ingest:
                 Flow ID = 1 Scheduled
               "foo" Ingest:
                 Flow ID = 0 Scheduled
-            
+
             #2: +10ms:
               "bar" Ingest:
                 Flow ID = 1 Scheduled
               "foo" Ingest:
                 Flow ID = 0 Running
-            
+
             #3: +20ms:
               "bar" Ingest:
                 Flow ID = 1 Scheduled
               "foo" Ingest:
                 Flow ID = 2 Queued
                 Flow ID = 0 Finished Success
-            
+
             #4: +20ms:
               "bar" Ingest:
                 Flow ID = 1 Running
               "foo" Ingest:
                 Flow ID = 2 Queued
                 Flow ID = 0 Finished Success
-            
+
             #5: +30ms:
               "bar" Ingest:
                 Flow ID = 3 Queued
@@ -530,7 +547,7 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
               "foo" Ingest:
                 Flow ID = 2 Queued
                 Flow ID = 0 Finished Success
-            
+
             #6: +50ms:
               "bar" Ingest:
                 Flow ID = 3 Finished Aborted
@@ -538,7 +555,7 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
               "foo" Ingest:
                 Flow ID = 2 Finished Aborted
                 Flow ID = 0 Finished Success
-            
+
             #7: +80ms:
               "bar" Ingest:
                 Flow ID = 5 Queued
@@ -548,7 +565,7 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
                 Flow ID = 4 Queued
                 Flow ID = 2 Finished Aborted
                 Flow ID = 0 Finished Success
-            
+
             #8: +80ms:
               "bar" Ingest:
                 Flow ID = 5 Queued
@@ -558,7 +575,7 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
                 Flow ID = 4 Scheduled
                 Flow ID = 2 Finished Aborted
                 Flow ID = 0 Finished Success
-            
+
             #9: +100ms:
               "bar" Ingest:
                 Flow ID = 5 Scheduled
@@ -568,11 +585,10 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
                 Flow ID = 4 Scheduled
                 Flow ID = 2 Finished Aborted
                 Flow ID = 0 Finished Success
-            
+
             "#
         )
     );
-
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -622,6 +638,7 @@ async fn test_dataset_deleted() {
             // Task 0: "foo" start running at 10ms, finish at 20ms
             let task0_driver = harness.task_driver(TaskDriverArgs {
                 task_id: TaskID::new(0),
+                dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::milliseconds(10),
                 finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success)),
             });
@@ -630,6 +647,7 @@ async fn test_dataset_deleted() {
             // Task 1: "bar" start running at 20ms, finish at 30ms
             let task1_driver = harness.task_driver(TaskDriverArgs {
                 task_id: TaskID::new(1),
+                dataset_id: Some(bar_id.clone()),
                 run_since_start: Duration::milliseconds(20),
                 finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success)),
             });
@@ -645,7 +663,7 @@ async fn test_dataset_deleted() {
                 //   - flow 1 scheduled at 0ms
                 //   - task 1 starts at 20ms, finishes at 30ms
                 //   - flow 3 enqueued for 30ms + period = 100ms
-                
+
                 // 50ms: deleting "foo" in QUEUED state
                 harness.advance_time(Duration::milliseconds(50)).await;
                 harness.delete_dataset(&foo_id).await;
@@ -664,7 +682,7 @@ async fn test_dataset_deleted() {
                 harness.advance_time(Duration::milliseconds(20)).await;
             };
 
-            tokio::join!(task0_handle, task1_handle, main_handle)      
+            tokio::join!(task0_handle, task1_handle, main_handle)
          } => Ok(()),
     }
     .unwrap();
@@ -678,33 +696,33 @@ async fn test_dataset_deleted() {
                 Flow ID = 1 Queued
               "foo" Ingest:
                 Flow ID = 0 Queued
-          
+
             #1: +0ms:
               "bar" Ingest:
                 Flow ID = 1 Scheduled
               "foo" Ingest:
                 Flow ID = 0 Scheduled
-            
+
             #2: +10ms:
               "bar" Ingest:
                 Flow ID = 1 Scheduled
               "foo" Ingest:
                 Flow ID = 0 Running
-            
+
             #3: +20ms:
               "bar" Ingest:
                 Flow ID = 1 Scheduled
               "foo" Ingest:
                 Flow ID = 2 Queued
                 Flow ID = 0 Finished Success
-            
+
             #4: +20ms:
               "bar" Ingest:
                 Flow ID = 1 Running
               "foo" Ingest:
                 Flow ID = 2 Queued
                 Flow ID = 0 Finished Success
-            
+
             #5: +30ms:
               "bar" Ingest:
                 Flow ID = 3 Queued
@@ -712,7 +730,7 @@ async fn test_dataset_deleted() {
               "foo" Ingest:
                 Flow ID = 2 Queued
                 Flow ID = 0 Finished Success
-            
+
             #6: +50ms:
               "bar" Ingest:
                 Flow ID = 3 Queued
@@ -720,7 +738,7 @@ async fn test_dataset_deleted() {
               "foo" Ingest:
                 Flow ID = 2 Finished Aborted
                 Flow ID = 0 Finished Success
-            
+
             #7: +100ms:
               "bar" Ingest:
                 Flow ID = 3 Scheduled
@@ -728,7 +746,7 @@ async fn test_dataset_deleted() {
               "foo" Ingest:
                 Flow ID = 2 Finished Aborted
                 Flow ID = 0 Finished Success
-            
+
             #8: +120ms:
               "bar" Ingest:
                 Flow ID = 3 Finished Aborted
@@ -736,7 +754,7 @@ async fn test_dataset_deleted() {
               "foo" Ingest:
                 Flow ID = 2 Finished Aborted
                 Flow ID = 0 Finished Success
-            
+
             "#
         )
     );
@@ -788,6 +806,7 @@ async fn test_task_completions_trigger_next_loop_on_success() {
             // Task 0: "foo" start running at 10ms, finish at 20ms
             let task0_driver = harness.task_driver(TaskDriverArgs {
                 task_id: TaskID::new(0),
+                dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::milliseconds(10),
                 finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success)),
             });
@@ -796,6 +815,7 @@ async fn test_task_completions_trigger_next_loop_on_success() {
             // Task 1: "bar" start running at 20ms, finish at 30ms with failure
             let task1_driver = harness.task_driver(TaskDriverArgs {
                 task_id: TaskID::new(1),
+                dataset_id: Some(bar_id.clone()),
                 run_since_start: Duration::milliseconds(20),
                 finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Failed)),
             });
@@ -804,6 +824,7 @@ async fn test_task_completions_trigger_next_loop_on_success() {
             // Task 1: "baz" start running at 30ms, finish at 40ms with cancellation
             let task2_driver = harness.task_driver(TaskDriverArgs {
                 task_id: TaskID::new(2),
+                dataset_id: Some(baz_id.clone()),
                 run_since_start: Duration::milliseconds(30),
                 finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Cancelled)),
             });
@@ -846,7 +867,7 @@ async fn test_task_completions_trigger_next_loop_on_success() {
                 Flow ID = 2 Queued
               "foo" Ingest:
                 Flow ID = 0 Queued
-          
+
             #1: +0ms:
               "bar" Ingest:
                 Flow ID = 1 Scheduled
@@ -854,7 +875,7 @@ async fn test_task_completions_trigger_next_loop_on_success() {
                 Flow ID = 2 Scheduled
               "foo" Ingest:
                 Flow ID = 0 Scheduled
-            
+
             #2: +10ms:
               "bar" Ingest:
                 Flow ID = 1 Scheduled
@@ -862,7 +883,7 @@ async fn test_task_completions_trigger_next_loop_on_success() {
                 Flow ID = 2 Scheduled
               "foo" Ingest:
                 Flow ID = 0 Running
-            
+
             #3: +20ms:
               "bar" Ingest:
                 Flow ID = 1 Scheduled
@@ -871,7 +892,7 @@ async fn test_task_completions_trigger_next_loop_on_success() {
               "foo" Ingest:
                 Flow ID = 3 Queued
                 Flow ID = 0 Finished Success
-            
+
             #4: +20ms:
               "bar" Ingest:
                 Flow ID = 1 Running
@@ -880,7 +901,7 @@ async fn test_task_completions_trigger_next_loop_on_success() {
               "foo" Ingest:
                 Flow ID = 3 Queued
                 Flow ID = 0 Finished Success
-            
+
             #5: +30ms:
               "bar" Ingest:
                 Flow ID = 1 Finished Failed
@@ -889,7 +910,7 @@ async fn test_task_completions_trigger_next_loop_on_success() {
               "foo" Ingest:
                 Flow ID = 3 Queued
                 Flow ID = 0 Finished Success
-            
+
             #6: +30ms:
               "bar" Ingest:
                 Flow ID = 1 Finished Failed
@@ -898,7 +919,7 @@ async fn test_task_completions_trigger_next_loop_on_success() {
               "foo" Ingest:
                 Flow ID = 3 Queued
                 Flow ID = 0 Finished Success
-            
+
             #7: +40ms:
               "bar" Ingest:
                 Flow ID = 1 Finished Failed
@@ -907,7 +928,7 @@ async fn test_task_completions_trigger_next_loop_on_success() {
               "foo" Ingest:
                 Flow ID = 3 Queued
                 Flow ID = 0 Finished Success
-            
+
             #8: +60ms:
               "bar" Ingest:
                 Flow ID = 1 Finished Failed
@@ -916,7 +937,7 @@ async fn test_task_completions_trigger_next_loop_on_success() {
               "foo" Ingest:
                 Flow ID = 3 Scheduled
                 Flow ID = 0 Finished Success
-            
+
             "#
         )
     );
@@ -978,6 +999,7 @@ async fn test_update_success_triggers_update_of_derived_dataset() {
             // Task 0: "foo" start running at 10ms, finish at 20ms
             let task0_driver = harness.task_driver(TaskDriverArgs {
                 task_id: TaskID::new(0),
+                dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::milliseconds(10),
                 finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success)),
             });
@@ -986,10 +1008,11 @@ async fn test_update_success_triggers_update_of_derived_dataset() {
             // Task 1: "bar" start running at 40ms, finish at 50ms
             let task1_driver = harness.task_driver(TaskDriverArgs {
                 task_id: TaskID::new(1),
+                dataset_id: Some(bar_id.clone()),
                 run_since_start: Duration::milliseconds(40),
                 finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success)),
             });
-            let task1_handle = task1_driver.run();            
+            let task1_handle = task1_driver.run();
 
             // Main simulation script
             let main_handle = async {
@@ -999,7 +1022,8 @@ async fn test_update_success_triggers_update_of_derived_dataset() {
             tokio::join!(task0_handle, task1_handle, main_handle)
 
         } => Ok(())
-    }.unwrap();
+    }
+    .unwrap();
 
     pretty_assertions::assert_eq!(
         format!("{}", test_flow_listener.as_ref()),
@@ -1008,50 +1032,50 @@ async fn test_update_success_triggers_update_of_derived_dataset() {
             #0: +0ms:
               "foo" Ingest:
                 Flow ID = 0 Queued
-          
+
             #1: +0ms:
               "foo" Ingest:
                 Flow ID = 0 Scheduled
-            
+
             #2: +10ms:
               "foo" Ingest:
                 Flow ID = 0 Running
-            
+
             #3: +20ms:
               "bar" ExecuteTransform:
                 Flow ID = 1 Queued
               "foo" Ingest:
                 Flow ID = 2 Queued
                 Flow ID = 0 Finished Success
-            
+
             #4: +20ms:
               "bar" ExecuteTransform:
                 Flow ID = 1 Scheduled
               "foo" Ingest:
                 Flow ID = 2 Queued
                 Flow ID = 0 Finished Success
-            
+
             #5: +40ms:
               "bar" ExecuteTransform:
                 Flow ID = 1 Running
               "foo" Ingest:
                 Flow ID = 2 Queued
                 Flow ID = 0 Finished Success
-            
+
             #6: +50ms:
               "bar" ExecuteTransform:
                 Flow ID = 1 Finished Success
               "foo" Ingest:
                 Flow ID = 2 Queued
                 Flow ID = 0 Finished Success
-            
+
             #7: +100ms:
               "bar" ExecuteTransform:
                 Flow ID = 1 Finished Success
               "foo" Ingest:
                 Flow ID = 2 Scheduled
                 Flow ID = 0 Finished Success
-            
+
             "#
         )
     );
@@ -1141,35 +1165,36 @@ impl std::fmt::Display for TestFlowSystemListener {
                 (*snapshot_time - initial_time).num_milliseconds(),
             )?;
 
-            let mut flow_headings = snapshots.keys().map(|flow_key| {
-                (flow_key, match flow_key {
-                    FlowKey::Dataset(fk_dataset) => 
-                        format!(
-                            "\"{}\" {:?}",
-                            state
-                                .dataset_display_names
-                                .get(&fk_dataset.dataset_id)
-                                .cloned()
-                                .unwrap_or_else(|| fk_dataset.dataset_id.to_string()),
-                            fk_dataset.flow_type
-                        ),
-                    FlowKey::System(fk_system) =>
-                        format!("System {:?}", fk_system.flow_type),
+            let mut flow_headings = snapshots
+                .keys()
+                .map(|flow_key| {
+                    (
+                        flow_key,
+                        match flow_key {
+                            FlowKey::Dataset(fk_dataset) => format!(
+                                "\"{}\" {:?}",
+                                state
+                                    .dataset_display_names
+                                    .get(&fk_dataset.dataset_id)
+                                    .cloned()
+                                    .unwrap_or_else(|| fk_dataset.dataset_id.to_string()),
+                                fk_dataset.flow_type
+                            ),
+                            FlowKey::System(fk_system) => {
+                                format!("System {:?}", fk_system.flow_type)
+                            }
+                        },
+                    )
                 })
-            }).collect::<Vec<_>>();
+                .collect::<Vec<_>>();
             flow_headings.sort_by_key(|(_, title)| title.clone());
 
             for (flow_key, heading) in flow_headings {
                 writeln!(f, "  {heading}:")?;
                 for state in snapshots.get(flow_key).unwrap() {
-                    write!(
-                        f,
-                        "    Flow ID = {} {:?}",
-                        state.flow_id,
-                        state.status(),
-                    )?;
+                    write!(f, "    Flow ID = {} {:?}", state.flow_id, state.status(),)?;
                     if let Some(outcome) = state.outcome {
-                        writeln!(f, " {outcome:?}", )?;
+                        writeln!(f, " {outcome:?}",)?;
                     } else {
                         writeln!(f)?;
                     }
@@ -1192,6 +1217,7 @@ impl AsyncEventHandler<FlowServiceEvent> for TestFlowSystemListener {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 const SCHEDULING_ALIGNMENT_MS: i64 = 10;
+const SCHEDULING_MANDATORY_THROTTLING_PERIOD_MS: i64 = SCHEDULING_ALIGNMENT_MS * 2;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -1206,10 +1232,16 @@ struct FlowHarness {
 
 impl FlowHarness {
     fn new() -> Self {
-        Self::new_custom_alignment(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
+        Self::new_custom_time_properties(
+            Duration::milliseconds(SCHEDULING_ALIGNMENT_MS),
+            Duration::milliseconds(SCHEDULING_MANDATORY_THROTTLING_PERIOD_MS),
+        )
     }
 
-    fn new_custom_alignment(alignment: Duration) -> Self {
+    fn new_custom_time_properties(
+        awaiting_step: Duration,
+        mandatory_throttling_period: Duration,
+    ) -> Self {
         let tmp_dir = tempfile::tempdir().unwrap();
         let datasets_dir = tmp_dir.path().join("datasets");
         std::fs::create_dir(&datasets_dir).unwrap();
@@ -1219,7 +1251,10 @@ impl FlowHarness {
 
         let catalog = dill::CatalogBuilder::new()
             .add::<EventBus>()
-            .add_value(FlowServiceRunConfig::new(alignment))
+            .add_value(FlowServiceRunConfig::new(
+                awaiting_step,
+                mandatory_throttling_period,
+            ))
             .add::<FlowServiceInMemory>()
             .add::<FlowEventStoreInMem>()
             .add::<FlowConfigurationServiceInMemory>()
@@ -1394,20 +1429,17 @@ impl FlowHarness {
             .unwrap();
     }
 
-    async fn trigger_manual_flow(&self, trigger_time: DateTime<Utc>, flow_key: FlowKey) {
-        self.flow_service
-            .trigger_manual_flow(
-                trigger_time,
-                flow_key,
-                FAKE_ACCOUNT_ID.to_string(),
-                AccountName::new_unchecked(auth::DEFAULT_ACCOUNT_NAME),
-            )
-            .await
-            .unwrap();
-    }
-
     fn task_driver(&self, args: TaskDriverArgs) -> TaskDriver {
         TaskDriver::new(
+            self.catalog.get_one().unwrap(),
+            self.catalog.get_one().unwrap(),
+            self.catalog.get_one().unwrap(),
+            args,
+        )
+    }
+
+    fn manual_flow_trigger_driver(&self, args: ManualFlowTriggerArgs) -> ManualFlowTriggerDriver {
+        ManualFlowTriggerDriver::new(
             self.catalog.get_one().unwrap(),
             self.catalog.get_one().unwrap(),
             args,
@@ -1419,7 +1451,11 @@ impl FlowHarness {
     }
 
     async fn advance_time(&self, time_quantum: Duration) {
-        self.advance_time_custom_alignment(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS), time_quantum).await;
+        self.advance_time_custom_alignment(
+            Duration::milliseconds(SCHEDULING_ALIGNMENT_MS),
+            time_quantum,
+        )
+        .await;
     }
 
     async fn advance_time_custom_alignment(&self, alignment: Duration, time_quantum: Duration) {
@@ -1438,10 +1474,8 @@ impl FlowHarness {
 
         for _ in 0..time_increments_count {
             yield_now().await;
-            
             self.fake_system_time_source.advance(alignment);
         }
-
     }
 }
 
@@ -1450,11 +1484,13 @@ impl FlowHarness {
 struct TaskDriver {
     time_source: Arc<dyn SystemTimeSource>,
     event_bus: Arc<EventBus>,
+    task_event_store: Arc<dyn TaskSystemEventStore>,
     args: TaskDriverArgs,
 }
 
 struct TaskDriverArgs {
     task_id: TaskID,
+    dataset_id: Option<DatasetID>,
     run_since_start: Duration,
     finish_in_with: Option<(Duration, TaskOutcome)>,
 }
@@ -1463,19 +1499,26 @@ impl TaskDriver {
     fn new(
         time_source: Arc<dyn SystemTimeSource>,
         event_bus: Arc<EventBus>,
+        task_event_store: Arc<dyn TaskSystemEventStore>,
         args: TaskDriverArgs,
     ) -> Self {
         Self {
             time_source,
             event_bus,
+            task_event_store,
             args,
         }
     }
 
-    async fn run(&self) {
+    async fn run(self) {
         let start_time = self.time_source.now();
 
         self.time_source.sleep(self.args.run_since_start).await;
+        while !(self.task_exists().await) {
+            yield_now().await;
+        }
+
+        self.ensure_task_matches_dataset().await;
 
         self.event_bus
             .dispatch_event(TaskEventRunning {
@@ -1497,6 +1540,70 @@ impl TaskDriver {
                 .await
                 .unwrap();
         }
+    }
+
+    async fn task_exists(&self) -> bool {
+        Task::try_load(self.args.task_id, self.task_event_store.as_ref())
+            .await
+            .unwrap()
+            .is_some()
+    }
+
+    async fn ensure_task_matches_dataset(&self) {
+        let task = Task::load(self.args.task_id, self.task_event_store.as_ref())
+            .await
+            .expect("Task does not exist yet");
+
+        match &task.logical_plan {
+            LogicalPlan::UpdateDataset(ud) => {
+                assert!(self.args.dataset_id.is_some());
+                assert_eq!(&ud.dataset_id, self.args.dataset_id.as_ref().unwrap());
+            }
+            LogicalPlan::Probe(_) => assert!(self.args.dataset_id.is_none()),
+        }
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+struct ManualFlowTriggerDriver {
+    time_source: Arc<dyn SystemTimeSource>,
+    flow_service: Arc<dyn FlowService>,
+    args: ManualFlowTriggerArgs,
+}
+
+struct ManualFlowTriggerArgs {
+    flow_key: FlowKey,
+    run_since_start: Duration,
+}
+
+impl ManualFlowTriggerDriver {
+    fn new(
+        time_source: Arc<dyn SystemTimeSource>,
+        flow_service: Arc<dyn FlowService>,
+        args: ManualFlowTriggerArgs,
+    ) -> Self {
+        Self {
+            time_source,
+            flow_service,
+            args,
+        }
+    }
+
+    async fn run(self) {
+        let start_time = self.time_source.now();
+
+        self.time_source.sleep(self.args.run_since_start).await;
+
+        self.flow_service
+            .trigger_manual_flow(
+                start_time + self.args.run_since_start,
+                self.args.flow_key,
+                FAKE_ACCOUNT_ID.to_string(),
+                AccountName::new_unchecked(auth::DEFAULT_ACCOUNT_NAME),
+            )
+            .await
+            .unwrap();
     }
 }
 

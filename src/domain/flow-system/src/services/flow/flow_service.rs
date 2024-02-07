@@ -182,12 +182,22 @@ impl From<LoadError<FlowState>> for CancelScheduledTasksError {
 
 #[derive(Debug)]
 pub struct FlowServiceRunConfig {
+    /// Defines discretion for main scheduling loop: how often new data is
+    /// checked and processed
     pub awaiting_step: chrono::Duration,
+    /// Defines minimal time between 2 runs of the same flow configuration
+    pub mandatory_throttling_period: chrono::Duration,
 }
 
 impl FlowServiceRunConfig {
-    pub fn new(awaiting_step: chrono::Duration) -> Self {
-        Self { awaiting_step }
+    pub fn new(
+        awaiting_step: chrono::Duration,
+        mandatory_throttling_period: chrono::Duration,
+    ) -> Self {
+        Self {
+            awaiting_step,
+            mandatory_throttling_period,
+        }
     }
 }
 

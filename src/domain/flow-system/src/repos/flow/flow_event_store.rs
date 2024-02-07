@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use chrono::{DateTime, Utc};
 use event_sourcing::EventStore;
 use opendatafabric::{AccountName, DatasetID};
 
@@ -19,18 +20,18 @@ pub trait FlowEventStore: EventStore<FlowState> {
     /// Generates new unique flow identifier
     fn new_flow_id(&self) -> FlowID;
 
-    /// Returns ID of the last succeeded dataset flow of certain type
-    async fn get_last_succeeded_dataset_flow_id(
+    /// Returns last run statistics for the dataset flow of certain type
+    async fn get_dataset_flow_run_stats(
         &self,
         dataset_id: &DatasetID,
         flow_type: DatasetFlowType,
-    ) -> Result<Option<FlowID>, InternalError>;
+    ) -> Result<FlowRunStats, InternalError>;
 
-    /// Returns ID of the last succeeded system flow of certain type
-    async fn get_last_succeded_system_flow_id(
+    /// Returns last run statistics for the system flow of certain type
+    async fn get_system_flow_run_stats(
         &self,
         flow_type: SystemFlowType,
-    ) -> Result<Option<FlowID>, InternalError>;
+    ) -> Result<FlowRunStats, InternalError>;
 
     /// Returns IDs of the flows associated with the specified
     /// dataset in reverse chronological order based on creation time.
@@ -100,6 +101,25 @@ pub struct SystemFlowFilters {
 pub enum InitiatorFilter {
     System,
     Account(AccountName), // TODO: replace on AccountID
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Default, Debug, Clone, Copy)]
+pub struct FlowRunStats {
+    pub last_success_time: Option<DateTime<Utc>>,
+    pub last_attempt_time: Option<DateTime<Utc>>,
+}
+
+impl FlowRunStats {
+    pub fn merge(&mut self, new_stats: FlowRunStats) {
+        if new_stats.last_success_time.is_some() {
+            self.last_success_time = new_stats.last_success_time;
+        }
+        if new_stats.last_attempt_time.is_some() {
+            self.last_attempt_time = new_stats.last_attempt_time;
+        }
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

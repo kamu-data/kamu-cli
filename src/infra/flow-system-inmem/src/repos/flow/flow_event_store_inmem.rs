@@ -34,8 +34,8 @@ struct State {
     all_flows: Vec<FlowID>,
     flow_search_index: HashMap<FlowID, FlowIndexEntry>,
     flow_key_by_flow_id: HashMap<FlowID, FlowKey>,
-    last_succeeded_dataset_flow_ids: HashMap<FlowKeyDataset, FlowID>,
-    last_sycceeded_system_flow_ids: HashMap<SystemFlowType, FlowID>,
+    dataset_flow_last_run_stats: HashMap<FlowKeyDataset, FlowRunStats>,
+    system_flow_last_run_stats: HashMap<SystemFlowType, FlowRunStats>,
 }
 
 impl State {
@@ -226,17 +226,31 @@ impl FlowEventStoreInMem {
                     .get(&e.flow_id)
                     .expect("Previously unseen flow ID");
 
+                let new_run_stats = FlowRunStats {
+                    last_attempt_time: Some(e.event_time),
+                    last_success_time: if e.task_outcome == TaskOutcome::Success {
+                        Some(e.event_time)
+                    } else {
+                        None
+                    },
+                };
+
                 match flow_key {
                     FlowKey::Dataset(flow_key) => state
-                        .last_succeeded_dataset_flow_ids
+                        .dataset_flow_last_run_stats
                         .entry(flow_key.clone())
-                        .and_modify(|flow_id_mut_ref| *flow_id_mut_ref = e.flow_id)
-                        .or_insert(e.flow_id),
+                        .and_modify(|flow_run_stats_mut_ref| {
+                            flow_run_stats_mut_ref.merge(new_run_stats);
+                        })
+                        .or_insert(new_run_stats),
+
                     FlowKey::System(flow_key) => state
-                        .last_sycceeded_system_flow_ids
+                        .system_flow_last_run_stats
                         .entry(flow_key.flow_type)
-                        .and_modify(|flow_id_mut_ref| *flow_id_mut_ref = e.flow_id)
-                        .or_insert(e.flow_id),
+                        .and_modify(|flow_run_stats_mut_ref| {
+                            flow_run_stats_mut_ref.merge(new_run_stats);
+                        })
+                        .or_insert(new_run_stats),
                 };
             }
         }
@@ -285,26 +299,30 @@ impl FlowEventStore for FlowEventStoreInMem {
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id, ?flow_type))]
-    async fn get_last_succeeded_dataset_flow_id(
+    async fn get_dataset_flow_run_stats(
         &self,
         dataset_id: &DatasetID,
         flow_type: DatasetFlowType,
-    ) -> Result<Option<FlowID>, InternalError> {
+    ) -> Result<FlowRunStats, InternalError> {
         let state = self.inner.as_state();
         let g = state.lock().unwrap();
-        Ok(g.last_succeeded_dataset_flow_ids
+        Ok(g.dataset_flow_last_run_stats
             .get(BorrowedFlowKeyDataset::new(dataset_id, flow_type).as_trait())
-            .copied())
+            .copied()
+            .unwrap_or_default())
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(?flow_type))]
-    async fn get_last_succeded_system_flow_id(
+    async fn get_system_flow_run_stats(
         &self,
         flow_type: SystemFlowType,
-    ) -> Result<Option<FlowID>, InternalError> {
+    ) -> Result<FlowRunStats, InternalError> {
         let state = self.inner.as_state();
         let g = state.lock().unwrap();
-        Ok(g.last_sycceeded_system_flow_ids.get(&flow_type).copied())
+        Ok(g.system_flow_last_run_stats
+            .get(&flow_type)
+            .copied()
+            .unwrap_or_default())
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id, ?filters, ?pagination))]

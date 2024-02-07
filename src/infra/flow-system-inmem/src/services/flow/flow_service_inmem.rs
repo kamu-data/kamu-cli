@@ -206,28 +206,77 @@ impl FlowServiceInMemory {
         flow_key: &FlowKey,
         schedule: &Schedule,
     ) -> Result<FlowState, InternalError> {
-        let trigger = FlowTrigger::AutoPolling(FlowTriggerAutoPolling {});
+        self.trigger_flow_common(
+            start_time,
+            flow_key,
+            FlowTrigger::AutoPolling(FlowTriggerAutoPolling {}),
+            |flow_run_stats: &FlowRunStats| {
+                schedule.next_activation_time(start_time, flow_run_stats.last_success_time)
+            },
+        )
+        .await
+    }
 
+    async fn trigger_flow_common(
+        &self,
+        trigger_time: DateTime<Utc>,
+        flow_key: &FlowKey,
+        trigger: FlowTrigger,
+        new_activation_time_fn: impl FnOnce(&FlowRunStats) -> DateTime<Utc>,
+    ) -> Result<FlowState, InternalError> {
+        // Query previous runs stats to determine activation time
+        let flow_run_stats = self.flow_run_stats(flow_key).await?;
+
+        // Flows may not be attempted more frequent than mandatory throttling period.
+        // If flow has never run before, let it go without restriction
+        let throttling_boundary_time = flow_run_stats.last_attempt_time.map_or(trigger_time, |t| {
+            t + self.run_config.mandatory_throttling_period
+        });
+
+        // Is a pending flow present for this config?
         match self.find_pending_flow(flow_key) {
-            // If flow is already pending, simply merge triggers
-            Some(flow_id) => self.merge_secondary_flow_trigger(flow_id, trigger).await,
+            // Already pending flow
+            Some(flow_id) => {
+                // Load, merge triggers, update activation time
+                let mut flow = Flow::load(flow_id, self.flow_event_store.as_ref())
+                    .await
+                    .int_err()?;
+                flow.add_trigger(trigger_time, trigger).int_err()?;
+
+                // Is new time earlier than previously planned?
+                if throttling_boundary_time
+                    < flow
+                        .timing
+                        .activate_at
+                        .expect("Flow expected to be queued by now")
+                {
+                    // If so, enqueue the flow earlier
+                    self.enqueue_flow(flow.flow_id, throttling_boundary_time)?;
+                    flow.activate_at_time(self.time_source.now(), throttling_boundary_time)
+                        .int_err()?;
+                }
+
+                flow.save(self.flow_event_store.as_ref()).await.int_err()?;
+                Ok(flow.into())
+            }
 
             // Otherwise, initiate a new flow, and enqueue it in the time wheel
             None => {
-                // Take the time of last similar flow run into account and generate next
-                // activation time suggestion
-                let maybe_last_flow_success_time = self.last_flow_run_time(flow_key).await?;
-                let next_activation_time =
-                    schedule.next_activation_time(start_time, maybe_last_flow_success_time);
+                // Next activation time dependds on:
+                //  - last success time, if ever launched
+                //  - schedule define
+                // but in any case, may not be less than throttling boundary
+                let next_activation_time = std::cmp::max(
+                    throttling_boundary_time,
+                    new_activation_time_fn(&flow_run_stats),
+                );
 
                 let mut flow = self.make_new_flow(flow_key.clone(), trigger).await?;
                 self.enqueue_flow(flow.flow_id, next_activation_time)?;
-
                 flow.activate_at_time(self.time_source.now(), next_activation_time)
                     .int_err()?;
 
                 flow.save(self.flow_event_store.as_ref()).await.int_err()?;
-
                 Ok(flow.into())
             }
         }
@@ -273,8 +322,15 @@ impl FlowServiceInMemory {
                 match self.find_pending_flow(&flow_key) {
                     // If flow is already pending for this dataset, simply merge triggers
                     Some(dependent_flow_id) => {
-                        self.merge_secondary_flow_trigger(dependent_flow_id, trigger)
-                            .await?;
+                        let mut dependent_flow =
+                            Flow::load(dependent_flow_id, self.flow_event_store.as_ref())
+                                .await
+                                .int_err()?;
+                        dependent_flow.add_trigger(start_time, trigger).int_err()?;
+                        dependent_flow
+                            .save(self.flow_event_store.as_ref())
+                            .await
+                            .int_err()?;
                     }
 
                     // Otherwise, initiate a new update accordingly to start condition rules
@@ -350,46 +406,18 @@ impl FlowServiceInMemory {
         Ok(flow)
     }
 
-    #[tracing::instrument(level = "trace", skip_all, fields(%flow_id, ?trigger))]
-    async fn merge_secondary_flow_trigger(
-        &self,
-        flow_id: FlowID,
-        trigger: FlowTrigger,
-    ) -> Result<FlowState, InternalError> {
-        let mut flow = Flow::load(flow_id, self.flow_event_store.as_ref())
-            .await
-            .int_err()?;
-        flow.add_trigger(self.time_source.now(), trigger)
-            .int_err()?;
-        flow.save(self.flow_event_store.as_ref()).await.int_err()?;
-        Ok(flow.into())
-    }
-
-    async fn last_flow_run_time(
-        &self,
-        flow_key: &FlowKey,
-    ) -> Result<Option<DateTime<Utc>>, InternalError> {
-        let maybe_last_flow_id = match flow_key {
-            FlowKey::Dataset(fk_dataset) => self
-                .flow_event_store
-                .get_last_succeeded_dataset_flow_id(&fk_dataset.dataset_id, fk_dataset.flow_type)
-                .await
-                .int_err()?,
-            FlowKey::System(fk_system) => self
-                .flow_event_store
-                .get_last_succeded_system_flow_id(fk_system.flow_type)
-                .await
-                .int_err()?,
-        };
-
-        if let Some(last_flow_id) = maybe_last_flow_id {
-            let last_flow = Flow::load(last_flow_id, self.flow_event_store.as_ref())
-                .await
-                .int_err()?;
-            assert!(last_flow.timing.finished_at.is_some());
-            Ok(last_flow.timing.finished_at)
-        } else {
-            Ok(None)
+    async fn flow_run_stats(&self, flow_key: &FlowKey) -> Result<FlowRunStats, InternalError> {
+        match flow_key {
+            FlowKey::Dataset(fk_dataset) => {
+                self.flow_event_store
+                    .get_dataset_flow_run_stats(&fk_dataset.dataset_id, fk_dataset.flow_type)
+                    .await
+            }
+            FlowKey::System(fk_system) => {
+                self.flow_event_store
+                    .get_system_flow_run_stats(fk_system.flow_type)
+                    .await
+            }
         }
     }
 
@@ -550,30 +578,19 @@ impl FlowService for FlowServiceInMemory {
         initiator_account_id: AccountID,
         initiator_account_name: AccountName,
     ) -> Result<FlowState, RequestFlowError> {
-        let trigger = FlowTrigger::Manual(FlowTriggerManual {
-            initiator_account_id,
-            initiator_account_name,
-        });
+        let activation_time = self.round_time(trigger_time).int_err()?;
 
-        match self.find_pending_flow(&flow_key) {
-            // If flow is already pending, simply merge triggers
-            Some(flow_id) => self
-                .merge_secondary_flow_trigger(flow_id, trigger)
-                .await
-                .map_err(RequestFlowError::Internal),
-
-            // Otherwise, initiate a new flow and activate it at the nearest scheduler slot
-            None => {
-                let mut flow = self.make_new_flow(flow_key, trigger).await?;
-                let activation_time = self.round_time(trigger_time)?;
-                self.enqueue_flow(flow.flow_id, activation_time)?;
-
-                flow.activate_at_time(self.time_source.now(), activation_time)
-                    .int_err()?;
-                flow.save(self.flow_event_store.as_ref()).await.int_err()?;
-                Ok(flow.into())
-            }
-        }
+        self.trigger_flow_common(
+            trigger_time,
+            &flow_key,
+            FlowTrigger::Manual(FlowTriggerManual {
+                initiator_account_id,
+                initiator_account_name,
+            }),
+            |_| activation_time,
+        )
+        .await
+        .map_err(RequestFlowError::Internal)
     }
 
     /// Returns states of flows associated with a given dataset
@@ -770,11 +787,13 @@ impl AsyncEventHandler<TaskEventRunning> for FlowServiceInMemory {
             state.pending_flows.try_get_flow_id_by_task(event.task_id)
         };
 
+        let running_time = self.round_time(event.event_time)?;
+
         if let Some(flow_id) = maybe_flow_id {
             let mut flow = Flow::load(flow_id, self.flow_event_store.as_ref())
                 .await
                 .int_err()?;
-            flow.on_task_running(self.time_source.now(), event.task_id)
+            flow.on_task_running(running_time, event.task_id)
                 .int_err()?;
             flow.save(self.flow_event_store.as_ref()).await.int_err()?;
         }
@@ -807,15 +826,15 @@ impl AsyncEventHandler<TaskEventFinished> for FlowServiceInMemory {
             state.pending_flows.try_get_flow_id_by_task(event.task_id)
         };
 
+        let finish_time = self.round_time(event.event_time)?;
+
         if let Some(flow_id) = maybe_flow_id {
             let mut flow = Flow::load(flow_id, self.flow_event_store.as_ref())
                 .await
                 .int_err()?;
-            flow.on_task_finished(self.time_source.now(), event.task_id, event.outcome)
+            flow.on_task_finished(finish_time, event.task_id, event.outcome)
                 .int_err()?;
             flow.save(self.flow_event_store.as_ref()).await.int_err()?;
-
-            let finish_time = self.round_time(event.event_time)?;
 
             // In case of success:
             //  - enqueue updates of dependent datasets
