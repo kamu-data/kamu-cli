@@ -21,7 +21,7 @@ use kamu_core::events::{
 use kamu_core::*;
 use opendatafabric::DatasetID;
 use petgraph::stable_graph::{NodeIndex, StableDiGraph};
-use petgraph::visit::{Bfs, Walker};
+use petgraph::visit::{Bfs, Dfs, Walker};
 use petgraph::Direction;
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -214,18 +214,62 @@ impl DependencyGraphService for DependencyGraphServiceInMemory {
                     .map_err(GetUpstreamDependenciesError::DatasetNotFound)
             })
             .collect::<Result<Vec<_>, _>>()?;
-
         let mut node_indexes_result = HashSet::new();
 
         for node_index in &nodes_to_search {
-            // Insert current node_index into HashSet
-            // if it return false it means we already have such value
-            // skip searching
-            if !node_indexes_result.insert(*node_index) {
-                continue;
-            }
             let mut bfs = Bfs::new(&state.datasets_graph, *node_index);
             while let Some(ni) = bfs.walk_next(&state.datasets_graph) {
+                // Insert current node_index into HashSet
+                // if it return false it means we already have such value
+                // skip searching
+                if !node_indexes_result.insert(ni) {
+                    break;
+                }
+            }
+        }
+
+        let result: Vec<_> = node_indexes_result
+            .iter()
+            .map(|node_index| {
+                state
+                    .datasets_graph
+                    .node_weight(*node_index)
+                    .unwrap()
+                    .clone()
+            })
+            .collect();
+
+        Ok(Box::pin(tokio_stream::iter(result)))
+    }
+
+    async fn get_all_downstream_dependencies(
+        &self,
+        dataset_ids: Vec<DatasetID>,
+    ) -> Result<DatasetIDStream, GetDownstreamDependenciesError> {
+        self.ensure_datasets_initially_scanned()
+            .await
+            .int_err()
+            .map_err(GetDownstreamDependenciesError::Internal)
+            .unwrap();
+
+        let state = self.state.lock().await;
+
+        let nodes_to_search = dataset_ids
+            .iter()
+            .map(|dataset_id| {
+                state
+                    .get_dataset_node(dataset_id)
+                    .map_err(GetDownstreamDependenciesError::DatasetNotFound)
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        let mut node_indexes_result = HashSet::new();
+
+        for node_index in &nodes_to_search {
+            let mut bfs = Dfs::new(&state.datasets_graph, *node_index);
+            while let Some(ni) = bfs.walk_next(&state.datasets_graph) {
+                // Insert current node_index into HashSet
+                // if it return false it means we already have such value
+                // skip searching
                 if !node_indexes_result.insert(ni) {
                     break;
                 }
