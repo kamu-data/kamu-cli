@@ -154,6 +154,8 @@ impl FlowServiceInMemory {
                     self.enqueue_auto_polling_flow(start_time, &flow_key, schedule)
                         .await?;
                 }
+                // TODO: trigger flows without schedules (i.e. derived datasets)
+                //   if they have not ran or it was long time ago
 
                 let mut state = self.state.lock().unwrap();
                 state
@@ -254,6 +256,17 @@ impl FlowServiceInMemory {
                     self.enqueue_flow(flow.flow_id, throttling_boundary_time)?;
                     flow.activate_at_time(self.time_source.now(), throttling_boundary_time)
                         .int_err()?;
+
+                    // Indicate throttling activity
+                    if throttling_boundary_time > trigger_time {
+                        flow.define_start_condition(
+                            self.time_source.now(),
+                            FlowStartCondition::Throttling(FlowStartConditionThrottling {
+                                interval: self.run_config.mandatory_throttling_period,
+                            }),
+                        )
+                        .int_err()?;
+                    }
                 }
 
                 flow.save(self.flow_event_store.as_ref()).await.int_err()?;
@@ -266,15 +279,25 @@ impl FlowServiceInMemory {
                 //  - last success time, if ever launched
                 //  - schedule define
                 // but in any case, may not be less than throttling boundary
-                let next_activation_time = std::cmp::max(
-                    throttling_boundary_time,
-                    new_activation_time_fn(&flow_run_stats),
-                );
+                let naive_next_activation_time = new_activation_time_fn(&flow_run_stats);
+                let next_activation_time =
+                    std::cmp::max(throttling_boundary_time, naive_next_activation_time);
 
                 let mut flow = self.make_new_flow(flow_key.clone(), trigger).await?;
                 self.enqueue_flow(flow.flow_id, next_activation_time)?;
                 flow.activate_at_time(self.time_source.now(), next_activation_time)
                     .int_err()?;
+
+                // Indicate throttling activity
+                if throttling_boundary_time > naive_next_activation_time {
+                    flow.define_start_condition(
+                        self.time_source.now(),
+                        FlowStartCondition::Throttling(FlowStartConditionThrottling {
+                            interval: self.run_config.mandatory_throttling_period,
+                        }),
+                    )
+                    .int_err()?;
+                }
 
                 flow.save(self.flow_event_store.as_ref()).await.int_err()?;
                 Ok(flow.into())
@@ -312,68 +335,22 @@ impl FlowServiceInMemory {
                 .try_get_dataset_start_condition(&dependent_dataset_id, flow_type);
 
             if let Some(start_condition) = maybe_dependent_start_condition {
+                if start_condition.minimal_data_batch.is_some() {
+                    unimplemented!("Data batching not supported yet in scheduler")
+                }
+
+                let dependent_flow_key =
+                    FlowKeyDataset::new(dependent_dataset_id.clone(), flow_type).into();
+
                 let trigger = FlowTrigger::InputDatasetFlow(FlowTriggerInputDatasetFlow {
                     dataset_id: dataset_id.clone(),
                     flow_type,
                     flow_id,
                 });
 
-                let flow_key = FlowKeyDataset::new(dependent_dataset_id.clone(), flow_type).into();
-                match self.find_pending_flow(&flow_key) {
-                    // If flow is already pending for this dataset, simply merge triggers
-                    Some(dependent_flow_id) => {
-                        let mut dependent_flow =
-                            Flow::load(dependent_flow_id, self.flow_event_store.as_ref())
-                                .await
-                                .int_err()?;
-                        dependent_flow.add_trigger(start_time, trigger).int_err()?;
-                        dependent_flow
-                            .save(self.flow_event_store.as_ref())
-                            .await
-                            .int_err()?;
-                    }
-
-                    // Otherwise, initiate a new update accordingly to start condition rules
-                    None => {
-                        let mut dependent_dataset_flow =
-                            self.make_new_flow(flow_key, trigger).await?;
-
-                        if start_condition.minimal_data_batch.is_some() {
-                            unimplemented!("Data batching not supported yet in scheduler")
-                        }
-
-                        if let Some(throttling_period) = start_condition.throttling_period {
-                            // TODO: throttle not from NOW,
-                            //  but from last flow of the dependent dataset
-                            let activation_time = start_time + throttling_period;
-                            self.enqueue_flow(dependent_dataset_flow.flow_id, activation_time)?;
-
-                            dependent_dataset_flow
-                                .activate_at_time(self.time_source.now(), activation_time)
-                                .int_err()?;
-
-                            dependent_dataset_flow
-                                .define_start_condition(
-                                    self.time_source.now(),
-                                    FlowStartCondition::Throttling(FlowStartConditionThrottling {
-                                        interval: throttling_period,
-                                    }),
-                                )
-                                .int_err()?;
-                        } else {
-                            self.enqueue_flow(dependent_dataset_flow.flow_id, start_time)?;
-
-                            dependent_dataset_flow
-                                .activate_at_time(self.time_source.now(), start_time)
-                                .int_err()?;
-                        }
-
-                        dependent_dataset_flow
-                            .save(self.flow_event_store.as_ref())
-                            .await
-                            .int_err()?;
-                    }
-                }
+                self.trigger_flow_common(start_time, &dependent_flow_key, trigger, |_| start_time)
+                    .await
+                    .int_err()?;
             }
         }
 
@@ -581,7 +558,7 @@ impl FlowService for FlowServiceInMemory {
         let activation_time = self.round_time(trigger_time).int_err()?;
 
         self.trigger_flow_common(
-            trigger_time,
+            activation_time,
             &flow_key,
             FlowTrigger::Manual(FlowTriggerManual {
                 initiator_account_id,
