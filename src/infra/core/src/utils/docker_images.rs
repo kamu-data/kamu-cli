@@ -9,7 +9,7 @@
 
 pub const SPARK: &str = "ghcr.io/kamu-data/engine-spark:0.22.1-spark_3.1.2";
 pub const FLINK: &str = "ghcr.io/kamu-data/engine-flink:0.18.0-flink_1.16.0-scala_2.12-java8";
-pub const DATAFUSION: &str = "ghcr.io/kamu-data/engine-datafusion:0.7.1";
+pub const DATAFUSION: &str = "ghcr.io/kamu-data/engine-datafusion:0.7.2";
 
 pub const LIVY: &str = SPARK;
 pub const JUPYTER: &str = "ghcr.io/kamu-data/jupyter:0.5.2";

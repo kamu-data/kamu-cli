@@ -4,10 +4,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.156.3] - 2024-02-09
+### Added
+- Native support for `arm64` architecture (including M-series Apple silicon) in `kamu-cli` and `kamu-engine-datafusion`
+  - Note: Flink and Spark engine images still don't provide `arm64` architecture and continue to require QEMU
 ### Changed
- - Flow system scheduling rules improved to respect system-wide throttling setting and 
-    take last succesful run into account when rescheduling a flow or after restart
+- Flow system scheduling rules improved to respect system-wide throttling setting and take last successful run into account when rescheduling a flow or after a restart
 
 ## [0.156.2] - 2024-02-07
 ### Changed

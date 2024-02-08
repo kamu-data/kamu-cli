@@ -8,105 +8,113 @@ env:
   BINARY_NAME: kamu
   KAMU_WEB_UI_VERSION: "0.15.0"
 jobs:
-  build_linux:
-    name: Build / Linux
-    runs-on: ubuntu-latest
+  build:
     strategy:
+      fail-fast: true
       matrix:
-        target:
-          - x86_64-unknown-linux-gnu
-          - x86_64-unknown-linux-musl
+        include:
+          # Keep in sync with artifact upload matrix below
+          #
+          # TODO: Add minimal targets that are stripped and do not embed WebUI
+          - name: Linux / amd64 / glibc
+            runs-on: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            use-cross: true
+            features: ftp,web-ui
+          - name: Linux / amd64 / musl
+            runs-on: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+            use-cross: true
+            features: ftp,web-ui
+          - name: Linux / arm64 / glibc
+            runs-on: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            use-cross: true
+            features: ftp,web-ui
+          - name: Linux / arm64 / musl
+            runs-on: ubuntu-latest
+            target: aarch64-unknown-linux-musl
+            use-cross: true
+            features: ftp,web-ui
+          - name: MacOS / amd64
+            runs-on: macos-13
+            target: x86_64-apple-darwin
+            use-cross: false
+            features: ftp,web-ui
+          - name: MacOS / arm64
+            runs-on: macos-14
+            target: aarch64-apple-darwin
+            use-cross: false
+            features: ftp,web-ui
+          - name: Windows / amd64
+            runs-on: windows-latest
+            target: x86_64-pc-windows-msvc
+            use-cross: false
+            features: ftp
+            binary-ext: '.exe'
+    name: Build (${{ matrix.name }})
+    runs-on: ${{ matrix.runs-on }}
+    env:
+      # This will be replaced with `cross` for cross-compilation targets
+      CARGO: cargo
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions-rs/toolchain@v1 # Uses rust-toolchain file
         with:
           target: ${{ matrix.target }}
           override: true
+
       - name: Install cross
-        run: cargo install cross --locked
-      - name: Fetch web UI artifacts # TODO: Add target without UI
+        if: matrix.use-cross
+        shell: bash
         run: |
-          wget https://github.com/kamu-data/kamu-web-ui/releases/download/v${{ env.KAMU_WEB_UI_VERSION }}/kamu-web-ui-any.tar.gz && \
-          tar -xf kamu-web-ui-any.tar.gz
-      - name: Build
-        run: >-
-          KAMU_WEB_UI_DIR=../../../kamu-web-ui-any
-          cross build
-          -p kamu-cli
-          --release
-          --target=${{ matrix.target }}
-          --features ftp,web-ui
-      - name: Rename binary
-        run: mv target/${{ matrix.target }}/release/${{ env.PACKAGE_NAME }} target/${{ matrix.target }}/release/${{ env.BINARY_NAME }}
-      - uses: actions/upload-artifact@v3
-        with:
-          name: ${{ env.PACKAGE_NAME }}-${{ matrix.target }}
-          path: target/${{ matrix.target }}/release/${{ env.BINARY_NAME }}
-          if-no-files-found: error
-  build_macos:
-    name: Build / MacOS
-    runs-on: macos-latest
-    strategy:
-      matrix:
-        target:
-          - x86_64-apple-darwin
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions-rs/toolchain@v1 # Uses rust-toolchain file
-      - name: Fetch web UI artifacts # TODO: Add target without UI
+          cargo install cross --locked
+          echo "CARGO=cross" >> $GITHUB_ENV
+
+      - name: Fetch web UI artifacts
+        if: contains(matrix.features, 'web-ui')
+        shell: bash
         run: |
-          wget https://github.com/kamu-data/kamu-web-ui/releases/download/v${{ env.KAMU_WEB_UI_VERSION }}/kamu-web-ui-any.tar.gz && \
+          wget https://github.com/kamu-data/kamu-web-ui/releases/download/v${{ env.KAMU_WEB_UI_VERSION }}/kamu-web-ui-any.tar.gz
           tar -xf kamu-web-ui-any.tar.gz
+          echo "KAMU_WEB_UI_DIR=../../../kamu-web-ui-any" >> $GITHUB_ENV
+
       - name: Build
-        run: >-
-          KAMU_WEB_UI_DIR=../../../kamu-web-ui-any
-          cargo build
-          -p kamu-cli
-          --release
-          --target=${{ matrix.target }}
-          --features ftp,web-ui
-      - name: Rename binary
-        run: mv target/${{ matrix.target }}/release/${{ env.PACKAGE_NAME }} target/${{ matrix.target }}/release/${{ env.BINARY_NAME }}
-      - uses: actions/upload-artifact@v3
-        with:
-          name: ${{ env.PACKAGE_NAME }}-${{ matrix.target }}
-          path: target/${{ matrix.target }}/release/${{ env.BINARY_NAME }}
-          if-no-files-found: error
-  build_windows:
-    name: Build / Windows
-    runs-on: windows-latest
-    strategy:
-      matrix:
-        target:
-          - x86_64-pc-windows-msvc
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions-rs/toolchain@v1 # Uses rust-toolchain file
-      - name: Build
-        run: >-
-          cargo build
-          -p kamu-cli
-          --release
-          --target=${{ matrix.target }}
-          --features ftp
+        shell: bash
+        run: |
+          ${{ env.CARGO }} build \
+            -p kamu-cli \
+            --release \
+            --target=${{ matrix.target }} \
+            --features=${{ matrix.features }}
+
       - name: Rename binary
         shell: bash
-        run: mv target/${{ matrix.target }}/release/${{ env.PACKAGE_NAME }}.exe target/${{ matrix.target }}/release/${{ env.BINARY_NAME }}.exe
+        run: |
+          mv \
+            target/${{ matrix.target }}/release/${{ env.PACKAGE_NAME }}${{ matrix.binary-ext }} \
+            target/${{ matrix.target }}/release/${{ env.BINARY_NAME }}${{ matrix.binary-ext }}
+
       - uses: actions/upload-artifact@v3
         with:
           name: ${{ env.PACKAGE_NAME }}-${{ matrix.target }}
-          path: target/${{ matrix.target }}/release/${{ env.BINARY_NAME }}.exe
+          path: target/${{ matrix.target }}/release/${{ env.BINARY_NAME }}${{ matrix.binary-ext }}
           if-no-files-found: error
+  
   create_release:
     name: Create Release
     runs-on: ubuntu-latest
-    needs: [build_linux, build_macos, build_windows]
+    needs: [build]
     steps:
       - uses: actions/checkout@v4
+
       # Sets the header for the release description
       - run: echo "" > RELEASE_HEAD.md
+
       # Extracts relevant section from CHANGELOG.md and outputs it into RELEASE.md
       - uses: CSchoel/release-notes-from-changelog@v1
+
       - name: Create Release
         id: create_release
         uses: actions/create-release@v1
@@ -120,55 +128,63 @@ jobs:
           body_path: RELEASE.md
     outputs:
       upload_url: ${{ steps.create_release.outputs.upload_url }}
-  upload_assets_targz:
-    name: Upload Assets (tar.gz)
+  
+  upload_assets:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            format: tar.gz
+            media-type: application/gzip
+          - target: x86_64-unknown-linux-musl
+            format: tar.gz
+            media-type: application/gzip
+          - target: aarch64-unknown-linux-gnu
+            format: tar.gz
+            media-type: application/gzip
+          - target: aarch64-unknown-linux-musl
+            format: tar.gz
+            media-type: application/gzip
+          - target: x86_64-apple-darwin
+            format: tar.gz
+            media-type: application/gzip
+          - target: aarch64-apple-darwin
+            format: tar.gz
+            media-type: application/gzip
+          - target: x86_64-pc-windows-msvc
+            format: zip
+            media-type: application/zip
+    name: Upload Assets (${{ matrix.target }})
     runs-on: ubuntu-latest
     needs: [create_release]
-    strategy:
-      matrix:
-        target:
-          - x86_64-unknown-linux-gnu
-          - x86_64-unknown-linux-musl
-          - x86_64-apple-darwin
     steps:
       - name: Download Artifact
         uses: actions/download-artifact@v3
         with:
           name: ${{ env.PACKAGE_NAME }}-${{ matrix.target }}
           path: ${{ env.PACKAGE_NAME }}-${{ matrix.target }}
-      - name: Compress Artifacts
-        run: tar -czvf ${{ env.PACKAGE_NAME }}-${{ matrix.target }}.tar.gz ${{ env.PACKAGE_NAME }}-${{ matrix.target }}
+
+      - name: Archive (tar.gz)
+        if: matrix.format == 'tar.gz'
+        run: |
+          tar -czvf \
+            ${{ env.PACKAGE_NAME }}-${{ matrix.target }}.tar.gz \
+            ${{ env.PACKAGE_NAME }}-${{ matrix.target }}
+
+      - name: Archive (zip)
+        if: matrix.format == 'zip'
+        run: |
+          zip -r \
+            ${{ env.PACKAGE_NAME }}-${{ matrix.target }}.zip \
+            ${{ env.PACKAGE_NAME }}-${{ matrix.target }}
+
       - name: Upload Asset
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ needs.create_release.outputs.upload_url }}
-          asset_path: ${{ env.PACKAGE_NAME }}-${{ matrix.target }}.tar.gz
-          asset_name: ${{ env.PACKAGE_NAME }}-${{ matrix.target }}.tar.gz
-          asset_content_type: application/gzip
-  upload_assets_zip:
-    name: Upload Assets (zip)
-    runs-on: ubuntu-latest
-    needs: [create_release]
-    strategy:
-      matrix:
-        target:
-          - x86_64-pc-windows-msvc
-    steps:
-      - name: Download Artifact
-        uses: actions/download-artifact@v3
-        with:
-          name: ${{ env.PACKAGE_NAME }}-${{ matrix.target }}
-          path: ${{ env.PACKAGE_NAME }}-${{ matrix.target }}
-      - name: Compress Artifacts
-        run: zip -r ${{ env.PACKAGE_NAME }}-${{ matrix.target }}.zip ${{ env.PACKAGE_NAME }}-${{ matrix.target }}
-      - name: Upload Asset
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ needs.create_release.outputs.upload_url }}
-          asset_path: ${{ env.PACKAGE_NAME }}-${{ matrix.target }}.zip
-          asset_name: ${{ env.PACKAGE_NAME }}-${{ matrix.target }}.zip
-          asset_content_type: application/gzip
+          asset_path: ${{ env.PACKAGE_NAME }}-${{ matrix.target }}.${{ matrix.format }}
+          asset_name: ${{ env.PACKAGE_NAME }}-${{ matrix.target }}.${{ matrix.format }}
+          asset_content_type: ${{ matrix.media-type }}
