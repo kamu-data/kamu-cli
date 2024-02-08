@@ -12,7 +12,7 @@ use std::sync::Arc;
 
 use dill::Component;
 use event_bus::EventBus;
-use futures::{StreamExt, TryStreamExt};
+use futures::{future, StreamExt, TryStreamExt};
 use internal_error::ResultIntoInternal;
 use kamu::testing::MetadataFactory;
 use kamu::{
@@ -310,6 +310,250 @@ async fn test_service_dataset_deleted() {
     );
 }
 
+#[test_log::test(tokio::test)]
+async fn test_get_all_downstream_dependencies() {
+    let harness = create_large_dataset_graph().await;
+
+    // Request downstream dependencies for last element
+    // should return only itself
+    let request_dataset = "test-derive-foo-foo-foo-bar-foo-bar";
+    let result = harness
+        .get_all_downstream_dependencies(vec![request_dataset])
+        .await;
+    assert_eq!(result, vec![request_dataset]);
+
+    let request_dataset = "test-derive-baz-baz-foo-bar";
+    let result = harness
+        .get_all_downstream_dependencies(vec![request_dataset])
+        .await;
+
+    assert_eq!(result, vec![request_dataset]);
+
+    let request_dataset = "test-derive-bar-baz";
+    let result = harness
+        .get_all_downstream_dependencies(vec![request_dataset])
+        .await;
+
+    assert_eq!(result, vec![request_dataset]);
+
+    // Request downstream dependencies for element with 1 dependency
+    // should return dependency and itself at the end
+    let request_dataset = "test-derive-foo-foo-foo-bar-foo";
+    let result = harness
+        .get_all_downstream_dependencies(vec![request_dataset])
+        .await;
+
+    let expected_result = vec!["test-derive-foo-foo-foo-bar-foo-bar", request_dataset];
+    assert_eq!(result, expected_result);
+
+    let request_dataset = "test-derive-baz-baz-foo";
+    let result = harness
+        .get_all_downstream_dependencies(vec![request_dataset])
+        .await;
+
+    let expected_result = vec!["test-derive-baz-baz-foo-bar", request_dataset];
+    assert_eq!(result, expected_result);
+
+    // Request downstream dependencies for element with 2 dependencies
+    // should return dependencies(from last to first) and itself at the end
+    let request_dataset = "test-root-bar";
+    let result = harness
+        .get_all_downstream_dependencies(vec![request_dataset])
+        .await;
+
+    let expected_result = vec![
+        "test-derive-bar-bar",
+        "test-derive-bar-baz",
+        request_dataset,
+    ];
+    assert_eq!(result, expected_result);
+
+    let request_dataset = "test-derive-baz-baz";
+    let result = harness
+        .get_all_downstream_dependencies(vec![request_dataset])
+        .await;
+
+    let expected_result = vec![
+        "test-derive-baz-baz-foo-bar",
+        "test-derive-baz-baz-foo",
+        request_dataset,
+    ];
+    assert_eq!(result, expected_result);
+
+    let request_dataset = "test-derive-foo-foo-foo-bar";
+    let result = harness
+        .get_all_downstream_dependencies(vec![request_dataset])
+        .await;
+
+    let expected_result = vec![
+        "test-derive-foo-foo-foo-bar-foo-bar",
+        "test-derive-foo-foo-foo-bar-foo",
+        request_dataset,
+    ];
+    assert_eq!(result, expected_result);
+
+    // Request downstream dependencies for element with 3 dependencies
+    // should return dependencies(from last to first) and itself at the end
+    let request_dataset = "test-root-baz";
+    let result = harness
+        .get_all_downstream_dependencies(vec![request_dataset])
+        .await;
+
+    let expected_result = vec![
+        "test-derive-baz-baz-foo-bar",
+        "test-derive-baz-baz-foo",
+        "test-derive-baz-baz",
+        request_dataset,
+    ];
+    assert_eq!(result, expected_result);
+
+    // Request downstream dependencies for element with 9 dependencies
+    // should return dependencies(from last to first) and itself at the end
+    let request_dataset = "test-root-foo";
+    let result = harness
+        .get_all_downstream_dependencies(vec![request_dataset])
+        .await;
+
+    let expected_result = vec![
+        "test-derive-foo-foo-foo-bar-foo-bar",
+        "test-derive-foo-foo-foo-bar-foo",
+        "test-derive-foo-foo-foo-bar",
+        "test-derive-foo-foo-foo-baz",
+        "test-derive-foo-foo-foo",
+        "test-derive-foo-foo-bar",
+        "test-derive-foo-foo",
+        "test-derive-foo-bar",
+        "test-derive-foo-baz",
+        request_dataset,
+    ];
+    assert_eq!(result, expected_result);
+
+    // Request downstream dependencies for 2 elements with 2 dependencies
+    // should return dependencies(from last to first) and requested dataset
+    // at the end of each chain
+    let request_datasets = vec!["test-root-bar", "test-derive-baz-baz"];
+    let result = harness
+        .get_all_downstream_dependencies(request_datasets.clone())
+        .await;
+
+    let expected_result = vec![
+        "test-derive-bar-bar",
+        "test-derive-bar-baz",
+        request_datasets[0],
+        "test-derive-baz-baz-foo-bar",
+        "test-derive-baz-baz-foo",
+        request_datasets[1],
+    ];
+    assert_eq!(result, expected_result);
+
+    // Request downstream dependencies for 2 elements with 2 dependencies
+    // and one element which is included in chain of dependencies from previos
+    // should return dependencies(from last to first) and requested dataset
+    // at the end of each chain without duplicates
+    let request_datasets = vec![
+        "test-derive-baz-baz-foo-bar",
+        "test-root-bar",
+        "test-derive-baz-baz",
+    ];
+    let result = harness
+        .get_all_downstream_dependencies(request_datasets.clone())
+        .await;
+
+    let expected_result = vec![
+        "test-derive-baz-baz-foo-bar",
+        "test-derive-bar-bar",
+        "test-derive-bar-baz",
+        request_datasets[1],
+        "test-derive-baz-baz-foo",
+        request_datasets[2],
+    ];
+    assert_eq!(result, expected_result);
+
+    // Add additional dataset which will be derived to 2 root nodes in graph
+    harness
+        .create_derived_dataset(
+            None,
+            "test-derive-multiple-bar-baz",
+            vec![
+                DatasetAlias::new(None, DatasetName::new_unchecked("test-root-bar")),
+                DatasetAlias::new(None, DatasetName::new_unchecked("test-root-baz")),
+            ],
+        )
+        .await;
+
+    // Request dependencies for 2 root nodes with dupicate dependencies
+    // duplicate should be in result only once in the first chain
+    let request_datasets = vec!["test-root-bar", "test-root-baz"];
+    let result = harness
+        .get_all_downstream_dependencies(request_datasets.clone())
+        .await;
+
+    let expected_result = vec![
+        "test-derive-bar-bar",
+        "test-derive-bar-baz",
+        "test-derive-multiple-bar-baz",
+        request_datasets[0],
+        "test-derive-baz-baz-foo-bar",
+        "test-derive-baz-baz-foo",
+        "test-derive-baz-baz",
+        request_datasets[1],
+    ];
+    assert_eq!(result, expected_result);
+}
+
+#[test_log::test(tokio::test)]
+async fn test_get_all_upstream_dependencies() {
+    let harness = create_large_dataset_graph().await;
+
+    // Should return only itself for root datasets
+    let request_datasets = vec!["test-root-foo"];
+    let result = harness
+        .get_all_upstream_dependencies(request_datasets.clone())
+        .await;
+
+    assert_eq!(result, request_datasets);
+
+    let request_datasets = vec!["test-root-foo", "test-root-bar", "test-root-baz"];
+    let result = harness
+        .get_all_upstream_dependencies(request_datasets.clone())
+        .await;
+
+    assert_eq!(result, request_datasets);
+
+    // Should correclty return result for root dataset and
+    // one of outcoming node
+    let request_datasets = vec!["test-root-foo", "test-derive-foo-foo"];
+    let result = harness
+        .get_all_upstream_dependencies(request_datasets.clone())
+        .await;
+
+    assert_eq!(result, request_datasets);
+
+    let request_datasets = vec!["test-root-bar", "test-derive-foo-foo"];
+    let result = harness
+        .get_all_upstream_dependencies(request_datasets.clone())
+        .await;
+    let expected_result = vec![request_datasets[0], request_datasets[1], "test-root-foo"];
+
+    assert_eq!(result, expected_result);
+
+    let request_datasets = vec!["test-root-foo", "test-derive-foo-foo-foo-bar-foo-bar"];
+    let result: Vec<String> = harness
+        .get_all_upstream_dependencies(request_datasets.clone())
+        .await;
+
+    let expected_result = vec![
+        request_datasets[0],
+        request_datasets[1],
+        "test-derive-foo-foo-foo-bar-foo",
+        "test-derive-foo-foo-foo-bar",
+        "test-derive-foo-foo-foo",
+        "test-derive-foo-foo",
+    ];
+
+    assert_eq!(result, expected_result);
+}
+
 /////////////////////////////////////////////////////////////////////////////////////////
 
 struct DependencyGraphHarness {
@@ -441,6 +685,58 @@ impl DependencyGraphHarness {
         }
 
         res.sort();
+        res
+    }
+
+    async fn get_all_downstream_dependencies(&self, dataset_names: Vec<&str>) -> Vec<String> {
+        let dataset_ids: Vec<_> = future::join_all(
+            dataset_names
+                .iter()
+                .map(|dataset_name| async { self.dataset_id_by_name(dataset_name).await }),
+        )
+        .await;
+
+        let downstream_dataset_ids: Vec<_> = self
+            .dependency_graph_service
+            .get_all_downstream_dependencies(dataset_ids)
+            .await
+            .int_err()
+            .unwrap()
+            .collect()
+            .await;
+
+        let mut res = Vec::new();
+        for downstream_dataset_id in downstream_dataset_ids {
+            let dataset_alias = self.dataset_alias_by_id(&downstream_dataset_id).await;
+            res.push(format!("{dataset_alias}"));
+        }
+
+        res
+    }
+
+    async fn get_all_upstream_dependencies(&self, dataset_names: Vec<&str>) -> Vec<String> {
+        let dataset_ids: Vec<_> = future::join_all(
+            dataset_names
+                .iter()
+                .map(|dataset_name| async { self.dataset_id_by_name(dataset_name).await }),
+        )
+        .await;
+
+        let downstream_dataset_ids: Vec<_> = self
+            .dependency_graph_service
+            .get_all_upstream_dependencies(dataset_ids)
+            .await
+            .int_err()
+            .unwrap()
+            .collect()
+            .await;
+
+        let mut res = Vec::new();
+        for downstream_dataset_id in downstream_dataset_ids {
+            let dataset_alias = self.dataset_alias_by_id(&downstream_dataset_id).await;
+            res.push(format!("{dataset_alias}"));
+        }
+
         res
     }
 
@@ -629,3 +925,176 @@ impl DependencyGraphHarness {
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
+
+async fn create_large_dataset_graph() -> DependencyGraphHarness {
+    let dependency_harness = DependencyGraphHarness::new(false);
+    dependency_harness.create_single_tenant_graph().await;
+    dependency_harness.eager_initialization().await;
+
+    /*
+       Graph representation:
+       foo_bar   foo_foo_bar
+          |          |
+         foo  --- foo_foo --- foo_foo_foo - foo_foo_foo_bar - foo_foo_foo_bar_foo - foo_foo_foo_bar_foo_bar
+          |                        |
+       foo_baz               foo_foo_foo_baz
+
+         bar - bar_baz
+          |
+        bar_bar
+
+         baz - baz_baz - baz_baz_foo - baz_baz_foo_bar
+    */
+    dependency_harness
+        .create_root_dataset(None, "test-root-foo")
+        .await;
+    dependency_harness
+        .create_root_dataset(None, "test-root-bar")
+        .await;
+    dependency_harness
+        .create_root_dataset(None, "test-root-baz")
+        .await;
+
+    dependency_harness
+        .create_derived_dataset(
+            None,
+            "test-derive-foo-foo",
+            vec![DatasetAlias::new(
+                None,
+                DatasetName::new_unchecked("test-root-foo"),
+            )],
+        )
+        .await;
+    dependency_harness
+        .create_derived_dataset(
+            None,
+            "test-derive-foo-bar",
+            vec![DatasetAlias::new(
+                None,
+                DatasetName::new_unchecked("test-root-foo"),
+            )],
+        )
+        .await;
+    dependency_harness
+        .create_derived_dataset(
+            None,
+            "test-derive-foo-baz",
+            vec![DatasetAlias::new(
+                None,
+                DatasetName::new_unchecked("test-root-foo"),
+            )],
+        )
+        .await;
+    dependency_harness
+        .create_derived_dataset(
+            None,
+            "test-derive-bar-bar",
+            vec![DatasetAlias::new(
+                None,
+                DatasetName::new_unchecked("test-root-bar"),
+            )],
+        )
+        .await;
+    dependency_harness
+        .create_derived_dataset(
+            None,
+            "test-derive-bar-baz",
+            vec![DatasetAlias::new(
+                None,
+                DatasetName::new_unchecked("test-root-bar"),
+            )],
+        )
+        .await;
+    dependency_harness
+        .create_derived_dataset(
+            None,
+            "test-derive-baz-baz",
+            vec![DatasetAlias::new(
+                None,
+                DatasetName::new_unchecked("test-root-baz"),
+            )],
+        )
+        .await;
+    dependency_harness
+        .create_derived_dataset(
+            None,
+            "test-derive-foo-foo-foo",
+            vec![DatasetAlias::new(
+                None,
+                DatasetName::new_unchecked("test-derive-foo-foo"),
+            )],
+        )
+        .await;
+    dependency_harness
+        .create_derived_dataset(
+            None,
+            "test-derive-foo-foo-bar",
+            vec![DatasetAlias::new(
+                None,
+                DatasetName::new_unchecked("test-derive-foo-foo"),
+            )],
+        )
+        .await;
+    dependency_harness
+        .create_derived_dataset(
+            None,
+            "test-derive-baz-baz-foo",
+            vec![DatasetAlias::new(
+                None,
+                DatasetName::new_unchecked("test-derive-baz-baz"),
+            )],
+        )
+        .await;
+    dependency_harness
+        .create_derived_dataset(
+            None,
+            "test-derive-foo-foo-foo-bar",
+            vec![DatasetAlias::new(
+                None,
+                DatasetName::new_unchecked("test-derive-foo-foo-foo"),
+            )],
+        )
+        .await;
+    dependency_harness
+        .create_derived_dataset(
+            None,
+            "test-derive-foo-foo-foo-baz",
+            vec![DatasetAlias::new(
+                None,
+                DatasetName::new_unchecked("test-derive-foo-foo-foo"),
+            )],
+        )
+        .await;
+    dependency_harness
+        .create_derived_dataset(
+            None,
+            "test-derive-baz-baz-foo-bar",
+            vec![DatasetAlias::new(
+                None,
+                DatasetName::new_unchecked("test-derive-baz-baz-foo"),
+            )],
+        )
+        .await;
+    dependency_harness
+        .create_derived_dataset(
+            None,
+            "test-derive-foo-foo-foo-bar-foo",
+            vec![DatasetAlias::new(
+                None,
+                DatasetName::new_unchecked("test-derive-foo-foo-foo-bar"),
+            )],
+        )
+        .await;
+    dependency_harness
+        .create_derived_dataset(
+            None,
+            "test-derive-foo-foo-foo-bar-foo-bar",
+            vec![DatasetAlias::new(
+                None,
+                DatasetName::new_unchecked("test-derive-foo-foo-foo-bar-foo"),
+            )],
+        )
+        .await;
+
+    dependency_harness
+}

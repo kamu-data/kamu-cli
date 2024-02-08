@@ -21,7 +21,7 @@ use kamu_core::events::{
 use kamu_core::*;
 use opendatafabric::DatasetID;
 use petgraph::stable_graph::{NodeIndex, StableDiGraph};
-use petgraph::visit::{depth_first_search, Bfs, DfsEvent, Walker};
+use petgraph::visit::{depth_first_search, DfsEvent};
 use petgraph::Direction;
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -214,18 +214,20 @@ impl DependencyGraphService for DependencyGraphServiceInMemory {
                     .map_err(GetUpstreamDependenciesError::DatasetNotFound)
             })
             .collect::<Result<Vec<_>, _>>()?;
-        let mut node_indexes_result = HashSet::new();
+
+        let mut node_indexes_result = Vec::new();
+        let mut visited_indexes = HashSet::new();
 
         for node_index in &nodes_to_search {
-            let mut bfs = Bfs::new(&state.datasets_graph, *node_index);
-            while let Some(ni) = bfs.walk_next(&state.datasets_graph) {
-                // Insert current node_index into HashSet
-                // if it return false it means we already have such value
-                // skip searching
-                if !node_indexes_result.insert(ni) {
-                    break;
-                }
-            }
+            // Push passed node to result
+            node_indexes_result.push(*node_index);
+            visited_indexes.insert(*node_index);
+            recursive_bfs(
+                &state.datasets_graph,
+                *node_index,
+                &mut visited_indexes,
+                &mut node_indexes_result,
+            );
         }
 
         let result: Vec<_> = node_indexes_result
@@ -424,3 +426,18 @@ impl AsyncEventHandler<DatasetEventDependenciesUpdated> for DependencyGraphServi
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
+
+fn recursive_bfs(
+    graph: &StableDiGraph<DatasetID, ()>,
+    current_node: NodeIndex,
+    visited: &mut HashSet<NodeIndex>,
+    result: &mut Vec<NodeIndex>,
+) {
+    for neighbor in graph.neighbors_directed(current_node, petgraph::Direction::Incoming) {
+        if !visited.contains(&neighbor) {
+            result.push(neighbor);
+            visited.insert(neighbor);
+            recursive_bfs(graph, neighbor, visited, result);
+        }
+    }
+}

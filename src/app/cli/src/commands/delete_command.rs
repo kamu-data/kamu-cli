@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use futures::{StreamExt, TryStreamExt};
+use futures::{future, StreamExt, TryStreamExt};
 use kamu::domain::*;
 use kamu::utils::datasets_filtering::filter_datasets_by_pattern;
 use opendatafabric::*;
@@ -93,14 +93,19 @@ impl Command for DeleteCommand {
         let confirmed = if self.no_confirmation {
             true
         } else {
+            let dataset_aliases = future::join_all(dataset_refs.iter().map(|dataset_id| async {
+                let dataset_hdl = self
+                    .dataset_repo
+                    .resolve_dataset_ref(dataset_id)
+                    .await
+                    .unwrap();
+                dataset_hdl.alias.to_string()
+            }))
+            .await;
             common::prompt_yes_no(&format!(
                 "{}: {}\n{}\nDo you wish to continue? [y/N]: ",
                 console::style("You are about to delete following dataset(s)").yellow(),
-                dataset_refs
-                    .iter()
-                    .map(ToString::to_string)
-                    .collect::<Vec<_>>()
-                    .join(", "),
+                dataset_aliases.join(", "),
                 console::style("This operation is irreversible!").yellow(),
             ))
         };
