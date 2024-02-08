@@ -7,13 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::HashMap;
 use std::str::FromStr;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use chrono::{DateTime, Duration, DurationRound, TimeZone, Utc};
 use dill::*;
-use event_bus::{AsyncEventHandler, EventBus};
+use event_bus::EventBus;
 use kamu::testing::MetadataFactory;
 use kamu::*;
 use kamu_core::*;
@@ -23,6 +22,14 @@ use kamu_task_system::*;
 use kamu_task_system_inmem::{TaskSchedulerInMemory, TaskSystemEventStoreInMemory};
 use opendatafabric::*;
 use tokio::task::yield_now;
+
+use super::{
+    FlowSystemTestListener,
+    ManualFlowTriggerArgs,
+    ManualFlowTriggerDriver,
+    TaskDriver,
+    TaskDriverArgs,
+};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -85,7 +92,7 @@ async fn test_read_initial_config_and_queue_without_waiting() {
     }
     .unwrap();
 
-    let test_flow_listener = harness.catalog.get_one::<TestFlowSystemListener>().unwrap();
+    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
 
     pretty_assertions::assert_eq!(
@@ -183,7 +190,7 @@ async fn test_cron_config() {
     }
     .unwrap();
 
-    let test_flow_listener = harness.catalog.get_one::<TestFlowSystemListener>().unwrap();
+    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
 
     pretty_assertions::assert_eq!(
@@ -240,7 +247,7 @@ async fn test_manual_trigger() {
     let foo_flow_key: FlowKey = FlowKeyDataset::new(foo_id.clone(), DatasetFlowType::Ingest).into();
     let bar_flow_key: FlowKey = FlowKeyDataset::new(bar_id.clone(), DatasetFlowType::Ingest).into();
 
-    let test_flow_listener = harness.catalog.get_one::<TestFlowSystemListener>().unwrap();
+    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
 
@@ -427,7 +434,7 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
         .await;
     harness.eager_dependencies_graph_init().await;
 
-    let test_flow_listener = harness.catalog.get_one::<TestFlowSystemListener>().unwrap();
+    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
 
@@ -622,7 +629,7 @@ async fn test_respect_last_success_time_when_schedule_resumes() {
     harness.eager_dependencies_graph_init().await;
 
     // Flow listener will collect snapshots at important moments of time
-    let test_flow_listener = harness.catalog.get_one::<TestFlowSystemListener>().unwrap();
+    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
 
@@ -702,9 +709,9 @@ async fn test_respect_last_success_time_when_schedule_resumes() {
     .unwrap();
 
     pretty_assertions::assert_eq!(
-      format!("{}", test_flow_listener.as_ref()),
-      indoc::indoc!(
-          r#"
+        format!("{}", test_flow_listener.as_ref()),
+        indoc::indoc!(
+            r#"
             #0: +0ms:
               "bar" Ingest:
                 Flow ID = 1 Queued
@@ -762,7 +769,7 @@ async fn test_respect_last_success_time_when_schedule_resumes() {
                 Flow ID = 4 Queued
                 Flow ID = 2 Finished Aborted
                 Flow ID = 0 Finished Success
- 
+
             #8: +100ms:
               "bar" Ingest:
                 Flow ID = 5 Scheduled
@@ -784,8 +791,8 @@ async fn test_respect_last_success_time_when_schedule_resumes() {
                 Flow ID = 0 Finished Success
 
       "#
-      )
-  );
+        )
+    );
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -815,7 +822,7 @@ async fn test_dataset_deleted() {
         .await;
     harness.eager_dependencies_graph_init().await;
 
-    let test_flow_listener = harness.catalog.get_one::<TestFlowSystemListener>().unwrap();
+    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
 
@@ -982,7 +989,7 @@ async fn test_task_completions_trigger_next_loop_on_success() {
     harness.eager_dependencies_graph_init().await;
 
     // Flow listener will collect snapshots at important moments of time
-    let test_flow_listener = harness.catalog.get_one::<TestFlowSystemListener>().unwrap();
+    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
     test_flow_listener.define_dataset_display_name(baz_id.clone(), "baz".to_string());
@@ -1176,7 +1183,7 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
     harness.eager_dependencies_graph_init().await;
 
     // Flow listener will collect snapshots at important moments of time
-    let test_flow_listener = harness.catalog.get_one::<TestFlowSystemListener>().unwrap();
+    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
 
@@ -1365,7 +1372,7 @@ async fn test_throttling_manual_triggers() {
     harness.eager_dependencies_graph_init().await;
 
     // Flow listener will collect snapshots at important moments of time
-    let test_flow_listener = harness.catalog.get_one::<TestFlowSystemListener>().unwrap();
+    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
 
     // Remember start time
@@ -1507,7 +1514,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
     harness.eager_dependencies_graph_init().await;
 
     // Flow listener will collect snapshots at important moments of time
-    let test_flow_listener = harness.catalog.get_one::<TestFlowSystemListener>().unwrap();
+    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
     test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
     test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
     test_flow_listener.define_dataset_display_name(baz_id.clone(), "baz".to_string());
@@ -1583,14 +1590,14 @@ async fn test_throttling_derived_dataset_with_2_parents() {
         let main_handle = async {
           // Stage 0: initial auto-polling
           //  - all 3 datasets auto-polled at 0ms, flows 0,1,2 correspondongly
-          //  - foo: 
+          //  - foo:
           //     - task 0 starts at 10ms, finishes at 20ms, flow 0 completes at 20ms
           //     - flow 3 queued for 120ns: 20ms initiated + max(period 50ms, throttling 100ms)
           //     - baz not queued as pending already, trigger recorded
           //  - bar:
           //     - task 1 starts at 20ms, finishes at 30ms, flow 1 completes at 30ms
           //     - flow 4 queued for 180ms: 30ms initiated + max(period 150ms, throttling 100ms)
-          //     - baz not queued as pending already, trigger recorded          
+          //     - baz not queued as pending already, trigger recorded
           //  - baz:
           //     - task 2 starts at 30ms, finishes at 50ms, flow 2 completes at 50ms
           //     - no continuation enqueued
@@ -1860,132 +1867,6 @@ async fn test_throttling_derived_dataset_with_2_parents() {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-struct TestFlowSystemListener {
-    flow_service: Arc<dyn FlowService>,
-    fake_time_source: Arc<FakeSystemTimeSource>,
-    state: Arc<Mutex<TestFlowSystemListenerState>>,
-}
-
-type FlowSnapshot = (DateTime<Utc>, HashMap<FlowKey, Vec<FlowState>>);
-
-#[derive(Default)]
-struct TestFlowSystemListenerState {
-    snapshots: Vec<FlowSnapshot>,
-    dataset_display_names: HashMap<DatasetID, String>,
-}
-
-#[component(pub)]
-#[scope(Singleton)]
-#[interface(dyn AsyncEventHandler<FlowServiceEvent>)]
-impl TestFlowSystemListener {
-    fn new(
-        flow_service: Arc<dyn FlowService>,
-        fake_time_source: Arc<FakeSystemTimeSource>,
-    ) -> Self {
-        Self {
-            flow_service,
-            fake_time_source,
-            state: Arc::new(Mutex::new(TestFlowSystemListenerState::default())),
-        }
-    }
-
-    async fn make_a_snapshot(&self, event_time: DateTime<Utc>) {
-        use futures::TryStreamExt;
-        let flows: Vec<_> = self
-            .flow_service
-            .list_all_flows(FlowPaginationOpts {
-                limit: 100,
-                offset: 0,
-            })
-            .await
-            .unwrap()
-            .matched_stream
-            .try_collect()
-            .await
-            .unwrap();
-
-        let mut flow_states_map: HashMap<FlowKey, Vec<FlowState>> = HashMap::new();
-        for flow in flows {
-            flow_states_map
-                .entry(flow.flow_key.clone())
-                .and_modify(|flows| flows.push(flow.clone()))
-                .or_insert(vec![flow]);
-        }
-
-        let mut state = self.state.lock().unwrap();
-        state.snapshots.push((event_time, flow_states_map));
-    }
-
-    fn define_dataset_display_name(&self, id: DatasetID, display_name: String) {
-        let mut state = self.state.lock().unwrap();
-        state.dataset_display_names.insert(id, display_name);
-    }
-}
-
-impl std::fmt::Display for TestFlowSystemListener {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let initial_time = self.fake_time_source.initial_time;
-
-        let state = self.state.lock().unwrap();
-        for i in 0..state.snapshots.len() {
-            let (snapshot_time, snapshots) = state.snapshots.get(i).unwrap();
-            writeln!(
-                f,
-                "#{i}: +{}ms:",
-                (*snapshot_time - initial_time).num_milliseconds(),
-            )?;
-
-            let mut flow_headings = snapshots
-                .keys()
-                .map(|flow_key| {
-                    (
-                        flow_key,
-                        match flow_key {
-                            FlowKey::Dataset(fk_dataset) => format!(
-                                "\"{}\" {:?}",
-                                state
-                                    .dataset_display_names
-                                    .get(&fk_dataset.dataset_id)
-                                    .cloned()
-                                    .unwrap_or_else(|| fk_dataset.dataset_id.to_string()),
-                                fk_dataset.flow_type
-                            ),
-                            FlowKey::System(fk_system) => {
-                                format!("System {:?}", fk_system.flow_type)
-                            }
-                        },
-                    )
-                })
-                .collect::<Vec<_>>();
-            flow_headings.sort_by_key(|(_, title)| title.clone());
-
-            for (flow_key, heading) in flow_headings {
-                writeln!(f, "  {heading}:")?;
-                for state in snapshots.get(flow_key).unwrap() {
-                    write!(f, "    Flow ID = {} {:?}", state.flow_id, state.status(),)?;
-                    if let Some(outcome) = state.outcome {
-                        writeln!(f, " {outcome:?}",)?;
-                    } else {
-                        writeln!(f)?;
-                    }
-                }
-            }
-            writeln!(f)?;
-        }
-        Ok(())
-    }
-}
-
-#[async_trait::async_trait]
-impl AsyncEventHandler<FlowServiceEvent> for TestFlowSystemListener {
-    async fn handle(&self, event: &FlowServiceEvent) -> Result<(), InternalError> {
-        self.make_a_snapshot(event.event_time()).await;
-        Ok(())
-    }
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
 const SCHEDULING_ALIGNMENT_MS: i64 = 10;
 const SCHEDULING_MANDATORY_THROTTLING_PERIOD_MS: i64 = SCHEDULING_ALIGNMENT_MS * 2;
 
@@ -2042,7 +1923,7 @@ impl FlowHarness {
             .add::<DependencyGraphServiceInMemory>()
             .add::<TaskSchedulerInMemory>()
             .add::<TaskSystemEventStoreInMemory>()
-            .add::<TestFlowSystemListener>()
+            .add::<FlowSystemTestListener>()
             .build();
 
         let flow_service = catalog.get_one::<dyn FlowService>().unwrap();
@@ -2246,134 +2127,6 @@ impl FlowHarness {
             yield_now().await;
             self.fake_system_time_source.advance(alignment);
         }
-    }
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-struct TaskDriver {
-    time_source: Arc<dyn SystemTimeSource>,
-    event_bus: Arc<EventBus>,
-    task_event_store: Arc<dyn TaskSystemEventStore>,
-    args: TaskDriverArgs,
-}
-
-struct TaskDriverArgs {
-    task_id: TaskID,
-    dataset_id: Option<DatasetID>,
-    run_since_start: Duration,
-    finish_in_with: Option<(Duration, TaskOutcome)>,
-}
-
-impl TaskDriver {
-    fn new(
-        time_source: Arc<dyn SystemTimeSource>,
-        event_bus: Arc<EventBus>,
-        task_event_store: Arc<dyn TaskSystemEventStore>,
-        args: TaskDriverArgs,
-    ) -> Self {
-        Self {
-            time_source,
-            event_bus,
-            task_event_store,
-            args,
-        }
-    }
-
-    async fn run(self) {
-        let start_time = self.time_source.now();
-
-        self.time_source.sleep(self.args.run_since_start).await;
-        while !(self.task_exists().await) {
-            yield_now().await;
-        }
-
-        self.ensure_task_matches_dataset().await;
-
-        self.event_bus
-            .dispatch_event(TaskEventRunning {
-                event_time: start_time + self.args.run_since_start,
-                task_id: self.args.task_id,
-            })
-            .await
-            .unwrap();
-
-        if let Some((finish_in, with_outcome)) = self.args.finish_in_with {
-            self.time_source.sleep(finish_in).await;
-
-            self.event_bus
-                .dispatch_event(TaskEventFinished {
-                    event_time: start_time + self.args.run_since_start + finish_in,
-                    task_id: self.args.task_id,
-                    outcome: with_outcome,
-                })
-                .await
-                .unwrap();
-        }
-    }
-
-    async fn task_exists(&self) -> bool {
-        Task::try_load(self.args.task_id, self.task_event_store.as_ref())
-            .await
-            .unwrap()
-            .is_some()
-    }
-
-    async fn ensure_task_matches_dataset(&self) {
-        let task = Task::load(self.args.task_id, self.task_event_store.as_ref())
-            .await
-            .expect("Task does not exist yet");
-
-        match &task.logical_plan {
-            LogicalPlan::UpdateDataset(ud) => {
-                assert!(self.args.dataset_id.is_some());
-                assert_eq!(&ud.dataset_id, self.args.dataset_id.as_ref().unwrap());
-            }
-            LogicalPlan::Probe(_) => assert!(self.args.dataset_id.is_none()),
-        }
-    }
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-struct ManualFlowTriggerDriver {
-    time_source: Arc<dyn SystemTimeSource>,
-    flow_service: Arc<dyn FlowService>,
-    args: ManualFlowTriggerArgs,
-}
-
-struct ManualFlowTriggerArgs {
-    flow_key: FlowKey,
-    run_since_start: Duration,
-}
-
-impl ManualFlowTriggerDriver {
-    fn new(
-        time_source: Arc<dyn SystemTimeSource>,
-        flow_service: Arc<dyn FlowService>,
-        args: ManualFlowTriggerArgs,
-    ) -> Self {
-        Self {
-            time_source,
-            flow_service,
-            args,
-        }
-    }
-
-    async fn run(self) {
-        let start_time = self.time_source.now();
-
-        self.time_source.sleep(self.args.run_since_start).await;
-
-        self.flow_service
-            .trigger_manual_flow(
-                start_time + self.args.run_since_start,
-                self.args.flow_key,
-                FAKE_ACCOUNT_ID.to_string(),
-                AccountName::new_unchecked(auth::DEFAULT_ACCOUNT_NAME),
-            )
-            .await
-            .unwrap();
     }
 }
 
