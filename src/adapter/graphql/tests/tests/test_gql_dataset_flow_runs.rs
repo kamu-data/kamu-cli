@@ -1366,7 +1366,10 @@ impl FlowRunsHarness {
             .add::<FlowConfigurationEventStoreInMem>()
             .add::<FlowServiceInMemory>()
             .add::<FlowEventStoreInMem>()
-            .add_value(FlowServiceRunConfig::new(chrono::Duration::seconds(1)))
+            .add_value(FlowServiceRunConfig::new(
+                chrono::Duration::seconds(1),
+                chrono::Duration::minutes(1),
+            ))
             .add::<TaskSchedulerInMemory>()
             .add::<TaskSystemEventStoreInMemory>()
             .add::<DataFormatRegistryImpl>()
