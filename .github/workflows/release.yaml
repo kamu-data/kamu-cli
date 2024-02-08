@@ -103,6 +103,8 @@ jobs:
     needs: [build_linux, build_macos, build_windows]
     steps:
       - uses: actions/checkout@v4
+      # Sets the header for the release description
+      - run: echo "" > RELEASE_HEAD.md
       # Extracts relevant section from CHANGELOG.md and outputs it into RELEASE.md
       - uses: CSchoel/release-notes-from-changelog@v1
       - name: Create Release
