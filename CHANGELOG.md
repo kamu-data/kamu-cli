@@ -4,10 +4,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [0.156.2] - 2024-02-07
 ### Changed
-- Usage of unique container and network names
-- Error handling for all subprocesses with file output
+- Using unique container and network names to prevent collisions when running concurrent `kamu` processes
+- Improved error handling for all subprocesses
 
 ## [0.156.1] - 2024-02-05
 ### Fixed
@@ -21,7 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - `kamu deleted` and `kamu verify` now accepts global pattern expression
 - Error handling for pipe subprocesses with file output
-- Pagination implementation made more effecient for flows and tasks event stores
+- Pagination implementation made more efficient for flows and tasks event stores
 
 ## [0.155.0] - 2024-01-25
 ### Added

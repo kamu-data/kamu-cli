@@ -102,6 +102,9 @@ jobs:
     runs-on: ubuntu-latest
     needs: [build_linux, build_macos, build_windows]
     steps:
+      - uses: actions/checkout@v4
+      # Extracts relevant section from CHANGELOG.md and outputs it into RELEASE.md
+      - uses: CSchoel/release-notes-from-changelog@v1
       - name: Create Release
         id: create_release
         uses: actions/create-release@v1
@@ -112,6 +115,7 @@ jobs:
           release_name: Release ${{ github.ref }}
           draft: false
           prerelease: false
+          body_path: RELEASE.md
     outputs:
       upload_url: ${{ steps.create_release.outputs.upload_url }}
   upload_assets_targz:
