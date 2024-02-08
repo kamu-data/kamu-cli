@@ -8,10 +8,12 @@
 // by the Apache License, Version 2.0.
 
 use async_trait::async_trait;
+use bytes::Bytes;
 use dashmap::DashMap;
 use kamu_core::{
     ContainsError,
     GetBlockError,
+    GetError,
     InsertError,
     InsertOpts,
     InsertResult,
@@ -26,7 +28,7 @@ use crate::MetadataBlockRepositoryImpl;
 
 pub struct MetadataBlockRepositoryCachingInMem<ObjRepo> {
     wrapped: MetadataBlockRepositoryImpl<ObjRepo>,
-    cache: DashMap<Multihash, MetadataBlock>,
+    cache: DashMap<Multihash, Bytes>,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -53,36 +55,56 @@ where
     ObjRepo: ObjectRepository + Sync + Send,
 {
     async fn contains(&self, hash: &Multihash) -> Result<bool, ContainsError> {
-        if self.cache.contains_key(hash) {
-            return Ok(true);
+        match self.get_block_data(hash).await {
+            Ok(_) => Ok(true),
+            Err(e) => match e {
+                GetError::NotFound(_) => Ok(false),
+                GetError::Access(e) => Err(ContainsError::Access(e)),
+                GetError::Internal(e) => Err(ContainsError::Internal(e)),
+            },
         }
-
-        self.wrapped.contains(hash).await
     }
 
-    async fn get(&self, hash: &Multihash) -> Result<MetadataBlock, GetBlockError> {
+    async fn get_block(&self, hash: &Multihash) -> Result<MetadataBlock, GetBlockError> {
+        let block_data = self.get_block_data(hash).await?;
+        let block =
+            MetadataBlockRepositoryImpl::<ObjRepo>::deserialize_metadata_block(hash, &block_data)?;
+
+        Ok(block)
+    }
+
+    async fn get_block_data(&self, hash: &Multihash) -> Result<Bytes, GetError> {
         if let Some(cached_result) = self.cache.get(hash) {
             return Ok(cached_result.clone());
         };
 
-        let get_result = self.wrapped.get(hash).await;
+        let get_block_data_result = self.wrapped.get_block_data(hash).await;
 
-        if let Ok(block) = &get_result {
-            self.cache.insert(hash.clone(), block.clone());
+        if let Ok(block_data) = &get_block_data_result {
+            self.cache.insert(hash.clone(), block_data.clone());
         }
 
-        get_result
+        get_block_data_result
     }
 
-    async fn insert<'a>(
+    async fn get_size(&self, hash: &Multihash) -> Result<u64, GetError> {
+        let block_data = self.get_block_data(hash).await?;
+        let size = u64::try_from(block_data.len()).unwrap();
+
+        Ok(size)
+    }
+
+    async fn insert_block_data<'a>(
         &'a self,
-        block: &MetadataBlock,
+        block_data: &'a [u8],
         options: InsertOpts<'a>,
     ) -> Result<InsertResult, InsertError> {
-        let insert_result = self.wrapped.insert(block, options).await;
+        let insert_result = self.wrapped.insert_block_data(block_data, options).await;
 
         if let Ok(result) = &insert_result {
-            self.cache.insert(result.hash.clone(), block.clone());
+            let copied_block_data = Bytes::copy_from_slice(block_data);
+
+            self.cache.insert(result.hash.clone(), copied_block_data);
         }
 
         insert_result

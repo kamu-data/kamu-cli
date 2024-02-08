@@ -96,6 +96,7 @@ async fn test_ingest_polling_snapshot() {
     let dataset_alias = dataset_snapshot.name.clone();
 
     harness.create_dataset(dataset_snapshot).await;
+    let data_helper = harness.dataset_data_helper(&dataset_alias).await;
 
     // Round 1
     std::fs::write(
@@ -112,8 +113,6 @@ async fn test_ingest_polling_snapshot() {
     .unwrap();
 
     harness.ingest(&dataset_alias).await.unwrap();
-
-    let data_helper = harness.dataset_data_helper(&dataset_alias).await;
 
     data_helper
         .assert_last_data_eq(
@@ -173,8 +172,6 @@ async fn test_ingest_polling_snapshot() {
 
     harness.ingest(&dataset_alias).await.unwrap();
 
-    let data_helper = harness.dataset_data_helper(&dataset_alias).await;
-
     data_helper
         .assert_last_data_records_eq(indoc!(
             r#"
@@ -217,8 +214,6 @@ async fn test_ingest_polling_snapshot() {
         .set(Utc.with_ymd_and_hms(2050, 2, 1, 12, 0, 0).unwrap());
 
     harness.ingest(&dataset_alias).await.unwrap();
-
-    let data_helper = harness.dataset_data_helper(&dataset_alias).await;
     let event = data_helper.get_last_block_typed::<AddData>().await.event;
 
     assert_eq!(event.new_data, None);
@@ -275,6 +270,7 @@ async fn test_ingest_polling_ledger() {
     let dataset_alias = dataset_snapshot.name.clone();
 
     harness.create_dataset(dataset_snapshot).await;
+    let data_helper = harness.dataset_data_helper(&dataset_alias).await;
 
     // Round 1
     std::fs::write(
@@ -291,9 +287,6 @@ async fn test_ingest_polling_ledger() {
     .unwrap();
 
     harness.ingest(&dataset_alias).await.unwrap();
-
-    let data_helper = harness.dataset_data_helper(&dataset_alias).await;
-
     data_helper
         .assert_last_data_eq(
             indoc!(
@@ -348,8 +341,6 @@ async fn test_ingest_polling_ledger() {
 
     harness.ingest(&dataset_alias).await.unwrap();
 
-    let data_helper = harness.dataset_data_helper(&dataset_alias).await;
-
     data_helper
         .assert_last_data_records_eq(indoc!(
             r#"
@@ -386,8 +377,6 @@ async fn test_ingest_polling_ledger() {
 
     harness.ingest(&dataset_alias).await.unwrap();
 
-    let data_helper = harness.dataset_data_helper(&dataset_alias).await;
-
     data_helper
         .assert_last_data_records_eq(indoc!(
             r#"
@@ -423,8 +412,6 @@ async fn test_ingest_polling_ledger() {
     .unwrap();
 
     harness.ingest(&dataset_alias).await.unwrap();
-
-    let data_helper = harness.dataset_data_helper(&dataset_alias).await;
     let event = data_helper.get_last_block_typed::<AddData>().await.event;
 
     assert_eq!(event.new_data, None);

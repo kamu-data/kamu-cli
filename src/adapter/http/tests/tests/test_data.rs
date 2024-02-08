@@ -46,8 +46,8 @@ async fn test_data_push_ingest_handler() {
     let system_time = Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap();
     server_harness.system_time_source().set(system_time);
 
-    let dataset_repo = server_harness.cli_dataset_repository();
-    let create_result = dataset_repo
+    let create_result = server_harness
+        .cli_dataset_repository()
         .create_dataset_from_snapshot(DatasetSnapshot {
             name: DatasetAlias::new(
                 server_harness.operating_account_name(),
@@ -74,11 +74,13 @@ async fn test_data_push_ingest_handler() {
         })
         .await
         .unwrap();
-    let dataset_ref = create_result.dataset_handle.as_local_ref();
-    let dataset_url = server_harness.dataset_url_with_scheme(dataset_ref.alias().unwrap(), "http");
+
+    let dataset_url =
+        server_harness.dataset_url_with_scheme(&create_result.dataset_handle.alias, "http");
 
     let client = async move {
         let cl = reqwest::Client::new();
+        let dataset_helper = DatasetDataHelper::new(create_result.dataset.clone());
         let ingest_url = format!("{dataset_url}/ingest");
         tracing::info!(%ingest_url, "Client request");
 
@@ -106,9 +108,6 @@ async fn test_data_push_ingest_handler() {
             .await
             .unwrap();
         assert_eq!(res.status(), http::StatusCode::OK);
-
-        let dataset = dataset_repo.get_dataset(&dataset_ref).await.unwrap();
-        let dataset_helper = DatasetDataHelper::new(dataset);
 
         dataset_helper
             .assert_last_data_eq(
@@ -138,9 +137,8 @@ async fn test_data_push_ingest_handler() {
             .await;
 
         // Add another source
-        let dataset = dataset_repo.get_dataset(&dataset_ref).await.unwrap();
-
-        dataset
+        create_result
+            .dataset
             .commit_event(
                 AddPushSource {
                     source_name: "source2".to_string(),
@@ -222,9 +220,6 @@ async fn test_data_push_ingest_handler() {
             .unwrap();
         assert_eq!(res.status(), http::StatusCode::OK);
 
-        let dataset = dataset_repo.get_dataset(&dataset_ref).await.unwrap();
-        let dataset_helper = DatasetDataHelper::new(dataset);
-
         dataset_helper
             .assert_last_data_eq(
                 indoc!(
@@ -285,9 +280,6 @@ async fn test_data_push_ingest_handler() {
             .await
             .unwrap();
         assert_eq!(res.status(), http::StatusCode::OK);
-
-        let dataset = dataset_repo.get_dataset(&dataset_ref).await.unwrap();
-        let dataset_helper = DatasetDataHelper::new(dataset);
 
         dataset_helper
             .assert_last_data_eq(

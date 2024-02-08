@@ -8,10 +8,10 @@
 // by the Apache License, Version 2.0.
 
 use async_trait::async_trait;
-use internal_error::ResultIntoInternal;
+use bytes::Bytes;
 use kamu_core::{
-    deserialize_metadata_block,
-    BlockNotFoundError,
+    BlockMalformedError,
+    BlockVersionError,
     ContainsError,
     GetBlockError,
     GetError,
@@ -21,8 +21,8 @@ use kamu_core::{
     MetadataBlockRepository,
     ObjectRepository,
 };
-use opendatafabric::serde::flatbuffers::FlatbuffersMetadataBlockSerializer;
-use opendatafabric::serde::MetadataBlockSerializer;
+use opendatafabric::serde::flatbuffers::FlatbuffersMetadataBlockDeserializer;
+use opendatafabric::serde::{Error, MetadataBlockDeserializer};
 use opendatafabric::{MetadataBlock, Multihash};
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -40,6 +40,26 @@ where
     pub fn new(obj_repo: ObjRepo) -> Self {
         Self { obj_repo }
     }
+
+    pub fn deserialize_metadata_block(
+        hash: &Multihash,
+        block_bytes: &[u8],
+    ) -> Result<MetadataBlock, GetBlockError> {
+        FlatbuffersMetadataBlockDeserializer
+            .read_manifest(block_bytes)
+            .map_err(|e| match e {
+                Error::UnsupportedVersion { .. } => {
+                    GetBlockError::BlockVersion(BlockVersionError {
+                        hash: hash.clone(),
+                        source: e.into(),
+                    })
+                }
+                _ => GetBlockError::BlockMalformed(BlockMalformedError {
+                    hash: hash.clone(),
+                    source: e.into(),
+                }),
+            })
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -53,29 +73,26 @@ where
         self.obj_repo.contains(hash).await
     }
 
-    async fn get(&self, hash: &Multihash) -> Result<MetadataBlock, GetBlockError> {
-        let data = match self.obj_repo.get_bytes(hash).await {
-            Ok(data) => Ok(data),
-            Err(GetError::NotFound(e)) => {
-                Err(GetBlockError::NotFound(BlockNotFoundError { hash: e.hash }))
-            }
-            Err(GetError::Access(e)) => Err(GetBlockError::Access(e)),
-            Err(GetError::Internal(e)) => Err(GetBlockError::Internal(e)),
-        }?;
+    async fn get_block(&self, hash: &Multihash) -> Result<MetadataBlock, GetBlockError> {
+        let block_data = self.get_block_data(hash).await?;
 
-        deserialize_metadata_block(hash, &data)
+        Self::deserialize_metadata_block(hash, &block_data)
     }
 
-    async fn insert<'a>(
+    async fn get_block_data(&self, hash: &Multihash) -> Result<Bytes, GetError> {
+        self.obj_repo.get_bytes(hash).await
+    }
+
+    async fn get_size(&self, hash: &Multihash) -> Result<u64, GetError> {
+        self.obj_repo.get_size(hash).await
+    }
+
+    async fn insert_block_data<'a>(
         &'a self,
-        block: &MetadataBlock,
+        block_data: &'a [u8],
         options: InsertOpts<'a>,
     ) -> Result<InsertResult, InsertError> {
-        let data = FlatbuffersMetadataBlockSerializer
-            .write_manifest(block)
-            .int_err()?;
-
-        self.obj_repo.insert_bytes(&data, options).await
+        self.obj_repo.insert_bytes(block_data, options).await
     }
 
     fn as_object_repo(&self) -> &dyn ObjectRepository {

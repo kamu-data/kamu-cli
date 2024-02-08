@@ -31,7 +31,7 @@ pub struct DatasetFactoryImpl {
 type DatasetImplLocalFS = DatasetImpl<
     MetadataChainImpl<
         MetadataBlockRepositoryCachingInMem<ObjectRepositoryLocalFSSha3>,
-        ReferenceRepositoryCachingInMem<NamedObjectRepositoryLocalFS>,
+        ReferenceRepositoryImpl<NamedObjectRepositoryLocalFS>,
     >,
     ObjectRepositoryLocalFSSha3,
     ObjectRepositoryLocalFSSha3,
@@ -62,9 +62,7 @@ impl DatasetFactoryImpl {
                 MetadataBlockRepositoryCachingInMem::new(ObjectRepositoryLocalFSSha3::new(
                     layout.blocks_dir,
                 )),
-                ReferenceRepositoryCachingInMem::new(NamedObjectRepositoryLocalFS::new(
-                    layout.refs_dir,
-                )),
+                ReferenceRepositoryImpl::new(NamedObjectRepositoryLocalFS::new(layout.refs_dir)),
             ),
             ObjectRepositoryLocalFS::new(layout.data_dir),
             ObjectRepositoryLocalFS::new(layout.checkpoints_dir),
@@ -87,7 +85,7 @@ impl DatasetFactoryImpl {
                     base_url.join("blocks/").unwrap(),
                     header_map.clone(),
                 )),
-                ReferenceRepositoryCachingInMem::new(NamedObjectRepositoryHttp::new(
+                ReferenceRepositoryImpl::new(NamedObjectRepositoryHttp::new(
                     client.clone(),
                     base_url.join("refs/").unwrap(),
                     header_map.clone(),
@@ -147,7 +145,7 @@ impl DatasetFactoryImpl {
                         format!("{key_prefix}blocks/"),
                     ),
                 )),
-                ReferenceRepositoryCachingInMem::new(NamedObjectRepositoryS3::new(S3Context::new(
+                ReferenceRepositoryImpl::new(NamedObjectRepositoryS3::new(S3Context::new(
                     client.clone(),
                     endpoint.clone(),
                     bucket.clone(),
@@ -241,7 +239,7 @@ impl DatasetFactoryImpl {
                     dataset_url.join("blocks/").unwrap(),
                     Default::default(),
                 )),
-                ReferenceRepositoryCachingInMem::new(NamedObjectRepositoryIpfsHttp::new(
+                ReferenceRepositoryImpl::new(NamedObjectRepositoryIpfsHttp::new(
                     client.clone(),
                     dataset_url.join("refs/").unwrap(),
                 )),

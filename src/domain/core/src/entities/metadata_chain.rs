@@ -11,13 +11,12 @@ use std::fmt::Display;
 
 use async_trait::async_trait;
 use internal_error::*;
-use opendatafabric::serde::flatbuffers::FlatbuffersMetadataBlockDeserializer;
-use opendatafabric::serde::{Error, MetadataBlockDeserializer};
 use opendatafabric::{MetadataBlock, MetadataBlockTyped, MetadataEvent, Multihash, VariantOf};
 use thiserror::Error;
 
 use super::metadata_stream::DynMetadataStream;
 use crate::repos::{SetRefError as SetRefErrorRepo, *};
+use crate::MetadataBlockRepository;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -78,7 +77,10 @@ pub trait MetadataChain: Send + Sync {
     ) -> Result<Multihash, AppendError>;
 
     fn as_object_repo(&self) -> &dyn ObjectRepository;
+
     fn as_reference_repo(&self) -> &dyn ReferenceRepository;
+
+    fn as_metadata_block_repository(&self) -> &dyn MetadataBlockRepository;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -286,6 +288,18 @@ pub enum GetBlockError {
         #[backtrace]
         InternalError,
     ),
+}
+
+impl From<GetError> for GetBlockError {
+    fn from(v: GetError) -> Self {
+        match v {
+            GetError::NotFound(ObjectNotFoundError { hash }) => {
+                GetBlockError::NotFound(BlockNotFoundError { hash })
+            }
+            GetError::Access(e) => GetBlockError::Access(e),
+            GetError::Internal(e) => GetBlockError::Internal(e),
+        }
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -586,23 +600,3 @@ impl Display for OffsetsNotSequentialError {
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-// Helpers
-///////////////////////////////////////////////////////////////////////////////
-
-pub fn deserialize_metadata_block(
-    hash: &Multihash,
-    block_bytes: &[u8],
-) -> Result<MetadataBlock, GetBlockError> {
-    FlatbuffersMetadataBlockDeserializer
-        .read_manifest(block_bytes)
-        .map_err(|e| match e {
-            Error::UnsupportedVersion { .. } => GetBlockError::BlockVersion(BlockVersionError {
-                hash: hash.clone(),
-                source: e.into(),
-            }),
-            _ => GetBlockError::BlockMalformed(BlockMalformedError {
-                hash: hash.clone(),
-                source: e.into(),
-            }),
-        })
-}

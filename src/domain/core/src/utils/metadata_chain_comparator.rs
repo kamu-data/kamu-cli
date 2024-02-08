@@ -475,6 +475,10 @@ impl<'a> MetadataChain for MetadataChainWithStats<'a> {
     fn as_reference_repo(&self) -> &dyn ReferenceRepository {
         self.chain.as_reference_repo()
     }
+
+    fn as_metadata_block_repository(&self) -> &dyn MetadataBlockRepository {
+        self.chain.as_metadata_block_repository()
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

@@ -15,6 +15,7 @@ use bytes::Bytes;
 use flate2::Compression;
 use futures::TryStreamExt;
 use kamu::domain::*;
+use kamu::{MetadataBlockRepositoryImpl, ObjectRepositoryInMemory};
 use opendatafabric::{MetadataBlock, MetadataEvent, Multihash};
 use tar::Header;
 use thiserror::Error;
@@ -77,7 +78,7 @@ pub async fn prepare_dataset_transfer_estimate(
         blocks_count += 1;
 
         bytes_in_blocks += metadata_chain
-            .as_object_repo()
+            .as_metadata_block_repository()
             .get_size(&hash)
             .await
             .int_err()?;
@@ -149,8 +150,8 @@ pub async fn prepare_dataset_metadata_batch(
         num_blocks += 1;
 
         let block_bytes: Bytes = metadata_chain
-            .as_object_repo()
-            .get_bytes(hash)
+            .as_metadata_block_repository()
+            .get_block_data(hash)
             .await
             .int_err()?;
 
@@ -188,11 +189,16 @@ pub fn decode_metadata_batch(
     blocks_data
         .into_iter()
         .map(|(hash, bytes)| {
-            // TODO: Avoid depending on specific implementation of MetadataChain.
+            // TODO: Avoid depending on specific implementation of MetadataBlockRepository.
             // This is currently necessary because we need to be able to deserialize blocks
             // BEFORE an instance of MetadataChain exists. Consider injecting a
             // configurable block deserializer.
-            deserialize_metadata_block(&hash, &bytes).map(|block| (hash, block))
+
+            // In this case, `ObjectRepositoryInMemory` is passed to keep compiler happy
+            MetadataBlockRepositoryImpl::<ObjectRepositoryInMemory>::deserialize_metadata_block(
+                &hash, &bytes,
+            )
+            .map(|block| (hash, block))
         })
         .collect::<Result<VecDeque<_>, _>>()
 }
@@ -583,11 +589,19 @@ pub async fn prepare_push_object_transfer_strategy(
         ObjectType::DataSlice => dataset.as_data_repo(),
         ObjectType::Checkpoint => dataset.as_checkpoint_repo(),
     };
-
-    let contains = object_repo
-        .contains(&object_file_ref.physical_hash)
-        .await
-        .int_err()?;
+    let contains = match object_file_ref.object_type {
+        ObjectType::MetadataBlock => {
+            dataset
+                .as_metadata_chain()
+                .as_metadata_block_repository()
+                .contains(&object_file_ref.physical_hash)
+                .await
+        }
+        ObjectType::DataSlice | ObjectType::Checkpoint => {
+            object_repo.contains(&object_file_ref.physical_hash).await
+        }
+    }
+    .int_err()?;
 
     if contains {
         Ok(PushObjectTransferStrategy {

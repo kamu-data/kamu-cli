@@ -64,9 +64,6 @@ pub use object_store_builder_s3::*;
 mod object_store_builder_local_fs;
 pub use object_store_builder_local_fs::*;
 
-mod reference_repository_caching_inmem;
-pub use reference_repository_caching_inmem::*;
-
 mod metadata_block_repository_impl;
 pub use metadata_block_repository_impl::*;
 
