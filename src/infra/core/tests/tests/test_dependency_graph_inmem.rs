@@ -499,6 +499,21 @@ async fn test_get_all_downstream_dependencies() {
         request_datasets[1],
     ];
     assert_eq!(result, expected_result);
+
+    let request_datasets = vec!["test-derive-foo-foo-foo"];
+    let result: Vec<String> = harness
+        .get_all_downstream_dependencies(request_datasets.clone())
+        .await;
+
+    let expected_result = vec![
+        "test-derive-foo-foo-foo-bar-foo-bar",
+        "test-derive-foo-foo-foo-bar-foo",
+        "test-derive-foo-foo-foo-bar",
+        "test-derive-foo-foo-foo-baz",
+        request_datasets[0],
+    ];
+
+    assert_eq!(result, expected_result);
 }
 
 #[test_log::test(tokio::test)]
