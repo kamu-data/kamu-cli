@@ -204,7 +204,7 @@ impl DependencyGraphService for DependencyGraphServiceInMemory {
             .map_err(GetUpstreamDependenciesError::Internal)
             .unwrap();
 
-        let mut state = self.state.lock().await;
+        let state = self.state.lock().await;
 
         let nodes_to_search = dataset_ids
             .iter()
@@ -215,38 +215,28 @@ impl DependencyGraphService for DependencyGraphServiceInMemory {
             })
             .collect::<Result<Vec<_>, _>>()?;
 
-        let mut node_indexes_result = Vec::new();
+        let mut result = Vec::new();
         let mut visited_indexes = HashSet::new();
 
-        state.datasets_graph.reverse();
+        let mut reversed_graph = state.datasets_graph.clone();
+
+        reversed_graph.reverse();
 
         for node_index in &nodes_to_search {
-            let mut bfs = Bfs::new(&state.datasets_graph, *node_index);
+            let mut bfs = Bfs::new(&reversed_graph, *node_index);
             // Push passed node to result
-            node_indexes_result.push(*node_index);
+            result.push(reversed_graph.node_weight(*node_index).unwrap().clone());
             visited_indexes.insert(*node_index);
 
-            while let Some(current_node_index) = bfs.next(&state.datasets_graph) {
+            while let Some(current_node_index) = bfs.next(&reversed_graph) {
                 if &current_node_index != node_index
                     && !visited_indexes.contains(&current_node_index)
                 {
                     visited_indexes.insert(*node_index);
-                    node_indexes_result.push(current_node_index);
+                    result.push(reversed_graph.node_weight(*node_index).unwrap().clone());
                 }
             }
         }
-        state.datasets_graph.reverse();
-
-        let result: Vec<_> = node_indexes_result
-            .iter()
-            .map(|node_index| {
-                state
-                    .datasets_graph
-                    .node_weight(*node_index)
-                    .unwrap()
-                    .clone()
-            })
-            .collect();
 
         Ok(Box::pin(tokio_stream::iter(result)))
     }
