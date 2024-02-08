@@ -946,7 +946,7 @@ async fn test_task_completions_trigger_next_loop_on_success() {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_update_success_triggers_update_of_derived_dataset() {
+async fn test_derived_dataset_triggered_initially_and_after_input_change() {
     let harness = FlowHarness::new();
 
     let foo_id = harness.create_root_dataset("foo").await;
@@ -1005,21 +1005,40 @@ async fn test_update_success_triggers_update_of_derived_dataset() {
             });
             let task0_handle = task0_driver.run();
 
-            // Task 1: "bar" start running at 40ms, finish at 50ms
+            // Task 1: "bar" start running at 20ms, finish at 30ms
             let task1_driver = harness.task_driver(TaskDriverArgs {
                 task_id: TaskID::new(1),
                 dataset_id: Some(bar_id.clone()),
-                run_since_start: Duration::milliseconds(40),
+                run_since_start: Duration::milliseconds(20),
                 finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success)),
             });
             let task1_handle = task1_driver.run();
 
+            // Task 2: "foo" start running at 110ms, finish at 120ms
+            let task2_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(2),
+                dataset_id: Some(foo_id.clone()),
+                run_since_start: Duration::milliseconds(110),
+                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success)),
+            });
+            let task2_handle = task2_driver.run();
+
+            // Task 3: "bar" start running at 130ms, finish at 140ms
+            let task3_driver = harness.task_driver(TaskDriverArgs {
+                task_id: TaskID::new(3),
+                dataset_id: Some(bar_id.clone()),
+                run_since_start: Duration::milliseconds(130),
+                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success)),
+            });
+            let task3_handle = task3_driver.run();
+
+
             // Main simulation script
             let main_handle = async {
-                harness.advance_time(Duration::milliseconds(120)).await;
+                harness.advance_time(Duration::milliseconds(220)).await;
             };
 
-            tokio::join!(task0_handle, task1_handle, main_handle)
+            tokio::join!(task0_handle, task1_handle, task2_handle, task3_handle, main_handle)
 
         } => Ok(())
     }
@@ -1030,50 +1049,101 @@ async fn test_update_success_triggers_update_of_derived_dataset() {
         indoc::indoc!(
             r#"
             #0: +0ms:
+              "bar" ExecuteTransform:
+                Flow ID = 1 Queued
               "foo" Ingest:
                 Flow ID = 0 Queued
 
             #1: +0ms:
+              "bar" ExecuteTransform:
+                Flow ID = 1 Scheduled
               "foo" Ingest:
                 Flow ID = 0 Scheduled
 
             #2: +10ms:
+              "bar" ExecuteTransform:
+                Flow ID = 1 Scheduled
               "foo" Ingest:
                 Flow ID = 0 Running
 
             #3: +20ms:
-              "bar" ExecuteTransform:
-                Flow ID = 1 Queued
-              "foo" Ingest:
-                Flow ID = 2 Queued
-                Flow ID = 0 Finished Success
-
-            #4: +20ms:
               "bar" ExecuteTransform:
                 Flow ID = 1 Scheduled
               "foo" Ingest:
                 Flow ID = 2 Queued
                 Flow ID = 0 Finished Success
 
-            #5: +40ms:
+            #4: +20ms:
               "bar" ExecuteTransform:
                 Flow ID = 1 Running
               "foo" Ingest:
                 Flow ID = 2 Queued
                 Flow ID = 0 Finished Success
 
-            #6: +50ms:
+            #5: +30ms:
               "bar" ExecuteTransform:
                 Flow ID = 1 Finished Success
               "foo" Ingest:
                 Flow ID = 2 Queued
                 Flow ID = 0 Finished Success
 
-            #7: +100ms:
+            #6: +100ms:
               "bar" ExecuteTransform:
                 Flow ID = 1 Finished Success
               "foo" Ingest:
                 Flow ID = 2 Scheduled
+                Flow ID = 0 Finished Success
+
+            #7: +110ms:
+              "bar" ExecuteTransform:
+                Flow ID = 1 Finished Success
+              "foo" Ingest:
+                Flow ID = 2 Running
+                Flow ID = 0 Finished Success
+
+            #8: +120ms:
+              "bar" ExecuteTransform:
+                Flow ID = 3 Queued
+                Flow ID = 1 Finished Success
+              "foo" Ingest:
+                Flow ID = 4 Queued
+                Flow ID = 2 Finished Success
+                Flow ID = 0 Finished Success
+
+            #9: +120ms:
+              "bar" ExecuteTransform:
+                Flow ID = 3 Scheduled
+                Flow ID = 1 Finished Success
+              "foo" Ingest:
+                Flow ID = 4 Queued
+                Flow ID = 2 Finished Success
+                Flow ID = 0 Finished Success
+
+            #10: +130ms:
+              "bar" ExecuteTransform:
+                Flow ID = 3 Running
+                Flow ID = 1 Finished Success
+              "foo" Ingest:
+                Flow ID = 4 Queued
+                Flow ID = 2 Finished Success
+                Flow ID = 0 Finished Success
+
+            #11: +140ms:
+              "bar" ExecuteTransform:
+                Flow ID = 3 Finished Success
+                Flow ID = 1 Finished Success
+              "foo" Ingest:
+                Flow ID = 4 Queued
+                Flow ID = 2 Finished Success
+                Flow ID = 0 Finished Success
+
+            #12: +200ms:
+              "bar" ExecuteTransform:
+                Flow ID = 3 Finished Success
+                Flow ID = 1 Finished Success
+              "foo" Ingest:
+                Flow ID = 4 Scheduled
+                Flow ID = 2 Finished Success
                 Flow ID = 0 Finished Success
 
             "#
@@ -1084,8 +1154,9 @@ async fn test_update_success_triggers_update_of_derived_dataset() {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 // TODO next:
-//  - derived more than 1 level
 //  - throttling
+//  - succesfull run, pause, resume, scheduling window adjustment (short, long)
+//  - derived more than 1 level
 //  - cancelling queued/scheduled flow (at flow level, not at task level)
 
 /////////////////////////////////////////////////////////////////////////////////////////

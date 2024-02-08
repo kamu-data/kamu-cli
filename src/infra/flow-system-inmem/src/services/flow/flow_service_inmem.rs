@@ -151,11 +151,12 @@ impl FlowServiceInMemory {
         match &flow_key {
             FlowKey::Dataset(dataset_flow_key) => {
                 if let FlowConfigurationRule::Schedule(schedule) = &rule {
-                    self.enqueue_auto_polling_flow(start_time, &flow_key, schedule)
+                    self.enqueue_scheduled_auto_polling_flow(start_time, &flow_key, schedule)
+                        .await?;
+                } else {
+                    self.enqueue_auto_polling_flow_unconditionally(start_time, &flow_key)
                         .await?;
                 }
-                // TODO: trigger flows without schedules (i.e. derived datasets)
-                //   if they have not ran or it was long time ago
 
                 let mut state = self.state.lock().unwrap();
                 state
@@ -164,7 +165,7 @@ impl FlowServiceInMemory {
             }
             FlowKey::System(system_flow_key) => {
                 if let FlowConfigurationRule::Schedule(schedule) = &rule {
-                    self.enqueue_auto_polling_flow(start_time, &flow_key, schedule)
+                    self.enqueue_scheduled_auto_polling_flow(start_time, &flow_key, schedule)
                         .await?;
 
                     let mut state = self.state.lock().unwrap();
@@ -181,7 +182,7 @@ impl FlowServiceInMemory {
     }
 
     #[tracing::instrument(level = "trace", skip_all, fields(?flow_key))]
-    async fn try_enqueue_auto_polling_flow_if_enabled(
+    async fn try_enqueue_scheduled_auto_polling_flow_if_enabled(
         &self,
         start_time: DateTime<Utc>,
         flow_key: &FlowKey,
@@ -194,7 +195,7 @@ impl FlowServiceInMemory {
             .try_get_flow_schedule(flow_key);
 
         if let Some(active_schedule) = maybe_active_schedule {
-            self.enqueue_auto_polling_flow(start_time, flow_key, &active_schedule)
+            self.enqueue_scheduled_auto_polling_flow(start_time, flow_key, &active_schedule)
                 .await?;
         }
 
@@ -202,7 +203,7 @@ impl FlowServiceInMemory {
     }
 
     #[tracing::instrument(level = "trace", skip_all, fields(?flow_key, ?schedule))]
-    async fn enqueue_auto_polling_flow(
+    async fn enqueue_scheduled_auto_polling_flow(
         &self,
         start_time: DateTime<Utc>,
         flow_key: &FlowKey,
@@ -215,6 +216,22 @@ impl FlowServiceInMemory {
             |flow_run_stats: &FlowRunStats| {
                 schedule.next_activation_time(start_time, flow_run_stats.last_success_time)
             },
+        )
+        .await
+    }
+
+    #[tracing::instrument(level = "trace", skip_all, fields(?flow_key))]
+    async fn enqueue_auto_polling_flow_unconditionally(
+        &self,
+        start_time: DateTime<Utc>,
+        flow_key: &FlowKey,
+    ) -> Result<FlowState, InternalError> {
+        // Very similar to manual trigger, but automatic reasons
+        self.trigger_flow_common(
+            start_time,
+            flow_key,
+            FlowTrigger::AutoPolling(FlowTriggerAutoPolling {}),
+            |_: &FlowRunStats| start_time,
         )
         .await
     }
@@ -713,7 +730,7 @@ impl FlowService for FlowServiceInMemory {
 
                 // Schedule next period
                 let abort_time = self.round_time(self.time_source.now())?;
-                self.try_enqueue_auto_polling_flow_if_enabled(abort_time, &flow.flow_key)
+                self.try_enqueue_scheduled_auto_polling_flow_if_enabled(abort_time, &flow.flow_key)
                     .await?;
             }
             FlowStatus::Finished => { /* Skip, idempotence */ }
@@ -837,8 +854,11 @@ impl AsyncEventHandler<TaskEventFinished> for FlowServiceInMemory {
             // In case of success:
             //  - enqueue next auto-polling flow cycle
             if event.outcome == TaskOutcome::Success {
-                self.try_enqueue_auto_polling_flow_if_enabled(finish_time, &flow.flow_key)
-                    .await?;
+                self.try_enqueue_scheduled_auto_polling_flow_if_enabled(
+                    finish_time,
+                    &flow.flow_key,
+                )
+                .await?;
             }
 
             // Publish progress event
