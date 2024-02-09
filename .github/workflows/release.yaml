@@ -38,7 +38,7 @@ jobs:
           --features ftp,web-ui
       - name: Rename binary
         run: mv target/${{ matrix.target }}/release/${{ env.PACKAGE_NAME }} target/${{ matrix.target }}/release/${{ env.BINARY_NAME }}
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: ${{ env.PACKAGE_NAME }}-${{ matrix.target }}
           path: target/${{ matrix.target }}/release/${{ env.BINARY_NAME }}
@@ -67,7 +67,7 @@ jobs:
           --features ftp,web-ui
       - name: Rename binary
         run: mv target/${{ matrix.target }}/release/${{ env.PACKAGE_NAME }} target/${{ matrix.target }}/release/${{ env.BINARY_NAME }}
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: ${{ env.PACKAGE_NAME }}-${{ matrix.target }}
           path: target/${{ matrix.target }}/release/${{ env.BINARY_NAME }}
@@ -92,7 +92,7 @@ jobs:
       - name: Rename binary
         shell: bash
         run: mv target/${{ matrix.target }}/release/${{ env.PACKAGE_NAME }}.exe target/${{ matrix.target }}/release/${{ env.BINARY_NAME }}.exe
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: ${{ env.PACKAGE_NAME }}-${{ matrix.target }}
           path: target/${{ matrix.target }}/release/${{ env.BINARY_NAME }}.exe
@@ -132,7 +132,7 @@ jobs:
           - x86_64-apple-darwin
     steps:
       - name: Download Artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: ${{ env.PACKAGE_NAME }}-${{ matrix.target }}
           path: ${{ env.PACKAGE_NAME }}-${{ matrix.target }}
@@ -157,7 +157,7 @@ jobs:
           - x86_64-pc-windows-msvc
     steps:
       - name: Download Artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: ${{ env.PACKAGE_NAME }}-${{ matrix.target }}
           path: ${{ env.PACKAGE_NAME }}-${{ matrix.target }}
