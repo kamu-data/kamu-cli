@@ -24,8 +24,8 @@ pub enum TaskStatus {
     Finished,
 }
 
-impl From<ts::TaskStatus> for TaskStatus {
-    fn from(v: ts::TaskStatus) -> Self {
+impl From<&ts::TaskStatus> for TaskStatus {
+    fn from(v: &ts::TaskStatus) -> Self {
         match v {
             ts::TaskStatus::Queued => Self::Queued,
             ts::TaskStatus::Running => Self::Running,
@@ -47,8 +47,8 @@ pub enum TaskOutcome {
     Cancelled,
 }
 
-impl From<ts::TaskOutcome> for TaskOutcome {
-    fn from(value: ts::TaskOutcome) -> Self {
+impl From<&ts::TaskOutcome> for TaskOutcome {
+    fn from(value: &ts::TaskOutcome) -> Self {
         match value {
             ts::TaskOutcome::Success(_) => Self::Success,
             ts::TaskOutcome::Failed => Self::Failed,

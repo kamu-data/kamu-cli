@@ -33,7 +33,7 @@ impl Task {
 
     /// Life-cycle status of a task
     async fn status(&self) -> TaskStatus {
-        self.state.status.clone().into()
+        (&self.state.status).into()
     }
 
     /// Whether the task was ordered to be cancelled
@@ -46,7 +46,7 @@ impl Task {
     async fn outcome(&self) -> Option<TaskOutcome> {
         match &self.state.status {
             ts::TaskStatus::Queued | ts::TaskStatus::Running => None,
-            ts::TaskStatus::Finished(outcome) => Some((outcome.clone()).into()),
+            ts::TaskStatus::Finished(outcome) => Some(outcome.into()),
         }
     }
 
