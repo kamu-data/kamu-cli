@@ -167,7 +167,8 @@ pub enum PullResult {
     Updated {
         old_head: Option<Multihash>,
         new_head: Multihash,
-        num_blocks: usize,
+        num_blocks: u64,
+        num_records: u64,
     },
 }
 
@@ -179,11 +180,13 @@ impl From<PollingIngestResult> for PullResult {
                 old_head,
                 new_head,
                 num_blocks,
+                num_records,
                 ..
             } => PullResult::Updated {
                 old_head: Some(old_head),
                 new_head,
                 num_blocks,
+                num_records,
             },
         }
     }
@@ -197,10 +200,12 @@ impl From<TransformResult> for PullResult {
                 old_head,
                 new_head,
                 num_blocks,
+                num_records,
             } => PullResult::Updated {
                 old_head: Some(old_head),
                 new_head,
                 num_blocks,
+                num_records,
             },
         }
     }
@@ -217,7 +222,8 @@ impl From<SyncResult> for PullResult {
             } => PullResult::Updated {
                 old_head,
                 new_head,
-                num_blocks,
+                num_blocks: num_blocks as u64,
+                num_records: 0, // TODO
             },
         }
     }
