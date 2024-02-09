@@ -129,8 +129,8 @@ pub async fn prepare_dataset_metadata_batch(
     metadata_chain: &dyn MetadataChain,
     stop_at: &Multihash,
     begin_after: Option<&Multihash>,
-) -> Result<ObjectsBatch, InternalError> {
-    let mut blocks_count: u32 = 0;
+) -> Result<MetadataBlocksBatch, InternalError> {
+    let mut num_blocks: u32 = 0;
     let encoder = flate2::write::GzEncoder::new(Vec::new(), Compression::default());
     let mut tarball_builder = tar::Builder::new(encoder);
 
@@ -141,7 +141,7 @@ pub async fn prepare_dataset_metadata_batch(
         .int_err()?;
 
     for (hash, _) in blocks_for_transfer.iter().rev() {
-        blocks_count += 1;
+        num_blocks += 1;
 
         let block_bytes: Bytes = metadata_chain
             .as_object_repo()
@@ -165,9 +165,8 @@ pub async fn prepare_dataset_metadata_batch(
 
     let tarball_data = tarball_builder.into_inner().int_err()?.finish().int_err()?;
 
-    Ok(ObjectsBatch {
-        objects_count: blocks_count,
-        object_type: ObjectType::MetadataBlock,
+    Ok(MetadataBlocksBatch {
+        num_blocks,
         media_type: String::from(MEDIA_TAR_GZ),
         encoding: String::from(ENCODING_RAW),
         payload: tarball_data,
@@ -177,9 +176,9 @@ pub async fn prepare_dataset_metadata_batch(
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub fn decode_metadata_batch(
-    objects_batch: &ObjectsBatch,
+    blocks_batch: &MetadataBlocksBatch,
 ) -> Result<VecDeque<(Multihash, MetadataBlock)>, GetBlockError> {
-    let blocks_data = unpack_dataset_metadata_batch(objects_batch);
+    let blocks_data = unpack_dataset_metadata_batch(blocks_batch);
     blocks_data
         .into_iter()
         .map(|(hash, bytes)| {
@@ -257,26 +256,20 @@ pub async fn dataset_append_metadata(
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-fn unpack_dataset_metadata_batch(objects_batch: &ObjectsBatch) -> Vec<(Multihash, Vec<u8>)> {
+fn unpack_dataset_metadata_batch(blocks_batch: &MetadataBlocksBatch) -> Vec<(Multihash, Vec<u8>)> {
     assert!(
-        objects_batch.media_type.eq(MEDIA_TAR_GZ),
+        blocks_batch.media_type.eq(MEDIA_TAR_GZ),
         "Unsupported media type {}",
-        objects_batch.media_type
+        blocks_batch.media_type
     );
 
     assert!(
-        objects_batch.encoding.eq(ENCODING_RAW),
+        blocks_batch.encoding.eq(ENCODING_RAW),
         "Unsupported batch encoding type {}",
-        objects_batch.encoding
+        blocks_batch.encoding
     );
 
-    assert!(
-        !(objects_batch.object_type != ObjectType::MetadataBlock),
-        "Unexpected object type {:?}",
-        objects_batch.object_type
-    );
-
-    let decoder = flate2::read::GzDecoder::new(objects_batch.payload.as_slice());
+    let decoder = flate2::read::GzDecoder::new(blocks_batch.payload.as_slice());
     let mut archive = tar::Archive::new(decoder);
     let blocks_data: Vec<(Multihash, Vec<u8>)> = archive
         .entries()
@@ -459,16 +452,6 @@ pub async fn prepare_pull_object_transfer_strategy(
     maybe_bearer_header: &Option<BearerHeader>,
 ) -> Result<PullObjectTransferStrategy, InternalError> {
     let get_download_url_result = match object_file_ref.object_type {
-        ObjectType::MetadataBlock => {
-            dataset
-                .as_metadata_chain()
-                .as_object_repo()
-                .get_external_download_url(
-                    &object_file_ref.physical_hash,
-                    ExternalTransferOpts::default(),
-                )
-                .await
-        }
         ObjectType::DataSlice => {
             dataset
                 .as_data_repo()
@@ -524,7 +507,6 @@ fn get_simple_transfer_protocol_url(
     dataset_url: &Url,
 ) -> Url {
     let path_suffix = match object_file_ref.object_type {
-        ObjectType::MetadataBlock => "blocks/",
         ObjectType::DataSlice => "data/",
         ObjectType::Checkpoint => "checkpoints/",
     };
@@ -595,7 +577,6 @@ pub async fn prepare_push_object_transfer_strategy(
     maybe_bearer_header: &Option<BearerHeader>,
 ) -> Result<PushObjectTransferStrategy, InternalError> {
     let object_repo = match object_file_ref.object_type {
-        ObjectType::MetadataBlock => dataset.as_metadata_chain().as_object_repo(),
         ObjectType::DataSlice => dataset.as_data_repo(),
         ObjectType::Checkpoint => dataset.as_checkpoint_repo(),
     };
@@ -680,7 +661,6 @@ pub async fn dataset_import_object_file(
         .compat();
 
     let target_object_repository = match object_file_reference.object_type {
-        ObjectType::MetadataBlock => panic!("Metadata block unexpected at objects import stage"),
         ObjectType::DataSlice => dataset.as_data_repo(),
         ObjectType::Checkpoint => dataset.as_checkpoint_repo(),
     };
@@ -740,7 +720,6 @@ pub async fn dataset_export_object_file(
     let object_file_reference = &object_transfer_strategy.object_file;
 
     let source_object_repository = match object_file_reference.object_type {
-        ObjectType::MetadataBlock => panic!("Metadata block unexpected at objects export stage"),
         ObjectType::DataSlice => dataset.as_data_repo(),
         ObjectType::Checkpoint => dataset.as_checkpoint_repo(),
     };

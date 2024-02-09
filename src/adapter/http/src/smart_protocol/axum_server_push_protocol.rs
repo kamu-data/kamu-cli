@@ -194,8 +194,7 @@ impl AxumServerPushProtocolInstance {
             }?;
 
         tracing::debug!(
-            objects_count = %push_metadata_request.new_blocks.objects_count,
-            object_type = ?push_metadata_request.new_blocks.object_type,
+            num_blocks = %push_metadata_request.new_blocks.num_blocks,
             media_type = %push_metadata_request.new_blocks.media_type,
             encoding = %push_metadata_request.new_blocks.encoding,
             payload_length = %push_metadata_request.new_blocks.payload.len(),
@@ -204,7 +203,7 @@ impl AxumServerPushProtocolInstance {
 
         assert_eq!(
             push_request.size_estimate.num_blocks,
-            push_metadata_request.new_blocks.objects_count
+            push_metadata_request.new_blocks.num_blocks
         );
 
         let new_blocks = decode_metadata_batch(&push_metadata_request.new_blocks).int_err()?;
