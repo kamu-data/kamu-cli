@@ -1,0 +1,78 @@
+name: release-test-installer
+on:
+  # Manual trigger
+  workflow_dispatch: {}
+  # Automatic trigger after each release
+  # Note: Triggers on both successes and failures (see conditional below)
+  workflow_run:
+    workflows:
+      - release
+    types:
+      - completed
+jobs:
+  install_script:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Keep in sync with artifact upload matrix below
+          #
+          # TODO: Add minimal targets that are stripped and do not embed WebUI
+          - name: Linux / amd64 / glibc
+            runs-on: ubuntu-latest
+            expected-target: x86_64-unknown-linux-gnu
+            expected-install-path: /home/runner/.local/bin/kamu
+          - name: Linux / amd64 / musl
+            runs-on: ubuntu-latest
+            installer-vars: KAMU_LIBC=musl
+            expected-target: x86_64-unknown-linux-musl
+            expected-install-path: /home/runner/.local/bin/kamu
+          - name: MacOS / amd64
+            runs-on: macos-13
+            expected-target: x86_64-apple-darwin
+            expected-install-path: /Users/runner/.local/bin/kamu
+          - name: MacOS / arm64
+            runs-on: macos-14
+            expected-target: aarch64-apple-darwin
+            expected-install-path: /Users/runner/.local/bin/kamu
+    name: Install via script (${{ matrix.name }})
+    runs-on: ${{ matrix.runs-on }}
+    if: |
+      github.event.workflow_run.conclusion == 'success' ||
+      github.event.workflow_run.conclusion == null
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read latest version
+        uses: SebRollen/toml-action@v1.0.2
+        id: read_version
+        with:
+          file: Cargo.toml
+          field: workspace.package.version
+      
+      - name: Install release
+        shell: bash
+        run: |
+          curl -s "https://get.kamu.dev" | \
+            KAMU_VERSION=${{ steps.read_version.outputs.value }} \
+            ${{ matrix.installer-vars }} \
+            sh -s
+
+          echo $(dirname ${{ matrix.expected-install-path }}) >> $GITHUB_PATH
+
+      - name: Test release
+        shell: bash
+        run: |
+          echo "Installed version info:"
+          kamu version
+
+          assert_eq() { if [[ "$1" == "$2" ]]; then true; else echo "$3, expected $2 but got $1"; false; fi }
+
+          assert_eq "$(kamu version --output-format json | jq -r .appVersion)" "${{ steps.read_version.outputs.value }}" "Invalid version"
+          assert_eq "$(kamu version --output-format json | jq -r .cargoOptLevel)" "3" "Invalid optimization level"
+          assert_eq "$(kamu version --output-format json | jq -r .cargoTargetTriple)" "${{ matrix.expected-target }}" "Invalid target"
+
+          assert_eq "$(which kamu)" "${{ matrix.expected-install-path }}" "Invalid install path"
+
+          kamu init
+          assert_eq "$(kamu list --output-format csv)" "Name,Kind,Pulled,Records,Size" "Unexpected list output"
