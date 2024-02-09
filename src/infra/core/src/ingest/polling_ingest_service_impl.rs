@@ -312,7 +312,7 @@ impl PollingIngestServiceImpl {
                     .event
                     .new_data
                     .as_ref()
-                    .map(|slice| slice.offset_interval.end - slice.offset_interval.start + 1)
+                    .map(DataSlice::num_records)
                     .unwrap_or_default();
 
                 Ok(PollingIngestResult::Updated {

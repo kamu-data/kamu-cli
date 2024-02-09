@@ -167,23 +167,25 @@ impl SimpleTransferProtocol {
             (create_result.dataset, Some(create_result.head))
         };
 
-        self.synchronize_blocks(
-            blocks,
-            src.as_ref(),
-            dst.as_ref(),
-            &src_head,
-            dst_head.as_ref(),
-            validation,
-            trust_source_hashes,
-            listener,
-            listener_adapter.into_status(),
-        )
-        .await?;
+        let stats = self
+            .synchronize_blocks(
+                blocks,
+                src.as_ref(),
+                dst.as_ref(),
+                &src_head,
+                dst_head.as_ref(),
+                validation,
+                trust_source_hashes,
+                listener,
+                listener_adapter.into_status(),
+            )
+            .await?;
 
         Ok(SyncResult::Updated {
             old_head,
             new_head: src_head,
-            num_blocks,
+            num_blocks: num_blocks as u64,
+            num_records: stats.dst.data_records_written,
         })
     }
 
@@ -300,6 +302,8 @@ impl SimpleTransferProtocol {
 
         stats.src.data_slices_read += 1;
         stats.dst.data_slices_written += 1;
+        stats.src.data_records_read += data_slice.num_records();
+        stats.dst.data_records_written += data_slice.num_records();
         stats.src.bytes_read += data_slice.size;
         stats.dst.bytes_written += data_slice.size;
 
@@ -391,7 +395,7 @@ impl SimpleTransferProtocol {
         trust_source_hashes: bool,
         listener: Arc<dyn SyncListener>,
         mut stats: SyncStats,
-    ) -> Result<(), SyncError> {
+    ) -> Result<SyncStats, SyncError> {
         // Update stats estimates based on metadata
         stats.dst_estimated.metadata_blocks_written += blocks.len() as u64;
 
@@ -399,9 +403,11 @@ impl SimpleTransferProtocol {
             if let Some(data_slice) = block.event.new_data {
                 stats.src_estimated.data_slices_read += 1;
                 stats.src_estimated.bytes_read += data_slice.size;
+                stats.src_estimated.data_records_read += data_slice.num_records();
 
                 stats.dst_estimated.data_slices_written += 1;
                 stats.dst_estimated.bytes_written += data_slice.size;
+                stats.dst_estimated.data_records_written += data_slice.num_records();
             }
             if let Some(checkpoint) = block.event.new_checkpoint {
                 stats.src_estimated.checkpoints_read += 1;
@@ -531,7 +537,7 @@ impl SimpleTransferProtocol {
             Err(SetRefError::BlockNotFound(e)) => Err(SyncError::Internal(e.int_err())),
         }?;
 
-        Ok(())
+        Ok(stats)
     }
 }
 

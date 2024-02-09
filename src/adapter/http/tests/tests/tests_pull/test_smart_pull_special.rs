@@ -63,7 +63,7 @@ async fn test_smart_pull_unauthenticated() {
                 old_head: None,
                 new_head: scenario.server_commit_result.new_head,
                 num_blocks: 4,
-                num_records: 0, // TODO
+                num_records: 10,
             },
             pull_result
         );

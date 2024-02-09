@@ -71,6 +71,8 @@ pub async fn prepare_dataset_transfer_estimate(
     let mut bytes_in_data_objects: u64 = 0;
     let mut bytes_in_checkpoint_objects: u64 = 0;
 
+    let mut data_records_count: u64 = 0;
+
     while let Some((hash, block)) = block_stream.try_next().await? {
         blocks_count += 1;
 
@@ -85,6 +87,7 @@ pub async fn prepare_dataset_transfer_estimate(
                 if let Some(new_data) = &add_data.new_data {
                     data_objects_count += 1;
                     bytes_in_data_objects += new_data.size;
+                    data_records_count += new_data.num_records();
                 }
                 if let Some(new_checkpoint) = &add_data.new_checkpoint {
                     checkpoint_objects_count += 1;
@@ -95,6 +98,7 @@ pub async fn prepare_dataset_transfer_estimate(
                 if let Some(new_data) = &execute_transform.new_data {
                     data_objects_count += 1;
                     bytes_in_data_objects += new_data.size;
+                    data_records_count += new_data.num_records();
                 }
                 if let Some(new_checkpoint) = &execute_transform.new_checkpoint {
                     checkpoint_objects_count += 1;
@@ -118,6 +122,7 @@ pub async fn prepare_dataset_transfer_estimate(
     Ok(TransferSizeEstimate {
         num_blocks: blocks_count,
         num_objects: data_objects_count + checkpoint_objects_count,
+        num_records: data_records_count,
         bytes_in_raw_blocks: bytes_in_blocks,
         bytes_in_raw_objects: bytes_in_data_objects + bytes_in_checkpoint_objects,
     })
