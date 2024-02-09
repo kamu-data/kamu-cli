@@ -11,12 +11,15 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use dashmap::DashMap;
 use kamu_core::{
-    ContainsError,
+    ContainsBlockError,
+    ExternalTransferOpts,
+    GetBlockDataError,
     GetBlockError,
-    GetError,
-    InsertError,
+    GetBlockExternalUrlError,
+    GetBlockExternalUrlResult,
+    InsertBlockError,
+    InsertBlockResult,
     InsertOpts,
-    InsertResult,
     MetadataBlockRepository,
     ObjectRepository,
 };
@@ -26,9 +29,16 @@ use crate::MetadataBlockRepositoryImpl;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+struct MetadataBlockRepositoryCacheValue {
+    block_data: Bytes,
+    deserialized_block: Option<MetadataBlock>,
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
 pub struct MetadataBlockRepositoryCachingInMem<ObjRepo> {
     wrapped: MetadataBlockRepositoryImpl<ObjRepo>,
-    cache: DashMap<Multihash, Bytes>,
+    cache: DashMap<Multihash, MetadataBlockRepositoryCacheValue>,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -54,40 +64,78 @@ impl<ObjRepo> MetadataBlockRepository for MetadataBlockRepositoryCachingInMem<Ob
 where
     ObjRepo: ObjectRepository + Sync + Send,
 {
-    async fn contains(&self, hash: &Multihash) -> Result<bool, ContainsError> {
+    async fn contains_block(&self, hash: &Multihash) -> Result<bool, ContainsBlockError> {
         match self.get_block_data(hash).await {
             Ok(_) => Ok(true),
             Err(e) => match e {
-                GetError::NotFound(_) => Ok(false),
-                GetError::Access(e) => Err(ContainsError::Access(e)),
-                GetError::Internal(e) => Err(ContainsError::Internal(e)),
+                GetBlockDataError::NotFound(_) => Ok(false),
+                GetBlockDataError::Access(e) => Err(ContainsBlockError::Access(e)),
+                GetBlockDataError::Internal(e) => Err(ContainsBlockError::Internal(e)),
             },
         }
     }
 
     async fn get_block(&self, hash: &Multihash) -> Result<MetadataBlock, GetBlockError> {
-        let block_data = self.get_block_data(hash).await?;
-        let block =
-            MetadataBlockRepositoryImpl::<ObjRepo>::deserialize_metadata_block(hash, &block_data)?;
+        match self.cache.get_mut(hash) {
+            Some(mut cached_value) => match &cached_value.deserialized_block {
+                Some(cached_block) => Ok(cached_block.clone()),
+                None => {
+                    let block = MetadataBlockRepositoryImpl::<ObjRepo>::deserialize_metadata_block(
+                        hash,
+                        &cached_value.block_data,
+                    )?;
 
-        Ok(block)
+                    cached_value.deserialized_block = Some(block.clone());
+
+                    Ok(block)
+                }
+            },
+            // No cached value
+            None => {
+                let get_block_data_result = self.wrapped.get_block_data(hash).await;
+
+                match get_block_data_result {
+                    Ok(block_data) => {
+                        let block =
+                            MetadataBlockRepositoryImpl::<ObjRepo>::deserialize_metadata_block(
+                                hash,
+                                &block_data,
+                            )?;
+                        let cache_value = MetadataBlockRepositoryCacheValue {
+                            block_data: block_data.clone(),
+                            deserialized_block: Some(block.clone()),
+                        };
+
+                        self.cache.insert(hash.clone(), cache_value);
+
+                        Ok(block)
+                    }
+                    Err(e) => Err(e.into()),
+                }
+            }
+        }
     }
 
-    async fn get_block_data(&self, hash: &Multihash) -> Result<Bytes, GetError> {
-        if let Some(cached_result) = self.cache.get(hash) {
-            return Ok(cached_result.clone());
+    async fn get_block_data(&self, hash: &Multihash) -> Result<Bytes, GetBlockDataError> {
+        if let Some(cached_value) = self.cache.get(hash) {
+            return Ok(cached_value.block_data.clone());
         };
 
         let get_block_data_result = self.wrapped.get_block_data(hash).await;
 
         if let Ok(block_data) = &get_block_data_result {
-            self.cache.insert(hash.clone(), block_data.clone());
+            let cache_value = MetadataBlockRepositoryCacheValue {
+                block_data: block_data.clone(),
+                deserialized_block: None,
+            };
+
+            self.cache.insert(hash.clone(), cache_value);
         }
 
         get_block_data_result
     }
 
-    async fn get_size(&self, hash: &Multihash) -> Result<u64, GetError> {
+    async fn get_block_size(&self, hash: &Multihash) -> Result<u64, GetBlockDataError> {
         let block_data = self.get_block_data(hash).await?;
         let size = u64::try_from(block_data.len()).unwrap();
 
@@ -98,19 +146,36 @@ where
         &'a self,
         block_data: &'a [u8],
         options: InsertOpts<'a>,
-    ) -> Result<InsertResult, InsertError> {
+    ) -> Result<InsertBlockResult, InsertBlockError> {
         let insert_result = self.wrapped.insert_block_data(block_data, options).await;
 
         if let Ok(result) = &insert_result {
-            let copied_block_data = Bytes::copy_from_slice(block_data);
+            let cache_value = MetadataBlockRepositoryCacheValue {
+                block_data: Bytes::copy_from_slice(block_data),
+                deserialized_block: None,
+            };
 
-            self.cache.insert(result.hash.clone(), copied_block_data);
+            self.cache.insert(result.hash.clone(), cache_value);
         }
 
         insert_result
     }
 
-    fn as_object_repo(&self) -> &dyn ObjectRepository {
-        self.wrapped.as_object_repo()
+    async fn get_block_external_download_url(
+        &self,
+        hash: &Multihash,
+        opts: ExternalTransferOpts,
+    ) -> Result<GetBlockExternalUrlResult, GetBlockExternalUrlError> {
+        self.wrapped
+            .get_block_external_download_url(hash, opts)
+            .await
+    }
+
+    async fn get_block_external_upload_url(
+        &self,
+        hash: &Multihash,
+        opts: ExternalTransferOpts,
+    ) -> Result<GetBlockExternalUrlResult, GetBlockExternalUrlError> {
+        self.wrapped.get_block_external_upload_url(hash, opts).await
     }
 }

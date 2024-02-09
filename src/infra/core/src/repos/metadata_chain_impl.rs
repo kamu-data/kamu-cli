@@ -48,7 +48,7 @@ where
         new_block: &MetadataBlock,
     ) -> Result<(), AppendError> {
         if let Some(prev) = &new_block.prev_block_hash {
-            match self.meta_block_repo.contains(prev).await {
+            match self.meta_block_repo.contains_block(prev).await {
                 Ok(true) => Ok(()),
                 Ok(false) => Err(
                     AppendValidationError::PrevBlockNotFound(BlockNotFoundError {
@@ -56,8 +56,8 @@ where
                     })
                     .into(),
                 ),
-                Err(ContainsError::Access(e)) => Err(AppendError::Access(e)),
-                Err(ContainsError::Internal(e)) => Err(AppendError::Internal(e)),
+                Err(ContainsBlockError::Access(e)) => Err(AppendError::Access(e)),
+                Err(ContainsBlockError::Internal(e)) => Err(AppendError::Internal(e)),
             }?;
         }
         Ok(())
@@ -586,7 +586,10 @@ where
     }
 
     async fn get_block(&self, hash: &Multihash) -> Result<MetadataBlock, GetBlockError> {
-        self.meta_block_repo.get_block(hash).await
+        self.meta_block_repo
+            .get_block(hash)
+            .await
+            .map_err(Into::into)
     }
 
     fn iter_blocks_interval<'a>(
@@ -680,13 +683,13 @@ where
         opts: SetRefOpts<'a>,
     ) -> Result<(), SetRefError> {
         if opts.validate_block_present {
-            match self.meta_block_repo.contains(hash).await {
+            match self.meta_block_repo.contains_block(hash).await {
                 Ok(true) => Ok(()),
                 Ok(false) => Err(SetRefError::BlockNotFound(BlockNotFoundError {
                     hash: hash.clone(),
                 })),
-                Err(ContainsError::Access(e)) => Err(SetRefError::Access(e)),
-                Err(ContainsError::Internal(e)) => Err(SetRefError::Internal(e)),
+                Err(ContainsBlockError::Access(e)) => Err(SetRefError::Access(e)),
+                Err(ContainsBlockError::Internal(e)) => Err(SetRefError::Internal(e)),
             }?;
         }
 
@@ -767,9 +770,9 @@ where
             )
             .await
             .map_err(|e| match e {
-                InsertError::HashMismatch(e) => AppendValidationError::HashMismatch(e).into(),
-                InsertError::Access(e) => AppendError::Access(e),
-                InsertError::Internal(e) => AppendError::Internal(e),
+                InsertBlockError::HashMismatch(e) => AppendValidationError::HashMismatch(e).into(),
+                InsertBlockError::Access(e) => AppendError::Access(e),
+                InsertBlockError::Internal(e) => AppendError::Internal(e),
             })?;
 
         if let Some(r) = opts.update_ref {
@@ -777,10 +780,6 @@ where
         }
 
         Ok(res.hash)
-    }
-
-    fn as_object_repo(&self) -> &dyn ObjectRepository {
-        self.meta_block_repo.as_object_repo()
     }
 
     fn as_reference_repo(&self) -> &dyn ReferenceRepository {

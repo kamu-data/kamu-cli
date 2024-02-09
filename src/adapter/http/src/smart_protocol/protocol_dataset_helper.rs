@@ -79,7 +79,7 @@ pub async fn prepare_dataset_transfer_estimate(
 
         bytes_in_blocks += metadata_chain
             .as_metadata_block_repository()
-            .get_size(&hash)
+            .get_block_size(&hash)
             .await
             .int_err()?;
 

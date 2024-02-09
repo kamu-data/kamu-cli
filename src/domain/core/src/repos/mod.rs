@@ -10,6 +10,7 @@
 pub mod dataset_factory;
 pub mod dataset_registry;
 pub mod dataset_repository;
+pub mod metadata_block_repository;
 pub mod named_object_repository;
 pub mod object_repository;
 pub mod object_store_registry;
@@ -18,6 +19,7 @@ pub mod reference_repository;
 pub use dataset_factory::*;
 pub use dataset_registry::*;
 pub use dataset_repository::*;
+pub use metadata_block_repository::*;
 pub use named_object_repository::*;
 pub use object_repository::*;
 pub use object_store_registry::*;

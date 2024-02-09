@@ -12,12 +12,15 @@ use bytes::Bytes;
 use kamu_core::{
     BlockMalformedError,
     BlockVersionError,
-    ContainsError,
+    ContainsBlockError,
+    ExternalTransferOpts,
+    GetBlockDataError,
     GetBlockError,
-    GetError,
-    InsertError,
+    GetBlockExternalUrlError,
+    GetBlockExternalUrlResult,
+    InsertBlockError,
+    InsertBlockResult,
     InsertOpts,
-    InsertResult,
     MetadataBlockRepository,
     ObjectRepository,
 };
@@ -69,8 +72,8 @@ impl<ObjRepo> MetadataBlockRepository for MetadataBlockRepositoryImpl<ObjRepo>
 where
     ObjRepo: ObjectRepository + Sync + Send,
 {
-    async fn contains(&self, hash: &Multihash) -> Result<bool, ContainsError> {
-        self.obj_repo.contains(hash).await
+    async fn contains_block(&self, hash: &Multihash) -> Result<bool, ContainsBlockError> {
+        self.obj_repo.contains(hash).await.map_err(Into::into)
     }
 
     async fn get_block(&self, hash: &Multihash) -> Result<MetadataBlock, GetBlockError> {
@@ -79,23 +82,47 @@ where
         Self::deserialize_metadata_block(hash, &block_data)
     }
 
-    async fn get_block_data(&self, hash: &Multihash) -> Result<Bytes, GetError> {
-        self.obj_repo.get_bytes(hash).await
+    async fn get_block_data(&self, hash: &Multihash) -> Result<Bytes, GetBlockDataError> {
+        self.obj_repo.get_bytes(hash).await.map_err(Into::into)
     }
 
-    async fn get_size(&self, hash: &Multihash) -> Result<u64, GetError> {
-        self.obj_repo.get_size(hash).await
+    async fn get_block_size(&self, hash: &Multihash) -> Result<u64, GetBlockDataError> {
+        self.obj_repo.get_size(hash).await.map_err(Into::into)
     }
 
     async fn insert_block_data<'a>(
         &'a self,
         block_data: &'a [u8],
         options: InsertOpts<'a>,
-    ) -> Result<InsertResult, InsertError> {
-        self.obj_repo.insert_bytes(block_data, options).await
+    ) -> Result<InsertBlockResult, InsertBlockError> {
+        self.obj_repo
+            .insert_bytes(block_data, options)
+            .await
+            .map(Into::into)
+            .map_err(Into::into)
     }
 
-    fn as_object_repo(&self) -> &dyn ObjectRepository {
-        &self.obj_repo
+    async fn get_block_external_download_url(
+        &self,
+        hash: &Multihash,
+        opts: ExternalTransferOpts,
+    ) -> Result<GetBlockExternalUrlResult, GetBlockExternalUrlError> {
+        self.obj_repo
+            .get_external_download_url(hash, opts)
+            .await
+            .map(Into::into)
+            .map_err(Into::into)
+    }
+
+    async fn get_block_external_upload_url(
+        &self,
+        hash: &Multihash,
+        opts: ExternalTransferOpts,
+    ) -> Result<GetBlockExternalUrlResult, GetBlockExternalUrlError> {
+        self.obj_repo
+            .get_external_upload_url(hash, opts)
+            .await
+            .map(Into::into)
+            .map_err(Into::into)
     }
 }

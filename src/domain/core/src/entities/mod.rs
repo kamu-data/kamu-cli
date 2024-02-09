@@ -12,13 +12,11 @@ pub mod dataset;
 pub mod dataset_summary;
 pub mod engine;
 pub mod events;
-pub mod metadata_block_repository;
 pub mod metadata_chain;
 pub mod metadata_stream;
 
 pub use current_account_subject::*;
 pub use dataset::*;
 pub use dataset_summary::*;
-pub use metadata_block_repository::*;
 pub use metadata_chain::*;
 pub use metadata_stream::*;

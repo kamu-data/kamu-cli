@@ -16,7 +16,6 @@ use thiserror::Error;
 
 use super::metadata_stream::DynMetadataStream;
 use crate::repos::{SetRefError as SetRefErrorRepo, *};
-use crate::MetadataBlockRepository;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -75,8 +74,6 @@ pub trait MetadataChain: Send + Sync {
         block: MetadataBlock,
         opts: AppendOpts<'a>,
     ) -> Result<Multihash, AppendError>;
-
-    fn as_object_repo(&self) -> &dyn ObjectRepository;
 
     fn as_reference_repo(&self) -> &dyn ReferenceRepository;
 
