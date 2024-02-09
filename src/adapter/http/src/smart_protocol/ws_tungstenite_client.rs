@@ -129,8 +129,7 @@ impl WsSmartTransferProtocolClient {
             })?;
 
         tracing::debug!(
-            objects_count = % dataset_metadata_pull_response.blocks.objects_count,
-            object_type = ? dataset_metadata_pull_response.blocks.object_type,
+            num_blocks = % dataset_metadata_pull_response.blocks.num_blocks,
             media_type = % dataset_metadata_pull_response.blocks.media_type,
             encoding = % dataset_metadata_pull_response.blocks.encoding,
             payload_length = % dataset_metadata_pull_response.blocks.payload.len(),
@@ -250,7 +249,7 @@ impl WsSmartTransferProtocolClient {
                 .int_err()?;
 
         tracing::debug!(
-            objects_count = % metadata_batch.objects_count,
+            num_blocks = % metadata_batch.num_blocks,
             payload_len = metadata_batch.payload.len(),
             "Metadata batch of blocks formed",
         );
