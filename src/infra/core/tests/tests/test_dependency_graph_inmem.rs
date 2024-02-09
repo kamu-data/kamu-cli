@@ -311,27 +311,27 @@ async fn test_service_dataset_deleted() {
 }
 
 #[test_log::test(tokio::test)]
-async fn test_get_all_downstream_dependencies() {
+async fn test_get_recursive_downstream_dependencies() {
     let harness = create_large_dataset_graph().await;
 
     // Request downstream dependencies for last element
     // should return only itself
     let request_dataset = "test-derive-foo-foo-foo-bar-foo-bar";
     let result = harness
-        .get_all_downstream_dependencies(vec![request_dataset])
+        .get_recursive_downstream_dependencies(vec![request_dataset])
         .await;
     assert_eq!(result, vec![request_dataset]);
 
     let request_dataset = "test-derive-baz-baz-foo-bar";
     let result = harness
-        .get_all_downstream_dependencies(vec![request_dataset])
+        .get_recursive_downstream_dependencies(vec![request_dataset])
         .await;
 
     assert_eq!(result, vec![request_dataset]);
 
     let request_dataset = "test-derive-bar-baz";
     let result = harness
-        .get_all_downstream_dependencies(vec![request_dataset])
+        .get_recursive_downstream_dependencies(vec![request_dataset])
         .await;
 
     assert_eq!(result, vec![request_dataset]);
@@ -340,7 +340,7 @@ async fn test_get_all_downstream_dependencies() {
     // should return dependency and itself at the end
     let request_dataset = "test-derive-foo-foo-foo-bar-foo";
     let result = harness
-        .get_all_downstream_dependencies(vec![request_dataset])
+        .get_recursive_downstream_dependencies(vec![request_dataset])
         .await;
 
     let expected_result = vec!["test-derive-foo-foo-foo-bar-foo-bar", request_dataset];
@@ -348,7 +348,7 @@ async fn test_get_all_downstream_dependencies() {
 
     let request_dataset = "test-derive-baz-baz-foo";
     let result = harness
-        .get_all_downstream_dependencies(vec![request_dataset])
+        .get_recursive_downstream_dependencies(vec![request_dataset])
         .await;
 
     let expected_result = vec!["test-derive-baz-baz-foo-bar", request_dataset];
@@ -358,19 +358,19 @@ async fn test_get_all_downstream_dependencies() {
     // should return dependencies(from last to first) and itself at the end
     let request_dataset = "test-root-bar";
     let result = harness
-        .get_all_downstream_dependencies(vec![request_dataset])
+        .get_recursive_downstream_dependencies(vec![request_dataset])
         .await;
 
     let expected_result = vec![
-        "test-derive-bar-bar",
         "test-derive-bar-baz",
+        "test-derive-bar-bar",
         request_dataset,
     ];
     assert_eq!(result, expected_result);
 
     let request_dataset = "test-derive-baz-baz";
     let result = harness
-        .get_all_downstream_dependencies(vec![request_dataset])
+        .get_recursive_downstream_dependencies(vec![request_dataset])
         .await;
 
     let expected_result = vec![
@@ -382,7 +382,7 @@ async fn test_get_all_downstream_dependencies() {
 
     let request_dataset = "test-derive-foo-foo-foo-bar";
     let result = harness
-        .get_all_downstream_dependencies(vec![request_dataset])
+        .get_recursive_downstream_dependencies(vec![request_dataset])
         .await;
 
     let expected_result = vec![
@@ -396,7 +396,7 @@ async fn test_get_all_downstream_dependencies() {
     // should return dependencies(from last to first) and itself at the end
     let request_dataset = "test-root-baz";
     let result = harness
-        .get_all_downstream_dependencies(vec![request_dataset])
+        .get_recursive_downstream_dependencies(vec![request_dataset])
         .await;
 
     let expected_result = vec![
@@ -411,19 +411,19 @@ async fn test_get_all_downstream_dependencies() {
     // should return dependencies(from last to first) and itself at the end
     let request_dataset = "test-root-foo";
     let result = harness
-        .get_all_downstream_dependencies(vec![request_dataset])
+        .get_recursive_downstream_dependencies(vec![request_dataset])
         .await;
 
     let expected_result = vec![
+        "test-derive-foo-baz",
+        "test-derive-foo-bar",
+        "test-derive-foo-foo-bar",
+        "test-derive-foo-foo-foo-baz",
         "test-derive-foo-foo-foo-bar-foo-bar",
         "test-derive-foo-foo-foo-bar-foo",
         "test-derive-foo-foo-foo-bar",
-        "test-derive-foo-foo-foo-baz",
         "test-derive-foo-foo-foo",
-        "test-derive-foo-foo-bar",
         "test-derive-foo-foo",
-        "test-derive-foo-bar",
-        "test-derive-foo-baz",
         request_dataset,
     ];
     assert_eq!(result, expected_result);
@@ -433,12 +433,12 @@ async fn test_get_all_downstream_dependencies() {
     // at the end of each chain
     let request_datasets = vec!["test-root-bar", "test-derive-baz-baz"];
     let result = harness
-        .get_all_downstream_dependencies(request_datasets.clone())
+        .get_recursive_downstream_dependencies(request_datasets.clone())
         .await;
 
     let expected_result = vec![
-        "test-derive-bar-bar",
         "test-derive-bar-baz",
+        "test-derive-bar-bar",
         request_datasets[0],
         "test-derive-baz-baz-foo-bar",
         "test-derive-baz-baz-foo",
@@ -456,13 +456,13 @@ async fn test_get_all_downstream_dependencies() {
         "test-derive-baz-baz",
     ];
     let result = harness
-        .get_all_downstream_dependencies(request_datasets.clone())
+        .get_recursive_downstream_dependencies(request_datasets.clone())
         .await;
 
     let expected_result = vec![
-        "test-derive-baz-baz-foo-bar",
-        "test-derive-bar-bar",
+        request_datasets[0],
         "test-derive-bar-baz",
+        "test-derive-bar-bar",
         request_datasets[1],
         "test-derive-baz-baz-foo",
         request_datasets[2],
@@ -485,13 +485,13 @@ async fn test_get_all_downstream_dependencies() {
     // duplicate should be in result only once in the first chain
     let request_datasets = vec!["test-root-bar", "test-root-baz"];
     let result = harness
-        .get_all_downstream_dependencies(request_datasets.clone())
+        .get_recursive_downstream_dependencies(request_datasets.clone())
         .await;
 
     let expected_result = vec![
-        "test-derive-bar-bar",
-        "test-derive-bar-baz",
         "test-derive-multiple-bar-baz",
+        "test-derive-bar-baz",
+        "test-derive-bar-bar",
         request_datasets[0],
         "test-derive-baz-baz-foo-bar",
         "test-derive-baz-baz-foo",
@@ -501,15 +501,15 @@ async fn test_get_all_downstream_dependencies() {
     assert_eq!(result, expected_result);
 
     let request_datasets = vec!["test-derive-foo-foo-foo"];
-    let result: Vec<String> = harness
-        .get_all_downstream_dependencies(request_datasets.clone())
+    let result = harness
+        .get_recursive_downstream_dependencies(request_datasets.clone())
         .await;
 
     let expected_result = vec![
+        "test-derive-foo-foo-foo-baz",
         "test-derive-foo-foo-foo-bar-foo-bar",
         "test-derive-foo-foo-foo-bar-foo",
         "test-derive-foo-foo-foo-bar",
-        "test-derive-foo-foo-foo-baz",
         request_datasets[0],
     ];
 
@@ -517,20 +517,20 @@ async fn test_get_all_downstream_dependencies() {
 }
 
 #[test_log::test(tokio::test)]
-async fn test_get_all_upstream_dependencies() {
+async fn test_get_recursive_upstream_dependencies() {
     let harness = create_large_dataset_graph().await;
 
     // Should return only itself for root datasets
     let request_datasets = vec!["test-root-foo"];
     let result = harness
-        .get_all_upstream_dependencies(request_datasets.clone())
+        .get_recursive_upstream_dependencies(request_datasets.clone())
         .await;
 
     assert_eq!(result, request_datasets);
 
     let request_datasets = vec!["test-root-foo", "test-root-bar", "test-root-baz"];
     let result = harness
-        .get_all_upstream_dependencies(request_datasets.clone())
+        .get_recursive_upstream_dependencies(request_datasets.clone())
         .await;
 
     assert_eq!(result, request_datasets);
@@ -539,22 +539,22 @@ async fn test_get_all_upstream_dependencies() {
     // one of outcoming node
     let request_datasets = vec!["test-root-foo", "test-derive-foo-foo"];
     let result = harness
-        .get_all_upstream_dependencies(request_datasets.clone())
+        .get_recursive_upstream_dependencies(request_datasets.clone())
         .await;
 
     assert_eq!(result, request_datasets);
 
     let request_datasets = vec!["test-root-bar", "test-derive-foo-foo"];
     let result = harness
-        .get_all_upstream_dependencies(request_datasets.clone())
+        .get_recursive_upstream_dependencies(request_datasets.clone())
         .await;
     let expected_result = vec![request_datasets[0], request_datasets[1], "test-root-foo"];
 
     assert_eq!(result, expected_result);
 
     let request_datasets = vec!["test-root-foo", "test-derive-foo-foo-foo-bar-foo-bar"];
-    let result: Vec<String> = harness
-        .get_all_upstream_dependencies(request_datasets.clone())
+    let result = harness
+        .get_recursive_upstream_dependencies(request_datasets.clone())
         .await;
 
     let expected_result = vec![
@@ -703,7 +703,7 @@ impl DependencyGraphHarness {
         res
     }
 
-    async fn get_all_downstream_dependencies(&self, dataset_names: Vec<&str>) -> Vec<String> {
+    async fn get_recursive_downstream_dependencies(&self, dataset_names: Vec<&str>) -> Vec<String> {
         let dataset_ids: Vec<_> = future::join_all(
             dataset_names
                 .iter()
@@ -713,7 +713,7 @@ impl DependencyGraphHarness {
 
         let downstream_dataset_ids: Vec<_> = self
             .dependency_graph_service
-            .get_all_downstream_dependencies(dataset_ids)
+            .get_recursive_downstream_dependencies(dataset_ids)
             .await
             .int_err()
             .unwrap()
@@ -729,7 +729,7 @@ impl DependencyGraphHarness {
         res
     }
 
-    async fn get_all_upstream_dependencies(&self, dataset_names: Vec<&str>) -> Vec<String> {
+    async fn get_recursive_upstream_dependencies(&self, dataset_names: Vec<&str>) -> Vec<String> {
         let dataset_ids: Vec<_> = future::join_all(
             dataset_names
                 .iter()
@@ -737,9 +737,9 @@ impl DependencyGraphHarness {
         )
         .await;
 
-        let downstream_dataset_ids: Vec<_> = self
+        let upstream_dataset_ids: Vec<_> = self
             .dependency_graph_service
-            .get_all_upstream_dependencies(dataset_ids)
+            .get_recursive_upstream_dependencies(dataset_ids)
             .await
             .int_err()
             .unwrap()
@@ -747,8 +747,8 @@ impl DependencyGraphHarness {
             .await;
 
         let mut res = Vec::new();
-        for downstream_dataset_id in downstream_dataset_ids {
-            let dataset_alias = self.dataset_alias_by_id(&downstream_dataset_id).await;
+        for upstream_dataset_id in upstream_dataset_ids {
+            let dataset_alias = self.dataset_alias_by_id(&upstream_dataset_id).await;
             res.push(format!("{dataset_alias}"));
         }
 

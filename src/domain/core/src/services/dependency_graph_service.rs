@@ -29,27 +29,37 @@ pub trait DependencyGraphService: Sync + Send {
     async fn get_downstream_dependencies(
         &self,
         dataset_id: &DatasetID,
-    ) -> Result<DatasetIDStream, GetDownstreamDependenciesError>;
+    ) -> Result<DatasetIDStream, GetDependenciesError>;
 
     /// Iterates over 1st level of dataset's upstream dependencies
     async fn get_upstream_dependencies(
         &self,
         dataset_id: &DatasetID,
-    ) -> Result<DatasetIDStream, GetUpstreamDependenciesError>;
+    ) -> Result<DatasetIDStream, GetDependenciesError>;
 
     /// Iterates over all levels of dataset's upstream dependencies
     /// and return result including passed parameters
-    async fn get_all_upstream_dependencies(
+    async fn get_recursive_upstream_dependencies(
         &self,
         dataset_ids: Vec<DatasetID>,
-    ) -> Result<DatasetIDStream, GetUpstreamDependenciesError>;
+    ) -> Result<DatasetIDStream, GetDependenciesError>;
 
     /// Iterates over all levels of dataset's downstream dependencies
     /// and return result including passed parameters
-    async fn get_all_downstream_dependencies(
+    async fn get_recursive_downstream_dependencies(
         &self,
         dataset_ids: Vec<DatasetID>,
-    ) -> Result<DatasetIDStream, GetDownstreamDependenciesError>;
+    ) -> Result<DatasetIDStream, GetDependenciesError>;
+
+    async fn run_recursive_depth_first_search(
+        &self,
+        dataset_ids: Vec<DatasetID>,
+    ) -> Result<Vec<DatasetID>, GetDependenciesError>;
+
+    async fn run_recursive_breadth_first_search(
+        &self,
+        dataset_ids: Vec<DatasetID>,
+    ) -> Result<Vec<DatasetID>, GetDependenciesError>;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -59,16 +69,7 @@ pub type DatasetIDStream<'a> = std::pin::Pin<Box<dyn Stream<Item = DatasetID> + 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
-pub enum GetDownstreamDependenciesError {
-    #[error(transparent)]
-    Internal(InternalError),
-
-    #[error(transparent)]
-    DatasetNotFound(#[from] DatasetNodeNotFoundError),
-}
-
-#[derive(Error, Debug)]
-pub enum GetUpstreamDependenciesError {
+pub enum GetDependenciesError {
     #[error(transparent)]
     Internal(InternalError),
 

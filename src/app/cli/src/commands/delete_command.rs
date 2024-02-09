@@ -56,7 +56,7 @@ impl Command for DeleteCommand {
         }
 
         let dataset_refs: Vec<_> = if self.all {
-            unimplemented!("Recursive deletion is not yet supported")
+            unimplemented!("All deletion is not yet supported")
         } else {
             let dataset_ids: Vec<_> = filter_datasets_by_pattern(
                 self.dataset_repo.as_ref(),
@@ -68,7 +68,7 @@ impl Command for DeleteCommand {
 
             if self.recursive {
                 self.dependency_graph_service
-                    .get_all_downstream_dependencies(dataset_ids)
+                    .get_recursive_downstream_dependencies(dataset_ids)
                     .await
                     .int_err()?
                     .map(DatasetRef::ID)
@@ -105,7 +105,7 @@ impl Command for DeleteCommand {
             common::prompt_yes_no(&format!(
                 "{}: {}\n{}\nDo you wish to continue? [y/N]: ",
                 console::style("You are about to delete following dataset(s)").yellow(),
-                dataset_aliases.join(", "),
+                dataset_aliases.join("\n"),
                 console::style("This operation is irreversible!").yellow(),
             ))
         };

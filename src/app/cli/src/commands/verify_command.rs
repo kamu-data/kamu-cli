@@ -92,7 +92,7 @@ impl VerifyCommand {
 
         let requests: Vec<_> = if self.recursive {
             self.dependency_graph_service
-                .get_all_upstream_dependencies(dataset_ids)
+                .get_recursive_upstream_dependencies(dataset_ids)
                 .await
                 .int_err()?
                 .map(|dataset_id| VerificationRequest {
