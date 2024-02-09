@@ -71,7 +71,7 @@ async fn test_task_get_non_existing() {
 async fn test_task_get_existing() {
     let returned_task = TaskState {
         task_id: TaskID::new(123),
-        status: TaskStatus::Finished(TaskOutcome::Success),
+        status: TaskStatus::Finished(TaskOutcome::Success(TaskResult::Empty)),
         cancellation_requested: false,
         logical_plan: LogicalPlan::UpdateDataset(UpdateDataset {
             dataset_id: DatasetID::new_seeded_ed25519(b"foo"),

@@ -217,10 +217,8 @@ impl FlowEventStoreInMem {
                 .expect("Previously unseen flow ID")
                 .flow_status = new_status;
 
-            // Record last succeeded flows
-            if let FlowEvent::TaskFinished(e) = &event
-                && e.task_outcome == TaskOutcome::Success
-            {
+            // Record last attempted/succeeded flows
+            if let FlowEvent::TaskFinished(e) = &event {
                 let flow_key = state
                     .flow_key_by_flow_id
                     .get(&e.flow_id)
@@ -228,7 +226,7 @@ impl FlowEventStoreInMem {
 
                 let new_run_stats = FlowRunStats {
                     last_attempt_time: Some(e.event_time),
-                    last_success_time: if e.task_outcome == TaskOutcome::Success {
+                    last_success_time: if let TaskOutcome::Success(_) = &e.task_outcome {
                         Some(e.event_time)
                     } else {
                         None

@@ -446,7 +446,7 @@ impl FlowServiceInMemory {
                     SystemFlowType::GC => LogicalPlan::Probe(Probe {
                         dataset_id: None,
                         busy_time: Some(std::time::Duration::from_secs(20)),
-                        end_with_outcome: Some(TaskOutcome::Success),
+                        end_with_outcome: Some(TaskOutcome::Success(TaskResult::Empty)),
                     }),
                 }
             }
@@ -826,13 +826,13 @@ impl AsyncEventHandler<TaskEventFinished> for FlowServiceInMemory {
             let mut flow = Flow::load(flow_id, self.flow_event_store.as_ref())
                 .await
                 .int_err()?;
-            flow.on_task_finished(finish_time, event.task_id, event.outcome)
+            flow.on_task_finished(finish_time, event.task_id, event.outcome.clone())
                 .int_err()?;
             flow.save(self.flow_event_store.as_ref()).await.int_err()?;
 
             // In case of success:
             //  - enqueue updates of dependent datasets
-            if event.outcome == TaskOutcome::Success
+            if let TaskOutcome::Success(_) = &event.outcome
                 && let FlowKey::Dataset(flow_key) = &flow.flow_key
                 && flow_key.flow_type.is_dataset_update()
             {
@@ -853,7 +853,7 @@ impl AsyncEventHandler<TaskEventFinished> for FlowServiceInMemory {
 
             // In case of success:
             //  - enqueue next auto-polling flow cycle
-            if event.outcome == TaskOutcome::Success {
+            if let TaskOutcome::Success(_) = &event.outcome {
                 self.try_enqueue_scheduled_auto_polling_flow_if_enabled(
                     finish_time,
                     &flow.flow_key,

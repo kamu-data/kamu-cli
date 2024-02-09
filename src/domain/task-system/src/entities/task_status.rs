@@ -9,7 +9,9 @@
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+use kamu_core::PullResult;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TaskStatus {
     /// Task is waiting for capacity to be allocated to it
     Queued,
@@ -21,16 +23,24 @@ pub enum TaskStatus {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TaskOutcome {
     /// Task succeeded
-    Success,
+    Success(TaskResult),
     /// Task failed to complete
     Failed,
     /// Task was cancelled by a user
     Cancelled,
     // /// Task was dropped in favor of another task
     // Replaced(TaskID),
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TaskResult {
+    Empty,
+    PullResult(Box<PullResult>),
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

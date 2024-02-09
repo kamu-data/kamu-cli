@@ -50,7 +50,7 @@ use kamu_flow_system_inmem::{
     FlowEventStoreInMem,
     FlowServiceInMemory,
 };
-use kamu_task_system::{TaskEventFinished, TaskEventRunning, TaskID, TaskOutcome};
+use kamu_task_system::{TaskEventFinished, TaskEventRunning, TaskID, TaskOutcome, TaskResult};
 use kamu_task_system_inmem::{TaskSchedulerInMemory, TaskSystemEventStoreInMemory};
 use opendatafabric::{DatasetID, DatasetKind, FAKE_ACCOUNT_ID};
 
@@ -1489,7 +1489,7 @@ impl FlowRunsHarness {
             .dispatch_event(TaskEventFinished {
                 event_time: Utc::now(),
                 task_id,
-                outcome: TaskOutcome::Success,
+                outcome: TaskOutcome::Success(TaskResult::Empty),
             })
             .await
             .unwrap();

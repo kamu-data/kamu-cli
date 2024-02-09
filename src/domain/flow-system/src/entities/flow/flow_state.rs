@@ -170,7 +170,7 @@ impl Projection for FlowState {
                             Ok(s)
                         } else {
                             match task_outcome {
-                                TaskOutcome::Success => Ok(FlowState {
+                                TaskOutcome::Success(_) => Ok(FlowState {
                                     outcome: Some(FlowOutcome::Success),
                                     timing: FlowTimingRecords {
                                         finished_at: Some(*event_time),

@@ -67,7 +67,7 @@ async fn test_read_initial_config_and_queue_without_waiting() {
                     task_id: TaskID::new(0),
                     dataset_id: Some(foo_id.clone()),
                     run_since_start: Duration::milliseconds(10),
-                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success)),
+                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
                 });
                 let foo_task0_handle = foo_task0_driver.run();
 
@@ -76,7 +76,7 @@ async fn test_read_initial_config_and_queue_without_waiting() {
                     task_id: TaskID::new(1),
                     dataset_id: Some(foo_id.clone()),
                     run_since_start: Duration::milliseconds(90),
-                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success)),
+                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
                 });
                 let foo_task1_handle = foo_task1_driver.run();
 
@@ -179,7 +179,7 @@ async fn test_cron_config() {
                     task_id: TaskID::new(0),
                     dataset_id: Some(foo_id.clone()),
                     run_since_start: Duration::seconds(6),
-                    finish_in_with: Some((Duration::seconds(1), TaskOutcome::Success)),
+                    finish_in_with: Some((Duration::seconds(1), TaskOutcome::Success(TaskResult::Empty))),
                 });
                 let foo_task0_handle = foo_task0_driver.run();
 
@@ -269,7 +269,7 @@ async fn test_manual_trigger() {
                     task_id: TaskID::new(0),
                     dataset_id: Some(foo_id.clone()),
                     run_since_start: Duration::milliseconds(10),
-                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success)),
+                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
                 });
                 let task0_handle = task0_driver.run();
 
@@ -278,7 +278,7 @@ async fn test_manual_trigger() {
                     task_id: TaskID::new(1),
                     dataset_id: Some(foo_id.clone()),
                     run_since_start: Duration::milliseconds(60),
-                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success)),
+                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
                 });
                 let task1_handle = task1_driver.run();
 
@@ -287,7 +287,7 @@ async fn test_manual_trigger() {
                     task_id: TaskID::new(2),
                     dataset_id: Some(bar_id.clone()),
                     run_since_start: Duration::milliseconds(100),
-                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success)),
+                    finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
                 });
                 let task2_handle = task2_driver.run();
 
@@ -456,7 +456,7 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
                 task_id: TaskID::new(0),
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::milliseconds(10),
-                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success)),
+                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
             });
             let task0_handle = task0_driver.run();
 
@@ -465,7 +465,7 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
                 task_id: TaskID::new(1),
                 dataset_id: Some(bar_id.clone()),
                 run_since_start: Duration::milliseconds(20),
-                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success)),
+                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
             });
             let task1_handle = task1_driver.run();
 
@@ -651,7 +651,7 @@ async fn test_respect_last_success_time_when_schedule_resumes() {
               task_id: TaskID::new(0),
               dataset_id: Some(foo_id.clone()),
               run_since_start: Duration::milliseconds(10),
-              finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success)),
+              finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
           });
           let task0_handle = task0_driver.run();
 
@@ -660,7 +660,7 @@ async fn test_respect_last_success_time_when_schedule_resumes() {
               task_id: TaskID::new(1),
               dataset_id: Some(bar_id.clone()),
               run_since_start: Duration::milliseconds(20),
-              finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success)),
+              finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
           });
           let task1_handle = task1_driver.run();
 
@@ -844,7 +844,7 @@ async fn test_dataset_deleted() {
                 task_id: TaskID::new(0),
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::milliseconds(10),
-                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success)),
+                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
             });
             let task0_handle = task0_driver.run();
 
@@ -853,7 +853,7 @@ async fn test_dataset_deleted() {
                 task_id: TaskID::new(1),
                 dataset_id: Some(bar_id.clone()),
                 run_since_start: Duration::milliseconds(20),
-                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success)),
+                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
             });
             let task1_handle = task1_driver.run();
 
@@ -1012,7 +1012,7 @@ async fn test_task_completions_trigger_next_loop_on_success() {
                 task_id: TaskID::new(0),
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::milliseconds(10),
-                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success)),
+                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
             });
             let task0_handle = task0_driver.run();
 
@@ -1205,7 +1205,7 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
                 task_id: TaskID::new(0),
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::milliseconds(10),
-                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success)),
+                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
             });
             let task0_handle = task0_driver.run();
 
@@ -1214,7 +1214,7 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
                 task_id: TaskID::new(1),
                 dataset_id: Some(bar_id.clone()),
                 run_since_start: Duration::milliseconds(20),
-                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success)),
+                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
             });
             let task1_handle = task1_driver.run();
 
@@ -1223,7 +1223,7 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
                 task_id: TaskID::new(2),
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::milliseconds(110),
-                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success)),
+                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
             });
             let task2_handle = task2_driver.run();
 
@@ -1232,7 +1232,7 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
                 task_id: TaskID::new(3),
                 dataset_id: Some(bar_id.clone()),
                 run_since_start: Duration::milliseconds(130),
-                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success)),
+                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
             });
             let task3_handle = task3_driver.run();
 
@@ -1414,7 +1414,7 @@ async fn test_throttling_manual_triggers() {
           task_id: TaskID::new(0),
           dataset_id: Some(foo_id.clone()),
           run_since_start: Duration::milliseconds(40),
-          finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success)),
+          finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
         });
         let task0_handle = task0_driver.run();
 
@@ -1537,7 +1537,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
           task_id: TaskID::new(0),
           dataset_id: Some(foo_id.clone()),
           run_since_start: Duration::milliseconds(10),
-          finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success)),
+          finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
         });
         let task0_handle = task0_driver.run();
 
@@ -1546,7 +1546,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
           task_id: TaskID::new(1),
           dataset_id: Some(bar_id.clone()),
           run_since_start: Duration::milliseconds(20),
-          finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success)),
+          finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
         });
         let task1_handle = task1_driver.run();
 
@@ -1555,7 +1555,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
           task_id: TaskID::new(2),
           dataset_id: Some(baz_id.clone()),
           run_since_start: Duration::milliseconds(30),
-          finish_in_with: Some((Duration::milliseconds(20), TaskOutcome::Success)),
+          finish_in_with: Some((Duration::milliseconds(20), TaskOutcome::Success(TaskResult::Empty))),
         });
         let task2_handle = task2_driver.run();
 
@@ -1564,7 +1564,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
           task_id: TaskID::new(3),
           dataset_id: Some(foo_id.clone()),
           run_since_start: Duration::milliseconds(130),
-          finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success)),
+          finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
         });
         let task3_handle = task3_driver.run();
 
@@ -1573,7 +1573,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
           task_id: TaskID::new(4),
           dataset_id: Some(baz_id.clone()),
           run_since_start: Duration::milliseconds(160),
-          finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success)),
+          finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
         });
         let task4_handle = task4_driver.run();
 
@@ -1582,7 +1582,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
           task_id: TaskID::new(5),
           dataset_id: Some(bar_id.clone()),
           run_since_start: Duration::milliseconds(190),
-          finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success)),
+          finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
         });
         let task5_handle = task5_driver.run();
 
