@@ -112,7 +112,8 @@ impl QueryServiceImpl {
                     dataset
                         .as_data_repo()
                         .get_internal_url(
-                            &Multihash::new(Multicodec::Arrow0_Sha3_256, &schema).unwrap())
+                            &Multihash::new(Multicodec::Arrow0_Sha3_256, &schema).unwrap(),
+                        )
                         .await,
                 );
 
