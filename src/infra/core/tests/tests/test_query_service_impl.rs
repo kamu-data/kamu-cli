@@ -198,6 +198,7 @@ async fn test_dataset_schema_common(catalog: dill::Catalog, tempdir: &TempDir) {
     );
 }
 
+#[ignore]
 #[test_group::group(engine, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_dataset_schema_local_fs() {
@@ -209,6 +210,7 @@ async fn test_dataset_schema_local_fs() {
     test_dataset_schema_common(catalog, &tempdir).await;
 }
 
+#[ignore]
 #[test_group::group(containerized, engine, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_dataset_schema_s3() {

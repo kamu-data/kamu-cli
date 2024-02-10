@@ -95,8 +95,7 @@ impl QueryServiceImpl {
         let last_data_slice_opt = dataset
             .as_metadata_chain()
             .iter_blocks()
-            .filter_data_stream_blocks()
-            .filter_map_ok(|(_, b)| b.event.new_data)
+            .filter_map_ok(|(_, b)| b.event.into_variant::<SetDataSchema>())
             .try_first()
             .await
             .map_err(|e| {
@@ -108,10 +107,12 @@ impl QueryServiceImpl {
         match last_data_slice_opt {
             Some(last_data_slice) => {
                 // TODO: Avoid boxing url - requires datafusion to fix API
+                let schema = last_data_slice.schema;
                 let data_url = Box::new(
                     dataset
                         .as_data_repo()
-                        .get_internal_url(&last_data_slice.physical_hash)
+                        .get_internal_url(
+                            &Multihash::new(Multicodec::Arrow0_Sha3_256, &schema).unwrap())
                         .await,
                 );
 
