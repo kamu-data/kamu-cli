@@ -107,10 +107,33 @@ impl Schedule {
         }
     }
 
-    pub fn next_activation_time(&self, now: DateTime<Utc>) -> Option<DateTime<Utc>> {
+    pub fn next_activation_time(
+        &self,
+        now: DateTime<Utc>,
+        maybe_last_success_time: Option<DateTime<Utc>>,
+    ) -> DateTime<Utc> {
         match self {
-            Schedule::TimeDelta(td) => Some(now + td.every),
-            Schedule::Cron(ce) => ce.cron_schedule.upcoming(Utc).next(),
+            // For TimeDelta, take last activation time into account, if any recorded.
+            // If we know the last run was long time ago or even never happened - no need to wait.
+            Schedule::TimeDelta(td) => {
+                if let Some(last_success_time) = maybe_last_success_time {
+                    let planned_activation_time = last_success_time + td.every;
+                    if planned_activation_time < now {
+                        now
+                    } else {
+                        planned_activation_time
+                    }
+                } else {
+                    now
+                }
+            }
+            // CRON expressions do not care of current or last activation time,
+            // they always pick next by the CRON expression
+            Schedule::Cron(ce) => ce
+                .cron_schedule
+                .after(&now)
+                .next()
+                .expect("CRON expressions we allow should never expire"),
         }
     }
 }
@@ -134,7 +157,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_validate_invalid_expression() {
+    fn test_validate_invalid_cron_expression() {
         // Try to pass invalid cron expression
         let invalid_cron_expression = "invalid".to_string();
         let err_result =
@@ -147,7 +170,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_next_time_from_expression() {
+    fn test_get_next_time_from_cron_expression() {
         let schedule = Schedule::try_from_5component_cron_expression("0 0 1 JAN ?").unwrap();
 
         let current_year = Utc::now().year();
@@ -155,7 +178,7 @@ mod tests {
             .with_ymd_and_hms(current_year + 1, 1, 1, 0, 0, 0)
             .unwrap();
 
-        let next_time = schedule.next_activation_time(Utc::now()).unwrap();
+        let next_time = schedule.next_activation_time(Utc::now(), None);
         assert_eq!(next_time, expected_time);
     }
 

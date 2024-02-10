@@ -26,6 +26,7 @@ use kamu::{
     ObjectStoreRegistryImpl,
     PollingIngestServiceImpl,
 };
+use kamu_core::auth::DEFAULT_ACCOUNT_NAME;
 use kamu_core::{
     auth,
     CreateDatasetResult,
@@ -256,6 +257,431 @@ async fn test_trigger_execute_transform_derived_dataset() {
                                     "hasNextPage": false,
                                     "currentPage": 0,
                                     "totalPages": 1,
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_list_flows_with_filters_and_pagination() {
+    let harness = FlowRunsHarness::new();
+    let create_result = harness.create_root_dataset().await;
+
+    let ingest_mutation_code =
+        FlowRunsHarness::trigger_flow_mutation(&create_result.dataset_handle.id, "INGEST");
+    let compaction_mutation_code =
+        FlowRunsHarness::trigger_flow_mutation(&create_result.dataset_handle.id, "COMPACTION");
+
+    let schema = kamu_adapter_graphql::schema_quiet();
+
+    let response = schema
+        .execute(
+            async_graphql::Request::new(ingest_mutation_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+    assert!(response.is_ok(), "{response:?}");
+
+    let response = schema
+        .execute(
+            async_graphql::Request::new(compaction_mutation_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+    assert!(response.is_ok(), "{response:?}");
+
+    // Pure listing
+
+    let request_code = indoc!(
+        r#"
+        {
+            datasets {
+                byId (datasetId: "<id>") {
+                    flows {
+                        runs {
+                            listFlows {
+                                nodes {
+                                    flowId
+                                }
+                                pageInfo {
+                                    currentPage
+                                    totalPages
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        "#
+    )
+    .replace("<id>", &create_result.dataset_handle.id.to_string());
+
+    let response = schema
+        .execute(async_graphql::Request::new(request_code).data(harness.catalog_authorized.clone()))
+        .await;
+
+    assert!(response.is_ok(), "{response:?}");
+    assert_eq!(
+        response.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "flows": {
+                        "runs": {
+                            "listFlows": {
+                                "nodes": [
+                                    {
+                                        "flowId": "1",
+                                    },
+                                    {
+                                        "flowId": "0",
+                                    }
+                                ],
+                                "pageInfo": {
+                                    "currentPage": 0,
+                                    "totalPages": 1,
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+
+    // Split on 2 pages by 1 element
+
+    let request_code = indoc!(
+        r#"
+        {
+            datasets {
+                byId (datasetId: "<id>") {
+                    flows {
+                        runs {
+                            listFlows(perPage: 1, page: 1) {
+                                nodes {
+                                    flowId
+                                }
+                                pageInfo {
+                                    currentPage
+                                    totalPages
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        "#
+    )
+    .replace("<id>", &create_result.dataset_handle.id.to_string());
+
+    let response = schema
+        .execute(async_graphql::Request::new(request_code).data(harness.catalog_authorized.clone()))
+        .await;
+
+    assert!(response.is_ok(), "{response:?}");
+    assert_eq!(
+        response.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "flows": {
+                        "runs": {
+                            "listFlows": {
+                                "nodes": [
+                                    {
+                                        "flowId": "0",
+                                    }
+                                ],
+                                "pageInfo": {
+                                    "currentPage": 1,
+                                    "totalPages": 2,
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+
+    // Filter by flow type
+
+    let request_code = indoc!(
+        r#"
+        {
+            datasets {
+                byId (datasetId: "<id>") {
+                    flows {
+                        runs {
+                            listFlows(
+                                filters: {
+                                    byFlowType: "COMPACTION"
+                                }
+                            ) {
+                                nodes {
+                                    flowId
+                                }
+                                pageInfo {
+                                    currentPage
+                                    totalPages
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        "#
+    )
+    .replace("<id>", &create_result.dataset_handle.id.to_string());
+
+    let response = schema
+        .execute(async_graphql::Request::new(request_code).data(harness.catalog_authorized.clone()))
+        .await;
+
+    assert!(response.is_ok(), "{response:?}");
+    assert_eq!(
+        response.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "flows": {
+                        "runs": {
+                            "listFlows": {
+                                "nodes": [
+                                    {
+                                        "flowId": "1",
+                                    }
+                                ],
+                                "pageInfo": {
+                                    "currentPage": 0,
+                                    "totalPages": 1,
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+
+    // Filter by flow status
+
+    let request_code = indoc!(
+        r#"
+        {
+            datasets {
+                byId (datasetId: "<id>") {
+                    flows {
+                        runs {
+                            listFlows(
+                                filters: {
+                                    byStatus: "QUEUED"
+                                }
+                            ) {
+                                nodes {
+                                    flowId
+                                }
+                                pageInfo {
+                                    currentPage
+                                    totalPages
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        "#
+    )
+    .replace("<id>", &create_result.dataset_handle.id.to_string());
+
+    let response = schema
+        .execute(
+            async_graphql::Request::new(request_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(response.is_ok(), "{response:?}");
+    assert_eq!(
+        response.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "flows": {
+                        "runs": {
+                            "listFlows": {
+                                "nodes": [
+                                    {
+                                        "flowId": "1",
+                                    },
+                                    {
+                                        "flowId": "0",
+                                    }
+                                ],
+                                "pageInfo": {
+                                    "currentPage": 0,
+                                    "totalPages": 1,
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+
+    let request_code = request_code.replace("QUEUED", "SCHEDULED");
+
+    let response = schema
+        .execute(async_graphql::Request::new(request_code).data(harness.catalog_authorized.clone()))
+        .await;
+
+    assert!(response.is_ok(), "{response:?}");
+    assert_eq!(
+        response.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "flows": {
+                        "runs": {
+                            "listFlows": {
+                                "nodes": [],
+                                "pageInfo": {
+                                    "currentPage": 0,
+                                    "totalPages": 0,
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+
+    // Filter by initiator
+
+    let request_code = indoc!(
+        r#"
+    {
+        datasets {
+            byId (datasetId: "<id>") {
+                flows {
+                    runs {
+                        listFlows(
+                            filters: {
+                                byInitiator: { account: "<account_name>"}
+                            }
+                        ) {
+                            nodes {
+                                flowId
+                            }
+                            pageInfo {
+                                currentPage
+                                totalPages
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    "#
+    )
+    .replace("<id>", &create_result.dataset_handle.id.to_string())
+    .replace("<account_name>", DEFAULT_ACCOUNT_NAME);
+
+    let response = schema
+        .execute(async_graphql::Request::new(request_code).data(harness.catalog_authorized.clone()))
+        .await;
+
+    assert!(response.is_ok(), "{response:?}");
+    assert_eq!(
+        response.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "flows": {
+                        "runs": {
+                            "listFlows": {
+                                "nodes": [
+                                    {
+                                        "flowId": "1",
+                                    },
+                                    {
+                                        "flowId": "0",
+                                    }
+                                ],
+                                "pageInfo": {
+                                    "currentPage": 0,
+                                    "totalPages": 1,
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+
+    let request_code = indoc!(
+        r#"
+    {
+        datasets {
+            byId (datasetId: "<id>") {
+                flows {
+                    runs {
+                        listFlows(
+                            filters: {
+                                byInitiator: { system: true}
+                            }
+                        ) {
+                            nodes {
+                                flowId
+                            }
+                            pageInfo {
+                                currentPage
+                                totalPages
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    "#
+    )
+    .replace("<id>", &create_result.dataset_handle.id.to_string())
+    .replace("<account_name>", DEFAULT_ACCOUNT_NAME);
+
+    let response = schema
+        .execute(async_graphql::Request::new(request_code).data(harness.catalog_authorized.clone()))
+        .await;
+
+    assert!(response.is_ok(), "{response:?}");
+    assert_eq!(
+        response.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "flows": {
+                        "runs": {
+                            "listFlows": {
+                                "nodes": [],
+                                "pageInfo": {
+                                    "currentPage": 0,
+                                    "totalPages": 0,
                                 }
                             }
                         }
@@ -940,7 +1366,10 @@ impl FlowRunsHarness {
             .add::<FlowConfigurationEventStoreInMem>()
             .add::<FlowServiceInMemory>()
             .add::<FlowEventStoreInMem>()
-            .add_value(FlowServiceRunConfig::new(chrono::Duration::seconds(1)))
+            .add_value(FlowServiceRunConfig::new(
+                chrono::Duration::seconds(1),
+                chrono::Duration::minutes(1),
+            ))
             .add::<TaskSchedulerInMemory>()
             .add::<TaskSystemEventStoreInMemory>()
             .add::<DataFormatRegistryImpl>()

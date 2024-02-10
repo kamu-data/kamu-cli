@@ -51,7 +51,7 @@ pub struct DatasetPullMetadataRequest {}
 /// Pull stage 1: metadata update response
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct DatasetMetadataPullResponse {
-    pub blocks: ObjectsBatch,
+    pub blocks: MetadataBlocksBatch,
 }
 
 /// Pull stage 2: object transfer request
@@ -112,7 +112,7 @@ pub struct DatasetPushInvalidHeadError {
 /// Push phase 1: push metadata request
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct DatasetPushMetadataRequest {
-    pub new_blocks: ObjectsBatch,
+    pub new_blocks: MetadataBlocksBatch,
 }
 
 /// Push phase 1: push metadata accepted
@@ -176,11 +176,10 @@ pub struct DatasetPushComplete {}
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct DatasetPushCompleteConfirmed {}
 
-/// Packed object batch
+/// Packed metadata blocks batch
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
-pub struct ObjectsBatch {
-    pub objects_count: u32,
-    pub object_type: ObjectType,
+pub struct MetadataBlocksBatch {
+    pub num_blocks: u32,
     pub media_type: String,
     pub encoding: String,
     pub payload: Vec<u8>,
@@ -206,7 +205,6 @@ pub struct ObjectFileReference {
 // Object type enumeration
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub enum ObjectType {
-    MetadataBlock,
     DataSlice,
     Checkpoint,
 }

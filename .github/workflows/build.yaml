@@ -47,74 +47,79 @@ jobs:
       - run: cargo install cargo-deny
       - run: cargo deny check
 
-  test_linux:
-    name: Test / Linux
-    runs-on: ubuntu-latest
-    env:
-      CARGO_FLAGS: --profile ci --features ftp
-      NEXTEST_FLAGS: --cargo-profile ci --features ftp
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux / amd64
+            runs-on: ubuntu-latest
+            cargo-flags: --profile ci --features ftp
+            nextest-flags: --cargo-profile ci --features ftp
+            container-runtime: podman
+            ipfs: true
+          # TODO: Not running docker as it takes ~7 minutes to install
+          # See: https://github.com/actions/runner/issues/1456
+          - name: MacOS / amd64
+            runs-on: macos-13
+            cargo-flags: --profile ci --features ftp
+            nextest-flags: --cargo-profile ci --features ftp -E '!test(::containerized::)'
+            container-runtime: ''
+            ipfs: false
+          # TODO: M1 cannot run docker due to lack of nested virtualization
+          # See: https://github.com/marketplace/actions/setup-docker-on-macos#arm64-processors-m1-m2-m3-series-used-on-macos-14-images-are-unsupported
+          - name: MacOS / arm64
+            runs-on: macos-14
+            cargo-flags: --profile ci
+            nextest-flags: --cargo-profile ci -E '!test(::containerized::)'
+            container-runtime: ''
+            ipfs: false
+          # TODO: DataFusion tests are temporarily disabled
+          # See: https://github.com/kamu-data/kamu-cli/issues/226
+          - name: Windows / amd64
+            runs-on: windows-latest
+            cargo-flags: --profile ci
+            nextest-flags: --cargo-profile ci -E 'not (test(::containerized::) | test(::datafusion::))'
+            container-runtime: ''
+            ipfs: false
+    name: Test / ${{ matrix.name }}
+    runs-on: ${{ matrix.runs-on }}
     steps:
-      - uses: ibnesayeed/setup-ipfs@master
+      - name: Setup IPFS
+        uses: ibnesayeed/setup-ipfs@master
+        if: matrix.ipfs
         with:
           ipfs_version: "0.19"
+
       - uses: actions/checkout@v4
+
       - uses: actions-rs/toolchain@v1
+
       - uses: swatinem/rust-cache@v2
         with:
           cache-on-failure: true
+
       - name: Install cargo tools
         run: |
           cargo install --locked cargo-nextest
-      - name: Configure podman runtime
+
+      - name: Configure runtime
+        if: matrix.container-runtime != ''
         run: |
-          echo '{ "kind": "CLIConfig", "version": 1, "content": {"engine": { "runtime": "podman" } } }' > ~/.kamuconfig
-      - name: build
-        run: cargo test ${{ env.CARGO_FLAGS }} --no-run
-      - name: pull test images
-        run: cargo nextest run ${{ env.NEXTEST_FLAGS }} -E 'test(::setup::)' --no-capture
-      - name: run tests
-        run: cargo nextest run ${{ env.NEXTEST_FLAGS }}
-      - name: check git diff # Ensures all generated files are up-to-date
+          echo '{ "kind": "CLIConfig", "version": 1, "content": {"engine": { "runtime": "${{ matrix.container-runtime }}" } } }' > ~/.kamuconfig
+          echo "KAMU_CONTAINER_RUNTIME_TYPE=${{ matrix.container-runtime }}" >> $GITHUB_ENV
+
+      - name: Build
+        run: cargo test ${{ matrix.cargo-flags }} --no-run
+
+      - name: Pull test images
+        if: matrix.container-runtime != ''
+        run: cargo nextest run ${{ matrix.nextest-flags }} -E 'test(::setup::)' --no-capture
+
+      - name: Run tests
+        run: cargo nextest run ${{ matrix.nextest-flags }}
+
+      # Not running on windows due to line ending differences
+      - name: Check generated files
+        if: "!contains(matrix.runs-on, 'windows')"
         run: git diff && git diff-index --quiet HEAD
-
-  test_macos:
-    name: Test / MacOS
-    runs-on: macos-latest
-    env:
-      CARGO_FLAGS: --profile ci
-      NEXTEST_FLAGS: --cargo-profile ci -E '!test(::containerized::)'
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions-rs/toolchain@v1
-      - uses: swatinem/rust-cache@v2
-        with:
-          cache-on-failure: true
-      - name: Install cargo tools
-        run: |
-          cargo install --locked cargo-nextest
-      - name: build
-        run: cargo test ${{ env.CARGO_FLAGS }} --no-run
-      - name: run tests
-        run: cargo nextest run ${{ env.NEXTEST_FLAGS }}
-
-  test_windows:
-    name: Test / Windows
-    runs-on: windows-latest
-    env:
-      CARGO_FLAGS: --profile ci
-      # TODO: FIXME: DataFusion tests are temporarily disabled
-      # See: https://github.com/kamu-data/kamu-cli/issues/226
-      NEXTEST_FLAGS: --cargo-profile ci -E 'not (test(::containerized::) | test(::datafusion::))'
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions-rs/toolchain@v1
-      - uses: swatinem/rust-cache@v2
-        with:
-          cache-on-failure: true
-      - name: Install cargo tools
-        run: |
-          cargo install --locked cargo-nextest
-      - name: build
-        run: cargo test ${{ env.CARGO_FLAGS }} --no-run
-      - name: run tests
-        run: cargo nextest run ${{ env.NEXTEST_FLAGS }}

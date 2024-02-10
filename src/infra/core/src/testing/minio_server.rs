@@ -59,7 +59,7 @@ impl MinioServer {
 
         let container = container_runtime
             .run_attached(Self::IMAGE)
-            .container_name_prefix("kamu-test-minio-")
+            .random_container_name_with_prefix("kamu-test-minio-")
             .args(["server", "/data"])
             .expose_port(server_port)
             .volume((server_dir, "/data"))

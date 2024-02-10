@@ -270,6 +270,7 @@ pub fn configure_base_catalog(
     b.add::<kamu_flow_system_inmem::FlowServiceInMemory>();
     b.add_value(kamu_flow_system_inmem::domain::FlowServiceRunConfig::new(
         chrono::Duration::seconds(1),
+        chrono::Duration::minutes(1),
     ));
 
     b.add::<kamu_flow_system_inmem::FlowEventStoreInMem>();

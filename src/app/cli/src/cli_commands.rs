@@ -444,6 +444,7 @@ pub fn get_command(
                     cli_catalog.get_one()?,
                     cli_catalog.get_one()?,
                     workspace_svc.is_in_workspace(),
+                    workspace_svc.layout().unwrap().run_info_dir.clone(),
                 ))
             }
             Some(("ipfs", ipfs_matches)) => match ipfs_matches.subcommand() {

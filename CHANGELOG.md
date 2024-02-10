@@ -4,12 +4,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [Unreleased]
+### Fixed
+ - Modeling mistake in Smart Transfer Protocol that creates unexpected push/pull transfer path for metadata blocks
+
+## [0.156.3] - 2024-02-09
+### Added
+- Native support for `arm64` architecture (including M-series Apple silicon) in `kamu-cli` and `kamu-engine-datafusion`
+  - Note: Flink and Spark engine images still don't provide `arm64` architecture and continue to require QEMU
+### Changed
+- Flow system scheduling rules improved to respect system-wide throttling setting and take last successful run into account when rescheduling a flow or after a restart
+
+## [0.156.2] - 2024-02-07
+### Changed
+- Using unique container and network names to prevent collisions when running concurrent `kamu` processes
+- Improved error handling for all subprocesses
+
+## [0.156.1] - 2024-02-05
+### Fixed
+- Pausing dataset flow configuration via the dedicated API should have impact on the currently running flow
+
+## [0.156.0] - 2024-02-03
 ### Added
 - New type `DatasetRefPattern` which allows CLI command to accept global pattern
 - New GraphQL APIs for quick pausing/resuming of dataset flow configs preserving the scheduling rules
+- New GraphQL APIs for server-side filtering of flow listings (by type, by status, and by initiator)
 ### Changed
 - `kamu deleted` and `kamu verify` now accepts global pattern expression
+- Error handling for pipe subprocesses with file output
+- Pagination implementation made more efficient for flows and tasks event stores
 
 ## [0.155.0] - 2024-01-25
 ### Added

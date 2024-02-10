@@ -131,7 +131,8 @@ impl Command for NotebookCommand {
                 },
                 || eprintln!("{}", s("Shutting down").yellow()),
             )
-            .await?;
+            .await
+            .int_err()?;
         Ok(())
     }
 }

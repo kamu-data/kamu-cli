@@ -176,7 +176,7 @@ impl AxumServerPullProtocolInstance {
                 .int_err()?;
 
                 tracing::debug!(
-                    num_blocks = % metadata_batch.objects_count,
+                    num_blocks = % metadata_batch.num_blocks,
                     payload_size = % metadata_batch.payload.len(),
                     "Metadata batch of blocks formed",
                 );

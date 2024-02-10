@@ -394,7 +394,7 @@ async fn do_test_sync(
             .await,
             Err(SyncError::Corrupted(CorruptedSourceError {
                 message,
-                source: _
+                ..
             })) if message == *"Source checkpoint file is missing"
         );
     }

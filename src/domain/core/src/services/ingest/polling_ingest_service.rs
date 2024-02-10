@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::backtrace::Backtrace;
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
@@ -15,7 +16,7 @@ use container_runtime::ImagePullError;
 use opendatafabric::*;
 use thiserror::Error;
 
-use crate::engine::{EngineError, ProcessError};
+use crate::engine::{normalize_logs, EngineError, ProcessError};
 use crate::*;
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -210,12 +211,12 @@ pub enum PollingIngestError {
         ProcessError,
     ),
 
-    #[error("Pipe command error: {command:?} {source}")]
-    PipeError {
-        command: Vec<String>,
-        source: BoxedError,
-        backtrace: Backtrace,
-    },
+    #[error(transparent)]
+    PipeError(
+        #[from]
+        #[backtrace]
+        PipeError,
+    ),
 
     #[error(transparent)]
     ReadError(
@@ -320,12 +321,46 @@ impl PollingIngestError {
             source,
         }
     }
+}
 
-    pub fn pipe(command: Vec<String>, e: impl std::error::Error + Send + Sync + 'static) -> Self {
-        Self::PipeError {
-            command,
+//////////////////////////////////////////////////////////
+
+#[derive(Debug, Error)]
+pub struct PipeError {
+    commands: Vec<String>,
+    source: BoxedError,
+    backtrace: Backtrace,
+    log_files: Vec<PathBuf>,
+}
+
+impl PipeError {
+    pub fn new(
+        log_files: Vec<PathBuf>,
+        commands: Vec<String>,
+        e: impl std::error::Error + Send + Sync + 'static,
+    ) -> Self {
+        Self {
+            commands,
+            log_files: normalize_logs(log_files),
             source: e.into(),
             backtrace: Backtrace::capture(),
         }
+    }
+}
+
+impl std::fmt::Display for PipeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Pipe error: ")?;
+        writeln!(f, "Commands: {} failed ", self.commands.join(";"))?;
+        write!(f, "with message: {}", self.source)?;
+
+        if !self.log_files.is_empty() {
+            writeln!(f, ", see log files for details:")?;
+            for path in &self.log_files {
+                writeln!(f, "- {}", path.display())?;
+            }
+        }
+
+        Ok(())
     }
 }

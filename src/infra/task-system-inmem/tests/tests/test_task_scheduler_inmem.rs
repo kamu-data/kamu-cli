@@ -28,14 +28,13 @@ async fn test_creates_task() {
         .unwrap();
 
     assert_matches!(task_state_actual, TaskState {
-        task_id: _,
         status: TaskStatus::Queued,
         cancellation_requested: false,
         logical_plan,
-        created_at: _,
         ran_at: None,
         cancellation_requested_at: None,
         finished_at: None,
+        ..
     } if logical_plan == logical_plan_expected);
 }
 

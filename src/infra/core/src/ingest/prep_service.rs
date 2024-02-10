@@ -10,7 +10,8 @@
 use std::fs::File;
 use std::io::prelude::*;
 use std::io::Error as IOError;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::process;
 use std::process::{Command, Stdio};
 use std::sync::Arc;
 
@@ -32,14 +33,21 @@ impl PrepService {
         prep_steps: &[PrepStep],
         src_path: &Path,
         target_path: &Path,
+        run_info_dir: &Path,
     ) -> Result<(), PollingIngestError> {
         let mut stream: Box<dyn Stream> = Box::new(File::open(src_path).int_err()?);
+        let stderr_file_path = run_info_dir.join(format!("kamu.stderr.log-{}", process::id()));
 
         for step in prep_steps {
             stream = match step {
                 PrepStep::Pipe(p) => Box::new(
-                    PipeStream::new(p.command.clone(), stream)
-                        .map_err(|e| PollingIngestError::pipe(p.command.clone(), e))?,
+                    PipeStream::new(p.command.clone(), stream, stderr_file_path.clone()).map_err(
+                        |e| {
+                            PollingIngestError::PipeError({
+                                PipeError::new(vec![stderr_file_path.clone()], p.command.clone(), e)
+                            })
+                        },
+                    )?,
                 ),
                 PrepStep::Decompress(dc) => match dc.format {
                     CompressionFormat::Zip => {
@@ -51,7 +59,6 @@ impl PrepService {
         }
 
         let sink = FileSink::new(File::create(target_path).int_err()?, stream);
-
         sink.join()?;
 
         Ok(())
@@ -100,11 +107,16 @@ struct PipeStream {
 }
 
 impl PipeStream {
-    fn new(cmd: Vec<String>, mut input: Box<dyn Stream>) -> Result<Self, IOError> {
+    fn new(
+        cmd: Vec<String>,
+        mut input: Box<dyn Stream>,
+        stderr_file_path: PathBuf,
+    ) -> Result<Self, IOError> {
         let mut process = Command::new(cmd.first().unwrap())
             .args(&cmd[1..])
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
+            .stderr(File::create(&stderr_file_path)?)
             .spawn()?;
 
         let stdout = process.stdout.take().unwrap();
@@ -119,7 +131,19 @@ impl PipeStream {
                     if read == 0 {
                         break;
                     }
-                    stdin.write_all(&buf[..read]).unwrap();
+                    if stdin.write_all(&buf[..read]).is_err() {
+                        // Error here can be caused when process returned
+                        // stderr with invalid data which will cause pipe broke
+                        let status = process.wait().unwrap();
+
+                        return Err(PollingIngestError::PipeError(PipeError::new(
+                            vec![stderr_file_path],
+                            cmd,
+                            BadStatusCode {
+                                code: status.code().unwrap(),
+                            },
+                        )));
+                    }
                 }
 
                 drop(stdin);
@@ -128,15 +152,15 @@ impl PipeStream {
                 let status = process.wait().unwrap();
 
                 if !status.success() {
-                    Err(PollingIngestError::pipe(
+                    return Err(PollingIngestError::PipeError(PipeError::new(
+                        vec![stderr_file_path],
                         cmd,
                         BadStatusCode {
                             code: status.code().unwrap(),
                         },
-                    ))
-                } else {
-                    Ok(())
+                    )));
                 }
+                Ok(())
             })
             .unwrap();
 

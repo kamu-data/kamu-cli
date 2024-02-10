@@ -18,6 +18,7 @@ use container_runtime::*;
 use internal_error::*;
 
 use crate::config::JupyterConfig;
+use crate::error::{CommandRunError, SubprocessError};
 
 pub struct NotebookServerImpl {
     container_runtime: Arc<ContainerRuntime>,
@@ -63,7 +64,7 @@ impl NotebookServerImpl {
         inherit_stdio: bool,
         on_started: StartedClb,
         on_shutdown: ShutdownClb,
-    ) -> Result<(), InternalError>
+    ) -> Result<(), CommandRunError>
     where
         StartedClb: FnOnce(&str) + Send + 'static,
         ShutdownClb: FnOnce() + Send + 'static,
@@ -73,22 +74,12 @@ impl NotebookServerImpl {
             "Exposing Notebook server on a host network interface is not yet supported"
         );
 
-        let network_name = "kamu";
-
-        // Delete network if exists from previous run
-        let _ = self
-            .container_runtime
-            .remove_network_cmd(network_name)
-            .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null())
-            .output()
-            .await;
-
         let network = self
             .container_runtime
-            .create_network(network_name)
+            .create_random_network_with_prefix("kamu-")
             .await
             .int_err()?;
+        let network_name = network.name();
 
         let cwd = Path::new(".").canonicalize().unwrap();
 
@@ -100,7 +91,7 @@ impl NotebookServerImpl {
         let mut livy = self
             .container_runtime
             .run_attached(self.jupyter_config.livy_image.as_ref().unwrap())
-            .container_name("kamu-livy")
+            .random_container_name_with_prefix("kamu-livy-")
             .hostname("kamu-livy")
             .network(network_name)
             .user("root")
@@ -118,12 +109,17 @@ impl NotebookServerImpl {
                 Stdio::from(std::fs::File::create(&livy_stderr_path).int_err()?)
             })
             .spawn()
-            .int_err()?;
+            .map_err(|err| {
+                CommandRunError::SubprocessError(SubprocessError::new(
+                    vec![livy_stderr_path, livy_stdout_path],
+                    err,
+                ))
+            })?;
 
         let mut jupyter = self
             .container_runtime
             .run_attached(self.jupyter_config.image.as_ref().unwrap())
-            .container_name("kamu-jupyter")
+            .random_container_name_with_prefix("kamu-jupyter-")
             .network(network_name)
             .user("root")
             .work_dir("/opt/workdir")
@@ -172,7 +168,12 @@ impl NotebookServerImpl {
                 jupyter.take_stderr().unwrap(),
                 tokio::fs::File::create(&jupyter_stderr_path)
                     .await
-                    .int_err()?,
+                    .map_err(|err| {
+                        CommandRunError::SubprocessError(SubprocessError::new(
+                            vec![jupyter_stderr_path, jupyter_stdout_path],
+                            err,
+                        ))
+                    })?,
                 Some(token_clb),
             )
         };
@@ -200,6 +201,7 @@ impl NotebookServerImpl {
                 if #[cfg(unix)] {
                     self.container_runtime
                         .run_attached(self.jupyter_config.image.as_ref().unwrap())
+                        .random_container_name_with_prefix("kamu-jupyter-permissions-")
                         .shell_cmd(format!(
                             "chown -Rf {}:{} {}",
                             unsafe { libc::geteuid() },

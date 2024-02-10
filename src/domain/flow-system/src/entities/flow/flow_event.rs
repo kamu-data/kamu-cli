@@ -136,6 +136,17 @@ impl FlowEvent {
             FlowEvent::Aborted(e) => e.event_time,
         }
     }
+
+    pub fn new_status(&self) -> Option<FlowStatus> {
+        match self {
+            FlowEvent::Initiated(_) => Some(FlowStatus::Waiting),
+            FlowEvent::StartConditionDefined(_) | FlowEvent::TriggerAdded(_) => None,
+            FlowEvent::Queued(_) => Some(FlowStatus::Queued),
+            FlowEvent::TaskScheduled(_) => Some(FlowStatus::Scheduled),
+            FlowEvent::TaskRunning(_) => Some(FlowStatus::Running),
+            FlowEvent::TaskFinished(_) | FlowEvent::Aborted(_) => Some(FlowStatus::Finished),
+        }
+    }
 }
 
 impl_enum_with_variants!(FlowEvent);

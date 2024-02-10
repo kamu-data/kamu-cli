@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::fs::File;
 use std::net::IpAddr;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
@@ -17,6 +18,7 @@ use container_runtime::*;
 use internal_error::*;
 use kamu::*;
 
+use crate::error::{CommandRunError, SubprocessError};
 use crate::WorkspaceLayout;
 
 pub struct SqlShellImpl {
@@ -48,7 +50,7 @@ impl SqlShellImpl {
         extra_volume_map: Vec<(PathBuf, PathBuf)>,
         address: Option<&IpAddr>,
         port: Option<u16>,
-    ) -> Result<ContainerProcess, InternalError> {
+    ) -> Result<ContainerProcess, CommandRunError> {
         let cwd = Path::new(".").canonicalize().unwrap();
 
         let spark_stdout_path = workspace_layout.run_info_dir.join("spark.out.txt");
@@ -63,7 +65,7 @@ impl SqlShellImpl {
                 .run_attached(&self.image)
                 .init(true)
                 .shell_cmd("sleep 999999")
-                .container_name("kamu-spark")
+                .random_container_name_with_prefix("kamu-spark-")
                 .user("root")
                 .volumes([
                     (cwd, "/opt/bitnami/spark/kamu_shell"),
@@ -87,7 +89,12 @@ impl SqlShellImpl {
                 container_builder.expose_port(10000)
             };
 
-            let container = container_builder.spawn().int_err()?;
+            let container = container_builder.spawn().map_err(|err| {
+                CommandRunError::SubprocessError(SubprocessError::new(
+                    vec![spark_stderr_path, spark_stdout_path],
+                    err,
+                ))
+            })?;
 
             container
                 .wait_for_container(Duration::from_secs(20))
@@ -115,7 +122,12 @@ impl SqlShellImpl {
                 .stderr(std::fs::File::create(&thrift_stderr_path).int_err()?)
                 .status()
                 .await
-                .int_err()?
+                .map_err(|err| {
+                    CommandRunError::SubprocessError(SubprocessError::new(
+                        vec![thrift_stderr_path, thrift_stdout_path],
+                        err,
+                    ))
+                })?
                 .exit_ok()
                 .int_err()?;
         }
@@ -139,16 +151,18 @@ impl SqlShellImpl {
         output_format: Option<S1>,
         command: Option<S2>,
         url: String,
-    ) -> Result<(), InternalError>
+        run_info_dir: &Path,
+    ) -> Result<(), CommandRunError>
     where
         S1: AsRef<str>,
         S2: AsRef<str>,
     {
         tracing::info!("Starting SQL shell");
+        let stderr_file_path = run_info_dir.join("sql-shell.err.log");
 
         let mut cmd = self.container_runtime.run_cmd(RunArgs {
             image: self.image.clone(),
-            container_name: Some("kamu-spark-shell".to_owned()),
+            container_name: Some(get_random_name_with_prefix("kamu-spark-shell-")),
             user: Some("root".to_owned()),
             network: Some("host".to_owned()),
             tty: true,
@@ -171,7 +185,14 @@ impl SqlShellImpl {
             ..RunArgs::default()
         });
 
-        cmd.spawn().int_err()?.wait().await.int_err()?;
+        cmd.stderr(File::create(&stderr_file_path).int_err()?)
+            .spawn()
+            .map_err(|err| {
+                CommandRunError::SubprocessError(SubprocessError::new(vec![stderr_file_path], err))
+            })?
+            .wait()
+            .await
+            .int_err()?;
 
         Ok(())
     }
@@ -205,7 +226,8 @@ impl SqlShellImpl {
                 None,
                 None,
             )
-            .await?;
+            .await
+            .int_err()?;
 
         {
             started_clb();
@@ -259,7 +281,9 @@ impl SqlShellImpl {
     {
         if let Some(url) = url {
             started_clb();
-            self.run_shell(output_format, command, url).await
+            self.run_shell(output_format, command, url, &workspace_layout.run_info_dir)
+                .await
+                .int_err()
         } else {
             self.run_two_in_one(workspace_layout, output_format, command, started_clb)
                 .await

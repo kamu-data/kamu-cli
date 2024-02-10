@@ -51,20 +51,17 @@ impl ContainerRunCommand {
         self
     }
 
-    pub fn container_name_prefix(mut self, prefix: impl AsRef<str>) -> Self {
-        use rand::distributions::Alphanumeric;
-        use rand::Rng;
+    pub fn random_container_network_with_prefix(mut self, prefix: impl AsRef<str>) -> Self {
+        let network_name = get_random_name_with_prefix(prefix);
 
-        let mut name = String::with_capacity(10 + prefix.as_ref().len());
-        name.push_str(prefix.as_ref());
-        name.extend(
-            rand::thread_rng()
-                .sample_iter(&Alphanumeric)
-                .take(10)
-                .map(char::from),
-        );
+        self.args.network = Some(network_name);
+        self
+    }
 
-        self.args.container_name = Some(name);
+    pub fn random_container_name_with_prefix(mut self, prefix: impl AsRef<str>) -> Self {
+        let container_name = get_random_name_with_prefix(prefix);
+
+        self.args.container_name = Some(container_name);
         self
     }
 
@@ -283,7 +280,7 @@ impl ContainerRunCommand {
         );
 
         if self.args.container_name.is_none() {
-            self = self.container_name_prefix("");
+            self = self.random_container_name_with_prefix("");
         }
 
         let image = self.args.image.clone();

@@ -97,9 +97,9 @@ impl TaskExecutor for TaskExecutorInMemory {
                     }
                 }
                 LogicalPlan::Probe(Probe {
-                    dataset_id: _,
                     busy_time,
                     end_with_outcome,
+                    ..
                 }) => {
                     if let Some(busy_time) = busy_time {
                         tokio::time::sleep(*busy_time).await;

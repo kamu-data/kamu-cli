@@ -102,7 +102,8 @@ impl Command for SqlServerLivyCommand {
                     eprintln!("{}", s("Use Ctrl+C to stop the server").yellow());
                 },
             )
-            .await?;
+            .await
+            .int_err()?;
         Ok(())
     }
 }

@@ -21,13 +21,13 @@ pub trait TaskScheduler: Sync + Send {
     /// Creates a new task from provided logical plan
     async fn create_task(&self, plan: LogicalPlan) -> Result<TaskState, CreateTaskError>;
 
-    /// Returns states of tasks associated with a given dataset ordered by
-    /// creation time from newest to oldest
-    // TODO: reconsider performance impact
-    fn list_tasks_by_dataset(
+    /// Returns page of states of tasks associated with a given dataset ordered
+    /// by creation time from newest to oldest
+    async fn list_tasks_by_dataset(
         &self,
         dataset_id: &DatasetID,
-    ) -> Result<TaskStateStream, ListTasksByDatasetError>;
+        pagination: TaskPaginationOpts,
+    ) -> Result<TaskStateListing, ListTasksByDatasetError>;
 
     /// Returns current state of a given task
     async fn get_task(&self, task_id: TaskID) -> Result<TaskState, GetTaskError>;
@@ -47,6 +47,11 @@ pub trait TaskScheduler: Sync + Send {
 
 pub type TaskStateStream<'a> =
     std::pin::Pin<Box<dyn Stream<Item = Result<TaskState, InternalError>> + Send + 'a>>;
+
+pub struct TaskStateListing<'a> {
+    pub stream: TaskStateStream<'a>,
+    pub total_count: usize,
+}
 
 /////////////////////////////////////////////////////////////////////////////////////////
 // Errors

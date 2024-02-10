@@ -358,9 +358,9 @@ impl SyncListener for PrettySyncProgress {
         let msg = match result {
             SyncResult::UpToDate => console::style("Repository is up-to-date".to_owned()).yellow(),
             SyncResult::Updated {
-                old_head: _,
                 ref new_head,
                 num_blocks,
+                ..
             } => console::style(format!(
                 "Updated repository to {} ({} block(s))",
                 new_head.as_multibase().short(),

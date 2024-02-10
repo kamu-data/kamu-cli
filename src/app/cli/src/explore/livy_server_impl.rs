@@ -17,6 +17,8 @@ use std::time::Duration;
 use container_runtime::*;
 use internal_error::*;
 
+use crate::error::{CommandRunError, SubprocessError};
+
 pub struct LivyServerImpl {
     container_runtime: Arc<ContainerRuntime>,
     image: String,
@@ -47,7 +49,7 @@ impl LivyServerImpl {
         run_info_dir: &Path,
         inherit_stdio: bool,
         on_started: StartedClb,
-    ) -> Result<(), InternalError>
+    ) -> Result<(), CommandRunError>
     where
         StartedClb: FnOnce() + Send + 'static,
     {
@@ -59,7 +61,7 @@ impl LivyServerImpl {
         let mut livy = self
             .container_runtime
             .run_attached(&self.image)
-            .container_name("kamu-livy")
+            .random_container_name_with_prefix("kamu-livy-")
             .entry_point("/opt/livy/bin/livy-server")
             .user("root")
             .map_port_with_address(addr, host_port, LIVY_PORT)
@@ -76,7 +78,12 @@ impl LivyServerImpl {
                 Stdio::from(File::create(&livy_stderr_path).int_err()?)
             })
             .spawn()
-            .int_err()?;
+            .map_err(|err| {
+                CommandRunError::SubprocessError(SubprocessError::new(
+                    vec![livy_stderr_path, livy_stdout_path],
+                    err,
+                ))
+            })?;
 
         livy.wait_for_host_socket(LIVY_PORT, Duration::from_secs(60))
             .await

@@ -92,8 +92,8 @@ async fn test_verify_data_consistency() {
             )
             .await,
         VerificationResult {
-            dataset_handle: _,
             outcome: Ok(()),
+            ..
         }
     );
 
@@ -166,8 +166,8 @@ async fn test_verify_data_consistency() {
             )
             .await,
         VerificationResult {
-            dataset_handle: _,
             outcome: Ok(()),
+            ..
         }
     );
 
@@ -201,7 +201,7 @@ async fn test_verify_data_consistency() {
                     error: DataVerificationError::LogicalHashMismatch { expected, .. },
                 }
             )),
-            dataset_handle: _
+            ..
         } if block_hash == head && expected == data_logical_hash,
     );
 }

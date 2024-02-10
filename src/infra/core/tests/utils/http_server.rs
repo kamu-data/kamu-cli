@@ -42,7 +42,7 @@ impl HttpServer {
 
         let container = container_runtime
             .run_attached(Self::IMAGE)
-            .container_name_prefix("kamu-test-http-")
+            .random_container_name_with_prefix("kamu-test-http-")
             .expose_port(server_port)
             .volume((server_dir, "/usr/local/apache2/htdocs"))
             .stdout(Stdio::null())

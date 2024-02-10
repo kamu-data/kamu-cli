@@ -9,7 +9,9 @@
 
 use std::backtrace::Backtrace;
 use std::fmt::Display;
+use std::path::PathBuf;
 
+use kamu::domain::engine::normalize_logs;
 use kamu::domain::*;
 use opendatafabric::DatasetRefPattern;
 use thiserror::Error;
@@ -274,3 +276,32 @@ pub fn check_env_var_set(var_name: &str) -> Result<(), CLIError> {
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum CommandRunError {
+    #[error(transparent)]
+    SubprocessError(#[from] SubprocessError),
+    #[error(transparent)]
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
+}
+
+#[derive(Error, Debug)]
+pub struct SubprocessError {
+    pub source: BoxedError,
+    pub log_files: Vec<PathBuf>,
+}
+
+impl SubprocessError {
+    pub fn new(log_files: Vec<PathBuf>, e: impl std::error::Error + Send + Sync + 'static) -> Self {
+        Self {
+            log_files: normalize_logs(log_files),
+            source: e.into(),
+        }
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////

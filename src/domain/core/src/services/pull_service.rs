@@ -174,16 +174,12 @@ pub enum PullResult {
 impl From<PollingIngestResult> for PullResult {
     fn from(other: PollingIngestResult) -> Self {
         match other {
-            PollingIngestResult::UpToDate {
-                no_source_defined: _,
-                uncacheable: _,
-            } => PullResult::UpToDate,
+            PollingIngestResult::UpToDate { .. } => PullResult::UpToDate,
             PollingIngestResult::Updated {
                 old_head,
                 new_head,
                 num_blocks,
-                has_more: _,
-                uncacheable: _,
+                ..
             } => PullResult::Updated {
                 old_head: Some(old_head),
                 new_head,

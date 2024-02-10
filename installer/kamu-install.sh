@@ -18,6 +18,7 @@ KAMU_DOCS_INSTALL_URL="https://docs.kamu.dev/cli/get-started/installation/"
 KAMU_VERSION="${KAMU_VERSION:-}"
 KAMU_ALIAS="${KAMU_ALIAS:-kamu}"
 KAMU_INSTALL_PATH="${KAMU_INSTALL_PATH:-${HOME}/.local/bin/${KAMU_ALIAS}}"
+KAMU_LIBC="${KAMU_LIBC:-}"
 KAMU_RELEASES_URL="${KAMU_RELEASES_URL:-https://github.com/kamu-data/kamu-cli/releases}"
 KAMU_DOWNLOADS_URL="${KAMU_DOWNLOADS_URL:-https://github.com/kamu-data/kamu-cli/releases/download}"
 
@@ -42,6 +43,7 @@ ENV VARS:
     KAMU_VERSION            Use to specify a version to be installed
     KAMU_ALIAS              Use to install the executable under a different name
     KAMU_INSTALL_PATH       Use to override the installation path
+    KAMU_LIBC               Use 'gnu' (default) or 'musl' libc on Linux
 " 1>&2
 }
 
@@ -411,7 +413,9 @@ get_architecture() {
         if [ "$(uname -o)" = Android ]; then
             _ostype=Android
         fi
-        if ldd --version 2>&1 | grep -q 'musl'; then
+        if [ -n "$KAMU_LIBC" ]; then
+            _clibtype="$KAMU_LIBC"
+        elif ldd --version 2>&1 | grep -q 'musl'; then
             _clibtype="musl"
         fi
     fi

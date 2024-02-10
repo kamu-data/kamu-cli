@@ -9,16 +9,16 @@
 
 use container_runtime::ContainerRuntime;
 
-use crate::common;
-
 #[test_group::group(containerized)]
 #[tokio::test]
 async fn test_network_handle_free_not_called() {
     let rt = ContainerRuntime::default();
 
-    let network_name = common::get_random_name("kamu-test-network-");
-
-    let network = rt.create_network(&network_name).await.unwrap();
+    let network = rt
+        .create_random_network_with_prefix("kamu-test-network-")
+        .await
+        .unwrap();
+    let network_name = network.name().to_owned();
 
     assert!(rt.has_network(&network_name).await.unwrap());
 
@@ -35,7 +35,7 @@ async fn test_network_handle_free_awaited() {
     let rt = ContainerRuntime::default();
 
     let network = rt
-        .create_network(&common::get_random_name("kamu-test-network-"))
+        .create_random_network_with_prefix("kamu-test-network-")
         .await
         .unwrap();
 
