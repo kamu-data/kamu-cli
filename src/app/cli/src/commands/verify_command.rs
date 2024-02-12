@@ -86,7 +86,7 @@ impl VerifyCommand {
             self.dataset_repo.as_ref(),
             vec![dataset_ref_pattern.clone()],
         )
-        .map_ok(|dataset_handle| dataset_handle.as_local_ref().id().unwrap().clone())
+        .map_ok(|dataset_handle| dataset_handle.id)
         .try_collect()
         .await?;
 

@@ -23,6 +23,7 @@ use opendatafabric::DatasetID;
 use petgraph::stable_graph::{NodeIndex, StableDiGraph};
 use petgraph::visit::{depth_first_search, Bfs, DfsEvent, Reversed};
 use petgraph::Direction;
+use tokio::sync::RwLockReadGuard;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -172,6 +173,79 @@ impl DependencyGraphServiceInMemory {
             state.datasets_graph.remove_edge(edge_index);
         }
     }
+
+    fn get_nodes_from_dataset_ids(
+        &self,
+        dataset_ids: &[DatasetID],
+        state: &RwLockReadGuard<'_, State>,
+    ) -> Result<Vec<NodeIndex>, GetDependenciesError> {
+        dataset_ids
+            .iter()
+            .map(|dataset_id| {
+                state
+                    .get_dataset_node(dataset_id)
+                    .map_err(GetDependenciesError::DatasetNotFound)
+            })
+            .collect()
+    }
+
+    async fn run_recursive_breadth_first_search(
+        &self,
+        dataset_ids: Vec<DatasetID>,
+    ) -> Result<Vec<DatasetID>, GetDependenciesError> {
+        let state = self.state.read().await;
+
+        let reversed_graph = Reversed(&state.datasets_graph);
+
+        let nodes_to_search = self.get_nodes_from_dataset_ids(&dataset_ids, &state)?;
+
+        let mut result = Vec::new();
+        let mut visited_indexes = HashSet::new();
+
+        for node_index in &nodes_to_search {
+            let mut bfs = Bfs::new(&reversed_graph, *node_index);
+
+            while let Some(current_node_index) = bfs.next(&reversed_graph) {
+                if !visited_indexes.contains(&current_node_index) {
+                    visited_indexes.insert(current_node_index);
+                    result.push(
+                        reversed_graph
+                            .0
+                            .node_weight(current_node_index)
+                            .unwrap()
+                            .clone(),
+                    );
+                }
+            }
+        }
+
+        Ok(result)
+    }
+
+    async fn run_recursive_depth_first_search(
+        &self,
+        dataset_ids: Vec<DatasetID>,
+    ) -> Result<Vec<DatasetID>, GetDependenciesError> {
+        let state = self.state.read().await;
+
+        let nodes_to_search = self.get_nodes_from_dataset_ids(&dataset_ids, &state)?;
+
+        let mut result = vec![];
+
+        depth_first_search(&state.datasets_graph, nodes_to_search, |event| {
+            if let DfsEvent::Finish(node_index, _) = event {
+                result.push(
+                    state
+                        .datasets_graph
+                        .node_weight(node_index)
+                        .unwrap()
+                        .clone(),
+                );
+            }
+        });
+
+        Ok(result)
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -222,78 +296,6 @@ impl DependencyGraphService for DependencyGraphServiceInMemory {
         let result = self.run_recursive_depth_first_search(dataset_ids).await?;
 
         Ok(Box::pin(tokio_stream::iter(result)))
-    }
-
-    async fn run_recursive_breadth_first_search(
-        &self,
-        dataset_ids: Vec<DatasetID>,
-    ) -> Result<Vec<DatasetID>, GetDependenciesError> {
-        let state = self.state.read().await;
-
-        let reversed_graph = Reversed(&state.datasets_graph);
-
-        let nodes_to_search = dataset_ids
-            .iter()
-            .map(|dataset_id| {
-                state
-                    .get_dataset_node(dataset_id)
-                    .map_err(GetDependenciesError::DatasetNotFound)
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-
-        let mut result = Vec::new();
-        let mut visited_indexes = HashSet::new();
-
-        for node_index in &nodes_to_search {
-            let mut bfs = Bfs::new(&reversed_graph, *node_index);
-
-            while let Some(current_node_index) = bfs.next(&reversed_graph) {
-                if !visited_indexes.contains(&current_node_index) {
-                    visited_indexes.insert(current_node_index);
-                    result.push(
-                        reversed_graph
-                            .0
-                            .node_weight(current_node_index)
-                            .unwrap()
-                            .clone(),
-                    );
-                }
-            }
-        }
-
-        Ok(result)
-    }
-
-    async fn run_recursive_depth_first_search(
-        &self,
-        dataset_ids: Vec<DatasetID>,
-    ) -> Result<Vec<DatasetID>, GetDependenciesError> {
-        let state = self.state.read().await;
-
-        let nodes_to_search = dataset_ids
-            .iter()
-            .map(|dataset_id| {
-                state
-                    .get_dataset_node(dataset_id)
-                    .map_err(GetDependenciesError::DatasetNotFound)
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-
-        let mut result = vec![];
-
-        depth_first_search(&state.datasets_graph, nodes_to_search, |event| {
-            if let DfsEvent::Finish(node_index, _) = event {
-                result.push(
-                    state
-                        .datasets_graph
-                        .node_weight(node_index)
-                        .unwrap()
-                        .clone(),
-                );
-            }
-        });
-
-        Ok(result)
     }
 
     /// Iterates over 1st level of dataset's downstream dependencies

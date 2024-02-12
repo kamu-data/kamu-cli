@@ -50,16 +50,6 @@ pub trait DependencyGraphService: Sync + Send {
         &self,
         dataset_ids: Vec<DatasetID>,
     ) -> Result<DatasetIDStream, GetDependenciesError>;
-
-    async fn run_recursive_depth_first_search(
-        &self,
-        dataset_ids: Vec<DatasetID>,
-    ) -> Result<Vec<DatasetID>, GetDependenciesError>;
-
-    async fn run_recursive_breadth_first_search(
-        &self,
-        dataset_ids: Vec<DatasetID>,
-    ) -> Result<Vec<DatasetID>, GetDependenciesError>;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

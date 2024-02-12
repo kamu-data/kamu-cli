@@ -62,7 +62,7 @@ impl Command for DeleteCommand {
                 self.dataset_repo.as_ref(),
                 self.dataset_ref_patterns.clone(),
             )
-            .map_ok(|dataset_handle| dataset_handle.as_local_ref().id().unwrap().clone())
+            .map_ok(|dataset_handle| dataset_handle.id)
             .try_collect()
             .await?;
 
