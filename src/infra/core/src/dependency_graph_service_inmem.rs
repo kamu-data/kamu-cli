@@ -23,7 +23,6 @@ use opendatafabric::DatasetID;
 use petgraph::stable_graph::{NodeIndex, StableDiGraph};
 use petgraph::visit::{depth_first_search, Bfs, DfsEvent, Reversed};
 use petgraph::Direction;
-use tokio::sync::RwLockReadGuard;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -177,7 +176,7 @@ impl DependencyGraphServiceInMemory {
     fn get_nodes_from_dataset_ids(
         &self,
         dataset_ids: &[DatasetID],
-        state: &RwLockReadGuard<'_, State>,
+        state: &State,
     ) -> Result<Vec<NodeIndex>, GetDependenciesError> {
         dataset_ids
             .iter()
