@@ -12,7 +12,7 @@
 use std::sync::Arc;
 
 use async_graphql::value;
-use chrono::Utc;
+use chrono::{DateTime, Duration, DurationRound, Utc};
 use container_runtime::ContainerRuntime;
 use dill::Component;
 use event_bus::EventBus;
@@ -50,7 +50,7 @@ use kamu_flow_system_inmem::{
     FlowEventStoreInMem,
     FlowServiceInMemory,
 };
-use kamu_task_system::{TaskEventFinished, TaskEventRunning, TaskID, TaskOutcome, TaskResult};
+use kamu_task_system as ts;
 use kamu_task_system_inmem::{TaskSchedulerInMemory, TaskSystemEventStoreInMemory};
 use opendatafabric::{DatasetID, DatasetKind, FAKE_ACCOUNT_ID};
 
@@ -131,6 +131,215 @@ async fn test_trigger_ingest_root_dataset() {
                                             "finishedAt": null,
                                         },
                                         "tasks": [],
+                                        "initiator": {
+                                            "id": FAKE_ACCOUNT_ID,
+                                            "accountName": auth::DEFAULT_ACCOUNT_NAME,
+                                        },
+                                        "primaryTrigger": {
+                                            "__typename": "FlowTriggerManual",
+                                            "initiator": {
+                                                "id": FAKE_ACCOUNT_ID,
+                                                "accountName": auth::DEFAULT_ACCOUNT_NAME,
+                                            }
+                                        },
+                                        "startCondition": null,
+                                    }
+                                ],
+                                "pageInfo": {
+                                    "hasPreviousPage": false,
+                                    "hasNextPage": false,
+                                    "currentPage": 0,
+                                    "totalPages": 1,
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+
+    let flow_task_id = harness.mimic_flow_scheduled("0").await;
+
+    let response = schema
+        .execute(
+            async_graphql::Request::new(request_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(response.is_ok(), "{response:?}");
+    assert_eq!(
+        response.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "flows": {
+                        "runs": {
+                            "listFlows": {
+                                "nodes": [
+                                    {
+                                        "flowId": "0",
+                                        "description": {
+                                            "__typename": "FlowDescriptionDatasetPollingIngest",
+                                            "datasetId": create_result.dataset_handle.id.to_string(),
+                                            "ingestedRecordsCount": null,
+                                        },
+                                        "status": "SCHEDULED",
+                                        "outcome": null,
+                                        "timing": {
+                                            "runningSince": null,
+                                            "finishedAt": null,
+                                        },
+                                        "tasks": [
+                                            {
+                                                "taskId": "0",
+                                                "status": "QUEUED",
+                                                "outcome": null,
+                                            }
+                                        ],
+                                        "initiator": {
+                                            "id": FAKE_ACCOUNT_ID,
+                                            "accountName": auth::DEFAULT_ACCOUNT_NAME,
+                                        },
+                                        "primaryTrigger": {
+                                            "__typename": "FlowTriggerManual",
+                                            "initiator": {
+                                                "id": FAKE_ACCOUNT_ID,
+                                                "accountName": auth::DEFAULT_ACCOUNT_NAME,
+                                            }
+                                        },
+                                        "startCondition": null,
+                                    }
+                                ],
+                                "pageInfo": {
+                                    "hasPreviousPage": false,
+                                    "hasNextPage": false,
+                                    "currentPage": 0,
+                                    "totalPages": 1,
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+
+    let running_time = Utc::now().duration_round(Duration::seconds(1)).unwrap();
+    harness.mimic_task_running(flow_task_id, running_time).await;
+
+    let response = schema
+        .execute(
+            async_graphql::Request::new(request_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(response.is_ok(), "{response:?}");
+    assert_eq!(
+        response.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "flows": {
+                        "runs": {
+                            "listFlows": {
+                                "nodes": [
+                                    {
+                                        "flowId": "0",
+                                        "description": {
+                                            "__typename": "FlowDescriptionDatasetPollingIngest",
+                                            "datasetId": create_result.dataset_handle.id.to_string(),
+                                            "ingestedRecordsCount": null,
+                                        },
+                                        "status": "RUNNING",
+                                        "outcome": null,
+                                        "timing": {
+                                            "runningSince": running_time.to_rfc3339(),
+                                            "finishedAt": null,
+                                        },
+                                        "tasks": [
+                                            {
+                                                "taskId": "0",
+                                                "status": "RUNNING",
+                                                "outcome": null,
+                                            }
+                                        ],
+                                        "initiator": {
+                                            "id": FAKE_ACCOUNT_ID,
+                                            "accountName": auth::DEFAULT_ACCOUNT_NAME,
+                                        },
+                                        "primaryTrigger": {
+                                            "__typename": "FlowTriggerManual",
+                                            "initiator": {
+                                                "id": FAKE_ACCOUNT_ID,
+                                                "accountName": auth::DEFAULT_ACCOUNT_NAME,
+                                            }
+                                        },
+                                        "startCondition": null,
+                                    }
+                                ],
+                                "pageInfo": {
+                                    "hasPreviousPage": false,
+                                    "hasNextPage": false,
+                                    "currentPage": 0,
+                                    "totalPages": 1,
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+
+    let complete_time = Utc::now().duration_round(Duration::seconds(1)).unwrap();
+    harness
+        .mimic_task_completed(
+            flow_task_id,
+            complete_time,
+            ts::TaskOutcome::Success(ts::TaskResult::Empty),
+        )
+        .await;
+
+    let response = schema
+        .execute(
+            async_graphql::Request::new(request_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(response.is_ok(), "{response:?}");
+    assert_eq!(
+        response.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "flows": {
+                        "runs": {
+                            "listFlows": {
+                                "nodes": [
+                                    {
+                                        "flowId": "0",
+                                        "description": {
+                                            "__typename": "FlowDescriptionDatasetPollingIngest",
+                                            "datasetId": create_result.dataset_handle.id.to_string(),
+                                            "ingestedRecordsCount": null,
+                                        },
+                                        "status": "RUNNING",
+                                        "outcome": null,
+                                        "timing": {
+                                            "runningSince": running_time.to_rfc3339(),
+                                            "finishedAt": null,
+                                        },
+                                        "tasks": [
+                                            {
+                                                "taskId": "0",
+                                                "status": "RUNNING",
+                                                "outcome": null,
+                                            }
+                                        ],
                                         "initiator": {
                                             "id": FAKE_ACCOUNT_ID,
                                             "accountName": auth::DEFAULT_ACCOUNT_NAME,
@@ -1143,9 +1352,13 @@ async fn test_cancel_already_succeeded_flow() {
     let flow_id = FlowRunsHarness::extract_flow_id_from_trigger_response(&response_json);
 
     let flow_task_id = harness.mimic_flow_scheduled(flow_id).await;
-    harness.mimic_task_running(flow_task_id).await;
+    harness.mimic_task_running(flow_task_id, Utc::now()).await;
     harness
-        .mimic_task_completed(flow_task_id, TaskOutcome::Success(TaskResult::Empty))
+        .mimic_task_completed(
+            flow_task_id,
+            Utc::now(),
+            ts::TaskOutcome::Success(ts::TaskResult::Empty),
+        )
         .await;
 
     let mutation_code =
@@ -1215,9 +1428,13 @@ async fn test_history_of_completed_flow() {
         .await;
 
     let flow_task_id = harness.mimic_flow_scheduled(flow_id).await;
-    harness.mimic_task_running(flow_task_id).await;
+    harness.mimic_task_running(flow_task_id, Utc::now()).await;
     harness
-        .mimic_task_completed(flow_task_id, TaskOutcome::Success(TaskResult::Empty))
+        .mimic_task_completed(
+            flow_task_id,
+            Utc::now(),
+            ts::TaskOutcome::Success(ts::TaskResult::Empty),
+        )
         .await;
 
     let query = FlowRunsHarness::flow_history_query(&create_result.dataset_handle.id, flow_id);
@@ -1371,8 +1588,8 @@ impl FlowRunsHarness {
             .add::<FlowServiceInMemory>()
             .add::<FlowEventStoreInMem>()
             .add_value(FlowServiceRunConfig::new(
-                chrono::Duration::seconds(1),
-                chrono::Duration::minutes(1),
+                Duration::seconds(1),
+                Duration::minutes(1),
             ))
             .add::<TaskSchedulerInMemory>()
             .add::<TaskSystemEventStoreInMemory>()
@@ -1464,34 +1681,61 @@ impl FlowRunsHarness {
         flow.save(flow_event_store.as_ref()).await.unwrap();
     }
 
-    async fn mimic_task_running(&self, task_id: TaskID) {
+    async fn mimic_task_running(&self, task_id: TaskID, event_time: DateTime<Utc>) {
         let flow_service_test_driver = self
             .catalog_authorized
             .get_one::<dyn FlowServiceTestDriver>()
             .unwrap();
         flow_service_test_driver.mimic_running_started();
 
+        let task_event_store = self
+            .catalog_anonymous
+            .get_one::<dyn TaskSystemEventStore>()
+            .unwrap();
+
+        let mut task = Task::load(task_id, task_event_store.as_ref())
+            .await
+            .unwrap();
+        task.run(event_time).unwrap();
+        task.save(task_event_store.as_ref()).await.unwrap();
+
         let event_bus = self.catalog_authorized.get_one::<EventBus>().unwrap();
         event_bus
             .dispatch_event(TaskEventRunning {
-                event_time: Utc::now(),
+                event_time,
                 task_id,
             })
             .await
             .unwrap();
     }
 
-    async fn mimic_task_completed(&self, task_id: TaskID, task_outcome: TaskOutcome) {
+    async fn mimic_task_completed(
+        &self,
+        task_id: TaskID,
+        event_time: DateTime<Utc>,
+        task_outcome: ts::TaskOutcome,
+    ) {
         let flow_service_test_driver = self
             .catalog_authorized
             .get_one::<dyn FlowServiceTestDriver>()
             .unwrap();
         flow_service_test_driver.mimic_running_started();
 
+        let task_event_store = self
+            .catalog_anonymous
+            .get_one::<dyn TaskSystemEventStore>()
+            .unwrap();
+
+        let mut task = Task::load(task_id, task_event_store.as_ref())
+            .await
+            .unwrap();
+        task.finish(event_time, task_outcome.clone()).unwrap();
+        task.save(task_event_store.as_ref()).await.unwrap();
+
         let event_bus = self.catalog_authorized.get_one::<EventBus>().unwrap();
         event_bus
             .dispatch_event(TaskEventFinished {
-                event_time: Utc::now(),
+                event_time,
                 task_id,
                 outcome: task_outcome,
             })
