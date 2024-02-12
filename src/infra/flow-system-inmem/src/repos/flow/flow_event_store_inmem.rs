@@ -12,7 +12,6 @@ use std::collections::HashMap;
 
 use dill::*;
 use kamu_flow_system::*;
-use kamu_task_system::TaskOutcome;
 use opendatafabric::{AccountName, DatasetID};
 
 use crate::dataset_flow_key::BorrowedFlowKeyDataset;
@@ -226,7 +225,7 @@ impl FlowEventStoreInMem {
 
                 let new_run_stats = FlowRunStats {
                     last_attempt_time: Some(e.event_time),
-                    last_success_time: if let TaskOutcome::Success(_) = &e.task_outcome {
+                    last_success_time: if e.task_outcome.is_success() {
                         Some(e.event_time)
                     } else {
                         None

@@ -9,7 +9,7 @@
 
 use chrono::{DateTime, Utc};
 use event_sourcing::*;
-use kamu_task_system::{TaskID, TaskOutcome};
+use kamu_task_system as ts;
 
 use crate::*;
 
@@ -28,7 +28,7 @@ pub struct FlowState {
     /// Timing records
     pub timing: FlowTimingRecords,
     /// Associated task IDs
-    pub task_ids: Vec<TaskID>,
+    pub task_ids: Vec<ts::TaskID>,
     /// Flow outcome
     pub outcome: Option<FlowOutcome>,
 }
@@ -56,6 +56,30 @@ impl FlowState {
             FlowStatus::Queued
         } else {
             FlowStatus::Waiting
+        }
+    }
+
+    /// Creates task logical plan that corresponds to template
+    pub fn make_task_logical_plan(&self) -> ts::LogicalPlan {
+        match &self.flow_key {
+            FlowKey::Dataset(flow_key) => match flow_key.flow_type {
+                DatasetFlowType::Ingest | DatasetFlowType::ExecuteTransform => {
+                    ts::LogicalPlan::UpdateDataset(ts::UpdateDataset {
+                        dataset_id: flow_key.dataset_id.clone(),
+                    })
+                }
+                DatasetFlowType::Compaction => unimplemented!(),
+            },
+            FlowKey::System(flow_key) => {
+                match flow_key.flow_type {
+                    // TODO: replace on correct logical plan
+                    SystemFlowType::GC => ts::LogicalPlan::Probe(ts::Probe {
+                        dataset_id: None,
+                        busy_time: Some(std::time::Duration::from_secs(20)),
+                        end_with_outcome: Some(ts::TaskOutcome::Success(ts::TaskResult::Empty)),
+                    }),
+                }
+            }
         }
     }
 }
@@ -92,7 +116,7 @@ impl Projection for FlowState {
             (Some(s), event) => {
                 assert_eq!(s.flow_id, event.flow_id());
 
-                match &event {
+                match event {
                     E::Initiated(_) => Err(ProjectionError::new(Some(s), event)),
                     E::StartConditionDefined(FlowEventStartConditionDefined {
                         start_condition,
@@ -102,7 +126,7 @@ impl Projection for FlowState {
                             Err(ProjectionError::new(Some(s), event))
                         } else {
                             Ok(FlowState {
-                                start_condition: Some(*start_condition),
+                                start_condition: Some(start_condition),
                                 ..s
                             })
                         }
@@ -113,7 +137,7 @@ impl Projection for FlowState {
                         } else {
                             Ok(FlowState {
                                 timing: FlowTimingRecords {
-                                    activate_at: Some(*activate_at),
+                                    activate_at: Some(activate_at),
                                     ..s.timing
                                 },
                                 ..s
@@ -132,7 +156,7 @@ impl Projection for FlowState {
                             Err(ProjectionError::new(Some(s), event))
                         } else {
                             let mut task_ids = s.task_ids.clone();
-                            task_ids.push(*task_id);
+                            task_ids.push(task_id);
 
                             Ok(FlowState { task_ids, ..s })
                         }
@@ -144,13 +168,13 @@ impl Projection for FlowState {
                     }) => {
                         if s.outcome.is_some()
                             || s.timing.activate_at.is_none()
-                            || !s.task_ids.contains(task_id)
+                            || !s.task_ids.contains(&task_id)
                         {
                             Err(ProjectionError::new(Some(s), event))
                         } else {
                             Ok(FlowState {
                                 timing: FlowTimingRecords {
-                                    running_since: Some(*event_time),
+                                    running_since: Some(event_time),
                                     ..s.timing
                                 },
                                 ..s
@@ -160,34 +184,34 @@ impl Projection for FlowState {
                     E::TaskFinished(FlowEventTaskFinished {
                         event_time,
                         task_id,
-                        task_outcome,
+                        ref task_outcome,
                         ..
                     }) => {
-                        if !s.task_ids.contains(task_id) || s.timing.running_since.is_none() {
+                        if !s.task_ids.contains(&task_id) || s.timing.running_since.is_none() {
                             Err(ProjectionError::new(Some(s), event))
                         } else if s.outcome.is_some() {
                             // Ignore for idempotence motivation
                             Ok(s)
                         } else {
                             match task_outcome {
-                                TaskOutcome::Success(_) => Ok(FlowState {
-                                    outcome: Some(FlowOutcome::Success),
+                                ts::TaskOutcome::Success(task_result) => Ok(FlowState {
+                                    outcome: Some(FlowOutcome::Success(task_result.into())),
                                     timing: FlowTimingRecords {
-                                        finished_at: Some(*event_time),
+                                        finished_at: Some(event_time),
                                         ..s.timing
                                     },
                                     ..s
                                 }),
-                                TaskOutcome::Cancelled => Ok(FlowState {
+                                ts::TaskOutcome::Cancelled => Ok(FlowState {
                                     outcome: Some(FlowOutcome::Cancelled),
                                     timing: FlowTimingRecords {
-                                        finished_at: Some(*event_time),
+                                        finished_at: Some(event_time),
                                         ..s.timing
                                     },
                                     ..s
                                 }),
                                 // TODO: support retries
-                                TaskOutcome::Failed => Ok(FlowState {
+                                ts::TaskOutcome::Failed => Ok(FlowState {
                                     outcome: Some(FlowOutcome::Failed),
                                     ..s
                                 }),
@@ -196,7 +220,7 @@ impl Projection for FlowState {
                     }
                     E::Aborted(FlowEventAborted { event_time, .. }) => {
                         if let Some(outcome) = s.outcome {
-                            if outcome == FlowOutcome::Success {
+                            if let FlowOutcome::Success(_) = outcome {
                                 Err(ProjectionError::new(Some(s), event))
                             } else {
                                 // Ignore for idempotence reasons
@@ -206,7 +230,7 @@ impl Projection for FlowState {
                             Ok(FlowState {
                                 outcome: Some(FlowOutcome::Aborted),
                                 timing: FlowTimingRecords {
-                                    finished_at: Some(*event_time),
+                                    finished_at: Some(event_time),
                                     ..s.timing
                                 },
                                 ..s

@@ -35,6 +35,12 @@ pub enum TaskOutcome {
     // Replaced(TaskID),
 }
 
+impl TaskOutcome {
+    pub fn is_success(&self) -> bool {
+        matches!(self, Self::Success(_))
+    }
+}
+
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq)]

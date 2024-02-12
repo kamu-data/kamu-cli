@@ -431,26 +431,7 @@ impl FlowServiceInMemory {
 
     #[tracing::instrument(level = "trace", skip_all, fields(flow_id = %flow.flow_id))]
     async fn schedule_flow_task(&self, flow: &mut Flow) -> Result<TaskID, InternalError> {
-        let logical_plan = match &flow.flow_key {
-            FlowKey::Dataset(flow_key) => match flow_key.flow_type {
-                DatasetFlowType::Ingest | DatasetFlowType::ExecuteTransform => {
-                    LogicalPlan::UpdateDataset(UpdateDataset {
-                        dataset_id: flow_key.dataset_id.clone(),
-                    })
-                }
-                DatasetFlowType::Compaction => unimplemented!(),
-            },
-            FlowKey::System(flow_key) => {
-                match flow_key.flow_type {
-                    // TODO: replace on correct logical plan
-                    SystemFlowType::GC => LogicalPlan::Probe(Probe {
-                        dataset_id: None,
-                        busy_time: Some(std::time::Duration::from_secs(20)),
-                        end_with_outcome: Some(TaskOutcome::Success(TaskResult::Empty)),
-                    }),
-                }
-            }
-        };
+        let logical_plan = flow.make_task_logical_plan();
 
         let task = self
             .task_scheduler
@@ -821,6 +802,7 @@ impl AsyncEventHandler<TaskEventFinished> for FlowServiceInMemory {
         };
 
         let finish_time = self.round_time(event.event_time)?;
+        let is_success = event.outcome.is_success();
 
         if let Some(flow_id) = maybe_flow_id {
             let mut flow = Flow::load(flow_id, self.flow_event_store.as_ref())
@@ -832,7 +814,7 @@ impl AsyncEventHandler<TaskEventFinished> for FlowServiceInMemory {
 
             // In case of success:
             //  - enqueue updates of dependent datasets
-            if let TaskOutcome::Success(_) = &event.outcome
+            if is_success
                 && let FlowKey::Dataset(flow_key) = &flow.flow_key
                 && flow_key.flow_type.is_dataset_update()
             {
@@ -853,7 +835,7 @@ impl AsyncEventHandler<TaskEventFinished> for FlowServiceInMemory {
 
             // In case of success:
             //  - enqueue next auto-polling flow cycle
-            if let TaskOutcome::Success(_) = &event.outcome {
+            if is_success {
                 self.try_enqueue_scheduled_auto_polling_flow_if_enabled(
                     finish_time,
                     &flow.flow_key,
