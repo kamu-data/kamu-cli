@@ -8,27 +8,19 @@
 // by the Apache License, Version 2.0.
 
 use async_trait::async_trait;
-use bytes::Bytes;
-use chrono::{DateTime, Utc};
 use internal_error::InternalError;
 use opendatafabric::{MetadataBlock, Multihash};
 use thiserror::Error;
-use url::Url;
 
 use crate::{
     AccessError,
-    BlockNotFoundError,
     ContainsError,
-    ExternalTransferOpts,
     GetBlockError,
-    GetError,
-    GetExternalUrlError,
-    GetExternalUrlResult,
     HashMismatchError,
     InsertError,
     InsertOpts,
     InsertResult,
-    ObjectNotFoundError,
+    ObjectRepository,
 };
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -39,27 +31,13 @@ pub trait MetadataBlockRepository: Send + Sync {
 
     async fn get_block(&self, hash: &Multihash) -> Result<MetadataBlock, GetBlockError>;
 
-    async fn get_block_data(&self, hash: &Multihash) -> Result<Bytes, GetBlockDataError>;
-
-    async fn get_block_size(&self, hash: &Multihash) -> Result<u64, GetBlockDataError>;
-
-    async fn insert_block_data<'a>(
+    async fn insert_block<'a>(
         &'a self,
-        block_data: &'a [u8],
+        block: &MetadataBlock,
         options: InsertOpts<'a>,
     ) -> Result<InsertBlockResult, InsertBlockError>;
 
-    async fn get_block_external_download_url(
-        &self,
-        hash: &Multihash,
-        opts: ExternalTransferOpts,
-    ) -> Result<GetBlockExternalUrlResult, GetBlockExternalUrlError>;
-
-    async fn get_block_external_upload_url(
-        &self,
-        hash: &Multihash,
-        opts: ExternalTransferOpts,
-    ) -> Result<GetBlockExternalUrlResult, GetBlockExternalUrlError>;
+    fn as_object_repo(&self) -> &dyn ObjectRepository;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -75,31 +53,6 @@ pub struct InsertBlockResult {
 impl From<InsertResult> for InsertBlockResult {
     fn from(InsertResult { hash }: InsertResult) -> Self {
         Self { hash }
-    }
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Clone)]
-pub struct GetBlockExternalUrlResult {
-    pub url: Url,
-    pub header_map: http::HeaderMap,
-    pub expires_at: Option<DateTime<Utc>>,
-}
-
-impl From<GetExternalUrlResult> for GetBlockExternalUrlResult {
-    fn from(
-        GetExternalUrlResult {
-            url,
-            header_map,
-            expires_at,
-        }: GetExternalUrlResult,
-    ) -> Self {
-        Self {
-            url,
-            header_map,
-            expires_at,
-        }
     }
 }
 
@@ -135,52 +88,6 @@ impl From<ContainsError> for ContainsBlockError {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
-pub enum GetBlockDataError {
-    #[error(transparent)]
-    NotFound(
-        #[from]
-        #[backtrace]
-        BlockNotFoundError,
-    ),
-    #[error(transparent)]
-    Access(
-        #[from]
-        #[backtrace]
-        AccessError,
-    ),
-    #[error(transparent)]
-    Internal(
-        #[from]
-        #[backtrace]
-        InternalError,
-    ),
-}
-
-impl From<GetError> for GetBlockDataError {
-    fn from(v: GetError) -> Self {
-        match v {
-            GetError::NotFound(ObjectNotFoundError { hash }) => {
-                Self::NotFound(BlockNotFoundError { hash })
-            }
-            GetError::Access(e) => Self::Access(e),
-            GetError::Internal(e) => Self::Internal(e),
-        }
-    }
-}
-
-impl From<GetBlockDataError> for GetBlockError {
-    fn from(v: GetBlockDataError) -> Self {
-        match v {
-            GetBlockDataError::NotFound(e) => Self::NotFound(e),
-            GetBlockDataError::Access(e) => Self::Access(e),
-            GetBlockDataError::Internal(e) => Self::Internal(e),
-        }
-    }
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Error, Debug)]
 pub enum InsertBlockError {
     #[error(transparent)]
     HashMismatch(
@@ -208,36 +115,6 @@ impl From<InsertError> for InsertBlockError {
             InsertError::HashMismatch(e) => Self::HashMismatch(e),
             InsertError::Access(e) => Self::Access(e),
             InsertError::Internal(e) => Self::Internal(e),
-        }
-    }
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Error, Debug)]
-pub enum GetBlockExternalUrlError {
-    #[error("Repository does not support external transfers")]
-    NotSupported,
-    #[error(transparent)]
-    Access(
-        #[from]
-        #[backtrace]
-        AccessError,
-    ),
-    #[error(transparent)]
-    Internal(
-        #[from]
-        #[backtrace]
-        InternalError,
-    ),
-}
-
-impl From<GetExternalUrlError> for GetBlockExternalUrlError {
-    fn from(v: GetExternalUrlError) -> Self {
-        match v {
-            GetExternalUrlError::NotSupported => Self::NotSupported,
-            GetExternalUrlError::Access(e) => Self::Access(e),
-            GetExternalUrlError::Internal(e) => Self::Internal(e),
         }
     }
 }

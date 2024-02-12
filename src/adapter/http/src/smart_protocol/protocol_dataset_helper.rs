@@ -78,8 +78,8 @@ pub async fn prepare_dataset_transfer_estimate(
         blocks_count += 1;
 
         bytes_in_blocks += metadata_chain
-            .as_metadata_block_repository()
-            .get_block_size(&hash)
+            .as_object_repo()
+            .get_size(&hash)
             .await
             .int_err()?;
 
@@ -150,8 +150,8 @@ pub async fn prepare_dataset_metadata_batch(
         num_blocks += 1;
 
         let block_bytes: Bytes = metadata_chain
-            .as_metadata_block_repository()
-            .get_block_data(hash)
+            .as_object_repo()
+            .get_bytes(hash)
             .await
             .int_err()?;
 
@@ -183,7 +183,7 @@ pub async fn prepare_dataset_metadata_batch(
 
 pub fn decode_metadata_batch(
     blocks_batch: &MetadataBlocksBatch,
-) -> Result<VecDeque<MetadataBlockPair>, GetBlockError> {
+) -> Result<VecDeque<HashedMetadataBlock>, GetBlockError> {
     let blocks_data = unpack_dataset_metadata_batch(blocks_batch);
 
     blocks_data
@@ -211,7 +211,7 @@ pub struct AppendMetadataResponse {
 
 pub async fn dataset_append_metadata(
     dataset: &dyn Dataset,
-    metadata: VecDeque<MetadataBlockPair>,
+    metadata: VecDeque<HashedMetadataBlock>,
 ) -> Result<AppendMetadataResponse, AppendError> {
     let old_head = metadata.front().unwrap().1.prev_block_hash.clone();
     let new_head = metadata.back().unwrap().0.clone();
@@ -354,7 +354,7 @@ pub async fn collect_object_references_from_interval(
 
 pub async fn collect_object_references_from_metadata(
     dataset: &dyn Dataset,
-    blocks: &VecDeque<MetadataBlockPair>,
+    blocks: &VecDeque<HashedMetadataBlock>,
     missing_files_only: bool,
 ) -> Vec<ObjectFileReference> {
     let mut res_references: Vec<ObjectFileReference> = Vec::new();
@@ -589,19 +589,11 @@ pub async fn prepare_push_object_transfer_strategy(
         ObjectType::DataSlice => dataset.as_data_repo(),
         ObjectType::Checkpoint => dataset.as_checkpoint_repo(),
     };
-    let contains = match object_file_ref.object_type {
-        ObjectType::MetadataBlock => {
-            dataset
-                .as_metadata_chain()
-                .as_metadata_block_repository()
-                .contains(&object_file_ref.physical_hash)
-                .await
-        }
-        ObjectType::DataSlice | ObjectType::Checkpoint => {
-            object_repo.contains(&object_file_ref.physical_hash).await
-        }
-    }
-    .int_err()?;
+
+    let contains = object_repo
+        .contains(&object_file_ref.physical_hash)
+        .await
+        .int_err()?;
 
     if contains {
         Ok(PushObjectTransferStrategy {

@@ -75,6 +75,8 @@ pub trait MetadataChain: Send + Sync {
         opts: AppendOpts<'a>,
     ) -> Result<Multihash, AppendError>;
 
+    fn as_object_repo(&self) -> &dyn ObjectRepository;
+
     fn as_reference_repo(&self) -> &dyn ReferenceRepository;
 
     fn as_metadata_block_repository(&self) -> &dyn MetadataBlockRepository;
@@ -155,7 +157,7 @@ impl<T> MetadataChainExt for T where T: MetadataChain + ?Sized {}
 /////////////////////////////////////////////////////////////////////////////////////////
 
 /// References are named pointers to metadata blocks
-#[derive(Clone, PartialEq, Eq, Debug, Hash)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub enum BlockRef {
     Head,
 }

@@ -10,8 +10,6 @@
 use async_trait::async_trait;
 use futures::TryStreamExt;
 use kamu_core::*;
-use opendatafabric::serde::flatbuffers::FlatbuffersMetadataBlockSerializer;
-use opendatafabric::serde::MetadataBlockSerializer;
 use opendatafabric::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -755,13 +753,10 @@ where
             }
         }
 
-        let block_data = FlatbuffersMetadataBlockSerializer
-            .write_manifest(&block)
-            .int_err()?;
         let res = self
             .meta_block_repo
-            .insert_block_data(
-                &block_data,
+            .insert_block(
+                &block,
                 InsertOpts {
                     precomputed_hash: opts.precomputed_hash,
                     expected_hash: opts.expected_hash,
@@ -780,6 +775,10 @@ where
         }
 
         Ok(res.hash)
+    }
+
+    fn as_object_repo(&self) -> &dyn ObjectRepository {
+        self.meta_block_repo.as_object_repo()
     }
 
     fn as_reference_repo(&self) -> &dyn ReferenceRepository {

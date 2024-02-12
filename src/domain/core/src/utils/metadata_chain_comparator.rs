@@ -468,6 +468,10 @@ impl<'a> MetadataChain for MetadataChainWithStats<'a> {
         self.chain.append(block, opts).await
     }
 
+    fn as_object_repo(&self) -> &dyn ObjectRepository {
+        self.chain.as_object_repo()
+    }
+
     fn as_reference_repo(&self) -> &dyn ReferenceRepository {
         self.chain.as_reference_repo()
     }
