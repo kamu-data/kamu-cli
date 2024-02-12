@@ -188,14 +188,13 @@ impl DependencyGraphServiceInMemory {
             .collect()
     }
 
-    async fn run_recursive_breadth_first_search(
+    async fn run_recursive_reversed_breadth_first_search(
         &self,
         dataset_ids: Vec<DatasetID>,
     ) -> Result<Vec<DatasetID>, GetDependenciesError> {
         let state = self.state.read().await;
 
         let reversed_graph = Reversed(&state.datasets_graph);
-
         let nodes_to_search = self.get_nodes_from_dataset_ids(&dataset_ids, &state)?;
 
         let mut result = Vec::new();
@@ -203,11 +202,12 @@ impl DependencyGraphServiceInMemory {
 
         for node_index in &nodes_to_search {
             let mut bfs = Bfs::new(&reversed_graph, *node_index);
+            let mut search_node_result = vec![];
 
             while let Some(current_node_index) = bfs.next(&reversed_graph) {
                 if !visited_indexes.contains(&current_node_index) {
                     visited_indexes.insert(current_node_index);
-                    result.push(
+                    search_node_result.push(
                         reversed_graph
                             .0
                             .node_weight(current_node_index)
@@ -216,6 +216,8 @@ impl DependencyGraphServiceInMemory {
                     );
                 }
             }
+            search_node_result.reverse();
+            result.extend(search_node_result);
         }
 
         Ok(result)
@@ -277,7 +279,9 @@ impl DependencyGraphService for DependencyGraphServiceInMemory {
             .map_err(GetDependenciesError::Internal)
             .unwrap();
 
-        let result = self.run_recursive_breadth_first_search(dataset_ids).await?;
+        let result = self
+            .run_recursive_reversed_breadth_first_search(dataset_ids)
+            .await?;
 
         Ok(Box::pin(tokio_stream::iter(result)))
     }

@@ -38,7 +38,7 @@ pub trait DependencyGraphService: Sync + Send {
     ) -> Result<DatasetIDStream, GetDependenciesError>;
 
     /// Iterates over all levels of dataset's upstream dependencies
-    /// and return result including passed parameters
+    /// and return reversed result including passed parameters
     async fn get_recursive_upstream_dependencies(
         &self,
         dataset_ids: Vec<DatasetID>,

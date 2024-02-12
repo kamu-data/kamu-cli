@@ -520,7 +520,7 @@ async fn test_get_recursive_downstream_dependencies() {
 async fn test_get_recursive_upstream_dependencies() {
     let harness = create_large_dataset_graph().await;
 
-    // Should return only itself for root datasets
+    // Should return only itself
     let request_datasets = vec!["test-root-foo"];
     let result = harness
         .get_recursive_upstream_dependencies(request_datasets.clone())
@@ -548,7 +548,8 @@ async fn test_get_recursive_upstream_dependencies() {
     let result = harness
         .get_recursive_upstream_dependencies(request_datasets.clone())
         .await;
-    let expected_result = vec![request_datasets[0], request_datasets[1], "test-root-foo"];
+
+    let expected_result = vec![request_datasets[0], "test-root-foo", request_datasets[1]];
 
     assert_eq!(result, expected_result);
 
@@ -559,11 +560,11 @@ async fn test_get_recursive_upstream_dependencies() {
 
     let expected_result = vec![
         request_datasets[0],
-        request_datasets[1],
-        "test-derive-foo-foo-foo-bar-foo",
-        "test-derive-foo-foo-foo-bar",
-        "test-derive-foo-foo-foo",
         "test-derive-foo-foo",
+        "test-derive-foo-foo-foo",
+        "test-derive-foo-foo-foo-bar",
+        "test-derive-foo-foo-foo-bar-foo",
+        request_datasets[1],
     ];
 
     assert_eq!(result, expected_result);
