@@ -1,7 +1,7 @@
 # Based on: https://github.com/jupyter-incubator/sparkmagic/blob/master/Dockerfile.jupyter
 # Tags: https://hub.docker.com/r/jupyter/base-notebook/tags
 FROM docker.io/jupyter/base-notebook:2022-11-15
-
+ARG TARGETPLATFORM
 ARG KAMU_VERSION
 ARG dev_mode=false
 
@@ -18,7 +18,7 @@ RUN apt update && \
     curl -L "https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/xUbuntu_${VERSION_ID}/Release.key" | apt-key add - && \
     apt update && \
     apt -y install podman fuse-overlayfs && \
-    rm -rf /var/lib/apt/lists/*
+    apt-get clean && rm -rf /var/lib/apt/lists /var/cache/apt/archives
 
 COPY podman/containers.conf /etc/containers/containers.conf
 COPY podman/storage.conf /etc/containers/storage.conf
@@ -46,14 +46,11 @@ RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2
 
 
 # Kamu
-RUN wget -q https://github.com/kamu-data/kamu-cli/releases/download/v$KAMU_VERSION/kamu-cli-x86_64-unknown-linux-gnu.tar.gz && \
-    tar -xf kamu-cli-x86_64-unknown-linux-gnu.tar.gz && \
-    chmod +x kamu-cli-x86_64-unknown-linux-gnu/kamu && \
-    mv kamu-cli-x86_64-unknown-linux-gnu/kamu /usr/local/bin/ && \
-    rm -rf kamu-cli-x86_64-unknown-linux-gnu* && \
-    echo "source <(kamu completions bash)" >> /home/$NB_USER/.bashrc
-COPY kamu/.kamuconfig /.kamuconfig
+RUN curl -s "https://get.kamu.dev" | KAMU_VERSION=$KAMU_VERSION KAMU_INSTALL_PATH=/usr/local/bin/kamu sh && \
+    echo "source <(kamu completions bash)" >> /home/$NB_USER/.profile
+COPY jupyter/.kamuconfig /.kamuconfig
 
+RUN chown -R $NB_USER:users /home/$NB_USER
 
 #########################################################################################
 USER $NB_USER
@@ -61,18 +58,17 @@ USER $NB_USER
 # This is needed because requests-kerberos fails to install on debian due to missing linux headers
 RUN conda install requests-kerberos==0.12.0 -y
 
-COPY kamu/requirements.txt requirements.txt
+COPY jupyter/requirements/$TARGETPLATFORM/requirements.txt requirements.txt
 RUN pip --no-cache-dir install --upgrade -r requirements.txt && rm requirements.txt
 
-COPY kamu/kamu.py /opt/conda/lib/python3.10/site-packages/kamu.py
+COPY jupyter/kamu.py /opt/conda/lib/python3.10/site-packages/kamu.py
 
-COPY kamu/sparkmagic.json /home/$NB_USER/.sparkmagic/config.json
+COPY jupyter/sparkmagic.json /home/$NB_USER/.sparkmagic/config.json
 RUN jupyter nbextension enable --py --sys-prefix widgetsnbextension
 #RUN jupyter-kernelspec install --user $(pip show sparkmagic | grep Location | cut -d" " -f2)/sparkmagic/kernels/sparkkernel
 RUN jupyter-kernelspec install --user $(pip show sparkmagic | grep Location | cut -d" " -f2)/sparkmagic/kernels/pysparkkernel
 #RUN jupyter-kernelspec install --user $(pip show sparkmagic | grep Location | cut -d" " -f2)/sparkmagic/kernels/sparkrkernel
 RUN jupyter serverextension enable --py sparkmagic
-
 
 #########################################################################################
 USER root

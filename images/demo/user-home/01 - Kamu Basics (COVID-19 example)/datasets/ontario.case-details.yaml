@@ -31,8 +31,8 @@ content:
             "Row_ID" as id,
             to_timestamp(coalesce("Case_Reported_Date", "Test_Reported_Date")) as case_reported_date,
             case
-              when "Test_Reported_Date" = '' then null
-              else to_timestamp("Test_Reported_Date")
+              when "Test_Reported_Date" != '' then to_timestamp("Test_Reported_Date")
+              else null
             end as test_reported_date,
             "Outcome1" as outcome,
             "Reporting_PHU_City" as city,

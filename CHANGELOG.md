@@ -5,8 +5,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- Complete support for `arm64` architecture (including M-series Apple silicon)
+  - `kamu-cli` now depends on multi-platform Datafusion, Spark, Flink, and Jupyter images allowing you to run data processing at native CPU speeds
+### Changed
+- Spark engine is upgraded to latest version of Spark 3.5
+- Spark engine is using [ANSI mode](https://spark.apache.org/docs/latest/sql-ref-ansi-compliance.html) by default which produces helpful errors instead of silently returning `null` in many built-in functions
 ### Fixed
- - Modeling mistake in Smart Transfer Protocol that creates unexpected push/pull transfer path for metadata blocks
+- Modeling mistake in Smart Transfer Protocol that creates unexpected push/pull transfer path for metadata blocks
 
 ## [0.156.3] - 2024-02-09
 ### Added

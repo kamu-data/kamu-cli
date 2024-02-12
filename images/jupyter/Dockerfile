@@ -1,12 +1,13 @@
 # Based on: https://github.com/jupyter-incubator/sparkmagic/blob/master/Dockerfile.jupyter
 # Tags: https://hub.docker.com/r/jupyter/base-notebook/tags
 FROM docker.io/jupyter/base-notebook:2022-11-15
+ARG TARGETPLATFORM
 
 USER root
 
 RUN apt update \
     && apt -y install curl wget gnupg unzip jq \
-    && rm -rf /var/lib/apt/lists/*
+    && apt-get clean && rm -rf /var/lib/apt/lists /var/cache/apt/archives
 
 
 #########################################################################################
@@ -15,7 +16,7 @@ USER $NB_USER
 # This is needed because requests-kerberos fails to install on debian due to missing linux headers
 RUN conda install requests-kerberos==0.12.0 -y
 
-COPY requirements.txt requirements.txt
+COPY requirements/$TARGETPLATFORM/requirements.txt requirements.txt
 RUN pip --no-cache-dir install --upgrade -r requirements.txt && rm requirements.txt
 
 COPY kamu.py /opt/conda/lib/python3.10/site-packages/kamu.py

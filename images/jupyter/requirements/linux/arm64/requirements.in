@@ -1,0 +1,18 @@
+sparkmagic
+
+pandas
+# TODO: Excluded due to fiona dependency that does not provide `aarch64` wheel
+# geopandas
+geojson
+xarray
+# TODO: Excluded doe to cftime dependency that does not provide `aarch64` wheel
+# netcdf4
+dask
+
+bokeh
+hvplot
+pandas-bokeh
+folium
+altair
+mapboxgl
+shapely

@@ -1,6 +1,7 @@
+IMAGE_PLATFORMS = linux/amd64,linux/arm64
 IMAGE_REPO = ghcr.io/kamu-data
 KAMU_VERSION = $(shell cargo metadata --format-version 1 | jq -r '.packages[] | select( .name == "kamu") | .version')
-DEMO_VERSION = 0.10.2
+DEMO_VERSION = 0.10.3
 
 #########################################################################################
 
@@ -8,6 +9,7 @@ DEMO_VERSION = 0.10.2
 all-examples:
 	rsync -avu --delete --exclude=".*/" "../../examples/" "user-home/XX - Other Examples"
 
+# Build image for local testing purposes
 .PHONY: jupyter
 jupyter: all-examples
 	docker build \
@@ -16,12 +18,20 @@ jupyter: all-examples
 		-t $(IMAGE_REPO)/kamu-cli-demo-jupyter:$(DEMO_VERSION) \
 		.
 
-.PHONY: jupyter-push
-jupyter-push:
-	docker push $(IMAGE_REPO)/kamu-cli-demo-jupyter:$(DEMO_VERSION)
+# Build and push multi-arch image
+.PHONY: jupyter-multi-arch
+jupyter-multi-arch:
+	docker buildx build \
+		-f Dockerfile.jupyter \
+		--push \
+		--platform $(IMAGE_PLATFORMS) \
+		--build-arg KAMU_VERSION=$(KAMU_VERSION) \
+		-t $(IMAGE_REPO)/kamu-cli-demo-jupyter:$(DEMO_VERSION) \
+		.
 
 #########################################################################################
 
+# Build image for local testing purposes
 .PHONY: minio
 minio:
 	docker build \
@@ -29,9 +39,15 @@ minio:
 		-t $(IMAGE_REPO)/kamu-cli-demo-minio:$(DEMO_VERSION) \
 		.
 
-.PHONY: minio-push
-minio-push:
-	docker push $(IMAGE_REPO)/kamu-cli-demo-minio:$(DEMO_VERSION)
+# Build and push multi-arch image
+.PHONY: minio-multi-arch
+minio-multi-arch:
+	docker buildx build \
+		-f Dockerfile.minio \
+		--push \
+		--platform $(IMAGE_PLATFORMS) \
+		-t $(IMAGE_REPO)/kamu-cli-demo-minio:$(DEMO_VERSION) \
+		.
 
 #########################################################################################
 
@@ -71,3 +87,9 @@ podman-images/:
 
 	# For Some reason podman creates files owned by a different users, so we need sudo to chmod them :(
 	sudo chmod -R a+rx podman-images
+
+#########################################################################################
+
+.PHONY: clean
+clean:
+	rm -rf minio-data podman-images

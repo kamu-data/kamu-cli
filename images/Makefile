@@ -1,9 +1,11 @@
+IMAGE_PLATFORMS = linux/amd64,linux/arm64
 IMAGE_REPO = ghcr.io/kamu-data
-IMAGE_JUPYTER_TAG = 0.5.2
+IMAGE_JUPYTER_TAG = 0.5.3
 
 KAMU_VERSION = $(shell cargo metadata --format-version 1 | jq -r '.packages[] | select( .name == "kamu") | .version')
 
 
+# Build image for local testing purposes
 .PHONY: jupyter
 jupyter:
 	docker build \
@@ -11,9 +13,14 @@ jupyter:
 		jupyter/
 
 
-.PHONY: jupyter-push
-jupyter-push:
-	docker push $(IMAGE_REPO)/jupyter:$(IMAGE_JUPYTER_TAG)
+# Build and push multi-arch image
+.PHONY: jupyter-multi-arch
+jupyter-multi-arch:
+	docker buildx build \
+		--push \
+		--platform $(IMAGE_PLATFORMS) \
+		-t $(IMAGE_REPO)/jupyter:$(IMAGE_JUPYTER_TAG) \
+		jupyter/
 
 
 #########################################################################################
