@@ -122,7 +122,7 @@ async fn test_trigger_ingest_root_dataset() {
                                         "description": {
                                             "__typename": "FlowDescriptionDatasetPollingIngest",
                                             "datasetId": create_result.dataset_handle.id.to_string(),
-                                            "ingestedRecordsCount": null,
+                                            "ingestResult": null,
                                         },
                                         "status": "QUEUED",
                                         "outcome": null,
@@ -229,7 +229,7 @@ async fn test_trigger_execute_transform_derived_dataset() {
                                         "description": {
                                             "__typename": "FlowDescriptionDatasetExecuteTransform",
                                             "datasetId": create_derived_result.dataset_handle.id.to_string(),
-                                            "transformedRecordsCount": null,
+                                            "transformResult": null,
                                         },
                                         "status": "QUEUED",
                                         "outcome": null,
@@ -1144,7 +1144,9 @@ async fn test_cancel_already_succeeded_flow() {
 
     let flow_task_id = harness.mimic_flow_scheduled(flow_id).await;
     harness.mimic_task_running(flow_task_id).await;
-    harness.mimic_task_completed(flow_task_id).await;
+    harness
+        .mimic_task_completed(flow_task_id, TaskOutcome::Success(TaskResult::Empty))
+        .await;
 
     let mutation_code =
         FlowRunsHarness::cancel_scheduled_tasks_mutation(&create_result.dataset_handle.id, flow_id);
@@ -1214,7 +1216,9 @@ async fn test_history_of_completed_flow() {
 
     let flow_task_id = harness.mimic_flow_scheduled(flow_id).await;
     harness.mimic_task_running(flow_task_id).await;
-    harness.mimic_task_completed(flow_task_id).await;
+    harness
+        .mimic_task_completed(flow_task_id, TaskOutcome::Success(TaskResult::Empty))
+        .await;
 
     let query = FlowRunsHarness::flow_history_query(&create_result.dataset_handle.id, flow_id);
 
@@ -1477,7 +1481,7 @@ impl FlowRunsHarness {
             .unwrap();
     }
 
-    async fn mimic_task_completed(&self, task_id: TaskID) {
+    async fn mimic_task_completed(&self, task_id: TaskID, task_outcome: TaskOutcome) {
         let flow_service_test_driver = self
             .catalog_authorized
             .get_one::<dyn FlowServiceTestDriver>()
@@ -1489,7 +1493,7 @@ impl FlowRunsHarness {
             .dispatch_event(TaskEventFinished {
                 event_time: Utc::now(),
                 task_id,
-                outcome: TaskOutcome::Success(TaskResult::Empty),
+                outcome: task_outcome,
             })
             .await
             .unwrap();
@@ -1521,17 +1525,26 @@ impl FlowRunsHarness {
                                             }
                                             ... on FlowDescriptionDatasetExecuteTransform {
                                                 datasetId
-                                                transformedRecordsCount
+                                                transformResult {
+                                                    numBlocks
+                                                    numRecords
+                                                }
                                             }
                                             ... on FlowDescriptionDatasetPollingIngest {
                                                 datasetId
-                                                ingestedRecordsCount
+                                                ingestResult {
+                                                    numBlocks
+                                                    numRecords
+                                                }
                                             }
                                             ... on FlowDescriptionDatasetPushIngest {
                                                 datasetId
                                                 sourceName
                                                 inputRecordsCount
-                                                ingestedRecordsCount
+                                                ingestResult {
+                                                    numBlocks
+                                                    numRecords
+                                                }
                                             }
                                         }
                                         status

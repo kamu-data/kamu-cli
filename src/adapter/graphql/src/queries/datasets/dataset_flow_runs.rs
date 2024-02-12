@@ -45,7 +45,7 @@ impl DatasetFlowRuns {
         let flow_state = flow_service.get_flow(flow_id.into()).await.int_err()?;
 
         Ok(GetFlowResult::Success(GetFlowSuccess {
-            flow: Flow::new(flow_state),
+            flow: Box::new(Flow::new(flow_state)),
         }))
     }
 
@@ -110,7 +110,7 @@ enum GetFlowResult {
 #[derive(SimpleObject)]
 #[graphql(complex)]
 struct GetFlowSuccess {
-    pub flow: Flow,
+    pub flow: Box<Flow>,
 }
 
 #[ComplexObject]

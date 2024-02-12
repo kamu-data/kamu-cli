@@ -34,8 +34,8 @@ pub enum FlowResult {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct FlowResultDatasetUpdate {
-    num_blocks: u64,
-    num_records: u64,
+    pub num_blocks: u64,
+    pub num_records: u64,
 }
 
 impl From<&ts::TaskResult> for FlowResult {

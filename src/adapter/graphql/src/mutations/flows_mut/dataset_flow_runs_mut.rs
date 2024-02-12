@@ -70,7 +70,7 @@ impl DatasetFlowRunsMut {
             })?;
 
         Ok(TriggerFlowResult::Success(TriggerFlowSuccess {
-            flow: Flow::new(flow_state),
+            flow: Box::new(Flow::new(flow_state)),
         }))
     }
 
@@ -97,7 +97,7 @@ impl DatasetFlowRunsMut {
         match res {
             Ok(flow_state) => Ok(CancelScheduledTasksResult::Success(
                 CancelScheduledTasksSuccess {
-                    flow: Flow::new(flow_state),
+                    flow: Box::new(Flow::new(flow_state)),
                 },
             )),
             Err(e) => match e {
@@ -125,7 +125,7 @@ enum TriggerFlowResult {
 #[derive(SimpleObject)]
 #[graphql(complex)]
 struct TriggerFlowSuccess {
-    pub flow: Flow,
+    pub flow: Box<Flow>,
 }
 
 #[ComplexObject]
@@ -148,7 +148,7 @@ enum CancelScheduledTasksResult {
 #[derive(SimpleObject)]
 #[graphql(complex)]
 struct CancelScheduledTasksSuccess {
-    pub flow: Flow,
+    pub flow: Box<Flow>,
 }
 
 #[ComplexObject]

@@ -61,25 +61,31 @@ impl Flow {
                     .await
                     .int_err()?;
 
+                let ingest_result = FlowDescriptionUpdateResult::from_maybe_flow_outcome(
+                    self.flow_state.outcome.as_ref(),
+                );
+
                 if maybe_polling_source.is_some() {
                     FlowDescriptionDataset::PollingIngest(FlowDescriptionDatasetPollingIngest {
                         dataset_id: dataset_key.dataset_id.clone().into(),
-                        ingested_records_count: None, // TODO
+                        ingest_result,
                     })
                 } else {
                     let source_name = self.flow_state.primary_trigger.push_source_name();
                     FlowDescriptionDataset::PushIngest(FlowDescriptionDatasetPushIngest {
                         dataset_id: dataset_key.dataset_id.clone().into(),
                         source_name,
-                        input_records_count: 0,       // TODO
-                        ingested_records_count: None, // TODO
+                        input_records_count: 0, // TODO
+                        ingest_result,
                     })
                 }
             }
             fs::DatasetFlowType::ExecuteTransform => {
                 FlowDescriptionDataset::ExecuteTransform(FlowDescriptionDatasetExecuteTransform {
                     dataset_id: dataset_key.dataset_id.clone().into(),
-                    transformed_records_count: None, // TODO
+                    transform_result: FlowDescriptionUpdateResult::from_maybe_flow_outcome(
+                        self.flow_state.outcome.as_ref(),
+                    ),
                 })
             }
             fs::DatasetFlowType::Compaction => {
@@ -193,7 +199,7 @@ enum FlowDescriptionDataset {
 #[derive(SimpleObject)]
 struct FlowDescriptionDatasetPollingIngest {
     dataset_id: DatasetID,
-    ingested_records_count: Option<u64>,
+    ingest_result: Option<FlowDescriptionUpdateResult>,
 }
 
 #[derive(SimpleObject)]
@@ -201,13 +207,13 @@ struct FlowDescriptionDatasetPushIngest {
     dataset_id: DatasetID,
     source_name: Option<String>,
     input_records_count: u64,
-    ingested_records_count: Option<u64>,
+    ingest_result: Option<FlowDescriptionUpdateResult>,
 }
 
 #[derive(SimpleObject)]
 struct FlowDescriptionDatasetExecuteTransform {
     dataset_id: DatasetID,
-    transformed_records_count: Option<u64>,
+    transform_result: Option<FlowDescriptionUpdateResult>,
 }
 
 #[derive(SimpleObject)]
@@ -215,6 +221,29 @@ struct FlowDescriptionDatasetCompaction {
     dataset_id: DatasetID,
     original_blocks_count: u64,
     resulting_blocks_count: Option<u64>,
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject)]
+struct FlowDescriptionUpdateResult {
+    num_blocks: u64,
+    num_records: u64,
+}
+
+impl FlowDescriptionUpdateResult {
+    fn from_maybe_flow_outcome(maybe_outcome: Option<&fs::FlowOutcome>) -> Option<Self> {
+        maybe_outcome.and_then(|outcome| match outcome {
+            fs::FlowOutcome::Success(result) => match result {
+                fs::FlowResult::Empty => None,
+                fs::FlowResult::DatasetUpdate(update) => Some(Self {
+                    num_blocks: update.num_blocks,
+                    num_records: update.num_records,
+                }),
+            },
+            _ => None,
+        })
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
