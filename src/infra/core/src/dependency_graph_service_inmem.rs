@@ -234,6 +234,7 @@ impl DependencyGraphServiceInMemory {
         let mut result = vec![];
 
         depth_first_search(&state.datasets_graph, nodes_to_search, |event| {
+            // Postorder nodes nodes
             if let DfsEvent::Finish(node_index, _) = event {
                 result.push(
                     state
