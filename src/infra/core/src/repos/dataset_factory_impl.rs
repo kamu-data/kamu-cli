@@ -30,7 +30,7 @@ pub struct DatasetFactoryImpl {
 // TODO: Make digest configurable
 type DatasetImplLocalFS = DatasetImpl<
     MetadataChainImpl<
-        MetadataBlockRepositoryCachingInMem<ObjectRepositoryLocalFSSha3>,
+        MetadataBlockRepositoryImplWithCache<ObjectRepositoryLocalFSSha3>,
         ReferenceRepositoryImpl<NamedObjectRepositoryLocalFS>,
     >,
     ObjectRepositoryLocalFSSha3,
@@ -59,7 +59,7 @@ impl DatasetFactoryImpl {
         DatasetImpl::new(
             event_bus,
             MetadataChainImpl::new(
-                MetadataBlockRepositoryCachingInMem::new(ObjectRepositoryLocalFSSha3::new(
+                MetadataBlockRepositoryImplWithCache::new(ObjectRepositoryLocalFSSha3::new(
                     layout.blocks_dir,
                 )),
                 ReferenceRepositoryImpl::new(NamedObjectRepositoryLocalFS::new(layout.refs_dir)),
@@ -80,7 +80,7 @@ impl DatasetFactoryImpl {
         DatasetImpl::new(
             event_bus,
             MetadataChainImpl::new(
-                MetadataBlockRepositoryCachingInMem::new(ObjectRepositoryHttp::new(
+                MetadataBlockRepositoryImplWithCache::new(ObjectRepositoryHttp::new(
                     client.clone(),
                     base_url.join("blocks/").unwrap(),
                     header_map.clone(),
@@ -137,7 +137,7 @@ impl DatasetFactoryImpl {
         Ok(DatasetImpl::new(
             event_bus,
             MetadataChainImpl::new(
-                MetadataBlockRepositoryCachingInMem::new(ObjectRepositoryS3Sha3::new(
+                MetadataBlockRepositoryImplWithCache::new(ObjectRepositoryS3Sha3::new(
                     S3Context::new(
                         client.clone(),
                         endpoint.clone(),
@@ -234,7 +234,7 @@ impl DatasetFactoryImpl {
         Ok(DatasetImpl::new(
             event_bus,
             MetadataChainImpl::new(
-                MetadataBlockRepositoryCachingInMem::new(ObjectRepositoryHttp::new(
+                MetadataBlockRepositoryImplWithCache::new(ObjectRepositoryHttp::new(
                     client.clone(),
                     dataset_url.join("blocks/").unwrap(),
                     Default::default(),

@@ -76,7 +76,7 @@ impl SimpleTransferProtocol {
         listener.begin();
 
         let empty_chain = MetadataChainImpl::new(
-            MetadataBlockRepositoryCachingInMem::new(ObjectRepositoryInMemory::new()),
+            MetadataBlockRepositoryImplWithCache::new(ObjectRepositoryInMemory::new()),
             ReferenceRepositoryImpl::new(NamedObjectRepositoryInMemory::new()),
         );
 

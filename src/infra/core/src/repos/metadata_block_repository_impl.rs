@@ -101,3 +101,25 @@ where
         &self.obj_repo
     }
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////
+// Helpers
+/////////////////////////////////////////////////////////////////////////////////////////
+
+pub trait MetadataBlockRepositoryExt<ObjRepo>
+where
+    ObjRepo: ObjectRepository + Sync + Send,
+{
+    fn new(obj_repo: ObjRepo) -> Self;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+impl<ObjRepo> MetadataBlockRepositoryExt<ObjRepo> for MetadataBlockRepositoryImpl<ObjRepo>
+where
+    ObjRepo: ObjectRepository + Sync + Send,
+{
+    fn new(obj_repo: ObjRepo) -> Self {
+        Self::new(obj_repo)
+    }
+}

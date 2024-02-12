@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::marker::PhantomData;
+
 use async_trait::async_trait;
 use dashmap::DashMap;
 use internal_error::ErrorIntoInternal;
@@ -21,27 +23,42 @@ use kamu_core::{
 };
 use opendatafabric::{MetadataBlock, Multihash};
 
-use crate::MetadataBlockRepositoryImpl;
+use crate::{MetadataBlockRepositoryExt, MetadataBlockRepositoryImpl};
+
+/////////////////////////////////////////////////////////////////////////////////////////
+// Type shortcuts
+/////////////////////////////////////////////////////////////////////////////////////////
+
+pub type MetadataBlockRepositoryImplWithCache<ObjRepo> =
+    MetadataBlockRepositoryCachingInMem<MetadataBlockRepositoryImpl<ObjRepo>, ObjRepo>;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct MetadataBlockRepositoryCachingInMem<ObjRepo> {
-    wrapped: MetadataBlockRepositoryImpl<ObjRepo>,
+pub struct MetadataBlockRepositoryCachingInMem<WrappedRepo, ObjRepo> {
+    wrapped: WrappedRepo,
     cache: DashMap<Multihash, MetadataBlock>,
+    _phantom: PhantomData<ObjRepo>,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-impl<ObjRepo> MetadataBlockRepositoryCachingInMem<ObjRepo>
+impl<WrappedRepo, ObjRepo> MetadataBlockRepositoryCachingInMem<WrappedRepo, ObjRepo>
 where
+    WrappedRepo: MetadataBlockRepositoryExt<ObjRepo> + Sync + Send,
     ObjRepo: ObjectRepository + Sync + Send,
 {
     pub fn new(obj_repo: ObjRepo) -> Self {
-        let wrapped = MetadataBlockRepositoryImpl::new(obj_repo);
+        let wrapped = WrappedRepo::new(obj_repo);
 
+        MetadataBlockRepositoryCachingInMem::new_wrapped(wrapped)
+    }
+
+    // This is for tests only
+    pub fn new_wrapped(wrapped: WrappedRepo) -> Self {
         Self {
             wrapped,
             cache: DashMap::new(),
+            _phantom: PhantomData,
         }
     }
 }
@@ -49,8 +66,10 @@ where
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait]
-impl<ObjRepo> MetadataBlockRepository for MetadataBlockRepositoryCachingInMem<ObjRepo>
+impl<WrappedRepo, ObjRepo> MetadataBlockRepository
+    for MetadataBlockRepositoryCachingInMem<WrappedRepo, ObjRepo>
 where
+    WrappedRepo: MetadataBlockRepository + Sync + Send,
     ObjRepo: ObjectRepository + Sync + Send,
 {
     async fn contains_block(&self, hash: &Multihash) -> Result<bool, ContainsBlockError> {
