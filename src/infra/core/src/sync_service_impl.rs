@@ -188,7 +188,6 @@ impl SyncServiceImpl {
         SimpleTransferProtocol
             .sync(
                 src_ref,
-                dst_ref,
                 src_dataset,
                 dst_dataset,
                 dst_factory,

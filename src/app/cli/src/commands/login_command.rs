@@ -43,8 +43,7 @@ impl LoginCommand {
 
     fn get_server_url(&self) -> Url {
         self.server
-            .as_ref()
-            .cloned()
+            .clone()
             .unwrap_or_else(|| Url::parse(odf_server::DEFAULT_ODF_FRONTEND_URL).unwrap())
     }
 

@@ -419,7 +419,6 @@ impl PullServiceImpl {
     async fn transform_multi(
         &self,
         batch: &[PullItem], // TODO: Move to avoid cloning
-        _options: &PullMultiOptions,
         listener: Option<Arc<dyn TransformMultiListener>>,
     ) -> Result<Vec<PullResponse>, InternalError> {
         let transform_requests = batch.iter().map(|pi| pi.local_ref.clone()).collect();
@@ -572,7 +571,6 @@ impl PullService for PullServiceImpl {
                 tracing::info!(%depth, ?batch, "Running transform batch");
                 self.transform_multi(
                     batch,
-                    &options,
                     listener
                         .as_ref()
                         .and_then(|l| l.clone().get_transform_listener()),

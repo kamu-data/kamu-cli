@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 #![feature(error_generic_member_access)]
-#![feature(file_create_new)]
 
 pub mod merge_strategies;
 pub mod readers;

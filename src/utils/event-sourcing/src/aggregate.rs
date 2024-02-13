@@ -266,7 +266,7 @@ where
             }
             Err(err) => {
                 // Restore the state pre error
-                self.state = err.inner.state.as_ref().cloned();
+                self.state = err.inner.state.clone();
                 Err(err)
             }
         }
@@ -293,7 +293,7 @@ where
             }
             Err(err) => {
                 // Restore the state pre error
-                self.state = err.inner.state.as_ref().cloned();
+                self.state = err.inner.state.clone();
                 Err(err)
             }
         }?;

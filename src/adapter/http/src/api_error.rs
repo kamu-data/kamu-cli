@@ -183,7 +183,7 @@ where
             ApiErrorCategory::Access(AccessError::Forbidden(_) | AccessError::ReadOnly(_)) => {
                 ApiError::new(self, http::StatusCode::FORBIDDEN)
             }
-            ApiErrorCategory::Internal(_) => {
+            ApiErrorCategory::Internal(_e) => {
                 ApiError::new(self, http::StatusCode::INTERNAL_SERVER_ERROR)
             }
             ApiErrorCategory::Other => ApiError::new(self, http::StatusCode::INTERNAL_SERVER_ERROR),

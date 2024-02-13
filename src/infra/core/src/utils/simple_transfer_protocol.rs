@@ -64,7 +64,6 @@ impl SimpleTransferProtocol {
     pub async fn sync(
         &self,
         src_ref: &DatasetRefAny,
-        _dst_ref: &DatasetRefAny,
         src: Arc<dyn Dataset>,
         maybe_dst: Option<Arc<dyn Dataset>>,
         dst_factory: Option<DatasetFactoryFn>,

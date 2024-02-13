@@ -89,23 +89,22 @@ impl FlowServiceInMemory {
     }
 
     #[tracing::instrument(level = "debug", skip_all)]
-    async fn run_current_timeslot(&self) {
-        let planned_flows: Vec<_> = {
+    async fn run_current_timeslot(&self) -> Result<(), InternalError> {
+        let planned_flow_ids: Vec<_> = {
             let mut state = self.state.lock().unwrap();
             state.time_wheel.take_nearest_planned_flows()
         };
 
-        let planned_task_futures: Vec<_> = planned_flows
-            .iter()
-            .map(async move |flow_id| {
-                let mut flow = Flow::load(*flow_id, self.flow_event_store.as_ref())
+        let mut planned_task_futures = Vec::new();
+        for planned_flow_id in planned_flow_ids {
+            planned_task_futures.push(async move {
+                let mut flow = Flow::load(planned_flow_id, self.flow_event_store.as_ref())
                     .await
                     .int_err()?;
-
                 self.schedule_flow_task(&mut flow).await?;
                 Ok(())
-            })
-            .collect();
+            });
+        }
 
         let results = futures::future::join_all(planned_task_futures).await;
         results
@@ -115,6 +114,8 @@ impl FlowServiceInMemory {
             .for_each(|e: InternalError| {
                 tracing::error!(error=?e, "Scheduling flow failed");
             });
+
+        Ok(())
     }
 
     #[tracing::instrument(level = "debug", skip_all)]
@@ -523,7 +524,7 @@ impl FlowService for FlowServiceInMemory {
                 && nearest_activation_time <= current_time
             {
                 // Run scheduling for current time slot. Should not throw any errors
-                self.run_current_timeslot().await;
+                self.run_current_timeslot().await.int_err()?;
 
                 // Publish progress event
                 self.event_bus

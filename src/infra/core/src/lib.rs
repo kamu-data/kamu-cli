@@ -12,6 +12,7 @@
 #![feature(box_patterns)]
 #![feature(exit_status_error)]
 #![feature(error_generic_member_access)]
+#![feature(trait_upcasting)]
 
 // Re-exports
 pub use kamu_core as domain;
