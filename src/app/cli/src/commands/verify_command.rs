@@ -26,10 +26,16 @@ pub struct VerifyCommand {
     dataset_repo: Arc<dyn DatasetRepository>,
     verification_svc: Arc<dyn VerificationService>,
     dependency_graph_service: Arc<dyn DependencyGraphService>,
+    remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
     output_config: Arc<OutputConfig>,
     refs: Vec<DatasetRefPattern>,
     recursive: bool,
     integrity: bool,
+}
+
+struct RemoteRefDependency {
+    source_dataset: String,
+    dependencies: Vec<String>,
 }
 
 impl VerifyCommand {
@@ -37,6 +43,7 @@ impl VerifyCommand {
         dataset_repo: Arc<dyn DatasetRepository>,
         verification_svc: Arc<dyn VerificationService>,
         dependency_graph_service: Arc<dyn DependencyGraphService>,
+        remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
         output_config: Arc<OutputConfig>,
         refs: I,
         recursive: bool,
@@ -49,6 +56,7 @@ impl VerifyCommand {
             dataset_repo,
             verification_svc,
             dependency_graph_service,
+            remote_alias_reg,
             output_config,
             refs: refs.collect(),
             recursive,
@@ -111,7 +119,33 @@ impl VerifyCommand {
                 .collect()
         };
 
-        if requests.is_empty() {
+        let (filtered_requests, missed_remote_dependencies) =
+            self.check_remote_datasets(requests).await;
+
+        if !missed_remote_dependencies.is_empty() {
+            let missed_dependiency_warnings: Vec<String> = missed_remote_dependencies
+                .iter()
+                .map(|remote_ref_dependency| {
+                    format!(
+                        "Dataset:\n {}\nDependencies:\n {}",
+                        remote_ref_dependency.source_dataset,
+                        remote_ref_dependency.dependencies.join("\n"),
+                    )
+                })
+                .collect();
+
+            eprintln!(
+                "{}",
+                console::style(format!(
+                    "Unable verify derivative transformation for some dataset(s). Please download \
+                     next dependencies: \n{}\nor add --integrity flag and try again",
+                    missed_dependiency_warnings.join("\n"),
+                ))
+                .yellow()
+            );
+        }
+
+        if filtered_requests.is_empty() {
             return Ok(vec![]);
         }
 
@@ -120,8 +154,71 @@ impl VerifyCommand {
         Ok(self
             .verification_svc
             .clone()
-            .verify_multi(requests, options, Some(listener))
+            .verify_multi(filtered_requests, options, Some(listener))
             .await)
+    }
+
+    // Return
+    async fn check_remote_datasets(
+        &self,
+        verifiation_requests: Vec<VerificationRequest>,
+    ) -> (Vec<VerificationRequest>, Vec<RemoteRefDependency>) {
+        let mut result = vec![];
+        let mut missed_dependencies = vec![];
+
+        for verification_request in &verifiation_requests {
+            if let Ok(dataset_handle) = self
+                .dataset_repo
+                .resolve_dataset_ref(&verification_request.dataset_ref)
+                .await
+            {
+                let is_remote = self
+                    .remote_alias_reg
+                    .get_remote_aliases(&dataset_handle.as_local_ref())
+                    .await
+                    .unwrap()
+                    .get_by_kind(RemoteAliasKind::Pull)
+                    .next()
+                    .is_some();
+                if !is_remote || self.integrity {
+                    result.push(verification_request.clone());
+                    continue;
+                }
+
+                let dataset = self
+                    .dataset_repo
+                    .get_dataset(&dataset_handle.as_local_ref())
+                    .await
+                    .unwrap();
+                let summary = dataset
+                    .get_summary(GetSummaryOpts::default())
+                    .await
+                    .unwrap();
+
+                let mut current_missed_dependencies = vec![];
+
+                for dependecy in summary.dependencies {
+                    if self
+                        .dataset_repo
+                        .resolve_dataset_ref(&DatasetRef::ID(dependecy.clone()))
+                        .await
+                        .is_err()
+                    {
+                        current_missed_dependencies.push(dependecy.to_string());
+                    }
+                }
+                if !current_missed_dependencies.is_empty() {
+                    missed_dependencies.push(RemoteRefDependency {
+                        source_dataset: dataset_handle.alias.to_string(),
+                        dependencies: current_missed_dependencies,
+                    });
+                } else {
+                    result.push(verification_request.clone());
+                }
+            }
+        }
+
+        (result, missed_dependencies)
     }
 }
 
