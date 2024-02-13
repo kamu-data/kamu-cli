@@ -42,29 +42,37 @@ where
 
 #[derive(thiserror::Error, Debug)]
 pub struct ProjectionError<Proj: Projection> {
-    pub state: Option<Box<Proj>>,
+    pub inner: Box<ProjectionErrorInner<Proj>>,
+}
+
+#[derive(Debug)]
+pub struct ProjectionErrorInner<Proj: Projection> {
+    pub state: Option<Proj>,
     pub event: <Proj as Projection>::Event,
 }
 
 impl<Proj: Projection> ProjectionError<Proj> {
     pub fn new(state: Option<Proj>, event: <Proj as Projection>::Event) -> Self {
         Self {
-            state: state.map(Box::new),
-            event,
+            inner: Box::new(ProjectionErrorInner::<Proj> { state, event }),
         }
     }
 }
 
 impl<Proj: Projection> std::fmt::Display for ProjectionError<Proj> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if let Some(state) = &self.state {
-            write!(f, "Event {:?} is illegal for state {:?}", self.event, state)
+        if let Some(state) = &self.inner.state {
+            write!(
+                f,
+                "Event {:?} is illegal for state {:?}",
+                self.inner.event, state
+            )
         } else {
             write!(
                 f,
                 "Cannot initialize {} from event {:?}",
                 std::any::type_name::<Proj>(),
-                self.event
+                self.inner.event
             )
         }
     }
