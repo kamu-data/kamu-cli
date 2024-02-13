@@ -46,7 +46,7 @@ impl TaskOutcome {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TaskResult {
     Empty,
-    PullResult(Box<PullResult>),
+    PullResult(PullResult),
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

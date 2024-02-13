@@ -93,7 +93,7 @@ impl TaskExecutor for TaskExecutorInMemory {
 
                     match maybe_pull_result {
                         Ok(pull_result) => {
-                            TaskOutcome::Success(TaskResult::PullResult(Box::new(pull_result)))
+                            TaskOutcome::Success(TaskResult::PullResult(pull_result))
                         }
                         Err(_) => TaskOutcome::Failed,
                     }

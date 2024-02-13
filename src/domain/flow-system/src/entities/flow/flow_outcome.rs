@@ -42,7 +42,7 @@ impl From<&ts::TaskResult> for FlowResult {
     fn from(value: &ts::TaskResult) -> Self {
         match value {
             ts::TaskResult::Empty => Self::Empty,
-            ts::TaskResult::PullResult(pull_result) => match **pull_result {
+            ts::TaskResult::PullResult(pull_result) => match *pull_result {
                 PullResult::UpToDate => Self::DatasetUpdate(FlowResultDatasetUpdate {
                     num_blocks: 0,
                     num_records: 0,

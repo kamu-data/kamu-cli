@@ -19,14 +19,16 @@ use crate::queries::{Account, Task};
 
 #[derive(Clone)]
 pub struct Flow {
-    flow_state: fs::FlowState,
+    flow_state: Box<fs::FlowState>,
 }
 
 #[Object]
 impl Flow {
     #[graphql(skip)]
     pub fn new(flow_state: fs::FlowState) -> Self {
-        Self { flow_state }
+        Self {
+            flow_state: Box::new(flow_state),
+        }
     }
 
     /// Unique identifier of the flow
