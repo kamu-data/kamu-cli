@@ -30,7 +30,6 @@ edition = { workspace = true }
 publish = { workspace = true }
 
 [dependencies]
-ahash = "0.8.8"
 arrow = "48.0.0"
 async-trait = "0.1"
 aws-config = "0.57"

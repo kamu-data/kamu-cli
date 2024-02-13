@@ -3494,7 +3494,6 @@ dependencies = [
 name = "kamu-cli"
 version = "0.158.0"
 dependencies = [
- "ahash",
  "arrow-flight",
  "assert_cmd",
  "async-graphql",
@@ -3609,7 +3608,6 @@ dependencies = [
 name = "kamu-data-utils"
 version = "0.158.0"
 dependencies = [
- "ahash",
  "arrow-digest",
  "async-trait",
  "datafusion",
@@ -3630,7 +3628,6 @@ dependencies = [
 name = "kamu-datafusion-cli"
 version = "0.158.0"
 dependencies = [
- "ahash",
  "arrow",
  "async-trait",
  "aws-config",
