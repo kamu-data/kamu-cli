@@ -157,6 +157,12 @@ impl TransformServiceImpl {
             }
         }
 
+        let num_records = response
+            .new_offset_interval
+            .as_ref()
+            .map(|interval| interval.end - interval.start + 1)
+            .unwrap_or_default();
+
         let params = ExecuteTransformParams {
             query_inputs: request.inputs.iter().map(|i| i.clone().into()).collect(),
             prev_checkpoint: request.prev_checkpoint,
@@ -183,6 +189,7 @@ impl TransformServiceImpl {
             old_head,
             new_head: commit_result.new_head,
             num_blocks: 1,
+            num_records,
         })
     }
 
@@ -839,12 +846,24 @@ impl TransformService for TransformServiceImpl {
                 .get_transform_listener()
                 .unwrap_or_else(|| Arc::new(NullTransformListener));
 
+            let num_records = actual_event
+                .as_ref()
+                .map(|e| {
+                    e.new_data
+                        .as_ref()
+                        .map(DataSlice::num_records)
+                        .unwrap_or_default()
+                })
+                .unwrap_or_default();
+
             let ds = dataset.clone();
             let out_event = &mut actual_event;
+
             let result = TransformResult::Updated {
                 old_head: expected_block.prev_block_hash.clone().unwrap(),
                 new_head: block_hash.clone(),
                 num_blocks: 1,
+                num_records,
             };
 
             Self::do_transform(

@@ -103,12 +103,22 @@ pub enum FlowStatus {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Enum, Copy, Clone, Eq, PartialEq)]
-#[graphql(remote = "kamu_flow_system::FlowOutcome")]
 pub enum FlowOutcome {
     Success,
     Failed,
     Cancelled,
     Aborted,
+}
+
+impl From<kamu_flow_system::FlowOutcome> for FlowOutcome {
+    fn from(value: kamu_flow_system::FlowOutcome) -> Self {
+        match value {
+            kamu_flow_system::FlowOutcome::Success(_) => Self::Success,
+            kamu_flow_system::FlowOutcome::Failed => Self::Failed,
+            kamu_flow_system::FlowOutcome::Cancelled => Self::Cancelled,
+            kamu_flow_system::FlowOutcome::Aborted => Self::Aborted,
+        }
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

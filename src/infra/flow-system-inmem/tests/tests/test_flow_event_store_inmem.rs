@@ -13,7 +13,7 @@ use chrono::{Duration, Utc};
 use futures::TryStreamExt;
 use kamu_flow_system::*;
 use kamu_flow_system_inmem::FlowEventStoreInMem;
-use kamu_task_system::TaskSystemEventStore;
+use kamu_task_system::{TaskOutcome, TaskResult, TaskSystemEventStore};
 use kamu_task_system_inmem::TaskSystemEventStoreInMemory;
 use opendatafabric::{AccountName, DatasetID, FAKE_ACCOUNT_ID};
 
@@ -1189,7 +1189,7 @@ fn drive_flow_to_status(
                     flow.on_task_finished(
                         start_moment + Duration::minutes(10),
                         task_id,
-                        kamu_task_system::TaskOutcome::Success,
+                        TaskOutcome::Success(TaskResult::Empty),
                     )
                     .unwrap();
                 } else if expected_status != FlowStatus::Running {

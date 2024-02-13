@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use std::sync::Arc;
-use std::usize;
 
 use opendatafabric::*;
 use thiserror::Error;
@@ -58,7 +57,8 @@ pub enum TransformResult {
     Updated {
         old_head: Multihash,
         new_head: Multihash,
-        num_blocks: usize,
+        num_blocks: u64,
+        num_records: u64,
     },
 }
 

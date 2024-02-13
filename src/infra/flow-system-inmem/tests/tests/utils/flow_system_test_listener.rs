@@ -14,7 +14,14 @@ use chrono::{DateTime, Utc};
 use dill::*;
 use event_bus::AsyncEventHandler;
 use kamu_core::{FakeSystemTimeSource, InternalError};
-use kamu_flow_system::{FlowKey, FlowPaginationOpts, FlowService, FlowServiceEvent, FlowState};
+use kamu_flow_system::{
+    FlowKey,
+    FlowOutcome,
+    FlowPaginationOpts,
+    FlowService,
+    FlowServiceEvent,
+    FlowState,
+};
 use opendatafabric::DatasetID;
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -123,7 +130,16 @@ impl std::fmt::Display for FlowSystemTestListener {
                 for state in snapshots.get(flow_key).unwrap() {
                     write!(f, "    Flow ID = {} {:?}", state.flow_id, state.status(),)?;
                     if let Some(outcome) = state.outcome {
-                        writeln!(f, " {outcome:?}",)?;
+                        writeln!(
+                            f,
+                            " {}",
+                            match outcome {
+                                FlowOutcome::Success(_) => "Success",
+                                FlowOutcome::Aborted => "Aborted",
+                                FlowOutcome::Cancelled => "Cancelled",
+                                FlowOutcome::Failed => "Failed",
+                            }
+                        )?;
                     } else {
                         writeln!(f)?;
                     }

@@ -714,23 +714,28 @@ type FlowDescriptionDatasetCompaction {
 
 type FlowDescriptionDatasetExecuteTransform {
 	datasetId: DatasetID!
-	transformedRecordsCount: Int
+	transformResult: FlowDescriptionUpdateResult
 }
 
 type FlowDescriptionDatasetPollingIngest {
 	datasetId: DatasetID!
-	ingestedRecordsCount: Int
+	ingestResult: FlowDescriptionUpdateResult
 }
 
 type FlowDescriptionDatasetPushIngest {
 	datasetId: DatasetID!
 	sourceName: String
 	inputRecordsCount: Int!
-	ingestedRecordsCount: Int
+	ingestResult: FlowDescriptionUpdateResult
 }
 
 type FlowDescriptionSystemGC {
 	dummy: Boolean!
+}
+
+type FlowDescriptionUpdateResult {
+	numBlocks: Int!
+	numRecords: Int!
 }
 
 type FlowEdge {

@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+### Added
+ - Flows API now reports number of ingested/transformed blocks & records to improve UI informativity
+
 ## [0.157.0] - 2024-02-12
 ### Added
 - Complete support for `arm64` architecture (including M-series Apple silicon)

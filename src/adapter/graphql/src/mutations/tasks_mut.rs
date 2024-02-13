@@ -63,7 +63,11 @@ impl TasksMut {
             .create_task(ts::LogicalPlan::Probe(ts::Probe {
                 dataset_id: dataset_id.map(Into::into),
                 busy_time: busy_time_ms.map(std::time::Duration::from_millis),
-                end_with_outcome: end_with_outcome.map(Into::into),
+                end_with_outcome: end_with_outcome.map(|o| match o {
+                    TaskOutcome::Success => ts::TaskOutcome::Success(ts::TaskResult::Empty),
+                    TaskOutcome::Failed => ts::TaskOutcome::Failed,
+                    TaskOutcome::Cancelled => ts::TaskOutcome::Cancelled,
+                }),
             }))
             .await
             .int_err()?;

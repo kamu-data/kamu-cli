@@ -397,39 +397,54 @@ impl SyncServiceImpl {
             }
         }
 
-        let num_blocks = match chains_comparison {
+        let (num_blocks, num_records) = match chains_comparison {
             Some(CompareChainsResult::Equal) => unreachable!(),
-            Some(CompareChainsResult::LhsAhead { lhs_ahead_blocks }) => lhs_ahead_blocks.len(),
+            Some(CompareChainsResult::LhsAhead { lhs_ahead_blocks }) => {
+                let num_records = lhs_ahead_blocks
+                    .iter()
+                    .map(|(_, block)| Self::num_data_records_in_block(block))
+                    .sum();
+                (lhs_ahead_blocks.len(), num_records)
+            }
             None
             | Some(
                 CompareChainsResult::LhsBehind { .. } | CompareChainsResult::Divergence { .. },
-            ) => match src_dataset
-                .as_metadata_chain()
-                .iter_blocks_interval(&src_head, None, false)
-                .try_count()
-                .await
-            {
-                Ok(v) => Ok(v),
-                Err(IterBlocksError::RefNotFound(e)) => Err(SyncError::Internal(e.int_err())),
-                Err(IterBlocksError::BlockNotFound(e)) => Err(CorruptedSourceError {
-                    message: "Source metadata chain is broken".to_owned(),
-                    source: Some(e.into()),
+            ) => {
+                let mut num_blocks = 0;
+                let mut num_records = 0;
+
+                use futures::TryStreamExt;
+                let mut block_stream = src_dataset
+                    .as_metadata_chain()
+                    .iter_blocks_interval(&src_head, None, false);
+
+                while let Some((_, block)) = block_stream.try_next().await.map_err(|e| match e {
+                    IterBlocksError::RefNotFound(e) => SyncError::Internal(e.int_err()),
+                    IterBlocksError::BlockNotFound(e) => CorruptedSourceError {
+                        message: "Source metadata chain is broken".to_owned(),
+                        source: Some(e.into()),
+                    }
+                    .into(),
+                    IterBlocksError::BlockVersion(e) => CorruptedSourceError {
+                        message: "Source metadata chain is broken".to_owned(),
+                        source: Some(e.into()),
+                    }
+                    .into(),
+                    IterBlocksError::BlockMalformed(e) => CorruptedSourceError {
+                        message: "Source metadata chain is broken".to_owned(),
+                        source: Some(e.into()),
+                    }
+                    .into(),
+                    IterBlocksError::InvalidInterval(_) => unreachable!(),
+                    IterBlocksError::Access(e) => SyncError::Access(e),
+                    IterBlocksError::Internal(e) => SyncError::Internal(e),
+                })? {
+                    num_blocks += 1;
+                    num_records += Self::num_data_records_in_block(&block);
                 }
-                .into()),
-                Err(IterBlocksError::BlockVersion(e)) => Err(CorruptedSourceError {
-                    message: "Source metadata chain is broken".to_owned(),
-                    source: Some(e.into()),
-                }
-                .into()),
-                Err(IterBlocksError::BlockMalformed(e)) => Err(CorruptedSourceError {
-                    message: "Source metadata chain is broken".to_owned(),
-                    source: Some(e.into()),
-                }
-                .into()),
-                Err(IterBlocksError::InvalidInterval(_)) => unreachable!(),
-                Err(IterBlocksError::Access(e)) => Err(SyncError::Access(e)),
-                Err(IterBlocksError::Internal(e)) => Err(SyncError::Internal(e)),
-            }?,
+
+                (num_blocks, num_records)
+            }
         };
 
         // Add files to IPFS
@@ -453,8 +468,22 @@ impl SyncServiceImpl {
         Ok(SyncResult::Updated {
             old_head: dst_head,
             new_head: src_head,
-            num_blocks,
+            num_blocks: num_blocks as u64,
+            num_records,
         })
+    }
+
+    fn num_data_records_in_block(block: &MetadataBlock) -> u64 {
+        let maybe_new_slice = match &block.event {
+            MetadataEvent::AddData(add_data) => add_data.new_data.as_ref(),
+            MetadataEvent::ExecuteTransform(transform) => transform.new_data.as_ref(),
+            _ => None,
+        };
+        if let Some(new_slice) = maybe_new_slice {
+            new_slice.num_records()
+        } else {
+            0
+        }
     }
 
     async fn add_to_ipfs(&self, src: &DatasetRef) -> Result<String, SyncError> {
