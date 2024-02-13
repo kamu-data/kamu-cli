@@ -158,7 +158,8 @@ impl VerifyCommand {
             .await)
     }
 
-    // Return
+    // Return tuple with filtered VerificationRequests(check existing)
+    //   with list of missed remote dependencies
     async fn check_remote_datasets(
         &self,
         verifiation_requests: Vec<VerificationRequest>,
