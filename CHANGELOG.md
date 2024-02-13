@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
  - Flows API now reports number of ingested/transformed blocks & records to improve UI informativity
+ - Support of --recursive flag for `kamu delete` and `kamu verify` commands
 ### Changed
 - The state when all flows of the given dataset are paused should be queryable via GraphQL API
 - Added caching of metablock chains to improve performance within transactions

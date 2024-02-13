@@ -92,6 +92,7 @@ pub fn get_command(
                 cli_catalog,
                 submatches.get_many("dataset").unwrap().cloned(),
             )?,
+            cli_catalog.get_one()?,
             submatches.get_flag("all"),
             submatches.get_flag("recursive"),
             submatches.get_flag("yes"),
@@ -492,6 +493,8 @@ pub fn get_command(
             ))
         }
         Some(("verify", submatches)) => Box::new(VerifyCommand::new(
+            cli_catalog.get_one()?,
+            cli_catalog.get_one()?,
             cli_catalog.get_one()?,
             cli_catalog.get_one()?,
             cli_catalog.get_one()?,

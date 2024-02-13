@@ -21,13 +21,14 @@ use kamu_core::events::{
 use kamu_core::*;
 use opendatafabric::DatasetID;
 use petgraph::stable_graph::{NodeIndex, StableDiGraph};
+use petgraph::visit::{depth_first_search, Bfs, DfsEvent, Reversed};
 use petgraph::Direction;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct DependencyGraphServiceInMemory {
     repository: Option<Arc<dyn DependencyGraphRepository>>,
-    state: Arc<tokio::sync::Mutex<State>>,
+    state: Arc<tokio::sync::RwLock<State>>,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -77,12 +78,12 @@ impl DependencyGraphServiceInMemory {
     pub fn new(repository: Option<Arc<dyn DependencyGraphRepository>>) -> Self {
         Self {
             repository,
-            state: Arc::new(tokio::sync::Mutex::new(State::default())),
+            state: Arc::new(tokio::sync::RwLock::new(State::default())),
         }
     }
 
     async fn ensure_datasets_initially_scanned(&self) -> Result<(), InternalError> {
-        let mut state = self.state.lock().await;
+        let mut state = self.state.write().await;
         if state.initially_scanned {
             return Ok(());
         }
@@ -171,6 +172,82 @@ impl DependencyGraphServiceInMemory {
             state.datasets_graph.remove_edge(edge_index);
         }
     }
+
+    fn get_nodes_from_dataset_ids(
+        &self,
+        dataset_ids: &[DatasetID],
+        state: &State,
+    ) -> Result<Vec<NodeIndex>, GetDependenciesError> {
+        dataset_ids
+            .iter()
+            .map(|dataset_id| {
+                state
+                    .get_dataset_node(dataset_id)
+                    .map_err(GetDependenciesError::DatasetNotFound)
+            })
+            .collect()
+    }
+
+    async fn run_recursive_reversed_breadth_first_search(
+        &self,
+        dataset_ids: Vec<DatasetID>,
+    ) -> Result<Vec<DatasetID>, GetDependenciesError> {
+        let state = self.state.read().await;
+
+        let reversed_graph = Reversed(&state.datasets_graph);
+        let nodes_to_search = self.get_nodes_from_dataset_ids(&dataset_ids, &state)?;
+
+        let mut result = Vec::new();
+        let mut visited_indexes = HashSet::new();
+
+        for node_index in &nodes_to_search {
+            let mut bfs = Bfs::new(&reversed_graph, *node_index);
+            let mut search_node_result = vec![];
+
+            while let Some(current_node_index) = bfs.next(&reversed_graph) {
+                if !visited_indexes.contains(&current_node_index) {
+                    visited_indexes.insert(current_node_index);
+                    search_node_result.push(
+                        reversed_graph
+                            .0
+                            .node_weight(current_node_index)
+                            .unwrap()
+                            .clone(),
+                    );
+                }
+            }
+            search_node_result.reverse();
+            result.extend(search_node_result);
+        }
+
+        Ok(result)
+    }
+
+    async fn run_recursive_depth_first_search(
+        &self,
+        dataset_ids: Vec<DatasetID>,
+    ) -> Result<Vec<DatasetID>, GetDependenciesError> {
+        let state = self.state.read().await;
+
+        let nodes_to_search = self.get_nodes_from_dataset_ids(&dataset_ids, &state)?;
+
+        let mut result = vec![];
+
+        depth_first_search(&state.datasets_graph, nodes_to_search, |event| {
+            // Postorder nodes nodes
+            if let DfsEvent::Finish(node_index, _) = event {
+                result.push(
+                    state
+                        .datasets_graph
+                        .node_weight(node_index)
+                        .unwrap()
+                        .clone(),
+                );
+            }
+        });
+
+        Ok(result)
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -184,7 +261,7 @@ impl DependencyGraphService for DependencyGraphServiceInMemory {
         &self,
         repository: &dyn DependencyGraphRepository,
     ) -> Result<(), InternalError> {
-        let mut state = self.state.lock().await;
+        let mut state = self.state.write().await;
         if state.initially_scanned {
             return Ok(());
         }
@@ -193,23 +270,55 @@ impl DependencyGraphService for DependencyGraphServiceInMemory {
             .await
     }
 
+    async fn get_recursive_upstream_dependencies(
+        &self,
+        dataset_ids: Vec<DatasetID>,
+    ) -> Result<DatasetIDStream, GetDependenciesError> {
+        self.ensure_datasets_initially_scanned()
+            .await
+            .int_err()
+            .map_err(GetDependenciesError::Internal)
+            .unwrap();
+
+        let result = self
+            .run_recursive_reversed_breadth_first_search(dataset_ids)
+            .await?;
+
+        Ok(Box::pin(tokio_stream::iter(result)))
+    }
+
+    async fn get_recursive_downstream_dependencies(
+        &self,
+        dataset_ids: Vec<DatasetID>,
+    ) -> Result<DatasetIDStream, GetDependenciesError> {
+        self.ensure_datasets_initially_scanned()
+            .await
+            .int_err()
+            .map_err(GetDependenciesError::Internal)
+            .unwrap();
+
+        let result = self.run_recursive_depth_first_search(dataset_ids).await?;
+
+        Ok(Box::pin(tokio_stream::iter(result)))
+    }
+
     /// Iterates over 1st level of dataset's downstream dependencies
     #[tracing::instrument(level = "debug", skip_all, fields(%dataset_id))]
     async fn get_downstream_dependencies(
         &self,
         dataset_id: &DatasetID,
-    ) -> Result<DatasetIDStream, GetDownstreamDependenciesError> {
+    ) -> Result<DatasetIDStream, GetDependenciesError> {
         self.ensure_datasets_initially_scanned()
             .await
             .int_err()
-            .map_err(GetDownstreamDependenciesError::Internal)?;
+            .map_err(GetDependenciesError::Internal)?;
 
         let downstream_node_datasets: Vec<_> = {
-            let state = self.state.lock().await;
+            let state = self.state.read().await;
 
             let node_index = state
                 .get_dataset_node(dataset_id)
-                .map_err(GetDownstreamDependenciesError::DatasetNotFound)?;
+                .map_err(GetDependenciesError::DatasetNotFound)?;
 
             state
                 .datasets_graph
@@ -232,18 +341,18 @@ impl DependencyGraphService for DependencyGraphServiceInMemory {
     async fn get_upstream_dependencies(
         &self,
         dataset_id: &DatasetID,
-    ) -> Result<DatasetIDStream, GetUpstreamDependenciesError> {
+    ) -> Result<DatasetIDStream, GetDependenciesError> {
         self.ensure_datasets_initially_scanned()
             .await
             .int_err()
-            .map_err(GetUpstreamDependenciesError::Internal)?;
+            .map_err(GetDependenciesError::Internal)?;
 
         let upstream_node_datasets: Vec<_> = {
-            let state = self.state.lock().await;
+            let state = self.state.read().await;
 
             let node_index = state
                 .get_dataset_node(dataset_id)
-                .map_err(GetUpstreamDependenciesError::DatasetNotFound)?;
+                .map_err(GetDependenciesError::DatasetNotFound)?;
 
             state
                 .datasets_graph
@@ -268,7 +377,7 @@ impl DependencyGraphService for DependencyGraphServiceInMemory {
 impl AsyncEventHandler<DatasetEventCreated> for DependencyGraphServiceInMemory {
     #[tracing::instrument(level = "debug", skip_all, fields(?event))]
     async fn handle(&self, event: &DatasetEventCreated) -> Result<(), InternalError> {
-        let mut state = self.state.lock().await;
+        let mut state = self.state.write().await;
         state.get_or_create_dataset_node(&event.dataset_id);
         Ok(())
     }
@@ -280,7 +389,7 @@ impl AsyncEventHandler<DatasetEventCreated> for DependencyGraphServiceInMemory {
 impl AsyncEventHandler<DatasetEventDeleted> for DependencyGraphServiceInMemory {
     #[tracing::instrument(level = "debug", skip_all, fields(?event))]
     async fn handle(&self, event: &DatasetEventDeleted) -> Result<(), InternalError> {
-        let mut state = self.state.lock().await;
+        let mut state = self.state.write().await;
 
         let node_index = state.get_dataset_node(&event.dataset_id).int_err()?;
 
@@ -297,7 +406,7 @@ impl AsyncEventHandler<DatasetEventDeleted> for DependencyGraphServiceInMemory {
 impl AsyncEventHandler<DatasetEventDependenciesUpdated> for DependencyGraphServiceInMemory {
     #[tracing::instrument(level = "debug", skip_all, fields(?event))]
     async fn handle(&self, event: &DatasetEventDependenciesUpdated) -> Result<(), InternalError> {
-        let mut state = self.state.lock().await;
+        let mut state = self.state.write().await;
 
         let node_index = state.get_dataset_node(&event.dataset_id).int_err()?;
 
