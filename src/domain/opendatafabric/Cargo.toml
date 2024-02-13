@@ -59,4 +59,5 @@ prost = "0.12"
 tonic = "0.10"
 
 # Optional
+ahash = "0.8.8"
 arrow = { optional = true, version = "48", default-features = false, features = ["ipc"] }

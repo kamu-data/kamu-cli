@@ -3494,6 +3494,7 @@ dependencies = [
 name = "kamu-cli"
 version = "0.158.0"
 dependencies = [
+ "ahash",
  "arrow-flight",
  "assert_cmd",
  "async-graphql",
@@ -3608,6 +3609,7 @@ dependencies = [
 name = "kamu-data-utils"
 version = "0.158.0"
 dependencies = [
+ "ahash",
  "arrow-digest",
  "async-trait",
  "datafusion",
@@ -3628,6 +3630,7 @@ dependencies = [
 name = "kamu-datafusion-cli"
 version = "0.158.0"
 dependencies = [
+ "ahash",
  "arrow",
  "async-trait",
  "aws-config",
@@ -4484,6 +4487,7 @@ checksum = "0ab1bc2a289d34bd04a330323ac98a1b4bc82c9d9fcb1e66b63caa84da26b575"
 name = "opendatafabric"
 version = "0.158.0"
 dependencies = [
+ "ahash",
  "arrow",
  "base64 0.21.7",
  "byteorder",
