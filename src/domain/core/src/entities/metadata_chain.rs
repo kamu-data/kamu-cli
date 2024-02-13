@@ -75,8 +75,9 @@ pub trait MetadataChain: Send + Sync {
         opts: AppendOpts<'a>,
     ) -> Result<Multihash, AppendError>;
 
-    fn as_object_repo(&self) -> &dyn ObjectRepository;
     fn as_reference_repo(&self) -> &dyn ReferenceRepository;
+
+    fn as_metadata_block_repository(&self) -> &dyn MetadataBlockRepository;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -284,6 +285,18 @@ pub enum GetBlockError {
         #[backtrace]
         InternalError,
     ),
+}
+
+impl From<GetError> for GetBlockError {
+    fn from(v: GetError) -> Self {
+        match v {
+            GetError::NotFound(ObjectNotFoundError { hash }) => {
+                GetBlockError::NotFound(BlockNotFoundError { hash })
+            }
+            GetError::Access(e) => GetBlockError::Access(e),
+            GetError::Internal(e) => GetBlockError::Internal(e),
+        }
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

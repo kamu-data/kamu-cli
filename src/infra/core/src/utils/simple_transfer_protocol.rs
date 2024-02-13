@@ -76,7 +76,7 @@ impl SimpleTransferProtocol {
         listener.begin();
 
         let empty_chain = MetadataChainImpl::new(
-            ObjectRepositoryInMemory::new(),
+            MetadataBlockRepositoryImpl::new(ObjectRepositoryInMemory::new()),
             ReferenceRepositoryImpl::new(NamedObjectRepositoryInMemory::new()),
         );
 
@@ -386,7 +386,7 @@ impl SimpleTransferProtocol {
 
     async fn synchronize_blocks<'a>(
         &'a self,
-        blocks: Vec<(Multihash, MetadataBlock)>,
+        blocks: Vec<HashedMetadataBlock>,
         src: &'a dyn Dataset,
         dst: &'a dyn Dataset,
         src_head: &'a Multihash,

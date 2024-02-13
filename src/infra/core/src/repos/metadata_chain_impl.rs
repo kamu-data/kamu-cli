@@ -10,8 +10,6 @@
 use async_trait::async_trait;
 use futures::TryStreamExt;
 use kamu_core::*;
-use opendatafabric::serde::flatbuffers::*;
-use opendatafabric::serde::*;
 use opendatafabric::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -24,29 +22,31 @@ macro_rules! invalid_event {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct MetadataChainImpl<ObjRepo, RefRepo> {
-    obj_repo: ObjRepo,
+pub struct MetadataChainImpl<MetaBlockRepo, RefRepo> {
+    meta_block_repo: MetaBlockRepo,
     ref_repo: RefRepo,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-impl<ObjRepo, RefRepo> MetadataChainImpl<ObjRepo, RefRepo>
+impl<MetaBlockRepo, RefRepo> MetadataChainImpl<MetaBlockRepo, RefRepo>
 where
-    ObjRepo: ObjectRepository + Sync + Send,
+    MetaBlockRepo: MetadataBlockRepository + Sync + Send,
     RefRepo: ReferenceRepository + Sync + Send,
 {
-    pub fn new(obj_repo: ObjRepo, ref_repo: RefRepo) -> Self {
-        Self { obj_repo, ref_repo }
+    pub fn new(meta_block_repo: MetaBlockRepo, ref_repo: RefRepo) -> Self {
+        Self {
+            meta_block_repo,
+            ref_repo,
+        }
     }
 
     async fn validate_append_prev_block_exists(
         &self,
         new_block: &MetadataBlock,
-        _block_cache: &mut [MetadataBlock],
     ) -> Result<(), AppendError> {
         if let Some(prev) = &new_block.prev_block_hash {
-            match self.obj_repo.contains(prev).await {
+            match self.meta_block_repo.contains_block(prev).await {
                 Ok(true) => Ok(()),
                 Ok(false) => Err(
                     AppendValidationError::PrevBlockNotFound(BlockNotFoundError {
@@ -54,8 +54,8 @@ where
                     })
                     .into(),
                 ),
-                Err(ContainsError::Access(e)) => Err(AppendError::Access(e)),
-                Err(ContainsError::Internal(e)) => Err(AppendError::Internal(e)),
+                Err(ContainsBlockError::Access(e)) => Err(AppendError::Access(e)),
+                Err(ContainsBlockError::Internal(e)) => Err(AppendError::Internal(e)),
             }?;
         }
         Ok(())
@@ -64,7 +64,6 @@ where
     async fn validate_append_sequence_numbers_integrity(
         &self,
         new_block: &MetadataBlock,
-        _block_cache: &mut [MetadataBlock],
     ) -> Result<(), AppendError> {
         if new_block.prev_block_hash.is_none() {
             if new_block.sequence_number != 0 {
@@ -79,16 +78,11 @@ where
             }
         } else {
             let block_hash = new_block.prev_block_hash.as_ref().unwrap();
-            let block = match self.get_block(block_hash).await {
-                Ok(block) => Ok(block),
-                Err(GetBlockError::NotFound(e)) => {
-                    Err(AppendValidationError::PrevBlockNotFound(e).into())
-                }
-                Err(GetBlockError::BlockVersion(e)) => Err(AppendError::Internal(e.int_err())),
-                Err(GetBlockError::BlockMalformed(e)) => Err(AppendError::Internal(e.int_err())),
-                Err(GetBlockError::Access(e)) => Err(AppendError::Access(e)),
-                Err(GetBlockError::Internal(e)) => Err(AppendError::Internal(e)),
-            }?;
+            let block = self
+                .get_block(block_hash)
+                .await
+                .map_err(map_validate_append_block_error)?;
+
             if block.sequence_number != (new_block.sequence_number - 1) {
                 return Err(
                     AppendValidationError::SequenceIntegrity(SequenceIntegrityError {
@@ -106,7 +100,6 @@ where
     fn validate_append_seed_block_order(
         &self,
         new_block: &MetadataBlock,
-        _block_cache: &mut [MetadataBlock],
     ) -> Result<(), AppendError> {
         match &new_block.event {
             MetadataEvent::Seed(_) if new_block.prev_block_hash.is_none() => Ok(()),
@@ -123,24 +116,12 @@ where
     async fn validate_append_system_time_is_monotonic(
         &self,
         new_block: &MetadataBlock,
-        block_cache: &mut Vec<MetadataBlock>,
     ) -> Result<(), AppendError> {
-        let maybe_prev_block = if !block_cache.is_empty() {
-            Ok(block_cache.first())
-        } else if let Some(prev_hash) = &new_block.prev_block_hash {
-            match self.get_block(prev_hash).await {
-                Ok(b) => {
-                    block_cache.push(b);
-                    Ok(block_cache.first())
-                }
-                Err(GetBlockError::NotFound(e)) => {
-                    Err(AppendValidationError::PrevBlockNotFound(e).into())
-                }
-                Err(GetBlockError::BlockVersion(e)) => Err(AppendError::Internal(e.int_err())),
-                Err(GetBlockError::BlockMalformed(e)) => Err(AppendError::Internal(e.int_err())),
-                Err(GetBlockError::Access(e)) => Err(AppendError::Access(e)),
-                Err(GetBlockError::Internal(e)) => Err(AppendError::Internal(e)),
-            }
+        let maybe_prev_block = if let Some(prev_hash) = &new_block.prev_block_hash {
+            self.get_block(prev_hash)
+                .await
+                .map(Some)
+                .map_err(map_validate_append_block_error)
         } else {
             Ok(None)
         }?;
@@ -156,7 +137,6 @@ where
     async fn validate_append_event_logical_structure(
         &self,
         new_block: &MetadataBlock,
-        _block_cache: &mut [MetadataBlock],
     ) -> Result<(), AppendError> {
         match &new_block.event {
             MetadataEvent::SetDataSchema(_) => {
@@ -182,7 +162,6 @@ where
                 let mut prev_add_data = None;
 
                 // TODO: Generalize this logic
-                // TODO: PERF: Use block cache
                 let mut blocks = self.iter_blocks_interval(
                     new_block.prev_block_hash.as_ref().unwrap(),
                     None,
@@ -263,7 +242,6 @@ where
                 let mut prev_query = None;
 
                 // TODO: Generalize this logic
-                // TODO: PERF: Use block cache
                 let mut blocks = self.iter_blocks_interval(
                     new_block.prev_block_hash.as_ref().unwrap(),
                     None,
@@ -517,10 +495,8 @@ where
     async fn validate_append_watermark_is_monotonic(
         &self,
         new_block: &MetadataBlock,
-        _block_cache: &mut [MetadataBlock],
     ) -> Result<(), AppendError> {
         if let Some(new_block) = new_block.as_data_stream_block() {
-            // TODO: PERF: Use block cache
             let prev_wm = self
                 .iter_blocks_interval(new_block.prev_block_hash.unwrap(), None, false)
                 .filter_data_stream_blocks()
@@ -547,7 +523,6 @@ where
     async fn validate_append_offsets_are_sequential(
         &self,
         new_block: &MetadataBlock,
-        _block_cache: &mut [MetadataBlock],
     ) -> Result<(), AppendError> {
         // Only check AddData and ExecuteTransform.
         // SetWatermark is also considered a data stream event but does not carry the
@@ -559,7 +534,6 @@ where
             _ => None,
         } {
             // Validate input/output offset sequencing
-            // TODO: PERF: Use block cache
             let expected_prev_offset = self
                 .iter_blocks_interval(new_block.prev_block_hash.as_ref().unwrap(), None, false)
                 .filter_data_stream_blocks()
@@ -597,35 +571,12 @@ where
     }
 }
 
-impl<ObjRepo, RefRepo> MetadataChainImpl<ObjRepo, RefRepo> {
-    pub fn deserialize_block(
-        hash: &Multihash,
-        block_bytes: &[u8],
-    ) -> Result<MetadataBlock, GetBlockError> {
-        match FlatbuffersMetadataBlockDeserializer.read_manifest(block_bytes) {
-            Ok(block) => Ok(block),
-            Err(e) => match e {
-                Error::UnsupportedVersion { .. } => {
-                    Err(GetBlockError::BlockVersion(BlockVersionError {
-                        hash: hash.clone(),
-                        source: e.into(),
-                    }))
-                }
-                _ => Err(GetBlockError::BlockMalformed(BlockMalformedError {
-                    hash: hash.clone(),
-                    source: e.into(),
-                })),
-            },
-        }
-    }
-}
-
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait]
-impl<ObjRepo, RefRepo> MetadataChain for MetadataChainImpl<ObjRepo, RefRepo>
+impl<MetaBlockRepo, RefRepo> MetadataChain for MetadataChainImpl<MetaBlockRepo, RefRepo>
 where
-    ObjRepo: ObjectRepository + Sync + Send,
+    MetaBlockRepo: MetadataBlockRepository + Sync + Send,
     RefRepo: ReferenceRepository + Sync + Send,
 {
     async fn get_ref(&self, r: &BlockRef) -> Result<Multihash, GetRefError> {
@@ -633,16 +584,10 @@ where
     }
 
     async fn get_block(&self, hash: &Multihash) -> Result<MetadataBlock, GetBlockError> {
-        let data = match self.obj_repo.get_bytes(hash).await {
-            Ok(data) => Ok(data),
-            Err(GetError::NotFound(e)) => {
-                Err(GetBlockError::NotFound(BlockNotFoundError { hash: e.hash }))
-            }
-            Err(GetError::Access(e)) => Err(GetBlockError::Access(e)),
-            Err(GetError::Internal(e)) => Err(GetBlockError::Internal(e)),
-        }?;
-
-        Self::deserialize_block(hash, &data)
+        self.meta_block_repo
+            .get_block(hash)
+            .await
+            .map_err(Into::into)
     }
 
     fn iter_blocks_interval<'a>(
@@ -736,13 +681,13 @@ where
         opts: SetRefOpts<'a>,
     ) -> Result<(), SetRefError> {
         if opts.validate_block_present {
-            match self.obj_repo.contains(hash).await {
+            match self.meta_block_repo.contains_block(hash).await {
                 Ok(true) => Ok(()),
                 Ok(false) => Err(SetRefError::BlockNotFound(BlockNotFoundError {
                     hash: hash.clone(),
                 })),
-                Err(ContainsError::Access(e)) => Err(SetRefError::Access(e)),
-                Err(ContainsError::Internal(e)) => Err(SetRefError::Internal(e)),
+                Err(ContainsBlockError::Access(e)) => Err(SetRefError::Access(e)),
+                Err(ContainsBlockError::Internal(e)) => Err(SetRefError::Internal(e)),
             }?;
         }
 
@@ -774,23 +719,16 @@ where
         block: MetadataBlock,
         opts: AppendOpts<'a>,
     ) -> Result<Multihash, AppendError> {
-        // TODO: PERF: Add caching layer that persists between multiple append calls
-        let mut block_cache = Vec::new();
-
         if opts.validation == AppendValidation::Full {
-            self.validate_append_prev_block_exists(&block, &mut block_cache)
+            self.validate_append_prev_block_exists(&block).await?;
+            self.validate_append_sequence_numbers_integrity(&block)
                 .await?;
-            self.validate_append_sequence_numbers_integrity(&block, &mut block_cache)
+            self.validate_append_seed_block_order(&block)?;
+            self.validate_append_system_time_is_monotonic(&block)
                 .await?;
-            self.validate_append_seed_block_order(&block, &mut block_cache)?;
-            self.validate_append_system_time_is_monotonic(&block, &mut block_cache)
-                .await?;
-            self.validate_append_watermark_is_monotonic(&block, &mut block_cache)
-                .await?;
-            self.validate_append_offsets_are_sequential(&block, &mut block_cache)
-                .await?;
-            self.validate_append_event_logical_structure(&block, &mut block_cache)
-                .await?;
+            self.validate_append_watermark_is_monotonic(&block).await?;
+            self.validate_append_offsets_are_sequential(&block).await?;
+            self.validate_append_event_logical_structure(&block).await?;
         }
 
         if opts.update_ref.is_some()
@@ -815,14 +753,10 @@ where
             }
         }
 
-        let data = FlatbuffersMetadataBlockSerializer
-            .write_manifest(&block)
-            .int_err()?;
-
         let res = self
-            .obj_repo
-            .insert_bytes(
-                &data,
+            .meta_block_repo
+            .insert_block(
+                &block,
                 InsertOpts {
                     precomputed_hash: opts.precomputed_hash,
                     expected_hash: opts.expected_hash,
@@ -831,9 +765,9 @@ where
             )
             .await
             .map_err(|e| match e {
-                InsertError::HashMismatch(e) => AppendValidationError::HashMismatch(e).into(),
-                InsertError::Access(e) => AppendError::Access(e),
-                InsertError::Internal(e) => AppendError::Internal(e),
+                InsertBlockError::HashMismatch(e) => AppendValidationError::HashMismatch(e).into(),
+                InsertBlockError::Access(e) => AppendError::Access(e),
+                InsertBlockError::Internal(e) => AppendError::Internal(e),
             })?;
 
         if let Some(r) = opts.update_ref {
@@ -843,11 +777,25 @@ where
         Ok(res.hash)
     }
 
-    fn as_object_repo(&self) -> &dyn ObjectRepository {
-        &self.obj_repo
-    }
-
     fn as_reference_repo(&self) -> &dyn ReferenceRepository {
         &self.ref_repo
+    }
+
+    fn as_metadata_block_repository(&self) -> &dyn MetadataBlockRepository {
+        &self.meta_block_repo
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+// Helper functions
+/////////////////////////////////////////////////////////////////////////////////////////
+
+fn map_validate_append_block_error(v: GetBlockError) -> AppendError {
+    match v {
+        GetBlockError::NotFound(e) => AppendValidationError::PrevBlockNotFound(e).into(),
+        GetBlockError::BlockVersion(e) => AppendError::Internal(e.int_err()),
+        GetBlockError::BlockMalformed(e) => AppendError::Internal(e.int_err()),
+        GetBlockError::Access(e) => AppendError::Access(e),
+        GetBlockError::Internal(e) => AppendError::Internal(e.int_err()),
     }
 }

@@ -57,7 +57,18 @@ pub use dataset_factory_impl::*;
 
 mod object_store_registy_impl;
 pub use object_store_registy_impl::*;
+
 mod object_store_builder_s3;
 pub use object_store_builder_s3::*;
+
 mod object_store_builder_local_fs;
 pub use object_store_builder_local_fs::*;
+
+mod metadata_block_repository_impl;
+pub use metadata_block_repository_impl::*;
+
+mod metadata_block_repository_caching_inmem;
+pub use metadata_block_repository_caching_inmem::*;
+
+mod metadata_block_repository_helpers;
+pub use metadata_block_repository_helpers::*;

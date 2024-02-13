@@ -22,7 +22,9 @@ pub type DynMetadataStream<'a> = Pin<Box<dyn MetadataStream<'a> + Send + 'a>>;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-type MetadataStreamItem = Result<(Multihash, MetadataBlock), IterBlocksError>;
+pub type HashedMetadataBlock = (Multihash, MetadataBlock);
+
+type MetadataStreamItem = Result<HashedMetadataBlock, IterBlocksError>;
 type FilteredDataStreamBlocksStreamItem =
     Result<(Multihash, MetadataBlockDataStream), IterBlocksError>;
 type FilteredDataStreamBlocksStream<'a> =

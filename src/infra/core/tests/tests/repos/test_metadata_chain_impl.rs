@@ -22,11 +22,12 @@ fn init_chain(root: &Path) -> impl MetadataChain {
     std::fs::create_dir(&blocks_dir).unwrap();
     std::fs::create_dir(&refs_dir).unwrap();
 
-    let obj_repo =
-        ObjectRepositoryLocalFS::<sha3::Sha3_256, 0x16>::new(blocks_dir /* unknown yet */);
+    let meta_block_repo = MetadataBlockRepositoryImpl::new(ObjectRepositoryLocalFSSha3::new(
+        blocks_dir, /* unknown yet */
+    ));
     let ref_repo = ReferenceRepositoryImpl::new(NamedObjectRepositoryLocalFS::new(refs_dir));
 
-    MetadataChainImpl::new(obj_repo, ref_repo)
+    MetadataChainImpl::new(meta_block_repo, ref_repo)
 }
 
 #[tokio::test]

@@ -79,7 +79,7 @@ async fn test_data_push_ingest_handler() {
         server_harness.dataset_url_with_scheme(&create_result.dataset_handle.alias, "http");
 
     let client = async move {
-        let cl: reqwest::Client = reqwest::Client::new();
+        let cl = reqwest::Client::new();
         let dataset_helper = DatasetDataHelper::new(create_result.dataset.clone());
         let ingest_url = format!("{dataset_url}/ingest");
         tracing::info!(%ingest_url, "Client request");

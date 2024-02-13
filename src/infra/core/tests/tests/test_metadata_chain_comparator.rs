@@ -18,9 +18,10 @@ use opendatafabric::*;
 /////////////////////////////////////////////////////////////////////////////////////////
 
 fn init_chain() -> impl MetadataChain {
-    let obj_repo = ObjectRepositoryInMemory::new();
+    let meta_block_repo = MetadataBlockRepositoryImpl::new(ObjectRepositoryInMemory::new());
     let ref_repo = ReferenceRepositoryImpl::new(NamedObjectRepositoryInMemory::new());
-    MetadataChainImpl::new(obj_repo, ref_repo)
+
+    MetadataChainImpl::new(meta_block_repo, ref_repo)
 }
 
 async fn push_block(chain: &dyn MetadataChain, block: MetadataBlock) -> Multihash {

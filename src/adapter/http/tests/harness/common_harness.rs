@@ -13,7 +13,7 @@ use std::{fs, io};
 
 use kamu::domain::*;
 use kamu::testing::{AddDataBuilder, MetadataFactory};
-use kamu::{DatasetLayout, ObjectRepositoryLocalFS};
+use kamu::{DatasetLayout, ObjectRepositoryLocalFSSha3};
 use opendatafabric::{AccountName, DatasetAlias, DatasetRef, MetadataEvent, Multihash};
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -82,7 +82,7 @@ async fn create_random_file(root: &Path) -> (Multihash, usize) {
 
     std::fs::create_dir_all(root).unwrap();
 
-    let repo = ObjectRepositoryLocalFS::<sha3::Sha3_256, 0x16>::new(root);
+    let repo = ObjectRepositoryLocalFSSha3::new(root);
     let hash = repo
         .insert_bytes(&data, InsertOpts::default())
         .await
