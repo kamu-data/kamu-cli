@@ -26,7 +26,6 @@ deny = [
 
     ### Creates we deny multiple versions of ###
     # This is a temporary approach until we deny by default with some exceptions
-    { name = "ahash", deny-multiple-versions = true },
     { name = "arrow", deny-multiple-versions = true },
     { name = "axum", deny-multiple-versions = true },
     { name = "aws-config", deny-multiple-versions = true },

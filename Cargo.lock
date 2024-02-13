@@ -3494,7 +3494,6 @@ dependencies = [
 name = "kamu-cli"
 version = "0.158.0"
 dependencies = [
- "ahash",
  "arrow-flight",
  "assert_cmd",
  "async-graphql",
