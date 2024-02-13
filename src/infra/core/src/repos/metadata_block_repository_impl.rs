@@ -11,8 +11,6 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use internal_error::ResultIntoInternal;
 use kamu_core::{
-    BlockMalformedError,
-    BlockVersionError,
     ContainsBlockError,
     GetBlockDataError,
     GetBlockError,
@@ -22,12 +20,11 @@ use kamu_core::{
     MetadataBlockRepository,
     ObjectRepository,
 };
-use opendatafabric::serde::flatbuffers::{
-    FlatbuffersMetadataBlockDeserializer,
-    FlatbuffersMetadataBlockSerializer,
-};
-use opendatafabric::serde::{Error, MetadataBlockDeserializer, MetadataBlockSerializer};
+use opendatafabric::serde::flatbuffers::FlatbuffersMetadataBlockSerializer;
+use opendatafabric::serde::MetadataBlockSerializer;
 use opendatafabric::{MetadataBlock, Multihash};
+
+use crate::repos::metadata_block_repository_helpers;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -43,26 +40,6 @@ where
 {
     pub fn new(obj_repo: ObjRepo) -> Self {
         Self { obj_repo }
-    }
-
-    pub fn deserialize_metadata_block(
-        hash: &Multihash,
-        block_bytes: &[u8],
-    ) -> Result<MetadataBlock, GetBlockError> {
-        FlatbuffersMetadataBlockDeserializer
-            .read_manifest(block_bytes)
-            .map_err(|e| match e {
-                Error::UnsupportedVersion { .. } => {
-                    GetBlockError::BlockVersion(BlockVersionError {
-                        hash: hash.clone(),
-                        source: e.into(),
-                    })
-                }
-                _ => GetBlockError::BlockMalformed(BlockMalformedError {
-                    hash: hash.clone(),
-                    source: e.into(),
-                }),
-            })
     }
 }
 
@@ -80,7 +57,7 @@ where
     async fn get_block(&self, hash: &Multihash) -> Result<MetadataBlock, GetBlockError> {
         let block_data = self.get_block_data(hash).await?;
 
-        Self::deserialize_metadata_block(hash, &block_data)
+        metadata_block_repository_helpers::deserialize_metadata_block(hash, &block_data)
     }
 
     async fn get_block_data(&self, hash: &Multihash) -> Result<Bytes, GetBlockDataError> {
@@ -117,23 +94,3 @@ where
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
-// Helpers
-/////////////////////////////////////////////////////////////////////////////////////////
-
-pub trait MetadataBlockRepositoryExt<ObjRepo>
-where
-    ObjRepo: ObjectRepository + Sync + Send,
-{
-    fn new(obj_repo: ObjRepo) -> Self;
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-impl<ObjRepo> MetadataBlockRepositoryExt<ObjRepo> for MetadataBlockRepositoryImpl<ObjRepo>
-where
-    ObjRepo: ObjectRepository + Sync + Send,
-{
-    fn new(obj_repo: ObjRepo) -> Self {
-        Self::new(obj_repo)
-    }
-}

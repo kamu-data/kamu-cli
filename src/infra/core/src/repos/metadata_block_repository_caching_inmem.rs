@@ -7,8 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::marker::PhantomData;
-
 use async_trait::async_trait;
 use bytes::Bytes;
 use dashmap::DashMap;
@@ -21,20 +19,12 @@ use kamu_core::{
     InsertBlockResult,
     InsertOpts,
     MetadataBlockRepository,
-    ObjectRepository,
 };
 use opendatafabric::serde::flatbuffers::FlatbuffersMetadataBlockSerializer;
 use opendatafabric::serde::MetadataBlockSerializer;
 use opendatafabric::{MetadataBlock, Multihash};
 
-use crate::{MetadataBlockRepositoryExt, MetadataBlockRepositoryImpl};
-
-/////////////////////////////////////////////////////////////////////////////////////////
-// Type shortcuts
-/////////////////////////////////////////////////////////////////////////////////////////
-
-pub type MetadataBlockRepositoryImplWithCache<ObjRepo> =
-    MetadataBlockRepositoryCachingInMem<MetadataBlockRepositoryImpl<ObjRepo>, ObjRepo>;
+use crate::repos::metadata_block_repository_helpers;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -45,31 +35,21 @@ struct CachedValue {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct MetadataBlockRepositoryCachingInMem<WrappedRepo, ObjRepo> {
+pub struct MetadataBlockRepositoryCachingInMem<WrappedRepo> {
     wrapped: WrappedRepo,
     cache: DashMap<Multihash, CachedValue>,
-    _phantom: PhantomData<ObjRepo>,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-impl<WrappedRepo, ObjRepo> MetadataBlockRepositoryCachingInMem<WrappedRepo, ObjRepo>
+impl<WrappedRepo> MetadataBlockRepositoryCachingInMem<WrappedRepo>
 where
-    WrappedRepo: MetadataBlockRepositoryExt<ObjRepo> + Sync + Send,
-    ObjRepo: ObjectRepository + Sync + Send,
+    WrappedRepo: MetadataBlockRepository + Sync + Send,
 {
-    pub fn new(obj_repo: ObjRepo) -> Self {
-        let wrapped = WrappedRepo::new(obj_repo);
-
-        MetadataBlockRepositoryCachingInMem::new_wrapped(wrapped)
-    }
-
-    // This is for tests only
-    pub fn new_wrapped(wrapped: WrappedRepo) -> Self {
+    pub fn new(wrapped: WrappedRepo) -> Self {
         Self {
             wrapped,
             cache: DashMap::new(),
-            _phantom: PhantomData,
         }
     }
 }
@@ -77,11 +57,9 @@ where
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait]
-impl<WrappedRepo, ObjRepo> MetadataBlockRepository
-    for MetadataBlockRepositoryCachingInMem<WrappedRepo, ObjRepo>
+impl<WrappedRepo> MetadataBlockRepository for MetadataBlockRepositoryCachingInMem<WrappedRepo>
 where
     WrappedRepo: MetadataBlockRepository + Sync + Send,
-    ObjRepo: ObjectRepository + Sync + Send,
 {
     async fn contains_block(&self, hash: &Multihash) -> Result<bool, ContainsBlockError> {
         match self.get_block_data(hash).await {
@@ -99,7 +77,7 @@ where
             Some(mut cached_value) => match &cached_value.deserialized_block {
                 Some(cached_block) => Ok(cached_block.clone()),
                 None => {
-                    let block = MetadataBlockRepositoryImpl::<ObjRepo>::deserialize_metadata_block(
+                    let block = metadata_block_repository_helpers::deserialize_metadata_block(
                         hash,
                         &cached_value.block_data,
                     )?;
@@ -115,11 +93,10 @@ where
 
                 match get_block_data_result {
                     Ok(block_data) => {
-                        let block =
-                            MetadataBlockRepositoryImpl::<ObjRepo>::deserialize_metadata_block(
-                                hash,
-                                &block_data,
-                            )?;
+                        let block = metadata_block_repository_helpers::deserialize_metadata_block(
+                            hash,
+                            &block_data,
+                        )?;
                         let cache_value = CachedValue {
                             block_data: block_data.clone(),
                             deserialized_block: Some(block.clone()),

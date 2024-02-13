@@ -69,3 +69,6 @@ pub use metadata_block_repository_impl::*;
 
 mod metadata_block_repository_caching_inmem;
 pub use metadata_block_repository_caching_inmem::*;
+
+mod metadata_block_repository_helpers;
+pub use metadata_block_repository_helpers::*;

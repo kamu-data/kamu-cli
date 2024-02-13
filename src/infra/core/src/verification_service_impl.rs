@@ -226,7 +226,7 @@ impl VerificationServiceImpl {
         // blocks in memory. Here we reuse validations implemented in append
         // rules when adding blocks to new chain.
         let in_memory_chain = MetadataChainImpl::new(
-            MetadataBlockRepositoryImplWithCache::new(ObjectRepositoryInMemory::new()),
+            MetadataBlockRepositoryImpl::new(ObjectRepositoryInMemory::new()),
             ReferenceRepositoryImpl::new(NamedObjectRepositoryInMemory::new()),
         );
 

@@ -10,9 +10,7 @@
 use bytes::Bytes;
 use kamu::{
     MetadataBlockRepositoryCachingInMem,
-    MetadataBlockRepositoryExt,
-    MetadataBlockRepositoryImplWithCache,
-    ObjectRepositoryInMemory,
+    MetadataBlockRepositoryImpl,
     ObjectRepositoryLocalFSSha3,
 };
 use kamu_core::{
@@ -24,7 +22,6 @@ use kamu_core::{
     InsertBlockResult,
     InsertOpts,
     MetadataBlockRepository,
-    ObjectRepository,
 };
 use opendatafabric::{MetadataBlock, Multihash};
 
@@ -36,7 +33,7 @@ use super::test_metadata_block_repository_shared;
 async fn test_insert_block() {
     let tmp_repo_dir = tempfile::tempdir().unwrap();
     let obj_repo = ObjectRepositoryLocalFSSha3::new(tmp_repo_dir.path());
-    let repo = MetadataBlockRepositoryImplWithCache::new(obj_repo);
+    let repo = MetadataBlockRepositoryCachingInMem::new(MetadataBlockRepositoryImpl::new(obj_repo));
 
     test_metadata_block_repository_shared::test_insert_block(&repo).await;
 }
@@ -80,19 +77,13 @@ async fn test_insert_block_cached_if_no_error() {
         .times(0)
         .returning(|_| Ok(false));
 
-    let repo = MockMetadataBlockRepositoryWithCache::new_wrapped(wrapped_mock_repo);
+    let repo = MetadataBlockRepositoryCachingInMem::new(wrapped_mock_repo);
 
     test_metadata_block_repository_shared::test_insert_block(&repo).await;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 // MockMetadataBlockRepository
-/////////////////////////////////////////////////////////////////////////////////////////
-
-// In this case, `ObjectRepositoryInMemory` is passed to keep compiler happy
-type MockMetadataBlockRepositoryWithCache =
-    MetadataBlockRepositoryCachingInMem<MockMetadataBlockRepository, ObjectRepositoryInMemory>;
-
 /////////////////////////////////////////////////////////////////////////////////////////
 
 mockall::mock! {
@@ -119,14 +110,5 @@ mockall::mock! {
             block_data: &'a [u8],
             options: InsertOpts<'a>,
         ) -> Result<InsertBlockResult, InsertBlockError>;
-    }
-}
-
-impl<ObjRepo> MetadataBlockRepositoryExt<ObjRepo> for MockMetadataBlockRepository
-where
-    ObjRepo: ObjectRepository + Sync + Send,
-{
-    fn new(_obj_repo: ObjRepo) -> Self {
-        Self::new()
     }
 }

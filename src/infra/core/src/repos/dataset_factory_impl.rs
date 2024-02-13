@@ -30,7 +30,9 @@ pub struct DatasetFactoryImpl {
 // TODO: Make digest configurable
 type DatasetImplLocalFS = DatasetImpl<
     MetadataChainImpl<
-        MetadataBlockRepositoryImplWithCache<ObjectRepositoryLocalFSSha3>,
+        MetadataBlockRepositoryCachingInMem<
+            MetadataBlockRepositoryImpl<ObjectRepositoryLocalFSSha3>,
+        >,
         ReferenceRepositoryImpl<NamedObjectRepositoryLocalFS>,
     >,
     ObjectRepositoryLocalFSSha3,
@@ -59,8 +61,8 @@ impl DatasetFactoryImpl {
         DatasetImpl::new(
             event_bus,
             MetadataChainImpl::new(
-                MetadataBlockRepositoryImplWithCache::new(ObjectRepositoryLocalFSSha3::new(
-                    layout.blocks_dir,
+                MetadataBlockRepositoryCachingInMem::new(MetadataBlockRepositoryImpl::new(
+                    ObjectRepositoryLocalFSSha3::new(layout.blocks_dir),
                 )),
                 ReferenceRepositoryImpl::new(NamedObjectRepositoryLocalFS::new(layout.refs_dir)),
             ),
@@ -80,10 +82,12 @@ impl DatasetFactoryImpl {
         DatasetImpl::new(
             event_bus,
             MetadataChainImpl::new(
-                MetadataBlockRepositoryImplWithCache::new(ObjectRepositoryHttp::new(
-                    client.clone(),
-                    base_url.join("blocks/").unwrap(),
-                    header_map.clone(),
+                MetadataBlockRepositoryCachingInMem::new(MetadataBlockRepositoryImpl::new(
+                    ObjectRepositoryHttp::new(
+                        client.clone(),
+                        base_url.join("blocks/").unwrap(),
+                        header_map.clone(),
+                    ),
                 )),
                 ReferenceRepositoryImpl::new(NamedObjectRepositoryHttp::new(
                     client.clone(),
@@ -137,13 +141,13 @@ impl DatasetFactoryImpl {
         Ok(DatasetImpl::new(
             event_bus,
             MetadataChainImpl::new(
-                MetadataBlockRepositoryImplWithCache::new(ObjectRepositoryS3Sha3::new(
-                    S3Context::new(
+                MetadataBlockRepositoryCachingInMem::new(MetadataBlockRepositoryImpl::new(
+                    ObjectRepositoryS3Sha3::new(S3Context::new(
                         client.clone(),
                         endpoint.clone(),
                         bucket.clone(),
                         format!("{key_prefix}blocks/"),
-                    ),
+                    )),
                 )),
                 ReferenceRepositoryImpl::new(NamedObjectRepositoryS3::new(S3Context::new(
                     client.clone(),
@@ -234,10 +238,12 @@ impl DatasetFactoryImpl {
         Ok(DatasetImpl::new(
             event_bus,
             MetadataChainImpl::new(
-                MetadataBlockRepositoryImplWithCache::new(ObjectRepositoryHttp::new(
-                    client.clone(),
-                    dataset_url.join("blocks/").unwrap(),
-                    Default::default(),
+                MetadataBlockRepositoryCachingInMem::new(MetadataBlockRepositoryImpl::new(
+                    ObjectRepositoryHttp::new(
+                        client.clone(),
+                        dataset_url.join("blocks/").unwrap(),
+                        Default::default(),
+                    ),
                 )),
                 ReferenceRepositoryImpl::new(NamedObjectRepositoryIpfsHttp::new(
                     client.clone(),

@@ -14,8 +14,8 @@ use std::str::FromStr;
 use bytes::Bytes;
 use flate2::Compression;
 use futures::TryStreamExt;
+use kamu::deserialize_metadata_block;
 use kamu::domain::*;
-use kamu::{MetadataBlockRepositoryImpl, ObjectRepositoryInMemory};
 use opendatafabric::{MetadataBlock, MetadataEvent, Multihash};
 use tar::Header;
 use thiserror::Error;
@@ -189,16 +189,12 @@ pub fn decode_metadata_batch(
     blocks_data
         .into_iter()
         .map(|(hash, bytes)| {
-            // TODO: Avoid depending on specific implementation of MetadataBlockRepository.
-            // This is currently necessary because we need to be able to deserialize blocks
-            // BEFORE an instance of MetadataChain exists. Consider injecting a
-            // configurable block deserializer.
-
-            // In this case, `ObjectRepositoryInMemory` is passed to keep compiler happy
-            MetadataBlockRepositoryImpl::<ObjectRepositoryInMemory>::deserialize_metadata_block(
-                &hash, &bytes,
-            )
-            .map(|block| (hash, block))
+            // TODO: Avoid depending on specific implementation of
+            //       metadata_block_repository_helpers::deserialize_metadata_block.
+            //       This is currently necessary because we need to be able to deserialize
+            //       blocks BEFORE an instance of MetadataChain exists.
+            //       Consider injecting a configurable block deserializer.
+            deserialize_metadata_block(&hash, &bytes).map(|block| (hash, block))
         })
         .collect::<Result<VecDeque<_>, _>>()
 }
