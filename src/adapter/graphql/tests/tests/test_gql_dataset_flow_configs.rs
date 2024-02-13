@@ -579,6 +579,34 @@ async fn test_pause_resume_dataset_flows() {
         );
     }
 
+    async fn check_dataset_all_configs_status(
+        harness: &FlowConfigHarness,
+        schema: &kamu_adapter_graphql::Schema,
+        dataset_id: &DatasetID,
+        expect_paused: bool,
+    ) {
+        let query = FlowConfigHarness::all_paused_config_query(dataset_id);
+
+        let res = schema
+            .execute(async_graphql::Request::new(query).data(harness.catalog_authorized.clone()))
+            .await;
+        assert!(res.is_ok(), "{res:?}");
+        assert_eq!(
+            res.data,
+            value!({
+                "datasets": {
+                    "byId": {
+                        "flows": {
+                            "configs": {
+                                "allPaused": expect_paused,
+                            }
+                        }
+                    }
+                }
+            })
+        );
+    }
+
     // Setup initial flow configs for datasets
 
     let harness = FlowConfigHarness::new();
@@ -636,7 +664,7 @@ async fn test_pause_resume_dataset_flows() {
         .await;
     assert!(res.is_ok(), "{res:?}");
 
-    let cases = [
+    let flow_cases = [
         (&create_root_result.dataset_handle.id, "INGEST"),
         (&create_root_result.dataset_handle.id, "COMPACTION"),
         (
@@ -645,9 +673,14 @@ async fn test_pause_resume_dataset_flows() {
         ),
     ];
 
+    let dataset_cases = [
+        &create_root_result.dataset_handle.id,
+        &create_derived_result.dataset_handle.id,
+    ];
+
     // Ensure all flow configs are not paused
     for ((dataset_id, dataset_flow_type), expect_paused) in
-        cases.iter().zip(vec![false, false, false])
+        flow_cases.iter().zip(vec![false, false, false])
     {
         check_flow_config_status(
             &harness,
@@ -657,6 +690,9 @@ async fn test_pause_resume_dataset_flows() {
             expect_paused,
         )
         .await;
+    }
+    for (dataset_id, expect_paused) in dataset_cases.iter().zip(vec![false, false]) {
+        check_dataset_all_configs_status(&harness, &schema, dataset_id, expect_paused).await;
     }
 
     // Pause compaction of root
@@ -676,7 +712,7 @@ async fn test_pause_resume_dataset_flows() {
 
     // Compaction should be paused
     for ((dataset_id, dataset_flow_type), expect_paused) in
-        cases.iter().zip(vec![false, true, false])
+        flow_cases.iter().zip(vec![false, true, false])
     {
         check_flow_config_status(
             &harness,
@@ -686,6 +722,9 @@ async fn test_pause_resume_dataset_flows() {
             expect_paused,
         )
         .await;
+    }
+    for (dataset_id, expect_paused) in dataset_cases.iter().zip(vec![false, false]) {
+        check_dataset_all_configs_status(&harness, &schema, dataset_id, expect_paused).await;
     }
 
     // Pause all of root
@@ -702,7 +741,7 @@ async fn test_pause_resume_dataset_flows() {
 
     // Root flows should be paused
     for ((dataset_id, dataset_flow_type), expect_paused) in
-        cases.iter().zip(vec![true, true, false])
+        flow_cases.iter().zip(vec![true, true, false])
     {
         check_flow_config_status(
             &harness,
@@ -712,6 +751,9 @@ async fn test_pause_resume_dataset_flows() {
             expect_paused,
         )
         .await;
+    }
+    for (dataset_id, expect_paused) in dataset_cases.iter().zip(vec![true, false]) {
+        check_dataset_all_configs_status(&harness, &schema, dataset_id, expect_paused).await;
     }
 
     // Resume ingestion
@@ -730,7 +772,7 @@ async fn test_pause_resume_dataset_flows() {
 
     // Only compacting of root should be paused
     for ((dataset_id, dataset_flow_type), expect_paused) in
-        cases.iter().zip(vec![false, true, false])
+        flow_cases.iter().zip(vec![false, true, false])
     {
         check_flow_config_status(
             &harness,
@@ -740,6 +782,9 @@ async fn test_pause_resume_dataset_flows() {
             expect_paused,
         )
         .await;
+    }
+    for (dataset_id, expect_paused) in dataset_cases.iter().zip(vec![false, false]) {
+        check_dataset_all_configs_status(&harness, &schema, dataset_id, expect_paused).await;
     }
 
     // Pause derived transform
@@ -758,7 +803,7 @@ async fn test_pause_resume_dataset_flows() {
 
     // Observe status change
     for ((dataset_id, dataset_flow_type), expect_paused) in
-        cases.iter().zip(vec![false, true, true])
+        flow_cases.iter().zip(vec![false, true, true])
     {
         check_flow_config_status(
             &harness,
@@ -768,6 +813,9 @@ async fn test_pause_resume_dataset_flows() {
             expect_paused,
         )
         .await;
+    }
+    for (dataset_id, expect_paused) in dataset_cases.iter().zip(vec![false, true]) {
+        check_dataset_all_configs_status(&harness, &schema, dataset_id, expect_paused).await;
     }
 
     // Resume all derived
@@ -784,7 +832,7 @@ async fn test_pause_resume_dataset_flows() {
 
     // Observe status change
     for ((dataset_id, dataset_flow_type), expect_paused) in
-        cases.iter().zip(vec![false, true, false])
+        flow_cases.iter().zip(vec![false, true, false])
     {
         check_flow_config_status(
             &harness,
@@ -794,6 +842,9 @@ async fn test_pause_resume_dataset_flows() {
             expect_paused,
         )
         .await;
+    }
+    for (dataset_id, expect_paused) in dataset_cases.iter().zip(vec![false, false]) {
+        check_dataset_all_configs_status(&harness, &schema, dataset_id, expect_paused).await;
     }
 }
 
@@ -1238,6 +1289,25 @@ impl FlowConfigHarness {
         )
         .replace("<id>", &id.to_string())
         .replace("<dataset_flow_type>", dataset_flow_type)
+    }
+
+    fn all_paused_config_query(id: &DatasetID) -> String {
+        indoc!(
+            r#"
+            {
+                datasets {
+                    byId (datasetId: "<id>") {
+                        flows {
+                            configs {
+                                allPaused
+                            }
+                        }
+                    }
+                }
+            }
+            "#
+        )
+        .replace("<id>", &id.to_string())
     }
 
     fn pause_flows_of_type_mutation(id: &DatasetID, dataset_flow_type: &str) -> String {

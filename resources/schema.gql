@@ -332,6 +332,10 @@ type DatasetFlowConfigs {
 	Returns defined configuration for a flow of specified type
 	"""
 	byType(datasetFlowType: DatasetFlowType!): FlowConfiguration
+	"""
+	Checks if all configs of this dataset are disabled
+	"""
+	allPaused: Boolean!
 }
 
 type DatasetFlowConfigsMut {
