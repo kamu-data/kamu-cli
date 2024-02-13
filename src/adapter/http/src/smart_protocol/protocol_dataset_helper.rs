@@ -78,8 +78,8 @@ pub async fn prepare_dataset_transfer_estimate(
         blocks_count += 1;
 
         bytes_in_blocks += metadata_chain
-            .as_object_repo()
-            .get_size(&hash)
+            .as_metadata_block_repository()
+            .get_block_size(&hash)
             .await
             .int_err()?;
 
@@ -150,8 +150,8 @@ pub async fn prepare_dataset_metadata_batch(
         num_blocks += 1;
 
         let block_bytes: Bytes = metadata_chain
-            .as_object_repo()
-            .get_bytes(hash)
+            .as_metadata_block_repository()
+            .get_block_data(hash)
             .await
             .int_err()?;
 

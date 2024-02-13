@@ -777,10 +777,6 @@ where
         Ok(res.hash)
     }
 
-    fn as_object_repo(&self) -> &dyn ObjectRepository {
-        self.meta_block_repo.as_object_repo()
-    }
-
     fn as_reference_repo(&self) -> &dyn ReferenceRepository {
         &self.ref_repo
     }

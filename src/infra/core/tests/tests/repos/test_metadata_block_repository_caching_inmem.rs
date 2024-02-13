@@ -7,8 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::assert_matches::assert_matches;
-
+use bytes::Bytes;
 use kamu::{
     MetadataBlockRepositoryCachingInMem,
     MetadataBlockRepositoryExt,
@@ -19,6 +18,7 @@ use kamu::{
 use kamu_core::{
     BlockNotFoundError,
     ContainsBlockError,
+    GetBlockDataError,
     GetBlockError,
     InsertBlockError,
     InsertBlockResult,
@@ -43,14 +43,13 @@ async fn test_insert_block() {
 
 #[tokio::test]
 async fn test_insert_block_cached_if_no_error() {
-    let (block, hash) = test_metadata_block_repository_shared::create_block();
     let mut wrapped_mock_repo = MockMetadataBlockRepository::new();
 
     wrapped_mock_repo
-        .expect_insert_block()
+        .expect_insert_block_data()
         .times(1)
         .returning(|_, _| {
-            let (_, hash) = test_metadata_block_repository_shared::create_block();
+            let (_, _, hash, _) = test_metadata_block_repository_shared::create_block();
 
             Ok(InsertBlockResult { hash })
         });
@@ -59,9 +58,21 @@ async fn test_insert_block_cached_if_no_error() {
         // We guarantee that the block will be taken from the cache
         .times(0)
         .returning(|_| {
-            let (_, hash) = test_metadata_block_repository_shared::create_block();
+            let (_, _, hash, _) = test_metadata_block_repository_shared::create_block();
 
             Err(GetBlockError::NotFound(BlockNotFoundError { hash }))
+        });
+    wrapped_mock_repo
+        .expect_get_block_data()
+        // We guarantee that the block will be taken from the cache
+        //
+        // Two calls, these are checks for a block before insert in
+        // test_metadata_block_repository_shared::test_insert_block()
+        .times(2)
+        .returning(|_| {
+            let (_, _, hash, _) = test_metadata_block_repository_shared::create_block();
+
+            Err(GetBlockDataError::NotFound(BlockNotFoundError { hash }))
         });
     wrapped_mock_repo
         .expect_contains_block()
@@ -71,12 +82,7 @@ async fn test_insert_block_cached_if_no_error() {
 
     let repo = MockMetadataBlockRepositoryWithCache::new_wrapped(wrapped_mock_repo);
 
-    assert_matches!(
-        repo.insert_block(&block, InsertOpts::default()).await,
-        Ok(..)
-    );
-    assert_eq!(repo.get_block(&hash).await.unwrap(), block);
-    assert!(repo.contains_block(&hash).await.unwrap());
+    test_metadata_block_repository_shared::test_insert_block(&repo).await;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -98,13 +104,21 @@ mockall::mock! {
 
         async fn get_block(&self, hash: &Multihash) -> Result<MetadataBlock, GetBlockError>;
 
+        async fn get_block_data(&self, hash: &Multihash) -> Result<Bytes, GetBlockDataError>;
+
+        async fn get_block_size(&self, hash: &Multihash) -> Result<u64, GetBlockDataError>;
+
         async fn insert_block<'a>(
             &'a self,
             block: &MetadataBlock,
             options: InsertOpts<'a>,
         ) -> Result<InsertBlockResult, InsertBlockError>;
 
-        fn as_object_repo(&self) -> &dyn ObjectRepository;
+        async fn insert_block_data<'a>(
+            &'a self,
+            block_data: &'a [u8],
+            options: InsertOpts<'a>,
+        ) -> Result<InsertBlockResult, InsertBlockError>;
     }
 }
 

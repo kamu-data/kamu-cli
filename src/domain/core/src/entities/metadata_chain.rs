@@ -75,8 +75,6 @@ pub trait MetadataChain: Send + Sync {
         opts: AppendOpts<'a>,
     ) -> Result<Multihash, AppendError>;
 
-    fn as_object_repo(&self) -> &dyn ObjectRepository;
-
     fn as_reference_repo(&self) -> &dyn ReferenceRepository;
 
     fn as_metadata_block_repository(&self) -> &dyn MetadataBlockRepository;

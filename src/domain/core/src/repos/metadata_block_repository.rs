@@ -8,19 +8,22 @@
 // by the Apache License, Version 2.0.
 
 use async_trait::async_trait;
+use bytes::Bytes;
 use internal_error::InternalError;
 use opendatafabric::{MetadataBlock, Multihash};
 use thiserror::Error;
 
 use crate::{
     AccessError,
+    BlockNotFoundError,
     ContainsError,
     GetBlockError,
+    GetError,
     HashMismatchError,
     InsertError,
     InsertOpts,
     InsertResult,
-    ObjectRepository,
+    ObjectNotFoundError,
 };
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -31,13 +34,21 @@ pub trait MetadataBlockRepository: Send + Sync {
 
     async fn get_block(&self, hash: &Multihash) -> Result<MetadataBlock, GetBlockError>;
 
+    async fn get_block_data(&self, hash: &Multihash) -> Result<Bytes, GetBlockDataError>;
+
+    async fn get_block_size(&self, hash: &Multihash) -> Result<u64, GetBlockDataError>;
+
     async fn insert_block<'a>(
         &'a self,
         block: &MetadataBlock,
         options: InsertOpts<'a>,
     ) -> Result<InsertBlockResult, InsertBlockError>;
 
-    fn as_object_repo(&self) -> &dyn ObjectRepository;
+    async fn insert_block_data<'a>(
+        &'a self,
+        block_data: &'a [u8],
+        options: InsertOpts<'a>,
+    ) -> Result<InsertBlockResult, InsertBlockError>;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -81,6 +92,52 @@ impl From<ContainsError> for ContainsBlockError {
         match v {
             ContainsError::Access(e) => Self::Access(e),
             ContainsError::Internal(e) => Self::Internal(e),
+        }
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum GetBlockDataError {
+    #[error(transparent)]
+    NotFound(
+        #[from]
+        #[backtrace]
+        BlockNotFoundError,
+    ),
+    #[error(transparent)]
+    Access(
+        #[from]
+        #[backtrace]
+        AccessError,
+    ),
+    #[error(transparent)]
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
+}
+
+impl From<GetError> for GetBlockDataError {
+    fn from(v: GetError) -> Self {
+        match v {
+            GetError::NotFound(ObjectNotFoundError { hash }) => {
+                Self::NotFound(BlockNotFoundError { hash })
+            }
+            GetError::Access(e) => Self::Access(e),
+            GetError::Internal(e) => Self::Internal(e),
+        }
+    }
+}
+
+impl From<GetBlockDataError> for GetBlockError {
+    fn from(v: GetBlockDataError) -> Self {
+        match v {
+            GetBlockDataError::NotFound(e) => Self::NotFound(e),
+            GetBlockDataError::Access(e) => Self::Access(e),
+            GetBlockDataError::Internal(e) => Self::Internal(e),
         }
     }
 }
