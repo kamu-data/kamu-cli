@@ -266,42 +266,6 @@ impl Default for AppendOpts<'_> {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
-pub enum GetBlockError {
-    #[error(transparent)]
-    NotFound(#[from] BlockNotFoundError),
-    #[error(transparent)]
-    BlockVersion(#[from] BlockVersionError),
-    #[error(transparent)]
-    BlockMalformed(#[from] BlockMalformedError),
-    #[error(transparent)]
-    Access(
-        #[from]
-        #[backtrace]
-        AccessError,
-    ),
-    #[error(transparent)]
-    Internal(
-        #[from]
-        #[backtrace]
-        InternalError,
-    ),
-}
-
-impl From<GetError> for GetBlockError {
-    fn from(v: GetError) -> Self {
-        match v {
-            GetError::NotFound(ObjectNotFoundError { hash }) => {
-                GetBlockError::NotFound(BlockNotFoundError { hash })
-            }
-            GetError::Access(e) => GetBlockError::Access(e),
-            GetError::Internal(e) => GetBlockError::Internal(e),
-        }
-    }
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Error, Debug)]
 pub enum IterBlocksError {
     #[error(transparent)]
     RefNotFound(RefNotFoundError),

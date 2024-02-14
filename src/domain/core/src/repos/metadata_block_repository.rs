@@ -15,9 +15,10 @@ use thiserror::Error;
 
 use crate::{
     AccessError,
+    BlockMalformedError,
     BlockNotFoundError,
+    BlockVersionError,
     ContainsError,
-    GetBlockError,
     GetError,
     HashMismatchError,
     InsertError,
@@ -92,6 +93,42 @@ impl From<ContainsError> for ContainsBlockError {
         match v {
             ContainsError::Access(e) => Self::Access(e),
             ContainsError::Internal(e) => Self::Internal(e),
+        }
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum GetBlockError {
+    #[error(transparent)]
+    NotFound(#[from] BlockNotFoundError),
+    #[error(transparent)]
+    BlockVersion(#[from] BlockVersionError),
+    #[error(transparent)]
+    BlockMalformed(#[from] BlockMalformedError),
+    #[error(transparent)]
+    Access(
+        #[from]
+        #[backtrace]
+        AccessError,
+    ),
+    #[error(transparent)]
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
+}
+
+impl From<GetError> for GetBlockError {
+    fn from(v: GetError) -> Self {
+        match v {
+            GetError::NotFound(ObjectNotFoundError { hash }) => {
+                GetBlockError::NotFound(BlockNotFoundError { hash })
+            }
+            GetError::Access(e) => GetBlockError::Access(e),
+            GetError::Internal(e) => GetBlockError::Internal(e),
         }
     }
 }
