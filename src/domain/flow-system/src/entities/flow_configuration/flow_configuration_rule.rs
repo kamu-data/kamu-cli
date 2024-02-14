@@ -16,20 +16,16 @@ use crate::Schedule;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FlowConfigurationRule {
     Schedule(Schedule),
-    StartCondition(StartConditionConfiguration),
+    BatchingCondition(BatchingConditionConfiguration),
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct StartConditionConfiguration {
-    // TODO: throttling period to be removed, using global unconfigurable throttling period instead
-    pub throttling_period: Option<Duration>,
-    // TODO: modeling to be refined:
-    //   - min records to accumulate
-    //   - max records to take
-    //   - max batching interval
-    pub minimal_data_batch: Option<i32>,
+pub struct BatchingConditionConfiguration {
+    pub min_records_awaited: u64,
+    pub max_records_taken: Option<u64>,
+    pub max_batching_interval: Option<Duration>,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

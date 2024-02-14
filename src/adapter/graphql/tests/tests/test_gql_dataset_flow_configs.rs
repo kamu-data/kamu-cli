@@ -455,11 +455,12 @@ async fn test_crud_batching_derived_dataset() {
                                 }
                                 batching {
                                     __typename
-                                    throttlingPeriod {
+                                    minRecordsAwaited
+                                    maxRecordsTaken
+                                    maxBatchingInterval {
                                         every
                                         unit
                                     }
-                                    minimalDataBatch
                                 }
                             }
                         }
@@ -499,8 +500,9 @@ async fn test_crud_batching_derived_dataset() {
         &create_derived_result.dataset_handle.id,
         "EXECUTE_TRANSFORM",
         false,
+        1,
+        1000,
         (30, "MINUTES"),
-        100,
     );
 
     let res = schema
@@ -527,11 +529,12 @@ async fn test_crud_batching_derived_dataset() {
                                     "schedule": null,
                                     "batching": {
                                         "__typename": "FlowConfigurationBatching",
-                                        "throttlingPeriod": {
+                                        "minRecordsAwaited": 1,
+                                        "maxRecordsTaken": 1000,
+                                        "maxBatchingInterval": {
                                             "every": 30,
                                             "unit": "MINUTES"
-                                        },
-                                        "minimalDataBatch": 100
+                                        }
                                     }
                                 }
                             }
@@ -652,8 +655,9 @@ async fn test_pause_resume_dataset_flows() {
         &create_derived_result.dataset_handle.id,
         "EXECUTE_TRANSFORM",
         false,
+        1,
+        1000,
         (30, "MINUTES"),
-        100,
     );
 
     let res = schema
@@ -863,8 +867,9 @@ async fn test_incorrect_dataset_kinds_for_flow_type() {
         &create_root_result.dataset_handle.id,
         "EXECUTE_TRANSFORM",
         false,
+        1,
+        1000,
         (30, "MINUTES"),
-        100,
     );
 
     let schema = kamu_adapter_graphql::schema_quiet();
@@ -994,8 +999,9 @@ async fn test_anonymous_setters_fail() {
             &create_derived_result.dataset_handle.id,
             "EXECUTE_TRANSFORM",
             false,
+            1,
+            1000,
             (30, "MINUTES"),
-            100,
         ),
         FlowConfigHarness::pause_flows_of_type_mutation(
             &create_root_result.dataset_handle.id,
@@ -1213,8 +1219,9 @@ impl FlowConfigHarness {
         id: &DatasetID,
         dataset_flow_type: &str,
         paused: bool,
-        throttling_period: (u64, &str),
-        minimal_data_batch: u64,
+        min_records_awaited: u64,
+        max_records_taken: u64,
+        max_batching_interval: (u32, &str),
     ) -> String {
         indoc!(
             r#"
@@ -1226,8 +1233,11 @@ impl FlowConfigHarness {
                                 setConfigBatching (
                                     datasetFlowType: "<dataset_flow_type>",
                                     paused: <paused>,
-                                    throttlingPeriod: { every: <every>, unit: "<unit>" },
-                                    minimalDataBatch: <min_data_batch>
+                                    batching: {
+                                        minRecordsAwaited: <minRecordsAwaited>,
+                                        maxRecordsTaken: <maxRecordsTaken>,
+                                        maxBatchingInterval: { every: <every>, unit: "<unit>" }
+                                    }
                                 ) {
                                     __typename,
                                     message
@@ -1243,11 +1253,12 @@ impl FlowConfigHarness {
                                                 }
                                                 batching {
                                                     __typename
-                                                    throttlingPeriod {
+                                                    minRecordsAwaited
+                                                    maxRecordsTaken
+                                                    maxBatchingInterval {
                                                         every
                                                         unit
                                                     }
-                                                    minimalDataBatch
                                                 }
                                             }
                                         }
@@ -1263,9 +1274,10 @@ impl FlowConfigHarness {
         .replace("<id>", &id.to_string())
         .replace("<dataset_flow_type>", dataset_flow_type)
         .replace("<paused>", if paused { "true" } else { "false" })
-        .replace("<every>", &throttling_period.0.to_string())
-        .replace("<unit>", throttling_period.1)
-        .replace("<min_data_batch>", &minimal_data_batch.to_string())
+        .replace("<every>", &max_batching_interval.0.to_string())
+        .replace("<unit>", max_batching_interval.1)
+        .replace("<minRecordsAwaited>", &min_records_awaited.to_string())
+        .replace("<maxRecordsTaken>", &max_records_taken.to_string())
     }
 
     fn quick_flow_config_query(id: &DatasetID, dataset_flow_type: &str) -> String {

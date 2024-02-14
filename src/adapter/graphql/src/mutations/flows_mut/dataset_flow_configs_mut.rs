@@ -9,13 +9,13 @@
 
 use chrono::Utc;
 use kamu_flow_system::{
+    BatchingConditionConfiguration,
     FlowConfigurationRule,
     FlowConfigurationService,
     FlowKeyDataset,
     Schedule,
     ScheduleTimeDelta,
     SetFlowConfigurationError,
-    StartConditionConfiguration,
 };
 use opendatafabric as odf;
 
@@ -91,8 +91,7 @@ impl DatasetFlowConfigsMut {
         ctx: &Context<'_>,
         dataset_flow_type: DatasetFlowType,
         paused: bool,
-        throttling_period: Option<TimeDeltaInput>,
-        minimal_data_batch: Option<i32>,
+        batching: BatchingConditionInput,
     ) -> Result<SetFlowConfigResult> {
         if let Some(e) =
             ensure_expected_dataset_kind(ctx, &self.dataset_handle, dataset_flow_type).await?
@@ -110,9 +109,10 @@ impl DatasetFlowConfigsMut {
                 FlowKeyDataset::new(self.dataset_handle.id.clone(), dataset_flow_type.into())
                     .into(),
                 paused,
-                FlowConfigurationRule::StartCondition(StartConditionConfiguration {
-                    throttling_period: throttling_period.map(Into::into),
-                    minimal_data_batch,
+                FlowConfigurationRule::BatchingCondition(BatchingConditionConfiguration {
+                    min_records_awaited: batching.min_records_awaited,
+                    max_records_taken: batching.max_records_taken,
+                    max_batching_interval: batching.max_batching_interval.map(Into::into),
                 }),
             )
             .await
@@ -195,6 +195,15 @@ impl From<TimeDeltaInput> for chrono::Duration {
             TimeUnit::Minutes => chrono::Duration::minutes(every),
         }
     }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+#[derive(InputObject)]
+struct BatchingConditionInput {
+    pub min_records_awaited: u64,
+    pub max_records_taken: Option<u64>,
+    pub max_batching_interval: Option<TimeDeltaInput>,
 }
 
 ///////////////////////////////////////////////////////////////////////////////

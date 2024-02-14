@@ -1172,9 +1172,10 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
             harness.now_datetime(),
             bar_id.clone(),
             DatasetFlowType::ExecuteTransform,
-            StartConditionConfiguration {
-                throttling_period: None,
-                minimal_data_batch: None,
+            BatchingConditionConfiguration {
+                min_records_awaited: 1,
+                max_records_taken: None,
+                max_batching_interval: None,
             },
         )
         .await;
@@ -1503,9 +1504,10 @@ async fn test_throttling_derived_dataset_with_2_parents() {
             harness.now_datetime(),
             baz_id.clone(),
             DatasetFlowType::ExecuteTransform,
-            StartConditionConfiguration {
-                throttling_period: None,
-                minimal_data_batch: None,
+            BatchingConditionConfiguration {
+                min_records_awaited: 1,
+                max_records_taken: None,
+                max_batching_interval: None,
             },
         )
         .await;
@@ -2027,14 +2029,14 @@ impl FlowHarness {
         request_time: DateTime<Utc>,
         dataset_id: DatasetID,
         dataset_flow_type: DatasetFlowType,
-        start_condition: StartConditionConfiguration,
+        start_condition: BatchingConditionConfiguration,
     ) {
         self.flow_configuration_service
             .set_configuration(
                 request_time,
                 FlowKeyDataset::new(dataset_id, dataset_flow_type).into(),
                 false,
-                FlowConfigurationRule::StartCondition(start_condition),
+                FlowConfigurationRule::BatchingCondition(start_condition),
             )
             .await
             .unwrap();

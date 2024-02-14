@@ -352,10 +352,8 @@ impl FlowServiceInMemory {
                 .active_configs
                 .try_get_dataset_start_condition(&dependent_dataset_id, flow_type);
 
-            if let Some(start_condition) = maybe_dependent_start_condition {
-                if start_condition.minimal_data_batch.is_some() {
-                    unimplemented!("Data batching not supported yet in scheduler")
-                }
+            if let Some(_batching_condition) = maybe_dependent_start_condition {
+                // TODO: Data batching not supported yet in scheduler
 
                 let dependent_flow_key =
                     FlowKeyDataset::new(dependent_dataset_id.clone(), flow_type).into();

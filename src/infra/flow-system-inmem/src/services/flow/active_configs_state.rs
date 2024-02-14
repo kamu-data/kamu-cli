@@ -20,7 +20,7 @@ use crate::dataset_flow_key::*;
 pub(crate) struct ActiveConfigsState {
     dataset_schedules: HashMap<FlowKeyDataset, Schedule>,
     system_schedules: HashMap<SystemFlowType, Schedule>,
-    dataset_start_conditions: HashMap<FlowKeyDataset, StartConditionConfiguration>,
+    dataset_start_conditions: HashMap<FlowKeyDataset, BatchingConditionConfiguration>,
 }
 
 impl ActiveConfigsState {
@@ -34,7 +34,7 @@ impl ActiveConfigsState {
             FlowConfigurationRule::Schedule(schedule) => {
                 self.dataset_schedules.insert(key, schedule);
             }
-            FlowConfigurationRule::StartCondition(condition) => {
+            FlowConfigurationRule::BatchingCondition(condition) => {
                 self.dataset_start_conditions.insert(key, condition);
             }
         }
@@ -83,7 +83,7 @@ impl ActiveConfigsState {
         &self,
         dataset_id: &DatasetID,
         flow_type: DatasetFlowType,
-    ) -> Option<StartConditionConfiguration> {
+    ) -> Option<BatchingConditionConfiguration> {
         self.dataset_start_conditions
             .get(BorrowedFlowKeyDataset::new(dataset_id, flow_type).as_trait())
             .cloned()

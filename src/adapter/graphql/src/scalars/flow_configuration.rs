@@ -24,10 +24,11 @@ impl From<kamu_flow_system::FlowConfigurationState> for FlowConfiguration {
     fn from(value: kamu_flow_system::FlowConfigurationState) -> Self {
         Self {
             paused: !value.is_active(),
-            batching: if let FlowConfigurationRule::StartCondition(condition) = &value.rule {
+            batching: if let FlowConfigurationRule::BatchingCondition(condition) = &value.rule {
                 Some(FlowConfigurationBatching {
-                    throttling_period: condition.throttling_period.map(Into::into),
-                    minimal_data_batch: condition.minimal_data_batch,
+                    min_records_awaited: condition.min_records_awaited,
+                    max_records_taken: condition.max_records_taken,
+                    max_batching_interval: condition.max_batching_interval.map(Into::into),
                 })
             } else {
                 None
@@ -54,8 +55,9 @@ pub enum FlowConfigurationSchedule {
 
 #[derive(SimpleObject, Clone, PartialEq, Eq)]
 pub struct FlowConfigurationBatching {
-    pub throttling_period: Option<TimeDelta>,
-    pub minimal_data_batch: Option<i32>,
+    pub min_records_awaited: u64,
+    pub max_records_taken: Option<u64>,
+    pub max_batching_interval: Option<TimeDelta>,
 }
 
 /////////////////////////////////////////////////////////////////////////////////

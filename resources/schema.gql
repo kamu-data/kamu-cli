@@ -96,6 +96,12 @@ type AuthMut {
 	accountDetails(accessToken: String!): Account!
 }
 
+input BatchingConditionInput {
+	minRecordsAwaited: Int!
+	maxRecordsTaken: Int
+	maxBatchingInterval: TimeDeltaInput
+}
+
 type BlockRef {
 	name: String!
 	blockHash: Multihash!
@@ -340,7 +346,7 @@ type DatasetFlowConfigs {
 
 type DatasetFlowConfigsMut {
 	setConfigSchedule(datasetFlowType: DatasetFlowType!, paused: Boolean!, schedule: ScheduleInput!): SetFlowConfigResult!
-	setConfigBatching(datasetFlowType: DatasetFlowType!, paused: Boolean!, throttlingPeriod: TimeDeltaInput, minimalDataBatch: Int): SetFlowConfigResult!
+	setConfigBatching(datasetFlowType: DatasetFlowType!, paused: Boolean!, batching: BatchingConditionInput!): SetFlowConfigResult!
 	pauseFlows(datasetFlowType: DatasetFlowType): Boolean!
 	resumeFlows(datasetFlowType: DatasetFlowType): Boolean!
 }
@@ -686,8 +692,9 @@ type FlowConfiguration {
 }
 
 type FlowConfigurationBatching {
-	throttlingPeriod: TimeDelta
-	minimalDataBatch: Int
+	minRecordsAwaited: Int!
+	maxRecordsTaken: Int
+	maxBatchingInterval: TimeDelta
 }
 
 union FlowConfigurationSchedule = TimeDelta | Cron5ComponentExpression
