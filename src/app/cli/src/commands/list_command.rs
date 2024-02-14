@@ -237,7 +237,10 @@ impl Command for ListCommand {
 
         for hdl in &datasets {
             let dataset = self.dataset_repo.get_dataset(&hdl.as_local_ref()).await?;
-            let current_head = dataset.as_metadata_chain().get_ref(&BlockRef::Head).await?;
+            let current_head = dataset
+                .as_metadata_chain()
+                .resolve_ref(&BlockRef::Head)
+                .await?;
             let summary = dataset.get_summary(GetSummaryOpts::default()).await?;
 
             name.push(hdl.alias.dataset_name.to_string());

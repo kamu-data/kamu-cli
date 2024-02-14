@@ -97,7 +97,7 @@ where
         &self,
         prev: Option<DatasetSummary>,
     ) -> Result<Option<DatasetSummary>, GetSummaryError> {
-        let current_head = match self.metadata_chain.get_ref(&BlockRef::Head).await {
+        let current_head = match self.metadata_chain.resolve_ref(&BlockRef::Head).await {
             Ok(h) => h,
             Err(GetRefError::NotFound(_)) => return Ok(prev),
             Err(GetRefError::Access(e)) => return Err(GetSummaryError::Access(e)),
@@ -402,7 +402,7 @@ where
         let prev_block_hash = if let Some(prev_block_hash) = opts.prev_block_hash {
             prev_block_hash.cloned()
         } else {
-            match chain.get_ref(opts.block_ref).await {
+            match chain.resolve_ref(opts.block_ref).await {
                 Ok(h) => Some(h),
                 Err(GetRefError::NotFound(_)) => None,
                 Err(e) => return Err(e.int_err().into()),

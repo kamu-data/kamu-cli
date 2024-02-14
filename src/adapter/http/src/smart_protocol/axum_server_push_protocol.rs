@@ -152,7 +152,11 @@ impl AxumServerPushProtocolInstance {
         // TODO: consider size estimate and maybe cancel too large pushes
 
         let actual_head = if let Some(dataset) = self.dataset.as_ref() {
-            match dataset.as_metadata_chain().get_ref(&BlockRef::Head).await {
+            match dataset
+                .as_metadata_chain()
+                .resolve_ref(&BlockRef::Head)
+                .await
+            {
                 Ok(head) => Some(head),
                 Err(kamu::domain::GetRefError::NotFound(_)) => None,
                 Err(e) => return Err(PushServerError::Internal(e.int_err())),

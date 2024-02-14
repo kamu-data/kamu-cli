@@ -186,7 +186,7 @@ pub async fn test_create_dataset_from_snapshot(
 
     let actual_head = dataset
         .as_metadata_chain()
-        .get_ref(&BlockRef::Head)
+        .resolve_ref(&BlockRef::Head)
         .await
         .unwrap();
 
@@ -312,7 +312,7 @@ pub async fn test_rename_dataset_same_name_multiple_tenants(repo: &dyn DatasetRe
     assert_eq!(
         my_bar
             .as_metadata_chain()
-            .get_ref(&BlockRef::Head)
+            .resolve_ref(&BlockRef::Head)
             .await
             .unwrap(),
         create_result_my_foo.head
@@ -320,7 +320,7 @@ pub async fn test_rename_dataset_same_name_multiple_tenants(repo: &dyn DatasetRe
     assert_eq!(
         her_bar
             .as_metadata_chain()
-            .get_ref(&BlockRef::Head)
+            .resolve_ref(&BlockRef::Head)
             .await
             .unwrap(),
         create_result_her_bar.head

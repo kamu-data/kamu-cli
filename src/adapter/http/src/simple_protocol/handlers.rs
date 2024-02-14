@@ -61,7 +61,7 @@ pub async fn dataset_refs_handler(
         Err(e) => Err(ApiError::not_found(e)),
     }?;
 
-    match dataset.as_metadata_chain().get_ref(&block_ref).await {
+    match dataset.as_metadata_chain().resolve_ref(&block_ref).await {
         Ok(hash) => Ok(hash.to_string()),
         Err(e @ GetRefError::NotFound(_)) => Err(ApiError::not_found(e)),
         Err(e) => Err(e.api_err()),
