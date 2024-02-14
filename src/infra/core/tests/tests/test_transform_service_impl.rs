@@ -150,7 +150,7 @@ impl TransformTestHarness {
             .unwrap()
             .unwrap_or(0);
 
-        let prev_head = chain.get_ref(&BlockRef::Head).await.unwrap();
+        let prev_head = chain.resolve_ref(&BlockRef::Head).await.unwrap();
         let prev_block = chain.get_block(&prev_head).await.unwrap();
 
         let block = MetadataFactory::metadata_block(

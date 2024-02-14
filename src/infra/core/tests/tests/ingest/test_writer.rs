@@ -798,7 +798,7 @@ async fn test_data_writer_builder_scan_no_source() {
     let head = harness
         .dataset
         .as_metadata_chain()
-        .get_ref(&BlockRef::Head)
+        .resolve_ref(&BlockRef::Head)
         .await
         .unwrap();
 

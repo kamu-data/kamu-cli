@@ -105,7 +105,7 @@ impl AxumServerPullProtocolInstance {
 
         let metadata_chain = self.dataset.as_metadata_chain();
         let head = metadata_chain
-            .get_ref(&BlockRef::Head)
+            .resolve_ref(&BlockRef::Head)
             .await
             .map_err(|e| PullServerError::Internal(e.int_err()))?;
 
@@ -163,7 +163,7 @@ impl AxumServerPullProtocolInstance {
 
                 let metadata_chain = self.dataset.as_metadata_chain();
                 let head = metadata_chain
-                    .get_ref(&BlockRef::Head)
+                    .resolve_ref(&BlockRef::Head)
                     .await
                     .map_err(|e| PullServerError::Internal(e.int_err()))?;
 

@@ -74,7 +74,7 @@ impl DatasetHelper {
         let old_head = self
             .dataset
             .as_metadata_chain()
-            .get_ref(&BlockRef::Head)
+            .resolve_ref(&BlockRef::Head)
             .await
             .unwrap();
 

@@ -59,7 +59,7 @@ impl MetadataChain {
             name: "head".to_owned(),
             block_hash: dataset
                 .as_metadata_chain()
-                .get_ref(&domain::BlockRef::Head)
+                .resolve_ref(&domain::BlockRef::Head)
                 .await
                 .int_err()?
                 .into(),

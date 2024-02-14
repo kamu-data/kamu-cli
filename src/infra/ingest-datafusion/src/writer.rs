@@ -848,7 +848,7 @@ impl DataWriterDataFusionBuilder {
         let head = self
             .dataset
             .as_metadata_chain()
-            .get_ref(&self.block_ref)
+            .resolve_ref(&self.block_ref)
             .await
             .int_err()?;
 

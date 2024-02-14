@@ -32,8 +32,8 @@ async fn compare_chains(
     lhs_chain: &dyn MetadataChain,
     rhs_chain: &dyn MetadataChain,
 ) -> CompareChainsResult {
-    let lhs_head = lhs_chain.get_ref(&BlockRef::Head).await.unwrap();
-    let rhs_head = match rhs_chain.get_ref(&BlockRef::Head).await {
+    let lhs_head = lhs_chain.resolve_ref(&BlockRef::Head).await.unwrap();
+    let rhs_head = match rhs_chain.resolve_ref(&BlockRef::Head).await {
         Ok(h) => Some(h),
         Err(_) => None,
     };

@@ -193,7 +193,7 @@ impl SimpleTransferProtocol {
         src_ref: &DatasetRefAny,
         src_chain: &dyn MetadataChain,
     ) -> Result<Multihash, SyncError> {
-        match src_chain.get_ref(&BlockRef::Head).await {
+        match src_chain.resolve_ref(&BlockRef::Head).await {
             Ok(head) => Ok(head),
             Err(GetRefError::NotFound(_)) => Err(DatasetNotFoundError {
                 dataset_ref: src_ref.clone(),
@@ -208,7 +208,7 @@ impl SimpleTransferProtocol {
         &self,
         dst_chain: &dyn MetadataChain,
     ) -> Result<Option<Multihash>, SyncError> {
-        match dst_chain.get_ref(&BlockRef::Head).await {
+        match dst_chain.resolve_ref(&BlockRef::Head).await {
             Ok(h) => Ok(Some(h)),
             Err(GetRefError::NotFound(_)) => Ok(None),
             Err(GetRefError::Access(e)) => Err(SyncError::Access(e)),

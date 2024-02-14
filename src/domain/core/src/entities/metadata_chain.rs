@@ -22,7 +22,7 @@ use crate::repos::{SetRefError as SetRefErrorRepo, *};
 #[async_trait]
 pub trait MetadataChain: Send + Sync {
     /// Resolves reference to the block hash it's pointing to
-    async fn get_ref(&self, r: &BlockRef) -> Result<Multihash, GetRefError>;
+    async fn resolve_ref(&self, r: &BlockRef) -> Result<Multihash, GetRefError>;
 
     /// Returns the specified block
     async fn get_block(&self, hash: &Multihash) -> Result<MetadataBlock, GetBlockError>;
@@ -88,7 +88,7 @@ pub trait MetadataChain: Send + Sync {
 pub trait MetadataChainExt: MetadataChain {
     /// Resolves reference to the block hash it's pointing to if it exists
     async fn try_get_ref(&self, r: &BlockRef) -> Result<Option<Multihash>, InternalError> {
-        match self.get_ref(r).await {
+        match self.resolve_ref(r).await {
             Ok(h) => Ok(Some(h)),
             Err(GetRefError::NotFound(_)) => Ok(None),
             Err(e) => Err(e.int_err()),

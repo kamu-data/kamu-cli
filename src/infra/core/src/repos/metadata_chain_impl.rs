@@ -579,7 +579,7 @@ where
     MetaBlockRepo: MetadataBlockRepository + Sync + Send,
     RefRepo: ReferenceRepository + Sync + Send,
 {
-    async fn get_ref(&self, r: &BlockRef) -> Result<Multihash, GetRefError> {
+    async fn resolve_ref(&self, r: &BlockRef) -> Result<Multihash, GetRefError> {
         self.ref_repo.get(r).await
     }
 
@@ -650,10 +650,10 @@ where
         tail: Option<&'a BlockRef>,
     ) -> DynMetadataStream<'a> {
         Box::pin(async_stream::try_stream! {
-            let head_hash = self.get_ref(head).await?;
+            let head_hash = self.resolve_ref(head).await?;
             let tail_hash = match tail {
                 None => None,
-                Some(r) => Some(self.get_ref(r).await?),
+                Some(r) => Some(self.resolve_ref(r).await?),
             };
 
             let mut current = Some(head_hash.clone());

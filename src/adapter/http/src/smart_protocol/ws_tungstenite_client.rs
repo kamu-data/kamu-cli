@@ -504,7 +504,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
         };
 
         let dst_head = if let Some(dst) = &dst {
-            match dst.as_metadata_chain().get_ref(&BlockRef::Head).await {
+            match dst.as_metadata_chain().resolve_ref(&BlockRef::Head).await {
                 Ok(head) => Ok(Some(head)),
                 Err(GetRefError::NotFound(_)) => Ok(None),
                 Err(GetRefError::Access(e)) => Err(SyncError::Access(e)),
@@ -622,7 +622,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
 
             let new_dst_head = dst
                 .as_metadata_chain()
-                .get_ref(&BlockRef::Head)
+                .resolve_ref(&BlockRef::Head)
                 .await
                 .int_err()?;
 
@@ -661,7 +661,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
 
         let src_head = src
             .as_metadata_chain()
-            .get_ref(&BlockRef::Head)
+            .resolve_ref(&BlockRef::Head)
             .await
             .int_err()?;
 

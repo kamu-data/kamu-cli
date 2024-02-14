@@ -35,7 +35,7 @@ async fn test_empty() {
     let tmp_dir = tempfile::tempdir().unwrap();
     let chain = init_chain(tmp_dir.path());
     assert_matches!(
-        chain.get_ref(&BlockRef::Head).await,
+        chain.resolve_ref(&BlockRef::Head).await,
         Err(GetRefError::NotFound(_))
     );
 }
@@ -53,7 +53,7 @@ async fn test_append_and_get() {
         .await
         .unwrap();
 
-    assert_eq!(chain.get_ref(&BlockRef::Head).await.unwrap(), hash_1);
+    assert_eq!(chain.resolve_ref(&BlockRef::Head).await.unwrap(), hash_1);
     assert_eq!(0, block_1.sequence_number);
 
     let block_2 = MetadataFactory::metadata_block(MetadataFactory::set_data_schema().build())
@@ -65,7 +65,7 @@ async fn test_append_and_get() {
         .await
         .unwrap();
 
-    assert_eq!(chain.get_ref(&BlockRef::Head).await.unwrap(), hash_2);
+    assert_eq!(chain.resolve_ref(&BlockRef::Head).await.unwrap(), hash_2);
     assert_eq!(1, block_2.sequence_number);
 
     assert_eq!(chain.get_block(&hash_1).await.unwrap(), block_1);
@@ -92,7 +92,7 @@ async fn test_set_ref() {
         .unwrap();
 
     assert_matches!(
-        chain.get_ref(&BlockRef::Head).await,
+        chain.resolve_ref(&BlockRef::Head).await,
         Err(GetRefError::NotFound(_))
     );
 
@@ -125,7 +125,7 @@ async fn test_set_ref() {
         .set_ref(&BlockRef::Head, &hash_1, SetRefOpts::default())
         .await
         .unwrap();
-    assert_eq!(chain.get_ref(&BlockRef::Head).await.unwrap(), hash_1);
+    assert_eq!(chain.resolve_ref(&BlockRef::Head).await.unwrap(), hash_1);
 }
 
 #[tokio::test]
@@ -164,7 +164,7 @@ async fn test_append_prev_block_not_found() {
 
     let hash_1 = chain.append(block_1, AppendOpts::default()).await.unwrap();
 
-    assert_eq!(chain.get_ref(&BlockRef::Head).await.unwrap(), hash_1);
+    assert_eq!(chain.resolve_ref(&BlockRef::Head).await.unwrap(), hash_1);
 
     let block_2 = MetadataFactory::metadata_block(MetadataFactory::add_data().build())
         .prev(
@@ -180,7 +180,7 @@ async fn test_append_prev_block_not_found() {
         ))
     );
 
-    assert_eq!(chain.get_ref(&BlockRef::Head).await.unwrap(), hash_1);
+    assert_eq!(chain.resolve_ref(&BlockRef::Head).await.unwrap(), hash_1);
 }
 
 #[tokio::test]
@@ -206,7 +206,7 @@ async fn test_append_prev_block_sequence_integrity_broken() {
         )
         .await
         .unwrap();
-    assert_eq!(chain.get_ref(&BlockRef::Head).await.unwrap(), hash);
+    assert_eq!(chain.resolve_ref(&BlockRef::Head).await.unwrap(), hash);
 
     let hash = chain
         .append(
@@ -276,7 +276,7 @@ async fn test_append_prev_block_sequence_integrity_broken() {
         .unwrap();
 
     assert_eq!(
-        chain.get_ref(&BlockRef::Head).await.unwrap(),
+        chain.resolve_ref(&BlockRef::Head).await.unwrap(),
         hash_just_right
     );
 }
@@ -294,7 +294,7 @@ async fn test_append_unexpected_ref() {
         )
         .await
         .unwrap();
-    assert_eq!(chain.get_ref(&BlockRef::Head).await.unwrap(), hash);
+    assert_eq!(chain.resolve_ref(&BlockRef::Head).await.unwrap(), hash);
 
     let invalid_hash = Multihash::from_digest_sha3_256(b"does-not-exist");
     assert_matches!(
@@ -312,7 +312,7 @@ async fn test_append_unexpected_ref() {
         Err(AppendError::RefCASFailed(_))
     );
 
-    assert_eq!(chain.get_ref(&BlockRef::Head).await.unwrap(), hash);
+    assert_eq!(chain.resolve_ref(&BlockRef::Head).await.unwrap(), hash);
 }
 
 #[tokio::test]

@@ -96,7 +96,11 @@ impl SyncServiceImpl {
             }
         };
 
-        match dataset.as_metadata_chain().get_ref(&BlockRef::Head).await {
+        match dataset
+            .as_metadata_chain()
+            .resolve_ref(&BlockRef::Head)
+            .await
+        {
             Ok(_) => Ok(dataset),
             Err(GetRefError::NotFound(_)) => Err(DatasetNotFoundError {
                 dataset_ref: dataset_ref.clone(),
@@ -143,7 +147,11 @@ impl SyncServiceImpl {
                     .await?;
 
                 if !create_if_not_exists {
-                    match dataset.as_metadata_chain().get_ref(&BlockRef::Head).await {
+                    match dataset
+                        .as_metadata_chain()
+                        .resolve_ref(&BlockRef::Head)
+                        .await
+                    {
                         Ok(_) => Ok(()),
                         Err(GetRefError::NotFound(_)) => Err(DatasetNotFoundError {
                             dataset_ref: dataset_ref.clone(),
@@ -241,7 +249,7 @@ impl SyncServiceImpl {
         let maybe_dst_head = match self.get_dataset_reader(&http_dst_ref).await {
             Ok(http_dst_dataset_view) => match http_dst_dataset_view
                 .as_metadata_chain()
-                .get_ref(&BlockRef::Head)
+                .resolve_ref(&BlockRef::Head)
                 .await
             {
                 Ok(head) => Ok(Some(head)),
@@ -296,7 +304,7 @@ impl SyncServiceImpl {
         let src_dataset = self.dataset_repo.get_dataset(src).await?;
         let src_head = src_dataset
             .as_metadata_chain()
-            .get_ref(&BlockRef::Head)
+            .resolve_ref(&BlockRef::Head)
             .await
             .int_err()?;
 
@@ -322,7 +330,7 @@ impl SyncServiceImpl {
                         .await?;
                     match dst_dataset
                         .as_metadata_chain()
-                        .get_ref(&BlockRef::Head)
+                        .resolve_ref(&BlockRef::Head)
                         .await
                     {
                         Ok(dst_head) => {
