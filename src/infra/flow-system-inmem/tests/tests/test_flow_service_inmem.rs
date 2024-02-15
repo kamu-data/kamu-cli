@@ -1217,6 +1217,7 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
                   new_head: Multihash::from_digest_sha3_256(b"new-slice"),
                   num_blocks: 1,
                   num_records: 5,
+                  new_watermark: None,
                 })))),
             });
             let task1_handle = task1_driver.run();
@@ -1232,6 +1233,7 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
                   new_head: Multihash::from_digest_sha3_256(b"newest-slice"),
                   num_blocks: 1,
                   num_records: 3,
+                  new_watermark: None,
                 })))),
             });
             let task2_handle = task2_driver.run();
@@ -1548,6 +1550,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
             new_head: Multihash::from_digest_sha3_256(b"foo-new-slice"),
             num_blocks: 1,
             num_records: 1,
+            new_watermark: None,
           })))),
         });
         let task0_handle = task0_driver.run();
@@ -1562,6 +1565,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
             new_head: Multihash::from_digest_sha3_256(b"fbar-new-slice"),
             num_blocks: 1,
             num_records: 2,
+            new_watermark: None,
           })))),
         });
         let task1_handle = task1_driver.run();
@@ -1585,6 +1589,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
             new_head: Multihash::from_digest_sha3_256(b"foo-newest-slice"),
             num_blocks: 1,
             num_records: 3,
+            new_watermark: None,
           })))),
         });
         let task3_handle = task3_driver.run();
@@ -1608,6 +1613,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
             new_head: Multihash::from_digest_sha3_256(b"bar-newest-slice"),
             num_blocks: 1,
             num_records: 1,
+            new_watermark: None,
           })))),
         });
         let task5_handle = task5_driver.run();

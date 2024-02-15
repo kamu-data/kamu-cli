@@ -45,6 +45,7 @@ pub enum FlowResult {
 pub struct FlowResultDatasetUpdate {
     pub num_blocks: u64,
     pub num_records: u64,
+    pub watermark_modified: bool,
 }
 
 impl From<&ts::TaskResult> for FlowResult {
@@ -55,14 +56,17 @@ impl From<&ts::TaskResult> for FlowResult {
                 PullResult::UpToDate => Self::DatasetUpdate(FlowResultDatasetUpdate {
                     num_blocks: 0,
                     num_records: 0,
+                    watermark_modified: false,
                 }),
                 PullResult::Updated {
                     num_blocks,
                     num_records,
+                    new_watermark,
                     ..
                 } => Self::DatasetUpdate(FlowResultDatasetUpdate {
                     num_blocks,
                     num_records,
+                    watermark_modified: new_watermark.is_some(),
                 }),
             },
         }

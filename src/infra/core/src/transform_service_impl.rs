@@ -163,6 +163,8 @@ impl TransformServiceImpl {
             .map(|interval| interval.end - interval.start + 1)
             .unwrap_or_default();
 
+        let new_watermark = response.new_watermark;
+
         let params = ExecuteTransformParams {
             query_inputs: request.inputs.iter().map(|i| i.clone().into()).collect(),
             prev_checkpoint: request.prev_checkpoint,
@@ -190,6 +192,7 @@ impl TransformServiceImpl {
             new_head: commit_result.new_head,
             num_blocks: 1,
             num_records,
+            new_watermark,
         })
     }
 
@@ -856,6 +859,8 @@ impl TransformService for TransformServiceImpl {
                 })
                 .unwrap_or_default();
 
+            let new_watermark = actual_event.as_ref().and_then(|e| e.new_watermark);
+
             let ds = dataset.clone();
             let out_event = &mut actual_event;
 
@@ -864,6 +869,7 @@ impl TransformService for TransformServiceImpl {
                 new_head: block_hash.clone(),
                 num_blocks: 1,
                 num_records,
+                new_watermark,
             };
 
             Self::do_transform(

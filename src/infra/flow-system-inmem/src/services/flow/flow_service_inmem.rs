@@ -372,9 +372,10 @@ impl FlowServiceInMemory {
         flow.define_start_condition(
             evaluation_time,
             FlowStartCondition::Batching(FlowStartConditionBatching {
-                accumulated_records_count: result.accumulated_records_count,
-                awaited_by_now: result.awaited_by_now,
                 active_batching_rule: *batching_rule,
+                awaited_by_now: result.awaited_by_now,
+                accumulated_records_count: result.accumulated_records_count,
+                watermark_modified: result.watermark_modified,
             }),
         )
         .int_err()?;

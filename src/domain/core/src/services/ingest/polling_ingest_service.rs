@@ -79,6 +79,7 @@ pub enum PollingIngestResult {
         new_head: Multihash,
         num_blocks: u64,
         num_records: u64,
+        new_watermark: Option<DateTime<Utc>>,
         has_more: bool,
         uncacheable: bool,
     },

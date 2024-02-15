@@ -47,12 +47,16 @@ impl BatchingRule {
         // TODO: it's likely assumed the accumulation is per each input separately, but
         // for now count overall number
         let mut accumulated_records_count = 0;
+        let mut watermark_modified = false;
+
+        // Scan each accumulated trigger to decide
         for trigger in triggers_it {
             if let FlowTrigger::InputDatasetFlow(trigger) = trigger {
                 match &trigger.flow_result {
                     FlowResult::Empty => {}
                     FlowResult::DatasetUpdate(update) => {
                         accumulated_records_count += update.num_records;
+                        watermark_modified |= update.watermark_modified;
                     }
                 }
             }
@@ -60,16 +64,19 @@ impl BatchingRule {
 
         // The conditoin is satisfied if
         //   - we crossed the number of new records threshold
-        //   - or waited long enough (with at least some change of the inputs)
-        let satisfied = accumulated_records_count > 0
+        //   - or waited long enough, assuming
+        //      - there is at least some change of the inputs
+        //      - watmermark got touched
+        let satisfied = (accumulated_records_count > 0 || watermark_modified)
             && (accumulated_records_count >= self.min_records_awaited
                 || self
                     .max_batching_interval
                     .is_some_and(|i| i <= awaited_by_now));
 
         BatchingRuleEvaluation {
-            accumulated_records_count,
             awaited_by_now,
+            accumulated_records_count,
+            watermark_modified,
             satisfied,
         }
     }
@@ -77,8 +84,9 @@ impl BatchingRule {
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct BatchingRuleEvaluation {
-    pub accumulated_records_count: u64,
     pub awaited_by_now: Duration,
+    pub accumulated_records_count: u64,
+    pub watermark_modified: bool,
     pub satisfied: bool,
 }
 

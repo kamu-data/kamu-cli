@@ -310,6 +310,7 @@ async fn test_trigger_ingest_root_dataset() {
                 new_head: Multihash::from_digest_sha3_256(b"new-slice"),
                 num_blocks: 1,
                 num_records: 12,
+                new_watermark: None,
             })),
         )
         .await;
@@ -509,6 +510,7 @@ async fn test_trigger_execute_transform_derived_dataset() {
                 new_head: Multihash::from_digest_sha3_256(b"new-slice"),
                 num_blocks: 3,
                 num_records: 25,
+                new_watermark: None,
             })),
         )
         .await;
@@ -1938,6 +1940,7 @@ impl FlowRunsHarness {
                                                         unit
                                                     }
                                                 }
+                                                watermarkModified
                                             }
                                             ... on FlowStartConditionThrottling {
                                                 intervalSec

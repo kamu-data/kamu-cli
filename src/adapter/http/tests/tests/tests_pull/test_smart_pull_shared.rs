@@ -35,6 +35,7 @@ pub(crate) async fn test_smart_pull_new_dataset<TServerHarness: ServerSideHarnes
                 new_head: scenario.server_commit_result.new_head,
                 num_blocks: 4,
                 num_records: 10,
+                new_watermark: None,
             },
             pull_result
         );
@@ -99,6 +100,7 @@ pub(crate) async fn test_smart_pull_existing_evolved_dataset<TServerHarness: Ser
                 new_head: scenario.server_commit_result.new_head,
                 num_blocks: 2,
                 num_records: 10,
+                new_watermark: None,
             },
             pull_result
         );
@@ -165,6 +167,7 @@ pub(crate) async fn test_smart_pull_aborted_read_of_new_reread_succeeds<
                 new_head: scenario.server_commit_result.new_head,
                 num_blocks: 4,
                 num_records: 10,
+                new_watermark: None,
             },
             pull_result
         );
@@ -205,6 +208,7 @@ pub(crate) async fn test_smart_pull_aborted_read_of_existing_evolved_dataset_rer
                 new_head: scenario.server_commit_result.new_head,
                 num_blocks: 2,
                 num_records: 10,
+                new_watermark: None,
             },
             pull_result
         );

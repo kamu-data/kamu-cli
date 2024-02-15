@@ -821,9 +821,10 @@ enum FlowOutcome {
 union FlowStartCondition = FlowStartConditionThrottling | FlowStartConditionBatching
 
 type FlowStartConditionBatching {
-	accumulatedRecordsCount: Int!
-	awaitedByNow: TimeDelta!
 	activeBatchingRule: FlowConfigurationBatching!
+	awaitedByNow: TimeDelta!
+	accumulatedRecordsCount: Int!
+	watermarkModified: Boolean!
 }
 
 type FlowStartConditionThrottling {
