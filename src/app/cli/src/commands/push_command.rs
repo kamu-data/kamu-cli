@@ -10,7 +10,9 @@
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+use futures::StreamExt;
 use kamu::domain::*;
+use kamu::utils::datasets_filtering::filter_datasets_by_any_pattern;
 use opendatafabric::*;
 
 use super::{BatchError, CLIError, Command};
@@ -23,7 +25,7 @@ use crate::output::OutputConfig;
 pub struct PushCommand {
     push_svc: Arc<dyn PushService>,
     dataset_repo: Arc<dyn DatasetRepository>,
-    refs: Vec<DatasetRefAny>,
+    refs: Vec<DatasetRefPatternAny>,
     all: bool,
     recursive: bool,
     add_aliases: bool,
@@ -45,7 +47,7 @@ impl PushCommand {
         output_config: Arc<OutputConfig>,
     ) -> Self
     where
-        I: Iterator<Item = DatasetRefAny>,
+        I: Iterator<Item = DatasetRefPatternAny>,
     {
         Self {
             push_svc,
@@ -65,13 +67,20 @@ impl PushCommand {
         listener: Option<Arc<dyn SyncMultiListener>>,
     ) -> Result<Vec<PushResponse>, CLIError> {
         if let Some(remote_ref) = &self.to {
-            let local_ref = self.refs[0]
-                .as_local_ref(|_| !self.dataset_repo.is_multi_tenant())
-                .map_err(|_| {
-                    CLIError::usage_error(
-                        "When using --to reference should point to a local dataset",
-                    )
-                })?;
+            let local_ref = match self.refs[0].as_dataset_ref_any() {
+                Some(dataset_ref_any) => dataset_ref_any
+                    .as_local_ref(|_| !self.dataset_repo.is_multi_tenant())
+                    .map_err(|_| {
+                        CLIError::usage_error(
+                            "When using --to reference should point to a local dataset",
+                        )
+                    })?,
+                None => {
+                    return Err(CLIError::usage_error(
+                        "When using --to reference should not point to wildcard pattern",
+                    ))
+                }
+            };
 
             Ok(self
                 .push_svc
@@ -90,10 +99,16 @@ impl PushCommand {
                 )
                 .await)
         } else {
+            let mut dataset_refs = vec![];
+            let mut dataset_refs_stream =
+                filter_datasets_by_any_pattern(self.dataset_repo.as_ref(), self.refs.clone());
+            while let Some((_, res)) = dataset_refs_stream.next().await {
+                dataset_refs.push(res.unwrap());
+            }
             Ok(self
                 .push_svc
                 .push_multi(
-                    self.refs.clone(),
+                    dataset_refs,
                     PushMultiOptions {
                         all: self.all,
                         recursive: self.recursive,

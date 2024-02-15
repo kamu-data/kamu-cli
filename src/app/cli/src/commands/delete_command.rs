@@ -11,14 +11,14 @@ use std::sync::Arc;
 
 use futures::{future, StreamExt, TryStreamExt};
 use kamu::domain::*;
-use kamu::utils::datasets_filtering::filter_datasets_by_pattern;
+use kamu::utils::datasets_filtering::filter_datasets_by_local_pattern;
 use opendatafabric::*;
 
 use super::{common, CLIError, Command};
 
 pub struct DeleteCommand {
     dataset_repo: Arc<dyn DatasetRepository>,
-    dataset_ref_patterns: Vec<DatasetRefPattern>,
+    dataset_ref_patterns: Vec<DatasetRefPatternLocal>,
     dependency_graph_service: Arc<dyn DependencyGraphService>,
     all: bool,
     recursive: bool,
@@ -35,7 +35,7 @@ impl DeleteCommand {
         no_confirmation: bool,
     ) -> Self
     where
-        I: IntoIterator<Item = DatasetRefPattern>,
+        I: IntoIterator<Item = DatasetRefPatternLocal>,
     {
         Self {
             dataset_repo,
@@ -58,7 +58,7 @@ impl Command for DeleteCommand {
         let dataset_refs: Vec<_> = if self.all {
             unimplemented!("All deletion is not yet supported")
         } else {
-            let dataset_ids: Vec<_> = filter_datasets_by_pattern(
+            let dataset_ids: Vec<_> = filter_datasets_by_local_pattern(
                 self.dataset_repo.as_ref(),
                 self.dataset_ref_patterns.clone(),
             )

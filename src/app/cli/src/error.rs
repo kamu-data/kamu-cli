@@ -13,7 +13,7 @@ use std::path::PathBuf;
 
 use kamu::domain::engine::normalize_logs;
 use kamu::domain::*;
-use opendatafabric::DatasetRefPattern;
+use opendatafabric::DatasetRefPatternLocal;
 use thiserror::Error;
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -244,7 +244,7 @@ pub struct NotInMultiTenantWorkspace;
 #[derive(Error, Clone, PartialEq, Eq, Debug)]
 #[error("Multi-tenant reference is unexpected in single-tenant workspace: {dataset_ref_pattern}")]
 pub struct MultiTenantRefUnexpectedError {
-    pub dataset_ref_pattern: DatasetRefPattern,
+    pub dataset_ref_pattern: DatasetRefPatternLocal,
 }
 
 #[derive(Debug, Error)]

@@ -12,22 +12,34 @@ use std::str::FromStr;
 use opendatafabric::{
     DatasetName,
     DatasetRef,
-    DatasetRefAny,
-    DatasetRefPattern,
+    DatasetRefPatternAny,
+    DatasetRefPatternLocal,
     DatasetRefRemote,
     Multihash,
     RepoName,
 };
 use url::Url;
 
-pub(crate) fn value_parse_dataset_ref_pattern_local(s: &str) -> Result<DatasetRefPattern, String> {
-    match DatasetRefPattern::from_str(s) {
-        Ok(drp) => Ok(drp),
+pub(crate) fn value_parse_dataset_ref_pattern_local(
+    s: &str,
+) -> Result<DatasetRefPatternLocal, String> {
+    match DatasetRefPatternLocal::from_str(s) {
+        Ok(dataset_ref_pattern) => Ok(dataset_ref_pattern),
         Err(_) => Err(
             "Local reference should be in form: `did:odf:...`, `my.dataset.id`, or a wildcard \
              pattern `my.dataset.%`"
                 .to_string(),
         ),
+    }
+}
+
+pub(crate) fn value_parse_dataset_ref_pattern_any(s: &str) -> Result<DatasetRefPatternAny, String> {
+    match DatasetRefPatternAny::from_str(s) {
+        Ok(dataset_ref_pattern) => Ok(dataset_ref_pattern),
+        Err(_) => Err("Dataset reference should be in form: `my.dataset.id` or \
+                       `repository/account/dataset-id` or `did:odf:...` or `scheme://some-url` \
+                       or a local wildcard pattern `my.dataset.%`"
+            .to_string()),
     }
 }
 
@@ -55,15 +67,6 @@ pub(crate) fn value_parse_dataset_ref_remote(s: &str) -> Result<DatasetRefRemote
         Ok(v) => Ok(v),
         Err(_) => Err("Remote reference should be in form: `did:odf:...` or \
                        `repository/account/dataset-id` or `scheme://some-url`"
-            .to_string()),
-    }
-}
-
-pub(crate) fn value_parse_dataset_ref_any(s: &str) -> Result<DatasetRefAny, String> {
-    match DatasetRefAny::try_from(s) {
-        Ok(v) => Ok(v),
-        Err(_) => Err("Dataset reference should be in form: `my.dataset.id` or \
-                       `repository/account/dataset-id` or `did:odf:...` or `scheme://some-url`"
             .to_string()),
     }
 }

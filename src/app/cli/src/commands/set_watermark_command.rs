@@ -19,7 +19,7 @@ pub struct SetWatermarkCommand {
     dataset_repo: Arc<dyn DatasetRepository>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
     pull_svc: Arc<dyn PullService>,
-    refs: Vec<DatasetRefAny>,
+    refs: Vec<DatasetRefPatternAny>,
     all: bool,
     recursive: bool,
     watermark: String,
@@ -37,7 +37,7 @@ impl SetWatermarkCommand {
     ) -> Self
     where
         S: Into<String>,
-        I: Iterator<Item = DatasetRefAny>,
+        I: Iterator<Item = DatasetRefPatternAny>,
     {
         Self {
             dataset_repo,
@@ -72,6 +72,8 @@ impl Command for SetWatermarkCommand {
         })?;
 
         let dataset_ref = self.refs[0]
+            .as_dataset_ref_any()
+            .unwrap()
             .as_local_ref(|_| !self.dataset_repo.is_multi_tenant())
             .map_err(|_| CLIError::usage_error("Expected a local dataset reference"))?;
 

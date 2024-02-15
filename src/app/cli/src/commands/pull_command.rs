@@ -11,7 +11,9 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use chrono::{DateTime, Utc};
+use futures::StreamExt;
 use kamu::domain::*;
+use kamu::utils::datasets_filtering::filter_datasets_by_any_pattern;
 use opendatafabric::*;
 
 use super::{BatchError, CLIError, Command};
@@ -25,7 +27,7 @@ pub struct PullCommand {
     pull_svc: Arc<dyn PullService>,
     dataset_repo: Arc<dyn DatasetRepository>,
     output_config: Arc<OutputConfig>,
-    refs: Vec<DatasetRefAny>,
+    refs: Vec<DatasetRefPatternAny>,
     all: bool,
     recursive: bool,
     fetch_uncacheable: bool,
@@ -48,7 +50,7 @@ impl PullCommand {
         force: bool,
     ) -> Self
     where
-        I: IntoIterator<Item = DatasetRefAny>,
+        I: IntoIterator<Item = DatasetRefPatternAny>,
     {
         Self {
             pull_svc,
@@ -69,9 +71,16 @@ impl PullCommand {
         listener: Option<Arc<dyn PullMultiListener>>,
     ) -> Result<Vec<PullResponse>, CLIError> {
         let local_name = self.as_name.as_ref().unwrap();
-        let remote_ref = self.refs[0].as_remote_ref(|_| true).map_err(|_| {
-            CLIError::usage_error("When using --as reference should point to a remote dataset")
-        })?;
+        let remote_ref = match self.refs[0].as_dataset_ref_any() {
+            Some(dataset_ref_any) => dataset_ref_any.as_remote_ref(|_| true).map_err(|_| {
+                CLIError::usage_error("When using --as reference should point to a remote dataset")
+            })?,
+            None => {
+                return Err(CLIError::usage_error(
+                    "When using --as reference should not point to wildcard pattern",
+                ))
+            }
+        };
 
         Ok(self
             .pull_svc
@@ -93,10 +102,17 @@ impl PullCommand {
         &self,
         listener: Option<Arc<dyn PullMultiListener>>,
     ) -> Result<Vec<PullResponse>, CLIError> {
+        let mut dataset_refs = vec![];
+        let mut dataset_refs_stream =
+            filter_datasets_by_any_pattern(self.dataset_repo.as_ref(), self.refs.clone());
+        while let Some((_, res)) = dataset_refs_stream.next().await {
+            dataset_refs.push(res.unwrap());
+        }
+
         Ok(self
             .pull_svc
             .pull_multi(
-                self.refs.clone(),
+                dataset_refs,
                 PullMultiOptions {
                     recursive: self.recursive,
                     all: self.all,

@@ -702,7 +702,7 @@ pub fn cli() -> Command {
                         Arg::new("dataset")
                             .action(ArgAction::Append)
                             .index(1)
-                            .value_parser(value_parse_dataset_ref_any)
+                            .value_parser(value_parse_dataset_ref_pattern_any)
                             .help("Local or remote dataset reference(s)"),
                         Arg::new("as")
                             .long("as")
@@ -780,7 +780,7 @@ pub fn cli() -> Command {
                         Arg::new("dataset")
                             .action(ArgAction::Append)
                             .index(1)
-                            .value_parser(value_parse_dataset_ref_any)
+                            .value_parser(value_parse_dataset_ref_pattern_any)
                             .help("Local or remote dataset reference(s)"),
                         Arg::new("to")
                             .long("to")

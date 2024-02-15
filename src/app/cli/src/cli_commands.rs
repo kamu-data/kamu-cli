@@ -537,7 +537,7 @@ fn validate_dataset_ref(
         let workspace_svc = catalog.get_one::<WorkspaceService>()?;
         if !workspace_svc.is_multi_tenant_workspace() && alias.is_multi_tenant() {
             return Err(MultiTenantRefUnexpectedError {
-                dataset_ref_pattern: DatasetRefPattern::Ref(dataset_ref),
+                dataset_ref_pattern: DatasetRefPatternLocal::Ref(dataset_ref),
             }
             .into());
         }
@@ -547,22 +547,22 @@ fn validate_dataset_ref(
 
 fn validate_dataset_ref_pattern(
     catalog: &dill::Catalog,
-    dataset_ref_pattern: DatasetRefPattern,
-) -> Result<DatasetRefPattern, CLIError> {
+    dataset_ref_pattern: DatasetRefPatternLocal,
+) -> Result<DatasetRefPatternLocal, CLIError> {
     match dataset_ref_pattern {
-        DatasetRefPattern::Ref(dsr) => {
+        DatasetRefPatternLocal::Ref(dsr) => {
             let valid_ref = validate_dataset_ref(catalog, dsr)?;
-            Ok(DatasetRefPattern::Ref(valid_ref))
+            Ok(DatasetRefPatternLocal::Ref(valid_ref))
         }
-        DatasetRefPattern::Pattern(an, drp) => {
+        DatasetRefPatternLocal::Pattern(drp) => {
             let workspace_svc = catalog.get_one::<WorkspaceService>()?;
-            if !workspace_svc.is_multi_tenant_workspace() && an.is_some() {
+            if !workspace_svc.is_multi_tenant_workspace() && drp.account_name.is_some() {
                 return Err(MultiTenantRefUnexpectedError {
-                    dataset_ref_pattern: DatasetRefPattern::Pattern(an, drp),
+                    dataset_ref_pattern: DatasetRefPatternLocal::Pattern(drp),
                 }
                 .into());
             }
-            Ok(DatasetRefPattern::Pattern(an, drp))
+            Ok(DatasetRefPatternLocal::Pattern(drp))
         }
     }
 }
@@ -585,9 +585,9 @@ where
 fn validate_many_dataset_patterns<I>(
     catalog: &dill::Catalog,
     dataset_ref_patterns: I,
-) -> Result<Vec<DatasetRefPattern>, CLIError>
+) -> Result<Vec<DatasetRefPatternLocal>, CLIError>
 where
-    I: IntoIterator<Item = DatasetRefPattern>,
+    I: IntoIterator<Item = DatasetRefPatternLocal>,
 {
     dataset_ref_patterns
         .into_iter()
