@@ -1172,10 +1172,7 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
             harness.now_datetime(),
             bar_id.clone(),
             DatasetFlowType::ExecuteTransform,
-            BatchingRule {
-                min_records_awaited: 1,
-                max_batching_interval: None,
-            },
+            BatchingRule::new(1, None),
         )
         .await;
 
@@ -1515,10 +1512,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
             harness.now_datetime(),
             baz_id.clone(),
             DatasetFlowType::ExecuteTransform,
-            BatchingRule {
-                min_records_awaited: 1,
-                max_batching_interval: None,
-            },
+            BatchingRule::new(1, None),
         )
         .await;
 

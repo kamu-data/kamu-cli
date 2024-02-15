@@ -58,8 +58,8 @@ pub struct FlowConfigurationBatching {
 impl From<BatchingRule> for FlowConfigurationBatching {
     fn from(value: BatchingRule) -> Self {
         Self {
-            min_records_awaited: value.min_records_awaited,
-            max_batching_interval: value.max_batching_interval.map(Into::into),
+            min_records_awaited: value.min_records_awaited(),
+            max_batching_interval: value.max_batching_interval().map(Into::into),
         }
     }
 }

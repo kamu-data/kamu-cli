@@ -109,10 +109,10 @@ impl DatasetFlowConfigsMut {
                 FlowKeyDataset::new(self.dataset_handle.id.clone(), dataset_flow_type.into())
                     .into(),
                 paused,
-                FlowConfigurationRule::BatchingRule(BatchingRule {
-                    min_records_awaited: batching.min_records_awaited,
-                    max_batching_interval: batching.max_batching_interval.map(Into::into),
-                }),
+                FlowConfigurationRule::BatchingRule(BatchingRule::new(
+                    batching.min_records_awaited,
+                    batching.max_batching_interval.map(Into::into),
+                )),
             )
             .await
             .map_err(|e| match e {
