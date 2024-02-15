@@ -52,7 +52,6 @@ pub enum FlowConfigurationSchedule {
 #[derive(SimpleObject, Clone, PartialEq, Eq)]
 pub struct FlowConfigurationBatching {
     pub min_records_awaited: u64,
-    pub max_records_taken: Option<u64>,
     pub max_batching_interval: Option<TimeDelta>,
 }
 
@@ -60,7 +59,6 @@ impl From<BatchingRule> for FlowConfigurationBatching {
     fn from(value: BatchingRule) -> Self {
         Self {
             min_records_awaited: value.min_records_awaited,
-            max_records_taken: value.max_records_taken,
             max_batching_interval: value.max_batching_interval.map(Into::into),
         }
     }

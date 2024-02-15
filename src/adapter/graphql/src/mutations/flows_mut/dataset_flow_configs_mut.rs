@@ -111,7 +111,6 @@ impl DatasetFlowConfigsMut {
                 paused,
                 FlowConfigurationRule::BatchingRule(BatchingRule {
                     min_records_awaited: batching.min_records_awaited,
-                    max_records_taken: batching.max_records_taken,
                     max_batching_interval: batching.max_batching_interval.map(Into::into),
                 }),
             )
@@ -202,7 +201,6 @@ impl From<TimeDeltaInput> for chrono::Duration {
 #[derive(InputObject)]
 struct BatchingConditionInput {
     pub min_records_awaited: u64,
-    pub max_records_taken: Option<u64>,
     pub max_batching_interval: Option<TimeDeltaInput>,
 }
 

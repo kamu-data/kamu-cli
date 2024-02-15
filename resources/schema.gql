@@ -98,7 +98,6 @@ type AuthMut {
 
 input BatchingConditionInput {
 	minRecordsAwaited: Int!
-	maxRecordsTaken: Int
 	maxBatchingInterval: TimeDeltaInput
 }
 
@@ -693,7 +692,6 @@ type FlowConfiguration {
 
 type FlowConfigurationBatching {
 	minRecordsAwaited: Int!
-	maxRecordsTaken: Int
 	maxBatchingInterval: TimeDelta
 }
 

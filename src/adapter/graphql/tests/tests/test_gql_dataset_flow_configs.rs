@@ -456,7 +456,6 @@ async fn test_crud_batching_derived_dataset() {
                                 batching {
                                     __typename
                                     minRecordsAwaited
-                                    maxRecordsTaken
                                     maxBatchingInterval {
                                         every
                                         unit
@@ -501,7 +500,6 @@ async fn test_crud_batching_derived_dataset() {
         "EXECUTE_TRANSFORM",
         false,
         1,
-        1000,
         (30, "MINUTES"),
     );
 
@@ -530,7 +528,6 @@ async fn test_crud_batching_derived_dataset() {
                                     "batching": {
                                         "__typename": "FlowConfigurationBatching",
                                         "minRecordsAwaited": 1,
-                                        "maxRecordsTaken": 1000,
                                         "maxBatchingInterval": {
                                             "every": 30,
                                             "unit": "MINUTES"
@@ -656,7 +653,6 @@ async fn test_pause_resume_dataset_flows() {
         "EXECUTE_TRANSFORM",
         false,
         1,
-        1000,
         (30, "MINUTES"),
     );
 
@@ -868,7 +864,6 @@ async fn test_incorrect_dataset_kinds_for_flow_type() {
         "EXECUTE_TRANSFORM",
         false,
         1,
-        1000,
         (30, "MINUTES"),
     );
 
@@ -1000,7 +995,6 @@ async fn test_anonymous_setters_fail() {
             "EXECUTE_TRANSFORM",
             false,
             1,
-            1000,
             (30, "MINUTES"),
         ),
         FlowConfigHarness::pause_flows_of_type_mutation(
@@ -1220,7 +1214,6 @@ impl FlowConfigHarness {
         dataset_flow_type: &str,
         paused: bool,
         min_records_awaited: u64,
-        max_records_taken: u64,
         max_batching_interval: (u32, &str),
     ) -> String {
         indoc!(
@@ -1235,7 +1228,6 @@ impl FlowConfigHarness {
                                     paused: <paused>,
                                     batching: {
                                         minRecordsAwaited: <minRecordsAwaited>,
-                                        maxRecordsTaken: <maxRecordsTaken>,
                                         maxBatchingInterval: { every: <every>, unit: "<unit>" }
                                     }
                                 ) {
@@ -1254,7 +1246,6 @@ impl FlowConfigHarness {
                                                 batching {
                                                     __typename
                                                     minRecordsAwaited
-                                                    maxRecordsTaken
                                                     maxBatchingInterval {
                                                         every
                                                         unit
@@ -1277,7 +1268,6 @@ impl FlowConfigHarness {
         .replace("<every>", &max_batching_interval.0.to_string())
         .replace("<unit>", max_batching_interval.1)
         .replace("<minRecordsAwaited>", &min_records_awaited.to_string())
-        .replace("<maxRecordsTaken>", &max_records_taken.to_string())
     }
 
     fn quick_flow_config_query(id: &DatasetID, dataset_flow_type: &str) -> String {

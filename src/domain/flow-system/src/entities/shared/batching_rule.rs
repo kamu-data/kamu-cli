@@ -16,7 +16,6 @@ use crate::{FlowResult, FlowTrigger};
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct BatchingRule {
     pub min_records_awaited: u64,
-    pub max_records_taken: Option<u64>,
     pub max_batching_interval: Option<Duration>,
 }
 
@@ -53,9 +52,6 @@ impl BatchingRule {
                 satisfied: true,
             };
         }
-
-        // TODO: not very clear how to use `max_records_taken`, especially if bigger
-        // block comes, that exceeds this value
 
         BatchingRuleEvaluation {
             accumulated_records_count,

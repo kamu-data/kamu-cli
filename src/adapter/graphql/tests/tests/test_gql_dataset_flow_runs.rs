@@ -1933,7 +1933,6 @@ impl FlowRunsHarness {
                                                 activeBatchingRule {
                                                     __typename
                                                     minRecordsAwaited
-                                                    maxRecordsTaken
                                                     maxBatchingInterval {
                                                         every
                                                         unit
