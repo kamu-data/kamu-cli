@@ -7,9 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use chrono::Duration;
-
-use crate::Schedule;
+use crate::{BatchingRule, Schedule};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -17,15 +15,6 @@ use crate::Schedule;
 pub enum FlowConfigurationRule {
     Schedule(Schedule),
     BatchingRule(BatchingRule),
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct BatchingRule {
-    pub min_records_awaited: u64,
-    pub max_records_taken: Option<u64>,
-    pub max_batching_interval: Option<Duration>,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

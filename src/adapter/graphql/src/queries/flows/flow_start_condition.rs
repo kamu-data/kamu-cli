@@ -43,14 +43,16 @@ impl From<fs::FlowStartConditionThrottling> for FlowStartConditionThrottling {
 
 #[derive(SimpleObject)]
 pub(crate) struct FlowStartConditionBatching {
-    pub current_records_accumulated: u64,
+    pub accumulated_records_count: u64,
+    pub awaited_by_now: TimeDelta,
     pub active_batching_rule: FlowConfigurationBatching,
 }
 
 impl From<fs::FlowStartConditionBatching> for FlowStartConditionBatching {
     fn from(value: fs::FlowStartConditionBatching) -> Self {
         Self {
-            current_records_accumulated: value.current_records_accumulated,
+            accumulated_records_count: value.accumulated_records_count,
+            awaited_by_now: value.awaited_by_now.into(),
             active_batching_rule: value.active_batching_rule.into(),
         }
     }

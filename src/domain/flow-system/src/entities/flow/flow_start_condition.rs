@@ -30,7 +30,8 @@ pub struct FlowStartConditionThrottling {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct FlowStartConditionBatching {
-    pub current_records_accumulated: u64,
+    pub accumulated_records_count: u64,
+    pub awaited_by_now: Duration,
     pub active_batching_rule: BatchingRule,
 }
 

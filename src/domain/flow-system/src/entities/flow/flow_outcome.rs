@@ -24,6 +24,15 @@ pub enum FlowOutcome {
     Aborted,
 }
 
+impl FlowOutcome {
+    pub fn try_result_as_ref(&self) -> Option<&FlowResult> {
+        match self {
+            Self::Success(flow_result) => Some(flow_result),
+            _ => None,
+        }
+    }
+}
+
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

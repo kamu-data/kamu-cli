@@ -67,6 +67,7 @@ pub struct FlowTriggerInputDatasetFlow {
     pub dataset_id: DatasetID,
     pub flow_type: DatasetFlowType,
     pub flow_id: FlowID,
+    pub flow_result: FlowResult,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

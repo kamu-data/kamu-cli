@@ -73,7 +73,7 @@ impl Flow {
                         ingest_result,
                     })
                 } else {
-                    let source_name = self.flow_state.primary_trigger.push_source_name();
+                    let source_name = self.flow_state.primary_trigger().push_source_name();
                     FlowDescriptionDataset::PushIngest(FlowDescriptionDatasetPushIngest {
                         dataset_id: dataset_key.dataset_id.clone().into(),
                         source_name,
@@ -154,14 +154,14 @@ impl Flow {
     /// A user, who initiated the flow run. None for system-initiated flows
     async fn initiator(&self) -> Option<Account> {
         self.flow_state
-            .primary_trigger
+            .primary_trigger()
             .initiator_account_name()
             .map(|initiator| Account::from_account_name(initiator.clone()))
     }
 
     /// Primary flow trigger
     async fn primary_trigger(&self) -> FlowTrigger {
-        self.flow_state.primary_trigger.clone().into()
+        self.flow_state.primary_trigger().clone().into()
     }
 
     /// Start condition

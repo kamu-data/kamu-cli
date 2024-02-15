@@ -1929,7 +1929,7 @@ impl FlowRunsHarness {
                                         startCondition {
                                             __typename
                                             ... on FlowStartConditionBatching {
-                                                currentRecordsAccumulated
+                                                accumulatedRecordsCount
                                                 activeBatchingRule {
                                                     __typename
                                                     minRecordsAwaited

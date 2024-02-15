@@ -1215,7 +1215,13 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
                 task_id: TaskID::new(1),
                 dataset_id: Some(bar_id.clone()),
                 run_since_start: Duration::milliseconds(20),
-                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
+                // Send some PullResult with records to bypass batching condition
+                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::PullResult(PullResult::Updated {
+                  old_head: Some(Multihash::from_digest_sha3_256(b"old-slice")),
+                  new_head: Multihash::from_digest_sha3_256(b"new-slice"),
+                  num_blocks: 1,
+                  num_records: 5,
+                })))),
             });
             let task1_handle = task1_driver.run();
 
@@ -1224,7 +1230,13 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
                 task_id: TaskID::new(2),
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::milliseconds(110),
-                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
+                // Send some PullResult with records to bypass batching condition
+                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::PullResult(PullResult::Updated {
+                  old_head: Some(Multihash::from_digest_sha3_256(b"new-slice")),
+                  new_head: Multihash::from_digest_sha3_256(b"newest-slice"),
+                  num_blocks: 1,
+                  num_records: 3,
+                })))),
             });
             let task2_handle = task2_driver.run();
 
@@ -1539,7 +1551,12 @@ async fn test_throttling_derived_dataset_with_2_parents() {
           task_id: TaskID::new(0),
           dataset_id: Some(foo_id.clone()),
           run_since_start: Duration::milliseconds(10),
-          finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
+          finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::PullResult(PullResult::Updated {
+            old_head: Some(Multihash::from_digest_sha3_256(b"foo-old-slice")),
+            new_head: Multihash::from_digest_sha3_256(b"foo-new-slice"),
+            num_blocks: 1,
+            num_records: 1,
+          })))),
         });
         let task0_handle = task0_driver.run();
 
@@ -1548,7 +1565,12 @@ async fn test_throttling_derived_dataset_with_2_parents() {
           task_id: TaskID::new(1),
           dataset_id: Some(bar_id.clone()),
           run_since_start: Duration::milliseconds(20),
-          finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
+          finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::PullResult(PullResult::Updated {
+            old_head: Some(Multihash::from_digest_sha3_256(b"bar-old-slice")),
+            new_head: Multihash::from_digest_sha3_256(b"fbar-new-slice"),
+            num_blocks: 1,
+            num_records: 2,
+          })))),
         });
         let task1_handle = task1_driver.run();
 
@@ -1566,7 +1588,12 @@ async fn test_throttling_derived_dataset_with_2_parents() {
           task_id: TaskID::new(3),
           dataset_id: Some(foo_id.clone()),
           run_since_start: Duration::milliseconds(130),
-          finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
+          finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::PullResult(PullResult::Updated {
+            old_head: Some(Multihash::from_digest_sha3_256(b"foo-new-slice")),
+            new_head: Multihash::from_digest_sha3_256(b"foo-newest-slice"),
+            num_blocks: 1,
+            num_records: 3,
+          })))),
         });
         let task3_handle = task3_driver.run();
 
@@ -1584,7 +1611,12 @@ async fn test_throttling_derived_dataset_with_2_parents() {
           task_id: TaskID::new(5),
           dataset_id: Some(bar_id.clone()),
           run_since_start: Duration::milliseconds(190),
-          finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
+          finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::PullResult(PullResult::Updated {
+            old_head: Some(Multihash::from_digest_sha3_256(b"bar-new-slice")),
+            new_head: Multihash::from_digest_sha3_256(b"bar-newest-slice"),
+            num_blocks: 1,
+            num_records: 1,
+          })))),
         });
         let task5_handle = task5_driver.run();
 
