@@ -225,12 +225,13 @@ impl From<SyncResult> for PullResult {
                 new_head,
                 num_blocks,
                 num_records,
+                new_watermark,
             } => PullResult::Updated {
                 old_head,
                 new_head,
                 num_blocks,
                 num_records,
-                new_watermark: None, // TODO: support watermarks
+                new_watermark,
             },
         }
     }

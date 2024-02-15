@@ -166,6 +166,19 @@ impl SimpleTransferProtocol {
             (create_result.dataset, Some(create_result.head))
         };
 
+        let new_watermark = blocks
+            .iter()
+            .rev()
+            .map(|(_, block)| match &block.event {
+                MetadataEvent::AddData(add_data) => add_data.new_watermark,
+                MetadataEvent::ExecuteTransform(execute_transform) => {
+                    execute_transform.new_watermark
+                }
+                _ => None,
+            })
+            .find(Option::is_some)
+            .flatten();
+
         let stats = self
             .synchronize_blocks(
                 blocks,
@@ -185,6 +198,7 @@ impl SimpleTransferProtocol {
             new_head: src_head,
             num_blocks: num_blocks as u64,
             num_records: stats.dst.data_records_written,
+            new_watermark,
         })
     }
 

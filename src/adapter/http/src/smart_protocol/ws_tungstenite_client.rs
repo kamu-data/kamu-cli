@@ -86,10 +86,10 @@ impl WsSmartTransferProtocolClient {
         match dataset_pull_response {
             Ok(success) => {
                 tracing::debug!(
-                    num_blocks = % success.size_estimate.num_blocks,
-                    bytes_in_raw_locks = % success.size_estimate.bytes_in_raw_blocks,
-                    num_objects = % success.size_estimate.num_objects,
-                    bytes_in_raw_objecs = % success.size_estimate.bytes_in_raw_objects,
+                    num_blocks = % success.transfer_plan.num_blocks,
+                    bytes_in_raw_locks = % success.transfer_plan.bytes_in_raw_blocks,
+                    num_objects = % success.transfer_plan.num_objects,
+                    bytes_in_raw_objecs = % success.transfer_plan.bytes_in_raw_objects,
                     "Pull response estimate",
                 );
                 Ok(success)
@@ -191,12 +191,12 @@ impl WsSmartTransferProtocolClient {
     async fn push_send_request(
         &self,
         socket: &mut TungsteniteStream,
-        size_estimate: TransferSizeEstimate,
+        transfer_plan: TransferPlan,
         dst_head: Option<&Multihash>,
     ) -> Result<DatasetPushRequestAccepted, PushClientError> {
         let push_request_message = DatasetPushRequest {
             current_head: dst_head.cloned(),
-            size_estimate,
+            transfer_plan,
         };
 
         tracing::debug!("Sending push request: {:?}", push_request_message);
@@ -525,7 +525,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
             }
         };
 
-        let sync_result = if dataset_pull_result.size_estimate.num_blocks > 0 {
+        let sync_result = if dataset_pull_result.transfer_plan.num_blocks > 0 {
             let dataset_pull_metadata_response =
                 match self.pull_send_metadata_request(&mut ws_stream).await {
                     Ok(dataset_pull_metadata_response) => Ok(dataset_pull_metadata_response),
@@ -629,8 +629,9 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
             SyncResult::Updated {
                 old_head: dst_head,
                 new_head: new_dst_head,
-                num_blocks: u64::from(dataset_pull_result.size_estimate.num_blocks),
-                num_records: dataset_pull_result.size_estimate.num_records,
+                num_blocks: u64::from(dataset_pull_result.transfer_plan.num_blocks),
+                num_records: dataset_pull_result.transfer_plan.num_records,
+                new_watermark: dataset_pull_result.transfer_plan.new_watermark,
             }
         } else {
             SyncResult::UpToDate
@@ -665,17 +666,18 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
             .await
             .int_err()?;
 
-        let size_estimate =
-            prepare_dataset_transfer_estimate(src.as_metadata_chain(), &src_head, dst_head)
+        let transfer_plan =
+            prepare_dataset_transfer_plan(src.as_metadata_chain(), &src_head, dst_head)
                 .await
                 .map_err(|e| SyncError::Internal(e.int_err()))?;
 
-        let num_blocks = size_estimate.num_blocks;
+        let num_blocks = transfer_plan.num_blocks;
         if num_blocks == 0 {
             return Ok(SyncResult::UpToDate);
         }
 
-        let num_records = size_estimate.num_records;
+        let num_records = transfer_plan.num_records;
+        let new_watermark = transfer_plan.new_watermark;
 
         let maybe_access_token = self
             .dataset_credential_resolver
@@ -715,7 +717,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
         };
 
         match self
-            .push_send_request(&mut ws_stream, size_estimate, dst_head)
+            .push_send_request(&mut ws_stream, transfer_plan, dst_head)
             .await
         {
             Ok(_) => {}
@@ -789,6 +791,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
             new_head: src_head,
             num_blocks: u64::from(num_blocks),
             num_records,
+            new_watermark,
         })
     }
 }
