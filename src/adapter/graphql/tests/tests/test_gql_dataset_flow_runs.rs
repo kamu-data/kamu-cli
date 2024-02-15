@@ -1929,7 +1929,16 @@ impl FlowRunsHarness {
                                         startCondition {
                                             __typename
                                             ... on FlowStartConditionBatching {
-                                                thresholdNewRecords
+                                                currentRecordsAccumulated
+                                                activeBatchingRule {
+                                                    __typename
+                                                    minRecordsAwaited
+                                                    maxRecordsTaken
+                                                    maxBatchingInterval {
+                                                        every
+                                                        unit
+                                                    }
+                                                }
                                             }
                                             ... on FlowStartConditionThrottling {
                                                 intervalSec

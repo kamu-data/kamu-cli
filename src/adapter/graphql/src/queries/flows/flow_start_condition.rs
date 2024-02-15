@@ -43,13 +43,15 @@ impl From<fs::FlowStartConditionThrottling> for FlowStartConditionThrottling {
 
 #[derive(SimpleObject)]
 pub(crate) struct FlowStartConditionBatching {
-    pub threshold_new_records: usize,
+    pub current_records_accumulated: u64,
+    pub active_batching_rule: FlowConfigurationBatching,
 }
 
 impl From<fs::FlowStartConditionBatching> for FlowStartConditionBatching {
     fn from(value: fs::FlowStartConditionBatching) -> Self {
         Self {
-            threshold_new_records: value.threshold_new_records,
+            current_records_accumulated: value.current_records_accumulated,
+            active_batching_rule: value.active_batching_rule.into(),
         }
     }
 }

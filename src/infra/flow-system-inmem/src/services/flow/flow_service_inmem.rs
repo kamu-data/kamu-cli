@@ -174,7 +174,9 @@ impl FlowServiceInMemory {
                         .active_configs
                         .add_system_flow_config(system_flow_key.flow_type, schedule.clone());
                 } else {
-                    unimplemented!("Doubt will ever need to schedule system flows via conditions")
+                    unimplemented!(
+                        "Doubt will ever need to schedule system flows via batching rules"
+                    )
                 }
             }
         }
@@ -345,14 +347,14 @@ impl FlowServiceInMemory {
 
         // For each, scan if flows configurations are on
         for dependent_dataset_id in dependent_dataset_ids {
-            let maybe_dependent_start_condition = self
+            let maybe_batching_rule = self
                 .state
                 .lock()
                 .unwrap()
                 .active_configs
-                .try_get_dataset_start_condition(&dependent_dataset_id, flow_type);
+                .try_get_dataset_batching_rule(&dependent_dataset_id, flow_type);
 
-            if let Some(_batching_condition) = maybe_dependent_start_condition {
+            if let Some(_batching_rule) = maybe_batching_rule {
                 // TODO: Data batching not supported yet in scheduler
 
                 let dependent_flow_key =

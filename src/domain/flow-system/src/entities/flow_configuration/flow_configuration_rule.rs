@@ -16,13 +16,13 @@ use crate::Schedule;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FlowConfigurationRule {
     Schedule(Schedule),
-    BatchingCondition(BatchingConditionConfiguration),
+    BatchingRule(BatchingRule),
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct BatchingConditionConfiguration {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BatchingRule {
     pub min_records_awaited: u64,
     pub max_records_taken: Option<u64>,
     pub max_batching_interval: Option<Duration>,

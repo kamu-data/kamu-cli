@@ -9,6 +9,8 @@
 
 use chrono::Duration;
 
+use crate::BatchingRule;
+
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -28,7 +30,8 @@ pub struct FlowStartConditionThrottling {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct FlowStartConditionBatching {
-    pub threshold_new_records: usize,
+    pub current_records_accumulated: u64,
+    pub active_batching_rule: BatchingRule,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

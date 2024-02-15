@@ -9,7 +9,7 @@
 
 use chrono::Utc;
 use kamu_flow_system::{
-    BatchingConditionConfiguration,
+    BatchingRule,
     FlowConfigurationRule,
     FlowConfigurationService,
     FlowKeyDataset,
@@ -109,7 +109,7 @@ impl DatasetFlowConfigsMut {
                 FlowKeyDataset::new(self.dataset_handle.id.clone(), dataset_flow_type.into())
                     .into(),
                 paused,
-                FlowConfigurationRule::BatchingCondition(BatchingConditionConfiguration {
+                FlowConfigurationRule::BatchingRule(BatchingRule {
                     min_records_awaited: batching.min_records_awaited,
                     max_records_taken: batching.max_records_taken,
                     max_batching_interval: batching.max_batching_interval.map(Into::into),
