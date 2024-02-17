@@ -389,6 +389,10 @@ pub fn cli() -> Command {
                 Command::new("init")
                     .about("Initialize an empty workspace in the current directory")
                     .args([
+                        Arg::new("exists-ok")
+                            .long("exists-ok")
+                            .action(ArgAction::SetTrue)
+                            .help("Don't return an error if workspace already exists"),
                         Arg::new("pull-images")
                             .long("pull-images")
                             .action(ArgAction::SetTrue)

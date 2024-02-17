@@ -14,13 +14,19 @@ use crate::{AlreadyInWorkspace, WorkspaceLayout};
 
 pub struct InitCommand {
     workspace_layout: Arc<WorkspaceLayout>,
+    exists_ok: bool,
     multi_tenant: bool,
 }
 
 impl InitCommand {
-    pub fn new(workspace_layout: Arc<WorkspaceLayout>, multi_tenant: bool) -> Self {
+    pub fn new(
+        workspace_layout: Arc<WorkspaceLayout>,
+        exists_ok: bool,
+        multi_tenant: bool,
+    ) -> Self {
         Self {
             workspace_layout,
+            exists_ok,
             multi_tenant,
         }
     }
@@ -34,7 +40,12 @@ impl Command for InitCommand {
 
     async fn run(&mut self) -> Result<(), CLIError> {
         if self.workspace_layout.root_dir.is_dir() {
-            return Err(CLIError::usage_error_from(AlreadyInWorkspace));
+            return if self.exists_ok {
+                eprintln!("{}", console::style("Workspace already exists").yellow());
+                Ok(())
+            } else {
+                Err(CLIError::usage_error_from(AlreadyInWorkspace))
+            };
         }
 
         WorkspaceLayout::create(&self.workspace_layout.root_dir, self.multi_tenant)?;

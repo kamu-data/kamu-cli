@@ -4,13 +4,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+### Added
+- New `--exists-ok` flag for `kamu init` command
+### Fixed
+- Ignoring the trailing slash during inference of a dataset name from pull URL
+
 ## [0.158.0] - 2024-02-13
 ### Added
- - Flows API now reports number of ingested/transformed blocks & records to improve UI informativity
- - Support of --recursive flag for `kamu delete` and `kamu verify` commands
+- Flows API now reports number of ingested/transformed blocks & records to improve UI informativity
+- Support of `--recursive` flag for `kamu delete` and `kamu verify` commands
 ### Changed
 - The state when all flows of the given dataset are paused should be queryable via GraphQL API
-- Added caching of metablock chains to improve performance within transactions
+- Added caching of metadata chains to improve performance within transactions
 
 ## [0.157.0] - 2024-02-12
 ### Added
