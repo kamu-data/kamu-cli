@@ -298,6 +298,7 @@ Initialize an empty workspace in the current directory
 
 **Options:**
 
+* `--exists-ok` — Don't return an error if workspace already exists
 * `--pull-images` — Only pull container images and exit
 * `--list-only` — List image names instead of pulling
 * `--multi-tenant` — Initialize a workspace for multiple tenants
