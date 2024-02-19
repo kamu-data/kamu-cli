@@ -58,3 +58,22 @@ kamu-base-with-data-push:
 		IMAGE_REPO=$(IMAGE_REPO) \
 		KAMU_VERSION=$(KAMU_VERSION) \
 		image-push
+
+
+#########################################################################################
+
+
+.PHONY: kamu-base-with-data-mt
+kamu-base-with-data-mt:
+	make -C kamu-base-with-data-mt/ \
+		IMAGE_REPO=$(IMAGE_REPO) \
+		KAMU_VERSION=$(KAMU_VERSION) \
+		workspace image
+
+
+.PHONY: kamu-base-with-data-mt-push
+kamu-base-with-data-mt-push:
+	make -C kamu-base-with-data-mt/ \
+		IMAGE_REPO=$(IMAGE_REPO) \
+		KAMU_VERSION=$(KAMU_VERSION) \
+		image-push

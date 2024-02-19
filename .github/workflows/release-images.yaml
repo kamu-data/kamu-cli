@@ -36,13 +36,15 @@ jobs:
           cd images/
           make kamu-base
 
-      - name: Build base image with sample data
+      - name: Build images with sample data
         run: |
           cd images/
           make kamu-base-with-data
+          make kamu-base-with-data-mt
 
       - name: Publish images
         run: |
           cd images
           make kamu-base-push
           make kamu-base-with-data-push
+          make kamu-base-with-data-mt-push
