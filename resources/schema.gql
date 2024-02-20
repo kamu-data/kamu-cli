@@ -827,7 +827,7 @@ union FlowStartCondition = FlowStartConditionThrottling | FlowStartConditionBatc
 
 type FlowStartConditionBatching {
 	activeBatchingRule: FlowConfigurationBatching!
-	awaitedByNow: TimeDelta!
+	batchingDeadline: DateTime!
 	accumulatedRecordsCount: Int!
 	watermarkModified: Boolean!
 }

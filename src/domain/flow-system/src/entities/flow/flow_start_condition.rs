@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use chrono::Duration;
+use chrono::{DateTime, Duration, Utc};
 
 use crate::BatchingRule;
 
@@ -31,7 +31,7 @@ pub struct FlowStartConditionThrottling {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct FlowStartConditionBatching {
     pub active_batching_rule: BatchingRule,
-    pub awaited_by_now: Duration,
+    pub batching_deadline: DateTime<Utc>,
     pub accumulated_records_count: u64,
     pub watermark_modified: bool,
 }

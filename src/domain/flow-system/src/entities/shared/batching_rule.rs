@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use chrono::Duration;
+use chrono::{DateTime, Duration, Utc};
 use thiserror::Error;
 
 use crate::{FlowResult, FlowTrigger};
@@ -54,7 +54,8 @@ impl BatchingRule {
 
     pub fn evaluate(
         &self,
-        awaited_by_now: Duration,
+        flow_start_time: DateTime<Utc>,
+        evaluation_time: DateTime<Utc>,
         triggers: &[FlowTrigger],
     ) -> BatchingRuleEvaluation {
         // TODO: it's likely assumed the accumulation is per each input separately, but
@@ -75,6 +76,9 @@ impl BatchingRule {
             }
         }
 
+        // The timeout for batching will happen at:
+        let batching_deadline = flow_start_time + self.max_batching_interval;
+
         // The conditoin is satisfied if
         //   - we crossed the number of new records threshold
         //   - or waited long enough, assuming
@@ -82,10 +86,10 @@ impl BatchingRule {
         //      - watmermark got touched
         let satisfied = (accumulated_records_count > 0 || watermark_modified)
             && (accumulated_records_count >= self.min_records_to_await
-                || self.max_batching_interval <= awaited_by_now);
+                || evaluation_time >= batching_deadline);
 
         BatchingRuleEvaluation {
-            awaited_by_now,
+            batching_deadline,
             accumulated_records_count,
             watermark_modified,
             satisfied,
@@ -111,7 +115,7 @@ pub enum BatchingRuleValidationError {
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct BatchingRuleEvaluation {
-    pub awaited_by_now: Duration,
+    pub batching_deadline: DateTime<Utc>,
     pub accumulated_records_count: u64,
     pub watermark_modified: bool,
     pub satisfied: bool,

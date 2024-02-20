@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use chrono::{DateTime, Utc};
 use kamu_flow_system as fs;
 
 use crate::prelude::*;
@@ -44,7 +45,7 @@ impl From<fs::FlowStartConditionThrottling> for FlowStartConditionThrottling {
 #[derive(SimpleObject)]
 pub(crate) struct FlowStartConditionBatching {
     pub active_batching_rule: FlowConfigurationBatching,
-    pub awaited_by_now: TimeDelta,
+    pub batching_deadline: DateTime<Utc>,
     pub accumulated_records_count: u64,
     pub watermark_modified: bool,
 }
@@ -53,7 +54,7 @@ impl From<fs::FlowStartConditionBatching> for FlowStartConditionBatching {
     fn from(value: fs::FlowStartConditionBatching) -> Self {
         Self {
             active_batching_rule: value.active_batching_rule.into(),
-            awaited_by_now: value.awaited_by_now.into(),
+            batching_deadline: value.batching_deadline,
             accumulated_records_count: value.accumulated_records_count,
             watermark_modified: value.watermark_modified,
         }

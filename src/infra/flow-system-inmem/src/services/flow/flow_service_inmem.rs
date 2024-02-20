@@ -363,17 +363,15 @@ impl FlowServiceInMemory {
         batching_rule: &BatchingRule,
     ) -> Result<bool, InternalError> {
         // Run evaluation
-        let result = batching_rule.evaluate(
-            evaluation_time - flow.timing.created_at, // how much time flow waited
-            &flow.triggers,
-        );
+        let result =
+            batching_rule.evaluate(flow.timing.created_at, evaluation_time, &flow.triggers);
 
         // Update batching condition data
         flow.define_start_condition(
             evaluation_time,
             FlowStartCondition::Batching(FlowStartConditionBatching {
                 active_batching_rule: *batching_rule,
-                awaited_by_now: result.awaited_by_now,
+                batching_deadline: result.batching_deadline,
                 accumulated_records_count: result.accumulated_records_count,
                 watermark_modified: result.watermark_modified,
             }),
