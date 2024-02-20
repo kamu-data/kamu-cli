@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_core::PullResult;
 use kamu_task_system as ts;
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -52,23 +51,13 @@ impl From<&ts::TaskResult> for FlowResult {
     fn from(value: &ts::TaskResult) -> Self {
         match value {
             ts::TaskResult::Empty => Self::Empty,
-            ts::TaskResult::PullResult(pull_result) => match *pull_result {
-                PullResult::UpToDate => Self::DatasetUpdate(FlowResultDatasetUpdate {
-                    num_blocks: 0,
-                    num_records: 0,
-                    watermark_modified: false,
-                }),
-                PullResult::Updated {
-                    num_blocks,
-                    num_records,
-                    new_watermark,
-                    ..
-                } => Self::DatasetUpdate(FlowResultDatasetUpdate {
-                    num_blocks,
-                    num_records,
-                    watermark_modified: new_watermark.is_some(),
-                }),
-            },
+            ts::TaskResult::UpdateDatasetResult(task_pull_result) => {
+                Self::DatasetUpdate(FlowResultDatasetUpdate {
+                    num_blocks: task_pull_result.num_blocks,
+                    num_records: task_pull_result.num_records,
+                    watermark_modified: task_pull_result.updated_watermark.is_some(),
+                })
+            }
         }
     }
 }

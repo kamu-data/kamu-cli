@@ -166,25 +166,23 @@ impl SimpleTransferProtocol {
             (create_result.dataset, Some(create_result.head))
         };
 
-        let stats = self
-            .synchronize_blocks(
-                blocks,
-                src.as_ref(),
-                dst.as_ref(),
-                &src_head,
-                dst_head.as_ref(),
-                validation,
-                trust_source_hashes,
-                listener,
-                listener_adapter.into_status(),
-            )
-            .await?;
+        self.synchronize_blocks(
+            blocks,
+            src.as_ref(),
+            dst.as_ref(),
+            &src_head,
+            dst_head.as_ref(),
+            validation,
+            trust_source_hashes,
+            listener,
+            listener_adapter.into_status(),
+        )
+        .await?;
 
         Ok(SyncResult::Updated {
             old_head,
             new_head: src_head,
             num_blocks: num_blocks as u64,
-            num_records: stats.dst.data_records_written,
         })
     }
 
@@ -394,7 +392,7 @@ impl SimpleTransferProtocol {
         trust_source_hashes: bool,
         listener: Arc<dyn SyncListener>,
         mut stats: SyncStats,
-    ) -> Result<SyncStats, SyncError> {
+    ) -> Result<(), SyncError> {
         // Update stats estimates based on metadata
         stats.dst_estimated.metadata_blocks_written += blocks.len() as u64;
 
@@ -536,7 +534,7 @@ impl SimpleTransferProtocol {
             Err(SetRefError::BlockNotFound(e)) => Err(SyncError::Internal(e.int_err())),
         }?;
 
-        Ok(stats)
+        Ok(())
     }
 }
 

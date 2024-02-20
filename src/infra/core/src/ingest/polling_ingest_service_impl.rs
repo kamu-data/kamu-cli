@@ -308,19 +308,9 @@ impl PollingIngestServiceImpl {
 
                 let res = args.data_writer.commit(staged).await?;
 
-                let num_records = res
-                    .new_block
-                    .event
-                    .new_data
-                    .as_ref()
-                    .map(DataSlice::num_records)
-                    .unwrap_or_default();
-
                 Ok(PollingIngestResult::Updated {
                     old_head: res.old_head,
                     new_head: res.new_head,
-                    num_blocks: 1,
-                    num_records,
                     has_more: savepoint.has_more,
                     uncacheable,
                 })
@@ -551,32 +541,22 @@ impl PollingIngestServiceImpl {
             (None | Some(PollingIngestResult::UpToDate { .. }), n) => n,
             (
                 Some(PollingIngestResult::Updated {
-                    old_head,
-                    new_head,
-                    num_blocks,
-                    num_records,
-                    ..
+                    old_head, new_head, ..
                 }),
                 PollingIngestResult::UpToDate { uncacheable, .. },
             ) => PollingIngestResult::Updated {
                 old_head,
                 new_head,
-                num_blocks,
-                num_records,
                 has_more: false,
                 uncacheable,
             },
             (
                 Some(PollingIngestResult::Updated {
                     old_head: prev_old_head,
-                    num_blocks: prev_num_blocks,
-                    num_records: prev_num_records,
                     ..
                 }),
                 PollingIngestResult::Updated {
                     new_head,
-                    num_blocks,
-                    num_records,
                     has_more,
                     uncacheable,
                     ..
@@ -584,8 +564,6 @@ impl PollingIngestServiceImpl {
             ) => PollingIngestResult::Updated {
                 old_head: prev_old_head,
                 new_head,
-                num_blocks: num_blocks + prev_num_blocks,
-                num_records: num_records + prev_num_records,
                 has_more,
                 uncacheable,
             },

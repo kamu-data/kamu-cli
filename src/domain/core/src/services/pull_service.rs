@@ -167,9 +167,6 @@ pub enum PullResult {
     Updated {
         old_head: Option<Multihash>,
         new_head: Multihash,
-        num_blocks: u64,
-        num_records: u64,
-        new_watermark: Option<DateTime<Utc>>,
     },
 }
 
@@ -178,17 +175,10 @@ impl From<PollingIngestResult> for PullResult {
         match other {
             PollingIngestResult::UpToDate { .. } => PullResult::UpToDate,
             PollingIngestResult::Updated {
-                old_head,
-                new_head,
-                num_blocks,
-                num_records,
-                ..
+                old_head, new_head, ..
             } => PullResult::Updated {
                 old_head: Some(old_head),
                 new_head,
-                num_blocks,
-                num_records,
-                new_watermark: None, // TODO
             },
         }
     }
@@ -198,17 +188,9 @@ impl From<TransformResult> for PullResult {
     fn from(other: TransformResult) -> Self {
         match other {
             TransformResult::UpToDate => PullResult::UpToDate,
-            TransformResult::Updated {
-                old_head,
-                new_head,
-                num_blocks,
-                num_records,
-            } => PullResult::Updated {
+            TransformResult::Updated { old_head, new_head } => PullResult::Updated {
                 old_head: Some(old_head),
                 new_head,
-                num_blocks,
-                num_records,
-                new_watermark: None, // TODO
             },
         }
     }
@@ -219,17 +201,8 @@ impl From<SyncResult> for PullResult {
         match other {
             SyncResult::UpToDate => PullResult::UpToDate,
             SyncResult::Updated {
-                old_head,
-                new_head,
-                num_blocks,
-                num_records,
-            } => PullResult::Updated {
-                old_head,
-                new_head,
-                num_blocks,
-                num_records,
-                new_watermark: None, // TODO
-            },
+                old_head, new_head, ..
+            } => PullResult::Updated { old_head, new_head },
         }
     }
 }

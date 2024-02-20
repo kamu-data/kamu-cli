@@ -7,9 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-/////////////////////////////////////////////////////////////////////////////////////////
-
+use chrono::{DateTime, Utc};
 use kamu_core::PullResult;
+
+/////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TaskStatus {
@@ -46,7 +47,17 @@ impl TaskOutcome {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TaskResult {
     Empty,
-    PullResult(PullResult),
+    UpdateDatasetResult(TaskUpdateDatasetResult),
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TaskUpdateDatasetResult {
+    pub pull_result: PullResult,
+    pub num_blocks: u64,
+    pub num_records: u64,
+    pub updated_watermark: Option<DateTime<Utc>>,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

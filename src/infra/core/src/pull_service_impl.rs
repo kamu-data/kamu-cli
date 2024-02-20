@@ -642,9 +642,6 @@ impl PullService for PullServiceImpl {
             Ok(res) => Ok(PullResult::Updated {
                 old_head: Some(res.old_head),
                 new_head: res.new_head,
-                num_blocks: 1,
-                num_records: 0,
-                new_watermark: Some(new_watermark),
             }),
             Err(
                 WriteWatermarkError::EmptyCommit(_)

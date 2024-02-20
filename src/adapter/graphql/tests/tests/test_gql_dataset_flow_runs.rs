@@ -305,13 +305,17 @@ async fn test_trigger_ingest_root_dataset() {
         .mimic_task_completed(
             flow_task_id,
             complete_time,
-            ts::TaskOutcome::Success(ts::TaskResult::PullResult(PullResult::Updated {
-                old_head: Some(Multihash::from_digest_sha3_256(b"old-slice")),
-                new_head: Multihash::from_digest_sha3_256(b"new-slice"),
-                num_blocks: 1,
-                num_records: 12,
-                new_watermark: None,
-            })),
+            ts::TaskOutcome::Success(ts::TaskResult::UpdateDatasetResult(
+                ts::TaskUpdateDatasetResult {
+                    pull_result: PullResult::Updated {
+                        old_head: Some(Multihash::from_digest_sha3_256(b"old-slice")),
+                        new_head: Multihash::from_digest_sha3_256(b"new-slice"),
+                    },
+                    num_blocks: 1,
+                    num_records: 12,
+                    updated_watermark: None,
+                },
+            )),
         )
         .await;
 
@@ -505,13 +509,17 @@ async fn test_trigger_execute_transform_derived_dataset() {
         .mimic_task_completed(
             flow_task_id,
             complete_time,
-            ts::TaskOutcome::Success(ts::TaskResult::PullResult(PullResult::Updated {
-                old_head: Some(Multihash::from_digest_sha3_256(b"old-slice")),
-                new_head: Multihash::from_digest_sha3_256(b"new-slice"),
-                num_blocks: 3,
-                num_records: 25,
-                new_watermark: None,
-            })),
+            ts::TaskOutcome::Success(ts::TaskResult::UpdateDatasetResult(
+                ts::TaskUpdateDatasetResult {
+                    pull_result: PullResult::Updated {
+                        old_head: Some(Multihash::from_digest_sha3_256(b"old-slice")),
+                        new_head: Multihash::from_digest_sha3_256(b"new-slice"),
+                    },
+                    num_blocks: 3,
+                    num_records: 25,
+                    updated_watermark: None,
+                },
+            )),
         )
         .await;
 

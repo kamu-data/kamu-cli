@@ -34,7 +34,6 @@ pub(crate) async fn test_smart_push_new_dataset<TServerHarness: ServerSideHarnes
                 old_head: None,
                 new_head: scenario.client_commit_result.new_head,
                 num_blocks: 4,
-                num_records: 10,
             },
             push_result
         );
@@ -99,7 +98,6 @@ pub(crate) async fn test_smart_push_existing_evolved_dataset<TServerHarness: Ser
                 old_head: Some(scenario.client_create_result.head),
                 new_head: scenario.client_commit_result.new_head,
                 num_blocks: 2,
-                num_records: 10,
             },
             push_result
         );
@@ -164,7 +162,6 @@ pub(crate) async fn test_smart_push_aborted_write_of_new_rewrite_succeeds<
                 old_head: None,
                 new_head: scenario.client_commit_result.new_head,
                 num_blocks: 4,
-                num_records: 10,
             },
             push_result
         );
@@ -202,7 +199,6 @@ pub(crate) async fn test_smart_push_aborted_write_of_updated_rewrite_succeeds<
                 old_head: Some(scenario.client_create_result.head),
                 new_head: scenario.client_commit_result.new_head,
                 num_blocks: 2,
-                num_records: 10,
             },
             push_result
         );
