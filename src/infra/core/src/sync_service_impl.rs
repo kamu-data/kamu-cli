@@ -9,7 +9,6 @@
 
 use std::sync::Arc;
 
-use chrono::{DateTime, Utc};
 use dill::*;
 use kamu_core::services::sync_service::DatasetNotFoundError;
 use kamu_core::utils::metadata_chain_comparator::*;
@@ -405,22 +404,14 @@ impl SyncServiceImpl {
             }
         }
 
-        let (num_blocks, num_records, new_watermark) = match chains_comparison {
+        let (num_blocks, num_records) = match chains_comparison {
             Some(CompareChainsResult::Equal) => unreachable!(),
             Some(CompareChainsResult::LhsAhead { lhs_ahead_blocks }) => {
                 let num_records = lhs_ahead_blocks
                     .iter()
                     .map(|(_, block)| Self::num_data_records_in_block(block))
                     .sum();
-
-                let new_watermark = lhs_ahead_blocks
-                    .iter()
-                    .rev()
-                    .map(|(_, block)| Self::new_watermark(block))
-                    .find(Option::is_some)
-                    .flatten();
-
-                (lhs_ahead_blocks.len(), num_records, new_watermark)
+                (lhs_ahead_blocks.len(), num_records)
             }
             None
             | Some(
@@ -428,7 +419,6 @@ impl SyncServiceImpl {
             ) => {
                 let mut num_blocks = 0;
                 let mut num_records = 0;
-                let mut new_watermark = None;
 
                 use futures::TryStreamExt;
                 let mut block_stream = src_dataset
@@ -458,11 +448,9 @@ impl SyncServiceImpl {
                 })? {
                     num_blocks += 1;
                     num_records += Self::num_data_records_in_block(&block);
-                    // Take the latest Some
-                    new_watermark = Self::new_watermark(&block).or(new_watermark);
                 }
 
-                (num_blocks, num_records, new_watermark)
+                (num_blocks, num_records)
             }
         };
 
@@ -489,7 +477,6 @@ impl SyncServiceImpl {
             new_head: src_head,
             num_blocks: num_blocks as u64,
             num_records,
-            new_watermark,
         })
     }
 
@@ -504,23 +491,6 @@ impl SyncServiceImpl {
         } else {
             0
         }
-    }
-
-    fn new_watermark(block: &MetadataBlock) -> Option<DateTime<Utc>> {
-        match &block.event {
-            MetadataEvent::AddData(add_data) => {
-                if add_data.new_watermark.is_some() {
-                    return add_data.new_watermark;
-                }
-            }
-            MetadataEvent::ExecuteTransform(transform) => {
-                if transform.new_watermark.is_some() {
-                    return transform.new_watermark;
-                }
-            }
-            _ => {}
-        };
-        None
     }
 
     async fn add_to_ipfs(&self, src: &DatasetRef) -> Result<String, SyncError> {

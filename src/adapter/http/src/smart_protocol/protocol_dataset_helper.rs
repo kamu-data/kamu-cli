@@ -73,7 +73,6 @@ pub async fn prepare_dataset_transfer_plan(
     let mut bytes_in_checkpoint_objects: u64 = 0;
 
     let mut data_records_count: u64 = 0;
-    let mut new_watermark = None;
 
     while let Some((hash, block)) = block_stream.try_next().await? {
         blocks_count += 1;
@@ -95,7 +94,6 @@ pub async fn prepare_dataset_transfer_plan(
                     checkpoint_objects_count += 1;
                     bytes_in_checkpoint_objects += new_checkpoint.size;
                 }
-                new_watermark = add_data.new_watermark.or(new_watermark);
             }
             MetadataEvent::ExecuteTransform(execute_transform) => {
                 if let Some(new_data) = &execute_transform.new_data {
@@ -107,7 +105,6 @@ pub async fn prepare_dataset_transfer_plan(
                     checkpoint_objects_count += 1;
                     bytes_in_checkpoint_objects += new_checkpoint.size;
                 }
-                new_watermark = execute_transform.new_watermark.or(new_watermark);
             }
             MetadataEvent::Seed(_)
             | MetadataEvent::SetDataSchema(_)
@@ -127,7 +124,6 @@ pub async fn prepare_dataset_transfer_plan(
         num_blocks: blocks_count,
         num_objects: data_objects_count + checkpoint_objects_count,
         num_records: data_records_count,
-        new_watermark,
         bytes_in_raw_blocks: bytes_in_blocks,
         bytes_in_raw_objects: bytes_in_data_objects + bytes_in_checkpoint_objects,
     })

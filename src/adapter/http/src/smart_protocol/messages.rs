@@ -191,7 +191,6 @@ pub struct TransferPlan {
     pub num_blocks: u32,
     pub num_objects: u32,
     pub num_records: u64,
-    pub new_watermark: Option<DateTime<Utc>>,
     pub bytes_in_raw_blocks: u64,
     pub bytes_in_raw_objects: u64,
 }

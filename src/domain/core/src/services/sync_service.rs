@@ -9,7 +9,6 @@
 
 use std::sync::Arc;
 
-use chrono::{DateTime, Utc};
 use opendatafabric::*;
 use thiserror::Error;
 
@@ -80,7 +79,6 @@ pub enum SyncResult {
         new_head: Multihash,
         num_blocks: u64,
         num_records: u64,
-        new_watermark: Option<DateTime<Utc>>,
     },
 }
 

@@ -1231,7 +1231,6 @@ impl SyncService for TestSyncService {
                     new_head: Multihash::from_digest_sha3_256(b"boop"),
                     num_blocks: 1,
                     num_records: 0,
-                    new_watermark: None,
                 }),
             });
         }

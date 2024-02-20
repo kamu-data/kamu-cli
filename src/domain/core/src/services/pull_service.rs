@@ -182,14 +182,13 @@ impl From<PollingIngestResult> for PullResult {
                 new_head,
                 num_blocks,
                 num_records,
-                new_watermark,
                 ..
             } => PullResult::Updated {
                 old_head: Some(old_head),
                 new_head,
                 num_blocks,
                 num_records,
-                new_watermark,
+                new_watermark: None, // TODO
             },
         }
     }
@@ -204,13 +203,12 @@ impl From<TransformResult> for PullResult {
                 new_head,
                 num_blocks,
                 num_records,
-                new_watermark,
             } => PullResult::Updated {
                 old_head: Some(old_head),
                 new_head,
                 num_blocks,
                 num_records,
-                new_watermark,
+                new_watermark: None, // TODO
             },
         }
     }
@@ -225,13 +223,12 @@ impl From<SyncResult> for PullResult {
                 new_head,
                 num_blocks,
                 num_records,
-                new_watermark,
             } => PullResult::Updated {
                 old_head,
                 new_head,
                 num_blocks,
                 num_records,
-                new_watermark,
+                new_watermark: None, // TODO
             },
         }
     }

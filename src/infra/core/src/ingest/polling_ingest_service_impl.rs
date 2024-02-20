@@ -321,7 +321,6 @@ impl PollingIngestServiceImpl {
                     new_head: res.new_head,
                     num_blocks: 1,
                     num_records,
-                    new_watermark: res.new_block.event.new_watermark,
                     has_more: savepoint.has_more,
                     uncacheable,
                 })
@@ -556,7 +555,6 @@ impl PollingIngestServiceImpl {
                     new_head,
                     num_blocks,
                     num_records,
-                    new_watermark,
                     ..
                 }),
                 PollingIngestResult::UpToDate { uncacheable, .. },
@@ -565,7 +563,6 @@ impl PollingIngestServiceImpl {
                 new_head,
                 num_blocks,
                 num_records,
-                new_watermark,
                 has_more: false,
                 uncacheable,
             },
@@ -574,14 +571,12 @@ impl PollingIngestServiceImpl {
                     old_head: prev_old_head,
                     num_blocks: prev_num_blocks,
                     num_records: prev_num_records,
-                    new_watermark: prev_new_watermark,
                     ..
                 }),
                 PollingIngestResult::Updated {
                     new_head,
                     num_blocks,
                     num_records,
-                    new_watermark,
                     has_more,
                     uncacheable,
                     ..
@@ -591,7 +586,6 @@ impl PollingIngestServiceImpl {
                 new_head,
                 num_blocks: num_blocks + prev_num_blocks,
                 num_records: num_records + prev_num_records,
-                new_watermark: new_watermark.or(prev_new_watermark),
                 has_more,
                 uncacheable,
             },

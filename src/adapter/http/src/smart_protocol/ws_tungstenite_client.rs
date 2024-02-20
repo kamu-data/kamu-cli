@@ -631,7 +631,6 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
                 new_head: new_dst_head,
                 num_blocks: u64::from(dataset_pull_result.transfer_plan.num_blocks),
                 num_records: dataset_pull_result.transfer_plan.num_records,
-                new_watermark: dataset_pull_result.transfer_plan.new_watermark,
             }
         } else {
             SyncResult::UpToDate
@@ -677,7 +676,6 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
         }
 
         let num_records = transfer_plan.num_records;
-        let new_watermark = transfer_plan.new_watermark;
 
         let maybe_access_token = self
             .dataset_credential_resolver
@@ -791,7 +789,6 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
             new_head: src_head,
             num_blocks: u64::from(num_blocks),
             num_records,
-            new_watermark,
         })
     }
 }
