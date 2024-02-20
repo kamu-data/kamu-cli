@@ -365,7 +365,7 @@ impl FlowServiceInMemory {
         // Run evaluation
         let result = batching_rule.evaluate(
             evaluation_time - flow.timing.created_at, // how much time flow waited
-            flow.triggers.iter(),
+            &flow.triggers,
         );
 
         // Update batching condition data

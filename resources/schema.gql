@@ -97,8 +97,8 @@ type AuthMut {
 }
 
 input BatchingConditionInput {
-	minRecordsAwaited: Int!
-	maxBatchingInterval: TimeDeltaInput
+	minRecordsToAwait: Int!
+	maxBatchingInterval: TimeDeltaInput!
 }
 
 type BlockRef {
@@ -691,8 +691,8 @@ type FlowConfiguration {
 }
 
 type FlowConfigurationBatching {
-	minRecordsAwaited: Int!
-	maxBatchingInterval: TimeDelta
+	minRecordsToAwait: Int!
+	maxBatchingInterval: TimeDelta!
 }
 
 union FlowConfigurationSchedule = TimeDelta | Cron5ComponentExpression
@@ -798,6 +798,11 @@ scalar FlowID
 type FlowIncompatibleDatasetKind implements SetFlowConfigResult & TriggerFlowResult {
 	expectedDatasetKind: DatasetKind!
 	actualDatasetKind: DatasetKind!
+	message: String!
+}
+
+type FlowInvalidBatchingConfig implements SetFlowConfigResult {
+	reason: String!
 	message: String!
 }
 

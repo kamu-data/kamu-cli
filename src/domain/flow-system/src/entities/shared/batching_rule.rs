@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::Duration;
+use thiserror::Error;
 
 use crate::{FlowResult, FlowTrigger};
 
@@ -15,34 +16,46 @@ use crate::{FlowResult, FlowTrigger};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct BatchingRule {
-    min_records_awaited: u64,
-    max_batching_interval: Option<Duration>,
+    min_records_to_await: u64,
+    max_batching_interval: Duration,
 }
 
 impl BatchingRule {
-    pub fn new(min_records_awaited: u64, max_batching_interval: Option<Duration>) -> Self {
-        assert!(min_records_awaited > 0);
+    const MAX_BATCHING_INTERVAL_HOURS: i64 = 24;
 
-        Self {
-            min_records_awaited,
-            max_batching_interval,
+    pub fn new_checked(
+        min_records_to_await: u64,
+        max_batching_interval: Duration,
+    ) -> Result<Self, BatchingRuleValidationError> {
+        if min_records_to_await == 0 {
+            return Err(BatchingRuleValidationError::MinRecordsToAwaitNotPositive);
         }
+
+        let max_possible_interval = Duration::hours(Self::MAX_BATCHING_INTERVAL_HOURS);
+        if max_batching_interval > max_possible_interval {
+            return Err(BatchingRuleValidationError::MaxIntervalAboveLimit);
+        }
+
+        Ok(Self {
+            min_records_to_await,
+            max_batching_interval,
+        })
     }
 
     #[inline]
-    pub fn min_records_awaited(&self) -> u64 {
-        self.min_records_awaited
+    pub fn min_records_to_await(&self) -> u64 {
+        self.min_records_to_await
     }
 
     #[inline]
-    pub fn max_batching_interval(&self) -> &Option<Duration> {
+    pub fn max_batching_interval(&self) -> &Duration {
         &self.max_batching_interval
     }
 
-    pub fn evaluate<'a, I: Iterator<Item = &'a FlowTrigger>>(
+    pub fn evaluate(
         &self,
         awaited_by_now: Duration,
-        triggers_it: I,
+        triggers: &[FlowTrigger],
     ) -> BatchingRuleEvaluation {
         // TODO: it's likely assumed the accumulation is per each input separately, but
         // for now count overall number
@@ -50,7 +63,7 @@ impl BatchingRule {
         let mut watermark_modified = false;
 
         // Scan each accumulated trigger to decide
-        for trigger in triggers_it {
+        for trigger in triggers {
             if let FlowTrigger::InputDatasetFlow(trigger) = trigger {
                 match &trigger.flow_result {
                     FlowResult::Empty => {}
@@ -68,10 +81,8 @@ impl BatchingRule {
         //      - there is at least some change of the inputs
         //      - watmermark got touched
         let satisfied = (accumulated_records_count > 0 || watermark_modified)
-            && (accumulated_records_count >= self.min_records_awaited
-                || self
-                    .max_batching_interval
-                    .is_some_and(|i| i <= awaited_by_now));
+            && (accumulated_records_count >= self.min_records_to_await
+                || self.max_batching_interval <= awaited_by_now);
 
         BatchingRuleEvaluation {
             awaited_by_now,
@@ -81,6 +92,22 @@ impl BatchingRule {
         }
     }
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum BatchingRuleValidationError {
+    #[error("Minimum records to await must be a positive number")]
+    MinRecordsToAwaitNotPositive,
+
+    #[error(
+        "Maximum interval to await should not exceed {} hours",
+        BatchingRule::MAX_BATCHING_INTERVAL_HOURS
+    )]
+    MaxIntervalAboveLimit,
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct BatchingRuleEvaluation {

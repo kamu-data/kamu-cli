@@ -1934,7 +1934,7 @@ impl FlowRunsHarness {
                                                 accumulatedRecordsCount
                                                 activeBatchingRule {
                                                     __typename
-                                                    minRecordsAwaited
+                                                    minRecordsToAwait
                                                     maxBatchingInterval {
                                                         every
                                                         unit

@@ -93,6 +93,20 @@ impl DatasetFlowConfigsMut {
         paused: bool,
         batching: BatchingConditionInput,
     ) -> Result<SetFlowConfigResult> {
+        let batching_rule = match BatchingRule::new_checked(
+            batching.min_records_to_await,
+            batching.max_batching_interval.into(),
+        ) {
+            Ok(rule) => rule,
+            Err(e) => {
+                return Ok(SetFlowConfigResult::InvalidBatchingConfig(
+                    FlowInvalidBatchingConfig {
+                        reason: e.to_string(),
+                    },
+                ))
+            }
+        };
+
         if let Some(e) =
             ensure_expected_dataset_kind(ctx, &self.dataset_handle, dataset_flow_type).await?
         {
@@ -109,10 +123,7 @@ impl DatasetFlowConfigsMut {
                 FlowKeyDataset::new(self.dataset_handle.id.clone(), dataset_flow_type.into())
                     .into(),
                 paused,
-                FlowConfigurationRule::BatchingRule(BatchingRule::new(
-                    batching.min_records_awaited,
-                    batching.max_batching_interval.map(Into::into),
-                )),
+                FlowConfigurationRule::BatchingRule(batching_rule),
             )
             .await
             .map_err(|e| match e {
@@ -200,8 +211,8 @@ impl From<TimeDeltaInput> for chrono::Duration {
 
 #[derive(InputObject)]
 struct BatchingConditionInput {
-    pub min_records_awaited: u64,
-    pub max_batching_interval: Option<TimeDeltaInput>,
+    pub min_records_to_await: u64,
+    pub max_batching_interval: TimeDeltaInput,
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -211,6 +222,7 @@ struct BatchingConditionInput {
 enum SetFlowConfigResult {
     Success(SetFlowConfigSuccess),
     IncompatibleDatasetKind(FlowIncompatibleDatasetKind),
+    InvalidBatchingConfig(FlowInvalidBatchingConfig),
 }
 
 #[derive(SimpleObject)]
@@ -223,6 +235,19 @@ struct SetFlowConfigSuccess {
 impl SetFlowConfigSuccess {
     pub async fn message(&self) -> String {
         "Success".to_string()
+    }
+}
+
+#[derive(SimpleObject, Debug, Clone)]
+#[graphql(complex)]
+pub(crate) struct FlowInvalidBatchingConfig {
+    reason: String,
+}
+
+#[ComplexObject]
+impl FlowInvalidBatchingConfig {
+    pub async fn message(&self) -> String {
+        self.reason.clone()
     }
 }
 
