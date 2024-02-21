@@ -41,7 +41,7 @@ impl FlowEvent {
     pub fn new(event_id: evs::EventID, event: fs::FlowEvent) -> Self {
         match event {
             fs::FlowEvent::Initiated(e) => Self::Initiated(FlowEventInitiated::new(event_id, e)),
-            fs::FlowEvent::StartConditionDefined(e) => {
+            fs::FlowEvent::StartConditionUpdated(e) => {
                 Self::StartConditionDefined(FlowEventStartConditionDefined::new(event_id, &e))
             }
             fs::FlowEvent::Queued(e) => Self::Queued(FlowEventQueued::new(event_id, &e)),
@@ -100,7 +100,7 @@ pub struct FlowEventStartConditionDefined {
 }
 
 impl FlowEventStartConditionDefined {
-    fn new(event_id: evs::EventID, event: &fs::FlowEventStartConditionDefined) -> Self {
+    fn new(event_id: evs::EventID, event: &fs::FlowEventStartConditionUpdated) -> Self {
         Self {
             event_id: event_id.into(),
             event_time: event.event_time,

@@ -40,13 +40,13 @@ impl Flow {
         )
     }
 
-    /// Define start condition for the history
-    pub fn define_start_condition(
+    /// Define start condition to indicate the relevant reason of waiting
+    pub fn set_relevant_start_condition(
         &mut self,
         now: DateTime<Utc>,
         start_condition: FlowStartCondition,
     ) -> Result<(), ProjectionError<FlowState>> {
-        let event = FlowEventStartConditionDefined {
+        let event = FlowEventStartConditionUpdated {
             event_time: now,
             flow_id: self.flow_id,
             start_condition,

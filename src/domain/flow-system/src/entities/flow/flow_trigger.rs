@@ -37,6 +37,57 @@ impl FlowTrigger {
             panic!("Any trigger kind except Push unexpected")
         }
     }
+
+    /// Merges new trigger into a list of existing triggers according to
+    /// type-specific mergeing rules, or appends it simply, if it's unique
+    pub fn reduce(
+        mut existing_triggers: Vec<FlowTrigger>,
+        new_trigger: FlowTrigger,
+    ) -> Vec<FlowTrigger> {
+        // Try finding a similar existing trigger
+        for existing_trigger in &mut existing_triggers {
+            match &new_trigger {
+                FlowTrigger::Manual(_) => {
+                    if matches!(existing_trigger, FlowTrigger::Manual(_)) {
+                        return existing_triggers;
+                    }
+                }
+                FlowTrigger::AutoPolling(_) => {
+                    if matches!(existing_trigger, FlowTrigger::AutoPolling(_)) {
+                        return existing_triggers;
+                    }
+                }
+                FlowTrigger::Push(new_push_trigger) => {
+                    if let FlowTrigger::Push(existing_push_trigger) = existing_trigger
+                        && existing_push_trigger.source_name == new_push_trigger.source_name
+                    {
+                        return existing_triggers;
+                    }
+                }
+                FlowTrigger::InputDatasetFlow(new_dataset_trigger) => {
+                    // Compare dataset ID and flow type
+                    if let FlowTrigger::InputDatasetFlow(existing_dataset_trigger) =
+                        existing_trigger
+                        && existing_dataset_trigger.is_same_key_as(&new_dataset_trigger)
+                    {
+                        // We should not be getting the same flow twice!
+                        assert_ne!(
+                            existing_dataset_trigger.flow_id,
+                            new_dataset_trigger.flow_id
+                        );
+
+                        // Accumulate stats for proper batching control
+                        existing_dataset_trigger.flow_result += new_dataset_trigger.flow_result;
+                        return existing_triggers;
+                    }
+                }
+            }
+        }
+
+        // If the execition reached down here, new trigger wasn't merged
+        existing_triggers.push(new_trigger);
+        existing_triggers
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -68,6 +119,12 @@ pub struct FlowTriggerInputDatasetFlow {
     pub flow_type: DatasetFlowType,
     pub flow_id: FlowID,
     pub flow_result: FlowResult,
+}
+
+impl FlowTriggerInputDatasetFlow {
+    pub fn is_same_key_as(&self, other: &FlowTriggerInputDatasetFlow) -> bool {
+        self.flow_type == other.flow_type && self.dataset_id == other.dataset_id
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

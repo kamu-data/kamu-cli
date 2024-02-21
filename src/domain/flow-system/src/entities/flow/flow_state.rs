@@ -133,7 +133,7 @@ impl Projection for FlowState {
 
                 match event {
                     E::Initiated(_) => Err(ProjectionError::new(Some(s), event)),
-                    E::StartConditionDefined(FlowEventStartConditionDefined {
+                    E::StartConditionUpdated(FlowEventStartConditionUpdated {
                         start_condition,
                         ..
                     }) => {
@@ -163,9 +163,7 @@ impl Projection for FlowState {
                         if s.outcome.is_some() {
                             Err(ProjectionError::new(Some(s), event))
                         } else {
-                            let mut triggers = s.triggers.clone();
-                            triggers.push(trigger.clone());
-
+                            let triggers = FlowTrigger::reduce(s.triggers, trigger.clone());
                             Ok(FlowState { triggers, ..s })
                         }
                     }
@@ -173,9 +171,8 @@ impl Projection for FlowState {
                         if s.outcome.is_some() || s.timing.activate_at.is_none() {
                             Err(ProjectionError::new(Some(s), event))
                         } else {
-                            let mut task_ids = s.task_ids.clone();
+                            let mut task_ids = s.task_ids;
                             task_ids.push(task_id);
-
                             Ok(FlowState { task_ids, ..s })
                         }
                     }

@@ -297,7 +297,7 @@ impl FlowServiceInMemory {
 
                         // Indicate throttling activity
                         if throttling_boundary_time > trigger_time {
-                            flow.define_start_condition(
+                            flow.set_relevant_start_condition(
                                 self.time_source.now(),
                                 FlowStartCondition::Throttling(FlowStartConditionThrottling {
                                     interval: self.run_config.mandatory_throttling_period,
@@ -340,7 +340,7 @@ impl FlowServiceInMemory {
 
                     // Indicate throttling activity
                     if throttling_boundary_time > naive_next_activation_time {
-                        flow.define_start_condition(
+                        flow.set_relevant_start_condition(
                             self.time_source.now(),
                             FlowStartCondition::Throttling(FlowStartConditionThrottling {
                                 interval: self.run_config.mandatory_throttling_period,
@@ -367,7 +367,7 @@ impl FlowServiceInMemory {
             batching_rule.evaluate(flow.timing.created_at, evaluation_time, &flow.triggers);
 
         // Update batching condition data
-        flow.define_start_condition(
+        flow.set_relevant_start_condition(
             evaluation_time,
             FlowStartCondition::Batching(FlowStartConditionBatching {
                 active_batching_rule: *batching_rule,

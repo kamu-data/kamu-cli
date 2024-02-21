@@ -62,4 +62,20 @@ impl From<&ts::TaskResult> for FlowResult {
     }
 }
 
+impl std::ops::AddAssign for FlowResult {
+    fn add_assign(&mut self, rhs: Self) {
+        match self {
+            FlowResult::Empty => *self = rhs,
+            FlowResult::DatasetUpdate(self_update) => match rhs {
+                FlowResult::Empty => {}
+                FlowResult::DatasetUpdate(rhs_update) => {
+                    self_update.num_blocks += rhs_update.num_blocks;
+                    self_update.num_records += rhs_update.num_records;
+                    self_update.watermark_modified |= rhs_update.watermark_modified;
+                }
+            },
+        }
+    }
+}
+
 /////////////////////////////////////////////////////////////////////////////////////////
