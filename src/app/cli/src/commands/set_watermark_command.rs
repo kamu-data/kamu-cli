@@ -58,9 +58,15 @@ impl Command for SetWatermarkCommand {
             return Err(CLIError::usage_error(
                 "Only one dataset can be provided when setting a watermark",
             ));
-        } else if self.recursive || self.all {
+        }
+        if self.recursive || self.all {
             return Err(CLIError::usage_error(
                 "Can't use --all or --recursive flags when setting a watermark",
+            ));
+        }
+        if self.refs[0].is_pattern() {
+            return Err(CLIError::usage_error(
+                "Only static dataset reference can be provided when setting a watermark",
             ));
         }
 

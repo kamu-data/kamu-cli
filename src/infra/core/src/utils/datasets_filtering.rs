@@ -8,11 +8,20 @@
 // by the Apache License, Version 2.0.
 
 use std::pin::Pin;
+use std::str::FromStr;
+use std::sync::Arc;
 
+use futures::stream::Chain;
 use futures::{future, StreamExt, TryStreamExt};
-use kamu_core::{DatasetRepository, GetDatasetError};
-use opendatafabric::{DatasetHandle, DatasetRefAny, DatasetRefPatternAny, DatasetRefPatternLocal};
-use tokio_stream::{self as stream, Stream, StreamMap};
+use kamu_core::{DatasetRepository, GetDatasetError, SearchOptions, SearchResult, SearchService};
+use opendatafabric::{
+    DatasetHandle,
+    DatasetRefAny,
+    DatasetRefPatternAny,
+    DatasetRefPatternLocal,
+    RepoName,
+};
+use tokio_stream::Stream;
 
 type FilteredDatasetHandleStream<'a> =
     Pin<Box<dyn Stream<Item = Result<DatasetHandle, GetDatasetError>> + Send + 'a>>;
@@ -54,45 +63,61 @@ pub fn filter_datasets_by_local_pattern(
 
 pub fn filter_datasets_by_any_pattern(
     dataset_repo: &dyn DatasetRepository,
+    search_svc: Arc<dyn SearchService>,
     dataset_ref_patterns: Vec<DatasetRefPatternAny>,
-) -> StreamMap<&'_ str, FilteredDatasetRefAnyStream<'_>> {
-    let mut is_pattern = false;
-    let mut static_dataset_refs = vec![];
-    for dataset_ref_pattern in &dataset_ref_patterns {
-        if dataset_ref_pattern.is_pattern() {
-            is_pattern = true;
-        } else {
-            static_dataset_refs.push(Ok(dataset_ref_pattern
-                .as_dataset_ref_any()
-                .unwrap()
-                .clone()));
-        }
-    }
+) -> Chain<FilteredDatasetRefAnyStream<'_>, FilteredDatasetRefAnyStream<'_>> {
+    let clone_dataset_ref_patterns = dataset_ref_patterns.clone();
 
-    let mut result = StreamMap::new();
+    let static_stream = Box::pin(async_stream::try_stream! {
+        for dataset_ref_pattern in &dataset_ref_patterns.clone() {
+            if !dataset_ref_pattern.is_pattern() {
+                yield dataset_ref_pattern
+                    .as_dataset_ref_any()
+                    .unwrap()
+                    .clone();
+            } else if let Some(repo_pattern) = dataset_ref_pattern.repo_pattern() {
+                let search_options = if repo_pattern.contains('%') {
+                    SearchOptions {
+                        repository_names: vec![],
+                    }
+                } else {
+                    SearchOptions {
+                        repository_names: vec![RepoName::from_str(repo_pattern.as_ref()).unwrap()],
+                    }
+                };
 
-    result.insert(
-        "static_dataset_refs",
-        Box::pin(stream::iter(static_dataset_refs)) as FilteredDatasetRefAnyStream,
-    );
+                let dataset_name_pattern_to_search = dataset_ref_pattern.name_static_pattern().unwrap().to_owned();
+                let dataset_name_to_search = dataset_name_pattern_to_search.replace('%', "");
 
-    if is_pattern {
-        result.insert(
-            "filtered_dataset_refs",
-            dataset_repo
-                .get_all_datasets()
-                .try_filter(move |dataset_handle| {
-                    future::ready(
-                        dataset_ref_patterns.iter().any(|dataset_ref_pattern| {
-                            dataset_ref_pattern.is_match(dataset_handle)
+                let remote_datasets = search_svc.search(Some(dataset_name_to_search.as_str()), search_options).await.unwrap_or(SearchResult {
+                    datasets: vec![],
+                });
+
+                for dataset_alias in &remote_datasets.datasets {
+                    if dataset_ref_pattern.is_match_remote(dataset_alias) {
+                        yield dataset_alias.as_any_ref();
+                    }
+                }
+            }
+        };
+    }) as FilteredDatasetRefAnyStream<'_>;
+
+    let result = static_stream.chain(
+        dataset_repo
+            .get_all_datasets()
+            .try_filter(move |dataset_handle| {
+                future::ready(
+                    clone_dataset_ref_patterns
+                        .iter()
+                        .any(|dataset_ref_pattern| {
+                            dataset_ref_pattern.is_match_local(dataset_handle)
                         }),
-                    )
-                })
-                .map_ok(|dataset_handle| dataset_handle.as_any_ref())
-                .map_err(Into::into)
-                .boxed(),
-        );
-    }
+                )
+            })
+            .map_ok(|dataset_handle| dataset_handle.as_any_ref())
+            .map_err(Into::into)
+            .boxed(),
+    );
 
     result
 }

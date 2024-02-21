@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::convert::{AsRef, TryFrom};
+use std::str::FromStr;
 use std::sync::Arc;
 use std::{cmp, fmt, ops};
 
@@ -223,8 +224,6 @@ impl DatasetName {
     }
 }
 
-////////////////////////////////////////////////////////////////////////////////
-
 ///////////////////////////////////////////////////////////////////////////////
 
 newtype_str!(
@@ -236,6 +235,37 @@ newtype_str!(
 impl DatasetNamePattern {
     pub fn is_match(&self, dataset_name: &DatasetName) -> bool {
         Like::<false>::like(dataset_name.as_str(), self).unwrap()
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+newtype_str!(
+    DatasetAccountPattern,
+    Grammar::match_dataset_account_pattern,
+    DatasetAccountPatternSerdeVisitor
+);
+
+impl DatasetAccountPattern {
+    pub fn is_match(&self, dataset_account_maybe: Option<AccountName>) -> bool {
+        if dataset_account_maybe.is_none() {
+            return false;
+        }
+        Like::<false>::like(dataset_account_maybe.unwrap().as_str(), self).unwrap()
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+newtype_str!(
+    DatasetRepoPattern,
+    Grammar::match_dataset_repo_pattern,
+    DatasetRepoPatternSerdeVisitor
+);
+
+impl DatasetRepoPattern {
+    pub fn is_match(&self, dataset_repo: &RepoName) -> bool {
+        Like::<false>::like(dataset_repo.as_str(), self).unwrap()
     }
 }
 
@@ -293,6 +323,137 @@ impl std::str::FromStr for DatasetPattern {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DatasetPatternAny {
+    pub account_repo_pattern: Option<RepoAccountPattern>,
+    pub dataset_name_pattern: DatasetNamePattern,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RepoAccountPattern {
+    RemotePattern(DatasetRepoPattern, Option<DatasetAccountPattern>),
+    AmbiguousPattern(Arc<str>),
+}
+
+impl DatasetPatternAny {
+    pub fn new(
+        account_repo_pattern: Option<RepoAccountPattern>,
+        dataset_name_pattern: DatasetNamePattern,
+    ) -> Self {
+        Self {
+            account_repo_pattern,
+            dataset_name_pattern,
+        }
+    }
+
+    pub fn repo_pattern(&self) -> Option<DatasetRepoPattern> {
+        match self.account_repo_pattern.as_ref()? {
+            RepoAccountPattern::AmbiguousPattern(repo_pattern) => {
+                Some(DatasetRepoPattern::from_str(repo_pattern).unwrap())
+            }
+            RepoAccountPattern::RemotePattern(repo_pattern, _) => Some(repo_pattern.clone()),
+        }
+    }
+
+    pub fn account_pattern(&self) -> Option<DatasetAccountPattern> {
+        match self.account_repo_pattern.as_ref()? {
+            RepoAccountPattern::AmbiguousPattern(account_pattern) => {
+                Some(DatasetAccountPattern::from_str(account_pattern).unwrap())
+            }
+            RepoAccountPattern::RemotePattern(_, account_pattern_maybe) => {
+                account_pattern_maybe.clone()
+            }
+        }
+    }
+
+    pub fn name_pattern(&self) -> &str {
+        self.dataset_name_pattern.as_str()
+    }
+
+    pub fn is_match_local(&self, dataset_handle: &DatasetHandle) -> bool {
+        (self.account_pattern().is_none()
+            || self
+                .account_pattern()
+                .unwrap()
+                .is_match(dataset_handle.alias.account_name.clone()))
+            && self
+                .dataset_name_pattern
+                .is_match(&dataset_handle.alias.dataset_name)
+    }
+
+    pub fn is_match_account_repo_pattern(&self, dataset_alias_remote: &DatasetAliasRemote) -> bool {
+        if self.account_repo_pattern.is_none() {
+            return false;
+        }
+        match self.account_repo_pattern.clone().unwrap() {
+            RepoAccountPattern::RemotePattern(repo_pattern, account_pattern) => {
+                (account_pattern.is_none()
+                    || account_pattern
+                        .unwrap()
+                        .is_match(dataset_alias_remote.account_name.clone()))
+                    && repo_pattern.is_match(&dataset_alias_remote.repo_name)
+            }
+            RepoAccountPattern::AmbiguousPattern(_) => self
+                .repo_pattern()
+                .unwrap()
+                .is_match(&dataset_alias_remote.repo_name),
+        }
+    }
+
+    pub fn is_match_remote(&self, dataset_alias_remote: &DatasetAliasRemote) -> bool {
+        self.is_match_account_repo_pattern(dataset_alias_remote)
+            && self
+                .dataset_name_pattern
+                .is_match(&dataset_alias_remote.dataset_name)
+    }
+}
+
+impl std::str::FromStr for DatasetPatternAny {
+    type Err = ParseError<Self>;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.split_once('/') {
+            Some((repo, rest)) => match DatasetRepoPattern::try_from(repo) {
+                Ok(repo_pattern) => match rest.split_once('/') {
+                    Some((account_name, dataset_name)) => {
+                        match DatasetAccountPattern::try_from(account_name) {
+                            Ok(account_pattern) => match DatasetNamePattern::try_from(dataset_name)
+                            {
+                                Ok(dataset_name_pattern) => Ok(Self {
+                                    account_repo_pattern: Some(RepoAccountPattern::RemotePattern(
+                                        repo_pattern,
+                                        Some(account_pattern),
+                                    )),
+                                    dataset_name_pattern,
+                                }),
+                                Err(_) => Err(Self::Err::new(s)),
+                            },
+                            Err(_) => Err(Self::Err::new(s)),
+                        }
+                    }
+                    None => match DatasetNamePattern::try_from(rest) {
+                        Ok(dataset_name_pattern) => Ok(Self {
+                            account_repo_pattern: Some(RepoAccountPattern::AmbiguousPattern(
+                                repo_pattern.into_inner(),
+                            )),
+                            dataset_name_pattern,
+                        }),
+                        Err(_) => Err(Self::Err::new(s)),
+                    },
+                },
+                Err(_) => Err(Self::Err::new(s)),
+            },
+            None => match DatasetNamePattern::try_from(s) {
+                Ok(dataset_name_pattern) => Ok(Self {
+                    account_repo_pattern: None,
+                    dataset_name_pattern,
+                }),
+                Err(_) => Err(Self::Err::new(s)),
+            },
+        }
+    }
+}
 
 // TODO: implement similarly to DatasetID
 pub type AccountID = String;
@@ -467,5 +628,6 @@ impl_try_from_str!(DatasetAliasRemote);
 
 impl_parse_error!(DatasetAliasRemote);
 impl_parse_error!(DatasetPattern);
+impl_parse_error!(DatasetPatternAny);
 
 impl_serde!(DatasetAliasRemote, DatasetAliasRemoteSerdeVisitor);

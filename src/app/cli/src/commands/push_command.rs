@@ -10,7 +10,7 @@
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use futures::StreamExt;
+use futures::TryStreamExt;
 use kamu::domain::*;
 use kamu::utils::datasets_filtering::filter_datasets_by_any_pattern;
 use opendatafabric::*;
@@ -25,6 +25,7 @@ use crate::output::OutputConfig;
 pub struct PushCommand {
     push_svc: Arc<dyn PushService>,
     dataset_repo: Arc<dyn DatasetRepository>,
+    search_svc: Arc<dyn SearchService>,
     refs: Vec<DatasetRefPatternAny>,
     all: bool,
     recursive: bool,
@@ -38,6 +39,7 @@ impl PushCommand {
     pub fn new<I>(
         push_svc: Arc<dyn PushService>,
         dataset_repo: Arc<dyn DatasetRepository>,
+        search_svc: Arc<dyn SearchService>,
         refs: I,
         all: bool,
         recursive: bool,
@@ -52,6 +54,7 @@ impl PushCommand {
         Self {
             push_svc,
             dataset_repo,
+            search_svc,
             refs: refs.collect(),
             all,
             recursive,
@@ -99,12 +102,15 @@ impl PushCommand {
                 )
                 .await)
         } else {
-            let mut dataset_refs = vec![];
-            let mut dataset_refs_stream =
-                filter_datasets_by_any_pattern(self.dataset_repo.as_ref(), self.refs.clone());
-            while let Some((_, res)) = dataset_refs_stream.next().await {
-                dataset_refs.push(res.unwrap());
-            }
+            let dataset_refs: Vec<_> = filter_datasets_by_any_pattern(
+                self.dataset_repo.as_ref(),
+                self.search_svc.clone(),
+                self.refs.clone(),
+            )
+            .map_ok(|dataset_ref_any| dataset_ref_any)
+            .try_collect()
+            .await?;
+
             Ok(self
                 .push_svc
                 .push_multi(

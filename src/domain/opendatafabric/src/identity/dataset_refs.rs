@@ -751,7 +751,7 @@ pub enum DatasetRefPatternLocal {
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum DatasetRefPatternAny {
-    Pattern(DatasetPattern),
+    Pattern(DatasetPatternAny),
     RefAny(DatasetRefAny),
 }
 
@@ -778,18 +778,38 @@ impl DatasetRefPatternLocal {
     /// Returns `false` if value is a reference to some specific dataset rather
     /// than a glob pattern
     pub fn is_pattern(&self) -> bool {
-        match self {
-            Self::Ref(_) => false,
-            Self::Pattern(_) => true,
-        }
+        matches!(self, Self::Pattern(_))
     }
 }
 
 impl DatasetRefPatternAny {
-    pub fn is_match(&self, dataset_handle: &DatasetHandle) -> bool {
+    pub fn is_match_local(&self, dataset_handle: &DatasetHandle) -> bool {
         match self {
             Self::RefAny(_) => false,
-            Self::Pattern(dataset_pattern) => dataset_pattern.is_match(dataset_handle),
+            Self::Pattern(dataset_pattern) => dataset_pattern.is_match_local(dataset_handle),
+        }
+    }
+
+    pub fn is_match_remote(&self, dataset_alias_remote: &DatasetAliasRemote) -> bool {
+        match self {
+            Self::RefAny(_) => false,
+            Self::Pattern(dataset_pattern) => dataset_pattern.is_match_remote(dataset_alias_remote),
+        }
+    }
+
+    // Return repo pattern part if exists
+    pub fn repo_pattern(&self) -> Option<DatasetRepoPattern> {
+        match self {
+            Self::RefAny(_) => None,
+            Self::Pattern(dataset_ref_pattern) => dataset_ref_pattern.repo_pattern(),
+        }
+    }
+
+    // Return dataset name pattern part
+    pub fn name_static_pattern(&self) -> Option<&str> {
+        match self {
+            Self::RefAny(_) => None,
+            Self::Pattern(dataset_ref_pattern) => Some(dataset_ref_pattern.name_pattern()),
         }
     }
 
@@ -804,10 +824,7 @@ impl DatasetRefPatternAny {
     /// Returns `false` if value is a reference to some specific dataset rather
     /// than a glob pattern
     pub fn is_pattern(&self) -> bool {
-        match self {
-            Self::RefAny(_) => false,
-            Self::Pattern(_) => true,
-        }
+        matches!(self, Self::Pattern(_))
     }
 }
 
@@ -847,7 +864,7 @@ impl std::str::FromStr for DatasetRefPatternAny {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if s.contains('%') {
-            return match DatasetPattern::from_str(s) {
+            return match DatasetPatternAny::from_str(s) {
                 Ok(dataset_pattern) => Ok(Self::Pattern(dataset_pattern)),
                 Err(_) => Err(Self::Err::new(s)),
             };

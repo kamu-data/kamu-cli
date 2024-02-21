@@ -11,7 +11,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use chrono::{DateTime, Utc};
-use futures::StreamExt;
+use futures::TryStreamExt;
 use kamu::domain::*;
 use kamu::utils::datasets_filtering::filter_datasets_by_any_pattern;
 use opendatafabric::*;
@@ -26,6 +26,7 @@ use crate::output::OutputConfig;
 pub struct PullCommand {
     pull_svc: Arc<dyn PullService>,
     dataset_repo: Arc<dyn DatasetRepository>,
+    search_svc: Arc<dyn SearchService>,
     output_config: Arc<OutputConfig>,
     refs: Vec<DatasetRefPatternAny>,
     all: bool,
@@ -40,6 +41,7 @@ impl PullCommand {
     pub fn new<I>(
         pull_svc: Arc<dyn PullService>,
         dataset_repo: Arc<dyn DatasetRepository>,
+        search_svc: Arc<dyn SearchService>,
         output_config: Arc<OutputConfig>,
         refs: I,
         all: bool,
@@ -55,6 +57,7 @@ impl PullCommand {
         Self {
             pull_svc,
             dataset_repo,
+            search_svc,
             output_config,
             refs: refs.into_iter().collect(),
             all,
@@ -102,12 +105,14 @@ impl PullCommand {
         &self,
         listener: Option<Arc<dyn PullMultiListener>>,
     ) -> Result<Vec<PullResponse>, CLIError> {
-        let mut dataset_refs = vec![];
-        let mut dataset_refs_stream =
-            filter_datasets_by_any_pattern(self.dataset_repo.as_ref(), self.refs.clone());
-        while let Some((_, res)) = dataset_refs_stream.next().await {
-            dataset_refs.push(res.unwrap());
-        }
+        let dataset_refs: Vec<_> = filter_datasets_by_any_pattern(
+            self.dataset_repo.as_ref(),
+            self.search_svc.clone(),
+            self.refs.clone(),
+        )
+        .map_ok(|dataset_ref_any| dataset_ref_any)
+        .try_collect()
+        .await?;
 
         Ok(self
             .pull_svc
