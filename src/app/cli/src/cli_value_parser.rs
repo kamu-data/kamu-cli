@@ -38,7 +38,7 @@ pub(crate) fn value_parse_dataset_ref_pattern_any(s: &str) -> Result<DatasetRefP
         Ok(dataset_ref_pattern) => Ok(dataset_ref_pattern),
         Err(_) => Err("Dataset reference should be in form: `my.dataset.id` or \
                        `repository/account/dataset-id` or `did:odf:...` or `scheme://some-url` \
-                       or a local wildcard pattern `my.dataset.%`"
+                       or a wildcard pattern: `my.dataset.%` or `repo%/acc%/dataset%`"
             .to_string()),
     }
 }
