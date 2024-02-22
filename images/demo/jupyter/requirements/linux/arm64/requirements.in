@@ -1,12 +1,15 @@
+# TODO: Pinned due to sparkmagic installation issue
+# See: https://github.com/jupyter-incubator/sparkmagic/issues/825
+# See workaround applied in: https://github.com/jupyter-incubator/sparkmagic/blob/master/Dockerfile.jupyter
+notebook==6.5.5
+
 sparkmagic
 
 pandas
-# TODO: Excluded due to fiona dependency that does not provide `aarch64` wheel
-# geopandas
+geopandas
 geojson
 xarray
-# TODO: Excluded doe to cftime dependency that does not provide `aarch64` wheel
-# netcdf4
+netcdf4
 dask
 
 bokeh

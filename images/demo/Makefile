@@ -1,7 +1,7 @@
 IMAGE_PLATFORMS = linux/amd64,linux/arm64
 IMAGE_REPO = ghcr.io/kamu-data
 KAMU_VERSION = $(shell cargo metadata --format-version 1 | jq -r '.packages[] | select( .name == "kamu") | .version')
-DEMO_VERSION = 0.10.3
+DEMO_VERSION = 0.11.1
 
 #########################################################################################
 
@@ -20,7 +20,7 @@ jupyter: all-examples
 
 # Build and push multi-arch image
 .PHONY: jupyter-multi-arch
-jupyter-multi-arch:
+jupyter-multi-arch: all-examples
 	docker buildx build \
 		-f Dockerfile.jupyter \
 		--push \

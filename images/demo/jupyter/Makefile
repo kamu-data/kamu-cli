@@ -1,20 +1,29 @@
 PLATFORM=linux/amd64
-BASE_IMAGE:=docker.io/jupyter/base-notebook:2022-11-15
+BASE_IMAGE:=quay.io/jupyter/minimal-notebook:2024-02-13
 
 
+# Requires QEMU
+# Refer to DEVELOPER.md when building multi-platform images
 .PHONY: requirements
 requirements:
+	make requirements-platform PLATFORM=linux/amd64
+	make requirements-platform PLATFORM=linux/arm64
+
+
+.PHONY: requirements-platform
+requirements-platform:
 	docker run \
+		--platform $(PLATFORM) \
 		--rm \
 		-u root \
 		-v `pwd`:/opt/mnt \
 		--workdir /opt/mnt \
 		$(BASE_IMAGE) \
-		bash -c "conda install -y requests-kerberos make && make do-requirements PLATFORM=$(PLATFORM)"
+		bash -c "mamba install -y make && make requirements-install-freeze PLATFORM=$(PLATFORM)"
 
 
-.PHONY: do-requirements
-do-requirements:
-	pip --no-cache-dir install --upgrade pip setuptools
-	pip --no-cache-dir install -r requirements/$(PLATFORM)/requirements.in
-	pip --no-cache-dir list --format=freeze > requirements/$(PLATFORM)/requirements.txt
+# Executed from inside the base image
+.PHONY: requirements-install-freeze
+requirements-install-freeze:
+	mamba install -y --file requirements/$(PLATFORM)/requirements.in
+	mamba list --export > requirements/$(PLATFORM)/requirements.txt

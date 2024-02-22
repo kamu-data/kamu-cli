@@ -5,12 +5,13 @@ networks:
 
 services:
   jupyter:
-    image: ghcr.io/kamu-data/kamu-cli-demo-jupyter:0.10.3
+    image: ghcr.io/kamu-data/kamu-cli-demo-jupyter:0.11.1
     # Unfortunately running podman within another container requires elevated permissions
     privileged: true
     command:
       - "jupyter"
       - "notebook"
+      - "--address=0.0.0.0"
       - "--port=8765"
       - "--NotebookApp.iopub_data_rate_limit=1000000000"
     environment:
@@ -31,7 +32,7 @@ services:
       - minio
 
   minio:
-    image: ghcr.io/kamu-data/kamu-cli-demo-minio:0.10.3
+    image: ghcr.io/kamu-data/kamu-cli-demo-minio:0.11.1
     command:
       - "server"
       - "--address"

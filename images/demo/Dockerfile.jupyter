@@ -1,6 +1,7 @@
-# Based on: https://github.com/jupyter-incubator/sparkmagic/blob/master/Dockerfile.jupyter
-# Tags: https://hub.docker.com/r/jupyter/base-notebook/tags
-FROM docker.io/jupyter/base-notebook:2022-11-15
+# Base image info: https://jupyter-docker-stacks.readthedocs.io/en/latest/using/selecting.html
+# Base image tags: https://quay.io/repository/jupyter/minimal-notebook
+# Customization is based on: https://github.com/jupyter-incubator/sparkmagic/blob/master/Dockerfile.jupyter
+FROM quay.io/jupyter/minimal-notebook:2024-02-13
 ARG TARGETPLATFORM
 ARG KAMU_VERSION
 ARG dev_mode=false
@@ -12,7 +13,7 @@ USER root
 # Podman
 # Source: https://github.com/containers/podman/blob/056f492f59c333d521ebbbe186abde0278e815db/contrib/podmanimage/stable/Dockerfile
 RUN apt update && \
-    apt -y install ca-certificates curl gnupg unzip jq && \
+    apt -y install ca-certificates curl wget gnupg unzip jq && \
     . /etc/os-release && \
     echo "deb https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/xUbuntu_${VERSION_ID}/ /" | tee /etc/apt/sources.list.d/devel:kubic:libcontainers:stable.list && \
     curl -L "https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/xUbuntu_${VERSION_ID}/Release.key" | apt-key add - && \
@@ -45,36 +46,47 @@ RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2
     rm -rf aws*
 
 
+# Sparkmagic and tools
+COPY jupyter/requirements/$TARGETPLATFORM/requirements.txt requirements.txt
+
+RUN mamba install -y --file requirements.txt && \
+    mamba clean --all -f -y &&  \
+    rm requirements.txt &&  \
+    fix-permissions "${CONDA_DIR}" &&  \
+    fix-permissions "/home/${NB_USER}"
+
+
 # Kamu
 RUN curl -s "https://get.kamu.dev" | KAMU_VERSION=$KAMU_VERSION KAMU_INSTALL_PATH=/usr/local/bin/kamu sh && \
-    echo "source <(kamu completions bash)" >> /home/$NB_USER/.profile
+    echo "source <(kamu completions bash)" >> /home/$NB_USER/.bashrc
+
 COPY jupyter/.kamuconfig /.kamuconfig
 
-RUN chown -R $NB_USER:users /home/$NB_USER
 
 #########################################################################################
 USER $NB_USER
 
-# This is needed because requests-kerberos fails to install on debian due to missing linux headers
-RUN conda install requests-kerberos==0.12.0 -y
-
-COPY jupyter/requirements/$TARGETPLATFORM/requirements.txt requirements.txt
-RUN pip --no-cache-dir install --upgrade -r requirements.txt && rm requirements.txt
-
-COPY jupyter/kamu.py /opt/conda/lib/python3.10/site-packages/kamu.py
-
+COPY jupyter/kamu.py /opt/conda/lib/python3.11/site-packages/kamu.py
 COPY jupyter/sparkmagic.json /home/$NB_USER/.sparkmagic/config.json
+
 RUN jupyter nbextension enable --py --sys-prefix widgetsnbextension
 #RUN jupyter-kernelspec install --user $(pip show sparkmagic | grep Location | cut -d" " -f2)/sparkmagic/kernels/sparkkernel
 RUN jupyter-kernelspec install --user $(pip show sparkmagic | grep Location | cut -d" " -f2)/sparkmagic/kernels/pysparkkernel
 #RUN jupyter-kernelspec install --user $(pip show sparkmagic | grep Location | cut -d" " -f2)/sparkmagic/kernels/sparkrkernel
 RUN jupyter serverextension enable --py sparkmagic
 
+
 #########################################################################################
 USER root
+
 RUN rm -r /home/$NB_USER/work
 COPY user-home/ /home/$NB_USER/
-RUN chown -R $NB_USER:users /home/$NB_USER
+RUN fix-permissions "/home/${NB_USER}"
 
+
+#########################################################################################
 USER $NB_USER
-CMD ["jupyter", "notebook", "--NotebookApp.iopub_data_rate_limit=1000000000"]
+
+# TODO: Remove show_banner option after Sparkmagic supports novebook >= 7.0.0
+# See: https://github.com/jupyter-incubator/sparkmagic/issues/885
+CMD ["jupyter", "notebook", "--ip", "0.0.0.0", "--port", "8080", "--NotebookApp.iopub_data_rate_limit=1e10", "--NotebookApp.show_banner=False"]

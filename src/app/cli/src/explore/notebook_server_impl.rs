@@ -116,14 +116,18 @@ impl NotebookServerImpl {
                 ))
             })?;
 
+        let jupyter_port_in_container = port.unwrap_or(8080);
         let mut jupyter = self
             .container_runtime
             .run_attached(self.jupyter_config.image.as_ref().unwrap())
             .random_container_name_with_prefix("kamu-jupyter-")
             .network(network_name)
             .user("root")
+            // Start jupyter under root which suits better for rootless podman
+            // See: https://github.com/jupyter/docker-stacks/pull/2039
+            .environment_vars([("NB_USER", "root"), ("NB_UID", "0"), ("NB_GID", "0")])
             .work_dir("/opt/workdir")
-            .expose_port(80)
+            .expose_port(jupyter_port_in_container)
             .volume((&cwd, "/opt/workdir"))
             .environment_vars(environment_vars)
             .args([
@@ -135,7 +139,10 @@ impl NotebookServerImpl {
                     .unwrap_or(IpAddr::V4(Ipv4Addr::UNSPECIFIED))
                     .to_string(),
                 "--port".to_owned(),
-                port.unwrap_or(80).to_string(),
+                jupyter_port_in_container.to_string(),
+                // TODO: Remove show_banner option after Sparkmagic supports novebook >= 7.0.0
+                // See: https://github.com/jupyter-incubator/sparkmagic/issues/885
+                "--NotebookApp.show_banner=False".to_string(),
             ])
             .stdout(if inherit_stdio {
                 Stdio::inherit()
@@ -148,7 +155,7 @@ impl NotebookServerImpl {
 
         let docker_host = self.container_runtime.get_runtime_host_addr();
         let jupyter_port = jupyter
-            .wait_for_host_socket(80, Duration::from_secs(10))
+            .wait_for_host_socket(jupyter_port_in_container, Duration::from_secs(10))
             .await
             .int_err()?;
 
