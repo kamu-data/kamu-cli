@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 ### Changed
 - Upgraded to latest `datafusion` `v36.0.0`
+- Upgraded to latest `jupyter`
 
 ## [0.159.0] - 2024-02-16
 ### Added
