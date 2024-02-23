@@ -68,7 +68,7 @@ impl FlowTrigger {
                     // Compare dataset ID and flow type
                     if let FlowTrigger::InputDatasetFlow(existing_dataset_trigger) =
                         existing_trigger
-                        && existing_dataset_trigger.is_same_key_as(&new_dataset_trigger)
+                        && existing_dataset_trigger.is_same_key_as(new_dataset_trigger)
                     {
                         // We should not be getting the same flow twice!
                         assert_ne!(
