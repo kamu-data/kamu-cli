@@ -1217,9 +1217,6 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
                     old_head: Some(Multihash::from_digest_sha3_256(b"old-slice")),
                     new_head: Multihash::from_digest_sha3_256(b"new-slice"),
                   },
-                  num_blocks: 1,
-                  num_records: 5,
-                  updated_watermark: None
                 })))),
             });
             let task1_handle = task1_driver.run();
@@ -1235,9 +1232,6 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
                     old_head: Some(Multihash::from_digest_sha3_256(b"new-slice")),
                     new_head: Multihash::from_digest_sha3_256(b"newest-slice"),
                   },
-                  num_blocks: 1,
-                  num_records: 3,
-                  updated_watermark: None,
                 })))),
             });
             let task2_handle = task2_driver.run();
@@ -1554,9 +1548,6 @@ async fn test_throttling_derived_dataset_with_2_parents() {
               old_head: Some(Multihash::from_digest_sha3_256(b"foo-old-slice")),
               new_head: Multihash::from_digest_sha3_256(b"foo-new-slice"),
             },
-            num_blocks: 1,
-            num_records: 1,
-            updated_watermark: None,
           })))),
         });
         let task0_handle = task0_driver.run();
@@ -1571,10 +1562,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
               old_head: Some(Multihash::from_digest_sha3_256(b"bar-old-slice")),
               new_head: Multihash::from_digest_sha3_256(b"fbar-new-slice"),
             },
-            num_blocks: 1,
-            num_records: 2,
-            updated_watermark: None,
-          })))),
+         })))),
         });
         let task1_handle = task1_driver.run();
 
@@ -1597,9 +1585,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
               old_head: Some(Multihash::from_digest_sha3_256(b"foo-new-slice")),
               new_head: Multihash::from_digest_sha3_256(b"foo-newest-slice"),
             },
-            num_blocks: 1,
-            num_records: 3,
-            updated_watermark: None,
+
           })))),
         });
         let task3_handle = task3_driver.run();
@@ -1623,9 +1609,6 @@ async fn test_throttling_derived_dataset_with_2_parents() {
               old_head: Some(Multihash::from_digest_sha3_256(b"bar-new-slice")),
               new_head: Multihash::from_digest_sha3_256(b"bar-newest-slice"),
             },
-            num_blocks: 1,
-            num_records: 1,
-            updated_watermark: None,
           })))),
         });
         let task5_handle = task5_driver.run();
@@ -1962,6 +1945,7 @@ impl FlowHarness {
                     .with_multi_tenant(false),
             )
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+            .add::<DummyDatasetChangesService>()
             .add_value(CurrentAccountSubject::new_test())
             .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
             .add::<DependencyGraphServiceInMemory>()

@@ -7,11 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use kamu_core::PullResult;
 use kamu_task_system as ts;
+use opendatafabric::Multihash;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FlowOutcome {
     /// Flow succeeded
     Success(FlowResult),
@@ -34,29 +36,29 @@ impl FlowOutcome {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FlowResult {
     Empty,
     DatasetUpdate(FlowResultDatasetUpdate),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FlowResultDatasetUpdate {
-    pub num_blocks: u64,
-    pub num_records: u64,
-    pub watermark_modified: bool,
+    pub old_head: Option<Multihash>,
+    pub new_head: Multihash,
 }
 
-impl From<&ts::TaskResult> for FlowResult {
-    fn from(value: &ts::TaskResult) -> Self {
+impl From<ts::TaskResult> for FlowResult {
+    fn from(value: ts::TaskResult) -> Self {
         match value {
             ts::TaskResult::Empty => Self::Empty,
-            ts::TaskResult::UpdateDatasetResult(task_pull_result) => {
-                Self::DatasetUpdate(FlowResultDatasetUpdate {
-                    num_blocks: task_pull_result.num_blocks,
-                    num_records: task_pull_result.num_records,
-                    watermark_modified: task_pull_result.updated_watermark.is_some(),
-                })
+            ts::TaskResult::UpdateDatasetResult(task_update_result) => {
+                match task_update_result.pull_result {
+                    PullResult::UpToDate => Self::Empty,
+                    PullResult::Updated { old_head, new_head } => {
+                        Self::DatasetUpdate(FlowResultDatasetUpdate { old_head, new_head })
+                    }
+                }
             }
         }
     }
@@ -69,9 +71,8 @@ impl std::ops::AddAssign for FlowResult {
             FlowResult::DatasetUpdate(self_update) => match rhs {
                 FlowResult::Empty => {}
                 FlowResult::DatasetUpdate(rhs_update) => {
-                    self_update.num_blocks += rhs_update.num_blocks;
-                    self_update.num_records += rhs_update.num_records;
-                    self_update.watermark_modified |= rhs_update.watermark_modified;
+                    assert_eq!(Some(&self_update.new_head), rhs_update.old_head.as_ref());
+                    self_update.new_head = rhs_update.new_head;
                 }
             },
         }

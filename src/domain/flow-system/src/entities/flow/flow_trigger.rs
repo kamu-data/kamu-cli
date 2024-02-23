@@ -77,7 +77,8 @@ impl FlowTrigger {
                         );
 
                         // Accumulate stats for proper batching control
-                        existing_dataset_trigger.flow_result += new_dataset_trigger.flow_result;
+                        existing_dataset_trigger.flow_result +=
+                            new_dataset_trigger.flow_result.clone();
                         return existing_triggers;
                     }
                 }

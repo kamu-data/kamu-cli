@@ -210,7 +210,7 @@ impl Projection for FlowState {
                         } else {
                             match task_outcome {
                                 ts::TaskOutcome::Success(task_result) => Ok(FlowState {
-                                    outcome: Some(FlowOutcome::Success(task_result.into())),
+                                    outcome: Some(FlowOutcome::Success(task_result.clone().into())),
                                     timing: FlowTimingRecords {
                                         finished_at: Some(event_time),
                                         ..s.timing
@@ -234,7 +234,7 @@ impl Projection for FlowState {
                         }
                     }
                     E::Aborted(FlowEventAborted { event_time, .. }) => {
-                        if let Some(outcome) = s.outcome {
+                        if let Some(outcome) = &s.outcome {
                             if let FlowOutcome::Success(_) = outcome {
                                 Err(ProjectionError::new(Some(s), event))
                             } else {

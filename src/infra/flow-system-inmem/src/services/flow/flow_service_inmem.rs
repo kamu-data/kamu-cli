@@ -16,7 +16,7 @@ use dill::*;
 use event_bus::{AsyncEventHandler, EventBus};
 use futures::TryStreamExt;
 use kamu_core::events::DatasetEventDeleted;
-use kamu_core::{DependencyGraphService, InternalError, SystemTimeSource};
+use kamu_core::{DatasetChangesService, DependencyGraphService, InternalError, SystemTimeSource};
 use kamu_flow_system::*;
 use kamu_task_system::*;
 use opendatafabric::{AccountID, AccountName, DatasetID};
@@ -37,6 +37,7 @@ pub struct FlowServiceInMemory {
     task_scheduler: Arc<dyn TaskScheduler>,
     flow_configuration_service: Arc<dyn FlowConfigurationService>,
     dependency_graph_service: Arc<dyn DependencyGraphService>,
+    dataset_changes_service: Arc<dyn DatasetChangesService>,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -68,6 +69,7 @@ impl FlowServiceInMemory {
         task_scheduler: Arc<dyn TaskScheduler>,
         flow_configuration_service: Arc<dyn FlowConfigurationService>,
         dependency_graph_service: Arc<dyn DependencyGraphService>,
+        dataset_changes_service: Arc<dyn DatasetChangesService>,
     ) -> Self {
         Self {
             state: Arc::new(Mutex::new(State::default())),
@@ -78,6 +80,7 @@ impl FlowServiceInMemory {
             task_scheduler,
             flow_configuration_service,
             dependency_graph_service,
+            dataset_changes_service,
         }
     }
 
@@ -276,7 +279,8 @@ impl FlowServiceInMemory {
                     && let Some(batching_rule) = maybe_batching_rule
                 {
                     // Stop if batching condition not satisfied
-                    self.evaluate_flow_batching_rule(trigger_time, &mut flow, batching_rule)?
+                    self.evaluate_flow_batching_rule(trigger_time, &mut flow, batching_rule)
+                        .await?
                 } else {
                     true
                 };
@@ -320,7 +324,8 @@ impl FlowServiceInMemory {
                 // Evaluate batching rule, if defined
                 let batching_gate_pass = if let Some(batching_rule) = maybe_batching_rule {
                     // Stop if batching condition not satisfied
-                    self.evaluate_flow_batching_rule(trigger_time, &mut flow, batching_rule)?
+                    self.evaluate_flow_batching_rule(trigger_time, &mut flow, batching_rule)
+                        .await?
                 } else {
                     true
                 };
@@ -356,15 +361,21 @@ impl FlowServiceInMemory {
         }
     }
 
-    fn evaluate_flow_batching_rule(
+    async fn evaluate_flow_batching_rule(
         &self,
         evaluation_time: DateTime<Utc>,
         flow: &mut Flow,
         batching_rule: &BatchingRule,
     ) -> Result<bool, InternalError> {
         // Run evaluation
-        let result =
-            batching_rule.evaluate(flow.timing.created_at, evaluation_time, &flow.triggers);
+        let result = batching_rule
+            .evaluate(
+                flow.timing.created_at,
+                evaluation_time,
+                &flow.triggers,
+                self.dataset_changes_service.as_ref(),
+            )
+            .await?;
 
         // Update batching condition data
         flow.set_relevant_start_condition(
@@ -420,7 +431,7 @@ impl FlowServiceInMemory {
                     dataset_id: dataset_id.clone(),
                     flow_type,
                     flow_id,
-                    flow_result: *flow_result,
+                    flow_result: flow_result.clone(),
                 });
 
                 self.trigger_flow_common(

@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Duration, Utc};
+use kamu_core::{DatasetChangesService, InternalError, ResultIntoInternal};
 use thiserror::Error;
 
 use crate::{FlowResult, FlowTrigger};
@@ -52,12 +53,13 @@ impl BatchingRule {
         &self.max_batching_interval
     }
 
-    pub fn evaluate(
+    pub async fn evaluate(
         &self,
         flow_start_time: DateTime<Utc>,
         evaluation_time: DateTime<Utc>,
         triggers: &[FlowTrigger],
-    ) -> BatchingRuleEvaluation {
+        dataset_changes_service: &dyn DatasetChangesService,
+    ) -> Result<BatchingRuleEvaluation, InternalError> {
         // TODO: it's likely assumed the accumulation is per each input separately, but
         // for now count overall number
         let mut accumulated_records_count = 0;
@@ -69,8 +71,17 @@ impl BatchingRule {
                 match &trigger.flow_result {
                     FlowResult::Empty => {}
                     FlowResult::DatasetUpdate(update) => {
-                        accumulated_records_count += update.num_records;
-                        watermark_modified |= update.watermark_modified;
+                        let increment = dataset_changes_service
+                            .get_interval_increment(
+                                &trigger.dataset_id,
+                                update.old_head.as_ref(),
+                                &update.new_head,
+                            )
+                            .await
+                            .int_err()?;
+
+                        accumulated_records_count += increment.num_records;
+                        watermark_modified |= increment.updated_watermark.is_some();
                     }
                 }
             }
@@ -88,12 +99,12 @@ impl BatchingRule {
             && (accumulated_records_count >= self.min_records_to_await
                 || evaluation_time >= batching_deadline);
 
-        BatchingRuleEvaluation {
+        Ok(BatchingRuleEvaluation {
             batching_deadline,
             accumulated_records_count,
             watermark_modified,
             satisfied,
-        }
+        })
     }
 }
 

@@ -32,6 +32,7 @@ use kamu_core::{
     CreateDatasetResult,
     DatasetRepository,
     DependencyGraphRepository,
+    DummyDatasetChangesService,
     PollingIngestService,
     PullResult,
     SystemTimeSourceDefault,
@@ -311,9 +312,6 @@ async fn test_trigger_ingest_root_dataset() {
                         old_head: Some(Multihash::from_digest_sha3_256(b"old-slice")),
                         new_head: Multihash::from_digest_sha3_256(b"new-slice"),
                     },
-                    num_blocks: 1,
-                    num_records: 12,
-                    updated_watermark: None,
                 },
             )),
         )
@@ -515,9 +513,6 @@ async fn test_trigger_execute_transform_derived_dataset() {
                         old_head: Some(Multihash::from_digest_sha3_256(b"old-slice")),
                         new_head: Multihash::from_digest_sha3_256(b"new-slice"),
                     },
-                    num_blocks: 3,
-                    num_records: 25,
-                    updated_watermark: None,
                 },
             )),
         )
@@ -546,8 +541,8 @@ async fn test_trigger_execute_transform_derived_dataset() {
                                             "__typename": "FlowDescriptionDatasetExecuteTransform",
                                             "datasetId": create_derived_result.dataset_handle.id.to_string(),
                                             "transformResult": {
-                                                "numBlocks": 3,
-                                                "numRecords": 25,
+                                                "numBlocks": 1,
+                                                "numRecords": 12,
                                             },
                                         },
                                         "status": "FINISHED",
@@ -1694,6 +1689,7 @@ impl FlowRunsHarness {
                     .with_multi_tenant(false),
             )
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+            .add::<DummyDatasetChangesService>()
             .add::<SystemTimeSourceDefault>()
             .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
             .add::<DependencyGraphServiceInMemory>()
