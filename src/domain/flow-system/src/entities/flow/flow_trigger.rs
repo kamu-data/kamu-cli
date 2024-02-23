@@ -38,30 +38,28 @@ impl FlowTrigger {
         }
     }
 
-    /// Merges new trigger into a list of existing triggers according to
-    /// type-specific mergeing rules, or appends it simply, if it's unique
-    pub fn reduce(
-        mut existing_triggers: Vec<FlowTrigger>,
-        new_trigger: FlowTrigger,
-    ) -> Vec<FlowTrigger> {
+    /// Checks if new trigger is unique compared to the existing triggers
+    pub fn is_unique_vs(&self, existing_triggers: &[FlowTrigger]) -> bool {
         // Try finding a similar existing trigger
-        for existing_trigger in &mut existing_triggers {
-            match &new_trigger {
-                FlowTrigger::Manual(_) => {
-                    if matches!(existing_trigger, FlowTrigger::Manual(_)) {
-                        return existing_triggers;
+        for existing_trigger in existing_triggers {
+            match self {
+                FlowTrigger::Manual(new_manual_trigger) => {
+                    if let FlowTrigger::Manual(existing_manual_trigger) = existing_trigger {
+                        if existing_manual_trigger == new_manual_trigger {
+                            return true;
+                        }
                     }
                 }
                 FlowTrigger::AutoPolling(_) => {
                     if matches!(existing_trigger, FlowTrigger::AutoPolling(_)) {
-                        return existing_triggers;
+                        return true;
                     }
                 }
                 FlowTrigger::Push(new_push_trigger) => {
                     if let FlowTrigger::Push(existing_push_trigger) = existing_trigger
                         && existing_push_trigger.source_name == new_push_trigger.source_name
                     {
-                        return existing_triggers;
+                        return true;
                     }
                 }
                 FlowTrigger::InputDatasetFlow(new_dataset_trigger) => {
@@ -75,19 +73,13 @@ impl FlowTrigger {
                             existing_dataset_trigger.flow_id,
                             new_dataset_trigger.flow_id
                         );
-
-                        // Accumulate stats for proper batching control
-                        existing_dataset_trigger.flow_result +=
-                            new_dataset_trigger.flow_result.clone();
-                        return existing_triggers;
+                        return true;
                     }
                 }
             }
         }
 
-        // If the execition reached down here, new trigger wasn't merged
-        existing_triggers.push(new_trigger);
-        existing_triggers
+        false
     }
 }
 

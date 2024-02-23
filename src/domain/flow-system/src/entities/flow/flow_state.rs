@@ -163,7 +163,8 @@ impl Projection for FlowState {
                         if s.outcome.is_some() {
                             Err(ProjectionError::new(Some(s), event))
                         } else {
-                            let triggers = FlowTrigger::reduce(s.triggers, trigger.clone());
+                            let mut triggers = s.triggers;
+                            triggers.push(trigger.clone());
                             Ok(FlowState { triggers, ..s })
                         }
                     }

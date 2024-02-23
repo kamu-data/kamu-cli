@@ -257,7 +257,7 @@ impl FlowDescriptionUpdateResult {
                     fs::FlowResult::Empty => Ok(None),
                     fs::FlowResult::DatasetUpdate(update) => {
                         let increment = dataset_changes_service
-                            .get_interval_increment(
+                            .get_increment_between(
                                 dataset_id,
                                 update.old_head.as_ref(),
                                 &update.new_head,

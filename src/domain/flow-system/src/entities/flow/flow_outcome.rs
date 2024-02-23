@@ -64,19 +64,4 @@ impl From<ts::TaskResult> for FlowResult {
     }
 }
 
-impl std::ops::AddAssign for FlowResult {
-    fn add_assign(&mut self, rhs: Self) {
-        match self {
-            FlowResult::Empty => *self = rhs,
-            FlowResult::DatasetUpdate(self_update) => match rhs {
-                FlowResult::Empty => {}
-                FlowResult::DatasetUpdate(rhs_update) => {
-                    assert_eq!(Some(&self_update.new_head), rhs_update.old_head.as_ref());
-                    self_update.new_head = rhs_update.new_head;
-                }
-            },
-        }
-    }
-}
-
 /////////////////////////////////////////////////////////////////////////////////////////

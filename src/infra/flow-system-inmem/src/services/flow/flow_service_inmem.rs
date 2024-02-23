@@ -272,7 +272,11 @@ impl FlowServiceInMemory {
                 let mut flow = Flow::load(flow_id, self.flow_event_store.as_ref())
                     .await
                     .int_err()?;
-                flow.add_trigger(trigger_time, trigger).int_err()?;
+
+                // Only merge unique triggers, ignore identical
+                if trigger.is_unique_vs(&flow.triggers) {
+                    flow.add_trigger(trigger_time, trigger).int_err()?;
+                }
 
                 // Evaluate batching rule, if defined, and still waiting
                 let batching_gate_pass = if flow.status() == FlowStatus::Waiting
@@ -378,6 +382,8 @@ impl FlowServiceInMemory {
             .await?;
 
         // Update batching condition data
+        // TODO: this can cause many events in the flow
+        // Only set this once, and move recompute to API boundaries
         flow.set_relevant_start_condition(
             evaluation_time,
             FlowStartCondition::Batching(FlowStartConditionBatching {

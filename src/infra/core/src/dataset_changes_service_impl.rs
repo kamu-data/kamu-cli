@@ -12,12 +12,14 @@ use std::sync::Arc;
 use dill::*;
 use futures::TryStreamExt;
 use kamu_core::{
+    BlockRef,
     Dataset,
     DatasetChangesService,
     DatasetIntervalIncrement,
     DatasetRepository,
     GetDatasetError,
-    GetIntervalIncrementError,
+    GetIncrementError,
+    GetRefError,
     InternalError,
     ResultIntoInternal,
     TryStreamExtExt,
@@ -37,6 +39,35 @@ pub struct DatasetChangesServiceImpl {
 impl DatasetChangesServiceImpl {
     pub fn new(dataset_repo: Arc<dyn DatasetRepository>) -> Self {
         Self { dataset_repo }
+    }
+
+    async fn resolve_dataset_by_id(
+        &self,
+        dataset_id: &DatasetID,
+    ) -> Result<Arc<dyn Dataset>, GetIncrementError> {
+        self.dataset_repo
+            .get_dataset(&dataset_id.as_local_ref())
+            .await
+            .map_err(|e| match e {
+                GetDatasetError::NotFound(e) => GetIncrementError::DatasetNotFound(e),
+                GetDatasetError::Internal(e) => GetIncrementError::Internal(e),
+            })
+    }
+
+    async fn resolve_dataset_head(
+        &self,
+        dataset: &dyn Dataset,
+    ) -> Result<Multihash, GetIncrementError> {
+        dataset
+            .as_metadata_chain()
+            .as_reference_repo()
+            .get(&BlockRef::Head)
+            .await
+            .map_err(|e| match e {
+                GetRefError::Access(e) => GetIncrementError::Access(e),
+                GetRefError::NotFound(e) => GetIncrementError::RefNotFound(e),
+                GetRefError::Internal(e) => GetIncrementError::Internal(e),
+            })
     }
 
     // Scan updated dataset to detect statistics for task system result
@@ -152,25 +183,34 @@ impl DatasetChangesServiceImpl {
 
 #[async_trait::async_trait]
 impl DatasetChangesService for DatasetChangesServiceImpl {
-    async fn get_interval_increment(
+    async fn get_increment_between(
         &self,
         dataset_id: &DatasetID,
         old_head: Option<&Multihash>,
         new_head: &Multihash,
-    ) -> Result<DatasetIntervalIncrement, GetIntervalIncrementError> {
-        let dataset = self
-            .dataset_repo
-            .get_dataset(&dataset_id.as_local_ref())
-            .await
-            .map_err(|e| match e {
-                GetDatasetError::NotFound(e) => GetIntervalIncrementError::DatasetNotFound(e),
-                GetDatasetError::Internal(e) => GetIntervalIncrementError::Internal(e),
-            })?;
+    ) -> Result<DatasetIntervalIncrement, GetIncrementError> {
+        let dataset = self.resolve_dataset_by_id(dataset_id).await?;
 
         let increment = self
             .make_dataset_update_result_from_updated_pull(dataset, old_head, new_head)
             .await
-            .map_err(GetIntervalIncrementError::Internal)?;
+            .map_err(GetIncrementError::Internal)?;
+
+        Ok(increment)
+    }
+
+    async fn get_increment_since(
+        &self,
+        dataset_id: &DatasetID,
+        old_head: Option<&Multihash>,
+    ) -> Result<DatasetIntervalIncrement, GetIncrementError> {
+        let dataset = self.resolve_dataset_by_id(dataset_id).await?;
+        let current_head = self.resolve_dataset_head(dataset.as_ref()).await?;
+
+        let increment = self
+            .make_dataset_update_result_from_updated_pull(dataset, old_head, &current_head)
+            .await
+            .map_err(GetIncrementError::Internal)?;
 
         Ok(increment)
     }

@@ -71,12 +71,11 @@ impl BatchingRule {
                 match &trigger.flow_result {
                     FlowResult::Empty => {}
                     FlowResult::DatasetUpdate(update) => {
+                        // Compute increment since the first trigger by this dataset.
+                        // Note: there might have been multiple updates since that time.
+                        // We are only recording the first trigger of particular dataset.
                         let increment = dataset_changes_service
-                            .get_interval_increment(
-                                &trigger.dataset_id,
-                                update.old_head.as_ref(),
-                                &update.new_head,
-                            )
+                            .get_increment_since(&trigger.dataset_id, update.old_head.as_ref())
                             .await
                             .int_err()?;
 

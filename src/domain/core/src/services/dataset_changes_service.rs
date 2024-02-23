@@ -12,18 +12,27 @@ use internal_error::InternalError;
 use opendatafabric::{DatasetID, Multihash};
 use thiserror::Error;
 
-use crate::DatasetNotFoundError;
+use crate::{AccessError, DatasetNotFoundError, RefNotFoundError};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 pub trait DatasetChangesService: Sync + Send {
-    async fn get_interval_increment(
+    /// Computes incremental stats between two given blocks of the dataset
+    async fn get_increment_between(
         &self,
         dataset_id: &DatasetID,
         old_head: Option<&Multihash>,
         new_head: &Multihash,
-    ) -> Result<DatasetIntervalIncrement, GetIntervalIncrementError>;
+    ) -> Result<DatasetIntervalIncrement, GetIncrementError>;
+
+    /// Computes incremental stats between the given block and the current head
+    /// of the dataset
+    async fn get_increment_since(
+        &self,
+        dataset_id: &DatasetID,
+        old_head: Option<&Multihash>,
+    ) -> Result<DatasetIntervalIncrement, GetIncrementError>;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -38,9 +47,15 @@ pub struct DatasetIntervalIncrement {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
-pub enum GetIntervalIncrementError {
+pub enum GetIncrementError {
     #[error(transparent)]
     DatasetNotFound(DatasetNotFoundError),
+
+    #[error(transparent)]
+    RefNotFound(RefNotFoundError),
+
+    #[error(transparent)]
+    Access(AccessError),
 
     #[error(transparent)]
     Internal(InternalError),
@@ -60,15 +75,27 @@ impl DummyDatasetChangesService {
 
 #[async_trait::async_trait]
 impl DatasetChangesService for DummyDatasetChangesService {
-    async fn get_interval_increment(
+    async fn get_increment_between(
         &self,
         _dataset_id: &DatasetID,
         _old_head: Option<&Multihash>,
         _new_head: &Multihash,
-    ) -> Result<DatasetIntervalIncrement, GetIntervalIncrementError> {
+    ) -> Result<DatasetIntervalIncrement, GetIncrementError> {
         Ok(DatasetIntervalIncrement {
             num_blocks: 1,
             num_records: 12,
+            updated_watermark: None,
+        })
+    }
+
+    async fn get_increment_since(
+        &self,
+        _dataset_id: &DatasetID,
+        _old_head: Option<&Multihash>,
+    ) -> Result<DatasetIntervalIncrement, GetIncrementError> {
+        Ok(DatasetIntervalIncrement {
+            num_blocks: 3,
+            num_records: 15,
             updated_watermark: None,
         })
     }
