@@ -126,6 +126,7 @@ impl FlowServiceInMemory {
         &self,
         start_time: DateTime<Utc>,
     ) -> Result<(), InternalError> {
+        // Query all enabled flow configurations
         let enabled_configurations: Vec<_> = self
             .flow_configuration_service
             .list_enabled_configurations()
@@ -133,7 +134,20 @@ impl FlowServiceInMemory {
             .await
             .int_err()?;
 
-        for enabled_config in enabled_configurations {
+        // Split configs by those which have a schedule or different rules
+        let (schedule_configs, non_schedule_configs): (Vec<_>, Vec<_>) = enabled_configurations
+            .into_iter()
+            .partition(|config| matches!(config.rule, FlowConfigurationRule::Schedule(_)));
+
+        // Activate all configs, ensuring schedule configs preceeds non-schedule configs
+        // (this i.e. forces all root datasets to be updated earlier than the derived)
+        //
+        // Thought: maybe we need topological sorting by derived relations as well to
+        // optimize the initial execution order, but batching rules may work just fine
+        for enabled_config in schedule_configs
+            .into_iter()
+            .chain(non_schedule_configs.into_iter())
+        {
             self.activate_flow_configuration(
                 start_time,
                 enabled_config.flow_key,
