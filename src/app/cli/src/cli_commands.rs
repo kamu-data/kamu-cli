@@ -209,6 +209,8 @@ pub fn get_command(
                 odf_server::AccessTokenStoreScope::Workspace
             },
             submatches.get_one::<Url>("server").cloned(),
+            submatches.get_one("access-token").cloned(),
+            submatches.get_flag("check"),
         )),
         Some(("logout", submatches)) => Box::new(LogoutCommand::new(
             cli_catalog.get_one()?,
@@ -449,6 +451,11 @@ pub fn get_command(
                     workspace_svc.layout().unwrap().run_info_dir.clone(),
                 ))
             }
+            Some(("generate-token", gen_matches)) => Box::new(GenerateTokenCommand::new(
+                cli_catalog.get_one()?,
+                gen_matches.get_one("gh-login").cloned().unwrap(),
+                gen_matches.get_one("gh-access-token").cloned().unwrap(),
+            )),
             Some(("ipfs", ipfs_matches)) => match ipfs_matches.subcommand() {
                 Some(("add", add_matches)) => Box::new(SystemIpfsAddCommand::new(
                     cli_catalog.get_one()?,

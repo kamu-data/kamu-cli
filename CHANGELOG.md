@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Upgraded to latest `datafusion` `v36.0.0`
 - Upgraded to latest `jupyter`
+### Added
+- New `kamu system generate-token` command useful for debugging node interactions
+- New `--check` flag for `kamu login` command to validate token with the remote and exit
 
 ## [0.159.0] - 2024-02-16
 ### Added

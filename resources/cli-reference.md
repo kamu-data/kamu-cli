@@ -499,11 +499,13 @@ Logs in to a remote Kamu server
 
 **Arguments:**
 
-* `<SERVER>` — Custom remote server front-end URL (Kamu web platform is used by default)
+* `<SERVER>` — ODF server URL (defaults to kamu.dev)
 
 **Options:**
 
 * `--user` — Store access token in the user home folder rather than in the workspace
+* `--check` — Check whether existing authorization is still valid without triggering a login flow
+* `--access-token <ACCESS-TOKEN>` — Provide an existing access token
 
 
 
@@ -515,7 +517,7 @@ Logs out from a remote Kamu server
 
 **Arguments:**
 
-* `<SERVER>` — Custom remote server front-end URL (Kamu web platform is used by default)
+* `<SERVER>` — ODF server URL (defaults to kamu.dev)
 
 **Options:**
 
@@ -1008,6 +1010,7 @@ Command group for system-level functionality
 * `info` — Summary of the system information
 * `diagnose` — Run basic system diagnose check
 * `ipfs` — IPFS helpers
+* `generate-token` — Generate a platform token from a known secret for debugging
 
 
 
@@ -1129,6 +1132,19 @@ Adds the specified dataset to IPFS and returns the CID
 **Arguments:**
 
 * `<DATASET>` — Dataset reference
+
+
+
+## `kamu system generate-token`
+
+Generate a platform token from a known secret for debugging
+
+**Usage:** `kamu system generate-token --gh-login <gh-login> --gh-access-token <gh-access-token>`
+
+**Options:**
+
+* `--gh-login <GH-LOGIN>` — GitHub account login
+* `--gh-access-token <GH-ACCESS-TOKEN>` — An existing GitHub access token
 
 
 

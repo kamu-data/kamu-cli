@@ -97,7 +97,7 @@ impl AuthenticationServiceImpl {
         }
     }
 
-    fn make_access_token(
+    pub fn make_access_token(
         &self,
         subject: String,
         login_method: &str,

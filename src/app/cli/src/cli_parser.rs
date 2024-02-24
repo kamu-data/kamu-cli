@@ -603,7 +603,14 @@ pub fn cli() -> Command {
                         Arg::new("server")
                             .index(1)
                             .value_parser(value_parse_url)
-                            .help("Custom remote server front-end URL (Kamu web platform is used by default)"),
+                            .help("ODF server URL (defaults to kamu.dev)"),
+                        Arg::new("check")
+                            .long("check")
+                            .action(ArgAction::SetTrue)
+                            .help("Check whether existing authorization is still valid without triggering a login flow"),
+                        Arg::new("access-token")
+                            .long("access-token")
+                            .help("Provide an existing access token"),
                     ]),
                 Command::new("logout")
                     .about("Logs out from a remote Kamu server")
@@ -615,7 +622,7 @@ pub fn cli() -> Command {
                         Arg::new("server")
                             .index(1)
                             .value_parser(value_parse_url)
-                            .help("Custom remote server front-end URL (Kamu web platform is used by default)"),
+                            .help("ODF server URL (defaults to kamu.dev)"),
                         Arg::new("all")
                             .short('a')
                             .long("all")
@@ -1208,6 +1215,19 @@ pub fn cli() -> Command {
                                     .required(true)
                                     .value_parser(value_parse_dataset_ref_local)
                                     .help("Dataset reference")])]),
+                        // TODO: This command is temporary and likely will be removed soon
+                        Command::new("generate-token")
+                            .about("Generate a platform token from a known secret for debugging")
+                            .args([
+                                Arg::new("gh-login")
+                                    .long("gh-login")
+                                    .required(true)
+                                    .help("GitHub account login"),
+                                Arg::new("gh-access-token")
+                                    .long("gh-access-token")
+                                    .required(true)
+                                    .help("An existing GitHub access token"),
+                            ]),
                     ]),
                 tabular_output_params(
                     Command::new("tail")
