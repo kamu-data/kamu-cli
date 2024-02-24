@@ -141,7 +141,7 @@ impl Projection for FlowState {
                             Err(ProjectionError::new(Some(s), event))
                         } else {
                             Ok(FlowState {
-                                start_condition: Some(start_condition),
+                                start_condition,
                                 ..s
                             })
                         }

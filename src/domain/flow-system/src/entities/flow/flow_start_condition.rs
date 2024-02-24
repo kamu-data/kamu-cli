@@ -32,8 +32,6 @@ pub struct FlowStartConditionThrottling {
 pub struct FlowStartConditionBatching {
     pub active_batching_rule: BatchingRule,
     pub batching_deadline: DateTime<Utc>,
-    pub accumulated_records_count: u64,
-    pub watermark_modified: bool,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

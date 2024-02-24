@@ -177,8 +177,17 @@ impl Flow {
     }
 
     /// Start condition
-    async fn start_condition(&self) -> Option<FlowStartCondition> {
-        self.flow_state.start_condition.map(Into::into)
+    async fn start_condition(&self, ctx: &Context<'_>) -> Result<Option<FlowStartCondition>> {
+        let dataset_changes_service = from_catalog::<dyn DatasetChangesService>(ctx).unwrap();
+
+        let maybe_condition = FlowStartCondition::create_from_raw_flow_data(
+            &self.flow_state,
+            dataset_changes_service.as_ref(),
+        )
+        .await
+        .int_err()?;
+
+        Ok(maybe_condition)
     }
 }
 

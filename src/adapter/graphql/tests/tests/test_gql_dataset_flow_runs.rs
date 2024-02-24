@@ -1990,10 +1990,8 @@ impl FlowRunsHarness {
                                                         __typename
                                                     }
                                                 }
-                                                ... on FlowEventStartConditionDefined {
-                                                    startCondition {
-                                                        __typename
-                                                    }
+                                                ... on FlowEventStartConditionUpdated {
+                                                    startConditionKind
                                                 }
                                                 ... on FlowEventTriggerAdded {
                                                     trigger {

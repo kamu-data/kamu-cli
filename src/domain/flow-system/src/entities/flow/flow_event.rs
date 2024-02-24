@@ -51,7 +51,7 @@ pub struct FlowEventInitiated {
 pub struct FlowEventStartConditionUpdated {
     pub event_time: DateTime<Utc>,
     pub flow_id: FlowID,
-    pub start_condition: FlowStartCondition,
+    pub start_condition: Option<FlowStartCondition>,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

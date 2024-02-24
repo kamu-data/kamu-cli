@@ -381,21 +381,27 @@ impl FlowServiceInMemory {
             )
             .await?;
 
-        // Update batching condition data
-        // TODO: this can cause many events in the flow
-        // Only set this once, and move recompute to API boundaries
-        flow.set_relevant_start_condition(
-            evaluation_time,
-            FlowStartCondition::Batching(FlowStartConditionBatching {
-                active_batching_rule: *batching_rule,
-                batching_deadline: result.batching_deadline,
-                accumulated_records_count: result.accumulated_records_count,
-                watermark_modified: result.watermark_modified,
-            }),
-        )
-        .int_err()?;
+        // Set batching condition data, but only during the first rule evaluation.
+        if !matches!(
+            flow.start_condition.as_ref(),
+            Some(FlowStartCondition::Batching(_))
+        ) {
+            flow.set_relevant_start_condition(
+                evaluation_time,
+                FlowStartCondition::Batching(FlowStartConditionBatching {
+                    active_batching_rule: *batching_rule,
+                    batching_deadline: result.batching_deadline,
+                }),
+            )
+            .int_err()?;
+        }
 
-        // Stop if batching condition not satisfied
+        // If batching rule is satisfied, clear the starting condition
+        if result.satisfied {
+            flow.clear_start_condition(evaluation_time).int_err()?;
+        }
+
+        // Stop if batching rule not satisfied
         Ok(result.satisfied)
     }
 
@@ -519,6 +525,11 @@ impl FlowServiceInMemory {
             .create_task(logical_plan)
             .await
             .int_err()?;
+
+        if flow.start_condition.is_some() {
+            flow.clear_start_condition(self.time_source.now())
+                .int_err()?;
+        }
 
         flow.on_task_scheduled(self.time_source.now(), task.task_id)
             .int_err()?;

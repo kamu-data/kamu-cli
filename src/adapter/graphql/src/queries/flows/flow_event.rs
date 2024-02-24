@@ -10,7 +10,7 @@
 use chrono::{DateTime, Utc};
 use {event_sourcing as evs, kamu_flow_system as fs, kamu_task_system as ts};
 
-use super::{FlowStartCondition, FlowTrigger};
+use super::FlowTrigger;
 use crate::prelude::*;
 use crate::queries::Task;
 use crate::utils;
@@ -26,7 +26,7 @@ pub enum FlowEvent {
     /// Flow initiated
     Initiated(FlowEventInitiated),
     /// Start condition defined
-    StartConditionDefined(FlowEventStartConditionDefined),
+    StartConditionUpdated(FlowEventStartConditionUpdated),
     /// Queued for time
     Queued(FlowEventQueued),
     /// Secondary trigger added
@@ -42,7 +42,7 @@ impl FlowEvent {
         match event {
             fs::FlowEvent::Initiated(e) => Self::Initiated(FlowEventInitiated::new(event_id, e)),
             fs::FlowEvent::StartConditionUpdated(e) => {
-                Self::StartConditionDefined(FlowEventStartConditionDefined::new(event_id, &e))
+                Self::StartConditionUpdated(FlowEventStartConditionUpdated::new(event_id, &e))
             }
             fs::FlowEvent::Queued(e) => Self::Queued(FlowEventQueued::new(event_id, &e)),
             fs::FlowEvent::TriggerAdded(e) => {
@@ -93,20 +93,31 @@ impl FlowEventInitiated {
 ///////////////////////////////////////////////////////////////////////////////
 
 #[derive(SimpleObject)]
-pub struct FlowEventStartConditionDefined {
+pub struct FlowEventStartConditionUpdated {
     event_id: EventID,
     event_time: DateTime<Utc>,
-    start_condition: FlowStartCondition,
+    start_condition_kind: Option<FlowStartConditionKind>,
 }
 
-impl FlowEventStartConditionDefined {
+impl FlowEventStartConditionUpdated {
     fn new(event_id: evs::EventID, event: &fs::FlowEventStartConditionUpdated) -> Self {
         Self {
             event_id: event_id.into(),
             event_time: event.event_time,
-            start_condition: event.start_condition.into(),
+            start_condition_kind: event.start_condition.as_ref().map(|start_condition| {
+                match start_condition {
+                    fs::FlowStartCondition::Throttling(_) => FlowStartConditionKind::Throttling,
+                    fs::FlowStartCondition::Batching(_) => FlowStartConditionKind::Batching,
+                }
+            }),
         }
     }
+}
+
+#[derive(Enum, Debug, Copy, Clone, PartialEq, Eq)]
+pub enum FlowStartConditionKind {
+    Throttling,
+    Batching,
 }
 
 ///////////////////////////////////////////////////////////////////////////////

@@ -37,11 +37,25 @@ pub trait DatasetChangesService: Sync + Send {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq)]
 pub struct DatasetIntervalIncrement {
     pub num_blocks: u64,
     pub num_records: u64,
     pub updated_watermark: Option<DateTime<Utc>>,
+}
+
+impl std::ops::AddAssign for DatasetIntervalIncrement {
+    fn add_assign(&mut self, rhs: Self) {
+        self.num_blocks += rhs.num_blocks;
+        self.num_records += rhs.num_records;
+        self.updated_watermark = match self.updated_watermark {
+            None => rhs.updated_watermark,
+            Some(self_watermark) => match rhs.updated_watermark {
+                None => Some(self_watermark),
+                Some(rhs_watermark) => Some(std::cmp::max(self_watermark, rhs_watermark)),
+            },
+        }
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

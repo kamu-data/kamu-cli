@@ -773,10 +773,10 @@ type FlowEventQueued implements FlowEvent {
 	activateAt: DateTime!
 }
 
-type FlowEventStartConditionDefined implements FlowEvent {
+type FlowEventStartConditionUpdated implements FlowEvent {
 	eventId: EventID!
 	eventTime: DateTime!
-	startCondition: FlowStartCondition!
+	startConditionKind: FlowStartConditionKind
 }
 
 type FlowEventTaskChanged implements FlowEvent {
@@ -830,6 +830,11 @@ type FlowStartConditionBatching {
 	batchingDeadline: DateTime!
 	accumulatedRecordsCount: Int!
 	watermarkModified: Boolean!
+}
+
+enum FlowStartConditionKind {
+	THROTTLING
+	BATCHING
 }
 
 type FlowStartConditionThrottling {
