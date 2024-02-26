@@ -20,11 +20,18 @@ use kamu_core::{DatasetChangesService, DependencyGraphService, InternalError, Sy
 use kamu_flow_system::*;
 use kamu_task_system::*;
 use opendatafabric::{AccountID, AccountName, DatasetID};
-use tokio_stream::StreamExt;
 
 use super::active_configs_state::ActiveConfigsState;
 use super::flow_time_wheel::FlowTimeWheel;
 use super::pending_flows_state::PendingFlowsState;
+use super::strategies::{
+    evaluate_batching_rules,
+    BatchingRuleEvaluationResult,
+    BatchingRuleEvaluator,
+    DatasetUpdateStrategy,
+    FlowServiceCallbacksFacade,
+    FlowSuccessHandler,
+};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -36,8 +43,8 @@ pub struct FlowServiceInMemory {
     time_source: Arc<dyn SystemTimeSource>,
     task_scheduler: Arc<dyn TaskScheduler>,
     flow_configuration_service: Arc<dyn FlowConfigurationService>,
-    dependency_graph_service: Arc<dyn DependencyGraphService>,
-    dataset_changes_service: Arc<dyn DatasetChangesService>,
+    success_handlers: Vec<Arc<dyn FlowSuccessHandler>>,
+    batching_rule_evaluators: Vec<Arc<dyn BatchingRuleEvaluator>>,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -71,6 +78,11 @@ impl FlowServiceInMemory {
         dependency_graph_service: Arc<dyn DependencyGraphService>,
         dataset_changes_service: Arc<dyn DatasetChangesService>,
     ) -> Self {
+        let dataset_update_strategy = Arc::new(DatasetUpdateStrategy::new(
+            dataset_changes_service,
+            dependency_graph_service,
+        ));
+
         Self {
             state: Arc::new(Mutex::new(State::default())),
             run_config,
@@ -79,8 +91,8 @@ impl FlowServiceInMemory {
             time_source,
             task_scheduler,
             flow_configuration_service,
-            dependency_graph_service,
-            dataset_changes_service,
+            success_handlers: vec![dataset_update_strategy.clone()],
+            batching_rule_evaluators: vec![dataset_update_strategy],
         }
     }
 
@@ -386,93 +398,41 @@ impl FlowServiceInMemory {
         batching_rule: &BatchingRule,
     ) -> Result<bool, InternalError> {
         // Run evaluation
-        let result = batching_rule
-            .evaluate(
-                flow.timing.created_at,
-                evaluation_time,
-                &flow.triggers,
-                self.dataset_changes_service.as_ref(),
-            )
-            .await?;
+        let evaluation_result = evaluate_batching_rules(
+            evaluation_time,
+            flow,
+            batching_rule,
+            &self.batching_rule_evaluators,
+        )
+        .await?;
 
-        // Set batching condition data, but only during the first rule evaluation.
-        if !matches!(
-            flow.start_condition.as_ref(),
-            Some(FlowStartCondition::Batching(_))
-        ) {
-            flow.set_relevant_start_condition(
-                evaluation_time,
-                FlowStartCondition::Batching(FlowStartConditionBatching {
-                    active_batching_rule: *batching_rule,
-                    batching_deadline: result.batching_deadline,
-                }),
-            )
-            .int_err()?;
-        }
+        match evaluation_result {
+            BatchingRuleEvaluationResult::Inapplicable => Ok(true),
+            BatchingRuleEvaluationResult::Success(evaluation) => {
+                // Set batching condition data, but only during the first rule evaluation.
+                if !matches!(
+                    flow.start_condition.as_ref(),
+                    Some(FlowStartCondition::Batching(_))
+                ) {
+                    flow.set_relevant_start_condition(
+                        evaluation_time,
+                        FlowStartCondition::Batching(FlowStartConditionBatching {
+                            active_batching_rule: *batching_rule,
+                            batching_deadline: evaluation.batching_deadline,
+                        }),
+                    )
+                    .int_err()?;
+                }
 
-        // If batching rule is satisfied, clear the starting condition
-        if result.satisfied {
-            flow.clear_start_condition(evaluation_time).int_err()?;
-        }
+                // If batching rule is satisfied, clear the starting condition
+                if evaluation.satisfied {
+                    flow.clear_start_condition(evaluation_time).int_err()?;
+                }
 
-        // Stop if batching rule not satisfied
-        Ok(result.satisfied)
-    }
-
-    #[tracing::instrument(level = "trace", skip_all, fields(%dataset_id, ?flow_type, %flow_id))]
-    async fn enqueue_dependent_dataset_flows(
-        &self,
-        start_time: DateTime<Utc>,
-        dataset_id: &DatasetID,
-        flow_type: DatasetFlowType,
-        flow_id: FlowID,
-        flow_result: &FlowResult,
-    ) -> Result<(), InternalError> {
-        // Note: this is applicable to dataset updates only
-        assert!(flow_type.is_dataset_update());
-
-        // Extract list of downstream 1 level datasets
-        let dependent_dataset_ids: Vec<_> = self
-            .dependency_graph_service
-            .get_downstream_dependencies(dataset_id)
-            .await
-            .int_err()?
-            .collect()
-            .await;
-
-        // For each, scan if flows configurations are on
-        for dependent_dataset_id in dependent_dataset_ids {
-            let maybe_batching_rule = self
-                .state
-                .lock()
-                .unwrap()
-                .active_configs
-                .try_get_dataset_batching_rule(&dependent_dataset_id, flow_type);
-
-            if let Some(batching_rule) = maybe_batching_rule {
-                let dependent_flow_key =
-                    FlowKeyDataset::new(dependent_dataset_id.clone(), flow_type).into();
-
-                let trigger = FlowTrigger::InputDatasetFlow(FlowTriggerInputDatasetFlow {
-                    dataset_id: dataset_id.clone(),
-                    flow_type,
-                    flow_id,
-                    flow_result: flow_result.clone(),
-                });
-
-                self.trigger_flow_common(
-                    start_time,
-                    &dependent_flow_key,
-                    trigger,
-                    Some(&batching_rule),
-                    |_| start_time,
-                )
-                .await
-                .int_err()?;
+                // Stop if batching rule not satisfied
+                Ok(evaluation.satisfied)
             }
         }
-
-        Ok(())
     }
 
     fn find_pending_flow(&self, flow_key: &FlowKey) -> Option<FlowID> {
@@ -831,6 +791,38 @@ impl FlowService for FlowServiceInMemory {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
+impl FlowServiceCallbacksFacade for FlowServiceInMemory {
+    fn try_get_dataset_batching_rule(
+        &self,
+        dataset_id: &DatasetID,
+        flow_type: DatasetFlowType,
+    ) -> Option<BatchingRule> {
+        self.state
+            .lock()
+            .unwrap()
+            .active_configs
+            .try_get_dataset_batching_rule(dataset_id, flow_type)
+    }
+
+    async fn trigger_flow(
+        &self,
+        trigger_time: DateTime<Utc>,
+        flow_key: &FlowKey,
+        trigger: FlowTrigger,
+        maybe_batching_rule: Option<&BatchingRule>,
+    ) -> Result<(), InternalError> {
+        self.trigger_flow_common(trigger_time, flow_key, trigger, maybe_batching_rule, |_| {
+            trigger_time
+        })
+        .await?;
+
+        Ok(())
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait::async_trait]
 impl FlowServiceTestDriver for FlowServiceInMemory {
     /// Pretends running started
     fn mimic_running_started(&self) {
@@ -918,20 +910,18 @@ impl AsyncEventHandler<TaskEventFinished> for FlowServiceInMemory {
                 .int_err()?;
             flow.save(self.flow_event_store.as_ref()).await.int_err()?;
 
-            // In case of success:
-            //  - enqueue updates of dependent datasets
-            if let Some(flow_result) = flow.try_result_as_ref()
-                && let FlowKey::Dataset(flow_key) = &flow.flow_key
-                && flow_key.flow_type.is_dataset_update()
-            {
-                self.enqueue_dependent_dataset_flows(
-                    finish_time,
-                    &flow_key.dataset_id,
-                    DatasetFlowType::ExecuteTransform,
-                    flow.flow_id,
-                    flow_result,
-                )
-                .await?;
+            if let Some(flow_result) = flow.try_result_as_ref() {
+                for handler in &self.success_handlers {
+                    handler
+                        .on_flow_success(
+                            self,
+                            finish_time,
+                            flow.flow_id,
+                            &flow.flow_key,
+                            flow_result,
+                        )
+                        .await?;
+                }
             }
 
             {

@@ -21,10 +21,6 @@ impl DatasetFlowType {
         &[Self::Ingest, Self::ExecuteTransform, Self::Compaction]
     }
 
-    pub fn is_dataset_update(&self) -> bool {
-        *self == DatasetFlowType::Ingest || *self == DatasetFlowType::ExecuteTransform
-    }
-
     pub fn dataset_kind_restriction(&self) -> Option<opendatafabric::DatasetKind> {
         match self {
             DatasetFlowType::Ingest => Some(opendatafabric::DatasetKind::Root),
