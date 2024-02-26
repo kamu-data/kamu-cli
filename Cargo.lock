@@ -3697,6 +3697,7 @@ dependencies = [
  "internal-error",
  "kamu-core",
  "kamu-task-system",
+ "lazy_static",
  "opendatafabric",
  "serde",
  "serde_with",
