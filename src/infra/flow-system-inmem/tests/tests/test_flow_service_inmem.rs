@@ -13,7 +13,7 @@ use std::sync::Arc;
 use chrono::{DateTime, Duration, DurationRound, TimeZone, Utc};
 use dill::*;
 use event_bus::EventBus;
-use kamu::testing::MetadataFactory;
+use kamu::testing::{MetadataFactory, MockDatasetChangesService};
 use kamu::*;
 use kamu_core::*;
 use kamu_flow_system::*;
@@ -142,8 +142,11 @@ async fn test_read_initial_config_and_queue_without_waiting() {
 #[test_log::test(tokio::test)]
 async fn test_cron_config() {
     // Note: this test runs with 1s step, CRON does not apply to milliseconds
-    let harness =
-        FlowHarness::new_custom_time_properties(Duration::seconds(1), Duration::seconds(1));
+    let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
+        awaiting_step: Some(Duration::seconds(1)),
+        mandatory_throttling_period: Some(Duration::seconds(1)),
+        ..Default::default()
+    });
 
     // Create a "foo" root dataset, and configure ingestion cron schedule of every
     // 5s
@@ -1151,7 +1154,16 @@ async fn test_task_completions_trigger_next_loop_on_success() {
 
 #[test_log::test(tokio::test)]
 async fn test_derived_dataset_triggered_initially_and_after_input_change() {
-    let harness = FlowHarness::new();
+    let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
+        mock_dataset_changes: Some(MockDatasetChangesService::with_increment_since(
+            DatasetIntervalIncrement {
+                num_blocks: 1,
+                num_records: 3,
+                updated_watermark: None,
+            },
+        )),
+        ..Default::default()
+    });
 
     let foo_id = harness.create_root_dataset("foo").await;
     let bar_id = harness
@@ -1368,10 +1380,11 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
 
 #[test_log::test(tokio::test)]
 async fn test_throttling_manual_triggers() {
-    let harness = FlowHarness::new_custom_time_properties(
-        Duration::milliseconds(SCHEDULING_ALIGNMENT_MS), // 10ms
-        Duration::milliseconds(SCHEDULING_ALIGNMENT_MS * 10), // 100ms
-    );
+    let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
+        awaiting_step: Some(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS)),
+        mandatory_throttling_period: Some(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS * 10)),
+        ..Default::default()
+    });
 
     // Foo Flow
     let foo_id = harness.create_root_dataset("foo").await;
@@ -1478,10 +1491,17 @@ async fn test_throttling_manual_triggers() {
 
 #[test_log::test(tokio::test)]
 async fn test_throttling_derived_dataset_with_2_parents() {
-    let harness = FlowHarness::new_custom_time_properties(
-        Duration::milliseconds(SCHEDULING_ALIGNMENT_MS), // 10ms
-        Duration::milliseconds(SCHEDULING_ALIGNMENT_MS * 10), // 100ms
-    );
+    let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
+        awaiting_step: Some(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS)), // 10ms,
+        mandatory_throttling_period: Some(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS * 10)), /* 100ms */
+        mock_dataset_changes: Some(MockDatasetChangesService::with_increment_since(
+            DatasetIntervalIncrement {
+                num_blocks: 2,
+                num_records: 7,
+                updated_watermark: None,
+            },
+        )),
+    });
 
     let foo_id = harness.create_root_dataset("foo").await;
     let bar_id = harness.create_root_dataset("bar").await;
@@ -1908,24 +1928,38 @@ struct FlowHarness {
     fake_system_time_source: FakeSystemTimeSource,
 }
 
+#[derive(Default)]
+struct FlowHarnessOverrides {
+    awaiting_step: Option<Duration>,
+    mandatory_throttling_period: Option<Duration>,
+    mock_dataset_changes: Option<MockDatasetChangesService>,
+}
+
 impl FlowHarness {
     fn new() -> Self {
-        Self::new_custom_time_properties(
-            Duration::milliseconds(SCHEDULING_ALIGNMENT_MS),
-            Duration::milliseconds(SCHEDULING_MANDATORY_THROTTLING_PERIOD_MS),
-        )
+        Self::with_overrides(FlowHarnessOverrides::default())
     }
 
-    fn new_custom_time_properties(
-        awaiting_step: Duration,
-        mandatory_throttling_period: Duration,
-    ) -> Self {
+    fn with_overrides(overrides: FlowHarnessOverrides) -> Self {
         let tmp_dir = tempfile::tempdir().unwrap();
         let datasets_dir = tmp_dir.path().join("datasets");
         std::fs::create_dir(&datasets_dir).unwrap();
 
         let t = Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap();
         let fake_system_time_source = FakeSystemTimeSource::new(t);
+
+        let awaiting_step = overrides
+            .awaiting_step
+            .unwrap_or(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS));
+
+        let mandatory_throttling_period =
+            overrides
+                .mandatory_throttling_period
+                .unwrap_or(Duration::milliseconds(
+                    SCHEDULING_MANDATORY_THROTTLING_PERIOD_MS,
+                ));
+
+        let mock_dataset_changes = overrides.mock_dataset_changes.unwrap_or_default();
 
         let catalog = dill::CatalogBuilder::new()
             .add::<EventBus>()
@@ -1945,7 +1979,8 @@ impl FlowHarness {
                     .with_multi_tenant(false),
             )
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-            .add::<DummyDatasetChangesService>()
+            .add_value(mock_dataset_changes)
+            .bind::<dyn DatasetChangesService, MockDatasetChangesService>()
             .add_value(CurrentAccountSubject::new_test())
             .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
             .add::<DependencyGraphServiceInMemory>()

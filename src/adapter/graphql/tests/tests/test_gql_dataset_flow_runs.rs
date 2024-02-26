@@ -17,7 +17,7 @@ use container_runtime::ContainerRuntime;
 use dill::Component;
 use event_bus::EventBus;
 use indoc::indoc;
-use kamu::testing::{MetadataFactory, MockDependencyGraphRepository};
+use kamu::testing::{MetadataFactory, MockDatasetChangesService, MockDependencyGraphRepository};
 use kamu::{
     DataFormatRegistryImpl,
     DatasetRepositoryLocalFs,
@@ -30,9 +30,10 @@ use kamu_core::auth::DEFAULT_ACCOUNT_NAME;
 use kamu_core::{
     auth,
     CreateDatasetResult,
+    DatasetChangesService,
+    DatasetIntervalIncrement,
     DatasetRepository,
     DependencyGraphRepository,
-    DummyDatasetChangesService,
     PollingIngestService,
     PullResult,
     SystemTimeSourceDefault,
@@ -62,12 +63,16 @@ use crate::utils::{authentication_catalogs, expect_anonymous_access_error};
 
 #[test_log::test(tokio::test)]
 async fn test_trigger_ingest_root_dataset() {
-    let mut dependency_graph_repo_mock = MockDependencyGraphRepository::new();
-    dependency_graph_repo_mock
-        .expect_list_dependencies_of_all_datasets()
-        .return_once(|| Box::pin(futures::stream::empty()));
-
-    let harness = FlowRunsHarness::new_custom(dependency_graph_repo_mock);
+    let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
+        dependency_graph_mock: Some(MockDependencyGraphRepository::no_dependencies()),
+        dataset_changes_mock: Some(MockDatasetChangesService::with_increment_between(
+            DatasetIntervalIncrement {
+                num_blocks: 1,
+                num_records: 12,
+                updated_watermark: None,
+            },
+        )),
+    });
     let create_result = harness.create_root_dataset().await;
 
     let mutation_code =
@@ -390,12 +395,16 @@ async fn test_trigger_ingest_root_dataset() {
 
 #[test_log::test(tokio::test)]
 async fn test_trigger_execute_transform_derived_dataset() {
-    let mut dependency_graph_repo_mock = MockDependencyGraphRepository::new();
-    dependency_graph_repo_mock
-        .expect_list_dependencies_of_all_datasets()
-        .return_once(|| Box::pin(futures::stream::empty()));
-
-    let harness = FlowRunsHarness::new_custom(dependency_graph_repo_mock);
+    let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
+        dependency_graph_mock: Some(MockDependencyGraphRepository::no_dependencies()),
+        dataset_changes_mock: Some(MockDatasetChangesService::with_increment_between(
+            DatasetIntervalIncrement {
+                num_blocks: 1,
+                num_records: 5,
+                updated_watermark: None,
+            },
+        )),
+    });
     harness.create_root_dataset().await;
     let create_derived_result = harness.create_derived_dataset().await;
 
@@ -542,7 +551,7 @@ async fn test_trigger_execute_transform_derived_dataset() {
                                             "datasetId": create_derived_result.dataset_handle.id.to_string(),
                                             "transformResult": {
                                                 "numBlocks": 1,
-                                                "numRecords": 12,
+                                                "numRecords": 5,
                                             },
                                         },
                                         "status": "FINISHED",
@@ -1439,12 +1448,10 @@ async fn test_cancel_already_cancelled_flow() {
 
 #[test_log::test(tokio::test)]
 async fn test_cancel_already_succeeded_flow() {
-    let mut dependency_graph_repo_mock = MockDependencyGraphRepository::new();
-    dependency_graph_repo_mock
-        .expect_list_dependencies_of_all_datasets()
-        .return_once(|| Box::pin(futures::stream::empty()));
-
-    let harness = FlowRunsHarness::new_custom(dependency_graph_repo_mock);
+    let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
+        dependency_graph_mock: Some(MockDependencyGraphRepository::no_dependencies()),
+        ..Default::default()
+    });
     let create_result: CreateDatasetResult = harness.create_root_dataset().await;
 
     let mutation_code =
@@ -1512,12 +1519,10 @@ async fn test_cancel_already_succeeded_flow() {
 
 #[test_log::test(tokio::test)]
 async fn test_history_of_completed_flow() {
-    let mut dependency_graph_repo_mock = MockDependencyGraphRepository::new();
-    dependency_graph_repo_mock
-        .expect_list_dependencies_of_all_datasets()
-        .return_once(|| Box::pin(futures::stream::empty()));
-
-    let harness = FlowRunsHarness::new_custom(dependency_graph_repo_mock);
+    let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
+        dependency_graph_mock: Some(MockDependencyGraphRepository::no_dependencies()),
+        ..Default::default()
+    });
     let create_result: CreateDatasetResult = harness.create_root_dataset().await;
 
     let mutation_code =
@@ -1669,17 +1674,26 @@ struct FlowRunsHarness {
     dataset_repo: Arc<dyn DatasetRepository>,
 }
 
+#[derive(Default)]
+struct FlowRunsHarnessOverrides {
+    dependency_graph_mock: Option<MockDependencyGraphRepository>,
+    dataset_changes_mock: Option<MockDatasetChangesService>,
+}
+
 impl FlowRunsHarness {
     fn new() -> Self {
-        Self::new_custom(MockDependencyGraphRepository::new())
+        Self::with_overrides(FlowRunsHarnessOverrides::default())
     }
 
-    fn new_custom(dependency_graph_repo: MockDependencyGraphRepository) -> Self {
+    fn with_overrides(overrides: FlowRunsHarnessOverrides) -> Self {
         let tempdir = tempfile::tempdir().unwrap();
         let run_info_dir = tempdir.path().join("run");
         let cache_dir = tempdir.path().join("cache");
         std::fs::create_dir(&run_info_dir).unwrap();
         std::fs::create_dir(&cache_dir).unwrap();
+
+        let dataset_changes_mock = overrides.dataset_changes_mock.unwrap_or_default();
+        let dependency_graph_mock = overrides.dependency_graph_mock.unwrap_or_default();
 
         let catalog_base = dill::CatalogBuilder::new()
             .add::<EventBus>()
@@ -1689,11 +1703,12 @@ impl FlowRunsHarness {
                     .with_multi_tenant(false),
             )
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
-            .add::<DummyDatasetChangesService>()
+            .add_value(dataset_changes_mock)
+            .bind::<dyn DatasetChangesService, MockDatasetChangesService>()
             .add::<SystemTimeSourceDefault>()
             .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
             .add::<DependencyGraphServiceInMemory>()
-            .add_value(dependency_graph_repo)
+            .add_value(dependency_graph_mock)
             .bind::<dyn DependencyGraphRepository, MockDependencyGraphRepository>()
             .add::<FlowConfigurationServiceInMemory>()
             .add::<FlowConfigurationEventStoreInMem>()

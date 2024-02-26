@@ -182,11 +182,11 @@ impl DatasetChangesServiceImpl {
 
 #[async_trait::async_trait]
 impl DatasetChangesService for DatasetChangesServiceImpl {
-    async fn get_increment_between(
-        &self,
-        dataset_id: &DatasetID,
-        old_head: Option<&Multihash>,
-        new_head: &Multihash,
+    async fn get_increment_between<'a>(
+        &'a self,
+        dataset_id: &'a DatasetID,
+        old_head: Option<&'a Multihash>,
+        new_head: &'a Multihash,
     ) -> Result<DatasetIntervalIncrement, GetIncrementError> {
         let dataset = self.resolve_dataset_by_id(dataset_id).await?;
 
@@ -198,10 +198,10 @@ impl DatasetChangesService for DatasetChangesServiceImpl {
         Ok(increment)
     }
 
-    async fn get_increment_since(
-        &self,
-        dataset_id: &DatasetID,
-        old_head: Option<&Multihash>,
+    async fn get_increment_since<'a>(
+        &'a self,
+        dataset_id: &'a DatasetID,
+        old_head: Option<&'a Multihash>,
     ) -> Result<DatasetIntervalIncrement, GetIncrementError> {
         let dataset = self.resolve_dataset_by_id(dataset_id).await?;
         let current_head = self.resolve_dataset_head(dataset.as_ref()).await?;

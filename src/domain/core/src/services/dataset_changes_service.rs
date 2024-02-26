@@ -19,19 +19,19 @@ use crate::{AccessError, DatasetNotFoundError, RefNotFoundError};
 #[async_trait::async_trait]
 pub trait DatasetChangesService: Sync + Send {
     /// Computes incremental stats between two given blocks of the dataset
-    async fn get_increment_between(
-        &self,
-        dataset_id: &DatasetID,
-        old_head: Option<&Multihash>,
-        new_head: &Multihash,
+    async fn get_increment_between<'a>(
+        &'a self,
+        dataset_id: &'a DatasetID,
+        old_head: Option<&'a Multihash>,
+        new_head: &'a Multihash,
     ) -> Result<DatasetIntervalIncrement, GetIncrementError>;
 
     /// Computes incremental stats between the given block and the current head
     /// of the dataset
-    async fn get_increment_since(
-        &self,
-        dataset_id: &DatasetID,
-        old_head: Option<&Multihash>,
+    async fn get_increment_since<'a>(
+        &'a self,
+        dataset_id: &'a DatasetID,
+        old_head: Option<&'a Multihash>,
     ) -> Result<DatasetIntervalIncrement, GetIncrementError>;
 }
 
@@ -73,46 +73,6 @@ pub enum GetIncrementError {
 
     #[error(transparent)]
     Internal(InternalError),
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-pub struct DummyDatasetChangesService {}
-
-#[dill::component(pub)]
-#[dill::interface(dyn DatasetChangesService)]
-impl DummyDatasetChangesService {
-    pub fn new() -> Self {
-        Self {}
-    }
-}
-
-#[async_trait::async_trait]
-impl DatasetChangesService for DummyDatasetChangesService {
-    async fn get_increment_between(
-        &self,
-        _dataset_id: &DatasetID,
-        _old_head: Option<&Multihash>,
-        _new_head: &Multihash,
-    ) -> Result<DatasetIntervalIncrement, GetIncrementError> {
-        Ok(DatasetIntervalIncrement {
-            num_blocks: 1,
-            num_records: 12,
-            updated_watermark: None,
-        })
-    }
-
-    async fn get_increment_since(
-        &self,
-        _dataset_id: &DatasetID,
-        _old_head: Option<&Multihash>,
-    ) -> Result<DatasetIntervalIncrement, GetIncrementError> {
-        Ok(DatasetIntervalIncrement {
-            num_blocks: 3,
-            num_records: 15,
-            updated_watermark: None,
-        })
-    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
