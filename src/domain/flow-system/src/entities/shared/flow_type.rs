@@ -31,3 +31,24 @@ impl DatasetFlowType {
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
+pub enum SystemFlowType {
+    GC,
+}
+
+impl SystemFlowType {
+    pub fn all() -> &'static [SystemFlowType] {
+        &[Self::GC]
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
+pub enum AnyFlowType {
+    Dataset(DatasetFlowType),
+    System(SystemFlowType),
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////

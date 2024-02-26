@@ -24,13 +24,7 @@ use kamu_flow_system::{
     FlowTriggerInputDatasetFlow,
 };
 
-use super::{
-    BatchingRuleEvaluation,
-    BatchingRuleEvaluationResult,
-    BatchingRuleEvaluator,
-    FlowServiceCallbacksFacade,
-    FlowSuccessHandler,
-};
+use super::{BatchingRuleEvaluation, FlowServiceCallbacksFacade, FlowTypeSupportStrategy};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -51,62 +45,71 @@ impl DatasetUpdateStrategy {
             dependency_graph_service,
         }
     }
+}
 
-    async fn enqueue_dependent_dataset_updates(
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait::async_trait]
+impl FlowTypeSupportStrategy for DatasetUpdateStrategy {
+    async fn on_flow_success(
         &self,
         callbacks_facade: &dyn FlowServiceCallbacksFacade,
-        start_time: DateTime<Utc>,
-        flow_key: &FlowKeyDataset,
+        success_time: DateTime<Utc>,
         flow_id: FlowID,
+        flow_key: &FlowKey,
         flow_result: &FlowResult,
     ) -> Result<(), InternalError> {
-        // Extract list of downstream 1 level datasets
-        let dependent_dataset_ids: Vec<_> = self
-            .dependency_graph_service
-            .get_downstream_dependencies(&flow_key.dataset_id)
-            .await
-            .int_err()?
-            .collect()
-            .await;
+        if let FlowKey::Dataset(fk_dataset) = flow_key {
+            // Extract list of downstream 1 level datasets
+            let dependent_dataset_ids: Vec<_> = self
+                .dependency_graph_service
+                .get_downstream_dependencies(&fk_dataset.dataset_id)
+                .await
+                .int_err()?
+                .collect()
+                .await;
 
-        // For each, scan if flows configurations are on
-        for dependent_dataset_id in dependent_dataset_ids {
-            let maybe_batching_rule = callbacks_facade.try_get_dataset_batching_rule(
-                &dependent_dataset_id,
-                DatasetFlowType::ExecuteTransform,
-            );
-
-            // When dependent flow batching rule is enabled, schedule dependent update
-            if let Some(batching_rule) = maybe_batching_rule {
-                let dependent_flow_key = FlowKeyDataset::new(
-                    dependent_dataset_id.clone(),
+            // For each, scan if flows configurations are on
+            for dependent_dataset_id in dependent_dataset_ids {
+                let maybe_batching_rule = callbacks_facade.try_get_dataset_batching_rule(
+                    &dependent_dataset_id,
                     DatasetFlowType::ExecuteTransform,
-                )
-                .into();
+                );
 
-                let trigger = FlowTrigger::InputDatasetFlow(FlowTriggerInputDatasetFlow {
-                    dataset_id: flow_key.dataset_id.clone(),
-                    flow_type: flow_key.flow_type,
-                    flow_id,
-                    flow_result: flow_result.clone(),
-                });
-
-                callbacks_facade
-                    .trigger_flow(
-                        start_time,
-                        &dependent_flow_key,
-                        trigger,
-                        Some(&batching_rule),
+                // When dependent flow batching rule is enabled, schedule dependent update
+                if let Some(batching_rule) = maybe_batching_rule {
+                    let dependent_flow_key = FlowKeyDataset::new(
+                        dependent_dataset_id.clone(),
+                        DatasetFlowType::ExecuteTransform,
                     )
-                    .await
-                    .int_err()?;
-            }
-        }
+                    .into();
 
-        Ok(())
+                    let trigger = FlowTrigger::InputDatasetFlow(FlowTriggerInputDatasetFlow {
+                        dataset_id: fk_dataset.dataset_id.clone(),
+                        flow_type: fk_dataset.flow_type,
+                        flow_id,
+                        flow_result: flow_result.clone(),
+                    });
+
+                    callbacks_facade
+                        .trigger_flow(
+                            success_time,
+                            &dependent_flow_key,
+                            trigger,
+                            Some(&batching_rule),
+                        )
+                        .await
+                        .int_err()?;
+                }
+            }
+
+            Ok(())
+        } else {
+            unreachable!("Not expecting other types of flow keys than dataset");
+        }
     }
 
-    async fn evaluate_dataset_update_batching_rule(
+    async fn evaluate_batching_rule(
         &self,
         evaluation_time: DateTime<Utc>,
         flow_state: &FlowState,
@@ -158,68 +161,6 @@ impl DatasetUpdateStrategy {
             watermark_modified,
             satisfied,
         })
-    }
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-#[async_trait::async_trait]
-impl FlowSuccessHandler for DatasetUpdateStrategy {
-    async fn on_flow_success(
-        &self,
-        callbacks_facade: &dyn FlowServiceCallbacksFacade,
-        success_time: DateTime<Utc>,
-        flow_id: FlowID,
-        flow_key: &FlowKey,
-        flow_result: &FlowResult,
-    ) -> Result<(), InternalError> {
-        if let FlowKey::Dataset(fk_dataset) = flow_key {
-            match fk_dataset.flow_type {
-                DatasetFlowType::Ingest | DatasetFlowType::ExecuteTransform => {
-                    self.enqueue_dependent_dataset_updates(
-                        callbacks_facade,
-                        success_time,
-                        fk_dataset,
-                        flow_id,
-                        flow_result,
-                    )
-                    .await?;
-                }
-                _ => {}
-            }
-        }
-
-        Ok(())
-    }
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-#[async_trait::async_trait]
-impl BatchingRuleEvaluator for DatasetUpdateStrategy {
-    async fn evaluate(
-        &self,
-        evaluation_time: DateTime<Utc>,
-        flow_state: &FlowState,
-        batching_rule: &BatchingRule,
-    ) -> Result<BatchingRuleEvaluationResult, InternalError> {
-        if let FlowKey::Dataset(fk_dataset) = &flow_state.flow_key {
-            match fk_dataset.flow_type {
-                DatasetFlowType::Ingest | DatasetFlowType::ExecuteTransform => {
-                    return Ok(BatchingRuleEvaluationResult::Success(
-                        self.evaluate_dataset_update_batching_rule(
-                            evaluation_time,
-                            flow_state,
-                            batching_rule,
-                        )
-                        .await?,
-                    ))
-                }
-                _ => {}
-            }
-        }
-
-        Ok(BatchingRuleEvaluationResult::Inapplicable)
     }
 }
 

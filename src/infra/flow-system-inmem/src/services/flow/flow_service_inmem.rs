@@ -9,6 +9,7 @@
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use chrono::{DateTime, DurationRound, Utc};
@@ -25,12 +26,9 @@ use super::active_configs_state::ActiveConfigsState;
 use super::flow_time_wheel::FlowTimeWheel;
 use super::pending_flows_state::PendingFlowsState;
 use super::strategies::{
-    evaluate_batching_rules,
-    BatchingRuleEvaluationResult,
-    BatchingRuleEvaluator,
     DatasetUpdateStrategy,
     FlowServiceCallbacksFacade,
-    FlowSuccessHandler,
+    FlowTypeSupportStrategy,
 };
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -43,8 +41,7 @@ pub struct FlowServiceInMemory {
     time_source: Arc<dyn SystemTimeSource>,
     task_scheduler: Arc<dyn TaskScheduler>,
     flow_configuration_service: Arc<dyn FlowConfigurationService>,
-    success_handlers: Vec<Arc<dyn FlowSuccessHandler>>,
-    batching_rule_evaluators: Vec<Arc<dyn BatchingRuleEvaluator>>,
+    support_strategies_by_type: HashMap<AnyFlowType, Arc<dyn FlowTypeSupportStrategy>>,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -83,6 +80,15 @@ impl FlowServiceInMemory {
             dependency_graph_service,
         ));
 
+        let support_strategies_by_type = HashMap::from_iter(
+            [DatasetFlowType::Ingest, DatasetFlowType::ExecuteTransform].map(|flow_type| {
+                (
+                    AnyFlowType::Dataset(flow_type),
+                    dataset_update_strategy.clone() as Arc<dyn FlowTypeSupportStrategy>,
+                )
+            }),
+        );
+
         Self {
             state: Arc::new(Mutex::new(State::default())),
             run_config,
@@ -91,8 +97,7 @@ impl FlowServiceInMemory {
             time_source,
             task_scheduler,
             flow_configuration_service,
-            success_handlers: vec![dataset_update_strategy.clone()],
-            batching_rule_evaluators: vec![dataset_update_strategy],
+            support_strategies_by_type,
         }
     }
 
@@ -397,18 +402,16 @@ impl FlowServiceInMemory {
         flow: &mut Flow,
         batching_rule: &BatchingRule,
     ) -> Result<bool, InternalError> {
-        // Run evaluation
-        let evaluation_result = evaluate_batching_rules(
-            evaluation_time,
-            flow,
-            batching_rule,
-            &self.batching_rule_evaluators,
-        )
-        .await?;
+        match self
+            .support_strategies_by_type
+            .get(&flow.flow_key.get_type())
+        {
+            // Handler for this flow type available
+            Some(strategy) => {
+                let evaluation = strategy
+                    .evaluate_batching_rule(evaluation_time, flow, batching_rule)
+                    .await?;
 
-        match evaluation_result {
-            BatchingRuleEvaluationResult::Inapplicable => Ok(true),
-            BatchingRuleEvaluationResult::Success(evaluation) => {
                 // Set batching condition data, but only during the first rule evaluation.
                 if !matches!(
                     flow.start_condition.as_ref(),
@@ -432,6 +435,9 @@ impl FlowServiceInMemory {
                 // Stop if batching rule not satisfied
                 Ok(evaluation.satisfied)
             }
+
+            // Unrelated flow type
+            None => Ok(true),
         }
     }
 
@@ -911,7 +917,10 @@ impl AsyncEventHandler<TaskEventFinished> for FlowServiceInMemory {
             flow.save(self.flow_event_store.as_ref()).await.int_err()?;
 
             if let Some(flow_result) = flow.try_result_as_ref() {
-                for handler in &self.success_handlers {
+                if let Some(handler) = self
+                    .support_strategies_by_type
+                    .get(&flow.flow_key.get_type())
+                {
                     handler
                         .on_flow_success(
                             self,

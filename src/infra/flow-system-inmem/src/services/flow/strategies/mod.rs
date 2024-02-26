@@ -7,12 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod batching_rule_evaluator;
 mod dataset_update_strategy;
 mod flow_service_callbacks_facade;
-mod flow_success_handler;
+mod flow_type_support_strategy;
 
-pub(crate) use batching_rule_evaluator::*;
 pub(crate) use dataset_update_strategy::*;
 pub(crate) use flow_service_callbacks_facade::*;
-pub(crate) use flow_success_handler::*;
+pub(crate) use flow_type_support_strategy::*;
