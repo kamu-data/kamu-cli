@@ -70,8 +70,7 @@ impl DatasetChangesServiceImpl {
             })
     }
 
-    // Scan updated dataset to detect statistics for task system result
-    async fn make_dataset_update_result_from_updated_pull(
+    async fn make_increment_from_interval(
         &self,
         dataset: Arc<dyn Dataset>,
         old_head: Option<&Multihash>,
@@ -192,7 +191,7 @@ impl DatasetChangesService for DatasetChangesServiceImpl {
         let dataset = self.resolve_dataset_by_id(dataset_id).await?;
 
         let increment = self
-            .make_dataset_update_result_from_updated_pull(dataset, old_head, new_head)
+            .make_increment_from_interval(dataset, old_head, new_head)
             .await
             .map_err(GetIncrementError::Internal)?;
 
@@ -208,7 +207,7 @@ impl DatasetChangesService for DatasetChangesServiceImpl {
         let current_head = self.resolve_dataset_head(dataset.as_ref()).await?;
 
         let increment = self
-            .make_dataset_update_result_from_updated_pull(dataset, old_head, &current_head)
+            .make_increment_from_interval(dataset, old_head, &current_head)
             .await
             .map_err(GetIncrementError::Internal)?;
 

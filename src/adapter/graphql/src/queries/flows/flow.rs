@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use chrono::{DateTime, Utc};
 use futures::TryStreamExt;
 use kamu_core::{DatasetChangesService, PollingIngestService};
 use {kamu_flow_system as fs, kamu_task_system as ts, opendatafabric as odf};
@@ -252,6 +253,7 @@ struct FlowDescriptionDatasetCompaction {
 struct FlowDescriptionUpdateResult {
     num_blocks: u64,
     num_records: u64,
+    updated_watermark: Option<DateTime<Utc>>,
 }
 
 impl FlowDescriptionUpdateResult {
@@ -277,6 +279,7 @@ impl FlowDescriptionUpdateResult {
                         Ok(Some(Self {
                             num_blocks: increment.num_blocks,
                             num_records: increment.num_records,
+                            updated_watermark: increment.updated_watermark,
                         }))
                     }
                 },

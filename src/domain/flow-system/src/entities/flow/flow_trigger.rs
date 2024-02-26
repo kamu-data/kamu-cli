@@ -40,46 +40,31 @@ impl FlowTrigger {
 
     /// Checks if new trigger is unique compared to the existing triggers
     pub fn is_unique_vs(&self, existing_triggers: &[FlowTrigger]) -> bool {
-        // Try finding a similar existing trigger
-        for existing_trigger in existing_triggers {
-            match self {
-                FlowTrigger::Manual(new_manual_trigger) => {
-                    if let FlowTrigger::Manual(existing_manual_trigger) = existing_trigger {
-                        if existing_manual_trigger == new_manual_trigger {
-                            return true;
-                        }
-                    }
+        // Try finding a similar existing trigger and abort early, when found
+        for existing in existing_triggers {
+            match (self, existing) {
+                (FlowTrigger::Manual(this), FlowTrigger::Manual(existing)) if this == existing => {
+                    return false
                 }
-                FlowTrigger::AutoPolling(_) => {
-                    if matches!(existing_trigger, FlowTrigger::AutoPolling(_)) {
-                        return true;
-                    }
+                (FlowTrigger::AutoPolling(_), FlowTrigger::AutoPolling(_)) => return false,
+                (FlowTrigger::Push(this), FlowTrigger::Push(existing))
+                    if this.source_name == existing.source_name =>
+                {
+                    return false
                 }
-                FlowTrigger::Push(new_push_trigger) => {
-                    if let FlowTrigger::Push(existing_push_trigger) = existing_trigger
-                        && existing_push_trigger.source_name == new_push_trigger.source_name
-                    {
-                        return true;
-                    }
-                }
-                FlowTrigger::InputDatasetFlow(new_dataset_trigger) => {
-                    // Compare dataset ID and flow type
-                    if let FlowTrigger::InputDatasetFlow(existing_dataset_trigger) =
-                        existing_trigger
-                        && existing_dataset_trigger.is_same_key_as(new_dataset_trigger)
-                    {
+                (FlowTrigger::InputDatasetFlow(this), FlowTrigger::InputDatasetFlow(existing)) => {
+                    if this.is_same_key_as(existing) {
                         // We should not be getting the same flow twice!
-                        assert_ne!(
-                            existing_dataset_trigger.flow_id,
-                            new_dataset_trigger.flow_id
-                        );
-                        return true;
+                        assert_ne!(this.flow_id, existing.flow_id);
+                        return false;
                     }
                 }
+                _ => { /* Continue comparing */ }
             }
         }
 
-        false
+        // No similar trigger was found, so it's a truly unique one
+        true
     }
 }
 
