@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use opendatafabric::{DatasetAliasRemote, RepoName};
+use opendatafabric::*;
 use thiserror::Error;
 
 use crate::*;
@@ -32,14 +32,17 @@ pub struct SearchOptions {
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct SearchResult {
-    pub datasets: Vec<DatasetAliasRemote>,
+    pub datasets: Vec<SearchResultDataset>,
 }
 
-impl SearchResult {
-    pub fn merge(mut self, mut other: Self) -> Self {
-        self.datasets.append(&mut other.datasets);
-        self
-    }
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SearchResultDataset {
+    pub id: Option<DatasetID>,
+    pub alias: DatasetAliasRemote,
+    pub kind: Option<DatasetKind>,
+    pub num_blocks: Option<u64>,
+    pub num_records: Option<u64>,
+    pub estimated_size: Option<u64>,
 }
 
 ///////////////////////////////////////////////////////////////////////////////

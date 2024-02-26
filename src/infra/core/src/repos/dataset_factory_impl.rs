@@ -328,8 +328,18 @@ impl DatasetFactory for DatasetFactoryImpl {
                 let ds = Self::get_local_fs(layout, self.event_bus.clone());
                 Ok(Arc::new(ds) as Arc<dyn Dataset>)
             }
-            "http" | "https" | "odf+http" | "odf+https" => {
+            "http" | "https" => {
                 let ds = Self::get_http(url, self.build_header_map(url), self.event_bus.clone());
+                Ok(Arc::new(ds))
+            }
+            "odf+http" | "odf+https" => {
+                // TODO: PERF: Consider what speedups are possible in smart protocol
+                let http_url = Url::parse(url.as_str().strip_prefix("odf+").unwrap()).unwrap();
+                let ds = Self::get_http(
+                    &http_url,
+                    self.build_header_map(&http_url),
+                    self.event_bus.clone(),
+                );
                 Ok(Arc::new(ds))
             }
             "ipfs" | "ipns" | "ipfs+http" | "ipfs+https" | "ipns+http" | "ipns+https" => {

@@ -139,7 +139,7 @@ impl PullServiceImpl {
                 Some(
                     DatasetRefRemote::Alias(alias)
                     | DatasetRefRemote::Handle(DatasetHandleRemote { alias, .. }),
-                ) => DatasetAlias::new(alias.account_name.clone(), alias.dataset_name.clone()),
+                ) => DatasetAlias::new(None, alias.dataset_name.clone()),
                 Some(DatasetRefRemote::Url(url)) => DatasetAlias::new(
                     if self.dataset_repo.is_multi_tenant() {
                         match self.current_account_subject.as_ref() {
