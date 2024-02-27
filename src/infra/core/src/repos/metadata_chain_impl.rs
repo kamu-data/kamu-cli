@@ -665,7 +665,7 @@ where
         // Phase 2. Check the previous blocks if required by Visitors.
         let mut blocks = self.iter_blocks_interval(prev_block_hash, None, false);
 
-        while let Some((hash, block)) = blocks.try_next().await.int_err()? {
+        while let Some((hash, block)) = wrap_block_stream_error(blocks.try_next().await)? {
             let (next_visitors, next_decision) =
                 MetadataChainVisitorBatchProcessor::get_next_decisions(
                     visitors,
@@ -683,12 +683,19 @@ where
             // At the moment, we're just iterating through all the blocks
         }
 
-        // Phase 3. Post final validation: check if validators are expecting any
-        // additional blocks.
-        MetadataChainVisitorBatchProcessor::finish(visitors)?;
-
         return Ok(());
     }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+// Helpers
+/////////////////////////////////////////////////////////////////////////////////////////
+
+fn wrap_block_stream_error<T>(res: Result<T, IterBlocksError>) -> Result<T, AppendError> {
+    res.map_err(|error| match error {
+        IterBlocksError::BlockNotFound(e) => AppendValidationError::PrevBlockNotFound(e).into(),
+        e => e.int_err().into(),
+    })
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

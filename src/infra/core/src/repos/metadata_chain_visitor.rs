@@ -55,10 +55,6 @@ pub trait MetadataChainVisitor: Sync + Send {
         &mut self,
         block_with_optional_hash: MetadataBlockWithOptionalHashRef,
     ) -> Result<Decision, AppendError>;
-
-    fn finish(&mut self) -> Result<(), AppendError> {
-        Ok(())
-    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
