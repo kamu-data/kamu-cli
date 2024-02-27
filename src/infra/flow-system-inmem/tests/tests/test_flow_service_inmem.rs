@@ -101,34 +101,34 @@ async fn test_read_initial_config_and_queue_without_waiting() {
             r#"
             #0: +0ms:
               "foo" Ingest:
-                Flow ID = 0 Queued
+                Flow ID = 0 Queued(0ms) AutoPolling
 
             #1: +0ms:
               "foo" Ingest:
-                Flow ID = 0 Scheduled
+                Flow ID = 0 Scheduled(task=0) AutoPolling
 
             #2: +10ms:
               "foo" Ingest:
-                Flow ID = 0 Running
+                Flow ID = 0 Running(task=0)
 
             #3: +20ms:
               "foo" Ingest:
-                Flow ID = 1 Queued
+                Flow ID = 1 Queued(80ms) AutoPolling
                 Flow ID = 0 Finished Success
 
             #4: +80ms:
               "foo" Ingest:
-                Flow ID = 1 Scheduled
+                Flow ID = 1 Scheduled(task=1) AutoPolling
                 Flow ID = 0 Finished Success
 
             #5: +90ms:
               "foo" Ingest:
-                Flow ID = 1 Running
+                Flow ID = 1 Running(task=1)
                 Flow ID = 0 Finished Success
 
             #6: +100ms:
               "foo" Ingest:
-                Flow ID = 2 Queued
+                Flow ID = 2 Queued(160ms) AutoPolling
                 Flow ID = 1 Finished Success
                 Flow ID = 0 Finished Success
 
@@ -202,24 +202,24 @@ async fn test_cron_config() {
             r#"
             #0: +0ms:
               "foo" Ingest:
-                Flow ID = 0 Queued
+                Flow ID = 0 Queued(5000ms) AutoPolling
 
             #1: +5000ms:
               "foo" Ingest:
-                Flow ID = 0 Scheduled
+                Flow ID = 0 Scheduled(task=0) AutoPolling
 
             #2: +6000ms:
               "foo" Ingest:
-                Flow ID = 0 Running
+                Flow ID = 0 Running(task=0)
 
             #3: +7000ms:
               "foo" Ingest:
-                Flow ID = 1 Queued
+                Flow ID = 1 Queued(10000ms) AutoPolling
                 Flow ID = 0 Finished Success
 
             #4: +10000ms:
               "foo" Ingest:
-                Flow ID = 1 Scheduled
+                Flow ID = 1 Scheduled(task=1) AutoPolling
                 Flow ID = 0 Finished Success
 
             "#
@@ -343,50 +343,50 @@ async fn test_manual_trigger() {
             r#"
             #0: +0ms:
               "foo" Ingest:
-                Flow ID = 0 Queued
+                Flow ID = 0 Queued(0ms) AutoPolling
 
             #1: +0ms:
               "foo" Ingest:
-                Flow ID = 0 Scheduled
+                Flow ID = 0 Scheduled(task=0) AutoPolling
 
             #2: +10ms:
               "foo" Ingest:
-                Flow ID = 0 Running
+                Flow ID = 0 Running(task=0)
 
             #3: +20ms:
               "foo" Ingest:
-                Flow ID = 1 Queued
+                Flow ID = 1 Queued(110ms) AutoPolling
                 Flow ID = 0 Finished Success
 
             #4: +40ms:
               "foo" Ingest:
-                Flow ID = 1 Scheduled
+                Flow ID = 1 Scheduled(task=1) AutoPolling
                 Flow ID = 0 Finished Success
 
             #5: +60ms:
               "foo" Ingest:
-                Flow ID = 1 Running
+                Flow ID = 1 Running(task=1)
                 Flow ID = 0 Finished Success
 
             #6: +70ms:
               "foo" Ingest:
-                Flow ID = 2 Queued
+                Flow ID = 2 Queued(160ms) AutoPolling
                 Flow ID = 1 Finished Success
                 Flow ID = 0 Finished Success
 
             #7: +80ms:
               "bar" Ingest:
-                Flow ID = 3 Scheduled
+                Flow ID = 3 Scheduled(task=2) Manual
               "foo" Ingest:
-                Flow ID = 2 Queued
+                Flow ID = 2 Queued(160ms) AutoPolling
                 Flow ID = 1 Finished Success
                 Flow ID = 0 Finished Success
 
             #8: +100ms:
               "bar" Ingest:
-                Flow ID = 3 Running
+                Flow ID = 3 Running(task=2)
               "foo" Ingest:
-                Flow ID = 2 Queued
+                Flow ID = 2 Queued(160ms) AutoPolling
                 Flow ID = 1 Finished Success
                 Flow ID = 0 Finished Success
 
@@ -394,7 +394,7 @@ async fn test_manual_trigger() {
               "bar" Ingest:
                 Flow ID = 3 Finished Success
               "foo" Ingest:
-                Flow ID = 2 Queued
+                Flow ID = 2 Queued(160ms) AutoPolling
                 Flow ID = 1 Finished Success
                 Flow ID = 0 Finished Success
 
@@ -402,7 +402,7 @@ async fn test_manual_trigger() {
               "bar" Ingest:
                 Flow ID = 3 Finished Success
               "foo" Ingest:
-                Flow ID = 2 Scheduled
+                Flow ID = 2 Scheduled(task=3) AutoPolling
                 Flow ID = 1 Finished Success
                 Flow ID = 0 Finished Success
 
@@ -520,42 +520,42 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
             r#"
             #0: +0ms:
               "bar" Ingest:
-                Flow ID = 1 Queued
+                Flow ID = 1 Queued(0ms) AutoPolling
               "foo" Ingest:
-                Flow ID = 0 Queued
+                Flow ID = 0 Queued(0ms) AutoPolling
 
             #1: +0ms:
               "bar" Ingest:
-                Flow ID = 1 Scheduled
+                Flow ID = 1 Scheduled(task=1) AutoPolling
               "foo" Ingest:
-                Flow ID = 0 Scheduled
+                Flow ID = 0 Scheduled(task=0) AutoPolling
 
             #2: +10ms:
               "bar" Ingest:
-                Flow ID = 1 Scheduled
+                Flow ID = 1 Scheduled(task=1) AutoPolling
               "foo" Ingest:
-                Flow ID = 0 Running
+                Flow ID = 0 Running(task=0)
 
             #3: +20ms:
               "bar" Ingest:
-                Flow ID = 1 Scheduled
+                Flow ID = 1 Scheduled(task=1) AutoPolling
               "foo" Ingest:
-                Flow ID = 2 Queued
+                Flow ID = 2 Queued(70ms) AutoPolling
                 Flow ID = 0 Finished Success
 
             #4: +20ms:
               "bar" Ingest:
-                Flow ID = 1 Running
+                Flow ID = 1 Running(task=1)
               "foo" Ingest:
-                Flow ID = 2 Queued
+                Flow ID = 2 Queued(70ms) AutoPolling
                 Flow ID = 0 Finished Success
 
             #5: +30ms:
               "bar" Ingest:
-                Flow ID = 3 Queued
+                Flow ID = 3 Queued(110ms) AutoPolling
                 Flow ID = 1 Finished Success
               "foo" Ingest:
-                Flow ID = 2 Queued
+                Flow ID = 2 Queued(70ms) AutoPolling
                 Flow ID = 0 Finished Success
 
             #6: +50ms:
@@ -568,31 +568,31 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
 
             #7: +80ms:
               "bar" Ingest:
-                Flow ID = 5 Queued
+                Flow ID = 5 Queued(100ms) AutoPolling
                 Flow ID = 3 Finished Aborted
                 Flow ID = 1 Finished Success
               "foo" Ingest:
-                Flow ID = 4 Queued
+                Flow ID = 4 Queued(80ms) AutoPolling
                 Flow ID = 2 Finished Aborted
                 Flow ID = 0 Finished Success
 
             #8: +80ms:
               "bar" Ingest:
-                Flow ID = 5 Queued
+                Flow ID = 5 Queued(100ms) AutoPolling
                 Flow ID = 3 Finished Aborted
                 Flow ID = 1 Finished Success
               "foo" Ingest:
-                Flow ID = 4 Scheduled
+                Flow ID = 4 Scheduled(task=2) AutoPolling
                 Flow ID = 2 Finished Aborted
                 Flow ID = 0 Finished Success
 
             #9: +100ms:
               "bar" Ingest:
-                Flow ID = 5 Scheduled
+                Flow ID = 5 Scheduled(task=3) AutoPolling
                 Flow ID = 3 Finished Aborted
                 Flow ID = 1 Finished Success
               "foo" Ingest:
-                Flow ID = 4 Scheduled
+                Flow ID = 4 Scheduled(task=2) AutoPolling
                 Flow ID = 2 Finished Aborted
                 Flow ID = 0 Finished Success
 
@@ -717,42 +717,42 @@ async fn test_respect_last_success_time_when_schedule_resumes() {
             r#"
             #0: +0ms:
               "bar" Ingest:
-                Flow ID = 1 Queued
+                Flow ID = 1 Queued(0ms) AutoPolling
               "foo" Ingest:
-                Flow ID = 0 Queued
+                Flow ID = 0 Queued(0ms) AutoPolling
 
             #1: +0ms:
               "bar" Ingest:
-                Flow ID = 1 Scheduled
+                Flow ID = 1 Scheduled(task=1) AutoPolling
               "foo" Ingest:
-                Flow ID = 0 Scheduled
+                Flow ID = 0 Scheduled(task=0) AutoPolling
 
             #2: +10ms:
               "bar" Ingest:
-                Flow ID = 1 Scheduled
+                Flow ID = 1 Scheduled(task=1) AutoPolling
               "foo" Ingest:
-                Flow ID = 0 Running
+                Flow ID = 0 Running(task=0)
 
             #3: +20ms:
               "bar" Ingest:
-                Flow ID = 1 Scheduled
+                Flow ID = 1 Scheduled(task=1) AutoPolling
               "foo" Ingest:
-                Flow ID = 2 Queued
+                Flow ID = 2 Queued(120ms) AutoPolling
                 Flow ID = 0 Finished Success
 
             #4: +20ms:
               "bar" Ingest:
-                Flow ID = 1 Running
+                Flow ID = 1 Running(task=1)
               "foo" Ingest:
-                Flow ID = 2 Queued
+                Flow ID = 2 Queued(120ms) AutoPolling
                 Flow ID = 0 Finished Success
 
             #5: +30ms:
               "bar" Ingest:
-                Flow ID = 3 Queued
+                Flow ID = 3 Queued(90ms) AutoPolling
                 Flow ID = 1 Finished Success
               "foo" Ingest:
-                Flow ID = 2 Queued
+                Flow ID = 2 Queued(120ms) AutoPolling
                 Flow ID = 0 Finished Success
 
             #6: +50ms:
@@ -765,31 +765,31 @@ async fn test_respect_last_success_time_when_schedule_resumes() {
 
             #7: +100ms:
               "bar" Ingest:
-                Flow ID = 5 Queued
+                Flow ID = 5 Queued(100ms) AutoPolling
                 Flow ID = 3 Finished Aborted
                 Flow ID = 1 Finished Success
               "foo" Ingest:
-                Flow ID = 4 Queued
+                Flow ID = 4 Queued(120ms) AutoPolling
                 Flow ID = 2 Finished Aborted
                 Flow ID = 0 Finished Success
 
             #8: +100ms:
               "bar" Ingest:
-                Flow ID = 5 Scheduled
+                Flow ID = 5 Scheduled(task=2) AutoPolling
                 Flow ID = 3 Finished Aborted
                 Flow ID = 1 Finished Success
               "foo" Ingest:
-                Flow ID = 4 Queued
+                Flow ID = 4 Queued(120ms) AutoPolling
                 Flow ID = 2 Finished Aborted
                 Flow ID = 0 Finished Success
 
             #9: +120ms:
               "bar" Ingest:
-                Flow ID = 5 Scheduled
+                Flow ID = 5 Scheduled(task=2) AutoPolling
                 Flow ID = 3 Finished Aborted
                 Flow ID = 1 Finished Success
               "foo" Ingest:
-                Flow ID = 4 Scheduled
+                Flow ID = 4 Scheduled(task=3) AutoPolling
                 Flow ID = 2 Finished Aborted
                 Flow ID = 0 Finished Success
 
@@ -900,47 +900,47 @@ async fn test_dataset_deleted() {
             r#"
             #0: +0ms:
               "bar" Ingest:
-                Flow ID = 1 Queued
+                Flow ID = 1 Queued(0ms) AutoPolling
               "foo" Ingest:
-                Flow ID = 0 Queued
+                Flow ID = 0 Queued(0ms) AutoPolling
 
             #1: +0ms:
               "bar" Ingest:
-                Flow ID = 1 Scheduled
+                Flow ID = 1 Scheduled(task=1) AutoPolling
               "foo" Ingest:
-                Flow ID = 0 Scheduled
+                Flow ID = 0 Scheduled(task=0) AutoPolling
 
             #2: +10ms:
               "bar" Ingest:
-                Flow ID = 1 Scheduled
+                Flow ID = 1 Scheduled(task=1) AutoPolling
               "foo" Ingest:
-                Flow ID = 0 Running
+                Flow ID = 0 Running(task=0)
 
             #3: +20ms:
               "bar" Ingest:
-                Flow ID = 1 Scheduled
+                Flow ID = 1 Scheduled(task=1) AutoPolling
               "foo" Ingest:
-                Flow ID = 2 Queued
+                Flow ID = 2 Queued(70ms) AutoPolling
                 Flow ID = 0 Finished Success
 
             #4: +20ms:
               "bar" Ingest:
-                Flow ID = 1 Running
+                Flow ID = 1 Running(task=1)
               "foo" Ingest:
-                Flow ID = 2 Queued
+                Flow ID = 2 Queued(70ms) AutoPolling
                 Flow ID = 0 Finished Success
 
             #5: +30ms:
               "bar" Ingest:
-                Flow ID = 3 Queued
+                Flow ID = 3 Queued(100ms) AutoPolling
                 Flow ID = 1 Finished Success
               "foo" Ingest:
-                Flow ID = 2 Queued
+                Flow ID = 2 Queued(70ms) AutoPolling
                 Flow ID = 0 Finished Success
 
             #6: +50ms:
               "bar" Ingest:
-                Flow ID = 3 Queued
+                Flow ID = 3 Queued(100ms) AutoPolling
                 Flow ID = 1 Finished Success
               "foo" Ingest:
                 Flow ID = 2 Finished Aborted
@@ -948,7 +948,7 @@ async fn test_dataset_deleted() {
 
             #7: +100ms:
               "bar" Ingest:
-                Flow ID = 3 Scheduled
+                Flow ID = 3 Scheduled(task=2) AutoPolling
                 Flow ID = 1 Finished Success
               "foo" Ingest:
                 Flow ID = 2 Finished Aborted
@@ -1069,62 +1069,62 @@ async fn test_task_completions_trigger_next_loop_on_success() {
             r#"
             #0: +0ms:
               "bar" Ingest:
-                Flow ID = 1 Queued
+                Flow ID = 1 Queued(0ms) AutoPolling
               "baz" Ingest:
-                Flow ID = 2 Queued
+                Flow ID = 2 Queued(0ms) AutoPolling
               "foo" Ingest:
-                Flow ID = 0 Queued
+                Flow ID = 0 Queued(0ms) AutoPolling
 
             #1: +0ms:
               "bar" Ingest:
-                Flow ID = 1 Scheduled
+                Flow ID = 1 Scheduled(task=1) AutoPolling
               "baz" Ingest:
-                Flow ID = 2 Scheduled
+                Flow ID = 2 Scheduled(task=2) AutoPolling
               "foo" Ingest:
-                Flow ID = 0 Scheduled
+                Flow ID = 0 Scheduled(task=0) AutoPolling
 
             #2: +10ms:
               "bar" Ingest:
-                Flow ID = 1 Scheduled
+                Flow ID = 1 Scheduled(task=1) AutoPolling
               "baz" Ingest:
-                Flow ID = 2 Scheduled
+                Flow ID = 2 Scheduled(task=2) AutoPolling
               "foo" Ingest:
-                Flow ID = 0 Running
+                Flow ID = 0 Running(task=0)
 
             #3: +20ms:
               "bar" Ingest:
-                Flow ID = 1 Scheduled
+                Flow ID = 1 Scheduled(task=1) AutoPolling
               "baz" Ingest:
-                Flow ID = 2 Scheduled
+                Flow ID = 2 Scheduled(task=2) AutoPolling
               "foo" Ingest:
-                Flow ID = 3 Queued
+                Flow ID = 3 Queued(60ms) AutoPolling
                 Flow ID = 0 Finished Success
 
             #4: +20ms:
               "bar" Ingest:
-                Flow ID = 1 Running
+                Flow ID = 1 Running(task=1)
               "baz" Ingest:
-                Flow ID = 2 Scheduled
+                Flow ID = 2 Scheduled(task=2) AutoPolling
               "foo" Ingest:
-                Flow ID = 3 Queued
+                Flow ID = 3 Queued(60ms) AutoPolling
                 Flow ID = 0 Finished Success
 
             #5: +30ms:
               "bar" Ingest:
                 Flow ID = 1 Finished Failed
               "baz" Ingest:
-                Flow ID = 2 Scheduled
+                Flow ID = 2 Scheduled(task=2) AutoPolling
               "foo" Ingest:
-                Flow ID = 3 Queued
+                Flow ID = 3 Queued(60ms) AutoPolling
                 Flow ID = 0 Finished Success
 
             #6: +30ms:
               "bar" Ingest:
                 Flow ID = 1 Finished Failed
               "baz" Ingest:
-                Flow ID = 2 Running
+                Flow ID = 2 Running(task=2)
               "foo" Ingest:
-                Flow ID = 3 Queued
+                Flow ID = 3 Queued(60ms) AutoPolling
                 Flow ID = 0 Finished Success
 
             #7: +40ms:
@@ -1133,7 +1133,7 @@ async fn test_task_completions_trigger_next_loop_on_success() {
               "baz" Ingest:
                 Flow ID = 2 Finished Cancelled
               "foo" Ingest:
-                Flow ID = 3 Queued
+                Flow ID = 3 Queued(60ms) AutoPolling
                 Flow ID = 0 Finished Success
 
             #8: +60ms:
@@ -1142,7 +1142,7 @@ async fn test_task_completions_trigger_next_loop_on_success() {
               "baz" Ingest:
                 Flow ID = 2 Finished Cancelled
               "foo" Ingest:
-                Flow ID = 3 Scheduled
+                Flow ID = 3 Scheduled(task=3) AutoPolling
                 Flow ID = 0 Finished Success
 
             "#
@@ -1275,81 +1275,81 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
             r#"
             #0: +0ms:
               "bar" ExecuteTransform:
-                Flow ID = 1 Queued
+                Flow ID = 1 Queued(0ms) AutoPolling
               "foo" Ingest:
-                Flow ID = 0 Queued
+                Flow ID = 0 Queued(0ms) AutoPolling
 
             #1: +0ms:
               "bar" ExecuteTransform:
-                Flow ID = 1 Scheduled
+                Flow ID = 1 Scheduled(task=1) AutoPolling
               "foo" Ingest:
-                Flow ID = 0 Scheduled
+                Flow ID = 0 Scheduled(task=0) AutoPolling
 
             #2: +10ms:
               "bar" ExecuteTransform:
-                Flow ID = 1 Scheduled
+                Flow ID = 1 Scheduled(task=1) AutoPolling
               "foo" Ingest:
-                Flow ID = 0 Running
+                Flow ID = 0 Running(task=0)
 
             #3: +20ms:
               "bar" ExecuteTransform:
-                Flow ID = 1 Scheduled
+                Flow ID = 1 Scheduled(task=1) AutoPolling
               "foo" Ingest:
-                Flow ID = 2 Queued
+                Flow ID = 2 Queued(100ms) AutoPolling
                 Flow ID = 0 Finished Success
 
             #4: +20ms:
               "bar" ExecuteTransform:
-                Flow ID = 1 Running
+                Flow ID = 1 Running(task=1)
               "foo" Ingest:
-                Flow ID = 2 Queued
+                Flow ID = 2 Queued(100ms) AutoPolling
                 Flow ID = 0 Finished Success
 
             #5: +30ms:
               "bar" ExecuteTransform:
                 Flow ID = 1 Finished Success
               "foo" Ingest:
-                Flow ID = 2 Queued
+                Flow ID = 2 Queued(100ms) AutoPolling
                 Flow ID = 0 Finished Success
 
             #6: +100ms:
               "bar" ExecuteTransform:
                 Flow ID = 1 Finished Success
               "foo" Ingest:
-                Flow ID = 2 Scheduled
+                Flow ID = 2 Scheduled(task=2) AutoPolling
                 Flow ID = 0 Finished Success
 
             #7: +110ms:
               "bar" ExecuteTransform:
                 Flow ID = 1 Finished Success
               "foo" Ingest:
-                Flow ID = 2 Running
+                Flow ID = 2 Running(task=2)
                 Flow ID = 0 Finished Success
 
             #8: +120ms:
               "bar" ExecuteTransform:
-                Flow ID = 3 Queued
+                Flow ID = 3 Queued(120ms) Input(foo)
                 Flow ID = 1 Finished Success
               "foo" Ingest:
-                Flow ID = 4 Queued
+                Flow ID = 4 Queued(200ms) AutoPolling
                 Flow ID = 2 Finished Success
                 Flow ID = 0 Finished Success
 
             #9: +120ms:
               "bar" ExecuteTransform:
-                Flow ID = 3 Scheduled
+                Flow ID = 3 Scheduled(task=3) Input(foo)
                 Flow ID = 1 Finished Success
               "foo" Ingest:
-                Flow ID = 4 Queued
+                Flow ID = 4 Queued(200ms) AutoPolling
                 Flow ID = 2 Finished Success
                 Flow ID = 0 Finished Success
 
             #10: +130ms:
               "bar" ExecuteTransform:
-                Flow ID = 3 Running
+                Flow ID = 3 Running(task=3)
                 Flow ID = 1 Finished Success
               "foo" Ingest:
-                Flow ID = 4 Queued
+                Flow ID = 4 Queued(200ms) AutoPolling
                 Flow ID = 2 Finished Success
                 Flow ID = 0 Finished Success
 
@@ -1358,7 +1358,7 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
                 Flow ID = 3 Finished Success
                 Flow ID = 1 Finished Success
               "foo" Ingest:
-                Flow ID = 4 Queued
+                Flow ID = 4 Queued(200ms) AutoPolling
                 Flow ID = 2 Finished Success
                 Flow ID = 0 Finished Success
 
@@ -1367,7 +1367,7 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
                 Flow ID = 3 Finished Success
                 Flow ID = 1 Finished Success
               "foo" Ingest:
-                Flow ID = 4 Scheduled
+                Flow ID = 4 Scheduled(task=4) AutoPolling
                 Flow ID = 2 Finished Success
                 Flow ID = 0 Finished Success
 
@@ -1462,11 +1462,11 @@ async fn test_throttling_manual_triggers() {
 
             #1: +20ms:
               "foo" Ingest:
-                Flow ID = 0 Scheduled
+                Flow ID = 0 Scheduled(task=0) Manual
 
             #2: +40ms:
               "foo" Ingest:
-                Flow ID = 0 Running
+                Flow ID = 0 Running(task=0)
 
             #3: +50ms:
               "foo" Ingest:
@@ -1474,12 +1474,12 @@ async fn test_throttling_manual_triggers() {
 
             #4: +100ms:
               "foo" Ingest:
-                Flow ID = 1 Queued
+                Flow ID = 1 Queued(150ms) Manual Throttling(100ms)
                 Flow ID = 0 Finished Success
 
             #5: +150ms:
               "foo" Ingest:
-                Flow ID = 1 Scheduled
+                Flow ID = 1 Scheduled(task=1) Manual
                 Flow ID = 0 Finished Success
 
           "#
@@ -1683,221 +1683,221 @@ async fn test_throttling_derived_dataset_with_2_parents() {
             r#"
           #0: +0ms:
             "bar" Ingest:
-              Flow ID = 1 Queued
+              Flow ID = 1 Queued(0ms) AutoPolling
             "baz" ExecuteTransform:
-              Flow ID = 2 Queued
+              Flow ID = 2 Queued(0ms) AutoPolling
             "foo" Ingest:
-              Flow ID = 0 Queued
+              Flow ID = 0 Queued(0ms) AutoPolling
 
           #1: +0ms:
             "bar" Ingest:
-              Flow ID = 1 Scheduled
+              Flow ID = 1 Scheduled(task=1) AutoPolling
             "baz" ExecuteTransform:
-              Flow ID = 2 Scheduled
+              Flow ID = 2 Scheduled(task=2) AutoPolling
             "foo" Ingest:
-              Flow ID = 0 Scheduled
+              Flow ID = 0 Scheduled(task=0) AutoPolling
 
           #2: +10ms:
             "bar" Ingest:
-              Flow ID = 1 Scheduled
+              Flow ID = 1 Scheduled(task=1) AutoPolling
             "baz" ExecuteTransform:
-              Flow ID = 2 Scheduled
+              Flow ID = 2 Scheduled(task=2) AutoPolling
             "foo" Ingest:
-              Flow ID = 0 Running
+              Flow ID = 0 Running(task=0)
 
           #3: +20ms:
             "bar" Ingest:
-              Flow ID = 1 Scheduled
+              Flow ID = 1 Scheduled(task=1) AutoPolling
             "baz" ExecuteTransform:
-              Flow ID = 2 Scheduled
+              Flow ID = 2 Scheduled(task=2) AutoPolling
             "foo" Ingest:
-              Flow ID = 3 Queued
+              Flow ID = 3 Queued(120ms) AutoPolling Throttling(100ms)
               Flow ID = 0 Finished Success
 
           #4: +20ms:
             "bar" Ingest:
-              Flow ID = 1 Running
+              Flow ID = 1 Running(task=1)
             "baz" ExecuteTransform:
-              Flow ID = 2 Scheduled
+              Flow ID = 2 Scheduled(task=2) AutoPolling
             "foo" Ingest:
-              Flow ID = 3 Queued
+              Flow ID = 3 Queued(120ms) AutoPolling Throttling(100ms)
               Flow ID = 0 Finished Success
 
           #5: +30ms:
             "bar" Ingest:
-              Flow ID = 4 Queued
+              Flow ID = 4 Queued(180ms) AutoPolling
               Flow ID = 1 Finished Success
             "baz" ExecuteTransform:
-              Flow ID = 2 Scheduled
+              Flow ID = 2 Scheduled(task=2) AutoPolling
             "foo" Ingest:
-              Flow ID = 3 Queued
+              Flow ID = 3 Queued(120ms) AutoPolling Throttling(100ms)
               Flow ID = 0 Finished Success
 
           #6: +30ms:
             "bar" Ingest:
-              Flow ID = 4 Queued
+              Flow ID = 4 Queued(180ms) AutoPolling
               Flow ID = 1 Finished Success
             "baz" ExecuteTransform:
-              Flow ID = 2 Running
+              Flow ID = 2 Running(task=2)
             "foo" Ingest:
-              Flow ID = 3 Queued
+              Flow ID = 3 Queued(120ms) AutoPolling Throttling(100ms)
               Flow ID = 0 Finished Success
 
           #7: +50ms:
             "bar" Ingest:
-              Flow ID = 4 Queued
+              Flow ID = 4 Queued(180ms) AutoPolling
               Flow ID = 1 Finished Success
             "baz" ExecuteTransform:
               Flow ID = 2 Finished Success
             "foo" Ingest:
-              Flow ID = 3 Queued
+              Flow ID = 3 Queued(120ms) AutoPolling Throttling(100ms)
               Flow ID = 0 Finished Success
 
           #8: +120ms:
             "bar" Ingest:
-              Flow ID = 4 Queued
+              Flow ID = 4 Queued(180ms) AutoPolling
               Flow ID = 1 Finished Success
             "baz" ExecuteTransform:
               Flow ID = 2 Finished Success
             "foo" Ingest:
-              Flow ID = 3 Scheduled
+              Flow ID = 3 Scheduled(task=3) AutoPolling
               Flow ID = 0 Finished Success
 
           #9: +130ms:
             "bar" Ingest:
-              Flow ID = 4 Queued
+              Flow ID = 4 Queued(180ms) AutoPolling
               Flow ID = 1 Finished Success
             "baz" ExecuteTransform:
               Flow ID = 2 Finished Success
             "foo" Ingest:
-              Flow ID = 3 Running
+              Flow ID = 3 Running(task=3)
               Flow ID = 0 Finished Success
 
           #10: +140ms:
             "bar" Ingest:
-              Flow ID = 4 Queued
+              Flow ID = 4 Queued(180ms) AutoPolling
               Flow ID = 1 Finished Success
             "baz" ExecuteTransform:
-              Flow ID = 5 Queued
+              Flow ID = 5 Queued(150ms) Input(foo) Throttling(100ms)
               Flow ID = 2 Finished Success
             "foo" Ingest:
-              Flow ID = 6 Queued
+              Flow ID = 6 Queued(240ms) AutoPolling Throttling(100ms)
               Flow ID = 3 Finished Success
               Flow ID = 0 Finished Success
 
           #11: +140ms:
             "bar" Ingest:
-              Flow ID = 4 Queued
+              Flow ID = 4 Queued(180ms) AutoPolling
               Flow ID = 1 Finished Success
             "baz" ExecuteTransform:
-              Flow ID = 5 Scheduled
+              Flow ID = 5 Scheduled(task=4) Input(foo)
               Flow ID = 2 Finished Success
             "foo" Ingest:
-              Flow ID = 6 Queued
+              Flow ID = 6 Queued(240ms) AutoPolling Throttling(100ms)
               Flow ID = 3 Finished Success
               Flow ID = 0 Finished Success
 
           #12: +160ms:
             "bar" Ingest:
-              Flow ID = 4 Queued
+              Flow ID = 4 Queued(180ms) AutoPolling
               Flow ID = 1 Finished Success
             "baz" ExecuteTransform:
-              Flow ID = 5 Running
+              Flow ID = 5 Running(task=4)
               Flow ID = 2 Finished Success
             "foo" Ingest:
-              Flow ID = 6 Queued
+              Flow ID = 6 Queued(240ms) AutoPolling Throttling(100ms)
               Flow ID = 3 Finished Success
               Flow ID = 0 Finished Success
 
           #13: +170ms:
             "bar" Ingest:
-              Flow ID = 4 Queued
+              Flow ID = 4 Queued(180ms) AutoPolling
               Flow ID = 1 Finished Success
             "baz" ExecuteTransform:
               Flow ID = 5 Finished Success
               Flow ID = 2 Finished Success
             "foo" Ingest:
-              Flow ID = 6 Queued
+              Flow ID = 6 Queued(240ms) AutoPolling Throttling(100ms)
               Flow ID = 3 Finished Success
               Flow ID = 0 Finished Success
 
           #14: +180ms:
             "bar" Ingest:
-              Flow ID = 4 Scheduled
+              Flow ID = 4 Scheduled(task=5) AutoPolling
               Flow ID = 1 Finished Success
             "baz" ExecuteTransform:
               Flow ID = 5 Finished Success
               Flow ID = 2 Finished Success
             "foo" Ingest:
-              Flow ID = 6 Queued
+              Flow ID = 6 Queued(240ms) AutoPolling Throttling(100ms)
               Flow ID = 3 Finished Success
               Flow ID = 0 Finished Success
 
           #15: +190ms:
             "bar" Ingest:
-              Flow ID = 4 Running
+              Flow ID = 4 Running(task=5)
               Flow ID = 1 Finished Success
             "baz" ExecuteTransform:
               Flow ID = 5 Finished Success
               Flow ID = 2 Finished Success
             "foo" Ingest:
-              Flow ID = 6 Queued
+              Flow ID = 6 Queued(240ms) AutoPolling Throttling(100ms)
               Flow ID = 3 Finished Success
               Flow ID = 0 Finished Success
 
           #16: +200ms:
             "bar" Ingest:
-              Flow ID = 8 Queued
+              Flow ID = 8 Queued(350ms) AutoPolling
               Flow ID = 4 Finished Success
               Flow ID = 1 Finished Success
             "baz" ExecuteTransform:
-              Flow ID = 7 Queued
+              Flow ID = 7 Queued(270ms) Input(bar) Throttling(100ms)
               Flow ID = 5 Finished Success
               Flow ID = 2 Finished Success
             "foo" Ingest:
-              Flow ID = 6 Queued
+              Flow ID = 6 Queued(240ms) AutoPolling Throttling(100ms)
               Flow ID = 3 Finished Success
               Flow ID = 0 Finished Success
 
           #17: +200ms:
             "bar" Ingest:
-              Flow ID = 8 Queued
+              Flow ID = 8 Queued(350ms) AutoPolling
               Flow ID = 4 Finished Success
               Flow ID = 1 Finished Success
             "baz" ExecuteTransform:
-              Flow ID = 7 Scheduled
+              Flow ID = 7 Scheduled(task=6) Input(bar)
               Flow ID = 5 Finished Success
               Flow ID = 2 Finished Success
             "foo" Ingest:
-              Flow ID = 6 Queued
+              Flow ID = 6 Queued(240ms) AutoPolling Throttling(100ms)
               Flow ID = 3 Finished Success
               Flow ID = 0 Finished Success
 
           #18: +240ms:
             "bar" Ingest:
-              Flow ID = 8 Queued
+              Flow ID = 8 Queued(350ms) AutoPolling
               Flow ID = 4 Finished Success
               Flow ID = 1 Finished Success
             "baz" ExecuteTransform:
-              Flow ID = 7 Scheduled
+              Flow ID = 7 Scheduled(task=6) Input(bar)
               Flow ID = 5 Finished Success
               Flow ID = 2 Finished Success
             "foo" Ingest:
-              Flow ID = 6 Scheduled
+              Flow ID = 6 Scheduled(task=7) AutoPolling
               Flow ID = 3 Finished Success
               Flow ID = 0 Finished Success
 
           #19: +350ms:
             "bar" Ingest:
-              Flow ID = 8 Scheduled
+              Flow ID = 8 Scheduled(task=8) AutoPolling
               Flow ID = 4 Finished Success
               Flow ID = 1 Finished Success
             "baz" ExecuteTransform:
-              Flow ID = 7 Scheduled
+              Flow ID = 7 Scheduled(task=6) Input(bar)
               Flow ID = 5 Finished Success
               Flow ID = 2 Finished Success
             "foo" Ingest:
-              Flow ID = 6 Scheduled
+              Flow ID = 6 Scheduled(task=7) AutoPolling
               Flow ID = 3 Finished Success
               Flow ID = 0 Finished Success
 
@@ -2075,110 +2075,110 @@ async fn test_batching_condition_records_only() {
           r#"
             #0: +0ms:
               "bar" ExecuteTransform:
-                Flow ID = 1 Queued
+                Flow ID = 1 Queued(0ms) AutoPolling
               "foo" Ingest:
-                Flow ID = 0 Queued
+                Flow ID = 0 Queued(0ms) AutoPolling
 
             #1: +0ms:
               "bar" ExecuteTransform:
-                Flow ID = 1 Scheduled
+                Flow ID = 1 Scheduled(task=1) AutoPolling
               "foo" Ingest:
-                Flow ID = 0 Scheduled
+                Flow ID = 0 Scheduled(task=0) AutoPolling
 
             #2: +10ms:
               "bar" ExecuteTransform:
-                Flow ID = 1 Scheduled
+                Flow ID = 1 Scheduled(task=1) AutoPolling
               "foo" Ingest:
-                Flow ID = 0 Running
+                Flow ID = 0 Running(task=0)
 
             #3: +20ms:
               "bar" ExecuteTransform:
-                Flow ID = 1 Scheduled
+                Flow ID = 1 Scheduled(task=1) AutoPolling
               "foo" Ingest:
-                Flow ID = 2 Queued
+                Flow ID = 2 Queued(70ms) AutoPolling
                 Flow ID = 0 Finished Success
 
             #4: +20ms:
               "bar" ExecuteTransform:
-                Flow ID = 1 Running
+                Flow ID = 1 Running(task=1)
               "foo" Ingest:
-                Flow ID = 2 Queued
+                Flow ID = 2 Queued(70ms) AutoPolling
                 Flow ID = 0 Finished Success
 
             #5: +30ms:
               "bar" ExecuteTransform:
                 Flow ID = 1 Finished Success
               "foo" Ingest:
-                Flow ID = 2 Queued
+                Flow ID = 2 Queued(70ms) AutoPolling
                 Flow ID = 0 Finished Success
 
             #6: +70ms:
               "bar" ExecuteTransform:
                 Flow ID = 1 Finished Success
               "foo" Ingest:
-                Flow ID = 2 Scheduled
+                Flow ID = 2 Scheduled(task=2) AutoPolling
                 Flow ID = 0 Finished Success
 
             #7: +80ms:
               "bar" ExecuteTransform:
                 Flow ID = 1 Finished Success
               "foo" Ingest:
-                Flow ID = 2 Running
+                Flow ID = 2 Running(task=2)
                 Flow ID = 0 Finished Success
 
             #8: +90ms:
               "bar" ExecuteTransform:
-                Flow ID = 3 Queued
+                Flow ID = 3 Queued(220ms) Input(foo) Batching(10, until=220ms)
                 Flow ID = 1 Finished Success
               "foo" Ingest:
-                Flow ID = 4 Queued
+                Flow ID = 4 Queued(140ms) AutoPolling
                 Flow ID = 2 Finished Success
                 Flow ID = 0 Finished Success
 
             #9: +140ms:
               "bar" ExecuteTransform:
-                Flow ID = 3 Queued
+                Flow ID = 3 Queued(220ms) Input(foo) Batching(10, until=220ms)
                 Flow ID = 1 Finished Success
               "foo" Ingest:
-                Flow ID = 4 Scheduled
+                Flow ID = 4 Scheduled(task=3) AutoPolling
                 Flow ID = 2 Finished Success
                 Flow ID = 0 Finished Success
 
             #10: +150ms:
               "bar" ExecuteTransform:
-                Flow ID = 3 Queued
+                Flow ID = 3 Queued(220ms) Input(foo) Batching(10, until=220ms)
                 Flow ID = 1 Finished Success
               "foo" Ingest:
-                Flow ID = 4 Running
+                Flow ID = 4 Running(task=3)
                 Flow ID = 2 Finished Success
                 Flow ID = 0 Finished Success
 
             #11: +160ms:
               "bar" ExecuteTransform:
-                Flow ID = 3 Queued
+                Flow ID = 3 Queued(160ms) Input(foo) Batching(10, until=220ms)
                 Flow ID = 1 Finished Success
               "foo" Ingest:
-                Flow ID = 5 Queued
+                Flow ID = 5 Queued(210ms) AutoPolling
                 Flow ID = 4 Finished Success
                 Flow ID = 2 Finished Success
                 Flow ID = 0 Finished Success
 
             #12: +160ms:
               "bar" ExecuteTransform:
-                Flow ID = 3 Scheduled
+                Flow ID = 3 Scheduled(task=4) Input(foo)
                 Flow ID = 1 Finished Success
               "foo" Ingest:
-                Flow ID = 5 Queued
+                Flow ID = 5 Queued(210ms) AutoPolling
                 Flow ID = 4 Finished Success
                 Flow ID = 2 Finished Success
                 Flow ID = 0 Finished Success
 
             #13: +170ms:
               "bar" ExecuteTransform:
-                Flow ID = 3 Running
+                Flow ID = 3 Running(task=4)
                 Flow ID = 1 Finished Success
               "foo" Ingest:
-                Flow ID = 5 Queued
+                Flow ID = 5 Queued(210ms) AutoPolling
                 Flow ID = 4 Finished Success
                 Flow ID = 2 Finished Success
                 Flow ID = 0 Finished Success
@@ -2188,7 +2188,7 @@ async fn test_batching_condition_records_only() {
                 Flow ID = 3 Finished Success
                 Flow ID = 1 Finished Success
               "foo" Ingest:
-                Flow ID = 5 Queued
+                Flow ID = 5 Queued(210ms) AutoPolling
                 Flow ID = 4 Finished Success
                 Flow ID = 2 Finished Success
                 Flow ID = 0 Finished Success
@@ -2198,7 +2198,7 @@ async fn test_batching_condition_records_only() {
                 Flow ID = 3 Finished Success
                 Flow ID = 1 Finished Success
               "foo" Ingest:
-                Flow ID = 5 Scheduled
+                Flow ID = 5 Scheduled(task=5) AutoPolling
                 Flow ID = 4 Finished Success
                 Flow ID = 2 Finished Success
                 Flow ID = 0 Finished Success

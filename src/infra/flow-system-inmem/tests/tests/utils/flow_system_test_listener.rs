@@ -20,7 +20,10 @@ use kamu_flow_system::{
     FlowPaginationOpts,
     FlowService,
     FlowServiceEvent,
+    FlowStartCondition,
     FlowState,
+    FlowStatus,
+    FlowTrigger,
 };
 use opendatafabric::DatasetID;
 
@@ -127,9 +130,67 @@ impl std::fmt::Display for FlowSystemTestListener {
 
             for (flow_key, heading) in flow_headings {
                 writeln!(f, "  {heading}:")?;
-                for state in snapshots.get(flow_key).unwrap() {
-                    write!(f, "    Flow ID = {} {:?}", state.flow_id, state.status(),)?;
-                    if let Some(outcome) = &state.outcome {
+                for flow_state in snapshots.get(flow_key).unwrap() {
+                    write!(
+                        f,
+                        "    Flow ID = {} {}",
+                        flow_state.flow_id,
+                        match flow_state.status() {
+                            FlowStatus::Queued => format!(
+                                "Queued({}ms)",
+                                (flow_state.timing.activate_at.unwrap() - initial_time)
+                                    .num_milliseconds()
+                            ),
+                            FlowStatus::Scheduled | FlowStatus::Running => format!(
+                                "{:?}(task={})",
+                                flow_state.status(),
+                                flow_state
+                                    .task_ids
+                                    .iter()
+                                    .map(|task_id| format!("{task_id}"))
+                                    .collect::<Vec<_>>()
+                                    .join(",")
+                            ),
+                            _ => format!("{:?}", flow_state.status()),
+                        }
+                    )?;
+
+                    match flow_state.status() {
+                        FlowStatus::Waiting | FlowStatus::Queued | FlowStatus::Scheduled => write!(
+                            f,
+                            " {}",
+                            match flow_state.primary_trigger() {
+                                FlowTrigger::Manual(_) => String::from("Manual"),
+                                FlowTrigger::AutoPolling(_) => String::from("AutoPolling"),
+                                FlowTrigger::Push(_) => String::from("Push"),
+                                FlowTrigger::InputDatasetFlow(i) => format!(
+                                    "Input({})",
+                                    state
+                                        .dataset_display_names
+                                        .get(&i.dataset_id)
+                                        .cloned()
+                                        .unwrap_or_else(|| i.dataset_id.to_string()),
+                                ),
+                            }
+                        )?,
+                        _ => {}
+                    }
+
+                    if let Some(start_condition) = flow_state.start_condition {
+                        match start_condition {
+                            FlowStartCondition::Throttling(t) => {
+                                write!(f, " Throttling({}ms)", t.interval.num_milliseconds())?;
+                            }
+                            FlowStartCondition::Batching(b) => write!(
+                                f,
+                                " Batching({}, until={}ms)",
+                                b.active_batching_rule.min_records_to_await(),
+                                (b.batching_deadline - initial_time).num_milliseconds(),
+                            )?,
+                        }
+                    }
+
+                    if let Some(outcome) = &flow_state.outcome {
                         writeln!(
                             f,
                             " {}",
