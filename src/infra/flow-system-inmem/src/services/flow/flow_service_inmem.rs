@@ -315,19 +315,19 @@ impl FlowServiceInMemory {
                 }
 
                 // Evaluate batching rule, if defined, and still waiting
-                let maybe_batching_finish_time = if flow.status() == FlowStatus::Waiting
+                if flow.status() == FlowStatus::Waiting
                     && let Some(batching_rule) = maybe_batching_rule
                 {
-                    // Stop if batching condition not satisfied
-                    self.evaluate_flow_batching_rule(trigger_time, &mut flow, batching_rule)
-                        .await
-                        .int_err()?
+                    self.evaluate_flow_batching_rule(
+                        trigger_time,
+                        &mut flow,
+                        batching_rule,
+                        throttling_boundary_time,
+                    )
+                    .await
+                    .int_err()?;
                 } else {
-                    Some(trigger_time)
-                };
-
-                // Evaluate throttling condition, if batching condition passed
-                if let Some(batching_finish_time) = maybe_batching_finish_time {
+                    // Evaluate throttling condition, if batching condition passed
                     // Is new time earlier than planned?
                     if throttling_boundary_time
                         < flow
@@ -340,15 +340,9 @@ impl FlowServiceInMemory {
                         flow.activate_at_time(self.time_source.now(), throttling_boundary_time)
                             .int_err()?;
 
-                        // Indicate throttling activity
-                        if throttling_boundary_time > batching_finish_time {
-                            flow.set_relevant_start_condition(
-                                self.time_source.now(),
-                                FlowStartCondition::Throttling(FlowStartConditionThrottling {
-                                    interval: self.run_config.mandatory_throttling_period,
-                                }),
-                            )
-                            .int_err()?;
+                        // Set throttling activity as start condition
+                        if throttling_boundary_time > trigger_time {
+                            self.indicate_throttling_activity(&mut flow)?;
                         }
                     }
                 }
@@ -363,39 +357,33 @@ impl FlowServiceInMemory {
                 let mut flow = self.make_new_flow(flow_key.clone(), trigger).await?;
 
                 // Evaluate batching rule, if defined
-                let maybe_batching_finish_time = if let Some(batching_rule) = maybe_batching_rule {
-                    // Stop if batching condition not satisfied
-                    self.evaluate_flow_batching_rule(trigger_time, &mut flow, batching_rule)
-                        .await?
+                if let Some(batching_rule) = maybe_batching_rule {
+                    // Don't activate if batching condition not satisfied
+                    self.evaluate_flow_batching_rule(
+                        trigger_time,
+                        &mut flow,
+                        batching_rule,
+                        throttling_boundary_time,
+                    )
+                    .await
+                    .int_err()?;
                 } else {
-                    Some(trigger_time)
-                };
+                    // Evaluate throttling condition, if batching condition passed
 
-                // Evaluate throttling condition, if batching condition passed
-                if let Some(batching_finish_time) = maybe_batching_finish_time {
                     // Next activation time depends on:
                     //  - last success time, if ever launched
-                    //  - batching condition, if defined
                     //  - schedule, if defined
                     // but in any case, may not be less than throttling boundary
                     let naive_next_activation_time = new_activation_time_fn(&flow_run_stats);
-                    let next_activation_time = std::cmp::max(
-                        throttling_boundary_time,
-                        std::cmp::max(batching_finish_time, naive_next_activation_time),
-                    );
+                    let next_activation_time =
+                        std::cmp::max(throttling_boundary_time, naive_next_activation_time);
                     self.enqueue_flow(flow.flow_id, next_activation_time)?;
                     flow.activate_at_time(self.time_source.now(), next_activation_time)
                         .int_err()?;
 
-                    // Indicate throttling activity
+                    // Set throttling activity as start condition
                     if throttling_boundary_time > naive_next_activation_time {
-                        flow.set_relevant_start_condition(
-                            self.time_source.now(),
-                            FlowStartCondition::Throttling(FlowStartConditionThrottling {
-                                interval: self.run_config.mandatory_throttling_period,
-                            }),
-                        )
-                        .int_err()?;
+                        self.indicate_throttling_activity(&mut flow)?;
                     }
                 }
 
@@ -410,7 +398,8 @@ impl FlowServiceInMemory {
         evaluation_time: DateTime<Utc>,
         flow: &mut Flow,
         batching_rule: &BatchingRule,
-    ) -> Result<Option<DateTime<Utc>>, InternalError> {
+        throttling_boundary_time: DateTime<Utc>,
+    ) -> Result<(), InternalError> {
         match self
             .support_strategies_by_type
             .get(&flow.flow_key.get_type())
@@ -436,40 +425,60 @@ impl FlowServiceInMemory {
                     .int_err()?;
                 }
 
-                let maybe_batching_finish_time = if evaluation.satisfied {
-                    // If batching rule is satisfied =>
-                    //  - clear the starting condition
-                    //  - indicate immediate readiness
-                    flow.clear_start_condition(evaluation_time).int_err()?;
-                    Some(evaluation_time)
-                } else if evaluation.accumulated_something() {
-                    // If at least something was accumulated =>
-                    //   indicate readiness at deadline time
-                    Some(evaluation.batching_deadline)
-                } else {
-                    // Not ready
-                    None
-                };
+                //  If we accumulated at least something (records or watermarks),
+                //   the upper bound of potential finish time for batching is known
+                if evaluation.accumulated_something() {
+                    // Finish immediately if satisfied, or not later than the deadline
+                    let batching_finish_time = if evaluation.satisfied {
+                        evaluation_time
+                    } else {
+                        evaluation.batching_deadline
+                    };
 
-                // If batching finish time is clear, activate the flow not later than this time
-                if let Some(batching_finish_time) = maybe_batching_finish_time {
+                    // Throttling boundary correction
+                    let corrected_finish_time =
+                        std::cmp::max(batching_finish_time, throttling_boundary_time);
+
+                    // Indicate if flow activation is required
                     let should_activate = match flow.timing.activate_at {
-                        Some(activate_at) => activate_at > batching_finish_time,
+                        Some(activate_at) => activate_at > corrected_finish_time,
                         None => true,
                     };
                     if should_activate {
-                        flow.activate_at_time(self.time_source.now(), batching_finish_time)
+                        flow.activate_at_time(self.time_source.now(), corrected_finish_time)
                             .int_err()?;
-                        self.enqueue_flow(flow.flow_id, batching_finish_time)?;
+                        self.enqueue_flow(flow.flow_id, corrected_finish_time)?;
+                    }
+
+                    // If batching is over, it's start condition is no longer valid.
+                    // However, set throttling condition, if it applies
+                    if evaluation.satisfied {
+                        if throttling_boundary_time > batching_finish_time {
+                            self.indicate_throttling_activity(flow)?;
+                        } else {
+                            flow.clear_start_condition(self.time_source.now())
+                                .int_err()?;
+                        }
                     }
                 }
 
-                Ok(maybe_batching_finish_time)
+                Ok(())
             }
 
             // Unrelated flow type
-            None => Ok(None),
+            None => panic!("Unrelated flow type for batching conditions"),
         }
+    }
+
+    fn indicate_throttling_activity(&self, flow: &mut Flow) -> Result<(), InternalError> {
+        flow.set_relevant_start_condition(
+            self.time_source.now(),
+            FlowStartCondition::Throttling(FlowStartConditionThrottling {
+                interval: self.run_config.mandatory_throttling_period,
+            }),
+        )
+        .int_err()?;
+        Ok(())
     }
 
     fn find_pending_flow(&self, flow_key: &FlowKey) -> Option<FlowID> {

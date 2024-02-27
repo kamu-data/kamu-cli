@@ -1184,7 +1184,7 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
             harness.now_datetime(),
             bar_id.clone(),
             DatasetFlowType::ExecuteTransform,
-            BatchingRule::new_checked(1, Duration::hours(24)).unwrap(),
+            BatchingRule::new_checked(1, Duration::seconds(1)).unwrap(),
         )
         .await;
 
@@ -1785,7 +1785,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
               Flow ID = 3 Finished Success
               Flow ID = 0 Finished Success
 
-          #11: +140ms:
+          #11: +150ms:
             "bar" Ingest:
               Flow ID = 4 Queued(180ms) AutoPolling
               Flow ID = 1 Finished Success
@@ -1859,31 +1859,31 @@ async fn test_throttling_derived_dataset_with_2_parents() {
               Flow ID = 3 Finished Success
               Flow ID = 0 Finished Success
 
-          #17: +200ms:
+          #17: +240ms:
             "bar" Ingest:
               Flow ID = 8 Queued(350ms) AutoPolling
               Flow ID = 4 Finished Success
               Flow ID = 1 Finished Success
             "baz" ExecuteTransform:
-              Flow ID = 7 Scheduled(task=6) Input(bar)
+              Flow ID = 7 Queued(270ms) Input(bar) Throttling(100ms)
               Flow ID = 5 Finished Success
               Flow ID = 2 Finished Success
             "foo" Ingest:
-              Flow ID = 6 Queued(240ms) AutoPolling Throttling(100ms)
+              Flow ID = 6 Scheduled(task=6) AutoPolling
               Flow ID = 3 Finished Success
               Flow ID = 0 Finished Success
 
-          #18: +240ms:
+          #18: +270ms:
             "bar" Ingest:
               Flow ID = 8 Queued(350ms) AutoPolling
               Flow ID = 4 Finished Success
               Flow ID = 1 Finished Success
             "baz" ExecuteTransform:
-              Flow ID = 7 Scheduled(task=6) Input(bar)
+              Flow ID = 7 Scheduled(task=7) Input(bar)
               Flow ID = 5 Finished Success
               Flow ID = 2 Finished Success
             "foo" Ingest:
-              Flow ID = 6 Scheduled(task=7) AutoPolling
+              Flow ID = 6 Scheduled(task=6) AutoPolling
               Flow ID = 3 Finished Success
               Flow ID = 0 Finished Success
 
@@ -1893,11 +1893,11 @@ async fn test_throttling_derived_dataset_with_2_parents() {
               Flow ID = 4 Finished Success
               Flow ID = 1 Finished Success
             "baz" ExecuteTransform:
-              Flow ID = 7 Scheduled(task=6) Input(bar)
+              Flow ID = 7 Scheduled(task=7) Input(bar)
               Flow ID = 5 Finished Success
               Flow ID = 2 Finished Success
             "foo" Ingest:
-              Flow ID = 6 Scheduled(task=7) AutoPolling
+              Flow ID = 6 Scheduled(task=6) AutoPolling
               Flow ID = 3 Finished Success
               Flow ID = 0 Finished Success
 
