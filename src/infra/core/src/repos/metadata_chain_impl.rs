@@ -650,6 +650,7 @@ where
     ) -> Result<(), AppendError> {
         assert!(!visitors.is_empty());
 
+        // Phase 1. Check the append block itself
         let (mut visitors, mut decision) =
             MetadataChainVisitorBatchProcessor::get_next_decisions(visitors, (append_block, None))?;
 
@@ -661,6 +662,7 @@ where
             return Ok(());
         };
 
+        // Phase 2. Check the previous blocks if required by Visitors.
         let mut blocks = self.iter_blocks_interval(prev_block_hash, None, false);
 
         while let Some((hash, block)) = blocks.try_next().await.int_err()? {
@@ -670,16 +672,20 @@ where
                     (&block, Some(&hash)),
                 )?;
 
+            visitors = next_visitors;
+            decision = next_decision;
+
             if decision == Decision::Stop {
                 break;
             }
 
             // TODO: Traversal optimizations
             // At the moment, we're just iterating through all the blocks
-
-            visitors = next_visitors;
-            decision = next_decision;
         }
+
+        // Phase 3. Post final validation: check if validators are expecting any
+        // additional blocks.
+        MetadataChainVisitorBatchProcessor::finish(visitors)?;
 
         return Ok(());
     }

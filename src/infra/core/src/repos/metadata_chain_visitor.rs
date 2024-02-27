@@ -50,12 +50,15 @@ pub enum Decision {
 
 pub type MetadataBlockWithOptionalHashRef<'a> = (&'a MetadataBlock, Option<&'a Multihash>);
 
-#[async_trait::async_trait]
 pub trait MetadataChainVisitor: Sync + Send {
     fn visit(
         &mut self,
         block_with_optional_hash: MetadataBlockWithOptionalHashRef,
     ) -> Result<Decision, AppendError>;
+
+    fn finish(&mut self) -> Result<(), AppendError> {
+        Ok(())
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////

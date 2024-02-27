@@ -54,6 +54,7 @@ impl MetadataChainVisitor for ValidateSeedBlockOrderVisitor {
 #[derive(Default)]
 pub struct ValidatePrevBlockExistsVisitor {
     next_prev_block_hash: Option<Multihash>,
+    has_previous_block_processed: bool,
 }
 
 impl MetadataChainVisitor for ValidatePrevBlockExistsVisitor {
@@ -67,6 +68,8 @@ impl MetadataChainVisitor for ValidatePrevBlockExistsVisitor {
             return Ok(Decision::Next);
         };
 
+        self.has_previous_block_processed = true;
+
         if next_prev_block_hash != maybe_hash.unwrap() {
             return Err(
                 AppendValidationError::PrevBlockNotFound(BlockNotFoundError {
@@ -77,6 +80,21 @@ impl MetadataChainVisitor for ValidatePrevBlockExistsVisitor {
         }
 
         Ok(Decision::Stop)
+    }
+
+    fn finish(&mut self) -> Result<(), AppendError> {
+        if self.has_previous_block_processed {
+            Ok(())
+        } else {
+            let next_prev_block_hash = self.next_prev_block_hash.take().unwrap();
+
+            Err(
+                AppendValidationError::PrevBlockNotFound(BlockNotFoundError {
+                    hash: next_prev_block_hash.clone(),
+                })
+                .into(),
+            )
+        }
     }
 }
 
@@ -310,6 +328,12 @@ impl MetadataChainVisitorBatchProcessor {
                 Ok(acc)
             },
         )
+    }
+
+    pub fn finish(visitors: BoxedVisitors) -> Result<(), AppendError> {
+        visitors
+            .into_iter()
+            .try_for_each(|mut visitor| visitor.finish())
     }
 
     fn apply_decision(left_decision: Decision, right_decision: Decision) -> Decision {
