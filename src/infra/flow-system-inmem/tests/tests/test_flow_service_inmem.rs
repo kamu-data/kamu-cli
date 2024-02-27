@@ -2781,7 +2781,7 @@ async fn test_batching_condition_with_2_inputs() {
             harness.now_datetime(),
             foo_id.clone(),
             DatasetFlowType::Ingest,
-            Duration::milliseconds(40).into(),
+            Duration::milliseconds(80).into(),
         )
         .await;
 
@@ -2790,7 +2790,7 @@ async fn test_batching_condition_with_2_inputs() {
             harness.now_datetime(),
             bar_id.clone(),
             DatasetFlowType::Ingest,
-            Duration::milliseconds(60).into(),
+            Duration::milliseconds(120).into(),
         )
         .await;
 
@@ -2799,7 +2799,7 @@ async fn test_batching_condition_with_2_inputs() {
             harness.now_datetime(),
             baz_id.clone(),
             DatasetFlowType::ExecuteTransform,
-            BatchingRule::new_checked(15, Duration::milliseconds(100)).unwrap(),
+            BatchingRule::new_checked(15, Duration::milliseconds(200)).unwrap(),
         )
         .await;
 
@@ -2868,11 +2868,11 @@ async fn test_batching_condition_with_2_inputs() {
         });
         let task2_handle = task2_driver.run();
 
-        // Task 3: "foo" start running at 70ms, finish at 80ms
+        // Task 3: "foo" start running at 110ms, finish at 120ms
         let task3_driver = harness.task_driver(TaskDriverArgs {
           task_id: TaskID::new(3),
           dataset_id: Some(foo_id.clone()),
-          run_since_start: Duration::milliseconds(70),
+          run_since_start: Duration::milliseconds(110),
           finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
             pull_result: PullResult::Updated {
               old_head: Some(Multihash::from_digest_sha3_256(b"foo-new-slice")),
@@ -2882,11 +2882,11 @@ async fn test_batching_condition_with_2_inputs() {
         });
         let task3_handle = task3_driver.run();
 
-        // Task 4: "bar" start running at 100ms, finish at 110ms
+        // Task 4: "bar" start running at 160ms, finish at 170ms
         let task4_driver = harness.task_driver(TaskDriverArgs {
           task_id: TaskID::new(4),
           dataset_id: Some(bar_id.clone()),
-          run_since_start: Duration::milliseconds(100),
+          run_since_start: Duration::milliseconds(160),
           finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult{
             pull_result: PullResult::Updated {
               old_head: Some(Multihash::from_digest_sha3_256(b"bar-new-slice")),
@@ -2897,11 +2897,11 @@ async fn test_batching_condition_with_2_inputs() {
         });
         let task4_handle = task4_driver.run();
 
-        // Task 5: "foo" start running at 130ms, finish at 140ms
+        // Task 5: "foo" start running at 210ms, finish at 220ms
         let task5_driver = harness.task_driver(TaskDriverArgs {
           task_id: TaskID::new(5),
           dataset_id: Some(foo_id.clone()),
-          run_since_start: Duration::milliseconds(130),
+          run_since_start: Duration::milliseconds(210),
           finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
             pull_result: PullResult::Updated {
               old_head: Some(Multihash::from_digest_sha3_256(b"foo-new-slice")),
@@ -2911,11 +2911,11 @@ async fn test_batching_condition_with_2_inputs() {
         });
         let task5_handle = task5_driver.run();
 
-        // Task 6: "baz" start running at 150ms, finish at 160ms
+        // Task 6: "baz" start running at 230ms, finish at 240ms
         let task6_driver = harness.task_driver(TaskDriverArgs {
           task_id: TaskID::new(6),
           dataset_id: Some(baz_id.clone()),
-          run_since_start: Duration::milliseconds(150),
+          run_since_start: Duration::milliseconds(230),
           finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult{
             pull_result: PullResult::Updated {
               old_head: Some(Multihash::from_digest_sha3_256(b"baz-new-slice")),
@@ -2970,7 +2970,7 @@ async fn test_batching_condition_with_2_inputs() {
           "baz" ExecuteTransform:
             Flow ID = 2 Scheduled(task=2) AutoPolling
           "foo" Ingest:
-            Flow ID = 3 Queued(60ms) AutoPolling
+            Flow ID = 3 Queued(100ms) AutoPolling
             Flow ID = 0 Finished Success
 
         #4: +20ms:
@@ -2979,42 +2979,42 @@ async fn test_batching_condition_with_2_inputs() {
           "baz" ExecuteTransform:
             Flow ID = 2 Scheduled(task=2) AutoPolling
           "foo" Ingest:
-            Flow ID = 3 Queued(60ms) AutoPolling
+            Flow ID = 3 Queued(100ms) AutoPolling
             Flow ID = 0 Finished Success
 
         #5: +30ms:
           "bar" Ingest:
-            Flow ID = 4 Queued(90ms) AutoPolling
+            Flow ID = 4 Queued(150ms) AutoPolling
             Flow ID = 1 Finished Success
           "baz" ExecuteTransform:
             Flow ID = 2 Scheduled(task=2) AutoPolling
           "foo" Ingest:
-            Flow ID = 3 Queued(60ms) AutoPolling
+            Flow ID = 3 Queued(100ms) AutoPolling
             Flow ID = 0 Finished Success
 
         #6: +30ms:
           "bar" Ingest:
-            Flow ID = 4 Queued(90ms) AutoPolling
+            Flow ID = 4 Queued(150ms) AutoPolling
             Flow ID = 1 Finished Success
           "baz" ExecuteTransform:
             Flow ID = 2 Running(task=2)
           "foo" Ingest:
-            Flow ID = 3 Queued(60ms) AutoPolling
+            Flow ID = 3 Queued(100ms) AutoPolling
             Flow ID = 0 Finished Success
 
         #7: +40ms:
           "bar" Ingest:
-            Flow ID = 4 Queued(90ms) AutoPolling
+            Flow ID = 4 Queued(150ms) AutoPolling
             Flow ID = 1 Finished Success
           "baz" ExecuteTransform:
             Flow ID = 2 Finished Success
           "foo" Ingest:
-            Flow ID = 3 Queued(60ms) AutoPolling
+            Flow ID = 3 Queued(100ms) AutoPolling
             Flow ID = 0 Finished Success
 
-        #8: +60ms:
+        #8: +100ms:
           "bar" Ingest:
-            Flow ID = 4 Queued(90ms) AutoPolling
+            Flow ID = 4 Queued(150ms) AutoPolling
             Flow ID = 1 Finished Success
           "baz" ExecuteTransform:
             Flow ID = 2 Finished Success
@@ -3022,9 +3022,9 @@ async fn test_batching_condition_with_2_inputs() {
             Flow ID = 3 Scheduled(task=3) AutoPolling
             Flow ID = 0 Finished Success
 
-        #9: +70ms:
+        #9: +110ms:
           "bar" Ingest:
-            Flow ID = 4 Queued(90ms) AutoPolling
+            Flow ID = 4 Queued(150ms) AutoPolling
             Flow ID = 1 Finished Success
           "baz" ExecuteTransform:
             Flow ID = 2 Finished Success
@@ -3032,138 +3032,138 @@ async fn test_batching_condition_with_2_inputs() {
             Flow ID = 3 Running(task=3)
             Flow ID = 0 Finished Success
 
-        #10: +80ms:
+        #10: +120ms:
           "bar" Ingest:
-            Flow ID = 4 Queued(90ms) AutoPolling
+            Flow ID = 4 Queued(150ms) AutoPolling
             Flow ID = 1 Finished Success
           "baz" ExecuteTransform:
-            Flow ID = 5 Queued(180ms) Input(foo) Batching(15, until=180ms)
+            Flow ID = 5 Queued(320ms) Input(foo) Batching(15, until=320ms)
             Flow ID = 2 Finished Success
           "foo" Ingest:
-            Flow ID = 6 Queued(120ms) AutoPolling
+            Flow ID = 6 Queued(200ms) AutoPolling
             Flow ID = 3 Finished Success
             Flow ID = 0 Finished Success
 
-        #11: +90ms:
+        #11: +150ms:
           "bar" Ingest:
             Flow ID = 4 Scheduled(task=4) AutoPolling
             Flow ID = 1 Finished Success
           "baz" ExecuteTransform:
-            Flow ID = 5 Queued(180ms) Input(foo) Batching(15, until=180ms)
+            Flow ID = 5 Queued(320ms) Input(foo) Batching(15, until=320ms)
             Flow ID = 2 Finished Success
           "foo" Ingest:
-            Flow ID = 6 Queued(120ms) AutoPolling
+            Flow ID = 6 Queued(200ms) AutoPolling
             Flow ID = 3 Finished Success
             Flow ID = 0 Finished Success
 
-        #12: +100ms:
+        #12: +160ms:
           "bar" Ingest:
             Flow ID = 4 Running(task=4)
             Flow ID = 1 Finished Success
           "baz" ExecuteTransform:
-            Flow ID = 5 Queued(180ms) Input(foo) Batching(15, until=180ms)
+            Flow ID = 5 Queued(320ms) Input(foo) Batching(15, until=320ms)
             Flow ID = 2 Finished Success
           "foo" Ingest:
-            Flow ID = 6 Queued(120ms) AutoPolling
+            Flow ID = 6 Queued(200ms) AutoPolling
             Flow ID = 3 Finished Success
             Flow ID = 0 Finished Success
 
-        #13: +110ms:
+        #13: +170ms:
           "bar" Ingest:
-            Flow ID = 7 Queued(170ms) AutoPolling
+            Flow ID = 7 Queued(290ms) AutoPolling
             Flow ID = 4 Finished Success
             Flow ID = 1 Finished Success
           "baz" ExecuteTransform:
-            Flow ID = 5 Queued(180ms) Input(foo) Batching(15, until=180ms)
+            Flow ID = 5 Queued(320ms) Input(foo) Batching(15, until=320ms)
             Flow ID = 2 Finished Success
           "foo" Ingest:
-            Flow ID = 6 Queued(120ms) AutoPolling
+            Flow ID = 6 Queued(200ms) AutoPolling
             Flow ID = 3 Finished Success
             Flow ID = 0 Finished Success
 
-        #14: +120ms:
+        #14: +200ms:
           "bar" Ingest:
-            Flow ID = 7 Queued(170ms) AutoPolling
+            Flow ID = 7 Queued(290ms) AutoPolling
             Flow ID = 4 Finished Success
             Flow ID = 1 Finished Success
           "baz" ExecuteTransform:
-            Flow ID = 5 Queued(180ms) Input(foo) Batching(15, until=180ms)
+            Flow ID = 5 Queued(320ms) Input(foo) Batching(15, until=320ms)
             Flow ID = 2 Finished Success
           "foo" Ingest:
             Flow ID = 6 Scheduled(task=5) AutoPolling
             Flow ID = 3 Finished Success
             Flow ID = 0 Finished Success
 
-        #15: +130ms:
+        #15: +210ms:
           "bar" Ingest:
-            Flow ID = 7 Queued(170ms) AutoPolling
+            Flow ID = 7 Queued(290ms) AutoPolling
             Flow ID = 4 Finished Success
             Flow ID = 1 Finished Success
           "baz" ExecuteTransform:
-            Flow ID = 5 Queued(180ms) Input(foo) Batching(15, until=180ms)
+            Flow ID = 5 Queued(320ms) Input(foo) Batching(15, until=320ms)
             Flow ID = 2 Finished Success
           "foo" Ingest:
             Flow ID = 6 Running(task=5)
             Flow ID = 3 Finished Success
             Flow ID = 0 Finished Success
 
-        #16: +140ms:
+        #16: +220ms:
           "bar" Ingest:
-            Flow ID = 7 Queued(170ms) AutoPolling
+            Flow ID = 7 Queued(290ms) AutoPolling
             Flow ID = 4 Finished Success
             Flow ID = 1 Finished Success
           "baz" ExecuteTransform:
-            Flow ID = 5 Queued(140ms) Input(foo) Batching(15, until=180ms)
+            Flow ID = 5 Queued(220ms) Input(foo) Batching(15, until=320ms)
             Flow ID = 2 Finished Success
           "foo" Ingest:
-            Flow ID = 8 Queued(180ms) AutoPolling
+            Flow ID = 8 Queued(300ms) AutoPolling
             Flow ID = 6 Finished Success
             Flow ID = 3 Finished Success
             Flow ID = 0 Finished Success
 
-        #17: +140ms:
+        #17: +220ms:
           "bar" Ingest:
-            Flow ID = 7 Queued(170ms) AutoPolling
+            Flow ID = 7 Queued(290ms) AutoPolling
             Flow ID = 4 Finished Success
             Flow ID = 1 Finished Success
           "baz" ExecuteTransform:
             Flow ID = 5 Scheduled(task=6) Input(foo)
             Flow ID = 2 Finished Success
           "foo" Ingest:
-            Flow ID = 8 Queued(180ms) AutoPolling
+            Flow ID = 8 Queued(300ms) AutoPolling
             Flow ID = 6 Finished Success
             Flow ID = 3 Finished Success
             Flow ID = 0 Finished Success
 
-        #18: +150ms:
+        #18: +230ms:
           "bar" Ingest:
-            Flow ID = 7 Queued(170ms) AutoPolling
+            Flow ID = 7 Queued(290ms) AutoPolling
             Flow ID = 4 Finished Success
             Flow ID = 1 Finished Success
           "baz" ExecuteTransform:
             Flow ID = 5 Running(task=6)
             Flow ID = 2 Finished Success
           "foo" Ingest:
-            Flow ID = 8 Queued(180ms) AutoPolling
+            Flow ID = 8 Queued(300ms) AutoPolling
             Flow ID = 6 Finished Success
             Flow ID = 3 Finished Success
             Flow ID = 0 Finished Success
 
-        #19: +160ms:
+        #19: +240ms:
           "bar" Ingest:
-            Flow ID = 7 Queued(170ms) AutoPolling
+            Flow ID = 7 Queued(290ms) AutoPolling
             Flow ID = 4 Finished Success
             Flow ID = 1 Finished Success
           "baz" ExecuteTransform:
             Flow ID = 5 Finished Success
             Flow ID = 2 Finished Success
           "foo" Ingest:
-            Flow ID = 8 Queued(180ms) AutoPolling
+            Flow ID = 8 Queued(300ms) AutoPolling
             Flow ID = 6 Finished Success
             Flow ID = 3 Finished Success
             Flow ID = 0 Finished Success
 
-        #20: +170ms:
+        #20: +290ms:
           "bar" Ingest:
             Flow ID = 7 Scheduled(task=7) AutoPolling
             Flow ID = 4 Finished Success
@@ -3172,12 +3172,12 @@ async fn test_batching_condition_with_2_inputs() {
             Flow ID = 5 Finished Success
             Flow ID = 2 Finished Success
           "foo" Ingest:
-            Flow ID = 8 Queued(180ms) AutoPolling
+            Flow ID = 8 Queued(300ms) AutoPolling
             Flow ID = 6 Finished Success
             Flow ID = 3 Finished Success
             Flow ID = 0 Finished Success
 
-        #21: +180ms:
+        #21: +300ms:
           "bar" Ingest:
             Flow ID = 7 Scheduled(task=7) AutoPolling
             Flow ID = 4 Finished Success
