@@ -290,10 +290,15 @@ impl FlowServiceInMemory {
         let flow_run_stats = self.flow_run_stats(flow_key).await?;
 
         // Flows may not be attempted more frequent than mandatory throttling period.
-        // If flow has never run before, let it go without restriction
-        let throttling_boundary_time = flow_run_stats.last_attempt_time.map_or(trigger_time, |t| {
-            t + self.run_config.mandatory_throttling_period
-        });
+        // If flow has never run before, let it go without restriction.
+        let mut throttling_boundary_time =
+            flow_run_stats.last_attempt_time.map_or(trigger_time, |t| {
+                t + self.run_config.mandatory_throttling_period
+            });
+        // It's also possible we are waiting for some start condition much longer..
+        if throttling_boundary_time < trigger_time {
+            throttling_boundary_time = trigger_time;
+        }
 
         // Is a pending flow present for this config?
         match self.find_pending_flow(flow_key) {
@@ -310,19 +315,20 @@ impl FlowServiceInMemory {
                 }
 
                 // Evaluate batching rule, if defined, and still waiting
-                let batching_gate_pass = if flow.status() == FlowStatus::Waiting
+                let maybe_batching_finish_time = if flow.status() == FlowStatus::Waiting
                     && let Some(batching_rule) = maybe_batching_rule
                 {
                     // Stop if batching condition not satisfied
                     self.evaluate_flow_batching_rule(trigger_time, &mut flow, batching_rule)
-                        .await?
+                        .await
+                        .int_err()?
                 } else {
-                    true
+                    Some(trigger_time)
                 };
 
                 // Evaluate throttling condition, if batching condition passed
-                if batching_gate_pass {
-                    // Is new time earlier than previously planned?
+                if let Some(batching_finish_time) = maybe_batching_finish_time {
+                    // Is new time earlier than planned?
                     if throttling_boundary_time
                         < flow
                             .timing
@@ -335,7 +341,7 @@ impl FlowServiceInMemory {
                             .int_err()?;
 
                         // Indicate throttling activity
-                        if throttling_boundary_time > trigger_time {
+                        if throttling_boundary_time > batching_finish_time {
                             flow.set_relevant_start_condition(
                                 self.time_source.now(),
                                 FlowStartCondition::Throttling(FlowStartConditionThrottling {
@@ -357,23 +363,26 @@ impl FlowServiceInMemory {
                 let mut flow = self.make_new_flow(flow_key.clone(), trigger).await?;
 
                 // Evaluate batching rule, if defined
-                let batching_gate_pass = if let Some(batching_rule) = maybe_batching_rule {
+                let maybe_batching_finish_time = if let Some(batching_rule) = maybe_batching_rule {
                     // Stop if batching condition not satisfied
                     self.evaluate_flow_batching_rule(trigger_time, &mut flow, batching_rule)
                         .await?
                 } else {
-                    true
+                    Some(trigger_time)
                 };
 
                 // Evaluate throttling condition, if batching condition passed
-                if batching_gate_pass {
-                    // Next activation time dependds on:
+                if let Some(batching_finish_time) = maybe_batching_finish_time {
+                    // Next activation time depends on:
                     //  - last success time, if ever launched
+                    //  - batching condition, if defined
                     //  - schedule, if defined
                     // but in any case, may not be less than throttling boundary
                     let naive_next_activation_time = new_activation_time_fn(&flow_run_stats);
-                    let next_activation_time =
-                        std::cmp::max(throttling_boundary_time, naive_next_activation_time);
+                    let next_activation_time = std::cmp::max(
+                        throttling_boundary_time,
+                        std::cmp::max(batching_finish_time, naive_next_activation_time),
+                    );
                     self.enqueue_flow(flow.flow_id, next_activation_time)?;
                     flow.activate_at_time(self.time_source.now(), next_activation_time)
                         .int_err()?;
@@ -401,7 +410,7 @@ impl FlowServiceInMemory {
         evaluation_time: DateTime<Utc>,
         flow: &mut Flow,
         batching_rule: &BatchingRule,
-    ) -> Result<bool, InternalError> {
+    ) -> Result<Option<DateTime<Utc>>, InternalError> {
         match self
             .support_strategies_by_type
             .get(&flow.flow_key.get_type())
@@ -427,17 +436,39 @@ impl FlowServiceInMemory {
                     .int_err()?;
                 }
 
-                // If batching rule is satisfied, clear the starting condition
-                if evaluation.satisfied {
+                let maybe_batching_finish_time = if evaluation.satisfied {
+                    // If batching rule is satisfied =>
+                    //  - clear the starting condition
+                    //  - indicate immediate readiness
                     flow.clear_start_condition(evaluation_time).int_err()?;
+                    Some(evaluation_time)
+                } else if evaluation.accumulated_something() {
+                    // If at least something was accumulated =>
+                    //   indicate readiness at deadline time
+                    Some(evaluation.batching_deadline)
+                } else {
+                    // Not ready
+                    None
+                };
+
+                // If batching finish time is clear, activate the flow not later than this time
+                if let Some(batching_finish_time) = maybe_batching_finish_time {
+                    let should_activate = match flow.timing.activate_at {
+                        Some(activate_at) => activate_at > batching_finish_time,
+                        None => true,
+                    };
+                    if should_activate {
+                        flow.activate_at_time(self.time_source.now(), batching_finish_time)
+                            .int_err()?;
+                        self.enqueue_flow(flow.flow_id, batching_finish_time)?;
+                    }
                 }
 
-                // Stop if batching rule not satisfied
-                Ok(evaluation.satisfied)
+                Ok(maybe_batching_finish_time)
             }
 
             // Unrelated flow type
-            None => Ok(true),
+            None => Ok(None),
         }
     }
 

@@ -44,4 +44,10 @@ pub(crate) struct BatchingRuleEvaluation {
     pub satisfied: bool,
 }
 
+impl BatchingRuleEvaluation {
+    pub(crate) fn accumulated_something(&self) -> bool {
+        self.accumulated_records_count > 0 || self.watermark_modified
+    }
+}
+
 /////////////////////////////////////////////////////////////////////////////////////////
