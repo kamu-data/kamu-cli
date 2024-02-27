@@ -314,18 +314,22 @@ impl FlowServiceInMemory {
                     flow.add_trigger(trigger_time, trigger).int_err()?;
                 }
 
-                // Evaluate batching rule, if defined, and still waiting
-                if flow.status() == FlowStatus::Waiting
-                    && let Some(batching_rule) = maybe_batching_rule
-                {
-                    self.evaluate_flow_batching_rule(
-                        trigger_time,
-                        &mut flow,
-                        batching_rule,
-                        throttling_boundary_time,
-                    )
-                    .await
-                    .int_err()?;
+                // Evaluate batching rule, if defined
+                if let Some(batching_rule) = maybe_batching_rule {
+                    // Is this rule still waited?
+                    if matches!(flow.start_condition, Some(FlowStartCondition::Batching(_))) {
+                        self.evaluate_flow_batching_rule(
+                            trigger_time,
+                            &mut flow,
+                            batching_rule,
+                            throttling_boundary_time,
+                        )
+                        .await
+                        .int_err()?;
+                    } else {
+                        // Skip, the flow is scheduled already or waits for
+                        // something else
+                    }
                 } else {
                     // Evaluate throttling condition, if batching condition passed
                     // Is new time earlier than planned?
@@ -454,13 +458,8 @@ impl FlowServiceInMemory {
 
                     // If batching is over, it's start condition is no longer valid.
                     // However, set throttling condition, if it applies
-                    if evaluation.satisfied {
-                        if throttling_boundary_time > batching_finish_time {
-                            self.indicate_throttling_activity(flow)?;
-                        } else {
-                            flow.clear_start_condition(self.time_source.now())
-                                .int_err()?;
-                        }
+                    if evaluation.satisfied && throttling_boundary_time > batching_finish_time {
+                        self.indicate_throttling_activity(flow)?;
                     }
                 }
 
