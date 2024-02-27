@@ -1914,27 +1914,27 @@ async fn test_batching_condition_records_reached() {
 
     let mut mock_dataset_changes = MockDatasetChangesService::new();
     mock_dataset_changes
-      .expect_get_increment_since()
-      .times(1)
-      .in_sequence(&mut seq)
-      .returning(|_,_|
-        Ok(DatasetIntervalIncrement {
-          num_blocks: 1,
-          num_records: 5,
-          updated_watermark: None,
-        })
-    );
+        .expect_get_increment_since()
+        .times(1)
+        .in_sequence(&mut seq)
+        .returning(|_, _| {
+            Ok(DatasetIntervalIncrement {
+                num_blocks: 1,
+                num_records: 5,
+                updated_watermark: None,
+            })
+        });
     mock_dataset_changes
-      .expect_get_increment_since()
-      .times(1)
-      .in_sequence(&mut seq)
-      .returning(|_,_|
-        Ok(DatasetIntervalIncrement {
-          num_blocks: 2,
-          num_records: 10,
-          updated_watermark: None,
-        })
-    );
+        .expect_get_increment_since()
+        .times(1)
+        .in_sequence(&mut seq)
+        .returning(|_, _| {
+            Ok(DatasetIntervalIncrement {
+                num_blocks: 2,
+                num_records: 10,
+                updated_watermark: None,
+            })
+        });
 
     let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
         mock_dataset_changes: Some(mock_dataset_changes),
@@ -2041,7 +2041,7 @@ async fn test_batching_condition_records_reached() {
 
           })))),
         });
-        let task3_handle = task3_driver.run();        
+        let task3_handle = task3_driver.run();
 
         // Task 4: "bar" start running at 170ms, finish at 180ms
         let task4_driver = harness.task_driver(TaskDriverArgs {
@@ -2056,7 +2056,7 @@ async fn test_batching_condition_records_reached() {
 
           })))),
         });
-        let task4_handle = task4_driver.run();        
+        let task4_handle = task4_driver.run();
 
         // Main simulation script
         let main_handle = async {
@@ -2068,11 +2068,10 @@ async fn test_batching_condition_records_reached() {
     }
     .unwrap();
 
-
     pretty_assertions::assert_eq!(
-      format!("{}", test_flow_listener.as_ref()),
-      indoc::indoc!(
-          r#"
+        format!("{}", test_flow_listener.as_ref()),
+        indoc::indoc!(
+            r#"
             #0: +0ms:
               "bar" ExecuteTransform:
                 Flow ID = 1 Queued(0ms) AutoPolling
@@ -2204,8 +2203,8 @@ async fn test_batching_condition_records_reached() {
                 Flow ID = 0 Finished Success
 
       "#
-      )
-  );
+        )
+    );
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -2216,16 +2215,16 @@ async fn test_batching_condition_timeout() {
 
     let mut mock_dataset_changes = MockDatasetChangesService::new();
     mock_dataset_changes
-      .expect_get_increment_since()
-      .times(1)
-      .in_sequence(&mut seq)
-      .returning(|_,_|
-        Ok(DatasetIntervalIncrement {
-          num_blocks: 1,
-          num_records: 5,
-          updated_watermark: None,
-        })
-    );
+        .expect_get_increment_since()
+        .times(1)
+        .in_sequence(&mut seq)
+        .returning(|_, _| {
+            Ok(DatasetIntervalIncrement {
+                num_blocks: 1,
+                num_records: 5,
+                updated_watermark: None,
+            })
+        });
 
     let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
         mock_dataset_changes: Some(mock_dataset_changes),
@@ -2334,7 +2333,7 @@ async fn test_batching_condition_timeout() {
 
           })))),
         });
-        let task4_handle = task4_driver.run();        
+        let task4_handle = task4_driver.run();
 
         // Main simulation script
         let main_handle = async {
@@ -2346,11 +2345,10 @@ async fn test_batching_condition_timeout() {
     }
     .unwrap();
 
-
     pretty_assertions::assert_eq!(
-      format!("{}", test_flow_listener.as_ref()),
-      indoc::indoc!(
-          r#"
+        format!("{}", test_flow_listener.as_ref()),
+        indoc::indoc!(
+            r#"
             #0: +0ms:
               "bar" ExecuteTransform:
                 Flow ID = 1 Queued(0ms) AutoPolling
@@ -2450,8 +2448,8 @@ async fn test_batching_condition_timeout() {
                 Flow ID = 0 Finished Success
 
       "#
-      )
-  );
+        )
+    );
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -2462,16 +2460,16 @@ async fn test_batching_condition_watermark() {
 
     let mut mock_dataset_changes = MockDatasetChangesService::new();
     mock_dataset_changes
-      .expect_get_increment_since()
-      .times(1)
-      .in_sequence(&mut seq)
-      .returning(|_,_|
-        Ok(DatasetIntervalIncrement {
-          num_blocks: 1,
-          num_records: 0,  // no records, just watermark
-          updated_watermark: Some(Utc::now()),
-        })
-    );
+        .expect_get_increment_since()
+        .times(1)
+        .in_sequence(&mut seq)
+        .returning(|_, _| {
+            Ok(DatasetIntervalIncrement {
+                num_blocks: 1,
+                num_records: 0, // no records, just watermark
+                updated_watermark: Some(Utc::now()),
+            })
+        });
 
     let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
         mock_dataset_changes: Some(mock_dataset_changes),
@@ -2580,7 +2578,7 @@ async fn test_batching_condition_watermark() {
 
           })))),
         });
-        let task4_handle = task4_driver.run();        
+        let task4_handle = task4_driver.run();
 
         // Main simulation script
         let main_handle = async {
@@ -2593,9 +2591,9 @@ async fn test_batching_condition_watermark() {
     .unwrap();
 
     pretty_assertions::assert_eq!(
-      format!("{}", test_flow_listener.as_ref()),
-      indoc::indoc!(
-        r#"
+        format!("{}", test_flow_listener.as_ref()),
+        indoc::indoc!(
+            r#"
         #0: +0ms:
           "bar" ExecuteTransform:
             Flow ID = 1 Queued(0ms) AutoPolling
@@ -2634,7 +2632,7 @@ async fn test_batching_condition_watermark() {
           "foo" Ingest:
             Flow ID = 2 Queued(60ms) AutoPolling
             Flow ID = 0 Finished Success
- 
+
         #6: +60ms:
           "bar" ExecuteTransform:
             Flow ID = 1 Finished Success
@@ -2695,8 +2693,8 @@ async fn test_batching_condition_watermark() {
             Flow ID = 0 Finished Success
 
         "#
-      )
-  );
+        )
+    );
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -2708,64 +2706,64 @@ async fn test_batching_condition_with_2_inputs() {
     let mut mock_dataset_changes = MockDatasetChangesService::new();
     // 'foo': first reading of task 3 after 'foo' task 3
     mock_dataset_changes
-      .expect_get_increment_since()
-      .times(1)
-      .in_sequence(&mut seq)
-      .returning(|_,_|
-        Ok(DatasetIntervalIncrement {
-          num_blocks: 1,
-          num_records: 5,
-          updated_watermark: None,
-        })
-    );
+        .expect_get_increment_since()
+        .times(1)
+        .in_sequence(&mut seq)
+        .returning(|_, _| {
+            Ok(DatasetIntervalIncrement {
+                num_blocks: 1,
+                num_records: 5,
+                updated_watermark: None,
+            })
+        });
     // 'foo': Second reading of task 3 after 'bar' task 4
     mock_dataset_changes
-      .expect_get_increment_since()
-      .times(1)
-      .in_sequence(&mut seq)
-      .returning(|_,_|
-        Ok(DatasetIntervalIncrement {
-          num_blocks: 1,
-          num_records: 5,
-          updated_watermark: None,
-        })
-    );
+        .expect_get_increment_since()
+        .times(1)
+        .in_sequence(&mut seq)
+        .returning(|_, _| {
+            Ok(DatasetIntervalIncrement {
+                num_blocks: 1,
+                num_records: 5,
+                updated_watermark: None,
+            })
+        });
     // 'bar' : First reading of task 4 after task 4
     mock_dataset_changes
-      .expect_get_increment_since()
-      .times(1)
-      .in_sequence(&mut seq)
-      .returning(|_,_|
-        Ok(DatasetIntervalIncrement {
-          num_blocks: 1,
-          num_records: 7,
-          updated_watermark: None,
-        })
-    );
+        .expect_get_increment_since()
+        .times(1)
+        .in_sequence(&mut seq)
+        .returning(|_, _| {
+            Ok(DatasetIntervalIncrement {
+                num_blocks: 1,
+                num_records: 7,
+                updated_watermark: None,
+            })
+        });
     // 'foo': third reading of tasks 3, 5 after foo task 5
     mock_dataset_changes
-      .expect_get_increment_since()
-      .times(1)
-      .in_sequence(&mut seq)
-      .returning(|_,_|
-        Ok(DatasetIntervalIncrement {
-          num_blocks: 2,
-          num_records: 8,
-          updated_watermark: None,
-        })
-    );        
+        .expect_get_increment_since()
+        .times(1)
+        .in_sequence(&mut seq)
+        .returning(|_, _| {
+            Ok(DatasetIntervalIncrement {
+                num_blocks: 2,
+                num_records: 8,
+                updated_watermark: None,
+            })
+        });
     // 'bar' : Second reading of task 4 after foo task 5
     mock_dataset_changes
-      .expect_get_increment_since()
-      .times(1)
-      .in_sequence(&mut seq)
-      .returning(|_,_|
-        Ok(DatasetIntervalIncrement {
-          num_blocks: 1,
-          num_records: 7,
-          updated_watermark: None,
-        })
-    );    
+        .expect_get_increment_since()
+        .times(1)
+        .in_sequence(&mut seq)
+        .returning(|_, _| {
+            Ok(DatasetIntervalIncrement {
+                num_blocks: 1,
+                num_records: 7,
+                updated_watermark: None,
+            })
+        });
 
     let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
         mock_dataset_changes: Some(mock_dataset_changes),
@@ -2794,7 +2792,7 @@ async fn test_batching_condition_with_2_inputs() {
             DatasetFlowType::Ingest,
             Duration::milliseconds(60).into(),
         )
-        .await;      
+        .await;
 
     harness
         .set_dataset_flow_batching_rule(
@@ -2897,7 +2895,7 @@ async fn test_batching_condition_with_2_inputs() {
 
           })))),
         });
-        let task4_handle = task4_driver.run();        
+        let task4_handle = task4_driver.run();
 
         // Task 5: "foo" start running at 130ms, finish at 140ms
         let task5_driver = harness.task_driver(TaskDriverArgs {
@@ -2939,9 +2937,9 @@ async fn test_batching_condition_with_2_inputs() {
     .unwrap();
 
     pretty_assertions::assert_eq!(
-      format!("{}", test_flow_listener.as_ref()),
-      indoc::indoc!(
-        r#"
+        format!("{}", test_flow_listener.as_ref()),
+        indoc::indoc!(
+            r#"
         #0: +0ms:
           "bar" Ingest:
             Flow ID = 1 Queued(0ms) AutoPolling
@@ -3194,8 +3192,8 @@ async fn test_batching_condition_with_2_inputs() {
             Flow ID = 0 Finished Success
 
         "#
-      )
-  );
+        )
+    );
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
