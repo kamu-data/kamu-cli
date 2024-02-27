@@ -541,8 +541,72 @@ async fn test_crud_batching_derived_dataset() {
             }
         })
     );
+}
 
-    // TODO: add validation tests
+////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_batching_config_validation() {
+    let harness = FlowConfigHarness::new();
+
+    harness.create_root_dataset().await;
+    let create_derived_result = harness.create_derived_dataset().await;
+
+    let schema = kamu_adapter_graphql::schema_quiet();
+
+    for test_case in [
+        (
+            0,
+            30,
+            "MINUTES",
+            "Minimum records to await must be a positive number",
+        ),
+        (
+            1,
+            0,
+            "MINUTES",
+            "Minimum interval to await should be positive",
+        ),
+        (
+            1,
+            25,
+            "HOURS",
+            "Maximum interval to await should not exceed 24 hours",
+        ),
+    ] {
+        let mutation_code = FlowConfigHarness::set_config_batching_mutation(
+            &create_derived_result.dataset_handle.id,
+            "EXECUTE_TRANSFORM",
+            true,
+            test_case.0,
+            (test_case.1, test_case.2),
+        );
+
+        let response = schema
+            .execute(
+                async_graphql::Request::new(mutation_code.clone())
+                    .data(harness.catalog_authorized.clone()),
+            )
+            .await;
+        assert!(response.is_ok(), "{response:?}");
+        assert_eq!(
+            response.data,
+            value!({
+                    "datasets": {
+                        "byId": {
+                            "flows": {
+                                "configs": {
+                                    "setConfigBatching": {
+                                        "__typename": "FlowInvalidBatchingConfig",
+                                        "message": test_case.3,
+                                    }
+                                }
+                            }
+                        }
+                    }
+            })
+        );
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
