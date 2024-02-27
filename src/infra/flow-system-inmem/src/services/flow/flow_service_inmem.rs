@@ -354,7 +354,9 @@ impl FlowServiceInMemory {
             // Otherwise, initiate a new flow, and enqueue it in the time wheel
             None => {
                 // Initiate new flow
-                let mut flow = self.make_new_flow(flow_key.clone(), trigger).await?;
+                let mut flow = self
+                    .make_new_flow(trigger_time, flow_key.clone(), trigger)
+                    .await?;
 
                 // Evaluate batching rule, if defined
                 if let Some(batching_rule) = maybe_batching_rule {
@@ -489,11 +491,12 @@ impl FlowServiceInMemory {
     #[tracing::instrument(level = "trace", skip_all, fields(?flow_key, ?trigger))]
     async fn make_new_flow(
         &self,
+        creation_time: DateTime<Utc>,
         flow_key: FlowKey,
         trigger: FlowTrigger,
     ) -> Result<Flow, InternalError> {
         let flow = Flow::new(
-            self.time_source.now(),
+            creation_time,
             self.flow_event_store.new_flow_id(),
             flow_key,
             trigger,
