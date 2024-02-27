@@ -145,27 +145,35 @@ impl DatasetChangesServiceImpl {
         {
             // Did we have any head before?
             if let Some(old_head) = &old_head {
-                // Yes, so try locating the previous watermark - earliest different
-                // watermark
-                let prev_different_watermark = dataset
+                // Yes, so try locating the previous watermark containing node
+                let previous_nearest_watermark = dataset
                     .as_metadata_chain()
                     .iter_blocks_interval(old_head, None, false)
                     .filter_data_stream_blocks()
-                    .filter_map_ok(|(_, b)| {
-                        b.event.new_watermark.and_then(|new_watermark| {
-                            if new_watermark != *latest_watermark_ref {
-                                Some(new_watermark)
-                            } else {
-                                None
-                            }
-                        })
-                    })
+                    .filter_map_ok(|(_, b)| b.event.new_watermark)
                     .try_first()
                     .await
                     .int_err()?;
-                updated_watermark = prev_different_watermark.or(latest_watermark);
+
+                // The "latest" watermark is only an update, if we can find a different
+                // watermark before the searched interval, or if it's a first watermark
+                updated_watermark = if let Some(previous_nearest_watermark) =
+                    previous_nearest_watermark
+                {
+                    // There is previous watermark
+                    if previous_nearest_watermark != *latest_watermark_ref {
+                        // It's different from what we've found on the interval, so it's an update
+                        latest_watermark
+                    } else {
+                        // It's the same as what we've found on the interval, so there is no update
+                        None
+                    }
+                } else {
+                    // There was no watermark before, so it's definitely an update
+                    latest_watermark
+                };
             } else {
-                // It's a first pull, the latest watermark is an update
+                // It's a first pull, the latest watermark is an update, if earlier found
                 updated_watermark = latest_watermark;
             }
         }

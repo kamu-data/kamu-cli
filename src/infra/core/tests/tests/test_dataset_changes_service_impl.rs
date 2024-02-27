@@ -26,6 +26,7 @@ use kamu_core::{
 use opendatafabric::{
     Checkpoint,
     DatasetAlias,
+    DatasetID,
     DatasetKind,
     DatasetName,
     MetadataEvent,
@@ -164,7 +165,7 @@ async fn test_add_data_differences() {
         .await
         .unwrap();
 
-    let between_checks = [
+    let between_cases = [
         // SetPollingSource -> SetDataSchema
         (
             Some(commit_result_1.old_head.as_ref().unwrap()),
@@ -237,18 +238,11 @@ async fn test_add_data_differences() {
         ),
     ];
 
-    for (old_head, new_head, expected_increment) in between_checks {
-        assert_eq!(
-            harness
-                .dataset_changes_service
-                .get_increment_between(&foo_result.dataset_handle.id, old_head, new_head,)
-                .await
-                .unwrap(),
-            expected_increment
-        );
-    }
+    harness
+        .check_between_cases(&foo_result.dataset_handle.id, &between_cases)
+        .await;
 
-    let since_checks = [
+    let since_cases = [
         // Since beginning
         (
             None,
@@ -287,16 +281,9 @@ async fn test_add_data_differences() {
         ),
     ];
 
-    for (old_head, expected_increment) in since_checks {
-        assert_eq!(
-            harness
-                .dataset_changes_service
-                .get_increment_since(&foo_result.dataset_handle.id, old_head)
-                .await
-                .unwrap(),
-            expected_increment
-        );
-    }
+    harness
+        .check_since_cases(&foo_result.dataset_handle.id, &since_cases)
+        .await;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -367,7 +354,7 @@ async fn test_execute_transform_differences() {
         .await
         .unwrap();
 
-    let between_checks = [
+    let between_cases = [
         // SetTransform -> SetDataSchema
         (
             Some(commit_result_1.old_head.as_ref().unwrap()),
@@ -440,18 +427,11 @@ async fn test_execute_transform_differences() {
         ),
     ];
 
-    for (old_head, new_head, expected_increment) in between_checks {
-        assert_eq!(
-            harness
-                .dataset_changes_service
-                .get_increment_between(&bar_result.dataset_handle.id, old_head, new_head,)
-                .await
-                .unwrap(),
-            expected_increment
-        );
-    }
+    harness
+        .check_between_cases(&bar_result.dataset_handle.id, &between_cases)
+        .await;
 
-    let since_checks = [
+    let since_cases = [
         // Since beginning
         (
             None,
@@ -490,25 +470,328 @@ async fn test_execute_transform_differences() {
         ),
     ];
 
-    for (old_head, expected_increment) in since_checks {
-        assert_eq!(
-            harness
-                .dataset_changes_service
-                .get_increment_since(&bar_result.dataset_handle.id, old_head)
-                .await
-                .unwrap(),
-            expected_increment
-        );
-    }
+    harness
+        .check_since_cases(&bar_result.dataset_handle.id, &since_cases)
+        .await;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-// TODO:
-//  - more than 1 watermark on the interval => pick latest updated
-//  - had watermark earlier than interval:
-//       - updated within => pick updated
-//       - propagated older => pick nothing
+#[test_log::test(tokio::test)]
+async fn test_multiple_watermarks_within_interval() {
+    let harness = DatasetChangesHarness::new();
+    let foo_result = harness.create_root_dataset("foo").await;
+
+    let dataset = harness
+        .dataset_repo
+        .get_dataset(&foo_result.dataset_handle.as_local_ref())
+        .await
+        .unwrap();
+
+    // Commit SetDataSchema and 2 data nodes each having a watermark
+
+    let commit_result_1 = dataset
+        .commit_event(
+            MetadataEvent::SetDataSchema(MetadataFactory::set_data_schema().build()),
+            CommitOpts::default(),
+        )
+        .await
+        .unwrap();
+
+    let watermark_1_time = Utc::now();
+
+    let commit_result_2 = dataset
+        .commit_event(
+            MetadataEvent::AddData(
+                MetadataFactory::add_data()
+                    .some_new_data_with_offset(0, 9)
+                    .new_checkpoint(Some(Checkpoint {
+                        physical_hash: Multihash::from_digest_sha3_256(b"checkpoint-1"),
+                        size: 1,
+                    }))
+                    .new_watermark(Some(watermark_1_time))
+                    .some_new_source_state()
+                    .build(),
+            ),
+            CommitOpts {
+                check_object_refs: false,
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+
+    let watermark_2_time = Utc::now();
+
+    let commit_result_3 = dataset
+        .commit_event(
+            MetadataEvent::AddData(
+                MetadataFactory::add_data()
+                    .some_new_data_with_offset(10, 24)
+                    .prev_checkpoint(Some(Multihash::from_digest_sha3_256(b"checkpoint-1")))
+                    .new_checkpoint(Some(Checkpoint {
+                        physical_hash: Multihash::from_digest_sha3_256(b"checkpoint-2"),
+                        size: 1,
+                    }))
+                    .new_watermark(Some(watermark_2_time))
+                    .some_new_source_state()
+                    .build(),
+            ),
+            CommitOpts {
+                check_object_refs: false,
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+
+    let between_cases = [
+        // SetPollingSource -> SetDataSchema
+        (
+            Some(commit_result_1.old_head.as_ref().unwrap()),
+            &commit_result_1.new_head,
+            DatasetIntervalIncrement {
+                num_blocks: 1,
+                num_records: 0,
+                updated_watermark: None,
+            },
+        ),
+        // SetDataSchema -> AddData #1
+        (
+            Some(commit_result_2.old_head.as_ref().unwrap()),
+            &commit_result_2.new_head,
+            DatasetIntervalIncrement {
+                num_blocks: 1,
+                num_records: 10,
+                updated_watermark: Some(watermark_1_time),
+            },
+        ),
+        // AddData #1 -> AddData #2
+        (
+            Some(commit_result_3.old_head.as_ref().unwrap()),
+            &commit_result_3.new_head,
+            DatasetIntervalIncrement {
+                num_blocks: 1,
+                num_records: 15,
+                updated_watermark: Some(watermark_2_time),
+            },
+        ),
+        // Initial -> AddData #2
+        (
+            None,
+            &commit_result_3.new_head,
+            DatasetIntervalIncrement {
+                num_blocks: 5,
+                num_records: 25,
+                updated_watermark: Some(watermark_2_time),
+            },
+        ),
+    ];
+
+    harness
+        .check_between_cases(&foo_result.dataset_handle.id, &between_cases)
+        .await;
+
+    let since_cases = [
+        // Since beginning
+        (
+            None,
+            DatasetIntervalIncrement {
+                num_blocks: 5,
+                num_records: 25,
+                updated_watermark: Some(watermark_2_time),
+            },
+        ),
+        // Since AddData #1
+        (
+            Some(&commit_result_2.new_head),
+            DatasetIntervalIncrement {
+                num_blocks: 1,
+                num_records: 15,
+                updated_watermark: Some(watermark_2_time),
+            },
+        ),
+    ];
+
+    harness
+        .check_since_cases(&foo_result.dataset_handle.id, &since_cases)
+        .await;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_older_watermark_before_interval() {
+    let harness = DatasetChangesHarness::new();
+    let foo_result = harness.create_root_dataset("foo").await;
+
+    let dataset = harness
+        .dataset_repo
+        .get_dataset(&foo_result.dataset_handle.as_local_ref())
+        .await
+        .unwrap();
+
+    // Commit SetDataSchema and 3 data nodes, with #1,3 containing watermark
+
+    dataset
+        .commit_event(
+            MetadataEvent::SetDataSchema(MetadataFactory::set_data_schema().build()),
+            CommitOpts::default(),
+        )
+        .await
+        .unwrap();
+
+    let watermark_1_time = Utc::now();
+
+    let commit_result_2 = dataset
+        .commit_event(
+            MetadataEvent::AddData(
+                MetadataFactory::add_data()
+                    .some_new_data_with_offset(0, 9)
+                    .new_checkpoint(Some(Checkpoint {
+                        physical_hash: Multihash::from_digest_sha3_256(b"checkpoint-1"),
+                        size: 1,
+                    }))
+                    .new_watermark(Some(watermark_1_time))
+                    .some_new_source_state()
+                    .build(),
+            ),
+            CommitOpts {
+                check_object_refs: false,
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+
+    let commit_result_3 = dataset
+        .commit_event(
+            MetadataEvent::AddData(
+                MetadataFactory::add_data()
+                    .some_new_data_with_offset(10, 24)
+                    .prev_checkpoint(Some(Multihash::from_digest_sha3_256(b"checkpoint-1")))
+                    .new_checkpoint(Some(Checkpoint {
+                        physical_hash: Multihash::from_digest_sha3_256(b"checkpoint-2"),
+                        size: 1,
+                    }))
+                    .new_watermark(Some(watermark_1_time))
+                    .some_new_source_state()
+                    .build(),
+            ),
+            CommitOpts {
+                check_object_refs: false,
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+
+    let watermark_2_time = Utc::now();
+
+    let commit_result_4 = dataset
+        .commit_event(
+            MetadataEvent::AddData(
+                MetadataFactory::add_data()
+                    .some_new_data_with_offset(25, 36)
+                    .prev_checkpoint(Some(Multihash::from_digest_sha3_256(b"checkpoint-2")))
+                    .new_checkpoint(Some(Checkpoint {
+                        physical_hash: Multihash::from_digest_sha3_256(b"checkpoint-3"),
+                        size: 1,
+                    }))
+                    .new_watermark(Some(watermark_2_time))
+                    .some_new_source_state()
+                    .build(),
+            ),
+            CommitOpts {
+                check_object_refs: false,
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+
+    let between_cases = [
+        // SetDataSchema -> AddData #1
+        (
+            Some(commit_result_2.old_head.as_ref().unwrap()),
+            &commit_result_2.new_head,
+            DatasetIntervalIncrement {
+                num_blocks: 1,
+                num_records: 10,
+                updated_watermark: Some(watermark_1_time),
+            },
+        ),
+        // AddData #1 -> AddData #2
+        (
+            Some(commit_result_3.old_head.as_ref().unwrap()),
+            &commit_result_3.new_head,
+            DatasetIntervalIncrement {
+                num_blocks: 1,
+                num_records: 15,
+                updated_watermark: None,
+            },
+        ),
+        // AddData #2 -> AddData #3
+        (
+            Some(commit_result_4.old_head.as_ref().unwrap()),
+            &commit_result_4.new_head,
+            DatasetIntervalIncrement {
+                num_blocks: 1,
+                num_records: 12,
+                updated_watermark: Some(watermark_2_time),
+            },
+        ),
+        // Initial -> AddData #2
+        (
+            None,
+            &commit_result_3.new_head,
+            DatasetIntervalIncrement {
+                num_blocks: 5,
+                num_records: 25,
+                updated_watermark: Some(watermark_1_time),
+            },
+        ),
+        // Initial -> AddData #3
+        (
+            None,
+            &commit_result_4.new_head,
+            DatasetIntervalIncrement {
+                num_blocks: 6,
+                num_records: 37,
+                updated_watermark: Some(watermark_2_time),
+            },
+        ),
+    ];
+
+    harness
+        .check_between_cases(&foo_result.dataset_handle.id, &between_cases)
+        .await;
+
+    let since_cases = [
+        // Since beginning
+        (
+            None,
+            DatasetIntervalIncrement {
+                num_blocks: 6,
+                num_records: 37,
+                updated_watermark: Some(watermark_2_time),
+            },
+        ),
+        // Since AddData #1
+        (
+            Some(&commit_result_2.new_head),
+            DatasetIntervalIncrement {
+                num_blocks: 2,
+                num_records: 27,
+                updated_watermark: Some(watermark_2_time),
+            },
+        ),
+    ];
+
+    harness
+        .check_since_cases(&foo_result.dataset_handle.id, &since_cases)
+        .await;
+}
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -605,6 +888,40 @@ impl DatasetChangesHarness {
             )
             .await
             .unwrap()
+    }
+
+    async fn check_between_cases(
+        &self,
+        dataset_id: &DatasetID,
+        between_cases: &[(Option<&Multihash>, &Multihash, DatasetIntervalIncrement)],
+    ) {
+        for (index, (old_head, new_head, expected_increment)) in between_cases.iter().enumerate() {
+            assert_eq!(
+                self.dataset_changes_service
+                    .get_increment_between(dataset_id, *old_head, new_head,)
+                    .await
+                    .unwrap(),
+                *expected_increment,
+                "Checking between-case #{index}"
+            );
+        }
+    }
+
+    async fn check_since_cases(
+        &self,
+        dataset_id: &DatasetID,
+        since_cases: &[(Option<&Multihash>, DatasetIntervalIncrement)],
+    ) {
+        for (index, (old_head, expected_increment)) in since_cases.iter().enumerate() {
+            assert_eq!(
+                self.dataset_changes_service
+                    .get_increment_since(dataset_id, *old_head)
+                    .await
+                    .unwrap(),
+                *expected_increment,
+                "Checking since-case #{index}"
+            );
+        }
     }
 }
 
