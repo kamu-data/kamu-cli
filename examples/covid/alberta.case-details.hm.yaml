@@ -1,14 +1,14 @@
 kind: DatasetSnapshot
 version: 1
 content:
-  name: alberta.case-details.hm
+  name: covid19.alberta.case-details.hm
   kind: Derivative
   # List of metadata events that get dataset into its initial state
   metadata:
     - kind: SetTransform
       # References the datasets that will be used as sources of data.
       inputs:
-        - datasetRef: alberta.case-details
+        - datasetRef: covid19.alberta.case-details
       # Transformation that will be applied to produce new data
       transform:
         kind: Sql
@@ -33,7 +33,7 @@ content:
                  when age_group = '80+ years' then '80s'
                  else 'UNKNOWN' end as age_group,
             zone as location
-          from "alberta.case-details"
+          from "covid19.alberta.case-details"
     - kind: SetVocab
       eventTimeColumn: reported_date
     - kind: SetInfo

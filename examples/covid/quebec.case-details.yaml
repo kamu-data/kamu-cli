@@ -1,7 +1,7 @@
 kind: DatasetSnapshot
 version: 1
 content:
-  name: quebec.case-details
+  name: covid19.quebec.case-details
   kind: Root
   metadata:
     # Specifies the source of data that can be periodically polled to refresh the dataset

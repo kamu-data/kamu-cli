@@ -1,17 +1,17 @@
 kind: DatasetSnapshot
 version: 1
 content:
-  name: canada.case-details
+  name: covid19.canada.case-details
   kind: Derivative
   # List of metadata events that get dataset into its initial state
   metadata:
     - kind: SetTransform
       # References the datasets that will be used as sources of data.
       inputs:
-        - datasetRef: alberta.case-details.hm
-        - datasetRef: british-columbia.case-details.hm
-        - datasetRef: ontario.case-details.hm
-        - datasetRef: quebec.case-details.hm
+        - datasetRef: covid19.alberta.case-details.hm
+        - datasetRef: covid19.british-columbia.case-details.hm
+        - datasetRef: covid19.ontario.case-details.hm
+        - datasetRef: covid19.quebec.case-details.hm
       # Transformation that will be applied to produce new data
       transform:
         kind: Sql
@@ -23,7 +23,7 @@ content:
             reported_date,
             gender,
             location
-            FROM `alberta.case-details.hm`
+            FROM `covid19.alberta.case-details.hm`
           UNION ALL
           SELECT
             "BC" as province,
@@ -31,7 +31,7 @@ content:
             reported_date,
             gender,
             location
-            FROM `british-columbia.case-details.hm`
+            FROM `covid19.british-columbia.case-details.hm`
           UNION ALL
           SELECT
             "ON" as province,
@@ -39,7 +39,7 @@ content:
             reported_date,
             gender,
             location
-            FROM `ontario.case-details.hm`
+            FROM `covid19.ontario.case-details.hm`
           UNION ALL
           SELECT
             "QC" as province,
@@ -47,7 +47,7 @@ content:
             reported_date,
             gender,
             location
-            FROM `quebec.case-details.hm`
+            FROM `covid19.quebec.case-details.hm`
     - kind: SetVocab
       eventTimeColumn: reported_date
     - kind: SetInfo

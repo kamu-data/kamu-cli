@@ -1,7 +1,7 @@
 kind: DatasetSnapshot
 version: 1
 content:
-  name: ontario.case-details
+  name: covid19.ontario.case-details
   kind: Root
   metadata:
     - kind: SetPollingSource

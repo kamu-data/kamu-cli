@@ -1,7 +1,7 @@
 kind: DatasetSnapshot
 version: 1
 content:
-  name: british-columbia.case-details
+  name: covid19.british-columbia.case-details
   kind: root
   metadata:
     # Specifies the source of data that can be periodically polled to refresh the dataset
