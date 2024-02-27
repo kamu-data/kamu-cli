@@ -65,7 +65,7 @@ sha3 = "0.10"
 aws-config = { version = "0.57" }
 aws-sdk-s3 = { version = "0.35" }
 aws-smithy-http = { version = "0.57", features = ["rt-tokio"] }
-aws-smithy-types = { version = "0.57"}
+aws-smithy-types = { version = "0.57" }
 aws-credential-types = { version = "0.57" }
 trust-dns-resolver = "0.23"  # TODO: Needed for DNSLink resolution with IPFS
 http = "0.2"
@@ -74,6 +74,7 @@ http = "0.2"
 async-recursion = "1"
 async-stream = "0.3"
 async-trait = "0.1"
+bitflags = "2.4"
 bytes = "1"
 cfg-if = "1"  # Conditional compilation
 chrono = { version = "0.4", features = ["serde"] }
@@ -95,9 +96,9 @@ strum = "0.25"  # Enum from string
 strum_macros = "0.25"
 tempfile = "3"
 thiserror = { version = "1", default-features = false }
-tokio = { version = "1", default-features = false, features=["fs", "process"] }
+tokio = { version = "1", default-features = false, features = ["fs", "process"] }
 tokio-stream = "0.1"
-tokio-util = { version = "0.7", default-features = false, features=["codec", "compat", "io"] }
+tokio-util = { version = "0.7", default-features = false, features = ["codec", "compat", "io"] }
 tracing = "0.1"
 url = { version = "2", features = ["serde"] }
 walkdir = "2"
@@ -115,7 +116,7 @@ libc = "0.2"  # For getting uid:gid
 criterion = { version = "0.5", features = ["async_tokio"] }
 filetime = "0.2"
 indoc = "2"
-tokio = { version = "1", default-features = false, features=["rt", "macros"] }
+tokio = { version = "1", default-features = false, features = ["rt", "macros"] }
 
 test-group = { version = "1" }
 test-log = { version = "0.2", features = ["trace"] }
