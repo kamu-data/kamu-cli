@@ -12,18 +12,16 @@ use std::str::FromStr;
 use opendatafabric::{
     DatasetName,
     DatasetRef,
-    DatasetRefPatternAny,
-    DatasetRefPatternLocal,
+    DatasetRefAnyPattern,
+    DatasetRefPattern,
     DatasetRefRemote,
     Multihash,
     RepoName,
 };
 use url::Url;
 
-pub(crate) fn value_parse_dataset_ref_pattern_local(
-    s: &str,
-) -> Result<DatasetRefPatternLocal, String> {
-    match DatasetRefPatternLocal::from_str(s) {
+pub(crate) fn value_parse_dataset_ref_pattern_local(s: &str) -> Result<DatasetRefPattern, String> {
+    match DatasetRefPattern::from_str(s) {
         Ok(dataset_ref_pattern) => Ok(dataset_ref_pattern),
         Err(_) => Err(
             "Local reference should be in form: `did:odf:...`, `my.dataset.id`, or a wildcard \
@@ -33,8 +31,8 @@ pub(crate) fn value_parse_dataset_ref_pattern_local(
     }
 }
 
-pub(crate) fn value_parse_dataset_ref_pattern_any(s: &str) -> Result<DatasetRefPatternAny, String> {
-    match DatasetRefPatternAny::from_str(s) {
+pub(crate) fn value_parse_dataset_ref_pattern_any(s: &str) -> Result<DatasetRefAnyPattern, String> {
+    match DatasetRefAnyPattern::from_str(s) {
         Ok(dataset_ref_pattern) => Ok(dataset_ref_pattern),
         Err(_) => Err("Dataset reference should be in form: `my.dataset.id` or \
                        `repository/account/dataset-id` or `did:odf:...` or `scheme://some-url` \

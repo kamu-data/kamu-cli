@@ -17,8 +17,8 @@ use kamu_core::{DatasetRepository, GetDatasetError, RemoteRepositoryRegistry};
 use opendatafabric::{
     DatasetHandle,
     DatasetRefAny,
-    DatasetRefPatternAny,
-    DatasetRefPatternLocal,
+    DatasetRefAnyPattern,
+    DatasetRefPattern,
     RepoName,
 };
 use tokio_stream::Stream;
@@ -31,14 +31,14 @@ type FilteredDatasetRefAnyStream<'a> =
 
 pub fn filter_datasets_by_local_pattern(
     dataset_repo: &dyn DatasetRepository,
-    dataset_ref_patterns: Vec<DatasetRefPatternLocal>,
+    dataset_ref_patterns: Vec<DatasetRefPattern>,
 ) -> FilteredDatasetHandleStream<'_> {
     // We assume here that resolving specific references one by one is more
     // efficient than iterating all datasets, so we iterate only if one of the
     // inputs is a glob pattern
     if !dataset_ref_patterns
         .iter()
-        .any(DatasetRefPatternLocal::is_pattern)
+        .any(DatasetRefPattern::is_pattern)
     {
         Box::pin(async_stream::try_stream! {
             for dataset_ref_pattern in &dataset_ref_patterns {
@@ -64,7 +64,7 @@ pub fn filter_datasets_by_local_pattern(
 pub fn filter_datasets_by_any_pattern(
     dataset_repo: &dyn DatasetRepository,
     remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
-    dataset_ref_patterns: Vec<DatasetRefPatternAny>,
+    dataset_ref_patterns: Vec<DatasetRefAnyPattern>,
 ) -> Chain<FilteredDatasetRefAnyStream<'_>, FilteredDatasetRefAnyStream<'_>> {
     let clone_dataset_ref_patterns = dataset_ref_patterns.clone();
 

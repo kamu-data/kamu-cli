@@ -28,7 +28,7 @@ pub struct PullCommand {
     dataset_repo: Arc<dyn DatasetRepository>,
     remote_repo_req: Arc<dyn RemoteRepositoryRegistry>,
     output_config: Arc<OutputConfig>,
-    refs: Vec<DatasetRefPatternAny>,
+    refs: Vec<DatasetRefAnyPattern>,
     all: bool,
     recursive: bool,
     fetch_uncacheable: bool,
@@ -52,7 +52,7 @@ impl PullCommand {
         force: bool,
     ) -> Self
     where
-        I: IntoIterator<Item = DatasetRefPatternAny>,
+        I: IntoIterator<Item = DatasetRefAnyPattern>,
     {
         Self {
             pull_svc,

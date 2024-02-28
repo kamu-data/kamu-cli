@@ -19,7 +19,7 @@ pub struct SetWatermarkCommand {
     dataset_repo: Arc<dyn DatasetRepository>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
     pull_svc: Arc<dyn PullService>,
-    refs: Vec<DatasetRefPatternAny>,
+    refs: Vec<DatasetRefAnyPattern>,
     all: bool,
     recursive: bool,
     watermark: String,
@@ -37,7 +37,7 @@ impl SetWatermarkCommand {
     ) -> Self
     where
         S: Into<String>,
-        I: Iterator<Item = DatasetRefPatternAny>,
+        I: Iterator<Item = DatasetRefAnyPattern>,
     {
         Self {
             dataset_repo,

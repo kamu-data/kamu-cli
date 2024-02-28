@@ -13,65 +13,65 @@ use opendatafabric::*;
 use url::Url;
 
 #[test]
-fn test_dataset_ref_pattern_local() {
+fn test_dataset_ref_pattern() {
     // Parse valid local dataset_ref
     let param = "net.example.com";
-    let res = DatasetRefPatternLocal::from_str(param).unwrap();
+    let res = DatasetRefPattern::from_str(param).unwrap();
 
     assert_eq!(
         res,
-        DatasetRefPatternLocal::Ref(DatasetRef::from_str(param).unwrap())
+        DatasetRefPattern::Ref(DatasetRef::from_str(param).unwrap())
     );
 
     // Parse valid multitenant local dataset_ref
     let param = "account/net.example.com";
-    let res = DatasetRefPatternLocal::from_str(param).unwrap();
+    let res = DatasetRefPattern::from_str(param).unwrap();
 
     assert_eq!(
         res,
-        DatasetRefPatternLocal::Ref(DatasetRef::from_str(param).unwrap())
+        DatasetRefPattern::Ref(DatasetRef::from_str(param).unwrap())
     );
 
     // Parse valid local did reference
     let param = "did:odf:fed012126262ba49e1ba8392c26f7a39e1ba8d756c7469786d3365200c68402ff65dc";
-    let res = DatasetRefPatternLocal::from_str(param).unwrap();
+    let res = DatasetRefPattern::from_str(param).unwrap();
 
     assert_eq!(
         res,
-        DatasetRefPatternLocal::Ref(DatasetRef::from_str(param).unwrap())
+        DatasetRefPattern::Ref(DatasetRef::from_str(param).unwrap())
     );
 
     // Parse invalid local dataset_ref
     let param = "invalid_ref^";
-    let res = DatasetRefPatternLocal::from_str(param).unwrap_err();
+    let res = DatasetRefPattern::from_str(param).unwrap_err();
 
     assert_eq!(
         res.to_string(),
-        format!("Value '{param}' is not a valid DatasetRefPatternLocal"),
+        format!("Value '{param}' is not a valid DatasetRefPattern"),
     );
 
     // Parse valid local ref with wildcard net.example.%
     let param = "net.example.%";
-    let res = DatasetRefPatternLocal::from_str(param).unwrap();
+    let res = DatasetRefPattern::from_str(param).unwrap();
 
     assert_eq!(
         res,
-        DatasetRefPatternLocal::Pattern(DatasetPattern {
+        DatasetRefPattern::Pattern(DatasetPattern {
             account_name: None,
-            dataset_name_pattern: DatasetNamePattern::from_str(param).unwrap()
+            dataset_alias_pattern: DatasetAliasPattern::from_str(param).unwrap()
         }),
     );
 
     // Parse valid multitenant local ref with wildcard account/%
     let account = "account";
     let pattern = "%";
-    let res = DatasetRefPatternLocal::from_str(format!("{account}/{pattern}").as_str()).unwrap();
+    let res = DatasetRefPattern::from_str(format!("{account}/{pattern}").as_str()).unwrap();
 
     assert_eq!(
         res,
-        DatasetRefPatternLocal::Pattern(DatasetPattern {
+        DatasetRefPattern::Pattern(DatasetPattern {
             account_name: Some(AccountName::from_str(account).unwrap()),
-            dataset_name_pattern: DatasetNamePattern::from_str(pattern).unwrap(),
+            dataset_alias_pattern: DatasetAliasPattern::from_str(pattern).unwrap(),
         }),
     );
 }
@@ -82,9 +82,9 @@ fn test_dataset_ref_pattern_local_match() {
         "did:odf:fed012126262ba49e1ba8392c26f7a39e1ba8d756c7469786d3365200c68402ff65dc";
     let default_dataset_id = DatasetID::from_did_str(dataset_id_str).unwrap();
     let expression = "%odf%";
-    let pattern = DatasetRefPatternLocal::from_str(expression).unwrap();
+    let pattern = DatasetRefPattern::from_str(expression).unwrap();
 
-    // Test match of DatasetRefPatternLocal is Pattern type
+    // Test match of DatasetRefPattern is Pattern type
     let dataset_name = "net.example.com";
     let dataset_handle = DatasetHandle {
         id: default_dataset_id.clone(),
@@ -120,11 +120,11 @@ fn test_dataset_ref_pattern_local_match() {
     assert!(pattern.is_match(&dataset_handle));
 
     let dataset_account = "account1";
-    let dataset_name_pattern = "net%";
+    let dataset_alias_pattern = "net%";
     let dataset_name = "net.example.com";
 
-    let expression = format!("{dataset_account}/{dataset_name_pattern}");
-    let pattern = DatasetRefPatternLocal::from_str(expression.as_str()).unwrap();
+    let expression = format!("{dataset_account}/{dataset_alias_pattern}");
+    let pattern = DatasetRefPattern::from_str(expression.as_str()).unwrap();
     let dataset_handle = DatasetHandle {
         id: default_dataset_id.clone(),
         alias: DatasetAlias {
@@ -146,8 +146,8 @@ fn test_dataset_ref_pattern_local_match() {
 
     assert!(!pattern.is_match(&dataset_handle));
 
-    // Test match of DatasetRefPatternLocal is Ref type
-    let pattern = DatasetRefPatternLocal::from_str(dataset_id_str).unwrap();
+    // Test match of DatasetRefPattern is Ref type
+    let pattern = DatasetRefPattern::from_str(dataset_id_str).unwrap();
     let dataset_name = "net.example.com";
     let dataset_handle = DatasetHandle {
         id: default_dataset_id.clone(),
@@ -160,7 +160,7 @@ fn test_dataset_ref_pattern_local_match() {
     assert!(pattern.is_match(&dataset_handle));
 
     let expression = "net.example.com";
-    let pattern = DatasetRefPatternLocal::from_str(expression).unwrap();
+    let pattern = DatasetRefPattern::from_str(expression).unwrap();
     let dataset_handle = DatasetHandle {
         id: default_dataset_id.clone(),
         alias: DatasetAlias {
@@ -172,14 +172,14 @@ fn test_dataset_ref_pattern_local_match() {
 }
 
 #[test]
-fn test_dataset_ref_pattern_any() {
+fn test_dataset_ref_any_pattern() {
     // Parse valid local dataset_ref
     let param = "net.example.com";
-    let res = DatasetRefPatternAny::from_str(param).unwrap();
+    let res = DatasetRefAnyPattern::from_str(param).unwrap();
 
     assert_eq!(
         res,
-        DatasetRefPatternAny::RefAny(DatasetRefAny::LocalAlias(
+        DatasetRefAnyPattern::Ref(DatasetRefAny::LocalAlias(
             None,
             DatasetName::from_str(param).unwrap()
         ))
@@ -189,11 +189,11 @@ fn test_dataset_ref_pattern_any() {
     let account_name = "account";
     let dataset_name = "net.example.com";
     let param = format!("{account_name}/{dataset_name}");
-    let res = DatasetRefPatternAny::from_str(&param).unwrap();
+    let res = DatasetRefAnyPattern::from_str(&param).unwrap();
 
     assert_eq!(
         res,
-        DatasetRefPatternAny::RefAny(DatasetRefAny::AmbiguousAlias(
+        DatasetRefAnyPattern::Ref(DatasetRefAny::AmbiguousAlias(
             account_name.into(),
             DatasetName::from_str(dataset_name).unwrap()
         ))
@@ -201,11 +201,11 @@ fn test_dataset_ref_pattern_any() {
 
     // Parse valid local did reference
     let param = "did:odf:fed012126262ba49e1ba8392c26f7a39e1ba8d756c7469786d3365200c68402ff65dc";
-    let res = DatasetRefPatternAny::from_str(param).unwrap();
+    let res = DatasetRefAnyPattern::from_str(param).unwrap();
 
     assert_eq!(
         res,
-        DatasetRefPatternAny::RefAny(DatasetRefAny::ID(
+        DatasetRefAnyPattern::Ref(DatasetRefAny::ID(
             None,
             DatasetID::from_did_str(param).unwrap()
         ))
@@ -213,31 +213,29 @@ fn test_dataset_ref_pattern_any() {
 
     // Parse valid remote url reference
     let param = "https://example.com";
-    let res = DatasetRefPatternAny::from_str(param).unwrap();
+    let res = DatasetRefAnyPattern::from_str(param).unwrap();
 
     assert_eq!(
         res,
-        DatasetRefPatternAny::RefAny(DatasetRefAny::Url(Url::from_str(param).unwrap().into()))
+        DatasetRefAnyPattern::Ref(DatasetRefAny::Url(Url::from_str(param).unwrap().into()))
     );
 
     // Parse invalid local dataset_ref
     let param = "invalid_ref^";
-    let res = DatasetRefPatternAny::from_str(param).unwrap_err();
+    let res = DatasetRefAnyPattern::from_str(param).unwrap_err();
 
     assert_eq!(
         res.to_string(),
-        format!("Value '{param}' is not a valid DatasetRefPatternAny"),
+        format!("Value '{param}' is not a valid DatasetRefAnyPattern"),
     );
 
     // Parse valid local ref with wildcard net.example.%
     let param = "net.example.%";
-    let res = DatasetRefPatternAny::from_str(param).unwrap();
+    let res = DatasetRefAnyPattern::from_str(param).unwrap();
 
     assert_eq!(
         res,
-        DatasetRefPatternAny::Pattern(DatasetPatternAny::Local(
-            DatasetNamePattern::from_str(param).unwrap()
-        )),
+        DatasetRefAnyPattern::Local(DatasetAliasPattern::from_str(param).unwrap()),
     );
 
     // Parse valid remote ambiguous ref with wildcard repo/net.example.%
@@ -245,18 +243,18 @@ fn test_dataset_ref_pattern_any() {
     let dataset_name = "net.example.%";
     let param = format!("{repo_name}/{dataset_name}");
 
-    let res = DatasetRefPatternAny::from_str(&param).unwrap();
+    let res = DatasetRefAnyPattern::from_str(&param).unwrap();
 
     assert_eq!(
         res,
-        DatasetRefPatternAny::Pattern(DatasetPatternAny::AmbiguousAlias(
+        DatasetRefAnyPattern::AmbiguousAlias(
             DatasetAmbiguousPattern {
-                pattern: DatasetNamePattern::from_str(repo_name)
+                pattern: DatasetAliasPattern::from_str(repo_name)
                     .unwrap()
                     .into_inner(),
             },
-            DatasetNamePattern::from_str(dataset_name).unwrap()
-        )),
+            DatasetAliasPattern::from_str(dataset_name).unwrap()
+        ),
     );
 
     // Parse valid remote ref with repo and account wildcard repo/net.example.%
@@ -265,14 +263,14 @@ fn test_dataset_ref_pattern_any() {
     let dataset_name = "net.example.%";
     let param = format!("{repo_name}/{account_name}/{dataset_name}");
 
-    let res = DatasetRefPatternAny::from_str(&param).unwrap();
+    let res = DatasetRefAnyPattern::from_str(&param).unwrap();
 
     assert_eq!(
         res,
-        DatasetRefPatternAny::Pattern(DatasetPatternAny::RemoteAlias(
+        DatasetRefAnyPattern::RemoteAlias(
             DatasetRepoPattern::from_str(repo_name).unwrap(),
             DatasetAccountPattern::from_str(account_name).unwrap(),
-            DatasetNamePattern::from_str(dataset_name).unwrap()
-        )),
+            DatasetAliasPattern::from_str(dataset_name).unwrap()
+        ),
     );
 }

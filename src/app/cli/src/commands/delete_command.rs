@@ -18,7 +18,7 @@ use super::{common, CLIError, Command};
 
 pub struct DeleteCommand {
     dataset_repo: Arc<dyn DatasetRepository>,
-    dataset_ref_patterns: Vec<DatasetRefPatternLocal>,
+    dataset_ref_patterns: Vec<DatasetRefPattern>,
     dependency_graph_service: Arc<dyn DependencyGraphService>,
     all: bool,
     recursive: bool,
@@ -35,7 +35,7 @@ impl DeleteCommand {
         no_confirmation: bool,
     ) -> Self
     where
-        I: IntoIterator<Item = DatasetRefPatternLocal>,
+        I: IntoIterator<Item = DatasetRefPattern>,
     {
         Self {
             dataset_repo,

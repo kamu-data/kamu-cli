@@ -28,7 +28,7 @@ pub struct VerifyCommand {
     dependency_graph_service: Arc<dyn DependencyGraphService>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
     output_config: Arc<OutputConfig>,
-    refs: Vec<DatasetRefPatternLocal>,
+    refs: Vec<DatasetRefPattern>,
     recursive: bool,
     integrity: bool,
 }
@@ -50,7 +50,7 @@ impl VerifyCommand {
         integrity: bool,
     ) -> Self
     where
-        I: Iterator<Item = DatasetRefPatternLocal>,
+        I: Iterator<Item = DatasetRefPattern>,
     {
         Self {
             dataset_repo,

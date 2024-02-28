@@ -26,7 +26,7 @@ pub struct PushCommand {
     push_svc: Arc<dyn PushService>,
     dataset_repo: Arc<dyn DatasetRepository>,
     remote_repo_req: Arc<dyn RemoteRepositoryRegistry>,
-    refs: Vec<DatasetRefPatternAny>,
+    refs: Vec<DatasetRefAnyPattern>,
     all: bool,
     recursive: bool,
     add_aliases: bool,
@@ -49,7 +49,7 @@ impl PushCommand {
         output_config: Arc<OutputConfig>,
     ) -> Self
     where
-        I: Iterator<Item = DatasetRefPatternAny>,
+        I: Iterator<Item = DatasetRefAnyPattern>,
     {
         Self {
             push_svc,
