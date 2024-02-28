@@ -1215,6 +1215,14 @@ pub fn cli() -> Command {
                                     .required(true)
                                     .value_parser(value_parse_dataset_ref_local)
                                     .help("Dataset reference")])]),
+                        Command::new("check-token")
+                            .about("Validate a Kamu token")
+                            .args([
+                                Arg::new("token")
+                                    .index(1)
+                                    .required(true)
+                                    .help("Kamu token"),
+                            ]),
                         // TODO: This command is temporary and likely will be removed soon
                         Command::new("generate-token")
                             .about("Generate a platform token from a known secret for debugging")

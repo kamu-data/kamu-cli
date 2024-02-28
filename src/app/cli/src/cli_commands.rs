@@ -452,6 +452,10 @@ pub fn get_command(
                     workspace_svc.layout().unwrap().run_info_dir.clone(),
                 ))
             }
+            Some(("check-token", matches)) => Box::new(CheckTokenCommand::new(
+                cli_catalog.get_one()?,
+                matches.get_one("token").cloned().unwrap(),
+            )),
             Some(("generate-token", gen_matches)) => Box::new(GenerateTokenCommand::new(
                 cli_catalog.get_one()?,
                 gen_matches.get_one("gh-login").cloned().unwrap(),

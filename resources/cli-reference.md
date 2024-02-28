@@ -1010,6 +1010,7 @@ Command group for system-level functionality
 * `info` — Summary of the system information
 * `diagnose` — Run basic system diagnose check
 * `ipfs` — IPFS helpers
+* `check-token` — Validate a Kamu token
 * `generate-token` — Generate a platform token from a known secret for debugging
 
 
@@ -1132,6 +1133,18 @@ Adds the specified dataset to IPFS and returns the CID
 **Arguments:**
 
 * `<DATASET>` — Dataset reference
+
+
+
+## `kamu system check-token`
+
+Validate a Kamu token
+
+**Usage:** `kamu system check-token <token>`
+
+**Arguments:**
+
+* `<TOKEN>` — Kamu token
 
 
 

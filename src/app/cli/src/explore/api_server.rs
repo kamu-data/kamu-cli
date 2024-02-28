@@ -42,7 +42,7 @@ impl APIServer {
         // behalf of the system, as they are automatically scheduled
         let task_executor = cli_catalog.get_one().unwrap();
 
-        let flow_service = base_catalog.get_one().unwrap();
+        let flow_service = cli_catalog.get_one().unwrap();
 
         let time_source = base_catalog.get_one().unwrap();
 
