@@ -146,7 +146,7 @@ impl AxumServerPushProtocolInstance {
                 .as_ref()
                 .map(ToString::to_string)
                 .ok_or("None"),
-            push_request.size_estimate
+            push_request.transfer_plan
         );
 
         // TODO: consider size estimate and maybe cancel too large pushes
@@ -207,7 +207,7 @@ impl AxumServerPushProtocolInstance {
         );
 
         assert_eq!(
-            push_request.size_estimate.num_blocks,
+            push_request.transfer_plan.num_blocks,
             push_metadata_request.new_blocks.num_blocks
         );
 

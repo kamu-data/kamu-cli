@@ -78,7 +78,6 @@ pub enum SyncResult {
         old_head: Option<Multihash>,
         new_head: Multihash,
         num_blocks: u64,
-        num_records: u64,
     },
 }
 

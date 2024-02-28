@@ -14,6 +14,8 @@ use event_bus::EventBus;
 use kamu_core::{PullOptions, PullService, SystemTimeSource};
 use kamu_task_system::*;
 
+/////////////////////////////////////////////////////////////////////////////////////////
+
 pub struct TaskExecutorInMemory {
     task_sched: Arc<dyn TaskScheduler>,
     event_store: Arc<dyn TaskSystemEventStore>,
@@ -21,6 +23,8 @@ pub struct TaskExecutorInMemory {
     time_source: Arc<dyn SystemTimeSource>,
     catalog: Catalog,
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
 #[interface(dyn TaskExecutor)]
@@ -66,6 +70,8 @@ impl TaskExecutorInMemory {
     }
 }
 
+/////////////////////////////////////////////////////////////////////////////////////////
+
 #[async_trait::async_trait]
 impl TaskExecutor for TaskExecutorInMemory {
     // TODO: Error and panic handling strategy
@@ -92,9 +98,9 @@ impl TaskExecutor for TaskExecutorInMemory {
                         .await;
 
                     match maybe_pull_result {
-                        Ok(pull_result) => {
-                            TaskOutcome::Success(TaskResult::PullResult(pull_result))
-                        }
+                        Ok(pull_result) => TaskOutcome::Success(TaskResult::UpdateDatasetResult(
+                            pull_result.into(),
+                        )),
                         Err(_) => TaskOutcome::Failed,
                     }
                 }
@@ -129,3 +135,5 @@ impl TaskExecutor for TaskExecutorInMemory {
         }
     }
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////

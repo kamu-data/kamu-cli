@@ -7,9 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use chrono::{DateTime, Utc};
 use futures::TryStreamExt;
-use kamu_core::PollingIngestService;
-use {kamu_flow_system as fs, kamu_task_system as ts};
+use kamu_core::{DatasetChangesService, PollingIngestService};
+use {kamu_flow_system as fs, kamu_task_system as ts, opendatafabric as odf};
 
 use super::{FlowEvent, FlowStartCondition, FlowTrigger};
 use crate::prelude::*;
@@ -63,9 +64,15 @@ impl Flow {
                     .await
                     .int_err()?;
 
+                let dataset_changes_svc = from_catalog::<dyn DatasetChangesService>(ctx).unwrap();
+
                 let ingest_result = FlowDescriptionUpdateResult::from_maybe_flow_outcome(
                     self.flow_state.outcome.as_ref(),
-                );
+                    &dataset_key.dataset_id,
+                    dataset_changes_svc.as_ref(),
+                )
+                .await
+                .int_err()?;
 
                 if maybe_polling_source.is_some() {
                     FlowDescriptionDataset::PollingIngest(FlowDescriptionDatasetPollingIngest {
@@ -73,7 +80,7 @@ impl Flow {
                         ingest_result,
                     })
                 } else {
-                    let source_name = self.flow_state.primary_trigger.push_source_name();
+                    let source_name = self.flow_state.primary_trigger().push_source_name();
                     FlowDescriptionDataset::PushIngest(FlowDescriptionDatasetPushIngest {
                         dataset_id: dataset_key.dataset_id.clone().into(),
                         source_name,
@@ -83,11 +90,17 @@ impl Flow {
                 }
             }
             fs::DatasetFlowType::ExecuteTransform => {
+                let dataset_changes_svc = from_catalog::<dyn DatasetChangesService>(ctx).unwrap();
+
                 FlowDescriptionDataset::ExecuteTransform(FlowDescriptionDatasetExecuteTransform {
                     dataset_id: dataset_key.dataset_id.clone().into(),
                     transform_result: FlowDescriptionUpdateResult::from_maybe_flow_outcome(
                         self.flow_state.outcome.as_ref(),
-                    ),
+                        &dataset_key.dataset_id,
+                        dataset_changes_svc.as_ref(),
+                    )
+                    .await
+                    .int_err()?,
                 })
             }
             fs::DatasetFlowType::Compaction => {
@@ -116,7 +129,7 @@ impl Flow {
 
     /// Outcome of the flow (Finished state only)
     async fn outcome(&self) -> Option<FlowOutcome> {
-        self.flow_state.outcome.map(Into::into)
+        self.flow_state.outcome.as_ref().map(Into::into)
     }
 
     /// Timing records associated with the flow lifecycle
@@ -154,19 +167,28 @@ impl Flow {
     /// A user, who initiated the flow run. None for system-initiated flows
     async fn initiator(&self) -> Option<Account> {
         self.flow_state
-            .primary_trigger
+            .primary_trigger()
             .initiator_account_name()
             .map(|initiator| Account::from_account_name(initiator.clone()))
     }
 
     /// Primary flow trigger
     async fn primary_trigger(&self) -> FlowTrigger {
-        self.flow_state.primary_trigger.clone().into()
+        self.flow_state.primary_trigger().clone().into()
     }
 
     /// Start condition
-    async fn start_condition(&self) -> Option<FlowStartCondition> {
-        self.flow_state.start_condition.map(Into::into)
+    async fn start_condition(&self, ctx: &Context<'_>) -> Result<Option<FlowStartCondition>> {
+        let dataset_changes_service = from_catalog::<dyn DatasetChangesService>(ctx).unwrap();
+
+        let maybe_condition = FlowStartCondition::create_from_raw_flow_data(
+            &self.flow_state,
+            dataset_changes_service.as_ref(),
+        )
+        .await
+        .int_err()?;
+
+        Ok(maybe_condition)
     }
 }
 
@@ -231,20 +253,41 @@ struct FlowDescriptionDatasetCompaction {
 struct FlowDescriptionUpdateResult {
     num_blocks: u64,
     num_records: u64,
+    updated_watermark: Option<DateTime<Utc>>,
 }
 
 impl FlowDescriptionUpdateResult {
-    fn from_maybe_flow_outcome(maybe_outcome: Option<&fs::FlowOutcome>) -> Option<Self> {
-        maybe_outcome.and_then(|outcome| match outcome {
-            fs::FlowOutcome::Success(result) => match result {
-                fs::FlowResult::Empty => None,
-                fs::FlowResult::DatasetUpdate(update) => Some(Self {
-                    num_blocks: update.num_blocks,
-                    num_records: update.num_records,
-                }),
-            },
-            _ => None,
-        })
+    async fn from_maybe_flow_outcome(
+        maybe_outcome: Option<&fs::FlowOutcome>,
+        dataset_id: &odf::DatasetID,
+        dataset_changes_service: &dyn DatasetChangesService,
+    ) -> Result<Option<Self>, InternalError> {
+        if let Some(outcome) = maybe_outcome {
+            match outcome {
+                fs::FlowOutcome::Success(result) => match result {
+                    fs::FlowResult::Empty => Ok(None),
+                    fs::FlowResult::DatasetUpdate(update) => {
+                        let increment = dataset_changes_service
+                            .get_increment_between(
+                                dataset_id,
+                                update.old_head.as_ref(),
+                                &update.new_head,
+                            )
+                            .await
+                            .int_err()?;
+
+                        Ok(Some(Self {
+                            num_blocks: increment.num_blocks,
+                            num_records: increment.num_records,
+                            updated_watermark: increment.updated_watermark,
+                        }))
+                    }
+                },
+                _ => Ok(None),
+            }
+        } else {
+            Ok(None)
+        }
     }
 }
 

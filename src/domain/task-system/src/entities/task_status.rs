@@ -7,9 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-/////////////////////////////////////////////////////////////////////////////////////////
-
 use kamu_core::PullResult;
+
+/////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TaskStatus {
@@ -46,7 +46,18 @@ impl TaskOutcome {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TaskResult {
     Empty,
-    PullResult(PullResult),
+    UpdateDatasetResult(TaskUpdateDatasetResult),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TaskUpdateDatasetResult {
+    pub pull_result: PullResult,
+}
+
+impl From<PullResult> for TaskUpdateDatasetResult {
+    fn from(value: PullResult) -> Self {
+        Self { pull_result: value }
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

@@ -21,8 +21,8 @@ pub struct FlowState {
     pub flow_id: FlowID,
     /// Flow key
     pub flow_key: FlowKey,
-    /// Primary flow trigger
-    pub primary_trigger: FlowTrigger,
+    /// Triggers
+    pub triggers: Vec<FlowTrigger>,
     /// Start condition (if defined)
     pub start_condition: Option<FlowStartCondition>,
     /// Timing records
@@ -35,6 +35,8 @@ pub struct FlowState {
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct FlowTimingRecords {
+    /// Creation time
+    pub created_at: DateTime<Utc>,
     /// Activating at time
     pub activate_at: Option<DateTime<Utc>>,
     /// Started running at time
@@ -44,6 +46,12 @@ pub struct FlowTimingRecords {
 }
 
 impl FlowState {
+    /// Extract primary trigger
+    pub fn primary_trigger(&self) -> &FlowTrigger {
+        // At least 1 trigger is initially defined for sure
+        self.triggers.first().unwrap()
+    }
+
     /// Computes status
     pub fn status(&self) -> FlowStatus {
         if self.outcome.is_some() {
@@ -82,6 +90,12 @@ impl FlowState {
             }
         }
     }
+
+    pub fn try_result_as_ref(&self) -> Option<&FlowResult> {
+        self.outcome
+            .as_ref()
+            .and_then(|outcome| outcome.try_result_as_ref())
+    }
 }
 
 impl Projection for FlowState {
@@ -94,16 +108,17 @@ impl Projection for FlowState {
         match (state, event) {
             (None, event) => match event {
                 E::Initiated(FlowEventInitiated {
+                    event_time,
                     flow_id,
                     flow_key,
                     trigger,
-                    ..
                 }) => Ok(Self {
                     flow_id,
                     flow_key,
-                    primary_trigger: trigger,
+                    triggers: vec![trigger],
                     start_condition: None,
                     timing: FlowTimingRecords {
+                        created_at: event_time,
                         activate_at: None,
                         running_since: None,
                         finished_at: None,
@@ -118,7 +133,7 @@ impl Projection for FlowState {
 
                 match event {
                     E::Initiated(_) => Err(ProjectionError::new(Some(s), event)),
-                    E::StartConditionDefined(FlowEventStartConditionDefined {
+                    E::StartConditionUpdated(FlowEventStartConditionUpdated {
                         start_condition,
                         ..
                     }) => {
@@ -126,7 +141,7 @@ impl Projection for FlowState {
                             Err(ProjectionError::new(Some(s), event))
                         } else {
                             Ok(FlowState {
-                                start_condition: Some(start_condition),
+                                start_condition,
                                 ..s
                             })
                         }
@@ -144,20 +159,21 @@ impl Projection for FlowState {
                             })
                         }
                     }
-                    E::TriggerAdded(_) => {
+                    E::TriggerAdded(FlowEventTriggerAdded { ref trigger, .. }) => {
                         if s.outcome.is_some() {
                             Err(ProjectionError::new(Some(s), event))
                         } else {
-                            Ok(s)
+                            let mut triggers = s.triggers;
+                            triggers.push(trigger.clone());
+                            Ok(FlowState { triggers, ..s })
                         }
                     }
                     E::TaskScheduled(FlowEventTaskScheduled { task_id, .. }) => {
                         if s.outcome.is_some() || s.timing.activate_at.is_none() {
                             Err(ProjectionError::new(Some(s), event))
                         } else {
-                            let mut task_ids = s.task_ids.clone();
+                            let mut task_ids = s.task_ids;
                             task_ids.push(task_id);
-
                             Ok(FlowState { task_ids, ..s })
                         }
                     }
@@ -195,7 +211,7 @@ impl Projection for FlowState {
                         } else {
                             match task_outcome {
                                 ts::TaskOutcome::Success(task_result) => Ok(FlowState {
-                                    outcome: Some(FlowOutcome::Success(task_result.into())),
+                                    outcome: Some(FlowOutcome::Success(task_result.clone().into())),
                                     timing: FlowTimingRecords {
                                         finished_at: Some(event_time),
                                         ..s.timing
@@ -219,7 +235,7 @@ impl Projection for FlowState {
                         }
                     }
                     E::Aborted(FlowEventAborted { event_time, .. }) => {
-                        if let Some(outcome) = s.outcome {
+                        if let Some(outcome) = &s.outcome {
                             if let FlowOutcome::Success(_) = outcome {
                                 Err(ProjectionError::new(Some(s), event))
                             } else {

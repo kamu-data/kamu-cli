@@ -57,11 +57,11 @@ impl From<IterBlocksError> for PrepareDatasetTransferEstimateError {
     }
 }
 
-pub async fn prepare_dataset_transfer_estimate(
+pub async fn prepare_dataset_transfer_plan(
     metadata_chain: &dyn MetadataChain,
     stop_at: &Multihash,
     begin_after: Option<&Multihash>,
-) -> Result<TransferSizeEstimate, PrepareDatasetTransferEstimateError> {
+) -> Result<TransferPlan, PrepareDatasetTransferEstimateError> {
     let mut block_stream = metadata_chain.iter_blocks_interval(stop_at, begin_after, false);
 
     let mut blocks_count: u32 = 0;
@@ -120,7 +120,7 @@ pub async fn prepare_dataset_transfer_estimate(
         }
     }
 
-    Ok(TransferSizeEstimate {
+    Ok(TransferPlan {
         num_blocks: blocks_count,
         num_objects: data_objects_count + checkpoint_objects_count,
         num_records: data_records_count,

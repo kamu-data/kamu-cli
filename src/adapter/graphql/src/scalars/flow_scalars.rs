@@ -110,8 +110,8 @@ pub enum FlowOutcome {
     Aborted,
 }
 
-impl From<kamu_flow_system::FlowOutcome> for FlowOutcome {
-    fn from(value: kamu_flow_system::FlowOutcome) -> Self {
+impl From<&kamu_flow_system::FlowOutcome> for FlowOutcome {
+    fn from(value: &kamu_flow_system::FlowOutcome) -> Self {
         match value {
             kamu_flow_system::FlowOutcome::Success(_) => Self::Success,
             kamu_flow_system::FlowOutcome::Failed => Self::Failed,

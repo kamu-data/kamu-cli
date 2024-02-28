@@ -96,6 +96,11 @@ type AuthMut {
 	accountDetails(accessToken: String!): Account!
 }
 
+input BatchingConditionInput {
+	minRecordsToAwait: Int!
+	maxBatchingInterval: TimeDeltaInput!
+}
+
 type BlockRef {
 	name: String!
 	blockHash: Multihash!
@@ -340,7 +345,7 @@ type DatasetFlowConfigs {
 
 type DatasetFlowConfigsMut {
 	setConfigSchedule(datasetFlowType: DatasetFlowType!, paused: Boolean!, schedule: ScheduleInput!): SetFlowConfigResult!
-	setConfigBatching(datasetFlowType: DatasetFlowType!, paused: Boolean!, throttlingPeriod: TimeDeltaInput, minimalDataBatch: Int): SetFlowConfigResult!
+	setConfigBatching(datasetFlowType: DatasetFlowType!, paused: Boolean!, batching: BatchingConditionInput!): SetFlowConfigResult!
 	pauseFlows(datasetFlowType: DatasetFlowType): Boolean!
 	resumeFlows(datasetFlowType: DatasetFlowType): Boolean!
 }
@@ -686,8 +691,8 @@ type FlowConfiguration {
 }
 
 type FlowConfigurationBatching {
-	throttlingPeriod: TimeDelta
-	minimalDataBatch: Int
+	minRecordsToAwait: Int!
+	maxBatchingInterval: TimeDelta!
 }
 
 union FlowConfigurationSchedule = TimeDelta | Cron5ComponentExpression
@@ -740,6 +745,7 @@ type FlowDescriptionSystemGC {
 type FlowDescriptionUpdateResult {
 	numBlocks: Int!
 	numRecords: Int!
+	updatedWatermark: DateTime
 }
 
 type FlowEdge {
@@ -768,10 +774,10 @@ type FlowEventQueued implements FlowEvent {
 	activateAt: DateTime!
 }
 
-type FlowEventStartConditionDefined implements FlowEvent {
+type FlowEventStartConditionUpdated implements FlowEvent {
 	eventId: EventID!
 	eventTime: DateTime!
-	startCondition: FlowStartCondition!
+	startConditionKind: FlowStartConditionKind
 }
 
 type FlowEventTaskChanged implements FlowEvent {
@@ -796,6 +802,11 @@ type FlowIncompatibleDatasetKind implements SetFlowConfigResult & TriggerFlowRes
 	message: String!
 }
 
+type FlowInvalidBatchingConfig implements SetFlowConfigResult {
+	reason: String!
+	message: String!
+}
+
 type FlowNotFound implements GetFlowResult & CancelScheduledTasksResult {
 	flowId: FlowID!
 	message: String!
@@ -816,7 +827,15 @@ enum FlowOutcome {
 union FlowStartCondition = FlowStartConditionThrottling | FlowStartConditionBatching
 
 type FlowStartConditionBatching {
-	thresholdNewRecords: Int!
+	activeBatchingRule: FlowConfigurationBatching!
+	batchingDeadline: DateTime!
+	accumulatedRecordsCount: Int!
+	watermarkModified: Boolean!
+}
+
+enum FlowStartConditionKind {
+	THROTTLING
+	BATCHING
 }
 
 type FlowStartConditionThrottling {

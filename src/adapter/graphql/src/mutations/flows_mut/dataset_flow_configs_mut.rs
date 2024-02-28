@@ -9,13 +9,13 @@
 
 use chrono::Utc;
 use kamu_flow_system::{
+    BatchingRule,
     FlowConfigurationRule,
     FlowConfigurationService,
     FlowKeyDataset,
     Schedule,
     ScheduleTimeDelta,
     SetFlowConfigurationError,
-    StartConditionConfiguration,
 };
 use opendatafabric as odf;
 
@@ -91,9 +91,22 @@ impl DatasetFlowConfigsMut {
         ctx: &Context<'_>,
         dataset_flow_type: DatasetFlowType,
         paused: bool,
-        throttling_period: Option<TimeDeltaInput>,
-        minimal_data_batch: Option<i32>,
+        batching: BatchingConditionInput,
     ) -> Result<SetFlowConfigResult> {
+        let batching_rule = match BatchingRule::new_checked(
+            batching.min_records_to_await,
+            batching.max_batching_interval.into(),
+        ) {
+            Ok(rule) => rule,
+            Err(e) => {
+                return Ok(SetFlowConfigResult::InvalidBatchingConfig(
+                    FlowInvalidBatchingConfig {
+                        reason: e.to_string(),
+                    },
+                ))
+            }
+        };
+
         if let Some(e) =
             ensure_expected_dataset_kind(ctx, &self.dataset_handle, dataset_flow_type).await?
         {
@@ -110,10 +123,7 @@ impl DatasetFlowConfigsMut {
                 FlowKeyDataset::new(self.dataset_handle.id.clone(), dataset_flow_type.into())
                     .into(),
                 paused,
-                FlowConfigurationRule::StartCondition(StartConditionConfiguration {
-                    throttling_period: throttling_period.map(Into::into),
-                    minimal_data_batch,
-                }),
+                FlowConfigurationRule::BatchingRule(batching_rule),
             )
             .await
             .map_err(|e| match e {
@@ -199,11 +209,20 @@ impl From<TimeDeltaInput> for chrono::Duration {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+#[derive(InputObject)]
+struct BatchingConditionInput {
+    pub min_records_to_await: u64,
+    pub max_batching_interval: TimeDeltaInput,
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 #[derive(Interface)]
 #[graphql(field(name = "message", ty = "String"))]
 enum SetFlowConfigResult {
     Success(SetFlowConfigSuccess),
     IncompatibleDatasetKind(FlowIncompatibleDatasetKind),
+    InvalidBatchingConfig(FlowInvalidBatchingConfig),
 }
 
 #[derive(SimpleObject)]
@@ -216,6 +235,19 @@ struct SetFlowConfigSuccess {
 impl SetFlowConfigSuccess {
     pub async fn message(&self) -> String {
         "Success".to_string()
+    }
+}
+
+#[derive(SimpleObject, Debug, Clone)]
+#[graphql(complex)]
+pub(crate) struct FlowInvalidBatchingConfig {
+    reason: String,
+}
+
+#[ComplexObject]
+impl FlowInvalidBatchingConfig {
+    pub async fn message(&self) -> String {
+        self.reason.clone()
     }
 }
 
