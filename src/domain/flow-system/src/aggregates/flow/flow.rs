@@ -81,18 +81,23 @@ impl Flow {
         self.apply(event)
     }
 
-    /// Extra trigger
-    pub fn add_trigger(
+    /// Add extra trigger, if it's unique
+    pub fn add_trigger_if_unique(
         &mut self,
         now: DateTime<Utc>,
         trigger: FlowTrigger,
-    ) -> Result<(), ProjectionError<FlowState>> {
-        let event = FlowEventTriggerAdded {
-            event_time: now,
-            flow_id: self.flow_id,
-            trigger,
-        };
-        self.apply(event)
+    ) -> Result<bool, ProjectionError<FlowState>> {
+        if trigger.is_unique_vs(&self.triggers) {
+            let event = FlowEventTriggerAdded {
+                event_time: now,
+                flow_id: self.flow_id,
+                trigger,
+            };
+            self.apply(event)?;
+            Ok(true)
+        } else {
+            Ok(false)
+        }
     }
 
     /// Attaches a scheduled task

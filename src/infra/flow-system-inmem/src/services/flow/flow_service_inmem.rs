@@ -310,9 +310,8 @@ impl FlowServiceInMemory {
                     .int_err()?;
 
                 // Only merge unique triggers, ignore identical
-                if trigger.is_unique_vs(&flow.triggers) {
-                    flow.add_trigger(trigger_time, trigger).int_err()?;
-                }
+                flow.add_trigger_if_unique(trigger_time, trigger)
+                    .int_err()?;
 
                 // Evaluate batching rule, if defined
                 if let Some(batching_rule) = maybe_batching_rule {

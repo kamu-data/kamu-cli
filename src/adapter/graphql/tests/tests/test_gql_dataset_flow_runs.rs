@@ -1804,7 +1804,8 @@ impl FlowRunsHarness {
         .await
         .unwrap();
 
-        flow.add_trigger(Utc::now(), flow_trigger).unwrap();
+        flow.add_trigger_if_unique(Utc::now(), flow_trigger)
+            .unwrap();
         flow.save(flow_event_store.as_ref()).await.unwrap();
     }
 
