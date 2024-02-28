@@ -11,6 +11,5 @@ mod active_configs_state;
 mod flow_service_inmem;
 mod flow_time_wheel;
 mod pending_flows_state;
-mod strategies;
 
 pub use flow_service_inmem::*;

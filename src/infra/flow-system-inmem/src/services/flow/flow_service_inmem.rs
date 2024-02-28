@@ -9,13 +9,12 @@
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use chrono::{DateTime, DurationRound, Utc};
 use dill::*;
 use event_bus::{AsyncEventHandler, EventBus};
-use futures::TryStreamExt;
+use futures::{StreamExt, TryStreamExt};
 use kamu_core::events::DatasetEventDeleted;
 use kamu_core::{DatasetChangesService, DependencyGraphService, InternalError, SystemTimeSource};
 use kamu_flow_system::*;
@@ -25,11 +24,6 @@ use opendatafabric::{AccountID, AccountName, DatasetID};
 use super::active_configs_state::ActiveConfigsState;
 use super::flow_time_wheel::FlowTimeWheel;
 use super::pending_flows_state::PendingFlowsState;
-use super::strategies::{
-    DatasetUpdateStrategy,
-    FlowServiceCallbacksFacade,
-    FlowTypeSupportStrategy,
-};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -41,8 +35,8 @@ pub struct FlowServiceInMemory {
     time_source: Arc<dyn SystemTimeSource>,
     task_scheduler: Arc<dyn TaskScheduler>,
     flow_configuration_service: Arc<dyn FlowConfigurationService>,
+    dependency_graph_service: Arc<dyn DependencyGraphService>,
     dataset_changes_service: Arc<dyn DatasetChangesService>,
-    support_strategies_by_type: HashMap<AnyFlowType, Arc<dyn FlowTypeSupportStrategy>>,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -76,18 +70,6 @@ impl FlowServiceInMemory {
         dependency_graph_service: Arc<dyn DependencyGraphService>,
         dataset_changes_service: Arc<dyn DatasetChangesService>,
     ) -> Self {
-        let dataset_update_strategy =
-            Arc::new(DatasetUpdateStrategy::new(dependency_graph_service));
-
-        let support_strategies_by_type = HashMap::from_iter(
-            [DatasetFlowType::Ingest, DatasetFlowType::ExecuteTransform].map(|flow_type| {
-                (
-                    AnyFlowType::Dataset(flow_type),
-                    dataset_update_strategy.clone() as Arc<dyn FlowTypeSupportStrategy>,
-                )
-            }),
-        );
-
         Self {
             state: Arc::new(Mutex::new(State::default())),
             run_config,
@@ -96,8 +78,8 @@ impl FlowServiceInMemory {
             time_source,
             task_scheduler,
             flow_configuration_service,
+            dependency_graph_service,
             dataset_changes_service,
-            support_strategies_by_type,
         }
     }
 
@@ -276,6 +258,69 @@ impl FlowServiceInMemory {
             |_: &FlowRunStats| start_time,
         )
         .await
+    }
+
+    #[tracing::instrument(level = "trace", skip_all, fields(?flow_key, %flow_id))]
+    async fn enqueue_dependent_flows(
+        &self,
+        input_success_time: DateTime<Utc>,
+        flow_key: &FlowKey,
+        flow_id: FlowID,
+        flow_result: &FlowResult,
+    ) -> Result<(), InternalError> {
+        if let FlowKey::Dataset(fk_dataset) = flow_key {
+            // Extract list of downstream 1 level datasets
+            let dependent_dataset_ids: Vec<_> = self
+                .dependency_graph_service
+                .get_downstream_dependencies(&fk_dataset.dataset_id)
+                .await
+                .int_err()?
+                .collect()
+                .await;
+
+            // For each, scan if flows configurations are on
+            for dependent_dataset_id in dependent_dataset_ids {
+                // Is batching rule enabled?
+                let maybe_batching_rule = self
+                    .state
+                    .lock()
+                    .unwrap()
+                    .active_configs
+                    .try_get_dataset_batching_rule(
+                        &dependent_dataset_id,
+                        DatasetFlowType::ExecuteTransform,
+                    );
+
+                // When dependent flow batching rule is enabled, schedule dependent update
+                if let Some(batching_rule) = maybe_batching_rule {
+                    let dependent_flow_key = FlowKeyDataset::new(
+                        dependent_dataset_id.clone(),
+                        DatasetFlowType::ExecuteTransform,
+                    )
+                    .into();
+
+                    let trigger = FlowTrigger::InputDatasetFlow(FlowTriggerInputDatasetFlow {
+                        dataset_id: fk_dataset.dataset_id.clone(),
+                        flow_type: fk_dataset.flow_type,
+                        flow_id,
+                        flow_result: flow_result.clone(),
+                    });
+
+                    self.trigger_flow_common(
+                        input_success_time,
+                        &dependent_flow_key,
+                        trigger,
+                        Some(&batching_rule),
+                        |_| input_success_time,
+                    )
+                    .await?;
+                }
+            }
+
+            Ok(())
+        } else {
+            unreachable!("Not expecting other types of flow keys than dataset");
+        }
     }
 
     async fn trigger_flow_common(
@@ -870,38 +915,6 @@ impl FlowService for FlowServiceInMemory {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl FlowServiceCallbacksFacade for FlowServiceInMemory {
-    fn try_get_dataset_batching_rule(
-        &self,
-        dataset_id: &DatasetID,
-        flow_type: DatasetFlowType,
-    ) -> Option<BatchingRule> {
-        self.state
-            .lock()
-            .unwrap()
-            .active_configs
-            .try_get_dataset_batching_rule(dataset_id, flow_type)
-    }
-
-    async fn trigger_flow(
-        &self,
-        trigger_time: DateTime<Utc>,
-        flow_key: &FlowKey,
-        trigger: FlowTrigger,
-        maybe_batching_rule: Option<&BatchingRule>,
-    ) -> Result<(), InternalError> {
-        self.trigger_flow_common(trigger_time, flow_key, trigger, maybe_batching_rule, |_| {
-            trigger_time
-        })
-        .await?;
-
-        Ok(())
-    }
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-#[async_trait::async_trait]
 impl FlowServiceTestDriver for FlowServiceInMemory {
     /// Pretends running started
     fn mimic_running_started(&self) {
@@ -989,27 +1002,27 @@ impl AsyncEventHandler<TaskEventFinished> for FlowServiceInMemory {
                 .int_err()?;
             flow.save(self.flow_event_store.as_ref()).await.int_err()?;
 
-            if let Some(flow_result) = flow.try_result_as_ref() {
-                if let Some(handler) = self
-                    .support_strategies_by_type
-                    .get(&flow.flow_key.get_type())
-                {
-                    handler
-                        .on_flow_success(
-                            self,
-                            finish_time,
-                            flow.flow_id,
-                            &flow.flow_key,
-                            flow_result,
-                        )
-                        .await?;
-                }
-            }
-
             {
                 let mut state = self.state.lock().unwrap();
                 state.pending_flows.untrack_flow_by_task(event.task_id);
                 state.pending_flows.drop_pending_flow(&flow.flow_key);
+            }
+
+            // In case of success:
+            //  - execute followup method
+            if let Some(flow_result) = flow.try_result_as_ref() {
+                match flow.flow_key.get_type().success_followup_method() {
+                    FlowSuccessFollowupMethod::Ignore => {}
+                    FlowSuccessFollowupMethod::TriggerDependent => {
+                        self.enqueue_dependent_flows(
+                            finish_time,
+                            &flow.flow_key,
+                            flow.flow_id,
+                            flow_result,
+                        )
+                        .await?;
+                    }
+                }
             }
 
             // In case of success:
