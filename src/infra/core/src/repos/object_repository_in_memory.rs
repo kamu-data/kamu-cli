@@ -97,6 +97,13 @@ impl ObjectRepository for ObjectRepositoryInMemory {
         Err(GetExternalUrlError::NotSupported)
     }
 
+    fn get_bytes_hash(&self, data: &[u8]) -> Result<Multihash, GetBytesHashError> {
+        Ok(Multihash::from_digest::<sha3::Sha3_256>(
+            Multicodec::Sha3_256,
+            data,
+        ))
+    }
+
     async fn insert_bytes<'a>(
         &'a self,
         data: &'a [u8],
@@ -106,7 +113,7 @@ impl ObjectRepository for ObjectRepositoryInMemory {
         let hash = if let Some(hash) = options.precomputed_hash {
             hash.clone()
         } else {
-            Multihash::from_digest::<sha3::Sha3_256>(Multicodec::Sha3_256, data)
+            self.get_bytes_hash(data)?
         };
 
         if let Some(expected_hash) = options.expected_hash {

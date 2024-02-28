@@ -70,6 +70,8 @@ pub trait ObjectRepository: Send + Sync {
         opts: ExternalTransferOpts,
     ) -> Result<GetExternalUrlResult, GetExternalUrlError>;
 
+    fn get_bytes_hash(&self, data: &[u8]) -> Result<Multihash, GetBytesHashError>;
+
     async fn insert_bytes<'a>(
         &'a self,
         data: &'a [u8],
@@ -222,6 +224,24 @@ pub enum GetExternalUrlError {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
+pub enum GetBytesHashError {
+    #[error(transparent)]
+    Access(
+        #[from]
+        #[backtrace]
+        AccessError,
+    ),
+    #[error(transparent)]
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
 pub enum InsertError {
     #[error(transparent)]
     HashMismatch(
@@ -248,6 +268,15 @@ impl From<ContainsError> for InsertError {
         match v {
             ContainsError::Access(e) => InsertError::Access(e),
             ContainsError::Internal(e) => InsertError::Internal(e),
+        }
+    }
+}
+
+impl From<GetBytesHashError> for InsertError {
+    fn from(v: GetBytesHashError) -> Self {
+        match v {
+            GetBytesHashError::Access(e) => InsertError::Access(e),
+            GetBytesHashError::Internal(e) => InsertError::Internal(e),
         }
     }
 }

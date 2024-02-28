@@ -30,7 +30,8 @@ pub type ObjectRepositoryS3Sha3 =
 /////////////////////////////////////////////////////////////////////////////////////////
 
 // TODO: Pass a single type that configures digest algo, multicodec, and hash
-// base TODO: Verify atomic behavior
+//       base
+// TODO: Verify atomic behavior
 pub struct ObjectRepositoryS3<D, const C: u32> {
     s3_context: S3Context,
     _phantom: PhantomData<D>,
@@ -221,6 +222,13 @@ where
         })
     }
 
+    fn get_bytes_hash(&self, data: &[u8]) -> Result<Multihash, GetBytesHashError> {
+        Ok(Multihash::from_digest::<D>(
+            Multicodec::try_from(C).unwrap(),
+            data,
+        ))
+    }
+
     async fn insert_bytes<'a>(
         &'a self,
         data: &'a [u8],
@@ -229,7 +237,7 @@ where
         let hash = if let Some(hash) = options.precomputed_hash {
             hash.clone()
         } else {
-            Multihash::from_digest::<D>(Multicodec::try_from(C).unwrap(), data)
+            self.get_bytes_hash(data)?
         };
 
         if let Some(expected_hash) = options.expected_hash {
