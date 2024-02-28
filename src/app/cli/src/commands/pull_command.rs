@@ -190,7 +190,7 @@ impl Command for PullCommand {
             }
         }
 
-        if updated != 0 {
+        if updated != 0 && !self.output_config.quiet {
             eprintln!(
                 "{}",
                 console::style(format!("{updated} dataset(s) updated"))
@@ -198,7 +198,7 @@ impl Command for PullCommand {
                     .bold()
             );
         }
-        if up_to_date != 0 {
+        if up_to_date != 0 && !self.output_config.quiet {
             eprintln!(
                 "{}",
                 console::style(format!("{up_to_date} dataset(s) up-to-date"))

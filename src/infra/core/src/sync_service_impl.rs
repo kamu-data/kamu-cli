@@ -55,12 +55,21 @@ impl SyncServiceImpl {
         }
     }
 
+    fn resolve_sync_ref(&self, any_ref: &DatasetRefAny) -> Result<SyncRef, SyncError> {
+        match any_ref.as_local_ref(|repo| self.remote_repo_reg.get_repository(repo).is_ok()) {
+            Ok(local_ref) => Ok(SyncRef::Local(local_ref)),
+            Err(remote_ref) => Ok(SyncRef::Remote(Arc::new(
+                self.resolve_remote_dataset_url(&remote_ref)?,
+            ))),
+        }
+    }
+
     fn resolve_remote_dataset_url(&self, remote_ref: &DatasetRefRemote) -> Result<Url, SyncError> {
         // TODO: REMOTE ID
         match remote_ref {
-            DatasetRefRemote::ID(_, _) => {
-                unimplemented!("Syncing remote dataset by ID is not yet supported")
-            }
+            DatasetRefRemote::ID(_, _) => Err(SyncError::Internal(
+                "Syncing remote dataset by ID is not yet supported".int_err(),
+            )),
             DatasetRefRemote::Alias(alias)
             | DatasetRefRemote::Handle(DatasetHandleRemote { alias, .. }) => {
                 let mut repo = self.remote_repo_reg.get_repository(&alias.repo_name)?;
@@ -78,21 +87,22 @@ impl SyncServiceImpl {
 
     async fn get_dataset_reader(
         &self,
-        dataset_ref: &DatasetRefAny,
+        dataset_ref: &SyncRef,
     ) -> Result<Arc<dyn Dataset>, SyncError> {
-        let dataset = match dataset_ref.as_local_ref(|_| !self.dataset_repo.is_multi_tenant()) {
-            Ok(local_ref) => {
-                let dataset_handle = self.dataset_repo.resolve_dataset_ref(&local_ref).await?;
+        let dataset = match dataset_ref {
+            SyncRef::Local(local_ref) => {
+                let dataset_handle = self.dataset_repo.resolve_dataset_ref(local_ref).await?;
                 self.dataset_action_authorizer
                     .check_action_allowed(&dataset_handle, auth::DatasetAction::Read)
                     .await?;
 
-                self.dataset_repo.get_dataset(&local_ref).await?
+                self.dataset_repo.get_dataset(local_ref).await?
             }
-            Err(remote_ref) => {
+            SyncRef::Remote(url) => {
                 // TODO: implement authorization checks somehow
-                let url = self.resolve_remote_dataset_url(&remote_ref)?;
-                self.dataset_factory.get_dataset(&url, false).await?
+                self.dataset_factory
+                    .get_dataset(url.as_ref(), false)
+                    .await?
             }
         };
 
@@ -103,7 +113,7 @@ impl SyncServiceImpl {
         {
             Ok(_) => Ok(dataset),
             Err(GetRefError::NotFound(_)) => Err(DatasetNotFoundError {
-                dataset_ref: dataset_ref.clone(),
+                dataset_ref: dataset_ref.as_any_ref(),
             }
             .into()),
             Err(GetRefError::Access(e)) => Err(SyncError::Access(e)),
@@ -113,13 +123,13 @@ impl SyncServiceImpl {
 
     async fn get_dataset_writer(
         &self,
-        dataset_ref: &DatasetRefAny,
+        dataset_ref: &SyncRef,
         create_if_not_exists: bool,
     ) -> Result<(Option<Arc<dyn Dataset>>, Option<DatasetFactoryFn>), SyncError> {
-        match dataset_ref.as_local_ref(|_| !self.dataset_repo.is_multi_tenant()) {
-            Ok(local_ref) => match self.dataset_repo.get_dataset(&local_ref).await {
+        match dataset_ref {
+            SyncRef::Local(local_ref) => match self.dataset_repo.get_dataset(local_ref).await {
                 Ok(dataset) => {
-                    let dataset_handle = self.dataset_repo.resolve_dataset_ref(&local_ref).await?;
+                    let dataset_handle = self.dataset_repo.resolve_dataset_ref(local_ref).await?;
                     self.dataset_action_authorizer
                         .check_action_allowed(&dataset_handle, auth::DatasetAction::Write)
                         .await?;
@@ -138,12 +148,11 @@ impl SyncServiceImpl {
                 }
                 Err(err) => Err(err.into()),
             },
-            Err(remote_ref) => {
+            SyncRef::Remote(url) => {
                 // TODO: implement authorization checks somehow
-                let url = self.resolve_remote_dataset_url(&remote_ref)?;
                 let dataset = self
                     .dataset_factory
-                    .get_dataset(&url, create_if_not_exists)
+                    .get_dataset(url.as_ref(), create_if_not_exists)
                     .await?;
 
                 if !create_if_not_exists {
@@ -154,7 +163,7 @@ impl SyncServiceImpl {
                     {
                         Ok(_) => Ok(()),
                         Err(GetRefError::NotFound(_)) => Err(DatasetNotFoundError {
-                            dataset_ref: dataset_ref.clone(),
+                            dataset_ref: dataset_ref.as_any_ref(),
                         }
                         .into()),
                         Err(GetRefError::Access(e)) => Err(SyncError::Access(e)),
@@ -169,14 +178,12 @@ impl SyncServiceImpl {
 
     async fn sync_generic(
         &self,
-        src_ref: &DatasetRefAny,
-        dst_ref: &DatasetRefAny,
+        src_ref: &SyncRef,
+        dst_ref: &SyncRef,
         opts: SyncOptions,
         listener: Arc<dyn SyncListener>,
     ) -> Result<SyncResult, SyncError> {
-        let src_is_local = src_ref
-            .as_local_ref(|_| !self.dataset_repo.is_multi_tenant())
-            .is_ok();
+        let src_is_local = src_ref.is_local();
 
         let src_dataset = self.get_dataset_reader(src_ref).await?;
         let (dst_dataset, dst_factory) = self
@@ -195,7 +202,7 @@ impl SyncServiceImpl {
 
         SimpleTransferProtocol
             .sync(
-                src_ref,
+                &src_ref.as_any_ref(),
                 src_dataset,
                 dst_dataset,
                 dst_factory,
@@ -209,13 +216,12 @@ impl SyncServiceImpl {
 
     async fn sync_smart_pull_transfer_protocol(
         &self,
-        src_ref: &DatasetRefRemote,
-        dst_ref: &DatasetRefAny,
+        src_url: &Url,
+        dst_ref: &SyncRef,
         opts: SyncOptions,
         listener: Arc<dyn SyncListener>,
     ) -> Result<SyncResult, SyncError> {
-        let odf_src_url = self.resolve_remote_dataset_url(src_ref)?;
-        let http_src_url = Url::parse(&odf_src_url.as_str()["odf+".len()..]).unwrap(); // odf+http, odf+https - cut odf+
+        let http_src_url = src_url.odf_to_transport_protocol()?;
 
         let (dst_dataset, dst_factory) = self
             .get_dataset_writer(dst_ref, opts.create_if_not_exists)
@@ -236,17 +242,19 @@ impl SyncServiceImpl {
 
     async fn sync_smart_push_transfer_protocol<'a>(
         &'a self,
-        src: &DatasetRefAny,
-        odf_dst: &DatasetRefRemote,
+        src: &SyncRef,
+        dst_url: &Url,
         listener: Arc<dyn SyncListener>,
     ) -> Result<SyncResult, SyncError> {
         let src_dataset = self.get_dataset_reader(src).await?;
 
-        let odf_dst_url = self.resolve_remote_dataset_url(odf_dst)?;
-        let http_dst_url = Url::parse(&odf_dst_url.as_str()[4..]).unwrap(); // odf+http, odf+https - cut odf+
+        let http_dst_url = dst_url.odf_to_transport_protocol()?;
 
-        let http_dst_ref = DatasetRefAny::Url(http_dst_url.clone().into());
-        let maybe_dst_head = match self.get_dataset_reader(&http_dst_ref).await {
+        // TODO: move head check into the protocol
+        let maybe_dst_head = match self
+            .get_dataset_reader(&SyncRef::Remote(Arc::new(http_dst_url.clone())))
+            .await
+        {
             Ok(http_dst_dataset_view) => match http_dst_dataset_view
                 .as_metadata_chain()
                 .resolve_ref(&BlockRef::Head)
@@ -496,8 +504,13 @@ impl SyncServiceImpl {
         opts: SyncOptions,
         listener: Arc<dyn SyncListener>,
     ) -> Result<SyncResult, SyncError> {
-        match (src, dst) {
-            (_, DatasetRefAny::Url(dst_url)) if dst_url.scheme() == "ipfs" => {
+        let src = self.resolve_sync_ref(src)?;
+        let dst = self.resolve_sync_ref(dst)?;
+        tracing::info!(src_loc = ?src, dst_loc = ?dst, "Resolved source / destination");
+
+        match (&src, &dst) {
+            // * -> ipfs
+            (_, SyncRef::Remote(dst_url)) if dst_url.scheme() == "ipfs" => {
                 Err(UnsupportedProtocolError {
                     url: dst_url.as_ref().clone(),
                     message: Some(
@@ -512,29 +525,31 @@ impl SyncServiceImpl {
                 }
                 .into())
             }
-            (_, DatasetRefAny::Url(dst_url)) if dst_url.scheme() == "ipns" => {
-                match src.as_local_ref(|_| !self.dataset_repo.is_multi_tenant()) {
-                    Ok(src) => match dst_url.path() {
-                        "" | "/" => self.sync_to_ipfs(&src, dst_url, opts).await,
-                        _ => Err(UnsupportedProtocolError {
-                            url: dst_url.as_ref().clone(),
-                            message: Some(
-                                concat!(
-                                    "Cannot use a sub-path when syncing to ipns:// URL. ",
-                                    "Only a single dataset per IPNS key is currently supported.",
-                                )
-                                .to_owned(),
-                            ),
-                        }
-                        .into()),
-                    },
-                    Err(_) => Err(UnsupportedProtocolError {
+            // <remote> -> ipns
+            (SyncRef::Remote(_), SyncRef::Remote(dst_url)) if dst_url.scheme() == "ipns" => {
+                Err(UnsupportedProtocolError {
+                    url: dst_url.as_ref().clone(),
+                    message: Some(
+                        concat!(
+                            "Syncing from a remote repository directly to IPFS ",
+                            "is not currently supported. Consider pulling the dataset ",
+                            "locally and then pushing to IPFS.",
+                        )
+                        .to_owned(),
+                    ),
+                }
+                .into())
+            }
+            // <local> -> ipns
+            (SyncRef::Local(src_ref), SyncRef::Remote(dst_url)) if dst_url.scheme() == "ipns" => {
+                match dst_url.path() {
+                    "" | "/" => self.sync_to_ipfs(src_ref, dst_url, opts).await,
+                    _ => Err(UnsupportedProtocolError {
                         url: dst_url.as_ref().clone(),
                         message: Some(
                             concat!(
-                                "Syncing from a remote repository directly to IPFS ",
-                                "is not currently supported. Consider pulling the dataset ",
-                                "locally and then pushing to IPFS.",
+                                "Cannot use a sub-path when syncing to ipns:// URL. ",
+                                "Only a single dataset per IPNS key is supported.",
                             )
                             .to_owned(),
                         ),
@@ -542,7 +557,8 @@ impl SyncServiceImpl {
                     .into()),
                 }
             }
-            (DatasetRefAny::Url(src_url), DatasetRefAny::Url(dst_url))
+            // odf -> odf
+            (SyncRef::Remote(src_url), SyncRef::Remote(dst_url))
                 if src_url.is_odf_protocol() && dst_url.is_odf_protocol() =>
             {
                 Err(UnsupportedProtocolError {
@@ -558,24 +574,18 @@ impl SyncServiceImpl {
                 }
                 .into())
             }
-            (DatasetRefAny::Url(src_url), _) if src_url.is_odf_protocol() => {
-                self.sync_smart_pull_transfer_protocol(
-                    &DatasetRefRemote::Url(src_url.clone()),
-                    dst,
-                    opts,
-                    listener,
-                )
-                .await
+            // odf -> *
+            (SyncRef::Remote(src_url), _) if src_url.is_odf_protocol() => {
+                self.sync_smart_pull_transfer_protocol(src_url.as_ref(), &dst, opts, listener)
+                    .await
             }
-            (_, DatasetRefAny::Url(dst_url)) if dst_url.is_odf_protocol() => {
-                self.sync_smart_push_transfer_protocol(
-                    src,
-                    &DatasetRefRemote::Url(dst_url.clone()),
-                    listener,
-                )
-                .await
+            // * -> odf
+            (_, SyncRef::Remote(dst_url)) if dst_url.is_odf_protocol() => {
+                self.sync_smart_push_transfer_protocol(&src, dst_url.as_ref(), listener)
+                    .await
             }
-            (_, _) => self.sync_generic(src, dst, opts, listener).await,
+            // * -> *
+            (_, _) => self.sync_generic(&src, &dst, opts, listener).await,
         }
     }
 }
@@ -631,9 +641,36 @@ impl SyncService for SyncServiceImpl {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Debug, Clone)]
+enum SyncRef {
+    Local(DatasetRef),
+    Remote(Arc<Url>),
+}
+
+impl SyncRef {
+    fn is_local(&self) -> bool {
+        match self {
+            Self::Local(_) => true,
+            Self::Remote(_) => false,
+        }
+    }
+
+    fn as_any_ref(&self) -> DatasetRefAny {
+        match self {
+            Self::Local(local_ref) => local_ref.as_any_ref(),
+            Self::Remote(url) => DatasetRefAny::Url(Arc::clone(url)),
+        }
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
 trait UrlExt {
     fn ensure_trailing_slash(&mut self);
     fn is_odf_protocol(&self) -> bool;
+
+    /// Converts from odf+http(s) scheme to plain http(s)
+    fn odf_to_transport_protocol(&self) -> Result<Url, InternalError>;
 }
 
 impl UrlExt for Url {
@@ -645,5 +682,13 @@ impl UrlExt for Url {
 
     fn is_odf_protocol(&self) -> bool {
         self.scheme().starts_with("odf+")
+    }
+
+    fn odf_to_transport_protocol(&self) -> Result<Url, InternalError> {
+        let s = self
+            .as_str()
+            .strip_prefix("odf+")
+            .ok_or_else(|| format!("Expected odf+http(s) URL but got: {self}").int_err())?;
+        Url::parse(s).int_err()
     }
 }

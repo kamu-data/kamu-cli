@@ -109,7 +109,7 @@ impl SearchServiceImpl {
         let gql_query = r#"
             {
               search {
-                query(query: "{query}") {
+                query(query: "{query}", perPage: 100) {
                   nodes {
                     ... on Dataset {
                       id
