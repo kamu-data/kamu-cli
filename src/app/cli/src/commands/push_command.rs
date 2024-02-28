@@ -26,7 +26,6 @@ pub struct PushCommand {
     push_svc: Arc<dyn PushService>,
     dataset_repo: Arc<dyn DatasetRepository>,
     remote_repo_req: Arc<dyn RemoteRepositoryRegistry>,
-    search_svc: Arc<dyn SearchService>,
     refs: Vec<DatasetRefPatternAny>,
     all: bool,
     recursive: bool,
@@ -41,7 +40,6 @@ impl PushCommand {
         push_svc: Arc<dyn PushService>,
         dataset_repo: Arc<dyn DatasetRepository>,
         remote_repo_req: Arc<dyn RemoteRepositoryRegistry>,
-        search_svc: Arc<dyn SearchService>,
         refs: I,
         all: bool,
         recursive: bool,
@@ -57,7 +55,6 @@ impl PushCommand {
             push_svc,
             dataset_repo,
             remote_repo_req,
-            search_svc,
             refs: refs.collect(),
             all,
             recursive,
@@ -108,7 +105,6 @@ impl PushCommand {
             let dataset_refs: Vec<_> = filter_datasets_by_any_pattern(
                 self.dataset_repo.as_ref(),
                 self.remote_repo_req.clone(),
-                self.search_svc.clone(),
                 self.refs.clone(),
             )
             .map_ok(|dataset_ref_any| dataset_ref_any)

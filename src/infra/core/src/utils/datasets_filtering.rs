@@ -8,18 +8,12 @@
 // by the Apache License, Version 2.0.
 
 use std::pin::Pin;
+use std::str::FromStr;
 use std::sync::Arc;
 
 use futures::stream::Chain;
 use futures::{future, StreamExt, TryStreamExt};
-use kamu_core::{
-    DatasetRepository,
-    GetDatasetError,
-    RemoteRepositoryRegistry,
-    SearchOptions,
-    SearchResult,
-    SearchService,
-};
+use kamu_core::{DatasetRepository, GetDatasetError, RemoteRepositoryRegistry};
 use opendatafabric::{
     DatasetHandle,
     DatasetRefAny,
@@ -70,7 +64,6 @@ pub fn filter_datasets_by_local_pattern(
 pub fn filter_datasets_by_any_pattern(
     dataset_repo: &dyn DatasetRepository,
     remote_repo_reg: Arc<dyn RemoteRepositoryRegistry>,
-    search_svc: Arc<dyn SearchService>,
     dataset_ref_patterns: Vec<DatasetRefPatternAny>,
 ) -> Chain<FilteredDatasetRefAnyStream<'_>, FilteredDatasetRefAnyStream<'_>> {
     let clone_dataset_ref_patterns = dataset_ref_patterns.clone();
@@ -88,20 +81,32 @@ pub fn filter_datasets_by_any_pattern(
                     .filter(|repo_name| dataset_ref_pattern.is_match_repo_name(repo_name))
                     .collect();
 
-                let search_options = SearchOptions {
-                    repository_names: matched_repos,
-                };
-
-                let search_result = search_svc.search(None, search_options).await.unwrap_or(SearchResult {
-                    datasets: vec![]
-                });
-
-                for remote_dataset in &search_result.datasets {
-                    let dataset_ref_any = remote_dataset.as_any_ref();
-                    if dataset_ref_pattern.is_match(&dataset_ref_any, true) {
-                        yield dataset_ref_any;
+                for repo_name in &matched_repos {
+                    let static_dataset_pattern = dataset_ref_pattern.as_string_with_static_repo(repo_name);
+                    if !static_dataset_pattern.contains('%') {
+                        yield DatasetRefAny::from_str(static_dataset_pattern.as_str()).unwrap();
                     }
                 }
+
+                // This block will allow us to support wildcarding like rep%/acc%/net.ex%
+                // and validate its existing
+                // but it requires full scan of each matched repository
+
+                // let search_options = SearchOptions {
+                //     repository_names: matched_repos,
+                // };
+                // let search_result = search_svc.search(None, search_options).await.unwrap_or(SearchResult {
+                //     datasets: vec![]
+                // });
+                // println!("search_result: {:?}", search_result);
+
+                // for remote_dataset in &search_result.datasets {
+                //     let dataset_ref_any = remote_dataset.alias.as_any_ref();
+                //     println!("dataset_ref_any: {:?}", dataset_ref_any);
+                //     if dataset_ref_pattern.is_match(&dataset_ref_any, true) {
+                //         yield dataset_ref_any;
+                //     }
+                // }
             }
         };
     }) as FilteredDatasetRefAnyStream<'_>;

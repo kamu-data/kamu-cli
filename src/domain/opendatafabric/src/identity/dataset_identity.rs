@@ -342,6 +342,19 @@ pub struct DatasetAmbiguousPattern {
 }
 
 impl DatasetPatternAny {
+    pub fn as_string_with_static_repo(&self, static_repo_pattern: &RepoName) -> String {
+        match self {
+            Self::ID(_, dataset_id) => format!("{static_repo_pattern}/{dataset_id}"),
+            Self::Local(dataset_name_pattern) => dataset_name_pattern.to_string(),
+            Self::AmbiguousAlias(_, dataset_name_pattern) => {
+                format!("{static_repo_pattern}/{dataset_name_pattern}")
+            }
+            Self::RemoteAlias(_, account_pattern, dataset_name_pattern) => {
+                format!("{static_repo_pattern}/{account_pattern}/{dataset_name_pattern}")
+            }
+        }
+    }
+
     pub fn repo_pattern(&self) -> Option<DatasetRepoPattern> {
         match self {
             Self::ID(repo_name_pattern, _) | Self::RemoteAlias(repo_name_pattern, _, _) => {

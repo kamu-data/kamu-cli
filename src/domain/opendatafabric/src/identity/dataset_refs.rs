@@ -798,6 +798,15 @@ impl DatasetRefPatternAny {
         }
     }
 
+    pub fn as_string_with_static_repo(&self, repo_name: &RepoName) -> String {
+        match self {
+            Self::RefAny(_) => unimplemented!(),
+            Self::Pattern(dataset_ref_pattern) => {
+                dataset_ref_pattern.as_string_with_static_repo(repo_name)
+            }
+        }
+    }
+
     /// Returns `false` if value is a reference to some specific dataset rather
     /// than a glob pattern
     pub fn is_pattern(&self) -> bool {

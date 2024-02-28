@@ -27,7 +27,6 @@ pub struct PullCommand {
     pull_svc: Arc<dyn PullService>,
     dataset_repo: Arc<dyn DatasetRepository>,
     remote_repo_req: Arc<dyn RemoteRepositoryRegistry>,
-    search_svc: Arc<dyn SearchService>,
     output_config: Arc<OutputConfig>,
     refs: Vec<DatasetRefPatternAny>,
     all: bool,
@@ -43,7 +42,6 @@ impl PullCommand {
         pull_svc: Arc<dyn PullService>,
         dataset_repo: Arc<dyn DatasetRepository>,
         remote_repo_req: Arc<dyn RemoteRepositoryRegistry>,
-        search_svc: Arc<dyn SearchService>,
         output_config: Arc<OutputConfig>,
         refs: I,
         all: bool,
@@ -60,7 +58,6 @@ impl PullCommand {
             pull_svc,
             dataset_repo,
             remote_repo_req,
-            search_svc,
             output_config,
             refs: refs.into_iter().collect(),
             all,
@@ -111,7 +108,6 @@ impl PullCommand {
         let dataset_refs: Vec<_> = filter_datasets_by_any_pattern(
             self.dataset_repo.as_ref(),
             self.remote_repo_req.clone(),
-            self.search_svc.clone(),
             self.refs.clone(),
         )
         .map_ok(|dataset_ref_any| dataset_ref_any)
