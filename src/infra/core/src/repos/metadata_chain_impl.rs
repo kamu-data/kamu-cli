@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::borrow::Cow;
+
 use async_trait::async_trait;
 use futures::TryStreamExt;
 use kamu_core::*;
@@ -565,13 +567,22 @@ where
         opts: AppendOpts<'a>,
     ) -> Result<Multihash, AppendError> {
         if opts.validation == AppendValidation::Full {
+            let hash = if let Some(b) = opts.precomputed_hash {
+                Cow::Borrowed(b)
+            } else {
+                let hash = self.meta_block_repo.get_block_hash(&block).int_err()?;
+
+                Cow::Owned(hash)
+            };
+            let hashed_block = (hash.as_ref(), &block);
+
             let validators: BoxedVisitors = vec![
-                Box::<ValidateSeedBlockOrderVisitor>::default(),
-                Box::<ValidatePrevBlockExistsVisitor>::default(),
-                Box::<ValidateSequenceNumbersIntegrityVisitor>::default(),
-                Box::<ValidateSystemTimeIsMonotonicVisitor>::default(),
-                Box::<ValidateWatermarkIsMonotonicVisitor>::default(),
-                Box::<ValidateOffsetsAreSequentialVisitor>::default(),
+                Box::new(ValidateSeedBlockOrderVisitor::new(hashed_block)),
+                Box::new(ValidatePrevBlockExistsVisitor::new(hashed_block)),
+                Box::new(ValidateSequenceNumbersIntegrityVisitor::new(hashed_block)),
+                Box::new(ValidateSystemTimeIsMonotonicVisitor::new(hashed_block)),
+                Box::new(ValidateWatermarkIsMonotonicVisitor::new(hashed_block)),
+                Box::new(ValidateOffsetsAreSequentialVisitor::new(hashed_block)),
                 // TODO add ValidateEventLogicalStructureVisitor
             ];
 
@@ -643,16 +654,16 @@ where
     MetaBlockRepo: MetadataBlockRepository + Sync + Send,
     RefRepo: ReferenceRepository + Sync + Send,
 {
-    async fn accept(
-        &self,
+    async fn accept<'a>(
+        &'a self,
         append_block: &MetadataBlock,
-        visitors: BoxedVisitors,
+        visitors: BoxedVisitors<'a>,
     ) -> Result<(), AppendError> {
         assert!(!visitors.is_empty());
 
         // Phase 1. Check the append block itself
         let (mut visitors, mut decision) =
-            MetadataChainVisitorBatchProcessor::get_next_decisions(visitors, (append_block, None))?;
+            MetadataChainVisitorBatchProcessor::get_next_decisions(visitors)?;
 
         if decision == Decision::Stop {
             return Ok(());
@@ -667,9 +678,9 @@ where
 
         while let Some((hash, block)) = wrap_block_stream_error(blocks.try_next().await)? {
             let (next_visitors, next_decision) =
-                MetadataChainVisitorBatchProcessor::get_next_decisions(
+                MetadataChainVisitorBatchProcessor::get_next_decisions_with_block(
                     visitors,
-                    (&block, Some(&hash)),
+                    (&hash, &block),
                 )?;
 
             visitors = next_visitors;
@@ -683,7 +694,7 @@ where
             // At the moment, we're just iterating through all the blocks
         }
 
-        return Ok(());
+        Ok(())
     }
 }
 

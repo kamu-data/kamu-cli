@@ -10,7 +10,7 @@
 use std::hash::Hash;
 
 use bitflags::bitflags;
-use kamu_core::AppendError;
+use kamu_core::{AppendError, HashedMetadataBlockRef};
 use opendatafabric::{MetadataBlock, Multihash};
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -48,25 +48,25 @@ pub enum Decision {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-pub type MetadataBlockWithOptionalHashRef<'a> = (&'a MetadataBlock, Option<&'a Multihash>);
-
 pub trait MetadataChainVisitor: Sync + Send {
-    fn visit(
+    fn visit(&mut self) -> Result<Decision, AppendError>;
+
+    fn visit_with_block(
         &mut self,
-        block_with_optional_hash: MetadataBlockWithOptionalHashRef,
+        hashed_block: HashedMetadataBlockRef,
     ) -> Result<Decision, AppendError>;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-pub type BoxedVisitors = Vec<Box<dyn MetadataChainVisitor>>;
+pub type BoxedVisitors<'a> = Vec<Box<dyn MetadataChainVisitor + 'a>>;
 
 #[async_trait::async_trait]
 pub trait MetadataChainVisitorHost {
-    async fn accept(
-        &self,
+    async fn accept<'a>(
+        &'a self,
         append_block: &MetadataBlock,
-        visitors: BoxedVisitors,
+        visitors: BoxedVisitors<'a>,
     ) -> Result<(), AppendError>;
 }
 
