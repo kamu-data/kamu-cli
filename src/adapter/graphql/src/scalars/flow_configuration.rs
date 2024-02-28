@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_flow_system::{FlowConfigurationRule, Schedule, ScheduleCron};
+use kamu_flow_system::{BatchingRule, FlowConfigurationRule, Schedule, ScheduleCron};
 
 use crate::prelude::*;
 
@@ -24,11 +24,8 @@ impl From<kamu_flow_system::FlowConfigurationState> for FlowConfiguration {
     fn from(value: kamu_flow_system::FlowConfigurationState) -> Self {
         Self {
             paused: !value.is_active(),
-            batching: if let FlowConfigurationRule::StartCondition(condition) = &value.rule {
-                Some(FlowConfigurationBatching {
-                    throttling_period: condition.throttling_period.map(Into::into),
-                    minimal_data_batch: condition.minimal_data_batch,
-                })
+            batching: if let FlowConfigurationRule::BatchingRule(condition) = &value.rule {
+                Some((*condition).into())
             } else {
                 None
             },
@@ -54,8 +51,17 @@ pub enum FlowConfigurationSchedule {
 
 #[derive(SimpleObject, Clone, PartialEq, Eq)]
 pub struct FlowConfigurationBatching {
-    pub throttling_period: Option<TimeDelta>,
-    pub minimal_data_batch: Option<i32>,
+    pub min_records_to_await: u64,
+    pub max_batching_interval: TimeDelta,
+}
+
+impl From<BatchingRule> for FlowConfigurationBatching {
+    fn from(value: BatchingRule) -> Self {
+        Self {
+            min_records_to_await: value.min_records_to_await(),
+            max_batching_interval: (*value.max_batching_interval()).into(),
+        }
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////

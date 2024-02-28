@@ -9,7 +9,7 @@
 
 use opendatafabric::DatasetID;
 
-use crate::{DatasetFlowType, SystemFlowType};
+use crate::{AnyFlowType, DatasetFlowType, SystemFlowType};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -17,6 +17,15 @@ use crate::{DatasetFlowType, SystemFlowType};
 pub enum FlowKey {
     Dataset(FlowKeyDataset),
     System(FlowKeySystem),
+}
+
+impl FlowKey {
+    pub fn get_type(&self) -> AnyFlowType {
+        match self {
+            Self::Dataset(fk_dataset) => AnyFlowType::Dataset(fk_dataset.flow_type),
+            Self::System(fk_system) => AnyFlowType::System(fk_system.flow_type),
+        }
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

@@ -109,7 +109,7 @@ impl AxumServerPullProtocolInstance {
             .await
             .map_err(|e| PullServerError::Internal(e.int_err()))?;
 
-        let size_estimate_result = prepare_dataset_transfer_estimate(
+        let transfer_plan_result = prepare_dataset_transfer_plan(
             metadata_chain,
             pull_request.stop_at.as_ref().unwrap_or(&head),
             pull_request.begin_after.as_ref(),
@@ -118,10 +118,10 @@ impl AxumServerPullProtocolInstance {
 
         axum_write_payload::<DatasetPullResponse>(
             &mut self.socket,
-            match size_estimate_result {
-                Ok(size_estimate) => {
-                    tracing::debug!("Sending size estimate: {:?}", size_estimate);
-                    DatasetPullResponse::Ok(DatasetPullSuccessResponse { size_estimate })
+            match transfer_plan_result {
+                Ok(transfer_plan) => {
+                    tracing::debug!("Sending size estimate: {:?}", transfer_plan);
+                    DatasetPullResponse::Ok(DatasetPullSuccessResponse { transfer_plan })
                 }
                 Err(PrepareDatasetTransferEstimateError::InvalidInterval(e)) => {
                     tracing::debug!("Sending invalid interval error: {:?}", e);

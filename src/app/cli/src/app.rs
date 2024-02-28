@@ -205,6 +205,8 @@ pub fn configure_base_catalog(
 
     b.add::<DatasetFactoryImpl>();
 
+    b.add::<DatasetChangesServiceImpl>();
+
     b.add_builder(
         RemoteRepositoryRegistryImpl::builder().with_repos_dir(workspace_layout.repos_dir.clone()),
     );

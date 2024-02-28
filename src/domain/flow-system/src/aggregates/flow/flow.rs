@@ -40,16 +40,29 @@ impl Flow {
         )
     }
 
-    /// Define start condition for the history
-    pub fn define_start_condition(
+    /// Define start condition to indicate the relevant reason of waiting
+    pub fn set_relevant_start_condition(
         &mut self,
         now: DateTime<Utc>,
         start_condition: FlowStartCondition,
     ) -> Result<(), ProjectionError<FlowState>> {
-        let event = FlowEventStartConditionDefined {
+        let event = FlowEventStartConditionUpdated {
             event_time: now,
             flow_id: self.flow_id,
-            start_condition,
+            start_condition: Some(start_condition),
+        };
+        self.apply(event)
+    }
+
+    /// Clear start condition to indicate there is no reason of waiting
+    pub fn clear_start_condition(
+        &mut self,
+        now: DateTime<Utc>,
+    ) -> Result<(), ProjectionError<FlowState>> {
+        let event = FlowEventStartConditionUpdated {
+            event_time: now,
+            flow_id: self.flow_id,
+            start_condition: None,
         };
         self.apply(event)
     }
@@ -68,18 +81,23 @@ impl Flow {
         self.apply(event)
     }
 
-    /// Extra trigger
-    pub fn add_trigger(
+    /// Add extra trigger, if it's unique
+    pub fn add_trigger_if_unique(
         &mut self,
         now: DateTime<Utc>,
         trigger: FlowTrigger,
-    ) -> Result<(), ProjectionError<FlowState>> {
-        let event = FlowEventTriggerAdded {
-            event_time: now,
-            flow_id: self.flow_id,
-            trigger,
-        };
-        self.apply(event)
+    ) -> Result<bool, ProjectionError<FlowState>> {
+        if trigger.is_unique_vs(&self.triggers) {
+            let event = FlowEventTriggerAdded {
+                event_time: now,
+                flow_id: self.flow_id,
+                trigger,
+            };
+            self.apply(event)?;
+            Ok(true)
+        } else {
+            Ok(false)
+        }
     }
 
     /// Attaches a scheduled task

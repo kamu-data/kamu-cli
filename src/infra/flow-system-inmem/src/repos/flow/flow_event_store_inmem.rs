@@ -86,11 +86,6 @@ struct FlowIndexEntry {
     pub initiator: Option<AccountName>,
 }
 
-enum AnyFlowType {
-    Dataset(DatasetFlowType),
-    System(SystemFlowType),
-}
-
 impl FlowIndexEntry {
     pub fn matches_dataset_flow_filters(&self, filters: &DatasetFlowFilters) -> bool {
         self.dataset_flow_type_matches(filters.by_flow_type)

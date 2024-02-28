@@ -13,7 +13,7 @@ use std::sync::Arc;
 use chrono::{DateTime, Duration, DurationRound, TimeZone, Utc};
 use dill::*;
 use event_bus::EventBus;
-use kamu::testing::MetadataFactory;
+use kamu::testing::{MetadataFactory, MockDatasetChangesService};
 use kamu::*;
 use kamu_core::*;
 use kamu_flow_system::*;
@@ -101,34 +101,34 @@ async fn test_read_initial_config_and_queue_without_waiting() {
             r#"
             #0: +0ms:
               "foo" Ingest:
-                Flow ID = 0 Queued
+                Flow ID = 0 Queued(0ms) AutoPolling
 
             #1: +0ms:
               "foo" Ingest:
-                Flow ID = 0 Scheduled
+                Flow ID = 0 Scheduled(task=0) AutoPolling
 
             #2: +10ms:
               "foo" Ingest:
-                Flow ID = 0 Running
+                Flow ID = 0 Running(task=0)
 
             #3: +20ms:
               "foo" Ingest:
-                Flow ID = 1 Queued
+                Flow ID = 1 Queued(80ms) AutoPolling
                 Flow ID = 0 Finished Success
 
             #4: +80ms:
               "foo" Ingest:
-                Flow ID = 1 Scheduled
+                Flow ID = 1 Scheduled(task=1) AutoPolling
                 Flow ID = 0 Finished Success
 
             #5: +90ms:
               "foo" Ingest:
-                Flow ID = 1 Running
+                Flow ID = 1 Running(task=1)
                 Flow ID = 0 Finished Success
 
             #6: +100ms:
               "foo" Ingest:
-                Flow ID = 2 Queued
+                Flow ID = 2 Queued(160ms) AutoPolling
                 Flow ID = 1 Finished Success
                 Flow ID = 0 Finished Success
 
@@ -142,8 +142,11 @@ async fn test_read_initial_config_and_queue_without_waiting() {
 #[test_log::test(tokio::test)]
 async fn test_cron_config() {
     // Note: this test runs with 1s step, CRON does not apply to milliseconds
-    let harness =
-        FlowHarness::new_custom_time_properties(Duration::seconds(1), Duration::seconds(1));
+    let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
+        awaiting_step: Some(Duration::seconds(1)),
+        mandatory_throttling_period: Some(Duration::seconds(1)),
+        ..Default::default()
+    });
 
     // Create a "foo" root dataset, and configure ingestion cron schedule of every
     // 5s
@@ -199,24 +202,24 @@ async fn test_cron_config() {
             r#"
             #0: +0ms:
               "foo" Ingest:
-                Flow ID = 0 Queued
+                Flow ID = 0 Queued(5000ms) AutoPolling
 
             #1: +5000ms:
               "foo" Ingest:
-                Flow ID = 0 Scheduled
+                Flow ID = 0 Scheduled(task=0) AutoPolling
 
             #2: +6000ms:
               "foo" Ingest:
-                Flow ID = 0 Running
+                Flow ID = 0 Running(task=0)
 
             #3: +7000ms:
               "foo" Ingest:
-                Flow ID = 1 Queued
+                Flow ID = 1 Queued(10000ms) AutoPolling
                 Flow ID = 0 Finished Success
 
             #4: +10000ms:
               "foo" Ingest:
-                Flow ID = 1 Scheduled
+                Flow ID = 1 Scheduled(task=1) AutoPolling
                 Flow ID = 0 Finished Success
 
             "#
@@ -340,50 +343,50 @@ async fn test_manual_trigger() {
             r#"
             #0: +0ms:
               "foo" Ingest:
-                Flow ID = 0 Queued
+                Flow ID = 0 Queued(0ms) AutoPolling
 
             #1: +0ms:
               "foo" Ingest:
-                Flow ID = 0 Scheduled
+                Flow ID = 0 Scheduled(task=0) AutoPolling
 
             #2: +10ms:
               "foo" Ingest:
-                Flow ID = 0 Running
+                Flow ID = 0 Running(task=0)
 
             #3: +20ms:
               "foo" Ingest:
-                Flow ID = 1 Queued
+                Flow ID = 1 Queued(110ms) AutoPolling
                 Flow ID = 0 Finished Success
 
             #4: +40ms:
               "foo" Ingest:
-                Flow ID = 1 Scheduled
+                Flow ID = 1 Scheduled(task=1) AutoPolling
                 Flow ID = 0 Finished Success
 
             #5: +60ms:
               "foo" Ingest:
-                Flow ID = 1 Running
+                Flow ID = 1 Running(task=1)
                 Flow ID = 0 Finished Success
 
             #6: +70ms:
               "foo" Ingest:
-                Flow ID = 2 Queued
+                Flow ID = 2 Queued(160ms) AutoPolling
                 Flow ID = 1 Finished Success
                 Flow ID = 0 Finished Success
 
             #7: +80ms:
               "bar" Ingest:
-                Flow ID = 3 Scheduled
+                Flow ID = 3 Scheduled(task=2) Manual
               "foo" Ingest:
-                Flow ID = 2 Queued
+                Flow ID = 2 Queued(160ms) AutoPolling
                 Flow ID = 1 Finished Success
                 Flow ID = 0 Finished Success
 
             #8: +100ms:
               "bar" Ingest:
-                Flow ID = 3 Running
+                Flow ID = 3 Running(task=2)
               "foo" Ingest:
-                Flow ID = 2 Queued
+                Flow ID = 2 Queued(160ms) AutoPolling
                 Flow ID = 1 Finished Success
                 Flow ID = 0 Finished Success
 
@@ -391,7 +394,7 @@ async fn test_manual_trigger() {
               "bar" Ingest:
                 Flow ID = 3 Finished Success
               "foo" Ingest:
-                Flow ID = 2 Queued
+                Flow ID = 2 Queued(160ms) AutoPolling
                 Flow ID = 1 Finished Success
                 Flow ID = 0 Finished Success
 
@@ -399,7 +402,7 @@ async fn test_manual_trigger() {
               "bar" Ingest:
                 Flow ID = 3 Finished Success
               "foo" Ingest:
-                Flow ID = 2 Scheduled
+                Flow ID = 2 Scheduled(task=3) AutoPolling
                 Flow ID = 1 Finished Success
                 Flow ID = 0 Finished Success
 
@@ -517,42 +520,42 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
             r#"
             #0: +0ms:
               "bar" Ingest:
-                Flow ID = 1 Queued
+                Flow ID = 1 Queued(0ms) AutoPolling
               "foo" Ingest:
-                Flow ID = 0 Queued
+                Flow ID = 0 Queued(0ms) AutoPolling
 
             #1: +0ms:
               "bar" Ingest:
-                Flow ID = 1 Scheduled
+                Flow ID = 1 Scheduled(task=1) AutoPolling
               "foo" Ingest:
-                Flow ID = 0 Scheduled
+                Flow ID = 0 Scheduled(task=0) AutoPolling
 
             #2: +10ms:
               "bar" Ingest:
-                Flow ID = 1 Scheduled
+                Flow ID = 1 Scheduled(task=1) AutoPolling
               "foo" Ingest:
-                Flow ID = 0 Running
+                Flow ID = 0 Running(task=0)
 
             #3: +20ms:
               "bar" Ingest:
-                Flow ID = 1 Scheduled
+                Flow ID = 1 Scheduled(task=1) AutoPolling
               "foo" Ingest:
-                Flow ID = 2 Queued
+                Flow ID = 2 Queued(70ms) AutoPolling
                 Flow ID = 0 Finished Success
 
             #4: +20ms:
               "bar" Ingest:
-                Flow ID = 1 Running
+                Flow ID = 1 Running(task=1)
               "foo" Ingest:
-                Flow ID = 2 Queued
+                Flow ID = 2 Queued(70ms) AutoPolling
                 Flow ID = 0 Finished Success
 
             #5: +30ms:
               "bar" Ingest:
-                Flow ID = 3 Queued
+                Flow ID = 3 Queued(110ms) AutoPolling
                 Flow ID = 1 Finished Success
               "foo" Ingest:
-                Flow ID = 2 Queued
+                Flow ID = 2 Queued(70ms) AutoPolling
                 Flow ID = 0 Finished Success
 
             #6: +50ms:
@@ -565,31 +568,31 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
 
             #7: +80ms:
               "bar" Ingest:
-                Flow ID = 5 Queued
+                Flow ID = 5 Queued(100ms) AutoPolling
                 Flow ID = 3 Finished Aborted
                 Flow ID = 1 Finished Success
               "foo" Ingest:
-                Flow ID = 4 Queued
+                Flow ID = 4 Queued(80ms) AutoPolling
                 Flow ID = 2 Finished Aborted
                 Flow ID = 0 Finished Success
 
             #8: +80ms:
               "bar" Ingest:
-                Flow ID = 5 Queued
+                Flow ID = 5 Queued(100ms) AutoPolling
                 Flow ID = 3 Finished Aborted
                 Flow ID = 1 Finished Success
               "foo" Ingest:
-                Flow ID = 4 Scheduled
+                Flow ID = 4 Scheduled(task=2) AutoPolling
                 Flow ID = 2 Finished Aborted
                 Flow ID = 0 Finished Success
 
             #9: +100ms:
               "bar" Ingest:
-                Flow ID = 5 Scheduled
+                Flow ID = 5 Scheduled(task=3) AutoPolling
                 Flow ID = 3 Finished Aborted
                 Flow ID = 1 Finished Success
               "foo" Ingest:
-                Flow ID = 4 Scheduled
+                Flow ID = 4 Scheduled(task=2) AutoPolling
                 Flow ID = 2 Finished Aborted
                 Flow ID = 0 Finished Success
 
@@ -714,42 +717,42 @@ async fn test_respect_last_success_time_when_schedule_resumes() {
             r#"
             #0: +0ms:
               "bar" Ingest:
-                Flow ID = 1 Queued
+                Flow ID = 1 Queued(0ms) AutoPolling
               "foo" Ingest:
-                Flow ID = 0 Queued
+                Flow ID = 0 Queued(0ms) AutoPolling
 
             #1: +0ms:
               "bar" Ingest:
-                Flow ID = 1 Scheduled
+                Flow ID = 1 Scheduled(task=1) AutoPolling
               "foo" Ingest:
-                Flow ID = 0 Scheduled
+                Flow ID = 0 Scheduled(task=0) AutoPolling
 
             #2: +10ms:
               "bar" Ingest:
-                Flow ID = 1 Scheduled
+                Flow ID = 1 Scheduled(task=1) AutoPolling
               "foo" Ingest:
-                Flow ID = 0 Running
+                Flow ID = 0 Running(task=0)
 
             #3: +20ms:
               "bar" Ingest:
-                Flow ID = 1 Scheduled
+                Flow ID = 1 Scheduled(task=1) AutoPolling
               "foo" Ingest:
-                Flow ID = 2 Queued
+                Flow ID = 2 Queued(120ms) AutoPolling
                 Flow ID = 0 Finished Success
 
             #4: +20ms:
               "bar" Ingest:
-                Flow ID = 1 Running
+                Flow ID = 1 Running(task=1)
               "foo" Ingest:
-                Flow ID = 2 Queued
+                Flow ID = 2 Queued(120ms) AutoPolling
                 Flow ID = 0 Finished Success
 
             #5: +30ms:
               "bar" Ingest:
-                Flow ID = 3 Queued
+                Flow ID = 3 Queued(90ms) AutoPolling
                 Flow ID = 1 Finished Success
               "foo" Ingest:
-                Flow ID = 2 Queued
+                Flow ID = 2 Queued(120ms) AutoPolling
                 Flow ID = 0 Finished Success
 
             #6: +50ms:
@@ -762,31 +765,31 @@ async fn test_respect_last_success_time_when_schedule_resumes() {
 
             #7: +100ms:
               "bar" Ingest:
-                Flow ID = 5 Queued
+                Flow ID = 5 Queued(100ms) AutoPolling
                 Flow ID = 3 Finished Aborted
                 Flow ID = 1 Finished Success
               "foo" Ingest:
-                Flow ID = 4 Queued
+                Flow ID = 4 Queued(120ms) AutoPolling
                 Flow ID = 2 Finished Aborted
                 Flow ID = 0 Finished Success
 
             #8: +100ms:
               "bar" Ingest:
-                Flow ID = 5 Scheduled
+                Flow ID = 5 Scheduled(task=2) AutoPolling
                 Flow ID = 3 Finished Aborted
                 Flow ID = 1 Finished Success
               "foo" Ingest:
-                Flow ID = 4 Queued
+                Flow ID = 4 Queued(120ms) AutoPolling
                 Flow ID = 2 Finished Aborted
                 Flow ID = 0 Finished Success
 
             #9: +120ms:
               "bar" Ingest:
-                Flow ID = 5 Scheduled
+                Flow ID = 5 Scheduled(task=2) AutoPolling
                 Flow ID = 3 Finished Aborted
                 Flow ID = 1 Finished Success
               "foo" Ingest:
-                Flow ID = 4 Scheduled
+                Flow ID = 4 Scheduled(task=3) AutoPolling
                 Flow ID = 2 Finished Aborted
                 Flow ID = 0 Finished Success
 
@@ -897,47 +900,47 @@ async fn test_dataset_deleted() {
             r#"
             #0: +0ms:
               "bar" Ingest:
-                Flow ID = 1 Queued
+                Flow ID = 1 Queued(0ms) AutoPolling
               "foo" Ingest:
-                Flow ID = 0 Queued
+                Flow ID = 0 Queued(0ms) AutoPolling
 
             #1: +0ms:
               "bar" Ingest:
-                Flow ID = 1 Scheduled
+                Flow ID = 1 Scheduled(task=1) AutoPolling
               "foo" Ingest:
-                Flow ID = 0 Scheduled
+                Flow ID = 0 Scheduled(task=0) AutoPolling
 
             #2: +10ms:
               "bar" Ingest:
-                Flow ID = 1 Scheduled
+                Flow ID = 1 Scheduled(task=1) AutoPolling
               "foo" Ingest:
-                Flow ID = 0 Running
+                Flow ID = 0 Running(task=0)
 
             #3: +20ms:
               "bar" Ingest:
-                Flow ID = 1 Scheduled
+                Flow ID = 1 Scheduled(task=1) AutoPolling
               "foo" Ingest:
-                Flow ID = 2 Queued
+                Flow ID = 2 Queued(70ms) AutoPolling
                 Flow ID = 0 Finished Success
 
             #4: +20ms:
               "bar" Ingest:
-                Flow ID = 1 Running
+                Flow ID = 1 Running(task=1)
               "foo" Ingest:
-                Flow ID = 2 Queued
+                Flow ID = 2 Queued(70ms) AutoPolling
                 Flow ID = 0 Finished Success
 
             #5: +30ms:
               "bar" Ingest:
-                Flow ID = 3 Queued
+                Flow ID = 3 Queued(100ms) AutoPolling
                 Flow ID = 1 Finished Success
               "foo" Ingest:
-                Flow ID = 2 Queued
+                Flow ID = 2 Queued(70ms) AutoPolling
                 Flow ID = 0 Finished Success
 
             #6: +50ms:
               "bar" Ingest:
-                Flow ID = 3 Queued
+                Flow ID = 3 Queued(100ms) AutoPolling
                 Flow ID = 1 Finished Success
               "foo" Ingest:
                 Flow ID = 2 Finished Aborted
@@ -945,7 +948,7 @@ async fn test_dataset_deleted() {
 
             #7: +100ms:
               "bar" Ingest:
-                Flow ID = 3 Scheduled
+                Flow ID = 3 Scheduled(task=2) AutoPolling
                 Flow ID = 1 Finished Success
               "foo" Ingest:
                 Flow ID = 2 Finished Aborted
@@ -1066,62 +1069,62 @@ async fn test_task_completions_trigger_next_loop_on_success() {
             r#"
             #0: +0ms:
               "bar" Ingest:
-                Flow ID = 1 Queued
+                Flow ID = 1 Queued(0ms) AutoPolling
               "baz" Ingest:
-                Flow ID = 2 Queued
+                Flow ID = 2 Queued(0ms) AutoPolling
               "foo" Ingest:
-                Flow ID = 0 Queued
+                Flow ID = 0 Queued(0ms) AutoPolling
 
             #1: +0ms:
               "bar" Ingest:
-                Flow ID = 1 Scheduled
+                Flow ID = 1 Scheduled(task=1) AutoPolling
               "baz" Ingest:
-                Flow ID = 2 Scheduled
+                Flow ID = 2 Scheduled(task=2) AutoPolling
               "foo" Ingest:
-                Flow ID = 0 Scheduled
+                Flow ID = 0 Scheduled(task=0) AutoPolling
 
             #2: +10ms:
               "bar" Ingest:
-                Flow ID = 1 Scheduled
+                Flow ID = 1 Scheduled(task=1) AutoPolling
               "baz" Ingest:
-                Flow ID = 2 Scheduled
+                Flow ID = 2 Scheduled(task=2) AutoPolling
               "foo" Ingest:
-                Flow ID = 0 Running
+                Flow ID = 0 Running(task=0)
 
             #3: +20ms:
               "bar" Ingest:
-                Flow ID = 1 Scheduled
+                Flow ID = 1 Scheduled(task=1) AutoPolling
               "baz" Ingest:
-                Flow ID = 2 Scheduled
+                Flow ID = 2 Scheduled(task=2) AutoPolling
               "foo" Ingest:
-                Flow ID = 3 Queued
+                Flow ID = 3 Queued(60ms) AutoPolling
                 Flow ID = 0 Finished Success
 
             #4: +20ms:
               "bar" Ingest:
-                Flow ID = 1 Running
+                Flow ID = 1 Running(task=1)
               "baz" Ingest:
-                Flow ID = 2 Scheduled
+                Flow ID = 2 Scheduled(task=2) AutoPolling
               "foo" Ingest:
-                Flow ID = 3 Queued
+                Flow ID = 3 Queued(60ms) AutoPolling
                 Flow ID = 0 Finished Success
 
             #5: +30ms:
               "bar" Ingest:
                 Flow ID = 1 Finished Failed
               "baz" Ingest:
-                Flow ID = 2 Scheduled
+                Flow ID = 2 Scheduled(task=2) AutoPolling
               "foo" Ingest:
-                Flow ID = 3 Queued
+                Flow ID = 3 Queued(60ms) AutoPolling
                 Flow ID = 0 Finished Success
 
             #6: +30ms:
               "bar" Ingest:
                 Flow ID = 1 Finished Failed
               "baz" Ingest:
-                Flow ID = 2 Running
+                Flow ID = 2 Running(task=2)
               "foo" Ingest:
-                Flow ID = 3 Queued
+                Flow ID = 3 Queued(60ms) AutoPolling
                 Flow ID = 0 Finished Success
 
             #7: +40ms:
@@ -1130,7 +1133,7 @@ async fn test_task_completions_trigger_next_loop_on_success() {
               "baz" Ingest:
                 Flow ID = 2 Finished Cancelled
               "foo" Ingest:
-                Flow ID = 3 Queued
+                Flow ID = 3 Queued(60ms) AutoPolling
                 Flow ID = 0 Finished Success
 
             #8: +60ms:
@@ -1139,7 +1142,7 @@ async fn test_task_completions_trigger_next_loop_on_success() {
               "baz" Ingest:
                 Flow ID = 2 Finished Cancelled
               "foo" Ingest:
-                Flow ID = 3 Scheduled
+                Flow ID = 3 Scheduled(task=3) AutoPolling
                 Flow ID = 0 Finished Success
 
             "#
@@ -1151,7 +1154,16 @@ async fn test_task_completions_trigger_next_loop_on_success() {
 
 #[test_log::test(tokio::test)]
 async fn test_derived_dataset_triggered_initially_and_after_input_change() {
-    let harness = FlowHarness::new();
+    let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
+        mock_dataset_changes: Some(MockDatasetChangesService::with_increment_since(
+            DatasetIntervalIncrement {
+                num_blocks: 1,
+                num_records: 3,
+                updated_watermark: None,
+            },
+        )),
+        ..Default::default()
+    });
 
     let foo_id = harness.create_root_dataset("foo").await;
     let bar_id = harness
@@ -1168,14 +1180,11 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
         .await;
 
     harness
-        .set_dataset_flow_start_condition(
+        .set_dataset_flow_batching_rule(
             harness.now_datetime(),
             bar_id.clone(),
             DatasetFlowType::ExecuteTransform,
-            StartConditionConfiguration {
-                throttling_period: None,
-                minimal_data_batch: None,
-            },
+            BatchingRule::new_checked(1, Duration::seconds(1)).unwrap(),
         )
         .await;
 
@@ -1214,7 +1223,13 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
                 task_id: TaskID::new(1),
                 dataset_id: Some(bar_id.clone()),
                 run_since_start: Duration::milliseconds(20),
-                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
+                // Send some PullResult with records to bypass batching condition
+                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
+                  pull_result: PullResult::Updated {
+                    old_head: Some(Multihash::from_digest_sha3_256(b"old-slice")),
+                    new_head: Multihash::from_digest_sha3_256(b"new-slice"),
+                  },
+                })))),
             });
             let task1_handle = task1_driver.run();
 
@@ -1223,7 +1238,13 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
                 task_id: TaskID::new(2),
                 dataset_id: Some(foo_id.clone()),
                 run_since_start: Duration::milliseconds(110),
-                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
+                // Send some PullResult with records to bypass batching condition
+                finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
+                  pull_result: PullResult::Updated {
+                    old_head: Some(Multihash::from_digest_sha3_256(b"new-slice")),
+                    new_head: Multihash::from_digest_sha3_256(b"newest-slice"),
+                  },
+                })))),
             });
             let task2_handle = task2_driver.run();
 
@@ -1254,81 +1275,81 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
             r#"
             #0: +0ms:
               "bar" ExecuteTransform:
-                Flow ID = 1 Queued
+                Flow ID = 1 Queued(0ms) AutoPolling
               "foo" Ingest:
-                Flow ID = 0 Queued
+                Flow ID = 0 Queued(0ms) AutoPolling
 
             #1: +0ms:
               "bar" ExecuteTransform:
-                Flow ID = 1 Scheduled
+                Flow ID = 1 Scheduled(task=1) AutoPolling
               "foo" Ingest:
-                Flow ID = 0 Scheduled
+                Flow ID = 0 Scheduled(task=0) AutoPolling
 
             #2: +10ms:
               "bar" ExecuteTransform:
-                Flow ID = 1 Scheduled
+                Flow ID = 1 Scheduled(task=1) AutoPolling
               "foo" Ingest:
-                Flow ID = 0 Running
+                Flow ID = 0 Running(task=0)
 
             #3: +20ms:
               "bar" ExecuteTransform:
-                Flow ID = 1 Scheduled
+                Flow ID = 1 Scheduled(task=1) AutoPolling
               "foo" Ingest:
-                Flow ID = 2 Queued
+                Flow ID = 2 Queued(100ms) AutoPolling
                 Flow ID = 0 Finished Success
 
             #4: +20ms:
               "bar" ExecuteTransform:
-                Flow ID = 1 Running
+                Flow ID = 1 Running(task=1)
               "foo" Ingest:
-                Flow ID = 2 Queued
+                Flow ID = 2 Queued(100ms) AutoPolling
                 Flow ID = 0 Finished Success
 
             #5: +30ms:
               "bar" ExecuteTransform:
                 Flow ID = 1 Finished Success
               "foo" Ingest:
-                Flow ID = 2 Queued
+                Flow ID = 2 Queued(100ms) AutoPolling
                 Flow ID = 0 Finished Success
 
             #6: +100ms:
               "bar" ExecuteTransform:
                 Flow ID = 1 Finished Success
               "foo" Ingest:
-                Flow ID = 2 Scheduled
+                Flow ID = 2 Scheduled(task=2) AutoPolling
                 Flow ID = 0 Finished Success
 
             #7: +110ms:
               "bar" ExecuteTransform:
                 Flow ID = 1 Finished Success
               "foo" Ingest:
-                Flow ID = 2 Running
+                Flow ID = 2 Running(task=2)
                 Flow ID = 0 Finished Success
 
             #8: +120ms:
               "bar" ExecuteTransform:
-                Flow ID = 3 Queued
+                Flow ID = 3 Queued(120ms) Input(foo) Batching(1, until=1120ms)
                 Flow ID = 1 Finished Success
               "foo" Ingest:
-                Flow ID = 4 Queued
+                Flow ID = 4 Queued(200ms) AutoPolling
                 Flow ID = 2 Finished Success
                 Flow ID = 0 Finished Success
 
             #9: +120ms:
               "bar" ExecuteTransform:
-                Flow ID = 3 Scheduled
+                Flow ID = 3 Scheduled(task=3) Input(foo)
                 Flow ID = 1 Finished Success
               "foo" Ingest:
-                Flow ID = 4 Queued
+                Flow ID = 4 Queued(200ms) AutoPolling
                 Flow ID = 2 Finished Success
                 Flow ID = 0 Finished Success
 
             #10: +130ms:
               "bar" ExecuteTransform:
-                Flow ID = 3 Running
+                Flow ID = 3 Running(task=3)
                 Flow ID = 1 Finished Success
               "foo" Ingest:
-                Flow ID = 4 Queued
+                Flow ID = 4 Queued(200ms) AutoPolling
                 Flow ID = 2 Finished Success
                 Flow ID = 0 Finished Success
 
@@ -1337,7 +1358,7 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
                 Flow ID = 3 Finished Success
                 Flow ID = 1 Finished Success
               "foo" Ingest:
-                Flow ID = 4 Queued
+                Flow ID = 4 Queued(200ms) AutoPolling
                 Flow ID = 2 Finished Success
                 Flow ID = 0 Finished Success
 
@@ -1346,7 +1367,7 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
                 Flow ID = 3 Finished Success
                 Flow ID = 1 Finished Success
               "foo" Ingest:
-                Flow ID = 4 Scheduled
+                Flow ID = 4 Scheduled(task=4) AutoPolling
                 Flow ID = 2 Finished Success
                 Flow ID = 0 Finished Success
 
@@ -1359,10 +1380,11 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
 
 #[test_log::test(tokio::test)]
 async fn test_throttling_manual_triggers() {
-    let harness = FlowHarness::new_custom_time_properties(
-        Duration::milliseconds(SCHEDULING_ALIGNMENT_MS), // 10ms
-        Duration::milliseconds(SCHEDULING_ALIGNMENT_MS * 10), // 100ms
-    );
+    let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
+        awaiting_step: Some(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS)),
+        mandatory_throttling_period: Some(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS * 10)),
+        ..Default::default()
+    });
 
     // Foo Flow
     let foo_id = harness.create_root_dataset("foo").await;
@@ -1440,11 +1462,11 @@ async fn test_throttling_manual_triggers() {
 
             #1: +20ms:
               "foo" Ingest:
-                Flow ID = 0 Scheduled
+                Flow ID = 0 Scheduled(task=0) Manual
 
             #2: +40ms:
               "foo" Ingest:
-                Flow ID = 0 Running
+                Flow ID = 0 Running(task=0)
 
             #3: +50ms:
               "foo" Ingest:
@@ -1452,12 +1474,12 @@ async fn test_throttling_manual_triggers() {
 
             #4: +100ms:
               "foo" Ingest:
-                Flow ID = 1 Queued
+                Flow ID = 1 Queued(150ms) Manual Throttling(100ms)
                 Flow ID = 0 Finished Success
 
             #5: +150ms:
               "foo" Ingest:
-                Flow ID = 1 Scheduled
+                Flow ID = 1 Scheduled(task=1) Manual
                 Flow ID = 0 Finished Success
 
           "#
@@ -1469,10 +1491,17 @@ async fn test_throttling_manual_triggers() {
 
 #[test_log::test(tokio::test)]
 async fn test_throttling_derived_dataset_with_2_parents() {
-    let harness = FlowHarness::new_custom_time_properties(
-        Duration::milliseconds(SCHEDULING_ALIGNMENT_MS), // 10ms
-        Duration::milliseconds(SCHEDULING_ALIGNMENT_MS * 10), // 100ms
-    );
+    let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
+        awaiting_step: Some(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS)), // 10ms,
+        mandatory_throttling_period: Some(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS * 10)), /* 100ms */
+        mock_dataset_changes: Some(MockDatasetChangesService::with_increment_since(
+            DatasetIntervalIncrement {
+                num_blocks: 2,
+                num_records: 7,
+                updated_watermark: None,
+            },
+        )),
+    });
 
     let foo_id = harness.create_root_dataset("foo").await;
     let bar_id = harness.create_root_dataset("bar").await;
@@ -1499,14 +1528,11 @@ async fn test_throttling_derived_dataset_with_2_parents() {
         .await;
 
     harness
-        .set_dataset_flow_start_condition(
+        .set_dataset_flow_batching_rule(
             harness.now_datetime(),
             baz_id.clone(),
             DatasetFlowType::ExecuteTransform,
-            StartConditionConfiguration {
-                throttling_period: None,
-                minimal_data_batch: None,
-            },
+            BatchingRule::new_checked(1, Duration::hours(24)).unwrap(),
         )
         .await;
 
@@ -1537,7 +1563,12 @@ async fn test_throttling_derived_dataset_with_2_parents() {
           task_id: TaskID::new(0),
           dataset_id: Some(foo_id.clone()),
           run_since_start: Duration::milliseconds(10),
-          finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
+          finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
+            pull_result: PullResult::Updated {
+              old_head: Some(Multihash::from_digest_sha3_256(b"foo-old-slice")),
+              new_head: Multihash::from_digest_sha3_256(b"foo-new-slice"),
+            },
+          })))),
         });
         let task0_handle = task0_driver.run();
 
@@ -1546,7 +1577,12 @@ async fn test_throttling_derived_dataset_with_2_parents() {
           task_id: TaskID::new(1),
           dataset_id: Some(bar_id.clone()),
           run_since_start: Duration::milliseconds(20),
-          finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
+          finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
+            pull_result: PullResult::Updated {
+              old_head: Some(Multihash::from_digest_sha3_256(b"bar-old-slice")),
+              new_head: Multihash::from_digest_sha3_256(b"fbar-new-slice"),
+            },
+         })))),
         });
         let task1_handle = task1_driver.run();
 
@@ -1564,7 +1600,13 @@ async fn test_throttling_derived_dataset_with_2_parents() {
           task_id: TaskID::new(3),
           dataset_id: Some(foo_id.clone()),
           run_since_start: Duration::milliseconds(130),
-          finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
+          finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult{
+            pull_result: PullResult::Updated {
+              old_head: Some(Multihash::from_digest_sha3_256(b"foo-new-slice")),
+              new_head: Multihash::from_digest_sha3_256(b"foo-newest-slice"),
+            },
+
+          })))),
         });
         let task3_handle = task3_driver.run();
 
@@ -1582,7 +1624,12 @@ async fn test_throttling_derived_dataset_with_2_parents() {
           task_id: TaskID::new(5),
           dataset_id: Some(bar_id.clone()),
           run_since_start: Duration::milliseconds(190),
-          finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::Empty))),
+          finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
+            pull_result: PullResult::Updated {
+              old_head: Some(Multihash::from_digest_sha3_256(b"bar-new-slice")),
+              new_head: Multihash::from_digest_sha3_256(b"bar-newest-slice"),
+            },
+          })))),
         });
         let task5_handle = task5_driver.run();
 
@@ -1636,223 +1683,1513 @@ async fn test_throttling_derived_dataset_with_2_parents() {
             r#"
           #0: +0ms:
             "bar" Ingest:
-              Flow ID = 1 Queued
+              Flow ID = 1 Queued(0ms) AutoPolling
             "baz" ExecuteTransform:
-              Flow ID = 2 Queued
+              Flow ID = 2 Queued(0ms) AutoPolling
             "foo" Ingest:
-              Flow ID = 0 Queued
+              Flow ID = 0 Queued(0ms) AutoPolling
 
           #1: +0ms:
             "bar" Ingest:
-              Flow ID = 1 Scheduled
+              Flow ID = 1 Scheduled(task=1) AutoPolling
             "baz" ExecuteTransform:
-              Flow ID = 2 Scheduled
+              Flow ID = 2 Scheduled(task=2) AutoPolling
             "foo" Ingest:
-              Flow ID = 0 Scheduled
+              Flow ID = 0 Scheduled(task=0) AutoPolling
 
           #2: +10ms:
             "bar" Ingest:
-              Flow ID = 1 Scheduled
+              Flow ID = 1 Scheduled(task=1) AutoPolling
             "baz" ExecuteTransform:
-              Flow ID = 2 Scheduled
+              Flow ID = 2 Scheduled(task=2) AutoPolling
             "foo" Ingest:
-              Flow ID = 0 Running
+              Flow ID = 0 Running(task=0)
 
           #3: +20ms:
             "bar" Ingest:
-              Flow ID = 1 Scheduled
+              Flow ID = 1 Scheduled(task=1) AutoPolling
             "baz" ExecuteTransform:
-              Flow ID = 2 Scheduled
+              Flow ID = 2 Scheduled(task=2) AutoPolling
             "foo" Ingest:
-              Flow ID = 3 Queued
+              Flow ID = 3 Queued(120ms) AutoPolling Throttling(100ms)
               Flow ID = 0 Finished Success
 
           #4: +20ms:
             "bar" Ingest:
-              Flow ID = 1 Running
+              Flow ID = 1 Running(task=1)
             "baz" ExecuteTransform:
-              Flow ID = 2 Scheduled
+              Flow ID = 2 Scheduled(task=2) AutoPolling
             "foo" Ingest:
-              Flow ID = 3 Queued
+              Flow ID = 3 Queued(120ms) AutoPolling Throttling(100ms)
               Flow ID = 0 Finished Success
 
           #5: +30ms:
             "bar" Ingest:
-              Flow ID = 4 Queued
+              Flow ID = 4 Queued(180ms) AutoPolling
               Flow ID = 1 Finished Success
             "baz" ExecuteTransform:
-              Flow ID = 2 Scheduled
+              Flow ID = 2 Scheduled(task=2) AutoPolling
             "foo" Ingest:
-              Flow ID = 3 Queued
+              Flow ID = 3 Queued(120ms) AutoPolling Throttling(100ms)
               Flow ID = 0 Finished Success
 
           #6: +30ms:
             "bar" Ingest:
-              Flow ID = 4 Queued
+              Flow ID = 4 Queued(180ms) AutoPolling
               Flow ID = 1 Finished Success
             "baz" ExecuteTransform:
-              Flow ID = 2 Running
+              Flow ID = 2 Running(task=2)
             "foo" Ingest:
-              Flow ID = 3 Queued
+              Flow ID = 3 Queued(120ms) AutoPolling Throttling(100ms)
               Flow ID = 0 Finished Success
 
           #7: +50ms:
             "bar" Ingest:
-              Flow ID = 4 Queued
+              Flow ID = 4 Queued(180ms) AutoPolling
               Flow ID = 1 Finished Success
             "baz" ExecuteTransform:
               Flow ID = 2 Finished Success
             "foo" Ingest:
-              Flow ID = 3 Queued
+              Flow ID = 3 Queued(120ms) AutoPolling Throttling(100ms)
               Flow ID = 0 Finished Success
 
           #8: +120ms:
             "bar" Ingest:
-              Flow ID = 4 Queued
+              Flow ID = 4 Queued(180ms) AutoPolling
               Flow ID = 1 Finished Success
             "baz" ExecuteTransform:
               Flow ID = 2 Finished Success
             "foo" Ingest:
-              Flow ID = 3 Scheduled
+              Flow ID = 3 Scheduled(task=3) AutoPolling
               Flow ID = 0 Finished Success
 
           #9: +130ms:
             "bar" Ingest:
-              Flow ID = 4 Queued
+              Flow ID = 4 Queued(180ms) AutoPolling
               Flow ID = 1 Finished Success
             "baz" ExecuteTransform:
               Flow ID = 2 Finished Success
             "foo" Ingest:
-              Flow ID = 3 Running
+              Flow ID = 3 Running(task=3)
               Flow ID = 0 Finished Success
 
           #10: +140ms:
             "bar" Ingest:
-              Flow ID = 4 Queued
+              Flow ID = 4 Queued(180ms) AutoPolling
               Flow ID = 1 Finished Success
             "baz" ExecuteTransform:
-              Flow ID = 5 Queued
+              Flow ID = 5 Queued(150ms) Input(foo) Throttling(100ms)
               Flow ID = 2 Finished Success
             "foo" Ingest:
-              Flow ID = 6 Queued
+              Flow ID = 6 Queued(240ms) AutoPolling Throttling(100ms)
               Flow ID = 3 Finished Success
               Flow ID = 0 Finished Success
 
           #11: +150ms:
             "bar" Ingest:
-              Flow ID = 4 Queued
+              Flow ID = 4 Queued(180ms) AutoPolling
               Flow ID = 1 Finished Success
             "baz" ExecuteTransform:
-              Flow ID = 5 Scheduled
+              Flow ID = 5 Scheduled(task=4) Input(foo)
               Flow ID = 2 Finished Success
             "foo" Ingest:
-              Flow ID = 6 Queued
+              Flow ID = 6 Queued(240ms) AutoPolling Throttling(100ms)
               Flow ID = 3 Finished Success
               Flow ID = 0 Finished Success
 
           #12: +160ms:
             "bar" Ingest:
-              Flow ID = 4 Queued
+              Flow ID = 4 Queued(180ms) AutoPolling
               Flow ID = 1 Finished Success
             "baz" ExecuteTransform:
-              Flow ID = 5 Running
+              Flow ID = 5 Running(task=4)
               Flow ID = 2 Finished Success
             "foo" Ingest:
-              Flow ID = 6 Queued
+              Flow ID = 6 Queued(240ms) AutoPolling Throttling(100ms)
               Flow ID = 3 Finished Success
               Flow ID = 0 Finished Success
 
           #13: +170ms:
             "bar" Ingest:
-              Flow ID = 4 Queued
+              Flow ID = 4 Queued(180ms) AutoPolling
               Flow ID = 1 Finished Success
             "baz" ExecuteTransform:
               Flow ID = 5 Finished Success
               Flow ID = 2 Finished Success
             "foo" Ingest:
-              Flow ID = 6 Queued
+              Flow ID = 6 Queued(240ms) AutoPolling Throttling(100ms)
               Flow ID = 3 Finished Success
               Flow ID = 0 Finished Success
 
           #14: +180ms:
             "bar" Ingest:
-              Flow ID = 4 Scheduled
+              Flow ID = 4 Scheduled(task=5) AutoPolling
               Flow ID = 1 Finished Success
             "baz" ExecuteTransform:
               Flow ID = 5 Finished Success
               Flow ID = 2 Finished Success
             "foo" Ingest:
-              Flow ID = 6 Queued
+              Flow ID = 6 Queued(240ms) AutoPolling Throttling(100ms)
               Flow ID = 3 Finished Success
               Flow ID = 0 Finished Success
 
           #15: +190ms:
             "bar" Ingest:
-              Flow ID = 4 Running
+              Flow ID = 4 Running(task=5)
               Flow ID = 1 Finished Success
             "baz" ExecuteTransform:
               Flow ID = 5 Finished Success
               Flow ID = 2 Finished Success
             "foo" Ingest:
-              Flow ID = 6 Queued
+              Flow ID = 6 Queued(240ms) AutoPolling Throttling(100ms)
               Flow ID = 3 Finished Success
               Flow ID = 0 Finished Success
 
           #16: +200ms:
             "bar" Ingest:
-              Flow ID = 8 Queued
+              Flow ID = 8 Queued(350ms) AutoPolling
               Flow ID = 4 Finished Success
               Flow ID = 1 Finished Success
             "baz" ExecuteTransform:
-              Flow ID = 7 Queued
+              Flow ID = 7 Queued(270ms) Input(bar) Throttling(100ms)
               Flow ID = 5 Finished Success
               Flow ID = 2 Finished Success
             "foo" Ingest:
-              Flow ID = 6 Queued
+              Flow ID = 6 Queued(240ms) AutoPolling Throttling(100ms)
               Flow ID = 3 Finished Success
               Flow ID = 0 Finished Success
 
           #17: +240ms:
             "bar" Ingest:
-              Flow ID = 8 Queued
+              Flow ID = 8 Queued(350ms) AutoPolling
               Flow ID = 4 Finished Success
               Flow ID = 1 Finished Success
             "baz" ExecuteTransform:
-              Flow ID = 7 Queued
+              Flow ID = 7 Queued(270ms) Input(bar) Throttling(100ms)
               Flow ID = 5 Finished Success
               Flow ID = 2 Finished Success
             "foo" Ingest:
-              Flow ID = 6 Scheduled
+              Flow ID = 6 Scheduled(task=6) AutoPolling
               Flow ID = 3 Finished Success
               Flow ID = 0 Finished Success
 
           #18: +270ms:
             "bar" Ingest:
-              Flow ID = 8 Queued
+              Flow ID = 8 Queued(350ms) AutoPolling
               Flow ID = 4 Finished Success
               Flow ID = 1 Finished Success
             "baz" ExecuteTransform:
-              Flow ID = 7 Scheduled
+              Flow ID = 7 Scheduled(task=7) Input(bar)
               Flow ID = 5 Finished Success
               Flow ID = 2 Finished Success
             "foo" Ingest:
-              Flow ID = 6 Scheduled
+              Flow ID = 6 Scheduled(task=6) AutoPolling
               Flow ID = 3 Finished Success
               Flow ID = 0 Finished Success
 
           #19: +350ms:
             "bar" Ingest:
-              Flow ID = 8 Scheduled
+              Flow ID = 8 Scheduled(task=8) AutoPolling
               Flow ID = 4 Finished Success
               Flow ID = 1 Finished Success
             "baz" ExecuteTransform:
-              Flow ID = 7 Scheduled
+              Flow ID = 7 Scheduled(task=7) Input(bar)
               Flow ID = 5 Finished Success
               Flow ID = 2 Finished Success
             "foo" Ingest:
-              Flow ID = 6 Scheduled
+              Flow ID = 6 Scheduled(task=6) AutoPolling
               Flow ID = 3 Finished Success
               Flow ID = 0 Finished Success
+
+        "#
+        )
+    );
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_batching_condition_records_reached() {
+    let mut seq = mockall::Sequence::new();
+
+    let mut mock_dataset_changes = MockDatasetChangesService::new();
+    mock_dataset_changes
+        .expect_get_increment_since()
+        .times(1)
+        .in_sequence(&mut seq)
+        .returning(|_, _| {
+            Ok(DatasetIntervalIncrement {
+                num_blocks: 1,
+                num_records: 5,
+                updated_watermark: None,
+            })
+        });
+    mock_dataset_changes
+        .expect_get_increment_since()
+        .times(1)
+        .in_sequence(&mut seq)
+        .returning(|_, _| {
+            Ok(DatasetIntervalIncrement {
+                num_blocks: 2,
+                num_records: 10,
+                updated_watermark: None,
+            })
+        });
+
+    let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
+        mock_dataset_changes: Some(mock_dataset_changes),
+        ..Default::default()
+    });
+
+    let foo_id = harness.create_root_dataset("foo").await;
+    let bar_id = harness
+        .create_derived_dataset("bar", vec![foo_id.clone()])
+        .await;
+
+    harness
+        .set_dataset_flow_schedule(
+            harness.now_datetime(),
+            foo_id.clone(),
+            DatasetFlowType::Ingest,
+            Duration::milliseconds(50).into(),
+        )
+        .await;
+
+    harness
+        .set_dataset_flow_batching_rule(
+            harness.now_datetime(),
+            bar_id.clone(),
+            DatasetFlowType::ExecuteTransform,
+            BatchingRule::new_checked(10, Duration::milliseconds(120)).unwrap(),
+        )
+        .await;
+
+    // Enforce dependency graph initialization
+    harness.eager_dependencies_graph_init().await;
+
+    // Flow listener will collect snapshots at important moments of time
+    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
+    test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
+
+    // Remember start time
+    let start_time = harness
+        .now_datetime()
+        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
+        .unwrap();
+
+    // Run scheduler concurrently with manual triggers script
+    tokio::select! {
+      // Run API service
+      res = harness.flow_service.run(start_time) => res.int_err(),
+
+      // Run simulation script and task drivers
+      _ = async {
+        // Task 0: "foo" start running at 10ms, finish at 20ms
+        let task0_driver = harness.task_driver(TaskDriverArgs {
+          task_id: TaskID::new(0),
+          dataset_id: Some(foo_id.clone()),
+          run_since_start: Duration::milliseconds(10),
+          finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
+            pull_result: PullResult::Updated {
+              old_head: Some(Multihash::from_digest_sha3_256(b"foo-old-slice")),
+              new_head: Multihash::from_digest_sha3_256(b"foo-new-slice"),
+            },
+          })))),
+        });
+        let task0_handle = task0_driver.run();
+
+        // Task 1: "bar" start running at 20ms, finish at 30ms
+        let task1_driver = harness.task_driver(TaskDriverArgs {
+          task_id: TaskID::new(1),
+          dataset_id: Some(bar_id.clone()),
+          run_since_start: Duration::milliseconds(20),
+          finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
+            pull_result: PullResult::Updated {
+              old_head: Some(Multihash::from_digest_sha3_256(b"bar-old-slice")),
+              new_head: Multihash::from_digest_sha3_256(b"bar-new-slice"),
+            },
+         })))),
+        });
+        let task1_handle = task1_driver.run();
+
+        // Task 2: "foo" start running at 80ms, finish at 90ms
+        let task2_driver = harness.task_driver(TaskDriverArgs {
+          task_id: TaskID::new(2),
+          dataset_id: Some(foo_id.clone()),
+          run_since_start: Duration::milliseconds(80),
+          finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult{
+            pull_result: PullResult::Updated {
+              old_head: Some(Multihash::from_digest_sha3_256(b"foo-new-slice")),
+              new_head: Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
+            },
+
+          })))),
+        });
+        let task2_handle = task2_driver.run();
+
+        // Task 3: "foo" start running at 150ms, finish at 160ms
+        let task3_driver = harness.task_driver(TaskDriverArgs {
+          task_id: TaskID::new(3),
+          dataset_id: Some(foo_id.clone()),
+          run_since_start: Duration::milliseconds(150),
+          finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult{
+            pull_result: PullResult::Updated {
+              old_head: Some(Multihash::from_digest_sha3_256(b"foo-new-slice-2")),
+              new_head: Multihash::from_digest_sha3_256(b"foo-new-slice-3"),
+            },
+
+          })))),
+        });
+        let task3_handle = task3_driver.run();
+
+        // Task 4: "bar" start running at 170ms, finish at 180ms
+        let task4_driver = harness.task_driver(TaskDriverArgs {
+          task_id: TaskID::new(4),
+          dataset_id: Some(bar_id.clone()),
+          run_since_start: Duration::milliseconds(170),
+          finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult{
+            pull_result: PullResult::Updated {
+              old_head: Some(Multihash::from_digest_sha3_256(b"bar-new-slice")),
+              new_head: Multihash::from_digest_sha3_256(b"bar-new-slice-2"),
+            },
+
+          })))),
+        });
+        let task4_handle = task4_driver.run();
+
+        // Main simulation script
+        let main_handle = async {
+          harness.advance_time(Duration::milliseconds(400)).await;
+        };
+
+        tokio::join!(task0_handle, task1_handle, task2_handle, task3_handle, task4_handle, main_handle)
+      } => Ok(())
+    }
+    .unwrap();
+
+    pretty_assertions::assert_eq!(
+        format!("{}", test_flow_listener.as_ref()),
+        indoc::indoc!(
+            r#"
+            #0: +0ms:
+              "bar" ExecuteTransform:
+                Flow ID = 1 Queued(0ms) AutoPolling
+              "foo" Ingest:
+                Flow ID = 0 Queued(0ms) AutoPolling
+
+            #1: +0ms:
+              "bar" ExecuteTransform:
+                Flow ID = 1 Scheduled(task=1) AutoPolling
+              "foo" Ingest:
+                Flow ID = 0 Scheduled(task=0) AutoPolling
+
+            #2: +10ms:
+              "bar" ExecuteTransform:
+                Flow ID = 1 Scheduled(task=1) AutoPolling
+              "foo" Ingest:
+                Flow ID = 0 Running(task=0)
+
+            #3: +20ms:
+              "bar" ExecuteTransform:
+                Flow ID = 1 Scheduled(task=1) AutoPolling
+              "foo" Ingest:
+                Flow ID = 2 Queued(70ms) AutoPolling
+                Flow ID = 0 Finished Success
+
+            #4: +20ms:
+              "bar" ExecuteTransform:
+                Flow ID = 1 Running(task=1)
+              "foo" Ingest:
+                Flow ID = 2 Queued(70ms) AutoPolling
+                Flow ID = 0 Finished Success
+
+            #5: +30ms:
+              "bar" ExecuteTransform:
+                Flow ID = 1 Finished Success
+              "foo" Ingest:
+                Flow ID = 2 Queued(70ms) AutoPolling
+                Flow ID = 0 Finished Success
+
+            #6: +70ms:
+              "bar" ExecuteTransform:
+                Flow ID = 1 Finished Success
+              "foo" Ingest:
+                Flow ID = 2 Scheduled(task=2) AutoPolling
+                Flow ID = 0 Finished Success
+
+            #7: +80ms:
+              "bar" ExecuteTransform:
+                Flow ID = 1 Finished Success
+              "foo" Ingest:
+                Flow ID = 2 Running(task=2)
+                Flow ID = 0 Finished Success
+
+            #8: +90ms:
+              "bar" ExecuteTransform:
+                Flow ID = 3 Queued(210ms) Input(foo) Batching(10, until=210ms)
+                Flow ID = 1 Finished Success
+              "foo" Ingest:
+                Flow ID = 4 Queued(140ms) AutoPolling
+                Flow ID = 2 Finished Success
+                Flow ID = 0 Finished Success
+
+            #9: +140ms:
+              "bar" ExecuteTransform:
+                Flow ID = 3 Queued(210ms) Input(foo) Batching(10, until=210ms)
+                Flow ID = 1 Finished Success
+              "foo" Ingest:
+                Flow ID = 4 Scheduled(task=3) AutoPolling
+                Flow ID = 2 Finished Success
+                Flow ID = 0 Finished Success
+
+            #10: +150ms:
+              "bar" ExecuteTransform:
+                Flow ID = 3 Queued(210ms) Input(foo) Batching(10, until=210ms)
+                Flow ID = 1 Finished Success
+              "foo" Ingest:
+                Flow ID = 4 Running(task=3)
+                Flow ID = 2 Finished Success
+                Flow ID = 0 Finished Success
+
+            #11: +160ms:
+              "bar" ExecuteTransform:
+                Flow ID = 3 Queued(160ms) Input(foo) Batching(10, until=210ms)
+                Flow ID = 1 Finished Success
+              "foo" Ingest:
+                Flow ID = 5 Queued(210ms) AutoPolling
+                Flow ID = 4 Finished Success
+                Flow ID = 2 Finished Success
+                Flow ID = 0 Finished Success
+
+            #12: +160ms:
+              "bar" ExecuteTransform:
+                Flow ID = 3 Scheduled(task=4) Input(foo)
+                Flow ID = 1 Finished Success
+              "foo" Ingest:
+                Flow ID = 5 Queued(210ms) AutoPolling
+                Flow ID = 4 Finished Success
+                Flow ID = 2 Finished Success
+                Flow ID = 0 Finished Success
+
+            #13: +170ms:
+              "bar" ExecuteTransform:
+                Flow ID = 3 Running(task=4)
+                Flow ID = 1 Finished Success
+              "foo" Ingest:
+                Flow ID = 5 Queued(210ms) AutoPolling
+                Flow ID = 4 Finished Success
+                Flow ID = 2 Finished Success
+                Flow ID = 0 Finished Success
+
+            #14: +180ms:
+              "bar" ExecuteTransform:
+                Flow ID = 3 Finished Success
+                Flow ID = 1 Finished Success
+              "foo" Ingest:
+                Flow ID = 5 Queued(210ms) AutoPolling
+                Flow ID = 4 Finished Success
+                Flow ID = 2 Finished Success
+                Flow ID = 0 Finished Success
+
+            #15: +210ms:
+              "bar" ExecuteTransform:
+                Flow ID = 3 Finished Success
+                Flow ID = 1 Finished Success
+              "foo" Ingest:
+                Flow ID = 5 Scheduled(task=5) AutoPolling
+                Flow ID = 4 Finished Success
+                Flow ID = 2 Finished Success
+                Flow ID = 0 Finished Success
+
+      "#
+        )
+    );
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_batching_condition_timeout() {
+    let mut seq = mockall::Sequence::new();
+
+    let mut mock_dataset_changes = MockDatasetChangesService::new();
+    mock_dataset_changes
+        .expect_get_increment_since()
+        .times(1)
+        .in_sequence(&mut seq)
+        .returning(|_, _| {
+            Ok(DatasetIntervalIncrement {
+                num_blocks: 1,
+                num_records: 5,
+                updated_watermark: None,
+            })
+        });
+
+    let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
+        mock_dataset_changes: Some(mock_dataset_changes),
+        ..Default::default()
+    });
+
+    let foo_id = harness.create_root_dataset("foo").await;
+    let bar_id = harness
+        .create_derived_dataset("bar", vec![foo_id.clone()])
+        .await;
+
+    harness
+        .set_dataset_flow_schedule(
+            harness.now_datetime(),
+            foo_id.clone(),
+            DatasetFlowType::Ingest,
+            Duration::milliseconds(50).into(),
+        )
+        .await;
+
+    harness
+        .set_dataset_flow_batching_rule(
+            harness.now_datetime(),
+            bar_id.clone(),
+            DatasetFlowType::ExecuteTransform,
+            BatchingRule::new_checked(10, Duration::milliseconds(150)).unwrap(),
+        )
+        .await;
+
+    // Enforce dependency graph initialization
+    harness.eager_dependencies_graph_init().await;
+
+    // Flow listener will collect snapshots at important moments of time
+    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
+    test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
+
+    // Remember start time
+    let start_time = harness
+        .now_datetime()
+        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
+        .unwrap();
+
+    // Run scheduler concurrently with manual triggers script
+    tokio::select! {
+      // Run API service
+      res = harness.flow_service.run(start_time) => res.int_err(),
+
+      // Run simulation script and task drivers
+      _ = async {
+        // Task 0: "foo" start running at 10ms, finish at 20ms
+        let task0_driver = harness.task_driver(TaskDriverArgs {
+          task_id: TaskID::new(0),
+          dataset_id: Some(foo_id.clone()),
+          run_since_start: Duration::milliseconds(10),
+          finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
+            pull_result: PullResult::Updated {
+              old_head: Some(Multihash::from_digest_sha3_256(b"foo-old-slice")),
+              new_head: Multihash::from_digest_sha3_256(b"foo-new-slice"),
+            },
+          })))),
+        });
+        let task0_handle = task0_driver.run();
+
+        // Task 1: "bar" start running at 20ms, finish at 30ms
+        let task1_driver = harness.task_driver(TaskDriverArgs {
+          task_id: TaskID::new(1),
+          dataset_id: Some(bar_id.clone()),
+          run_since_start: Duration::milliseconds(20),
+          finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
+            pull_result: PullResult::Updated {
+              old_head: Some(Multihash::from_digest_sha3_256(b"bar-old-slice")),
+              new_head: Multihash::from_digest_sha3_256(b"bar-new-slice"),
+            },
+         })))),
+        });
+        let task1_handle = task1_driver.run();
+
+        // Task 2: "foo" start running at 80ms, finish at 90ms
+        let task2_driver = harness.task_driver(TaskDriverArgs {
+          task_id: TaskID::new(2),
+          dataset_id: Some(foo_id.clone()),
+          run_since_start: Duration::milliseconds(80),
+          finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult{
+            pull_result: PullResult::Updated {
+              old_head: Some(Multihash::from_digest_sha3_256(b"foo-new-slice")),
+              new_head: Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
+            },
+
+          })))),
+        });
+        let task2_handle = task2_driver.run();
+
+        // Task 3 is scheduled, but never runs
+
+        // Task 4: "bar" start running at 250ms, finish at 2560ms
+        let task4_driver = harness.task_driver(TaskDriverArgs {
+          task_id: TaskID::new(4),
+          dataset_id: Some(bar_id.clone()),
+          run_since_start: Duration::milliseconds(250),
+          finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult{
+            pull_result: PullResult::Updated {
+              old_head: Some(Multihash::from_digest_sha3_256(b"bar-new-slice")),
+              new_head: Multihash::from_digest_sha3_256(b"bar-new-slice-2"),
+            },
+
+          })))),
+        });
+        let task4_handle = task4_driver.run();
+
+        // Main simulation script
+        let main_handle = async {
+          harness.advance_time(Duration::milliseconds(400)).await;
+        };
+
+        tokio::join!(task0_handle, task1_handle, task2_handle, task4_handle, main_handle)
+      } => Ok(())
+    }
+    .unwrap();
+
+    pretty_assertions::assert_eq!(
+        format!("{}", test_flow_listener.as_ref()),
+        indoc::indoc!(
+            r#"
+            #0: +0ms:
+              "bar" ExecuteTransform:
+                Flow ID = 1 Queued(0ms) AutoPolling
+              "foo" Ingest:
+                Flow ID = 0 Queued(0ms) AutoPolling
+
+            #1: +0ms:
+              "bar" ExecuteTransform:
+                Flow ID = 1 Scheduled(task=1) AutoPolling
+              "foo" Ingest:
+                Flow ID = 0 Scheduled(task=0) AutoPolling
+
+            #2: +10ms:
+              "bar" ExecuteTransform:
+                Flow ID = 1 Scheduled(task=1) AutoPolling
+              "foo" Ingest:
+                Flow ID = 0 Running(task=0)
+
+            #3: +20ms:
+              "bar" ExecuteTransform:
+                Flow ID = 1 Scheduled(task=1) AutoPolling
+              "foo" Ingest:
+                Flow ID = 2 Queued(70ms) AutoPolling
+                Flow ID = 0 Finished Success
+
+            #4: +20ms:
+              "bar" ExecuteTransform:
+                Flow ID = 1 Running(task=1)
+              "foo" Ingest:
+                Flow ID = 2 Queued(70ms) AutoPolling
+                Flow ID = 0 Finished Success
+
+            #5: +30ms:
+              "bar" ExecuteTransform:
+                Flow ID = 1 Finished Success
+              "foo" Ingest:
+                Flow ID = 2 Queued(70ms) AutoPolling
+                Flow ID = 0 Finished Success
+
+            #6: +70ms:
+              "bar" ExecuteTransform:
+                Flow ID = 1 Finished Success
+              "foo" Ingest:
+                Flow ID = 2 Scheduled(task=2) AutoPolling
+                Flow ID = 0 Finished Success
+
+            #7: +80ms:
+              "bar" ExecuteTransform:
+                Flow ID = 1 Finished Success
+              "foo" Ingest:
+                Flow ID = 2 Running(task=2)
+                Flow ID = 0 Finished Success
+
+            #8: +90ms:
+              "bar" ExecuteTransform:
+                Flow ID = 3 Queued(240ms) Input(foo) Batching(10, until=240ms)
+                Flow ID = 1 Finished Success
+              "foo" Ingest:
+                Flow ID = 4 Queued(140ms) AutoPolling
+                Flow ID = 2 Finished Success
+                Flow ID = 0 Finished Success
+
+            #9: +140ms:
+              "bar" ExecuteTransform:
+                Flow ID = 3 Queued(240ms) Input(foo) Batching(10, until=240ms)
+                Flow ID = 1 Finished Success
+              "foo" Ingest:
+                Flow ID = 4 Scheduled(task=3) AutoPolling
+                Flow ID = 2 Finished Success
+                Flow ID = 0 Finished Success
+
+            #10: +240ms:
+              "bar" ExecuteTransform:
+                Flow ID = 3 Scheduled(task=4) Input(foo)
+                Flow ID = 1 Finished Success
+              "foo" Ingest:
+                Flow ID = 4 Scheduled(task=3) AutoPolling
+                Flow ID = 2 Finished Success
+                Flow ID = 0 Finished Success
+
+            #11: +250ms:
+              "bar" ExecuteTransform:
+                Flow ID = 3 Running(task=4)
+                Flow ID = 1 Finished Success
+              "foo" Ingest:
+                Flow ID = 4 Scheduled(task=3) AutoPolling
+                Flow ID = 2 Finished Success
+                Flow ID = 0 Finished Success
+
+            #12: +260ms:
+              "bar" ExecuteTransform:
+                Flow ID = 3 Finished Success
+                Flow ID = 1 Finished Success
+              "foo" Ingest:
+                Flow ID = 4 Scheduled(task=3) AutoPolling
+                Flow ID = 2 Finished Success
+                Flow ID = 0 Finished Success
+
+      "#
+        )
+    );
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_batching_condition_watermark() {
+    let mut seq = mockall::Sequence::new();
+
+    let mut mock_dataset_changes = MockDatasetChangesService::new();
+    mock_dataset_changes
+        .expect_get_increment_since()
+        .times(1)
+        .in_sequence(&mut seq)
+        .returning(|_, _| {
+            Ok(DatasetIntervalIncrement {
+                num_blocks: 1,
+                num_records: 0, // no records, just watermark
+                updated_watermark: Some(Utc::now()),
+            })
+        });
+
+    let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
+        mock_dataset_changes: Some(mock_dataset_changes),
+        ..Default::default()
+    });
+
+    let foo_id = harness.create_root_dataset("foo").await;
+    let bar_id = harness
+        .create_derived_dataset("bar", vec![foo_id.clone()])
+        .await;
+
+    harness
+        .set_dataset_flow_schedule(
+            harness.now_datetime(),
+            foo_id.clone(),
+            DatasetFlowType::Ingest,
+            Duration::milliseconds(40).into(),
+        )
+        .await;
+
+    harness
+        .set_dataset_flow_batching_rule(
+            harness.now_datetime(),
+            bar_id.clone(),
+            DatasetFlowType::ExecuteTransform,
+            BatchingRule::new_checked(10, Duration::milliseconds(200)).unwrap(),
+        )
+        .await;
+
+    // Enforce dependency graph initialization
+    harness.eager_dependencies_graph_init().await;
+
+    // Flow listener will collect snapshots at important moments of time
+    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
+    test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
+
+    // Remember start time
+    let start_time = harness
+        .now_datetime()
+        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
+        .unwrap();
+
+    // Run scheduler concurrently with manual triggers script
+    tokio::select! {
+      // Run API service
+      res = harness.flow_service.run(start_time) => res.int_err(),
+
+      // Run simulation script and task drivers
+      _ = async {
+        // Task 0: "foo" start running at 10ms, finish at 20ms
+        let task0_driver = harness.task_driver(TaskDriverArgs {
+          task_id: TaskID::new(0),
+          dataset_id: Some(foo_id.clone()),
+          run_since_start: Duration::milliseconds(10),
+          finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
+            pull_result: PullResult::Updated {
+              old_head: Some(Multihash::from_digest_sha3_256(b"foo-old-slice")),
+              new_head: Multihash::from_digest_sha3_256(b"foo-new-slice"),
+            },
+          })))),
+        });
+        let task0_handle = task0_driver.run();
+
+        // Task 1: "bar" start running at 20ms, finish at 30ms
+        let task1_driver = harness.task_driver(TaskDriverArgs {
+          task_id: TaskID::new(1),
+          dataset_id: Some(bar_id.clone()),
+          run_since_start: Duration::milliseconds(20),
+          finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
+            pull_result: PullResult::Updated {
+              old_head: Some(Multihash::from_digest_sha3_256(b"bar-old-slice")),
+              new_head: Multihash::from_digest_sha3_256(b"bar-new-slice"),
+            },
+         })))),
+        });
+        let task1_handle = task1_driver.run();
+
+        // Task 2: "foo" start running at 70ms, finish at 80ms
+        let task2_driver = harness.task_driver(TaskDriverArgs {
+          task_id: TaskID::new(2),
+          dataset_id: Some(foo_id.clone()),
+          run_since_start: Duration::milliseconds(70),
+          finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult{
+            pull_result: PullResult::Updated {
+              old_head: Some(Multihash::from_digest_sha3_256(b"foo-new-slice")),
+              new_head: Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
+            },
+
+          })))),
+        });
+        let task2_handle = task2_driver.run();
+
+        // Task 3 is scheduled, but never runs
+
+        // Task 4: "bar" start running at 290ms, finish at 300ms
+        let task4_driver = harness.task_driver(TaskDriverArgs {
+          task_id: TaskID::new(4),
+          dataset_id: Some(bar_id.clone()),
+          run_since_start: Duration::milliseconds(290),
+          finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult{
+            pull_result: PullResult::Updated {
+              old_head: Some(Multihash::from_digest_sha3_256(b"bar-new-slice")),
+              new_head: Multihash::from_digest_sha3_256(b"bar-new-slice-2"),
+            },
+
+          })))),
+        });
+        let task4_handle = task4_driver.run();
+
+        // Main simulation script
+        let main_handle = async {
+          harness.advance_time(Duration::milliseconds(400)).await;
+        };
+
+        tokio::join!(task0_handle, task1_handle, task2_handle, task4_handle, main_handle)
+      } => Ok(())
+    }
+    .unwrap();
+
+    pretty_assertions::assert_eq!(
+        format!("{}", test_flow_listener.as_ref()),
+        indoc::indoc!(
+            r#"
+        #0: +0ms:
+          "bar" ExecuteTransform:
+            Flow ID = 1 Queued(0ms) AutoPolling
+          "foo" Ingest:
+            Flow ID = 0 Queued(0ms) AutoPolling
+
+        #1: +0ms:
+          "bar" ExecuteTransform:
+            Flow ID = 1 Scheduled(task=1) AutoPolling
+          "foo" Ingest:
+            Flow ID = 0 Scheduled(task=0) AutoPolling
+
+        #2: +10ms:
+          "bar" ExecuteTransform:
+            Flow ID = 1 Scheduled(task=1) AutoPolling
+          "foo" Ingest:
+            Flow ID = 0 Running(task=0)
+
+        #3: +20ms:
+          "bar" ExecuteTransform:
+            Flow ID = 1 Scheduled(task=1) AutoPolling
+          "foo" Ingest:
+            Flow ID = 2 Queued(60ms) AutoPolling
+            Flow ID = 0 Finished Success
+
+        #4: +20ms:
+          "bar" ExecuteTransform:
+            Flow ID = 1 Running(task=1)
+          "foo" Ingest:
+            Flow ID = 2 Queued(60ms) AutoPolling
+            Flow ID = 0 Finished Success
+
+        #5: +30ms:
+          "bar" ExecuteTransform:
+            Flow ID = 1 Finished Success
+          "foo" Ingest:
+            Flow ID = 2 Queued(60ms) AutoPolling
+            Flow ID = 0 Finished Success
+
+        #6: +60ms:
+          "bar" ExecuteTransform:
+            Flow ID = 1 Finished Success
+          "foo" Ingest:
+            Flow ID = 2 Scheduled(task=2) AutoPolling
+            Flow ID = 0 Finished Success
+
+        #7: +70ms:
+          "bar" ExecuteTransform:
+            Flow ID = 1 Finished Success
+          "foo" Ingest:
+            Flow ID = 2 Running(task=2)
+            Flow ID = 0 Finished Success
+
+        #8: +80ms:
+          "bar" ExecuteTransform:
+            Flow ID = 3 Queued(280ms) Input(foo) Batching(10, until=280ms)
+            Flow ID = 1 Finished Success
+          "foo" Ingest:
+            Flow ID = 4 Queued(120ms) AutoPolling
+            Flow ID = 2 Finished Success
+            Flow ID = 0 Finished Success
+
+        #9: +120ms:
+          "bar" ExecuteTransform:
+            Flow ID = 3 Queued(280ms) Input(foo) Batching(10, until=280ms)
+            Flow ID = 1 Finished Success
+          "foo" Ingest:
+            Flow ID = 4 Scheduled(task=3) AutoPolling
+            Flow ID = 2 Finished Success
+            Flow ID = 0 Finished Success
+
+        #10: +280ms:
+          "bar" ExecuteTransform:
+            Flow ID = 3 Scheduled(task=4) Input(foo)
+            Flow ID = 1 Finished Success
+          "foo" Ingest:
+            Flow ID = 4 Scheduled(task=3) AutoPolling
+            Flow ID = 2 Finished Success
+            Flow ID = 0 Finished Success
+
+        #11: +290ms:
+          "bar" ExecuteTransform:
+            Flow ID = 3 Running(task=4)
+            Flow ID = 1 Finished Success
+          "foo" Ingest:
+            Flow ID = 4 Scheduled(task=3) AutoPolling
+            Flow ID = 2 Finished Success
+            Flow ID = 0 Finished Success
+
+        #12: +300ms:
+          "bar" ExecuteTransform:
+            Flow ID = 3 Finished Success
+            Flow ID = 1 Finished Success
+          "foo" Ingest:
+            Flow ID = 4 Scheduled(task=3) AutoPolling
+            Flow ID = 2 Finished Success
+            Flow ID = 0 Finished Success
+
+        "#
+        )
+    );
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_batching_condition_with_2_inputs() {
+    let mut seq = mockall::Sequence::new();
+
+    let mut mock_dataset_changes = MockDatasetChangesService::new();
+    // 'foo': first reading of task 3 after 'foo' task 3
+    mock_dataset_changes
+        .expect_get_increment_since()
+        .times(1)
+        .in_sequence(&mut seq)
+        .returning(|_, _| {
+            Ok(DatasetIntervalIncrement {
+                num_blocks: 1,
+                num_records: 5,
+                updated_watermark: None,
+            })
+        });
+    // 'foo': Second reading of task 3 after 'bar' task 4
+    mock_dataset_changes
+        .expect_get_increment_since()
+        .times(1)
+        .in_sequence(&mut seq)
+        .returning(|_, _| {
+            Ok(DatasetIntervalIncrement {
+                num_blocks: 1,
+                num_records: 5,
+                updated_watermark: None,
+            })
+        });
+    // 'bar' : First reading of task 4 after task 4
+    mock_dataset_changes
+        .expect_get_increment_since()
+        .times(1)
+        .in_sequence(&mut seq)
+        .returning(|_, _| {
+            Ok(DatasetIntervalIncrement {
+                num_blocks: 1,
+                num_records: 7,
+                updated_watermark: None,
+            })
+        });
+    // 'foo': third reading of tasks 3, 5 after foo task 5
+    mock_dataset_changes
+        .expect_get_increment_since()
+        .times(1)
+        .in_sequence(&mut seq)
+        .returning(|_, _| {
+            Ok(DatasetIntervalIncrement {
+                num_blocks: 2,
+                num_records: 8,
+                updated_watermark: None,
+            })
+        });
+    // 'bar' : Second reading of task 4 after foo task 5
+    mock_dataset_changes
+        .expect_get_increment_since()
+        .times(1)
+        .in_sequence(&mut seq)
+        .returning(|_, _| {
+            Ok(DatasetIntervalIncrement {
+                num_blocks: 1,
+                num_records: 7,
+                updated_watermark: None,
+            })
+        });
+
+    let harness = FlowHarness::with_overrides(FlowHarnessOverrides {
+        mock_dataset_changes: Some(mock_dataset_changes),
+        ..Default::default()
+    });
+
+    let foo_id = harness.create_root_dataset("foo").await;
+    let bar_id = harness.create_root_dataset("bar").await;
+    let baz_id = harness
+        .create_derived_dataset("baz", vec![foo_id.clone(), bar_id.clone()])
+        .await;
+
+    harness
+        .set_dataset_flow_schedule(
+            harness.now_datetime(),
+            foo_id.clone(),
+            DatasetFlowType::Ingest,
+            Duration::milliseconds(80).into(),
+        )
+        .await;
+
+    harness
+        .set_dataset_flow_schedule(
+            harness.now_datetime(),
+            bar_id.clone(),
+            DatasetFlowType::Ingest,
+            Duration::milliseconds(120).into(),
+        )
+        .await;
+
+    harness
+        .set_dataset_flow_batching_rule(
+            harness.now_datetime(),
+            baz_id.clone(),
+            DatasetFlowType::ExecuteTransform,
+            BatchingRule::new_checked(15, Duration::milliseconds(200)).unwrap(),
+        )
+        .await;
+
+    // Enforce dependency graph initialization
+    harness.eager_dependencies_graph_init().await;
+
+    // Flow listener will collect snapshots at important moments of time
+    let test_flow_listener = harness.catalog.get_one::<FlowSystemTestListener>().unwrap();
+    test_flow_listener.define_dataset_display_name(foo_id.clone(), "foo".to_string());
+    test_flow_listener.define_dataset_display_name(bar_id.clone(), "bar".to_string());
+    test_flow_listener.define_dataset_display_name(baz_id.clone(), "baz".to_string());
+
+    // Remember start time
+    let start_time = harness
+        .now_datetime()
+        .duration_round(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS))
+        .unwrap();
+
+    // Run scheduler concurrently with manual triggers script
+    tokio::select! {
+      // Run API service
+      res = harness.flow_service.run(start_time) => res.int_err(),
+
+      // Run simulation script and task drivers
+      _ = async {
+        // Task 0: "foo" start running at 10ms, finish at 20ms
+        let task0_driver = harness.task_driver(TaskDriverArgs {
+          task_id: TaskID::new(0),
+          dataset_id: Some(foo_id.clone()),
+          run_since_start: Duration::milliseconds(10),
+          finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
+            pull_result: PullResult::Updated {
+              old_head: Some(Multihash::from_digest_sha3_256(b"foo-old-slice")),
+              new_head: Multihash::from_digest_sha3_256(b"foo-new-slice"),
+            },
+          })))),
+        });
+        let task0_handle = task0_driver.run();
+
+        // Task 1: "bar" start running at 20ms, finish at 30ms
+        let task1_driver = harness.task_driver(TaskDriverArgs {
+          task_id: TaskID::new(1),
+          dataset_id: Some(bar_id.clone()),
+          run_since_start: Duration::milliseconds(20),
+          finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
+            pull_result: PullResult::Updated {
+              old_head: Some(Multihash::from_digest_sha3_256(b"bar-old-slice")),
+              new_head: Multihash::from_digest_sha3_256(b"bar-new-slice"),
+            },
+         })))),
+        });
+        let task1_handle = task1_driver.run();
+
+        // Task 2: "baz" start running at 30ms, finish at 40ms
+        let task2_driver = harness.task_driver(TaskDriverArgs {
+          task_id: TaskID::new(2),
+          dataset_id: Some(baz_id.clone()),
+          run_since_start: Duration::milliseconds(30),
+          finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult{
+            pull_result: PullResult::Updated {
+              old_head: Some(Multihash::from_digest_sha3_256(b"baz-old-slice")),
+              new_head: Multihash::from_digest_sha3_256(b"baz-new-slice"),
+            },
+
+          })))),
+        });
+        let task2_handle = task2_driver.run();
+
+        // Task 3: "foo" start running at 110ms, finish at 120ms
+        let task3_driver = harness.task_driver(TaskDriverArgs {
+          task_id: TaskID::new(3),
+          dataset_id: Some(foo_id.clone()),
+          run_since_start: Duration::milliseconds(110),
+          finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
+            pull_result: PullResult::Updated {
+              old_head: Some(Multihash::from_digest_sha3_256(b"foo-new-slice")),
+              new_head: Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
+            },
+          })))),
+        });
+        let task3_handle = task3_driver.run();
+
+        // Task 4: "bar" start running at 160ms, finish at 170ms
+        let task4_driver = harness.task_driver(TaskDriverArgs {
+          task_id: TaskID::new(4),
+          dataset_id: Some(bar_id.clone()),
+          run_since_start: Duration::milliseconds(160),
+          finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult{
+            pull_result: PullResult::Updated {
+              old_head: Some(Multihash::from_digest_sha3_256(b"bar-new-slice")),
+              new_head: Multihash::from_digest_sha3_256(b"bar-new-slice-2"),
+            },
+
+          })))),
+        });
+        let task4_handle = task4_driver.run();
+
+        // Task 5: "foo" start running at 210ms, finish at 220ms
+        let task5_driver = harness.task_driver(TaskDriverArgs {
+          task_id: TaskID::new(5),
+          dataset_id: Some(foo_id.clone()),
+          run_since_start: Duration::milliseconds(210),
+          finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult {
+            pull_result: PullResult::Updated {
+              old_head: Some(Multihash::from_digest_sha3_256(b"foo-new-slice")),
+              new_head: Multihash::from_digest_sha3_256(b"foo-new-slice-2"),
+            },
+          })))),
+        });
+        let task5_handle = task5_driver.run();
+
+        // Task 6: "baz" start running at 230ms, finish at 240ms
+        let task6_driver = harness.task_driver(TaskDriverArgs {
+          task_id: TaskID::new(6),
+          dataset_id: Some(baz_id.clone()),
+          run_since_start: Duration::milliseconds(230),
+          finish_in_with: Some((Duration::milliseconds(10), TaskOutcome::Success(TaskResult::UpdateDatasetResult(TaskUpdateDatasetResult{
+            pull_result: PullResult::Updated {
+              old_head: Some(Multihash::from_digest_sha3_256(b"baz-new-slice")),
+              new_head: Multihash::from_digest_sha3_256(b"baz-new-slice-2"),
+            },
+
+          })))),
+        });
+        let task6_handle = task6_driver.run();
+
+        // Main simulation script
+        let main_handle = async {
+          harness.advance_time(Duration::milliseconds(400)).await;
+        };
+
+        tokio::join!(task0_handle, task1_handle, task2_handle, task3_handle, task4_handle, task5_handle, task6_handle, main_handle)
+      } => Ok(())
+    }
+    .unwrap();
+
+    pretty_assertions::assert_eq!(
+        format!("{}", test_flow_listener.as_ref()),
+        indoc::indoc!(
+            r#"
+        #0: +0ms:
+          "bar" Ingest:
+            Flow ID = 1 Queued(0ms) AutoPolling
+          "baz" ExecuteTransform:
+            Flow ID = 2 Queued(0ms) AutoPolling
+          "foo" Ingest:
+            Flow ID = 0 Queued(0ms) AutoPolling
+
+        #1: +0ms:
+          "bar" Ingest:
+            Flow ID = 1 Scheduled(task=1) AutoPolling
+          "baz" ExecuteTransform:
+            Flow ID = 2 Scheduled(task=2) AutoPolling
+          "foo" Ingest:
+            Flow ID = 0 Scheduled(task=0) AutoPolling
+
+        #2: +10ms:
+          "bar" Ingest:
+            Flow ID = 1 Scheduled(task=1) AutoPolling
+          "baz" ExecuteTransform:
+            Flow ID = 2 Scheduled(task=2) AutoPolling
+          "foo" Ingest:
+            Flow ID = 0 Running(task=0)
+
+        #3: +20ms:
+          "bar" Ingest:
+            Flow ID = 1 Scheduled(task=1) AutoPolling
+          "baz" ExecuteTransform:
+            Flow ID = 2 Scheduled(task=2) AutoPolling
+          "foo" Ingest:
+            Flow ID = 3 Queued(100ms) AutoPolling
+            Flow ID = 0 Finished Success
+
+        #4: +20ms:
+          "bar" Ingest:
+            Flow ID = 1 Running(task=1)
+          "baz" ExecuteTransform:
+            Flow ID = 2 Scheduled(task=2) AutoPolling
+          "foo" Ingest:
+            Flow ID = 3 Queued(100ms) AutoPolling
+            Flow ID = 0 Finished Success
+
+        #5: +30ms:
+          "bar" Ingest:
+            Flow ID = 4 Queued(150ms) AutoPolling
+            Flow ID = 1 Finished Success
+          "baz" ExecuteTransform:
+            Flow ID = 2 Scheduled(task=2) AutoPolling
+          "foo" Ingest:
+            Flow ID = 3 Queued(100ms) AutoPolling
+            Flow ID = 0 Finished Success
+
+        #6: +30ms:
+          "bar" Ingest:
+            Flow ID = 4 Queued(150ms) AutoPolling
+            Flow ID = 1 Finished Success
+          "baz" ExecuteTransform:
+            Flow ID = 2 Running(task=2)
+          "foo" Ingest:
+            Flow ID = 3 Queued(100ms) AutoPolling
+            Flow ID = 0 Finished Success
+
+        #7: +40ms:
+          "bar" Ingest:
+            Flow ID = 4 Queued(150ms) AutoPolling
+            Flow ID = 1 Finished Success
+          "baz" ExecuteTransform:
+            Flow ID = 2 Finished Success
+          "foo" Ingest:
+            Flow ID = 3 Queued(100ms) AutoPolling
+            Flow ID = 0 Finished Success
+
+        #8: +100ms:
+          "bar" Ingest:
+            Flow ID = 4 Queued(150ms) AutoPolling
+            Flow ID = 1 Finished Success
+          "baz" ExecuteTransform:
+            Flow ID = 2 Finished Success
+          "foo" Ingest:
+            Flow ID = 3 Scheduled(task=3) AutoPolling
+            Flow ID = 0 Finished Success
+
+        #9: +110ms:
+          "bar" Ingest:
+            Flow ID = 4 Queued(150ms) AutoPolling
+            Flow ID = 1 Finished Success
+          "baz" ExecuteTransform:
+            Flow ID = 2 Finished Success
+          "foo" Ingest:
+            Flow ID = 3 Running(task=3)
+            Flow ID = 0 Finished Success
+
+        #10: +120ms:
+          "bar" Ingest:
+            Flow ID = 4 Queued(150ms) AutoPolling
+            Flow ID = 1 Finished Success
+          "baz" ExecuteTransform:
+            Flow ID = 5 Queued(320ms) Input(foo) Batching(15, until=320ms)
+            Flow ID = 2 Finished Success
+          "foo" Ingest:
+            Flow ID = 6 Queued(200ms) AutoPolling
+            Flow ID = 3 Finished Success
+            Flow ID = 0 Finished Success
+
+        #11: +150ms:
+          "bar" Ingest:
+            Flow ID = 4 Scheduled(task=4) AutoPolling
+            Flow ID = 1 Finished Success
+          "baz" ExecuteTransform:
+            Flow ID = 5 Queued(320ms) Input(foo) Batching(15, until=320ms)
+            Flow ID = 2 Finished Success
+          "foo" Ingest:
+            Flow ID = 6 Queued(200ms) AutoPolling
+            Flow ID = 3 Finished Success
+            Flow ID = 0 Finished Success
+
+        #12: +160ms:
+          "bar" Ingest:
+            Flow ID = 4 Running(task=4)
+            Flow ID = 1 Finished Success
+          "baz" ExecuteTransform:
+            Flow ID = 5 Queued(320ms) Input(foo) Batching(15, until=320ms)
+            Flow ID = 2 Finished Success
+          "foo" Ingest:
+            Flow ID = 6 Queued(200ms) AutoPolling
+            Flow ID = 3 Finished Success
+            Flow ID = 0 Finished Success
+
+        #13: +170ms:
+          "bar" Ingest:
+            Flow ID = 7 Queued(290ms) AutoPolling
+            Flow ID = 4 Finished Success
+            Flow ID = 1 Finished Success
+          "baz" ExecuteTransform:
+            Flow ID = 5 Queued(320ms) Input(foo) Batching(15, until=320ms)
+            Flow ID = 2 Finished Success
+          "foo" Ingest:
+            Flow ID = 6 Queued(200ms) AutoPolling
+            Flow ID = 3 Finished Success
+            Flow ID = 0 Finished Success
+
+        #14: +200ms:
+          "bar" Ingest:
+            Flow ID = 7 Queued(290ms) AutoPolling
+            Flow ID = 4 Finished Success
+            Flow ID = 1 Finished Success
+          "baz" ExecuteTransform:
+            Flow ID = 5 Queued(320ms) Input(foo) Batching(15, until=320ms)
+            Flow ID = 2 Finished Success
+          "foo" Ingest:
+            Flow ID = 6 Scheduled(task=5) AutoPolling
+            Flow ID = 3 Finished Success
+            Flow ID = 0 Finished Success
+
+        #15: +210ms:
+          "bar" Ingest:
+            Flow ID = 7 Queued(290ms) AutoPolling
+            Flow ID = 4 Finished Success
+            Flow ID = 1 Finished Success
+          "baz" ExecuteTransform:
+            Flow ID = 5 Queued(320ms) Input(foo) Batching(15, until=320ms)
+            Flow ID = 2 Finished Success
+          "foo" Ingest:
+            Flow ID = 6 Running(task=5)
+            Flow ID = 3 Finished Success
+            Flow ID = 0 Finished Success
+
+        #16: +220ms:
+          "bar" Ingest:
+            Flow ID = 7 Queued(290ms) AutoPolling
+            Flow ID = 4 Finished Success
+            Flow ID = 1 Finished Success
+          "baz" ExecuteTransform:
+            Flow ID = 5 Queued(220ms) Input(foo) Batching(15, until=320ms)
+            Flow ID = 2 Finished Success
+          "foo" Ingest:
+            Flow ID = 8 Queued(300ms) AutoPolling
+            Flow ID = 6 Finished Success
+            Flow ID = 3 Finished Success
+            Flow ID = 0 Finished Success
+
+        #17: +220ms:
+          "bar" Ingest:
+            Flow ID = 7 Queued(290ms) AutoPolling
+            Flow ID = 4 Finished Success
+            Flow ID = 1 Finished Success
+          "baz" ExecuteTransform:
+            Flow ID = 5 Scheduled(task=6) Input(foo)
+            Flow ID = 2 Finished Success
+          "foo" Ingest:
+            Flow ID = 8 Queued(300ms) AutoPolling
+            Flow ID = 6 Finished Success
+            Flow ID = 3 Finished Success
+            Flow ID = 0 Finished Success
+
+        #18: +230ms:
+          "bar" Ingest:
+            Flow ID = 7 Queued(290ms) AutoPolling
+            Flow ID = 4 Finished Success
+            Flow ID = 1 Finished Success
+          "baz" ExecuteTransform:
+            Flow ID = 5 Running(task=6)
+            Flow ID = 2 Finished Success
+          "foo" Ingest:
+            Flow ID = 8 Queued(300ms) AutoPolling
+            Flow ID = 6 Finished Success
+            Flow ID = 3 Finished Success
+            Flow ID = 0 Finished Success
+
+        #19: +240ms:
+          "bar" Ingest:
+            Flow ID = 7 Queued(290ms) AutoPolling
+            Flow ID = 4 Finished Success
+            Flow ID = 1 Finished Success
+          "baz" ExecuteTransform:
+            Flow ID = 5 Finished Success
+            Flow ID = 2 Finished Success
+          "foo" Ingest:
+            Flow ID = 8 Queued(300ms) AutoPolling
+            Flow ID = 6 Finished Success
+            Flow ID = 3 Finished Success
+            Flow ID = 0 Finished Success
+
+        #20: +290ms:
+          "bar" Ingest:
+            Flow ID = 7 Scheduled(task=7) AutoPolling
+            Flow ID = 4 Finished Success
+            Flow ID = 1 Finished Success
+          "baz" ExecuteTransform:
+            Flow ID = 5 Finished Success
+            Flow ID = 2 Finished Success
+          "foo" Ingest:
+            Flow ID = 8 Queued(300ms) AutoPolling
+            Flow ID = 6 Finished Success
+            Flow ID = 3 Finished Success
+            Flow ID = 0 Finished Success
+
+        #21: +300ms:
+          "bar" Ingest:
+            Flow ID = 7 Scheduled(task=7) AutoPolling
+            Flow ID = 4 Finished Success
+            Flow ID = 1 Finished Success
+          "baz" ExecuteTransform:
+            Flow ID = 5 Finished Success
+            Flow ID = 2 Finished Success
+          "foo" Ingest:
+            Flow ID = 8 Scheduled(task=8) AutoPolling
+            Flow ID = 6 Finished Success
+            Flow ID = 3 Finished Success
+            Flow ID = 0 Finished Success
 
         "#
         )
@@ -1881,24 +3218,38 @@ struct FlowHarness {
     fake_system_time_source: FakeSystemTimeSource,
 }
 
+#[derive(Default)]
+struct FlowHarnessOverrides {
+    awaiting_step: Option<Duration>,
+    mandatory_throttling_period: Option<Duration>,
+    mock_dataset_changes: Option<MockDatasetChangesService>,
+}
+
 impl FlowHarness {
     fn new() -> Self {
-        Self::new_custom_time_properties(
-            Duration::milliseconds(SCHEDULING_ALIGNMENT_MS),
-            Duration::milliseconds(SCHEDULING_MANDATORY_THROTTLING_PERIOD_MS),
-        )
+        Self::with_overrides(FlowHarnessOverrides::default())
     }
 
-    fn new_custom_time_properties(
-        awaiting_step: Duration,
-        mandatory_throttling_period: Duration,
-    ) -> Self {
+    fn with_overrides(overrides: FlowHarnessOverrides) -> Self {
         let tmp_dir = tempfile::tempdir().unwrap();
         let datasets_dir = tmp_dir.path().join("datasets");
         std::fs::create_dir(&datasets_dir).unwrap();
 
         let t = Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap();
         let fake_system_time_source = FakeSystemTimeSource::new(t);
+
+        let awaiting_step = overrides
+            .awaiting_step
+            .unwrap_or(Duration::milliseconds(SCHEDULING_ALIGNMENT_MS));
+
+        let mandatory_throttling_period =
+            overrides
+                .mandatory_throttling_period
+                .unwrap_or(Duration::milliseconds(
+                    SCHEDULING_MANDATORY_THROTTLING_PERIOD_MS,
+                ));
+
+        let mock_dataset_changes = overrides.mock_dataset_changes.unwrap_or_default();
 
         let catalog = dill::CatalogBuilder::new()
             .add::<EventBus>()
@@ -1918,6 +3269,8 @@ impl FlowHarness {
                     .with_multi_tenant(false),
             )
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+            .add_value(mock_dataset_changes)
+            .bind::<dyn DatasetChangesService, MockDatasetChangesService>()
             .add_value(CurrentAccountSubject::new_test())
             .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
             .add::<DependencyGraphServiceInMemory>()
@@ -2022,19 +3375,19 @@ impl FlowHarness {
             .unwrap();
     }
 
-    async fn set_dataset_flow_start_condition(
+    async fn set_dataset_flow_batching_rule(
         &self,
         request_time: DateTime<Utc>,
         dataset_id: DatasetID,
         dataset_flow_type: DatasetFlowType,
-        start_condition: StartConditionConfiguration,
+        batching_rule: BatchingRule,
     ) {
         self.flow_configuration_service
             .set_configuration(
                 request_time,
                 FlowKeyDataset::new(dataset_id, dataset_flow_type).into(),
                 false,
-                FlowConfigurationRule::StartCondition(start_condition),
+                FlowConfigurationRule::BatchingRule(batching_rule),
             )
             .await
             .unwrap();

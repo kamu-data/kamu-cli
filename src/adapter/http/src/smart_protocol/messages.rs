@@ -27,7 +27,7 @@ pub type DatasetPullResponse = Result<DatasetPullSuccessResponse, DatasetPullReq
 /// Successful response to initial dataset pull request
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct DatasetPullSuccessResponse {
-    pub size_estimate: TransferSizeEstimate,
+    pub transfer_plan: TransferPlan,
 }
 
 // Unsuccessful response to initial dataset pull request
@@ -84,7 +84,7 @@ pub enum ObjectPullStrategy {
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct DatasetPushRequest {
     pub current_head: Option<Multihash>,
-    pub size_estimate: TransferSizeEstimate,
+    pub transfer_plan: TransferPlan,
 }
 
 /// Response to initial dataset push request message
@@ -185,9 +185,9 @@ pub struct MetadataBlocksBatch {
     pub payload: Vec<u8>,
 }
 
-/// Transfer size estimate
+/// Transfer plan
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
-pub struct TransferSizeEstimate {
+pub struct TransferPlan {
     pub num_blocks: u32,
     pub num_objects: u32,
     pub num_records: u64,

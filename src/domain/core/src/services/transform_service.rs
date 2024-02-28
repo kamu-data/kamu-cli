@@ -57,8 +57,6 @@ pub enum TransformResult {
     Updated {
         old_head: Multihash,
         new_head: Multihash,
-        num_blocks: u64,
-        num_records: u64,
     },
 }
 

@@ -20,3 +20,15 @@ mockall::mock! {
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
+
+impl MockDependencyGraphRepository {
+    pub fn no_dependencies() -> Self {
+        let mut dependency_graph_repo_mock = MockDependencyGraphRepository::default();
+        dependency_graph_repo_mock
+            .expect_list_dependencies_of_all_datasets()
+            .return_once(|| Box::pin(futures::stream::empty()));
+        dependency_graph_repo_mock
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////

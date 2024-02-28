@@ -56,7 +56,7 @@ impl FlowTimeWheel {
                     break;
                 }
 
-                if self.is_flow_activation_planned(ar.0.flow_id) {
+                if self.is_flow_activation_planned(ar.0.flow_id, activation_moment) {
                     res.push(ar.0.flow_id);
                 }
 
@@ -85,8 +85,14 @@ impl FlowTimeWheel {
         }
     }
 
-    pub fn is_flow_activation_planned(&self, flow_id: FlowID) -> bool {
-        self.flow_activation_times_by_id.contains_key(&flow_id)
+    fn is_flow_activation_planned(
+        &self,
+        flow_id: FlowID,
+        activation_moment: DateTime<Utc>,
+    ) -> bool {
+        self.flow_activation_times_by_id
+            .get(&flow_id)
+            .is_some_and(|flow_activation_time| *flow_activation_time == activation_moment)
     }
 
     pub fn cancel_flow_activation(
@@ -117,7 +123,7 @@ impl FlowTimeWheel {
 
     fn clean_top_cancellations(&mut self) {
         while let Some(ar) = self.flow_heap.peek() {
-            if self.is_flow_activation_planned(ar.0.flow_id) {
+            if self.is_flow_activation_planned(ar.0.flow_id, ar.0.activation_time) {
                 break;
             }
 
