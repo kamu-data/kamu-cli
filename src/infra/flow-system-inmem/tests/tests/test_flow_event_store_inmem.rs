@@ -38,16 +38,14 @@ async fn test_dataset_flow_empty_filters_distingush_dataset() {
             offset: 0,
             limit: 100,
         },
-        10,
+        8,
         vec![
             foo_cases.compacting_flow_ids.flow_id_finished,
             foo_cases.compacting_flow_ids.flow_id_running,
-            foo_cases.compacting_flow_ids.flow_id_scheduled,
             foo_cases.compacting_flow_ids.flow_id_queued,
             foo_cases.compacting_flow_ids.flow_id_waiting,
             foo_cases.ingest_flow_ids.flow_id_finished,
             foo_cases.ingest_flow_ids.flow_id_running,
-            foo_cases.ingest_flow_ids.flow_id_scheduled,
             foo_cases.ingest_flow_ids.flow_id_queued,
             foo_cases.ingest_flow_ids.flow_id_waiting,
         ],
@@ -62,16 +60,14 @@ async fn test_dataset_flow_empty_filters_distingush_dataset() {
             offset: 0,
             limit: 100,
         },
-        10,
+        8,
         vec![
             bar_cases.compacting_flow_ids.flow_id_finished,
             bar_cases.compacting_flow_ids.flow_id_running,
-            bar_cases.compacting_flow_ids.flow_id_scheduled,
             bar_cases.compacting_flow_ids.flow_id_queued,
             bar_cases.compacting_flow_ids.flow_id_waiting,
             bar_cases.ingest_flow_ids.flow_id_finished,
             bar_cases.ingest_flow_ids.flow_id_running,
-            bar_cases.ingest_flow_ids.flow_id_scheduled,
             bar_cases.ingest_flow_ids.flow_id_queued,
             bar_cases.ingest_flow_ids.flow_id_waiting,
         ],
@@ -107,16 +103,6 @@ async fn test_dataset_flow_filter_by_status() {
             vec![
                 foo_cases.compacting_flow_ids.flow_id_queued,
                 foo_cases.ingest_flow_ids.flow_id_queued,
-            ],
-        ),
-        (
-            DatasetFlowFilters {
-                by_flow_status: Some(FlowStatus::Scheduled),
-                ..Default::default()
-            },
-            vec![
-                foo_cases.compacting_flow_ids.flow_id_scheduled,
-                foo_cases.ingest_flow_ids.flow_id_scheduled,
             ],
         ),
         (
@@ -175,7 +161,6 @@ async fn test_dataset_flow_filter_by_flow_type() {
             vec![
                 foo_cases.ingest_flow_ids.flow_id_finished,
                 foo_cases.ingest_flow_ids.flow_id_running,
-                foo_cases.ingest_flow_ids.flow_id_scheduled,
                 foo_cases.ingest_flow_ids.flow_id_queued,
                 foo_cases.ingest_flow_ids.flow_id_waiting,
             ],
@@ -188,7 +173,6 @@ async fn test_dataset_flow_filter_by_flow_type() {
             vec![
                 foo_cases.compacting_flow_ids.flow_id_finished,
                 foo_cases.compacting_flow_ids.flow_id_running,
-                foo_cases.compacting_flow_ids.flow_id_scheduled,
                 foo_cases.compacting_flow_ids.flow_id_queued,
                 foo_cases.compacting_flow_ids.flow_id_waiting,
             ],
@@ -237,9 +221,7 @@ async fn test_dataset_flow_filter_by_initiator() {
             },
             vec![
                 foo_cases.compacting_flow_ids.flow_id_queued,
-                foo_cases.compacting_flow_ids.flow_id_waiting,
                 foo_cases.ingest_flow_ids.flow_id_queued,
-                foo_cases.ingest_flow_ids.flow_id_waiting,
             ],
         ),
         (
@@ -250,8 +232,8 @@ async fn test_dataset_flow_filter_by_initiator() {
                 ..Default::default()
             },
             vec![
-                foo_cases.compacting_flow_ids.flow_id_scheduled,
-                foo_cases.ingest_flow_ids.flow_id_scheduled,
+                foo_cases.compacting_flow_ids.flow_id_waiting,
+                foo_cases.ingest_flow_ids.flow_id_waiting,
             ],
         ),
         (
@@ -307,7 +289,7 @@ async fn test_dataset_flow_filter_combinations() {
                 by_flow_status: Some(FlowStatus::Waiting),
                 by_flow_type: Some(DatasetFlowType::Compaction),
                 by_initiator: Some(InitiatorFilter::Account(AccountName::new_unchecked(
-                    "wasya",
+                    "petya",
                 ))),
             },
             vec![foo_cases.compacting_flow_ids.flow_id_waiting],
@@ -360,7 +342,7 @@ async fn test_dataset_flow_pagination() {
         ),
         (
             FlowPaginationOpts {
-                offset: 3,
+                offset: 2,
                 limit: 4,
             },
             vec![
@@ -372,7 +354,7 @@ async fn test_dataset_flow_pagination() {
         ),
         (
             FlowPaginationOpts {
-                offset: 8,
+                offset: 6,
                 limit: 2,
             },
             vec![
@@ -382,14 +364,14 @@ async fn test_dataset_flow_pagination() {
         ),
         (
             FlowPaginationOpts {
-                offset: 9,
+                offset: 7,
                 limit: 2,
             },
             vec![foo_cases.ingest_flow_ids.flow_id_waiting],
         ),
         (
             FlowPaginationOpts {
-                offset: 10,
+                offset: 8,
                 limit: 5,
             },
             vec![],
@@ -402,7 +384,7 @@ async fn test_dataset_flow_pagination() {
             &foo_cases,
             Default::default(),
             pagination,
-            10,
+            8,
             expected_flow_ids,
         )
         .await;
@@ -428,7 +410,7 @@ async fn test_dataset_flow_pagination_with_filters() {
                 by_flow_type: Some(DatasetFlowType::Ingest),
                 ..Default::default()
             },
-            5,
+            4,
             vec![
                 foo_cases.ingest_flow_ids.flow_id_finished,
                 foo_cases.ingest_flow_ids.flow_id_running,
@@ -461,18 +443,6 @@ async fn test_dataset_flow_pagination_with_filters() {
                 foo_cases.ingest_flow_ids.flow_id_finished,
             ],
         ),
-        (
-            FlowPaginationOpts {
-                offset: 3,
-                limit: 5,
-            },
-            DatasetFlowFilters {
-                by_flow_status: Some(FlowStatus::Scheduled),
-                ..Default::default()
-            },
-            2,
-            vec![],
-        ),
     ];
 
     for (pagination, filters, expected_total_count, expected_flow_ids) in cases {
@@ -504,11 +474,10 @@ async fn test_unfiltered_system_flows() {
             offset: 0,
             limit: 100,
         },
-        5,
+        4,
         vec![
             system_case.gc_flow_ids.flow_id_finished,
             system_case.gc_flow_ids.flow_id_running,
-            system_case.gc_flow_ids.flow_id_scheduled,
             system_case.gc_flow_ids.flow_id_queued,
             system_case.gc_flow_ids.flow_id_waiting,
         ],
@@ -533,7 +502,6 @@ async fn test_system_flows_filtered_by_flow_type() {
         vec![
             system_case.gc_flow_ids.flow_id_finished,
             system_case.gc_flow_ids.flow_id_running,
-            system_case.gc_flow_ids.flow_id_scheduled,
             system_case.gc_flow_ids.flow_id_queued,
             system_case.gc_flow_ids.flow_id_waiting,
         ],
@@ -622,10 +590,7 @@ async fn test_system_flows_filtered_by_initiator() {
                 ))),
                 ..Default::default()
             },
-            vec![
-                system_case.gc_flow_ids.flow_id_queued,
-                system_case.gc_flow_ids.flow_id_waiting,
-            ],
+            vec![system_case.gc_flow_ids.flow_id_queued],
         ),
         (
             SystemFlowFilters {
@@ -674,7 +639,7 @@ async fn test_system_flows_complex_filter() {
         (
             SystemFlowFilters {
                 by_initiator: Some(InitiatorFilter::Account(AccountName::new_unchecked(
-                    "wasya",
+                    "petya",
                 ))),
                 by_flow_status: Some(FlowStatus::Waiting),
                 by_flow_type: None,
@@ -729,13 +694,6 @@ async fn test_system_flow_pagination() {
         (
             FlowPaginationOpts {
                 offset: 2,
-                limit: 1,
-            },
-            vec![system_case.gc_flow_ids.flow_id_scheduled],
-        ),
-        (
-            FlowPaginationOpts {
-                offset: 3,
                 limit: 2,
             },
             vec![
@@ -745,14 +703,14 @@ async fn test_system_flow_pagination() {
         ),
         (
             FlowPaginationOpts {
-                offset: 4,
+                offset: 3,
                 limit: 2,
             },
             vec![system_case.gc_flow_ids.flow_id_waiting],
         ),
         (
             FlowPaginationOpts {
-                offset: 5,
+                offset: 4,
                 limit: 5,
             },
             vec![],
@@ -764,7 +722,7 @@ async fn test_system_flow_pagination() {
             flow_event_store.clone(),
             Default::default(),
             pagination,
-            5,
+            4,
             expected_flow_ids,
         )
         .await;
@@ -790,7 +748,7 @@ async fn test_system_flow_pagination_with_filters() {
                 by_flow_type: Some(SystemFlowType::GC),
                 ..Default::default()
             },
-            5,
+            4,
             vec![
                 system_case.gc_flow_ids.flow_id_finished,
                 system_case.gc_flow_ids.flow_id_running,
@@ -819,18 +777,6 @@ async fn test_system_flow_pagination_with_filters() {
             },
             2,
             vec![system_case.gc_flow_ids.flow_id_running],
-        ),
-        (
-            FlowPaginationOpts {
-                offset: 1,
-                limit: 5,
-            },
-            SystemFlowFilters {
-                by_flow_status: Some(FlowStatus::Scheduled),
-                ..Default::default()
-            },
-            1,
-            vec![],
         ),
     ];
 
@@ -868,11 +814,10 @@ struct SystemTestCase {
 }
 
 struct TestFlowIDs {
-    flow_id_waiting: FlowID,   // Initiator: wasya
-    flow_id_queued: FlowID,    // Initiator: wasya
-    flow_id_scheduled: FlowID, // Initiator: petya
-    flow_id_running: FlowID,   // Initiator: system
-    flow_id_finished: FlowID,  // Initiator: system
+    flow_id_waiting: FlowID,  // Initiator: wasya
+    flow_id_queued: FlowID,   // Initiator: wasya
+    flow_id_running: FlowID,  // Initiator: system
+    flow_id_finished: FlowID, // Initiator: system
 }
 
 async fn make_dataset_test_case(
@@ -932,21 +877,10 @@ async fn make_dataset_test_flows(
     let automatic_trigger = FlowTrigger::AutoPolling(FlowTriggerAutoPolling {});
 
     let flow_id_waiting = flow_generator
-        .make_new_flow(
-            dataset_flow_type,
-            FlowStatus::Waiting,
-            wasya_manual_trigger.clone(),
-        )
+        .make_new_flow(dataset_flow_type, FlowStatus::Waiting, petya_manual_trigger)
         .await;
     let flow_id_queued = flow_generator
         .make_new_flow(dataset_flow_type, FlowStatus::Queued, wasya_manual_trigger)
-        .await;
-    let flow_id_scheduled = flow_generator
-        .make_new_flow(
-            dataset_flow_type,
-            FlowStatus::Scheduled,
-            petya_manual_trigger.clone(),
-        )
         .await;
     let flow_id_running = flow_generator
         .make_new_flow(
@@ -962,7 +896,6 @@ async fn make_dataset_test_flows(
     TestFlowIDs {
         flow_id_waiting,
         flow_id_queued,
-        flow_id_scheduled,
         flow_id_running,
         flow_id_finished,
     }
@@ -988,21 +921,10 @@ async fn make_system_test_flows(
     let automatic_trigger = FlowTrigger::AutoPolling(FlowTriggerAutoPolling {});
 
     let flow_id_waiting = flow_generator
-        .make_new_flow(
-            system_flow_type,
-            FlowStatus::Waiting,
-            wasya_manual_trigger.clone(),
-        )
+        .make_new_flow(system_flow_type, FlowStatus::Waiting, petya_manual_trigger)
         .await;
     let flow_id_queued = flow_generator
         .make_new_flow(system_flow_type, FlowStatus::Queued, wasya_manual_trigger)
-        .await;
-    let flow_id_scheduled = flow_generator
-        .make_new_flow(
-            system_flow_type,
-            FlowStatus::Scheduled,
-            petya_manual_trigger.clone(),
-        )
         .await;
     let flow_id_running = flow_generator
         .make_new_flow(
@@ -1018,7 +940,6 @@ async fn make_system_test_flows(
     TestFlowIDs {
         flow_id_waiting,
         flow_id_queued,
-        flow_id_scheduled,
         flow_id_running,
         flow_id_finished,
     }
@@ -1180,21 +1101,18 @@ fn drive_flow_to_status(
             let task_id = task_event_store.new_task_id();
             flow.on_task_scheduled(start_moment + Duration::minutes(5), task_id)
                 .unwrap();
+            flow.on_task_running(start_moment + Duration::minutes(7), task_id)
+                .unwrap();
 
-            if expected_status != FlowStatus::Scheduled {
-                flow.on_task_running(start_moment + Duration::minutes(7), task_id)
-                    .unwrap();
-
-                if expected_status == FlowStatus::Finished {
-                    flow.on_task_finished(
-                        start_moment + Duration::minutes(10),
-                        task_id,
-                        TaskOutcome::Success(TaskResult::Empty),
-                    )
-                    .unwrap();
-                } else if expected_status != FlowStatus::Running {
-                    panic!("Not expecting flow status {expected_status:?}");
-                }
+            if expected_status == FlowStatus::Finished {
+                flow.on_task_finished(
+                    start_moment + Duration::minutes(10),
+                    task_id,
+                    TaskOutcome::Success(TaskResult::Empty),
+                )
+                .unwrap();
+            } else if expected_status != FlowStatus::Running {
+                panic!("Not expecting flow status {expected_status:?}");
             }
         }
     }

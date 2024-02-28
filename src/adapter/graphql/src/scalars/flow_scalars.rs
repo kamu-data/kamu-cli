@@ -95,7 +95,6 @@ impl From<fs::FlowTimingRecords> for FlowTimingRecords {
 pub enum FlowStatus {
     Waiting,
     Queued,
-    Scheduled,
     Running,
     Finished,
 }

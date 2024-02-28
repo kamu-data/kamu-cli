@@ -19,6 +19,7 @@ use crate::prelude::*;
 pub(crate) enum FlowStartCondition {
     Throttling(FlowStartConditionThrottling),
     Batching(FlowStartConditionBatching),
+    Executor(FlowStartConditionExecutor),
 }
 
 impl FlowStartCondition {
@@ -61,6 +62,11 @@ impl FlowStartCondition {
                     watermark_modified: total_increment.updated_watermark.is_some(),
                 }))
             }
+            Some(fs::FlowStartCondition::Executor(e)) => {
+                Some(Self::Executor(FlowStartConditionExecutor {
+                    task_id: e.task_id.into(),
+                }))
+            }
         })
     }
 }
@@ -85,6 +91,11 @@ pub(crate) struct FlowStartConditionBatching {
     pub accumulated_records_count: u64,
     pub watermark_modified: bool,
     // TODO: we can list all applied input flows, if that is interesting for debugging
+}
+
+#[derive(SimpleObject)]
+pub(crate) struct FlowStartConditionExecutor {
+    pub task_id: TaskID,
 }
 
 ///////////////////////////////////////////////////////////////////////////////

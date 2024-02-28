@@ -13,7 +13,6 @@
 pub enum FlowStatus {
     Waiting,
     Queued,
-    Scheduled,
     Running,
     Finished,
 }

@@ -96,7 +96,7 @@ impl FlowEventInitiated {
 pub struct FlowEventStartConditionUpdated {
     event_id: EventID,
     event_time: DateTime<Utc>,
-    start_condition_kind: Option<FlowStartConditionKind>,
+    start_condition_kind: FlowStartConditionKind,
 }
 
 impl FlowEventStartConditionUpdated {
@@ -104,12 +104,11 @@ impl FlowEventStartConditionUpdated {
         Self {
             event_id: event_id.into(),
             event_time: event.event_time,
-            start_condition_kind: event.start_condition.as_ref().map(|start_condition| {
-                match start_condition {
-                    fs::FlowStartCondition::Throttling(_) => FlowStartConditionKind::Throttling,
-                    fs::FlowStartCondition::Batching(_) => FlowStartConditionKind::Batching,
-                }
-            }),
+            start_condition_kind: match event.start_condition {
+                fs::FlowStartCondition::Throttling(_) => FlowStartConditionKind::Throttling,
+                fs::FlowStartCondition::Batching(_) => FlowStartConditionKind::Batching,
+                fs::FlowStartCondition::Executor(_) => FlowStartConditionKind::Executor,
+            },
         }
     }
 }
@@ -118,6 +117,7 @@ impl FlowEventStartConditionUpdated {
 pub enum FlowStartConditionKind {
     Throttling,
     Batching,
+    Executor,
 }
 
 ///////////////////////////////////////////////////////////////////////////////

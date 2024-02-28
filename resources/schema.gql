@@ -777,7 +777,7 @@ type FlowEventQueued implements FlowEvent {
 type FlowEventStartConditionUpdated implements FlowEvent {
 	eventId: EventID!
 	eventTime: DateTime!
-	startConditionKind: FlowStartConditionKind
+	startConditionKind: FlowStartConditionKind!
 }
 
 type FlowEventTaskChanged implements FlowEvent {
@@ -824,7 +824,7 @@ enum FlowOutcome {
 	ABORTED
 }
 
-union FlowStartCondition = FlowStartConditionThrottling | FlowStartConditionBatching
+union FlowStartCondition = FlowStartConditionThrottling | FlowStartConditionBatching | FlowStartConditionExecutor
 
 type FlowStartConditionBatching {
 	activeBatchingRule: FlowConfigurationBatching!
@@ -833,9 +833,14 @@ type FlowStartConditionBatching {
 	watermarkModified: Boolean!
 }
 
+type FlowStartConditionExecutor {
+	taskId: TaskID!
+}
+
 enum FlowStartConditionKind {
 	THROTTLING
 	BATCHING
+	EXECUTOR
 }
 
 type FlowStartConditionThrottling {
@@ -845,7 +850,6 @@ type FlowStartConditionThrottling {
 enum FlowStatus {
 	WAITING
 	QUEUED
-	SCHEDULED
 	RUNNING
 	FINISHED
 }

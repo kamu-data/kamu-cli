@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Duration, Utc};
+use kamu_task_system::TaskID;
 
 use crate::BatchingRule;
 
@@ -17,6 +18,7 @@ use crate::BatchingRule;
 pub enum FlowStartCondition {
     Throttling(FlowStartConditionThrottling),
     Batching(FlowStartConditionBatching),
+    Executor(FlowStartConditionExecutor),
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -32,6 +34,13 @@ pub struct FlowStartConditionThrottling {
 pub struct FlowStartConditionBatching {
     pub active_batching_rule: BatchingRule,
     pub batching_deadline: DateTime<Utc>,
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FlowStartConditionExecutor {
+    pub task_id: TaskID,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

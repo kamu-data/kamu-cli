@@ -58,8 +58,6 @@ impl FlowState {
             FlowStatus::Finished
         } else if self.timing.running_since.is_some() {
             FlowStatus::Running
-        } else if !self.task_ids.is_empty() {
-            FlowStatus::Scheduled
         } else if self.timing.activate_at.is_some() {
             FlowStatus::Queued
         } else {
@@ -137,11 +135,11 @@ impl Projection for FlowState {
                         start_condition,
                         ..
                     }) => {
-                        if s.outcome.is_some() || !s.task_ids.is_empty() {
+                        if s.outcome.is_some() || s.timing.running_since.is_some() {
                             Err(ProjectionError::new(Some(s), event))
                         } else {
                             Ok(FlowState {
-                                start_condition,
+                                start_condition: Some(start_condition),
                                 ..s
                             })
                         }
@@ -193,6 +191,7 @@ impl Projection for FlowState {
                                     running_since: Some(event_time),
                                     ..s.timing
                                 },
+                                start_condition: None,
                                 ..s
                             })
                         }
@@ -203,7 +202,10 @@ impl Projection for FlowState {
                         ref task_outcome,
                         ..
                     }) => {
-                        if !s.task_ids.contains(&task_id) || s.timing.running_since.is_none() {
+                        if !s.task_ids.contains(&task_id)
+                            || s.timing.running_since.is_none()
+                            || s.start_condition.is_some()
+                        {
                             Err(ProjectionError::new(Some(s), event))
                         } else if s.outcome.is_some() {
                             // Ignore for idempotence motivation
@@ -249,6 +251,7 @@ impl Projection for FlowState {
                                     finished_at: Some(event_time),
                                     ..s.timing
                                 },
+                                start_condition: None,
                                 ..s
                             })
                         }

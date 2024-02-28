@@ -141,7 +141,7 @@ impl std::fmt::Display for FlowSystemTestListener {
                                 (flow_state.timing.activate_at.unwrap() - initial_time)
                                     .num_milliseconds()
                             ),
-                            FlowStatus::Scheduled | FlowStatus::Running => format!(
+                            FlowStatus::Running => format!(
                                 "{:?}(task={})",
                                 flow_state.status(),
                                 flow_state
@@ -156,7 +156,7 @@ impl std::fmt::Display for FlowSystemTestListener {
                     )?;
 
                     match flow_state.status() {
-                        FlowStatus::Waiting | FlowStatus::Queued | FlowStatus::Scheduled => write!(
+                        FlowStatus::Waiting | FlowStatus::Queued => write!(
                             f,
                             " {}",
                             match flow_state.primary_trigger() {
@@ -187,6 +187,9 @@ impl std::fmt::Display for FlowSystemTestListener {
                                 b.active_batching_rule.min_records_to_await(),
                                 (b.batching_deadline - initial_time).num_milliseconds(),
                             )?,
+                            FlowStartCondition::Executor(e) => {
+                                write!(f, " Executor(task={})", e.task_id)?;
+                            }
                         }
                     }
 

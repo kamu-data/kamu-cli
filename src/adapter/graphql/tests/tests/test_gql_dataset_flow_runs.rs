@@ -197,7 +197,7 @@ async fn test_trigger_ingest_root_dataset() {
                                             "datasetId": create_result.dataset_handle.id.to_string(),
                                             "ingestResult": null,
                                         },
-                                        "status": "SCHEDULED",
+                                        "status": "QUEUED",
                                         "outcome": null,
                                         "timing": {
                                             "runningSince": null,
@@ -221,7 +221,10 @@ async fn test_trigger_ingest_root_dataset() {
                                                 "accountName": auth::DEFAULT_ACCOUNT_NAME,
                                             }
                                         },
-                                        "startCondition": null,
+                                        "startCondition": {
+                                            "__typename": "FlowStartConditionExecutor",
+                                            "taskId": "0",
+                                        },
                                     }
                                 ],
                                 "pageInfo": {
@@ -871,34 +874,6 @@ async fn test_list_flows_with_filters_and_pagination() {
         })
     );
 
-    let request_code = request_code.replace("QUEUED", "SCHEDULED");
-
-    let response = schema
-        .execute(async_graphql::Request::new(request_code).data(harness.catalog_authorized.clone()))
-        .await;
-
-    assert!(response.is_ok(), "{response:?}");
-    assert_eq!(
-        response.data,
-        value!({
-            "datasets": {
-                "byId": {
-                    "flows": {
-                        "runs": {
-                            "listFlows": {
-                                "nodes": [],
-                                "pageInfo": {
-                                    "currentPage": 0,
-                                    "totalPages": 0,
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        })
-    );
-
     // Filter by initiator
 
     let request_code = indoc!(
@@ -1119,7 +1094,8 @@ async fn test_cancel_ingest_root_dataset() {
     let response_json = response.data.into_json().unwrap();
     let flow_id = FlowRunsHarness::extract_flow_id_from_trigger_response(&response_json);
 
-    harness.mimic_flow_scheduled(flow_id).await;
+    let task_id = harness.mimic_flow_scheduled(flow_id).await;
+    harness.mimic_task_running(task_id, Utc::now()).await;
 
     let mutation_code =
         FlowRunsHarness::cancel_scheduled_tasks_mutation(&create_result.dataset_handle.id, flow_id);
@@ -1182,7 +1158,8 @@ async fn test_cancel_transform_derived_dataset() {
     let response_json = response.data.into_json().unwrap();
     let flow_id = FlowRunsHarness::extract_flow_id_from_trigger_response(&response_json);
 
-    harness.mimic_flow_scheduled(flow_id).await;
+    let task_id = harness.mimic_flow_scheduled(flow_id).await;
+    harness.mimic_task_running(task_id, Utc::now()).await;
 
     let mutation_code = FlowRunsHarness::cancel_scheduled_tasks_mutation(
         &create_derived_result.dataset_handle.id,
@@ -1395,7 +1372,8 @@ async fn test_cancel_already_cancelled_flow() {
         .as_str()
         .unwrap();
 
-    harness.mimic_flow_scheduled(flow_id).await;
+    let task_id = harness.mimic_flow_scheduled(flow_id).await;
+    harness.mimic_task_running(task_id, Utc::now()).await;
 
     let mutation_code =
         FlowRunsHarness::cancel_scheduled_tasks_mutation(&create_result.dataset_handle.id, flow_id);
@@ -1593,8 +1571,13 @@ async fn test_history_of_completed_flow() {
                                             }
                                         },
                                         {
-                                            "__typename": "FlowEventTaskChanged",
+                                            "__typename": "FlowEventStartConditionUpdated",
                                             "eventId": "3",
+                                            "startConditionKind": "EXECUTOR"
+                                        },
+                                        {
+                                            "__typename": "FlowEventTaskChanged",
+                                            "eventId": "4",
                                             "taskId": "0",
                                             "taskStatus": "QUEUED",
                                             "task": {
@@ -1603,7 +1586,7 @@ async fn test_history_of_completed_flow() {
                                         },
                                         {
                                             "__typename": "FlowEventTaskChanged",
-                                            "eventId": "4",
+                                            "eventId": "5",
                                             "taskId": "0",
                                             "taskStatus": "RUNNING",
                                             "task": {
@@ -1612,7 +1595,7 @@ async fn test_history_of_completed_flow() {
                                         },
                                         {
                                             "__typename": "FlowEventTaskChanged",
-                                            "eventId": "5",
+                                            "eventId": "6",
                                             "taskId": "0",
                                             "taskStatus": "FINISHED",
                                             "task": {
@@ -1964,6 +1947,9 @@ impl FlowRunsHarness {
                                             }
                                             ... on FlowStartConditionThrottling {
                                                 intervalSec
+                                            }
+                                            ... on FlowStartConditionExecutor {
+                                                taskId
                                             }
                                         }
                                     }

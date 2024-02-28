@@ -371,8 +371,7 @@ impl FlowServiceInMemory {
                         .await
                         .int_err()?;
                     } else {
-                        // Skip, the flow is scheduled already or waits for
-                        // something else
+                        // Skip, the flow waits for something else
                     }
                 } else {
                     // Evaluate throttling condition, if batching condition passed
@@ -624,10 +623,13 @@ impl FlowServiceInMemory {
             .await
             .int_err()?;
 
-        if flow.start_condition.is_some() {
-            flow.clear_start_condition(self.time_source.now())
-                .int_err()?;
-        }
+        flow.set_relevant_start_condition(
+            self.time_source.now(),
+            FlowStartCondition::Executor(FlowStartConditionExecutor {
+                task_id: task.task_id,
+            }),
+        )
+        .int_err()?;
 
         flow.on_task_scheduled(self.time_source.now(), task.task_id)
             .int_err()?;
@@ -888,7 +890,7 @@ impl FlowService for FlowServiceInMemory {
         let mut flow = Flow::load(flow_id, self.flow_event_store.as_ref()).await?;
 
         // May not be called for Draft or Queued flows.
-        // Cancel tasks for flows in Scheduled/Running state.
+        // Cancel tasks for flows in Running state.
         // Ignore in Finished state
         match flow.status() {
             FlowStatus::Waiting | FlowStatus::Queued => {
@@ -896,7 +898,7 @@ impl FlowService for FlowServiceInMemory {
                     FlowNotScheduledError { flow_id },
                 ))
             }
-            FlowStatus::Scheduled | FlowStatus::Running => {
+            FlowStatus::Running => {
                 // Abort current flow and it's scheduled tasks
                 self.abort_flow_impl(&mut flow).await?;
 

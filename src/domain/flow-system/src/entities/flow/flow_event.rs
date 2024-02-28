@@ -51,7 +51,7 @@ pub struct FlowEventInitiated {
 pub struct FlowEventStartConditionUpdated {
     pub event_time: DateTime<Utc>,
     pub flow_id: FlowID,
-    pub start_condition: Option<FlowStartCondition>,
+    pub start_condition: FlowStartCondition,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -140,9 +140,10 @@ impl FlowEvent {
     pub fn new_status(&self) -> Option<FlowStatus> {
         match self {
             FlowEvent::Initiated(_) => Some(FlowStatus::Waiting),
-            FlowEvent::StartConditionUpdated(_) | FlowEvent::TriggerAdded(_) => None,
+            FlowEvent::StartConditionUpdated(_)
+            | FlowEvent::TriggerAdded(_)
+            | FlowEvent::TaskScheduled(_) => None,
             FlowEvent::Queued(_) => Some(FlowStatus::Queued),
-            FlowEvent::TaskScheduled(_) => Some(FlowStatus::Scheduled),
             FlowEvent::TaskRunning(_) => Some(FlowStatus::Running),
             FlowEvent::TaskFinished(_) | FlowEvent::Aborted(_) => Some(FlowStatus::Finished),
         }
