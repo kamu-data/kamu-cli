@@ -9,7 +9,7 @@
 
 use chrono::{DateTime, Utc};
 use kamu_core::InternalError;
-use kamu_flow_system::{BatchingRule, FlowID, FlowKey, FlowResult, FlowState};
+use kamu_flow_system::{FlowID, FlowKey, FlowResult};
 
 use super::FlowServiceCallbacksFacade;
 
@@ -25,29 +25,6 @@ pub(crate) trait FlowTypeSupportStrategy: Send + Sync {
         flow_key: &FlowKey,
         flow_result: &FlowResult,
     ) -> Result<(), InternalError>;
-
-    async fn evaluate_batching_rule(
-        &self,
-        evaluation_time: DateTime<Utc>,
-        flow_state: &FlowState,
-        batching_rule: &BatchingRule,
-    ) -> Result<BatchingRuleEvaluation, InternalError>;
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub(crate) struct BatchingRuleEvaluation {
-    pub batching_deadline: DateTime<Utc>,
-    pub accumulated_records_count: u64,
-    pub watermark_modified: bool,
-    pub satisfied: bool,
-}
-
-impl BatchingRuleEvaluation {
-    pub(crate) fn accumulated_something(&self) -> bool {
-        self.accumulated_records_count > 0 || self.watermark_modified
-    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

@@ -41,6 +41,7 @@ pub struct FlowServiceInMemory {
     time_source: Arc<dyn SystemTimeSource>,
     task_scheduler: Arc<dyn TaskScheduler>,
     flow_configuration_service: Arc<dyn FlowConfigurationService>,
+    dataset_changes_service: Arc<dyn DatasetChangesService>,
     support_strategies_by_type: HashMap<AnyFlowType, Arc<dyn FlowTypeSupportStrategy>>,
 }
 
@@ -75,10 +76,8 @@ impl FlowServiceInMemory {
         dependency_graph_service: Arc<dyn DependencyGraphService>,
         dataset_changes_service: Arc<dyn DatasetChangesService>,
     ) -> Self {
-        let dataset_update_strategy = Arc::new(DatasetUpdateStrategy::new(
-            dataset_changes_service,
-            dependency_graph_service,
-        ));
+        let dataset_update_strategy =
+            Arc::new(DatasetUpdateStrategy::new(dependency_graph_service));
 
         let support_strategies_by_type = HashMap::from_iter(
             [DatasetFlowType::Ingest, DatasetFlowType::ExecuteTransform].map(|flow_type| {
@@ -97,6 +96,7 @@ impl FlowServiceInMemory {
             time_source,
             task_scheduler,
             flow_configuration_service,
+            dataset_changes_service,
             support_strategies_by_type,
         }
     }
@@ -405,69 +405,101 @@ impl FlowServiceInMemory {
         batching_rule: &BatchingRule,
         throttling_boundary_time: DateTime<Utc>,
     ) -> Result<(), InternalError> {
-        match self
-            .support_strategies_by_type
-            .get(&flow.flow_key.get_type())
-        {
-            // Handler for this flow type available
-            Some(strategy) => {
-                let evaluation = strategy
-                    .evaluate_batching_rule(evaluation_time, flow, batching_rule)
-                    .await?;
+        assert!(matches!(
+            flow.flow_key.get_type(),
+            AnyFlowType::Dataset(DatasetFlowType::ExecuteTransform)
+        ));
 
-                // Set batching condition data, but only during the first rule evaluation.
-                if !matches!(
-                    flow.start_condition.as_ref(),
-                    Some(FlowStartCondition::Batching(_))
-                ) {
-                    flow.set_relevant_start_condition(
-                        evaluation_time,
-                        FlowStartCondition::Batching(FlowStartConditionBatching {
-                            active_batching_rule: *batching_rule,
-                            batching_deadline: evaluation.batching_deadline,
-                        }),
-                    )
-                    .int_err()?;
-                }
+        // TODO: it's likely assumed the accumulation is per each input separately, but
+        // for now count overall number
+        let mut accumulated_records_count = 0;
+        let mut watermark_modified = false;
 
-                //  If we accumulated at least something (records or watermarks),
-                //   the upper bound of potential finish time for batching is known
-                if evaluation.accumulated_something() {
-                    // Finish immediately if satisfied, or not later than the deadline
-                    let batching_finish_time = if evaluation.satisfied {
-                        evaluation_time
-                    } else {
-                        evaluation.batching_deadline
-                    };
-
-                    // Throttling boundary correction
-                    let corrected_finish_time =
-                        std::cmp::max(batching_finish_time, throttling_boundary_time);
-
-                    // Indicate if flow activation is required
-                    let should_activate = match flow.timing.activate_at {
-                        Some(activate_at) => activate_at > corrected_finish_time,
-                        None => true,
-                    };
-                    if should_activate {
-                        flow.activate_at_time(self.time_source.now(), corrected_finish_time)
+        // Scan each accumulated trigger to decide
+        for trigger in &flow.triggers {
+            if let FlowTrigger::InputDatasetFlow(trigger) = trigger {
+                match &trigger.flow_result {
+                    FlowResult::Empty => {}
+                    FlowResult::DatasetUpdate(update) => {
+                        // Compute increment since the first trigger by this dataset.
+                        // Note: there might have been multiple updates since that time.
+                        // We are only recording the first trigger of particular dataset.
+                        let increment = self
+                            .dataset_changes_service
+                            .get_increment_since(&trigger.dataset_id, update.old_head.as_ref())
+                            .await
                             .int_err()?;
-                        self.enqueue_flow(flow.flow_id, corrected_finish_time)?;
-                    }
 
-                    // If batching is over, it's start condition is no longer valid.
-                    // However, set throttling condition, if it applies
-                    if evaluation.satisfied && throttling_boundary_time > batching_finish_time {
-                        self.indicate_throttling_activity(flow)?;
+                        accumulated_records_count += increment.num_records;
+                        watermark_modified |= increment.updated_watermark.is_some();
                     }
                 }
+            }
+        }
 
-                Ok(())
+        // The timeout for batching will happen at:
+        let batching_deadline = flow.timing.created_at + *batching_rule.max_batching_interval();
+
+        // Accumulated something if at least some input changed or watermark was touched
+        let accumulated_something = accumulated_records_count > 0 || watermark_modified;
+
+        // The condition is satisfied if
+        //   - we crossed the number of new records threshold
+        //   - or waited long enough, assuming
+        //      - there is at least some change of the inputs
+        //      - watmermark got touched
+        let satisfied = accumulated_something
+            && (accumulated_records_count >= batching_rule.min_records_to_await()
+                || evaluation_time >= batching_deadline);
+
+        // Set batching condition data, but only during the first rule evaluation.
+        if !matches!(
+            flow.start_condition.as_ref(),
+            Some(FlowStartCondition::Batching(_))
+        ) {
+            flow.set_relevant_start_condition(
+                evaluation_time,
+                FlowStartCondition::Batching(FlowStartConditionBatching {
+                    active_batching_rule: *batching_rule,
+                    batching_deadline,
+                }),
+            )
+            .int_err()?;
+        }
+
+        //  If we accumulated at least something (records or watermarks),
+        //   the upper bound of potential finish time for batching is known
+        if accumulated_something {
+            // Finish immediately if satisfied, or not later than the deadline
+            let batching_finish_time = if satisfied {
+                evaluation_time
+            } else {
+                batching_deadline
+            };
+
+            // Throttling boundary correction
+            let corrected_finish_time =
+                std::cmp::max(batching_finish_time, throttling_boundary_time);
+
+            // Indicate if flow activation is required
+            let should_activate = match flow.timing.activate_at {
+                Some(activate_at) => activate_at > corrected_finish_time,
+                None => true,
+            };
+            if should_activate {
+                flow.activate_at_time(self.time_source.now(), corrected_finish_time)
+                    .int_err()?;
+                self.enqueue_flow(flow.flow_id, corrected_finish_time)?;
             }
 
-            // Unrelated flow type
-            None => panic!("Unrelated flow type for batching conditions"),
+            // If batching is over, it's start condition is no longer valid.
+            // However, set throttling condition, if it applies
+            if satisfied && throttling_boundary_time > batching_finish_time {
+                self.indicate_throttling_activity(flow)?;
+            }
         }
+
+        Ok(())
     }
 
     fn indicate_throttling_activity(&self, flow: &mut Flow) -> Result<(), InternalError> {

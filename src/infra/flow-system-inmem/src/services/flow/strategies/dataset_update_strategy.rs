@@ -11,37 +11,30 @@ use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 use futures::StreamExt;
-use kamu_core::{DatasetChangesService, DependencyGraphService, InternalError, ResultIntoInternal};
+use kamu_core::{DependencyGraphService, InternalError, ResultIntoInternal};
 use kamu_flow_system::{
-    BatchingRule,
     DatasetFlowType,
     FlowID,
     FlowKey,
     FlowKeyDataset,
     FlowResult,
-    FlowState,
     FlowTrigger,
     FlowTriggerInputDatasetFlow,
 };
 
-use super::{BatchingRuleEvaluation, FlowServiceCallbacksFacade, FlowTypeSupportStrategy};
+use super::{FlowServiceCallbacksFacade, FlowTypeSupportStrategy};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) struct DatasetUpdateStrategy {
-    dataset_changes_service: Arc<dyn DatasetChangesService>,
     dependency_graph_service: Arc<dyn DependencyGraphService>,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 impl DatasetUpdateStrategy {
-    pub fn new(
-        dataset_changes_service: Arc<dyn DatasetChangesService>,
-        dependency_graph_service: Arc<dyn DependencyGraphService>,
-    ) -> Self {
+    pub fn new(dependency_graph_service: Arc<dyn DependencyGraphService>) -> Self {
         Self {
-            dataset_changes_service,
             dependency_graph_service,
         }
     }
@@ -107,60 +100,6 @@ impl FlowTypeSupportStrategy for DatasetUpdateStrategy {
         } else {
             unreachable!("Not expecting other types of flow keys than dataset");
         }
-    }
-
-    async fn evaluate_batching_rule(
-        &self,
-        evaluation_time: DateTime<Utc>,
-        flow_state: &FlowState,
-        batching_rule: &BatchingRule,
-    ) -> Result<BatchingRuleEvaluation, InternalError> {
-        // TODO: it's likely assumed the accumulation is per each input separately, but
-        // for now count overall number
-        let mut accumulated_records_count = 0;
-        let mut watermark_modified = false;
-
-        // Scan each accumulated trigger to decide
-        for trigger in &flow_state.triggers {
-            if let FlowTrigger::InputDatasetFlow(trigger) = trigger {
-                match &trigger.flow_result {
-                    FlowResult::Empty => {}
-                    FlowResult::DatasetUpdate(update) => {
-                        // Compute increment since the first trigger by this dataset.
-                        // Note: there might have been multiple updates since that time.
-                        // We are only recording the first trigger of particular dataset.
-                        let increment = self
-                            .dataset_changes_service
-                            .get_increment_since(&trigger.dataset_id, update.old_head.as_ref())
-                            .await
-                            .int_err()?;
-
-                        accumulated_records_count += increment.num_records;
-                        watermark_modified |= increment.updated_watermark.is_some();
-                    }
-                }
-            }
-        }
-
-        // The timeout for batching will happen at:
-        let batching_deadline =
-            flow_state.timing.created_at + *batching_rule.max_batching_interval();
-
-        // The condition is satisfied if
-        //   - we crossed the number of new records threshold
-        //   - or waited long enough, assuming
-        //      - there is at least some change of the inputs
-        //      - watmermark got touched
-        let satisfied = (accumulated_records_count > 0 || watermark_modified)
-            && (accumulated_records_count >= batching_rule.min_records_to_await()
-                || evaluation_time >= batching_deadline);
-
-        Ok(BatchingRuleEvaluation {
-            batching_deadline,
-            accumulated_records_count,
-            watermark_modified,
-            satisfied,
-        })
     }
 }
 
