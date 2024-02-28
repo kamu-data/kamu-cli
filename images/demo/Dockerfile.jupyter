@@ -60,6 +60,7 @@ RUN mamba install -y --file requirements.txt && \
 RUN curl -s "https://get.kamu.dev" | KAMU_VERSION=$KAMU_VERSION KAMU_INSTALL_PATH=/usr/local/bin/kamu sh && \
     echo "source <(kamu completions bash)" >> /home/$NB_USER/.bashrc
 
+COPY jupyter/kamu-start-hook.sh /usr/local/bin/before-notebook.d/kamu-start-hook.sh
 COPY jupyter/.kamuconfig /.kamuconfig
 
 
