@@ -10,9 +10,10 @@
 use std::sync::Arc;
 
 use super::{CLIError, Command};
-use crate::{AlreadyInWorkspace, WorkspaceLayout};
+use crate::{AlreadyInWorkspace, OutputConfig, WorkspaceLayout};
 
 pub struct InitCommand {
+    output_config: Arc<OutputConfig>,
     workspace_layout: Arc<WorkspaceLayout>,
     exists_ok: bool,
     multi_tenant: bool,
@@ -20,11 +21,13 @@ pub struct InitCommand {
 
 impl InitCommand {
     pub fn new(
+        output_config: Arc<OutputConfig>,
         workspace_layout: Arc<WorkspaceLayout>,
         exists_ok: bool,
         multi_tenant: bool,
     ) -> Self {
         Self {
+            output_config,
             workspace_layout,
             exists_ok,
             multi_tenant,
@@ -41,7 +44,9 @@ impl Command for InitCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
         if self.workspace_layout.root_dir.is_dir() {
             return if self.exists_ok {
-                eprintln!("{}", console::style("Workspace already exists").yellow());
+                if !self.output_config.quiet {
+                    eprintln!("{}", console::style("Workspace already exists").yellow());
+                }
                 Ok(())
             } else {
                 Err(CLIError::usage_error_from(AlreadyInWorkspace))
@@ -52,16 +57,19 @@ impl Command for InitCommand {
 
         // TODO, write a workspace config
 
-        eprintln!(
-            "{}",
-            console::style(if self.multi_tenant {
-                "Initialized an empty multi-tenant workspace"
-            } else {
-                "Initialized an empty workspace"
-            })
-            .green()
-            .bold()
-        );
+        if !self.output_config.quiet {
+            eprintln!(
+                "{}",
+                console::style(if self.multi_tenant {
+                    "Initialized an empty multi-tenant workspace"
+                } else {
+                    "Initialized an empty workspace"
+                })
+                .green()
+                .bold()
+            );
+        }
+
         Ok(())
     }
 }

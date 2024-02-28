@@ -86,7 +86,7 @@ impl VerifyCommand {
     async fn verify(
         &self,
         options: VerificationOptions,
-        listener: Option<Arc<VerificationMultiProgress>>,
+        listener: Option<Arc<dyn VerificationMultiListener>>,
     ) -> GenericVerificationResult {
         let dataset_ref_pattern = self.refs.first().unwrap();
 
@@ -149,12 +149,10 @@ impl VerifyCommand {
             return Ok(vec![]);
         }
 
-        let listener = listener.unwrap();
-
         Ok(self
             .verification_svc
             .clone()
-            .verify_multi(filtered_requests, options, Some(listener))
+            .verify_multi(filtered_requests, options, listener)
             .await)
     }
 

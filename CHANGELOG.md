@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+### Fixed
+- `kamu login` no longer requires workspace in `--user` scope (#525)
+- Sync will correctly select smart ODF protocol when pushing/pulling via repository alias (#521)
+- Fixed `kamu verify` crash under verbose logging (#524)
+- Increased default number of results returned by `kamu search` command
+
 ## [0.161.0] - 2024-02-26
 ### Added
 - `kamu search` command now works with ODF repositories
