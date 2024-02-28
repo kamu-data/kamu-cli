@@ -96,7 +96,7 @@ jobs:
             target/${{ matrix.target }}/release/${{ env.PACKAGE_NAME }}${{ matrix.binary-ext }} \
             target/${{ matrix.target }}/release/${{ env.BINARY_NAME }}${{ matrix.binary-ext }}
 
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: ${{ env.PACKAGE_NAME }}-${{ matrix.target }}
           path: target/${{ matrix.target }}/release/${{ env.BINARY_NAME }}${{ matrix.binary-ext }}
@@ -160,7 +160,7 @@ jobs:
     needs: [create_release]
     steps:
       - name: Download Artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: ${{ env.PACKAGE_NAME }}-${{ matrix.target }}
           path: ${{ env.PACKAGE_NAME }}-${{ matrix.target }}
