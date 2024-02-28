@@ -19,6 +19,7 @@ use crate::{
     BlockNotFoundError,
     BlockVersionError,
     ContainsError,
+    GetBytesHashError,
     GetError,
     HashMismatchError,
     InsertError,
@@ -38,6 +39,8 @@ pub trait MetadataBlockRepository: Send + Sync {
     async fn get_block_data(&self, hash: &Multihash) -> Result<Bytes, GetBlockDataError>;
 
     async fn get_block_size(&self, hash: &Multihash) -> Result<u64, GetBlockDataError>;
+
+    fn get_block_hash(&self, block: &MetadataBlock) -> Result<Multihash, GetBlockHashError>;
 
     async fn insert_block<'a>(
         &'a self,
@@ -175,6 +178,35 @@ impl From<GetBlockDataError> for GetBlockError {
             GetBlockDataError::NotFound(e) => Self::NotFound(e),
             GetBlockDataError::Access(e) => Self::Access(e),
             GetBlockDataError::Internal(e) => Self::Internal(e),
+        }
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum GetBlockHashError {
+    #[error(transparent)]
+    Access(
+        #[from]
+        #[backtrace]
+        AccessError,
+    ),
+    #[error(transparent)]
+    SerializationError(#[from] opendatafabric::serde::Error),
+    #[error(transparent)]
+    Internal(
+        #[from]
+        #[backtrace]
+        InternalError,
+    ),
+}
+
+impl From<GetBytesHashError> for GetBlockHashError {
+    fn from(v: GetBytesHashError) -> Self {
+        match v {
+            GetBytesHashError::Access(e) => Self::Access(e),
+            GetBytesHashError::Internal(e) => Self::Internal(e),
         }
     }
 }

@@ -18,6 +18,7 @@ use kamu_core::{
     ContainsBlockError,
     GetBlockDataError,
     GetBlockError,
+    GetBlockHashError,
     InsertBlockError,
     InsertBlockResult,
     InsertOpts,
@@ -98,6 +99,8 @@ mockall::mock! {
         async fn get_block_data(&self, hash: &Multihash) -> Result<Bytes, GetBlockDataError>;
 
         async fn get_block_size(&self, hash: &Multihash) -> Result<u64, GetBlockDataError>;
+
+        fn get_block_hash(&self, block: &MetadataBlock) -> Result<Multihash, GetBlockHashError>;
 
         async fn insert_block<'a>(
             &'a self,
