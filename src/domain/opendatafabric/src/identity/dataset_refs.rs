@@ -783,33 +783,10 @@ impl DatasetRefPatternLocal {
 }
 
 impl DatasetRefPatternAny {
-    pub fn is_match_local(&self, dataset_handle: &DatasetHandle) -> bool {
+    pub fn is_match(&self, dataset_ref_any: &DatasetRefAny, is_repo: bool) -> bool {
         match self {
             Self::RefAny(_) => false,
-            Self::Pattern(dataset_pattern) => dataset_pattern.is_match_local(dataset_handle),
-        }
-    }
-
-    pub fn is_match_remote(&self, dataset_alias_remote: &DatasetAliasRemote) -> bool {
-        match self {
-            Self::RefAny(_) => false,
-            Self::Pattern(dataset_pattern) => dataset_pattern.is_match_remote(dataset_alias_remote),
-        }
-    }
-
-    // Return repo pattern part if exists
-    pub fn repo_pattern(&self) -> Option<DatasetRepoPattern> {
-        match self {
-            Self::RefAny(_) => None,
-            Self::Pattern(dataset_ref_pattern) => dataset_ref_pattern.repo_pattern(),
-        }
-    }
-
-    // Return dataset name pattern part
-    pub fn name_static_pattern(&self) -> Option<&str> {
-        match self {
-            Self::RefAny(_) => None,
-            Self::Pattern(dataset_ref_pattern) => Some(dataset_ref_pattern.name_pattern()),
+            Self::Pattern(dataset_pattern) => dataset_pattern.is_match(dataset_ref_any, is_repo),
         }
     }
 
@@ -825,6 +802,29 @@ impl DatasetRefPatternAny {
     /// than a glob pattern
     pub fn is_pattern(&self) -> bool {
         matches!(self, Self::Pattern(_))
+    }
+
+    /// Return `true` if pattern has remote repo reference
+    pub fn is_remote(&self) -> bool {
+        match self {
+            Self::RefAny(_) => false,
+            Self::Pattern(pattern) => match pattern {
+                DatasetPatternAny::Local(_) => false,
+                DatasetPatternAny::ID(_, _)
+                | DatasetPatternAny::AmbiguousAlias(_, _)
+                | DatasetPatternAny::RemoteAlias(_, _, _) => true,
+            },
+        }
+    }
+
+    pub fn is_match_repo_name(&self, repo_name: &RepoName) -> bool {
+        match self {
+            Self::RefAny(_) => false,
+            Self::Pattern(dataset_pattern) => {
+                let dataset_repo_pattern = dataset_pattern.repo_pattern();
+                dataset_repo_pattern.is_some() && dataset_repo_pattern.unwrap().is_match(repo_name)
+            }
+        }
     }
 }
 

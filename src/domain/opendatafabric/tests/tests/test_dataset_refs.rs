@@ -185,7 +185,7 @@ fn test_dataset_ref_pattern_any() {
         ))
     );
 
-    // Parse valid ambigious dataset_ref
+    // Parse valid ambiguous dataset_ref
     let account_name = "account";
     let dataset_name = "net.example.com";
     let param = format!("{account_name}/{dataset_name}");
@@ -235,10 +235,9 @@ fn test_dataset_ref_pattern_any() {
 
     assert_eq!(
         res,
-        DatasetRefPatternAny::Pattern(DatasetPatternAny {
-            account_repo_pattern: None,
-            dataset_name_pattern: DatasetNamePattern::from_str(param).unwrap()
-        }),
+        DatasetRefPatternAny::Pattern(DatasetPatternAny::Local(
+            DatasetNamePattern::from_str(param).unwrap()
+        )),
     );
 
     // Parse valid remote ambiguous ref with wildcard repo/net.example.%
@@ -250,10 +249,14 @@ fn test_dataset_ref_pattern_any() {
 
     assert_eq!(
         res,
-        DatasetRefPatternAny::Pattern(DatasetPatternAny {
-            account_repo_pattern: Some(RepoAccountPattern::AmbiguousPattern(repo_name.into())),
-            dataset_name_pattern: DatasetNamePattern::from_str(dataset_name).unwrap()
-        }),
+        DatasetRefPatternAny::Pattern(DatasetPatternAny::AmbiguousAlias(
+            DatasetAmbiguousPattern {
+                pattern: DatasetNamePattern::from_str(repo_name)
+                    .unwrap()
+                    .into_inner(),
+            },
+            DatasetNamePattern::from_str(dataset_name).unwrap()
+        )),
     );
 
     // Parse valid remote ref with repo and account wildcard repo/net.example.%
@@ -266,12 +269,10 @@ fn test_dataset_ref_pattern_any() {
 
     assert_eq!(
         res,
-        DatasetRefPatternAny::Pattern(DatasetPatternAny {
-            account_repo_pattern: Some(RepoAccountPattern::RemotePattern(
-                DatasetRepoPattern::from_str(repo_name).unwrap(),
-                Some(DatasetAccountPattern::from_str(account_name).unwrap())
-            )),
-            dataset_name_pattern: DatasetNamePattern::from_str(dataset_name).unwrap()
-        }),
+        DatasetRefPatternAny::Pattern(DatasetPatternAny::RemoteAlias(
+            DatasetRepoPattern::from_str(repo_name).unwrap(),
+            DatasetAccountPattern::from_str(account_name).unwrap(),
+            DatasetNamePattern::from_str(dataset_name).unwrap()
+        )),
     );
 }

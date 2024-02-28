@@ -263,6 +263,7 @@ pub fn get_command(
                     cli_catalog.get_one()?,
                     cli_catalog.get_one()?,
                     cli_catalog.get_one()?,
+                    cli_catalog.get_one()?,
                     datasets,
                     submatches.get_flag("all"),
                     submatches.get_flag("recursive"),
@@ -274,6 +275,7 @@ pub fn get_command(
             }
         }
         Some(("push", push_matches)) => Box::new(PushCommand::new(
+            cli_catalog.get_one()?,
             cli_catalog.get_one()?,
             cli_catalog.get_one()?,
             cli_catalog.get_one()?,
