@@ -29,8 +29,6 @@ pub enum FlowEvent {
     StartConditionUpdated(FlowEventStartConditionUpdated),
     /// Secondary trigger added
     TriggerAdded(FlowEventTriggerAdded),
-    /// Activation time defined
-    ActivationTimeDefined(FlowEventActivationTimeDefined),
     /// Associated task has changed status
     TaskChanged(FlowEventTaskChanged),
     /// Aborted flow (user cancellation or system factor, such as ds delete)
@@ -46,9 +44,6 @@ impl FlowEvent {
             }
             fs::FlowEvent::TriggerAdded(e) => {
                 Self::TriggerAdded(FlowEventTriggerAdded::new(event_id, e))
-            }
-            fs::FlowEvent::ActivationTimeDefined(e) => {
-                Self::ActivationTimeDefined(FlowEventActivationTimeDefined::new(event_id, &e))
             }
             fs::FlowEvent::TaskScheduled(e) => Self::TaskChanged(FlowEventTaskChanged::new(
                 event_id,
@@ -139,25 +134,6 @@ impl FlowEventTriggerAdded {
             event_id: event_id.into(),
             event_time: event.event_time,
             trigger: event.trigger.into(),
-        }
-    }
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-#[derive(SimpleObject)]
-pub struct FlowEventActivationTimeDefined {
-    event_id: EventID,
-    event_time: DateTime<Utc>,
-    activation_time: DateTime<Utc>,
-}
-
-impl FlowEventActivationTimeDefined {
-    fn new(event_id: evs::EventID, event: &fs::FlowEventActivationTimeDefined) -> Self {
-        Self {
-            event_id: event_id.into(),
-            event_time: event.event_time,
-            activation_time: event.activation_time,
         }
     }
 }

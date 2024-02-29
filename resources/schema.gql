@@ -762,12 +762,6 @@ type FlowEventAborted implements FlowEvent {
 	eventTime: DateTime!
 }
 
-type FlowEventActivationTimeDefined implements FlowEvent {
-	eventId: EventID!
-	eventTime: DateTime!
-	activationTime: DateTime!
-}
-
 type FlowEventInitiated implements FlowEvent {
 	eventId: EventID!
 	eventTime: DateTime!
@@ -845,7 +839,7 @@ enum FlowStartConditionKind {
 }
 
 type FlowStartConditionSchedule {
-	activateAt: DateTime!
+	wakeUpAt: DateTime!
 }
 
 type FlowStartConditionThrottling {
@@ -859,10 +853,6 @@ enum FlowStatus {
 }
 
 type FlowTimingRecords {
-	"""
-	Planned activation time (at least, Queued state)
-	"""
-	activateAt: DateTime
 	"""
 	Recorded start of running (Running state seen at least once)
 	"""

@@ -374,18 +374,14 @@ impl FlowServiceInMemory {
                         // Skip, the flow waits for something else
                     }
                 } else {
-                    // Evaluate throttling condition, if batching condition passed
-                    // Is new time earlier than planned?
-                    if throttling_boundary_time
-                        < flow
-                            .timing
-                            .activate_at
-                            .expect("Flow expected to be queued by now")
-                    {
+                    // Evaluate throttling condition: is new time earlier than planned?
+                    let planned_time = self
+                        .find_planned_flow_activation_time(flow.flow_id)
+                        .expect("Flow expected to have activation time by now");
+
+                    if throttling_boundary_time < planned_time {
                         // If so, enqueue the flow earlier
                         self.enqueue_flow(flow.flow_id, throttling_boundary_time)?;
-                        flow.activate_at_time(self.time_source.now(), throttling_boundary_time)
-                            .int_err()?;
 
                         // Indicate throttling, if applied
                         if throttling_boundary_time > trigger_time {
@@ -428,7 +424,7 @@ impl FlowServiceInMemory {
                     flow.set_relevant_start_condition(
                         self.time_source.now(),
                         FlowStartCondition::Schedule(FlowStartConditionSchedule {
-                            activate_at: naive_next_activation_time,
+                            wake_up_at: naive_next_activation_time,
                         }),
                     )
                     .int_err()?;
@@ -437,8 +433,6 @@ impl FlowServiceInMemory {
                     let next_activation_time =
                         std::cmp::max(throttling_boundary_time, naive_next_activation_time);
                     self.enqueue_flow(flow.flow_id, next_activation_time)?;
-                    flow.activate_at_time(self.time_source.now(), next_activation_time)
-                        .int_err()?;
 
                     // Set throttling activity as start condition
                     if throttling_boundary_time > naive_next_activation_time {
@@ -535,14 +529,11 @@ impl FlowServiceInMemory {
             let corrected_finish_time =
                 std::cmp::max(batching_finish_time, throttling_boundary_time);
 
-            // Indicate if flow activation is required
-            let should_activate = match flow.timing.activate_at {
-                Some(activate_at) => activate_at > corrected_finish_time,
+            let should_activate = match self.find_planned_flow_activation_time(flow.flow_id) {
+                Some(activation_time) => activation_time > corrected_finish_time,
                 None => true,
             };
             if should_activate {
-                flow.activate_at_time(self.time_source.now(), corrected_finish_time)
-                    .int_err()?;
                 self.enqueue_flow(flow.flow_id, corrected_finish_time)?;
             }
 
@@ -570,6 +561,14 @@ impl FlowServiceInMemory {
     fn find_pending_flow(&self, flow_key: &FlowKey) -> Option<FlowID> {
         let state = self.state.lock().unwrap();
         state.pending_flows.try_get_pending_flow(flow_key)
+    }
+
+    fn find_planned_flow_activation_time(&self, flow_id: FlowID) -> Option<DateTime<Utc>> {
+        self.state
+            .lock()
+            .unwrap()
+            .time_wheel
+            .get_planned_flow_activation_time(flow_id)
     }
 
     #[tracing::instrument(level = "trace", skip_all, fields(?flow_key, ?trigger))]

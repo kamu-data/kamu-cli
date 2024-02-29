@@ -23,8 +23,6 @@ pub enum FlowEvent {
     StartConditionUpdated(FlowEventStartConditionUpdated),
     /// Secondary trigger added
     TriggerAdded(FlowEventTriggerAdded),
-    /// Activation time defined
-    ActivationTimeDefined(FlowEventActivationTimeDefined),
     /// Scheduled/Rescheduled a task
     TaskScheduled(FlowEventTaskScheduled),
     /// Task running
@@ -61,15 +59,6 @@ pub struct FlowEventTriggerAdded {
     pub event_time: DateTime<Utc>,
     pub flow_id: FlowID,
     pub trigger: FlowTrigger,
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct FlowEventActivationTimeDefined {
-    pub event_time: DateTime<Utc>,
-    pub flow_id: FlowID,
-    pub activation_time: DateTime<Utc>,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -116,7 +105,6 @@ impl FlowEvent {
             FlowEvent::Initiated(e) => e.flow_id,
             FlowEvent::StartConditionUpdated(e) => e.flow_id,
             FlowEvent::TriggerAdded(e) => e.flow_id,
-            FlowEvent::ActivationTimeDefined(e) => e.flow_id,
             FlowEvent::TaskScheduled(e) => e.flow_id,
             FlowEvent::TaskRunning(e) => e.flow_id,
             FlowEvent::TaskFinished(e) => e.flow_id,
@@ -129,7 +117,6 @@ impl FlowEvent {
             FlowEvent::Initiated(e) => e.event_time,
             FlowEvent::StartConditionUpdated(e) => e.event_time,
             FlowEvent::TriggerAdded(e) => e.event_time,
-            FlowEvent::ActivationTimeDefined(e) => e.event_time,
             FlowEvent::TaskScheduled(e) => e.event_time,
             FlowEvent::TaskRunning(e) => e.event_time,
             FlowEvent::TaskFinished(e) => e.event_time,
@@ -142,7 +129,6 @@ impl FlowEvent {
             FlowEvent::Initiated(_) => Some(FlowStatus::Waiting),
             FlowEvent::StartConditionUpdated(_)
             | FlowEvent::TriggerAdded(_)
-            | FlowEvent::ActivationTimeDefined(_)
             | FlowEvent::TaskScheduled(_) => None,
             FlowEvent::TaskRunning(_) => Some(FlowStatus::Running),
             FlowEvent::TaskFinished(_) | FlowEvent::Aborted(_) => Some(FlowStatus::Finished),
@@ -157,9 +143,6 @@ impl_enum_variant!(FlowEvent::StartConditionUpdated(
     FlowEventStartConditionUpdated
 ));
 impl_enum_variant!(FlowEvent::TriggerAdded(FlowEventTriggerAdded));
-impl_enum_variant!(FlowEvent::ActivationTimeDefined(
-    FlowEventActivationTimeDefined
-));
 impl_enum_variant!(FlowEvent::TaskScheduled(FlowEventTaskScheduled));
 impl_enum_variant!(FlowEvent::TaskRunning(FlowEventTaskRunning));
 impl_enum_variant!(FlowEvent::TaskFinished(FlowEventTaskFinished));

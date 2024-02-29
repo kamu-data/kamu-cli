@@ -32,7 +32,7 @@ impl FlowStartCondition {
             None => None,
             Some(fs::FlowStartCondition::Schedule(s)) => {
                 Some(Self::Schedule(FlowStartConditionSchedule {
-                    activate_at: s.activate_at,
+                    wake_up_at: s.wake_up_at,
                 }))
             }
             Some(fs::FlowStartCondition::Throttling(t)) => Some(Self::Throttling((*t).into())),
@@ -79,7 +79,7 @@ impl FlowStartCondition {
 
 #[derive(SimpleObject)]
 pub(crate) struct FlowStartConditionSchedule {
-    activate_at: DateTime<Utc>,
+    wake_up_at: DateTime<Utc>,
 }
 
 #[derive(SimpleObject)]

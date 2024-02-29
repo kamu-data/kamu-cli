@@ -26,7 +26,7 @@ pub enum FlowStartCondition {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct FlowStartConditionSchedule {
-    pub activate_at: DateTime<Utc>,
+    pub wake_up_at: DateTime<Utc>,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

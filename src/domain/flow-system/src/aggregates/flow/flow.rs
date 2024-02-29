@@ -54,20 +54,6 @@ impl Flow {
         self.apply(event)
     }
 
-    /// Activate at time
-    pub fn activate_at_time(
-        &mut self,
-        now: DateTime<Utc>,
-        activation_time: DateTime<Utc>,
-    ) -> Result<(), ProjectionError<FlowState>> {
-        let event = FlowEventActivationTimeDefined {
-            event_time: now,
-            flow_id: self.flow_id,
-            activation_time,
-        };
-        self.apply(event)
-    }
-
     /// Add extra trigger, if it's unique
     pub fn add_trigger_if_unique(
         &mut self,

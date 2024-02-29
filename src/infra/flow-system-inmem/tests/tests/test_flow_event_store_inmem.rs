@@ -1056,18 +1056,13 @@ fn drive_flow_to_status(
     flow.set_relevant_start_condition(
         start_moment + Duration::seconds(1),
         FlowStartCondition::Schedule(FlowStartConditionSchedule {
-            activate_at: start_moment + Duration::minutes(1),
+            wake_up_at: start_moment + Duration::minutes(1),
         }),
     )
     .unwrap();
 
     if expected_status != FlowStatus::Waiting {
         let task_id = task_event_store.new_task_id();
-        flow.activate_at_time(
-            start_moment + Duration::seconds(1),
-            start_moment + Duration::minutes(1),
-        )
-        .unwrap();
         flow.on_task_scheduled(start_moment + Duration::minutes(5), task_id)
             .unwrap();
         flow.on_task_running(start_moment + Duration::minutes(7), task_id)

@@ -189,7 +189,7 @@ impl std::fmt::Display for FlowSystemTestListener {
                                 write!(
                                     f,
                                     " Schedule({}ms)",
-                                    (s.activate_at - initial_time).num_milliseconds(),
+                                    (s.wake_up_at - initial_time).num_milliseconds(),
                                 )?;
                             }
                         }
