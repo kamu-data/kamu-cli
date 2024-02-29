@@ -226,12 +226,12 @@ impl DatasetName {
 ///////////////////////////////////////////////////////////////////////////////
 
 newtype_str!(
-    DatasetAliasPattern,
-    Grammar::match_dataset_alias_pattern,
-    DatasetAliasPatternSerdeVisitor
+    DatasetNamePattern,
+    Grammar::match_dataset_name_pattern,
+    DatasetNamePatternSerdeVisitor
 );
 
-impl DatasetAliasPattern {
+impl DatasetNamePattern {
     pub fn is_match(&self, dataset_name: &DatasetName) -> bool {
         Like::<false>::like(dataset_name.as_str(), self).unwrap()
     }
@@ -271,49 +271,49 @@ impl DatasetRepoPattern {
 ////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DatasetPattern {
+pub struct DatasetAliasPattern {
     pub account_name: Option<AccountName>,
-    pub dataset_alias_pattern: DatasetAliasPattern,
+    pub dataset_name_pattern: DatasetNamePattern,
 }
 
-impl DatasetPattern {
+impl DatasetAliasPattern {
     pub fn new(
         account_name: Option<AccountName>,
-        dataset_alias_pattern: DatasetAliasPattern,
+        dataset_name_pattern: DatasetNamePattern,
     ) -> Self {
         Self {
             account_name,
-            dataset_alias_pattern,
+            dataset_name_pattern,
         }
     }
 
     pub fn is_match(&self, dataset_handle: &DatasetHandle) -> bool {
         (self.account_name.is_none() || self.account_name == dataset_handle.alias.account_name)
             && self
-                .dataset_alias_pattern
+                .dataset_name_pattern
                 .is_match(&dataset_handle.alias.dataset_name)
     }
 }
 
-impl std::str::FromStr for DatasetPattern {
+impl std::str::FromStr for DatasetAliasPattern {
     type Err = ParseError<Self>;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.split_once('/') {
-            Some((account, dataset_name)) => match DatasetAliasPattern::try_from(dataset_name) {
-                Ok(dataset_alias_pattern) => match AccountName::try_from(account) {
+            Some((account, dataset_name)) => match DatasetNamePattern::try_from(dataset_name) {
+                Ok(dataset_name_pattern) => match AccountName::try_from(account) {
                     Ok(account_name) => Ok(Self {
                         account_name: Some(account_name),
-                        dataset_alias_pattern,
+                        dataset_name_pattern,
                     }),
                     Err(_) => Err(Self::Err::new(s)),
                 },
                 Err(_) => Err(Self::Err::new(s)),
             },
-            None => match DatasetAliasPattern::try_from(s) {
-                Ok(dataset_alias_pattern) => Ok(Self {
+            None => match DatasetNamePattern::try_from(s) {
+                Ok(dataset_name_pattern) => Ok(Self {
                     account_name: None,
-                    dataset_alias_pattern,
+                    dataset_name_pattern,
                 }),
                 Err(_) => Err(Self::Err::new(s)),
             },
@@ -495,6 +495,6 @@ impl fmt::Display for DatasetAliasRemote {
 impl_try_from_str!(DatasetAliasRemote);
 
 impl_parse_error!(DatasetAliasRemote);
-impl_parse_error!(DatasetPattern);
+impl_parse_error!(DatasetAliasPattern);
 
 impl_serde!(DatasetAliasRemote, DatasetAliasRemoteSerdeVisitor);

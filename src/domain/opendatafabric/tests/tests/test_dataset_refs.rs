@@ -56,9 +56,9 @@ fn test_dataset_ref_pattern() {
 
     assert_eq!(
         res,
-        DatasetRefPattern::Pattern(DatasetPattern {
+        DatasetRefPattern::Pattern(DatasetAliasPattern {
             account_name: None,
-            dataset_alias_pattern: DatasetAliasPattern::from_str(param).unwrap()
+            dataset_name_pattern: DatasetNamePattern::from_str(param).unwrap()
         }),
     );
 
@@ -69,9 +69,9 @@ fn test_dataset_ref_pattern() {
 
     assert_eq!(
         res,
-        DatasetRefPattern::Pattern(DatasetPattern {
+        DatasetRefPattern::Pattern(DatasetAliasPattern {
             account_name: Some(AccountName::from_str(account).unwrap()),
-            dataset_alias_pattern: DatasetAliasPattern::from_str(pattern).unwrap(),
+            dataset_name_pattern: DatasetNamePattern::from_str(pattern).unwrap(),
         }),
     );
 }
@@ -120,10 +120,10 @@ fn test_dataset_ref_pattern_local_match() {
     assert!(pattern.is_match(&dataset_handle));
 
     let dataset_account = "account1";
-    let dataset_alias_pattern = "net%";
+    let dataset_name_pattern = "net%";
     let dataset_name = "net.example.com";
 
-    let expression = format!("{dataset_account}/{dataset_alias_pattern}");
+    let expression = format!("{dataset_account}/{dataset_name_pattern}");
     let pattern = DatasetRefPattern::from_str(expression.as_str()).unwrap();
     let dataset_handle = DatasetHandle {
         id: default_dataset_id.clone(),
@@ -235,7 +235,7 @@ fn test_dataset_ref_any_pattern() {
 
     assert_eq!(
         res,
-        DatasetRefAnyPattern::Local(DatasetAliasPattern::from_str(param).unwrap()),
+        DatasetRefAnyPattern::Local(DatasetNamePattern::from_str(param).unwrap()),
     );
 
     // Parse valid remote ambiguous ref with wildcard repo/net.example.%
@@ -249,11 +249,11 @@ fn test_dataset_ref_any_pattern() {
         res,
         DatasetRefAnyPattern::AmbiguousAlias(
             DatasetAmbiguousPattern {
-                pattern: DatasetAliasPattern::from_str(repo_name)
+                pattern: DatasetNamePattern::from_str(repo_name)
                     .unwrap()
                     .into_inner(),
             },
-            DatasetAliasPattern::from_str(dataset_name).unwrap()
+            DatasetNamePattern::from_str(dataset_name).unwrap()
         ),
     );
 
@@ -270,7 +270,7 @@ fn test_dataset_ref_any_pattern() {
         DatasetRefAnyPattern::RemoteAlias(
             DatasetRepoPattern::from_str(repo_name).unwrap(),
             DatasetAccountPattern::from_str(account_name).unwrap(),
-            DatasetAliasPattern::from_str(dataset_name).unwrap()
+            DatasetNamePattern::from_str(dataset_name).unwrap()
         ),
     );
 }

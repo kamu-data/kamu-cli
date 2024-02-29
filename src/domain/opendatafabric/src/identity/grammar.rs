@@ -219,19 +219,19 @@ impl Grammar {
         Self::match_hostname(s)
     }
 
-    // DatasetAliasPattern = Hostname with possible wildcard symbols
-    pub fn match_dataset_alias_pattern(s: &str) -> Option<(&str, &str)> {
+    // DatasetNamePattern = Hostname with possible wildcard symbols
+    pub fn match_dataset_name_pattern(s: &str) -> Option<(&str, &str)> {
         // Try parsing as pattern (with wildcards) or a host name (without)
         Self::match_alt(s, Self::match_hostname_pattern, Self::match_hostname)
     }
 
-    // DatasetAliasPattern = Hostname with possible wildcard symbols
+    // DatasetNamePattern = Hostname with possible wildcard symbols
     pub fn match_dataset_account_pattern(s: &str) -> Option<(&str, &str)> {
         // Try parsing as pattern (with wildcards) or a host name (without)
         Self::match_alt(s, Self::match_hostname_pattern, Self::match_hostname)
     }
 
-    // DatasetAliasPattern = Hostname with possible wildcard symbols
+    // DatasetNamePattern = Hostname with possible wildcard symbols
     pub fn match_dataset_repo_pattern(s: &str) -> Option<(&str, &str)> {
         // Try parsing as pattern (with wildcards) or a host name (without)
         Self::match_alt(s, Self::match_hostname_pattern, Self::match_hostname)

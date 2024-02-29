@@ -747,7 +747,7 @@ impl std::cmp::PartialOrd for DatasetRefAny {
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum DatasetRefPattern {
     Ref(DatasetRef),
-    Pattern(DatasetPattern),
+    Pattern(DatasetAliasPattern),
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -756,10 +756,10 @@ pub enum DatasetRefAnyPattern {
     RemoteAlias(
         DatasetRepoPattern,
         DatasetAccountPattern,
-        DatasetAliasPattern,
+        DatasetNamePattern,
     ),
-    AmbiguousAlias(DatasetAmbiguousPattern, DatasetAliasPattern),
-    Local(DatasetAliasPattern),
+    AmbiguousAlias(DatasetAmbiguousPattern, DatasetNamePattern),
+    Local(DatasetNamePattern),
     Ref(DatasetRefAny),
 }
 
@@ -809,15 +809,15 @@ impl DatasetRefAnyPattern {
                     false
                 }
             }
-            Self::Local(dataset_alias_pattern) => {
+            Self::Local(dataset_name_pattern) => {
                 if let Ok(dataset_local_ref) = dataset_ref_any.as_local_ref(|_| false) {
                     dataset_local_ref.dataset_name().is_some()
-                        && dataset_alias_pattern.is_match(dataset_local_ref.dataset_name().unwrap())
+                        && dataset_name_pattern.is_match(dataset_local_ref.dataset_name().unwrap())
                 } else {
                     false
                 }
             }
-            Self::AmbiguousAlias(account_repo_pattern, dataset_alias_pattern) => {
+            Self::AmbiguousAlias(account_repo_pattern, dataset_name_pattern) => {
                 if !is_repo {
                     let account_pattern =
                         DatasetAccountPattern::from_str(&account_repo_pattern.pattern);
@@ -827,7 +827,7 @@ impl DatasetRefAnyPattern {
                                 .unwrap()
                                 .is_match(dataset_local_ref.account_name()))
                             && dataset_local_ref.dataset_name().is_some()
-                            && dataset_alias_pattern
+                            && dataset_name_pattern
                                 .is_match(dataset_local_ref.dataset_name().unwrap());
                     }
                 } else {
@@ -838,19 +838,19 @@ impl DatasetRefAnyPattern {
                                 .unwrap()
                                 .is_match(dataset_remote_ref.repo_name().unwrap()))
                             && dataset_remote_ref.dataset_name().is_some()
-                            && dataset_alias_pattern
+                            && dataset_name_pattern
                                 .is_match(dataset_remote_ref.dataset_name().unwrap());
                     }
                 }
                 false
             }
-            Self::RemoteAlias(repo_pattern, account_pattern, dataset_alias_pattern) => {
+            Self::RemoteAlias(repo_pattern, account_pattern, dataset_name_pattern) => {
                 if let Ok(dataset_remote_ref) = dataset_ref_any.as_remote_ref(|_| true) {
                     (dataset_remote_ref.repo_name().is_some()
                         && repo_pattern.is_match(dataset_remote_ref.repo_name().unwrap()))
                         && (account_pattern.is_match(dataset_remote_ref.account_name()))
                         && (dataset_remote_ref.dataset_name().is_some()
-                            && dataset_alias_pattern
+                            && dataset_name_pattern
                                 .is_match(dataset_remote_ref.dataset_name().unwrap()))
                 } else {
                     false
@@ -874,12 +874,12 @@ impl DatasetRefAnyPattern {
         match self {
             Self::Ref(_) => unimplemented!(),
             Self::ID(_, dataset_id) => format!("{repo_name}/{dataset_id}"),
-            Self::Local(dataset_alias_pattern) => dataset_alias_pattern.to_string(),
-            Self::AmbiguousAlias(_, dataset_alias_pattern) => {
-                format!("{repo_name}/{dataset_alias_pattern}")
+            Self::Local(dataset_name_pattern) => dataset_name_pattern.to_string(),
+            Self::AmbiguousAlias(_, dataset_name_pattern) => {
+                format!("{repo_name}/{dataset_name_pattern}")
             }
-            Self::RemoteAlias(_, account_pattern, dataset_alias_pattern) => {
-                format!("{repo_name}/{account_pattern}/{dataset_alias_pattern}")
+            Self::RemoteAlias(_, account_pattern, dataset_name_pattern) => {
+                format!("{repo_name}/{account_pattern}/{dataset_name_pattern}")
             }
         }
     }
@@ -921,7 +921,7 @@ impl fmt::Display for DatasetRefPattern {
                 if let Some(account_name) = &dataset_pattern.account_name {
                     write!(f, "{account_name}/")?;
                 }
-                write!(f, "{}", dataset_pattern.dataset_alias_pattern)
+                write!(f, "{}", dataset_pattern.dataset_name_pattern)
             }
         }
     }
@@ -932,7 +932,7 @@ impl std::str::FromStr for DatasetRefPattern {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if s.contains('%') {
-            return match DatasetPattern::from_str(s) {
+            return match DatasetAliasPattern::from_str(s) {
                 Ok(dataset_pattern) => Ok(Self::Pattern(dataset_pattern)),
                 Err(_) => Err(Self::Err::new(s)),
             };
@@ -955,11 +955,11 @@ impl std::str::FromStr for DatasetRefAnyPattern {
                         Some((account_name, dataset_name)) => {
                             match DatasetAccountPattern::from_str(account_name) {
                                 Ok(account_pattern) => {
-                                    match DatasetAliasPattern::from_str(dataset_name) {
-                                        Ok(dataset_alias_pattern) => Ok(Self::RemoteAlias(
+                                    match DatasetNamePattern::from_str(dataset_name) {
+                                        Ok(dataset_name_pattern) => Ok(Self::RemoteAlias(
                                             repo_account_pattern,
                                             account_pattern,
-                                            dataset_alias_pattern,
+                                            dataset_name_pattern,
                                         )),
                                         Err(_) => Err(Self::Err::new(s)),
                                     }
@@ -969,12 +969,12 @@ impl std::str::FromStr for DatasetRefAnyPattern {
                         }
                         None => match DatasetID::from_did_str(rest) {
                             Ok(dataset_id) => Ok(Self::ID(repo_account_pattern, dataset_id)),
-                            Err(_) => match DatasetAliasPattern::from_str(rest) {
-                                Ok(dataset_alias_pattern) => Ok(Self::AmbiguousAlias(
+                            Err(_) => match DatasetNamePattern::from_str(rest) {
+                                Ok(dataset_name_pattern) => Ok(Self::AmbiguousAlias(
                                     DatasetAmbiguousPattern {
                                         pattern: repo_account_pattern.into_inner(),
                                     },
-                                    dataset_alias_pattern,
+                                    dataset_name_pattern,
                                 )),
                                 Err(_) => Err(Self::Err::new(s)),
                             },
@@ -982,8 +982,8 @@ impl std::str::FromStr for DatasetRefAnyPattern {
                     },
                     Err(_) => Err(Self::Err::new(s)),
                 },
-                None => match DatasetAliasPattern::try_from(s) {
-                    Ok(dataset_alias_pattern) => Ok(Self::Local(dataset_alias_pattern)),
+                None => match DatasetNamePattern::try_from(s) {
+                    Ok(dataset_name_pattern) => Ok(Self::Local(dataset_name_pattern)),
                     Err(_) => Err(Self::Err::new(s)),
                 },
             };
