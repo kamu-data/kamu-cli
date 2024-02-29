@@ -49,34 +49,7 @@ impl Flow {
         let event = FlowEventStartConditionUpdated {
             event_time: now,
             flow_id: self.flow_id,
-            start_condition: Some(start_condition),
-        };
-        self.apply(event)
-    }
-
-    /// Clear start condition to indicate there is no reason of waiting
-    pub fn clear_start_condition(
-        &mut self,
-        now: DateTime<Utc>,
-    ) -> Result<(), ProjectionError<FlowState>> {
-        let event = FlowEventStartConditionUpdated {
-            event_time: now,
-            flow_id: self.flow_id,
-            start_condition: None,
-        };
-        self.apply(event)
-    }
-
-    /// Activate at time
-    pub fn activate_at_time(
-        &mut self,
-        now: DateTime<Utc>,
-        activate_at: DateTime<Utc>,
-    ) -> Result<(), ProjectionError<FlowState>> {
-        let event = FlowEventQueued {
-            event_time: now,
-            flow_id: self.flow_id,
-            activate_at,
+            start_condition,
         };
         self.apply(event)
     }

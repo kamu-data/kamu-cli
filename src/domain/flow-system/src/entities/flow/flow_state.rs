@@ -37,8 +37,8 @@ pub struct FlowState {
 pub struct FlowTimingRecords {
     /// Creation time
     pub created_at: DateTime<Utc>,
-    /// Activating at time
-    pub activate_at: Option<DateTime<Utc>>,
+    /// Task scheduled and awaiting for exeuction since time
+    pub awaiting_executor_since: Option<DateTime<Utc>>,
     /// Started running at time
     pub running_since: Option<DateTime<Utc>>,
     /// Finish time (success or cancel/abort)
@@ -58,10 +58,6 @@ impl FlowState {
             FlowStatus::Finished
         } else if self.timing.running_since.is_some() {
             FlowStatus::Running
-        } else if !self.task_ids.is_empty() {
-            FlowStatus::Scheduled
-        } else if self.timing.activate_at.is_some() {
-            FlowStatus::Queued
         } else {
             FlowStatus::Waiting
         }
@@ -119,7 +115,7 @@ impl Projection for FlowState {
                     start_condition: None,
                     timing: FlowTimingRecords {
                         created_at: event_time,
-                        activate_at: None,
+                        awaiting_executor_since: None,
                         running_since: None,
                         finished_at: None,
                     },
@@ -137,24 +133,11 @@ impl Projection for FlowState {
                         start_condition,
                         ..
                     }) => {
-                        if s.outcome.is_some() || !s.task_ids.is_empty() {
+                        if s.outcome.is_some() || s.timing.running_since.is_some() {
                             Err(ProjectionError::new(Some(s), event))
                         } else {
                             Ok(FlowState {
-                                start_condition,
-                                ..s
-                            })
-                        }
-                    }
-                    E::Queued(FlowEventQueued { activate_at, .. }) => {
-                        if s.outcome.is_some() || !s.task_ids.is_empty() {
-                            Err(ProjectionError::new(Some(s), event))
-                        } else {
-                            Ok(FlowState {
-                                timing: FlowTimingRecords {
-                                    activate_at: Some(activate_at),
-                                    ..s.timing
-                                },
+                                start_condition: Some(start_condition),
                                 ..s
                             })
                         }
@@ -168,13 +151,24 @@ impl Projection for FlowState {
                             Ok(FlowState { triggers, ..s })
                         }
                     }
-                    E::TaskScheduled(FlowEventTaskScheduled { task_id, .. }) => {
-                        if s.outcome.is_some() || s.timing.activate_at.is_none() {
+                    E::TaskScheduled(FlowEventTaskScheduled {
+                        event_time,
+                        task_id,
+                        ..
+                    }) => {
+                        if s.outcome.is_some() {
                             Err(ProjectionError::new(Some(s), event))
                         } else {
                             let mut task_ids = s.task_ids;
                             task_ids.push(task_id);
-                            Ok(FlowState { task_ids, ..s })
+                            Ok(FlowState {
+                                task_ids,
+                                timing: FlowTimingRecords {
+                                    awaiting_executor_since: Some(event_time),
+                                    ..s.timing
+                                },
+                                ..s
+                            })
                         }
                     }
                     E::TaskRunning(FlowEventTaskRunning {
@@ -183,8 +177,8 @@ impl Projection for FlowState {
                         ..
                     }) => {
                         if s.outcome.is_some()
-                            || s.timing.activate_at.is_none()
                             || !s.task_ids.contains(&task_id)
+                            || s.timing.awaiting_executor_since.is_none()
                         {
                             Err(ProjectionError::new(Some(s), event))
                         } else {
@@ -193,6 +187,7 @@ impl Projection for FlowState {
                                     running_since: Some(event_time),
                                     ..s.timing
                                 },
+                                start_condition: None,
                                 ..s
                             })
                         }
@@ -203,7 +198,10 @@ impl Projection for FlowState {
                         ref task_outcome,
                         ..
                     }) => {
-                        if !s.task_ids.contains(&task_id) || s.timing.running_since.is_none() {
+                        if !s.task_ids.contains(&task_id)
+                            || s.timing.running_since.is_none()
+                            || s.start_condition.is_some()
+                        {
                             Err(ProjectionError::new(Some(s), event))
                         } else if s.outcome.is_some() {
                             // Ignore for idempotence motivation
@@ -249,6 +247,7 @@ impl Projection for FlowState {
                                     finished_at: Some(event_time),
                                     ..s.timing
                                 },
+                                start_condition: None,
                                 ..s
                             })
                         }

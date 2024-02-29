@@ -136,12 +136,8 @@ impl std::fmt::Display for FlowSystemTestListener {
                         "    Flow ID = {} {}",
                         flow_state.flow_id,
                         match flow_state.status() {
-                            FlowStatus::Queued => format!(
-                                "Queued({}ms)",
-                                (flow_state.timing.activate_at.unwrap() - initial_time)
-                                    .num_milliseconds()
-                            ),
-                            FlowStatus::Scheduled | FlowStatus::Running => format!(
+                            FlowStatus::Waiting => "Waiting".to_string(),
+                            FlowStatus::Running => format!(
                                 "{:?}(task={})",
                                 flow_state.status(),
                                 flow_state
@@ -155,8 +151,8 @@ impl std::fmt::Display for FlowSystemTestListener {
                         }
                     )?;
 
-                    match flow_state.status() {
-                        FlowStatus::Waiting | FlowStatus::Queued | FlowStatus::Scheduled => write!(
+                    if matches!(flow_state.status(), FlowStatus::Waiting) {
+                        write!(
                             f,
                             " {}",
                             match flow_state.primary_trigger() {
@@ -172,14 +168,19 @@ impl std::fmt::Display for FlowSystemTestListener {
                                         .unwrap_or_else(|| i.dataset_id.to_string()),
                                 ),
                             }
-                        )?,
-                        _ => {}
+                        )?;
                     }
 
                     if let Some(start_condition) = flow_state.start_condition {
                         match start_condition {
                             FlowStartCondition::Throttling(t) => {
-                                write!(f, " Throttling({}ms)", t.interval.num_milliseconds())?;
+                                write!(
+                                    f,
+                                    " Throttling(for={}ms, wakeup={}ms, shifted={}ms)",
+                                    t.interval.num_milliseconds(),
+                                    (t.wake_up_at - initial_time).num_milliseconds(),
+                                    (t.shifted_from - initial_time).num_milliseconds()
+                                )?;
                             }
                             FlowStartCondition::Batching(b) => write!(
                                 f,
@@ -187,6 +188,23 @@ impl std::fmt::Display for FlowSystemTestListener {
                                 b.active_batching_rule.min_records_to_await(),
                                 (b.batching_deadline - initial_time).num_milliseconds(),
                             )?,
+                            FlowStartCondition::Executor(e) => {
+                                write!(
+                                    f,
+                                    " Executor(task={}, since={}ms)",
+                                    e.task_id,
+                                    (flow_state.timing.awaiting_executor_since.unwrap()
+                                        - initial_time)
+                                        .num_milliseconds()
+                                )?;
+                            }
+                            FlowStartCondition::Schedule(s) => {
+                                write!(
+                                    f,
+                                    " Schedule(wakeup={}ms)",
+                                    (s.wake_up_at - initial_time).num_milliseconds(),
+                                )?;
+                            }
                         }
                     }
 

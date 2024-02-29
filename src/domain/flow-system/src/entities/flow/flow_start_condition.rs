@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Duration, Utc};
+use kamu_task_system::TaskID;
 
 use crate::BatchingRule;
 
@@ -15,8 +16,17 @@ use crate::BatchingRule;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FlowStartCondition {
+    Schedule(FlowStartConditionSchedule),
     Throttling(FlowStartConditionThrottling),
     Batching(FlowStartConditionBatching),
+    Executor(FlowStartConditionExecutor),
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FlowStartConditionSchedule {
+    pub wake_up_at: DateTime<Utc>,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -24,6 +34,8 @@ pub enum FlowStartCondition {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct FlowStartConditionThrottling {
     pub interval: Duration,
+    pub wake_up_at: DateTime<Utc>,
+    pub shifted_from: DateTime<Utc>,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -32,6 +44,13 @@ pub struct FlowStartConditionThrottling {
 pub struct FlowStartConditionBatching {
     pub active_batching_rule: BatchingRule,
     pub batching_deadline: DateTime<Utc>,
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FlowStartConditionExecutor {
+    pub task_id: TaskID,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

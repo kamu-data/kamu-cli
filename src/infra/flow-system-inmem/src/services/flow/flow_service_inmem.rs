@@ -91,7 +91,10 @@ impl FlowServiceInMemory {
     }
 
     #[tracing::instrument(level = "debug", skip_all)]
-    async fn run_current_timeslot(&self) -> Result<(), InternalError> {
+    async fn run_current_timeslot(
+        &self,
+        timeslot_time: DateTime<Utc>,
+    ) -> Result<(), InternalError> {
         let planned_flow_ids: Vec<_> = {
             let mut state = self.state.lock().unwrap();
             state.time_wheel.take_nearest_planned_flows()
@@ -103,7 +106,7 @@ impl FlowServiceInMemory {
                 let mut flow = Flow::load(planned_flow_id, self.flow_event_store.as_ref())
                     .await
                     .int_err()?;
-                self.schedule_flow_task(&mut flow).await?;
+                self.schedule_flow_task(&mut flow, timeslot_time).await?;
                 Ok(())
             });
         }
@@ -235,10 +238,7 @@ impl FlowServiceInMemory {
             start_time,
             flow_key,
             FlowTrigger::AutoPolling(FlowTriggerAutoPolling {}),
-            None,
-            |flow_run_stats: &FlowRunStats| {
-                schedule.next_activation_time(start_time, flow_run_stats.last_success_time)
-            },
+            FlowTriggerContext::Scheduled(schedule),
         )
         .await
     }
@@ -254,8 +254,7 @@ impl FlowServiceInMemory {
             start_time,
             flow_key,
             FlowTrigger::AutoPolling(FlowTriggerAutoPolling {}),
-            None,
-            |_: &FlowRunStats| start_time,
+            FlowTriggerContext::Unconditional,
         )
         .await
     }
@@ -310,8 +309,7 @@ impl FlowServiceInMemory {
                         input_success_time,
                         &dependent_flow_key,
                         trigger,
-                        Some(&batching_rule),
-                        |_| input_success_time,
+                        FlowTriggerContext::Batching(&batching_rule),
                     )
                     .await?;
                 }
@@ -323,13 +321,12 @@ impl FlowServiceInMemory {
         }
     }
 
-    async fn trigger_flow_common(
+    async fn trigger_flow_common<'a>(
         &self,
         trigger_time: DateTime<Utc>,
         flow_key: &FlowKey,
         trigger: FlowTrigger,
-        maybe_batching_rule: Option<&BatchingRule>,
-        new_activation_time_fn: impl FnOnce(&FlowRunStats) -> DateTime<Utc>,
+        context: FlowTriggerContext<'a>,
     ) -> Result<FlowState, InternalError> {
         // Query previous runs stats to determine activation time
         let flow_run_stats = self.flow_run_stats(flow_key).await?;
@@ -358,39 +355,40 @@ impl FlowServiceInMemory {
                 flow.add_trigger_if_unique(trigger_time, trigger)
                     .int_err()?;
 
-                // Evaluate batching rule, if defined
-                if let Some(batching_rule) = maybe_batching_rule {
-                    // Is this rule still waited?
-                    if matches!(flow.start_condition, Some(FlowStartCondition::Batching(_))) {
-                        self.evaluate_flow_batching_rule(
-                            trigger_time,
-                            &mut flow,
-                            batching_rule,
-                            throttling_boundary_time,
-                        )
-                        .await
-                        .int_err()?;
-                    } else {
-                        // Skip, the flow is scheduled already or waits for
-                        // something else
-                    }
-                } else {
-                    // Evaluate throttling condition, if batching condition passed
-                    // Is new time earlier than planned?
-                    if throttling_boundary_time
-                        < flow
-                            .timing
-                            .activate_at
-                            .expect("Flow expected to be queued by now")
-                    {
-                        // If so, enqueue the flow earlier
-                        self.enqueue_flow(flow.flow_id, throttling_boundary_time)?;
-                        flow.activate_at_time(self.time_source.now(), throttling_boundary_time)
+                match context {
+                    FlowTriggerContext::Batching(batching_rule) => {
+                        // Is this rule still waited?
+                        if matches!(flow.start_condition, Some(FlowStartCondition::Batching(_))) {
+                            self.evaluate_flow_batching_rule(
+                                trigger_time,
+                                &mut flow,
+                                batching_rule,
+                                throttling_boundary_time,
+                            )
+                            .await
                             .int_err()?;
+                        } else {
+                            // Skip, the flow waits for something else
+                        }
+                    }
+                    FlowTriggerContext::Scheduled(_) | FlowTriggerContext::Unconditional => {
+                        // Evaluate throttling condition: is new time earlier than planned?
+                        let planned_time = self
+                            .find_planned_flow_activation_time(flow.flow_id)
+                            .expect("Flow expected to have activation time by now");
 
-                        // Set throttling activity as start condition
-                        if throttling_boundary_time > trigger_time {
-                            self.indicate_throttling_activity(&mut flow)?;
+                        if throttling_boundary_time < planned_time {
+                            // If so, enqueue the flow earlier
+                            self.enqueue_flow(flow.flow_id, throttling_boundary_time)?;
+
+                            // Indicate throttling, if applied
+                            if throttling_boundary_time > trigger_time {
+                                self.indicate_throttling_activity(
+                                    &mut flow,
+                                    throttling_boundary_time,
+                                    trigger_time,
+                                )?;
+                            }
                         }
                     }
                 }
@@ -406,34 +404,62 @@ impl FlowServiceInMemory {
                     .make_new_flow(trigger_time, flow_key.clone(), trigger)
                     .await?;
 
-                // Evaluate batching rule, if defined
-                if let Some(batching_rule) = maybe_batching_rule {
-                    // Don't activate if batching condition not satisfied
-                    self.evaluate_flow_batching_rule(
-                        trigger_time,
-                        &mut flow,
-                        batching_rule,
-                        throttling_boundary_time,
-                    )
-                    .await
-                    .int_err()?;
-                } else {
-                    // Evaluate throttling condition, if batching condition passed
-
-                    // Next activation time depends on:
-                    //  - last success time, if ever launched
-                    //  - schedule, if defined
-                    // but in any case, may not be less than throttling boundary
-                    let naive_next_activation_time = new_activation_time_fn(&flow_run_stats);
-                    let next_activation_time =
-                        std::cmp::max(throttling_boundary_time, naive_next_activation_time);
-                    self.enqueue_flow(flow.flow_id, next_activation_time)?;
-                    flow.activate_at_time(self.time_source.now(), next_activation_time)
+                match context {
+                    FlowTriggerContext::Batching(batching_rule) => {
+                        // Don't activate if batching condition not satisfied
+                        self.evaluate_flow_batching_rule(
+                            trigger_time,
+                            &mut flow,
+                            batching_rule,
+                            throttling_boundary_time,
+                        )
+                        .await
                         .int_err()?;
+                    }
+                    FlowTriggerContext::Scheduled(schedule) => {
+                        // Next activation time depends on:
+                        //  - last success time, if ever launched
+                        //  - schedule, if defined
+                        let naive_next_activation_time = schedule
+                            .next_activation_time(trigger_time, flow_run_stats.last_success_time);
 
-                    // Set throttling activity as start condition
-                    if throttling_boundary_time > naive_next_activation_time {
-                        self.indicate_throttling_activity(&mut flow)?;
+                        // Apply throttling boundary
+                        let next_activation_time =
+                            std::cmp::max(throttling_boundary_time, naive_next_activation_time);
+                        self.enqueue_flow(flow.flow_id, next_activation_time)?;
+
+                        // Set throttling activity as start condition
+                        if throttling_boundary_time > naive_next_activation_time {
+                            self.indicate_throttling_activity(
+                                &mut flow,
+                                throttling_boundary_time,
+                                naive_next_activation_time,
+                            )?;
+                        } else if naive_next_activation_time > trigger_time {
+                            // Set waiting according to the schedule
+                            flow.set_relevant_start_condition(
+                                self.time_source.now(),
+                                FlowStartCondition::Schedule(FlowStartConditionSchedule {
+                                    wake_up_at: naive_next_activation_time,
+                                }),
+                            )
+                            .int_err()?;
+                        }
+                    }
+                    FlowTriggerContext::Unconditional => {
+                        // Apply throttling boundary
+                        let next_activation_time =
+                            std::cmp::max(throttling_boundary_time, trigger_time);
+                        self.enqueue_flow(flow.flow_id, next_activation_time)?;
+
+                        // Set throttling activity as start condition
+                        if throttling_boundary_time > trigger_time {
+                            self.indicate_throttling_activity(
+                                &mut flow,
+                                throttling_boundary_time,
+                                trigger_time,
+                            )?;
+                        }
                     }
                 }
 
@@ -526,32 +552,40 @@ impl FlowServiceInMemory {
             let corrected_finish_time =
                 std::cmp::max(batching_finish_time, throttling_boundary_time);
 
-            // Indicate if flow activation is required
-            let should_activate = match flow.timing.activate_at {
-                Some(activate_at) => activate_at > corrected_finish_time,
+            let should_activate = match self.find_planned_flow_activation_time(flow.flow_id) {
+                Some(activation_time) => activation_time > corrected_finish_time,
                 None => true,
             };
             if should_activate {
-                flow.activate_at_time(self.time_source.now(), corrected_finish_time)
-                    .int_err()?;
                 self.enqueue_flow(flow.flow_id, corrected_finish_time)?;
             }
 
             // If batching is over, it's start condition is no longer valid.
             // However, set throttling condition, if it applies
             if satisfied && throttling_boundary_time > batching_finish_time {
-                self.indicate_throttling_activity(flow)?;
+                self.indicate_throttling_activity(
+                    flow,
+                    throttling_boundary_time,
+                    batching_finish_time,
+                )?;
             }
         }
 
         Ok(())
     }
 
-    fn indicate_throttling_activity(&self, flow: &mut Flow) -> Result<(), InternalError> {
+    fn indicate_throttling_activity(
+        &self,
+        flow: &mut Flow,
+        wake_up_at: DateTime<Utc>,
+        shifted_from: DateTime<Utc>,
+    ) -> Result<(), InternalError> {
         flow.set_relevant_start_condition(
             self.time_source.now(),
             FlowStartCondition::Throttling(FlowStartConditionThrottling {
                 interval: self.run_config.mandatory_throttling_period,
+                wake_up_at,
+                shifted_from,
             }),
         )
         .int_err()?;
@@ -561,6 +595,14 @@ impl FlowServiceInMemory {
     fn find_pending_flow(&self, flow_key: &FlowKey) -> Option<FlowID> {
         let state = self.state.lock().unwrap();
         state.pending_flows.try_get_pending_flow(flow_key)
+    }
+
+    fn find_planned_flow_activation_time(&self, flow_id: FlowID) -> Option<DateTime<Utc>> {
+        self.state
+            .lock()
+            .unwrap()
+            .time_wheel
+            .get_planned_flow_activation_time(flow_id)
     }
 
     #[tracing::instrument(level = "trace", skip_all, fields(?flow_key, ?trigger))]
@@ -615,7 +657,11 @@ impl FlowServiceInMemory {
     }
 
     #[tracing::instrument(level = "trace", skip_all, fields(flow_id = %flow.flow_id))]
-    async fn schedule_flow_task(&self, flow: &mut Flow) -> Result<TaskID, InternalError> {
+    async fn schedule_flow_task(
+        &self,
+        flow: &mut Flow,
+        schedule_time: DateTime<Utc>,
+    ) -> Result<TaskID, InternalError> {
         let logical_plan = flow.make_task_logical_plan();
 
         let task = self
@@ -624,12 +670,15 @@ impl FlowServiceInMemory {
             .await
             .int_err()?;
 
-        if flow.start_condition.is_some() {
-            flow.clear_start_condition(self.time_source.now())
-                .int_err()?;
-        }
+        flow.set_relevant_start_condition(
+            schedule_time,
+            FlowStartCondition::Executor(FlowStartConditionExecutor {
+                task_id: task.task_id,
+            }),
+        )
+        .int_err()?;
 
-        flow.on_task_scheduled(self.time_source.now(), task.task_id)
+        flow.on_task_scheduled(schedule_time, task.task_id)
             .int_err()?;
         flow.save(self.flow_event_store.as_ref()).await.int_err()?;
 
@@ -713,7 +762,9 @@ impl FlowService for FlowServiceInMemory {
                 && nearest_activation_time <= current_time
             {
                 // Run scheduling for current time slot. Should not throw any errors
-                self.run_current_timeslot().await.int_err()?;
+                self.run_current_timeslot(nearest_activation_time)
+                    .await
+                    .int_err()?;
 
                 // Publish progress event
                 self.event_bus
@@ -752,8 +803,7 @@ impl FlowService for FlowServiceInMemory {
                 initiator_account_id,
                 initiator_account_name,
             }),
-            None, // Ignore batching condition when triggering manually, even if it is defined
-            |_| activation_time,
+            FlowTriggerContext::Unconditional,
         )
         .await
         .map_err(RequestFlowError::Internal)
@@ -887,16 +937,16 @@ impl FlowService for FlowServiceInMemory {
     ) -> Result<FlowState, CancelScheduledTasksError> {
         let mut flow = Flow::load(flow_id, self.flow_event_store.as_ref()).await?;
 
-        // May not be called for Draft or Queued flows.
-        // Cancel tasks for flows in Scheduled/Running state.
+        // May not be called for Waiting flows.
+        // Cancel tasks for flows in Running state.
         // Ignore in Finished state
         match flow.status() {
-            FlowStatus::Waiting | FlowStatus::Queued => {
+            FlowStatus::Waiting => {
                 return Err(CancelScheduledTasksError::NotScheduled(
                     FlowNotScheduledError { flow_id },
                 ))
             }
-            FlowStatus::Scheduled | FlowStatus::Running => {
+            FlowStatus::Running => {
                 // Abort current flow and it's scheduled tasks
                 self.abort_flow_impl(&mut flow).await?;
 
@@ -922,8 +972,13 @@ impl FlowServiceTestDriver for FlowServiceInMemory {
         state.running = true;
     }
 
-    /// Pretends it is time to schedule the given flow that was in Queued state
-    async fn mimic_flow_scheduled(&self, flow_id: FlowID) -> Result<TaskID, InternalError> {
+    /// Pretends it is time to schedule the given flow that was not waiting for
+    /// anything else
+    async fn mimic_flow_scheduled(
+        &self,
+        flow_id: FlowID,
+        schedule_time: DateTime<Utc>,
+    ) -> Result<TaskID, InternalError> {
         {
             let mut state = self.state.lock().unwrap();
             state.time_wheel.cancel_flow_activation(flow_id).int_err()?;
@@ -932,7 +987,10 @@ impl FlowServiceTestDriver for FlowServiceInMemory {
         let mut flow = Flow::load(flow_id, self.flow_event_store.as_ref())
             .await
             .int_err()?;
-        let task_id = self.schedule_flow_task(&mut flow).await.int_err()?;
+        let task_id = self
+            .schedule_flow_task(&mut flow, schedule_time)
+            .await
+            .int_err()?;
         Ok(task_id)
     }
 }
@@ -1153,6 +1211,14 @@ impl AsyncEventHandler<DatasetEventDeleted> for FlowServiceInMemory {
 
         Ok(())
     }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+enum FlowTriggerContext<'a> {
+    Unconditional,
+    Scheduled(&'a Schedule),
+    Batching(&'a BatchingRule),
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

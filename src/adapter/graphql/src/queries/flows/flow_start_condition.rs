@@ -17,8 +17,10 @@ use crate::prelude::*;
 
 #[derive(Union)]
 pub(crate) enum FlowStartCondition {
+    Schedule(FlowStartConditionSchedule),
     Throttling(FlowStartConditionThrottling),
     Batching(FlowStartConditionBatching),
+    Executor(FlowStartConditionExecutor),
 }
 
 impl FlowStartCondition {
@@ -28,6 +30,11 @@ impl FlowStartCondition {
     ) -> Result<Option<Self>, InternalError> {
         Ok(match &flow_state.start_condition {
             None => None,
+            Some(fs::FlowStartCondition::Schedule(s)) => {
+                Some(Self::Schedule(FlowStartConditionSchedule {
+                    wake_up_at: s.wake_up_at,
+                }))
+            }
             Some(fs::FlowStartCondition::Throttling(t)) => Some(Self::Throttling((*t).into())),
             Some(fs::FlowStartCondition::Batching(b)) => {
                 // Start from zero increment
@@ -61,19 +68,33 @@ impl FlowStartCondition {
                     watermark_modified: total_increment.updated_watermark.is_some(),
                 }))
             }
+            Some(fs::FlowStartCondition::Executor(e)) => {
+                Some(Self::Executor(FlowStartConditionExecutor {
+                    task_id: e.task_id.into(),
+                }))
+            }
         })
     }
 }
 
 #[derive(SimpleObject)]
+pub(crate) struct FlowStartConditionSchedule {
+    wake_up_at: DateTime<Utc>,
+}
+
+#[derive(SimpleObject)]
 pub(crate) struct FlowStartConditionThrottling {
     interval_sec: i64,
+    wake_up_at: DateTime<Utc>,
+    shifted_from: DateTime<Utc>,
 }
 
 impl From<fs::FlowStartConditionThrottling> for FlowStartConditionThrottling {
     fn from(value: fs::FlowStartConditionThrottling) -> Self {
         Self {
             interval_sec: value.interval.num_seconds(),
+            wake_up_at: value.wake_up_at,
+            shifted_from: value.shifted_from,
         }
     }
 }
@@ -85,6 +106,11 @@ pub(crate) struct FlowStartConditionBatching {
     pub accumulated_records_count: u64,
     pub watermark_modified: bool,
     // TODO: we can list all applied input flows, if that is interesting for debugging
+}
+
+#[derive(SimpleObject)]
+pub(crate) struct FlowStartConditionExecutor {
+    pub task_id: TaskID,
 }
 
 ///////////////////////////////////////////////////////////////////////////////

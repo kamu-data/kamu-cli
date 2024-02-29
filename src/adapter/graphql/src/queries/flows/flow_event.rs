@@ -27,8 +27,6 @@ pub enum FlowEvent {
     Initiated(FlowEventInitiated),
     /// Start condition defined
     StartConditionUpdated(FlowEventStartConditionUpdated),
-    /// Queued for time
-    Queued(FlowEventQueued),
     /// Secondary trigger added
     TriggerAdded(FlowEventTriggerAdded),
     /// Associated task has changed status
@@ -44,7 +42,6 @@ impl FlowEvent {
             fs::FlowEvent::StartConditionUpdated(e) => {
                 Self::StartConditionUpdated(FlowEventStartConditionUpdated::new(event_id, &e))
             }
-            fs::FlowEvent::Queued(e) => Self::Queued(FlowEventQueued::new(event_id, &e)),
             fs::FlowEvent::TriggerAdded(e) => {
                 Self::TriggerAdded(FlowEventTriggerAdded::new(event_id, e))
             }
@@ -96,7 +93,7 @@ impl FlowEventInitiated {
 pub struct FlowEventStartConditionUpdated {
     event_id: EventID,
     event_time: DateTime<Utc>,
-    start_condition_kind: Option<FlowStartConditionKind>,
+    start_condition_kind: FlowStartConditionKind,
 }
 
 impl FlowEventStartConditionUpdated {
@@ -104,39 +101,22 @@ impl FlowEventStartConditionUpdated {
         Self {
             event_id: event_id.into(),
             event_time: event.event_time,
-            start_condition_kind: event.start_condition.as_ref().map(|start_condition| {
-                match start_condition {
-                    fs::FlowStartCondition::Throttling(_) => FlowStartConditionKind::Throttling,
-                    fs::FlowStartCondition::Batching(_) => FlowStartConditionKind::Batching,
-                }
-            }),
+            start_condition_kind: match event.start_condition {
+                fs::FlowStartCondition::Schedule(_) => FlowStartConditionKind::Schedule,
+                fs::FlowStartCondition::Throttling(_) => FlowStartConditionKind::Throttling,
+                fs::FlowStartCondition::Batching(_) => FlowStartConditionKind::Batching,
+                fs::FlowStartCondition::Executor(_) => FlowStartConditionKind::Executor,
+            },
         }
     }
 }
 
 #[derive(Enum, Debug, Copy, Clone, PartialEq, Eq)]
 pub enum FlowStartConditionKind {
+    Schedule,
     Throttling,
     Batching,
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-#[derive(SimpleObject)]
-pub struct FlowEventQueued {
-    event_id: EventID,
-    event_time: DateTime<Utc>,
-    activate_at: DateTime<Utc>,
-}
-
-impl FlowEventQueued {
-    fn new(event_id: evs::EventID, event: &fs::FlowEventQueued) -> Self {
-        Self {
-            event_id: event_id.into(),
-            event_time: event.event_time,
-            activate_at: event.activate_at,
-        }
-    }
+    Executor,
 }
 
 ///////////////////////////////////////////////////////////////////////////////
