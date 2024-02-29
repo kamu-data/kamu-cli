@@ -194,7 +194,7 @@ impl std::fmt::Display for FlowSystemTestListener {
                             FlowStartCondition::Schedule(s) => {
                                 write!(
                                     f,
-                                    " Schedule({}ms)",
+                                    " Schedule(wakeup={}ms)",
                                     (s.wake_up_at - initial_time).num_milliseconds(),
                                 )?;
                             }
