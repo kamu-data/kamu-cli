@@ -155,9 +155,7 @@ async fn test_trigger_ingest_root_dataset() {
                                                 "accountName": auth::DEFAULT_ACCOUNT_NAME,
                                             }
                                         },
-                                        "startCondition": {
-                                            "__typename": "FlowStartConditionSchedule"
-                                        },
+                                        "startCondition": null,
                                     }
                                 ],
                                 "pageInfo": {
@@ -500,9 +498,7 @@ async fn test_trigger_execute_transform_derived_dataset() {
                                                 "accountName": auth::DEFAULT_ACCOUNT_NAME,
                                             }
                                         },
-                                        "startCondition": {
-                                            "__typename": "FlowStartConditionSchedule"
-                                        },
+                                        "startCondition": null,
                                     }
                                 ],
                                 "pageInfo": {
@@ -1572,25 +1568,20 @@ async fn test_history_of_completed_flow() {
                                             }
                                         },
                                         {
-                                            "__typename": "FlowEventStartConditionUpdated",
-                                            "eventId": "1",
-                                            "startConditionKind": "SCHEDULE"
-                                        },
-                                        {
                                             "__typename": "FlowEventTriggerAdded",
-                                            "eventId": "2",
+                                            "eventId": "1",
                                             "trigger": {
                                                 "__typename": "FlowTriggerAutoPolling"
                                             }
                                         },
                                         {
                                             "__typename": "FlowEventStartConditionUpdated",
-                                            "eventId": "3",
+                                            "eventId": "2",
                                             "startConditionKind": "EXECUTOR"
                                         },
                                         {
                                             "__typename": "FlowEventTaskChanged",
-                                            "eventId": "4",
+                                            "eventId": "3",
                                             "taskId": "0",
                                             "taskStatus": "QUEUED",
                                             "task": {
@@ -1599,7 +1590,7 @@ async fn test_history_of_completed_flow() {
                                         },
                                         {
                                             "__typename": "FlowEventTaskChanged",
-                                            "eventId": "5",
+                                            "eventId": "4",
                                             "taskId": "0",
                                             "taskStatus": "RUNNING",
                                             "task": {
@@ -1608,7 +1599,7 @@ async fn test_history_of_completed_flow() {
                                         },
                                         {
                                             "__typename": "FlowEventTaskChanged",
-                                            "eventId": "6",
+                                            "eventId": "5",
                                             "taskId": "0",
                                             "taskStatus": "FINISHED",
                                             "task": {

@@ -101,7 +101,7 @@ async fn test_read_initial_config_and_queue_without_waiting() {
             r#"
             #0: +0ms:
               "foo" Ingest:
-                Flow ID = 0 Waiting AutoPolling Schedule(wakeup=0ms)
+                Flow ID = 0 Waiting AutoPolling
 
             #1: +0ms:
               "foo" Ingest:
@@ -343,7 +343,7 @@ async fn test_manual_trigger() {
             r#"
             #0: +0ms:
               "foo" Ingest:
-                Flow ID = 0 Waiting AutoPolling Schedule(wakeup=0ms)
+                Flow ID = 0 Waiting AutoPolling
 
             #1: +0ms:
               "foo" Ingest:
@@ -520,9 +520,9 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
             r#"
             #0: +0ms:
               "bar" Ingest:
-                Flow ID = 1 Waiting AutoPolling Schedule(wakeup=0ms)
+                Flow ID = 1 Waiting AutoPolling
               "foo" Ingest:
-                Flow ID = 0 Waiting AutoPolling Schedule(wakeup=0ms)
+                Flow ID = 0 Waiting AutoPolling
 
             #1: +0ms:
               "bar" Ingest:
@@ -572,7 +572,7 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
                 Flow ID = 3 Finished Aborted
                 Flow ID = 1 Finished Success
               "foo" Ingest:
-                Flow ID = 4 Waiting AutoPolling Schedule(wakeup=80ms)
+                Flow ID = 4 Waiting AutoPolling
                 Flow ID = 2 Finished Aborted
                 Flow ID = 0 Finished Success
 
@@ -717,9 +717,9 @@ async fn test_respect_last_success_time_when_schedule_resumes() {
             r#"
             #0: +0ms:
               "bar" Ingest:
-                Flow ID = 1 Waiting AutoPolling Schedule(wakeup=0ms)
+                Flow ID = 1 Waiting AutoPolling
               "foo" Ingest:
-                Flow ID = 0 Waiting AutoPolling Schedule(wakeup=0ms)
+                Flow ID = 0 Waiting AutoPolling
 
             #1: +0ms:
               "bar" Ingest:
@@ -765,7 +765,7 @@ async fn test_respect_last_success_time_when_schedule_resumes() {
 
             #7: +100ms:
               "bar" Ingest:
-                Flow ID = 5 Waiting AutoPolling Schedule(wakeup=100ms)
+                Flow ID = 5 Waiting AutoPolling
                 Flow ID = 3 Finished Aborted
                 Flow ID = 1 Finished Success
               "foo" Ingest:
@@ -900,9 +900,9 @@ async fn test_dataset_deleted() {
             r#"
             #0: +0ms:
               "bar" Ingest:
-                Flow ID = 1 Waiting AutoPolling Schedule(wakeup=0ms)
+                Flow ID = 1 Waiting AutoPolling
               "foo" Ingest:
-                Flow ID = 0 Waiting AutoPolling Schedule(wakeup=0ms)
+                Flow ID = 0 Waiting AutoPolling
 
             #1: +0ms:
               "bar" Ingest:
@@ -1069,11 +1069,11 @@ async fn test_task_completions_trigger_next_loop_on_success() {
             r#"
             #0: +0ms:
               "bar" Ingest:
-                Flow ID = 1 Waiting AutoPolling Schedule(wakeup=0ms)
+                Flow ID = 1 Waiting AutoPolling
               "baz" Ingest:
-                Flow ID = 2 Waiting AutoPolling Schedule(wakeup=0ms)
+                Flow ID = 2 Waiting AutoPolling
               "foo" Ingest:
-                Flow ID = 0 Waiting AutoPolling Schedule(wakeup=0ms)
+                Flow ID = 0 Waiting AutoPolling
 
             #1: +0ms:
               "bar" Ingest:
@@ -1275,9 +1275,9 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
             r#"
             #0: +0ms:
               "bar" ExecuteTransform:
-                Flow ID = 1 Waiting AutoPolling Schedule(wakeup=0ms)
+                Flow ID = 1 Waiting AutoPolling
               "foo" Ingest:
-                Flow ID = 0 Waiting AutoPolling Schedule(wakeup=0ms)
+                Flow ID = 0 Waiting AutoPolling
 
             #1: +0ms:
               "bar" ExecuteTransform:
@@ -1683,11 +1683,11 @@ async fn test_throttling_derived_dataset_with_2_parents() {
             r#"
           #0: +0ms:
             "bar" Ingest:
-              Flow ID = 1 Waiting AutoPolling Schedule(wakeup=0ms)
+              Flow ID = 1 Waiting AutoPolling
             "baz" ExecuteTransform:
-              Flow ID = 2 Waiting AutoPolling Schedule(wakeup=0ms)
+              Flow ID = 2 Waiting AutoPolling
             "foo" Ingest:
-              Flow ID = 0 Waiting AutoPolling Schedule(wakeup=0ms)
+              Flow ID = 0 Waiting AutoPolling
 
           #1: +0ms:
             "bar" Ingest:
@@ -2074,9 +2074,9 @@ async fn test_batching_condition_records_reached() {
             r#"
             #0: +0ms:
               "bar" ExecuteTransform:
-                Flow ID = 1 Waiting AutoPolling Schedule(wakeup=0ms)
+                Flow ID = 1 Waiting AutoPolling
               "foo" Ingest:
-                Flow ID = 0 Waiting AutoPolling Schedule(wakeup=0ms)
+                Flow ID = 0 Waiting AutoPolling
 
             #1: +0ms:
               "bar" ExecuteTransform:
@@ -2351,9 +2351,9 @@ async fn test_batching_condition_timeout() {
             r#"
             #0: +0ms:
               "bar" ExecuteTransform:
-                Flow ID = 1 Waiting AutoPolling Schedule(wakeup=0ms)
+                Flow ID = 1 Waiting AutoPolling
               "foo" Ingest:
-                Flow ID = 0 Waiting AutoPolling Schedule(wakeup=0ms)
+                Flow ID = 0 Waiting AutoPolling
 
             #1: +0ms:
               "bar" ExecuteTransform:
@@ -2596,9 +2596,9 @@ async fn test_batching_condition_watermark() {
             r#"
         #0: +0ms:
           "bar" ExecuteTransform:
-            Flow ID = 1 Waiting AutoPolling Schedule(wakeup=0ms)
+            Flow ID = 1 Waiting AutoPolling
           "foo" Ingest:
-            Flow ID = 0 Waiting AutoPolling Schedule(wakeup=0ms)
+            Flow ID = 0 Waiting AutoPolling
 
         #1: +0ms:
           "bar" ExecuteTransform:
@@ -2942,11 +2942,11 @@ async fn test_batching_condition_with_2_inputs() {
             r#"
         #0: +0ms:
           "bar" Ingest:
-            Flow ID = 1 Waiting AutoPolling Schedule(wakeup=0ms)
+            Flow ID = 1 Waiting AutoPolling
           "baz" ExecuteTransform:
-            Flow ID = 2 Waiting AutoPolling Schedule(wakeup=0ms)
+            Flow ID = 2 Waiting AutoPolling
           "foo" Ingest:
-            Flow ID = 0 Waiting AutoPolling Schedule(wakeup=0ms)
+            Flow ID = 0 Waiting AutoPolling
 
         #1: +0ms:
           "bar" Ingest:
