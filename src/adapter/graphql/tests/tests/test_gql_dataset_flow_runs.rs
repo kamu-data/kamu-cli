@@ -1952,6 +1952,8 @@ impl FlowRunsHarness {
                                             }
                                             ... on FlowStartConditionThrottling {
                                                 intervalSec
+                                                wakeUpAt
+                                                shiftedFrom
                                             }
                                             ... on FlowStartConditionExecutor {
                                                 taskId

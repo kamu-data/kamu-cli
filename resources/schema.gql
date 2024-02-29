@@ -844,6 +844,8 @@ type FlowStartConditionSchedule {
 
 type FlowStartConditionThrottling {
 	intervalSec: Int!
+	wakeUpAt: DateTime!
+	shiftedFrom: DateTime!
 }
 
 enum FlowStatus {

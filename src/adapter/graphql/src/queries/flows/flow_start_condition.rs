@@ -85,12 +85,16 @@ pub(crate) struct FlowStartConditionSchedule {
 #[derive(SimpleObject)]
 pub(crate) struct FlowStartConditionThrottling {
     interval_sec: i64,
+    wake_up_at: DateTime<Utc>,
+    shifted_from: DateTime<Utc>,
 }
 
 impl From<fs::FlowStartConditionThrottling> for FlowStartConditionThrottling {
     fn from(value: fs::FlowStartConditionThrottling) -> Self {
         Self {
             interval_sec: value.interval.num_seconds(),
+            wake_up_at: value.wake_up_at,
+            shifted_from: value.shifted_from,
         }
     }
 }

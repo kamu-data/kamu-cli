@@ -34,6 +34,8 @@ pub struct FlowStartConditionSchedule {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct FlowStartConditionThrottling {
     pub interval: Duration,
+    pub wake_up_at: DateTime<Utc>,
+    pub shifted_from: DateTime<Utc>,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

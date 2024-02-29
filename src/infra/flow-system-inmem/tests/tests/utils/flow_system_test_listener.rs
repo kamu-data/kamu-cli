@@ -174,7 +174,13 @@ impl std::fmt::Display for FlowSystemTestListener {
                     if let Some(start_condition) = flow_state.start_condition {
                         match start_condition {
                             FlowStartCondition::Throttling(t) => {
-                                write!(f, " Throttling({}ms)", t.interval.num_milliseconds())?;
+                                write!(
+                                    f,
+                                    " Throttling(for={}ms, wakeup={}ms, shifted={}ms)",
+                                    t.interval.num_milliseconds(),
+                                    (t.wake_up_at - initial_time).num_milliseconds(),
+                                    (t.shifted_from - initial_time).num_milliseconds()
+                                )?;
                             }
                             FlowStartCondition::Batching(b) => write!(
                                 f,

@@ -385,7 +385,11 @@ impl FlowServiceInMemory {
 
                         // Indicate throttling, if applied
                         if throttling_boundary_time > trigger_time {
-                            self.indicate_throttling_activity(&mut flow)?;
+                            self.indicate_throttling_activity(
+                                &mut flow,
+                                throttling_boundary_time,
+                                trigger_time,
+                            )?;
                         }
                     }
                 }
@@ -436,7 +440,11 @@ impl FlowServiceInMemory {
 
                     // Set throttling activity as start condition
                     if throttling_boundary_time > naive_next_activation_time {
-                        self.indicate_throttling_activity(&mut flow)?;
+                        self.indicate_throttling_activity(
+                            &mut flow,
+                            throttling_boundary_time,
+                            naive_next_activation_time,
+                        )?;
                     }
                 }
 
@@ -540,18 +548,29 @@ impl FlowServiceInMemory {
             // If batching is over, it's start condition is no longer valid.
             // However, set throttling condition, if it applies
             if satisfied && throttling_boundary_time > batching_finish_time {
-                self.indicate_throttling_activity(flow)?;
+                self.indicate_throttling_activity(
+                    flow,
+                    throttling_boundary_time,
+                    batching_finish_time,
+                )?;
             }
         }
 
         Ok(())
     }
 
-    fn indicate_throttling_activity(&self, flow: &mut Flow) -> Result<(), InternalError> {
+    fn indicate_throttling_activity(
+        &self,
+        flow: &mut Flow,
+        wake_up_at: DateTime<Utc>,
+        shifted_from: DateTime<Utc>,
+    ) -> Result<(), InternalError> {
         flow.set_relevant_start_condition(
             self.time_source.now(),
             FlowStartCondition::Throttling(FlowStartConditionThrottling {
                 interval: self.run_config.mandatory_throttling_period,
+                wake_up_at,
+                shifted_from,
             }),
         )
         .int_err()?;

@@ -1474,7 +1474,7 @@ async fn test_throttling_manual_triggers() {
 
             #4: +100ms:
               "foo" Ingest:
-                Flow ID = 1 Waiting Manual Throttling(100ms)
+                Flow ID = 1 Waiting Manual Throttling(for=100ms, wakeup=150ms, shifted=70ms)
                 Flow ID = 0 Finished Success
 
             #5: +150ms:
@@ -1711,7 +1711,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
             "baz" ExecuteTransform:
               Flow ID = 2 Waiting AutoPolling Executor(task=2)
             "foo" Ingest:
-              Flow ID = 3 Waiting AutoPolling Throttling(100ms)
+              Flow ID = 3 Waiting AutoPolling Throttling(for=100ms, wakeup=120ms, shifted=70ms)
               Flow ID = 0 Finished Success
 
           #4: +20ms:
@@ -1720,7 +1720,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
             "baz" ExecuteTransform:
               Flow ID = 2 Waiting AutoPolling Executor(task=2)
             "foo" Ingest:
-              Flow ID = 3 Waiting AutoPolling Throttling(100ms)
+              Flow ID = 3 Waiting AutoPolling Throttling(for=100ms, wakeup=120ms, shifted=70ms)
               Flow ID = 0 Finished Success
 
           #5: +30ms:
@@ -1730,7 +1730,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
             "baz" ExecuteTransform:
               Flow ID = 2 Waiting AutoPolling Executor(task=2)
             "foo" Ingest:
-              Flow ID = 3 Waiting AutoPolling Throttling(100ms)
+              Flow ID = 3 Waiting AutoPolling Throttling(for=100ms, wakeup=120ms, shifted=70ms)
               Flow ID = 0 Finished Success
 
           #6: +30ms:
@@ -1740,7 +1740,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
             "baz" ExecuteTransform:
               Flow ID = 2 Running(task=2)
             "foo" Ingest:
-              Flow ID = 3 Waiting AutoPolling Throttling(100ms)
+              Flow ID = 3 Waiting AutoPolling Throttling(for=100ms, wakeup=120ms, shifted=70ms)
               Flow ID = 0 Finished Success
 
           #7: +50ms:
@@ -1750,7 +1750,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
             "baz" ExecuteTransform:
               Flow ID = 2 Finished Success
             "foo" Ingest:
-              Flow ID = 3 Waiting AutoPolling Throttling(100ms)
+              Flow ID = 3 Waiting AutoPolling Throttling(for=100ms, wakeup=120ms, shifted=70ms)
               Flow ID = 0 Finished Success
 
           #8: +120ms:
@@ -1778,10 +1778,10 @@ async fn test_throttling_derived_dataset_with_2_parents() {
               Flow ID = 4 Waiting AutoPolling Schedule(180ms)
               Flow ID = 1 Finished Success
             "baz" ExecuteTransform:
-              Flow ID = 5 Waiting Input(foo) Throttling(100ms)
+              Flow ID = 5 Waiting Input(foo) Throttling(for=100ms, wakeup=150ms, shifted=140ms)
               Flow ID = 2 Finished Success
             "foo" Ingest:
-              Flow ID = 6 Waiting AutoPolling Throttling(100ms)
+              Flow ID = 6 Waiting AutoPolling Throttling(for=100ms, wakeup=240ms, shifted=190ms)
               Flow ID = 3 Finished Success
               Flow ID = 0 Finished Success
 
@@ -1793,7 +1793,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
               Flow ID = 5 Waiting Input(foo) Executor(task=4)
               Flow ID = 2 Finished Success
             "foo" Ingest:
-              Flow ID = 6 Waiting AutoPolling Throttling(100ms)
+              Flow ID = 6 Waiting AutoPolling Throttling(for=100ms, wakeup=240ms, shifted=190ms)
               Flow ID = 3 Finished Success
               Flow ID = 0 Finished Success
 
@@ -1805,7 +1805,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
               Flow ID = 5 Running(task=4)
               Flow ID = 2 Finished Success
             "foo" Ingest:
-              Flow ID = 6 Waiting AutoPolling Throttling(100ms)
+              Flow ID = 6 Waiting AutoPolling Throttling(for=100ms, wakeup=240ms, shifted=190ms)
               Flow ID = 3 Finished Success
               Flow ID = 0 Finished Success
 
@@ -1817,7 +1817,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
               Flow ID = 5 Finished Success
               Flow ID = 2 Finished Success
             "foo" Ingest:
-              Flow ID = 6 Waiting AutoPolling Throttling(100ms)
+              Flow ID = 6 Waiting AutoPolling Throttling(for=100ms, wakeup=240ms, shifted=190ms)
               Flow ID = 3 Finished Success
               Flow ID = 0 Finished Success
 
@@ -1829,7 +1829,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
               Flow ID = 5 Finished Success
               Flow ID = 2 Finished Success
             "foo" Ingest:
-              Flow ID = 6 Waiting AutoPolling Throttling(100ms)
+              Flow ID = 6 Waiting AutoPolling Throttling(for=100ms, wakeup=240ms, shifted=190ms)
               Flow ID = 3 Finished Success
               Flow ID = 0 Finished Success
 
@@ -1841,7 +1841,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
               Flow ID = 5 Finished Success
               Flow ID = 2 Finished Success
             "foo" Ingest:
-              Flow ID = 6 Waiting AutoPolling Throttling(100ms)
+              Flow ID = 6 Waiting AutoPolling Throttling(for=100ms, wakeup=240ms, shifted=190ms)
               Flow ID = 3 Finished Success
               Flow ID = 0 Finished Success
 
@@ -1851,11 +1851,11 @@ async fn test_throttling_derived_dataset_with_2_parents() {
               Flow ID = 4 Finished Success
               Flow ID = 1 Finished Success
             "baz" ExecuteTransform:
-              Flow ID = 7 Waiting Input(bar) Throttling(100ms)
+              Flow ID = 7 Waiting Input(bar) Throttling(for=100ms, wakeup=270ms, shifted=200ms)
               Flow ID = 5 Finished Success
               Flow ID = 2 Finished Success
             "foo" Ingest:
-              Flow ID = 6 Waiting AutoPolling Throttling(100ms)
+              Flow ID = 6 Waiting AutoPolling Throttling(for=100ms, wakeup=240ms, shifted=190ms)
               Flow ID = 3 Finished Success
               Flow ID = 0 Finished Success
 
@@ -1865,7 +1865,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
               Flow ID = 4 Finished Success
               Flow ID = 1 Finished Success
             "baz" ExecuteTransform:
-              Flow ID = 7 Waiting Input(bar) Throttling(100ms)
+              Flow ID = 7 Waiting Input(bar) Throttling(for=100ms, wakeup=270ms, shifted=200ms)
               Flow ID = 5 Finished Success
               Flow ID = 2 Finished Success
             "foo" Ingest:
