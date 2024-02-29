@@ -16,10 +16,10 @@ use kamu_core::*;
 use opendatafabric::*;
 
 use crate::{
-    BoxedVisitors,
     MetadataBlockTypeFlags,
     MetadataChainVisitorBatchProcessor,
     MetadataChainVisitorHost,
+    StackVisitors,
     ValidateOffsetsAreSequentialVisitor,
     ValidatePrevBlockExistsVisitor,
     ValidateSeedBlockOrderVisitor,
@@ -577,17 +577,17 @@ where
             };
             let hashed_block = (hash.as_ref(), &block);
 
-            let validators: BoxedVisitors = vec![
-                Box::new(ValidateSeedBlockOrderVisitor::new(hashed_block)),
-                Box::new(ValidatePrevBlockExistsVisitor::new(hashed_block)),
-                Box::new(ValidateSequenceNumbersIntegrityVisitor::new(hashed_block)),
-                Box::new(ValidateSystemTimeIsMonotonicVisitor::new(hashed_block)),
-                Box::new(ValidateWatermarkIsMonotonicVisitor::new(hashed_block)),
-                Box::new(ValidateOffsetsAreSequentialVisitor::new(hashed_block)),
+            let mut validators: StackVisitors = [
+                &mut ValidateSeedBlockOrderVisitor::new(hashed_block),
+                &mut ValidatePrevBlockExistsVisitor::new(hashed_block),
+                &mut ValidateSequenceNumbersIntegrityVisitor::new(hashed_block),
+                &mut ValidateSystemTimeIsMonotonicVisitor::new(hashed_block),
+                &mut ValidateWatermarkIsMonotonicVisitor::new(hashed_block),
+                &mut ValidateOffsetsAreSequentialVisitor::new(hashed_block),
                 // TODO add ValidateEventLogicalStructureVisitor
             ];
 
-            self.accept(&block, validators).await?;
+            self.accept(&block, &mut validators).await?;
 
             self.validate_append_event_logical_structure(&block).await?;
         }
@@ -658,7 +658,7 @@ where
     async fn accept<'a>(
         &'a self,
         append_block: &MetadataBlock,
-        visitors: BoxedVisitors<'a>,
+        visitors: &'a mut StackVisitors<'a>,
     ) -> Result<(), AppendError> {
         assert!(!visitors.is_empty());
 

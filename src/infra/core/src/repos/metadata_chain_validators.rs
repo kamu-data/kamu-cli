@@ -35,6 +35,7 @@ use crate::{
     Decision,
     MetadataBlockTypeFlags,
     MetadataChainVisitor,
+    StackVisitors,
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -371,13 +372,15 @@ impl MetadataChainVisitorBatchProcessor {
         Some((requested_by_hash_visitors, requested_by_flags_visitors))
     }
 
-    pub fn get_next_decisions(visitors: BoxedVisitors) -> Result<DecisionMap, AppendError> {
+    pub fn get_next_decisions<'a>(
+        visitors: &'a mut StackVisitors<'a>,
+    ) -> Result<DecisionMap<'a>, AppendError> {
         visitors.into_iter().try_fold(
             HashMap::<Decision, BoxedVisitors>::new(),
-            |mut acc, mut visitor| {
+            |mut acc, visitor| {
                 let decision = visitor.visit()?;
 
-                acc.entry(decision).or_default().push(visitor);
+                acc.entry(decision).or_default().push(*visitor);
 
                 Ok(acc)
             },
@@ -390,7 +393,7 @@ impl MetadataChainVisitorBatchProcessor {
     ) -> Result<DecisionMap<'a>, AppendError> {
         visitors.into_iter().try_fold(
             HashMap::<Decision, BoxedVisitors>::new(),
-            |mut acc, mut visitor| {
+            |mut acc, visitor| {
                 let decision = visitor.visit_with_block(hashed_block)?;
 
                 acc.entry(decision).or_default().push(visitor);

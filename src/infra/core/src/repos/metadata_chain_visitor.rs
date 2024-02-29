@@ -78,15 +78,16 @@ pub trait MetadataChainVisitor: Sync + Send {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-pub type BoxedVisitor<'a> = Box<dyn MetadataChainVisitor + 'a>;
+pub type BoxedVisitor<'a> = &'a mut dyn MetadataChainVisitor;
 pub type BoxedVisitors<'a> = Vec<BoxedVisitor<'a>>;
+pub type StackVisitors<'a> = [BoxedVisitor<'a>; 6];
 
 #[async_trait::async_trait]
 pub trait MetadataChainVisitorHost {
     async fn accept<'a>(
         &'a self,
         append_block: &MetadataBlock,
-        visitors: BoxedVisitors<'a>,
+        visitors: &'a mut StackVisitors<'a>,
     ) -> Result<(), AppendError>;
 }
 
