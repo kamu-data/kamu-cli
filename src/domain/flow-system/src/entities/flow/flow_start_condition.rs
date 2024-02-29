@@ -16,9 +16,17 @@ use crate::BatchingRule;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FlowStartCondition {
+    Schedule(FlowStartConditionSchedule),
     Throttling(FlowStartConditionThrottling),
     Batching(FlowStartConditionBatching),
     Executor(FlowStartConditionExecutor),
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FlowStartConditionSchedule {
+    pub activate_at: DateTime<Utc>,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

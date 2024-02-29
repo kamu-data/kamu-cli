@@ -136,11 +136,7 @@ impl std::fmt::Display for FlowSystemTestListener {
                         "    Flow ID = {} {}",
                         flow_state.flow_id,
                         match flow_state.status() {
-                            FlowStatus::Queued => format!(
-                                "Queued({}ms)",
-                                (flow_state.timing.activate_at.unwrap() - initial_time)
-                                    .num_milliseconds()
-                            ),
+                            FlowStatus::Waiting => "Waiting".to_string(),
                             FlowStatus::Running => format!(
                                 "{:?}(task={})",
                                 flow_state.status(),
@@ -155,8 +151,8 @@ impl std::fmt::Display for FlowSystemTestListener {
                         }
                     )?;
 
-                    match flow_state.status() {
-                        FlowStatus::Waiting | FlowStatus::Queued => write!(
+                    if matches!(flow_state.status(), FlowStatus::Waiting) {
+                        write!(
                             f,
                             " {}",
                             match flow_state.primary_trigger() {
@@ -172,8 +168,7 @@ impl std::fmt::Display for FlowSystemTestListener {
                                         .unwrap_or_else(|| i.dataset_id.to_string()),
                                 ),
                             }
-                        )?,
-                        _ => {}
+                        )?;
                     }
 
                     if let Some(start_condition) = flow_state.start_condition {
@@ -189,6 +184,13 @@ impl std::fmt::Display for FlowSystemTestListener {
                             )?,
                             FlowStartCondition::Executor(e) => {
                                 write!(f, " Executor(task={})", e.task_id)?;
+                            }
+                            FlowStartCondition::Schedule(s) => {
+                                write!(
+                                    f,
+                                    " Schedule({}ms)",
+                                    (s.activate_at - initial_time).num_milliseconds(),
+                                )?;
                             }
                         }
                     }

@@ -27,10 +27,10 @@ pub enum FlowEvent {
     Initiated(FlowEventInitiated),
     /// Start condition defined
     StartConditionUpdated(FlowEventStartConditionUpdated),
-    /// Queued for time
-    Queued(FlowEventQueued),
     /// Secondary trigger added
     TriggerAdded(FlowEventTriggerAdded),
+    /// Activation time defined
+    ActivationTimeDefined(FlowEventActivationTimeDefined),
     /// Associated task has changed status
     TaskChanged(FlowEventTaskChanged),
     /// Aborted flow (user cancellation or system factor, such as ds delete)
@@ -44,9 +44,11 @@ impl FlowEvent {
             fs::FlowEvent::StartConditionUpdated(e) => {
                 Self::StartConditionUpdated(FlowEventStartConditionUpdated::new(event_id, &e))
             }
-            fs::FlowEvent::Queued(e) => Self::Queued(FlowEventQueued::new(event_id, &e)),
             fs::FlowEvent::TriggerAdded(e) => {
                 Self::TriggerAdded(FlowEventTriggerAdded::new(event_id, e))
+            }
+            fs::FlowEvent::ActivationTimeDefined(e) => {
+                Self::ActivationTimeDefined(FlowEventActivationTimeDefined::new(event_id, &e))
             }
             fs::FlowEvent::TaskScheduled(e) => Self::TaskChanged(FlowEventTaskChanged::new(
                 event_id,
@@ -105,6 +107,7 @@ impl FlowEventStartConditionUpdated {
             event_id: event_id.into(),
             event_time: event.event_time,
             start_condition_kind: match event.start_condition {
+                fs::FlowStartCondition::Schedule(_) => FlowStartConditionKind::Schedule,
                 fs::FlowStartCondition::Throttling(_) => FlowStartConditionKind::Throttling,
                 fs::FlowStartCondition::Batching(_) => FlowStartConditionKind::Batching,
                 fs::FlowStartCondition::Executor(_) => FlowStartConditionKind::Executor,
@@ -115,28 +118,10 @@ impl FlowEventStartConditionUpdated {
 
 #[derive(Enum, Debug, Copy, Clone, PartialEq, Eq)]
 pub enum FlowStartConditionKind {
+    Schedule,
     Throttling,
     Batching,
     Executor,
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-#[derive(SimpleObject)]
-pub struct FlowEventQueued {
-    event_id: EventID,
-    event_time: DateTime<Utc>,
-    activate_at: DateTime<Utc>,
-}
-
-impl FlowEventQueued {
-    fn new(event_id: evs::EventID, event: &fs::FlowEventQueued) -> Self {
-        Self {
-            event_id: event_id.into(),
-            event_time: event.event_time,
-            activate_at: event.activate_at,
-        }
-    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -154,6 +139,25 @@ impl FlowEventTriggerAdded {
             event_id: event_id.into(),
             event_time: event.event_time,
             trigger: event.trigger.into(),
+        }
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject)]
+pub struct FlowEventActivationTimeDefined {
+    event_id: EventID,
+    event_time: DateTime<Utc>,
+    activation_time: DateTime<Utc>,
+}
+
+impl FlowEventActivationTimeDefined {
+    fn new(event_id: evs::EventID, event: &fs::FlowEventActivationTimeDefined) -> Self {
+        Self {
+            event_id: event_id.into(),
+            event_time: event.event_time,
+            activation_time: event.activation_time,
         }
     }
 }

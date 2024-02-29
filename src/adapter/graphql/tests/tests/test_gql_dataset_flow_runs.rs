@@ -100,7 +100,7 @@ async fn test_trigger_ingest_root_dataset() {
                                 "flow": {
                                     "__typename": "Flow",
                                     "flowId": "0",
-                                    "status": "QUEUED",
+                                    "status": "WAITING",
                                     "outcome": null
                                 }
                             }
@@ -136,7 +136,7 @@ async fn test_trigger_ingest_root_dataset() {
                                             "datasetId": create_result.dataset_handle.id.to_string(),
                                             "ingestResult": null,
                                         },
-                                        "status": "QUEUED",
+                                        "status": "WAITING",
                                         "outcome": null,
                                         "timing": {
                                             "runningSince": null,
@@ -154,7 +154,9 @@ async fn test_trigger_ingest_root_dataset() {
                                                 "accountName": auth::DEFAULT_ACCOUNT_NAME,
                                             }
                                         },
-                                        "startCondition": null,
+                                        "startCondition": {
+                                            "__typename": "FlowStartConditionSchedule"
+                                        },
                                     }
                                 ],
                                 "pageInfo": {
@@ -197,7 +199,7 @@ async fn test_trigger_ingest_root_dataset() {
                                             "datasetId": create_result.dataset_handle.id.to_string(),
                                             "ingestResult": null,
                                         },
-                                        "status": "QUEUED",
+                                        "status": "WAITING",
                                         "outcome": null,
                                         "timing": {
                                             "runningSince": null,
@@ -438,7 +440,7 @@ async fn test_trigger_execute_transform_derived_dataset() {
                                 "flow": {
                                     "__typename": "Flow",
                                     "flowId": "0",
-                                    "status": "QUEUED",
+                                    "status": "WAITING",
                                     "outcome": null
                                 }
                             }
@@ -474,7 +476,7 @@ async fn test_trigger_execute_transform_derived_dataset() {
                                             "datasetId": create_derived_result.dataset_handle.id.to_string(),
                                             "transformResult": null,
                                         },
-                                        "status": "QUEUED",
+                                        "status": "WAITING",
                                         "outcome": null,
                                         "timing": {
                                             "runningSince": null,
@@ -492,7 +494,9 @@ async fn test_trigger_execute_transform_derived_dataset() {
                                                 "accountName": auth::DEFAULT_ACCOUNT_NAME,
                                             }
                                         },
-                                        "startCondition": null,
+                                        "startCondition": {
+                                            "__typename": "FlowStartConditionSchedule"
+                                        },
                                     }
                                 ],
                                 "pageInfo": {
@@ -818,7 +822,7 @@ async fn test_list_flows_with_filters_and_pagination() {
                         runs {
                             listFlows(
                                 filters: {
-                                    byStatus: "QUEUED"
+                                    byStatus: "WAITING"
                                 }
                             ) {
                                 nodes {
@@ -1560,24 +1564,29 @@ async fn test_history_of_completed_flow() {
                                             }
                                         },
                                         {
-                                            "__typename": "FlowEventQueued",
+                                            "__typename": "FlowEventStartConditionUpdated",
                                             "eventId": "1",
+                                            "startConditionKind": "SCHEDULE"
+                                        },
+                                        {
+                                            "__typename": "FlowEventActivationTimeDefined",
+                                            "eventId": "2",
                                         },
                                         {
                                             "__typename": "FlowEventTriggerAdded",
-                                            "eventId": "2",
+                                            "eventId": "3",
                                             "trigger": {
                                                 "__typename": "FlowTriggerAutoPolling"
                                             }
                                         },
                                         {
                                             "__typename": "FlowEventStartConditionUpdated",
-                                            "eventId": "3",
+                                            "eventId": "4",
                                             "startConditionKind": "EXECUTOR"
                                         },
                                         {
                                             "__typename": "FlowEventTaskChanged",
-                                            "eventId": "4",
+                                            "eventId": "5",
                                             "taskId": "0",
                                             "taskStatus": "QUEUED",
                                             "task": {
@@ -1586,7 +1595,7 @@ async fn test_history_of_completed_flow() {
                                         },
                                         {
                                             "__typename": "FlowEventTaskChanged",
-                                            "eventId": "5",
+                                            "eventId": "6",
                                             "taskId": "0",
                                             "taskStatus": "RUNNING",
                                             "task": {
@@ -1595,7 +1604,7 @@ async fn test_history_of_completed_flow() {
                                         },
                                         {
                                             "__typename": "FlowEventTaskChanged",
-                                            "eventId": "6",
+                                            "eventId": "7",
                                             "taskId": "0",
                                             "taskStatus": "FINISHED",
                                             "task": {

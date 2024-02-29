@@ -17,6 +17,7 @@ use crate::prelude::*;
 
 #[derive(Union)]
 pub(crate) enum FlowStartCondition {
+    Schedule(FlowStartConditionSchedule),
     Throttling(FlowStartConditionThrottling),
     Batching(FlowStartConditionBatching),
     Executor(FlowStartConditionExecutor),
@@ -29,6 +30,11 @@ impl FlowStartCondition {
     ) -> Result<Option<Self>, InternalError> {
         Ok(match &flow_state.start_condition {
             None => None,
+            Some(fs::FlowStartCondition::Schedule(s)) => {
+                Some(Self::Schedule(FlowStartConditionSchedule {
+                    activate_at: s.activate_at,
+                }))
+            }
             Some(fs::FlowStartCondition::Throttling(t)) => Some(Self::Throttling((*t).into())),
             Some(fs::FlowStartCondition::Batching(b)) => {
                 // Start from zero increment
@@ -69,6 +75,11 @@ impl FlowStartCondition {
             }
         })
     }
+}
+
+#[derive(SimpleObject)]
+pub(crate) struct FlowStartConditionSchedule {
+    activate_at: DateTime<Utc>,
 }
 
 #[derive(SimpleObject)]

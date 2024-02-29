@@ -387,7 +387,7 @@ impl FlowServiceInMemory {
                         flow.activate_at_time(self.time_source.now(), throttling_boundary_time)
                             .int_err()?;
 
-                        // Set throttling activity as start condition
+                        // Indicate throttling, if applied
                         if throttling_boundary_time > trigger_time {
                             self.indicate_throttling_activity(&mut flow)?;
                         }
@@ -422,8 +422,18 @@ impl FlowServiceInMemory {
                     // Next activation time depends on:
                     //  - last success time, if ever launched
                     //  - schedule, if defined
-                    // but in any case, may not be less than throttling boundary
+
                     let naive_next_activation_time = new_activation_time_fn(&flow_run_stats);
+                    // Indicate schedule reason
+                    flow.set_relevant_start_condition(
+                        self.time_source.now(),
+                        FlowStartCondition::Schedule(FlowStartConditionSchedule {
+                            activate_at: naive_next_activation_time,
+                        }),
+                    )
+                    .int_err()?;
+
+                    // Apply throttling boundary
                     let next_activation_time =
                         std::cmp::max(throttling_boundary_time, naive_next_activation_time);
                     self.enqueue_flow(flow.flow_id, next_activation_time)?;
@@ -889,11 +899,11 @@ impl FlowService for FlowServiceInMemory {
     ) -> Result<FlowState, CancelScheduledTasksError> {
         let mut flow = Flow::load(flow_id, self.flow_event_store.as_ref()).await?;
 
-        // May not be called for Draft or Queued flows.
+        // May not be called for Waiting flows.
         // Cancel tasks for flows in Running state.
         // Ignore in Finished state
         match flow.status() {
-            FlowStatus::Waiting | FlowStatus::Queued => {
+            FlowStatus::Waiting => {
                 return Err(CancelScheduledTasksError::NotScheduled(
                     FlowNotScheduledError { flow_id },
                 ))

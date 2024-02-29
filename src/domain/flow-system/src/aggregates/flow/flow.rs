@@ -58,12 +58,12 @@ impl Flow {
     pub fn activate_at_time(
         &mut self,
         now: DateTime<Utc>,
-        activate_at: DateTime<Utc>,
+        activation_time: DateTime<Utc>,
     ) -> Result<(), ProjectionError<FlowState>> {
-        let event = FlowEventQueued {
+        let event = FlowEventActivationTimeDefined {
             event_time: now,
             flow_id: self.flow_id,
-            activate_at,
+            activation_time,
         };
         self.apply(event)
     }

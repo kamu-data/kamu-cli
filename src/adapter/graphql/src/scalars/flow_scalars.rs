@@ -94,7 +94,6 @@ impl From<fs::FlowTimingRecords> for FlowTimingRecords {
 #[graphql(remote = "kamu_flow_system::FlowStatus")]
 pub enum FlowStatus {
     Waiting,
-    Queued,
     Running,
     Finished,
 }

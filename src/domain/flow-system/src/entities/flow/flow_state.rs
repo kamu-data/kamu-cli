@@ -58,8 +58,6 @@ impl FlowState {
             FlowStatus::Finished
         } else if self.timing.running_since.is_some() {
             FlowStatus::Running
-        } else if self.timing.activate_at.is_some() {
-            FlowStatus::Queued
         } else {
             FlowStatus::Waiting
         }
@@ -144,19 +142,6 @@ impl Projection for FlowState {
                             })
                         }
                     }
-                    E::Queued(FlowEventQueued { activate_at, .. }) => {
-                        if s.outcome.is_some() || !s.task_ids.is_empty() {
-                            Err(ProjectionError::new(Some(s), event))
-                        } else {
-                            Ok(FlowState {
-                                timing: FlowTimingRecords {
-                                    activate_at: Some(activate_at),
-                                    ..s.timing
-                                },
-                                ..s
-                            })
-                        }
-                    }
                     E::TriggerAdded(FlowEventTriggerAdded { ref trigger, .. }) => {
                         if s.outcome.is_some() {
                             Err(ProjectionError::new(Some(s), event))
@@ -164,6 +149,22 @@ impl Projection for FlowState {
                             let mut triggers = s.triggers;
                             triggers.push(trigger.clone());
                             Ok(FlowState { triggers, ..s })
+                        }
+                    }
+                    E::ActivationTimeDefined(FlowEventActivationTimeDefined {
+                        activation_time,
+                        ..
+                    }) => {
+                        if s.outcome.is_some() || !s.task_ids.is_empty() {
+                            Err(ProjectionError::new(Some(s), event))
+                        } else {
+                            Ok(FlowState {
+                                timing: FlowTimingRecords {
+                                    activate_at: Some(activation_time),
+                                    ..s.timing
+                                },
+                                ..s
+                            })
                         }
                     }
                     E::TaskScheduled(FlowEventTaskScheduled { task_id, .. }) => {
