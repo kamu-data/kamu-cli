@@ -139,6 +139,7 @@ async fn test_trigger_ingest_root_dataset() {
                                         "status": "WAITING",
                                         "outcome": null,
                                         "timing": {
+                                            "awaitingExecutorSince": null,
                                             "runningSince": null,
                                             "finishedAt": null,
                                         },
@@ -173,7 +174,8 @@ async fn test_trigger_ingest_root_dataset() {
         })
     );
 
-    let flow_task_id = harness.mimic_flow_scheduled("0").await;
+    let schedule_time = Utc::now().duration_round(Duration::seconds(1)).unwrap();
+    let flow_task_id = harness.mimic_flow_scheduled("0", schedule_time).await;
 
     let response = schema
         .execute(
@@ -202,6 +204,7 @@ async fn test_trigger_ingest_root_dataset() {
                                         "status": "WAITING",
                                         "outcome": null,
                                         "timing": {
+                                            "awaitingExecutorSince": schedule_time.to_rfc3339(),
                                             "runningSince": null,
                                             "finishedAt": null,
                                         },
@@ -273,6 +276,7 @@ async fn test_trigger_ingest_root_dataset() {
                                         "status": "RUNNING",
                                         "outcome": null,
                                         "timing": {
+                                            "awaitingExecutorSince": schedule_time.to_rfc3339(),
                                             "runningSince": running_time.to_rfc3339(),
                                             "finishedAt": null,
                                         },
@@ -357,6 +361,7 @@ async fn test_trigger_ingest_root_dataset() {
                                         "status": "FINISHED",
                                         "outcome": "SUCCESS",
                                         "timing": {
+                                            "awaitingExecutorSince": schedule_time.to_rfc3339(),
                                             "runningSince": running_time.to_rfc3339(),
                                             "finishedAt": complete_time.to_rfc3339(),
                                         },
@@ -479,6 +484,7 @@ async fn test_trigger_execute_transform_derived_dataset() {
                                         "status": "WAITING",
                                         "outcome": null,
                                         "timing": {
+                                            "awaitingExecutorSince": null,
                                             "runningSince": null,
                                             "finishedAt": null,
                                         },
@@ -513,7 +519,8 @@ async fn test_trigger_execute_transform_derived_dataset() {
         })
     );
 
-    let flow_task_id = harness.mimic_flow_scheduled("0").await;
+    let schedule_time = Utc::now().duration_round(Duration::seconds(1)).unwrap();
+    let flow_task_id = harness.mimic_flow_scheduled("0", schedule_time).await;
 
     let running_time = Utc::now().duration_round(Duration::seconds(1)).unwrap();
     harness.mimic_task_running(flow_task_id, running_time).await;
@@ -564,6 +571,7 @@ async fn test_trigger_execute_transform_derived_dataset() {
                                         "status": "FINISHED",
                                         "outcome": "SUCCESS",
                                         "timing": {
+                                            "awaitingExecutorSince": schedule_time.to_rfc3339(),
                                             "runningSince": running_time.to_rfc3339(),
                                             "finishedAt": complete_time.to_rfc3339(),
                                         },
@@ -1098,7 +1106,7 @@ async fn test_cancel_ingest_root_dataset() {
     let response_json = response.data.into_json().unwrap();
     let flow_id = FlowRunsHarness::extract_flow_id_from_trigger_response(&response_json);
 
-    let task_id = harness.mimic_flow_scheduled(flow_id).await;
+    let task_id = harness.mimic_flow_scheduled(flow_id, Utc::now()).await;
     harness.mimic_task_running(task_id, Utc::now()).await;
 
     let mutation_code =
@@ -1162,7 +1170,7 @@ async fn test_cancel_transform_derived_dataset() {
     let response_json = response.data.into_json().unwrap();
     let flow_id = FlowRunsHarness::extract_flow_id_from_trigger_response(&response_json);
 
-    let task_id = harness.mimic_flow_scheduled(flow_id).await;
+    let task_id = harness.mimic_flow_scheduled(flow_id, Utc::now()).await;
     harness.mimic_task_running(task_id, Utc::now()).await;
 
     let mutation_code = FlowRunsHarness::cancel_scheduled_tasks_mutation(
@@ -1376,7 +1384,7 @@ async fn test_cancel_already_cancelled_flow() {
         .as_str()
         .unwrap();
 
-    let task_id = harness.mimic_flow_scheduled(flow_id).await;
+    let task_id = harness.mimic_flow_scheduled(flow_id, Utc::now()).await;
     harness.mimic_task_running(task_id, Utc::now()).await;
 
     let mutation_code =
@@ -1451,7 +1459,7 @@ async fn test_cancel_already_succeeded_flow() {
     let response_json = response.data.into_json().unwrap();
     let flow_id = FlowRunsHarness::extract_flow_id_from_trigger_response(&response_json);
 
-    let flow_task_id = harness.mimic_flow_scheduled(flow_id).await;
+    let flow_task_id = harness.mimic_flow_scheduled(flow_id, Utc::now()).await;
     harness.mimic_task_running(flow_task_id, Utc::now()).await;
     harness
         .mimic_task_completed(
@@ -1525,7 +1533,7 @@ async fn test_history_of_completed_flow() {
         .mimic_flow_secondary_trigger(flow_id, FlowTrigger::AutoPolling(FlowTriggerAutoPolling {}))
         .await;
 
-    let flow_task_id = harness.mimic_flow_scheduled(flow_id).await;
+    let flow_task_id = harness.mimic_flow_scheduled(flow_id, Utc::now()).await;
     harness.mimic_task_running(flow_task_id, Utc::now()).await;
     harness
         .mimic_task_completed(
@@ -1766,7 +1774,11 @@ impl FlowRunsHarness {
             .unwrap()
     }
 
-    async fn mimic_flow_scheduled(&self, flow_id: &str) -> ts::TaskID {
+    async fn mimic_flow_scheduled(
+        &self,
+        flow_id: &str,
+        schedule_time: DateTime<Utc>,
+    ) -> ts::TaskID {
         let flow_service_test_driver = self
             .catalog_authorized
             .get_one::<dyn FlowServiceTestDriver>()
@@ -1774,7 +1786,7 @@ impl FlowRunsHarness {
 
         let flow_id = FlowID::new(flow_id.parse::<u64>().unwrap());
         flow_service_test_driver
-            .mimic_flow_scheduled(flow_id)
+            .mimic_flow_scheduled(flow_id, schedule_time)
             .await
             .unwrap()
     }
@@ -1910,6 +1922,7 @@ impl FlowRunsHarness {
                                         status
                                         outcome
                                         timing {
+                                            awaitingExecutorSince
                                             runningSince
                                             finishedAt
                                         }

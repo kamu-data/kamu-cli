@@ -105,7 +105,7 @@ async fn test_read_initial_config_and_queue_without_waiting() {
 
             #1: +0ms:
               "foo" Ingest:
-                Flow ID = 0 Waiting AutoPolling Executor(task=0)
+                Flow ID = 0 Waiting AutoPolling Executor(task=0, since=0ms)
 
             #2: +10ms:
               "foo" Ingest:
@@ -118,7 +118,7 @@ async fn test_read_initial_config_and_queue_without_waiting() {
 
             #4: +80ms:
               "foo" Ingest:
-                Flow ID = 1 Waiting AutoPolling Executor(task=1)
+                Flow ID = 1 Waiting AutoPolling Executor(task=1, since=80ms)
                 Flow ID = 0 Finished Success
 
             #5: +90ms:
@@ -206,7 +206,7 @@ async fn test_cron_config() {
 
             #1: +5000ms:
               "foo" Ingest:
-                Flow ID = 0 Waiting AutoPolling Executor(task=0)
+                Flow ID = 0 Waiting AutoPolling Executor(task=0, since=5000ms)
 
             #2: +6000ms:
               "foo" Ingest:
@@ -219,7 +219,7 @@ async fn test_cron_config() {
 
             #4: +10000ms:
               "foo" Ingest:
-                Flow ID = 1 Waiting AutoPolling Executor(task=1)
+                Flow ID = 1 Waiting AutoPolling Executor(task=1, since=10000ms)
                 Flow ID = 0 Finished Success
 
             "#
@@ -347,7 +347,7 @@ async fn test_manual_trigger() {
 
             #1: +0ms:
               "foo" Ingest:
-                Flow ID = 0 Waiting AutoPolling Executor(task=0)
+                Flow ID = 0 Waiting AutoPolling Executor(task=0, since=0ms)
 
             #2: +10ms:
               "foo" Ingest:
@@ -360,7 +360,7 @@ async fn test_manual_trigger() {
 
             #4: +40ms:
               "foo" Ingest:
-                Flow ID = 1 Waiting AutoPolling Executor(task=1)
+                Flow ID = 1 Waiting AutoPolling Executor(task=1, since=40ms)
                 Flow ID = 0 Finished Success
 
             #5: +60ms:
@@ -376,7 +376,7 @@ async fn test_manual_trigger() {
 
             #7: +80ms:
               "bar" Ingest:
-                Flow ID = 3 Waiting Manual Executor(task=2)
+                Flow ID = 3 Waiting Manual Executor(task=2, since=80ms)
               "foo" Ingest:
                 Flow ID = 2 Waiting AutoPolling Schedule(wakeup=160ms)
                 Flow ID = 1 Finished Success
@@ -402,7 +402,7 @@ async fn test_manual_trigger() {
               "bar" Ingest:
                 Flow ID = 3 Finished Success
               "foo" Ingest:
-                Flow ID = 2 Waiting AutoPolling Executor(task=3)
+                Flow ID = 2 Waiting AutoPolling Executor(task=3, since=160ms)
                 Flow ID = 1 Finished Success
                 Flow ID = 0 Finished Success
 
@@ -526,19 +526,19 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
 
             #1: +0ms:
               "bar" Ingest:
-                Flow ID = 1 Waiting AutoPolling Executor(task=1)
+                Flow ID = 1 Waiting AutoPolling Executor(task=1, since=0ms)
               "foo" Ingest:
-                Flow ID = 0 Waiting AutoPolling Executor(task=0)
+                Flow ID = 0 Waiting AutoPolling Executor(task=0, since=0ms)
 
             #2: +10ms:
               "bar" Ingest:
-                Flow ID = 1 Waiting AutoPolling Executor(task=1)
+                Flow ID = 1 Waiting AutoPolling Executor(task=1, since=0ms)
               "foo" Ingest:
                 Flow ID = 0 Running(task=0)
 
             #3: +20ms:
               "bar" Ingest:
-                Flow ID = 1 Waiting AutoPolling Executor(task=1)
+                Flow ID = 1 Waiting AutoPolling Executor(task=1, since=0ms)
               "foo" Ingest:
                 Flow ID = 2 Waiting AutoPolling Schedule(wakeup=70ms)
                 Flow ID = 0 Finished Success
@@ -582,17 +582,17 @@ async fn test_dataset_flow_configuration_paused_resumed_modified() {
                 Flow ID = 3 Finished Aborted
                 Flow ID = 1 Finished Success
               "foo" Ingest:
-                Flow ID = 4 Waiting AutoPolling Executor(task=2)
+                Flow ID = 4 Waiting AutoPolling Executor(task=2, since=80ms)
                 Flow ID = 2 Finished Aborted
                 Flow ID = 0 Finished Success
 
             #9: +100ms:
               "bar" Ingest:
-                Flow ID = 5 Waiting AutoPolling Executor(task=3)
+                Flow ID = 5 Waiting AutoPolling Executor(task=3, since=100ms)
                 Flow ID = 3 Finished Aborted
                 Flow ID = 1 Finished Success
               "foo" Ingest:
-                Flow ID = 4 Waiting AutoPolling Executor(task=2)
+                Flow ID = 4 Waiting AutoPolling Executor(task=2, since=80ms)
                 Flow ID = 2 Finished Aborted
                 Flow ID = 0 Finished Success
 
@@ -723,19 +723,19 @@ async fn test_respect_last_success_time_when_schedule_resumes() {
 
             #1: +0ms:
               "bar" Ingest:
-                Flow ID = 1 Waiting AutoPolling Executor(task=1)
+                Flow ID = 1 Waiting AutoPolling Executor(task=1, since=0ms)
               "foo" Ingest:
-                Flow ID = 0 Waiting AutoPolling Executor(task=0)
+                Flow ID = 0 Waiting AutoPolling Executor(task=0, since=0ms)
 
             #2: +10ms:
               "bar" Ingest:
-                Flow ID = 1 Waiting AutoPolling Executor(task=1)
+                Flow ID = 1 Waiting AutoPolling Executor(task=1, since=0ms)
               "foo" Ingest:
                 Flow ID = 0 Running(task=0)
 
             #3: +20ms:
               "bar" Ingest:
-                Flow ID = 1 Waiting AutoPolling Executor(task=1)
+                Flow ID = 1 Waiting AutoPolling Executor(task=1, since=0ms)
               "foo" Ingest:
                 Flow ID = 2 Waiting AutoPolling Schedule(wakeup=120ms)
                 Flow ID = 0 Finished Success
@@ -775,7 +775,7 @@ async fn test_respect_last_success_time_when_schedule_resumes() {
 
             #8: +100ms:
               "bar" Ingest:
-                Flow ID = 5 Waiting AutoPolling Executor(task=2)
+                Flow ID = 5 Waiting AutoPolling Executor(task=2, since=100ms)
                 Flow ID = 3 Finished Aborted
                 Flow ID = 1 Finished Success
               "foo" Ingest:
@@ -785,11 +785,11 @@ async fn test_respect_last_success_time_when_schedule_resumes() {
 
             #9: +120ms:
               "bar" Ingest:
-                Flow ID = 5 Waiting AutoPolling Executor(task=2)
+                Flow ID = 5 Waiting AutoPolling Executor(task=2, since=100ms)
                 Flow ID = 3 Finished Aborted
                 Flow ID = 1 Finished Success
               "foo" Ingest:
-                Flow ID = 4 Waiting AutoPolling Executor(task=3)
+                Flow ID = 4 Waiting AutoPolling Executor(task=3, since=120ms)
                 Flow ID = 2 Finished Aborted
                 Flow ID = 0 Finished Success
 
@@ -906,19 +906,19 @@ async fn test_dataset_deleted() {
 
             #1: +0ms:
               "bar" Ingest:
-                Flow ID = 1 Waiting AutoPolling Executor(task=1)
+                Flow ID = 1 Waiting AutoPolling Executor(task=1, since=0ms)
               "foo" Ingest:
-                Flow ID = 0 Waiting AutoPolling Executor(task=0)
+                Flow ID = 0 Waiting AutoPolling Executor(task=0, since=0ms)
 
             #2: +10ms:
               "bar" Ingest:
-                Flow ID = 1 Waiting AutoPolling Executor(task=1)
+                Flow ID = 1 Waiting AutoPolling Executor(task=1, since=0ms)
               "foo" Ingest:
                 Flow ID = 0 Running(task=0)
 
             #3: +20ms:
               "bar" Ingest:
-                Flow ID = 1 Waiting AutoPolling Executor(task=1)
+                Flow ID = 1 Waiting AutoPolling Executor(task=1, since=0ms)
               "foo" Ingest:
                 Flow ID = 2 Waiting AutoPolling Schedule(wakeup=70ms)
                 Flow ID = 0 Finished Success
@@ -948,7 +948,7 @@ async fn test_dataset_deleted() {
 
             #7: +100ms:
               "bar" Ingest:
-                Flow ID = 3 Waiting AutoPolling Executor(task=2)
+                Flow ID = 3 Waiting AutoPolling Executor(task=2, since=100ms)
                 Flow ID = 1 Finished Success
               "foo" Ingest:
                 Flow ID = 2 Finished Aborted
@@ -1077,25 +1077,25 @@ async fn test_task_completions_trigger_next_loop_on_success() {
 
             #1: +0ms:
               "bar" Ingest:
-                Flow ID = 1 Waiting AutoPolling Executor(task=1)
+                Flow ID = 1 Waiting AutoPolling Executor(task=1, since=0ms)
               "baz" Ingest:
-                Flow ID = 2 Waiting AutoPolling Executor(task=2)
+                Flow ID = 2 Waiting AutoPolling Executor(task=2, since=0ms)
               "foo" Ingest:
-                Flow ID = 0 Waiting AutoPolling Executor(task=0)
+                Flow ID = 0 Waiting AutoPolling Executor(task=0, since=0ms)
 
             #2: +10ms:
               "bar" Ingest:
-                Flow ID = 1 Waiting AutoPolling Executor(task=1)
+                Flow ID = 1 Waiting AutoPolling Executor(task=1, since=0ms)
               "baz" Ingest:
-                Flow ID = 2 Waiting AutoPolling Executor(task=2)
+                Flow ID = 2 Waiting AutoPolling Executor(task=2, since=0ms)
               "foo" Ingest:
                 Flow ID = 0 Running(task=0)
 
             #3: +20ms:
               "bar" Ingest:
-                Flow ID = 1 Waiting AutoPolling Executor(task=1)
+                Flow ID = 1 Waiting AutoPolling Executor(task=1, since=0ms)
               "baz" Ingest:
-                Flow ID = 2 Waiting AutoPolling Executor(task=2)
+                Flow ID = 2 Waiting AutoPolling Executor(task=2, since=0ms)
               "foo" Ingest:
                 Flow ID = 3 Waiting AutoPolling Schedule(wakeup=60ms)
                 Flow ID = 0 Finished Success
@@ -1104,7 +1104,7 @@ async fn test_task_completions_trigger_next_loop_on_success() {
               "bar" Ingest:
                 Flow ID = 1 Running(task=1)
               "baz" Ingest:
-                Flow ID = 2 Waiting AutoPolling Executor(task=2)
+                Flow ID = 2 Waiting AutoPolling Executor(task=2, since=0ms)
               "foo" Ingest:
                 Flow ID = 3 Waiting AutoPolling Schedule(wakeup=60ms)
                 Flow ID = 0 Finished Success
@@ -1113,7 +1113,7 @@ async fn test_task_completions_trigger_next_loop_on_success() {
               "bar" Ingest:
                 Flow ID = 1 Finished Failed
               "baz" Ingest:
-                Flow ID = 2 Waiting AutoPolling Executor(task=2)
+                Flow ID = 2 Waiting AutoPolling Executor(task=2, since=0ms)
               "foo" Ingest:
                 Flow ID = 3 Waiting AutoPolling Schedule(wakeup=60ms)
                 Flow ID = 0 Finished Success
@@ -1142,7 +1142,7 @@ async fn test_task_completions_trigger_next_loop_on_success() {
               "baz" Ingest:
                 Flow ID = 2 Finished Cancelled
               "foo" Ingest:
-                Flow ID = 3 Waiting AutoPolling Executor(task=3)
+                Flow ID = 3 Waiting AutoPolling Executor(task=3, since=60ms)
                 Flow ID = 0 Finished Success
 
             "#
@@ -1281,19 +1281,19 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
 
             #1: +0ms:
               "bar" ExecuteTransform:
-                Flow ID = 1 Waiting AutoPolling Executor(task=1)
+                Flow ID = 1 Waiting AutoPolling Executor(task=1, since=0ms)
               "foo" Ingest:
-                Flow ID = 0 Waiting AutoPolling Executor(task=0)
+                Flow ID = 0 Waiting AutoPolling Executor(task=0, since=0ms)
 
             #2: +10ms:
               "bar" ExecuteTransform:
-                Flow ID = 1 Waiting AutoPolling Executor(task=1)
+                Flow ID = 1 Waiting AutoPolling Executor(task=1, since=0ms)
               "foo" Ingest:
                 Flow ID = 0 Running(task=0)
 
             #3: +20ms:
               "bar" ExecuteTransform:
-                Flow ID = 1 Waiting AutoPolling Executor(task=1)
+                Flow ID = 1 Waiting AutoPolling Executor(task=1, since=0ms)
               "foo" Ingest:
                 Flow ID = 2 Waiting AutoPolling Schedule(wakeup=100ms)
                 Flow ID = 0 Finished Success
@@ -1316,7 +1316,7 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
               "bar" ExecuteTransform:
                 Flow ID = 1 Finished Success
               "foo" Ingest:
-                Flow ID = 2 Waiting AutoPolling Executor(task=2)
+                Flow ID = 2 Waiting AutoPolling Executor(task=2, since=100ms)
                 Flow ID = 0 Finished Success
 
             #7: +110ms:
@@ -1337,7 +1337,7 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
 
             #9: +120ms:
               "bar" ExecuteTransform:
-                Flow ID = 3 Waiting Input(foo) Executor(task=3)
+                Flow ID = 3 Waiting Input(foo) Executor(task=3, since=120ms)
                 Flow ID = 1 Finished Success
               "foo" Ingest:
                 Flow ID = 4 Waiting AutoPolling Schedule(wakeup=200ms)
@@ -1367,7 +1367,7 @@ async fn test_derived_dataset_triggered_initially_and_after_input_change() {
                 Flow ID = 3 Finished Success
                 Flow ID = 1 Finished Success
               "foo" Ingest:
-                Flow ID = 4 Waiting AutoPolling Executor(task=4)
+                Flow ID = 4 Waiting AutoPolling Executor(task=4, since=200ms)
                 Flow ID = 2 Finished Success
                 Flow ID = 0 Finished Success
 
@@ -1462,7 +1462,7 @@ async fn test_throttling_manual_triggers() {
 
             #1: +20ms:
               "foo" Ingest:
-                Flow ID = 0 Waiting Manual Executor(task=0)
+                Flow ID = 0 Waiting Manual Executor(task=0, since=20ms)
 
             #2: +40ms:
               "foo" Ingest:
@@ -1479,7 +1479,7 @@ async fn test_throttling_manual_triggers() {
 
             #5: +150ms:
               "foo" Ingest:
-                Flow ID = 1 Waiting Manual Executor(task=1)
+                Flow ID = 1 Waiting Manual Executor(task=1, since=150ms)
                 Flow ID = 0 Finished Success
 
           "#
@@ -1691,25 +1691,25 @@ async fn test_throttling_derived_dataset_with_2_parents() {
 
           #1: +0ms:
             "bar" Ingest:
-              Flow ID = 1 Waiting AutoPolling Executor(task=1)
+              Flow ID = 1 Waiting AutoPolling Executor(task=1, since=0ms)
             "baz" ExecuteTransform:
-              Flow ID = 2 Waiting AutoPolling Executor(task=2)
+              Flow ID = 2 Waiting AutoPolling Executor(task=2, since=0ms)
             "foo" Ingest:
-              Flow ID = 0 Waiting AutoPolling Executor(task=0)
+              Flow ID = 0 Waiting AutoPolling Executor(task=0, since=0ms)
 
           #2: +10ms:
             "bar" Ingest:
-              Flow ID = 1 Waiting AutoPolling Executor(task=1)
+              Flow ID = 1 Waiting AutoPolling Executor(task=1, since=0ms)
             "baz" ExecuteTransform:
-              Flow ID = 2 Waiting AutoPolling Executor(task=2)
+              Flow ID = 2 Waiting AutoPolling Executor(task=2, since=0ms)
             "foo" Ingest:
               Flow ID = 0 Running(task=0)
 
           #3: +20ms:
             "bar" Ingest:
-              Flow ID = 1 Waiting AutoPolling Executor(task=1)
+              Flow ID = 1 Waiting AutoPolling Executor(task=1, since=0ms)
             "baz" ExecuteTransform:
-              Flow ID = 2 Waiting AutoPolling Executor(task=2)
+              Flow ID = 2 Waiting AutoPolling Executor(task=2, since=0ms)
             "foo" Ingest:
               Flow ID = 3 Waiting AutoPolling Throttling(for=100ms, wakeup=120ms, shifted=70ms)
               Flow ID = 0 Finished Success
@@ -1718,7 +1718,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
             "bar" Ingest:
               Flow ID = 1 Running(task=1)
             "baz" ExecuteTransform:
-              Flow ID = 2 Waiting AutoPolling Executor(task=2)
+              Flow ID = 2 Waiting AutoPolling Executor(task=2, since=0ms)
             "foo" Ingest:
               Flow ID = 3 Waiting AutoPolling Throttling(for=100ms, wakeup=120ms, shifted=70ms)
               Flow ID = 0 Finished Success
@@ -1728,7 +1728,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
               Flow ID = 4 Waiting AutoPolling Schedule(wakeup=180ms)
               Flow ID = 1 Finished Success
             "baz" ExecuteTransform:
-              Flow ID = 2 Waiting AutoPolling Executor(task=2)
+              Flow ID = 2 Waiting AutoPolling Executor(task=2, since=0ms)
             "foo" Ingest:
               Flow ID = 3 Waiting AutoPolling Throttling(for=100ms, wakeup=120ms, shifted=70ms)
               Flow ID = 0 Finished Success
@@ -1760,7 +1760,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
             "baz" ExecuteTransform:
               Flow ID = 2 Finished Success
             "foo" Ingest:
-              Flow ID = 3 Waiting AutoPolling Executor(task=3)
+              Flow ID = 3 Waiting AutoPolling Executor(task=3, since=120ms)
               Flow ID = 0 Finished Success
 
           #9: +130ms:
@@ -1790,7 +1790,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
               Flow ID = 4 Waiting AutoPolling Schedule(wakeup=180ms)
               Flow ID = 1 Finished Success
             "baz" ExecuteTransform:
-              Flow ID = 5 Waiting Input(foo) Executor(task=4)
+              Flow ID = 5 Waiting Input(foo) Executor(task=4, since=150ms)
               Flow ID = 2 Finished Success
             "foo" Ingest:
               Flow ID = 6 Waiting AutoPolling Throttling(for=100ms, wakeup=240ms, shifted=190ms)
@@ -1823,7 +1823,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
 
           #14: +180ms:
             "bar" Ingest:
-              Flow ID = 4 Waiting AutoPolling Executor(task=5)
+              Flow ID = 4 Waiting AutoPolling Executor(task=5, since=180ms)
               Flow ID = 1 Finished Success
             "baz" ExecuteTransform:
               Flow ID = 5 Finished Success
@@ -1869,7 +1869,7 @@ async fn test_throttling_derived_dataset_with_2_parents() {
               Flow ID = 5 Finished Success
               Flow ID = 2 Finished Success
             "foo" Ingest:
-              Flow ID = 6 Waiting AutoPolling Executor(task=6)
+              Flow ID = 6 Waiting AutoPolling Executor(task=6, since=240ms)
               Flow ID = 3 Finished Success
               Flow ID = 0 Finished Success
 
@@ -1879,25 +1879,25 @@ async fn test_throttling_derived_dataset_with_2_parents() {
               Flow ID = 4 Finished Success
               Flow ID = 1 Finished Success
             "baz" ExecuteTransform:
-              Flow ID = 7 Waiting Input(bar) Executor(task=7)
+              Flow ID = 7 Waiting Input(bar) Executor(task=7, since=270ms)
               Flow ID = 5 Finished Success
               Flow ID = 2 Finished Success
             "foo" Ingest:
-              Flow ID = 6 Waiting AutoPolling Executor(task=6)
+              Flow ID = 6 Waiting AutoPolling Executor(task=6, since=240ms)
               Flow ID = 3 Finished Success
               Flow ID = 0 Finished Success
 
           #19: +350ms:
             "bar" Ingest:
-              Flow ID = 8 Waiting AutoPolling Executor(task=8)
+              Flow ID = 8 Waiting AutoPolling Executor(task=8, since=350ms)
               Flow ID = 4 Finished Success
               Flow ID = 1 Finished Success
             "baz" ExecuteTransform:
-              Flow ID = 7 Waiting Input(bar) Executor(task=7)
+              Flow ID = 7 Waiting Input(bar) Executor(task=7, since=270ms)
               Flow ID = 5 Finished Success
               Flow ID = 2 Finished Success
             "foo" Ingest:
-              Flow ID = 6 Waiting AutoPolling Executor(task=6)
+              Flow ID = 6 Waiting AutoPolling Executor(task=6, since=240ms)
               Flow ID = 3 Finished Success
               Flow ID = 0 Finished Success
 
@@ -2080,19 +2080,19 @@ async fn test_batching_condition_records_reached() {
 
             #1: +0ms:
               "bar" ExecuteTransform:
-                Flow ID = 1 Waiting AutoPolling Executor(task=1)
+                Flow ID = 1 Waiting AutoPolling Executor(task=1, since=0ms)
               "foo" Ingest:
-                Flow ID = 0 Waiting AutoPolling Executor(task=0)
+                Flow ID = 0 Waiting AutoPolling Executor(task=0, since=0ms)
 
             #2: +10ms:
               "bar" ExecuteTransform:
-                Flow ID = 1 Waiting AutoPolling Executor(task=1)
+                Flow ID = 1 Waiting AutoPolling Executor(task=1, since=0ms)
               "foo" Ingest:
                 Flow ID = 0 Running(task=0)
 
             #3: +20ms:
               "bar" ExecuteTransform:
-                Flow ID = 1 Waiting AutoPolling Executor(task=1)
+                Flow ID = 1 Waiting AutoPolling Executor(task=1, since=0ms)
               "foo" Ingest:
                 Flow ID = 2 Waiting AutoPolling Schedule(wakeup=70ms)
                 Flow ID = 0 Finished Success
@@ -2115,7 +2115,7 @@ async fn test_batching_condition_records_reached() {
               "bar" ExecuteTransform:
                 Flow ID = 1 Finished Success
               "foo" Ingest:
-                Flow ID = 2 Waiting AutoPolling Executor(task=2)
+                Flow ID = 2 Waiting AutoPolling Executor(task=2, since=70ms)
                 Flow ID = 0 Finished Success
 
             #7: +80ms:
@@ -2139,7 +2139,7 @@ async fn test_batching_condition_records_reached() {
                 Flow ID = 3 Waiting Input(foo) Batching(10, until=210ms)
                 Flow ID = 1 Finished Success
               "foo" Ingest:
-                Flow ID = 4 Waiting AutoPolling Executor(task=3)
+                Flow ID = 4 Waiting AutoPolling Executor(task=3, since=140ms)
                 Flow ID = 2 Finished Success
                 Flow ID = 0 Finished Success
 
@@ -2164,7 +2164,7 @@ async fn test_batching_condition_records_reached() {
 
             #12: +160ms:
               "bar" ExecuteTransform:
-                Flow ID = 3 Waiting Input(foo) Executor(task=4)
+                Flow ID = 3 Waiting Input(foo) Executor(task=4, since=160ms)
                 Flow ID = 1 Finished Success
               "foo" Ingest:
                 Flow ID = 5 Waiting AutoPolling Schedule(wakeup=210ms)
@@ -2197,7 +2197,7 @@ async fn test_batching_condition_records_reached() {
                 Flow ID = 3 Finished Success
                 Flow ID = 1 Finished Success
               "foo" Ingest:
-                Flow ID = 5 Waiting AutoPolling Executor(task=5)
+                Flow ID = 5 Waiting AutoPolling Executor(task=5, since=210ms)
                 Flow ID = 4 Finished Success
                 Flow ID = 2 Finished Success
                 Flow ID = 0 Finished Success
@@ -2357,19 +2357,19 @@ async fn test_batching_condition_timeout() {
 
             #1: +0ms:
               "bar" ExecuteTransform:
-                Flow ID = 1 Waiting AutoPolling Executor(task=1)
+                Flow ID = 1 Waiting AutoPolling Executor(task=1, since=0ms)
               "foo" Ingest:
-                Flow ID = 0 Waiting AutoPolling Executor(task=0)
+                Flow ID = 0 Waiting AutoPolling Executor(task=0, since=0ms)
 
             #2: +10ms:
               "bar" ExecuteTransform:
-                Flow ID = 1 Waiting AutoPolling Executor(task=1)
+                Flow ID = 1 Waiting AutoPolling Executor(task=1, since=0ms)
               "foo" Ingest:
                 Flow ID = 0 Running(task=0)
 
             #3: +20ms:
               "bar" ExecuteTransform:
-                Flow ID = 1 Waiting AutoPolling Executor(task=1)
+                Flow ID = 1 Waiting AutoPolling Executor(task=1, since=0ms)
               "foo" Ingest:
                 Flow ID = 2 Waiting AutoPolling Schedule(wakeup=70ms)
                 Flow ID = 0 Finished Success
@@ -2392,7 +2392,7 @@ async fn test_batching_condition_timeout() {
               "bar" ExecuteTransform:
                 Flow ID = 1 Finished Success
               "foo" Ingest:
-                Flow ID = 2 Waiting AutoPolling Executor(task=2)
+                Flow ID = 2 Waiting AutoPolling Executor(task=2, since=70ms)
                 Flow ID = 0 Finished Success
 
             #7: +80ms:
@@ -2416,16 +2416,16 @@ async fn test_batching_condition_timeout() {
                 Flow ID = 3 Waiting Input(foo) Batching(10, until=240ms)
                 Flow ID = 1 Finished Success
               "foo" Ingest:
-                Flow ID = 4 Waiting AutoPolling Executor(task=3)
+                Flow ID = 4 Waiting AutoPolling Executor(task=3, since=140ms)
                 Flow ID = 2 Finished Success
                 Flow ID = 0 Finished Success
 
             #10: +240ms:
               "bar" ExecuteTransform:
-                Flow ID = 3 Waiting Input(foo) Executor(task=4)
+                Flow ID = 3 Waiting Input(foo) Executor(task=4, since=240ms)
                 Flow ID = 1 Finished Success
               "foo" Ingest:
-                Flow ID = 4 Waiting AutoPolling Executor(task=3)
+                Flow ID = 4 Waiting AutoPolling Executor(task=3, since=140ms)
                 Flow ID = 2 Finished Success
                 Flow ID = 0 Finished Success
 
@@ -2434,7 +2434,7 @@ async fn test_batching_condition_timeout() {
                 Flow ID = 3 Running(task=4)
                 Flow ID = 1 Finished Success
               "foo" Ingest:
-                Flow ID = 4 Waiting AutoPolling Executor(task=3)
+                Flow ID = 4 Waiting AutoPolling Executor(task=3, since=140ms)
                 Flow ID = 2 Finished Success
                 Flow ID = 0 Finished Success
 
@@ -2443,7 +2443,7 @@ async fn test_batching_condition_timeout() {
                 Flow ID = 3 Finished Success
                 Flow ID = 1 Finished Success
               "foo" Ingest:
-                Flow ID = 4 Waiting AutoPolling Executor(task=3)
+                Flow ID = 4 Waiting AutoPolling Executor(task=3, since=140ms)
                 Flow ID = 2 Finished Success
                 Flow ID = 0 Finished Success
 
@@ -2602,19 +2602,19 @@ async fn test_batching_condition_watermark() {
 
         #1: +0ms:
           "bar" ExecuteTransform:
-            Flow ID = 1 Waiting AutoPolling Executor(task=1)
+            Flow ID = 1 Waiting AutoPolling Executor(task=1, since=0ms)
           "foo" Ingest:
-            Flow ID = 0 Waiting AutoPolling Executor(task=0)
+            Flow ID = 0 Waiting AutoPolling Executor(task=0, since=0ms)
 
         #2: +10ms:
           "bar" ExecuteTransform:
-            Flow ID = 1 Waiting AutoPolling Executor(task=1)
+            Flow ID = 1 Waiting AutoPolling Executor(task=1, since=0ms)
           "foo" Ingest:
             Flow ID = 0 Running(task=0)
 
         #3: +20ms:
           "bar" ExecuteTransform:
-            Flow ID = 1 Waiting AutoPolling Executor(task=1)
+            Flow ID = 1 Waiting AutoPolling Executor(task=1, since=0ms)
           "foo" Ingest:
             Flow ID = 2 Waiting AutoPolling Schedule(wakeup=60ms)
             Flow ID = 0 Finished Success
@@ -2637,7 +2637,7 @@ async fn test_batching_condition_watermark() {
           "bar" ExecuteTransform:
             Flow ID = 1 Finished Success
           "foo" Ingest:
-            Flow ID = 2 Waiting AutoPolling Executor(task=2)
+            Flow ID = 2 Waiting AutoPolling Executor(task=2, since=60ms)
             Flow ID = 0 Finished Success
 
         #7: +70ms:
@@ -2661,16 +2661,16 @@ async fn test_batching_condition_watermark() {
             Flow ID = 3 Waiting Input(foo) Batching(10, until=280ms)
             Flow ID = 1 Finished Success
           "foo" Ingest:
-            Flow ID = 4 Waiting AutoPolling Executor(task=3)
+            Flow ID = 4 Waiting AutoPolling Executor(task=3, since=120ms)
             Flow ID = 2 Finished Success
             Flow ID = 0 Finished Success
 
         #10: +280ms:
           "bar" ExecuteTransform:
-            Flow ID = 3 Waiting Input(foo) Executor(task=4)
+            Flow ID = 3 Waiting Input(foo) Executor(task=4, since=280ms)
             Flow ID = 1 Finished Success
           "foo" Ingest:
-            Flow ID = 4 Waiting AutoPolling Executor(task=3)
+            Flow ID = 4 Waiting AutoPolling Executor(task=3, since=120ms)
             Flow ID = 2 Finished Success
             Flow ID = 0 Finished Success
 
@@ -2679,7 +2679,7 @@ async fn test_batching_condition_watermark() {
             Flow ID = 3 Running(task=4)
             Flow ID = 1 Finished Success
           "foo" Ingest:
-            Flow ID = 4 Waiting AutoPolling Executor(task=3)
+            Flow ID = 4 Waiting AutoPolling Executor(task=3, since=120ms)
             Flow ID = 2 Finished Success
             Flow ID = 0 Finished Success
 
@@ -2688,7 +2688,7 @@ async fn test_batching_condition_watermark() {
             Flow ID = 3 Finished Success
             Flow ID = 1 Finished Success
           "foo" Ingest:
-            Flow ID = 4 Waiting AutoPolling Executor(task=3)
+            Flow ID = 4 Waiting AutoPolling Executor(task=3, since=120ms)
             Flow ID = 2 Finished Success
             Flow ID = 0 Finished Success
 
@@ -2950,25 +2950,25 @@ async fn test_batching_condition_with_2_inputs() {
 
         #1: +0ms:
           "bar" Ingest:
-            Flow ID = 1 Waiting AutoPolling Executor(task=1)
+            Flow ID = 1 Waiting AutoPolling Executor(task=1, since=0ms)
           "baz" ExecuteTransform:
-            Flow ID = 2 Waiting AutoPolling Executor(task=2)
+            Flow ID = 2 Waiting AutoPolling Executor(task=2, since=0ms)
           "foo" Ingest:
-            Flow ID = 0 Waiting AutoPolling Executor(task=0)
+            Flow ID = 0 Waiting AutoPolling Executor(task=0, since=0ms)
 
         #2: +10ms:
           "bar" Ingest:
-            Flow ID = 1 Waiting AutoPolling Executor(task=1)
+            Flow ID = 1 Waiting AutoPolling Executor(task=1, since=0ms)
           "baz" ExecuteTransform:
-            Flow ID = 2 Waiting AutoPolling Executor(task=2)
+            Flow ID = 2 Waiting AutoPolling Executor(task=2, since=0ms)
           "foo" Ingest:
             Flow ID = 0 Running(task=0)
 
         #3: +20ms:
           "bar" Ingest:
-            Flow ID = 1 Waiting AutoPolling Executor(task=1)
+            Flow ID = 1 Waiting AutoPolling Executor(task=1, since=0ms)
           "baz" ExecuteTransform:
-            Flow ID = 2 Waiting AutoPolling Executor(task=2)
+            Flow ID = 2 Waiting AutoPolling Executor(task=2, since=0ms)
           "foo" Ingest:
             Flow ID = 3 Waiting AutoPolling Schedule(wakeup=100ms)
             Flow ID = 0 Finished Success
@@ -2977,7 +2977,7 @@ async fn test_batching_condition_with_2_inputs() {
           "bar" Ingest:
             Flow ID = 1 Running(task=1)
           "baz" ExecuteTransform:
-            Flow ID = 2 Waiting AutoPolling Executor(task=2)
+            Flow ID = 2 Waiting AutoPolling Executor(task=2, since=0ms)
           "foo" Ingest:
             Flow ID = 3 Waiting AutoPolling Schedule(wakeup=100ms)
             Flow ID = 0 Finished Success
@@ -2987,7 +2987,7 @@ async fn test_batching_condition_with_2_inputs() {
             Flow ID = 4 Waiting AutoPolling Schedule(wakeup=150ms)
             Flow ID = 1 Finished Success
           "baz" ExecuteTransform:
-            Flow ID = 2 Waiting AutoPolling Executor(task=2)
+            Flow ID = 2 Waiting AutoPolling Executor(task=2, since=0ms)
           "foo" Ingest:
             Flow ID = 3 Waiting AutoPolling Schedule(wakeup=100ms)
             Flow ID = 0 Finished Success
@@ -3019,7 +3019,7 @@ async fn test_batching_condition_with_2_inputs() {
           "baz" ExecuteTransform:
             Flow ID = 2 Finished Success
           "foo" Ingest:
-            Flow ID = 3 Waiting AutoPolling Executor(task=3)
+            Flow ID = 3 Waiting AutoPolling Executor(task=3, since=100ms)
             Flow ID = 0 Finished Success
 
         #9: +110ms:
@@ -3046,7 +3046,7 @@ async fn test_batching_condition_with_2_inputs() {
 
         #11: +150ms:
           "bar" Ingest:
-            Flow ID = 4 Waiting AutoPolling Executor(task=4)
+            Flow ID = 4 Waiting AutoPolling Executor(task=4, since=150ms)
             Flow ID = 1 Finished Success
           "baz" ExecuteTransform:
             Flow ID = 5 Waiting Input(foo) Batching(15, until=320ms)
@@ -3090,7 +3090,7 @@ async fn test_batching_condition_with_2_inputs() {
             Flow ID = 5 Waiting Input(foo) Batching(15, until=320ms)
             Flow ID = 2 Finished Success
           "foo" Ingest:
-            Flow ID = 6 Waiting AutoPolling Executor(task=5)
+            Flow ID = 6 Waiting AutoPolling Executor(task=5, since=200ms)
             Flow ID = 3 Finished Success
             Flow ID = 0 Finished Success
 
@@ -3127,7 +3127,7 @@ async fn test_batching_condition_with_2_inputs() {
             Flow ID = 4 Finished Success
             Flow ID = 1 Finished Success
           "baz" ExecuteTransform:
-            Flow ID = 5 Waiting Input(foo) Executor(task=6)
+            Flow ID = 5 Waiting Input(foo) Executor(task=6, since=220ms)
             Flow ID = 2 Finished Success
           "foo" Ingest:
             Flow ID = 8 Waiting AutoPolling Schedule(wakeup=300ms)
@@ -3165,7 +3165,7 @@ async fn test_batching_condition_with_2_inputs() {
 
         #20: +290ms:
           "bar" Ingest:
-            Flow ID = 7 Waiting AutoPolling Executor(task=7)
+            Flow ID = 7 Waiting AutoPolling Executor(task=7, since=290ms)
             Flow ID = 4 Finished Success
             Flow ID = 1 Finished Success
           "baz" ExecuteTransform:
@@ -3179,14 +3179,14 @@ async fn test_batching_condition_with_2_inputs() {
 
         #21: +300ms:
           "bar" Ingest:
-            Flow ID = 7 Waiting AutoPolling Executor(task=7)
+            Flow ID = 7 Waiting AutoPolling Executor(task=7, since=290ms)
             Flow ID = 4 Finished Success
             Flow ID = 1 Finished Success
           "baz" ExecuteTransform:
             Flow ID = 5 Finished Success
             Flow ID = 2 Finished Success
           "foo" Ingest:
-            Flow ID = 8 Waiting AutoPolling Executor(task=8)
+            Flow ID = 8 Waiting AutoPolling Executor(task=8, since=300ms)
             Flow ID = 6 Finished Success
             Flow ID = 3 Finished Success
             Flow ID = 0 Finished Success

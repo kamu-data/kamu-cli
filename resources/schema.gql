@@ -856,6 +856,10 @@ enum FlowStatus {
 
 type FlowTimingRecords {
 	"""
+	Recorded time of last task scheduling
+	"""
+	awaitingExecutorSince: DateTime
+	"""
 	Recorded start of running (Running state seen at least once)
 	"""
 	runningSince: DateTime

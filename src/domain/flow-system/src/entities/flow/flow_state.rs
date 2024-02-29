@@ -37,6 +37,8 @@ pub struct FlowState {
 pub struct FlowTimingRecords {
     /// Creation time
     pub created_at: DateTime<Utc>,
+    /// Task scheduled and awaiting for exeuction since time
+    pub awaiting_executor_since: Option<DateTime<Utc>>,
     /// Started running at time
     pub running_since: Option<DateTime<Utc>>,
     /// Finish time (success or cancel/abort)
@@ -113,6 +115,7 @@ impl Projection for FlowState {
                     start_condition: None,
                     timing: FlowTimingRecords {
                         created_at: event_time,
+                        awaiting_executor_since: None,
                         running_since: None,
                         finished_at: None,
                     },
@@ -148,13 +151,24 @@ impl Projection for FlowState {
                             Ok(FlowState { triggers, ..s })
                         }
                     }
-                    E::TaskScheduled(FlowEventTaskScheduled { task_id, .. }) => {
+                    E::TaskScheduled(FlowEventTaskScheduled {
+                        event_time,
+                        task_id,
+                        ..
+                    }) => {
                         if s.outcome.is_some() {
                             Err(ProjectionError::new(Some(s), event))
                         } else {
                             let mut task_ids = s.task_ids;
                             task_ids.push(task_id);
-                            Ok(FlowState { task_ids, ..s })
+                            Ok(FlowState {
+                                task_ids,
+                                timing: FlowTimingRecords {
+                                    awaiting_executor_since: Some(event_time),
+                                    ..s.timing
+                                },
+                                ..s
+                            })
                         }
                     }
                     E::TaskRunning(FlowEventTaskRunning {
@@ -162,7 +176,10 @@ impl Projection for FlowState {
                         task_id,
                         ..
                     }) => {
-                        if s.outcome.is_some() || !s.task_ids.contains(&task_id) {
+                        if s.outcome.is_some()
+                            || !s.task_ids.contains(&task_id)
+                            || s.timing.awaiting_executor_since.is_none()
+                        {
                             Err(ProjectionError::new(Some(s), event))
                         } else {
                             Ok(FlowState {

@@ -91,7 +91,10 @@ impl FlowServiceInMemory {
     }
 
     #[tracing::instrument(level = "debug", skip_all)]
-    async fn run_current_timeslot(&self) -> Result<(), InternalError> {
+    async fn run_current_timeslot(
+        &self,
+        timeslot_time: DateTime<Utc>,
+    ) -> Result<(), InternalError> {
         let planned_flow_ids: Vec<_> = {
             let mut state = self.state.lock().unwrap();
             state.time_wheel.take_nearest_planned_flows()
@@ -103,7 +106,7 @@ impl FlowServiceInMemory {
                 let mut flow = Flow::load(planned_flow_id, self.flow_event_store.as_ref())
                     .await
                     .int_err()?;
-                self.schedule_flow_task(&mut flow).await?;
+                self.schedule_flow_task(&mut flow, timeslot_time).await?;
                 Ok(())
             });
         }
@@ -642,7 +645,11 @@ impl FlowServiceInMemory {
     }
 
     #[tracing::instrument(level = "trace", skip_all, fields(flow_id = %flow.flow_id))]
-    async fn schedule_flow_task(&self, flow: &mut Flow) -> Result<TaskID, InternalError> {
+    async fn schedule_flow_task(
+        &self,
+        flow: &mut Flow,
+        schedule_time: DateTime<Utc>,
+    ) -> Result<TaskID, InternalError> {
         let logical_plan = flow.make_task_logical_plan();
 
         let task = self
@@ -652,14 +659,14 @@ impl FlowServiceInMemory {
             .int_err()?;
 
         flow.set_relevant_start_condition(
-            self.time_source.now(),
+            schedule_time,
             FlowStartCondition::Executor(FlowStartConditionExecutor {
                 task_id: task.task_id,
             }),
         )
         .int_err()?;
 
-        flow.on_task_scheduled(self.time_source.now(), task.task_id)
+        flow.on_task_scheduled(schedule_time, task.task_id)
             .int_err()?;
         flow.save(self.flow_event_store.as_ref()).await.int_err()?;
 
@@ -743,7 +750,9 @@ impl FlowService for FlowServiceInMemory {
                 && nearest_activation_time <= current_time
             {
                 // Run scheduling for current time slot. Should not throw any errors
-                self.run_current_timeslot().await.int_err()?;
+                self.run_current_timeslot(nearest_activation_time)
+                    .await
+                    .int_err()?;
 
                 // Publish progress event
                 self.event_bus
@@ -952,8 +961,13 @@ impl FlowServiceTestDriver for FlowServiceInMemory {
         state.running = true;
     }
 
-    /// Pretends it is time to schedule the given flow that was in Queued state
-    async fn mimic_flow_scheduled(&self, flow_id: FlowID) -> Result<TaskID, InternalError> {
+    /// Pretends it is time to schedule the given flow that was not waiting for
+    /// anything else
+    async fn mimic_flow_scheduled(
+        &self,
+        flow_id: FlowID,
+        schedule_time: DateTime<Utc>,
+    ) -> Result<TaskID, InternalError> {
         {
             let mut state = self.state.lock().unwrap();
             state.time_wheel.cancel_flow_activation(flow_id).int_err()?;
@@ -962,7 +976,10 @@ impl FlowServiceTestDriver for FlowServiceInMemory {
         let mut flow = Flow::load(flow_id, self.flow_event_store.as_ref())
             .await
             .int_err()?;
-        let task_id = self.schedule_flow_task(&mut flow).await.int_err()?;
+        let task_id = self
+            .schedule_flow_task(&mut flow, schedule_time)
+            .await
+            .int_err()?;
         Ok(task_id)
     }
 }

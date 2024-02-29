@@ -189,7 +189,14 @@ impl std::fmt::Display for FlowSystemTestListener {
                                 (b.batching_deadline - initial_time).num_milliseconds(),
                             )?,
                             FlowStartCondition::Executor(e) => {
-                                write!(f, " Executor(task={})", e.task_id)?;
+                                write!(
+                                    f,
+                                    " Executor(task={}, since={}ms)",
+                                    e.task_id,
+                                    (flow_state.timing.awaiting_executor_since.unwrap()
+                                        - initial_time)
+                                        .num_milliseconds()
+                                )?;
                             }
                             FlowStartCondition::Schedule(s) => {
                                 write!(
