@@ -7,6 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::hash_map::Entry;
+use std::collections::HashMap;
+
 use chrono::{DateTime, Utc};
 use kamu_core::{
     AppendError,
@@ -25,7 +28,14 @@ use opendatafabric::{
     Multihash,
 };
 
-use crate::{invalid_event, BoxedVisitors, Decision, MetadataBlockTypeFlags, MetadataChainVisitor};
+use crate::{
+    invalid_event,
+    BoxedVisitor,
+    BoxedVisitors,
+    Decision,
+    MetadataBlockTypeFlags,
+    MetadataChainVisitor,
+};
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -324,24 +334,66 @@ impl<'a> MetadataChainVisitor for ValidateOffsetsAreSequentialVisitor<'a> {
 // Helpers
 ///////////////////////////////////////////////////////////////////////////////
 
+type DecisionMap<'a> = HashMap<Decision, Vec<BoxedVisitor<'a>>>;
+
+type RequestedByHashVisitors<'a> = Vec<(Multihash, BoxedVisitors<'a>)>;
+type RequestedByFlagsVisitors<'a> = Vec<(MetadataBlockTypeFlags, BoxedVisitors<'a>)>;
+
 pub struct MetadataChainVisitorBatchProcessor {}
 
 impl MetadataChainVisitorBatchProcessor {
-    // TODO: extract common part
-    pub fn get_next_decisions(
-        visitors: BoxedVisitors,
-    ) -> Result<(BoxedVisitors, Decision), AppendError> {
-        let acc_capacity = visitors.len();
+    pub fn process_decision_map(
+        visitors_count: usize,
+        decision_map: DecisionMap,
+    ) -> Option<(RequestedByHashVisitors, RequestedByFlagsVisitors)> {
+        let mut requested_by_hash_visitors = Vec::new();
+        let mut requested_by_flags_visitors = Vec::new();
 
+        for (decision, visitors) in decision_map {
+            match decision {
+                Decision::Stop if visitors.len() == visitors_count => {
+                    // All Visitors have finished
+                    return None;
+                }
+                Decision::Stop => {
+                    // Some Visitors have already finished,
+                    // we are processing rest
+                }
+                Decision::NextWithHash(hash) => {
+                    requested_by_hash_visitors.push((hash, visitors));
+                }
+                Decision::NextOfType(flags) => {
+                    requested_by_flags_visitors.push((flags, visitors));
+                }
+            }
+        }
+
+        Some((requested_by_hash_visitors, requested_by_flags_visitors))
+    }
+
+    pub fn get_next_decisions(visitors: BoxedVisitors) -> Result<DecisionMap, AppendError> {
         visitors.into_iter().try_fold(
-            (Vec::with_capacity(acc_capacity), Decision::Stop),
+            HashMap::<Decision, BoxedVisitors>::new(),
             |mut acc, mut visitor| {
                 let decision = visitor.visit()?;
 
-                if decision != Decision::Stop {
-                    acc.0.push(visitor);
-                    acc.1 = Self::apply_decision(acc.1, decision);
-                }
+                acc.entry(decision).or_default().push(visitor);
+
+                Ok(acc)
+            },
+        )
+    }
+
+    fn get_next_decisions_with_block_impl<'a>(
+        visitors: BoxedVisitors<'a>,
+        hashed_block: HashedMetadataBlockRef,
+    ) -> Result<DecisionMap<'a>, AppendError> {
+        visitors.into_iter().try_fold(
+            HashMap::<Decision, BoxedVisitors>::new(),
+            |mut acc, mut visitor| {
+                let decision = visitor.visit_with_block(hashed_block)?;
+
+                acc.entry(decision).or_default().push(visitor);
 
                 Ok(acc)
             },
@@ -351,46 +403,29 @@ impl MetadataChainVisitorBatchProcessor {
     pub fn get_next_decisions_with_block<'a>(
         visitors: BoxedVisitors<'a>,
         hashed_block: HashedMetadataBlockRef,
-    ) -> Result<(BoxedVisitors<'a>, Decision), AppendError> {
-        let acc_capacity = visitors.len();
+        prev_decision_map: DecisionMap<'a>,
+    ) -> Result<DecisionMap<'a>, AppendError> {
+        let map = MetadataChainVisitorBatchProcessor::get_next_decisions_with_block_impl(
+            visitors,
+            hashed_block,
+        )?;
 
-        visitors.into_iter().try_fold(
-            (Vec::with_capacity(acc_capacity), Decision::Stop),
-            |mut acc, mut visitor| {
-                let decision = visitor.visit_with_block(hashed_block)?;
-
-                if decision != Decision::Stop {
-                    acc.0.push(visitor);
-                    acc.1 = Self::apply_decision(acc.1, decision);
-                }
-
-                Ok(acc)
-            },
-        )
+        Ok(Self::merge_maps(prev_decision_map, map))
     }
 
-    fn apply_decision(left_decision: Decision, right_decision: Decision) -> Decision {
-        // Sorting helps us eliminate duplicate pairs in the following comparison
-        let decision_pair = if left_decision > right_decision {
-            (right_decision, left_decision)
-        } else {
-            (left_decision, right_decision)
-        };
-
-        match decision_pair {
-            (Decision::Stop, Decision::Stop) => Decision::Stop,
-            (Decision::Stop, non_stop_decision) => non_stop_decision,
-            (Decision::NextWithHash(_), Decision::NextWithHash(_)) => {
-                // TODO: Discuss at the review
-                panic!("Ambiguity in the choice of decision")
-            }
-            (Decision::NextWithHash(_), next_of_type @ Decision::NextOfType(_)) => next_of_type,
-            (Decision::NextOfType(left_flags), Decision::NextOfType(right_flags)) => {
-                Decision::NextOfType(left_flags | right_flags)
-            }
-            _ => {
-                unreachable!()
+    fn merge_maps<'a>(
+        mut left_map: DecisionMap<'a>,
+        right_map: DecisionMap<'a>,
+    ) -> DecisionMap<'a> {
+        for (decision, visitors) in right_map {
+            match left_map.entry(decision) {
+                Entry::Occupied(entry) => entry.into_mut().extend(visitors),
+                Entry::Vacant(entry) => {
+                    entry.insert(visitors);
+                }
             }
         }
+
+        left_map
     }
 }

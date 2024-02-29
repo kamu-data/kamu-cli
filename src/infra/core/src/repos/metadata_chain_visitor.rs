@@ -11,12 +11,12 @@ use std::hash::Hash;
 
 use bitflags::bitflags;
 use kamu_core::{AppendError, HashedMetadataBlockRef};
-use opendatafabric::{MetadataBlock, Multihash};
+use opendatafabric::{MetadataBlock, MetadataEvent, Multihash};
 
 ///////////////////////////////////////////////////////////////////////////////
 
 bitflags! {
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct MetadataBlockTypeFlags: u32 {
         const ADD_DATA = 1 << 0;
         const EXECUTE_TRANSFORM = 1 << 1;
@@ -36,9 +36,29 @@ bitflags! {
     }
 }
 
+impl From<&MetadataBlock> for MetadataBlockTypeFlags {
+    fn from(block: &MetadataBlock) -> Self {
+        match block.event {
+            MetadataEvent::AddData(_) => Self::ADD_DATA,
+            MetadataEvent::ExecuteTransform(_) => Self::EXECUTE_TRANSFORM,
+            MetadataEvent::Seed(_) => Self::SEED,
+            MetadataEvent::SetPollingSource(_) => Self::SET_POLLING_SOURCE,
+            MetadataEvent::SetTransform(_) => Self::SET_TRANSFORM,
+            MetadataEvent::SetVocab(_) => Self::SET_VOCAB,
+            MetadataEvent::SetAttachments(_) => Self::SET_ATTACHMENTS,
+            MetadataEvent::SetInfo(_) => Self::SET_INFO,
+            MetadataEvent::SetLicense(_) => Self::SET_LICENSE,
+            MetadataEvent::SetDataSchema(_) => Self::SET_DATA_SCHEMA,
+            MetadataEvent::AddPushSource(_) => Self::ADD_PUSH_SOURCE,
+            MetadataEvent::DisablePushSource(_) => Self::DISABLE_PUSH_SOURCE,
+            MetadataEvent::DisablePollingSource(_) => Self::DISABLE_POLLING_SOURCE,
+        }
+    }
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Decision {
     Stop,
     NextWithHash(Multihash),
@@ -58,7 +78,8 @@ pub trait MetadataChainVisitor: Sync + Send {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-pub type BoxedVisitors<'a> = Vec<Box<dyn MetadataChainVisitor + 'a>>;
+pub type BoxedVisitor<'a> = Box<dyn MetadataChainVisitor + 'a>;
+pub type BoxedVisitors<'a> = Vec<BoxedVisitor<'a>>;
 
 #[async_trait::async_trait]
 pub trait MetadataChainVisitorHost {

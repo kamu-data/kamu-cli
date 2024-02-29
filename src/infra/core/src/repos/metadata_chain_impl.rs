@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::borrow::Cow;
+use std::collections::HashMap;
 
 use async_trait::async_trait;
 use futures::TryStreamExt;
@@ -16,7 +17,7 @@ use opendatafabric::*;
 
 use crate::{
     BoxedVisitors,
-    Decision,
+    MetadataBlockTypeFlags,
     MetadataChainVisitorBatchProcessor,
     MetadataChainVisitorHost,
     ValidateOffsetsAreSequentialVisitor,
@@ -661,13 +662,19 @@ where
     ) -> Result<(), AppendError> {
         assert!(!visitors.is_empty());
 
-        // Phase 1. Check the append block itself
-        let (mut visitors, mut decision) =
-            MetadataChainVisitorBatchProcessor::get_next_decisions(visitors)?;
+        type Processor = MetadataChainVisitorBatchProcessor;
 
-        if decision == Decision::Stop {
+        // Phase 1. Check the append block itself
+        let visitors_count = visitors.len();
+        let decision_map = Processor::get_next_decisions(visitors)?;
+
+        // Initial grouping Visitors by their decisions regarding the append block
+        let Some((mut hash_visitors, mut flags_visitors)) =
+            Processor::process_decision_map(visitors_count, decision_map)
+        else {
+            // All Visitors have finished
             return Ok(());
-        }
+        };
 
         let Some(prev_block_hash) = append_block.prev_block_hash.as_ref() else {
             return Ok(());
@@ -677,21 +684,43 @@ where
         let mut blocks = self.iter_blocks_interval(prev_block_hash, None, false);
 
         while let Some((hash, block)) = wrap_block_stream_error(blocks.try_next().await)? {
-            let (next_visitors, next_decision) =
-                MetadataChainVisitorBatchProcessor::get_next_decisions_with_block(
-                    visitors,
-                    (&hash, &block),
-                )?;
+            let mut decision_map = HashMap::new();
 
-            visitors = next_visitors;
-            decision = next_decision;
+            // TODO: Traversal optimizations:
+            //       At the moment, we're just iterating through all the blocks
 
-            if decision == Decision::Stop {
-                break;
+            for (requested_hash, visitors) in hash_visitors {
+                if hash == requested_hash {
+                    decision_map = Processor::get_next_decisions_with_block(
+                        visitors,
+                        (&hash, &block),
+                        decision_map,
+                    )?;
+                }
             }
 
-            // TODO: Traversal optimizations
-            // At the moment, we're just iterating through all the blocks
+            let block_flag = MetadataBlockTypeFlags::from(&block);
+
+            for (requested_flags, visitors) in flags_visitors {
+                if requested_flags.contains(block_flag) {
+                    decision_map = Processor::get_next_decisions_with_block(
+                        visitors,
+                        (&hash, &block),
+                        decision_map,
+                    )?;
+                }
+            }
+
+            // Again grouping visitors by their decisions
+            let Some((new_hash_visitors, new_flags_visitors)) =
+                Processor::process_decision_map(visitors_count, decision_map)
+            else {
+                // All Visitors have finished
+                break;
+            };
+
+            hash_visitors = new_hash_visitors;
+            flags_visitors = new_flags_visitors;
         }
 
         Ok(())
