@@ -41,7 +41,6 @@ bitflags! {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Decision {
     Stop,
-    Next,
     NextWithHash(Multihash),
     NextOfType(MetadataBlockTypeFlags),
 }

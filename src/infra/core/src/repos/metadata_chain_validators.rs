@@ -80,9 +80,8 @@ impl<'a> ValidatePrevBlockExistsVisitor<'a> {
 
 impl<'a> MetadataChainVisitor for ValidatePrevBlockExistsVisitor<'a> {
     fn visit(&mut self) -> Result<Decision, AppendError> {
-        match self.initial_block.prev_block_hash {
-            // TODO Use Decision::NextWithHash()
-            Some(_) => Ok(Decision::Next),
+        match &self.initial_block.prev_block_hash {
+            Some(hash) => Ok(Decision::NextWithHash(hash.clone())),
             None => Ok(Decision::Stop),
         }
     }
@@ -126,18 +125,18 @@ impl<'a> MetadataChainVisitor for ValidateSequenceNumbersIntegrityVisitor<'a> {
     fn visit(&mut self) -> Result<Decision, AppendError> {
         let block = self.initial_block;
 
-        if block.prev_block_hash.is_none() && block.sequence_number != 0 {
-            return Err(
-                AppendValidationError::SequenceIntegrity(SequenceIntegrityError {
+        match &block.prev_block_hash {
+            Some(hash) => Ok(Decision::NextWithHash(hash.clone())),
+            None if block.sequence_number != 0 => Err(AppendValidationError::SequenceIntegrity(
+                SequenceIntegrityError {
                     prev_block_hash: None,
                     prev_block_sequence_number: None,
                     next_block_sequence_number: block.sequence_number,
-                })
-                .into(),
-            );
+                },
+            )
+            .into()),
+            None => Ok(Decision::Stop),
         }
-
-        Ok(Decision::Next)
     }
 
     fn visit_with_block(
@@ -177,7 +176,11 @@ impl<'a> ValidateSystemTimeIsMonotonicVisitor<'a> {
 
 impl<'a> MetadataChainVisitor for ValidateSystemTimeIsMonotonicVisitor<'a> {
     fn visit(&mut self) -> Result<Decision, AppendError> {
-        Ok(Decision::Next)
+        if let Some(hash) = &self.initial_block.prev_block_hash {
+            Ok(Decision::NextWithHash(hash.clone()))
+        } else {
+            Ok(Decision::Stop)
+        }
     }
 
     fn visit_with_block(
@@ -377,7 +380,6 @@ impl MetadataChainVisitorBatchProcessor {
         match decision_pair {
             (Decision::Stop, Decision::Stop) => Decision::Stop,
             (Decision::Stop, non_stop_decision) => non_stop_decision,
-            (Decision::Next, _) => Decision::Next,
             (Decision::NextWithHash(_), Decision::NextWithHash(_)) => {
                 // TODO: Discuss at the review
                 panic!("Ambiguity in the choice of decision")
