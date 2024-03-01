@@ -69,6 +69,8 @@ pub fn filter_datasets_by_any_pattern(
                     .unwrap()
                     .clone();
             } else if dataset_ref_pattern.is_remote() {
+                // ToDo low perfomance solution will always full scan remote repo
+                // should be handled after search will support wildcarding
                 let search_options = SearchOptions {
                     repository_names: vec![dataset_ref_pattern.pattern_repo_name().unwrap()],
                 };

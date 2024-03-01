@@ -828,19 +828,6 @@ impl DatasetRefAnyPattern {
         }
     }
 
-    pub fn as_string_with_static_repo(&self, repo_name: &RepoName) -> String {
-        match self {
-            Self::Ref(_) => unimplemented!(),
-            Self::Local(dataset_name_pattern) => dataset_name_pattern.to_string(),
-            Self::AmbiguousAlias(_, dataset_name_pattern) => {
-                format!("{repo_name}/{dataset_name_pattern}")
-            }
-            Self::RemoteAlias(_, account_pattern, dataset_name_pattern) => {
-                format!("{repo_name}/{account_pattern}/{dataset_name_pattern}")
-            }
-        }
-    }
-
     /// Returns `false` if value is a reference to some specific dataset rather
     /// than a glob pattern
     pub fn is_pattern(&self) -> bool {
@@ -855,6 +842,7 @@ impl DatasetRefAnyPattern {
         }
     }
 
+    /// Return repository part from pattern
     pub fn pattern_repo_name(&self) -> Option<RepoName> {
         match self {
             Self::Ref(_) | Self::Local(_) => None,
