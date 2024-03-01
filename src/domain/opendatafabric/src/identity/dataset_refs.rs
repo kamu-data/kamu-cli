@@ -791,34 +791,8 @@ impl DatasetRefPattern {
 }
 
 impl DatasetRefAnyPattern {
-    pub fn is_match_local(&self, dataset_handle: &DatasetHandle) -> bool {
-        match self {
-            Self::Ref(_) | Self::RemoteAlias(_, _, _) => false,
-            Self::Local(dataset_name_pattern) => {
-                dataset_name_pattern.is_match(&dataset_handle.alias.dataset_name)
-            }
-            Self::AmbiguousAlias(account_name, dataset_name_pattern) => {
-                (Some(AccountName::from_str(&account_name.pattern).unwrap())
-                    == dataset_handle.alias.account_name)
-                    && dataset_name_pattern.is_match(&dataset_handle.alias.dataset_name)
-            }
-        }
-    }
-
-    pub fn is_match_remote(&self, dataset_alias_remote: &DatasetAliasRemote) -> bool {
-        match self {
-            Self::Ref(_) | Self::Local(_) => false,
-            Self::AmbiguousAlias(repo_name, dataset_name_pattern) => {
-                (RepoName::from_str(&repo_name.pattern).unwrap() == dataset_alias_remote.repo_name)
-                    && dataset_name_pattern.is_match(&dataset_alias_remote.dataset_name)
-            }
-            Self::RemoteAlias(repo_name, account_name, dataset_name_pattern) => {
-                repo_name == &dataset_alias_remote.repo_name
-                    && (dataset_alias_remote.account_name.is_some()
-                        && account_name == dataset_alias_remote.account_name.as_ref().unwrap())
-                    && dataset_name_pattern.is_match(&dataset_alias_remote.dataset_name)
-            }
-        }
+    pub fn is_match(&self, _: &DatasetHandle) -> bool {
+        unreachable!()
     }
 
     /// Convert into a [`DatasetRefAny`] when value is not a glob pattern
@@ -836,10 +810,11 @@ impl DatasetRefAnyPattern {
     }
 
     /// Return `true` if pattern has remote repo reference
-    pub fn is_remote(&self) -> bool {
+    pub fn is_remote(&self, is_multitenant: bool) -> bool {
         match self {
             Self::Ref(_) | Self::Local(_) => false,
-            Self::AmbiguousAlias(_, _) | Self::RemoteAlias(_, _, _) => true,
+            Self::RemoteAlias(_, _, _) => true,
+            Self::AmbiguousAlias(_, _) => is_multitenant,
         }
     }
 

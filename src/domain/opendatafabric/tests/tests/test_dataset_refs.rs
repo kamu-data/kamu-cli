@@ -181,7 +181,7 @@ fn test_dataset_ref_any_pattern() {
         res,
         DatasetRefAnyPattern::Ref(DatasetRefAny::LocalAlias(
             None,
-            DatasetName::from_str(param).unwrap()
+            DatasetName::new_unchecked(param)
         ))
     );
 
@@ -195,7 +195,7 @@ fn test_dataset_ref_any_pattern() {
         res,
         DatasetRefAnyPattern::Ref(DatasetRefAny::AmbiguousAlias(
             account_name.into(),
-            DatasetName::from_str(dataset_name).unwrap()
+            DatasetName::new_unchecked(dataset_name)
         ))
     );
 
@@ -268,119 +268,9 @@ fn test_dataset_ref_any_pattern() {
     assert_eq!(
         res,
         DatasetRefAnyPattern::RemoteAlias(
-            RepoName::from_str(repo_name).unwrap(),
-            AccountName::from_str(account_name).unwrap(),
+            RepoName::new_unchecked(repo_name),
+            AccountName::new_unchecked(account_name),
             DatasetNamePattern::from_str(dataset_name).unwrap()
         ),
     );
-}
-
-#[test]
-fn test_dataset_ref_any_match() {
-    // Test matching of local dataset types
-    let dataset_id_str =
-        "did:odf:fed012126262ba49e1ba8392c26f7a39e1ba8d756c7469786d3365200c68402ff65dc";
-    let default_dataset_id = DatasetID::from_did_str(dataset_id_str).unwrap();
-    let expression = "%odf%";
-    let pattern = DatasetRefAnyPattern::from_str(expression).unwrap();
-
-    let dataset_name = "net.example.com";
-    let dataset_handle = DatasetHandle {
-        id: default_dataset_id.clone(),
-        alias: DatasetAlias {
-            account_name: None,
-            dataset_name: DatasetName::from_str(dataset_name).unwrap(),
-        },
-    };
-
-    assert!(!pattern.is_match_local(&dataset_handle));
-
-    let dataset_name = "net.example.odf";
-    let dataset_handle = DatasetHandle {
-        id: default_dataset_id.clone(),
-        alias: DatasetAlias {
-            account_name: None,
-            dataset_name: DatasetName::from_str(dataset_name).unwrap(),
-        },
-    };
-
-    assert!(pattern.is_match_local(&dataset_handle));
-
-    let dataset_name = "net.example.odf";
-    let dataset_account = "account1";
-    let dataset_handle = DatasetHandle {
-        id: default_dataset_id.clone(),
-        alias: DatasetAlias {
-            account_name: Some(AccountName::from_str(dataset_account).unwrap()),
-            dataset_name: DatasetName::from_str(dataset_name).unwrap(),
-        },
-    };
-
-    assert!(pattern.is_match_local(&dataset_handle));
-
-    let dataset_account = "account1";
-    let dataset_name_pattern = "net%";
-    let dataset_name = "net.example.com";
-
-    let expression = format!("{dataset_account}/{dataset_name_pattern}");
-    let pattern = DatasetRefAnyPattern::from_str(expression.as_str()).unwrap();
-    let dataset_handle = DatasetHandle {
-        id: default_dataset_id.clone(),
-        alias: DatasetAlias {
-            account_name: Some(AccountName::from_str(dataset_account).unwrap()),
-            dataset_name: DatasetName::from_str(dataset_name).unwrap(),
-        },
-    };
-
-    assert!(pattern.is_match_local(&dataset_handle));
-
-    let dataset_account = "account2";
-    let dataset_handle = DatasetHandle {
-        id: default_dataset_id.clone(),
-        alias: DatasetAlias {
-            account_name: Some(AccountName::from_str(dataset_account).unwrap()),
-            dataset_name: DatasetName::from_str(dataset_name).unwrap(),
-        },
-    };
-
-    assert!(!pattern.is_match_local(&dataset_handle));
-
-    // Test matching of remote dataset types
-
-    let repo_name = "repository";
-    let dataset_name = "net.example.com";
-    let dataset_alias_remote = DatasetAliasRemote {
-        repo_name: RepoName::from_str(repo_name).unwrap(),
-        account_name: None,
-        dataset_name: DatasetName::from_str(dataset_name).unwrap(),
-    };
-
-    let expression = "repository1/net.example%";
-    let pattern = DatasetRefAnyPattern::from_str(expression).unwrap();
-
-    assert!(!pattern.is_match_remote(&dataset_alias_remote));
-
-    let expression = format!("{repo_name}/net.example%");
-    let pattern = DatasetRefAnyPattern::from_str(expression.as_str()).unwrap();
-
-    assert!(pattern.is_match_remote(&dataset_alias_remote));
-
-    let expression = format!("{repo_name}/account/net.example%");
-    let pattern = DatasetRefAnyPattern::from_str(expression.as_str()).unwrap();
-
-    assert!(!pattern.is_match_remote(&dataset_alias_remote));
-
-    let account_name = "account";
-    let dataset_alias_remote = DatasetAliasRemote {
-        repo_name: RepoName::from_str(repo_name).unwrap(),
-        account_name: Some(AccountName::from_str(account_name).unwrap()),
-        dataset_name: DatasetName::from_str(dataset_name).unwrap(),
-    };
-
-    assert!(pattern.is_match_remote(&dataset_alias_remote));
-
-    let expression = format!("{repo_name}/account1/net.example%");
-    let pattern = DatasetRefAnyPattern::from_str(expression.as_str()).unwrap();
-
-    assert!(!pattern.is_match_remote(&dataset_alias_remote));
 }
