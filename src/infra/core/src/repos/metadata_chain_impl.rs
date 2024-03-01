@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::borrow::Cow;
+use std::error::Error;
 
 use async_trait::async_trait;
 use futures::TryStreamExt;
@@ -416,7 +417,7 @@ where
         Ok(())
     }
 
-    async fn accept<'a>(
+    async fn accept_append_validators<'a>(
         &'a self,
         mut visitors: StackVisitorsWithDecisionsMutRef<'a, AppendError>,
         prev_append_block_hash: Option<&Multihash>,
@@ -433,11 +434,42 @@ where
             return Ok(());
         };
 
-        // Phase 2. Check the previous blocks if required by Visitors.
+        // Phase 2. Check the previous blocks if required by Visitors
         let mut blocks = self.iter_blocks_interval(prev_block_hash, None, false);
 
         // TODO: PERF: Traversal optimizations: skip lists
         while let Some((hash, block)) = wrap_block_stream_error(blocks.try_next().await)? {
+            let hashed_block_ref = (&hash, &block);
+            let all_visitors_finished = visitor_facade.visit_with_block(hashed_block_ref)?;
+
+            if all_visitors_finished {
+                break;
+            }
+        }
+
+        Ok(())
+    }
+
+    pub async fn accept<'a, E>(
+        &'a self,
+        mut visitors: StackVisitorsWithDecisionsMutRef<'a, E>,
+    ) -> Result<(), E>
+    where
+        E: Error + From<IterBlocksError>,
+    {
+        let mut visitor_facade = MetadataChainVisitorFacade::new(&mut visitors);
+        // Phase 1. Check the append block itself
+        let all_visitors_finished = visitor_facade.visit()?;
+
+        if all_visitors_finished {
+            return Ok(());
+        }
+
+        // Phase 2. Check the previous blocks if required by Visitors
+        let mut blocks = self.iter_blocks();
+
+        // TODO: PERF: Traversal optimizations: skip lists
+        while let Some((hash, block)) = blocks.try_next().await? {
             let hashed_block_ref = (&hash, &block);
             let all_visitors_finished = visitor_facade.visit_with_block(hashed_block_ref)?;
 
@@ -636,7 +668,7 @@ where
                 // TODO add ValidateEventLogicalStructureVisitor
             ];
 
-            self.accept(validators, block.prev_block_hash.as_ref())
+            self.accept_append_validators(validators, block.prev_block_hash.as_ref())
                 .await?;
 
             self.validate_append_event_logical_structure(&block).await?;
