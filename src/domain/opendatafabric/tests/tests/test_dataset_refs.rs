@@ -268,8 +268,8 @@ fn test_dataset_ref_any_pattern() {
     assert_eq!(
         res,
         DatasetRefAnyPattern::RemoteAlias(
-            DatasetRepoPattern::from_str(repo_name).unwrap(),
-            DatasetAccountPattern::from_str(account_name).unwrap(),
+            RepoName::from_str(repo_name).unwrap(),
+            AccountName::from_str(account_name).unwrap(),
             DatasetNamePattern::from_str(dataset_name).unwrap()
         ),
     );

@@ -237,37 +237,6 @@ impl DatasetNamePattern {
     }
 }
 
-///////////////////////////////////////////////////////////////////////////////
-
-newtype_str!(
-    DatasetAccountPattern,
-    Grammar::match_dataset_account_pattern,
-    DatasetAccountPatternSerdeVisitor
-);
-
-impl DatasetAccountPattern {
-    pub fn is_match(&self, dataset_account_maybe: Option<&AccountName>) -> bool {
-        if dataset_account_maybe.is_none() {
-            return false;
-        }
-        Like::<false>::like(dataset_account_maybe.unwrap().as_str(), self).unwrap()
-    }
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-newtype_str!(
-    DatasetRepoPattern,
-    Grammar::match_dataset_repo_pattern,
-    DatasetRepoPatternSerdeVisitor
-);
-
-impl DatasetRepoPattern {
-    pub fn is_match(&self, dataset_repo: &RepoName) -> bool {
-        Like::<false>::like(dataset_repo.as_str(), self).unwrap()
-    }
-}
-
 ////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq)]
