@@ -943,11 +943,6 @@ impl FlowService for FlowServiceInMemory {
             FlowStatus::Waiting | FlowStatus::Running => {
                 // Abort current flow and it's scheduled tasks
                 self.abort_flow_impl(&mut flow).await?;
-
-                // Schedule next period
-                let abort_time = self.round_time(self.time_source.now())?;
-                self.try_enqueue_scheduled_auto_polling_flow_if_enabled(abort_time, &flow.flow_key)
-                    .await?;
             }
             FlowStatus::Finished => { /* Skip, idempotence */ }
         }
