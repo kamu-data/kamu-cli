@@ -418,8 +418,8 @@ where
 
     async fn accept<'a>(
         &'a self,
-        append_block: &MetadataBlock,
         mut visitors: StackVisitorsWithDecisionsMutRef<'a, AppendError>,
+        prev_append_block_hash: Option<&Multihash>,
     ) -> Result<(), AppendError> {
         let mut visitor_facade = MetadataChainVisitorFacade::new(&mut visitors);
         // Phase 1. Check the append block itself
@@ -429,7 +429,7 @@ where
             return Ok(());
         }
 
-        let Some(prev_block_hash) = append_block.prev_block_hash.as_ref() else {
+        let Some(prev_block_hash) = prev_append_block_hash else {
             return Ok(());
         };
 
@@ -636,7 +636,8 @@ where
                 // TODO add ValidateEventLogicalStructureVisitor
             ];
 
-            self.accept(&block, validators).await?;
+            self.accept(validators, block.prev_block_hash.as_ref())
+                .await?;
 
             self.validate_append_event_logical_structure(&block).await?;
         }

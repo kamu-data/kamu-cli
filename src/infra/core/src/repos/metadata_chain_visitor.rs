@@ -16,6 +16,7 @@ use opendatafabric::{MetadataBlock, MetadataEvent, Multihash};
 
 ///////////////////////////////////////////////////////////////////////////////
 
+// TODO: Follow-up change: generate in the ODF land
 bitflags! {
     #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct MetadataBlockTypeFlags: u32 {
