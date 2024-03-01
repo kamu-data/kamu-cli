@@ -7,10 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::error::Error;
 use std::hash::Hash;
 
 use bitflags::bitflags;
-use kamu_core::{AppendError, HashedMetadataBlockRef};
+use kamu_core::HashedMetadataBlockRef;
 use opendatafabric::{MetadataBlock, MetadataEvent, Multihash};
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -68,12 +69,14 @@ pub enum Decision {
 ///////////////////////////////////////////////////////////////////////////////
 
 pub trait MetadataChainVisitor: Sync + Send {
-    fn visit(&mut self) -> Result<Decision, AppendError>;
+    type VisitError: Error;
+
+    fn visit(&mut self) -> Result<Decision, Self::VisitError>;
 
     fn visit_with_block(
         &mut self,
         hashed_block_ref: HashedMetadataBlockRef,
-    ) -> Result<Decision, AppendError>;
+    ) -> Result<Decision, Self::VisitError>;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

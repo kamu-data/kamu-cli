@@ -7,29 +7,34 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_core::{AppendError, HashedMetadataBlockRef};
+use std::error::Error;
+
+use kamu_core::HashedMetadataBlockRef;
 
 use crate::{Decision, MetadataBlockTypeFlags, MetadataChainVisitor};
 
 ///////////////////////////////////////////////////////////////////////////////
 
-pub type StackVisitorsWithDecisionsMutRef<'a> =
-    &'a mut [(Decision, &'a mut dyn MetadataChainVisitor)];
+pub type StackVisitorsWithDecisionsMutRef<'a, E> =
+    &'a mut [(Decision, &'a mut dyn MetadataChainVisitor<VisitError = E>)];
 
 ///////////////////////////////////////////////////////////////////////////////
 
-pub struct MetadataChainVisitorFacade<'a, 'b> {
-    visitors: &'b mut StackVisitorsWithDecisionsMutRef<'a>,
+pub struct MetadataChainVisitorFacade<'a, 'b, E> {
+    visitors: &'b mut StackVisitorsWithDecisionsMutRef<'a, E>,
 }
 
-impl<'a, 'b> MetadataChainVisitorFacade<'a, 'b> {
+impl<'a, 'b, E> MetadataChainVisitorFacade<'a, 'b, E>
+where
+    E: Error,
+{
     pub fn new(
-        visitors: &'b mut StackVisitorsWithDecisionsMutRef<'a>,
-    ) -> MetadataChainVisitorFacade<'a, 'b> {
+        visitors: &'b mut StackVisitorsWithDecisionsMutRef<'a, E>,
+    ) -> MetadataChainVisitorFacade<'a, 'b, E> {
         Self { visitors }
     }
 
-    pub fn visit(&mut self) -> Result<bool, AppendError> {
+    pub fn visit(&mut self) -> Result<bool, E> {
         for (decision, visitor) in self.visitors.iter_mut() {
             *decision = visitor.visit()?;
         }
@@ -45,7 +50,7 @@ impl<'a, 'b> MetadataChainVisitorFacade<'a, 'b> {
     pub fn visit_with_block(
         &mut self,
         hashed_block_ref: HashedMetadataBlockRef,
-    ) -> Result<bool, AppendError> {
+    ) -> Result<bool, E> {
         let (hash, block) = hashed_block_ref;
         let mut stopped_visitors = 0;
 

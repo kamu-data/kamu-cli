@@ -419,7 +419,7 @@ where
     async fn accept<'a>(
         &'a self,
         append_block: &MetadataBlock,
-        mut visitors: StackVisitorsWithDecisionsMutRef<'a>,
+        mut visitors: StackVisitorsWithDecisionsMutRef<'a, AppendError>,
     ) -> Result<(), AppendError> {
         let mut visitor_facade = MetadataChainVisitorFacade::new(&mut visitors);
         // Phase 1. Check the append block itself
@@ -436,8 +436,7 @@ where
         // Phase 2. Check the previous blocks if required by Visitors.
         let mut blocks = self.iter_blocks_interval(prev_block_hash, None, false);
 
-        // TODO: Traversal optimizations:
-        //       At the moment, we're just iterating through all the blocks
+        // TODO: PERF: Traversal optimizations: skip lists
         while let Some((hash, block)) = wrap_block_stream_error(blocks.try_next().await)? {
             let hashed_block_ref = (&hash, &block);
             let all_visitors_finished = visitor_facade.visit_with_block(hashed_block_ref)?;
@@ -609,7 +608,7 @@ where
             };
             let hashed_block = (hash.as_ref(), &block);
 
-            let mut validators: StackVisitorsWithDecisionsMutRef = &mut [
+            let validators: StackVisitorsWithDecisionsMutRef<AppendError> = &mut [
                 (
                     Decision::Stop,
                     &mut ValidateSeedBlockOrderVisitor::new(hashed_block),
@@ -637,7 +636,7 @@ where
                 // TODO add ValidateEventLogicalStructureVisitor
             ];
 
-            self.accept(&block, &mut validators).await?;
+            self.accept(&block, validators).await?;
 
             self.validate_append_event_logical_structure(&block).await?;
         }
