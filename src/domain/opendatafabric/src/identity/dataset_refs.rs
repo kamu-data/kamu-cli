@@ -814,16 +814,19 @@ impl DatasetRefAnyPattern {
         match self {
             Self::Ref(_) | Self::Local(_) => false,
             Self::RemoteAlias(_, _, _) => true,
-            Self::AmbiguousAlias(_, _) => is_multitenant,
+            Self::AmbiguousAlias(_, _) => !is_multitenant,
         }
     }
 
     /// Return repository part from pattern
-    pub fn pattern_repo_name(&self) -> Option<RepoName> {
+    pub fn pattern_repo_name(&self, is_multitenant: bool) -> Option<RepoName> {
         match self {
             Self::Ref(_) | Self::Local(_) => None,
             Self::RemoteAlias(repo_name, _, _) => Some(repo_name.clone()),
             Self::AmbiguousAlias(account_repo_name, _) => {
+                if is_multitenant {
+                    return None;
+                };
                 Some(RepoName::from_str(&account_repo_name.pattern).unwrap())
             }
         }

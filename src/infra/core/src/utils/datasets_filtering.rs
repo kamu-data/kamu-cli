@@ -75,26 +75,31 @@ pub fn filter_datasets_by_any_pattern(
         .into_iter()
         .partition(|pattern| pattern.is_remote(dataset_repo.is_multi_tenant()));
 
-    let static_stream = static_and_remote_datasets(static_refs);
+    let static_stream = get_static_datasets_stream(static_refs);
 
     let result = static_stream
-        .chain(remote_datasets(search_svc, remote_patterns))
-        .chain(local_datasets(dataset_repo, local_patterns))
+        .chain(get_remote_datasets_stream(
+            search_svc,
+            remote_patterns,
+            dataset_repo.is_multi_tenant(),
+        ))
+        .chain(get_local_datasets_stream(dataset_repo, local_patterns))
         .boxed();
 
     result
 }
 
-fn remote_datasets(
+fn get_remote_datasets_stream(
     search_svc: Arc<dyn SearchService>,
     remote_ref_patterns: Vec<DatasetRefAnyPattern>,
+    is_multitenant: bool,
 ) -> FilteredDatasetRefAnyStream<'static> {
     Box::pin(async_stream::try_stream! {
         for remote_ref_pattern in &remote_ref_patterns.clone() {
             // ToDo low perfomance solution will always full scan remote repo
             // should be handled after search will support wildcarding
             let search_options = SearchOptions {
-                repository_names: vec![remote_ref_pattern.pattern_repo_name().unwrap()],
+                repository_names: vec![remote_ref_pattern.pattern_repo_name(is_multitenant).unwrap()],
             };
             let search_result = search_svc.search(None, search_options).await.unwrap_or(SearchResult {
                 datasets: vec![]
@@ -109,7 +114,7 @@ fn remote_datasets(
     })
 }
 
-fn static_and_remote_datasets(
+fn get_static_datasets_stream(
     static_refs: Vec<DatasetRefAnyPattern>,
 ) -> FilteredDatasetRefAnyStream<'static> {
     Box::pin(async_stream::try_stream! {
@@ -141,7 +146,7 @@ pub fn match_remote_dataset(
     }
 }
 
-fn local_datasets(
+fn get_local_datasets_stream(
     dataset_repo: &dyn DatasetRepository,
     dataset_ref_patterns: Vec<DatasetRefAnyPattern>,
 ) -> FilteredDatasetRefAnyStream<'_> {
