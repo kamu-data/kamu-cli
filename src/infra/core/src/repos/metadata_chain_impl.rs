@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use std::borrow::Cow;
-use std::collections::HashMap;
 
 use async_trait::async_trait;
 use futures::TryStreamExt;
@@ -16,10 +15,10 @@ use kamu_core::*;
 use opendatafabric::*;
 
 use crate::{
+    Decision,
     MetadataBlockTypeFlags,
-    MetadataChainVisitorBatchProcessor,
     MetadataChainVisitorHost,
-    StackVisitors,
+    StackVisitorsWithDecisionsMutRef,
     ValidateOffsetsAreSequentialVisitor,
     ValidatePrevBlockExistsVisitor,
     ValidateSeedBlockOrderVisitor,
@@ -577,13 +576,31 @@ where
             };
             let hashed_block = (hash.as_ref(), &block);
 
-            let mut validators: StackVisitors = [
-                &mut ValidateSeedBlockOrderVisitor::new(hashed_block),
-                &mut ValidatePrevBlockExistsVisitor::new(hashed_block),
-                &mut ValidateSequenceNumbersIntegrityVisitor::new(hashed_block),
-                &mut ValidateSystemTimeIsMonotonicVisitor::new(hashed_block),
-                &mut ValidateWatermarkIsMonotonicVisitor::new(hashed_block),
-                &mut ValidateOffsetsAreSequentialVisitor::new(hashed_block),
+            let mut validators: StackVisitorsWithDecisionsMutRef = &mut [
+                (
+                    Decision::Stop,
+                    &mut ValidateSeedBlockOrderVisitor::new(hashed_block),
+                ),
+                (
+                    Decision::Stop,
+                    &mut ValidatePrevBlockExistsVisitor::new(hashed_block),
+                ),
+                (
+                    Decision::Stop,
+                    &mut ValidateSequenceNumbersIntegrityVisitor::new(hashed_block),
+                ),
+                (
+                    Decision::Stop,
+                    &mut ValidateSystemTimeIsMonotonicVisitor::new(hashed_block),
+                ),
+                (
+                    Decision::Stop,
+                    &mut ValidateWatermarkIsMonotonicVisitor::new(hashed_block),
+                ),
+                (
+                    Decision::Stop,
+                    &mut ValidateOffsetsAreSequentialVisitor::new(hashed_block),
+                ),
                 // TODO add ValidateEventLogicalStructureVisitor
             ];
 
@@ -658,23 +675,20 @@ where
     async fn accept<'a>(
         &'a self,
         append_block: &MetadataBlock,
-        visitors: &'a mut StackVisitors<'a>,
+        visitors_with_decisions: StackVisitorsWithDecisionsMutRef<'a>,
     ) -> Result<(), AppendError> {
-        assert!(!visitors.is_empty());
-
-        type Processor = MetadataChainVisitorBatchProcessor;
-
         // Phase 1. Check the append block itself
-        let visitors_count = visitors.len();
-        let decision_map = Processor::get_next_decisions(visitors)?;
+        for (decision, visitor) in visitors_with_decisions.iter_mut() {
+            *decision = visitor.visit()?;
+        }
 
-        // Initial grouping Visitors by their decisions regarding the append block
-        let Some((mut hash_visitors, mut flags_visitors)) =
-            Processor::process_decision_map(visitors_count, decision_map)
-        else {
-            // All Visitors have finished
+        let all_visitors_finished = visitors_with_decisions
+            .iter()
+            .all(|(decision, _)| matches!(*decision, Decision::Stop));
+
+        if all_visitors_finished {
             return Ok(());
-        };
+        }
 
         let Some(prev_block_hash) = append_block.prev_block_hash.as_ref() else {
             return Ok(());
@@ -684,43 +698,34 @@ where
         let mut blocks = self.iter_blocks_interval(prev_block_hash, None, false);
 
         while let Some((hash, block)) = wrap_block_stream_error(blocks.try_next().await)? {
-            let mut decision_map = HashMap::new();
-
             // TODO: Traversal optimizations:
             //       At the moment, we're just iterating through all the blocks
 
-            for (requested_hash, visitors) in hash_visitors {
-                if hash == requested_hash {
-                    decision_map = Processor::get_next_decisions_with_block(
-                        visitors,
-                        (&hash, &block),
-                        decision_map,
-                    )?;
+            let mut stopped_visitors = 0;
+
+            for (decision, visitor) in visitors_with_decisions.iter_mut() {
+                match decision {
+                    Decision::Stop => {
+                        stopped_visitors += 1;
+                    }
+                    Decision::NextWithHash(requested_hash) => {
+                        if &hash == requested_hash {
+                            *decision = visitor.visit_with_block((&hash, &block))?;
+                        }
+                    }
+                    Decision::NextOfType(requested_flags) => {
+                        let block_flag = MetadataBlockTypeFlags::from(&block);
+
+                        if requested_flags.contains(block_flag) {
+                            *decision = visitor.visit_with_block((&hash, &block))?;
+                        }
+                    }
                 }
             }
 
-            let block_flag = MetadataBlockTypeFlags::from(&block);
-
-            for (requested_flags, visitors) in flags_visitors {
-                if requested_flags.contains(block_flag) {
-                    decision_map = Processor::get_next_decisions_with_block(
-                        visitors,
-                        (&hash, &block),
-                        decision_map,
-                    )?;
-                }
-            }
-
-            // Again grouping visitors by their decisions
-            let Some((new_hash_visitors, new_flags_visitors)) =
-                Processor::process_decision_map(visitors_count, decision_map)
-            else {
-                // All Visitors have finished
+            if visitors_with_decisions.len() == stopped_visitors {
                 break;
-            };
-
-            hash_visitors = new_hash_visitors;
-            flags_visitors = new_flags_visitors;
+            }
         }
 
         Ok(())
