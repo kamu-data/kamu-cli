@@ -937,16 +937,10 @@ impl FlowService for FlowServiceInMemory {
     ) -> Result<FlowState, CancelScheduledTasksError> {
         let mut flow = Flow::load(flow_id, self.flow_event_store.as_ref()).await?;
 
-        // May not be called for Waiting flows.
-        // Cancel tasks for flows in Running state.
+        // Cancel tasks for flows in Waiting/Running state.
         // Ignore in Finished state
         match flow.status() {
-            FlowStatus::Waiting => {
-                return Err(CancelScheduledTasksError::NotScheduled(
-                    FlowNotScheduledError { flow_id },
-                ))
-            }
-            FlowStatus::Running => {
+            FlowStatus::Waiting | FlowStatus::Running => {
                 // Abort current flow and it's scheduled tasks
                 self.abort_flow_impl(&mut flow).await?;
 

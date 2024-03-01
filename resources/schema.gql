@@ -806,11 +806,6 @@ type FlowNotFound implements GetFlowResult & CancelScheduledTasksResult {
 	message: String!
 }
 
-type FlowNotScheduled implements CancelScheduledTasksResult {
-	flowId: FlowID!
-	message: String!
-}
-
 enum FlowOutcome {
 	SUCCESS
 	FAILED

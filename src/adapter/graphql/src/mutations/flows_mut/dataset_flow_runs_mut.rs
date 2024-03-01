@@ -17,7 +17,6 @@ use super::{
     FlowInDatasetError,
     FlowIncompatibleDatasetKind,
     FlowNotFound,
-    FlowNotScheduled,
 };
 use crate::prelude::*;
 use crate::queries::Flow;
@@ -102,11 +101,6 @@ impl DatasetFlowRunsMut {
             )),
             Err(e) => match e {
                 fs::CancelScheduledTasksError::NotFound(_) => unreachable!("Flow checked already"),
-                fs::CancelScheduledTasksError::NotScheduled(_) => {
-                    Ok(CancelScheduledTasksResult::NotScheduled(FlowNotScheduled {
-                        flow_id,
-                    }))
-                }
                 fs::CancelScheduledTasksError::Internal(e) => Err(GqlError::Internal(e)),
             },
         }
@@ -142,7 +136,6 @@ impl TriggerFlowSuccess {
 enum CancelScheduledTasksResult {
     Success(CancelScheduledTasksSuccess),
     NotFound(FlowNotFound),
-    NotScheduled(FlowNotScheduled),
 }
 
 #[derive(SimpleObject)]
