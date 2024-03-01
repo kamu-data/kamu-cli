@@ -93,7 +93,7 @@ pub fn filter_datasets_by_any_pattern(
                     clone_dataset_ref_patterns
                         .iter()
                         .any(|dataset_ref_pattern| {
-                            dataset_ref_pattern.is_match_local(&dataset_handle)
+                            dataset_ref_pattern.is_match_local(dataset_handle)
                         }),
                 )
             })
