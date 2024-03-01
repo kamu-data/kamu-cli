@@ -89,21 +89,30 @@ impl DatasetFlowRunsMut {
             });
         }
 
+        // Attempt cancelling scheduled tasks
         let flow_service = from_catalog::<dyn fs::FlowService>(ctx).unwrap();
-
-        let res = flow_service.cancel_scheduled_tasks(flow_id.into()).await;
-
-        match res {
-            Ok(flow_state) => Ok(CancelScheduledTasksResult::Success(
-                CancelScheduledTasksSuccess {
-                    flow: Flow::new(flow_state),
-                },
-            )),
-            Err(e) => match e {
+        let flow_state = flow_service
+            .cancel_scheduled_tasks(flow_id.into())
+            .await
+            .map_err(|e| match e {
                 fs::CancelScheduledTasksError::NotFound(_) => unreachable!("Flow checked already"),
-                fs::CancelScheduledTasksError::Internal(e) => Err(GqlError::Internal(e)),
-            },
+                fs::CancelScheduledTasksError::Internal(e) => GqlError::Internal(e),
+            })?;
+
+        // If flow is aborted, pause it's configuration
+        if let Some(fs::FlowOutcome::Aborted) = &flow_state.outcome {
+            let flow_configuration_service =
+                from_catalog::<dyn fs::FlowConfigurationService>(ctx).unwrap();
+            flow_configuration_service
+                .pause_flow_configuration(Utc::now(), flow_state.flow_key.clone())
+                .await?;
         }
+
+        Ok(CancelScheduledTasksResult::Success(
+            CancelScheduledTasksSuccess {
+                flow: Flow::new(flow_state),
+            },
+        ))
     }
 }
 
