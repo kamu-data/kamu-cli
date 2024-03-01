@@ -72,7 +72,7 @@ pub trait MetadataChainVisitor: Sync + Send {
 
     fn visit_with_block(
         &mut self,
-        hashed_block: HashedMetadataBlockRef,
+        hashed_block_ref: HashedMetadataBlockRef,
     ) -> Result<Decision, AppendError>;
 }
 
