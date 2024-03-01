@@ -1144,7 +1144,7 @@ async fn test_cancel_ingest_root_dataset() {
 ////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_cancel_transform_derived_dataset() {
+async fn test_cancel_running_transform_derived_dataset() {
     let harness = FlowRunsHarness::new();
     harness.create_root_dataset().await;
     let create_derived_result = harness.create_derived_dataset().await;
@@ -1303,7 +1303,7 @@ async fn test_cancel_foreign_flow_fails() {
 ////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_cancel_queued_flow_fails() {
+async fn test_cancel_waiting_flow() {
     let harness = FlowRunsHarness::new();
     let create_result = harness.create_root_dataset().await;
 
@@ -1324,7 +1324,7 @@ async fn test_cancel_queued_flow_fails() {
         .as_str()
         .unwrap();
 
-    // Note: no scheduling!
+    // Note: no scheduling of tasks, waiting!
 
     let mutation_code =
         FlowRunsHarness::cancel_scheduled_tasks_mutation(&create_result.dataset_handle.id, flow_id);
@@ -1345,8 +1345,14 @@ async fn test_cancel_queued_flow_fails() {
                     "flows": {
                         "runs": {
                             "cancelScheduledTasks": {
-                                "__typename": "FlowNotScheduled",
-                                "message": format!("Flow '{flow_id}' was not scheduled yet"),
+                                "__typename": "CancelScheduledTasksSuccess",
+                                "message": "Success",
+                                "flow": {
+                                    "__typename": "Flow",
+                                    "flowId": flow_id,
+                                    "status": "FINISHED",
+                                    "outcome": "ABORTED"
+                                }
                             }
                         }
                     }
