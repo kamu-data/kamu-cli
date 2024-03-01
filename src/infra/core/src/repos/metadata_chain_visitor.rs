@@ -77,17 +77,3 @@ pub trait MetadataChainVisitor: Sync + Send {
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-
-pub type StackVisitorsWithDecisionsMutRef<'a> =
-    &'a mut [(Decision, &'a mut dyn MetadataChainVisitor)];
-
-#[async_trait::async_trait]
-pub trait MetadataChainVisitorHost {
-    async fn accept<'a>(
-        &'a self,
-        append_block: &MetadataBlock,
-        visitors: StackVisitorsWithDecisionsMutRef<'a>,
-    ) -> Result<(), AppendError>;
-}
-
-///////////////////////////////////////////////////////////////////////////////

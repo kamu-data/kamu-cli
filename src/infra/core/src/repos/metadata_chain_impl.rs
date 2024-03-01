@@ -17,7 +17,6 @@ use opendatafabric::*;
 use crate::{
     Decision,
     MetadataBlockTypeFlags,
-    MetadataChainVisitorHost,
     StackVisitorsWithDecisionsMutRef,
     ValidateOffsetsAreSequentialVisitor,
     ValidatePrevBlockExistsVisitor,
@@ -416,6 +415,65 @@ where
 
         Ok(())
     }
+
+    async fn accept<'a>(
+        &'a self,
+        append_block: &MetadataBlock,
+        visitors: StackVisitorsWithDecisionsMutRef<'a>,
+    ) -> Result<(), AppendError> {
+        // Phase 1. Check the append block itself
+        for (decision, visitor) in visitors.iter_mut() {
+            *decision = visitor.visit()?;
+        }
+
+        let all_visitors_finished = visitors
+            .iter()
+            .all(|(decision, _)| matches!(*decision, Decision::Stop));
+
+        if all_visitors_finished {
+            return Ok(());
+        }
+
+        let Some(prev_block_hash) = append_block.prev_block_hash.as_ref() else {
+            return Ok(());
+        };
+
+        // Phase 2. Check the previous blocks if required by Visitors.
+        let mut blocks = self.iter_blocks_interval(prev_block_hash, None, false);
+
+        while let Some((hash, block)) = wrap_block_stream_error(blocks.try_next().await)? {
+            // TODO: Traversal optimizations:
+            //       At the moment, we're just iterating through all the blocks
+
+            let mut stopped_visitors = 0;
+
+            for (decision, visitor) in visitors.iter_mut() {
+                match decision {
+                    Decision::Stop => {
+                        stopped_visitors += 1;
+                    }
+                    Decision::NextWithHash(requested_hash) => {
+                        if &hash == requested_hash {
+                            *decision = visitor.visit_with_block((&hash, &block))?;
+                        }
+                    }
+                    Decision::NextOfType(requested_flags) => {
+                        let block_flag = MetadataBlockTypeFlags::from(&block);
+
+                        if requested_flags.contains(block_flag) {
+                            *decision = visitor.visit_with_block((&hash, &block))?;
+                        }
+                    }
+                }
+            }
+
+            if visitors.len() == stopped_visitors {
+                break;
+            }
+        }
+
+        Ok(())
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -661,74 +719,6 @@ where
 
     fn as_metadata_block_repository(&self) -> &dyn MetadataBlockRepository {
         &self.meta_block_repo
-    }
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-#[async_trait]
-impl<MetaBlockRepo, RefRepo> MetadataChainVisitorHost for MetadataChainImpl<MetaBlockRepo, RefRepo>
-where
-    MetaBlockRepo: MetadataBlockRepository + Sync + Send,
-    RefRepo: ReferenceRepository + Sync + Send,
-{
-    async fn accept<'a>(
-        &'a self,
-        append_block: &MetadataBlock,
-        visitors_with_decisions: StackVisitorsWithDecisionsMutRef<'a>,
-    ) -> Result<(), AppendError> {
-        // Phase 1. Check the append block itself
-        for (decision, visitor) in visitors_with_decisions.iter_mut() {
-            *decision = visitor.visit()?;
-        }
-
-        let all_visitors_finished = visitors_with_decisions
-            .iter()
-            .all(|(decision, _)| matches!(*decision, Decision::Stop));
-
-        if all_visitors_finished {
-            return Ok(());
-        }
-
-        let Some(prev_block_hash) = append_block.prev_block_hash.as_ref() else {
-            return Ok(());
-        };
-
-        // Phase 2. Check the previous blocks if required by Visitors.
-        let mut blocks = self.iter_blocks_interval(prev_block_hash, None, false);
-
-        while let Some((hash, block)) = wrap_block_stream_error(blocks.try_next().await)? {
-            // TODO: Traversal optimizations:
-            //       At the moment, we're just iterating through all the blocks
-
-            let mut stopped_visitors = 0;
-
-            for (decision, visitor) in visitors_with_decisions.iter_mut() {
-                match decision {
-                    Decision::Stop => {
-                        stopped_visitors += 1;
-                    }
-                    Decision::NextWithHash(requested_hash) => {
-                        if &hash == requested_hash {
-                            *decision = visitor.visit_with_block((&hash, &block))?;
-                        }
-                    }
-                    Decision::NextOfType(requested_flags) => {
-                        let block_flag = MetadataBlockTypeFlags::from(&block);
-
-                        if requested_flags.contains(block_flag) {
-                            *decision = visitor.visit_with_block((&hash, &block))?;
-                        }
-                    }
-                }
-            }
-
-            if visitors_with_decisions.len() == stopped_visitors {
-                break;
-            }
-        }
-
-        Ok(())
     }
 }
 
