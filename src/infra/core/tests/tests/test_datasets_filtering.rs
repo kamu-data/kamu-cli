@@ -9,7 +9,7 @@
 
 use std::str::FromStr;
 
-use kamu::utils::datasets_filtering::{match_local_dataset, match_remote_dataset};
+use kamu::utils::datasets_filtering::{matches_local_ref_pattern, matches_remote_ref_pattern};
 use opendatafabric::{
     AccountName,
     DatasetAlias,
@@ -21,8 +21,10 @@ use opendatafabric::{
     RepoName,
 };
 
+////////////////////////////////////////////////////////////////////////////////
+
 #[test]
-fn test_match_local_dataset() {
+fn test_matches_local_ref_pattern() {
     let dataset_id_str =
         "did:odf:fed012126262ba49e1ba8392c26f7a39e1ba8d756c7469786d3365200c68402ff65dc";
     let default_dataset_id = DatasetID::from_did_str(dataset_id_str).unwrap();
@@ -38,7 +40,7 @@ fn test_match_local_dataset() {
         },
     };
 
-    assert!(!match_local_dataset(&pattern, &dataset_handle));
+    assert!(!matches_local_ref_pattern(&pattern, &dataset_handle));
 
     let dataset_name = "net.example.odf";
     let dataset_handle = DatasetHandle {
@@ -49,7 +51,7 @@ fn test_match_local_dataset() {
         },
     };
 
-    assert!(match_local_dataset(&pattern, &dataset_handle));
+    assert!(matches_local_ref_pattern(&pattern, &dataset_handle));
 
     let dataset_name = "net.example.odf";
     let dataset_account = "account1";
@@ -61,7 +63,7 @@ fn test_match_local_dataset() {
         },
     };
 
-    assert!(match_local_dataset(&pattern, &dataset_handle));
+    assert!(matches_local_ref_pattern(&pattern, &dataset_handle));
 
     let dataset_account = "account";
     let dataset_name_pattern = "net%";
@@ -77,7 +79,7 @@ fn test_match_local_dataset() {
         },
     };
 
-    assert!(match_local_dataset(&pattern, &dataset_handle));
+    assert!(matches_local_ref_pattern(&pattern, &dataset_handle));
 
     let dataset_account = "account2";
     let dataset_handle = DatasetHandle {
@@ -88,11 +90,13 @@ fn test_match_local_dataset() {
         },
     };
 
-    assert!(!match_local_dataset(&pattern, &dataset_handle));
+    assert!(!matches_local_ref_pattern(&pattern, &dataset_handle));
 }
 
+////////////////////////////////////////////////////////////////////////////////
+
 #[test]
-fn test_match_remote_dataset() {
+fn test_matches_remote_ref_pattern() {
     let repo_name = "repository";
     let dataset_name = "net.example.com";
     let dataset_alias_remote = DatasetAliasRemote {
@@ -104,17 +108,17 @@ fn test_match_remote_dataset() {
     let expression = "repository1/net.example%";
     let pattern = DatasetRefAnyPattern::from_str(expression).unwrap();
 
-    assert!(!match_remote_dataset(&pattern, &dataset_alias_remote));
+    assert!(!matches_remote_ref_pattern(&pattern, &dataset_alias_remote));
 
     let expression = format!("{repo_name}/net.example%");
     let pattern = DatasetRefAnyPattern::from_str(expression.as_str()).unwrap();
 
-    assert!(match_remote_dataset(&pattern, &dataset_alias_remote));
+    assert!(matches_remote_ref_pattern(&pattern, &dataset_alias_remote));
 
     let expression = format!("{repo_name}/account/net.example%");
     let pattern = DatasetRefAnyPattern::from_str(expression.as_str()).unwrap();
 
-    assert!(!match_remote_dataset(&pattern, &dataset_alias_remote));
+    assert!(!matches_remote_ref_pattern(&pattern, &dataset_alias_remote));
 
     let account_name = "account";
     let dataset_alias_remote = DatasetAliasRemote {
@@ -123,10 +127,12 @@ fn test_match_remote_dataset() {
         dataset_name: DatasetName::from_str(dataset_name).unwrap(),
     };
 
-    assert!(match_remote_dataset(&pattern, &dataset_alias_remote));
+    assert!(matches_remote_ref_pattern(&pattern, &dataset_alias_remote));
 
     let expression = format!("{repo_name}/account1/net.example%");
     let pattern = DatasetRefAnyPattern::from_str(expression.as_str()).unwrap();
 
-    assert!(!match_remote_dataset(&pattern, &dataset_alias_remote));
+    assert!(!matches_remote_ref_pattern(&pattern, &dataset_alias_remote));
 }
+
+////////////////////////////////////////////////////////////////////////////////

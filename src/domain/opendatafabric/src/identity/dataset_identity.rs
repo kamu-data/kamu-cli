@@ -232,7 +232,7 @@ newtype_str!(
 );
 
 impl DatasetNamePattern {
-    pub fn is_match(&self, dataset_name: &DatasetName) -> bool {
+    pub fn matches(&self, dataset_name: &DatasetName) -> bool {
         Like::<false>::like(dataset_name.as_str(), self).unwrap()
     }
 }
@@ -256,11 +256,11 @@ impl DatasetAliasPattern {
         }
     }
 
-    pub fn is_match(&self, dataset_handle: &DatasetHandle) -> bool {
+    pub fn matches(&self, dataset_handle: &DatasetHandle) -> bool {
         (self.account_name.is_none() || self.account_name == dataset_handle.alias.account_name)
             && self
                 .dataset_name_pattern
-                .is_match(&dataset_handle.alias.dataset_name)
+                .matches(&dataset_handle.alias.dataset_name)
     }
 }
 

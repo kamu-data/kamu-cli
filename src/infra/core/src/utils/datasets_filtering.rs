@@ -30,6 +30,8 @@ type FilteredDatasetHandleStream<'a> =
 type FilteredDatasetRefAnyStream<'a> =
     Pin<Box<dyn Stream<Item = Result<DatasetRefAny, GetDatasetError>> + Send + 'a>>;
 
+////////////////////////////////////////////////////////////////////////////////
+
 pub fn filter_datasets_by_local_pattern(
     dataset_repo: &dyn DatasetRepository,
     dataset_ref_patterns: Vec<DatasetRefPattern>,
@@ -54,7 +56,7 @@ pub fn filter_datasets_by_local_pattern(
                 future::ready(
                     dataset_ref_patterns
                         .iter()
-                        .any(|dataset_ref_pattern| dataset_ref_pattern.is_match(dataset_handle)),
+                        .any(|dataset_ref_pattern| dataset_ref_pattern.matches(dataset_handle)),
                 )
             })
             .map_err(Into::into)
@@ -62,57 +64,35 @@ pub fn filter_datasets_by_local_pattern(
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////
+
 pub fn filter_datasets_by_any_pattern(
     dataset_repo: &dyn DatasetRepository,
     search_svc: Arc<dyn SearchService>,
-    dataset_ref_patterns: Vec<DatasetRefAnyPattern>,
+    dataset_ref_any_patterns: Vec<DatasetRefAnyPattern>,
 ) -> FilteredDatasetRefAnyStream<'_> {
-    let (global_patterns, static_refs): (Vec<_>, Vec<_>) = dataset_ref_patterns
+    let in_multitenant_mode = dataset_repo.is_multi_tenant();
+
+    let (all_ref_patterns, static_refs): (Vec<_>, Vec<_>) = dataset_ref_any_patterns
         .into_iter()
         .partition(DatasetRefAnyPattern::is_pattern);
 
-    let (remote_patterns, local_patterns): (Vec<_>, Vec<_>) = global_patterns
+    let (remote_ref_patterns, local_ref_patterns): (Vec<_>, Vec<_>) = all_ref_patterns
         .into_iter()
-        .partition(|pattern| pattern.is_remote(dataset_repo.is_multi_tenant()));
+        .partition(|pattern| pattern.is_remote_pattern(in_multitenant_mode));
 
-    let static_stream = get_static_datasets_stream(static_refs);
+    let static_datasets_stream = get_static_datasets_stream(static_refs);
+    let remote_patterns_stream =
+        get_remote_datasets_stream(search_svc, remote_ref_patterns, in_multitenant_mode);
+    let local_patterns_stream = get_local_datasets_stream(dataset_repo, local_ref_patterns);
 
-    let result = static_stream
-        .chain(get_remote_datasets_stream(
-            search_svc,
-            remote_patterns,
-            dataset_repo.is_multi_tenant(),
-        ))
-        .chain(get_local_datasets_stream(dataset_repo, local_patterns))
-        .boxed();
-
-    result
+    static_datasets_stream
+        .chain(remote_patterns_stream)
+        .chain(local_patterns_stream)
+        .boxed()
 }
 
-fn get_remote_datasets_stream(
-    search_svc: Arc<dyn SearchService>,
-    remote_ref_patterns: Vec<DatasetRefAnyPattern>,
-    is_multitenant: bool,
-) -> FilteredDatasetRefAnyStream<'static> {
-    Box::pin(async_stream::try_stream! {
-        for remote_ref_pattern in &remote_ref_patterns.clone() {
-            // ToDo low perfomance solution will always full scan remote repo
-            // should be handled after search will support wildcarding
-            let search_options = SearchOptions {
-                repository_names: vec![remote_ref_pattern.pattern_repo_name(is_multitenant).unwrap()],
-            };
-            let search_result = search_svc.search(None, search_options).await.unwrap_or(SearchResult {
-                datasets: vec![]
-            });
-
-            for remote_dataset in &search_result.datasets {
-                if match_remote_dataset(remote_ref_pattern, &remote_dataset.alias) {
-                    yield remote_dataset.alias.as_any_ref();
-                }
-            }
-        };
-    })
-}
+////////////////////////////////////////////////////////////////////////////////
 
 fn get_static_datasets_stream(
     static_refs: Vec<DatasetRefAnyPattern>,
@@ -127,24 +107,57 @@ fn get_static_datasets_stream(
     })
 }
 
-pub fn match_remote_dataset(
+////////////////////////////////////////////////////////////////////////////////
+
+fn get_remote_datasets_stream(
+    search_svc: Arc<dyn SearchService>,
+    remote_ref_patterns: Vec<DatasetRefAnyPattern>,
+    in_multitenant_mode: bool,
+) -> FilteredDatasetRefAnyStream<'static> {
+    Box::pin(async_stream::try_stream! {
+        for remote_ref_pattern in &remote_ref_patterns.clone() {
+            // TODO: potentially low performance solution,as it will always fully scan a remote repo.
+            // Should be improved after search will support wildcarding.
+            let maybe_repo_name = remote_ref_pattern.pattern_repo_name(in_multitenant_mode);
+            assert!(maybe_repo_name.is_some());
+
+            let search_options = SearchOptions {
+                repository_names: vec![maybe_repo_name.unwrap()],
+            };
+
+            // TODO: search error handling?
+            let search_result = search_svc.search(None, search_options).await.unwrap_or(SearchResult::default());
+
+            for remote_dataset in &search_result.datasets {
+                if matches_remote_ref_pattern(remote_ref_pattern, &remote_dataset.alias) {
+                    yield remote_dataset.alias.as_any_ref();
+                }
+            }
+        };
+    })
+}
+
+pub fn matches_remote_ref_pattern(
     remote_ref_pattern: &DatasetRefAnyPattern,
     dataset_alias_remote: &DatasetAliasRemote,
 ) -> bool {
     match remote_ref_pattern {
-        DatasetRefAnyPattern::Ref(_) | DatasetRefAnyPattern::Local(_) => false,
+        DatasetRefAnyPattern::Ref(_) | DatasetRefAnyPattern::Local(_) => unreachable!(),
         DatasetRefAnyPattern::AmbiguousAlias(repo_name, dataset_name_pattern) => {
-            (RepoName::from_str(&repo_name.pattern).unwrap() == dataset_alias_remote.repo_name)
-                && dataset_name_pattern.is_match(&dataset_alias_remote.dataset_name)
+            let repo_name = RepoName::from_str(&repo_name.pattern).unwrap();
+            repo_name == dataset_alias_remote.repo_name
+                && dataset_name_pattern.matches(&dataset_alias_remote.dataset_name)
         }
         DatasetRefAnyPattern::RemoteAlias(repo_name, account_name, dataset_name_pattern) => {
             repo_name == &dataset_alias_remote.repo_name
                 && (dataset_alias_remote.account_name.is_some()
                     && account_name == dataset_alias_remote.account_name.as_ref().unwrap())
-                && dataset_name_pattern.is_match(&dataset_alias_remote.dataset_name)
+                && dataset_name_pattern.matches(&dataset_alias_remote.dataset_name)
         }
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////
 
 fn get_local_datasets_stream(
     dataset_repo: &dyn DatasetRepository,
@@ -154,7 +167,7 @@ fn get_local_datasets_stream(
         .get_all_datasets()
         .try_filter(move |dataset_handle| {
             future::ready(dataset_ref_patterns.iter().any(|dataset_ref_pattern| {
-                match_local_dataset(dataset_ref_pattern, dataset_handle)
+                matches_local_ref_pattern(dataset_ref_pattern, dataset_handle)
             }))
         })
         .map_ok(|dataset_handle| dataset_handle.as_any_ref())
@@ -162,19 +175,21 @@ fn get_local_datasets_stream(
         .boxed()
 }
 
-pub fn match_local_dataset(
+pub fn matches_local_ref_pattern(
     local_ref_pattern: &DatasetRefAnyPattern,
     dataset_handle: &DatasetHandle,
 ) -> bool {
     match local_ref_pattern {
-        DatasetRefAnyPattern::Ref(_) | DatasetRefAnyPattern::RemoteAlias(_, _, _) => false,
+        DatasetRefAnyPattern::Ref(_) | DatasetRefAnyPattern::RemoteAlias(_, _, _) => unreachable!(),
         DatasetRefAnyPattern::Local(dataset_name_pattern) => {
-            dataset_name_pattern.is_match(&dataset_handle.alias.dataset_name)
+            dataset_name_pattern.matches(&dataset_handle.alias.dataset_name)
         }
         DatasetRefAnyPattern::AmbiguousAlias(account_name, dataset_name_pattern) => {
-            (Some(AccountName::from_str(&account_name.pattern).unwrap())
-                == dataset_handle.alias.account_name)
-                && dataset_name_pattern.is_match(&dataset_handle.alias.dataset_name)
+            let account_name = AccountName::from_str(&account_name.pattern).unwrap();
+            Some(account_name) == dataset_handle.alias.account_name
+                && dataset_name_pattern.matches(&dataset_handle.alias.dataset_name)
         }
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////

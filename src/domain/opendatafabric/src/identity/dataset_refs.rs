@@ -750,28 +750,15 @@ pub enum DatasetRefPattern {
     Pattern(DatasetAliasPattern),
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub enum DatasetRefAnyPattern {
-    RemoteAlias(RepoName, AccountName, DatasetNamePattern),
-    AmbiguousAlias(DatasetAmbiguousPattern, DatasetNamePattern),
-    Local(DatasetNamePattern),
-    Ref(DatasetRefAny),
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DatasetAmbiguousPattern {
-    pub pattern: Arc<str>,
-}
-
 impl DatasetRefPattern {
-    pub fn is_match(&self, dataset_handle: &DatasetHandle) -> bool {
+    pub fn matches(&self, dataset_handle: &DatasetHandle) -> bool {
         match self {
             Self::Ref(dataset_ref) => match dataset_ref {
                 DatasetRef::ID(dataset_id) => *dataset_id == dataset_handle.id,
                 DatasetRef::Alias(dataset_alias) => *dataset_alias == dataset_handle.alias,
                 DatasetRef::Handle(dataset_handle_res) => dataset_handle_res == dataset_handle,
             },
-            Self::Pattern(dataset_pattern) => dataset_pattern.is_match(dataset_handle),
+            Self::Pattern(dataset_pattern) => dataset_pattern.matches(dataset_handle),
         }
     }
 
@@ -787,63 +774,6 @@ impl DatasetRefPattern {
     /// than a glob pattern
     pub fn is_pattern(&self) -> bool {
         matches!(self, Self::Pattern(_))
-    }
-}
-
-impl DatasetRefAnyPattern {
-    pub fn is_match(&self, _: &DatasetHandle) -> bool {
-        unreachable!()
-    }
-
-    /// Convert into a [`DatasetRefAny`] when value is not a glob pattern
-    pub fn as_dataset_ref_any(&self) -> Option<&DatasetRefAny> {
-        match self {
-            Self::Ref(dataset_ref) => Some(dataset_ref),
-            Self::Local(_) | Self::AmbiguousAlias(_, _) | Self::RemoteAlias(_, _, _) => None,
-        }
-    }
-
-    /// Returns `false` if value is a reference to some specific dataset rather
-    /// than a glob pattern
-    pub fn is_pattern(&self) -> bool {
-        !matches!(self, Self::Ref(_))
-    }
-
-    /// Return `true` if pattern has remote repo reference
-    pub fn is_remote(&self, is_multitenant: bool) -> bool {
-        match self {
-            Self::Ref(_) | Self::Local(_) => false,
-            Self::RemoteAlias(_, _, _) => true,
-            Self::AmbiguousAlias(_, _) => !is_multitenant,
-        }
-    }
-
-    /// Return repository part from pattern
-    pub fn pattern_repo_name(&self, is_multitenant: bool) -> Option<RepoName> {
-        match self {
-            Self::Ref(_) | Self::Local(_) => None,
-            Self::RemoteAlias(repo_name, _, _) => Some(repo_name.clone()),
-            Self::AmbiguousAlias(account_repo_name, _) => {
-                if is_multitenant {
-                    return None;
-                };
-                Some(RepoName::from_str(&account_repo_name.pattern).unwrap())
-            }
-        }
-    }
-}
-
-impl fmt::Display for DatasetRefPattern {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Ref(dataset_ref) => write!(f, "{dataset_ref}"),
-            Self::Pattern(dataset_pattern) => {
-                if let Some(account_name) = &dataset_pattern.account_name {
-                    write!(f, "{account_name}/")?;
-                }
-                write!(f, "{}", dataset_pattern.dataset_name_pattern)
-            }
-        }
     }
 }
 
@@ -864,6 +794,76 @@ impl std::str::FromStr for DatasetRefPattern {
     }
 }
 
+impl fmt::Display for DatasetRefPattern {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Ref(dataset_ref) => write!(f, "{dataset_ref}"),
+            Self::Pattern(dataset_pattern) => {
+                if let Some(account_name) = &dataset_pattern.account_name {
+                    write!(f, "{account_name}/")?;
+                }
+                write!(f, "{}", dataset_pattern.dataset_name_pattern)
+            }
+        }
+    }
+}
+
+super::dataset_identity::impl_parse_error!(DatasetRefPattern);
+
+////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum DatasetRefAnyPattern {
+    RemoteAlias(RepoName, AccountName, DatasetNamePattern),
+    AmbiguousAlias(DatasetAmbiguousPattern, DatasetNamePattern),
+    Local(DatasetNamePattern),
+    Ref(DatasetRefAny),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DatasetAmbiguousPattern {
+    pub pattern: Arc<str>,
+}
+
+impl DatasetRefAnyPattern {
+    /// Convert into a [`DatasetRefAny`] when value is not a glob pattern
+    pub fn as_dataset_ref_any(&self) -> Option<&DatasetRefAny> {
+        match self {
+            Self::Ref(dataset_ref) => Some(dataset_ref),
+            Self::Local(_) | Self::AmbiguousAlias(_, _) | Self::RemoteAlias(_, _, _) => None,
+        }
+    }
+
+    /// Returns `false` if value is a reference to some specific dataset rather
+    /// than a glob pattern
+    pub fn is_pattern(&self) -> bool {
+        !matches!(self, Self::Ref(_))
+    }
+
+    /// Return `true` if pattern has remote repo reference
+    pub fn is_remote_pattern(&self, in_multitenant_mode: bool) -> bool {
+        match self {
+            Self::Ref(_) | Self::Local(_) => false,
+            Self::RemoteAlias(_, _, _) => true,
+            Self::AmbiguousAlias(_, _) => !in_multitenant_mode,
+        }
+    }
+
+    /// Return repository part from pattern
+    pub fn pattern_repo_name(&self, in_multitenant_mode: bool) -> Option<RepoName> {
+        match self {
+            Self::Ref(_) | Self::Local(_) => None,
+            Self::RemoteAlias(repo_name, _, _) => Some(repo_name.clone()),
+            Self::AmbiguousAlias(account_repo_name, _) => {
+                if in_multitenant_mode {
+                    return None;
+                };
+                Some(RepoName::from_str(&account_repo_name.pattern).unwrap())
+            }
+        }
+    }
+}
+
 impl std::str::FromStr for DatasetRefAnyPattern {
     type Err = ParseError<Self>;
 
@@ -871,13 +871,14 @@ impl std::str::FromStr for DatasetRefAnyPattern {
         if s.contains('%') {
             return match s.split_once('/') {
                 Some((repo, rest)) => match RepoName::try_from(repo) {
-                    Ok(repo_account_name) => match rest.split_once('/') {
+                    Ok(repo_or_account_name) => match rest.split_once('/') {
                         Some((account_pattern, dataset_name)) => {
+                            let repo_name = repo_or_account_name;
                             match AccountName::from_str(account_pattern) {
                                 Ok(account_name) => {
                                     match DatasetNamePattern::from_str(dataset_name) {
                                         Ok(dataset_name_pattern) => Ok(Self::RemoteAlias(
-                                            repo_account_name,
+                                            repo_name,
                                             account_name,
                                             dataset_name_pattern,
                                         )),
@@ -890,7 +891,7 @@ impl std::str::FromStr for DatasetRefAnyPattern {
                         None => match DatasetNamePattern::from_str(rest) {
                             Ok(dataset_name_pattern) => Ok(Self::AmbiguousAlias(
                                 DatasetAmbiguousPattern {
-                                    pattern: repo_account_name.into_inner(),
+                                    pattern: repo_or_account_name.into_inner(),
                                 },
                                 dataset_name_pattern,
                             )),
@@ -912,5 +913,6 @@ impl std::str::FromStr for DatasetRefAnyPattern {
     }
 }
 
-super::dataset_identity::impl_parse_error!(DatasetRefPattern);
 super::dataset_identity::impl_parse_error!(DatasetRefAnyPattern);
+
+////////////////////////////////////////////////////////////////////////////////

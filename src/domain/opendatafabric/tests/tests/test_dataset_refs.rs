@@ -94,7 +94,7 @@ fn test_dataset_ref_pattern_match() {
         },
     };
 
-    assert!(!pattern.is_match(&dataset_handle));
+    assert!(!pattern.matches(&dataset_handle));
 
     let dataset_name = "net.example.odf";
     let dataset_handle = DatasetHandle {
@@ -105,7 +105,7 @@ fn test_dataset_ref_pattern_match() {
         },
     };
 
-    assert!(pattern.is_match(&dataset_handle));
+    assert!(pattern.matches(&dataset_handle));
 
     let dataset_name = "net.example.odf";
     let dataset_account = "account1";
@@ -117,7 +117,7 @@ fn test_dataset_ref_pattern_match() {
         },
     };
 
-    assert!(pattern.is_match(&dataset_handle));
+    assert!(pattern.matches(&dataset_handle));
 
     let dataset_account = "account1";
     let dataset_name_pattern = "net%";
@@ -133,7 +133,7 @@ fn test_dataset_ref_pattern_match() {
         },
     };
 
-    assert!(pattern.is_match(&dataset_handle));
+    assert!(pattern.matches(&dataset_handle));
 
     let dataset_account = "account2";
     let dataset_handle = DatasetHandle {
@@ -144,7 +144,7 @@ fn test_dataset_ref_pattern_match() {
         },
     };
 
-    assert!(!pattern.is_match(&dataset_handle));
+    assert!(!pattern.matches(&dataset_handle));
 
     // Test match of DatasetRefPattern is Ref type
     let pattern = DatasetRefPattern::from_str(dataset_id_str).unwrap();
@@ -157,7 +157,7 @@ fn test_dataset_ref_pattern_match() {
         },
     };
 
-    assert!(pattern.is_match(&dataset_handle));
+    assert!(pattern.matches(&dataset_handle));
 
     let expression = "net.example.com";
     let pattern = DatasetRefPattern::from_str(expression).unwrap();
@@ -168,7 +168,7 @@ fn test_dataset_ref_pattern_match() {
             dataset_name: DatasetName::from_str(expression).unwrap(),
         },
     };
-    assert!(pattern.is_match(&dataset_handle));
+    assert!(pattern.matches(&dataset_handle));
 }
 
 #[test]
