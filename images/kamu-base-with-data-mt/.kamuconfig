@@ -1,0 +1,90 @@
+kind: CLIConfig
+version: 1
+content:
+  users:
+    allowLoginUnknown: true
+    predefined:
+      - accountId: sh101-bowen
+        accountName: sh101-bowen
+        accountType: User
+        displayName: sh101-bowen
+        avatarUrl: https://cdn-icons-png.flaticon.com/512/3118/3118054.png
+        isAdmin: false
+      - accountId: sh102-gambier
+        accountName: sh102-gambier
+        accountType: User
+        displayName: sh102-gambier
+        avatarUrl: https://cdn-icons-png.flaticon.com/512/3118/3118054.png
+        isAdmin: false
+      - accountId: sh103-howe
+        accountName: sh103-howe
+        accountType: User
+        displayName: sh103-howe
+        avatarUrl: https://cdn-icons-png.flaticon.com/512/3118/3118054.png
+        isAdmin: false
+      - accountId: sh104-granville
+        accountName: sh104-granville
+        accountType: User
+        displayName: sh104-granville
+        avatarUrl: https://cdn-icons-png.flaticon.com/512/3118/3118054.png
+        isAdmin: false
+      - accountId: sh105-keats
+        accountName: sh105-keats
+        accountType: User
+        displayName: sh105-keats
+        avatarUrl: https://cdn-icons-png.flaticon.com/512/3118/3118054.png
+        isAdmin: false
+      - accountId: sh106-seymour
+        accountName: sh106-seymour
+        accountType: User
+        displayName: sh106-seymour
+        avatarUrl: https://cdn-icons-png.flaticon.com/512/3118/3118054.png
+        isAdmin: false
+      - accountId: moa.gov.nl
+        accountName: moa.gov.nl
+        accountType: Organization
+        displayName: moa.gov.nl
+        avatarUrl: https://cdn-icons-png.flaticon.com/512/3530/3530558.png
+        isAdmin: false
+      - accountId: mim.dk
+        accountName: mim.dk
+        accountType: Organization
+        displayName: mim.dk
+        avatarUrl: https://cdn-icons-png.flaticon.com/512/3530/3530558.png
+        isAdmin: false
+      - accountId: ofb.gouv.fr
+        accountName: ofb.gouv.fr
+        accountType: Organization
+        displayName: ofb.gouv.fr
+        avatarUrl: https://cdn-icons-png.flaticon.com/512/3530/3530558.png
+        isAdmin: false
+      - accountId: mmo.gov.uk
+        accountName: mmo.gov.uk
+        accountType: Organization
+        displayName: mmo.gov.uk
+        avatarUrl: https://cdn-icons-png.flaticon.com/512/3530/3530558.png
+        isAdmin: false
+      - accountId: protectedseas.net
+        accountName: protectedseas.net
+        accountType: Organization
+        displayName: protectedseas.net
+        avatarUrl: https://cdn-icons-png.flaticon.com/512/3530/3530558.png
+        isAdmin: false
+      - accountId: bmis-bycatch.org
+        accountName: bmis-bycatch.org
+        accountType: Organization
+        displayName: Bycatch Management Information System
+        avatarUrl: https://cdn-icons-png.flaticon.com/128/10197/10197245.png
+        isAdmin: false
+      - accountId: acme.fishing.co
+        accountName: acme.fishing.co
+        accountType: Organization
+        displayName: acme.fishing.co
+        avatarUrl: https://cdn-icons-png.flaticon.com/512/1090/1090630.png
+        isAdmin: false
+      - accountId: globalfishingwatch.org
+        accountName: globalfishingwatch.org
+        accountType: Organization
+        displayName: globalfishingwatch.org
+        avatarUrl: https://cdn-icons-png.flaticon.com/512/744/744480.png
+        isAdmin: false

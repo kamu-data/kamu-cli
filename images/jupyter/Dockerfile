@@ -14,7 +14,10 @@ RUN apt update && \
 
 COPY requirements/$TARGETPLATFORM/requirements.txt requirements.txt
 
+# TODO: Semi-permanent hack for `mapboxgl` package being broken in conda-forge
+# See: https://github.com/kamu-data/kamu-cli/issues/533
 RUN mamba install -y --file requirements.txt && \
+    mamba uninstall mapboxgl && pip install --no-cache-dir mapboxgl && \
     mamba clean --all -f -y &&  \
     rm requirements.txt &&  \
     fix-permissions "${CONDA_DIR}" &&  \
