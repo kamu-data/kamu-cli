@@ -12,7 +12,14 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use futures::{future, StreamExt, TryStreamExt};
-use kamu_core::{DatasetRepository, GetDatasetError, SearchOptions, SearchResult, SearchService};
+use kamu_core::{
+    DatasetRepository,
+    GetDatasetError,
+    InternalError,
+    SearchError,
+    SearchOptions,
+    SearchService,
+};
 use opendatafabric::{
     AccountName,
     DatasetAliasRemote,
@@ -125,10 +132,15 @@ fn get_remote_datasets_stream(
                 repository_names: vec![maybe_repo_name.unwrap()],
             };
 
-            // TODO: search error handling?
-            let search_result = search_svc.search(None, search_options).await.unwrap_or(SearchResult::default());
+            let remote_datasets: Vec<_> = match search_svc.search(None, search_options).await {
+                Err(err) => match err {
+                    SearchError::RepositoryNotFound(_) => vec![],
+                    _ => Err(GetDatasetError::Internal(InternalError::new(err)))?,
+                },
+                Ok(result) => result.datasets,
+            };
 
-            for remote_dataset in &search_result.datasets {
+            for remote_dataset in &remote_datasets {
                 if matches_remote_ref_pattern(remote_ref_pattern, &remote_dataset.alias) {
                     yield remote_dataset.alias.as_any_ref();
                 }
