@@ -817,6 +817,10 @@ pub fn cli() -> Command {
 
                             kamu push org.example.data
 
+                        Sync datasets matching pattern that already have push aliases:
+
+                            kamu push org.example.%
+
                         Add dataset to local IPFS node and update IPNS entry to the new CID:
 
                             kamu push org.example.data --to ipns://k5..zy
