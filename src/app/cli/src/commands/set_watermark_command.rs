@@ -66,7 +66,7 @@ impl Command for SetWatermarkCommand {
         }
         if self.refs[0].is_pattern() {
             return Err(CLIError::usage_error(
-                "Only static dataset reference can be provided when setting a watermark",
+                "Cannot use a pattern when setting a watermark",
             ));
         }
 

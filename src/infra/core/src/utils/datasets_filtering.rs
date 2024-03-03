@@ -120,13 +120,12 @@ fn get_remote_datasets_stream(
     search_svc: Arc<dyn SearchService>,
     remote_ref_patterns: Vec<DatasetRefAnyPattern>,
     in_multitenant_mode: bool,
-) -> FilteredDatasetRefAnyStream<'static> {
+) -> impl Stream<Item = Result<DatasetRefAny, GetDatasetError>> + 'static {
     Box::pin(async_stream::try_stream! {
-        for remote_ref_pattern in &remote_ref_patterns.clone() {
+        for remote_ref_pattern in &remote_ref_patterns {
             // TODO: potentially low performance solution,as it will always fully scan a remote repo.
             // Should be improved after search will support wildcarding.
             let maybe_repo_name = remote_ref_pattern.pattern_repo_name(in_multitenant_mode);
-            assert!(maybe_repo_name.is_some());
 
             let search_options = SearchOptions {
                 repository_names: vec![maybe_repo_name.unwrap()],
@@ -154,13 +153,13 @@ pub fn matches_remote_ref_pattern(
     dataset_alias_remote: &DatasetAliasRemote,
 ) -> bool {
     match remote_ref_pattern {
-        DatasetRefAnyPattern::Ref(_) | DatasetRefAnyPattern::Local(_) => unreachable!(),
-        DatasetRefAnyPattern::AmbiguousAlias(repo_name, dataset_name_pattern) => {
+        DatasetRefAnyPattern::Ref(_) | DatasetRefAnyPattern::PatternLocal(_) => unreachable!(),
+        DatasetRefAnyPattern::PatternAmbiguous(repo_name, dataset_name_pattern) => {
             let repo_name = RepoName::from_str(&repo_name.pattern).unwrap();
             repo_name == dataset_alias_remote.repo_name
                 && dataset_name_pattern.matches(&dataset_alias_remote.dataset_name)
         }
-        DatasetRefAnyPattern::RemoteAlias(repo_name, account_name, dataset_name_pattern) => {
+        DatasetRefAnyPattern::PatternRemote(repo_name, account_name, dataset_name_pattern) => {
             repo_name == &dataset_alias_remote.repo_name
                 && (dataset_alias_remote.account_name.is_some()
                     && account_name == dataset_alias_remote.account_name.as_ref().unwrap())
@@ -174,7 +173,7 @@ pub fn matches_remote_ref_pattern(
 fn get_local_datasets_stream(
     dataset_repo: &dyn DatasetRepository,
     dataset_ref_patterns: Vec<DatasetRefAnyPattern>,
-) -> FilteredDatasetRefAnyStream<'_> {
+) -> impl Stream<Item = Result<DatasetRefAny, GetDatasetError>> + '_ {
     dataset_repo
         .get_all_datasets()
         .try_filter(move |dataset_handle| {
@@ -184,7 +183,6 @@ fn get_local_datasets_stream(
         })
         .map_ok(|dataset_handle| dataset_handle.as_any_ref())
         .map_err(Into::into)
-        .boxed()
 }
 
 pub fn matches_local_ref_pattern(
@@ -192,11 +190,13 @@ pub fn matches_local_ref_pattern(
     dataset_handle: &DatasetHandle,
 ) -> bool {
     match local_ref_pattern {
-        DatasetRefAnyPattern::Ref(_) | DatasetRefAnyPattern::RemoteAlias(_, _, _) => unreachable!(),
-        DatasetRefAnyPattern::Local(dataset_name_pattern) => {
+        DatasetRefAnyPattern::Ref(_) | DatasetRefAnyPattern::PatternRemote(_, _, _) => {
+            unreachable!()
+        }
+        DatasetRefAnyPattern::PatternLocal(dataset_name_pattern) => {
             dataset_name_pattern.matches(&dataset_handle.alias.dataset_name)
         }
-        DatasetRefAnyPattern::AmbiguousAlias(account_name, dataset_name_pattern) => {
+        DatasetRefAnyPattern::PatternAmbiguous(account_name, dataset_name_pattern) => {
             let account_name = AccountName::from_str(&account_name.pattern).unwrap();
             Some(account_name) == dataset_handle.alias.account_name
                 && dataset_name_pattern.matches(&dataset_handle.alias.dataset_name)

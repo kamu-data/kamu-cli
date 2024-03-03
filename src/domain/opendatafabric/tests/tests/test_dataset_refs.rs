@@ -235,7 +235,7 @@ fn test_dataset_ref_any_pattern() {
 
     assert_eq!(
         res,
-        DatasetRefAnyPattern::Local(DatasetNamePattern::from_str(param).unwrap()),
+        DatasetRefAnyPattern::PatternLocal(DatasetNamePattern::from_str(param).unwrap()),
     );
 
     // Parse valid remote ambiguous ref with wildcard repo/net.example.%
@@ -247,7 +247,7 @@ fn test_dataset_ref_any_pattern() {
 
     assert_eq!(
         res,
-        DatasetRefAnyPattern::AmbiguousAlias(
+        DatasetRefAnyPattern::PatternAmbiguous(
             DatasetAmbiguousPattern {
                 pattern: DatasetNamePattern::from_str(repo_name)
                     .unwrap()
@@ -267,7 +267,7 @@ fn test_dataset_ref_any_pattern() {
 
     assert_eq!(
         res,
-        DatasetRefAnyPattern::RemoteAlias(
+        DatasetRefAnyPattern::PatternRemote(
             RepoName::new_unchecked(repo_name),
             AccountName::new_unchecked(account_name),
             DatasetNamePattern::from_str(dataset_name).unwrap()

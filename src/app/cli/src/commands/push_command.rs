@@ -107,7 +107,6 @@ impl PushCommand {
                 self.search_svc.clone(),
                 self.refs.clone(),
             )
-            .map_ok(|dataset_ref_any| dataset_ref_any)
             .try_collect()
             .await?;
 

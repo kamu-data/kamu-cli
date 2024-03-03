@@ -737,6 +737,10 @@ pub fn cli() -> Command {
 
                             kamu pull org.example.data
 
+                        Fetch latest data in datasets matching pattern:
+
+                            kamu pull org.example.%
+
                         Fetch latest data for the entire dependency tree of a dataset:
 
                             kamu pull --recursive org.example.derivative

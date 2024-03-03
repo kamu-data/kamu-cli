@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Simplified flow statuses within Flow System (no more Queued or Scheduled status)
 - Extended flow start conditions with more debug information for UI needs
+- Added support of wildcard patterns for `kamu pull` and `kamu push` commands
 
 ## [0.162.1] - 2024-02-28
 ### Added

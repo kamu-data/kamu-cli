@@ -814,10 +814,10 @@ super::dataset_identity::impl_parse_error!(DatasetRefPattern);
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum DatasetRefAnyPattern {
-    RemoteAlias(RepoName, AccountName, DatasetNamePattern),
-    AmbiguousAlias(DatasetAmbiguousPattern, DatasetNamePattern),
-    Local(DatasetNamePattern),
     Ref(DatasetRefAny),
+    PatternRemote(RepoName, AccountName, DatasetNamePattern),
+    PatternAmbiguous(DatasetAmbiguousPattern, DatasetNamePattern),
+    PatternLocal(DatasetNamePattern),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -830,7 +830,9 @@ impl DatasetRefAnyPattern {
     pub fn as_dataset_ref_any(&self) -> Option<&DatasetRefAny> {
         match self {
             Self::Ref(dataset_ref) => Some(dataset_ref),
-            Self::Local(_) | Self::AmbiguousAlias(_, _) | Self::RemoteAlias(_, _, _) => None,
+            Self::PatternLocal(_) | Self::PatternAmbiguous(_, _) | Self::PatternRemote(_, _, _) => {
+                None
+            }
         }
     }
 
@@ -843,18 +845,18 @@ impl DatasetRefAnyPattern {
     /// Return `true` if pattern has remote repo reference
     pub fn is_remote_pattern(&self, in_multitenant_mode: bool) -> bool {
         match self {
-            Self::Ref(_) | Self::Local(_) => false,
-            Self::RemoteAlias(_, _, _) => true,
-            Self::AmbiguousAlias(_, _) => !in_multitenant_mode,
+            Self::Ref(_) | Self::PatternLocal(_) => false,
+            Self::PatternRemote(_, _, _) => true,
+            Self::PatternAmbiguous(_, _) => !in_multitenant_mode,
         }
     }
 
     /// Return repository part from pattern
     pub fn pattern_repo_name(&self, in_multitenant_mode: bool) -> Option<RepoName> {
         match self {
-            Self::Ref(_) | Self::Local(_) => None,
-            Self::RemoteAlias(repo_name, _, _) => Some(repo_name.clone()),
-            Self::AmbiguousAlias(account_repo_name, _) => {
+            Self::Ref(_) | Self::PatternLocal(_) => None,
+            Self::PatternRemote(repo_name, _, _) => Some(repo_name.clone()),
+            Self::PatternAmbiguous(account_repo_name, _) => {
                 if in_multitenant_mode {
                     return None;
                 };
@@ -877,7 +879,7 @@ impl std::str::FromStr for DatasetRefAnyPattern {
                             match AccountName::from_str(account_pattern) {
                                 Ok(account_name) => {
                                     match DatasetNamePattern::from_str(dataset_name) {
-                                        Ok(dataset_name_pattern) => Ok(Self::RemoteAlias(
+                                        Ok(dataset_name_pattern) => Ok(Self::PatternRemote(
                                             repo_name,
                                             account_name,
                                             dataset_name_pattern,
@@ -889,7 +891,7 @@ impl std::str::FromStr for DatasetRefAnyPattern {
                             }
                         }
                         None => match DatasetNamePattern::from_str(rest) {
-                            Ok(dataset_name_pattern) => Ok(Self::AmbiguousAlias(
+                            Ok(dataset_name_pattern) => Ok(Self::PatternAmbiguous(
                                 DatasetAmbiguousPattern {
                                     pattern: repo_or_account_name.into_inner(),
                                 },
@@ -901,7 +903,7 @@ impl std::str::FromStr for DatasetRefAnyPattern {
                     Err(_) => Err(Self::Err::new(s)),
                 },
                 None => match DatasetNamePattern::try_from(s) {
-                    Ok(dataset_name_pattern) => Ok(Self::Local(dataset_name_pattern)),
+                    Ok(dataset_name_pattern) => Ok(Self::PatternLocal(dataset_name_pattern)),
                     Err(_) => Err(Self::Err::new(s)),
                 },
             };
