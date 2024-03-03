@@ -43,6 +43,20 @@ pub trait FlowConfigurationService: Sync + Send {
     /// Lists all flow configurations, which are currently enabled
     fn list_enabled_configurations(&self) -> FlowConfigurationStateStream;
 
+    /// Pauses particular flow configuration
+    async fn pause_flow_configuration(
+        &self,
+        request_time: DateTime<Utc>,
+        flow_key: FlowKey,
+    ) -> Result<(), InternalError>;
+
+    /// Resumes particular flow configuration
+    async fn resume_flow_configuration(
+        &self,
+        request_time: DateTime<Utc>,
+        flow_key: FlowKey,
+    ) -> Result<(), InternalError>;
+
     /// Pauses dataset flows of given type for given dataset.
     /// If type is omitted, all possible dataset flow types are paused
     async fn pause_dataset_flows(

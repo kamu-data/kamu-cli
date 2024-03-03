@@ -126,6 +126,7 @@ fn get_remote_datasets_stream(
             // TODO: potentially low performance solution,as it will always fully scan a remote repo.
             // Should be improved after search will support wildcarding.
             let maybe_repo_name = remote_ref_pattern.pattern_repo_name(in_multitenant_mode);
+            assert!(maybe_repo_name.is_some());
 
             let search_options = SearchOptions {
                 repository_names: vec![maybe_repo_name.unwrap()],

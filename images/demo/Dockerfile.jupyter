@@ -49,7 +49,10 @@ RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2
 # Sparkmagic and tools
 COPY jupyter/requirements/$TARGETPLATFORM/requirements.txt requirements.txt
 
+# TODO: Semi-permanent hack for `mapboxgl` package being broken in conda-forge
+# See: https://github.com/kamu-data/kamu-cli/issues/533
 RUN mamba install -y --file requirements.txt && \
+    mamba uninstall mapboxgl && pip install --no-cache-dir mapboxgl && \
     mamba clean --all -f -y &&  \
     rm requirements.txt &&  \
     fix-permissions "${CONDA_DIR}" &&  \
@@ -60,6 +63,7 @@ RUN mamba install -y --file requirements.txt && \
 RUN curl -s "https://get.kamu.dev" | KAMU_VERSION=$KAMU_VERSION KAMU_INSTALL_PATH=/usr/local/bin/kamu sh && \
     echo "source <(kamu completions bash)" >> /home/$NB_USER/.bashrc
 
+COPY jupyter/kamu-start-hook.sh /usr/local/bin/before-notebook.d/kamu-start-hook.sh
 COPY jupyter/.kamuconfig /.kamuconfig
 
 

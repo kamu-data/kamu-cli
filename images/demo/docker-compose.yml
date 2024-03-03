@@ -5,7 +5,7 @@ networks:
 
 services:
   jupyter:
-    image: ghcr.io/kamu-data/kamu-cli-demo-jupyter:0.11.1
+    image: ghcr.io/kamu-data/kamu-cli-demo-jupyter:0.12.1
     # Unfortunately running podman within another container requires elevated permissions
     privileged: true
     command:
@@ -19,6 +19,10 @@ services:
       - AWS_SECRET_ACCESS_KEY=minio123
       # This is a free tier token - get one at https://etherscan.io/apis
       - ETHERSCAN_API_KEY=MST1914HGG228XNGTVQFJRE86QYJ3A52NA
+      # TODO: Restore support for local Minio
+      - GITHUB_LOGIN=guest
+      - KAMU_NODE_URL=odf+https://node.demo.kamu.dev/
+      - KAMU_WEB_UI_URL=https://platform.demo.kamu.dev/
     # volumes:
     #   - ./podman-images:/var/lib/containers/shared:ro
     #   - "./user-home/01 - Kamu Basics (COVID-19 example):/home/jovyan/01 - Kamu Basics (COVID-19 example)"
@@ -32,7 +36,7 @@ services:
       - minio
 
   minio:
-    image: ghcr.io/kamu-data/kamu-cli-demo-minio:0.11.1
+    image: ghcr.io/kamu-data/kamu-cli-demo-minio:0.12.1
     command:
       - "server"
       - "--address"
