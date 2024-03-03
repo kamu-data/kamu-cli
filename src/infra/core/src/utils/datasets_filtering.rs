@@ -78,7 +78,7 @@ pub fn filter_datasets_by_any_pattern(
     search_svc: Arc<dyn SearchService>,
     dataset_ref_any_patterns: Vec<DatasetRefAnyPattern>,
 ) -> FilteredDatasetRefAnyStream<'_> {
-    let in_multitenant_mode = dataset_repo.is_multi_tenant();
+    let is_multitenant_mode = dataset_repo.is_multi_tenant();
 
     let (all_ref_patterns, static_refs): (Vec<_>, Vec<_>) = dataset_ref_any_patterns
         .into_iter()
@@ -86,11 +86,11 @@ pub fn filter_datasets_by_any_pattern(
 
     let (remote_ref_patterns, local_ref_patterns): (Vec<_>, Vec<_>) = all_ref_patterns
         .into_iter()
-        .partition(|pattern| pattern.is_remote_pattern(in_multitenant_mode));
+        .partition(|pattern| pattern.is_remote_pattern(is_multitenant_mode));
 
     let static_datasets_stream = get_static_datasets_stream(static_refs);
     let remote_patterns_stream =
-        get_remote_datasets_stream(search_svc, remote_ref_patterns, in_multitenant_mode);
+        get_remote_datasets_stream(search_svc, remote_ref_patterns, is_multitenant_mode);
     let local_patterns_stream = get_local_datasets_stream(dataset_repo, local_ref_patterns);
 
     static_datasets_stream
@@ -105,11 +105,10 @@ fn get_static_datasets_stream(
     static_refs: Vec<DatasetRefAnyPattern>,
 ) -> FilteredDatasetRefAnyStream<'static> {
     Box::pin(async_stream::try_stream! {
-        for static_ref in &static_refs.clone() {
+        for static_ref in static_refs {
             yield static_ref
-                .as_dataset_ref_any()
-                .unwrap()
-                .clone();
+                .into_dataset_ref_any()
+                .unwrap();
         }
     })
 }
@@ -119,17 +118,16 @@ fn get_static_datasets_stream(
 fn get_remote_datasets_stream(
     search_svc: Arc<dyn SearchService>,
     remote_ref_patterns: Vec<DatasetRefAnyPattern>,
-    in_multitenant_mode: bool,
+    is_multitenant_mode: bool,
 ) -> impl Stream<Item = Result<DatasetRefAny, GetDatasetError>> + 'static {
     Box::pin(async_stream::try_stream! {
         for remote_ref_pattern in &remote_ref_patterns {
             // TODO: potentially low performance solution,as it will always fully scan a remote repo.
             // Should be improved after search will support wildcarding.
-            let maybe_repo_name = remote_ref_pattern.pattern_repo_name(in_multitenant_mode);
-            assert!(maybe_repo_name.is_some());
+            let repo_name = remote_ref_pattern.pattern_repo_name(is_multitenant_mode).expect("Invalid repository name");
 
             let search_options = SearchOptions {
-                repository_names: vec![maybe_repo_name.unwrap()],
+                repository_names: vec![repo_name],
             };
 
             let remote_datasets: Vec<_> = match search_svc.search(None, search_options).await {

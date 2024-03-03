@@ -826,8 +826,19 @@ pub struct DatasetAmbiguousPattern {
 }
 
 impl DatasetRefAnyPattern {
-    /// Convert into a [`DatasetRefAny`] when value is not a glob pattern
+    /// Convert into a [`DatasetRefAny`] pointer when value is not a glob
+    /// pattern
     pub fn as_dataset_ref_any(&self) -> Option<&DatasetRefAny> {
+        match self {
+            Self::Ref(dataset_ref) => Some(dataset_ref),
+            Self::PatternLocal(_) | Self::PatternAmbiguous(_, _) | Self::PatternRemote(_, _, _) => {
+                None
+            }
+        }
+    }
+
+    /// Convert into a [`DatasetRefAny`] when value is not a glob pattern
+    pub fn into_dataset_ref_any(self) -> Option<DatasetRefAny> {
         match self {
             Self::Ref(dataset_ref) => Some(dataset_ref),
             Self::PatternLocal(_) | Self::PatternAmbiguous(_, _) | Self::PatternRemote(_, _, _) => {
@@ -843,21 +854,21 @@ impl DatasetRefAnyPattern {
     }
 
     /// Return `true` if pattern has remote repo reference
-    pub fn is_remote_pattern(&self, in_multitenant_mode: bool) -> bool {
+    pub fn is_remote_pattern(&self, is_multitenant_mode: bool) -> bool {
         match self {
             Self::Ref(_) | Self::PatternLocal(_) => false,
             Self::PatternRemote(_, _, _) => true,
-            Self::PatternAmbiguous(_, _) => !in_multitenant_mode,
+            Self::PatternAmbiguous(_, _) => !is_multitenant_mode,
         }
     }
 
     /// Return repository part from pattern
-    pub fn pattern_repo_name(&self, in_multitenant_mode: bool) -> Option<RepoName> {
+    pub fn pattern_repo_name(&self, is_multitenant_mode: bool) -> Option<RepoName> {
         match self {
             Self::Ref(_) | Self::PatternLocal(_) => None,
             Self::PatternRemote(repo_name, _, _) => Some(repo_name.clone()),
             Self::PatternAmbiguous(account_repo_name, _) => {
-                if in_multitenant_mode {
+                if is_multitenant_mode {
                     return None;
                 };
                 Some(RepoName::from_str(&account_repo_name.pattern).unwrap())
