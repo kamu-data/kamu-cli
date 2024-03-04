@@ -77,7 +77,7 @@ pub fn filter_datasets_by_any_pattern(
     dataset_repo: &dyn DatasetRepository,
     search_svc: Arc<dyn SearchService>,
     dataset_ref_any_patterns: Vec<DatasetRefAnyPattern>,
-) -> FilteredDatasetRefAnyStream<'_> {
+) -> FilteredDatasetRefAnyStream {
     let is_multitenant_mode = dataset_repo.is_multi_tenant();
 
     let (all_ref_patterns, static_refs): (Vec<_>, Vec<_>) = dataset_ref_any_patterns
@@ -103,14 +103,14 @@ pub fn filter_datasets_by_any_pattern(
 
 fn get_static_datasets_stream(
     static_refs: Vec<DatasetRefAnyPattern>,
-) -> FilteredDatasetRefAnyStream<'static> {
-    Box::pin(async_stream::try_stream! {
+) -> impl Stream<Item = Result<DatasetRefAny, GetDatasetError>> + 'static {
+    async_stream::try_stream! {
         for static_ref in static_refs {
             yield static_ref
                 .into_dataset_ref_any()
                 .unwrap();
         }
-    })
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -120,7 +120,7 @@ fn get_remote_datasets_stream(
     remote_ref_patterns: Vec<DatasetRefAnyPattern>,
     is_multitenant_mode: bool,
 ) -> impl Stream<Item = Result<DatasetRefAny, GetDatasetError>> + 'static {
-    Box::pin(async_stream::try_stream! {
+    async_stream::try_stream! {
         for remote_ref_pattern in &remote_ref_patterns {
             // TODO: potentially low performance solution,as it will always fully scan a remote repo.
             // Should be improved after search will support wildcarding.
@@ -144,7 +144,7 @@ fn get_remote_datasets_stream(
                 }
             }
         };
-    })
+    }
 }
 
 pub fn matches_remote_ref_pattern(
