@@ -29,25 +29,11 @@ use crate::{invalid_event, Decision, MetadataBlockTypeFlags, MetadataChainVisito
 
 ///////////////////////////////////////////////////////////////////////////////
 
-pub struct ValidateSeedBlockOrderVisitor<'a> {
-    initial_block: &'a MetadataBlock,
-}
+pub struct ValidateSeedBlockOrderVisitor {}
 
-impl<'a> ValidateSeedBlockOrderVisitor<'a> {
-    pub fn new((_, block): HashedMetadataBlockRef<'a>) -> Self {
-        Self {
-            initial_block: block,
-        }
-    }
-}
-
-impl<'a> MetadataChainVisitor for ValidateSeedBlockOrderVisitor<'a> {
-    type VisitError = AppendError;
-
-    fn visit(&mut self) -> Result<Decision, Self::VisitError> {
-        let block = self.initial_block;
-
-        match block.event {
+impl ValidateSeedBlockOrderVisitor {
+    pub fn new(block: &MetadataBlock) -> Result<(Decision, Self), AppendError> {
+        let decision = match block.event {
             MetadataEvent::Seed(_) if block.prev_block_hash.is_some() => {
                 Err(AppendValidationError::AppendingSeedBlockToNonEmptyChain.into())
             }
@@ -55,14 +41,17 @@ impl<'a> MetadataChainVisitor for ValidateSeedBlockOrderVisitor<'a> {
             _ if block.prev_block_hash.is_none() => {
                 Err(AppendValidationError::FirstBlockMustBeSeed.into())
             }
-            _ => Ok(Decision::Stop),
-        }
-    }
+            _ => Result::<Decision, AppendError>::Ok(Decision::Stop),
+        }?;
 
-    fn visit_with_block(
-        &mut self,
-        _: HashedMetadataBlockRef,
-    ) -> Result<Decision, Self::VisitError> {
+        Ok((decision, Self {}))
+    }
+}
+
+impl MetadataChainVisitor for ValidateSeedBlockOrderVisitor {
+    type VisitError = AppendError;
+
+    fn visit(&mut self, _: HashedMetadataBlockRef) -> Result<Decision, Self::VisitError> {
         Ok(Decision::Stop)
     }
 }
@@ -70,41 +59,38 @@ impl<'a> MetadataChainVisitor for ValidateSeedBlockOrderVisitor<'a> {
 ///////////////////////////////////////////////////////////////////////////////
 
 pub struct ValidatePrevBlockExistsVisitor<'a> {
-    initial_hash: &'a Multihash,
-    initial_block: &'a MetadataBlock,
+    initial_prev_block_hash: Option<&'a Multihash>,
 }
 
 impl<'a> ValidatePrevBlockExistsVisitor<'a> {
-    pub fn new((hash, block): HashedMetadataBlockRef<'a>) -> Self {
-        Self {
-            initial_hash: hash,
-            initial_block: block,
-        }
+    pub fn new(block: &'a MetadataBlock) -> Result<(Decision, Self), AppendError> {
+        let decision = if block.prev_block_hash.is_some() {
+            Decision::Next
+        } else {
+            Decision::Stop
+        };
+
+        Ok((
+            decision,
+            Self {
+                initial_prev_block_hash: block.prev_block_hash.as_ref(),
+            },
+        ))
     }
 }
 
 impl<'a> MetadataChainVisitor for ValidatePrevBlockExistsVisitor<'a> {
     type VisitError = AppendError;
 
-    fn visit(&mut self) -> Result<Decision, Self::VisitError> {
-        match &self.initial_block.prev_block_hash {
-            Some(hash) => Ok(Decision::NextWithHash(hash.clone())),
-            None => Ok(Decision::Stop),
-        }
-    }
-
-    fn visit_with_block(
-        &mut self,
-        (hash, _): HashedMetadataBlockRef,
-    ) -> Result<Decision, Self::VisitError> {
-        let Some(initial_prev_block_hash) = &self.initial_block.prev_block_hash else {
+    fn visit(&mut self, (hash, _): HashedMetadataBlockRef) -> Result<Decision, Self::VisitError> {
+        let Some(initial_prev_block_hash) = self.initial_prev_block_hash else {
             unreachable!()
         };
 
         if initial_prev_block_hash != hash {
             return Err(
                 AppendValidationError::PrevBlockNotFound(BlockNotFoundError {
-                    hash: self.initial_hash.clone(),
+                    hash: initial_prev_block_hash.clone(),
                 })
                 .into(),
             );
@@ -116,26 +102,14 @@ impl<'a> MetadataChainVisitor for ValidatePrevBlockExistsVisitor<'a> {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-pub struct ValidateSequenceNumbersIntegrityVisitor<'a> {
-    initial_block: &'a MetadataBlock,
+pub struct ValidateSequenceNumbersIntegrityVisitor {
+    initial_sequence_number: u64,
 }
 
-impl<'a> ValidateSequenceNumbersIntegrityVisitor<'a> {
-    pub fn new((_, block): HashedMetadataBlockRef<'a>) -> Self {
-        Self {
-            initial_block: block,
-        }
-    }
-}
-
-impl<'a> MetadataChainVisitor for ValidateSequenceNumbersIntegrityVisitor<'a> {
-    type VisitError = AppendError;
-
-    fn visit(&mut self) -> Result<Decision, Self::VisitError> {
-        let block = self.initial_block;
-
-        match &block.prev_block_hash {
-            Some(hash) => Ok(Decision::NextWithHash(hash.clone())),
+impl<'a> ValidateSequenceNumbersIntegrityVisitor {
+    pub fn new(block: &'a MetadataBlock) -> Result<(Decision, Self), AppendError> {
+        let decision = match &block.prev_block_hash {
+            Some(_) => Result::<Decision, AppendError>::Ok(Decision::Next),
             None if block.sequence_number != 0 => Err(AppendValidationError::SequenceIntegrity(
                 SequenceIntegrityError {
                     prev_block_hash: None,
@@ -145,21 +119,30 @@ impl<'a> MetadataChainVisitor for ValidateSequenceNumbersIntegrityVisitor<'a> {
             )
             .into()),
             None => Ok(Decision::Stop),
-        }
-    }
+        }?;
 
-    fn visit_with_block(
+        Ok((
+            decision,
+            Self {
+                initial_sequence_number: block.sequence_number,
+            },
+        ))
+    }
+}
+
+impl MetadataChainVisitor for ValidateSequenceNumbersIntegrityVisitor {
+    type VisitError = AppendError;
+
+    fn visit(
         &mut self,
         (hash, block): HashedMetadataBlockRef,
     ) -> Result<Decision, Self::VisitError> {
-        let next_sequence_number = self.initial_block.sequence_number;
-
-        if block.sequence_number != (next_sequence_number - 1) {
+        if block.sequence_number != (self.initial_sequence_number - 1) {
             return Err(
                 AppendValidationError::SequenceIntegrity(SequenceIntegrityError {
                     prev_block_hash: Some(hash.clone()),
                     prev_block_sequence_number: Some(block.sequence_number),
-                    next_block_sequence_number: next_sequence_number,
+                    next_block_sequence_number: self.initial_sequence_number,
                 })
                 .into(),
             );
@@ -172,33 +155,31 @@ impl<'a> MetadataChainVisitor for ValidateSequenceNumbersIntegrityVisitor<'a> {
 ///////////////////////////////////////////////////////////////////////////////
 
 pub struct ValidateSystemTimeIsMonotonicVisitor<'a> {
-    initial_block: &'a MetadataBlock,
+    initial_system_time: &'a DateTime<Utc>,
 }
 
 impl<'a> ValidateSystemTimeIsMonotonicVisitor<'a> {
-    pub fn new((_, block): HashedMetadataBlockRef<'a>) -> Self {
-        Self {
-            initial_block: block,
-        }
+    pub fn new(block: &'a MetadataBlock) -> Result<(Decision, Self), AppendError> {
+        let decision = if block.prev_block_hash.is_some() {
+            Decision::Next
+        } else {
+            Decision::Stop
+        };
+
+        Ok((
+            decision,
+            Self {
+                initial_system_time: &block.system_time,
+            },
+        ))
     }
 }
 
 impl<'a> MetadataChainVisitor for ValidateSystemTimeIsMonotonicVisitor<'a> {
     type VisitError = AppendError;
 
-    fn visit(&mut self) -> Result<Decision, Self::VisitError> {
-        if let Some(hash) = &self.initial_block.prev_block_hash {
-            Ok(Decision::NextWithHash(hash.clone()))
-        } else {
-            Ok(Decision::Stop)
-        }
-    }
-
-    fn visit_with_block(
-        &mut self,
-        (_, block): HashedMetadataBlockRef,
-    ) -> Result<Decision, Self::VisitError> {
-        if self.initial_block.system_time < block.system_time {
+    fn visit(&mut self, (_, block): HashedMetadataBlockRef) -> Result<Decision, Self::VisitError> {
+        if *self.initial_system_time < block.system_time {
             return Err(AppendValidationError::SystemTimeIsNotMonotonic.into());
         }
 
@@ -209,42 +190,34 @@ impl<'a> MetadataChainVisitor for ValidateSystemTimeIsMonotonicVisitor<'a> {
 ///////////////////////////////////////////////////////////////////////////////
 
 pub struct ValidateWatermarkIsMonotonicVisitor {
-    is_initial_data_event: bool,
     initial_new_watermark: Option<DateTime<Utc>>,
 }
 
 impl ValidateWatermarkIsMonotonicVisitor {
-    pub fn new((_, block): HashedMetadataBlockRef) -> Self {
-        let (is_initial_data_event, initial_new_watermark) =
+    pub fn new(block: &MetadataBlock) -> Result<(Decision, Self), AppendError> {
+        let (decision, initial_new_watermark) =
             if let Some(data_steam_event) = block.event.as_data_stream_event() {
-                (true, data_steam_event.new_watermark.copied())
+                (
+                    Decision::NextOfType(MetadataBlockTypeFlags::DATA_BLOCK),
+                    data_steam_event.new_watermark.copied(),
+                )
             } else {
-                (false, None)
+                (Decision::Stop, None)
             };
 
-        Self {
-            is_initial_data_event,
-            initial_new_watermark,
-        }
+        Ok((
+            decision,
+            Self {
+                initial_new_watermark,
+            },
+        ))
     }
 }
 
 impl MetadataChainVisitor for ValidateWatermarkIsMonotonicVisitor {
     type VisitError = AppendError;
 
-    fn visit(&mut self) -> Result<Decision, Self::VisitError> {
-        if !self.is_initial_data_event {
-            // If it's not a data block, there's nothing to validate
-            return Ok(Decision::Stop);
-        };
-
-        Ok(Decision::NextOfType(MetadataBlockTypeFlags::DATA_BLOCK))
-    }
-
-    fn visit_with_block(
-        &mut self,
-        (_, block): HashedMetadataBlockRef,
-    ) -> Result<Decision, Self::VisitError> {
+    fn visit(&mut self, (_, block): HashedMetadataBlockRef) -> Result<Decision, Self::VisitError> {
         let Some(data_steam_event) = block.event.as_data_stream_event() else {
             return Ok(Decision::NextOfType(MetadataBlockTypeFlags::DATA_BLOCK));
         };
@@ -262,35 +235,33 @@ impl MetadataChainVisitor for ValidateWatermarkIsMonotonicVisitor {
 ///////////////////////////////////////////////////////////////////////////////
 
 pub struct ValidateOffsetsAreSequentialVisitor<'a> {
-    initial_block: &'a MetadataBlock,
+    initial_block_event: &'a MetadataEvent,
     initial_data_block: Option<MetadataBlockDataStreamRef<'a>>,
 }
 
 impl<'a> ValidateOffsetsAreSequentialVisitor<'a> {
-    pub fn new((_, block): HashedMetadataBlockRef<'a>) -> Self {
-        Self {
-            initial_block: block,
-            initial_data_block: block.as_data_stream_block(),
-        }
+    pub fn new(block: &'a MetadataBlock) -> Result<(Decision, Self), AppendError> {
+        let initial_data_block = block.as_data_stream_block();
+        let decision = if initial_data_block.is_some() {
+            Decision::NextOfType(MetadataBlockTypeFlags::DATA_BLOCK)
+        } else {
+            Decision::Stop
+        };
+
+        Ok((
+            decision,
+            Self {
+                initial_block_event: &block.event,
+                initial_data_block,
+            },
+        ))
     }
 }
 
 impl<'a> MetadataChainVisitor for ValidateOffsetsAreSequentialVisitor<'a> {
     type VisitError = AppendError;
 
-    fn visit(&mut self) -> Result<Decision, Self::VisitError> {
-        if self.initial_data_block.is_none() {
-            // If it's not a data block, there's nothing to validate
-            return Ok(Decision::Stop);
-        };
-
-        Ok(Decision::NextOfType(MetadataBlockTypeFlags::DATA_BLOCK))
-    }
-
-    fn visit_with_block(
-        &mut self,
-        (_, block): HashedMetadataBlockRef,
-    ) -> Result<Decision, Self::VisitError> {
+    fn visit(&mut self, (_, block): HashedMetadataBlockRef) -> Result<Decision, Self::VisitError> {
         // Only check AddData and ExecuteTransform.
         // SetWatermark is also considered a data stream event but does not carry the
         // offsets.
@@ -307,7 +278,7 @@ impl<'a> MetadataChainVisitor for ValidateOffsetsAreSequentialVisitor<'a> {
 
         if initial_data_block.event.prev_offset != expected_next_prev_offset {
             invalid_event!(
-                self.initial_block.event.clone(),
+                self.initial_block_event.clone(),
                 "Carried prev offset does not correspond to the last offset in the chain",
             );
         }
@@ -327,7 +298,7 @@ impl<'a> MetadataChainVisitor for ValidateOffsetsAreSequentialVisitor<'a> {
             }
 
             if new_data.offset_interval.end < new_data.offset_interval.start {
-                invalid_event!(self.initial_block.event.clone(), "Invalid offset interval",);
+                invalid_event!(self.initial_block_event.clone(), "Invalid offset interval",);
             }
         }
 

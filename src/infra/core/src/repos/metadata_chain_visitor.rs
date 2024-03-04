@@ -63,6 +63,7 @@ impl From<&MetadataBlock> for MetadataBlockTypeFlags {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Decision {
     Stop,
+    Next,
     NextWithHash(Multihash),
     NextOfType(MetadataBlockTypeFlags),
 }
@@ -72,9 +73,7 @@ pub enum Decision {
 pub trait MetadataChainVisitor: Sync + Send {
     type VisitError: Error;
 
-    fn visit(&mut self) -> Result<Decision, Self::VisitError>;
-
-    fn visit_with_block(
+    fn visit(
         &mut self,
         hashed_block_ref: HashedMetadataBlockRef,
     ) -> Result<Decision, Self::VisitError>;

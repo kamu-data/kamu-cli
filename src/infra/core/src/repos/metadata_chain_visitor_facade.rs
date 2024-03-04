@@ -34,23 +34,13 @@ where
         Self { visitors }
     }
 
-    pub fn visit(&mut self) -> Result<bool, E> {
-        for (decision, visitor) in self.visitors.iter_mut() {
-            *decision = visitor.visit()?;
-        }
-
-        let all_visitors_finished = self
-            .visitors
+    pub fn finished(&mut self) -> bool {
+        self.visitors
             .iter()
-            .all(|(decision, _)| matches!(*decision, Decision::Stop));
-
-        Ok(all_visitors_finished)
+            .all(|(decision, _)| matches!(*decision, Decision::Stop))
     }
 
-    pub fn visit_with_block(
-        &mut self,
-        hashed_block_ref: HashedMetadataBlockRef,
-    ) -> Result<bool, E> {
+    pub fn visit(&mut self, hashed_block_ref: HashedMetadataBlockRef) -> Result<bool, E> {
         let (hash, block) = hashed_block_ref;
         let mut stopped_visitors = 0;
 
@@ -59,16 +49,19 @@ where
                 Decision::Stop => {
                     stopped_visitors += 1;
                 }
+                Decision::Next => {
+                    *decision = visitor.visit(hashed_block_ref)?;
+                }
                 Decision::NextWithHash(requested_hash) => {
                     if hash == requested_hash {
-                        *decision = visitor.visit_with_block(hashed_block_ref)?;
+                        *decision = visitor.visit(hashed_block_ref)?;
                     }
                 }
                 Decision::NextOfType(requested_flags) => {
                     let block_flag = MetadataBlockTypeFlags::from(block);
 
                     if requested_flags.contains(block_flag) {
-                        *decision = visitor.visit_with_block(hashed_block_ref)?;
+                        *decision = visitor.visit(hashed_block_ref)?;
                     }
                 }
             }
