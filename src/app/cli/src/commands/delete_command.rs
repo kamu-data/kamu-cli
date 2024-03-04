@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use futures::{future, StreamExt, TryStreamExt};
 use kamu::domain::*;
-use kamu::utils::datasets_filtering::filter_datasets_by_pattern;
+use kamu::utils::datasets_filtering::filter_datasets_by_local_pattern;
 use opendatafabric::*;
 
 use super::{common, CLIError, Command};
@@ -58,7 +58,7 @@ impl Command for DeleteCommand {
         let dataset_refs: Vec<_> = if self.all {
             unimplemented!("All deletion is not yet supported")
         } else {
-            let dataset_ids: Vec<_> = filter_datasets_by_pattern(
+            let dataset_ids: Vec<_> = filter_datasets_by_local_pattern(
                 self.dataset_repo.as_ref(),
                 self.dataset_ref_patterns.clone(),
             )

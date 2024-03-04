@@ -262,6 +262,7 @@ pub fn get_command(
                     cli_catalog.get_one()?,
                     cli_catalog.get_one()?,
                     cli_catalog.get_one()?,
+                    cli_catalog.get_one()?,
                     datasets,
                     submatches.get_flag("all"),
                     submatches.get_flag("recursive"),
@@ -273,6 +274,7 @@ pub fn get_command(
             }
         }
         Some(("push", push_matches)) => Box::new(PushCommand::new(
+            cli_catalog.get_one()?,
             cli_catalog.get_one()?,
             cli_catalog.get_one()?,
             push_matches
@@ -554,15 +556,15 @@ fn validate_dataset_ref_pattern(
             let valid_ref = validate_dataset_ref(catalog, dsr)?;
             Ok(DatasetRefPattern::Ref(valid_ref))
         }
-        DatasetRefPattern::Pattern(an, drp) => {
+        DatasetRefPattern::Pattern(drp) => {
             let workspace_svc = catalog.get_one::<WorkspaceService>()?;
-            if !workspace_svc.is_multi_tenant_workspace() && an.is_some() {
+            if !workspace_svc.is_multi_tenant_workspace() && drp.account_name.is_some() {
                 return Err(MultiTenantRefUnexpectedError {
-                    dataset_ref_pattern: DatasetRefPattern::Pattern(an, drp),
+                    dataset_ref_pattern: DatasetRefPattern::Pattern(drp),
                 }
                 .into());
             }
-            Ok(DatasetRefPattern::Pattern(an, drp))
+            Ok(DatasetRefPattern::Pattern(drp))
         }
     }
 }

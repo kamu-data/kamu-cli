@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use futures::{StreamExt, TryStreamExt};
 use kamu::domain::*;
-use kamu::utils::datasets_filtering::filter_datasets_by_pattern;
+use kamu::utils::datasets_filtering::filter_datasets_by_local_pattern;
 use opendatafabric::*;
 
 use super::{BatchError, CLIError, Command};
@@ -90,7 +90,7 @@ impl VerifyCommand {
     ) -> GenericVerificationResult {
         let dataset_ref_pattern = self.refs.first().unwrap();
 
-        let dataset_ids: Vec<_> = filter_datasets_by_pattern(
+        let dataset_ids: Vec<_> = filter_datasets_by_local_pattern(
             self.dataset_repo.as_ref(),
             vec![dataset_ref_pattern.clone()],
         )

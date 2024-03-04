@@ -702,7 +702,7 @@ pub fn cli() -> Command {
                         Arg::new("dataset")
                             .action(ArgAction::Append)
                             .index(1)
-                            .value_parser(value_parse_dataset_ref_any)
+                            .value_parser(value_parse_dataset_ref_pattern_any)
                             .help("Local or remote dataset reference(s)"),
                         Arg::new("as")
                             .long("as")
@@ -736,6 +736,10 @@ pub fn cli() -> Command {
                         Fetch latest data in a specific dataset:
 
                             kamu pull org.example.data
+
+                        Fetch latest data in datasets matching pattern:
+
+                            kamu pull org.example.%
 
                         Fetch latest data for the entire dependency tree of a dataset:
 
@@ -780,7 +784,7 @@ pub fn cli() -> Command {
                         Arg::new("dataset")
                             .action(ArgAction::Append)
                             .index(1)
-                            .value_parser(value_parse_dataset_ref_any)
+                            .value_parser(value_parse_dataset_ref_pattern_any)
                             .help("Local or remote dataset reference(s)"),
                         Arg::new("to")
                             .long("to")
@@ -812,6 +816,10 @@ pub fn cli() -> Command {
                         Sync dataset that already has a push alias:
 
                             kamu push org.example.data
+
+                        Sync datasets matching pattern that already have push aliases:
+
+                            kamu push org.example.%
 
                         Add dataset to local IPFS node and update IPNS entry to the new CID:
 

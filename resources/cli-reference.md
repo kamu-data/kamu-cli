@@ -603,6 +603,10 @@ Fetch latest data in a specific dataset:
 
     kamu pull org.example.data
 
+Fetch latest data in datasets matching pattern:
+
+    kamu pull org.example.%
+
 Fetch latest data for the entire dependency tree of a dataset:
 
     kamu pull --recursive org.example.derivative
@@ -663,6 +667,10 @@ Sync dataset to a named repository (see `kamu repo` command group):
 Sync dataset that already has a push alias:
 
     kamu push org.example.data
+
+Sync datasets matching pattern that already have push aliases:
+
+    kamu push org.example.%
 
 Add dataset to local IPFS node and update IPNS entry to the new CID:
 

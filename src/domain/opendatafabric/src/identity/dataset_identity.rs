@@ -14,6 +14,7 @@ use std::{cmp, fmt, ops};
 use super::grammar::Grammar;
 use super::{DatasetRef, DatasetRefAny, DatasetRefRemote};
 use crate::formats::*;
+use crate::DatasetHandle;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Macro helpers
@@ -222,8 +223,6 @@ impl DatasetName {
     }
 }
 
-////////////////////////////////////////////////////////////////////////////////
-
 ///////////////////////////////////////////////////////////////////////////////
 
 newtype_str!(
@@ -233,8 +232,61 @@ newtype_str!(
 );
 
 impl DatasetNamePattern {
-    pub fn is_match(&self, dataset_name: &DatasetName) -> bool {
+    pub fn matches(&self, dataset_name: &DatasetName) -> bool {
         Like::<false>::like(dataset_name.as_str(), self).unwrap()
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DatasetAliasPattern {
+    pub account_name: Option<AccountName>,
+    pub dataset_name_pattern: DatasetNamePattern,
+}
+
+impl DatasetAliasPattern {
+    pub fn new(
+        account_name: Option<AccountName>,
+        dataset_name_pattern: DatasetNamePattern,
+    ) -> Self {
+        Self {
+            account_name,
+            dataset_name_pattern,
+        }
+    }
+
+    pub fn matches(&self, dataset_handle: &DatasetHandle) -> bool {
+        (self.account_name.is_none() || self.account_name == dataset_handle.alias.account_name)
+            && self
+                .dataset_name_pattern
+                .matches(&dataset_handle.alias.dataset_name)
+    }
+}
+
+impl std::str::FromStr for DatasetAliasPattern {
+    type Err = ParseError<Self>;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.split_once('/') {
+            Some((account, dataset_name)) => match DatasetNamePattern::try_from(dataset_name) {
+                Ok(dataset_name_pattern) => match AccountName::try_from(account) {
+                    Ok(account_name) => Ok(Self {
+                        account_name: Some(account_name),
+                        dataset_name_pattern,
+                    }),
+                    Err(_) => Err(Self::Err::new(s)),
+                },
+                Err(_) => Err(Self::Err::new(s)),
+            },
+            None => match DatasetNamePattern::try_from(s) {
+                Ok(dataset_name_pattern) => Ok(Self {
+                    account_name: None,
+                    dataset_name_pattern,
+                }),
+                Err(_) => Err(Self::Err::new(s)),
+            },
+        }
     }
 }
 
@@ -412,5 +464,6 @@ impl fmt::Display for DatasetAliasRemote {
 impl_try_from_str!(DatasetAliasRemote);
 
 impl_parse_error!(DatasetAliasRemote);
+impl_parse_error!(DatasetAliasPattern);
 
 impl_serde!(DatasetAliasRemote, DatasetAliasRemoteSerdeVisitor);

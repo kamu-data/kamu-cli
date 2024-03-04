@@ -19,7 +19,7 @@ pub struct SetWatermarkCommand {
     dataset_repo: Arc<dyn DatasetRepository>,
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
     pull_svc: Arc<dyn PullService>,
-    refs: Vec<DatasetRefAny>,
+    refs: Vec<DatasetRefAnyPattern>,
     all: bool,
     recursive: bool,
     watermark: String,
@@ -37,7 +37,7 @@ impl SetWatermarkCommand {
     ) -> Self
     where
         S: Into<String>,
-        I: Iterator<Item = DatasetRefAny>,
+        I: Iterator<Item = DatasetRefAnyPattern>,
     {
         Self {
             dataset_repo,
@@ -58,9 +58,15 @@ impl Command for SetWatermarkCommand {
             return Err(CLIError::usage_error(
                 "Only one dataset can be provided when setting a watermark",
             ));
-        } else if self.recursive || self.all {
+        }
+        if self.recursive || self.all {
             return Err(CLIError::usage_error(
                 "Can't use --all or --recursive flags when setting a watermark",
+            ));
+        }
+        if self.refs[0].is_pattern() {
+            return Err(CLIError::usage_error(
+                "Cannot use a pattern when setting a watermark",
             ));
         }
 
@@ -72,6 +78,8 @@ impl Command for SetWatermarkCommand {
         })?;
 
         let dataset_ref = self.refs[0]
+            .as_dataset_ref_any()
+            .unwrap()
             .as_local_ref(|_| !self.dataset_repo.is_multi_tenant())
             .map_err(|_| CLIError::usage_error("Expected a local dataset reference"))?;
 
