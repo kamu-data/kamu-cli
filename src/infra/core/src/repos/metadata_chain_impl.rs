@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::borrow::Cow;
 use std::error::Error;
 
 use async_trait::async_trait;
@@ -420,14 +419,13 @@ where
 
     async fn accept_append_validators<'a>(
         &'a self,
-        mut visitors: StackVisitorsWithDecisionsMutRef<'a, AppendError>,
+        decisions: DecisionsMutRef<'a>,
+        visitors: VisitorsMutRef<'a, 'a, AppendError>,
         prev_append_block_hash: Option<&Multihash>,
     ) -> Result<(), AppendError> {
-        let mut visitor_facade = MetadataChainVisitorFacade::new(&mut visitors);
-        // Phase 1. Check the append block itself
-        let all_visitors_finished = visitor_facade.visit()?;
+        let mut visitor_facade = MetadataChainVisitorFacade::new(decisions, visitors);
 
-        if all_visitors_finished {
+        if visitor_facade.finished() {
             return Ok(());
         }
 
@@ -435,13 +433,12 @@ where
             return Ok(());
         };
 
-        // Phase 2. Check the previous blocks if required by Visitors
         let mut blocks = self.iter_blocks_interval(prev_block_hash, None, false);
 
         // TODO: PERF: Traversal optimizations: skip lists
         while let Some((hash, block)) = wrap_block_stream_error(blocks.try_next().await)? {
             let hashed_block_ref = (&hash, &block);
-            let all_visitors_finished = visitor_facade.visit_with_block(hashed_block_ref)?;
+            let all_visitors_finished = visitor_facade.visit(hashed_block_ref)?;
 
             if all_visitors_finished {
                 break;
@@ -622,45 +619,23 @@ where
         opts: AppendOpts<'a>,
     ) -> Result<Multihash, AppendError> {
         if opts.validation == AppendValidation::Full {
-            let hash = if let Some(b) = opts.precomputed_hash {
-                Cow::Borrowed(b)
-            } else {
-                let hash = self.meta_block_repo.get_block_hash(&block).int_err()?;
+            let (d1, mut v1) = ValidateSeedBlockOrderVisitor::new(&block)?;
+            let (d2, mut v2) = ValidatePrevBlockExistsVisitor::new(&block)?;
+            let (d3, mut v3) = ValidateSequenceNumbersIntegrityVisitor::new(&block)?;
+            let (d4, mut v4) = ValidateSystemTimeIsMonotonicVisitor::new(&block)?;
+            let (d5, mut v5) = ValidateWatermarkIsMonotonicVisitor::new(&block)?;
+            let (d6, mut v6) = ValidateOffsetsAreSequentialVisitor::new(&block)?;
 
-                Cow::Owned(hash)
-            };
-            let hashed_block = (hash.as_ref(), &block);
+            let mut decisions = [d1, d2, d3, d4, d5, d6];
+            let validators: VisitorsMutRef<'_, '_, AppendError> =
+                &mut [&mut v1, &mut v2, &mut v3, &mut v4, &mut v5, &mut v6];
 
-            let validators: StackVisitorsWithDecisionsMutRef<AppendError> = &mut [
-                (
-                    Decision::Stop,
-                    &mut ValidateSeedBlockOrderVisitor::new(hashed_block),
-                ),
-                (
-                    Decision::Stop,
-                    &mut ValidatePrevBlockExistsVisitor::new(hashed_block),
-                ),
-                (
-                    Decision::Stop,
-                    &mut ValidateSequenceNumbersIntegrityVisitor::new(hashed_block),
-                ),
-                (
-                    Decision::Stop,
-                    &mut ValidateSystemTimeIsMonotonicVisitor::new(hashed_block),
-                ),
-                (
-                    Decision::Stop,
-                    &mut ValidateWatermarkIsMonotonicVisitor::new(hashed_block),
-                ),
-                (
-                    Decision::Stop,
-                    &mut ValidateOffsetsAreSequentialVisitor::new(hashed_block),
-                ),
-                // TODO add ValidateEventLogicalStructureVisitor
-            ];
-
-            self.accept_append_validators(validators, block.prev_block_hash.as_ref())
-                .await?;
+            self.accept_append_validators(
+                &mut decisions,
+                validators,
+                block.prev_block_hash.as_ref(),
+            )
+            .await?;
 
             self.validate_append_event_logical_structure(&block).await?;
         }
