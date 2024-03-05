@@ -446,27 +446,6 @@ where
 
         Ok(())
     }
-
-    pub async fn accept<'a, E>(&'a self, visitors: VisitorsMutRef<'a, 'a, E>) -> Result<(), E>
-    where
-        E: Error + From<IterBlocksError>,
-    {
-        let mut decisions = Vec::<Decision>::with_capacity(visitors.len());
-        let mut visitor_facade = MetadataChainVisitorFacade::new(&mut decisions, visitors);
-        let mut blocks = self.iter_blocks();
-
-        // TODO: PERF: Traversal optimizations: skip lists
-        while let Some((hash, block)) = blocks.try_next().await? {
-            let hashed_block_ref = (&hash, &block);
-            let all_visitors_finished = visitor_facade.visit(hashed_block_ref)?;
-
-            if all_visitors_finished {
-                break;
-            }
-        }
-
-        Ok(())
-    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -683,6 +662,27 @@ where
         }
 
         Ok(res.hash)
+    }
+
+    async fn accept<'a, E>(&'a self, visitors: VisitorsMutRef<'a, 'a, E>) -> Result<(), E>
+    where
+        E: Error + From<IterBlocksError>,
+    {
+        let mut decisions = Vec::<Decision>::with_capacity(visitors.len());
+        let mut visitor_facade = MetadataChainVisitorFacade::new(&mut decisions, visitors);
+        let mut blocks = self.iter_blocks();
+
+        // TODO: PERF: Traversal optimizations: skip lists
+        while let Some((hash, block)) = blocks.try_next().await? {
+            let hashed_block_ref = (&hash, &block);
+            let all_visitors_finished = visitor_facade.visit(hashed_block_ref)?;
+
+            if all_visitors_finished {
+                break;
+            }
+        }
+
+        Ok(())
     }
 
     fn as_reference_repo(&self) -> &dyn ReferenceRepository {

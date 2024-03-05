@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::error::Error;
 use std::fmt::Display;
 
 use async_trait::async_trait;
@@ -16,6 +17,10 @@ use thiserror::Error;
 
 use super::metadata_stream::DynMetadataStream;
 use crate::repos::{SetRefError as SetRefErrorRepo, *};
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+pub type VisitorsMutRef<'a, 'b, E> = &'a mut [&'b mut dyn MetadataChainVisitor<VisitError = E>];
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -74,6 +79,10 @@ pub trait MetadataChain: Send + Sync {
         block: MetadataBlock,
         opts: AppendOpts<'a>,
     ) -> Result<Multihash, AppendError>;
+
+    async fn accept<'a, E>(&'a self, visitors: VisitorsMutRef<'a, 'a, E>) -> Result<(), E>
+    where
+        E: Error + From<IterBlocksError>;
 
     fn as_reference_repo(&self) -> &dyn ReferenceRepository;
 

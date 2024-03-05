@@ -9,11 +9,16 @@
 
 use std::error::Error;
 
-use kamu_core::{Decision, HashedMetadataBlockRef, MetadataBlockTypeFlags, MetadataChainVisitor};
+use kamu_core::{
+    Decision,
+    HashedMetadataBlockRef,
+    MetadataBlockTypeFlags,
+    MetadataChainVisitor,
+    VisitorsMutRef,
+};
 
 ///////////////////////////////////////////////////////////////////////////////
 
-pub type VisitorsMutRef<'a, 'b, E> = &'a mut [&'b mut dyn MetadataChainVisitor<VisitError = E>];
 pub type DecisionsMutRef<'a> = &'a mut [Decision];
 
 ///////////////////////////////////////////////////////////////////////////////
