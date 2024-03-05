@@ -161,7 +161,12 @@ pub fn matches_remote_ref_pattern(
         DatasetRefAnyPattern::PatternRemote(repo_name, account_name, dataset_name_pattern) => {
             repo_name == &dataset_alias_remote.repo_name
                 && (dataset_alias_remote.account_name.is_some()
-                    && account_name == dataset_alias_remote.account_name.as_ref().unwrap())
+                    && account_name.to_lowercase()
+                        == dataset_alias_remote
+                            .account_name
+                            .as_ref()
+                            .unwrap()
+                            .to_lowercase())
                 && dataset_name_pattern.matches(&dataset_alias_remote.dataset_name)
         }
     }
