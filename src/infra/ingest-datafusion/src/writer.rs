@@ -21,8 +21,10 @@ use datafusion::prelude::*;
 use internal_error::*;
 use kamu_core::ingest::*;
 use kamu_core::*;
-use odf::{AsTypedBlock, DatasetVocabulary, MergeStrategyAppend};
+use odf::{AsTypedBlock, DatasetVocabulary};
 use opendatafabric as odf;
+
+use crate::visitor::DataWriterDataFusionMetaDataStateVisitor;
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -850,138 +852,18 @@ impl DataWriterDataFusionBuilder {
             .await
             .int_err()?;
 
-        let mut schema = None;
-        let mut source_event: Option<odf::MetadataEvent> = None;
-        let mut set_vocab = None;
-        let mut data_slices = Vec::new();
-        let mut prev_checkpoint = None;
-        let mut prev_watermark = None;
-        let mut prev_source_state = None;
-        let mut prev_offset = None;
+        let mut metadata_state_visitor =
+            DataWriterDataFusionMetaDataStateVisitor::new(head.clone(), source_name);
 
-        {
-            use futures::stream::TryStreamExt;
-            let mut block_stream = self
-                .dataset
-                .as_metadata_chain()
-                .iter_blocks_interval(&head, None, false);
+        self.dataset
+            .as_metadata_chain()
+            .accept_interval(&mut [&mut metadata_state_visitor], &head, None, false)
+            .await
+            .int_err()?;
 
-            while let Some((_, block)) = block_stream.try_next().await.int_err()? {
-                match block.event {
-                    odf::MetadataEvent::SetDataSchema(set_data_schema) => {
-                        if schema.is_none() {
-                            schema = Some(set_data_schema.schema_as_arrow().int_err()?);
-                        }
-                    }
-                    odf::MetadataEvent::AddData(e) => {
-                        if let Some(output_data) = &e.new_data {
-                            data_slices.push(output_data.physical_hash.clone());
-                        }
-                        if prev_offset.is_none() {
-                            prev_offset = Some(e.last_offset());
-                        }
-                        if prev_checkpoint.is_none() {
-                            prev_checkpoint = Some(e.new_checkpoint.map(|cp| cp.physical_hash));
-                        }
-                        if prev_watermark.is_none() {
-                            prev_watermark = Some(e.new_watermark);
-                        }
-                        if prev_source_state.is_none() {
-                            if let Some(ss) = &e.new_source_state {
-                                if source_name.is_some()
-                                    && source_name != Some(ss.source_name.as_str())
-                                {
-                                    unimplemented!(
-                                        "Differentiating between the state of multiple sources is \
-                                         not yet supported"
-                                    );
-                                }
-                            }
-                            prev_source_state = Some(e.new_source_state);
-                        }
-                    }
-                    odf::MetadataEvent::SetPollingSource(e) => {
-                        if source_name.is_some() {
-                            return Err(SourceNotFoundError::new(
-                                source_name,
-                                "Expected a named push source, but found polling source",
-                            )
-                            .into());
-                        }
-                        if source_event.is_none() {
-                            source_event = Some(e.into());
-                        }
-                    }
-                    odf::MetadataEvent::DisablePollingSource(_) => {
-                        unimplemented!("Disabling sources is not yet fully supported")
-                    }
-                    odf::MetadataEvent::AddPushSource(e) => {
-                        if source_event.is_none() {
-                            if source_name.is_none() || source_name == Some(e.source_name.as_str())
-                            {
-                                source_event = Some(e.into());
-                            }
-                        } else {
-                            // Encountered another source - if `source_name` was not specified we
-                            // return ambiguity error
-                            if source_name.is_none() {
-                                return Err(SourceNotFoundError::new(
-                                    None::<&str>,
-                                    "Explicit source name is required to pick between several \
-                                     active push sources",
-                                )
-                                .into());
-                            }
-                        }
-                    }
-                    odf::MetadataEvent::DisablePushSource(_) => {
-                        unimplemented!("Disabling sources is not yet fully supported")
-                    }
-                    odf::MetadataEvent::SetVocab(e) => {
-                        if set_vocab.is_none() {
-                            set_vocab = Some(e);
-                        }
-                    }
-                    odf::MetadataEvent::Seed(e) => {
-                        assert_eq!(e.dataset_kind, odf::DatasetKind::Root);
-                    }
-                    odf::MetadataEvent::ExecuteTransform(_) => unreachable!(),
-                    odf::MetadataEvent::SetAttachments(_)
-                    | odf::MetadataEvent::SetInfo(_)
-                    | odf::MetadataEvent::SetLicense(_)
-                    | odf::MetadataEvent::SetTransform(_) => (),
-                }
-            }
-        }
+        let metadata_state = metadata_state_visitor.get_metadata_state()?;
 
-        let merge_strategy = match (&source_event, source_name) {
-            // Source found
-            (Some(e), _) => match e {
-                odf::MetadataEvent::SetPollingSource(e) => Ok(e.merge.clone()),
-                odf::MetadataEvent::AddPushSource(e) => Ok(e.merge.clone()),
-                _ => unreachable!(),
-            },
-            // No source defined - assuming append strategy
-            (None, None) => Ok(odf::MergeStrategy::Append(MergeStrategyAppend {})),
-            // Source expected but not found
-            (None, Some(source)) => Err(SourceNotFoundError::new(
-                Some(source),
-                format!("Source '{source}' not found"),
-            )),
-        }?;
-
-        Ok(self.with_metadata_state(DataWriterMetadataState {
-            head,
-            schema,
-            source_event,
-            merge_strategy,
-            vocab: set_vocab.unwrap_or_default().into(),
-            data_slices,
-            prev_offset: prev_offset.unwrap_or_default(),
-            prev_checkpoint: prev_checkpoint.unwrap_or_default(),
-            prev_watermark: prev_watermark.unwrap_or_default(),
-            prev_source_state: prev_source_state.unwrap_or_default(),
-        }))
+        Ok(self.with_metadata_state(metadata_state))
     }
 
     pub fn build(self) -> DataWriterDataFusion {
