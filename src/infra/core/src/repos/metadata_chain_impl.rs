@@ -23,7 +23,6 @@ use crate::{
     ValidateSequenceNumbersIntegrityVisitor,
     ValidateSystemTimeIsMonotonicVisitor,
     ValidateWatermarkIsMonotonicVisitor,
-    VisitorsMutRef,
 };
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -416,26 +415,16 @@ where
         Ok(())
     }
 
-    async fn accept_append_validators<'a>(
+    async fn accept_metadata_stream<'a, E>(
         &'a self,
-        decisions: DecisionsMutRef<'a>,
-        visitors: VisitorsMutRef<'a, 'a, AppendError>,
-        prev_append_block_hash: Option<&Multihash>,
-    ) -> Result<(), AppendError> {
-        let mut visitor_facade = MetadataChainVisitorFacade::new(decisions, visitors);
-
-        if visitor_facade.finished() {
-            return Ok(());
-        }
-
-        let Some(prev_block_hash) = prev_append_block_hash else {
-            return Ok(());
-        };
-
-        let mut blocks = self.iter_blocks_interval(prev_block_hash, None, false);
-
+        mut visitor_facade: MetadataChainVisitorFacade<'a, 'a, E>,
+        mut block_stream: DynMetadataStream<'a>,
+    ) -> Result<(), E>
+    where
+        E: Error + From<IterBlocksError>,
+    {
         // TODO: PERF: Traversal optimizations: skip lists
-        while let Some((hash, block)) = wrap_block_stream_error(blocks.try_next().await)? {
+        while let Some((hash, block)) = block_stream.try_next().await? {
             let hashed_block_ref = (&hash, &block);
             let all_visitors_finished = visitor_facade.visit(hashed_block_ref)?;
 
@@ -445,6 +434,28 @@ where
         }
 
         Ok(())
+    }
+
+    async fn accept_append_validators<'a>(
+        &'a self,
+        decisions: DecisionsMutRef<'a>,
+        visitors: VisitorsMutRef<'a, 'a, IterBlocksError>,
+        prev_append_block_hash: Option<&Multihash>,
+    ) -> Result<(), AppendError> {
+        let mut visitor_facade = MetadataChainVisitorFacade::with_decisions(decisions, visitors);
+
+        if visitor_facade.finished() {
+            return Ok(());
+        }
+
+        let Some(prev_block_hash) = prev_append_block_hash else {
+            return Ok(());
+        };
+
+        wrap_block_stream_error(
+            self.accept_interval(visitors, prev_block_hash, None, false)
+                .await,
+        )
     }
 }
 
@@ -664,33 +675,54 @@ where
         Ok(res.hash)
     }
 
-    async fn accept<'a, E>(&'a self, visitors: VisitorsMutRef<'a, 'a, E>) -> Result<(), E>
-    where
-        E: Error + From<IterBlocksError>,
-    {
-        let mut decisions = Vec::<Decision>::with_capacity(visitors.len());
-        let mut visitor_facade = MetadataChainVisitorFacade::new(&mut decisions, visitors);
-        let mut blocks = self.iter_blocks();
-
-        // TODO: PERF: Traversal optimizations: skip lists
-        while let Some((hash, block)) = blocks.try_next().await? {
-            let hashed_block_ref = (&hash, &block);
-            let all_visitors_finished = visitor_facade.visit(hashed_block_ref)?;
-
-            if all_visitors_finished {
-                break;
-            }
-        }
-
-        Ok(())
-    }
-
     fn as_reference_repo(&self) -> &dyn ReferenceRepository {
         &self.ref_repo
     }
 
     fn as_metadata_block_repository(&self) -> &dyn MetadataBlockRepository {
         &self.meta_block_repo
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait]
+impl<MetaBlockRepo, RefRepo> MetadataChainExt for MetadataChainImpl<MetaBlockRepo, RefRepo>
+where
+    MetaBlockRepo: MetadataBlockRepository + Sync + Send,
+    RefRepo: ReferenceRepository + Sync + Send,
+{
+    async fn accept_interval<'a, E>(
+        &'a self,
+        visitors: VisitorsMutRef<'a, 'a, E>,
+        head: &'a Multihash,
+        tail: Option<&'a Multihash>,
+        ignore_missing_tail: bool,
+    ) -> Result<(), E>
+    where
+        E: Error + From<IterBlocksError>,
+    {
+        let visitor_facade = MetadataChainVisitorFacade::new(visitors);
+        let block_stream = self.iter_blocks_interval(head, tail, ignore_missing_tail);
+
+        self.accept_metadata_stream(visitor_facade, block_stream)
+            .await
+    }
+
+    async fn accept_interval_ref<'a, E>(
+        &'a self,
+        visitors: VisitorsMutRef<'a, 'a, E>,
+        head: &'a BlockRef,
+        tail: Option<&'a BlockRef>,
+    ) -> Result<(), E>
+    where
+        E: Error + From<IterBlocksError>,
+    {
+        let visitor_facade = MetadataChainVisitorFacade::new(visitors);
+        let block_stream = self.iter_blocks_interval_ref(head, tail);
+
+        self.accept_metadata_stream(visitor_facade, block_stream)
+            .await
     }
 }
 

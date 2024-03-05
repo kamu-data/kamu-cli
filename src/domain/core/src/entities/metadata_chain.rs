@@ -80,10 +80,6 @@ pub trait MetadataChain: Send + Sync {
         opts: AppendOpts<'a>,
     ) -> Result<Multihash, AppendError>;
 
-    async fn accept<'a, E>(&'a self, visitors: VisitorsMutRef<'a, 'a, E>) -> Result<(), E>
-    where
-        E: Error + From<IterBlocksError>;
-
     fn as_reference_repo(&self) -> &dyn ReferenceRepository;
 
     fn as_metadata_block_repository(&self) -> &dyn MetadataBlockRepository;
@@ -154,6 +150,50 @@ pub trait MetadataChainExt: MetadataChain {
     /// reference
     fn iter_blocks_ref<'a>(&'a self, head: &'a BlockRef) -> DynMetadataStream<'a> {
         self.iter_blocks_interval_ref(head, None)
+    }
+
+    async fn accept_interval<'a, E>(
+        &'a self,
+        _visitors: VisitorsMutRef<'a, 'a, E>,
+        _head: &'a Multihash,
+        _tail: Option<&'a Multihash>,
+        _ignore_missing_tail: bool,
+    ) -> Result<(), E>
+    where
+        E: Error + From<IterBlocksError>,
+    {
+        unreachable!()
+    }
+
+    async fn accept_interval_ref<'a, E>(
+        &'a self,
+        _visitors: VisitorsMutRef<'a, 'a, E>,
+        _head: &'a BlockRef,
+        _tail: Option<&'a BlockRef>,
+    ) -> Result<(), E>
+    where
+        E: Error + From<IterBlocksError>,
+    {
+        unreachable!()
+    }
+
+    async fn accept<'a, E>(&'a self, visitors: VisitorsMutRef<'a, 'a, E>) -> Result<(), E>
+    where
+        E: Error + From<IterBlocksError>,
+    {
+        self.accept_interval_ref(visitors, &BlockRef::Head, None)
+            .await
+    }
+
+    async fn accept_ref<'a, E>(
+        &'a self,
+        visitors: VisitorsMutRef<'a, 'a, E>,
+        head: &'a BlockRef,
+    ) -> Result<(), E>
+    where
+        E: Error + From<IterBlocksError>,
+    {
+        self.accept_interval_ref(visitors, head, None).await
     }
 }
 
