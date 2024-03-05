@@ -15,13 +15,14 @@ use crate::{Decision, MetadataBlockTypeFlags, MetadataChainVisitor};
 
 ///////////////////////////////////////////////////////////////////////////////
 
-pub type StackVisitorsWithDecisionsMutRef<'a, E> =
-    &'a mut [(Decision, &'a mut dyn MetadataChainVisitor<VisitError = E>)];
+pub type VisitorsMutRef<'a, 'b, E> = &'a mut [&'b mut dyn MetadataChainVisitor<VisitError = E>];
+pub type DecisionsMutRef<'a> = &'a mut [Decision];
 
 ///////////////////////////////////////////////////////////////////////////////
 
 pub struct MetadataChainVisitorFacade<'a, 'b, E> {
-    visitors: &'b mut StackVisitorsWithDecisionsMutRef<'a, E>,
+    decisions: DecisionsMutRef<'a>,
+    visitors: VisitorsMutRef<'a, 'b, E>,
 }
 
 impl<'a, 'b, E> MetadataChainVisitorFacade<'a, 'b, E>
@@ -29,22 +30,26 @@ where
     E: Error,
 {
     pub fn new(
-        visitors: &'b mut StackVisitorsWithDecisionsMutRef<'a, E>,
+        decisions: DecisionsMutRef<'a>,
+        visitors: VisitorsMutRef<'a, 'b, E>,
     ) -> MetadataChainVisitorFacade<'a, 'b, E> {
-        Self { visitors }
+        Self {
+            decisions,
+            visitors,
+        }
     }
 
     pub fn finished(&mut self) -> bool {
-        self.visitors
+        self.decisions
             .iter()
-            .all(|(decision, _)| matches!(*decision, Decision::Stop))
+            .all(|decision| matches!(*decision, Decision::Stop))
     }
 
     pub fn visit(&mut self, hashed_block_ref: HashedMetadataBlockRef) -> Result<bool, E> {
         let (hash, block) = hashed_block_ref;
         let mut stopped_visitors = 0;
 
-        for (decision, visitor) in self.visitors.iter_mut() {
+        for (decision, visitor) in self.decisions.iter_mut().zip(self.visitors.iter_mut()) {
             match decision {
                 Decision::Stop => {
                     stopped_visitors += 1;
