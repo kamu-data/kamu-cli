@@ -15,7 +15,6 @@ use kamu_core::{
     ContainsBlockError,
     GetBlockDataError,
     GetBlockError,
-    GetBlockHashError,
     InsertBlockError,
     InsertBlockResult,
     InsertOpts,
@@ -137,10 +136,6 @@ where
         let size = u64::try_from(block_data.len()).unwrap();
 
         Ok(size)
-    }
-
-    fn get_block_hash(&self, block: &MetadataBlock) -> Result<Multihash, GetBlockHashError> {
-        self.wrapped.get_block_hash(block)
     }
 
     async fn insert_block<'a>(

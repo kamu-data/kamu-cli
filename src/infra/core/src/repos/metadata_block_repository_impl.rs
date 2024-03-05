@@ -14,7 +14,6 @@ use kamu_core::{
     ContainsBlockError,
     GetBlockDataError,
     GetBlockError,
-    GetBlockHashError,
     InsertBlockError,
     InsertBlockResult,
     InsertOpts,
@@ -67,14 +66,6 @@ where
 
     async fn get_block_size(&self, hash: &Multihash) -> Result<u64, GetBlockDataError> {
         self.obj_repo.get_size(hash).await.map_err(Into::into)
-    }
-
-    fn get_block_hash(&self, block: &MetadataBlock) -> Result<Multihash, GetBlockHashError> {
-        let block_data = FlatbuffersMetadataBlockSerializer
-            .write_manifest(block)
-            .int_err()?;
-
-        Ok(self.obj_repo.get_bytes_hash(&block_data)?)
     }
 
     async fn insert_block<'a>(

@@ -191,13 +191,6 @@ where
         Err(GetExternalUrlError::NotSupported)
     }
 
-    fn get_bytes_hash(&self, data: &[u8]) -> Result<Multihash, GetBytesHashError> {
-        Ok(Multihash::from_digest::<D>(
-            Multicodec::try_from(C).unwrap(),
-            data,
-        ))
-    }
-
     async fn insert_bytes<'a>(
         &'a self,
         data: &'a [u8],
@@ -206,7 +199,7 @@ where
         let hash = if let Some(hash) = options.precomputed_hash {
             hash.clone()
         } else {
-            self.get_bytes_hash(data)?
+            Multihash::from_digest::<D>(Multicodec::try_from(C).unwrap(), data)
         };
 
         if let Some(expected_hash) = options.expected_hash {

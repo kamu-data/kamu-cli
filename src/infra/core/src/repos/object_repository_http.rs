@@ -197,10 +197,6 @@ impl ObjectRepository for ObjectRepositoryHttp {
         Err(AccessError::ReadOnly(None).into())
     }
 
-    fn get_bytes_hash(&self, _data: &[u8]) -> Result<Multihash, GetBytesHashError> {
-        Err(AccessError::ReadOnly(None).into())
-    }
-
     async fn insert_bytes<'a>(
         &'a self,
         _data: &'a [u8],
