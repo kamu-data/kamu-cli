@@ -223,7 +223,7 @@ impl DatasetName {
         DatasetRef::Alias(DatasetAlias::new(None, self))
     }
 
-    fn lowercase_eq(&self, other: &Self) -> bool {
+    pub fn lowercase_eq(&self, other: &Self) -> bool {
         self.to_lowercase() == other.to_lowercase()
     }
 }
@@ -262,7 +262,14 @@ impl DatasetAliasPattern {
     }
 
     pub fn matches(&self, dataset_handle: &DatasetHandle) -> bool {
-        (self.account_name.is_none() || self.account_name == dataset_handle.alias.account_name)
+        ((self.account_name.is_none() && dataset_handle.alias.account_name.is_none())
+            || (self.account_name.is_some()
+                && dataset_handle.alias.account_name.is_some()
+                && self
+                    .account_name
+                    .as_ref()
+                    .unwrap()
+                    .lowercase_eq(dataset_handle.alias.account_name.as_ref().unwrap())))
             && self
                 .dataset_name_pattern
                 .matches(&dataset_handle.alias.dataset_name)
@@ -311,7 +318,7 @@ newtype_str!(
 );
 
 impl AccountName {
-    fn lowercase_eq(&self, other: &Self) -> bool {
+    pub fn lowercase_eq(&self, other: &Self) -> bool {
         self.to_lowercase() == other.to_lowercase()
     }
 }

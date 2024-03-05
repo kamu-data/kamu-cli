@@ -233,3 +233,55 @@ fn test_dataset_refs_conversions() {
         alias: DatasetAlias::try_from("bar").unwrap(),
     });
 }
+
+#[test]
+fn test_dataset_alias_eq() {
+    assert_eq!(
+        DatasetAlias::from_str("account/net.example.com").unwrap(),
+        DatasetAlias::from_str("aCCouNt/net.ExaMplE.coM").unwrap(),
+    );
+    assert_eq!(
+        DatasetAlias::from_str("account/net.example.com").unwrap(),
+        DatasetAlias::from_str("account/net.example.com").unwrap(),
+    );
+    assert_eq!(
+        DatasetAlias::from_str("net.example.com").unwrap(),
+        DatasetAlias::from_str("net.ExaMplE.coM").unwrap(),
+    );
+    assert_ne!(
+        DatasetAlias::from_str("account/net.example.com").unwrap(),
+        DatasetAlias::from_str("aCCouNt1/net.eXamPle.cOm").unwrap(),
+    );
+    assert_ne!(
+        DatasetAlias::from_str("account1/net.example.com").unwrap(),
+        DatasetAlias::from_str("account/net.example.com").unwrap(),
+    );
+    assert_ne!(
+        DatasetAlias::from_str("net.example.com").unwrap(),
+        DatasetAlias::from_str("account/net.example.com").unwrap(),
+    );
+}
+
+#[test]
+fn test_dataset_remote_alias_eq() {
+    assert_eq!(
+        DatasetAliasRemote::from_str("repository/net.example.com").unwrap(),
+        DatasetAliasRemote::from_str("repository/net.ExaMplE.coM").unwrap(),
+    );
+    assert_eq!(
+        DatasetAliasRemote::from_str("repository/net.example.com").unwrap(),
+        DatasetAliasRemote::from_str("repository/net.example.com").unwrap(),
+    );
+    assert_eq!(
+        DatasetAliasRemote::from_str("repository/account/net.example.com").unwrap(),
+        DatasetAliasRemote::from_str("repository/AccOuNt/net.ExaMplE.coM").unwrap(),
+    );
+    assert_ne!(
+        DatasetAliasRemote::from_str("repository/net.example.com").unwrap(),
+        DatasetAliasRemote::from_str("rEpoSitOry/net.ExaMplE.coM").unwrap(),
+    );
+    assert_ne!(
+        DatasetAliasRemote::from_str("repository/account/net.example.com").unwrap(),
+        DatasetAliasRemote::from_str("repository/net.example.com").unwrap(),
+    );
+}

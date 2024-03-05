@@ -810,8 +810,9 @@ impl DatasetStorageStrategy for DatasetMultiTenantStorageStrategy {
                     )
                     .await?;
 
-                if candidate_dataset_alias.dataset_name.to_lowercase()
-                    == dataset_alias.dataset_name.to_lowercase()
+                if candidate_dataset_alias
+                    .dataset_name
+                    .lowercase_eq(&dataset_alias.dataset_name)
                 {
                     return Ok(DatasetHandle::new(dataset_id, candidate_dataset_alias));
                 }

@@ -117,7 +117,7 @@ fn test_dataset_ref_pattern_match() {
         },
     };
 
-    assert!(pattern.matches(&dataset_handle));
+    assert!(!pattern.matches(&dataset_handle));
 
     let dataset_account = "account1";
     let dataset_name_pattern = "net%";
