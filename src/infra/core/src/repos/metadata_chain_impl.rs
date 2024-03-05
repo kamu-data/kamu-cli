@@ -17,14 +17,15 @@ use opendatafabric::*;
 
 use crate::{
     Decision,
+    DecisionsMutRef,
     MetadataChainVisitorFacade,
-    StackVisitorsWithDecisionsMutRef,
     ValidateOffsetsAreSequentialVisitor,
     ValidatePrevBlockExistsVisitor,
     ValidateSeedBlockOrderVisitor,
     ValidateSequenceNumbersIntegrityVisitor,
     ValidateSystemTimeIsMonotonicVisitor,
     ValidateWatermarkIsMonotonicVisitor,
+    VisitorsMutRef,
 };
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -450,28 +451,18 @@ where
         Ok(())
     }
 
-    pub async fn accept<'a, E>(
-        &'a self,
-        mut visitors: StackVisitorsWithDecisionsMutRef<'a, E>,
-    ) -> Result<(), E>
+    pub async fn accept<'a, E>(&'a self, visitors: VisitorsMutRef<'a, 'a, E>) -> Result<(), E>
     where
         E: Error + From<IterBlocksError>,
     {
-        let mut visitor_facade = MetadataChainVisitorFacade::new(&mut visitors);
-        // Phase 1. Check the append block itself
-        let all_visitors_finished = visitor_facade.visit()?;
-
-        if all_visitors_finished {
-            return Ok(());
-        }
-
-        // Phase 2. Check the previous blocks if required by Visitors
+        let mut decisions = Vec::<Decision>::with_capacity(visitors.len());
+        let mut visitor_facade = MetadataChainVisitorFacade::new(&mut decisions, visitors);
         let mut blocks = self.iter_blocks();
 
         // TODO: PERF: Traversal optimizations: skip lists
         while let Some((hash, block)) = blocks.try_next().await? {
             let hashed_block_ref = (&hash, &block);
-            let all_visitors_finished = visitor_facade.visit_with_block(hashed_block_ref)?;
+            let all_visitors_finished = visitor_facade.visit(hashed_block_ref)?;
 
             if all_visitors_finished {
                 break;
