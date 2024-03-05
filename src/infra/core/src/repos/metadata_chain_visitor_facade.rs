@@ -9,9 +9,7 @@
 
 use std::error::Error;
 
-use kamu_core::HashedMetadataBlockRef;
-
-use crate::{Decision, MetadataBlockTypeFlags, MetadataChainVisitor};
+use kamu_core::{Decision, HashedMetadataBlockRef, MetadataBlockTypeFlags, MetadataChainVisitor};
 
 ///////////////////////////////////////////////////////////////////////////////
 

@@ -11,8 +11,9 @@ use std::error::Error;
 use std::hash::Hash;
 
 use bitflags::bitflags;
-use kamu_core::HashedMetadataBlockRef;
 use opendatafabric::{MetadataBlock, MetadataEvent, Multihash};
+
+use crate::HashedMetadataBlockRef;
 
 ///////////////////////////////////////////////////////////////////////////////
 

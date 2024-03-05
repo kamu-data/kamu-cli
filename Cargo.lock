@@ -3306,7 +3306,6 @@ dependencies = [
  "aws-smithy-http",
  "aws-smithy-types",
  "axum",
- "bitflags 2.4.2",
  "bytes",
  "cfg-if",
  "chrono",
@@ -3604,6 +3603,7 @@ version = "0.164.2"
 dependencies = [
  "async-stream",
  "async-trait",
+ "bitflags 2.4.2",
  "bytes",
  "chrono",
  "container-runtime",

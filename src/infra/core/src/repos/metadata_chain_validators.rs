@@ -12,7 +12,10 @@ use kamu_core::{
     AppendError,
     AppendValidationError,
     BlockNotFoundError,
+    Decision,
     HashedMetadataBlockRef,
+    MetadataBlockTypeFlags,
+    MetadataChainVisitor,
     OffsetsNotSequentialError,
     SequenceIntegrityError,
 };
@@ -25,7 +28,7 @@ use opendatafabric::{
     Multihash,
 };
 
-use crate::{invalid_event, Decision, MetadataBlockTypeFlags, MetadataChainVisitor};
+use crate::invalid_event;
 
 ///////////////////////////////////////////////////////////////////////////////
 
