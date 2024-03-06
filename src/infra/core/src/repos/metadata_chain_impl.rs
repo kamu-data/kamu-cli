@@ -425,8 +425,10 @@ where
             return Ok(());
         };
 
-        self.accept_interval(visitors, prev_block_hash, None, false)
-            .await
+        let visitor_facade = MetadataChainVisitorFacade::new(decisions, visitors);
+        let block_stream = self.iter_blocks_interval(prev_block_hash, None, false);
+
+        accept_metadata_stream(visitor_facade, block_stream).await
     }
 }
 

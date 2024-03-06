@@ -631,7 +631,7 @@ impl Display for OffsetsNotSequentialError {
 // Helpers
 ///////////////////////////////////////////////////////////////////////////////
 
-async fn accept_metadata_stream<'a, 'b, E>(
+pub async fn accept_metadata_stream<'a, 'b, E>(
     mut visitor_facade: MetadataChainVisitorFacade<'a, 'b, E>,
     mut block_stream: DynMetadataStream<'a>,
 ) -> Result<(), E>
