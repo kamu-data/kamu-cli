@@ -36,7 +36,6 @@ url = "2"
 
 
 [dev-dependencies]
-env_logger = "0.10"
 test-group = { version = "1" }
 test-log = { version = "0.2", features = ["trace"] }
 tempfile = "3"

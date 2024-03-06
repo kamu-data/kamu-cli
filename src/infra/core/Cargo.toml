@@ -113,7 +113,6 @@ libc = "0.2"  # For getting uid:gid
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["async_tokio"] }
-env_logger = "0.10"
 filetime = "0.2"
 indoc = "2"
 tokio = { version = "1", default-features = false, features=["rt", "macros"] }

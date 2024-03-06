@@ -49,7 +49,6 @@ kamu = { workspace = true }
 kamu-task-system-inmem = { workspace = true }
 
 cron = { version = "0.12.0", default-features = false }
-env_logger = "0.10"
 indoc = "2"
 mockall = "0.11"
 pretty_assertions = "1"

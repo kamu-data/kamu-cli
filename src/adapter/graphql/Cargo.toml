@@ -56,7 +56,6 @@ kamu-flow-system-inmem = { workspace = true }
 kamu-task-system-inmem = { workspace = true }
 
 
-env_logger = "0.10"
 indoc = "2"
 mockall = "0.11"
 tempfile = "3"
