@@ -2480,7 +2480,6 @@ version = "0.164.1"
 dependencies = [
  "async-stream",
  "async-trait",
- "chrono",
  "event-sourcing-macros",
  "futures",
  "internal-error",
@@ -3371,7 +3370,6 @@ dependencies = [
  "sha3",
  "strum 0.25.0",
  "strum_macros 0.25.3",
- "tar",
  "tempfile",
  "test-group",
  "test-log",
@@ -3449,7 +3447,7 @@ dependencies = [
  "event-bus",
  "event-sourcing",
  "futures",
- "indoc 1.0.9",
+ "indoc 2.0.4",
  "internal-error",
  "kamu",
  "kamu-core",
@@ -3801,7 +3799,6 @@ dependencies = [
  "regex",
  "semver",
  "toml",
- "url",
 ]
 
 [[package]]
@@ -4540,7 +4537,6 @@ version = "0.164.1"
 dependencies = [
  "arrow",
  "base64 0.21.7",
- "byteorder",
  "chrono",
  "digest",
  "ed25519-dalek",

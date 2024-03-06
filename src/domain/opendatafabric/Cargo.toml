@@ -33,7 +33,6 @@ multiformats = { workspace = true }
 
 chrono = { version = "0.4", features = ["serde"] }
 digest = "0.10"
-indoc = "2"
 futures-core = "0.3"
 thiserror = { version = "1", default-features = false }
 
@@ -47,7 +46,6 @@ rand = "0.8"
 
 # Serialization
 base64 = "0.21"
-byteorder = "1"
 flatbuffers = "23"
 hex = "0.4"
 serde = { version = "1", features = ["derive"] }
@@ -60,3 +58,6 @@ tonic = "0.10"
 
 # Optional
 arrow = { optional = true, version = "50", default-features = false, features = ["ipc"] }
+
+[dev-dependencies]
+indoc = "2"

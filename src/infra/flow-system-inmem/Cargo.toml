@@ -23,7 +23,6 @@ doctest = false
 
 [dependencies]
 opendatafabric = { workspace = true }
-kamu = { workspace = true }
 kamu-core = { workspace = true }
 kamu-task-system = { workspace = true }
 kamu-flow-system = { workspace = true }
@@ -46,6 +45,7 @@ serde_with = { version = "3", default-features = false }
 
 
 [dev-dependencies]
+kamu = { workspace = true }
 kamu-task-system-inmem = { workspace = true }
 
 cron = { version = "0.12.0", default-features = false }

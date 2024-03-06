@@ -31,7 +31,7 @@ doctest = false
 [features]
 default = []
 
-web-ui = []
+web-ui = ["rust-embed"]
 ftp = ["kamu/ftp"]
 
 
@@ -81,7 +81,7 @@ tower = "0.4"
 tower-http = { version = "0.4", features = ["trace", "cors"] }
 
 # Web UI
-rust-embed = { version = "8", features = ["interpolate-folder-path", "compression"] }
+rust-embed = { optional = true, version = "8", features = ["interpolate-folder-path", "compression"] }
 mime = "0.3"
 mime_guess = "2"
 
