@@ -1565,7 +1565,6 @@ dependencies = [
  "async-trait",
  "cfg-if",
  "dill",
- "env_logger 0.10.2",
  "libc",
  "rand",
  "regex",
@@ -2411,19 +2410,6 @@ dependencies = [
 
 [[package]]
 name = "env_logger"
-version = "0.10.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4cd405aab171cb85d6735e5c8d9db038c17d3ca007a4d2c25f337935c3d90580"
-dependencies = [
- "humantime",
- "is-terminal",
- "log",
- "regex",
- "termcolor",
-]
-
-[[package]]
-name = "env_logger"
 version = "0.11.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "38b35839ba51819680ba087cd351788c9a3c476841207e0b8cee0b04722343b9"
@@ -2464,10 +2450,8 @@ version = "0.164.1"
 dependencies = [
  "async-trait",
  "dill",
- "env_logger 0.10.2",
  "futures",
  "internal-error",
- "test-group",
  "test-log",
  "thiserror",
  "tokio",
@@ -2480,7 +2464,6 @@ version = "0.164.1"
 dependencies = [
  "async-stream",
  "async-trait",
- "chrono",
  "event-sourcing-macros",
  "futures",
  "internal-error",
@@ -3190,7 +3173,6 @@ checksum = "8bb03732005da905c88227371639bf1ad885cc712789c011c31c5fb3ab3ccf02"
 name = "internal-error"
 version = "0.164.1"
 dependencies = [
- "test-log",
  "thiserror",
 ]
 
@@ -3335,7 +3317,6 @@ dependencies = [
  "datafusion",
  "digest",
  "dill",
- "env_logger 0.10.2",
  "event-bus",
  "filetime",
  "flatbuffers",
@@ -3371,7 +3352,6 @@ dependencies = [
  "sha3",
  "strum 0.25.0",
  "strum_macros 0.25.3",
- "tar",
  "tempfile",
  "test-group",
  "test-log",
@@ -3395,7 +3375,6 @@ version = "0.164.1"
 dependencies = [
  "async-trait",
  "dill",
- "env_logger 0.10.2",
  "event-bus",
  "kamu",
  "kamu-core",
@@ -3403,7 +3382,6 @@ dependencies = [
  "oso",
  "oso-derive",
  "tempfile",
- "test-group",
  "test-log",
  "tokio",
  "tracing",
@@ -3419,7 +3397,6 @@ dependencies = [
  "base64 0.21.7",
  "dashmap",
  "datafusion",
- "env_logger 0.10.2",
  "futures",
  "indoc 2.0.4",
  "kamu-data-utils",
@@ -3445,11 +3422,10 @@ dependencies = [
  "cron",
  "datafusion",
  "dill",
- "env_logger 0.10.2",
  "event-bus",
  "event-sourcing",
  "futures",
- "indoc 1.0.9",
+ "indoc 2.0.4",
  "internal-error",
  "kamu",
  "kamu-core",
@@ -3484,7 +3460,6 @@ dependencies = [
  "container-runtime",
  "datafusion",
  "dill",
- "env_logger 0.10.2",
  "event-bus",
  "flate2",
  "fs_extra",
@@ -3524,21 +3499,16 @@ version = "0.164.1"
 dependencies = [
  "async-trait",
  "dill",
- "env_logger 0.10.2",
  "http",
- "kamu",
  "kamu-core",
  "opendatafabric",
  "reqwest",
  "serde",
  "serde_json",
  "tempfile",
- "test-group",
- "test-log",
  "thiserror",
  "tokio",
  "tracing",
- "tracing-subscriber",
 ]
 
 [[package]]
@@ -3564,7 +3534,6 @@ dependencies = [
  "dill",
  "dirs",
  "duration-string",
- "env_logger 0.10.2",
  "event-bus",
  "fs_extra",
  "futures",
@@ -3663,7 +3632,6 @@ dependencies = [
  "async-trait",
  "datafusion",
  "digest",
- "env_logger 0.10.2",
  "opendatafabric",
  "pretty_assertions",
  "sha3",
@@ -3728,7 +3696,6 @@ dependencies = [
  "chrono",
  "cron",
  "dill",
- "env_logger 0.10.2",
  "event-bus",
  "futures",
  "indoc 2.0.4",
@@ -3761,7 +3728,6 @@ dependencies = [
  "criterion",
  "datafusion",
  "digest",
- "env_logger 0.10.2",
  "futures",
  "geo-types",
  "geojson",
@@ -3801,7 +3767,6 @@ dependencies = [
  "regex",
  "semver",
  "toml",
- "url",
 ]
 
 [[package]]
@@ -3831,12 +3796,10 @@ dependencies = [
  "async-trait",
  "chrono",
  "dill",
- "env_logger 0.10.2",
  "event-bus",
  "futures",
  "kamu-core",
  "kamu-task-system",
- "mockall",
  "opendatafabric",
  "serde",
  "serde_with",
@@ -4540,7 +4503,6 @@ version = "0.164.1"
 dependencies = [
  "arrow",
  "base64 0.21.7",
- "byteorder",
  "chrono",
  "digest",
  "ed25519-dalek",
@@ -6167,15 +6129,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "termcolor"
-version = "1.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "06794f8f6c5c898b3275aebefa6b8a1cb24cd2c6c79397ab15774837a0bc5755"
-dependencies = [
- "winapi-util",
-]
-
-[[package]]
 name = "termtree"
 version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6200,7 +6153,7 @@ version = "0.2.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7b319995299c65d522680decf80f2c108d85b861d81dfe340a10d16cee29d9e6"
 dependencies = [
- "env_logger 0.11.3",
+ "env_logger",
  "test-log-macros",
  "tracing-subscriber",
 ]
@@ -6640,11 +6593,8 @@ name = "tracing-perfetto"
 version = "0.164.1"
 dependencies = [
  "conv",
- "env_logger 0.10.2",
  "serde",
  "serde_json",
- "test-group",
- "test-log",
  "tokio",
  "tracing",
  "tracing-subscriber",
