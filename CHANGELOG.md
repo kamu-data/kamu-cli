@@ -21,6 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Added support of wildcard patterns for `kamu pull` and `kamu push` commands
 - Added `{dataset}/tail` and `/query` REST API endpoints
+### Changed
+- Optimization of passes through metadata chain with API using Visitors
 
 ## [0.163.1] - 2024-03-01
 ### Fixed
