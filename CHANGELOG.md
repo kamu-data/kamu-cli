@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.164.1] - 2024-03-06
+### Changed:
+- Flow status `Cancelled` was finally replaced with `Aborted`, unifying cancellation types for simplicity
+### Fixed
+- Flow system now pauses flow configuration, even when cancelling an already completed flow
+
+
 ## [0.164.0] - 2024-03-06
 ### Added
 - Added support of wildcard patterns for `kamu pull` and `kamu push` commands
