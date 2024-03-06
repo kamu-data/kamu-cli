@@ -28,6 +28,7 @@ impl TestAPIServer {
         multi_tenant: bool,
     ) -> Self {
         let app = axum::Router::new()
+            .nest("/", kamu_adapter_http::data::root_router())
             .nest(
                 if multi_tenant {
                     "/:account_name/:dataset_name"
@@ -37,7 +38,7 @@ impl TestAPIServer {
                 kamu_adapter_http::add_dataset_resolver_layer(
                     axum::Router::new()
                         .nest("/", kamu_adapter_http::smart_transfer_protocol_router())
-                        .nest("/", kamu_adapter_http::data::router()),
+                        .nest("/", kamu_adapter_http::data::dataset_router()),
                     multi_tenant,
                 ),
             )
