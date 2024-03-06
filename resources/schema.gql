@@ -809,7 +809,6 @@ type FlowNotFound implements GetFlowResult & CancelScheduledTasksResult {
 enum FlowOutcome {
 	SUCCESS
 	FAILED
-	CANCELLED
 	ABORTED
 }
 

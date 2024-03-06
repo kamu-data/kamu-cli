@@ -103,7 +103,7 @@ impl From<chrono::Duration> for TimeDelta {
         );
 
         let num_weeks = value.num_weeks();
-        if (value - chrono::Duration::weeks(num_weeks)).is_zero() {
+        if (value - chrono::Duration::try_weeks(num_weeks).unwrap()).is_zero() {
             return Self {
                 every: num_weeks,
                 unit: TimeUnit::Weeks,
@@ -111,7 +111,7 @@ impl From<chrono::Duration> for TimeDelta {
         }
 
         let num_days = value.num_days();
-        if (value - chrono::Duration::days(num_days)).is_zero() {
+        if (value - chrono::Duration::try_days(num_days).unwrap()).is_zero() {
             return Self {
                 every: num_days,
                 unit: TimeUnit::Days,
@@ -119,7 +119,7 @@ impl From<chrono::Duration> for TimeDelta {
         }
 
         let num_hours = value.num_hours();
-        if (value - chrono::Duration::hours(num_hours)).is_zero() {
+        if (value - chrono::Duration::try_hours(num_hours).unwrap()).is_zero() {
             return Self {
                 every: num_hours,
                 unit: TimeUnit::Hours,
@@ -127,7 +127,7 @@ impl From<chrono::Duration> for TimeDelta {
         }
 
         let num_minutes = value.num_minutes();
-        if (value - chrono::Duration::minutes(num_minutes)).is_zero() {
+        if (value - chrono::Duration::try_minutes(num_minutes).unwrap()).is_zero() {
             return Self {
                 every: num_minutes,
                 unit: TimeUnit::Minutes,

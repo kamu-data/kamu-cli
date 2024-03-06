@@ -170,9 +170,9 @@ mod tests {
         assert!(timewheel.nearest_activation_moment().is_none());
 
         let now = Utc::now();
-        let moment_1 = now + Duration::seconds(10);
-        let moment_2 = now + Duration::seconds(20);
-        let moment_3 = now + Duration::seconds(30);
+        let moment_1 = now + Duration::try_seconds(10).unwrap();
+        let moment_2 = now + Duration::try_seconds(20).unwrap();
+        let moment_3 = now + Duration::try_seconds(30).unwrap();
 
         schedule_flow(&mut timewheel, moment_1, FLOW_ID_1);
         schedule_flow(&mut timewheel, moment_1, FLOW_ID_2);
@@ -191,9 +191,9 @@ mod tests {
         assert!(timewheel.nearest_activation_moment().is_none());
 
         let now = Utc::now();
-        let moment_1 = now + Duration::seconds(10);
-        let moment_2 = now + Duration::seconds(20);
-        let moment_3 = now + Duration::seconds(30);
+        let moment_1 = now + Duration::try_seconds(10).unwrap();
+        let moment_2 = now + Duration::try_seconds(20).unwrap();
+        let moment_3 = now + Duration::try_seconds(30).unwrap();
 
         schedule_flow(&mut timewheel, moment_2, FLOW_ID_3);
         schedule_flow(&mut timewheel, moment_3, FLOW_ID_5);
@@ -212,9 +212,9 @@ mod tests {
         assert!(timewheel.nearest_activation_moment().is_none());
 
         let now = Utc::now();
-        let moment_1 = now + Duration::seconds(10);
-        let moment_2 = now + Duration::seconds(20);
-        let moment_3 = now + Duration::seconds(30);
+        let moment_1 = now + Duration::try_seconds(10).unwrap();
+        let moment_2 = now + Duration::try_seconds(20).unwrap();
+        let moment_3 = now + Duration::try_seconds(30).unwrap();
 
         schedule_flow(&mut timewheel, moment_1, FLOW_ID_1);
         schedule_flow(&mut timewheel, moment_1, FLOW_ID_2);

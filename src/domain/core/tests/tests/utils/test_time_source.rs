@@ -23,12 +23,12 @@ async fn test_fake_sleep_stable_order() {
     let system_time_source = FakeSystemTimeSource::new(t0);
 
     let mut sleep_futures = vec![
-        Some(system_time_source.sleep(Duration::seconds(120))), // 1
-        Some(system_time_source.sleep(Duration::seconds(60))),  // 2
-        Some(system_time_source.sleep(Duration::seconds(90))),  // 3
-        Some(system_time_source.sleep(Duration::seconds(120))), // 4
-        Some(system_time_source.sleep(Duration::seconds(150))), // 5
-        Some(system_time_source.sleep(Duration::seconds(60))),  // 6
+        Some(system_time_source.sleep(Duration::try_seconds(120).unwrap())), // 1
+        Some(system_time_source.sleep(Duration::try_seconds(60).unwrap())),  // 2
+        Some(system_time_source.sleep(Duration::try_seconds(90).unwrap())),  // 3
+        Some(system_time_source.sleep(Duration::try_seconds(120).unwrap())), // 4
+        Some(system_time_source.sleep(Duration::try_seconds(150).unwrap())), // 5
+        Some(system_time_source.sleep(Duration::try_seconds(60).unwrap())),  // 6
     ];
 
     assert_eq!(
@@ -36,9 +36,9 @@ async fn test_fake_sleep_stable_order() {
         [false, false, false, false, false, false]
     );
 
-    let dt = Duration::seconds(150);
+    let dt = Duration::try_seconds(150).unwrap();
     let t = t0 + dt;
-    let ready_future_ids = system_time_source.advance(Duration::seconds(150));
+    let ready_future_ids = system_time_source.advance(Duration::try_seconds(150).unwrap());
 
     assert_eq!(
         check_futures_for_completion(&mut sleep_futures),
@@ -53,7 +53,7 @@ async fn test_fake_sleep_without_simulate_time_passage() {
     let t0 = point_in_time_in_a_parallel_universe();
     let system_time_source = FakeSystemTimeSource::new(t0);
 
-    let wake_after_1_sec_fut = system_time_source.sleep(Duration::seconds(1));
+    let wake_after_1_sec_fut = system_time_source.sleep(Duration::try_seconds(1).unwrap());
     let sleep_result_or_timeout = timeout(StdDuration::from_millis(50), wake_after_1_sec_fut).await;
 
     assert_matches!(sleep_result_or_timeout, Err(_));
@@ -65,11 +65,13 @@ async fn test_fake_sleep_with_lacking_simulate_time_passage() {
     let t0 = point_in_time_in_a_parallel_universe();
     let system_time_source = FakeSystemTimeSource::new(t0);
 
-    let mut sleep_futures = vec![Some(system_time_source.sleep(Duration::seconds(60)))];
+    let mut sleep_futures = vec![Some(
+        system_time_source.sleep(Duration::try_seconds(60).unwrap()),
+    )];
 
     assert_eq!(check_futures_for_completion(&mut sleep_futures), [false]);
 
-    let dt = Duration::seconds(30);
+    let dt = Duration::try_seconds(30).unwrap();
     let t = t0 + dt;
 
     system_time_source.advance(dt);
@@ -89,10 +91,10 @@ async fn test_fake_sleep_with_several_simulate_time_passage() {
     //    - c) 120 seconds
     //    - d) 120 seconds
     let mut sleep_futures = vec![
-        Some(system_time_source.sleep(Duration::seconds(60))),
-        Some(system_time_source.sleep(Duration::seconds(90))),
-        Some(system_time_source.sleep(Duration::seconds(120))),
-        Some(system_time_source.sleep(Duration::seconds(120))),
+        Some(system_time_source.sleep(Duration::try_seconds(60).unwrap())),
+        Some(system_time_source.sleep(Duration::try_seconds(90).unwrap())),
+        Some(system_time_source.sleep(Duration::try_seconds(120).unwrap())),
+        Some(system_time_source.sleep(Duration::try_seconds(120).unwrap())),
     ];
 
     assert_eq!(
@@ -105,7 +107,7 @@ async fn test_fake_sleep_with_several_simulate_time_passage() {
     //    - b) +00:30/01:30 - waiting
     //    - c) +00:30/02:00 - waiting
     //    - d) +00:30/02:00 - waiting
-    let dt = Duration::seconds(30);
+    let dt = Duration::try_seconds(30).unwrap();
     let t = t0 + dt;
 
     system_time_source.advance(dt);
@@ -121,7 +123,7 @@ async fn test_fake_sleep_with_several_simulate_time_passage() {
     //    - b) +01:00/01:30 - waiting
     //    - c) +01:00/02:00 - waiting
     //    - d) +01:00/02:00 - waiting
-    let dt = Duration::seconds(30);
+    let dt = Duration::try_seconds(30).unwrap();
     let t = t + dt;
 
     system_time_source.advance(dt);
@@ -137,7 +139,7 @@ async fn test_fake_sleep_with_several_simulate_time_passage() {
     //    - b) +01:30/01:30 - done
     //    - c) +01:30/02:00 - waiting
     //    - d) +01:30/02:00 - waiting
-    let dt = Duration::seconds(30);
+    let dt = Duration::try_seconds(30).unwrap();
     let t = t + dt;
 
     system_time_source.advance(dt);
@@ -153,7 +155,7 @@ async fn test_fake_sleep_with_several_simulate_time_passage() {
     //    - b) +01:30/01:30 - done (before)
     //    - c) +01:30/02:00 - done
     //    - d) +01:30/02:00 - done
-    let dt = Duration::seconds(30);
+    let dt = Duration::try_seconds(30).unwrap();
     let t = t + dt;
 
     system_time_source.advance(dt);
@@ -173,8 +175,8 @@ async fn test_fake_sleep_with_simulate_exceeding_passage() {
     //    - a) 60 seconds
     //    - b) 90 seconds
     let mut sleep_futures = vec![
-        Some(system_time_source.sleep(Duration::seconds(60))),
-        Some(system_time_source.sleep(Duration::seconds(90))),
+        Some(system_time_source.sleep(Duration::try_seconds(60).unwrap())),
+        Some(system_time_source.sleep(Duration::try_seconds(90).unwrap())),
     ];
 
     assert_eq!(
@@ -185,7 +187,7 @@ async fn test_fake_sleep_with_simulate_exceeding_passage() {
     // 2. Simulate +90 seconds:
     //    - a) +01:30/01:00 - 30-second overrun
     //    - b) +01:30/01:30 - done
-    let dt = Duration::seconds(90);
+    let dt = Duration::try_seconds(90).unwrap();
     let t = t0 + dt;
 
     system_time_source.advance(dt);

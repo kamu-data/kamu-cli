@@ -19,9 +19,7 @@ pub enum FlowOutcome {
     Success(FlowResult),
     /// Flow failed to complete, even after retry logic
     Failed,
-    /// Flow was cancelled by a user
-    Cancelled,
-    /// Flow was aborted by system by force
+    /// Flow was aborted by user or by system
     Aborted,
 }
 
