@@ -45,10 +45,10 @@ pub struct DataWriterDataFusionMetaDataStateVisitor<'a> {
     maybe_source_event: Option<MetadataEvent>,
     maybe_set_vocab: Option<SetVocab>,
 
-    maybe_prev_checkpoint: Option<Option<Multihash>>,
-    maybe_prev_watermark: Option<Option<DateTime<Utc>>>,
-    maybe_prev_source_state: Option<Option<SourceState>>,
-    maybe_prev_offset: Option<Option<u64>>,
+    maybe_prev_checkpoint: Option<Multihash>,
+    maybe_prev_watermark: Option<DateTime<Utc>>,
+    maybe_prev_source_state: Option<SourceState>,
+    maybe_prev_offset: Option<u64>,
 }
 
 impl<'a> DataWriterDataFusionMetaDataStateVisitor<'a> {
@@ -102,10 +102,10 @@ impl<'a> DataWriterDataFusionMetaDataStateVisitor<'a> {
             merge_strategy,
             vocab: self.maybe_set_vocab.unwrap_or_default().into(),
             data_slices: self.data_slices,
-            prev_offset: self.maybe_prev_offset.unwrap_or_default(),
-            prev_checkpoint: self.maybe_prev_checkpoint.unwrap_or_default(),
-            prev_watermark: self.maybe_prev_watermark.unwrap_or_default(),
-            prev_source_state: self.maybe_prev_source_state.unwrap_or_default(),
+            prev_offset: self.maybe_prev_offset,
+            prev_checkpoint: self.maybe_prev_checkpoint,
+            prev_watermark: self.maybe_prev_watermark,
+            prev_source_state: self.maybe_prev_source_state,
         })
     }
 
@@ -123,16 +123,16 @@ impl<'a> DataWriterDataFusionMetaDataStateVisitor<'a> {
         }
 
         if self.maybe_prev_offset.is_none() {
-            self.maybe_prev_offset = Some(e.last_offset());
+            self.maybe_prev_offset = e.last_offset();
         }
 
         if self.maybe_prev_checkpoint.is_none() {
             self.maybe_prev_checkpoint =
-                Some(e.new_checkpoint.as_ref().map(|cp| cp.physical_hash.clone()));
+                e.new_checkpoint.as_ref().map(|cp| cp.physical_hash.clone());
         }
 
         if self.maybe_prev_watermark.is_none() {
-            self.maybe_prev_watermark = Some(e.new_watermark);
+            self.maybe_prev_watermark = e.new_watermark;
         }
 
         if self.maybe_prev_source_state.is_none() {
@@ -145,7 +145,7 @@ impl<'a> DataWriterDataFusionMetaDataStateVisitor<'a> {
                 );
             }
 
-            self.maybe_prev_source_state = Some(e.new_source_state.clone());
+            self.maybe_prev_source_state = e.new_source_state.clone();
         }
     }
 
