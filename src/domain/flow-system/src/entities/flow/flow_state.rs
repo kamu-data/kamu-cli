@@ -217,7 +217,7 @@ impl Projection for FlowState {
                                     ..s
                                 }),
                                 ts::TaskOutcome::Cancelled => Ok(FlowState {
-                                    outcome: Some(FlowOutcome::Cancelled),
+                                    outcome: Some(FlowOutcome::Aborted),
                                     timing: FlowTimingRecords {
                                         finished_at: Some(event_time),
                                         ..s.timing

@@ -1131,7 +1131,7 @@ async fn test_task_completions_trigger_next_loop_on_success() {
               "bar" Ingest:
                 Flow ID = 1 Finished Failed
               "baz" Ingest:
-                Flow ID = 2 Finished Cancelled
+                Flow ID = 2 Finished Aborted
               "foo" Ingest:
                 Flow ID = 3 Waiting AutoPolling Schedule(wakeup=60ms)
                 Flow ID = 0 Finished Success
@@ -1140,7 +1140,7 @@ async fn test_task_completions_trigger_next_loop_on_success() {
               "bar" Ingest:
                 Flow ID = 1 Finished Failed
               "baz" Ingest:
-                Flow ID = 2 Finished Cancelled
+                Flow ID = 2 Finished Aborted
               "foo" Ingest:
                 Flow ID = 3 Waiting AutoPolling Executor(task=3, since=60ms)
                 Flow ID = 0 Finished Success

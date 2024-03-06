@@ -1365,7 +1365,7 @@ async fn test_cancel_waiting_flow() {
 ////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_cancel_already_cancelled_flow() {
+async fn test_cancel_already_aborted_flow() {
     let harness = FlowRunsHarness::new();
     let create_result = harness.create_root_dataset().await;
 
