@@ -9,12 +9,14 @@
 
 use std::assert_matches::assert_matches;
 use std::path::Path;
+use std::sync::{Arc, Mutex};
 
 use chrono::{TimeZone, Utc};
 use kamu::domain::*;
 use kamu::testing::*;
 use kamu::*;
 use opendatafabric::*;
+use thiserror::Error;
 
 fn init_chain(root: &Path) -> impl MetadataChain {
     let blocks_dir = root.join("blocks");
@@ -959,3 +961,197 @@ async fn test_iter_blocks() {
         ]
     );
 }
+
+#[tokio::test]
+async fn test_accept() {
+    let tmp_dir = tempfile::tempdir().unwrap();
+    let chain = init_chain(tmp_dir.path());
+
+    insert_blocks(
+        &chain,
+        [
+            // 1
+            MetadataFactory::seed(DatasetKind::Root).build().into(),
+            // 2
+            MetadataFactory::set_data_schema().build().into(),
+            // 3
+            MetadataFactory::add_data()
+                .new_offset_interval(0, 9)
+                .build()
+                .into(),
+            // 4
+            MetadataFactory::add_data()
+                .new_offset_interval(10, 19)
+                .build()
+                .into(),
+            // 5
+            SetInfo {
+                description: None,
+                keywords: None,
+            }
+            .into(),
+            // 6
+            MetadataFactory::add_data()
+                .new_offset_interval(20, 29)
+                .build()
+                .into(),
+        ],
+    )
+    .await;
+
+    let mut always_stop_visitor = create_always_stop_visitor();
+    let mut next_of_data_visitor = create_next_of_type_visitor(
+        MetadataBlockTypeFlags::DATA_BLOCK,
+        NextOfTypeVisitorState::with_expected_visit_call_count(3),
+    );
+    let mut next_of_set_data_schema_visitor = create_next_of_type_visitor(
+        MetadataBlockTypeFlags::SET_DATA_SCHEMA,
+        NextOfTypeVisitorState::with_expected_visit_call_count(2),
+    );
+    let mut always_next_visitor = create_always_next_visitor_with_expected_visit_call_count(6);
+
+    assert_matches!(
+        chain
+            .accept(&mut [
+                &mut always_stop_visitor,
+                &mut next_of_data_visitor,
+                &mut next_of_set_data_schema_visitor,
+                &mut always_next_visitor,
+            ])
+            .await,
+        Ok(_)
+    );
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// MockMetadataChainVisitor
+///////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Error)]
+pub enum MockError {
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+
+impl From<IterBlocksError> for MockError {
+    fn from(v: IterBlocksError) -> Self {
+        v.int_err().into()
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+mockall::mock! {
+    MetadataChainVisitor {}
+
+    #[async_trait::async_trait]
+    impl MetadataChainVisitor for MetadataChainVisitor {
+        type VisitError = MockError;
+
+        fn visit<'a>(&mut self, hashed_block_ref: HashedMetadataBlockRef<'a>) -> Result<Decision, MockError>;
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+fn create_always_stop_visitor() -> MockMetadataChainVisitor {
+    let mut always_stop_visitor = MockMetadataChainVisitor::new();
+
+    always_stop_visitor
+        .expect_visit()
+        .times(1)
+        .returning(|_| Ok(Decision::Stop));
+
+    always_stop_visitor
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+fn create_always_next_visitor_with_expected_visit_call_count(
+    visit_call_count: usize,
+) -> MockMetadataChainVisitor {
+    let mut always_next_visitor = MockMetadataChainVisitor::new();
+
+    always_next_visitor
+        .expect_visit()
+        .times(visit_call_count)
+        .returning(|_| Ok(Decision::Next));
+
+    always_next_visitor
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+struct NextOfTypeVisitorState {
+    expected_visit_call_count: usize,
+    visit_call_count: usize,
+}
+
+impl NextOfTypeVisitorState {
+    pub fn with_expected_visit_call_count(value: usize) -> Self {
+        Self {
+            expected_visit_call_count: value,
+            visit_call_count: 0,
+        }
+    }
+}
+
+fn create_next_of_type_visitor(
+    flags: MetadataBlockTypeFlags,
+    state: NextOfTypeVisitorState,
+) -> MockMetadataChainVisitor {
+    let state = Arc::new(Mutex::new(state));
+    let mut always_stop_visitor = MockMetadataChainVisitor::new();
+    let expected_visit_call_count = state.lock().unwrap().expected_visit_call_count;
+
+    always_stop_visitor
+        .expect_visit()
+        .times(expected_visit_call_count)
+        .returning(move |_| {
+            let mut state = state.lock().unwrap();
+
+            if state.visit_call_count != state.expected_visit_call_count {
+                state.visit_call_count += 1;
+
+                Ok(Decision::NextOfType(flags))
+            } else {
+                Ok(Decision::Stop)
+            }
+        });
+
+    always_stop_visitor
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// Helpers
+///////////////////////////////////////////////////////////////////////////////
+
+async fn insert_blocks<const BLOCKS_COUNT: usize>(
+    chain: &impl MetadataChain,
+    events: [MetadataEvent; BLOCKS_COUNT],
+) -> Vec<HashedMetadataBlock> {
+    let mut prev_block_data: Option<(Multihash, u64)> = None;
+    let mut res = vec![];
+
+    for event in events {
+        let mut block_builder = MetadataFactory::metadata_block(event);
+
+        if let Some((prev_hash, prev_sequence_number)) = &prev_block_data {
+            block_builder = block_builder.prev(prev_hash, *prev_sequence_number);
+        }
+
+        let block = block_builder.build();
+        let hash = chain
+            .append(block.clone(), AppendOpts::default())
+            .await
+            .unwrap();
+
+        prev_block_data = Some((hash.clone(), block.sequence_number));
+
+        res.push((hash, block));
+    }
+
+    res
+}
+
+///////////////////////////////////////////////////////////////////////////////
