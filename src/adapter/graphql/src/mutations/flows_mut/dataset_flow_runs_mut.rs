@@ -99,14 +99,13 @@ impl DatasetFlowRunsMut {
                 fs::CancelScheduledTasksError::Internal(e) => GqlError::Internal(e),
             })?;
 
-        // If flow is aborted, pause it's configuration
-        if let Some(fs::FlowOutcome::Aborted) = &flow_state.outcome {
-            let flow_configuration_service =
-                from_catalog::<dyn fs::FlowConfigurationService>(ctx).unwrap();
-            flow_configuration_service
-                .pause_flow_configuration(Utc::now(), flow_state.flow_key.clone())
-                .await?;
-        }
+        // Pause flow configuration regardless of current state.
+        // Duplicate requests are auto-ignored.
+        let flow_configuration_service =
+            from_catalog::<dyn fs::FlowConfigurationService>(ctx).unwrap();
+        flow_configuration_service
+            .pause_flow_configuration(Utc::now(), flow_state.flow_key.clone())
+            .await?;
 
         Ok(CancelScheduledTasksResult::Success(
             CancelScheduledTasksSuccess {
