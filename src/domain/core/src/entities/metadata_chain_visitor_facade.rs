@@ -9,13 +9,7 @@
 
 use std::error::Error;
 
-use kamu_core::{
-    Decision,
-    HashedMetadataBlockRef,
-    MetadataBlockTypeFlags,
-    MetadataChainVisitor,
-    VisitorsMutRef,
-};
+use crate::{Decision, HashedMetadataBlockRef, MetadataBlockTypeFlags, VisitorsMutRef};
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -32,14 +26,7 @@ impl<'a, 'b, E> MetadataChainVisitorFacade<'a, 'b, E>
 where
     E: Error,
 {
-    pub fn new(visitors: VisitorsMutRef<'a, 'b, E>) -> MetadataChainVisitorFacade<'a, 'b, E> {
-        Self {
-            decisions: &mut *Vec::with_capacity(visitors.len()),
-            visitors,
-        }
-    }
-
-    pub fn with_decisions(
+    pub fn new(
         decisions: DecisionsMutRef<'a>,
         visitors: VisitorsMutRef<'a, 'b, E>,
     ) -> MetadataChainVisitorFacade<'a, 'b, E> {
