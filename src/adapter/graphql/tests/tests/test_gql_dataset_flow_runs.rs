@@ -172,7 +172,9 @@ async fn test_trigger_ingest_root_dataset() {
         })
     );
 
-    let schedule_time = Utc::now().duration_round(Duration::seconds(1)).unwrap();
+    let schedule_time = Utc::now()
+        .duration_round(Duration::try_seconds(1).unwrap())
+        .unwrap();
     let flow_task_id = harness.mimic_flow_scheduled("0", schedule_time).await;
 
     let response = schema
@@ -244,7 +246,9 @@ async fn test_trigger_ingest_root_dataset() {
         })
     );
 
-    let running_time = Utc::now().duration_round(Duration::seconds(1)).unwrap();
+    let running_time = Utc::now()
+        .duration_round(Duration::try_seconds(1).unwrap())
+        .unwrap();
     harness.mimic_task_running(flow_task_id, running_time).await;
 
     let response = schema
@@ -313,7 +317,9 @@ async fn test_trigger_ingest_root_dataset() {
         })
     );
 
-    let complete_time = Utc::now().duration_round(Duration::seconds(1)).unwrap();
+    let complete_time = Utc::now()
+        .duration_round(Duration::try_seconds(1).unwrap())
+        .unwrap();
     harness
         .mimic_task_completed(
             flow_task_id,
@@ -515,13 +521,19 @@ async fn test_trigger_execute_transform_derived_dataset() {
         })
     );
 
-    let schedule_time = Utc::now().duration_round(Duration::seconds(1)).unwrap();
+    let schedule_time = Utc::now()
+        .duration_round(Duration::try_seconds(1).unwrap())
+        .unwrap();
     let flow_task_id = harness.mimic_flow_scheduled("0", schedule_time).await;
 
-    let running_time = Utc::now().duration_round(Duration::seconds(1)).unwrap();
+    let running_time = Utc::now()
+        .duration_round(Duration::try_seconds(1).unwrap())
+        .unwrap();
     harness.mimic_task_running(flow_task_id, running_time).await;
 
-    let complete_time = Utc::now().duration_round(Duration::seconds(1)).unwrap();
+    let complete_time = Utc::now()
+        .duration_round(Duration::try_seconds(1).unwrap())
+        .unwrap();
     harness
         .mimic_task_completed(
             flow_task_id,
@@ -1708,8 +1720,8 @@ impl FlowRunsHarness {
             .add::<FlowServiceInMemory>()
             .add::<FlowEventStoreInMem>()
             .add_value(FlowServiceRunConfig::new(
-                Duration::seconds(1),
-                Duration::minutes(1),
+                Duration::try_seconds(1).unwrap(),
+                Duration::try_minutes(1).unwrap(),
             ))
             .add::<TaskSchedulerInMemory>()
             .add::<TaskSystemEventStoreInMemory>()

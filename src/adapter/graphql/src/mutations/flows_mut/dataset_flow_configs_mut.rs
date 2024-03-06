@@ -199,10 +199,10 @@ impl From<TimeDeltaInput> for chrono::Duration {
     fn from(value: TimeDeltaInput) -> Self {
         let every = i64::from(value.every);
         match value.unit {
-            TimeUnit::Weeks => chrono::Duration::weeks(every),
-            TimeUnit::Days => chrono::Duration::days(every),
-            TimeUnit::Hours => chrono::Duration::hours(every),
-            TimeUnit::Minutes => chrono::Duration::minutes(every),
+            TimeUnit::Weeks => chrono::Duration::try_weeks(every).unwrap(),
+            TimeUnit::Days => chrono::Duration::try_days(every).unwrap(),
+            TimeUnit::Hours => chrono::Duration::try_hours(every).unwrap(),
+            TimeUnit::Minutes => chrono::Duration::try_minutes(every).unwrap(),
         }
     }
 }
