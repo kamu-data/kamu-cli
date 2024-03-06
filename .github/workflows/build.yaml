@@ -44,6 +44,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions-rs/toolchain@v1
+      - run: carg install cargo-udeps
+      - run: cargo udeps
       - run: cargo install cargo-deny
       - run: cargo deny check
 
