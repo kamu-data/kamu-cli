@@ -1023,12 +1023,71 @@ async fn test_accept() {
     );
 }
 
+#[tokio::test]
+async fn test_accept_stop_on_first_error() {
+    let tmp_dir = tempfile::tempdir().unwrap();
+    let chain = init_chain(tmp_dir.path());
+
+    insert_blocks(
+        &chain,
+        [
+            // 1
+            MetadataFactory::seed(DatasetKind::Root).build().into(),
+            // 2
+            MetadataFactory::set_data_schema().build().into(),
+            // 3
+            MetadataFactory::add_data()
+                .new_offset_interval(0, 9)
+                .build()
+                .into(),
+            // 4
+            MetadataFactory::add_data()
+                .new_offset_interval(10, 19)
+                .build()
+                .into(),
+            // 5
+            SetInfo {
+                description: None,
+                keywords: None,
+            }
+            .into(),
+            // 6
+            MetadataFactory::add_data()
+                .new_offset_interval(20, 29)
+                .build()
+                .into(),
+        ],
+    )
+    .await;
+
+    let mut always_stop_visitor = create_always_stop_visitor();
+    let mut always_next_visitor = create_always_next_visitor_with_expected_visit_call_count(2);
+    let mut failed_on_type_visitor = create_failed_on_type_visitor_with_expected_visit_call_count(
+        MetadataBlockTypeFlags::SET_INFO,
+        2,
+    );
+
+    assert_matches!(
+        chain
+            .accept(&mut [
+                &mut always_stop_visitor,
+                &mut always_next_visitor,
+                &mut failed_on_type_visitor,
+            ])
+            .await,
+        Err(MockError::SomethingFailed)
+    );
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 // MockMetadataChainVisitor
 ///////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Error)]
 pub enum MockError {
+    #[error("something failed")]
+    SomethingFailed,
+
     #[error(transparent)]
     Internal(#[from] InternalError),
 }
@@ -1050,6 +1109,30 @@ mockall::mock! {
 
         fn visit<'a>(&mut self, hashed_block_ref: HashedMetadataBlockRef<'a>) -> Result<Decision, MockError>;
     }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+fn create_failed_on_type_visitor_with_expected_visit_call_count(
+    fail_on_type_flags: MetadataBlockTypeFlags,
+    visit_call_count: usize,
+) -> MockMetadataChainVisitor {
+    let mut always_stop_visitor = MockMetadataChainVisitor::new();
+
+    always_stop_visitor
+        .expect_visit()
+        .times(visit_call_count)
+        .returning(move |(_, block)| {
+            let block_flag = MetadataBlockTypeFlags::from(block);
+
+            if fail_on_type_flags.contains(block_flag) {
+                Err(MockError::SomethingFailed)
+            } else {
+                Ok(Decision::NextOfType(fail_on_type_flags))
+            }
+        });
+
+    always_stop_visitor
 }
 
 ///////////////////////////////////////////////////////////////////////////////
