@@ -2467,7 +2467,6 @@ dependencies = [
  "env_logger 0.10.2",
  "futures",
  "internal-error",
- "test-group",
  "test-log",
  "thiserror",
  "tokio",
@@ -3189,7 +3188,6 @@ checksum = "8bb03732005da905c88227371639bf1ad885cc712789c011c31c5fb3ab3ccf02"
 name = "internal-error"
 version = "0.164.1"
 dependencies = [
- "test-log",
  "thiserror",
 ]
 
@@ -3401,7 +3399,6 @@ dependencies = [
  "oso",
  "oso-derive",
  "tempfile",
- "test-group",
  "test-log",
  "tokio",
  "tracing",
@@ -3522,21 +3519,16 @@ version = "0.164.1"
 dependencies = [
  "async-trait",
  "dill",
- "env_logger 0.10.2",
  "http",
- "kamu",
  "kamu-core",
  "opendatafabric",
  "reqwest",
  "serde",
  "serde_json",
  "tempfile",
- "test-group",
- "test-log",
  "thiserror",
  "tokio",
  "tracing",
- "tracing-subscriber",
 ]
 
 [[package]]
@@ -3833,7 +3825,6 @@ dependencies = [
  "futures",
  "kamu-core",
  "kamu-task-system",
- "mockall",
  "opendatafabric",
  "serde",
  "serde_with",
@@ -6636,11 +6627,8 @@ name = "tracing-perfetto"
 version = "0.164.1"
 dependencies = [
  "conv",
- "env_logger 0.10.2",
  "serde",
  "serde_json",
- "test-group",
- "test-log",
  "tokio",
  "tracing",
  "tracing-subscriber",

@@ -37,7 +37,6 @@ event-bus = { workspace = true }
 
 env_logger = "0.10"
 tempfile = "3"
-test-group = { version = "1" }
 test-log = { version = "0.2", features = ["trace"] }
 tokio = { version = "1", default-features = false, features = [] }
 tracing = "0.1"

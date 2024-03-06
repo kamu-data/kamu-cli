@@ -45,10 +45,10 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions-rs/toolchain@v1
       - uses: cargo-bins/cargo-binstall@main
-      - run: cargo binstall cargo-udeps -y
-      - run: cargo udeps
-      - run: cargo install cargo-deny
+      - run: cargo binstall cargo-deny -y
       - run: cargo deny check
+      - run: cargo binstall cargo-udeps -y
+      - run: cargo udeps --all-targets
 
   test:
     strategy:

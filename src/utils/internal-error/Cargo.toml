@@ -23,7 +23,3 @@ doctest = false
 
 [dependencies]
 thiserror = { version = "1", default-features = false }
-
-
-[dev-dependencies]
-test-log = { version = "0.2" }
