@@ -16,6 +16,7 @@ use opendatafabric::{MetadataBlock, MetadataBlockTyped, MetadataEvent, Multihash
 use thiserror::Error;
 
 use super::metadata_stream::DynMetadataStream;
+use crate::entities::metadata_chain_visitor_facade::MetadataChainVisitorFacade;
 use crate::repos::{SetRefError as SetRefErrorRepo, *};
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -154,27 +155,35 @@ pub trait MetadataChainExt: MetadataChain {
 
     async fn accept_interval<'a, E>(
         &'a self,
-        _visitors: VisitorsMutRef<'a, 'a, E>,
-        _head: &'a Multihash,
-        _tail: Option<&'a Multihash>,
-        _ignore_missing_tail: bool,
+        visitors: VisitorsMutRef<'a, 'a, E>,
+        head: &'a Multihash,
+        tail: Option<&'a Multihash>,
+        ignore_missing_tail: bool,
     ) -> Result<(), E>
     where
         E: Error + From<IterBlocksError>,
     {
-        unreachable!()
+        let mut decisions = vec![Decision::Next; visitors.len()];
+        let visitor_facade = MetadataChainVisitorFacade::new(&mut decisions, visitors);
+        let block_stream = self.iter_blocks_interval(head, tail, ignore_missing_tail);
+
+        accept_metadata_stream(visitor_facade, block_stream).await
     }
 
     async fn accept_interval_ref<'a, E>(
         &'a self,
-        _visitors: VisitorsMutRef<'a, 'a, E>,
-        _head: &'a BlockRef,
-        _tail: Option<&'a BlockRef>,
+        visitors: VisitorsMutRef<'a, 'a, E>,
+        head: &'a BlockRef,
+        tail: Option<&'a BlockRef>,
     ) -> Result<(), E>
     where
         E: Error + From<IterBlocksError>,
     {
-        unreachable!()
+        let mut decisions = vec![Decision::Next; visitors.len()];
+        let visitor_facade = MetadataChainVisitorFacade::new(&mut decisions, visitors);
+        let block_stream = self.iter_blocks_interval_ref(head, tail);
+
+        accept_metadata_stream(visitor_facade, block_stream).await
     }
 
     async fn accept<'a, E>(&'a self, visitors: VisitorsMutRef<'a, 'a, E>) -> Result<(), E>
@@ -437,6 +446,15 @@ impl From<SetRefError> for AppendError {
     }
 }
 
+impl From<IterBlocksError> for AppendError {
+    fn from(v: IterBlocksError) -> Self {
+        match v {
+            IterBlocksError::BlockNotFound(e) => AppendValidationError::PrevBlockNotFound(e).into(),
+            e => e.int_err().into(),
+        }
+    }
+}
+
 /////////////////////////////////////////////////////////////////////////////////////////
 // Individual Errors
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -610,3 +628,27 @@ impl Display for OffsetsNotSequentialError {
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+// Helpers
+///////////////////////////////////////////////////////////////////////////////
+
+async fn accept_metadata_stream<'a, 'b, E>(
+    mut visitor_facade: MetadataChainVisitorFacade<'a, 'b, E>,
+    mut block_stream: DynMetadataStream<'a>,
+) -> Result<(), E>
+where
+    E: Error + From<IterBlocksError>,
+{
+    use futures::TryStreamExt;
+
+    // TODO: PERF: Traversal optimizations: skip lists
+    while let Some((hash, block)) = block_stream.try_next().await? {
+        let hashed_block_ref = (&hash, &block);
+        let all_visitors_finished = visitor_facade.visit(hashed_block_ref)?;
+
+        if all_visitors_finished {
+            break;
+        }
+    }
+
+    Ok(())
+}

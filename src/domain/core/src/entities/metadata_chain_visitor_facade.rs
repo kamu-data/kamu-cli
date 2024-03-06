@@ -26,6 +26,12 @@ impl<'a, 'b, E> MetadataChainVisitorFacade<'a, 'b, E>
 where
     E: Error,
 {
+    pub fn finished(decisions: DecisionsMutRef<'a>) -> bool {
+        decisions
+            .iter()
+            .all(|decision| matches!(*decision, Decision::Stop))
+    }
+
     pub fn new(
         decisions: DecisionsMutRef<'a>,
         visitors: VisitorsMutRef<'a, 'b, E>,
@@ -36,12 +42,6 @@ where
             decisions,
             visitors,
         }
-    }
-
-    pub fn finished(&mut self) -> bool {
-        self.decisions
-            .iter()
-            .all(|decision| matches!(*decision, Decision::Stop))
     }
 
     pub fn visit(&mut self, hashed_block_ref: HashedMetadataBlockRef) -> Result<bool, E> {

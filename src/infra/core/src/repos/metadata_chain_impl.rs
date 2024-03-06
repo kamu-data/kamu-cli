@@ -7,16 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::error::Error;
-
 use async_trait::async_trait;
 use futures::TryStreamExt;
 use kamu_core::*;
 use opendatafabric::*;
 
 use crate::{
-    DecisionsMutRef,
-    MetadataChainVisitorFacade,
     ValidateOffsetsAreSequentialVisitor,
     ValidatePrevBlockExistsVisitor,
     ValidateSeedBlockOrderVisitor,
@@ -415,36 +411,13 @@ where
         Ok(())
     }
 
-    async fn accept_metadata_stream<'a, E>(
-        &'a self,
-        mut visitor_facade: MetadataChainVisitorFacade<'a, 'a, E>,
-        mut block_stream: DynMetadataStream<'a>,
-    ) -> Result<(), E>
-    where
-        E: Error + From<IterBlocksError>,
-    {
-        // TODO: PERF: Traversal optimizations: skip lists
-        while let Some((hash, block)) = block_stream.try_next().await? {
-            let hashed_block_ref = (&hash, &block);
-            let all_visitors_finished = visitor_facade.visit(hashed_block_ref)?;
-
-            if all_visitors_finished {
-                break;
-            }
-        }
-
-        Ok(())
-    }
-
     async fn accept_append_validators<'a>(
         &'a self,
         decisions: DecisionsMutRef<'a>,
-        visitors: VisitorsMutRef<'a, 'a, IterBlocksError>,
-        prev_append_block_hash: Option<&Multihash>,
+        visitors: VisitorsMutRef<'a, 'a, AppendError>,
+        prev_append_block_hash: Option<&'a Multihash>,
     ) -> Result<(), AppendError> {
-        let mut visitor_facade = MetadataChainVisitorFacade::with_decisions(decisions, visitors);
-
-        if visitor_facade.finished() {
+        if MetadataChainVisitorFacade::<AppendError>::finished(decisions) {
             return Ok(());
         }
 
@@ -452,10 +425,8 @@ where
             return Ok(());
         };
 
-        wrap_block_stream_error(
-            self.accept_interval(visitors, prev_block_hash, None, false)
-                .await,
-        )
+        self.accept_interval(visitors, prev_block_hash, None, false)
+            .await
     }
 }
 
@@ -682,59 +653,6 @@ where
     fn as_metadata_block_repository(&self) -> &dyn MetadataBlockRepository {
         &self.meta_block_repo
     }
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-#[async_trait]
-impl<MetaBlockRepo, RefRepo> MetadataChainExt for MetadataChainImpl<MetaBlockRepo, RefRepo>
-where
-    MetaBlockRepo: MetadataBlockRepository + Sync + Send,
-    RefRepo: ReferenceRepository + Sync + Send,
-{
-    async fn accept_interval<'a, E>(
-        &'a self,
-        visitors: VisitorsMutRef<'a, 'a, E>,
-        head: &'a Multihash,
-        tail: Option<&'a Multihash>,
-        ignore_missing_tail: bool,
-    ) -> Result<(), E>
-    where
-        E: Error + From<IterBlocksError>,
-    {
-        let visitor_facade = MetadataChainVisitorFacade::new(visitors);
-        let block_stream = self.iter_blocks_interval(head, tail, ignore_missing_tail);
-
-        self.accept_metadata_stream(visitor_facade, block_stream)
-            .await
-    }
-
-    async fn accept_interval_ref<'a, E>(
-        &'a self,
-        visitors: VisitorsMutRef<'a, 'a, E>,
-        head: &'a BlockRef,
-        tail: Option<&'a BlockRef>,
-    ) -> Result<(), E>
-    where
-        E: Error + From<IterBlocksError>,
-    {
-        let visitor_facade = MetadataChainVisitorFacade::new(visitors);
-        let block_stream = self.iter_blocks_interval_ref(head, tail);
-
-        self.accept_metadata_stream(visitor_facade, block_stream)
-            .await
-    }
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-// Helpers
-/////////////////////////////////////////////////////////////////////////////////////////
-
-fn wrap_block_stream_error<T>(res: Result<T, IterBlocksError>) -> Result<T, AppendError> {
-    res.map_err(|error| match error {
-        IterBlocksError::BlockNotFound(e) => AppendValidationError::PrevBlockNotFound(e).into(),
-        e => e.int_err().into(),
-    })
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

@@ -923,6 +923,12 @@ pub enum ScanMetadataError {
     ),
 }
 
+impl From<IterBlocksError> for ScanMetadataError {
+    fn from(v: IterBlocksError) -> Self {
+        v.int_err().into()
+    }
+}
+
 #[derive(Debug, thiserror::Error)]
 #[error("{message}")]
 pub struct SourceNotFoundError {
