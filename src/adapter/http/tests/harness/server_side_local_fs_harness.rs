@@ -94,7 +94,7 @@ impl ServerSideLocalFsHarness {
         }
     }
 
-    fn api_server_addr(&self) -> String {
+    pub fn api_server_addr(&self) -> String {
         self.api_server.local_addr().to_string()
     }
 

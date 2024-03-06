@@ -8,6 +8,8 @@
 // by the Apache License, Version 2.0.
 
 mod ingest_handler;
+mod query_handler;
 mod router;
+mod tail_handler;
 
 pub use router::*;

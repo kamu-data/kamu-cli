@@ -20,6 +20,330 @@ use crate::harness::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+#[test_group::group(engine, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_data_tail_handler() {
+    // TODO: Need access to these from harness level
+    let run_info_dir = tempfile::tempdir().unwrap();
+
+    let catalog = dill::CatalogBuilder::new()
+        .add::<DataFormatRegistryImpl>()
+        .add::<QueryServiceImpl>()
+        .add_builder(
+            PushIngestServiceImpl::builder().with_run_info_dir(run_info_dir.path().to_path_buf()),
+        )
+        .bind::<dyn PushIngestService, PushIngestServiceImpl>()
+        .add::<ObjectStoreRegistryImpl>()
+        .add::<ObjectStoreBuilderLocalFs>()
+        .add::<EngineProvisionerNull>()
+        .build();
+
+    let server_harness = ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
+        multi_tenant: true,
+        authorized_writes: true,
+        base_catalog: Some(catalog),
+    });
+
+    let system_time = Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap();
+    server_harness.system_time_source().set(system_time);
+
+    let create_result = server_harness
+        .cli_dataset_repository()
+        .create_dataset_from_snapshot(DatasetSnapshot {
+            name: DatasetAlias::new(
+                server_harness.operating_account_name(),
+                DatasetName::new_unchecked("population"),
+            ),
+            kind: DatasetKind::Root,
+            metadata: vec![AddPushSource {
+                source_name: "source1".to_string(),
+                read: ReadStepNdJson {
+                    schema: Some(vec![
+                        "event_time TIMESTAMP".to_owned(),
+                        "city STRING".to_owned(),
+                        "population BIGINT".to_owned(),
+                    ]),
+                    ..Default::default()
+                }
+                .into(),
+                preprocess: None,
+                merge: MergeStrategy::Ledger(MergeStrategyLedger {
+                    primary_key: vec!["event_time".to_owned(), "city".to_owned()],
+                }),
+            }
+            .into()],
+        })
+        .await
+        .unwrap();
+
+    let dataset_url =
+        server_harness.dataset_url_with_scheme(&create_result.dataset_handle.alias, "http");
+
+    let client = async move {
+        let cl = reqwest::Client::new();
+        let ingest_url = format!("{dataset_url}/ingest");
+
+        let res = cl
+            .execute(
+                cl.post(&ingest_url)
+                    .json(&json!(
+                        [
+                            {
+                                "event_time": "2020-01-01T00:00:00",
+                                "city": "A",
+                                "population": 100,
+                            },
+                            {
+                                "event_time": "2020-01-02T00:00:00",
+                                "city": "B",
+                                "population": 200,
+                            }
+                        ]
+                    ))
+                    .build()
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), http::StatusCode::OK);
+
+        // All points
+        let tail_url = format!("{dataset_url}/tail");
+        let res = cl
+            .execute(cl.get(&tail_url).build().unwrap())
+            .await
+            .unwrap();
+
+        assert_eq!(res.status(), http::StatusCode::OK);
+        assert_eq!(
+            res.json::<serde_json::Value>().await.unwrap(),
+            json!({"data": [{
+                "city": "A",
+                "event_time": "2020-01-01T00:00:00Z",
+                "offset": 0,
+                "op": 0,
+                "population": 100,
+                "system_time": "2050-01-01T12:00:00Z"
+            }, {
+                "city": "B",
+                "event_time": "2020-01-02T00:00:00Z",
+                "offset": 1,
+                "op": 0,
+                "population": 200,
+                "system_time": "2050-01-01T12:00:00Z"
+            }]})
+        );
+
+        // Limit
+        let res = cl
+            .execute(cl.get(&tail_url).query(&[("limit", "1")]).build().unwrap())
+            .await
+            .unwrap();
+        assert_eq!(res.status(), http::StatusCode::OK);
+        assert_eq!(
+            res.json::<serde_json::Value>().await.unwrap(),
+            json!({"data": [{
+                "city": "B",
+                "event_time": "2020-01-02T00:00:00Z",
+                "offset": 1,
+                "op": 0,
+                "population": 200,
+                "system_time": "2050-01-01T12:00:00Z"
+            }]})
+        );
+
+        // Skip
+        let res = cl
+            .execute(cl.get(&tail_url).query(&[("skip", "1")]).build().unwrap())
+            .await
+            .unwrap();
+
+        assert_eq!(res.status(), http::StatusCode::OK);
+        assert_eq!(
+            res.json::<serde_json::Value>().await.unwrap(),
+            json!({"data": [{
+                "city": "A",
+                "event_time": "2020-01-01T00:00:00Z",
+                "offset": 0,
+                "op": 0,
+                "population": 100,
+                "system_time": "2050-01-01T12:00:00Z"
+            }]})
+        );
+    };
+
+    await_client_server_flow!(server_harness.api_server_run(), client);
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, datafusion)]
+#[test_log::test(tokio::test)]
+async fn test_data_query_handler() {
+    // TODO: Need access to these from harness level
+    let run_info_dir = tempfile::tempdir().unwrap();
+
+    let catalog = dill::CatalogBuilder::new()
+        .add::<DataFormatRegistryImpl>()
+        .add::<QueryServiceImpl>()
+        .add_builder(
+            PushIngestServiceImpl::builder().with_run_info_dir(run_info_dir.path().to_path_buf()),
+        )
+        .bind::<dyn PushIngestService, PushIngestServiceImpl>()
+        .add::<ObjectStoreRegistryImpl>()
+        .add::<ObjectStoreBuilderLocalFs>()
+        .add::<EngineProvisionerNull>()
+        .build();
+
+    let server_harness = ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
+        multi_tenant: true,
+        authorized_writes: true,
+        base_catalog: Some(catalog),
+    });
+
+    let system_time = Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap();
+    server_harness.system_time_source().set(system_time);
+
+    let dataset_alias = DatasetAlias::new(
+        server_harness.operating_account_name(),
+        DatasetName::new_unchecked("population"),
+    );
+
+    let create_result = server_harness
+        .cli_dataset_repository()
+        .create_dataset_from_snapshot(DatasetSnapshot {
+            name: dataset_alias.clone(),
+            kind: DatasetKind::Root,
+            metadata: vec![AddPushSource {
+                source_name: "source1".to_string(),
+                read: ReadStepNdJson {
+                    schema: Some(vec![
+                        "event_time TIMESTAMP".to_owned(),
+                        "city STRING".to_owned(),
+                        "population BIGINT".to_owned(),
+                    ]),
+                    ..Default::default()
+                }
+                .into(),
+                preprocess: None,
+                merge: MergeStrategy::Ledger(MergeStrategyLedger {
+                    primary_key: vec!["event_time".to_owned(), "city".to_owned()],
+                }),
+            }
+            .into()],
+        })
+        .await
+        .unwrap();
+
+    let root_url = format!("http://{}", server_harness.api_server_addr());
+
+    let dataset_url =
+        server_harness.dataset_url_with_scheme(&create_result.dataset_handle.alias, "http");
+
+    let client = async move {
+        let cl = reqwest::Client::new();
+        let ingest_url = format!("{dataset_url}/ingest");
+
+        let res = cl
+            .execute(
+                cl.post(&ingest_url)
+                    .json(&json!(
+                        [
+                            {
+                                "event_time": "2020-01-01T00:00:00",
+                                "city": "A",
+                                "population": 100,
+                            },
+                            {
+                                "event_time": "2020-01-02T00:00:00",
+                                "city": "B",
+                                "population": 200,
+                            }
+                        ]
+                    ))
+                    .build()
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), http::StatusCode::OK);
+
+        // All points
+        let query = format!(
+            "select offset, city, population from \"{dataset_alias}\" order by offset desc"
+        );
+        let query_url = format!("{root_url}/query");
+        let res = cl
+            .execute(
+                cl.get(&query_url)
+                    .query(&[("query", &query)])
+                    .build()
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(res.status(), http::StatusCode::OK);
+        assert_eq!(
+            res.json::<serde_json::Value>().await.unwrap(),
+            json!({"data": [{
+                "city": "B",
+                "offset": 1,
+                "population": 200,
+            }, {
+                "city": "A",
+                "offset": 0,
+                "population": 100,
+            }]})
+        );
+
+        // Limit
+        let res = cl
+            .execute(
+                cl.get(&query_url)
+                    .query(&[("query", query.as_str()), ("limit", "1")])
+                    .build()
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), http::StatusCode::OK);
+        assert_eq!(
+            res.json::<serde_json::Value>().await.unwrap(),
+            json!({"data": [{
+                "city": "B",
+                "offset": 1,
+                "population": 200,
+            }]})
+        );
+
+        // Skip
+        let res = cl
+            .execute(
+                cl.get(&query_url)
+                    .query(&[("query", query.as_str()), ("skip", "1")])
+                    .build()
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(res.status(), http::StatusCode::OK);
+        assert_eq!(
+            res.json::<serde_json::Value>().await.unwrap(),
+            json!({"data": [{
+                "city": "A",
+                "offset": 0,
+                "population": 100,
+            }]})
+        );
+    };
+
+    await_client_server_flow!(server_harness.api_server_run(), client);
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
 #[test_group::group(engine, ingest, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_data_push_ingest_handler() {
