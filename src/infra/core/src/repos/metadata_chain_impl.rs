@@ -413,11 +413,15 @@ where
 
     async fn accept_append_validators<'a>(
         &'a self,
-        decisions: DecisionsMutRef<'a>,
+        decisions: &'a mut [Decision],
         visitors: VisitorsMutRef<'a, 'a, AppendError>,
         prev_append_block_hash: Option<&'a Multihash>,
     ) -> Result<(), AppendError> {
-        if MetadataChainVisitorFacade::<AppendError>::finished(decisions) {
+        let have_already_stopped = decisions
+            .iter()
+            .all(|decision| matches!(*decision, Decision::Stop));
+
+        if have_already_stopped {
             return Ok(());
         }
 
@@ -425,10 +429,8 @@ where
             return Ok(());
         };
 
-        let visitor_facade = MetadataChainVisitorFacade::new(decisions, visitors);
-        let block_stream = self.iter_blocks_interval(prev_block_hash, None, false);
-
-        accept_metadata_stream(visitor_facade, block_stream).await
+        self.accept_by_hash_with_decisions(decisions, visitors, prev_block_hash)
+            .await
     }
 }
 

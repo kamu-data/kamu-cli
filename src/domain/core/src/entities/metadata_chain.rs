@@ -16,7 +16,6 @@ use opendatafabric::{MetadataBlock, MetadataBlockTyped, MetadataEvent, Multihash
 use thiserror::Error;
 
 use super::metadata_stream::DynMetadataStream;
-use crate::entities::metadata_chain_visitor_facade::MetadataChainVisitorFacade;
 use crate::repos::{SetRefError as SetRefErrorRepo, *};
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -169,26 +168,9 @@ pub trait MetadataChainExt: MetadataChain {
         E: Error + From<IterBlocksError>,
     {
         let mut decisions = vec![Decision::Next; visitors.len()];
-        let mut visitor_facade = MetadataChainVisitorFacade::new(&mut decisions, visitors);
 
-        let mut maybe_current = Some(head_hash.clone());
-
-        while let Some(current) = maybe_current {
-            let block = self.get_block(&current).await.map_err(Into::into)?;
-
-            let hashed_block_ref = (&current, &block);
-            let all_visitors_finished = visitor_facade.visit(hashed_block_ref)?;
-
-            if all_visitors_finished {
-                break;
-            }
-
-            let next = block.prev_block_hash.clone();
-
-            maybe_current = next;
-        }
-
-        Ok(())
+        self.accept_by_hash_with_decisions(&mut decisions, visitors, head_hash)
+            .await
     }
 
     async fn accept_by_ref<'a, E>(
@@ -202,6 +184,65 @@ pub trait MetadataChainExt: MetadataChain {
         let head_hash = self.resolve_ref(head).await.map_err(Into::into)?;
 
         self.accept_by_hash(visitors, &head_hash).await
+    }
+
+    async fn accept_by_hash_with_decisions<'a, 'b, E>(
+        &'a self,
+        decisions: &'b mut [Decision],
+        visitors: VisitorsMutRef<'a, 'a, E>,
+        head_hash: &'b Multihash,
+    ) -> Result<(), E>
+    where
+        E: Error + From<IterBlocksError>,
+    {
+        let mut maybe_current = Some(head_hash.clone());
+
+        while let Some(current) = maybe_current {
+            // TODO: PERF: Traversal optimizations: skip lists
+
+            let hash = &current;
+            let block = self.get_block(hash).await.map_err(Into::into)?;
+            let hashed_block_ref = (hash, &block);
+
+            let all_visitors_finished = {
+                let mut stopped_visitors = 0;
+
+                for (decision, visitor) in decisions.iter_mut().zip(visitors.iter_mut()) {
+                    match decision {
+                        Decision::Stop => {
+                            stopped_visitors += 1;
+                        }
+                        Decision::Next => {
+                            *decision = visitor.visit(hashed_block_ref)?;
+                        }
+                        Decision::NextWithHash(requested_hash) => {
+                            if hash == requested_hash {
+                                *decision = visitor.visit(hashed_block_ref)?;
+                            }
+                        }
+                        Decision::NextOfType(requested_flags) => {
+                            let block_flag = MetadataBlockTypeFlags::from(&block);
+
+                            if requested_flags.contains(block_flag) {
+                                *decision = visitor.visit(hashed_block_ref)?;
+                            }
+                        }
+                    }
+                }
+
+                visitors.len() == stopped_visitors
+            };
+
+            if all_visitors_finished {
+                break;
+            }
+
+            let next = block.prev_block_hash.clone();
+
+            maybe_current = next;
+        }
+
+        Ok(())
     }
 }
 
@@ -627,27 +668,3 @@ impl Display for OffsetsNotSequentialError {
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-// Helpers
-///////////////////////////////////////////////////////////////////////////////
-
-pub async fn accept_metadata_stream<'a, 'b, E>(
-    mut visitor_facade: MetadataChainVisitorFacade<'a, 'b, E>,
-    mut block_stream: DynMetadataStream<'a>,
-) -> Result<(), E>
-where
-    E: Error + From<IterBlocksError>,
-{
-    use futures::TryStreamExt;
-
-    // TODO: PERF: Traversal optimizations: skip lists
-    while let Some((hash, block)) = block_stream.try_next().await? {
-        let hashed_block_ref = (&hash, &block);
-        let all_visitors_finished = visitor_facade.visit(hashed_block_ref)?;
-
-        if all_visitors_finished {
-            break;
-        }
-    }
-
-    Ok(())
-}
