@@ -112,7 +112,7 @@ use like::ILike;
 
 macro_rules! newtype_istr {
     ($typ:ident, $parse:expr, $visitor:ident) => {
-        #[derive(Debug, Clone, Eq, PartialEq, PartialOrd, Ord, Hash)]
+        #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
         pub struct $typ(Arc<str>);
 
         impl $typ {
@@ -132,7 +132,7 @@ macro_rules! newtype_istr {
                 Self(s)
             }
 
-            pub fn into_lowercase<'a>(s: &'a str) -> Cow<'a, str> {
+            pub fn into_lowercase(s: &str) -> Cow<'_, str> {
                 let bytes = s.as_bytes();
                 if !bytes.iter().any(u8::is_ascii_uppercase) {
                     Cow::Borrowed(s)
@@ -268,20 +268,10 @@ impl DatasetAliasPattern {
     }
 
     pub fn matches(&self, dataset_handle: &DatasetHandle) -> bool {
-        if self.account_name.is_some() && dataset_handle.alias.account_name.is_none()
-            || self.account_name.is_none() && dataset_handle.alias.account_name.is_some()
-        {
-            return false;
-        }
-        if self.account_name.as_ref().unwrap()
-            == dataset_handle.alias.account_name.as_ref().unwrap()
+        self.account_name == dataset_handle.alias.account_name
             && self
                 .dataset_name_pattern
                 .matches(&dataset_handle.alias.dataset_name)
-        {
-            return true;
-        }
-        false
     }
 }
 
@@ -332,7 +322,7 @@ newtype_istr!(RepoName, Grammar::match_repo_name, RepoNameSerdeVisitor);
 
 ////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, Eq, PartialEq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct DatasetAlias {
     pub account_name: Option<AccountName>,
     pub dataset_name: DatasetName,
@@ -409,7 +399,7 @@ impl_serde!(DatasetAlias, DatasetAliasSerdeVisitor);
 
 ////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, Eq, PartialEq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct DatasetAliasRemote {
     pub repo_name: RepoName,
     pub account_name: Option<AccountName>,

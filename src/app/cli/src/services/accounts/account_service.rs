@@ -120,11 +120,9 @@ impl AccountService {
         RelatedAccountIndication::new(target_account)
     }
 
-    fn find_account_info_impl(&self, account_name: &String) -> Option<AccountInfo> {
+    fn find_account_info_impl(&self, account_name: &AccountName) -> Option<AccountInfo> {
         // The account might be predefined in the configuration
-        self.predefined_accounts
-            .get(&account_name.to_ascii_lowercase())
-            .cloned()
+        self.predefined_accounts.get(account_name.as_str()).cloned()
     }
 
     fn get_account_info_impl(
@@ -231,7 +229,7 @@ impl auth::AuthenticationProvider for AccountService {
         &'a self,
         account_name: &'a AccountName,
     ) -> Result<Option<AccountInfo>, InternalError> {
-        Ok(self.find_account_info_impl(&account_name.into()))
+        Ok(self.find_account_info_impl(account_name))
     }
 }
 

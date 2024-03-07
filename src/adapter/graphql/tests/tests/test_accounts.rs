@@ -76,7 +76,7 @@ async fn test_account_by_name() {
                 "#,
                 "unknown",
             ))
-            .data(cat),
+            .data(cat.clone()),
         )
         .await;
 
@@ -86,6 +86,36 @@ async fn test_account_by_name() {
         value!({
             "accounts": {
                 "byName": null
+            }
+        })
+    );
+
+    let res = schema
+        .execute(
+            async_graphql::Request::new(format!(
+                r#"
+                query {{
+                    accounts {{
+                        byName (name: "{}") {{
+                            accountName
+                        }}
+                    }}
+                }}
+                "#,
+                DEFAULT_ACCOUNT_NAME.to_ascii_uppercase(),
+            ))
+            .data(cat),
+        )
+        .await;
+
+    assert!(res.is_ok(), "{res:?}");
+    assert_eq!(
+        res.data,
+        value!({
+            "accounts": {
+                "byName": {
+                    "accountName": DEFAULT_ACCOUNT_NAME
+                }
             }
         })
     );

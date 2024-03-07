@@ -169,6 +169,18 @@ fn test_dataset_ref_pattern_match() {
         },
     };
     assert!(pattern.matches(&dataset_handle));
+
+    let expression = "nEt.eXample%";
+    let dataset_name = "net.example.com";
+    let pattern = DatasetRefPattern::from_str(expression).unwrap();
+    let dataset_handle = DatasetHandle {
+        id: default_dataset_id.clone(),
+        alias: DatasetAlias {
+            account_name: None,
+            dataset_name: DatasetName::from_str(dataset_name).unwrap(),
+        },
+    };
+    assert!(pattern.matches(&dataset_handle));
 }
 
 #[test]

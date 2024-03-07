@@ -276,7 +276,7 @@ fn test_dataset_remote_alias_eq() {
         DatasetAliasRemote::from_str("repository/account/net.example.com").unwrap(),
         DatasetAliasRemote::from_str("repository/AccOuNt/net.ExaMplE.coM").unwrap(),
     );
-    assert_ne!(
+    assert_eq!(
         DatasetAliasRemote::from_str("repository/net.example.com").unwrap(),
         DatasetAliasRemote::from_str("rEpoSitOry/net.ExaMplE.coM").unwrap(),
     );

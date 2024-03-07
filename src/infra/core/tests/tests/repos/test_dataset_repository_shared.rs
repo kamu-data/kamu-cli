@@ -87,13 +87,9 @@ pub async fn test_create_and_get_case_insensetive_dataset(
 
     assert_eq!(create_result.dataset_handle.alias, dataset_alias_to_create);
 
-    let account_name_uppercase = if account_name.is_some() {
-        Some(AccountName::new_unchecked(
-            &account_name.unwrap().to_ascii_uppercase(),
-        ))
-    } else {
-        None
-    };
+    let account_name_uppercase = account_name.map(|account_name_value| {
+        AccountName::new_unchecked(&account_name_value.to_ascii_uppercase())
+    });
 
     let dataset_alias_in_another_registry =
         DatasetAlias::new(account_name_uppercase, DatasetName::new_unchecked("foO"));

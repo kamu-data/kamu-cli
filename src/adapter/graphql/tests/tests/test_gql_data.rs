@@ -160,6 +160,65 @@ async fn test_dataset_schema_local_fs() {
 
 #[test_group::group(engine, datafusion)]
 #[test_log::test(tokio::test)]
+async fn test_dataset_case_insensetive_schema_local_fs() {
+    let tempdir = tempfile::tempdir().unwrap();
+    let catalog = create_catalog_with_local_workspace(tempdir.path());
+    create_test_dataset(&catalog, tempdir.path()).await;
+
+    let schema = kamu_adapter_graphql::schema_quiet();
+    let res = schema
+        .execute(
+            async_graphql::Request::new(indoc::indoc!(
+                r#"
+                {
+                    datasets {
+                        byOwnerAndName(accountName: "kAmU", datasetName: "FOo") {
+                            name
+                            data {
+                                tail(limit: 1, schemaFormat: PARQUET_JSON, dataFormat: JSON) {
+                                    ... on DataQueryResultSuccess {
+                                        schema { content }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                "#
+            ))
+            .data(catalog),
+        )
+        .await;
+    assert!(res.is_ok(), "{res:?}");
+    let json = serde_json::to_string(&res.data).unwrap();
+    let json = serde_json::from_str::<serde_json::Value>(&json).unwrap();
+    let data_schema = &json["datasets"]["byOwnerAndName"]["data"]["tail"]["schema"]["content"];
+    let data_schema =
+        serde_json::from_str::<serde_json::Value>(data_schema.as_str().unwrap()).unwrap();
+    assert_eq!(
+        data_schema,
+        serde_json::json!({
+            "name": "arrow_schema",
+            "type": "struct",
+            "fields": [{
+                "name": "offset",
+                "repetition": "REQUIRED",
+                "type": "INT64",
+                "logicalType": "INTEGER(64,false)"
+            }, {
+                "name": "blah",
+                "repetition": "REQUIRED",
+                "type": "BYTE_ARRAY",
+                "logicalType": "STRING"
+            }]
+        })
+    );
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(engine, datafusion)]
+#[test_log::test(tokio::test)]
 async fn test_dataset_tail_local_fs() {
     let tempdir = tempfile::tempdir().unwrap();
     let catalog = create_catalog_with_local_workspace(tempdir.path());
