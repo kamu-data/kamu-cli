@@ -153,48 +153,45 @@ pub trait MetadataChainExt: MetadataChain {
         self.iter_blocks_interval_ref(head, None)
     }
 
-    async fn accept_interval<'a, E>(
-        &'a self,
-        visitors: VisitorsMutRef<'a, 'a, E>,
-        head: &'a Multihash,
-        tail: Option<&'a Multihash>,
-        ignore_missing_tail: bool,
-    ) -> Result<(), E>
-    where
-        E: Error + From<IterBlocksError>,
-    {
-        let mut decisions = vec![Decision::Next; visitors.len()];
-        let visitor_facade = MetadataChainVisitorFacade::new(&mut decisions, visitors);
-        let block_stream = self.iter_blocks_interval(head, tail, ignore_missing_tail);
-
-        accept_metadata_stream(visitor_facade, block_stream).await
-    }
-
-    async fn accept_interval_ref<'a, E>(
-        &'a self,
-        visitors: VisitorsMutRef<'a, 'a, E>,
-        head: &'a BlockRef,
-        tail: Option<&'a BlockRef>,
-    ) -> Result<(), E>
-    where
-        E: Error + From<IterBlocksError>,
-    {
-        let mut decisions = vec![Decision::Next; visitors.len()];
-        let visitor_facade = MetadataChainVisitorFacade::new(&mut decisions, visitors);
-        let block_stream = self.iter_blocks_interval_ref(head, tail);
-
-        accept_metadata_stream(visitor_facade, block_stream).await
-    }
-
     async fn accept<'a, E>(&'a self, visitors: VisitorsMutRef<'a, 'a, E>) -> Result<(), E>
     where
         E: Error + From<IterBlocksError>,
     {
-        self.accept_interval_ref(visitors, &BlockRef::Head, None)
-            .await
+        self.accept_by_ref(visitors, &BlockRef::Head).await
     }
 
-    async fn accept_ref<'a, E>(
+    async fn accept_by_hash<'a, 'b, E>(
+        &'a self,
+        visitors: VisitorsMutRef<'a, 'a, E>,
+        head_hash: &'b Multihash,
+    ) -> Result<(), E>
+    where
+        E: Error + From<IterBlocksError>,
+    {
+        let mut decisions = vec![Decision::Next; visitors.len()];
+        let mut visitor_facade = MetadataChainVisitorFacade::new(&mut decisions, visitors);
+
+        let mut maybe_current = Some(head_hash.clone());
+
+        while let Some(current) = maybe_current {
+            let block = self.get_block(&current).await.map_err(Into::into)?;
+
+            let hashed_block_ref = (&current, &block);
+            let all_visitors_finished = visitor_facade.visit(hashed_block_ref)?;
+
+            if all_visitors_finished {
+                break;
+            }
+
+            let next = block.prev_block_hash.clone();
+
+            maybe_current = next;
+        }
+
+        Ok(())
+    }
+
+    async fn accept_by_ref<'a, E>(
         &'a self,
         visitors: VisitorsMutRef<'a, 'a, E>,
         head: &'a BlockRef,
@@ -202,7 +199,9 @@ pub trait MetadataChainExt: MetadataChain {
     where
         E: Error + From<IterBlocksError>,
     {
-        self.accept_interval_ref(visitors, head, None).await
+        let head_hash = self.resolve_ref(head).await.map_err(Into::into)?;
+
+        self.accept_by_hash(visitors, &head_hash).await
     }
 }
 

@@ -857,7 +857,7 @@ impl DataWriterDataFusionBuilder {
 
         self.dataset
             .as_metadata_chain()
-            .accept_interval(&mut [&mut metadata_state_visitor], &head, None, false)
+            .accept_by_hash(&mut [&mut metadata_state_visitor], &head)
             .await?;
 
         let metadata_state = metadata_state_visitor.get_metadata_state()?;
