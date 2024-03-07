@@ -111,21 +111,19 @@ pub struct ValidateSequenceNumbersIntegrityVisitor {
 
 impl<'a> ValidateSequenceNumbersIntegrityVisitor {
     pub fn new(block: &'a MetadataBlock) -> Result<(Decision, Self), AppendError> {
-        let decision = match &block.prev_block_hash {
-            Some(_) => Result::<Decision, AppendError>::Ok(Decision::Next),
-            None if block.sequence_number != 0 => Err(AppendValidationError::SequenceIntegrity(
-                SequenceIntegrityError {
+        if block.prev_block_hash.is_none() && block.sequence_number != 0 {
+            return Err(
+                AppendValidationError::SequenceIntegrity(SequenceIntegrityError {
                     prev_block_hash: None,
                     prev_block_sequence_number: None,
                     next_block_sequence_number: block.sequence_number,
-                },
-            )
-            .into()),
-            None => Ok(Decision::Stop),
-        }?;
+                })
+                .into(),
+            );
+        }
 
         Ok((
-            decision,
+            Decision::Next,
             Self {
                 appended_sequence_number: block.sequence_number,
             },
