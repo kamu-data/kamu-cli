@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Using `cargo udeps` to detect unused dependencies during linting
 ### Fixed
-- Flow history no longer produces dual flow abortion events
+- Flow history no longer produces duplicate flow abortion events
 - Flow history no longer shows initiation time that is earlier than the next event's time
 
 ## [0.164.1] - 2024-03-06
