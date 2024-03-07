@@ -163,14 +163,8 @@ pub struct ValidateSystemTimeIsMonotonicVisitor<'a> {
 
 impl<'a> ValidateSystemTimeIsMonotonicVisitor<'a> {
     pub fn new(block: &'a MetadataBlock) -> Result<(Decision, Self), AppendError> {
-        let decision = if block.prev_block_hash.is_some() {
-            Decision::Next
-        } else {
-            Decision::Stop
-        };
-
         Ok((
-            decision,
+            Decision::Next,
             Self {
                 initial_system_time: &block.system_time,
             },
