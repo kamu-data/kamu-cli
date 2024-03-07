@@ -22,6 +22,7 @@ impl Flow {
     /// Creates a flow
     pub fn new(
         now: DateTime<Utc>,
+        trigger_time: DateTime<Utc>,
         flow_id: FlowID,
         flow_key: FlowKey,
         trigger: FlowTrigger,
@@ -31,6 +32,7 @@ impl Flow {
                 flow_id,
                 FlowEventInitiated {
                     event_time: now,
+                    trigger_time,
                     flow_id,
                     flow_key,
                     trigger,
@@ -46,12 +48,16 @@ impl Flow {
         now: DateTime<Utc>,
         start_condition: FlowStartCondition,
     ) -> Result<(), ProjectionError<FlowState>> {
-        let event = FlowEventStartConditionUpdated {
-            event_time: now,
-            flow_id: self.flow_id,
-            start_condition,
-        };
-        self.apply(event)
+        if self.start_condition != Some(start_condition) {
+            let event = FlowEventStartConditionUpdated {
+                event_time: now,
+                flow_id: self.flow_id,
+                start_condition,
+            };
+            self.apply(event)
+        } else {
+            Ok(())
+        }
     }
 
     /// Add extra trigger, if it's unique
@@ -119,11 +125,19 @@ impl Flow {
 
     /// Abort flow
     pub fn abort(&mut self, now: DateTime<Utc>) -> Result<(), ProjectionError<FlowState>> {
-        let event = FlowEventAborted {
-            event_time: now,
-            flow_id: self.flow_id,
-        };
-        self.apply(event)
+        if !self
+            .outcome
+            .as_ref()
+            .is_some_and(|outcome| matches!(outcome, FlowOutcome::Aborted))
+        {
+            let event = FlowEventAborted {
+                event_time: now,
+                flow_id: self.flow_id,
+            };
+            self.apply(event)
+        } else {
+            Ok(())
+        }
     }
 }
 

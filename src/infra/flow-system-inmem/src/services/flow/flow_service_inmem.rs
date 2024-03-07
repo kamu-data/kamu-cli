@@ -608,12 +608,13 @@ impl FlowServiceInMemory {
     #[tracing::instrument(level = "trace", skip_all, fields(?flow_key, ?trigger))]
     async fn make_new_flow(
         &self,
-        creation_time: DateTime<Utc>,
+        trigger_time: DateTime<Utc>,
         flow_key: FlowKey,
         trigger: FlowTrigger,
     ) -> Result<Flow, InternalError> {
         let flow = Flow::new(
-            creation_time,
+            self.time_source.now(),
+            trigger_time,
             self.flow_event_store.new_flow_id(),
             flow_key,
             trigger,

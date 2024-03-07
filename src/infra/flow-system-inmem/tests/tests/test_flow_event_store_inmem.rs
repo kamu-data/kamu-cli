@@ -984,6 +984,7 @@ impl<'a> DatasetFlowGenerator<'a> {
 
         let mut flow = Flow::new(
             creation_moment,
+            creation_moment,
             flow_id,
             FlowKeyDataset {
                 dataset_id: self.dataset_id.clone(),
@@ -1030,6 +1031,7 @@ impl SystemFlowGenerator {
         let creation_moment = Utc::now();
 
         let mut flow = Flow::new(
+            creation_moment,
             creation_moment,
             flow_id,
             FlowKey::System(FlowKeySystem { flow_type }),
