@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::borrow::Cow;
 use std::convert::{AsRef, TryFrom};
 use std::hash::Hash;
 use std::sync::Arc;
@@ -109,14 +110,14 @@ use like::ILike;
 
 ////////////////////////////////////////////////////////////////////////////////
 
-macro_rules! newtype_str {
+macro_rules! newtype_istr {
     ($typ:ident, $parse:expr, $visitor:ident) => {
-        #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+        #[derive(Debug, Clone, Eq, PartialEq, PartialOrd, Ord, Hash)]
         pub struct $typ(Arc<str>);
 
         impl $typ {
             pub fn new_unchecked<S: AsRef<str> + ?Sized>(s: &S) -> Self {
-                Self(Arc::from(s.as_ref()))
+                Self(Arc::from(Self::into_lowercase(s.as_ref())))
             }
 
             pub fn as_str(&self) -> &str {
@@ -129,6 +130,15 @@ macro_rules! newtype_str {
 
             pub fn from_inner_unchecked(s: Arc<str>) -> Self {
                 Self(s)
+            }
+
+            pub fn into_lowercase<'a>(s: &'a str) -> Cow<'a, str> {
+                let bytes = s.as_bytes();
+                if !bytes.iter().any(u8::is_ascii_uppercase) {
+                    Cow::Borrowed(s)
+                } else {
+                    Cow::Owned(s.to_ascii_lowercase())
+                }
             }
         }
 
@@ -153,7 +163,7 @@ macro_rules! newtype_str {
         impl std::str::FromStr for $typ {
             type Err = ::multiformats::ParseError<$typ>;
             fn from_str(s: &str) -> Result<Self, Self::Err> {
-                match $parse(s) {
+                match $parse(&$typ::into_lowercase(s)) {
                     Some((_, "")) => Ok(Self::new_unchecked(s)),
                     _ => Err(ParseError::new(s)),
                 }
@@ -208,7 +218,7 @@ macro_rules! newtype_str {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-newtype_str!(
+newtype_istr!(
     DatasetName,
     Grammar::match_dataset_name,
     DatasetNameSerdeVisitor
@@ -222,15 +232,11 @@ impl DatasetName {
     pub fn into_local_ref(self) -> DatasetRef {
         DatasetRef::Alias(DatasetAlias::new(None, self))
     }
-
-    pub fn lowercase_eq(&self, other: &Self) -> bool {
-        self.to_lowercase() == other.to_lowercase()
-    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-newtype_str!(
+newtype_istr!(
     DatasetNamePattern,
     Grammar::match_dataset_name_pattern,
     DatasetNamePatternSerdeVisitor
@@ -262,17 +268,20 @@ impl DatasetAliasPattern {
     }
 
     pub fn matches(&self, dataset_handle: &DatasetHandle) -> bool {
-        ((self.account_name.is_none() && dataset_handle.alias.account_name.is_none())
-            || (self.account_name.is_some()
-                && dataset_handle.alias.account_name.is_some()
-                && self
-                    .account_name
-                    .as_ref()
-                    .unwrap()
-                    .lowercase_eq(dataset_handle.alias.account_name.as_ref().unwrap())))
+        if self.account_name.is_some() && dataset_handle.alias.account_name.is_none()
+            || self.account_name.is_none() && dataset_handle.alias.account_name.is_some()
+        {
+            return false;
+        }
+        if self.account_name.as_ref().unwrap()
+            == dataset_handle.alias.account_name.as_ref().unwrap()
             && self
                 .dataset_name_pattern
                 .matches(&dataset_handle.alias.dataset_name)
+        {
+            return true;
+        }
+        false
     }
 }
 
@@ -311,25 +320,19 @@ pub const FAKE_ACCOUNT_ID: &str = "12345";
 
 ////////////////////////////////////////////////////////////////////////////////
 
-newtype_str!(
+newtype_istr!(
     AccountName,
     Grammar::match_account_name,
     AccountNameSerdeVisitor
 );
 
-impl AccountName {
-    pub fn lowercase_eq(&self, other: &Self) -> bool {
-        self.to_lowercase() == other.to_lowercase()
-    }
-}
+////////////////////////////////////////////////////////////////////////////////
+
+newtype_istr!(RepoName, Grammar::match_repo_name, RepoNameSerdeVisitor);
 
 ////////////////////////////////////////////////////////////////////////////////
 
-newtype_str!(RepoName, Grammar::match_repo_name, RepoNameSerdeVisitor);
-
-////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Clone, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, PartialOrd, Ord, Hash)]
 pub struct DatasetAlias {
     pub account_name: Option<AccountName>,
     pub dataset_name: DatasetName,
@@ -376,31 +379,10 @@ impl DatasetAlias {
     }
 }
 
-impl PartialEq<Self> for DatasetAlias {
-    fn eq(&self, other: &Self) -> bool {
-        ((self.account_name.is_none() && other.account_name.is_none())
-            || (self.account_name.is_some()
-                && other.account_name.is_some()
-                && self
-                    .account_name
-                    .as_ref()
-                    .unwrap()
-                    .lowercase_eq(other.account_name.as_ref().unwrap())))
-            && self.dataset_name.lowercase_eq(&other.dataset_name)
-    }
-}
-
-impl Hash for DatasetAlias {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.account_name.hash(state);
-        self.dataset_name.hash(state);
-    }
-}
-
 impl std::str::FromStr for DatasetAlias {
     type Err = ParseError<Self>;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match Grammar::match_dataset_alias(s) {
+        match Grammar::match_dataset_alias(&s.to_ascii_lowercase()) {
             Some((acc, ds, "")) => Ok(Self::new(
                 acc.map(AccountName::new_unchecked),
                 DatasetName::new_unchecked(ds),
@@ -427,7 +409,7 @@ impl_serde!(DatasetAlias, DatasetAliasSerdeVisitor);
 
 ////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialEq, PartialOrd, Ord, Hash)]
 pub struct DatasetAliasRemote {
     pub repo_name: RepoName,
     pub account_name: Option<AccountName>,
@@ -476,33 +458,10 @@ impl DatasetAliasRemote {
     }
 }
 
-impl PartialEq<Self> for DatasetAliasRemote {
-    fn eq(&self, other: &Self) -> bool {
-        (self.repo_name == other.repo_name)
-            && ((self.account_name.is_some()
-                && other.account_name.is_some()
-                && self
-                    .account_name
-                    .as_ref()
-                    .unwrap()
-                    .lowercase_eq(other.account_name.as_ref().unwrap()))
-                || (self.account_name.is_none() && other.account_name.is_none()))
-            && self.dataset_name.lowercase_eq(&other.dataset_name)
-    }
-}
-
-impl Hash for DatasetAliasRemote {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.repo_name.hash(state);
-        self.account_name.hash(state);
-        self.dataset_name.hash(state);
-    }
-}
-
 impl std::str::FromStr for DatasetAliasRemote {
     type Err = ParseError<Self>;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match Grammar::match_dataset_alias_remote(s) {
+        match Grammar::match_dataset_alias_remote(&s.to_ascii_lowercase()) {
             Some((repo, acc, ds, "")) => Ok(Self::new(
                 RepoName::new_unchecked(repo),
                 acc.map(AccountName::new_unchecked),

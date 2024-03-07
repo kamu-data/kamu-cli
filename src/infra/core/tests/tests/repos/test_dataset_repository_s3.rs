@@ -295,3 +295,19 @@ async fn test_iterate_datasets_multi_tenant() {
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(containerized)]
+#[tokio::test]
+async fn test_create_and_get_case_insensetive_dataset() {
+    let s3 = LocalS3Server::new().await;
+    let harness =
+        S3RepoHarness::create(&s3, auth::AlwaysHappyDatasetActionAuthorizer::new(), false).await;
+
+    test_dataset_repository_shared::test_create_and_get_case_insensetive_dataset(
+        harness.dataset_repo.as_ref(),
+        None,
+    )
+    .await;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////

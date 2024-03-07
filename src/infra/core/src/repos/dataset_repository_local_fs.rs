@@ -516,7 +516,7 @@ impl DatasetStorageStrategy for DatasetSingleTenantStorageStrategy {
     }
 
     fn get_datasets_by_owner(&self, account_name: AccountName) -> DatasetHandleStream<'_> {
-        if account_name.to_lowercase() == DEFAULT_ACCOUNT_NAME {
+        if account_name == DEFAULT_ACCOUNT_NAME {
             self.get_all_datasets()
         } else {
             Box::pin(futures::stream::empty())
@@ -529,8 +529,7 @@ impl DatasetStorageStrategy for DatasetSingleTenantStorageStrategy {
     ) -> Result<DatasetHandle, ResolveDatasetError> {
         assert!(
             !dataset_alias.is_multi_tenant()
-                || dataset_alias.account_name.as_ref().unwrap().to_lowercase()
-                    == DEFAULT_ACCOUNT_NAME,
+                || dataset_alias.account_name.as_ref().unwrap() == DEFAULT_ACCOUNT_NAME,
             "Multi-tenant refs shouldn't have reached down to here with earlier validations"
         );
 
@@ -810,10 +809,7 @@ impl DatasetStorageStrategy for DatasetMultiTenantStorageStrategy {
                     )
                     .await?;
 
-                if candidate_dataset_alias
-                    .dataset_name
-                    .lowercase_eq(&dataset_alias.dataset_name)
-                {
+                if candidate_dataset_alias.dataset_name == dataset_alias.dataset_name {
                     return Ok(DatasetHandle::new(dataset_id, candidate_dataset_alias));
                 }
             }

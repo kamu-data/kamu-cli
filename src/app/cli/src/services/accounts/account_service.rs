@@ -122,7 +122,9 @@ impl AccountService {
 
     fn find_account_info_impl(&self, account_name: &String) -> Option<AccountInfo> {
         // The account might be predefined in the configuration
-        self.predefined_accounts.get(account_name).cloned()
+        self.predefined_accounts
+            .get(&account_name.to_ascii_lowercase())
+            .cloned()
     }
 
     fn get_account_info_impl(
@@ -130,7 +132,10 @@ impl AccountService {
         account_name: &String,
     ) -> Result<AccountInfo, auth::RejectedCredentialsError> {
         // The account might be predefined in the configuration
-        match self.predefined_accounts.get(account_name) {
+        match self
+            .predefined_accounts
+            .get(&account_name.to_ascii_lowercase())
+        {
             // Use the predefined record
             Some(account_info) => Ok(account_info.clone()),
 

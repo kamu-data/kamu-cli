@@ -299,3 +299,39 @@ async fn test_iterate_datasets_multi_tenant() {
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_create_and_get_case_insensetive_dataset() {
+    let tempdir = tempfile::tempdir().unwrap();
+    let harness = LocalFsRepoHarness::create(
+        &tempdir,
+        auth::AlwaysHappyDatasetActionAuthorizer::new(),
+        false,
+    );
+
+    test_dataset_repository_shared::test_create_and_get_case_insensetive_dataset(
+        harness.dataset_repo.as_ref(),
+        None,
+    )
+    .await;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_create_and_get_case_insensetive_dataset_multi_tenant() {
+    let tempdir = tempfile::tempdir().unwrap();
+    let harness = LocalFsRepoHarness::create(
+        &tempdir,
+        auth::AlwaysHappyDatasetActionAuthorizer::new(),
+        true,
+    );
+
+    test_dataset_repository_shared::test_create_and_get_case_insensetive_dataset(
+        harness.dataset_repo.as_ref(),
+        Some(AccountName::new_unchecked(auth::DEFAULT_ACCOUNT_NAME)),
+    )
+    .await;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
