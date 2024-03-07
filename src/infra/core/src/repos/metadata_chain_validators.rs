@@ -62,7 +62,7 @@ impl MetadataChainVisitor for ValidateSeedBlockOrderVisitor {
 ///////////////////////////////////////////////////////////////////////////////
 
 pub struct ValidatePrevBlockExistsVisitor<'a> {
-    initial_prev_block_hash: Option<&'a Multihash>,
+    appended_prev_block_hash: Option<&'a Multihash>,
 }
 
 impl<'a> ValidatePrevBlockExistsVisitor<'a> {
@@ -76,7 +76,7 @@ impl<'a> ValidatePrevBlockExistsVisitor<'a> {
         Ok((
             decision,
             Self {
-                initial_prev_block_hash: block.prev_block_hash.as_ref(),
+                appended_prev_block_hash: block.prev_block_hash.as_ref(),
             },
         ))
     }
@@ -86,14 +86,14 @@ impl<'a> MetadataChainVisitor for ValidatePrevBlockExistsVisitor<'a> {
     type VisitError = AppendError;
 
     fn visit(&mut self, (hash, _): HashedMetadataBlockRef) -> Result<Decision, Self::VisitError> {
-        let Some(initial_prev_block_hash) = self.initial_prev_block_hash else {
+        let Some(appended_prev_block_hash) = self.appended_prev_block_hash else {
             unreachable!()
         };
 
-        if initial_prev_block_hash != hash {
+        if appended_prev_block_hash != hash {
             return Err(
                 AppendValidationError::PrevBlockNotFound(BlockNotFoundError {
-                    hash: initial_prev_block_hash.clone(),
+                    hash: appended_prev_block_hash.clone(),
                 })
                 .into(),
             );
@@ -106,7 +106,7 @@ impl<'a> MetadataChainVisitor for ValidatePrevBlockExistsVisitor<'a> {
 ///////////////////////////////////////////////////////////////////////////////
 
 pub struct ValidateSequenceNumbersIntegrityVisitor {
-    initial_sequence_number: u64,
+    appended_sequence_number: u64,
 }
 
 impl<'a> ValidateSequenceNumbersIntegrityVisitor {
@@ -127,7 +127,7 @@ impl<'a> ValidateSequenceNumbersIntegrityVisitor {
         Ok((
             decision,
             Self {
-                initial_sequence_number: block.sequence_number,
+                appended_sequence_number: block.sequence_number,
             },
         ))
     }
@@ -140,12 +140,12 @@ impl MetadataChainVisitor for ValidateSequenceNumbersIntegrityVisitor {
         &mut self,
         (hash, block): HashedMetadataBlockRef,
     ) -> Result<Decision, Self::VisitError> {
-        if block.sequence_number != (self.initial_sequence_number - 1) {
+        if block.sequence_number != (self.appended_sequence_number - 1) {
             return Err(
                 AppendValidationError::SequenceIntegrity(SequenceIntegrityError {
                     prev_block_hash: Some(hash.clone()),
                     prev_block_sequence_number: Some(block.sequence_number),
-                    next_block_sequence_number: self.initial_sequence_number,
+                    next_block_sequence_number: self.appended_sequence_number,
                 })
                 .into(),
             );
@@ -158,7 +158,7 @@ impl MetadataChainVisitor for ValidateSequenceNumbersIntegrityVisitor {
 ///////////////////////////////////////////////////////////////////////////////
 
 pub struct ValidateSystemTimeIsMonotonicVisitor<'a> {
-    initial_system_time: &'a DateTime<Utc>,
+    appended_system_time: &'a DateTime<Utc>,
 }
 
 impl<'a> ValidateSystemTimeIsMonotonicVisitor<'a> {
@@ -166,7 +166,7 @@ impl<'a> ValidateSystemTimeIsMonotonicVisitor<'a> {
         Ok((
             Decision::Next,
             Self {
-                initial_system_time: &block.system_time,
+                appended_system_time: &block.system_time,
             },
         ))
     }
@@ -176,7 +176,7 @@ impl<'a> MetadataChainVisitor for ValidateSystemTimeIsMonotonicVisitor<'a> {
     type VisitError = AppendError;
 
     fn visit(&mut self, (_, block): HashedMetadataBlockRef) -> Result<Decision, Self::VisitError> {
-        if *self.initial_system_time < block.system_time {
+        if *self.appended_system_time < block.system_time {
             return Err(AppendValidationError::SystemTimeIsNotMonotonic.into());
         }
 
@@ -187,12 +187,12 @@ impl<'a> MetadataChainVisitor for ValidateSystemTimeIsMonotonicVisitor<'a> {
 ///////////////////////////////////////////////////////////////////////////////
 
 pub struct ValidateWatermarkIsMonotonicVisitor {
-    initial_new_watermark: Option<DateTime<Utc>>,
+    appended_new_watermark: Option<DateTime<Utc>>,
 }
 
 impl ValidateWatermarkIsMonotonicVisitor {
     pub fn new(block: &MetadataBlock) -> Result<(Decision, Self), AppendError> {
-        let (decision, initial_new_watermark) =
+        let (decision, appended_new_watermark) =
             if let Some(data_steam_event) = block.event.as_data_stream_event() {
                 (
                     Decision::NextOfType(MetadataBlockTypeFlags::DATA_BLOCK),
@@ -205,7 +205,7 @@ impl ValidateWatermarkIsMonotonicVisitor {
         Ok((
             decision,
             Self {
-                initial_new_watermark,
+                appended_new_watermark,
             },
         ))
     }
@@ -219,7 +219,7 @@ impl MetadataChainVisitor for ValidateWatermarkIsMonotonicVisitor {
             unreachable!()
         };
 
-        match (data_steam_event.new_watermark, &self.initial_new_watermark) {
+        match (data_steam_event.new_watermark, &self.appended_new_watermark) {
             (Some(_), None) => Err(AppendValidationError::WatermarkIsNotMonotonic.into()),
             (Some(prev_wm), Some(next_wm)) if prev_wm > next_wm => {
                 Err(AppendValidationError::WatermarkIsNotMonotonic.into())
@@ -232,8 +232,8 @@ impl MetadataChainVisitor for ValidateWatermarkIsMonotonicVisitor {
 ///////////////////////////////////////////////////////////////////////////////
 
 pub struct ValidateOffsetsAreSequentialVisitor<'a> {
-    initial_block_event: &'a MetadataEvent,
-    initial_data_block: Option<MetadataBlockDataStreamRef<'a>>,
+    appended_block_event: &'a MetadataEvent,
+    appended_data_block: Option<MetadataBlockDataStreamRef<'a>>,
 }
 
 impl<'a> ValidateOffsetsAreSequentialVisitor<'a> {
@@ -263,9 +263,9 @@ impl<'a> ValidateOffsetsAreSequentialVisitor<'a> {
     }
 
     pub fn new(block: &'a MetadataBlock) -> Result<(Decision, Self), AppendError> {
-        let initial_data_block = block.as_data_stream_block();
-        let decision = if let Some(initial_data_block) = &initial_data_block {
-            Self::validate_internal_offset_consistency(&block.event, initial_data_block)?;
+        let maybe_data_block = block.as_data_stream_block();
+        let decision = if let Some(data_block) = &maybe_data_block {
+            Self::validate_internal_offset_consistency(&block.event, data_block)?;
 
             Decision::NextOfType(MetadataBlockTypeFlags::DATA_BLOCK)
         } else {
@@ -275,8 +275,8 @@ impl<'a> ValidateOffsetsAreSequentialVisitor<'a> {
         Ok((
             decision,
             Self {
-                initial_block_event: &block.event,
-                initial_data_block,
+                appended_block_event: &block.event,
+                appended_data_block: maybe_data_block,
             },
         ))
     }
@@ -290,23 +290,23 @@ impl<'a> MetadataChainVisitor for ValidateOffsetsAreSequentialVisitor<'a> {
             unreachable!()
         };
 
-        let Some(initial_data_block) = &self.initial_data_block else {
+        let Some(appended_data_block) = &self.appended_data_block else {
             unreachable!()
         };
 
         // Validate input/output offset sequencing
         let expected_next_prev_offset = data_block.event.last_offset();
 
-        if initial_data_block.event.prev_offset != expected_next_prev_offset {
+        if appended_data_block.event.prev_offset != expected_next_prev_offset {
             invalid_event!(
-                self.initial_block_event.clone(),
+                self.appended_block_event.clone(),
                 "Carried prev offset does not correspond to the last offset in the chain",
             );
         }
 
         // Validate internal offset consistency
-        if let Some(new_data) = initial_data_block.event.new_data {
-            let expected_start_offset = initial_data_block.event.prev_offset.map_or(0, |v| v + 1);
+        if let Some(new_data) = appended_data_block.event.new_data {
+            let expected_start_offset = appended_data_block.event.prev_offset.map_or(0, |v| v + 1);
 
             if new_data.offset_interval.start != expected_start_offset {
                 return Err(AppendValidationError::OffsetsAreNotSequential(
@@ -319,7 +319,7 @@ impl<'a> MetadataChainVisitor for ValidateOffsetsAreSequentialVisitor<'a> {
             }
 
             if new_data.offset_interval.end < new_data.offset_interval.start {
-                invalid_event!(self.initial_block_event.clone(), "Invalid offset interval");
+                invalid_event!(self.appended_block_event.clone(), "Invalid offset interval");
             }
         }
 
