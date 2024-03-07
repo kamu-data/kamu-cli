@@ -247,7 +247,11 @@ impl<'a> MetadataChainVisitor for DataWriterDataFusionMetaDataStateVisitor<'a> {
             }
         }
 
-        Ok(Decision::NextOfType(self.next_block_flags))
+        if !self.next_block_flags.is_empty() {
+            Ok(Decision::NextOfType(self.next_block_flags))
+        } else {
+            Ok(Decision::Stop)
+        }
     }
 }
 

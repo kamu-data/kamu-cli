@@ -216,7 +216,7 @@ impl MetadataChainVisitor for ValidateWatermarkIsMonotonicVisitor {
 
     fn visit(&mut self, (_, block): HashedMetadataBlockRef) -> Result<Decision, Self::VisitError> {
         let Some(data_steam_event) = block.event.as_data_stream_event() else {
-            return Ok(Decision::NextOfType(MetadataBlockTypeFlags::DATA_BLOCK));
+            unreachable!()
         };
 
         match (data_steam_event.new_watermark, &self.initial_new_watermark) {
@@ -237,9 +237,36 @@ pub struct ValidateOffsetsAreSequentialVisitor<'a> {
 }
 
 impl<'a> ValidateOffsetsAreSequentialVisitor<'a> {
+    fn validate_internal_offset_consistency(
+        event: &MetadataEvent,
+        data_block: &MetadataBlockDataStreamRef,
+    ) -> Result<(), AppendError> {
+        if let Some(new_data) = data_block.event.new_data {
+            let expected_start_offset = data_block.event.prev_offset.map_or(0, |v| v + 1);
+
+            if new_data.offset_interval.start != expected_start_offset {
+                return Err(AppendValidationError::OffsetsAreNotSequential(
+                    OffsetsNotSequentialError::new(
+                        expected_start_offset,
+                        new_data.offset_interval.start,
+                    ),
+                )
+                .into());
+            }
+
+            if new_data.offset_interval.end < new_data.offset_interval.start {
+                invalid_event!(event.clone(), "Invalid offset interval");
+            }
+        }
+
+        Ok(())
+    }
+
     pub fn new(block: &'a MetadataBlock) -> Result<(Decision, Self), AppendError> {
         let initial_data_block = block.as_data_stream_block();
-        let decision = if initial_data_block.is_some() {
+        let decision = if let Some(initial_data_block) = &initial_data_block {
+            Self::validate_internal_offset_consistency(&block.event, initial_data_block)?;
+
             Decision::NextOfType(MetadataBlockTypeFlags::DATA_BLOCK)
         } else {
             Decision::Stop
@@ -259,11 +286,8 @@ impl<'a> MetadataChainVisitor for ValidateOffsetsAreSequentialVisitor<'a> {
     type VisitError = AppendError;
 
     fn visit(&mut self, (_, block): HashedMetadataBlockRef) -> Result<Decision, Self::VisitError> {
-        // Only check AddData and ExecuteTransform.
-        // SetWatermark is also considered a data stream event but does not carry the
-        // offsets.
         let Some(data_block) = block.as_data_stream_block() else {
-            return Ok(Decision::NextOfType(MetadataBlockTypeFlags::DATA_BLOCK));
+            unreachable!()
         };
 
         let Some(initial_data_block) = &self.initial_data_block else {
@@ -295,7 +319,7 @@ impl<'a> MetadataChainVisitor for ValidateOffsetsAreSequentialVisitor<'a> {
             }
 
             if new_data.offset_interval.end < new_data.offset_interval.start {
-                invalid_event!(self.initial_block_event.clone(), "Invalid offset interval",);
+                invalid_event!(self.initial_block_event.clone(), "Invalid offset interval");
             }
         }
 
