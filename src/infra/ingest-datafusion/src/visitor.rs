@@ -110,9 +110,7 @@ impl<'a> DataWriterDataFusionMetaDataStateVisitor<'a> {
     }
 
     fn handle_set_data_schema(&mut self, e: &SetDataSchema) -> Result<(), ScanMetadataError> {
-        if self.maybe_schema.is_none() {
-            self.maybe_schema = Some(e.schema_as_arrow().int_err()?);
-        }
+        self.maybe_schema = Some(e.schema_as_arrow().int_err()?);
 
         Ok(())
     }
@@ -158,9 +156,7 @@ impl<'a> DataWriterDataFusionMetaDataStateVisitor<'a> {
             .into());
         }
 
-        if self.maybe_source_event.is_none() {
-            self.maybe_source_event = Some(e.clone().into());
-        }
+        self.maybe_source_event = Some(e.clone().into());
 
         Ok(())
     }
@@ -188,9 +184,7 @@ impl<'a> DataWriterDataFusionMetaDataStateVisitor<'a> {
     }
 
     fn handle_set_vocab(&mut self, e: &SetVocab) {
-        if self.maybe_set_vocab.is_none() {
-            self.maybe_set_vocab = Some(e.clone());
-        }
+        self.maybe_set_vocab = Some(e.clone());
     }
 
     fn handle_seed(&mut self, e: &Seed) {
