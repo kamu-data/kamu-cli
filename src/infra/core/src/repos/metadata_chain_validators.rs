@@ -112,8 +112,8 @@ pub struct ValidateSequenceNumbersIntegrityVisitor {
     appended_sequence_number: u64,
 }
 
-impl<'a> ValidateSequenceNumbersIntegrityVisitor {
-    pub fn new(block: &'a MetadataBlock) -> Result<(MetadataVisitorDecision, Self), AppendError> {
+impl ValidateSequenceNumbersIntegrityVisitor {
+    pub fn new(block: &MetadataBlock) -> Result<(MetadataVisitorDecision, Self), AppendError> {
         if block.prev_block_hash.is_none() && block.sequence_number != 0 {
             return Err(
                 AppendValidationError::SequenceIntegrity(SequenceIntegrityError {
