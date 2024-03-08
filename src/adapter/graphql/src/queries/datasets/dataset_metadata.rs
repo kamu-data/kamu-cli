@@ -8,9 +8,18 @@
 // by the Apache License, Version 2.0.
 
 use chrono::prelude::*;
-use kamu_core::{self as domain, MetadataChainExt, TryStreamExtExt};
+use kamu_core::{
+    self as domain,
+    MetadataChainExt,
+    SearchDataBlocksVisitor,
+    SearchSetAttachmentsVisitor,
+    SearchSetInfoVisitor,
+    SearchSetLicenseVisitor,
+    SearchSetVocabVisitor,
+    SearchSingleTypedBlockVisitor,
+};
 use opendatafabric as odf;
-use opendatafabric::{AsTypedBlock, VariantOf};
+use opendatafabric::VariantOf;
 
 use crate::prelude::*;
 use crate::queries::*;
@@ -37,19 +46,23 @@ impl DatasetMetadata {
     }
 
     #[graphql(skip)]
-    async fn get_last_block_of_type<T: VariantOf<odf::MetadataEvent>>(
+    async fn get_last_block_of_type<T: VariantOf<odf::MetadataEvent>, const F: u32>(
         &self,
         ctx: &Context<'_>,
-    ) -> Result<Option<odf::MetadataBlockTyped<T>>> {
+        mut visitor: SearchSingleTypedBlockVisitor<T, InternalError, F>,
+    ) -> Result<Option<odf::MetadataBlockTyped<T>>>
+    where
+        T: VariantOf<odf::MetadataEvent> + Send + Sync,
+    {
         let dataset = self.get_dataset(ctx).await?;
-        let block = dataset
+
+        dataset
             .as_metadata_chain()
-            .iter_blocks_ref(&domain::BlockRef::Head)
-            .filter_map_ok(|(_, b)| b.into_typed::<T>())
-            .try_first()
+            .accept(&mut [&mut visitor])
             .await
             .int_err()?;
-        Ok(block)
+
+        Ok(visitor.into_block())
     }
 
     /// Access to the temporal metadata chain of the dataset
@@ -59,15 +72,15 @@ impl DatasetMetadata {
 
     /// Last recorded watermark
     async fn current_watermark(&self, ctx: &Context<'_>) -> Result<Option<DateTime<Utc>>> {
-        let ds = self.get_dataset(ctx).await?;
-        Ok(ds
+        let dataset = self.get_dataset(ctx).await?;
+        let mut visitor = <SearchDataBlocksVisitor>::next_filled_new_watermark();
+
+        dataset
             .as_metadata_chain()
-            .iter_blocks_ref(&domain::BlockRef::Head)
-            .filter_data_stream_blocks()
-            .filter_map_ok(|(_, b)| b.event.new_watermark)
-            .try_first()
-            .await
-            .int_err()?)
+            .accept(&mut [&mut visitor])
+            .await?;
+
+        Ok(visitor.into_event().and_then(|e| e.new_watermark))
     }
 
     /// Latest data schema
@@ -198,7 +211,7 @@ impl DatasetMetadata {
     /// Current descriptive information about the dataset
     async fn current_info(&self, ctx: &Context<'_>) -> Result<SetInfo> {
         Ok(self
-            .get_last_block_of_type::<odf::SetInfo>(ctx)
+            .get_last_block_of_type(ctx, <SearchSetInfoVisitor>::default())
             .await?
             .map_or(
                 SetInfo {
@@ -213,7 +226,7 @@ impl DatasetMetadata {
     /// dataset
     async fn current_readme(&self, ctx: &Context<'_>) -> Result<Option<String>> {
         if let Some(attachments) = self
-            .get_last_block_of_type::<odf::SetAttachments>(ctx)
+            .get_last_block_of_type(ctx, <SearchSetAttachmentsVisitor>::default())
             .await?
         {
             match attachments.event.attachments {
@@ -232,7 +245,7 @@ impl DatasetMetadata {
     /// Current license associated with the dataset
     async fn current_license(&self, ctx: &Context<'_>) -> Result<Option<SetLicense>> {
         Ok(self
-            .get_last_block_of_type::<odf::SetLicense>(ctx)
+            .get_last_block_of_type(ctx, <SearchSetLicenseVisitor>::default())
             .await?
             .map(|b| b.event.into()))
     }
@@ -240,7 +253,7 @@ impl DatasetMetadata {
     /// Current vocabulary associated with the dataset
     async fn current_vocab(&self, ctx: &Context<'_>) -> Result<Option<SetVocab>> {
         Ok(self
-            .get_last_block_of_type::<odf::SetVocab>(ctx)
+            .get_last_block_of_type(ctx, <SearchSetVocabVisitor>::default())
             .await?
             .map(|b| b.event.into()))
     }

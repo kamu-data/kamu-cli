@@ -10,7 +10,12 @@
 use chrono::{DateTime, Utc};
 use datafusion::arrow::datatypes::SchemaRef;
 use internal_error::ResultIntoInternal;
-use kamu_core::{Decision, HashedMetadataBlockRef, MetadataBlockTypeFlags, MetadataChainVisitor};
+use kamu_core::{
+    HashedMetadataBlockRef,
+    MetadataBlockTypeFlags,
+    MetadataChainVisitor,
+    MetadataVisitorDecision as Decision,
+};
 use opendatafabric::{
     AddData,
     AddPushSource,

@@ -207,60 +207,39 @@ impl TransformServiceImpl {
         let block_ref = BlockRef::Head;
         let head = output_chain.resolve_ref(&block_ref).await.int_err()?;
 
-        let mut source = None;
-        let mut schema = None;
-        let mut set_vocab = None;
-        let mut prev_query = None;
-
         // TODO: PERF: Search for source, vocab, and data schema result in full scan
-        {
-            let mut block_stream = output_chain.iter_blocks_interval(&head, None, false);
-            while let Some((_, block)) = block_stream.try_next().await.int_err()? {
-                match block.event {
-                    MetadataEvent::SetVocab(e) => {
-                        if set_vocab.is_none() {
-                            set_vocab = Some(e);
-                        }
-                    }
-                    MetadataEvent::SetTransform(e) => {
-                        if source.is_none() {
-                            source = Some(e);
-                        } else {
-                            unimplemented!("Transform evolution is not yet supported");
-                        }
-                    }
-                    MetadataEvent::SetDataSchema(e) => {
-                        if schema.is_none() {
-                            schema = Some(e.schema_as_arrow().int_err()?);
-                        }
-                    }
-                    MetadataEvent::ExecuteTransform(e) => {
-                        if prev_query.is_none() {
-                            prev_query = Some(e);
-                        }
-                    }
-                    MetadataEvent::Seed(_)
-                    | MetadataEvent::SetAttachments(_)
-                    | MetadataEvent::SetInfo(_)
-                    | MetadataEvent::SetLicense(_) => {}
-                    MetadataEvent::AddData(_)
-                    | MetadataEvent::SetPollingSource(_)
-                    | MetadataEvent::AddPushSource(_)
-                    | MetadataEvent::DisablePushSource(_)
-                    | MetadataEvent::DisablePollingSource(_) => {
-                        unreachable!()
-                    }
-                }
+        let (source, schema, set_vocab, prev_query) = {
+            // TODO: Support transform evolution
+            let mut set_transform_visitor = <SearchSetTransformVisitor>::default();
+            let mut set_vocab_visitor = <SearchSetVocabVisitor>::default();
+            let mut set_data_schema_visitor = <SearchSetDataSchemaVisitor>::default();
+            let mut execute_transform_visitor = <SearchExecuteTransformVisitor>::default();
 
-                if source.is_some()
-                    && schema.is_some()
-                    && set_vocab.is_some()
-                    && prev_query.is_some()
-                {
-                    break;
-                }
-            }
-        }
+            dataset
+                .as_metadata_chain()
+                .accept_by_hash(
+                    &mut [
+                        &mut set_transform_visitor,
+                        &mut set_vocab_visitor,
+                        &mut set_data_schema_visitor,
+                        &mut execute_transform_visitor,
+                    ],
+                    &head,
+                )
+                .await?;
+
+            (
+                set_transform_visitor.into_event(),
+                set_data_schema_visitor
+                    .into_event()
+                    .as_ref()
+                    .map(SetDataSchema::schema_as_arrow)
+                    .transpose() // Option<Result<SchemaRef, E>> -> Result<Option<SchemaRef>, E>
+                    .int_err()?,
+                set_vocab_visitor.into_event(),
+                execute_transform_visitor.into_event(),
+            )
+        };
 
         let Some(source) = source else {
             return Err(TransformNotDefinedError {}.into());
@@ -322,16 +301,14 @@ impl TransformServiceImpl {
     // This will require passing the schema explicitly instead of relying on a file
     async fn is_never_pulled(&self, dataset_ref: &DatasetRef) -> Result<bool, InternalError> {
         let dataset = self.dataset_repo.get_dataset(dataset_ref).await.int_err()?;
-        let last_data_block = dataset
+        let mut visitor = <SearchDataBlocksVisitor>::next_data_block();
+
+        dataset
             .as_metadata_chain()
-            .iter_blocks()
-            .filter_data_stream_blocks()
-            .try_next()
-            .await
-            .int_err()?;
-        Ok(last_data_block
-            .and_then(|(_, b)| b.event.last_offset())
-            .is_none())
+            .accept(&mut [&mut visitor])
+            .await?;
+
+        Ok(visitor.into_event().and_then(|e| e.last_offset()).is_none())
     }
 
     async fn get_transform_input(
@@ -362,13 +339,19 @@ impl TransformServiceImpl {
 
         // Determine unprocessed block and offset range
         let last_unprocessed_block = input_chain.resolve_ref(&BlockRef::Head).await.int_err()?;
-        let last_unprocessed_offset = input_chain
-            .iter_blocks_interval(&last_unprocessed_block, last_processed_block, false)
-            .filter_map_ok(|(_, b)| b.into_data_stream_block())
-            .try_next()
-            .await
-            .int_err()?
-            .and_then(|b| b.event.last_offset())
+        let mut visitor = <SearchDataBlocksVisitor>::next_data_block();
+
+        input_chain
+            .accept_by_interval(
+                &mut [&mut visitor],
+                &last_unprocessed_block,
+                last_processed_block,
+            )
+            .await?;
+
+        let last_unprocessed_offset = visitor
+            .into_event()
+            .and_then(|e| e.last_offset())
             .or(last_processed_offset);
 
         let query_input = ExecuteTransformInput {
@@ -454,13 +437,15 @@ impl TransformServiceImpl {
             h.clone()
         } else {
             // TODO: This will not work with schema evolution
+            let mut visitor = <SearchDataBlocksVisitor>::next_filled_new_data();
+
             input_chain
-                .iter_blocks()
-                .filter_data_stream_blocks()
-                .filter_map_ok(|(_, b)| b.event.new_data)
-                .try_first()
-                .await
-                .int_err()?
+                .accept::<InternalError>(&mut [&mut visitor])
+                .await?;
+
+            visitor
+                .into_event()
+                .and_then(|e| e.new_data)
                 .unwrap() // Already checked that none of the inputs are empty
                 .physical_hash
         };
@@ -496,19 +481,18 @@ impl TransformServiceImpl {
         dataset_ref: &DatasetRef,
     ) -> Result<DatasetVocabulary, InternalError> {
         let dataset = self.dataset_repo.get_dataset(dataset_ref).await.int_err()?;
-        Ok(dataset
+        let mut visitor = <SearchSetVocabVisitor>::default();
+
+        dataset
             .as_metadata_chain()
-            .iter_blocks()
-            .filter_map_ok(|(_, b)| b.event.into_variant::<SetVocab>())
-            .try_first()
-            .await
-            .int_err()?
-            .unwrap_or_default()
-            .into())
+            .accept(&mut [&mut visitor])
+            .await?;
+
+        Ok(visitor.into_event().unwrap_or_default().into())
     }
 
     // TODO: Improve error handling
-    // Need an inconsistent medata error?
+    // Need an inconsistent metadata error?
     #[tracing::instrument(level = "info", skip_all)]
     pub async fn get_verification_plan(
         &self,
@@ -526,62 +510,87 @@ impl TransformServiceImpl {
             Some(hash) => hash,
         };
         let tail = block_range.0;
+        let tail_sequence_number = match tail.as_ref() {
+            Some(tail) => {
+                let block = metadata_chain.get_block(tail).await?;
 
-        let mut source = None;
-        let mut set_vocab = None;
-        let mut schema = None;
-        let mut blocks = Vec::new();
-        let mut finished_range = false;
-
-        {
-            let mut block_stream = metadata_chain.iter_blocks_interval(&head, None, false);
-
-            // TODO: PERF: Search for source, vocab, and data schema result in full scan
-            while let Some((block_hash, block)) = block_stream.try_next().await? {
-                match block.event {
-                    MetadataEvent::SetTransform(st) => {
-                        if source.is_none() {
-                            source = Some(st);
-                        } else {
-                            // TODO: Support dataset evolution
-                            unimplemented!(
-                                "Verifying datasets with evolving queries is not yet supported"
-                            );
-                        }
-                    }
-                    MetadataEvent::SetVocab(sv) => {
-                        if set_vocab.is_none() {
-                            set_vocab = Some(sv);
-                        }
-                    }
-                    MetadataEvent::SetDataSchema(e) => {
-                        if schema.is_none() {
-                            schema = Some(e.schema_as_arrow().int_err()?);
-                        }
-                    }
-                    MetadataEvent::ExecuteTransform(_) => {
-                        if !finished_range {
-                            blocks.push((block_hash.clone(), block));
-                        }
-                    }
-                    MetadataEvent::AddData(_)
-                    | MetadataEvent::SetPollingSource(_)
-                    | MetadataEvent::DisablePollingSource(_)
-                    | MetadataEvent::AddPushSource(_)
-                    | MetadataEvent::DisablePushSource(_) => {
-                        unreachable!()
-                    }
-                    MetadataEvent::Seed(_)
-                    | MetadataEvent::SetAttachments(_)
-                    | MetadataEvent::SetInfo(_)
-                    | MetadataEvent::SetLicense(_) => (),
-                }
-
-                if !finished_range && Some(&block_hash) == tail.as_ref() {
-                    finished_range = true;
-                }
+                Some(block.sequence_number)
             }
-        }
+            None => None,
+        };
+
+        let (source, set_vocab, schema, blocks, finished_range) = {
+            // TODO: Support dataset evolution
+            let mut set_transform_visitor = <SearchSetTransformVisitor>::default();
+            let mut set_vocab_visitor = <SearchSetVocabVisitor>::default();
+            let mut set_data_schema_visitor = <SearchSetDataSchemaVisitor>::default();
+
+            struct ExecuteTransformCollectorVisitor {
+                tail_sequence_number: Option<u64>,
+                blocks: Vec<(Multihash, MetadataBlock)>,
+                finished_range: bool,
+            }
+
+            let mut execute_transform_collector_visitor = GenericCallbackVisitor::new(
+                ExecuteTransformCollectorVisitor {
+                    tail_sequence_number,
+                    blocks: Vec::new(),
+                    finished_range: false,
+                },
+                |state, (hash, block)| {
+                    type Flag = MetadataBlockTypeFlags;
+                    type Decision = MetadataVisitorDecision;
+
+                    if Some(block.sequence_number) < state.tail_sequence_number {
+                        state.finished_range = true;
+
+                        return Ok(Decision::Stop);
+                    };
+
+                    let block_flag = Flag::from(block);
+
+                    if Flag::EXECUTE_TRANSFORM.contains(block_flag) {
+                        state.blocks.push((hash.clone(), block.clone()));
+                    };
+
+                    if Some(block.sequence_number) == state.tail_sequence_number {
+                        state.finished_range = true;
+
+                        Ok(Decision::Stop)
+                    } else {
+                        Ok(Decision::NextOfType(Flag::EXECUTE_TRANSFORM))
+                    }
+                },
+            );
+
+            metadata_chain
+                .accept::<InternalError>(&mut [
+                    &mut set_transform_visitor,
+                    &mut set_vocab_visitor,
+                    &mut set_data_schema_visitor,
+                    &mut execute_transform_collector_visitor,
+                ])
+                .await?;
+
+            let ExecuteTransformCollectorVisitor {
+                blocks,
+                finished_range,
+                ..
+            } = execute_transform_collector_visitor.into_state();
+
+            (
+                set_transform_visitor.into_event(),
+                set_vocab_visitor.into_event(),
+                set_data_schema_visitor
+                    .into_event()
+                    .as_ref()
+                    .map(SetDataSchema::schema_as_arrow)
+                    .transpose() // Option<Result<SchemaRef, E>> -> Result<Option<SchemaRef>, E>
+                    .int_err()?,
+                blocks,
+                finished_range,
+            )
+        };
 
         // Ensure start_block was found if specified
         if tail.is_some() && !finished_range {
@@ -719,15 +728,15 @@ impl TransformService for TransformServiceImpl {
         dataset_ref: &DatasetRef,
     ) -> Result<Option<(Multihash, MetadataBlockTyped<SetTransform>)>, GetDatasetError> {
         let dataset = self.dataset_repo.get_dataset(dataset_ref).await?;
+        let mut visitor = <SearchSetTransformVisitor>::default();
+
+        dataset
+            .as_metadata_chain()
+            .accept(&mut [&mut visitor])
+            .await?;
 
         // TODO: Support transform evolution
-        let source = dataset
-            .as_metadata_chain()
-            .iter_blocks()
-            .filter_map_ok(|(h, b)| b.into_typed::<SetTransform>().map(|b| (h, b)))
-            .try_first()
-            .await
-            .int_err()?;
+        let source = visitor.into_hashed_block();
 
         Ok(source)
     }

@@ -61,10 +61,28 @@ impl From<&MetadataBlock> for MetadataBlockTypeFlags {
 ///////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Decision {
+pub enum MetadataVisitorDecision {
+    /// Stop Marker. A visitor who has reported the end of work will not be
+    /// invited to visit again
     Stop,
+    /// A request for the previous block
     Next,
+    /// A request for a specific previous block, specifying its hash.
+    /// Reserved for long jumps through the metadata chain
     NextWithHash(Multihash),
+    /// A request for previous blocks, of specific types, using flags.
+    ///
+    /// # Examples
+    /// ```
+    /// // Request for SetVocab block
+    /// return MetadataVisitorDecision::NextOfType(MetadataBlockTypeFlags::SET_VOCAB);
+    ///
+    /// // Request for data blocks (ADD_DATA || EXECUTE_TRANSFORM)
+    /// return MetadataVisitorDecision::NextOfType(MetadataBlockTypeFlags::DATA_BLOCK);
+    ///
+    /// // Request for a list of blocks of different types
+    /// return MetadataVisitorDecision::NextOfType(MetadataBlockTypeFlags::SET_ATTACHMENTS | MetadataBlockTypeFlags::SET_LICENSE);
+    /// ```
     NextOfType(MetadataBlockTypeFlags),
 }
 
@@ -73,7 +91,10 @@ pub enum Decision {
 pub trait MetadataChainVisitor: Sync + Send {
     type Error: std::error::Error;
 
-    fn visit(&mut self, hashed_block_ref: HashedMetadataBlockRef) -> Result<Decision, Self::Error>;
+    fn visit(
+        &mut self,
+        hashed_block_ref: HashedMetadataBlockRef,
+    ) -> Result<MetadataVisitorDecision, Self::Error>;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

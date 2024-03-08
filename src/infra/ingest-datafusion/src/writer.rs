@@ -859,7 +859,7 @@ impl DataWriterDataFusionBuilder {
 
         self.dataset
             .as_metadata_chain()
-            .accept_by_hash_with_decisions(&mut [decision], &mut [&mut visitor], &head)
+            .accept_by_interval_with_decisions(&mut [decision], &mut [&mut visitor], &head, None)
             .await?;
 
         let metadata_state = visitor.get_metadata_state()?;

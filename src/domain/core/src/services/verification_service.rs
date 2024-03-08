@@ -285,6 +285,18 @@ impl From<auth::DatasetActionUnauthorizedError> for VerificationError {
     }
 }
 
+impl From<GetBlockError> for VerificationError {
+    fn from(v: GetBlockError) -> Self {
+        match v {
+            GetBlockError::NotFound(e) => Self::BlockNotFound(e),
+            GetBlockError::BlockVersion(e) => Self::BlockVersion(e),
+            GetBlockError::BlockMalformed(e) => Self::BlockMalformed(e),
+            GetBlockError::Access(e) => Self::Internal(e.int_err()),
+            GetBlockError::Internal(e) => Self::Internal(e),
+        }
+    }
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 
 #[derive(Clone, Debug, Eq, PartialEq)]

@@ -12,7 +12,7 @@ use std::fmt::Display;
 
 use async_trait::async_trait;
 use internal_error::*;
-use opendatafabric::{MetadataBlock, MetadataBlockTyped, MetadataEvent, Multihash, VariantOf};
+use opendatafabric::{MetadataBlock, MetadataEvent, Multihash};
 use thiserror::Error;
 
 use super::metadata_stream::DynMetadataStream;
@@ -108,34 +108,6 @@ pub trait MetadataChainExt: MetadataChain {
         }
     }
 
-    /// Same as [Self::last_of_type_ref] defaulting to the head reference
-    async fn last_of_type<E: VariantOf<MetadataEvent>>(
-        &self,
-    ) -> Result<Option<(Multihash, MetadataBlockTyped<E>)>, IterBlocksError> {
-        self.last_of_type_ref(&BlockRef::Head).await
-    }
-
-    /// Finds the last block (chronologically) carrying an instance of the
-    /// specified event type
-    async fn last_of_type_ref<E: VariantOf<MetadataEvent>>(
-        &self,
-        r: &BlockRef,
-    ) -> Result<Option<(Multihash, MetadataBlockTyped<E>)>, IterBlocksError> {
-        use futures::StreamExt;
-        use opendatafabric::AsTypedBlock;
-
-        let mut stream = self.iter_blocks_ref(r);
-        // TODO: PERF: Implement faster traversal of typed blocks
-        while let Some(r) = stream.next().await {
-            let (h, b) = r?;
-            if let Some(b) = b.into_typed::<E>() {
-                return Ok(Some((h, b)));
-            }
-        }
-
-        Ok(None)
-    }
-
     /// Convenience function to iterate blocks starting with the `head`
     /// reference
     fn iter_blocks(&self) -> DynMetadataStream<'_> {
@@ -148,6 +120,9 @@ pub trait MetadataChainExt: MetadataChain {
         self.iter_blocks_interval_ref(head, None)
     }
 
+    /// A method of accepting Visitors ([MetadataChainVisitor]) that allows us
+    /// to go through the metadata chain once and, if desired,
+    /// bypassing blocks of no interest.
     async fn accept<E>(
         &self,
         visitors: &mut [&mut dyn MetadataChainVisitor<Error = E>],
@@ -158,6 +133,27 @@ pub trait MetadataChainExt: MetadataChain {
         self.accept_by_ref(visitors, &BlockRef::Head).await
     }
 
+    /// Same as [Self::accept()], allowing us to define the block interval under
+    /// which we will be making the traverse.
+    ///
+    /// Note: the interval is `[head, tail)` - tail is exclusive
+    async fn accept_by_interval<E>(
+        &self,
+        visitors: &mut [&mut dyn MetadataChainVisitor<Error = E>],
+        head_hash: &Multihash,
+        tail_hash: Option<&Multihash>,
+    ) -> Result<(), E>
+    where
+        E: Error + From<IterBlocksError>,
+    {
+        let mut decisions = vec![MetadataVisitorDecision::Next; visitors.len()];
+
+        self.accept_by_interval_with_decisions(&mut decisions, visitors, head_hash, tail_hash)
+            .await
+    }
+
+    /// Same as [Self::accept()], allowing us to define the block (by hash) from
+    /// which we will start the traverse
     async fn accept_by_hash<E>(
         &self,
         visitors: &mut [&mut dyn MetadataChainVisitor<Error = E>],
@@ -166,12 +162,14 @@ pub trait MetadataChainExt: MetadataChain {
     where
         E: Error + From<IterBlocksError>,
     {
-        let mut decisions = vec![Decision::Next; visitors.len()];
+        let mut decisions = vec![MetadataVisitorDecision::Next; visitors.len()];
 
-        self.accept_by_hash_with_decisions(&mut decisions, visitors, head_hash)
+        self.accept_by_interval_with_decisions(&mut decisions, visitors, head_hash, None)
             .await
     }
 
+    /// Same as [Self::accept()], allowing us to define the block
+    /// (by block reference) from which we will start the traverse
     async fn accept_by_ref<E>(
         &self,
         visitors: &mut [&mut dyn MetadataChainVisitor<Error = E>],
@@ -185,21 +183,29 @@ pub trait MetadataChainExt: MetadataChain {
         self.accept_by_hash(visitors, &head_hash).await
     }
 
-    async fn accept_by_hash_with_decisions<E>(
+    /// A lower-level method of accepting Visitors ([MetadataChainVisitor])
+    /// to specify their initial decisions.
+    ///
+    /// See also [Self::accept()]
+    async fn accept_by_interval_with_decisions<E>(
         &self,
-        decisions: &mut [Decision],
+        decisions: &mut [MetadataVisitorDecision],
         visitors: &mut [&mut dyn MetadataChainVisitor<Error = E>],
         head_hash: &Multihash,
+        tail_hash: Option<&Multihash>,
     ) -> Result<(), E>
     where
         E: Error + From<IterBlocksError>,
     {
+        assert_eq!(decisions.len(), visitors.len());
+
         let mut all_visitors_finished = false;
         let mut current_hash = Some(head_hash.clone());
 
         // TODO: PERF: Add traversal optimizations such as skip-lists
         while let Some(hash) = current_hash
             && !all_visitors_finished
+            && tail_hash != Some(&hash)
         {
             let block = self.get_block(&hash).await.map_err(Into::into)?;
             let hashed_block_ref = (&hash, &block);
@@ -208,21 +214,22 @@ pub trait MetadataChainExt: MetadataChain {
 
             for (decision, visitor) in decisions.iter_mut().zip(visitors.iter_mut()) {
                 match decision {
-                    Decision::Stop => {
+                    MetadataVisitorDecision::Stop => {
                         stopped_visitors += 1;
                     }
-                    Decision::NextOfType(type_flags) if type_flags.is_empty() => {
+                    MetadataVisitorDecision::NextOfType(type_flags) if type_flags.is_empty() => {
                         stopped_visitors += 1;
+                        *decision = MetadataVisitorDecision::Stop;
                     }
-                    Decision::Next => {
+                    MetadataVisitorDecision::Next => {
                         *decision = visitor.visit(hashed_block_ref)?;
                     }
-                    Decision::NextWithHash(requested_hash) => {
+                    MetadataVisitorDecision::NextWithHash(requested_hash) => {
                         if hash == *requested_hash {
                             *decision = visitor.visit(hashed_block_ref)?;
                         }
                     }
-                    Decision::NextOfType(requested_flags) => {
+                    MetadataVisitorDecision::NextOfType(requested_flags) => {
                         let block_flag = MetadataBlockTypeFlags::from(&block);
 
                         if requested_flags.contains(block_flag) {
@@ -401,6 +408,15 @@ impl From<GetBlockError> for IterBlocksError {
             GetBlockError::BlockMalformed(e) => Self::BlockMalformed(e),
             GetBlockError::Access(e) => Self::Access(e),
             GetBlockError::Internal(e) => Self::Internal(e),
+        }
+    }
+}
+
+impl From<IterBlocksError> for InternalError {
+    fn from(v: IterBlocksError) -> Self {
+        match v {
+            IterBlocksError::Internal(e) => e,
+            e => e.int_err(),
         }
     }
 }

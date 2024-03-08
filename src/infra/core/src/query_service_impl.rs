@@ -160,19 +160,19 @@ impl QueryServiceImpl {
             .dataset_repo
             .get_dataset(&dataset_handle.as_local_ref())
             .await?;
+        let mut visitor = <SearchDataBlocksVisitor>::next_filled_new_data();
 
-        let last_data_slice_opt = dataset
+        dataset
             .as_metadata_chain()
-            .iter_blocks()
-            .filter_data_stream_blocks()
-            .filter_map_ok(|(_, b)| b.event.new_data)
-            .try_first()
+            .accept(&mut [&mut visitor])
             .await
             .map_err(|e| {
                 tracing::error!(error = ?e, "Resolving last data slice failed");
                 e
-            })
-            .int_err()?;
+            })?;
+
+        // TODO: Update to use SetDataSchema event
+        let last_data_slice_opt = visitor.into_event().and_then(|e| e.new_data);
 
         match last_data_slice_opt {
             Some(last_data_slice) => {
@@ -223,14 +223,15 @@ impl QueryService for QueryServiceImpl {
     ) -> Result<DataFrame, QueryError> {
         let (dataset, df) = self.single_dataset(dataset_ref, Some(skip + limit)).await?;
 
-        // TODO: PERF: Avoid full scan of metadata
-        let vocab: DatasetVocabulary = dataset
+        let mut search_set_vocab_visitor = <SearchSetVocabVisitor>::default();
+
+        dataset
             .as_metadata_chain()
-            .iter_blocks()
-            .filter_map_ok(|(_, b)| b.event.into_variant::<SetVocab>())
-            .try_first()
-            .await
-            .int_err()?
+            .accept(&mut [&mut search_set_vocab_visitor])
+            .await?;
+
+        let vocab: DatasetVocabulary = search_set_vocab_visitor
+            .into_event()
             .unwrap_or_default()
             .into();
 
