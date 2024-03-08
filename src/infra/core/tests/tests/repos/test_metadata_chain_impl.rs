@@ -1107,7 +1107,7 @@ mockall::mock! {
     impl MetadataChainVisitor for MetadataChainVisitor {
         type Error = MockError;
 
-        fn visit<'a>(&mut self, hashed_block_ref: HashedMetadataBlockRef<'a>) -> Result<Decision, MockError>;
+        fn visit<'a>(&mut self, hashed_block_ref: HashedMetadataBlockRef<'a>) -> Result<MetadataVisitorDecision, MockError>;
     }
 }
 
@@ -1128,7 +1128,7 @@ fn create_failed_on_type_visitor_with_expected_visit_call_count(
             if fail_on_type_flags.contains(block_flag) {
                 Err(MockError::SomethingFailed)
             } else {
-                Ok(Decision::NextOfType(fail_on_type_flags))
+                Ok(MetadataVisitorDecision::NextOfType(fail_on_type_flags))
             }
         });
 
@@ -1143,7 +1143,7 @@ fn create_always_stop_visitor() -> MockMetadataChainVisitor {
     always_stop_visitor
         .expect_visit()
         .times(1)
-        .returning(|_| Ok(Decision::Stop));
+        .returning(|_| Ok(MetadataVisitorDecision::Stop));
 
     always_stop_visitor
 }
@@ -1158,7 +1158,7 @@ fn create_always_next_visitor_with_expected_visit_call_count(
     always_next_visitor
         .expect_visit()
         .times(visit_call_count)
-        .returning(|_| Ok(Decision::Next));
+        .returning(|_| Ok(MetadataVisitorDecision::Next));
 
     always_next_visitor
 }
@@ -1196,9 +1196,9 @@ fn create_next_of_type_visitor(
             if state.visit_call_count != state.expected_visit_call_count {
                 state.visit_call_count += 1;
 
-                Ok(Decision::NextOfType(flags))
+                Ok(MetadataVisitorDecision::NextOfType(flags))
             } else {
-                Ok(Decision::Stop)
+                Ok(MetadataVisitorDecision::Stop)
             }
         });
 

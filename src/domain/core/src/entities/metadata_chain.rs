@@ -166,7 +166,7 @@ pub trait MetadataChainExt: MetadataChain {
     where
         E: Error + From<IterBlocksError>,
     {
-        let mut decisions = vec![Decision::Next; visitors.len()];
+        let mut decisions = vec![MetadataVisitorDecision::Next; visitors.len()];
 
         self.accept_by_hash_with_decisions(&mut decisions, visitors, head_hash)
             .await
@@ -187,7 +187,7 @@ pub trait MetadataChainExt: MetadataChain {
 
     async fn accept_by_hash_with_decisions<E>(
         &self,
-        decisions: &mut [Decision],
+        decisions: &mut [MetadataVisitorDecision],
         visitors: &mut [&mut dyn MetadataChainVisitor<Error = E>],
         head_hash: &Multihash,
     ) -> Result<(), E>
@@ -208,21 +208,21 @@ pub trait MetadataChainExt: MetadataChain {
 
             for (decision, visitor) in decisions.iter_mut().zip(visitors.iter_mut()) {
                 match decision {
-                    Decision::Stop => {
+                    MetadataVisitorDecision::Stop => {
                         stopped_visitors += 1;
                     }
-                    Decision::NextOfType(type_flags) if type_flags.is_empty() => {
+                    MetadataVisitorDecision::NextOfType(type_flags) if type_flags.is_empty() => {
                         stopped_visitors += 1;
                     }
-                    Decision::Next => {
+                    MetadataVisitorDecision::Next => {
                         *decision = visitor.visit(hashed_block_ref)?;
                     }
-                    Decision::NextWithHash(requested_hash) => {
+                    MetadataVisitorDecision::NextWithHash(requested_hash) => {
                         if hash == *requested_hash {
                             *decision = visitor.visit(hashed_block_ref)?;
                         }
                     }
-                    Decision::NextOfType(requested_flags) => {
+                    MetadataVisitorDecision::NextOfType(requested_flags) => {
                         let block_flag = MetadataBlockTypeFlags::from(&block);
 
                         if requested_flags.contains(block_flag) {

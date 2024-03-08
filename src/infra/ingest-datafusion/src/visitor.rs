@@ -10,7 +10,12 @@
 use chrono::{DateTime, Utc};
 use datafusion::arrow::datatypes::SchemaRef;
 use internal_error::ResultIntoInternal;
-use kamu_core::{Decision, HashedMetadataBlockRef, MetadataBlockTypeFlags, MetadataChainVisitor};
+use kamu_core::{
+    HashedMetadataBlockRef,
+    MetadataBlockTypeFlags,
+    MetadataChainVisitor,
+    MetadataVisitorDecision,
+};
 use opendatafabric::{
     AddData,
     AddPushSource,
@@ -200,7 +205,10 @@ impl<'a> DataWriterDataFusionMetaDataStateVisitor<'a> {
 impl<'a> MetadataChainVisitor for DataWriterDataFusionMetaDataStateVisitor<'a> {
     type Error = ScanMetadataError;
 
-    fn visit(&mut self, (_, block): HashedMetadataBlockRef) -> Result<Decision, Self::Error> {
+    fn visit(
+        &mut self,
+        (_, block): HashedMetadataBlockRef,
+    ) -> Result<MetadataVisitorDecision, Self::Error> {
         match &block.event {
             MetadataEvent::SetDataSchema(e) => {
                 self.handle_set_data_schema(e)?;
@@ -246,7 +254,7 @@ impl<'a> MetadataChainVisitor for DataWriterDataFusionMetaDataStateVisitor<'a> {
             }
         }
 
-        Ok(Decision::NextOfType(self.next_block_flags))
+        Ok(MetadataVisitorDecision::NextOfType(self.next_block_flags))
     }
 }
 

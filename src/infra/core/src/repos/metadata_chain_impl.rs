@@ -415,11 +415,13 @@ where
 
     async fn accept_append_validators<'a>(
         &'a self,
-        decisions: &'a mut [Decision],
+        decisions: &'a mut [MetadataVisitorDecision],
         visitors: &mut [&mut dyn MetadataChainVisitor<Error = AppendError>],
         prev_append_block_hash: Option<&'a Multihash>,
     ) -> Result<(), AppendError> {
-        let have_already_stopped = decisions.iter().all(|decision| *decision == Decision::Stop);
+        let have_already_stopped = decisions
+            .iter()
+            .all(|decision| *decision == MetadataVisitorDecision::Stop);
 
         if have_already_stopped {
             return Ok(());
