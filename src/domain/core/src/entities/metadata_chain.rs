@@ -205,6 +205,8 @@ pub trait MetadataChainExt: MetadataChain {
     where
         E: Error + From<IterBlocksError>,
     {
+        assert_eq!(decisions.len(), visitors.len());
+
         let mut all_visitors_finished = false;
         let mut current_hash = Some(head_hash.clone());
 
