@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::error::Error;
 use std::fmt::Display;
 
 use async_trait::async_trait;
@@ -145,6 +146,97 @@ pub trait MetadataChainExt: MetadataChain {
     /// reference
     fn iter_blocks_ref<'a>(&'a self, head: &'a BlockRef) -> DynMetadataStream<'a> {
         self.iter_blocks_interval_ref(head, None)
+    }
+
+    async fn accept<E>(
+        &self,
+        visitors: &mut [&mut dyn MetadataChainVisitor<Error = E>],
+    ) -> Result<(), E>
+    where
+        E: Error + From<IterBlocksError>,
+    {
+        self.accept_by_ref(visitors, &BlockRef::Head).await
+    }
+
+    async fn accept_by_hash<E>(
+        &self,
+        visitors: &mut [&mut dyn MetadataChainVisitor<Error = E>],
+        head_hash: &Multihash,
+    ) -> Result<(), E>
+    where
+        E: Error + From<IterBlocksError>,
+    {
+        let mut decisions = vec![Decision::Next; visitors.len()];
+
+        self.accept_by_hash_with_decisions(&mut decisions, visitors, head_hash)
+            .await
+    }
+
+    async fn accept_by_ref<E>(
+        &self,
+        visitors: &mut [&mut dyn MetadataChainVisitor<Error = E>],
+        head: &BlockRef,
+    ) -> Result<(), E>
+    where
+        E: Error + From<IterBlocksError>,
+    {
+        let head_hash = self.resolve_ref(head).await.map_err(Into::into)?;
+
+        self.accept_by_hash(visitors, &head_hash).await
+    }
+
+    async fn accept_by_hash_with_decisions<E>(
+        &self,
+        decisions: &mut [Decision],
+        visitors: &mut [&mut dyn MetadataChainVisitor<Error = E>],
+        head_hash: &Multihash,
+    ) -> Result<(), E>
+    where
+        E: Error + From<IterBlocksError>,
+    {
+        let mut all_visitors_finished = false;
+        let mut current_hash = Some(head_hash.clone());
+
+        // TODO: PERF: Add traversal optimizations such as skip-lists
+        while let Some(hash) = current_hash
+            && !all_visitors_finished
+        {
+            let block = self.get_block(&hash).await.map_err(Into::into)?;
+            let hashed_block_ref = (&hash, &block);
+
+            let mut stopped_visitors = 0;
+
+            for (decision, visitor) in decisions.iter_mut().zip(visitors.iter_mut()) {
+                match decision {
+                    Decision::Stop => {
+                        stopped_visitors += 1;
+                    }
+                    Decision::NextOfType(type_flags) if type_flags.is_empty() => {
+                        stopped_visitors += 1;
+                    }
+                    Decision::Next => {
+                        *decision = visitor.visit(hashed_block_ref)?;
+                    }
+                    Decision::NextWithHash(requested_hash) => {
+                        if hash == *requested_hash {
+                            *decision = visitor.visit(hashed_block_ref)?;
+                        }
+                    }
+                    Decision::NextOfType(requested_flags) => {
+                        let block_flag = MetadataBlockTypeFlags::from(&block);
+
+                        if requested_flags.contains(block_flag) {
+                            *decision = visitor.visit(hashed_block_ref)?;
+                        }
+                    }
+                }
+            }
+
+            all_visitors_finished = visitors.len() == stopped_visitors;
+            current_hash = block.prev_block_hash;
+        }
+
+        Ok(())
     }
 }
 
@@ -384,6 +476,15 @@ impl From<SetRefError> for AppendError {
             SetRefError::CASFailed(e) => Self::RefCASFailed(e),
             SetRefError::Access(e) => Self::Access(e),
             SetRefError::Internal(e) => Self::Internal(e),
+        }
+    }
+}
+
+impl From<IterBlocksError> for AppendError {
+    fn from(v: IterBlocksError) -> Self {
+        match v {
+            IterBlocksError::BlockNotFound(e) => AppendValidationError::PrevBlockNotFound(e).into(),
+            e => e.int_err().into(),
         }
     }
 }

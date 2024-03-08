@@ -38,7 +38,7 @@ resolver = "2"
 # Utils
 container-runtime = { version = "0.164.2", path = "src/utils/container-runtime", default-features = false }
 enum-variants = { version = "0.164.2", path = "src/utils/enum-variants", default-features = false }
-event-bus = { version = "0.164.2", path = "src/utils/event-bus", default-features = false}
+event-bus = { version = "0.164.2", path = "src/utils/event-bus", default-features = false }
 event-sourcing = { version = "0.164.2", path = "src/utils/event-sourcing", default-features = false }
 event-sourcing-macros = { version = "0.164.2", path = "src/utils/event-sourcing-macros", default-features = false }
 internal-error = { version = "0.164.2", path = "src/utils/internal-error", default-features = false }

@@ -30,7 +30,8 @@ pub type ObjectRepositoryS3Sha3 =
 /////////////////////////////////////////////////////////////////////////////////////////
 
 // TODO: Pass a single type that configures digest algo, multicodec, and hash
-// base TODO: Verify atomic behavior
+//       base
+// TODO: Verify atomic behavior
 pub struct ObjectRepositoryS3<D, const C: u32> {
     s3_context: S3Context,
     _phantom: PhantomData<D>,
