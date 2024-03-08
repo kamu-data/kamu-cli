@@ -148,6 +148,9 @@ pub trait MetadataChainExt: MetadataChain {
         self.iter_blocks_interval_ref(head, None)
     }
 
+    /// A method of accepting Visitors ([MetadataChainVisitor]) that allows us
+    /// to go through the metadata chain once and, if desired,
+    /// bypassing blocks of no interest.
     async fn accept<E>(
         &self,
         visitors: &mut [&mut dyn MetadataChainVisitor<Error = E>],
@@ -158,6 +161,8 @@ pub trait MetadataChainExt: MetadataChain {
         self.accept_by_ref(visitors, &BlockRef::Head).await
     }
 
+    /// Same as [Self::accept()], allowing us to define the block (by hash) from
+    /// which we will start the traverse
     async fn accept_by_hash<E>(
         &self,
         visitors: &mut [&mut dyn MetadataChainVisitor<Error = E>],
@@ -172,6 +177,8 @@ pub trait MetadataChainExt: MetadataChain {
             .await
     }
 
+    /// Same as [Self::accept()], allowing us to define the block
+    /// (by block reference) from which we will start the traverse
     async fn accept_by_ref<E>(
         &self,
         visitors: &mut [&mut dyn MetadataChainVisitor<Error = E>],
@@ -185,6 +192,10 @@ pub trait MetadataChainExt: MetadataChain {
         self.accept_by_hash(visitors, &head_hash).await
     }
 
+    /// A lower-level method of accepting Visitors ([MetadataChainVisitor])
+    /// to specify their initial decisions.
+    ///
+    /// See also [Self::accept()]
     async fn accept_by_hash_with_decisions<E>(
         &self,
         decisions: &mut [MetadataVisitorDecision],
