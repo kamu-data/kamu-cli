@@ -193,9 +193,9 @@ impl<'a> DataWriterDataFusionMetaDataStateVisitor<'a> {
 }
 
 impl<'a> MetadataChainVisitor for DataWriterDataFusionMetaDataStateVisitor<'a> {
-    type VisitError = ScanMetadataError;
+    type Error = ScanMetadataError;
 
-    fn visit(&mut self, (_, block): HashedMetadataBlockRef) -> Result<Decision, Self::VisitError> {
+    fn visit(&mut self, (_, block): HashedMetadataBlockRef) -> Result<Decision, Self::Error> {
         match &block.event {
             MetadataEvent::SetDataSchema(e) => {
                 self.handle_set_data_schema(e)?;
@@ -241,11 +241,7 @@ impl<'a> MetadataChainVisitor for DataWriterDataFusionMetaDataStateVisitor<'a> {
             }
         }
 
-        if !self.next_block_flags.is_empty() {
-            Ok(Decision::NextOfType(self.next_block_flags))
-        } else {
-            Ok(Decision::Stop)
-        }
+        Ok(Decision::NextOfType(self.next_block_flags))
     }
 }
 

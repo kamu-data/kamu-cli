@@ -52,9 +52,9 @@ impl ValidateSeedBlockOrderVisitor {
 }
 
 impl MetadataChainVisitor for ValidateSeedBlockOrderVisitor {
-    type VisitError = AppendError;
+    type Error = AppendError;
 
-    fn visit(&mut self, _: HashedMetadataBlockRef) -> Result<Decision, Self::VisitError> {
+    fn visit(&mut self, _: HashedMetadataBlockRef) -> Result<Decision, Self::Error> {
         Ok(Decision::Stop)
     }
 }
@@ -83,9 +83,9 @@ impl<'a> ValidatePrevBlockExistsVisitor<'a> {
 }
 
 impl<'a> MetadataChainVisitor for ValidatePrevBlockExistsVisitor<'a> {
-    type VisitError = AppendError;
+    type Error = AppendError;
 
-    fn visit(&mut self, (hash, _): HashedMetadataBlockRef) -> Result<Decision, Self::VisitError> {
+    fn visit(&mut self, (hash, _): HashedMetadataBlockRef) -> Result<Decision, Self::Error> {
         let Some(appended_prev_block_hash) = self.appended_prev_block_hash else {
             unreachable!()
         };
@@ -132,12 +132,9 @@ impl<'a> ValidateSequenceNumbersIntegrityVisitor {
 }
 
 impl MetadataChainVisitor for ValidateSequenceNumbersIntegrityVisitor {
-    type VisitError = AppendError;
+    type Error = AppendError;
 
-    fn visit(
-        &mut self,
-        (hash, block): HashedMetadataBlockRef,
-    ) -> Result<Decision, Self::VisitError> {
+    fn visit(&mut self, (hash, block): HashedMetadataBlockRef) -> Result<Decision, Self::Error> {
         if block.sequence_number != (self.appended_sequence_number - 1) {
             return Err(
                 AppendValidationError::SequenceIntegrity(SequenceIntegrityError {
@@ -171,9 +168,9 @@ impl<'a> ValidateSystemTimeIsMonotonicVisitor<'a> {
 }
 
 impl<'a> MetadataChainVisitor for ValidateSystemTimeIsMonotonicVisitor<'a> {
-    type VisitError = AppendError;
+    type Error = AppendError;
 
-    fn visit(&mut self, (_, block): HashedMetadataBlockRef) -> Result<Decision, Self::VisitError> {
+    fn visit(&mut self, (_, block): HashedMetadataBlockRef) -> Result<Decision, Self::Error> {
         if *self.appended_system_time < block.system_time {
             return Err(AppendValidationError::SystemTimeIsNotMonotonic.into());
         }
@@ -210,9 +207,9 @@ impl ValidateWatermarkIsMonotonicVisitor {
 }
 
 impl MetadataChainVisitor for ValidateWatermarkIsMonotonicVisitor {
-    type VisitError = AppendError;
+    type Error = AppendError;
 
-    fn visit(&mut self, (_, block): HashedMetadataBlockRef) -> Result<Decision, Self::VisitError> {
+    fn visit(&mut self, (_, block): HashedMetadataBlockRef) -> Result<Decision, Self::Error> {
         let Some(data_steam_event) = block.event.as_data_stream_event() else {
             unreachable!()
         };
@@ -281,9 +278,9 @@ impl<'a> ValidateOffsetsAreSequentialVisitor<'a> {
 }
 
 impl<'a> MetadataChainVisitor for ValidateOffsetsAreSequentialVisitor<'a> {
-    type VisitError = AppendError;
+    type Error = AppendError;
 
-    fn visit(&mut self, (_, block): HashedMetadataBlockRef) -> Result<Decision, Self::VisitError> {
+    fn visit(&mut self, (_, block): HashedMetadataBlockRef) -> Result<Decision, Self::Error> {
         let Some(data_block) = block.as_data_stream_block() else {
             unreachable!()
         };

@@ -1105,7 +1105,7 @@ mockall::mock! {
 
     #[async_trait::async_trait]
     impl MetadataChainVisitor for MetadataChainVisitor {
-        type VisitError = MockError;
+        type Error = MockError;
 
         fn visit<'a>(&mut self, hashed_block_ref: HashedMetadataBlockRef<'a>) -> Result<Decision, MockError>;
     }

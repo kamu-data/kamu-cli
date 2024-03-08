@@ -20,10 +20,6 @@ use crate::repos::{SetRefError as SetRefErrorRepo, *};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub type VisitorsMutRef<'a, 'b, E> = &'a mut [&'b mut dyn MetadataChainVisitor<VisitError = E>];
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
 #[async_trait]
 pub trait MetadataChain: Send + Sync {
     /// Resolves reference to the block hash it's pointing to
@@ -152,17 +148,20 @@ pub trait MetadataChainExt: MetadataChain {
         self.iter_blocks_interval_ref(head, None)
     }
 
-    async fn accept<'a, E>(&'a self, visitors: VisitorsMutRef<'a, 'a, E>) -> Result<(), E>
+    async fn accept<E>(
+        &self,
+        visitors: &mut [&mut dyn MetadataChainVisitor<Error = E>],
+    ) -> Result<(), E>
     where
         E: Error + From<IterBlocksError>,
     {
         self.accept_by_ref(visitors, &BlockRef::Head).await
     }
 
-    async fn accept_by_hash<'a, 'b, E>(
-        &'a self,
-        visitors: VisitorsMutRef<'a, 'a, E>,
-        head_hash: &'b Multihash,
+    async fn accept_by_hash<E>(
+        &self,
+        visitors: &mut [&mut dyn MetadataChainVisitor<Error = E>],
+        head_hash: &Multihash,
     ) -> Result<(), E>
     where
         E: Error + From<IterBlocksError>,
@@ -173,10 +172,10 @@ pub trait MetadataChainExt: MetadataChain {
             .await
     }
 
-    async fn accept_by_ref<'a, E>(
-        &'a self,
-        visitors: VisitorsMutRef<'a, 'a, E>,
-        head: &'a BlockRef,
+    async fn accept_by_ref<E>(
+        &self,
+        visitors: &mut [&mut dyn MetadataChainVisitor<Error = E>],
+        head: &BlockRef,
     ) -> Result<(), E>
     where
         E: Error + From<IterBlocksError>,
@@ -186,60 +185,55 @@ pub trait MetadataChainExt: MetadataChain {
         self.accept_by_hash(visitors, &head_hash).await
     }
 
-    async fn accept_by_hash_with_decisions<'a, 'b, E>(
-        &'a self,
-        decisions: &'b mut [Decision],
-        visitors: VisitorsMutRef<'a, 'a, E>,
-        head_hash: &'b Multihash,
+    async fn accept_by_hash_with_decisions<E>(
+        &self,
+        decisions: &mut [Decision],
+        visitors: &mut [&mut dyn MetadataChainVisitor<Error = E>],
+        head_hash: &Multihash,
     ) -> Result<(), E>
     where
         E: Error + From<IterBlocksError>,
     {
-        let mut maybe_current = Some(head_hash.clone());
+        let mut all_visitors_finished = false;
+        let mut current_hash = Some(head_hash.clone());
 
-        while let Some(current) = maybe_current {
-            // TODO: PERF: Traversal optimizations: skip lists
+        // TODO: PERF: Add traversal optimizations such as skip-lists
+        while let Some(hash) = current_hash
+            && !all_visitors_finished
+        {
+            let block = self.get_block(&hash).await.map_err(Into::into)?;
+            let hashed_block_ref = (&hash, &block);
 
-            let hash = &current;
-            let block = self.get_block(hash).await.map_err(Into::into)?;
-            let hashed_block_ref = (hash, &block);
+            let mut stopped_visitors = 0;
 
-            let all_visitors_finished = {
-                let mut stopped_visitors = 0;
-
-                for (decision, visitor) in decisions.iter_mut().zip(visitors.iter_mut()) {
-                    match decision {
-                        Decision::Stop => {
-                            stopped_visitors += 1;
-                        }
-                        Decision::Next => {
+            for (decision, visitor) in decisions.iter_mut().zip(visitors.iter_mut()) {
+                match decision {
+                    Decision::Stop => {
+                        stopped_visitors += 1;
+                    }
+                    Decision::NextOfType(type_flags) if type_flags.is_empty() => {
+                        stopped_visitors += 1;
+                    }
+                    Decision::Next => {
+                        *decision = visitor.visit(hashed_block_ref)?;
+                    }
+                    Decision::NextWithHash(requested_hash) => {
+                        if hash == *requested_hash {
                             *decision = visitor.visit(hashed_block_ref)?;
                         }
-                        Decision::NextWithHash(requested_hash) => {
-                            if hash == requested_hash {
-                                *decision = visitor.visit(hashed_block_ref)?;
-                            }
-                        }
-                        Decision::NextOfType(requested_flags) => {
-                            let block_flag = MetadataBlockTypeFlags::from(&block);
+                    }
+                    Decision::NextOfType(requested_flags) => {
+                        let block_flag = MetadataBlockTypeFlags::from(&block);
 
-                            if requested_flags.contains(block_flag) {
-                                *decision = visitor.visit(hashed_block_ref)?;
-                            }
+                        if requested_flags.contains(block_flag) {
+                            *decision = visitor.visit(hashed_block_ref)?;
                         }
                     }
                 }
-
-                visitors.len() == stopped_visitors
-            };
-
-            if all_visitors_finished {
-                break;
             }
 
-            let next = block.prev_block_hash.clone();
-
-            maybe_current = next;
+            all_visitors_finished = visitors.len() == stopped_visitors;
+            current_hash = block.prev_block_hash;
         }
 
         Ok(())

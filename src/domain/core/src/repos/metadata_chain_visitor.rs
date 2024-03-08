@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::error::Error;
 use std::hash::Hash;
 
 use bitflags::bitflags;
@@ -61,7 +60,7 @@ impl From<&MetadataBlock> for MetadataBlockTypeFlags {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Decision {
     Stop,
     Next,
@@ -72,12 +71,9 @@ pub enum Decision {
 ///////////////////////////////////////////////////////////////////////////////
 
 pub trait MetadataChainVisitor: Sync + Send {
-    type VisitError: Error;
+    type Error: std::error::Error;
 
-    fn visit(
-        &mut self,
-        hashed_block_ref: HashedMetadataBlockRef,
-    ) -> Result<Decision, Self::VisitError>;
+    fn visit(&mut self, hashed_block_ref: HashedMetadataBlockRef) -> Result<Decision, Self::Error>;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

@@ -23,14 +23,16 @@ use crate::{
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[macro_export]
 macro_rules! invalid_event {
     ($e:expr, $msg:expr $(,)?) => {
-        use $crate::domain::{AppendValidationError, InvalidEventError};
-
-        return Err(AppendValidationError::InvalidEvent(InvalidEventError::new($e, $msg)).into());
+        return Err(kamu_core::AppendValidationError::InvalidEvent(
+            kamu_core::InvalidEventError::new($e, $msg),
+        )
+        .into());
     };
 }
+
+pub(crate) use invalid_event;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -414,12 +416,10 @@ where
     async fn accept_append_validators<'a>(
         &'a self,
         decisions: &'a mut [Decision],
-        visitors: VisitorsMutRef<'a, 'a, AppendError>,
+        visitors: &mut [&mut dyn MetadataChainVisitor<Error = AppendError>],
         prev_append_block_hash: Option<&'a Multihash>,
     ) -> Result<(), AppendError> {
-        let have_already_stopped = decisions
-            .iter()
-            .all(|decision| matches!(*decision, Decision::Stop));
+        let have_already_stopped = decisions.iter().all(|decision| *decision == Decision::Stop);
 
         if have_already_stopped {
             return Ok(());
@@ -591,12 +591,18 @@ where
             let (d6, mut v6) = ValidateOffsetsAreSequentialVisitor::new(&block)?;
 
             let mut decisions = [d1, d2, d3, d4, d5, d6];
-            let validators: VisitorsMutRef<'_, '_, AppendError> =
-                &mut [&mut v1, &mut v2, &mut v3, &mut v4, &mut v5, &mut v6];
+            let mut validators = [
+                &mut v1 as &mut dyn MetadataChainVisitor<Error = _>,
+                &mut v2,
+                &mut v3,
+                &mut v4,
+                &mut v5,
+                &mut v6,
+            ];
 
             self.accept_append_validators(
                 &mut decisions,
-                validators,
+                &mut validators,
                 block.prev_block_hash.as_ref(),
             )
             .await?;
