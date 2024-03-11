@@ -34,10 +34,11 @@ impl OutputConfig {
                     .with_header(true)
                     .build(std::io::stdout()),
             ),
-            OutputFormat::Json => Box::new(JsonArrayWriter::new(std::io::stdout())),
+            OutputFormat::ParquetJson => Box::new(JsonArrayWriter::new(std::io::stdout())),
             OutputFormat::NdJson => Box::new(JsonLineDelimitedWriter::new(std::io::stdout())),
             OutputFormat::JsonSoA => unimplemented!("SoA Json format is not yet implemented"),
             OutputFormat::Table => Box::new(TableWriter::new(fmt, std::io::stdout())),
+            OutputFormat::ArrowJson => unimplemented!("Arrow Json format is not yet implemented"),
         }
     }
 }
@@ -48,7 +49,7 @@ impl OutputConfig {
 pub enum OutputFormat {
     Csv,
     /// Array of Structures format
-    Json,
+    ParquetJson,
     /// One Json object per line - easily splittable format
     NdJson,
     /// Structure of arrays - more compact and efficient format for encoding
@@ -56,6 +57,8 @@ pub enum OutputFormat {
     JsonSoA,
     /// A pretty human-readable table
     Table,
+    ///Language-independent columnar memory format for flat&hierarchical data
+    ArrowJson,
 }
 
 impl Default for OutputConfig {

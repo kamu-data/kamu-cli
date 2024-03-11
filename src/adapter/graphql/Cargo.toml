@@ -36,11 +36,11 @@ async-graphql = { version = "6", features = ["chrono", "url", "apollo_tracing"] 
 async-trait = { version = "0.1", default-features = false }
 cron = { version = "0.12.0", default-features = false }
 chrono = "0.4"
-datafusion = "33"  # TODO: Currently needed for type conversions but ideally should be encapsulated by kamu-core
+datafusion = { version = "33", features = ["serde"] }  # TODO: Currently needed for type conversions but ideally should be encapsulated by kamu-core
 dill = "0.8"
 futures = "0.3"
 indoc = "2"
-serde = "1"
+serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio = { version = "1", default-features = false, features = [] }
 tokio-stream = { version = "0.1", default-features = false }

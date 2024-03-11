@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use serde_json::to_string;
+
 use crate::prelude::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -17,6 +19,7 @@ use crate::prelude::*;
 pub enum DataSchemaFormat {
     Parquet,
     ParquetJson,
+    ArrowJson,
 }
 
 #[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
@@ -26,13 +29,12 @@ pub struct DataSchema {
 }
 
 impl DataSchema {
-    pub fn from_arrow_schema(
-        schema: &datafusion::arrow::datatypes::Schema,
-        format: DataSchemaFormat,
-    ) -> Result<DataSchema> {
-        let parquet_schema =
-            kamu_data_utils::schema::convert::arrow_schema_to_parquet_schema(schema);
-        Self::from_parquet_schema(parquet_schema.as_ref(), format)
+    pub fn from_arrow_schema(schema: &datafusion::arrow::datatypes::Schema) -> Result<DataSchema> {
+        let content = to_string(schema).unwrap();
+        Ok(DataSchema {
+            format: DataSchemaFormat::ArrowJson,
+            content,
+        })
     }
 
     pub fn from_data_frame_schema(
@@ -55,6 +57,7 @@ impl DataSchema {
         match format {
             DataSchemaFormat::Parquet => write_schema_parquet(&mut buf, schema),
             DataSchemaFormat::ParquetJson => write_schema_parquet_json(&mut buf, schema),
+            DataSchemaFormat::ArrowJson => Ok(()),
         }
         .int_err()?;
 

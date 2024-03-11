@@ -545,15 +545,16 @@ fn configure_output_format(
 
     let format = match format_str {
         Some("csv") => OutputFormat::Csv,
-        Some("json") => OutputFormat::Json,
+        Some("parquet-json") => OutputFormat::ParquetJson,
         Some("ndjson") => OutputFormat::NdJson,
         Some("json-soa") => OutputFormat::JsonSoA,
         Some("table") => OutputFormat::Table,
+        Some("arrow-json") => OutputFormat::ArrowJson,
         None | Some(_) => {
             if is_tty {
                 OutputFormat::Table
             } else {
-                OutputFormat::Json
+                OutputFormat::ParquetJson
             }
         }
     };

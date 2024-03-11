@@ -77,9 +77,8 @@ impl QueryServiceImpl {
     #[tracing::instrument(level = "debug", skip_all)]
     async fn get_schema_impl(
         &self,
-        session_context: &SessionContext,
         dataset_ref: &DatasetRef,
-    ) -> Result<Option<Type>, QueryError> {
+    ) -> Result<Option<SetDataSchema>, QueryError> {
         let dataset_handle = self.dataset_repo.resolve_dataset_ref(dataset_ref).await?;
 
         self.dataset_action_authorizer
@@ -105,15 +104,48 @@ impl QueryServiceImpl {
             .int_err()?;
 
         match last_data_slice_opt {
+            Some(last_data_slice) => Ok(Some(last_data_slice)),
+            None => Ok(None),
+        }
+    }
+
+    #[tracing::instrument(level = "debug", skip_all)]
+    async fn get_schema_parquet_impl(
+        &self,
+        session_context: &SessionContext,
+        dataset_ref: &DatasetRef,
+    ) -> Result<Option<Type>, QueryError> {
+        let dataset_handle = self.dataset_repo.resolve_dataset_ref(dataset_ref).await?;
+
+        self.dataset_action_authorizer
+            .check_action_allowed(&dataset_handle, DatasetAction::Read)
+            .await?;
+
+        let dataset = self
+            .dataset_repo
+            .get_dataset(&dataset_handle.as_local_ref())
+            .await?;
+
+        let last_data_slice_opt = dataset
+            .as_metadata_chain()
+            .iter_blocks()
+            .filter_data_stream_blocks()
+            .filter_map_ok(|(_, b)| b.event.new_data)
+            .try_first()
+            .await
+            .map_err(|e| {
+                tracing::error!(error = ?e, "Resolving last data slice failed");
+                e
+            })
+            .int_err()?;
+
+        match last_data_slice_opt {
             Some(last_data_slice) => {
                 // TODO: Avoid boxing url - requires datafusion to fix API
-                let schema = last_data_slice.schema;
                 let data_url = Box::new(
                     dataset
                         .as_data_repo()
-                        .get_internal_url(
-                            &Multihash::new(Multicodec::Arrow0_Sha3_256, &schema).unwrap(),
-                        )
+                        .get_internal_url(&last_data_slice.physical_hash)
                         .await,
                 );
 
@@ -221,9 +253,20 @@ impl QueryService for QueryServiceImpl {
     }
 
     #[tracing::instrument(level = "info", skip_all, fields(dataset_ref))]
-    async fn get_schema(&self, dataset_ref: &DatasetRef) -> Result<Option<Type>, QueryError> {
+    async fn get_schema(
+        &self,
+        dataset_ref: &DatasetRef,
+    ) -> Result<Option<SetDataSchema>, QueryError> {
+        self.get_schema_impl(dataset_ref).await
+    }
+
+    #[tracing::instrument(level = "info", skip_all, fields(dataset_ref))]
+    async fn get_schema_parquet(
+        &self,
+        dataset_ref: &DatasetRef,
+    ) -> Result<Option<Type>, QueryError> {
         let ctx = self.session_context(QueryOptions::default());
-        self.get_schema_impl(&ctx, dataset_ref).await
+        self.get_schema_parquet_impl(&ctx, dataset_ref).await
     }
 
     async fn get_known_engines(&self) -> Result<Vec<EngineDesc>, InternalError> {

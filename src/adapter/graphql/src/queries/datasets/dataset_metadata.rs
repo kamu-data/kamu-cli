@@ -76,7 +76,7 @@ impl DatasetMetadata {
         ctx: &Context<'_>,
         format: Option<DataSchemaFormat>,
     ) -> Result<Option<DataSchema>> {
-        let format = format.unwrap_or(DataSchemaFormat::Parquet);
+        format.unwrap_or(DataSchemaFormat::ArrowJson);
 
         let query_svc = from_catalog::<dyn domain::QueryService>(ctx).unwrap();
         let res_schema = query_svc
@@ -85,7 +85,7 @@ impl DatasetMetadata {
             .int_err()?;
 
         match res_schema {
-            Some(schema) => Ok(Some(DataSchema::from_parquet_schema(&schema, format)?)),
+            Some(arrow) => Ok(Some(SetDataSchema::from(arrow).schema)),
             None => Ok(None),
         }
     }

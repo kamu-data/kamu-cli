@@ -97,44 +97,51 @@ impl InspectSchemaCommand {
         Ok(())
     }
 
-    fn print_schema_json(&self, schema: &Type) -> Result<(), CLIError> {
-        kamu_data_utils::schema::format::write_schema_parquet_json(&mut std::io::stdout(), schema)?;
-        Ok(())
+    fn query_errors(e: QueryError) -> CLIError {
+        match e {
+            QueryError::DatasetNotFound(e) => CLIError::usage_error_from(e),
+            QueryError::DatasetSchemaNotAvailable(_) => unreachable!(),
+            e @ (QueryError::DataFusionError(_) | QueryError::Access(_)) => CLIError::failure(e),
+            e @ QueryError::Internal(_) => CLIError::critical(e),
+        }
     }
 
-    fn print_schema_unavailable(&self) {
-        eprintln!(
-            "{}: Dataset schema is not yet available: {}",
-            console::style("Warning").yellow(),
-            self.dataset_ref.alias().unwrap(),
-        );
+    async fn get_parquet_schema(&mut self) -> Result<Type, CLIError> {
+        Ok(self
+            .query_svc
+            .get_schema_parquet(&self.dataset_ref)
+            .await
+            .map_err(Self::query_errors)?
+            .unwrap())
     }
 }
 
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait(? Send)]
 impl Command for InspectSchemaCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
-        let maybe_schema =
-            self.query_svc
-                .get_schema(&self.dataset_ref)
-                .await
-                .map_err(|e| match e {
-                    QueryError::DatasetNotFound(e) => CLIError::usage_error_from(e),
-                    QueryError::DatasetSchemaNotAvailable(_) => unreachable!(),
-                    e @ (QueryError::DataFusionError(_) | QueryError::Access(_)) => {
-                        CLIError::failure(e)
-                    }
-                    e @ QueryError::Internal(_) => CLIError::critical(e),
-                })?;
-
-        match maybe_schema {
-            Some(schema) => match self.output_format.as_deref() {
-                None | Some("ddl") => self.print_schema_ddl(&schema),
-                Some("parquet") => self.print_schema_parquet(&schema)?,
-                Some("json") => self.print_schema_json(&schema)?,
-                _ => unreachable!(),
-            },
-            None => self.print_schema_unavailable(),
+        match self.output_format.as_deref() {
+            None | Some("ddl") => {
+                let schema = self.get_parquet_schema().await?;
+                self.print_schema_ddl(&schema)
+            }
+            Some("parquet-json") => {
+                let schema = self.get_parquet_schema().await?;
+                self.print_schema_parquet(&schema)?
+            }
+            Some("arrow-json") => {
+                let arrow = self
+                    .query_svc
+                    .get_schema(&self.dataset_ref)
+                    .await
+                    .map_err(Self::query_errors)?
+                    .unwrap();
+                let schema = SetDataSchema::from(arrow).schema_as_arrow().unwrap();
+                kamu_data_utils::schema::format::write_schema_arrow_json(
+                    &mut std::io::stdout(),
+                    &schema,
+                )?;
+            }
+            _ => unreachable!(),
         }
 
         Ok(())

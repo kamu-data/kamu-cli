@@ -10,7 +10,7 @@
 use datafusion::error::DataFusionError;
 use datafusion::parquet::schema::types::Type;
 use datafusion::prelude::{DataFrame, SessionContext};
-use opendatafabric::DatasetRef;
+use opendatafabric::{DatasetRef, SetDataSchema};
 use thiserror::Error;
 
 use crate::auth::DatasetActionUnauthorizedError;
@@ -51,10 +51,19 @@ pub trait QueryService: Send + Sync {
         options: QueryOptions,
     ) -> Result<DataFrame, QueryError>;
 
-    /// Returns the schema of the given dataset, if it is already defined by
+    /// Returns arrow schema of the given dataset, if it is already defined by
     /// this moment, None otherwise
-    async fn get_schema(&self, dataset_ref: &DatasetRef) -> Result<Option<Type>, QueryError>;
+    async fn get_schema(
+        &self,
+        dataset_ref: &DatasetRef,
+    ) -> Result<Option<SetDataSchema>, QueryError>;
 
+    /// Returns parquet schema of the given dataset, if it is already defined by
+    /// this moment, None otherwise
+    async fn get_schema_parquet(
+        &self,
+        dataset_ref: &DatasetRef,
+    ) -> Result<Option<Type>, QueryError>;
     /// Lists engines known to the system and recommended for use
     async fn get_known_engines(&self) -> Result<Vec<EngineDesc>, InternalError>;
 }
