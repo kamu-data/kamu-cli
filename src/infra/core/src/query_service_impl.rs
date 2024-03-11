@@ -26,6 +26,7 @@ use kamu_core::*;
 use opendatafabric::*;
 
 use crate::utils::docker_images;
+use crate::SearchSetVocabVisitor;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -175,15 +176,16 @@ impl QueryService for QueryServiceImpl {
             .into());
         }
 
-        // TODO: PERF: Avoid full scan of metadata
-        let vocab: DatasetVocabulary = dataset
+        let mut search_set_vocab_visitor = SearchSetVocabVisitor::<QueryError>::default();
+
+        dataset
             .as_metadata_chain()
-            .iter_blocks()
-            .filter_map_ok(|(_, b)| b.event.into_variant::<SetVocab>())
-            .try_first()
-            .await
-            .int_err()?
-            .unwrap_or_default()
+            .accept(&mut [&mut search_set_vocab_visitor])
+            .await?;
+
+        let vocab: DatasetVocabulary = search_set_vocab_visitor
+            .into_found_hashed_block()
+            .map_or_else(Default::default, |(_, block)| block.event)
             .into();
 
         let ctx = self.session_context(QueryOptions {
