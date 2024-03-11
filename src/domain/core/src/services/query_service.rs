@@ -153,6 +153,12 @@ pub enum QueryError {
     ),
 }
 
+impl From<IterBlocksError> for QueryError {
+    fn from(v: IterBlocksError) -> Self {
+        v.int_err().into()
+    }
+}
+
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Clone, PartialEq, Eq, Debug)]

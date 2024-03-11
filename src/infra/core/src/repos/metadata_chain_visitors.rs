@@ -1,0 +1,81 @@
+// Copyright Kamu Data, Inc. and contributors. All rights reserved.
+//
+// Use of this software is governed by the Business Source License
+// included in the LICENSE file.
+//
+// As of the Change Date specified in that file, in accordance with
+// the Business Source License, use of this software will be governed
+// by the Apache License, Version 2.0.
+
+use std::error::Error;
+use std::marker::PhantomData;
+
+use kamu_core::{
+    HashedMetadataBlockRef,
+    MetadataBlockTypeFlags as Flag,
+    MetadataChainVisitor,
+    MetadataVisitorDecision as Decision,
+};
+use opendatafabric::{
+    AsTypedBlock,
+    MetadataBlockTyped,
+    MetadataEvent,
+    Multihash,
+    SetVocab,
+    VariantOf,
+};
+
+///////////////////////////////////////////////////////////////////////////////
+
+pub type SearchSetVocabVisitor<E> =
+    SearchSingleTypedBlockVisitor<SetVocab, E, { Flag::SET_VOCAB.bits() }>;
+
+///////////////////////////////////////////////////////////////////////////////
+
+pub struct SearchSingleTypedBlockVisitor<T, E, const F: u32> {
+    requested_flag: Flag,
+    found_hashed_block: Option<(Multihash, MetadataBlockTyped<T>)>,
+    _phantom: PhantomData<E>,
+}
+
+impl<T, E, const F: u32> Default for SearchSingleTypedBlockVisitor<T, E, F> {
+    fn default() -> Self {
+        Self {
+            requested_flag: Flag::from_bits_retain(F),
+            found_hashed_block: None,
+            _phantom: PhantomData,
+        }
+    }
+}
+
+impl<T, E, const F: u32> SearchSingleTypedBlockVisitor<T, E, F>
+where
+    T: VariantOf<MetadataEvent> + Send + Sync,
+    E: Error + Send + Sync,
+{
+    pub fn into_found_hashed_block(self) -> Option<(Multihash, MetadataBlockTyped<T>)> {
+        self.found_hashed_block
+    }
+}
+
+impl<T, E, const F: u32> MetadataChainVisitor for SearchSingleTypedBlockVisitor<T, E, F>
+where
+    T: VariantOf<MetadataEvent> + Send + Sync,
+    E: Error + Send + Sync,
+{
+    type Error = E;
+
+    fn visit(&mut self, (hash, block): HashedMetadataBlockRef) -> Result<Decision, Self::Error> {
+        let flag = Flag::from(block);
+
+        if !self.requested_flag.contains(flag) {
+            return Ok(Decision::NextOfType(self.requested_flag));
+        }
+
+        self.found_hashed_block = Some((hash.clone(), block.clone().into_typed().unwrap()));
+
+        Ok(Decision::Stop)
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
