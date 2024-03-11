@@ -114,7 +114,7 @@ async fn query() {
                   }
                 ",
             )
-            .data(cat),
+            .data(cat.clone()),
         )
         .await;
     assert!(res.is_ok());
@@ -133,6 +133,50 @@ async fn query() {
                         "hasNextPage": false,
                         "hasPreviousPage": false,
                     }
+                }
+            }
+        })
+    );
+
+    let res = schema
+        .execute(
+            async_graphql::Request::new(
+                "
+                {
+                  search {
+                    query(query: \"\") {
+                      nodes {
+                        ... on Dataset {
+                          metadata {
+                            chain {
+                              blocks(page: 0, perPage: 0) {
+                                totalCount
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+                ",
+            )
+            .data(cat),
+        )
+        .await;
+    assert!(res.is_ok());
+    assert_eq!(
+        res.data,
+        value!({
+            "search": {
+                "query": {
+                    "nodes": [{
+                        "metadata": {
+                          "chain": {
+                            "blocks": { "totalCount": 2 }
+                          }
+                        },
+                    }],
                 }
             }
         })
