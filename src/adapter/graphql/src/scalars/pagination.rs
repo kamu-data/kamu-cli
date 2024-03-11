@@ -41,7 +41,7 @@ macro_rules! page_based_connection {
                     0 => (Some(0), false),
                     tc => {
                         if per_page == 0 {
-                            (Some(0), true)
+                            (Some(0), false)
                         } else {
                             (
                                 Some(tc.div_ceil(per_page)),

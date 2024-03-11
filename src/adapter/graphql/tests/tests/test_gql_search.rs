@@ -151,6 +151,11 @@ async fn query() {
                             chain {
                               blocks(page: 0, perPage: 0) {
                                 totalCount
+                                pageInfo {
+                                  totalPages
+                                  hasNextPage
+                                  hasPreviousPage
+                                }
                               }
                             }
                           }
@@ -173,7 +178,14 @@ async fn query() {
                     "nodes": [{
                         "metadata": {
                           "chain": {
-                            "blocks": { "totalCount": 2 }
+                            "blocks": {
+                              "totalCount": 2i32,
+                              "pageInfo": {
+                                "totalPages": 0i32,
+                                "hasNextPage": false,
+                                "hasPreviousPage": false
+                              }
+                            }
                           }
                         },
                     }],
