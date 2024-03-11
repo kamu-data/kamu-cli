@@ -122,11 +122,11 @@ impl Command for InspectSchemaCommand {
         match self.output_format.as_deref() {
             None | Some("ddl") => {
                 let schema = self.get_parquet_schema().await?;
-                self.print_schema_ddl(&schema)
+                self.print_schema_ddl(&schema);
             }
             Some("parquet-json") => {
                 let schema = self.get_parquet_schema().await?;
-                self.print_schema_parquet(&schema)?
+                self.print_schema_parquet(&schema)?;
             }
             Some("arrow-json") => {
                 let arrow = self
@@ -135,6 +135,7 @@ impl Command for InspectSchemaCommand {
                     .await
                     .map_err(Self::query_errors)?
                     .unwrap();
+                #[allow(clippy::all)]
                 let schema = SetDataSchema::from(arrow).schema_as_arrow().unwrap();
                 kamu_data_utils::schema::format::write_schema_arrow_json(
                     &mut std::io::stdout(),

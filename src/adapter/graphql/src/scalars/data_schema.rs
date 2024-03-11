@@ -29,12 +29,12 @@ pub struct DataSchema {
 }
 
 impl DataSchema {
-    pub fn from_arrow_schema(schema: &datafusion::arrow::datatypes::Schema) -> Result<DataSchema> {
+    pub fn from_arrow_schema(schema: &datafusion::arrow::datatypes::Schema) -> DataSchema {
         let content = to_string(schema).unwrap();
-        Ok(DataSchema {
+        DataSchema {
             format: DataSchemaFormat::ArrowJson,
             content,
-        })
+        }
     }
 
     pub fn from_data_frame_schema(

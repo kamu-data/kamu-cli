@@ -176,7 +176,7 @@ async fn test_dataset_schema_common(catalog: dill::Catalog, tempdir: &TempDir) {
             let data_schema_string = match serde_json::to_string_pretty(&schema) {
                 Ok(json) => json,
                 Err(err) => {
-                    eprintln!("Failed to serialize schema to JSON: {}", err);
+                    eprintln!("Failed to serialize schema to JSON: {err}");
                     return;
                 }
             };
@@ -209,8 +209,7 @@ async fn test_dataset_schema_common(catalog: dill::Catalog, tempdir: &TempDir) {
             );
         }
         Err(err) => {
-            eprintln!("Failed to get Arrow schema: {}", err);
-            return;
+            eprintln!("Failed to serialize schema to JSON: {err}");
         }
     }
 }
