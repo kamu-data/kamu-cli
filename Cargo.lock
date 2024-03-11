@@ -1578,7 +1578,6 @@ dependencies = [
  "rand",
  "regex",
  "serde",
- "serde_json",
  "tempfile",
  "test-group",
  "test-log",
