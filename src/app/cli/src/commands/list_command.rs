@@ -179,12 +179,12 @@ impl ListCommand {
             match &self.related_account.target_account {
                 accounts::TargetAccountSelection::Current => self
                     .dataset_repo
-                    .get_datasets_by_owner(self.current_account.account_name.clone()),
+                    .get_datasets_by_owner(&self.current_account.account_name),
                 accounts::TargetAccountSelection::Specific {
                     account_name: user_name,
                 } => self
                     .dataset_repo
-                    .get_datasets_by_owner(AccountName::from_str(user_name.as_str()).unwrap()),
+                    .get_datasets_by_owner(&AccountName::from_str(user_name.as_str()).unwrap()),
                 accounts::TargetAccountSelection::AllUsers => self.dataset_repo.get_all_datasets(),
             }
         } else {

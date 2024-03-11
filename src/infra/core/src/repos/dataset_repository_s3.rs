@@ -196,14 +196,15 @@ impl DatasetRepository for DatasetRepositoryS3 {
         self.stream_datasets_if(|_| true)
     }
 
-    fn get_datasets_by_owner(&self, account_name: AccountName) -> DatasetHandleStream<'_> {
-        if !self.is_multi_tenant() && account_name != DEFAULT_ACCOUNT_NAME {
+    fn get_datasets_by_owner(&self, account_name: &AccountName) -> DatasetHandleStream<'_> {
+        if !self.is_multi_tenant() && *account_name != DEFAULT_ACCOUNT_NAME {
             return Box::pin(futures::stream::empty());
         }
 
+        let account_name = account_name.clone();
         self.stream_datasets_if(move |dataset_alias| {
             if let Some(dataset_account_name) = &dataset_alias.account_name {
-                dataset_account_name == &account_name
+                *dataset_account_name == account_name
             } else {
                 true
             }

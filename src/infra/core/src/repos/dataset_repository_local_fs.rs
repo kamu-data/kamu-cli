@@ -163,7 +163,7 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
         self.storage_strategy.get_all_datasets()
     }
 
-    fn get_datasets_by_owner(&self, account_name: AccountName) -> DatasetHandleStream<'_> {
+    fn get_datasets_by_owner(&self, account_name: &AccountName) -> DatasetHandleStream<'_> {
         self.storage_strategy.get_datasets_by_owner(account_name)
     }
 
@@ -396,7 +396,7 @@ trait DatasetStorageStrategy: Sync + Send {
 
     fn get_all_datasets(&self) -> DatasetHandleStream<'_>;
 
-    fn get_datasets_by_owner(&self, account_name: AccountName) -> DatasetHandleStream<'_>;
+    fn get_datasets_by_owner(&self, account_name: &AccountName) -> DatasetHandleStream<'_>;
 
     async fn resolve_dataset_alias(
         &self,
@@ -515,8 +515,8 @@ impl DatasetStorageStrategy for DatasetSingleTenantStorageStrategy {
         })
     }
 
-    fn get_datasets_by_owner(&self, account_name: AccountName) -> DatasetHandleStream<'_> {
-        if account_name == DEFAULT_ACCOUNT_NAME {
+    fn get_datasets_by_owner(&self, account_name: &AccountName) -> DatasetHandleStream<'_> {
+        if *account_name == DEFAULT_ACCOUNT_NAME {
             self.get_all_datasets()
         } else {
             Box::pin(futures::stream::empty())
@@ -758,7 +758,8 @@ impl DatasetStorageStrategy for DatasetMultiTenantStorageStrategy {
         })
     }
 
-    fn get_datasets_by_owner(&self, account_name: AccountName) -> DatasetHandleStream<'_> {
+    fn get_datasets_by_owner(&self, account_name: &AccountName) -> DatasetHandleStream<'_> {
+        let account_name = account_name.clone();
         Box::pin(async_stream::try_stream! {
             let account_dir_path = self.root.join(account_name.clone());
             if !account_dir_path.is_dir() {

@@ -2044,6 +2044,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "datafusion-odata"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9233aebe0fbe0605054cdbe5dcecaab09d5b090a475c2613431de19c9aa242aa"
+dependencies = [
+ "async-trait",
+ "axum",
+ "chrono",
+ "datafusion",
+ "http",
+ "quick-xml",
+ "serde",
+ "tracing",
+]
+
+[[package]]
 name = "datafusion-optimizer"
 version = "36.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3518,6 +3534,35 @@ dependencies = [
 ]
 
 [[package]]
+name = "kamu-adapter-odata"
+version = "0.165.0"
+dependencies = [
+ "axum",
+ "chrono",
+ "datafusion",
+ "datafusion-odata",
+ "dill",
+ "event-bus",
+ "futures",
+ "http",
+ "hyper",
+ "indoc 2.0.4",
+ "kamu",
+ "kamu-core",
+ "opendatafabric",
+ "quick-xml",
+ "reqwest",
+ "serde",
+ "tempfile",
+ "test-group",
+ "test-log",
+ "tokio",
+ "tower-http",
+ "tracing",
+ "url",
+]
+
+[[package]]
 name = "kamu-cli"
 version = "0.165.0"
 dependencies = [
@@ -3557,6 +3602,7 @@ dependencies = [
  "kamu-adapter-graphql",
  "kamu-adapter-http",
  "kamu-adapter-oauth",
+ "kamu-adapter-odata",
  "kamu-data-utils",
  "kamu-datafusion-cli",
  "kamu-flow-system-inmem",

@@ -28,6 +28,7 @@ members = [
     "src/adapter/graphql",
     "src/adapter/http",
     "src/adapter/oauth",
+    "src/adapter/odata",
     # Apps
     "src/app/cli",
 ]
@@ -61,6 +62,7 @@ kamu-adapter-auth-oso = { version = "0.165.0", path = "src/adapter/auth-oso", de
 kamu-adapter-flight-sql = { version = "0.165.0", path = "src/adapter/flight-sql", default-features = false }
 kamu-adapter-graphql = { version = "0.165.0", path = "src/adapter/graphql", default-features = false }
 kamu-adapter-http = { version = "0.165.0", path = "src/adapter/http", default-features = false }
+kamu-adapter-odata = { version = "0.165.0", path = "src/adapter/odata", defualt-features = false }
 kamu-adapter-oauth = { version = "0.165.0", path = "src/adapter/oauth", defualt-features = false }
 
 [workspace.package]

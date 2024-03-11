@@ -73,12 +73,12 @@ pub fn filter_datasets_by_local_pattern(
 
 ////////////////////////////////////////////////////////////////////////////////
 
-pub fn filter_datasets_by_any_pattern(
-    dataset_repo: &dyn DatasetRepository,
+pub fn filter_datasets_by_any_pattern<'a>(
+    dataset_repo: &'a dyn DatasetRepository,
     search_svc: Arc<dyn SearchService>,
     dataset_ref_any_patterns: Vec<DatasetRefAnyPattern>,
-    current_account_name: AccountName,
-) -> FilteredDatasetRefAnyStream {
+    current_account_name: &AccountName,
+) -> FilteredDatasetRefAnyStream<'a> {
     let is_multitenant_mode = dataset_repo.is_multi_tenant();
 
     let (all_ref_patterns, static_refs): (Vec<_>, Vec<_>) = dataset_ref_any_patterns
@@ -171,11 +171,11 @@ pub fn matches_remote_ref_pattern(
 
 ////////////////////////////////////////////////////////////////////////////////
 
-pub fn get_local_datasets_stream(
-    dataset_repo: &dyn DatasetRepository,
+pub fn get_local_datasets_stream<'a>(
+    dataset_repo: &'a dyn DatasetRepository,
     dataset_ref_patterns: Vec<DatasetRefAnyPattern>,
-    current_account_name: AccountName,
-) -> impl Stream<Item = Result<DatasetRefAny, GetDatasetError>> + '_ {
+    current_account_name: &AccountName,
+) -> impl Stream<Item = Result<DatasetRefAny, GetDatasetError>> + 'a {
     dataset_repo
         .get_datasets_by_owner(current_account_name)
         .try_filter(move |dataset_handle| {
