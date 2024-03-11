@@ -9,9 +9,9 @@
 
 use std::sync::Arc;
 
-use futures::TryStreamExt;
+use futures::{future, StreamExt, TryStreamExt};
 use kamu::domain::*;
-use kamu::utils::datasets_filtering::filter_datasets_by_pattern;
+use kamu::utils::datasets_filtering::filter_datasets_by_local_pattern;
 use opendatafabric::*;
 
 use super::{common, CLIError, Command};
@@ -19,6 +19,7 @@ use super::{common, CLIError, Command};
 pub struct DeleteCommand {
     dataset_repo: Arc<dyn DatasetRepository>,
     dataset_ref_patterns: Vec<DatasetRefPattern>,
+    dependency_graph_service: Arc<dyn DependencyGraphService>,
     all: bool,
     recursive: bool,
     no_confirmation: bool,
@@ -28,6 +29,7 @@ impl DeleteCommand {
     pub fn new<I>(
         dataset_repo: Arc<dyn DatasetRepository>,
         dataset_ref_patterns: I,
+        dependency_graph_service: Arc<dyn DependencyGraphService>,
         all: bool,
         recursive: bool,
         no_confirmation: bool,
@@ -38,6 +40,7 @@ impl DeleteCommand {
         Self {
             dataset_repo,
             dataset_ref_patterns: dataset_ref_patterns.into_iter().collect(),
+            dependency_graph_service,
             all,
             recursive,
             no_confirmation,
@@ -53,17 +56,30 @@ impl Command for DeleteCommand {
         }
 
         let dataset_refs: Vec<_> = if self.all {
-            unimplemented!("Recursive deletion is not yet supported")
-        } else if self.recursive {
-            unimplemented!("Recursive deletion is not yet supported")
+            unimplemented!("All deletion is not yet supported")
         } else {
-            filter_datasets_by_pattern(
+            let dataset_ids: Vec<_> = filter_datasets_by_local_pattern(
                 self.dataset_repo.as_ref(),
                 self.dataset_ref_patterns.clone(),
             )
-            .map_ok(|dataset_handle| dataset_handle.as_local_ref())
+            .map_ok(|dataset_handle| dataset_handle.id)
             .try_collect()
-            .await?
+            .await?;
+
+            if self.recursive {
+                self.dependency_graph_service
+                    .get_recursive_downstream_dependencies(dataset_ids)
+                    .await
+                    .int_err()?
+                    .map(DatasetRef::ID)
+                    .collect()
+                    .await
+            } else {
+                dataset_ids
+                    .iter()
+                    .map(|dataset_id| DatasetRef::ID(dataset_id.clone()))
+                    .collect()
+            }
         };
 
         if dataset_refs.is_empty() {
@@ -77,14 +93,19 @@ impl Command for DeleteCommand {
         let confirmed = if self.no_confirmation {
             true
         } else {
+            let dataset_aliases = future::join_all(dataset_refs.iter().map(|dataset_id| async {
+                let dataset_hdl = self
+                    .dataset_repo
+                    .resolve_dataset_ref(dataset_id)
+                    .await
+                    .unwrap();
+                dataset_hdl.alias.to_string()
+            }))
+            .await;
             common::prompt_yes_no(&format!(
                 "{}: {}\n{}\nDo you wish to continue? [y/N]: ",
                 console::style("You are about to delete following dataset(s)").yellow(),
-                dataset_refs
-                    .iter()
-                    .map(ToString::to_string)
-                    .collect::<Vec<_>>()
-                    .join(", "),
+                dataset_aliases.join("\n"),
                 console::style("This operation is irreversible!").yellow(),
             ))
         };

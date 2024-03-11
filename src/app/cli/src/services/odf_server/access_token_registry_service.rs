@@ -225,6 +225,8 @@ impl AccessTokenRegistryService {
 #[async_trait::async_trait]
 impl kamu::domain::auth::OdfServerAccessTokenResolver for AccessTokenRegistryService {
     fn resolve_odf_dataset_access_token(&self, odf_dataset_http_url: &Url) -> Option<String> {
+        assert!(!odf_dataset_http_url.scheme().starts_with("odf+"));
+
         let origin = odf_dataset_http_url.origin().unicode_serialization();
         let odf_server_backend_url = Url::parse(origin.as_str()).unwrap();
 

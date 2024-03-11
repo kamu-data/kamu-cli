@@ -86,10 +86,10 @@ impl WsSmartTransferProtocolClient {
         match dataset_pull_response {
             Ok(success) => {
                 tracing::debug!(
-                    num_blocks = % success.size_estimate.num_blocks,
-                    bytes_in_raw_locks = % success.size_estimate.bytes_in_raw_blocks,
-                    num_objects = % success.size_estimate.num_objects,
-                    bytes_in_raw_objecs = % success.size_estimate.bytes_in_raw_objects,
+                    num_blocks = % success.transfer_plan.num_blocks,
+                    bytes_in_raw_locks = % success.transfer_plan.bytes_in_raw_blocks,
+                    num_objects = % success.transfer_plan.num_objects,
+                    bytes_in_raw_objecs = % success.transfer_plan.bytes_in_raw_objects,
                     "Pull response estimate",
                 );
                 Ok(success)
@@ -191,12 +191,12 @@ impl WsSmartTransferProtocolClient {
     async fn push_send_request(
         &self,
         socket: &mut TungsteniteStream,
-        size_estimate: TransferSizeEstimate,
+        transfer_plan: TransferPlan,
         dst_head: Option<&Multihash>,
     ) -> Result<DatasetPushRequestAccepted, PushClientError> {
         let push_request_message = DatasetPushRequest {
             current_head: dst_head.cloned(),
-            size_estimate,
+            transfer_plan,
         };
 
         tracing::debug!("Sending push request: {:?}", push_request_message);
@@ -504,7 +504,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
         };
 
         let dst_head = if let Some(dst) = &dst {
-            match dst.as_metadata_chain().get_ref(&BlockRef::Head).await {
+            match dst.as_metadata_chain().resolve_ref(&BlockRef::Head).await {
                 Ok(head) => Ok(Some(head)),
                 Err(GetRefError::NotFound(_)) => Ok(None),
                 Err(GetRefError::Access(e)) => Err(SyncError::Access(e)),
@@ -525,7 +525,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
             }
         };
 
-        let sync_result = if dataset_pull_result.size_estimate.num_blocks > 0 {
+        let sync_result = if dataset_pull_result.transfer_plan.num_blocks > 0 {
             let dataset_pull_metadata_response =
                 match self.pull_send_metadata_request(&mut ws_stream).await {
                     Ok(dataset_pull_metadata_response) => Ok(dataset_pull_metadata_response),
@@ -622,14 +622,14 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
 
             let new_dst_head = dst
                 .as_metadata_chain()
-                .get_ref(&BlockRef::Head)
+                .resolve_ref(&BlockRef::Head)
                 .await
                 .int_err()?;
 
             SyncResult::Updated {
                 old_head: dst_head,
                 new_head: new_dst_head,
-                num_blocks: dataset_pull_result.size_estimate.num_blocks as usize,
+                num_blocks: u64::from(dataset_pull_result.transfer_plan.num_blocks),
             }
         } else {
             SyncResult::UpToDate
@@ -660,16 +660,16 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
 
         let src_head = src
             .as_metadata_chain()
-            .get_ref(&BlockRef::Head)
+            .resolve_ref(&BlockRef::Head)
             .await
             .int_err()?;
 
-        let size_estimate =
-            prepare_dataset_transfer_estimate(src.as_metadata_chain(), &src_head, dst_head)
+        let transfer_plan =
+            prepare_dataset_transfer_plan(src.as_metadata_chain(), &src_head, dst_head)
                 .await
                 .map_err(|e| SyncError::Internal(e.int_err()))?;
 
-        let num_blocks = size_estimate.num_blocks;
+        let num_blocks = transfer_plan.num_blocks;
         if num_blocks == 0 {
             return Ok(SyncResult::UpToDate);
         }
@@ -712,7 +712,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
         };
 
         match self
-            .push_send_request(&mut ws_stream, size_estimate, dst_head)
+            .push_send_request(&mut ws_stream, transfer_plan, dst_head)
             .await
         {
             Ok(_) => {}
@@ -784,7 +784,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
         Ok(SyncResult::Updated {
             old_head: dst_head.cloned(),
             new_head: src_head,
-            num_blocks: num_blocks as usize,
+            num_blocks: u64::from(num_blocks),
         })
     }
 }

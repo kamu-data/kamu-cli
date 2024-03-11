@@ -14,7 +14,17 @@ use chrono::{DateTime, Utc};
 use dill::*;
 use event_bus::AsyncEventHandler;
 use kamu_core::{FakeSystemTimeSource, InternalError};
-use kamu_flow_system::{FlowKey, FlowPaginationOpts, FlowService, FlowServiceEvent, FlowState};
+use kamu_flow_system::{
+    FlowKey,
+    FlowOutcome,
+    FlowPaginationOpts,
+    FlowService,
+    FlowServiceEvent,
+    FlowStartCondition,
+    FlowState,
+    FlowStatus,
+    FlowTrigger,
+};
 use opendatafabric::DatasetID;
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -120,10 +130,94 @@ impl std::fmt::Display for FlowSystemTestListener {
 
             for (flow_key, heading) in flow_headings {
                 writeln!(f, "  {heading}:")?;
-                for state in snapshots.get(flow_key).unwrap() {
-                    write!(f, "    Flow ID = {} {:?}", state.flow_id, state.status(),)?;
-                    if let Some(outcome) = state.outcome {
-                        writeln!(f, " {outcome:?}",)?;
+                for flow_state in snapshots.get(flow_key).unwrap() {
+                    write!(
+                        f,
+                        "    Flow ID = {} {}",
+                        flow_state.flow_id,
+                        match flow_state.status() {
+                            FlowStatus::Waiting => "Waiting".to_string(),
+                            FlowStatus::Running => format!(
+                                "{:?}(task={})",
+                                flow_state.status(),
+                                flow_state
+                                    .task_ids
+                                    .iter()
+                                    .map(|task_id| format!("{task_id}"))
+                                    .collect::<Vec<_>>()
+                                    .join(",")
+                            ),
+                            _ => format!("{:?}", flow_state.status()),
+                        }
+                    )?;
+
+                    if matches!(flow_state.status(), FlowStatus::Waiting) {
+                        write!(
+                            f,
+                            " {}",
+                            match flow_state.primary_trigger() {
+                                FlowTrigger::Manual(_) => String::from("Manual"),
+                                FlowTrigger::AutoPolling(_) => String::from("AutoPolling"),
+                                FlowTrigger::Push(_) => String::from("Push"),
+                                FlowTrigger::InputDatasetFlow(i) => format!(
+                                    "Input({})",
+                                    state
+                                        .dataset_display_names
+                                        .get(&i.dataset_id)
+                                        .cloned()
+                                        .unwrap_or_else(|| i.dataset_id.to_string()),
+                                ),
+                            }
+                        )?;
+                    }
+
+                    if let Some(start_condition) = flow_state.start_condition {
+                        match start_condition {
+                            FlowStartCondition::Throttling(t) => {
+                                write!(
+                                    f,
+                                    " Throttling(for={}ms, wakeup={}ms, shifted={}ms)",
+                                    t.interval.num_milliseconds(),
+                                    (t.wake_up_at - initial_time).num_milliseconds(),
+                                    (t.shifted_from - initial_time).num_milliseconds()
+                                )?;
+                            }
+                            FlowStartCondition::Batching(b) => write!(
+                                f,
+                                " Batching({}, until={}ms)",
+                                b.active_batching_rule.min_records_to_await(),
+                                (b.batching_deadline - initial_time).num_milliseconds(),
+                            )?,
+                            FlowStartCondition::Executor(e) => {
+                                write!(
+                                    f,
+                                    " Executor(task={}, since={}ms)",
+                                    e.task_id,
+                                    (flow_state.timing.awaiting_executor_since.unwrap()
+                                        - initial_time)
+                                        .num_milliseconds()
+                                )?;
+                            }
+                            FlowStartCondition::Schedule(s) => {
+                                write!(
+                                    f,
+                                    " Schedule(wakeup={}ms)",
+                                    (s.wake_up_at - initial_time).num_milliseconds(),
+                                )?;
+                            }
+                        }
+                    }
+
+                    if let Some(outcome) = &flow_state.outcome {
+                        writeln!(
+                            f,
+                            " {}",
+                            match outcome {
+                                FlowOutcome::Success(_) => "Success",
+                                FlowOutcome::Aborted => "Aborted",
+                                FlowOutcome::Failed => "Failed",
+                            }
+                        )?;
                     } else {
                         writeln!(f)?;
                     }

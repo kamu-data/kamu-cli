@@ -231,7 +231,8 @@ async fn test_read_ndjson_format_timestamp_parse_failed() {
             assert_matches!(
                 res.unwrap().collect().await,
                 Err(DataFusionError::ArrowError(
-                    ::datafusion::arrow::error::ArrowError::JsonError(_)
+                    ::datafusion::arrow::error::ArrowError::JsonError(_),
+                    _
                 ))
             );
         },

@@ -14,6 +14,7 @@ use std::str::FromStr;
 use bytes::Bytes;
 use flate2::Compression;
 use futures::TryStreamExt;
+use kamu::deserialize_metadata_block;
 use kamu::domain::*;
 use opendatafabric::{MetadataBlock, MetadataEvent, Multihash};
 use tar::Header;
@@ -56,11 +57,11 @@ impl From<IterBlocksError> for PrepareDatasetTransferEstimateError {
     }
 }
 
-pub async fn prepare_dataset_transfer_estimate(
+pub async fn prepare_dataset_transfer_plan(
     metadata_chain: &dyn MetadataChain,
     stop_at: &Multihash,
     begin_after: Option<&Multihash>,
-) -> Result<TransferSizeEstimate, PrepareDatasetTransferEstimateError> {
+) -> Result<TransferPlan, PrepareDatasetTransferEstimateError> {
     let mut block_stream = metadata_chain.iter_blocks_interval(stop_at, begin_after, false);
 
     let mut blocks_count: u32 = 0;
@@ -71,12 +72,14 @@ pub async fn prepare_dataset_transfer_estimate(
     let mut bytes_in_data_objects: u64 = 0;
     let mut bytes_in_checkpoint_objects: u64 = 0;
 
+    let mut data_records_count: u64 = 0;
+
     while let Some((hash, block)) = block_stream.try_next().await? {
         blocks_count += 1;
 
         bytes_in_blocks += metadata_chain
-            .as_object_repo()
-            .get_size(&hash)
+            .as_metadata_block_repository()
+            .get_block_size(&hash)
             .await
             .int_err()?;
 
@@ -85,6 +88,7 @@ pub async fn prepare_dataset_transfer_estimate(
                 if let Some(new_data) = &add_data.new_data {
                     data_objects_count += 1;
                     bytes_in_data_objects += new_data.size;
+                    data_records_count += new_data.num_records();
                 }
                 if let Some(new_checkpoint) = &add_data.new_checkpoint {
                     checkpoint_objects_count += 1;
@@ -95,6 +99,7 @@ pub async fn prepare_dataset_transfer_estimate(
                 if let Some(new_data) = &execute_transform.new_data {
                     data_objects_count += 1;
                     bytes_in_data_objects += new_data.size;
+                    data_records_count += new_data.num_records();
                 }
                 if let Some(new_checkpoint) = &execute_transform.new_checkpoint {
                     checkpoint_objects_count += 1;
@@ -115,9 +120,10 @@ pub async fn prepare_dataset_transfer_estimate(
         }
     }
 
-    Ok(TransferSizeEstimate {
+    Ok(TransferPlan {
         num_blocks: blocks_count,
         num_objects: data_objects_count + checkpoint_objects_count,
+        num_records: data_records_count,
         bytes_in_raw_blocks: bytes_in_blocks,
         bytes_in_raw_objects: bytes_in_data_objects + bytes_in_checkpoint_objects,
     })
@@ -134,7 +140,7 @@ pub async fn prepare_dataset_metadata_batch(
     let encoder = flate2::write::GzEncoder::new(Vec::new(), Compression::default());
     let mut tarball_builder = tar::Builder::new(encoder);
 
-    let blocks_for_transfer: Vec<(Multihash, MetadataBlock)> = metadata_chain
+    let blocks_for_transfer: Vec<HashedMetadataBlock> = metadata_chain
         .iter_blocks_interval(stop_at, begin_after, false)
         .try_collect()
         .await
@@ -144,8 +150,8 @@ pub async fn prepare_dataset_metadata_batch(
         num_blocks += 1;
 
         let block_bytes: Bytes = metadata_chain
-            .as_object_repo()
-            .get_bytes(hash)
+            .as_metadata_block_repository()
+            .get_block_data(hash)
             .await
             .int_err()?;
 
@@ -177,19 +183,18 @@ pub async fn prepare_dataset_metadata_batch(
 
 pub fn decode_metadata_batch(
     blocks_batch: &MetadataBlocksBatch,
-) -> Result<VecDeque<(Multihash, MetadataBlock)>, GetBlockError> {
+) -> Result<VecDeque<HashedMetadataBlock>, GetBlockError> {
     let blocks_data = unpack_dataset_metadata_batch(blocks_batch);
+
     blocks_data
         .into_iter()
         .map(|(hash, bytes)| {
-            // TODO: Avoid depending on specific implementation of MetadataChain.
-            // This is currently necessary because we need to be able to deserialize blocks
-            // BEFORE an instance of MetadataChain exists. Consider injecting a
-            // configurable block deserializer.
-            match kamu::MetadataChainImpl::<(), ()>::deserialize_block(&hash, &bytes) {
-                Ok(block) => Ok((hash, block)),
-                Err(err) => Err(err),
-            }
+            // TODO: Avoid depending on specific implementation of
+            //       metadata_block_repository_helpers::deserialize_metadata_block.
+            //       This is currently necessary because we need to be able to deserialize
+            //       blocks BEFORE an instance of MetadataChain exists.
+            //       Consider injecting a configurable block deserializer.
+            deserialize_metadata_block(&hash, &bytes).map(|block| (hash, block))
         })
         .collect::<Result<VecDeque<_>, _>>()
 }
@@ -202,7 +207,7 @@ pub struct AppendMetadataResponse {
 
 pub async fn dataset_append_metadata(
     dataset: &dyn Dataset,
-    metadata: VecDeque<(Multihash, MetadataBlock)>,
+    metadata: VecDeque<HashedMetadataBlock>,
 ) -> Result<AppendMetadataResponse, AppendError> {
     let old_head = metadata.front().unwrap().1.prev_block_hash.clone();
     let new_head = metadata.back().unwrap().0.clone();
@@ -345,7 +350,7 @@ pub async fn collect_object_references_from_interval(
 
 pub async fn collect_object_references_from_metadata(
     dataset: &dyn Dataset,
-    blocks: &VecDeque<(Multihash, MetadataBlock)>,
+    blocks: &VecDeque<HashedMetadataBlock>,
     missing_files_only: bool,
 ) -> Vec<ObjectFileReference> {
     let mut res_references: Vec<ObjectFileReference> = Vec::new();

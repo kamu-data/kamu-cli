@@ -67,8 +67,8 @@ impl From<fs::FlowKeySystem> for FlowKeySystem {
 
 #[derive(SimpleObject, Debug, Clone)]
 pub struct FlowTimingRecords {
-    /// Planned activation time (at least, Queued state)
-    activate_at: Option<DateTime<Utc>>,
+    /// Recorded time of last task scheduling
+    awaiting_executor_since: Option<DateTime<Utc>>,
 
     /// Recorded start of running (Running state seen at least once)
     running_since: Option<DateTime<Utc>>,
@@ -81,7 +81,7 @@ pub struct FlowTimingRecords {
 impl From<fs::FlowTimingRecords> for FlowTimingRecords {
     fn from(value: fs::FlowTimingRecords) -> Self {
         Self {
-            activate_at: value.activate_at,
+            awaiting_executor_since: value.awaiting_executor_since,
             running_since: value.running_since,
             finished_at: value.finished_at,
         }
@@ -94,8 +94,6 @@ impl From<fs::FlowTimingRecords> for FlowTimingRecords {
 #[graphql(remote = "kamu_flow_system::FlowStatus")]
 pub enum FlowStatus {
     Waiting,
-    Queued,
-    Scheduled,
     Running,
     Finished,
 }
@@ -103,12 +101,20 @@ pub enum FlowStatus {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Enum, Copy, Clone, Eq, PartialEq)]
-#[graphql(remote = "kamu_flow_system::FlowOutcome")]
 pub enum FlowOutcome {
     Success,
     Failed,
-    Cancelled,
     Aborted,
+}
+
+impl From<&kamu_flow_system::FlowOutcome> for FlowOutcome {
+    fn from(value: &kamu_flow_system::FlowOutcome) -> Self {
+        match value {
+            kamu_flow_system::FlowOutcome::Success(_) => Self::Success,
+            kamu_flow_system::FlowOutcome::Failed => Self::Failed,
+            kamu_flow_system::FlowOutcome::Aborted => Self::Aborted,
+        }
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::assert_matches::assert_matches;
 use std::path::Path;
 
 use dill::Component;
@@ -79,17 +78,46 @@ async fn do_test_search(tmp_workspace_dir: &Path, repo_url: Url) {
         .unwrap();
 
     // Search!
-    assert_matches!(
-        search_svc.search(None, SearchOptions::default()).await,
-        Ok(SearchResult { datasets }) if datasets == vec![dataset_remote_alias.clone()]
+    assert_eq!(
+        search_svc
+            .search(None, SearchOptions::default())
+            .await
+            .unwrap(),
+        SearchResult {
+            datasets: vec![SearchResultDataset {
+                id: None,
+                alias: dataset_remote_alias.clone(),
+                kind: None,
+                num_blocks: None,
+                num_records: None,
+                estimated_size: None,
+            }]
+        }
     );
-    assert_matches!(
-        search_svc.search(Some("bar"), SearchOptions::default()).await,
-        Ok(SearchResult { datasets }) if datasets == vec![dataset_remote_alias.clone()]
+
+    assert_eq!(
+        search_svc
+            .search(Some("bar"), SearchOptions::default())
+            .await
+            .unwrap(),
+        SearchResult {
+            datasets: vec![SearchResultDataset {
+                id: None,
+                alias: dataset_remote_alias.clone(),
+                kind: None,
+                num_blocks: None,
+                num_records: None,
+                estimated_size: None,
+            }]
+        }
     );
-    assert_matches!(
-        search_svc.search(Some("foo"), SearchOptions::default()).await,
-        Ok(SearchResult { datasets }) if datasets.is_empty()
+
+    assert_eq!(
+        search_svc
+            .search(Some("foo"), SearchOptions::default())
+            .await
+            .unwrap(),
+        SearchResult { datasets: vec![] }
     );
 }
 

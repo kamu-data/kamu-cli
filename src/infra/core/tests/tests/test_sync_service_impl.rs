@@ -165,6 +165,7 @@ async fn do_test_sync(
             old_head: None,
             new_head,
             num_blocks: 2,
+            ..
         }) if new_head == b1
     );
 
@@ -174,6 +175,7 @@ async fn do_test_sync(
             old_head: None,
             new_head,
             num_blocks: 2,
+            ..
         }) if new_head == b1
     );
 
@@ -206,6 +208,7 @@ async fn do_test_sync(
             old_head,
             new_head,
             num_blocks: 2,
+            ..
         }) if old_head.as_ref() == Some(&b1) && new_head == b3
     );
 
@@ -215,6 +218,7 @@ async fn do_test_sync(
             old_head,
             new_head,
             num_blocks: 2,
+            ..
         }) if old_head.as_ref() == Some(&b1) && new_head == b3
     );
 
@@ -263,6 +267,7 @@ async fn do_test_sync(
             old_head,
             new_head,
             num_blocks: 1,
+            ..
         }) if old_head == Some(b3.clone()) && new_head == exta_head
     );
 
@@ -291,6 +296,7 @@ async fn do_test_sync(
             old_head,
             new_head,
             num_blocks: 4, // full resynchronization: seed, b1, b2, b3
+            ..
         }) if old_head == Some(exta_head.clone()) && new_head == b3
     );
 
@@ -318,6 +324,7 @@ async fn do_test_sync(
             old_head,
             new_head,
             num_blocks: 4, // full resynchronization: seed, b1, b2, b3
+            ..
         }) if old_head == Some(exta_head.clone()) && new_head == b3
     );
 
@@ -350,6 +357,7 @@ async fn do_test_sync(
             old_head,
             new_head,
             num_blocks: 2,
+            ..
         }) if old_head.as_ref() == Some(&b3) && new_head == b5
     );
 
@@ -466,7 +474,7 @@ async fn test_sync_to_from_ipfs() {
     let ipfs_daemon = IpfsDaemon::new().await;
     let ipfs_client = ipfs_daemon.client();
     let key_id = ipfs_client.key_gen("test").await.unwrap();
-    let ipns_url = Url::from_str(&format!("ipns://{key_id}")).unwrap();
+    let ipns_url = Url::from_str(&format!("ipns://{key_id}/")).unwrap();
 
     do_test_sync(
         tmp_workspace_dir.path(),

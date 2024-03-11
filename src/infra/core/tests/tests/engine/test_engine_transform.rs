@@ -74,7 +74,7 @@ impl DatasetHelper {
         let old_head = self
             .dataset
             .as_metadata_chain()
-            .get_ref(&BlockRef::Head)
+            .resolve_ref(&BlockRef::Head)
             .await
             .unwrap();
 
@@ -560,7 +560,7 @@ fn normalize_schema(s: &DFSchema, engine: &str) -> DFSchema {
                     // Spark:
                     // - produces optional `offset` and `event_time`
                     "spark" => match f.name().as_str() {
-                        "offset" | "op" => {
+                        "op" => {
                             assert!(f.is_nullable());
                             f.clone().with_nullable(false)
                         }

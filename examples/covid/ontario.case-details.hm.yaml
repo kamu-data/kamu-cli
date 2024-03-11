@@ -1,14 +1,14 @@
 kind: DatasetSnapshot
 version: 1
 content:
-  name: ontario.case-details.hm
+  name: covid19.ontario.case-details.hm
   kind: Derivative
   # List of metadata events that get dataset into its initial state
   metadata:
     - kind: SetTransform
       # References the datasets that will be used as sources of data.
       inputs:
-        - datasetRef: ontario.case-details
+        - datasetRef: covid19.ontario.case-details
       # Transformation that will be applied to produce new data
       transform:
         kind: Sql
@@ -22,7 +22,7 @@ content:
                  else 'U' end as gender,
             age_group,
             city as location
-            FROM "ontario.case-details"
+            FROM "covid19.ontario.case-details"
     - kind: SetVocab
       eventTimeColumn: reported_date
     - kind: SetInfo

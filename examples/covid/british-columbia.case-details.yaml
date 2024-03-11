@@ -1,8 +1,8 @@
 kind: DatasetSnapshot
 version: 1
 content:
-  name: british-columbia.case-details
-  kind: root
+  name: covid19.british-columbia.case-details
+  kind: Root
   metadata:
     # Specifies the source of data that can be periodically polled to refresh the dataset
     # See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#setpollingsource-schema

@@ -28,7 +28,7 @@ def resolve_dataset_ref(dataset_ref):
     else:
         # Multi-tenant
         # Assuming layout <account_name>/<dataset_id>/info/alias
-        account_path, _ = dataset_ref.split("/", 1)
+        account_path, name = dataset_ref.split("/", 1)
         if os.path.isdir(account_path):
             for dataset_id in os.listdir(account_path):
                 alias_path = os.path.join(account_path, dataset_id, "info", "alias")
@@ -36,7 +36,7 @@ def resolve_dataset_ref(dataset_ref):
                     continue
                 with open(alias_path) as f:
                     alias = f.read().strip()
-                if alias != dataset_ref:
+                if alias != name:
                     continue
                 return os.path.join(account_path, dataset_id, "data")
 
@@ -212,7 +212,7 @@ class LivyProcessHelper:
                 "and place your notebook in that directory."
             )
 
-        # TODO: Other pords are not supported due to podman running in host networking mode
+        # TODO: Other ports are not supported due to podman running in host networking mode
         port = 8998
 
         out_dir, _ = os.path.split(LIVY_STDOUT)

@@ -20,7 +20,7 @@ use std::sync::{Arc, Weak};
 
 use async_trait::async_trait;
 use datafusion::catalog::schema::SchemaProvider;
-use datafusion::catalog::{CatalogList, CatalogProvider};
+use datafusion::catalog::{CatalogProvider, CatalogProviderList};
 use datafusion::datasource::listing::{ListingTable, ListingTableConfig, ListingTableUrl};
 use datafusion::datasource::TableProvider;
 use datafusion::error::Result;
@@ -30,17 +30,17 @@ use parking_lot::RwLock;
 /// Wraps another catalog, automatically creating table providers
 /// for local files if needed
 pub struct DynamicFileCatalog {
-    inner: Arc<dyn CatalogList>,
+    inner: Arc<dyn CatalogProviderList>,
     state: Weak<RwLock<SessionState>>,
 }
 
 impl DynamicFileCatalog {
-    pub fn new(inner: Arc<dyn CatalogList>, state: Weak<RwLock<SessionState>>) -> Self {
+    pub fn new(inner: Arc<dyn CatalogProviderList>, state: Weak<RwLock<SessionState>>) -> Self {
         Self { inner, state }
     }
 }
 
-impl CatalogList for DynamicFileCatalog {
+impl CatalogProviderList for DynamicFileCatalog {
     fn as_any(&self) -> &dyn Any {
         self
     }

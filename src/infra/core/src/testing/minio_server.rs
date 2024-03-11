@@ -113,7 +113,7 @@ impl LocalS3Server {
         let minio = MinioServer::new(tmp_dir.path(), access_key, secret_key).await;
 
         let url = Url::parse(&format!(
-            "s3+http://{}:{}/{}",
+            "s3+http://{}:{}/{}/",
             minio.address, minio.host_port, bucket
         ))
         .unwrap();

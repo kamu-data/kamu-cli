@@ -518,11 +518,7 @@ async fn test_sync_from() {
     assert_matches!(
         res[0],
         PullResponse {
-            result: Ok(PullResult::Updated {
-                old_head: None,
-                num_blocks: 1,
-                ..
-            }),
+            result: Ok(PullResult::Updated { old_head: None, .. }),
             ..
         }
     );
@@ -565,11 +561,7 @@ async fn test_sync_from_url_and_local_ref() {
     assert_matches!(
         res[0],
         PullResponse {
-            result: Ok(PullResult::Updated {
-                old_head: None,
-                num_blocks: 1,
-                ..
-            }),
+            result: Ok(PullResult::Updated { old_head: None, .. }),
             ..
         }
     );
@@ -612,11 +604,7 @@ async fn test_sync_from_url_and_local_multi_tenant_ref() {
     assert_matches!(
         res[0],
         PullResponse {
-            result: Ok(PullResult::Updated {
-                old_head: None,
-                num_blocks: 1,
-                ..
-            }),
+            result: Ok(PullResult::Updated { old_head: None, .. }),
             ..
         }
     );
@@ -659,11 +647,7 @@ async fn test_sync_from_url_only() {
     assert_matches!(
         res[0],
         PullResponse {
-            result: Ok(PullResult::Updated {
-                old_head: None,
-                num_blocks: 1,
-                ..
-            }),
+            result: Ok(PullResult::Updated { old_head: None, .. }),
             ..
         }
     );
@@ -706,11 +690,7 @@ async fn test_sync_from_url_only_multi_tenant_case() {
     assert_matches!(
         res[0],
         PullResponse {
-            result: Ok(PullResult::Updated {
-                old_head: None,
-                num_blocks: 1,
-                ..
-            }),
+            result: Ok(PullResult::Updated { old_head: None, .. }),
             ..
         }
     );

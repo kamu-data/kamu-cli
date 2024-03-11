@@ -18,7 +18,7 @@ use serde::{Deserialize, Serialize};
 
 ///////////////////////////////////////////////////////////////////////////////
 
-const LOGIN_METHOD_GITHUB: &str = "oauth_github";
+pub const LOGIN_METHOD_GITHUB: &str = "oauth_github";
 
 pub const ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_ID: &str = "KAMU_AUTH_GITHUB_CLIENT_ID";
 pub const ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_SECRET: &str = "KAMU_AUTH_GITHUB_CLIENT_SECRET";
@@ -332,7 +332,7 @@ pub struct GithubLoginCredentials {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-struct GithubProviderCredentials {
+pub struct GithubProviderCredentials {
     pub access_token: String,
 }
 

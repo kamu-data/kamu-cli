@@ -22,6 +22,7 @@ impl Flow {
     /// Creates a flow
     pub fn new(
         now: DateTime<Utc>,
+        trigger_time: DateTime<Utc>,
         flow_id: FlowID,
         flow_key: FlowKey,
         trigger: FlowTrigger,
@@ -31,6 +32,7 @@ impl Flow {
                 flow_id,
                 FlowEventInitiated {
                     event_time: now,
+                    trigger_time,
                     flow_id,
                     flow_key,
                     trigger,
@@ -40,46 +42,41 @@ impl Flow {
         )
     }
 
-    /// Define start condition for the history
-    pub fn define_start_condition(
+    /// Define start condition to indicate the relevant reason of waiting
+    pub fn set_relevant_start_condition(
         &mut self,
         now: DateTime<Utc>,
         start_condition: FlowStartCondition,
     ) -> Result<(), ProjectionError<FlowState>> {
-        let event = FlowEventStartConditionDefined {
-            event_time: now,
-            flow_id: self.flow_id,
-            start_condition,
-        };
-        self.apply(event)
+        if self.start_condition != Some(start_condition) {
+            let event = FlowEventStartConditionUpdated {
+                event_time: now,
+                flow_id: self.flow_id,
+                start_condition,
+            };
+            self.apply(event)
+        } else {
+            Ok(())
+        }
     }
 
-    /// Activate at time
-    pub fn activate_at_time(
-        &mut self,
-        now: DateTime<Utc>,
-        activate_at: DateTime<Utc>,
-    ) -> Result<(), ProjectionError<FlowState>> {
-        let event = FlowEventQueued {
-            event_time: now,
-            flow_id: self.flow_id,
-            activate_at,
-        };
-        self.apply(event)
-    }
-
-    /// Extra trigger
-    pub fn add_trigger(
+    /// Add extra trigger, if it's unique
+    pub fn add_trigger_if_unique(
         &mut self,
         now: DateTime<Utc>,
         trigger: FlowTrigger,
-    ) -> Result<(), ProjectionError<FlowState>> {
-        let event = FlowEventTriggerAdded {
-            event_time: now,
-            flow_id: self.flow_id,
-            trigger,
-        };
-        self.apply(event)
+    ) -> Result<bool, ProjectionError<FlowState>> {
+        if trigger.is_unique_vs(&self.triggers) {
+            let event = FlowEventTriggerAdded {
+                event_time: now,
+                flow_id: self.flow_id,
+                trigger,
+            };
+            self.apply(event)?;
+            Ok(true)
+        } else {
+            Ok(false)
+        }
     }
 
     /// Attaches a scheduled task
@@ -128,11 +125,19 @@ impl Flow {
 
     /// Abort flow
     pub fn abort(&mut self, now: DateTime<Utc>) -> Result<(), ProjectionError<FlowState>> {
-        let event = FlowEventAborted {
-            event_time: now,
-            flow_id: self.flow_id,
-        };
-        self.apply(event)
+        if !self
+            .outcome
+            .as_ref()
+            .is_some_and(|outcome| matches!(outcome, FlowOutcome::Aborted))
+        {
+            let event = FlowEventAborted {
+                event_time: now,
+                flow_id: self.flow_id,
+            };
+            self.apply(event)
+        } else {
+            Ok(())
+        }
     }
 }
 

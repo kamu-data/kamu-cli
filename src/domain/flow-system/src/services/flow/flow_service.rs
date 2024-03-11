@@ -135,8 +135,6 @@ pub enum CancelScheduledTasksError {
     #[error(transparent)]
     NotFound(#[from] FlowNotFoundError),
     #[error(transparent)]
-    NotScheduled(#[from] FlowNotScheduledError),
-    #[error(transparent)]
     Internal(#[from] InternalError),
 }
 
@@ -145,12 +143,6 @@ pub enum CancelScheduledTasksError {
 #[derive(thiserror::Error, Debug)]
 #[error("Flow {flow_id} not found")]
 pub struct FlowNotFoundError {
-    pub flow_id: FlowID,
-}
-
-#[derive(thiserror::Error, Debug)]
-#[error("Flow {flow_id} is not scheduled yet.")]
-pub struct FlowNotScheduledError {
     pub flow_id: FlowID,
 }
 

@@ -577,7 +577,6 @@ impl SchemaProvider for KamuSchema {
                     table_partition_cols: Vec::new(),
                     parquet_pruning: None,
                     skip_metadata: None,
-                    insert_mode: datafusion::datasource::listing::ListingTableInsertMode::Error,
                 },
             )
             .await

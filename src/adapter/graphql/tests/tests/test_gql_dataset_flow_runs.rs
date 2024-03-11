@@ -12,12 +12,12 @@
 use std::sync::Arc;
 
 use async_graphql::value;
-use chrono::Utc;
+use chrono::{DateTime, Duration, DurationRound, Utc};
 use container_runtime::ContainerRuntime;
 use dill::Component;
 use event_bus::EventBus;
 use indoc::indoc;
-use kamu::testing::{MetadataFactory, MockDependencyGraphRepository};
+use kamu::testing::{MetadataFactory, MockDatasetChangesService, MockDependencyGraphRepository};
 use kamu::{
     DataFormatRegistryImpl,
     DatasetRepositoryLocalFs,
@@ -30,9 +30,12 @@ use kamu_core::auth::DEFAULT_ACCOUNT_NAME;
 use kamu_core::{
     auth,
     CreateDatasetResult,
+    DatasetChangesService,
+    DatasetIntervalIncrement,
     DatasetRepository,
     DependencyGraphRepository,
     PollingIngestService,
+    PullResult,
     SystemTimeSourceDefault,
 };
 use kamu_flow_system::{
@@ -50,9 +53,9 @@ use kamu_flow_system_inmem::{
     FlowEventStoreInMem,
     FlowServiceInMemory,
 };
-use kamu_task_system::{TaskEventFinished, TaskEventRunning, TaskID, TaskOutcome};
+use kamu_task_system as ts;
 use kamu_task_system_inmem::{TaskSchedulerInMemory, TaskSystemEventStoreInMemory};
-use opendatafabric::{DatasetID, DatasetKind, FAKE_ACCOUNT_ID};
+use opendatafabric::{DatasetID, DatasetKind, Multihash, FAKE_ACCOUNT_ID};
 
 use crate::utils::{authentication_catalogs, expect_anonymous_access_error};
 
@@ -60,7 +63,16 @@ use crate::utils::{authentication_catalogs, expect_anonymous_access_error};
 
 #[test_log::test(tokio::test)]
 async fn test_trigger_ingest_root_dataset() {
-    let harness = FlowRunsHarness::new();
+    let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
+        dependency_graph_mock: Some(MockDependencyGraphRepository::no_dependencies()),
+        dataset_changes_mock: Some(MockDatasetChangesService::with_increment_between(
+            DatasetIntervalIncrement {
+                num_blocks: 1,
+                num_records: 12,
+                updated_watermark: None,
+            },
+        )),
+    });
     let create_result = harness.create_root_dataset().await;
 
     let mutation_code =
@@ -88,7 +100,7 @@ async fn test_trigger_ingest_root_dataset() {
                                 "flow": {
                                     "__typename": "Flow",
                                     "flowId": "0",
-                                    "status": "QUEUED",
+                                    "status": "WAITING",
                                     "outcome": null
                                 }
                             }
@@ -122,15 +134,248 @@ async fn test_trigger_ingest_root_dataset() {
                                         "description": {
                                             "__typename": "FlowDescriptionDatasetPollingIngest",
                                             "datasetId": create_result.dataset_handle.id.to_string(),
-                                            "ingestedRecordsCount": null,
+                                            "ingestResult": null,
                                         },
-                                        "status": "QUEUED",
+                                        "status": "WAITING",
                                         "outcome": null,
                                         "timing": {
+                                            "awaitingExecutorSince": null,
                                             "runningSince": null,
                                             "finishedAt": null,
                                         },
                                         "tasks": [],
+                                        "initiator": {
+                                            "id": FAKE_ACCOUNT_ID,
+                                            "accountName": auth::DEFAULT_ACCOUNT_NAME,
+                                        },
+                                        "primaryTrigger": {
+                                            "__typename": "FlowTriggerManual",
+                                            "initiator": {
+                                                "id": FAKE_ACCOUNT_ID,
+                                                "accountName": auth::DEFAULT_ACCOUNT_NAME,
+                                            }
+                                        },
+                                        "startCondition": null,
+                                    }
+                                ],
+                                "pageInfo": {
+                                    "hasPreviousPage": false,
+                                    "hasNextPage": false,
+                                    "currentPage": 0,
+                                    "totalPages": 1,
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+
+    let schedule_time = Utc::now()
+        .duration_round(Duration::try_seconds(1).unwrap())
+        .unwrap();
+    let flow_task_id = harness.mimic_flow_scheduled("0", schedule_time).await;
+
+    let response = schema
+        .execute(
+            async_graphql::Request::new(request_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(response.is_ok(), "{response:?}");
+    assert_eq!(
+        response.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "flows": {
+                        "runs": {
+                            "listFlows": {
+                                "nodes": [
+                                    {
+                                        "flowId": "0",
+                                        "description": {
+                                            "__typename": "FlowDescriptionDatasetPollingIngest",
+                                            "datasetId": create_result.dataset_handle.id.to_string(),
+                                            "ingestResult": null,
+                                        },
+                                        "status": "WAITING",
+                                        "outcome": null,
+                                        "timing": {
+                                            "awaitingExecutorSince": schedule_time.to_rfc3339(),
+                                            "runningSince": null,
+                                            "finishedAt": null,
+                                        },
+                                        "tasks": [
+                                            {
+                                                "taskId": "0",
+                                                "status": "QUEUED",
+                                                "outcome": null,
+                                            }
+                                        ],
+                                        "initiator": {
+                                            "id": FAKE_ACCOUNT_ID,
+                                            "accountName": auth::DEFAULT_ACCOUNT_NAME,
+                                        },
+                                        "primaryTrigger": {
+                                            "__typename": "FlowTriggerManual",
+                                            "initiator": {
+                                                "id": FAKE_ACCOUNT_ID,
+                                                "accountName": auth::DEFAULT_ACCOUNT_NAME,
+                                            }
+                                        },
+                                        "startCondition": {
+                                            "__typename": "FlowStartConditionExecutor",
+                                            "taskId": "0",
+                                        },
+                                    }
+                                ],
+                                "pageInfo": {
+                                    "hasPreviousPage": false,
+                                    "hasNextPage": false,
+                                    "currentPage": 0,
+                                    "totalPages": 1,
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+
+    let running_time = Utc::now()
+        .duration_round(Duration::try_seconds(1).unwrap())
+        .unwrap();
+    harness.mimic_task_running(flow_task_id, running_time).await;
+
+    let response = schema
+        .execute(
+            async_graphql::Request::new(request_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(response.is_ok(), "{response:?}");
+    assert_eq!(
+        response.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "flows": {
+                        "runs": {
+                            "listFlows": {
+                                "nodes": [
+                                    {
+                                        "flowId": "0",
+                                        "description": {
+                                            "__typename": "FlowDescriptionDatasetPollingIngest",
+                                            "datasetId": create_result.dataset_handle.id.to_string(),
+                                            "ingestResult": null,
+                                        },
+                                        "status": "RUNNING",
+                                        "outcome": null,
+                                        "timing": {
+                                            "awaitingExecutorSince": schedule_time.to_rfc3339(),
+                                            "runningSince": running_time.to_rfc3339(),
+                                            "finishedAt": null,
+                                        },
+                                        "tasks": [
+                                            {
+                                                "taskId": "0",
+                                                "status": "RUNNING",
+                                                "outcome": null,
+                                            }
+                                        ],
+                                        "initiator": {
+                                            "id": FAKE_ACCOUNT_ID,
+                                            "accountName": auth::DEFAULT_ACCOUNT_NAME,
+                                        },
+                                        "primaryTrigger": {
+                                            "__typename": "FlowTriggerManual",
+                                            "initiator": {
+                                                "id": FAKE_ACCOUNT_ID,
+                                                "accountName": auth::DEFAULT_ACCOUNT_NAME,
+                                            }
+                                        },
+                                        "startCondition": null,
+                                    }
+                                ],
+                                "pageInfo": {
+                                    "hasPreviousPage": false,
+                                    "hasNextPage": false,
+                                    "currentPage": 0,
+                                    "totalPages": 1,
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+
+    let complete_time = Utc::now()
+        .duration_round(Duration::try_seconds(1).unwrap())
+        .unwrap();
+    harness
+        .mimic_task_completed(
+            flow_task_id,
+            complete_time,
+            ts::TaskOutcome::Success(ts::TaskResult::UpdateDatasetResult(
+                ts::TaskUpdateDatasetResult {
+                    pull_result: PullResult::Updated {
+                        old_head: Some(Multihash::from_digest_sha3_256(b"old-slice")),
+                        new_head: Multihash::from_digest_sha3_256(b"new-slice"),
+                    },
+                },
+            )),
+        )
+        .await;
+
+    let response = schema
+        .execute(
+            async_graphql::Request::new(request_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(response.is_ok(), "{response:?}");
+    assert_eq!(
+        response.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "flows": {
+                        "runs": {
+                            "listFlows": {
+                                "nodes": [
+                                    {
+                                        "flowId": "0",
+                                        "description": {
+                                            "__typename": "FlowDescriptionDatasetPollingIngest",
+                                            "datasetId": create_result.dataset_handle.id.to_string(),
+                                            "ingestResult": {
+                                                "numBlocks": 1,
+                                                "numRecords": 12,
+                                            },
+                                        },
+                                        "status": "FINISHED",
+                                        "outcome": "SUCCESS",
+                                        "timing": {
+                                            "awaitingExecutorSince": schedule_time.to_rfc3339(),
+                                            "runningSince": running_time.to_rfc3339(),
+                                            "finishedAt": complete_time.to_rfc3339(),
+                                        },
+                                        "tasks": [
+                                            {
+                                                "taskId": "0",
+                                                "status": "FINISHED",
+                                                "outcome": "SUCCESS",
+                                            }
+                                        ],
                                         "initiator": {
                                             "id": FAKE_ACCOUNT_ID,
                                             "accountName": auth::DEFAULT_ACCOUNT_NAME,
@@ -164,7 +409,16 @@ async fn test_trigger_ingest_root_dataset() {
 
 #[test_log::test(tokio::test)]
 async fn test_trigger_execute_transform_derived_dataset() {
-    let harness = FlowRunsHarness::new();
+    let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
+        dependency_graph_mock: Some(MockDependencyGraphRepository::no_dependencies()),
+        dataset_changes_mock: Some(MockDatasetChangesService::with_increment_between(
+            DatasetIntervalIncrement {
+                num_blocks: 1,
+                num_records: 5,
+                updated_watermark: None,
+            },
+        )),
+    });
     harness.create_root_dataset().await;
     let create_derived_result = harness.create_derived_dataset().await;
 
@@ -195,7 +449,7 @@ async fn test_trigger_execute_transform_derived_dataset() {
                                 "flow": {
                                     "__typename": "Flow",
                                     "flowId": "0",
-                                    "status": "QUEUED",
+                                    "status": "WAITING",
                                     "outcome": null
                                 }
                             }
@@ -229,15 +483,113 @@ async fn test_trigger_execute_transform_derived_dataset() {
                                         "description": {
                                             "__typename": "FlowDescriptionDatasetExecuteTransform",
                                             "datasetId": create_derived_result.dataset_handle.id.to_string(),
-                                            "transformedRecordsCount": null,
+                                            "transformResult": null,
                                         },
-                                        "status": "QUEUED",
+                                        "status": "WAITING",
                                         "outcome": null,
                                         "timing": {
+                                            "awaitingExecutorSince": null,
                                             "runningSince": null,
                                             "finishedAt": null,
                                         },
                                         "tasks": [],
+                                        "initiator": {
+                                            "id": FAKE_ACCOUNT_ID,
+                                            "accountName": auth::DEFAULT_ACCOUNT_NAME,
+                                        },
+                                        "primaryTrigger": {
+                                            "__typename": "FlowTriggerManual",
+                                            "initiator": {
+                                                "id": FAKE_ACCOUNT_ID,
+                                                "accountName": auth::DEFAULT_ACCOUNT_NAME,
+                                            }
+                                        },
+                                        "startCondition": null,
+                                    }
+                                ],
+                                "pageInfo": {
+                                    "hasPreviousPage": false,
+                                    "hasNextPage": false,
+                                    "currentPage": 0,
+                                    "totalPages": 1,
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+
+    let schedule_time = Utc::now()
+        .duration_round(Duration::try_seconds(1).unwrap())
+        .unwrap();
+    let flow_task_id = harness.mimic_flow_scheduled("0", schedule_time).await;
+
+    let running_time = Utc::now()
+        .duration_round(Duration::try_seconds(1).unwrap())
+        .unwrap();
+    harness.mimic_task_running(flow_task_id, running_time).await;
+
+    let complete_time = Utc::now()
+        .duration_round(Duration::try_seconds(1).unwrap())
+        .unwrap();
+    harness
+        .mimic_task_completed(
+            flow_task_id,
+            complete_time,
+            ts::TaskOutcome::Success(ts::TaskResult::UpdateDatasetResult(
+                ts::TaskUpdateDatasetResult {
+                    pull_result: PullResult::Updated {
+                        old_head: Some(Multihash::from_digest_sha3_256(b"old-slice")),
+                        new_head: Multihash::from_digest_sha3_256(b"new-slice"),
+                    },
+                },
+            )),
+        )
+        .await;
+
+    let response = schema
+        .execute(
+            async_graphql::Request::new(request_code.clone())
+                .data(harness.catalog_authorized.clone()),
+        )
+        .await;
+
+    assert!(response.is_ok(), "{response:?}");
+    assert_eq!(
+        response.data,
+        value!({
+            "datasets": {
+                "byId": {
+                    "flows": {
+                        "runs": {
+                            "listFlows": {
+                                "nodes": [
+                                    {
+                                        "flowId": "0",
+                                        "description": {
+                                            "__typename": "FlowDescriptionDatasetExecuteTransform",
+                                            "datasetId": create_derived_result.dataset_handle.id.to_string(),
+                                            "transformResult": {
+                                                "numBlocks": 1,
+                                                "numRecords": 5,
+                                            },
+                                        },
+                                        "status": "FINISHED",
+                                        "outcome": "SUCCESS",
+                                        "timing": {
+                                            "awaitingExecutorSince": schedule_time.to_rfc3339(),
+                                            "runningSince": running_time.to_rfc3339(),
+                                            "finishedAt": complete_time.to_rfc3339(),
+                                        },
+                                        "tasks": [
+                                            {
+                                                "taskId": "0",
+                                                "status": "FINISHED",
+                                                "outcome": "SUCCESS",
+                                            }
+                                        ],
                                         "initiator": {
                                             "id": FAKE_ACCOUNT_ID,
                                             "accountName": auth::DEFAULT_ACCOUNT_NAME,
@@ -486,7 +838,7 @@ async fn test_list_flows_with_filters_and_pagination() {
                         runs {
                             listFlows(
                                 filters: {
-                                    byStatus: "QUEUED"
+                                    byStatus: "WAITING"
                                 }
                             ) {
                                 nodes {
@@ -533,34 +885,6 @@ async fn test_list_flows_with_filters_and_pagination() {
                                 "pageInfo": {
                                     "currentPage": 0,
                                     "totalPages": 1,
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        })
-    );
-
-    let request_code = request_code.replace("QUEUED", "SCHEDULED");
-
-    let response = schema
-        .execute(async_graphql::Request::new(request_code).data(harness.catalog_authorized.clone()))
-        .await;
-
-    assert!(response.is_ok(), "{response:?}");
-    assert_eq!(
-        response.data,
-        value!({
-            "datasets": {
-                "byId": {
-                    "flows": {
-                        "runs": {
-                            "listFlows": {
-                                "nodes": [],
-                                "pageInfo": {
-                                    "currentPage": 0,
-                                    "totalPages": 0,
                                 }
                             }
                         }
@@ -790,7 +1114,8 @@ async fn test_cancel_ingest_root_dataset() {
     let response_json = response.data.into_json().unwrap();
     let flow_id = FlowRunsHarness::extract_flow_id_from_trigger_response(&response_json);
 
-    harness.mimic_flow_scheduled(flow_id).await;
+    let task_id = harness.mimic_flow_scheduled(flow_id, Utc::now()).await;
+    harness.mimic_task_running(task_id, Utc::now()).await;
 
     let mutation_code =
         FlowRunsHarness::cancel_scheduled_tasks_mutation(&create_result.dataset_handle.id, flow_id);
@@ -831,7 +1156,7 @@ async fn test_cancel_ingest_root_dataset() {
 ////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_cancel_transform_derived_dataset() {
+async fn test_cancel_running_transform_derived_dataset() {
     let harness = FlowRunsHarness::new();
     harness.create_root_dataset().await;
     let create_derived_result = harness.create_derived_dataset().await;
@@ -853,7 +1178,8 @@ async fn test_cancel_transform_derived_dataset() {
     let response_json = response.data.into_json().unwrap();
     let flow_id = FlowRunsHarness::extract_flow_id_from_trigger_response(&response_json);
 
-    harness.mimic_flow_scheduled(flow_id).await;
+    let task_id = harness.mimic_flow_scheduled(flow_id, Utc::now()).await;
+    harness.mimic_task_running(task_id, Utc::now()).await;
 
     let mutation_code = FlowRunsHarness::cancel_scheduled_tasks_mutation(
         &create_derived_result.dataset_handle.id,
@@ -989,7 +1315,7 @@ async fn test_cancel_foreign_flow_fails() {
 ////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_cancel_queued_flow_fails() {
+async fn test_cancel_waiting_flow() {
     let harness = FlowRunsHarness::new();
     let create_result = harness.create_root_dataset().await;
 
@@ -1010,7 +1336,7 @@ async fn test_cancel_queued_flow_fails() {
         .as_str()
         .unwrap();
 
-    // Note: no scheduling!
+    // Note: no scheduling of tasks, waiting!
 
     let mutation_code =
         FlowRunsHarness::cancel_scheduled_tasks_mutation(&create_result.dataset_handle.id, flow_id);
@@ -1031,8 +1357,14 @@ async fn test_cancel_queued_flow_fails() {
                     "flows": {
                         "runs": {
                             "cancelScheduledTasks": {
-                                "__typename": "FlowNotScheduled",
-                                "message": format!("Flow '{flow_id}' was not scheduled yet"),
+                                "__typename": "CancelScheduledTasksSuccess",
+                                "message": "Success",
+                                "flow": {
+                                    "__typename": "Flow",
+                                    "flowId": flow_id,
+                                    "status": "FINISHED",
+                                    "outcome": "ABORTED"
+                                }
                             }
                         }
                     }
@@ -1045,7 +1377,7 @@ async fn test_cancel_queued_flow_fails() {
 ////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_cancel_already_cancelled_flow() {
+async fn test_cancel_already_aborted_flow() {
     let harness = FlowRunsHarness::new();
     let create_result = harness.create_root_dataset().await;
 
@@ -1066,7 +1398,8 @@ async fn test_cancel_already_cancelled_flow() {
         .as_str()
         .unwrap();
 
-    harness.mimic_flow_scheduled(flow_id).await;
+    let task_id = harness.mimic_flow_scheduled(flow_id, Utc::now()).await;
+    harness.mimic_task_running(task_id, Utc::now()).await;
 
     let mutation_code =
         FlowRunsHarness::cancel_scheduled_tasks_mutation(&create_result.dataset_handle.id, flow_id);
@@ -1119,12 +1452,10 @@ async fn test_cancel_already_cancelled_flow() {
 
 #[test_log::test(tokio::test)]
 async fn test_cancel_already_succeeded_flow() {
-    let mut dependency_graph_repo_mock = MockDependencyGraphRepository::new();
-    dependency_graph_repo_mock
-        .expect_list_dependencies_of_all_datasets()
-        .return_once(|| Box::pin(futures::stream::empty()));
-
-    let harness = FlowRunsHarness::new_custom(dependency_graph_repo_mock);
+    let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
+        dependency_graph_mock: Some(MockDependencyGraphRepository::no_dependencies()),
+        ..Default::default()
+    });
     let create_result: CreateDatasetResult = harness.create_root_dataset().await;
 
     let mutation_code =
@@ -1142,9 +1473,15 @@ async fn test_cancel_already_succeeded_flow() {
     let response_json = response.data.into_json().unwrap();
     let flow_id = FlowRunsHarness::extract_flow_id_from_trigger_response(&response_json);
 
-    let flow_task_id = harness.mimic_flow_scheduled(flow_id).await;
-    harness.mimic_task_running(flow_task_id).await;
-    harness.mimic_task_completed(flow_task_id).await;
+    let flow_task_id = harness.mimic_flow_scheduled(flow_id, Utc::now()).await;
+    harness.mimic_task_running(flow_task_id, Utc::now()).await;
+    harness
+        .mimic_task_completed(
+            flow_task_id,
+            Utc::now(),
+            ts::TaskOutcome::Success(ts::TaskResult::Empty),
+        )
+        .await;
 
     let mutation_code =
         FlowRunsHarness::cancel_scheduled_tasks_mutation(&create_result.dataset_handle.id, flow_id);
@@ -1186,12 +1523,10 @@ async fn test_cancel_already_succeeded_flow() {
 
 #[test_log::test(tokio::test)]
 async fn test_history_of_completed_flow() {
-    let mut dependency_graph_repo_mock = MockDependencyGraphRepository::new();
-    dependency_graph_repo_mock
-        .expect_list_dependencies_of_all_datasets()
-        .return_once(|| Box::pin(futures::stream::empty()));
-
-    let harness = FlowRunsHarness::new_custom(dependency_graph_repo_mock);
+    let harness = FlowRunsHarness::with_overrides(FlowRunsHarnessOverrides {
+        dependency_graph_mock: Some(MockDependencyGraphRepository::no_dependencies()),
+        ..Default::default()
+    });
     let create_result: CreateDatasetResult = harness.create_root_dataset().await;
 
     let mutation_code =
@@ -1212,9 +1547,15 @@ async fn test_history_of_completed_flow() {
         .mimic_flow_secondary_trigger(flow_id, FlowTrigger::AutoPolling(FlowTriggerAutoPolling {}))
         .await;
 
-    let flow_task_id = harness.mimic_flow_scheduled(flow_id).await;
-    harness.mimic_task_running(flow_task_id).await;
-    harness.mimic_task_completed(flow_task_id).await;
+    let flow_task_id = harness.mimic_flow_scheduled(flow_id, Utc::now()).await;
+    harness.mimic_task_running(flow_task_id, Utc::now()).await;
+    harness
+        .mimic_task_completed(
+            flow_task_id,
+            Utc::now(),
+            ts::TaskOutcome::Success(ts::TaskResult::Empty),
+        )
+        .await;
 
     let query = FlowRunsHarness::flow_history_query(&create_result.dataset_handle.id, flow_id);
 
@@ -1245,15 +1586,16 @@ async fn test_history_of_completed_flow() {
                                             }
                                         },
                                         {
-                                            "__typename": "FlowEventQueued",
-                                            "eventId": "1",
-                                        },
-                                        {
                                             "__typename": "FlowEventTriggerAdded",
-                                            "eventId": "2",
+                                            "eventId": "1",
                                             "trigger": {
                                                 "__typename": "FlowTriggerAutoPolling"
                                             }
+                                        },
+                                        {
+                                            "__typename": "FlowEventStartConditionUpdated",
+                                            "eventId": "2",
+                                            "startConditionKind": "EXECUTOR"
                                         },
                                         {
                                             "__typename": "FlowEventTaskChanged",
@@ -1337,17 +1679,26 @@ struct FlowRunsHarness {
     dataset_repo: Arc<dyn DatasetRepository>,
 }
 
+#[derive(Default)]
+struct FlowRunsHarnessOverrides {
+    dependency_graph_mock: Option<MockDependencyGraphRepository>,
+    dataset_changes_mock: Option<MockDatasetChangesService>,
+}
+
 impl FlowRunsHarness {
     fn new() -> Self {
-        Self::new_custom(MockDependencyGraphRepository::new())
+        Self::with_overrides(FlowRunsHarnessOverrides::default())
     }
 
-    fn new_custom(dependency_graph_repo: MockDependencyGraphRepository) -> Self {
+    fn with_overrides(overrides: FlowRunsHarnessOverrides) -> Self {
         let tempdir = tempfile::tempdir().unwrap();
         let run_info_dir = tempdir.path().join("run");
         let cache_dir = tempdir.path().join("cache");
         std::fs::create_dir(&run_info_dir).unwrap();
         std::fs::create_dir(&cache_dir).unwrap();
+
+        let dataset_changes_mock = overrides.dataset_changes_mock.unwrap_or_default();
+        let dependency_graph_mock = overrides.dependency_graph_mock.unwrap_or_default();
 
         let catalog_base = dill::CatalogBuilder::new()
             .add::<EventBus>()
@@ -1357,18 +1708,20 @@ impl FlowRunsHarness {
                     .with_multi_tenant(false),
             )
             .bind::<dyn DatasetRepository, DatasetRepositoryLocalFs>()
+            .add_value(dataset_changes_mock)
+            .bind::<dyn DatasetChangesService, MockDatasetChangesService>()
             .add::<SystemTimeSourceDefault>()
             .add::<auth::AlwaysHappyDatasetActionAuthorizer>()
             .add::<DependencyGraphServiceInMemory>()
-            .add_value(dependency_graph_repo)
+            .add_value(dependency_graph_mock)
             .bind::<dyn DependencyGraphRepository, MockDependencyGraphRepository>()
             .add::<FlowConfigurationServiceInMemory>()
             .add::<FlowConfigurationEventStoreInMem>()
             .add::<FlowServiceInMemory>()
             .add::<FlowEventStoreInMem>()
             .add_value(FlowServiceRunConfig::new(
-                chrono::Duration::seconds(1),
-                chrono::Duration::minutes(1),
+                Duration::try_seconds(1).unwrap(),
+                Duration::try_minutes(1).unwrap(),
             ))
             .add::<TaskSchedulerInMemory>()
             .add::<TaskSystemEventStoreInMemory>()
@@ -1430,7 +1783,11 @@ impl FlowRunsHarness {
             .unwrap()
     }
 
-    async fn mimic_flow_scheduled(&self, flow_id: &str) -> TaskID {
+    async fn mimic_flow_scheduled(
+        &self,
+        flow_id: &str,
+        schedule_time: DateTime<Utc>,
+    ) -> ts::TaskID {
         let flow_service_test_driver = self
             .catalog_authorized
             .get_one::<dyn FlowServiceTestDriver>()
@@ -1438,7 +1795,7 @@ impl FlowRunsHarness {
 
         let flow_id = FlowID::new(flow_id.parse::<u64>().unwrap());
         flow_service_test_driver
-            .mimic_flow_scheduled(flow_id)
+            .mimic_flow_scheduled(flow_id, schedule_time)
             .await
             .unwrap()
     }
@@ -1456,40 +1813,68 @@ impl FlowRunsHarness {
         .await
         .unwrap();
 
-        flow.add_trigger(Utc::now(), flow_trigger).unwrap();
+        flow.add_trigger_if_unique(Utc::now(), flow_trigger)
+            .unwrap();
         flow.save(flow_event_store.as_ref()).await.unwrap();
     }
 
-    async fn mimic_task_running(&self, task_id: TaskID) {
+    async fn mimic_task_running(&self, task_id: ts::TaskID, event_time: DateTime<Utc>) {
         let flow_service_test_driver = self
             .catalog_authorized
             .get_one::<dyn FlowServiceTestDriver>()
             .unwrap();
         flow_service_test_driver.mimic_running_started();
 
+        let task_event_store = self
+            .catalog_anonymous
+            .get_one::<dyn ts::TaskSystemEventStore>()
+            .unwrap();
+
+        let mut task = ts::Task::load(task_id, task_event_store.as_ref())
+            .await
+            .unwrap();
+        task.run(event_time).unwrap();
+        task.save(task_event_store.as_ref()).await.unwrap();
+
         let event_bus = self.catalog_authorized.get_one::<EventBus>().unwrap();
         event_bus
-            .dispatch_event(TaskEventRunning {
-                event_time: Utc::now(),
+            .dispatch_event(ts::TaskEventRunning {
+                event_time,
                 task_id,
             })
             .await
             .unwrap();
     }
 
-    async fn mimic_task_completed(&self, task_id: TaskID) {
+    async fn mimic_task_completed(
+        &self,
+        task_id: ts::TaskID,
+        event_time: DateTime<Utc>,
+        task_outcome: ts::TaskOutcome,
+    ) {
         let flow_service_test_driver = self
             .catalog_authorized
             .get_one::<dyn FlowServiceTestDriver>()
             .unwrap();
         flow_service_test_driver.mimic_running_started();
 
+        let task_event_store = self
+            .catalog_anonymous
+            .get_one::<dyn ts::TaskSystemEventStore>()
+            .unwrap();
+
+        let mut task = ts::Task::load(task_id, task_event_store.as_ref())
+            .await
+            .unwrap();
+        task.finish(event_time, task_outcome.clone()).unwrap();
+        task.save(task_event_store.as_ref()).await.unwrap();
+
         let event_bus = self.catalog_authorized.get_one::<EventBus>().unwrap();
         event_bus
-            .dispatch_event(TaskEventFinished {
-                event_time: Utc::now(),
+            .dispatch_event(ts::TaskEventFinished {
+                event_time,
                 task_id,
-                outcome: TaskOutcome::Success,
+                outcome: task_outcome,
             })
             .await
             .unwrap();
@@ -1521,22 +1906,32 @@ impl FlowRunsHarness {
                                             }
                                             ... on FlowDescriptionDatasetExecuteTransform {
                                                 datasetId
-                                                transformedRecordsCount
+                                                transformResult {
+                                                    numBlocks
+                                                    numRecords
+                                                }
                                             }
                                             ... on FlowDescriptionDatasetPollingIngest {
                                                 datasetId
-                                                ingestedRecordsCount
+                                                ingestResult {
+                                                    numBlocks
+                                                    numRecords
+                                                }
                                             }
                                             ... on FlowDescriptionDatasetPushIngest {
                                                 datasetId
                                                 sourceName
                                                 inputRecordsCount
-                                                ingestedRecordsCount
+                                                ingestResult {
+                                                    numBlocks
+                                                    numRecords
+                                                }
                                             }
                                         }
                                         status
                                         outcome
                                         timing {
+                                            awaitingExecutorSince
                                             runningSince
                                             finishedAt
                                         }
@@ -1566,10 +1961,24 @@ impl FlowRunsHarness {
                                         startCondition {
                                             __typename
                                             ... on FlowStartConditionBatching {
-                                                thresholdNewRecords
+                                                accumulatedRecordsCount
+                                                activeBatchingRule {
+                                                    __typename
+                                                    minRecordsToAwait
+                                                    maxBatchingInterval {
+                                                        every
+                                                        unit
+                                                    }
+                                                }
+                                                watermarkModified
                                             }
                                             ... on FlowStartConditionThrottling {
                                                 intervalSec
+                                                wakeUpAt
+                                                shiftedFrom
+                                            }
+                                            ... on FlowStartConditionExecutor {
+                                                taskId
                                             }
                                         }
                                     }
@@ -1612,10 +2021,8 @@ impl FlowRunsHarness {
                                                         __typename
                                                     }
                                                 }
-                                                ... on FlowEventStartConditionDefined {
-                                                    startCondition {
-                                                        __typename
-                                                    }
+                                                ... on FlowEventStartConditionUpdated {
+                                                    startConditionKind
                                                 }
                                                 ... on FlowEventTriggerAdded {
                                                     trigger {

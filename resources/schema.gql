@@ -96,6 +96,11 @@ type AuthMut {
 	accountDetails(accessToken: String!): Account!
 }
 
+input BatchingConditionInput {
+	minRecordsToAwait: Int!
+	maxBatchingInterval: TimeDeltaInput!
+}
+
 type BlockRef {
 	name: String!
 	blockHash: Multihash!
@@ -333,11 +338,15 @@ type DatasetFlowConfigs {
 	Returns defined configuration for a flow of specified type
 	"""
 	byType(datasetFlowType: DatasetFlowType!): FlowConfiguration
+	"""
+	Checks if all configs of this dataset are disabled
+	"""
+	allPaused: Boolean!
 }
 
 type DatasetFlowConfigsMut {
 	setConfigSchedule(datasetFlowType: DatasetFlowType!, paused: Boolean!, schedule: ScheduleInput!): SetFlowConfigResult!
-	setConfigBatching(datasetFlowType: DatasetFlowType!, paused: Boolean!, throttlingPeriod: TimeDeltaInput, minimalDataBatch: Int): SetFlowConfigResult!
+	setConfigBatching(datasetFlowType: DatasetFlowType!, paused: Boolean!, batching: BatchingConditionInput!): SetFlowConfigResult!
 	pauseFlows(datasetFlowType: DatasetFlowType): Boolean!
 	resumeFlows(datasetFlowType: DatasetFlowType): Boolean!
 }
@@ -683,8 +692,8 @@ type FlowConfiguration {
 }
 
 type FlowConfigurationBatching {
-	throttlingPeriod: TimeDelta
-	minimalDataBatch: Int
+	minRecordsToAwait: Int!
+	maxBatchingInterval: TimeDelta!
 }
 
 union FlowConfigurationSchedule = TimeDelta | Cron5ComponentExpression
@@ -715,23 +724,29 @@ type FlowDescriptionDatasetCompaction {
 
 type FlowDescriptionDatasetExecuteTransform {
 	datasetId: DatasetID!
-	transformedRecordsCount: Int
+	transformResult: FlowDescriptionUpdateResult
 }
 
 type FlowDescriptionDatasetPollingIngest {
 	datasetId: DatasetID!
-	ingestedRecordsCount: Int
+	ingestResult: FlowDescriptionUpdateResult
 }
 
 type FlowDescriptionDatasetPushIngest {
 	datasetId: DatasetID!
 	sourceName: String
 	inputRecordsCount: Int!
-	ingestedRecordsCount: Int
+	ingestResult: FlowDescriptionUpdateResult
 }
 
 type FlowDescriptionSystemGC {
 	dummy: Boolean!
+}
+
+type FlowDescriptionUpdateResult {
+	numBlocks: Int!
+	numRecords: Int!
+	updatedWatermark: DateTime
 }
 
 type FlowEdge {
@@ -754,16 +769,10 @@ type FlowEventInitiated implements FlowEvent {
 	trigger: FlowTrigger!
 }
 
-type FlowEventQueued implements FlowEvent {
+type FlowEventStartConditionUpdated implements FlowEvent {
 	eventId: EventID!
 	eventTime: DateTime!
-	activateAt: DateTime!
-}
-
-type FlowEventStartConditionDefined implements FlowEvent {
-	eventId: EventID!
-	eventTime: DateTime!
-	startCondition: FlowStartCondition!
+	startConditionKind: FlowStartConditionKind!
 }
 
 type FlowEventTaskChanged implements FlowEvent {
@@ -788,12 +797,12 @@ type FlowIncompatibleDatasetKind implements SetFlowConfigResult & TriggerFlowRes
 	message: String!
 }
 
-type FlowNotFound implements GetFlowResult & CancelScheduledTasksResult {
-	flowId: FlowID!
+type FlowInvalidBatchingConfig implements SetFlowConfigResult {
+	reason: String!
 	message: String!
 }
 
-type FlowNotScheduled implements CancelScheduledTasksResult {
+type FlowNotFound implements GetFlowResult & CancelScheduledTasksResult {
 	flowId: FlowID!
 	message: String!
 }
@@ -801,33 +810,50 @@ type FlowNotScheduled implements CancelScheduledTasksResult {
 enum FlowOutcome {
 	SUCCESS
 	FAILED
-	CANCELLED
 	ABORTED
 }
 
-union FlowStartCondition = FlowStartConditionThrottling | FlowStartConditionBatching
+union FlowStartCondition = FlowStartConditionSchedule | FlowStartConditionThrottling | FlowStartConditionBatching | FlowStartConditionExecutor
 
 type FlowStartConditionBatching {
-	thresholdNewRecords: Int!
+	activeBatchingRule: FlowConfigurationBatching!
+	batchingDeadline: DateTime!
+	accumulatedRecordsCount: Int!
+	watermarkModified: Boolean!
+}
+
+type FlowStartConditionExecutor {
+	taskId: TaskID!
+}
+
+enum FlowStartConditionKind {
+	SCHEDULE
+	THROTTLING
+	BATCHING
+	EXECUTOR
+}
+
+type FlowStartConditionSchedule {
+	wakeUpAt: DateTime!
 }
 
 type FlowStartConditionThrottling {
 	intervalSec: Int!
+	wakeUpAt: DateTime!
+	shiftedFrom: DateTime!
 }
 
 enum FlowStatus {
 	WAITING
-	QUEUED
-	SCHEDULED
 	RUNNING
 	FINISHED
 }
 
 type FlowTimingRecords {
 	"""
-	Planned activation time (at least, Queued state)
+	Recorded time of last task scheduling
 	"""
-	activateAt: DateTime
+	awaitingExecutorSince: DateTime
 	"""
 	Recorded start of running (Running state seen at least once)
 	"""

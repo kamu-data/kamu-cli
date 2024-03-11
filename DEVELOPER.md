@@ -3,6 +3,8 @@
   - [Configure Podman as Default Runtime (Recommended)](#configure-podman-as-default-runtime-recommended)
   - [Run Tests](#run-tests)
   - [Build Speed Tweaks (Optional)](#build-speed-tweaks-optional)
+    - [Building](#building)
+    - [Linking](#linking)
   - [Building with Web UI (Optional)](#building-with-web-ui-optional)
   - [Code Generation](#code-generation)
 - [Code Structure](#code-structure)
@@ -15,6 +17,7 @@
   - [Release Procedure](#release-procedure)
   - [Minor Dependencies Update](#minor-dependencies-update)
   - [Major Dependencies Update](#major-dependencies-update)
+  - [Building Multi-platform Images](#building-multi-platform-images)
 - [Tips](#tips)
   - [IDE Configuration](#ide-configuration)
   - [Debugging](#debugging)
@@ -51,6 +54,7 @@ Prerequisites:
     * `cargo binstall cargo-edit -y` - for setting crate versions during release
     * `cargo binstall cargo-update -y` - for keeping up with major dependency updates
     * `cargo binstall cargo-deny -y` - for linting dependencies
+    * `cargo binstall cargo-udeps -y` - for linting dependencies (detecting unused)
   * To keep all these cargo tools up-to-date use `cargo install-update -a`
 
 Clone the repository:
@@ -299,6 +303,22 @@ We use the homegrown [`test-group`](https://crates.io/crates/test-group) crate t
 7. Run `cargo update` again to pull in any minor releases that were affected by your upgrades
 8. Run `cargo deny check` to audit new dependencies for duplicates and security advisories
 9. (Optional) Periodically run `cargo clean` to prevent your `target` dir from growing too big
+
+
+### Building Multi-platform Images
+We release multi-platform images to provide our users with native performance without emulation. Most of our images are built automatically by CI pipelines, so you may not have to worry about building them. Some images, however, are still built manually.
+
+To build multi-platform image on a local machine we use `docker buildx`. It has ability to create virtual builders that run QEMU for emulation.
+
+This command is usually enough to get started:
+```sh
+docker buildx create --use --name multi-arch-builder
+```
+
+If in some situation you want to run an image from different architecture on Linux under emulation - use this command to bootstrap QEMU ([source](https://wiki.archlinux.org/title/docker#Using_buildx_for_cross-compiling)):
+```sh
+docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
+```
 
 
 ## Tips

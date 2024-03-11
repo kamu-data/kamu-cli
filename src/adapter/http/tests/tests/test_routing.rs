@@ -126,7 +126,7 @@ async fn setup_client(dataset_url: url::Url, head_expected: Multihash) {
 
     let head_actual = dataset
         .as_metadata_chain()
-        .get_ref(&BlockRef::Head)
+        .resolve_ref(&BlockRef::Head)
         .await
         .unwrap();
 

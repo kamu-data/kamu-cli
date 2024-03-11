@@ -15,6 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#![cfg(not(doctest))]
 #![doc = include_str!("../README.md")]
 pub const DATAFUSION_CLI_VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -23,6 +24,7 @@ pub mod command;
 pub mod exec;
 pub mod functions;
 pub mod helper;
+pub mod highlighter;
 pub mod object_storage;
 pub mod print_format;
 pub mod print_options;

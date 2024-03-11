@@ -7,29 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use chrono::Duration;
-
-use crate::Schedule;
+use crate::{BatchingRule, Schedule};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FlowConfigurationRule {
     Schedule(Schedule),
-    StartCondition(StartConditionConfiguration),
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct StartConditionConfiguration {
-    // TODO: throttling period to be removed, using global unconfigurable throttling period instead
-    pub throttling_period: Option<Duration>,
-    // TODO: modeling to be refined:
-    //   - min records to accumulate
-    //   - max records to take
-    //   - max batching interval
-    pub minimal_data_batch: Option<i32>,
+    BatchingRule(BatchingRule),
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

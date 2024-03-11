@@ -11,6 +11,8 @@ mod auth;
 mod engine;
 mod ingest;
 mod repos;
+mod test_dataset_changes_service_impl;
+mod test_datasets_filtering;
 mod test_dependency_graph_inmem;
 mod test_metadata_chain_comparator;
 mod test_pull_service_impl;

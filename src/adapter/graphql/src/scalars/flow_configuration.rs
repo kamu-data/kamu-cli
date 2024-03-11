@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_flow_system::{FlowConfigurationRule, Schedule, ScheduleCron};
+use kamu_flow_system::{BatchingRule, FlowConfigurationRule, Schedule, ScheduleCron};
 
 use crate::prelude::*;
 
@@ -24,11 +24,8 @@ impl From<kamu_flow_system::FlowConfigurationState> for FlowConfiguration {
     fn from(value: kamu_flow_system::FlowConfigurationState) -> Self {
         Self {
             paused: !value.is_active(),
-            batching: if let FlowConfigurationRule::StartCondition(condition) = &value.rule {
-                Some(FlowConfigurationBatching {
-                    throttling_period: condition.throttling_period.map(Into::into),
-                    minimal_data_batch: condition.minimal_data_batch,
-                })
+            batching: if let FlowConfigurationRule::BatchingRule(condition) = &value.rule {
+                Some((*condition).into())
             } else {
                 None
             },
@@ -54,8 +51,17 @@ pub enum FlowConfigurationSchedule {
 
 #[derive(SimpleObject, Clone, PartialEq, Eq)]
 pub struct FlowConfigurationBatching {
-    pub throttling_period: Option<TimeDelta>,
-    pub minimal_data_batch: Option<i32>,
+    pub min_records_to_await: u64,
+    pub max_batching_interval: TimeDelta,
+}
+
+impl From<BatchingRule> for FlowConfigurationBatching {
+    fn from(value: BatchingRule) -> Self {
+        Self {
+            min_records_to_await: value.min_records_to_await(),
+            max_batching_interval: (*value.max_batching_interval()).into(),
+        }
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////
@@ -97,7 +103,7 @@ impl From<chrono::Duration> for TimeDelta {
         );
 
         let num_weeks = value.num_weeks();
-        if (value - chrono::Duration::weeks(num_weeks)).is_zero() {
+        if (value - chrono::Duration::try_weeks(num_weeks).unwrap()).is_zero() {
             return Self {
                 every: num_weeks,
                 unit: TimeUnit::Weeks,
@@ -105,7 +111,7 @@ impl From<chrono::Duration> for TimeDelta {
         }
 
         let num_days = value.num_days();
-        if (value - chrono::Duration::days(num_days)).is_zero() {
+        if (value - chrono::Duration::try_days(num_days).unwrap()).is_zero() {
             return Self {
                 every: num_days,
                 unit: TimeUnit::Days,
@@ -113,7 +119,7 @@ impl From<chrono::Duration> for TimeDelta {
         }
 
         let num_hours = value.num_hours();
-        if (value - chrono::Duration::hours(num_hours)).is_zero() {
+        if (value - chrono::Duration::try_hours(num_hours).unwrap()).is_zero() {
             return Self {
                 every: num_hours,
                 unit: TimeUnit::Hours,
@@ -121,7 +127,7 @@ impl From<chrono::Duration> for TimeDelta {
         }
 
         let num_minutes = value.num_minutes();
-        if (value - chrono::Duration::minutes(num_minutes)).is_zero() {
+        if (value - chrono::Duration::try_minutes(num_minutes).unwrap()).is_zero() {
             return Self {
                 every: num_minutes,
                 unit: TimeUnit::Minutes,

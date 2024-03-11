@@ -139,7 +139,7 @@ impl PullServiceImpl {
                 Some(
                     DatasetRefRemote::Alias(alias)
                     | DatasetRefRemote::Handle(DatasetHandleRemote { alias, .. }),
-                ) => DatasetAlias::new(alias.account_name.clone(), alias.dataset_name.clone()),
+                ) => DatasetAlias::new(None, alias.dataset_name.clone()),
                 Some(DatasetRefRemote::Url(url)) => DatasetAlias::new(
                     if self.dataset_repo.is_multi_tenant() {
                         match self.current_account_subject.as_ref() {
@@ -314,11 +314,15 @@ impl PullServiceImpl {
     }
 
     fn infer_local_name_from_url(&self, url: &Url) -> Result<DatasetName, PullError> {
-        if let Some(last_segment) = url.path_segments().and_then(Iterator::last) {
-            if let Ok(name) = DatasetName::try_from(last_segment) {
-                return Ok(name);
+        // Try use last path segment for a name (ignoring the trailing slash)
+        if let Some(path) = url.path_segments() {
+            if let Some(last_segment) = path.rev().find(|s| !s.is_empty()) {
+                if let Ok(name) = DatasetName::try_from(last_segment) {
+                    return Ok(name);
+                }
             }
         }
+        // Fall back to using domain name
         if let Some(url::Host::Domain(host)) = url.host() {
             if let Ok(name) = DatasetName::try_from(host) {
                 return Ok(name);
@@ -419,7 +423,6 @@ impl PullServiceImpl {
     async fn transform_multi(
         &self,
         batch: &[PullItem], // TODO: Move to avoid cloning
-        _options: &PullMultiOptions,
         listener: Option<Arc<dyn TransformMultiListener>>,
     ) -> Result<Vec<PullResponse>, InternalError> {
         let transform_requests = batch.iter().map(|pi| pi.local_ref.clone()).collect();
@@ -572,7 +575,6 @@ impl PullService for PullServiceImpl {
                 tracing::info!(%depth, ?batch, "Running transform batch");
                 self.transform_multi(
                     batch,
-                    &options,
                     listener
                         .as_ref()
                         .and_then(|l| l.clone().get_transform_listener()),
@@ -640,7 +642,6 @@ impl PullService for PullServiceImpl {
             Ok(res) => Ok(PullResult::Updated {
                 old_head: Some(res.old_head),
                 new_head: res.new_head,
-                num_blocks: 1,
             }),
             Err(
                 WriteWatermarkError::EmptyCommit(_)

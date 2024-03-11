@@ -44,8 +44,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions-rs/toolchain@v1
-      - run: cargo install cargo-deny
+      - uses: cargo-bins/cargo-binstall@main
+      - run: cargo binstall cargo-deny -y
       - run: cargo deny check
+      - run: cargo binstall cargo-udeps -y
+      - run: cargo udeps --all-targets
 
   test:
     strategy:
@@ -100,8 +103,9 @@ jobs:
           cache-on-failure: true
 
       - name: Install cargo tools
+        # TODO: Restore --locked switch as soon as `cargo-nextest` releases version with `ahash>=0.8.7`
         run: |
-          cargo install --locked cargo-nextest
+          cargo install cargo-nextest
 
       - name: Configure runtime
         if: matrix.container-runtime != ''

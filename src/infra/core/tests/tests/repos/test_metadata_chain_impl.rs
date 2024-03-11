@@ -9,12 +9,14 @@
 
 use std::assert_matches::assert_matches;
 use std::path::Path;
+use std::sync::{Arc, Mutex};
 
 use chrono::{TimeZone, Utc};
 use kamu::domain::*;
 use kamu::testing::*;
 use kamu::*;
 use opendatafabric::*;
+use thiserror::Error;
 
 fn init_chain(root: &Path) -> impl MetadataChain {
     let blocks_dir = root.join("blocks");
@@ -22,11 +24,12 @@ fn init_chain(root: &Path) -> impl MetadataChain {
     std::fs::create_dir(&blocks_dir).unwrap();
     std::fs::create_dir(&refs_dir).unwrap();
 
-    let obj_repo =
-        ObjectRepositoryLocalFS::<sha3::Sha3_256, 0x16>::new(blocks_dir /* unknown yet */);
+    let meta_block_repo = MetadataBlockRepositoryImpl::new(ObjectRepositoryLocalFSSha3::new(
+        blocks_dir, /* unknown yet */
+    ));
     let ref_repo = ReferenceRepositoryImpl::new(NamedObjectRepositoryLocalFS::new(refs_dir));
 
-    MetadataChainImpl::new(obj_repo, ref_repo)
+    MetadataChainImpl::new(meta_block_repo, ref_repo)
 }
 
 #[tokio::test]
@@ -34,7 +37,7 @@ async fn test_empty() {
     let tmp_dir = tempfile::tempdir().unwrap();
     let chain = init_chain(tmp_dir.path());
     assert_matches!(
-        chain.get_ref(&BlockRef::Head).await,
+        chain.resolve_ref(&BlockRef::Head).await,
         Err(GetRefError::NotFound(_))
     );
 }
@@ -52,7 +55,7 @@ async fn test_append_and_get() {
         .await
         .unwrap();
 
-    assert_eq!(chain.get_ref(&BlockRef::Head).await.unwrap(), hash_1);
+    assert_eq!(chain.resolve_ref(&BlockRef::Head).await.unwrap(), hash_1);
     assert_eq!(0, block_1.sequence_number);
 
     let block_2 = MetadataFactory::metadata_block(MetadataFactory::set_data_schema().build())
@@ -64,7 +67,7 @@ async fn test_append_and_get() {
         .await
         .unwrap();
 
-    assert_eq!(chain.get_ref(&BlockRef::Head).await.unwrap(), hash_2);
+    assert_eq!(chain.resolve_ref(&BlockRef::Head).await.unwrap(), hash_2);
     assert_eq!(1, block_2.sequence_number);
 
     assert_eq!(chain.get_block(&hash_1).await.unwrap(), block_1);
@@ -91,7 +94,7 @@ async fn test_set_ref() {
         .unwrap();
 
     assert_matches!(
-        chain.get_ref(&BlockRef::Head).await,
+        chain.resolve_ref(&BlockRef::Head).await,
         Err(GetRefError::NotFound(_))
     );
 
@@ -124,7 +127,7 @@ async fn test_set_ref() {
         .set_ref(&BlockRef::Head, &hash_1, SetRefOpts::default())
         .await
         .unwrap();
-    assert_eq!(chain.get_ref(&BlockRef::Head).await.unwrap(), hash_1);
+    assert_eq!(chain.resolve_ref(&BlockRef::Head).await.unwrap(), hash_1);
 }
 
 #[tokio::test]
@@ -163,7 +166,7 @@ async fn test_append_prev_block_not_found() {
 
     let hash_1 = chain.append(block_1, AppendOpts::default()).await.unwrap();
 
-    assert_eq!(chain.get_ref(&BlockRef::Head).await.unwrap(), hash_1);
+    assert_eq!(chain.resolve_ref(&BlockRef::Head).await.unwrap(), hash_1);
 
     let block_2 = MetadataFactory::metadata_block(MetadataFactory::add_data().build())
         .prev(
@@ -179,7 +182,7 @@ async fn test_append_prev_block_not_found() {
         ))
     );
 
-    assert_eq!(chain.get_ref(&BlockRef::Head).await.unwrap(), hash_1);
+    assert_eq!(chain.resolve_ref(&BlockRef::Head).await.unwrap(), hash_1);
 }
 
 #[tokio::test]
@@ -205,7 +208,7 @@ async fn test_append_prev_block_sequence_integrity_broken() {
         )
         .await
         .unwrap();
-    assert_eq!(chain.get_ref(&BlockRef::Head).await.unwrap(), hash);
+    assert_eq!(chain.resolve_ref(&BlockRef::Head).await.unwrap(), hash);
 
     let hash = chain
         .append(
@@ -275,7 +278,7 @@ async fn test_append_prev_block_sequence_integrity_broken() {
         .unwrap();
 
     assert_eq!(
-        chain.get_ref(&BlockRef::Head).await.unwrap(),
+        chain.resolve_ref(&BlockRef::Head).await.unwrap(),
         hash_just_right
     );
 }
@@ -293,7 +296,7 @@ async fn test_append_unexpected_ref() {
         )
         .await
         .unwrap();
-    assert_eq!(chain.get_ref(&BlockRef::Head).await.unwrap(), hash);
+    assert_eq!(chain.resolve_ref(&BlockRef::Head).await.unwrap(), hash);
 
     let invalid_hash = Multihash::from_digest_sha3_256(b"does-not-exist");
     assert_matches!(
@@ -311,7 +314,7 @@ async fn test_append_unexpected_ref() {
         Err(AppendError::RefCASFailed(_))
     );
 
-    assert_eq!(chain.get_ref(&BlockRef::Head).await.unwrap(), hash);
+    assert_eq!(chain.resolve_ref(&BlockRef::Head).await.unwrap(), hash);
 }
 
 #[tokio::test]
@@ -958,3 +961,280 @@ async fn test_iter_blocks() {
         ]
     );
 }
+
+#[tokio::test]
+async fn test_accept() {
+    let tmp_dir = tempfile::tempdir().unwrap();
+    let chain = init_chain(tmp_dir.path());
+
+    insert_blocks(
+        &chain,
+        [
+            // 1
+            MetadataFactory::seed(DatasetKind::Root).build().into(),
+            // 2
+            MetadataFactory::set_data_schema().build().into(),
+            // 3
+            MetadataFactory::add_data()
+                .new_offset_interval(0, 9)
+                .build()
+                .into(),
+            // 4
+            MetadataFactory::add_data()
+                .new_offset_interval(10, 19)
+                .build()
+                .into(),
+            // 5
+            SetInfo {
+                description: None,
+                keywords: None,
+            }
+            .into(),
+            // 6
+            MetadataFactory::add_data()
+                .new_offset_interval(20, 29)
+                .build()
+                .into(),
+        ],
+    )
+    .await;
+
+    let mut always_stop_visitor = create_always_stop_visitor();
+    let mut next_of_data_visitor = create_next_of_type_visitor(
+        MetadataBlockTypeFlags::DATA_BLOCK,
+        NextOfTypeVisitorState::with_expected_visit_call_count(3),
+    );
+    let mut next_of_set_data_schema_visitor = create_next_of_type_visitor(
+        MetadataBlockTypeFlags::SET_DATA_SCHEMA,
+        NextOfTypeVisitorState::with_expected_visit_call_count(2),
+    );
+    let mut always_next_visitor = create_always_next_visitor_with_expected_visit_call_count(6);
+
+    assert_matches!(
+        chain
+            .accept(&mut [
+                &mut always_stop_visitor,
+                &mut next_of_data_visitor,
+                &mut next_of_set_data_schema_visitor,
+                &mut always_next_visitor,
+            ])
+            .await,
+        Ok(_)
+    );
+}
+
+#[tokio::test]
+async fn test_accept_stop_on_first_error() {
+    let tmp_dir = tempfile::tempdir().unwrap();
+    let chain = init_chain(tmp_dir.path());
+
+    insert_blocks(
+        &chain,
+        [
+            // 1
+            MetadataFactory::seed(DatasetKind::Root).build().into(),
+            // 2
+            MetadataFactory::set_data_schema().build().into(),
+            // 3
+            MetadataFactory::add_data()
+                .new_offset_interval(0, 9)
+                .build()
+                .into(),
+            // 4
+            MetadataFactory::add_data()
+                .new_offset_interval(10, 19)
+                .build()
+                .into(),
+            // 5
+            SetInfo {
+                description: None,
+                keywords: None,
+            }
+            .into(),
+            // 6
+            MetadataFactory::add_data()
+                .new_offset_interval(20, 29)
+                .build()
+                .into(),
+        ],
+    )
+    .await;
+
+    let mut always_stop_visitor = create_always_stop_visitor();
+    let mut always_next_visitor = create_always_next_visitor_with_expected_visit_call_count(2);
+    let mut failed_on_type_visitor = create_failed_on_type_visitor_with_expected_visit_call_count(
+        MetadataBlockTypeFlags::SET_INFO,
+        2,
+    );
+
+    assert_matches!(
+        chain
+            .accept(&mut [
+                &mut always_stop_visitor,
+                &mut always_next_visitor,
+                &mut failed_on_type_visitor,
+            ])
+            .await,
+        Err(MockError::SomethingFailed)
+    );
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// MockMetadataChainVisitor
+///////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Error)]
+pub enum MockError {
+    #[error("something failed")]
+    SomethingFailed,
+
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+
+impl From<IterBlocksError> for MockError {
+    fn from(v: IterBlocksError) -> Self {
+        v.int_err().into()
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+mockall::mock! {
+    MetadataChainVisitor {}
+
+    #[async_trait::async_trait]
+    impl MetadataChainVisitor for MetadataChainVisitor {
+        type Error = MockError;
+
+        fn visit<'a>(&mut self, hashed_block_ref: HashedMetadataBlockRef<'a>) -> Result<Decision, MockError>;
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+fn create_failed_on_type_visitor_with_expected_visit_call_count(
+    fail_on_type_flags: MetadataBlockTypeFlags,
+    visit_call_count: usize,
+) -> MockMetadataChainVisitor {
+    let mut always_stop_visitor = MockMetadataChainVisitor::new();
+
+    always_stop_visitor
+        .expect_visit()
+        .times(visit_call_count)
+        .returning(move |(_, block)| {
+            let block_flag = MetadataBlockTypeFlags::from(block);
+
+            if fail_on_type_flags.contains(block_flag) {
+                Err(MockError::SomethingFailed)
+            } else {
+                Ok(Decision::NextOfType(fail_on_type_flags))
+            }
+        });
+
+    always_stop_visitor
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+fn create_always_stop_visitor() -> MockMetadataChainVisitor {
+    let mut always_stop_visitor = MockMetadataChainVisitor::new();
+
+    always_stop_visitor
+        .expect_visit()
+        .times(1)
+        .returning(|_| Ok(Decision::Stop));
+
+    always_stop_visitor
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+fn create_always_next_visitor_with_expected_visit_call_count(
+    visit_call_count: usize,
+) -> MockMetadataChainVisitor {
+    let mut always_next_visitor = MockMetadataChainVisitor::new();
+
+    always_next_visitor
+        .expect_visit()
+        .times(visit_call_count)
+        .returning(|_| Ok(Decision::Next));
+
+    always_next_visitor
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+struct NextOfTypeVisitorState {
+    expected_visit_call_count: usize,
+    visit_call_count: usize,
+}
+
+impl NextOfTypeVisitorState {
+    pub fn with_expected_visit_call_count(value: usize) -> Self {
+        Self {
+            expected_visit_call_count: value,
+            visit_call_count: 0,
+        }
+    }
+}
+
+fn create_next_of_type_visitor(
+    flags: MetadataBlockTypeFlags,
+    state: NextOfTypeVisitorState,
+) -> MockMetadataChainVisitor {
+    let state = Arc::new(Mutex::new(state));
+    let mut always_stop_visitor = MockMetadataChainVisitor::new();
+    let expected_visit_call_count = state.lock().unwrap().expected_visit_call_count;
+
+    always_stop_visitor
+        .expect_visit()
+        .times(expected_visit_call_count)
+        .returning(move |_| {
+            let mut state = state.lock().unwrap();
+
+            if state.visit_call_count != state.expected_visit_call_count {
+                state.visit_call_count += 1;
+
+                Ok(Decision::NextOfType(flags))
+            } else {
+                Ok(Decision::Stop)
+            }
+        });
+
+    always_stop_visitor
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// Helpers
+///////////////////////////////////////////////////////////////////////////////
+
+async fn insert_blocks<const BLOCKS_COUNT: usize>(
+    chain: &impl MetadataChain,
+    events: [MetadataEvent; BLOCKS_COUNT],
+) -> Vec<HashedMetadataBlock> {
+    let mut prev_block_data: Option<(Multihash, u64)> = None;
+    let mut res = vec![];
+
+    for event in events {
+        let mut block_builder = MetadataFactory::metadata_block(event);
+
+        if let Some((prev_hash, prev_sequence_number)) = &prev_block_data {
+            block_builder = block_builder.prev(prev_hash, *prev_sequence_number);
+        }
+
+        let block = block_builder.build();
+        let hash = chain
+            .append(block.clone(), AppendOpts::default())
+            .await
+            .unwrap();
+
+        prev_block_data = Some((hash.clone(), block.sequence_number));
+
+        res.push((hash, block));
+    }
+
+    res
+}
+
+///////////////////////////////////////////////////////////////////////////////

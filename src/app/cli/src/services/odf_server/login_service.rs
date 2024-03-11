@@ -21,7 +21,7 @@ use crate::odf_server;
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
-pub const DEFAULT_ODF_FRONTEND_URL: &str = "http://localhost:4200";
+pub const DEFAULT_ODF_FRONTEND_URL: &str = "https://platform.demo.kamu.dev";
 
 type WebServer =
     axum::Server<hyper::server::conn::AddrIncoming, axum::routing::IntoMakeService<axum::Router>>;

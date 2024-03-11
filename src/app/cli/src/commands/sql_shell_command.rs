@@ -135,6 +135,7 @@ impl SqlShellCommand {
         let mut print_options = PrintOptions {
             format: PrintFormat::Table,
             quiet: false,
+            color: true,
             maxrows: MaxRows::Limited(DEFAULT_MAX_ROWS_FOR_OUTPUT),
         };
 

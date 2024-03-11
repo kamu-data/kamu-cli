@@ -12,6 +12,8 @@
 #![feature(box_patterns)]
 #![feature(exit_status_error)]
 #![feature(error_generic_member_access)]
+#![feature(trait_upcasting)]
+#![feature(let_chains)]
 
 // Re-exports
 pub use kamu_core as domain;
@@ -23,6 +25,7 @@ mod repos;
 pub mod testing; // TODO: Put under feature flag
 pub mod utils;
 
+mod dataset_changes_service_impl;
 mod dataset_config;
 mod dataset_layout;
 mod dependency_graph_repository_inmem;
@@ -41,6 +44,7 @@ mod transform_service_impl;
 mod verification_service_impl;
 
 pub use auth::*;
+pub use dataset_changes_service_impl::*;
 pub use dataset_config::*;
 pub use dataset_layout::*;
 pub use dependency_graph_repository_inmem::*;

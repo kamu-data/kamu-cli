@@ -29,6 +29,7 @@ opendatafabric = { workspace = true }
 async-stream = { version = "0.3", default-features = false }
 async-trait = { version = "0.1", default-features = false }
 bytes = { version = "1", default-features = false }
+bitflags = { version = "2.4", default-features = false }
 chrono = { version = "0.4", default-features = false }
 dill = { version = "0.8", default-features = false }
 futures = { version = "0.3", default-features = false }
@@ -42,8 +43,8 @@ tracing = { version = "0.1", default-features = false }
 url = { version = "2", default-features = false, features = ["serde"] }
 
 # TODO: Avoid this dependency or depend on sub-crates
-datafusion = { version = "33", default-features = false }
-object_store = { version = "0.7", default-features = false }
+datafusion = { version = "36", default-features = false, features = ["parquet"] }
+object_store = { version = "0.9", default-features = false }
 
 # TODO: Make serde optional
 serde = { version = "1", default-features = false, features = ["derive"] }

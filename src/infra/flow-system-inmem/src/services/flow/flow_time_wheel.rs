@@ -56,7 +56,7 @@ impl FlowTimeWheel {
                     break;
                 }
 
-                if self.is_flow_activation_planned(ar.0.flow_id) {
+                if self.is_flow_activation_planned_at(ar.0.flow_id, activation_moment) {
                     res.push(ar.0.flow_id);
                 }
 
@@ -85,8 +85,18 @@ impl FlowTimeWheel {
         }
     }
 
-    pub fn is_flow_activation_planned(&self, flow_id: FlowID) -> bool {
-        self.flow_activation_times_by_id.contains_key(&flow_id)
+    pub fn get_planned_flow_activation_time(&self, flow_id: FlowID) -> Option<DateTime<Utc>> {
+        self.flow_activation_times_by_id.get(&flow_id).copied()
+    }
+
+    fn is_flow_activation_planned_at(
+        &self,
+        flow_id: FlowID,
+        activation_moment: DateTime<Utc>,
+    ) -> bool {
+        self.flow_activation_times_by_id
+            .get(&flow_id)
+            .is_some_and(|flow_activation_time| *flow_activation_time == activation_moment)
     }
 
     pub fn cancel_flow_activation(
@@ -117,7 +127,7 @@ impl FlowTimeWheel {
 
     fn clean_top_cancellations(&mut self) {
         while let Some(ar) = self.flow_heap.peek() {
-            if self.is_flow_activation_planned(ar.0.flow_id) {
+            if self.is_flow_activation_planned_at(ar.0.flow_id, ar.0.activation_time) {
                 break;
             }
 
@@ -160,9 +170,9 @@ mod tests {
         assert!(timewheel.nearest_activation_moment().is_none());
 
         let now = Utc::now();
-        let moment_1 = now + Duration::seconds(10);
-        let moment_2 = now + Duration::seconds(20);
-        let moment_3 = now + Duration::seconds(30);
+        let moment_1 = now + Duration::try_seconds(10).unwrap();
+        let moment_2 = now + Duration::try_seconds(20).unwrap();
+        let moment_3 = now + Duration::try_seconds(30).unwrap();
 
         schedule_flow(&mut timewheel, moment_1, FLOW_ID_1);
         schedule_flow(&mut timewheel, moment_1, FLOW_ID_2);
@@ -181,9 +191,9 @@ mod tests {
         assert!(timewheel.nearest_activation_moment().is_none());
 
         let now = Utc::now();
-        let moment_1 = now + Duration::seconds(10);
-        let moment_2 = now + Duration::seconds(20);
-        let moment_3 = now + Duration::seconds(30);
+        let moment_1 = now + Duration::try_seconds(10).unwrap();
+        let moment_2 = now + Duration::try_seconds(20).unwrap();
+        let moment_3 = now + Duration::try_seconds(30).unwrap();
 
         schedule_flow(&mut timewheel, moment_2, FLOW_ID_3);
         schedule_flow(&mut timewheel, moment_3, FLOW_ID_5);
@@ -202,9 +212,9 @@ mod tests {
         assert!(timewheel.nearest_activation_moment().is_none());
 
         let now = Utc::now();
-        let moment_1 = now + Duration::seconds(10);
-        let moment_2 = now + Duration::seconds(20);
-        let moment_3 = now + Duration::seconds(30);
+        let moment_1 = now + Duration::try_seconds(10).unwrap();
+        let moment_2 = now + Duration::try_seconds(20).unwrap();
+        let moment_3 = now + Duration::try_seconds(30).unwrap();
 
         schedule_flow(&mut timewheel, moment_1, FLOW_ID_1);
         schedule_flow(&mut timewheel, moment_1, FLOW_ID_2);

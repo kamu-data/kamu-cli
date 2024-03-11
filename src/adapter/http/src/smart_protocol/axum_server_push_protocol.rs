@@ -19,9 +19,10 @@ use kamu::domain::{
     DatasetRepository,
     ErrorIntoInternal,
     GetSummaryOpts,
+    HashedMetadataBlock,
     ResultIntoInternal,
 };
-use opendatafabric::{AsTypedBlock, DatasetRef, MetadataBlock, Multihash};
+use opendatafabric::{AsTypedBlock, DatasetRef};
 use url::Url;
 
 use super::errors::*;
@@ -145,13 +146,17 @@ impl AxumServerPushProtocolInstance {
                 .as_ref()
                 .map(ToString::to_string)
                 .ok_or("None"),
-            push_request.size_estimate
+            push_request.transfer_plan
         );
 
         // TODO: consider size estimate and maybe cancel too large pushes
 
         let actual_head = if let Some(dataset) = self.dataset.as_ref() {
-            match dataset.as_metadata_chain().get_ref(&BlockRef::Head).await {
+            match dataset
+                .as_metadata_chain()
+                .resolve_ref(&BlockRef::Head)
+                .await
+            {
                 Ok(head) => Some(head),
                 Err(kamu::domain::GetRefError::NotFound(_)) => None,
                 Err(e) => return Err(PushServerError::Internal(e.int_err())),
@@ -183,7 +188,7 @@ impl AxumServerPushProtocolInstance {
     async fn try_handle_push_metadata_request(
         &mut self,
         push_request: DatasetPushRequest,
-    ) -> Result<VecDeque<(Multihash, MetadataBlock)>, PushServerError> {
+    ) -> Result<VecDeque<HashedMetadataBlock>, PushServerError> {
         let push_metadata_request =
             match axum_read_payload::<DatasetPushMetadataRequest>(&mut self.socket).await {
                 Ok(push_metadata_request) => Ok(push_metadata_request),
@@ -202,7 +207,7 @@ impl AxumServerPushProtocolInstance {
         );
 
         assert_eq!(
-            push_request.size_estimate.num_blocks,
+            push_request.transfer_plan.num_blocks,
             push_metadata_request.new_blocks.num_blocks
         );
 
@@ -306,7 +311,7 @@ impl AxumServerPushProtocolInstance {
 
     async fn try_handle_push_complete(
         &mut self,
-        new_blocks: VecDeque<(Multihash, MetadataBlock)>,
+        new_blocks: VecDeque<HashedMetadataBlock>,
     ) -> Result<(), PushServerError> {
         axum_read_payload::<DatasetPushComplete>(&mut self.socket)
             .await

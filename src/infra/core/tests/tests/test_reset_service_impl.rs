@@ -172,7 +172,7 @@ impl ResetTestHarness {
         let dataset = self.resolve_dataset(dataset_handle).await;
         dataset
             .as_metadata_chain()
-            .get_ref(&BlockRef::Head)
+            .resolve_ref(&BlockRef::Head)
             .await
             .unwrap()
     }

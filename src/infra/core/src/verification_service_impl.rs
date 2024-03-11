@@ -55,7 +55,7 @@ impl VerificationServiceImpl {
         let chain = dataset.as_metadata_chain();
 
         let head = match block_range.1 {
-            None => chain.get_ref(&BlockRef::Head).await?,
+            None => chain.resolve_ref(&BlockRef::Head).await?,
             Some(hash) => hash,
         };
         let tail = block_range.0;
@@ -209,7 +209,7 @@ impl VerificationServiceImpl {
         let chain = dataset.as_metadata_chain();
 
         let head = match block_range.1 {
-            None => chain.get_ref(&BlockRef::Head).await?,
+            None => chain.resolve_ref(&BlockRef::Head).await?,
             Some(hash) => hash,
         };
         let tail = block_range.0;
@@ -226,7 +226,7 @@ impl VerificationServiceImpl {
         // blocks in memory. Here we reuse validations implemented in append
         // rules when adding blocks to new chain.
         let in_memory_chain = MetadataChainImpl::new(
-            ObjectRepositoryInMemory::new(),
+            MetadataBlockRepositoryImpl::new(ObjectRepositoryInMemory::new()),
             ReferenceRepositoryImpl::new(NamedObjectRepositoryInMemory::new()),
         );
 

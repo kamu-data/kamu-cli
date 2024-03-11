@@ -1,2 +1,16 @@
-FROM minio/minio:RELEASE.2020-10-28T08-16-50Z-48-ge773e06e5
-COPY minio-data /data
+FROM minio/minio:RELEASE.2024-02-09T21-25-16Z
+
+# Minio no longer supports mounting files directly as volume so we have to copy using their client
+# See: https://stackoverflow.com/questions/72904999/create-minio-docker-image-with-content
+COPY minio-data /data.tmp
+
+RUN mkdir /data; \
+    minio server /data & \
+    server_pid=$!; \
+    until mc alias set local http://localhost:9000 minioadmin minioadmin; do \
+        sleep 1; \
+    done; \
+    mc mb local/kamu-hub && \
+    mc cp --recursive /data.tmp/kamu-hub/* local/kamu-hub && \
+    kill $server_pid && \
+    rm -rf /data.tmp

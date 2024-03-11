@@ -24,8 +24,14 @@ use crate::utils::s3_context::{AsyncReadObj, S3Context};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+pub type ObjectRepositoryS3Sha3 =
+    ObjectRepositoryS3<sha3::Sha3_256, { Multicodec::Sha3_256 as u32 }>;
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
 // TODO: Pass a single type that configures digest algo, multicodec, and hash
-// base TODO: Verify atomic behavior
+//       base
+// TODO: Verify atomic behavior
 pub struct ObjectRepositoryS3<D, const C: u32> {
     s3_context: S3Context,
     _phantom: PhantomData<D>,
@@ -157,7 +163,9 @@ where
         hash: &Multihash,
         opts: ExternalTransferOpts,
     ) -> Result<GetExternalUrlResult, GetExternalUrlError> {
-        let expires_in = opts.expiration.unwrap_or(chrono::Duration::seconds(3600));
+        let expires_in = opts
+            .expiration
+            .unwrap_or(chrono::Duration::try_seconds(3600).unwrap());
 
         let presigned_conf = PresigningConfig::builder()
             .expires_in(expires_in.to_std().unwrap())
@@ -187,7 +195,9 @@ where
         hash: &Multihash,
         opts: ExternalTransferOpts,
     ) -> Result<GetExternalUrlResult, GetExternalUrlError> {
-        let expires_in = opts.expiration.unwrap_or(chrono::Duration::seconds(3600));
+        let expires_in = opts
+            .expiration
+            .unwrap_or(chrono::Duration::try_seconds(3600).unwrap());
 
         let presigned_conf = PresigningConfig::builder()
             .expires_in(expires_in.to_std().unwrap())

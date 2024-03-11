@@ -122,7 +122,7 @@ async fn test_ingest_polling_snapshot() {
                   OPTIONAL INT64 offset;
                   REQUIRED INT32 op;
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
-                  REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
+                  OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
                   OPTIONAL BYTE_ARRAY city (STRING);
                   OPTIONAL INT64 population;
                 }
@@ -907,7 +907,7 @@ async fn test_ingest_polling_preprocess_with_spark() {
                   OPTIONAL INT64 offset;
                   REQUIRED INT32 op;
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
-                  REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
+                  OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
                   OPTIONAL BYTE_ARRAY city (STRING);
                   OPTIONAL INT64 population;
                 }
@@ -999,7 +999,7 @@ async fn test_ingest_polling_preprocess_with_flink() {
                   OPTIONAL INT64 offset;
                   REQUIRED INT32 op;
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
-                  REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
+                  OPTIONAL INT64 event_time (TIMESTAMP(MILLIS,true));
                   OPTIONAL BYTE_ARRAY city (STRING);
                   OPTIONAL INT64 population;
                 }

@@ -77,7 +77,6 @@ pub enum PollingIngestResult {
     Updated {
         old_head: Multihash,
         new_head: Multihash,
-        num_blocks: usize,
         has_more: bool,
         uncacheable: bool,
     },

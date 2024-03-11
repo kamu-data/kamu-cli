@@ -392,6 +392,10 @@ pub fn cli() -> Command {
                 Command::new("init")
                     .about("Initialize an empty workspace in the current directory")
                     .args([
+                        Arg::new("exists-ok")
+                            .long("exists-ok")
+                            .action(ArgAction::SetTrue)
+                            .help("Don't return an error if workspace already exists"),
                         Arg::new("pull-images")
                             .long("pull-images")
                             .action(ArgAction::SetTrue)
@@ -602,7 +606,14 @@ pub fn cli() -> Command {
                         Arg::new("server")
                             .index(1)
                             .value_parser(value_parse_url)
-                            .help("Custom remote server front-end URL (Kamu web platform is used by default)"),
+                            .help("ODF server URL (defaults to kamu.dev)"),
+                        Arg::new("check")
+                            .long("check")
+                            .action(ArgAction::SetTrue)
+                            .help("Check whether existing authorization is still valid without triggering a login flow"),
+                        Arg::new("access-token")
+                            .long("access-token")
+                            .help("Provide an existing access token"),
                     ]),
                 Command::new("logout")
                     .about("Logs out from a remote Kamu server")
@@ -614,7 +625,7 @@ pub fn cli() -> Command {
                         Arg::new("server")
                             .index(1)
                             .value_parser(value_parse_url)
-                            .help("Custom remote server front-end URL (Kamu web platform is used by default)"),
+                            .help("ODF server URL (defaults to kamu.dev)"),
                         Arg::new("all")
                             .short('a')
                             .long("all")
@@ -694,7 +705,7 @@ pub fn cli() -> Command {
                         Arg::new("dataset")
                             .action(ArgAction::Append)
                             .index(1)
-                            .value_parser(value_parse_dataset_ref_any)
+                            .value_parser(value_parse_dataset_ref_pattern_any)
                             .help("Local or remote dataset reference(s)"),
                         Arg::new("as")
                             .long("as")
@@ -728,6 +739,10 @@ pub fn cli() -> Command {
                         Fetch latest data in a specific dataset:
 
                             kamu pull org.example.data
+
+                        Fetch latest data in datasets matching pattern:
+
+                            kamu pull org.example.%
 
                         Fetch latest data for the entire dependency tree of a dataset:
 
@@ -772,7 +787,7 @@ pub fn cli() -> Command {
                         Arg::new("dataset")
                             .action(ArgAction::Append)
                             .index(1)
-                            .value_parser(value_parse_dataset_ref_any)
+                            .value_parser(value_parse_dataset_ref_pattern_any)
                             .help("Local or remote dataset reference(s)"),
                         Arg::new("to")
                             .long("to")
@@ -804,6 +819,10 @@ pub fn cli() -> Command {
                         Sync dataset that already has a push alias:
 
                             kamu push org.example.data
+
+                        Sync datasets matching pattern that already have push aliases:
+
+                            kamu push org.example.%
 
                         Add dataset to local IPFS node and update IPNS entry to the new CID:
 
@@ -1207,6 +1226,27 @@ pub fn cli() -> Command {
                                     .required(true)
                                     .value_parser(value_parse_dataset_ref_local)
                                     .help("Dataset reference")])]),
+                        Command::new("check-token")
+                            .about("Validate a Kamu token")
+                            .args([
+                                Arg::new("token")
+                                    .index(1)
+                                    .required(true)
+                                    .help("Kamu token"),
+                            ]),
+                        // TODO: This command is temporary and likely will be removed soon
+                        Command::new("generate-token")
+                            .about("Generate a platform token from a known secret for debugging")
+                            .args([
+                                Arg::new("gh-login")
+                                    .long("gh-login")
+                                    .required(true)
+                                    .help("GitHub account login"),
+                                Arg::new("gh-access-token")
+                                    .long("gh-access-token")
+                                    .required(true)
+                                    .help("An existing GitHub access token"),
+                            ]),
                     ]),
                 tabular_output_params(
                     Command::new("tail")

@@ -92,6 +92,7 @@ pub fn get_command(
                 cli_catalog,
                 submatches.get_many("dataset").unwrap().cloned(),
             )?,
+            cli_catalog.get_one()?,
             submatches.get_flag("all"),
             submatches.get_flag("recursive"),
             submatches.get_flag("yes"),
@@ -126,6 +127,8 @@ pub fn get_command(
             } else {
                 Box::new(InitCommand::new(
                     cli_catalog.get_one()?,
+                    cli_catalog.get_one()?,
+                    submatches.get_flag("exists-ok"),
                     submatches.get_flag("multi-tenant"),
                 ))
             }
@@ -207,6 +210,8 @@ pub fn get_command(
                 odf_server::AccessTokenStoreScope::Workspace
             },
             submatches.get_one::<Url>("server").cloned(),
+            submatches.get_one("access-token").cloned(),
+            submatches.get_flag("check"),
         )),
         Some(("logout", submatches)) => Box::new(LogoutCommand::new(
             cli_catalog.get_one()?,
@@ -257,6 +262,7 @@ pub fn get_command(
                     cli_catalog.get_one()?,
                     cli_catalog.get_one()?,
                     cli_catalog.get_one()?,
+                    cli_catalog.get_one()?,
                     datasets,
                     submatches.get_flag("all"),
                     submatches.get_flag("recursive"),
@@ -268,6 +274,7 @@ pub fn get_command(
             }
         }
         Some(("push", push_matches)) => Box::new(PushCommand::new(
+            cli_catalog.get_one()?,
             cli_catalog.get_one()?,
             cli_catalog.get_one()?,
             push_matches
@@ -447,6 +454,15 @@ pub fn get_command(
                     workspace_svc.layout().unwrap().run_info_dir.clone(),
                 ))
             }
+            Some(("check-token", matches)) => Box::new(CheckTokenCommand::new(
+                cli_catalog.get_one()?,
+                matches.get_one("token").cloned().unwrap(),
+            )),
+            Some(("generate-token", gen_matches)) => Box::new(GenerateTokenCommand::new(
+                cli_catalog.get_one()?,
+                gen_matches.get_one("gh-login").cloned().unwrap(),
+                gen_matches.get_one("gh-access-token").cloned().unwrap(),
+            )),
             Some(("ipfs", ipfs_matches)) => match ipfs_matches.subcommand() {
                 Some(("add", add_matches)) => Box::new(SystemIpfsAddCommand::new(
                     cli_catalog.get_one()?,
@@ -495,6 +511,8 @@ pub fn get_command(
             cli_catalog.get_one()?,
             cli_catalog.get_one()?,
             cli_catalog.get_one()?,
+            cli_catalog.get_one()?,
+            cli_catalog.get_one()?,
             validate_many_dataset_patterns(
                 cli_catalog,
                 submatches.get_many("dataset").unwrap().cloned(),
@@ -538,15 +556,15 @@ fn validate_dataset_ref_pattern(
             let valid_ref = validate_dataset_ref(catalog, dsr)?;
             Ok(DatasetRefPattern::Ref(valid_ref))
         }
-        DatasetRefPattern::Pattern(an, drp) => {
+        DatasetRefPattern::Pattern(drp) => {
             let workspace_svc = catalog.get_one::<WorkspaceService>()?;
-            if !workspace_svc.is_multi_tenant_workspace() && an.is_some() {
+            if !workspace_svc.is_multi_tenant_workspace() && drp.account_name.is_some() {
                 return Err(MultiTenantRefUnexpectedError {
-                    dataset_ref_pattern: DatasetRefPattern::Pattern(an, drp),
+                    dataset_ref_pattern: DatasetRefPattern::Pattern(drp),
                 }
                 .into());
             }
-            Ok(DatasetRefPattern::Pattern(an, drp))
+            Ok(DatasetRefPattern::Pattern(drp))
         }
     }
 }

@@ -19,10 +19,8 @@ use crate::*;
 pub enum FlowEvent {
     /// Flow initiated
     Initiated(FlowEventInitiated),
-    /// Start condition defined
-    StartConditionDefined(FlowEventStartConditionDefined),
-    /// Queued for time
-    Queued(FlowEventQueued),
+    /// Start condition updated
+    StartConditionUpdated(FlowEventStartConditionUpdated),
     /// Secondary trigger added
     TriggerAdded(FlowEventTriggerAdded),
     /// Scheduled/Rescheduled a task
@@ -40,6 +38,7 @@ pub enum FlowEvent {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FlowEventInitiated {
     pub event_time: DateTime<Utc>,
+    pub trigger_time: DateTime<Utc>,
     pub flow_id: FlowID,
     pub flow_key: FlowKey,
     pub trigger: FlowTrigger,
@@ -48,19 +47,10 @@ pub struct FlowEventInitiated {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct FlowEventStartConditionDefined {
+pub struct FlowEventStartConditionUpdated {
     pub event_time: DateTime<Utc>,
     pub flow_id: FlowID,
     pub start_condition: FlowStartCondition,
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct FlowEventQueued {
-    pub event_time: DateTime<Utc>,
-    pub flow_id: FlowID,
-    pub activate_at: DateTime<Utc>,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -114,8 +104,7 @@ impl FlowEvent {
     pub fn flow_id(&self) -> FlowID {
         match self {
             FlowEvent::Initiated(e) => e.flow_id,
-            FlowEvent::StartConditionDefined(e) => e.flow_id,
-            FlowEvent::Queued(e) => e.flow_id,
+            FlowEvent::StartConditionUpdated(e) => e.flow_id,
             FlowEvent::TriggerAdded(e) => e.flow_id,
             FlowEvent::TaskScheduled(e) => e.flow_id,
             FlowEvent::TaskRunning(e) => e.flow_id,
@@ -127,8 +116,7 @@ impl FlowEvent {
     pub fn event_time(&self) -> DateTime<Utc> {
         match self {
             FlowEvent::Initiated(e) => e.event_time,
-            FlowEvent::StartConditionDefined(e) => e.event_time,
-            FlowEvent::Queued(e) => e.event_time,
+            FlowEvent::StartConditionUpdated(e) => e.event_time,
             FlowEvent::TriggerAdded(e) => e.event_time,
             FlowEvent::TaskScheduled(e) => e.event_time,
             FlowEvent::TaskRunning(e) => e.event_time,
@@ -140,9 +128,9 @@ impl FlowEvent {
     pub fn new_status(&self) -> Option<FlowStatus> {
         match self {
             FlowEvent::Initiated(_) => Some(FlowStatus::Waiting),
-            FlowEvent::StartConditionDefined(_) | FlowEvent::TriggerAdded(_) => None,
-            FlowEvent::Queued(_) => Some(FlowStatus::Queued),
-            FlowEvent::TaskScheduled(_) => Some(FlowStatus::Scheduled),
+            FlowEvent::StartConditionUpdated(_)
+            | FlowEvent::TriggerAdded(_)
+            | FlowEvent::TaskScheduled(_) => None,
             FlowEvent::TaskRunning(_) => Some(FlowStatus::Running),
             FlowEvent::TaskFinished(_) | FlowEvent::Aborted(_) => Some(FlowStatus::Finished),
         }
@@ -152,10 +140,9 @@ impl FlowEvent {
 impl_enum_with_variants!(FlowEvent);
 
 impl_enum_variant!(FlowEvent::Initiated(FlowEventInitiated));
-impl_enum_variant!(FlowEvent::StartConditionDefined(
-    FlowEventStartConditionDefined
+impl_enum_variant!(FlowEvent::StartConditionUpdated(
+    FlowEventStartConditionUpdated
 ));
-impl_enum_variant!(FlowEvent::Queued(FlowEventQueued));
 impl_enum_variant!(FlowEvent::TriggerAdded(FlowEventTriggerAdded));
 impl_enum_variant!(FlowEvent::TaskScheduled(FlowEventTaskScheduled));
 impl_enum_variant!(FlowEvent::TaskRunning(FlowEventTaskRunning));

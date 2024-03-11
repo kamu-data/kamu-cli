@@ -64,7 +64,6 @@ impl SimpleTransferProtocol {
     pub async fn sync(
         &self,
         src_ref: &DatasetRefAny,
-        _dst_ref: &DatasetRefAny,
         src: Arc<dyn Dataset>,
         maybe_dst: Option<Arc<dyn Dataset>>,
         dst_factory: Option<DatasetFactoryFn>,
@@ -76,7 +75,7 @@ impl SimpleTransferProtocol {
         listener.begin();
 
         let empty_chain = MetadataChainImpl::new(
-            ObjectRepositoryInMemory::new(),
+            MetadataBlockRepositoryImpl::new(ObjectRepositoryInMemory::new()),
             ReferenceRepositoryImpl::new(NamedObjectRepositoryInMemory::new()),
         );
 
@@ -183,7 +182,7 @@ impl SimpleTransferProtocol {
         Ok(SyncResult::Updated {
             old_head,
             new_head: src_head,
-            num_blocks,
+            num_blocks: num_blocks as u64,
         })
     }
 
@@ -192,7 +191,7 @@ impl SimpleTransferProtocol {
         src_ref: &DatasetRefAny,
         src_chain: &dyn MetadataChain,
     ) -> Result<Multihash, SyncError> {
-        match src_chain.get_ref(&BlockRef::Head).await {
+        match src_chain.resolve_ref(&BlockRef::Head).await {
             Ok(head) => Ok(head),
             Err(GetRefError::NotFound(_)) => Err(DatasetNotFoundError {
                 dataset_ref: src_ref.clone(),
@@ -207,7 +206,7 @@ impl SimpleTransferProtocol {
         &self,
         dst_chain: &dyn MetadataChain,
     ) -> Result<Option<Multihash>, SyncError> {
-        match dst_chain.get_ref(&BlockRef::Head).await {
+        match dst_chain.resolve_ref(&BlockRef::Head).await {
             Ok(h) => Ok(Some(h)),
             Err(GetRefError::NotFound(_)) => Ok(None),
             Err(GetRefError::Access(e)) => Err(SyncError::Access(e)),
@@ -300,6 +299,8 @@ impl SimpleTransferProtocol {
 
         stats.src.data_slices_read += 1;
         stats.dst.data_slices_written += 1;
+        stats.src.data_records_read += data_slice.num_records();
+        stats.dst.data_records_written += data_slice.num_records();
         stats.src.bytes_read += data_slice.size;
         stats.dst.bytes_written += data_slice.size;
 
@@ -382,7 +383,7 @@ impl SimpleTransferProtocol {
 
     async fn synchronize_blocks<'a>(
         &'a self,
-        blocks: Vec<(Multihash, MetadataBlock)>,
+        blocks: Vec<HashedMetadataBlock>,
         src: &'a dyn Dataset,
         dst: &'a dyn Dataset,
         src_head: &'a Multihash,
@@ -399,9 +400,11 @@ impl SimpleTransferProtocol {
             if let Some(data_slice) = block.event.new_data {
                 stats.src_estimated.data_slices_read += 1;
                 stats.src_estimated.bytes_read += data_slice.size;
+                stats.src_estimated.data_records_read += data_slice.num_records();
 
                 stats.dst_estimated.data_slices_written += 1;
                 stats.dst_estimated.bytes_written += data_slice.size;
+                stats.dst_estimated.data_records_written += data_slice.num_records();
             }
             if let Some(checkpoint) = block.event.new_checkpoint {
                 stats.src_estimated.checkpoints_read += 1;

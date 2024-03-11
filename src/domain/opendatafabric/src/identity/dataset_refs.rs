@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::fmt;
+use std::str::FromStr;
 use std::sync::Arc;
 
 use url::Url;
@@ -739,32 +740,32 @@ impl std::cmp::PartialOrd for DatasetRefAny {
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////
+// DatasetRefPattern
+////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum DatasetRefPattern {
     Ref(DatasetRef),
-    Pattern(Option<AccountName>, DatasetNamePattern),
+    Pattern(DatasetAliasPattern),
 }
 
 impl DatasetRefPattern {
-    pub fn is_match(&self, dataset_hande: &DatasetHandle) -> bool {
+    pub fn matches(&self, dataset_handle: &DatasetHandle) -> bool {
         match self {
             Self::Ref(dataset_ref) => match dataset_ref {
-                DatasetRef::ID(dataset_id) => *dataset_id == dataset_hande.id,
-                DatasetRef::Alias(dataset_alias) => *dataset_alias == dataset_hande.alias,
-                DatasetRef::Handle(dataset_handle_res) => dataset_handle_res == dataset_hande,
+                DatasetRef::ID(dataset_id) => *dataset_id == dataset_handle.id,
+                DatasetRef::Alias(dataset_alias) => *dataset_alias == dataset_handle.alias,
+                DatasetRef::Handle(dataset_handle_res) => dataset_handle_res == dataset_handle,
             },
-            Self::Pattern(account_name_maybe, dataset_name_pattern) => {
-                (account_name_maybe.is_none()
-                    || *account_name_maybe == dataset_hande.alias.account_name)
-                    && dataset_name_pattern.is_match(&dataset_hande.alias.dataset_name)
-            }
+            Self::Pattern(dataset_pattern) => dataset_pattern.matches(dataset_handle),
         }
     }
 
     /// Convert into a [`DatasetRef`] when value is not a glob pattern
     pub fn as_dataset_ref(&self) -> Option<&DatasetRef> {
         match self {
-            Self::Pattern(_, _) => None,
+            Self::Pattern(_) => None,
             Self::Ref(dataset_ref) => Some(dataset_ref),
         }
     }
@@ -772,24 +773,7 @@ impl DatasetRefPattern {
     /// Returns `false` if value is a reference to some specific dataset rather
     /// than a glob pattern
     pub fn is_pattern(&self) -> bool {
-        match self {
-            DatasetRefPattern::Ref(_) => false,
-            DatasetRefPattern::Pattern(_, _) => true,
-        }
-    }
-}
-
-impl fmt::Display for DatasetRefPattern {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Ref(dataset_ref) => write!(f, "{dataset_ref}"),
-            Self::Pattern(account_name_maybe, dataset_name_pattern) => {
-                if let Some(account_name) = account_name_maybe {
-                    write!(f, "{account_name}/")?;
-                }
-                write!(f, "{dataset_name_pattern}")
-            }
-        }
+        matches!(self, Self::Pattern(_))
     }
 }
 
@@ -798,20 +782,9 @@ impl std::str::FromStr for DatasetRefPattern {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if s.contains('%') {
-            return match s.split_once('/') {
-                Some((account, dataset_name)) => match DatasetNamePattern::try_from(dataset_name) {
-                    Ok(dataset_name_pattern) => match AccountName::try_from(account) {
-                        Ok(account_name) => {
-                            Ok(Self::Pattern(Some(account_name), dataset_name_pattern))
-                        }
-                        Err(_) => Err(Self::Err::new(s)),
-                    },
-                    Err(_) => Err(Self::Err::new(s)),
-                },
-                None => match DatasetNamePattern::try_from(s) {
-                    Ok(dataset_name_pattern) => Ok(Self::Pattern(None, dataset_name_pattern)),
-                    Err(_) => Err(Self::Err::new(s)),
-                },
+            return match DatasetAliasPattern::from_str(s) {
+                Ok(dataset_pattern) => Ok(Self::Pattern(dataset_pattern)),
+                Err(_) => Err(Self::Err::new(s)),
             };
         }
         match DatasetRef::from_str(s) {
@@ -821,4 +794,138 @@ impl std::str::FromStr for DatasetRefPattern {
     }
 }
 
+impl fmt::Display for DatasetRefPattern {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Ref(dataset_ref) => write!(f, "{dataset_ref}"),
+            Self::Pattern(dataset_pattern) => {
+                if let Some(account_name) = &dataset_pattern.account_name {
+                    write!(f, "{account_name}/")?;
+                }
+                write!(f, "{}", dataset_pattern.dataset_name_pattern)
+            }
+        }
+    }
+}
+
 super::dataset_identity::impl_parse_error!(DatasetRefPattern);
+
+////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum DatasetRefAnyPattern {
+    Ref(DatasetRefAny),
+    PatternRemote(RepoName, AccountName, DatasetNamePattern),
+    PatternAmbiguous(DatasetAmbiguousPattern, DatasetNamePattern),
+    PatternLocal(DatasetNamePattern),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DatasetAmbiguousPattern {
+    pub pattern: Arc<str>,
+}
+
+impl DatasetRefAnyPattern {
+    /// Convert into a [`DatasetRefAny`] pointer when value is not a glob
+    /// pattern
+    pub fn as_dataset_ref_any(&self) -> Option<&DatasetRefAny> {
+        match self {
+            Self::Ref(dataset_ref) => Some(dataset_ref),
+            Self::PatternLocal(_) | Self::PatternAmbiguous(_, _) | Self::PatternRemote(_, _, _) => {
+                None
+            }
+        }
+    }
+
+    /// Convert into a [`DatasetRefAny`] when value is not a glob pattern
+    pub fn into_dataset_ref_any(self) -> Option<DatasetRefAny> {
+        match self {
+            Self::Ref(dataset_ref) => Some(dataset_ref),
+            Self::PatternLocal(_) | Self::PatternAmbiguous(_, _) | Self::PatternRemote(_, _, _) => {
+                None
+            }
+        }
+    }
+
+    /// Returns `false` if value is a reference to some specific dataset rather
+    /// than a glob pattern
+    pub fn is_pattern(&self) -> bool {
+        !matches!(self, Self::Ref(_))
+    }
+
+    /// Return `true` if pattern has remote repo reference
+    pub fn is_remote_pattern(&self, is_multitenant_mode: bool) -> bool {
+        match self {
+            Self::Ref(_) | Self::PatternLocal(_) => false,
+            Self::PatternRemote(_, _, _) => true,
+            Self::PatternAmbiguous(_, _) => !is_multitenant_mode,
+        }
+    }
+
+    /// Return repository part from pattern
+    pub fn pattern_repo_name(&self, is_multitenant_mode: bool) -> Option<RepoName> {
+        match self {
+            Self::Ref(_) | Self::PatternLocal(_) => None,
+            Self::PatternRemote(repo_name, _, _) => Some(repo_name.clone()),
+            Self::PatternAmbiguous(account_repo_name, _) => {
+                if is_multitenant_mode {
+                    return None;
+                };
+                Some(RepoName::from_str(&account_repo_name.pattern).unwrap())
+            }
+        }
+    }
+}
+
+impl std::str::FromStr for DatasetRefAnyPattern {
+    type Err = ParseError<Self>;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s.contains('%') {
+            return match s.split_once('/') {
+                Some((repo, rest)) => match RepoName::try_from(repo) {
+                    Ok(repo_or_account_name) => match rest.split_once('/') {
+                        Some((account_pattern, dataset_name)) => {
+                            let repo_name = repo_or_account_name;
+                            match AccountName::from_str(account_pattern) {
+                                Ok(account_name) => {
+                                    match DatasetNamePattern::from_str(dataset_name) {
+                                        Ok(dataset_name_pattern) => Ok(Self::PatternRemote(
+                                            repo_name,
+                                            account_name,
+                                            dataset_name_pattern,
+                                        )),
+                                        Err(_) => Err(Self::Err::new(s)),
+                                    }
+                                }
+                                Err(_) => Err(Self::Err::new(s)),
+                            }
+                        }
+                        None => match DatasetNamePattern::from_str(rest) {
+                            Ok(dataset_name_pattern) => Ok(Self::PatternAmbiguous(
+                                DatasetAmbiguousPattern {
+                                    pattern: repo_or_account_name.into_inner(),
+                                },
+                                dataset_name_pattern,
+                            )),
+                            Err(_) => Err(Self::Err::new(s)),
+                        },
+                    },
+                    Err(_) => Err(Self::Err::new(s)),
+                },
+                None => match DatasetNamePattern::try_from(s) {
+                    Ok(dataset_name_pattern) => Ok(Self::PatternLocal(dataset_name_pattern)),
+                    Err(_) => Err(Self::Err::new(s)),
+                },
+            };
+        }
+        match DatasetRefAny::from_str(s) {
+            Ok(dataset_ref) => Ok(Self::Ref(dataset_ref)),
+            Err(_) => Err(Self::Err::new(s)),
+        }
+    }
+}
+
+super::dataset_identity::impl_parse_error!(DatasetRefAnyPattern);
+
+////////////////////////////////////////////////////////////////////////////////

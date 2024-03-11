@@ -15,7 +15,16 @@ use std::sync::Arc;
 use dill::*;
 use internal_error::*;
 use jsonwebtoken::errors::ErrorKind;
-use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
+use jsonwebtoken::{
+    decode,
+    encode,
+    Algorithm,
+    DecodingKey,
+    EncodingKey,
+    Header,
+    TokenData,
+    Validation,
+};
 use kamu_core::auth::*;
 use kamu_core::SystemTimeSource;
 use opendatafabric::AccountName;
@@ -97,7 +106,7 @@ impl AuthenticationServiceImpl {
         }
     }
 
-    fn make_access_token(
+    pub fn make_access_token(
         &self,
         subject: String,
         login_method: &str,
@@ -127,21 +136,19 @@ impl AuthenticationServiceImpl {
         .int_err()
     }
 
-    fn decode_access_token(
+    pub fn decode_access_token(
         &self,
         access_token: &str,
-    ) -> Result<KamuAccessCredentials, AccessTokenError> {
+    ) -> Result<TokenData<KamuAccessTokenClaims>, AccessTokenError> {
         let mut validation = Validation::new(KAMU_JWT_ALGORITHM);
         validation.set_issuer(vec![KAMU_JWT_ISSUER].as_slice());
 
-        let token_data =
-            decode::<KamuAccessTokenClaims>(access_token, &self.decoding_key, &validation)
-                .map_err(|e| match *e.kind() {
-                    ErrorKind::ExpiredSignature => AccessTokenError::Expired,
-                    _ => AccessTokenError::Invalid(Box::new(e)),
-                })?;
-
-        Ok(token_data.claims.access_credentials)
+        decode::<KamuAccessTokenClaims>(access_token, &self.decoding_key, &validation).map_err(
+            |e| match *e.kind() {
+                ErrorKind::ExpiredSignature => AccessTokenError::Expired,
+                _ => AccessTokenError::Invalid(Box::new(e)),
+            },
+        )
     }
 }
 
@@ -189,14 +196,16 @@ impl AuthenticationService for AuthenticationServiceImpl {
             .decode_access_token(&access_token)
             .map_err(GetAccountInfoError::AccessToken)?;
 
+        let access_credentials = decoded_access_token.claims.access_credentials;
+
         let provider = self
-            .resolve_authentication_provider(decoded_access_token.login_method.as_str())
+            .resolve_authentication_provider(access_credentials.login_method.as_str())
             .map_err(|e| {
                 GetAccountInfoError::AccessToken(AccessTokenError::Invalid(Box::new(e)))
             })?;
 
         provider
-            .account_info_by_token(decoded_access_token.provider_credentials_json)
+            .account_info_by_token(access_credentials.provider_credentials_json)
             .await
             .map_err(|e| GetAccountInfoError::Internal(e.int_err()))
     }
@@ -219,7 +228,7 @@ impl AuthenticationService for AuthenticationServiceImpl {
 ///////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-struct KamuAccessCredentials {
+pub struct KamuAccessCredentials {
     login_method: String,
     provider_credentials_json: String,
 }
@@ -241,7 +250,7 @@ impl KamuAccessCredentials {
 
 /// Our claims struct, it needs to derive `Serialize` and/or `Deserialize`
 #[derive(Debug, Serialize, Deserialize)]
-struct KamuAccessTokenClaims {
+pub struct KamuAccessTokenClaims {
     exp: usize,
     iat: usize,
     iss: String,

@@ -171,6 +171,7 @@ impl<'a> ParquetJsonSchemaWriter<'a> {
     ) -> String {
         match logical_type {
             Some(logical_type) => match logical_type {
+                LogicalType::Float16 => "FLOAT16".to_string(),
                 LogicalType::Integer {
                     bit_width,
                     is_signed,
@@ -245,45 +246,3 @@ impl<'a> ParquetJsonSchemaWriter<'a> {
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
-
-trait ParquetSchemaFormatter {
-    fn begin_group();
-    fn primitive();
-    fn end_group();
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-struct ParquetStyleSchemaFormatter;
-
-impl ParquetSchemaFormatter for ParquetStyleSchemaFormatter {
-    fn begin_group() {
-        todo!()
-    }
-
-    fn primitive() {
-        todo!()
-    }
-
-    fn end_group() {
-        todo!()
-    }
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
-struct ParquetJsonSchemaFormatter;
-
-impl ParquetSchemaFormatter for ParquetJsonSchemaFormatter {
-    fn begin_group() {
-        todo!()
-    }
-
-    fn primitive() {
-        todo!()
-    }
-
-    fn end_group() {
-        todo!()
-    }
-}

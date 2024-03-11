@@ -10,7 +10,9 @@
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+use futures::TryStreamExt;
 use kamu::domain::*;
+use kamu::utils::datasets_filtering::filter_datasets_by_any_pattern;
 use opendatafabric::*;
 
 use super::{BatchError, CLIError, Command};
@@ -23,7 +25,8 @@ use crate::output::OutputConfig;
 pub struct PushCommand {
     push_svc: Arc<dyn PushService>,
     dataset_repo: Arc<dyn DatasetRepository>,
-    refs: Vec<DatasetRefAny>,
+    search_svc: Arc<dyn SearchService>,
+    refs: Vec<DatasetRefAnyPattern>,
     all: bool,
     recursive: bool,
     add_aliases: bool,
@@ -36,6 +39,7 @@ impl PushCommand {
     pub fn new<I>(
         push_svc: Arc<dyn PushService>,
         dataset_repo: Arc<dyn DatasetRepository>,
+        search_svc: Arc<dyn SearchService>,
         refs: I,
         all: bool,
         recursive: bool,
@@ -45,11 +49,12 @@ impl PushCommand {
         output_config: Arc<OutputConfig>,
     ) -> Self
     where
-        I: Iterator<Item = DatasetRefAny>,
+        I: Iterator<Item = DatasetRefAnyPattern>,
     {
         Self {
             push_svc,
             dataset_repo,
+            search_svc,
             refs: refs.collect(),
             all,
             recursive,
@@ -65,13 +70,20 @@ impl PushCommand {
         listener: Option<Arc<dyn SyncMultiListener>>,
     ) -> Result<Vec<PushResponse>, CLIError> {
         if let Some(remote_ref) = &self.to {
-            let local_ref = self.refs[0]
-                .as_local_ref(|_| !self.dataset_repo.is_multi_tenant())
-                .map_err(|_| {
-                    CLIError::usage_error(
-                        "When using --to reference should point to a local dataset",
-                    )
-                })?;
+            let local_ref = match self.refs[0].as_dataset_ref_any() {
+                Some(dataset_ref_any) => dataset_ref_any
+                    .as_local_ref(|_| !self.dataset_repo.is_multi_tenant())
+                    .map_err(|_| {
+                        CLIError::usage_error(
+                            "When using --to reference should point to a local dataset",
+                        )
+                    })?,
+                None => {
+                    return Err(CLIError::usage_error(
+                        "When using --to reference should not point to wildcard pattern",
+                    ))
+                }
+            };
 
             Ok(self
                 .push_svc
@@ -90,10 +102,18 @@ impl PushCommand {
                 )
                 .await)
         } else {
+            let dataset_refs: Vec<_> = filter_datasets_by_any_pattern(
+                self.dataset_repo.as_ref(),
+                self.search_svc.clone(),
+                self.refs.clone(),
+            )
+            .try_collect()
+            .await?;
+
             Ok(self
                 .push_svc
                 .push_multi(
-                    self.refs.clone(),
+                    dataset_refs,
                     PushMultiOptions {
                         all: self.all,
                         recursive: self.recursive,

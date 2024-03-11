@@ -30,11 +30,13 @@ pub struct DatasetFactoryImpl {
 // TODO: Make digest configurable
 type DatasetImplLocalFS = DatasetImpl<
     MetadataChainImpl<
-        ObjectRepositoryLocalFS<sha3::Sha3_256, 0x16>,
+        MetadataBlockRepositoryCachingInMem<
+            MetadataBlockRepositoryImpl<ObjectRepositoryLocalFSSha3>,
+        >,
         ReferenceRepositoryImpl<NamedObjectRepositoryLocalFS>,
     >,
-    ObjectRepositoryLocalFS<sha3::Sha3_256, 0x16>,
-    ObjectRepositoryLocalFS<sha3::Sha3_256, 0x16>,
+    ObjectRepositoryLocalFSSha3,
+    ObjectRepositoryLocalFSSha3,
     NamedObjectRepositoryLocalFS,
 >;
 
@@ -59,7 +61,9 @@ impl DatasetFactoryImpl {
         DatasetImpl::new(
             event_bus,
             MetadataChainImpl::new(
-                ObjectRepositoryLocalFS::new(layout.blocks_dir),
+                MetadataBlockRepositoryCachingInMem::new(MetadataBlockRepositoryImpl::new(
+                    ObjectRepositoryLocalFSSha3::new(layout.blocks_dir),
+                )),
                 ReferenceRepositoryImpl::new(NamedObjectRepositoryLocalFS::new(layout.refs_dir)),
             ),
             ObjectRepositoryLocalFS::new(layout.data_dir),
@@ -74,14 +78,17 @@ impl DatasetFactoryImpl {
         event_bus: Arc<EventBus>,
     ) -> impl Dataset {
         let client = reqwest::Client::new();
+
         DatasetImpl::new(
             event_bus,
             MetadataChainImpl::new(
-                ObjectRepositoryHttp::new(
-                    client.clone(),
-                    base_url.join("blocks/").unwrap(),
-                    header_map.clone(),
-                ),
+                MetadataBlockRepositoryCachingInMem::new(MetadataBlockRepositoryImpl::new(
+                    ObjectRepositoryHttp::new(
+                        client.clone(),
+                        base_url.join("blocks/").unwrap(),
+                        header_map.clone(),
+                    ),
+                )),
                 ReferenceRepositoryImpl::new(NamedObjectRepositoryHttp::new(
                     client.clone(),
                     base_url.join("refs/").unwrap(),
@@ -134,11 +141,13 @@ impl DatasetFactoryImpl {
         Ok(DatasetImpl::new(
             event_bus,
             MetadataChainImpl::new(
-                ObjectRepositoryS3::<sha3::Sha3_256, 0x16>::new(S3Context::new(
-                    client.clone(),
-                    endpoint.clone(),
-                    bucket.clone(),
-                    format!("{key_prefix}blocks/"),
+                MetadataBlockRepositoryCachingInMem::new(MetadataBlockRepositoryImpl::new(
+                    ObjectRepositoryS3Sha3::new(S3Context::new(
+                        client.clone(),
+                        endpoint.clone(),
+                        bucket.clone(),
+                        format!("{key_prefix}blocks/"),
+                    )),
                 )),
                 ReferenceRepositoryImpl::new(NamedObjectRepositoryS3::new(S3Context::new(
                     client.clone(),
@@ -147,13 +156,13 @@ impl DatasetFactoryImpl {
                     format!("{key_prefix}refs/"),
                 ))),
             ),
-            ObjectRepositoryS3::<sha3::Sha3_256, 0x16>::new(S3Context::new(
+            ObjectRepositoryS3Sha3::new(S3Context::new(
                 client.clone(),
                 endpoint.clone(),
                 bucket.clone(),
                 format!("{key_prefix}data/"),
             )),
-            ObjectRepositoryS3::<sha3::Sha3_256, 0x16>::new(S3Context::new(
+            ObjectRepositoryS3Sha3::new(S3Context::new(
                 client.clone(),
                 endpoint.clone(),
                 bucket.clone(),
@@ -225,14 +234,17 @@ impl DatasetFactoryImpl {
         };
 
         let client = reqwest::Client::new();
+
         Ok(DatasetImpl::new(
             event_bus,
             MetadataChainImpl::new(
-                ObjectRepositoryHttp::new(
-                    client.clone(),
-                    dataset_url.join("blocks/").unwrap(),
-                    Default::default(),
-                ),
+                MetadataBlockRepositoryCachingInMem::new(MetadataBlockRepositoryImpl::new(
+                    ObjectRepositoryHttp::new(
+                        client.clone(),
+                        dataset_url.join("blocks/").unwrap(),
+                        Default::default(),
+                    ),
+                )),
                 ReferenceRepositoryImpl::new(NamedObjectRepositoryIpfsHttp::new(
                     client.clone(),
                     dataset_url.join("refs/").unwrap(),
@@ -316,8 +328,18 @@ impl DatasetFactory for DatasetFactoryImpl {
                 let ds = Self::get_local_fs(layout, self.event_bus.clone());
                 Ok(Arc::new(ds) as Arc<dyn Dataset>)
             }
-            "http" | "https" | "odf+http" | "odf+https" => {
+            "http" | "https" => {
                 let ds = Self::get_http(url, self.build_header_map(url), self.event_bus.clone());
+                Ok(Arc::new(ds))
+            }
+            "odf+http" | "odf+https" => {
+                // TODO: PERF: Consider what speedups are possible in smart protocol
+                let http_url = Url::parse(url.as_str().strip_prefix("odf+").unwrap()).unwrap();
+                let ds = Self::get_http(
+                    &http_url,
+                    self.build_header_map(&http_url),
+                    self.event_bus.clone(),
+                );
                 Ok(Arc::new(ds))
             }
             "ipfs" | "ipns" | "ipfs+http" | "ipfs+https" | "ipns+http" | "ipns+https" => {

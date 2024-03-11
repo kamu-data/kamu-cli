@@ -298,6 +298,7 @@ Initialize an empty workspace in the current directory
 
 **Options:**
 
+* `--exists-ok` — Don't return an error if workspace already exists
 * `--pull-images` — Only pull container images and exit
 * `--list-only` — List image names instead of pulling
 * `--multi-tenant` — Initialize a workspace for multiple tenants
@@ -498,11 +499,13 @@ Logs in to a remote Kamu server
 
 **Arguments:**
 
-* `<SERVER>` — Custom remote server front-end URL (Kamu web platform is used by default)
+* `<SERVER>` — ODF server URL (defaults to kamu.dev)
 
 **Options:**
 
 * `--user` — Store access token in the user home folder rather than in the workspace
+* `--check` — Check whether existing authorization is still valid without triggering a login flow
+* `--access-token <ACCESS-TOKEN>` — Provide an existing access token
 
 
 
@@ -514,7 +517,7 @@ Logs out from a remote Kamu server
 
 **Arguments:**
 
-* `<SERVER>` — Custom remote server front-end URL (Kamu web platform is used by default)
+* `<SERVER>` — ODF server URL (defaults to kamu.dev)
 
 **Options:**
 
@@ -600,6 +603,10 @@ Fetch latest data in a specific dataset:
 
     kamu pull org.example.data
 
+Fetch latest data in datasets matching pattern:
+
+    kamu pull org.example.%
+
 Fetch latest data for the entire dependency tree of a dataset:
 
     kamu pull --recursive org.example.derivative
@@ -660,6 +667,10 @@ Sync dataset to a named repository (see `kamu repo` command group):
 Sync dataset that already has a push alias:
 
     kamu push org.example.data
+
+Sync datasets matching pattern that already have push aliases:
+
+    kamu push org.example.%
 
 Add dataset to local IPFS node and update IPNS entry to the new CID:
 
@@ -1007,6 +1018,8 @@ Command group for system-level functionality
 * `info` — Summary of the system information
 * `diagnose` — Run basic system diagnose check
 * `ipfs` — IPFS helpers
+* `check-token` — Validate a Kamu token
+* `generate-token` — Generate a platform token from a known secret for debugging
 
 
 
@@ -1128,6 +1141,31 @@ Adds the specified dataset to IPFS and returns the CID
 **Arguments:**
 
 * `<DATASET>` — Dataset reference
+
+
+
+## `kamu system check-token`
+
+Validate a Kamu token
+
+**Usage:** `kamu system check-token <token>`
+
+**Arguments:**
+
+* `<TOKEN>` — Kamu token
+
+
+
+## `kamu system generate-token`
+
+Generate a platform token from a known secret for debugging
+
+**Usage:** `kamu system generate-token --gh-login <gh-login> --gh-access-token <gh-access-token>`
+
+**Options:**
+
+* `--gh-login <GH-LOGIN>` — GitHub account login
+* `--gh-access-token <GH-ACCESS-TOKEN>` — An existing GitHub access token
 
 
 

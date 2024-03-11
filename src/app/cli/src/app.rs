@@ -205,6 +205,8 @@ pub fn configure_base_catalog(
 
     b.add::<DatasetFactoryImpl>();
 
+    b.add::<DatasetChangesServiceImpl>();
+
     b.add_builder(
         RemoteRepositoryRegistryImpl::builder().with_repos_dir(workspace_layout.repos_dir.clone()),
     );
@@ -269,8 +271,8 @@ pub fn configure_base_catalog(
     b.add::<kamu_flow_system_inmem::FlowConfigurationServiceInMemory>();
     b.add::<kamu_flow_system_inmem::FlowServiceInMemory>();
     b.add_value(kamu_flow_system_inmem::domain::FlowServiceRunConfig::new(
-        chrono::Duration::seconds(1),
-        chrono::Duration::minutes(1),
+        chrono::Duration::try_seconds(1).unwrap(),
+        chrono::Duration::try_minutes(1).unwrap(),
     ));
 
     b.add::<kamu_flow_system_inmem::FlowEventStoreInMem>();

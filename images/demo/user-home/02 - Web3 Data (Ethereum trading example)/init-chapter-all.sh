@@ -1,14 +1,14 @@
 #!/bin/sh
 set -e
 
-S3_BASE_URL="https://s3.us-west-2.amazonaws.com/datasets.kamu.dev/odf/v2/contrib/"
+REPO_BASE_URL="${KAMU_NODE_URL}/kamu/"
 
 rm -rf .kamu
 kamu init
 
-kamu pull "${S3_BASE_URL}net.rocketpool.reth.mint-burn"
-kamu pull "${S3_BASE_URL}com.cryptocompare.ohlcv.eth-usd"
-kamu pull "${S3_BASE_URL}co.alphavantage.tickers.daily.spy"
+kamu pull "${REPO_BASE_URL}net.rocketpool.reth.mint-burn"
+kamu pull "${REPO_BASE_URL}com.cryptocompare.ohlcv.eth-usd"
+kamu pull "${REPO_BASE_URL}co.alphavantage.tickers.daily.spy"
 
 kamu add -r datasets/
 

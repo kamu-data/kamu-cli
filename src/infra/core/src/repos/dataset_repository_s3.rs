@@ -247,7 +247,7 @@ impl DatasetRepository for DatasetRepositoryS3 {
 
             match existing_dataset
                 .as_metadata_chain()
-                .get_ref(&BlockRef::Head)
+                .resolve_ref(&BlockRef::Head)
                 .await
             {
                 // Existing head

@@ -72,18 +72,12 @@ impl PrepService {
 // TODO: Error handling (?)
 
 trait Stream: std::io::Read + Send {
-    fn as_read(&mut self) -> &mut dyn std::io::Read;
-
     fn as_seekable_read(&mut self) -> Option<&mut dyn ReadAndSeek>;
 
     fn join(self: Box<Self>) -> Result<(), PollingIngestError>;
 }
 
 impl Stream for std::fs::File {
-    fn as_read(&mut self) -> &mut dyn std::io::Read {
-        self
-    }
-
     fn as_seekable_read(&mut self) -> Option<&mut dyn ReadAndSeek> {
         Some(self)
     }
@@ -175,10 +169,6 @@ impl Read for PipeStream {
 }
 
 impl Stream for PipeStream {
-    fn as_read(&mut self) -> &mut dyn std::io::Read {
-        self
-    }
-
     fn as_seekable_read(&mut self) -> Option<&mut dyn ReadAndSeek> {
         None
     }
@@ -288,10 +278,6 @@ impl Read for DecompressZipStream {
 }
 
 impl Stream for DecompressZipStream {
-    fn as_read(&mut self) -> &mut dyn std::io::Read {
-        self
-    }
-
     fn as_seekable_read(&mut self) -> Option<&mut dyn ReadAndSeek> {
         None
     }
@@ -323,10 +309,6 @@ impl Read for DecompressGzipStream {
 }
 
 impl Stream for DecompressGzipStream {
-    fn as_read(&mut self) -> &mut dyn std::io::Read {
-        self
-    }
-
     fn as_seekable_read(&mut self) -> Option<&mut dyn ReadAndSeek> {
         None
     }

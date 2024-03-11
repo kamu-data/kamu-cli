@@ -17,7 +17,6 @@ use super::{
     FlowInDatasetError,
     FlowIncompatibleDatasetKind,
     FlowNotFound,
-    FlowNotScheduled,
 };
 use crate::prelude::*;
 use crate::queries::Flow;
@@ -90,26 +89,29 @@ impl DatasetFlowRunsMut {
             });
         }
 
+        // Attempt cancelling scheduled tasks
         let flow_service = from_catalog::<dyn fs::FlowService>(ctx).unwrap();
-
-        let res = flow_service.cancel_scheduled_tasks(flow_id.into()).await;
-
-        match res {
-            Ok(flow_state) => Ok(CancelScheduledTasksResult::Success(
-                CancelScheduledTasksSuccess {
-                    flow: Flow::new(flow_state),
-                },
-            )),
-            Err(e) => match e {
+        let flow_state = flow_service
+            .cancel_scheduled_tasks(flow_id.into())
+            .await
+            .map_err(|e| match e {
                 fs::CancelScheduledTasksError::NotFound(_) => unreachable!("Flow checked already"),
-                fs::CancelScheduledTasksError::NotScheduled(_) => {
-                    Ok(CancelScheduledTasksResult::NotScheduled(FlowNotScheduled {
-                        flow_id,
-                    }))
-                }
-                fs::CancelScheduledTasksError::Internal(e) => Err(GqlError::Internal(e)),
+                fs::CancelScheduledTasksError::Internal(e) => GqlError::Internal(e),
+            })?;
+
+        // Pause flow configuration regardless of current state.
+        // Duplicate requests are auto-ignored.
+        let flow_configuration_service =
+            from_catalog::<dyn fs::FlowConfigurationService>(ctx).unwrap();
+        flow_configuration_service
+            .pause_flow_configuration(Utc::now(), flow_state.flow_key.clone())
+            .await?;
+
+        Ok(CancelScheduledTasksResult::Success(
+            CancelScheduledTasksSuccess {
+                flow: Flow::new(flow_state),
             },
-        }
+        ))
     }
 }
 
@@ -142,7 +144,6 @@ impl TriggerFlowSuccess {
 enum CancelScheduledTasksResult {
     Success(CancelScheduledTasksSuccess),
     NotFound(FlowNotFound),
-    NotScheduled(FlowNotScheduled),
 }
 
 #[derive(SimpleObject)]

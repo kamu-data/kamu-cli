@@ -22,6 +22,8 @@ pub struct LoginCommand {
     output_config: Arc<OutputConfig>,
     scope: odf_server::AccessTokenStoreScope,
     server: Option<Url>,
+    access_token: Option<String>,
+    check: bool,
 }
 
 impl LoginCommand {
@@ -31,6 +33,8 @@ impl LoginCommand {
         output_config: Arc<OutputConfig>,
         scope: odf_server::AccessTokenStoreScope,
         server: Option<Url>,
+        access_token: Option<String>,
+        check: bool,
     ) -> Self {
         Self {
             login_service,
@@ -38,14 +42,29 @@ impl LoginCommand {
             output_config,
             scope,
             server,
+            access_token,
+            check,
         }
     }
 
     fn get_server_url(&self) -> Url {
         self.server
-            .as_ref()
-            .cloned()
+            .clone()
             .unwrap_or_else(|| Url::parse(odf_server::DEFAULT_ODF_FRONTEND_URL).unwrap())
+    }
+
+    fn new_login_with_token(
+        &self,
+        odf_server_frontend_url: &Url,
+        access_token: &str,
+    ) -> Result<(), CLIError> {
+        self.access_token_registry_service.save_access_token(
+            self.scope,
+            odf_server_frontend_url,
+            odf_server_frontend_url,
+            access_token.to_string(),
+        )?;
+        Ok(())
     }
 
     async fn new_login(&self, odf_server_frontend_url: Url) -> Result<(), CLIError> {
@@ -140,9 +159,54 @@ impl LoginCommand {
 
 #[async_trait::async_trait(?Send)]
 impl Command for LoginCommand {
+    fn needs_workspace(&self) -> bool {
+        match self.scope {
+            odf_server::AccessTokenStoreScope::Workspace => true,
+            odf_server::AccessTokenStoreScope::User => false,
+        }
+    }
+
     async fn run(&mut self) -> Result<(), CLIError> {
         let odf_server_frontend_url = self.get_server_url();
 
+        // Check token and exit
+        if self.check {
+            return if let Some(token_find_report) = self
+                .access_token_registry_service
+                .find_by_frontend_url(self.scope, &odf_server_frontend_url)
+            {
+                match self.validate_login(token_find_report).await {
+                    Ok(_) => {
+                        eprintln!(
+                            "{}: {}",
+                            console::style("Access token valid").green().bold(),
+                            odf_server_frontend_url
+                        );
+                        Ok(())
+                    }
+                    Err(odf_server::ValidateAccessTokenError::ExpiredToken(_)) => {
+                        Err(CLIError::usage_error("Access token expired"))
+                    }
+                    Err(odf_server::ValidateAccessTokenError::InvalidToken(_)) => {
+                        Err(CLIError::usage_error("Access token invalid"))
+                    }
+                    Err(odf_server::ValidateAccessTokenError::Internal(e)) => {
+                        Err(CLIError::critical(e))
+                    }
+                }
+            } else {
+                Err(CLIError::usage_error(format!(
+                    "No access token found for: {odf_server_frontend_url}",
+                )))
+            };
+        }
+
+        // Login with existing token
+        if let Some(access_token) = &self.access_token {
+            return self.new_login_with_token(&odf_server_frontend_url, access_token);
+        }
+
+        // Validate token and trigger browser login flow if needed
         if let Some(token_find_report) = self
             .access_token_registry_service
             .find_by_frontend_url(self.scope, &odf_server_frontend_url)

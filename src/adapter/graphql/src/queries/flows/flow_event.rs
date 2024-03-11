@@ -10,7 +10,7 @@
 use chrono::{DateTime, Utc};
 use {event_sourcing as evs, kamu_flow_system as fs, kamu_task_system as ts};
 
-use super::{FlowStartCondition, FlowTrigger};
+use super::FlowTrigger;
 use crate::prelude::*;
 use crate::queries::Task;
 use crate::utils;
@@ -26,9 +26,7 @@ pub enum FlowEvent {
     /// Flow initiated
     Initiated(FlowEventInitiated),
     /// Start condition defined
-    StartConditionDefined(FlowEventStartConditionDefined),
-    /// Queued for time
-    Queued(FlowEventQueued),
+    StartConditionUpdated(FlowEventStartConditionUpdated),
     /// Secondary trigger added
     TriggerAdded(FlowEventTriggerAdded),
     /// Associated task has changed status
@@ -41,10 +39,9 @@ impl FlowEvent {
     pub fn new(event_id: evs::EventID, event: fs::FlowEvent) -> Self {
         match event {
             fs::FlowEvent::Initiated(e) => Self::Initiated(FlowEventInitiated::new(event_id, e)),
-            fs::FlowEvent::StartConditionDefined(e) => {
-                Self::StartConditionDefined(FlowEventStartConditionDefined::new(event_id, &e))
+            fs::FlowEvent::StartConditionUpdated(e) => {
+                Self::StartConditionUpdated(FlowEventStartConditionUpdated::new(event_id, &e))
             }
-            fs::FlowEvent::Queued(e) => Self::Queued(FlowEventQueued::new(event_id, &e)),
             fs::FlowEvent::TriggerAdded(e) => {
                 Self::TriggerAdded(FlowEventTriggerAdded::new(event_id, e))
             }
@@ -93,39 +90,33 @@ impl FlowEventInitiated {
 ///////////////////////////////////////////////////////////////////////////////
 
 #[derive(SimpleObject)]
-pub struct FlowEventStartConditionDefined {
+pub struct FlowEventStartConditionUpdated {
     event_id: EventID,
     event_time: DateTime<Utc>,
-    start_condition: FlowStartCondition,
+    start_condition_kind: FlowStartConditionKind,
 }
 
-impl FlowEventStartConditionDefined {
-    fn new(event_id: evs::EventID, event: &fs::FlowEventStartConditionDefined) -> Self {
+impl FlowEventStartConditionUpdated {
+    fn new(event_id: evs::EventID, event: &fs::FlowEventStartConditionUpdated) -> Self {
         Self {
             event_id: event_id.into(),
             event_time: event.event_time,
-            start_condition: event.start_condition.into(),
+            start_condition_kind: match event.start_condition {
+                fs::FlowStartCondition::Schedule(_) => FlowStartConditionKind::Schedule,
+                fs::FlowStartCondition::Throttling(_) => FlowStartConditionKind::Throttling,
+                fs::FlowStartCondition::Batching(_) => FlowStartConditionKind::Batching,
+                fs::FlowStartCondition::Executor(_) => FlowStartConditionKind::Executor,
+            },
         }
     }
 }
 
-///////////////////////////////////////////////////////////////////////////////
-
-#[derive(SimpleObject)]
-pub struct FlowEventQueued {
-    event_id: EventID,
-    event_time: DateTime<Utc>,
-    activate_at: DateTime<Utc>,
-}
-
-impl FlowEventQueued {
-    fn new(event_id: evs::EventID, event: &fs::FlowEventQueued) -> Self {
-        Self {
-            event_id: event_id.into(),
-            event_time: event.event_time,
-            activate_at: event.activate_at,
-        }
-    }
+#[derive(Enum, Debug, Copy, Clone, PartialEq, Eq)]
+pub enum FlowStartConditionKind {
+    Schedule,
+    Throttling,
+    Batching,
+    Executor,
 }
 
 ///////////////////////////////////////////////////////////////////////////////

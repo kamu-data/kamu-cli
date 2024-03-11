@@ -4,9 +4,90 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.164.2] - 2024-03-07
+### Changed
+- Using `cargo udeps` to detect unused dependencies during linting
 ### Fixed
- - Modeling mistake in Smart Transfer Protocol that creates unexpected push/pull transfer path for metadata blocks
+- Flow history no longer produces duplicate flow abortion events
+- Flow history no longer shows initiation time that is earlier than the next event's time
+
+## [0.164.1] - 2024-03-06
+### Changed:
+- Flow status `Cancelled` was finally replaced with `Aborted`, unifying cancellation types for simplicity
+### Fixed
+- Flow system now pauses flow configuration, even when cancelling an already completed flow
+
+## [0.164.0] - 2024-03-06
+### Added
+- Added support of wildcard patterns for `kamu pull` and `kamu push` commands
+- Added `{dataset}/tail` and `/query` REST API endpoints
+### Changed
+- Optimization of passes through metadata chain with API using Visitors
+
+## [0.163.1] - 2024-03-01
+### Fixed
+- Fixed `mapboxgl` dependency issue in Jupyter image
+
+## [0.163.0] - 2024-03-01
+### Changed
+- Simplified flow statuses within Flow System (no more Queued or Scheduled status)
+- Extended flow start conditions with more debug information for UI needs
+- Simplified flow cancellation API:
+    - Cancelling in Waiting/Running states is accepted, and aborts the flow and it's associated tasks
+    - Cancelling in Waiting/Running states also automatically pauses flow configuration
+
+## [0.162.1] - 2024-02-28
+### Added
+- `kamu system check-token` command for token debugging
+### Fixed
+- `kamu system api-server` startup failure
+
+## [0.162.0] - 2024-02-28
+### Added
+- Flow system now fully supports batching conditions for derived datasets:
+   - not launching excessive flows unless minimal number of input records is accumulated
+   - not waiting on the batching condition over a limit of 24h, if at least something accumulated
+### Fixed
+- `kamu login` no longer requires workspace in `--user` scope (#525)
+- Sync will correctly select smart ODF protocol when pushing/pulling via repository alias (#521)
+- Fixed `kamu verify` crash under verbose logging (#524)
+- Increased default number of results returned by `kamu search` command
+
+## [0.161.0] - 2024-02-26
+### Added
+- `kamu search` command now works with ODF repositories
+
+## [0.160.0] - 2024-02-26
+### Changed
+- Upgraded to latest `datafusion` `v36.0.0`
+- Upgraded to latest `jupyter`
+### Added
+- New `kamu system generate-token` command useful for debugging node interactions
+- New `--check` flag for `kamu login` command to validate token with the remote and exit
+
+## [0.159.0] - 2024-02-16
+### Added
+- New `--exists-ok` flag for `kamu init` command
+### Fixed
+- Ignoring the trailing slash during inference of a dataset name from pull URL
+
+## [0.158.0] - 2024-02-13
+### Added
+- Flows API now reports number of ingested/transformed blocks & records to improve UI informativity
+- Support of `--recursive` flag for `kamu delete` and `kamu verify` commands
+### Changed
+- The state when all flows of the given dataset are paused should be queryable via GraphQL API
+- Added caching of metadata chains to improve performance within transactions
+
+## [0.157.0] - 2024-02-12
+### Added
+- Complete support for `arm64` architecture (including M-series Apple silicon)
+  - `kamu-cli` now depends on multi-platform Datafusion, Spark, Flink, and Jupyter images allowing you to run data processing at native CPU speeds
+### Changed
+- Spark engine is upgraded to latest version of Spark 3.5
+- Spark engine is using [ANSI mode](https://spark.apache.org/docs/latest/sql-ref-ansi-compliance.html) by default which produces helpful errors instead of silently returning `null` in many built-in functions
+### Fixed
+- Modeling mistake in Smart Transfer Protocol that creates unexpected push/pull transfer path for metadata blocks
 
 ## [0.156.3] - 2024-02-09
 ### Added

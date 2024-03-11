@@ -28,19 +28,3 @@ impl FlowNotFound {
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-
-#[derive(SimpleObject)]
-#[graphql(complex)]
-pub(crate) struct FlowNotScheduled {
-    pub flow_id: FlowID,
-}
-
-#[ComplexObject]
-impl FlowNotScheduled {
-    pub async fn message(&self) -> String {
-        let flow_id: fs::FlowID = self.flow_id.into();
-        format!("Flow '{flow_id}' was not scheduled yet")
-    }
-}
-
-///////////////////////////////////////////////////////////////////////////////

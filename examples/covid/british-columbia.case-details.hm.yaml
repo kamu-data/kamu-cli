@@ -1,14 +1,14 @@
 kind: DatasetSnapshot
 version: 1
 content:
-  name: british-columbia.case-details.hm
+  name: covid19.british-columbia.case-details.hm
   kind: Derivative
   # List of metadata events that get dataset into its initial state
   metadata:
     - kind: SetTransform
       # References the datasets that will be used as sources of data.
       inputs:
-        - datasetRef: british-columbia.case-details
+        - datasetRef: covid19.british-columbia.case-details
       # Transformation that will be applied to produce new data
       transform:
         kind: Sql
@@ -30,7 +30,7 @@ content:
                  when age_group = '90+' then '90+'
                  else 'UNKNOWN' end as age_group,
             ha as location
-            FROM "british-columbia.case-details"
+            FROM "covid19.british-columbia.case-details"
     - kind: SetVocab
       eventTimeColumn: reported_date
     - kind: SetInfo

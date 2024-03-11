@@ -9,6 +9,7 @@
 
 #![feature(error_generic_member_access)]
 #![feature(hash_set_entry)]
+#![feature(let_chains)]
 
 // Re-exports
 pub use kamu_task_system as domain;

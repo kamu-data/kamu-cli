@@ -182,7 +182,6 @@ impl TransformServiceImpl {
         Ok(TransformResult::Updated {
             old_head,
             new_head: commit_result.new_head,
-            num_blocks: 1,
         })
     }
 
@@ -203,7 +202,7 @@ impl TransformServiceImpl {
 
         // TODO: externalize
         let block_ref = BlockRef::Head;
-        let head = output_chain.get_ref(&block_ref).await.int_err()?;
+        let head = output_chain.resolve_ref(&block_ref).await.int_err()?;
 
         let mut source = None;
         let mut schema = None;
@@ -374,7 +373,7 @@ impl TransformServiceImpl {
         let last_processed_offset = input_state.and_then(ExecuteTransformInput::last_offset);
 
         // Determine unprocessed block and offset range
-        let last_unprocessed_block = input_chain.get_ref(&BlockRef::Head).await.int_err()?;
+        let last_unprocessed_block = input_chain.resolve_ref(&BlockRef::Head).await.int_err()?;
         let last_unprocessed_offset = input_chain
             .iter_blocks_interval(&last_unprocessed_block, last_processed_block, false)
             .filter_map_ok(|(_, b)| b.into_data_stream_block())
@@ -535,7 +534,7 @@ impl TransformServiceImpl {
         let metadata_chain = dataset.as_metadata_chain();
 
         let head = match block_range.1 {
-            None => metadata_chain.get_ref(&BlockRef::Head).await?,
+            None => metadata_chain.resolve_ref(&BlockRef::Head).await?,
             Some(hash) => hash,
         };
         let tail = block_range.0;
@@ -841,10 +840,10 @@ impl TransformService for TransformServiceImpl {
 
             let ds = dataset.clone();
             let out_event = &mut actual_event;
+
             let result = TransformResult::Updated {
                 old_head: expected_block.prev_block_hash.clone().unwrap(),
                 new_head: block_hash.clone(),
-                num_blocks: 1,
             };
 
             Self::do_transform(

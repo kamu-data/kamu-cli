@@ -14,6 +14,8 @@ use event_bus::EventBus;
 use kamu_core::{PullOptions, PullService, SystemTimeSource};
 use kamu_task_system::*;
 
+/////////////////////////////////////////////////////////////////////////////////////////
+
 pub struct TaskExecutorInMemory {
     task_sched: Arc<dyn TaskScheduler>,
     event_store: Arc<dyn TaskSystemEventStore>,
@@ -21,6 +23,8 @@ pub struct TaskExecutorInMemory {
     time_source: Arc<dyn SystemTimeSource>,
     catalog: Catalog,
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////
 
 #[component(pub)]
 #[interface(dyn TaskExecutor)]
@@ -66,6 +70,8 @@ impl TaskExecutorInMemory {
     }
 }
 
+/////////////////////////////////////////////////////////////////////////////////////////
+
 #[async_trait::async_trait]
 impl TaskExecutor for TaskExecutorInMemory {
     // TODO: Error and panic handling strategy
@@ -87,12 +93,14 @@ impl TaskExecutor for TaskExecutorInMemory {
             let outcome = match &task.logical_plan {
                 LogicalPlan::UpdateDataset(upd) => {
                     let pull_svc = self.catalog.get_one::<dyn PullService>().int_err()?;
-                    let res = pull_svc
+                    let maybe_pull_result = pull_svc
                         .pull(&upd.dataset_id.as_any_ref(), PullOptions::default(), None)
                         .await;
 
-                    match res {
-                        Ok(_) => TaskOutcome::Success,
+                    match maybe_pull_result {
+                        Ok(pull_result) => TaskOutcome::Success(TaskResult::UpdateDatasetResult(
+                            pull_result.into(),
+                        )),
                         Err(_) => TaskOutcome::Failed,
                     }
                 }
@@ -104,7 +112,9 @@ impl TaskExecutor for TaskExecutorInMemory {
                     if let Some(busy_time) = busy_time {
                         tokio::time::sleep(*busy_time).await;
                     }
-                    end_with_outcome.unwrap_or(TaskOutcome::Success)
+                    end_with_outcome
+                        .clone()
+                        .unwrap_or(TaskOutcome::Success(TaskResult::Empty))
                 }
             };
 
@@ -117,10 +127,13 @@ impl TaskExecutor for TaskExecutorInMemory {
 
             // Refresh the task in case it was updated concurrently (e.g. late cancellation)
             task.update(self.event_store.as_ref()).await.int_err()?;
-            task.finish(self.time_source.now(), outcome).int_err()?;
+            task.finish(self.time_source.now(), outcome.clone())
+                .int_err()?;
             task.save(self.event_store.as_ref()).await.int_err()?;
 
             self.publish_task_finished(task.task_id, outcome).await?;
         }
     }
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////

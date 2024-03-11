@@ -77,7 +77,7 @@ pub enum SyncResult {
     Updated {
         old_head: Option<Multihash>,
         new_head: Multihash,
-        num_blocks: usize,
+        num_blocks: u64,
     },
 }
 
@@ -132,6 +132,10 @@ pub struct SyncPartyStats {
     pub data_slices_read: u64,
     /// Number of data files written to the party
     pub data_slices_written: u64,
+    /// Number of data records read from the party
+    pub data_records_read: u64,
+    /// Number of data records written to the party
+    pub data_records_written: u64,
     /// Number of bytes read from the party
     pub bytes_read: u64,
     /// Number of bytes written to the party

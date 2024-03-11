@@ -24,8 +24,8 @@ pub enum TaskStatus {
     Finished,
 }
 
-impl From<ts::TaskStatus> for TaskStatus {
-    fn from(v: ts::TaskStatus) -> Self {
+impl From<&ts::TaskStatus> for TaskStatus {
+    fn from(v: &ts::TaskStatus) -> Self {
         match v {
             ts::TaskStatus::Queued => Self::Queued,
             ts::TaskStatus::Running => Self::Running,
@@ -38,7 +38,6 @@ impl From<ts::TaskStatus> for TaskStatus {
 
 /// Describes a certain final outcome of the task
 #[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
-#[graphql(remote = "ts::TaskOutcome")]
 pub enum TaskOutcome {
     /// Task succeeded
     Success,
@@ -47,3 +46,15 @@ pub enum TaskOutcome {
     /// Task was cancelled by a user
     Cancelled,
 }
+
+impl From<&ts::TaskOutcome> for TaskOutcome {
+    fn from(value: &ts::TaskOutcome) -> Self {
+        match value {
+            ts::TaskOutcome::Success(_) => Self::Success,
+            ts::TaskOutcome::Failed => Self::Failed,
+            ts::TaskOutcome::Cancelled => Self::Cancelled,
+        }
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////

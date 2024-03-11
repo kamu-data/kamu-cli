@@ -32,6 +32,7 @@ deny = [
     { name = "clap", deny-multiple-versions = true },
     { name = "datafusion", deny-multiple-versions = true },
     { name = "object_store", deny-multiple-versions = true },
+    { name = "parquet", deny-multiple-versions = true },
     { name = "prost", deny-multiple-versions = true },
     # { name = "rustls", deny-multiple-versions = true },
     { name = "tokio", deny-multiple-versions = true },

@@ -42,7 +42,7 @@ pub trait VerificationService: Send + Sync {
 // DTOs
 ///////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct VerificationRequest {
     pub dataset_ref: DatasetRef,
     pub block_range: (Option<Multihash>, Option<Multihash>),

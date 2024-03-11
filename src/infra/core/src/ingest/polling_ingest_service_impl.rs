@@ -311,7 +311,6 @@ impl PollingIngestServiceImpl {
                 Ok(PollingIngestResult::Updated {
                     old_head: res.old_head,
                     new_head: res.new_head,
-                    num_blocks: 1,
                     has_more: savepoint.has_more,
                     uncacheable,
                 })
@@ -542,28 +541,22 @@ impl PollingIngestServiceImpl {
             (None | Some(PollingIngestResult::UpToDate { .. }), n) => n,
             (
                 Some(PollingIngestResult::Updated {
-                    old_head,
-                    new_head,
-                    num_blocks,
-                    ..
+                    old_head, new_head, ..
                 }),
                 PollingIngestResult::UpToDate { uncacheable, .. },
             ) => PollingIngestResult::Updated {
                 old_head,
                 new_head,
-                num_blocks,
                 has_more: false,
                 uncacheable,
             },
             (
                 Some(PollingIngestResult::Updated {
                     old_head: prev_old_head,
-                    num_blocks: prev_num_blocks,
                     ..
                 }),
                 PollingIngestResult::Updated {
                     new_head,
-                    num_blocks,
                     has_more,
                     uncacheable,
                     ..
@@ -571,7 +564,6 @@ impl PollingIngestServiceImpl {
             ) => PollingIngestResult::Updated {
                 old_head: prev_old_head,
                 new_head,
-                num_blocks: num_blocks + prev_num_blocks,
                 has_more,
                 uncacheable,
             },

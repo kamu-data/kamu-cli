@@ -93,54 +93,6 @@ impl FlowConfigurationServiceInMemory {
                 .collect()
         }
     }
-
-    async fn pause_flow_configuration(
-        &self,
-        request_time: DateTime<Utc>,
-        flow_key: FlowKey,
-    ) -> Result<(), InternalError> {
-        let maybe_flow_configuration =
-            FlowConfiguration::try_load(flow_key.clone(), self.event_store.as_ref())
-                .await
-                .int_err()?;
-
-        if let Some(mut flow_configuration) = maybe_flow_configuration {
-            flow_configuration.pause(request_time).int_err()?;
-            flow_configuration
-                .save(self.event_store.as_ref())
-                .await
-                .int_err()?;
-
-            self.publish_flow_configuration_modified(&flow_configuration, request_time)
-                .await?;
-        }
-
-        Ok(())
-    }
-
-    async fn resume_flow_configuration(
-        &self,
-        request_time: DateTime<Utc>,
-        flow_key: FlowKey,
-    ) -> Result<(), InternalError> {
-        let maybe_flow_configuration =
-            FlowConfiguration::try_load(flow_key.clone(), self.event_store.as_ref())
-                .await
-                .int_err()?;
-
-        if let Some(mut flow_configuration) = maybe_flow_configuration {
-            flow_configuration.resume(request_time).int_err()?;
-            flow_configuration
-                .save(self.event_store.as_ref())
-                .await
-                .int_err()?;
-
-            self.publish_flow_configuration_modified(&flow_configuration, request_time)
-                .await?;
-        }
-
-        Ok(())
-    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -217,6 +169,56 @@ impl FlowConfigurationService for FlowConfigurationServiceInMemory {
                 }
             }
         })
+    }
+
+    /// Pauses particular flow configuration
+    async fn pause_flow_configuration(
+        &self,
+        request_time: DateTime<Utc>,
+        flow_key: FlowKey,
+    ) -> Result<(), InternalError> {
+        let maybe_flow_configuration =
+            FlowConfiguration::try_load(flow_key.clone(), self.event_store.as_ref())
+                .await
+                .int_err()?;
+
+        if let Some(mut flow_configuration) = maybe_flow_configuration {
+            flow_configuration.pause(request_time).int_err()?;
+            flow_configuration
+                .save(self.event_store.as_ref())
+                .await
+                .int_err()?;
+
+            self.publish_flow_configuration_modified(&flow_configuration, request_time)
+                .await?;
+        }
+
+        Ok(())
+    }
+
+    /// Resumes particular flow configuration
+    async fn resume_flow_configuration(
+        &self,
+        request_time: DateTime<Utc>,
+        flow_key: FlowKey,
+    ) -> Result<(), InternalError> {
+        let maybe_flow_configuration =
+            FlowConfiguration::try_load(flow_key.clone(), self.event_store.as_ref())
+                .await
+                .int_err()?;
+
+        if let Some(mut flow_configuration) = maybe_flow_configuration {
+            flow_configuration.resume(request_time).int_err()?;
+            flow_configuration
+                .save(self.event_store.as_ref())
+                .await
+                .int_err()?;
+
+            self.publish_flow_configuration_modified(&flow_configuration, request_time)
+                .await?;
+        }
+
+        Ok(())
     }
 
     /// Pauses dataset flows of given type for given dataset.

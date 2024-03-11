@@ -12,8 +12,6 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FlowStatus {
     Waiting,
-    Queued,
-    Scheduled,
     Running,
     Finished,
 }

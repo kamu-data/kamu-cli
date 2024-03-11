@@ -10,9 +10,10 @@
 use std::str::FromStr;
 
 use opendatafabric::*;
+use url::Url;
 
 #[test]
-fn test_dataset_ref_patterns() {
+fn test_dataset_ref_pattern() {
     // Parse valid local dataset_ref
     let param = "net.example.com";
     let res = DatasetRefPattern::from_str(param).unwrap();
@@ -55,7 +56,10 @@ fn test_dataset_ref_patterns() {
 
     assert_eq!(
         res,
-        DatasetRefPattern::Pattern(None, DatasetNamePattern::from_str(param).unwrap()),
+        DatasetRefPattern::Pattern(DatasetAliasPattern {
+            account_name: None,
+            dataset_name_pattern: DatasetNamePattern::from_str(param).unwrap()
+        }),
     );
 
     // Parse valid multitenant local ref with wildcard account/%
@@ -65,10 +69,10 @@ fn test_dataset_ref_patterns() {
 
     assert_eq!(
         res,
-        DatasetRefPattern::Pattern(
-            Some(AccountName::from_str(account).unwrap()),
-            DatasetNamePattern::from_str(pattern).unwrap(),
-        ),
+        DatasetRefPattern::Pattern(DatasetAliasPattern {
+            account_name: Some(AccountName::from_str(account).unwrap()),
+            dataset_name_pattern: DatasetNamePattern::from_str(pattern).unwrap(),
+        }),
     );
 }
 
@@ -90,7 +94,7 @@ fn test_dataset_ref_pattern_match() {
         },
     };
 
-    assert!(!pattern.is_match(&dataset_handle));
+    assert!(!pattern.matches(&dataset_handle));
 
     let dataset_name = "net.example.odf";
     let dataset_handle = DatasetHandle {
@@ -101,7 +105,7 @@ fn test_dataset_ref_pattern_match() {
         },
     };
 
-    assert!(pattern.is_match(&dataset_handle));
+    assert!(pattern.matches(&dataset_handle));
 
     let dataset_name = "net.example.odf";
     let dataset_account = "account1";
@@ -113,7 +117,7 @@ fn test_dataset_ref_pattern_match() {
         },
     };
 
-    assert!(pattern.is_match(&dataset_handle));
+    assert!(pattern.matches(&dataset_handle));
 
     let dataset_account = "account1";
     let dataset_name_pattern = "net%";
@@ -129,7 +133,7 @@ fn test_dataset_ref_pattern_match() {
         },
     };
 
-    assert!(pattern.is_match(&dataset_handle));
+    assert!(pattern.matches(&dataset_handle));
 
     let dataset_account = "account2";
     let dataset_handle = DatasetHandle {
@@ -140,7 +144,7 @@ fn test_dataset_ref_pattern_match() {
         },
     };
 
-    assert!(!pattern.is_match(&dataset_handle));
+    assert!(!pattern.matches(&dataset_handle));
 
     // Test match of DatasetRefPattern is Ref type
     let pattern = DatasetRefPattern::from_str(dataset_id_str).unwrap();
@@ -153,7 +157,7 @@ fn test_dataset_ref_pattern_match() {
         },
     };
 
-    assert!(pattern.is_match(&dataset_handle));
+    assert!(pattern.matches(&dataset_handle));
 
     let expression = "net.example.com";
     let pattern = DatasetRefPattern::from_str(expression).unwrap();
@@ -164,5 +168,109 @@ fn test_dataset_ref_pattern_match() {
             dataset_name: DatasetName::from_str(expression).unwrap(),
         },
     };
-    assert!(pattern.is_match(&dataset_handle));
+    assert!(pattern.matches(&dataset_handle));
+}
+
+#[test]
+fn test_dataset_ref_any_pattern() {
+    // Parse valid local dataset_ref
+    let param = "net.example.com";
+    let res = DatasetRefAnyPattern::from_str(param).unwrap();
+
+    assert_eq!(
+        res,
+        DatasetRefAnyPattern::Ref(DatasetRefAny::LocalAlias(
+            None,
+            DatasetName::new_unchecked(param)
+        ))
+    );
+
+    // Parse valid ambiguous dataset_ref
+    let account_name = "account";
+    let dataset_name = "net.example.com";
+    let param = format!("{account_name}/{dataset_name}");
+    let res = DatasetRefAnyPattern::from_str(&param).unwrap();
+
+    assert_eq!(
+        res,
+        DatasetRefAnyPattern::Ref(DatasetRefAny::AmbiguousAlias(
+            account_name.into(),
+            DatasetName::new_unchecked(dataset_name)
+        ))
+    );
+
+    // Parse valid local did reference
+    let param = "did:odf:fed012126262ba49e1ba8392c26f7a39e1ba8d756c7469786d3365200c68402ff65dc";
+    let res = DatasetRefAnyPattern::from_str(param).unwrap();
+
+    assert_eq!(
+        res,
+        DatasetRefAnyPattern::Ref(DatasetRefAny::ID(
+            None,
+            DatasetID::from_did_str(param).unwrap()
+        ))
+    );
+
+    // Parse valid remote url reference
+    let param = "https://example.com";
+    let res = DatasetRefAnyPattern::from_str(param).unwrap();
+
+    assert_eq!(
+        res,
+        DatasetRefAnyPattern::Ref(DatasetRefAny::Url(Url::from_str(param).unwrap().into()))
+    );
+
+    // Parse invalid local dataset_ref
+    let param = "invalid_ref^";
+    let res = DatasetRefAnyPattern::from_str(param).unwrap_err();
+
+    assert_eq!(
+        res.to_string(),
+        format!("Value '{param}' is not a valid DatasetRefAnyPattern"),
+    );
+
+    // Parse valid local ref with wildcard net.example.%
+    let param = "net.example.%";
+    let res = DatasetRefAnyPattern::from_str(param).unwrap();
+
+    assert_eq!(
+        res,
+        DatasetRefAnyPattern::PatternLocal(DatasetNamePattern::from_str(param).unwrap()),
+    );
+
+    // Parse valid remote ambiguous ref with wildcard repo/net.example.%
+    let repo_name = "repo";
+    let dataset_name = "net.example.%";
+    let param = format!("{repo_name}/{dataset_name}");
+
+    let res = DatasetRefAnyPattern::from_str(&param).unwrap();
+
+    assert_eq!(
+        res,
+        DatasetRefAnyPattern::PatternAmbiguous(
+            DatasetAmbiguousPattern {
+                pattern: DatasetNamePattern::from_str(repo_name)
+                    .unwrap()
+                    .into_inner(),
+            },
+            DatasetNamePattern::from_str(dataset_name).unwrap()
+        ),
+    );
+
+    // Parse valid remote ref with repo and account wildcard repo/net.example.%
+    let repo_name = "repo";
+    let account_name = "account";
+    let dataset_name = "net.example.%";
+    let param = format!("{repo_name}/{account_name}/{dataset_name}");
+
+    let res = DatasetRefAnyPattern::from_str(&param).unwrap();
+
+    assert_eq!(
+        res,
+        DatasetRefAnyPattern::PatternRemote(
+            RepoName::new_unchecked(repo_name),
+            AccountName::new_unchecked(account_name),
+            DatasetNamePattern::from_str(dataset_name).unwrap()
+        ),
+    );
 }

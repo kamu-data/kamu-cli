@@ -167,7 +167,6 @@ pub enum PullResult {
     Updated {
         old_head: Option<Multihash>,
         new_head: Multihash,
-        num_blocks: usize,
     },
 }
 
@@ -176,14 +175,10 @@ impl From<PollingIngestResult> for PullResult {
         match other {
             PollingIngestResult::UpToDate { .. } => PullResult::UpToDate,
             PollingIngestResult::Updated {
-                old_head,
-                new_head,
-                num_blocks,
-                ..
+                old_head, new_head, ..
             } => PullResult::Updated {
                 old_head: Some(old_head),
                 new_head,
-                num_blocks,
             },
         }
     }
@@ -193,14 +188,9 @@ impl From<TransformResult> for PullResult {
     fn from(other: TransformResult) -> Self {
         match other {
             TransformResult::UpToDate => PullResult::UpToDate,
-            TransformResult::Updated {
-                old_head,
-                new_head,
-                num_blocks,
-            } => PullResult::Updated {
+            TransformResult::Updated { old_head, new_head } => PullResult::Updated {
                 old_head: Some(old_head),
                 new_head,
-                num_blocks,
             },
         }
     }
@@ -211,14 +201,8 @@ impl From<SyncResult> for PullResult {
         match other {
             SyncResult::UpToDate => PullResult::UpToDate,
             SyncResult::Updated {
-                old_head,
-                new_head,
-                num_blocks,
-            } => PullResult::Updated {
-                old_head,
-                new_head,
-                num_blocks,
-            },
+                old_head, new_head, ..
+            } => PullResult::Updated { old_head, new_head },
         }
     }
 }

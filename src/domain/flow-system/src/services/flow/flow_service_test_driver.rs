@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use chrono::{DateTime, Utc};
 use internal_error::InternalError;
 use kamu_task_system::TaskID;
 
@@ -20,7 +21,11 @@ pub trait FlowServiceTestDriver: Sync + Send {
     fn mimic_running_started(&self);
 
     /// Pretends it is time to schedule the given flow that was in Queued state
-    async fn mimic_flow_scheduled(&self, flow_id: FlowID) -> Result<TaskID, InternalError>;
+    async fn mimic_flow_scheduled(
+        &self,
+        flow_id: FlowID,
+        schedule_time: DateTime<Utc>,
+    ) -> Result<TaskID, InternalError>;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

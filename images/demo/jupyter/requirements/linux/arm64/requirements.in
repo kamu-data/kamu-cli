@@ -1,0 +1,21 @@
+# TODO: Pinned due to sparkmagic installation issue
+# See: https://github.com/jupyter-incubator/sparkmagic/issues/825
+# See workaround applied in: https://github.com/jupyter-incubator/sparkmagic/blob/master/Dockerfile.jupyter
+notebook==6.5.5
+
+sparkmagic
+
+pandas
+geopandas
+geojson
+xarray
+netcdf4
+dask
+
+bokeh
+hvplot
+pandas-bokeh
+folium
+altair
+mapboxgl
+shapely
