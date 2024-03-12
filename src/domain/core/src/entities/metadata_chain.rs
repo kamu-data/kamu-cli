@@ -418,6 +418,15 @@ impl From<GetBlockError> for IterBlocksError {
     }
 }
 
+impl From<IterBlocksError> for InternalError {
+    fn from(v: IterBlocksError) -> Self {
+        match v {
+            IterBlocksError::Internal(e) => e,
+            e @ _ => e.int_err(),
+        }
+    }
+}
+
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
