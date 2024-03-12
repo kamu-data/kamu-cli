@@ -40,6 +40,15 @@ pub enum FlowResult {
     DatasetUpdate(FlowResultDatasetUpdate),
 }
 
+impl FlowResult {
+    pub fn is_empty(&self) -> bool {
+        match self {
+            FlowResult::Empty => true,
+            FlowResult::DatasetUpdate(_) => false,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FlowResultDatasetUpdate {
     pub old_head: Option<Multihash>,
