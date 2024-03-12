@@ -17,6 +17,7 @@ use opendatafabric::{
     Multihash,
     Seed,
     SetPollingSource,
+    SetTransform,
     SetVocab,
     VariantOf,
 };
@@ -35,6 +36,8 @@ pub type SearchSetVocabVisitor<E> =
 pub type SearchSeedVisitor<E> = SearchSingleTypedBlockVisitor<Seed, E, { Flag::SEED.bits() }>;
 pub type SearchSetPollingSourceVisitor<E> =
     SearchSingleTypedBlockVisitor<SetPollingSource, E, { Flag::SET_POLLING_SOURCE.bits() }>;
+pub type SearchSetTransformVisitor<E> =
+    SearchSingleTypedBlockVisitor<SetTransform, E, { Flag::SET_TRANSFORM.bits() }>;
 
 ///////////////////////////////////////////////////////////////////////////////
 

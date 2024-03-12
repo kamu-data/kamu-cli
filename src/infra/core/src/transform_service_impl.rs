@@ -19,8 +19,6 @@ use kamu_core::*;
 use kamu_ingest_datafusion::DataWriterDataFusion;
 use opendatafabric::*;
 
-use crate::SearchSetVocabVisitor;
-
 pub struct TransformServiceImpl {
     dataset_repo: Arc<dyn DatasetRepository>,
     dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
@@ -735,15 +733,15 @@ impl TransformService for TransformServiceImpl {
         dataset_ref: &DatasetRef,
     ) -> Result<Option<(Multihash, MetadataBlockTyped<SetTransform>)>, GetDatasetError> {
         let dataset = self.dataset_repo.get_dataset(dataset_ref).await?;
+        let mut visitor = SearchSetTransformVisitor::<InternalError>::default();
+
+        dataset
+            .as_metadata_chain()
+            .accept(&mut [&mut visitor])
+            .await?;
 
         // TODO: Support transform evolution
-        let source = dataset
-            .as_metadata_chain()
-            .iter_blocks()
-            .filter_map_ok(|(h, b)| b.into_typed::<SetTransform>().map(|b| (h, b)))
-            .try_first()
-            .await
-            .int_err()?;
+        let source = visitor.into_found_hashed_block();
 
         Ok(source)
     }
