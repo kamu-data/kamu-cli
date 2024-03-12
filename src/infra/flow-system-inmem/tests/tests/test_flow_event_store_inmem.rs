@@ -844,16 +844,20 @@ async fn make_dataset_test_flows(
         DatasetFlowGenerator::new(dataset_id, flow_event_store.clone(), task_event_store);
 
     let wasya_manual_trigger = FlowTrigger::Manual(FlowTriggerManual {
+        trigger_time: Utc::now(),
         initiator_account_id: FAKE_ACCOUNT_ID.to_string(),
         initiator_account_name: AccountName::new_unchecked("wasya"),
     });
 
     let petya_manual_trigger = FlowTrigger::Manual(FlowTriggerManual {
+        trigger_time: Utc::now(),
         initiator_account_id: FAKE_ACCOUNT_ID.to_string(),
         initiator_account_name: AccountName::new_unchecked("petya"),
     });
 
-    let automatic_trigger = FlowTrigger::AutoPolling(FlowTriggerAutoPolling {});
+    let automatic_trigger = FlowTrigger::AutoPolling(FlowTriggerAutoPolling {
+        trigger_time: Utc::now(),
+    });
 
     let flow_id_waiting = flow_generator
         .make_new_flow(dataset_flow_type, FlowStatus::Waiting, petya_manual_trigger)
@@ -880,16 +884,20 @@ async fn make_system_test_flows(
     let flow_generator = SystemFlowGenerator::new(flow_event_store.clone(), task_event_store);
 
     let wasya_manual_trigger = FlowTrigger::Manual(FlowTriggerManual {
+        trigger_time: Utc::now(),
         initiator_account_id: FAKE_ACCOUNT_ID.to_string(),
         initiator_account_name: AccountName::new_unchecked("wasya"),
     });
 
     let petya_manual_trigger = FlowTrigger::Manual(FlowTriggerManual {
+        trigger_time: Utc::now(),
         initiator_account_id: FAKE_ACCOUNT_ID.to_string(),
         initiator_account_name: AccountName::new_unchecked("petya"),
     });
 
-    let automatic_trigger = FlowTrigger::AutoPolling(FlowTriggerAutoPolling {});
+    let automatic_trigger = FlowTrigger::AutoPolling(FlowTriggerAutoPolling {
+        trigger_time: Utc::now(),
+    });
 
     let flow_id_waiting = flow_generator
         .make_new_flow(system_flow_type, FlowStatus::Waiting, petya_manual_trigger)
@@ -984,7 +992,6 @@ impl<'a> DatasetFlowGenerator<'a> {
 
         let mut flow = Flow::new(
             creation_moment,
-            creation_moment,
             flow_id,
             FlowKeyDataset {
                 dataset_id: self.dataset_id.clone(),
@@ -1031,7 +1038,6 @@ impl SystemFlowGenerator {
         let creation_moment = Utc::now();
 
         let mut flow = Flow::new(
-            creation_moment,
             creation_moment,
             flow_id,
             FlowKey::System(FlowKeySystem { flow_type }),

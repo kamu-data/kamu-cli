@@ -6,7 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Fixed
-= Zero value handling for `per_page` value in GraphQL
+- Zero value handling for `per_page` value in GraphQL
+- Flow history: more corrections to show natural time of flow events and keep flow system testable
 
 ## [0.164.2] - 2024-03-07
 ### Changed

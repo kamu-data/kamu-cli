@@ -35,8 +35,6 @@ pub struct FlowState {
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct FlowTimingRecords {
-    /// Creation time
-    pub created_at: DateTime<Utc>,
     /// Task scheduled and awaiting for exeuction since time
     pub awaiting_executor_since: Option<DateTime<Utc>>,
     /// Started running at time
@@ -105,7 +103,6 @@ impl Projection for FlowState {
             (None, event) => match event {
                 E::Initiated(FlowEventInitiated {
                     event_time: _,
-                    trigger_time,
                     flow_id,
                     flow_key,
                     trigger,
@@ -115,7 +112,6 @@ impl Projection for FlowState {
                     triggers: vec![trigger],
                     start_condition: None,
                     timing: FlowTimingRecords {
-                        created_at: trigger_time,
                         awaiting_executor_since: None,
                         running_since: None,
                         finished_at: None,
