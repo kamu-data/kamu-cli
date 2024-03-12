@@ -1055,7 +1055,9 @@ impl AsyncEventHandler<TaskEventFinished> for FlowServiceInMemory {
 
             // In case of success:
             //  - execute followup method
-            if let Some(flow_result) = flow.try_result_as_ref() {
+            if let Some(flow_result) = flow.try_result_as_ref()
+                && !flow_result.is_empty()
+            {
                 match flow.flow_key.get_type().success_followup_method() {
                     FlowSuccessFollowupMethod::Ignore => {}
                     FlowSuccessFollowupMethod::TriggerDependent => {

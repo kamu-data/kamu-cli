@@ -51,6 +51,7 @@ impl Flow {
                 event_time: now,
                 flow_id: self.flow_id,
                 start_condition,
+                last_trigger_index: self.triggers.len(),
             };
             self.apply(event)
         } else {

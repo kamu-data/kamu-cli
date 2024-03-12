@@ -771,7 +771,7 @@ type FlowEventInitiated implements FlowEvent {
 type FlowEventStartConditionUpdated implements FlowEvent {
 	eventId: EventID!
 	eventTime: DateTime!
-	startConditionKind: FlowStartConditionKind!
+	startCondition: FlowStartCondition!
 }
 
 type FlowEventTaskChanged implements FlowEvent {
@@ -825,13 +825,6 @@ type FlowStartConditionExecutor {
 	taskId: TaskID!
 }
 
-enum FlowStartConditionKind {
-	SCHEDULE
-	THROTTLING
-	BATCHING
-	EXECUTOR
-}
-
 type FlowStartConditionSchedule {
 	wakeUpAt: DateTime!
 }
@@ -871,7 +864,7 @@ type FlowTriggerAutoPolling {
 }
 
 type FlowTriggerInputDatasetFlow {
-	datasetId: DatasetID!
+	dataset: Dataset!
 	flowType: DatasetFlowType!
 	flowId: FlowID!
 }
