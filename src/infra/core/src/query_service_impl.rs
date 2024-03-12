@@ -26,7 +26,6 @@ use kamu_core::*;
 use opendatafabric::*;
 
 use crate::utils::docker_images;
-use crate::SearchSetVocabVisitor;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 

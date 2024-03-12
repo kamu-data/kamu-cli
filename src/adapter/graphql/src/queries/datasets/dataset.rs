@@ -9,8 +9,7 @@
 
 use chrono::prelude::*;
 use futures::TryStreamExt;
-use kamu::SearchSeedVisitor;
-use kamu_core::{self as domain, MetadataChainExt, TryStreamExtExt};
+use kamu_core::{self as domain, MetadataChainExt, SearchSeedVisitor, TryStreamExtExt};
 use opendatafabric as odf;
 
 use crate::prelude::*;
