@@ -52,30 +52,35 @@ pub struct DataWriterDataFusionMetaDataStateVisitor<'a> {
 }
 
 impl<'a> DataWriterDataFusionMetaDataStateVisitor<'a> {
-    pub fn new(head: Multihash, maybe_source_name: Option<&'a str>) -> Self {
-        Self {
-            head,
-            maybe_source_name,
+    pub fn new(head: Multihash, maybe_source_name: Option<&'a str>) -> (Decision, Self) {
+        let next_block_flags = Flag::SET_DATA_SCHEMA
+            | Flag::ADD_DATA
+            | Flag::SET_POLLING_SOURCE
+            | Flag::DISABLE_POLLING_SOURCE
+            | Flag::ADD_PUSH_SOURCE
+            | Flag::DISABLE_PUSH_SOURCE
+            | Flag::SET_VOCAB
+            | Flag::SEED;
 
-            next_block_flags: Flag::SET_DATA_SCHEMA
-                | Flag::ADD_DATA
-                | Flag::SET_POLLING_SOURCE
-                | Flag::DISABLE_POLLING_SOURCE
-                | Flag::ADD_PUSH_SOURCE
-                | Flag::DISABLE_PUSH_SOURCE
-                | Flag::SET_VOCAB
-                | Flag::SEED,
-            data_slices: Vec::new(),
+        (
+            Decision::NextOfType(next_block_flags),
+            Self {
+                head,
+                maybe_source_name,
 
-            maybe_schema: None,
-            maybe_source_event: None,
-            maybe_set_vocab: None,
+                next_block_flags,
+                data_slices: Vec::new(),
 
-            maybe_prev_checkpoint: None,
-            maybe_prev_watermark: None,
-            maybe_prev_source_state: None,
-            maybe_prev_offset: None,
-        }
+                maybe_schema: None,
+                maybe_source_event: None,
+                maybe_set_vocab: None,
+
+                maybe_prev_checkpoint: None,
+                maybe_prev_watermark: None,
+                maybe_prev_source_state: None,
+                maybe_prev_offset: None,
+            },
+        )
     }
 
     pub fn get_metadata_state(self) -> Result<DataWriterMetadataState, ScanMetadataError> {
