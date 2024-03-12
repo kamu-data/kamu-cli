@@ -218,9 +218,6 @@ impl PushService for PushServiceImpl {
         if options.recursive {
             unimplemented!("Recursive push is not yet supported")
         }
-        if options.all {
-            unimplemented!("Pushing all datasets is not yet supported")
-        }
 
         let (plan, errors) = self.collect_plan(&initial_requests).await;
         if !errors.is_empty() {

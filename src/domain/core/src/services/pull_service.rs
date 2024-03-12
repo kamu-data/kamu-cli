@@ -122,8 +122,6 @@ impl Default for PullOptions {
 pub struct PullMultiOptions {
     /// Pull all dataset dependencies recursively in depth-first order
     pub recursive: bool,
-    /// Pull all known datasets
-    pub all: bool,
     /// Whether the datasets pulled from remotes should be permanently
     /// associated with them
     pub add_aliases: bool,
@@ -137,7 +135,6 @@ impl Default for PullMultiOptions {
     fn default() -> Self {
         Self {
             recursive: false,
-            all: false,
             add_aliases: true,
             ingest_options: PollingIngestOptions::default(),
             sync_options: SyncOptions::default(),

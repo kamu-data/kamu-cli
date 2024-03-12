@@ -29,6 +29,7 @@ pub struct PullCommand {
     search_svc: Arc<dyn SearchService>,
     output_config: Arc<OutputConfig>,
     refs: Vec<DatasetRefAnyPattern>,
+    current_account_subject: Arc<CurrentAccountSubject>,
     all: bool,
     recursive: bool,
     fetch_uncacheable: bool,
@@ -44,6 +45,7 @@ impl PullCommand {
         search_svc: Arc<dyn SearchService>,
         output_config: Arc<OutputConfig>,
         refs: I,
+        current_account_subject: Arc<CurrentAccountSubject>,
         all: bool,
         recursive: bool,
         fetch_uncacheable: bool,
@@ -60,6 +62,7 @@ impl PullCommand {
             search_svc,
             output_config,
             refs: refs.into_iter().collect(),
+            current_account_subject,
             all,
             recursive,
             fetch_uncacheable,
@@ -104,11 +107,14 @@ impl PullCommand {
     async fn pull_multi(
         &self,
         listener: Option<Arc<dyn PullMultiListener>>,
+        current_account_name: Option<AccountName>,
     ) -> Result<Vec<PullResponse>, CLIError> {
         let dataset_refs: Vec<_> = filter_datasets_by_any_pattern(
             self.dataset_repo.as_ref(),
             self.search_svc.clone(),
             self.refs.clone(),
+            current_account_name,
+            self.all,
         )
         .try_collect()
         .await?;
@@ -119,7 +125,6 @@ impl PullCommand {
                 dataset_refs,
                 PullMultiOptions {
                     recursive: self.recursive,
-                    all: self.all,
                     add_aliases: self.add_aliases,
                     ingest_options: PollingIngestOptions {
                         fetch_uncacheable: self.fetch_uncacheable,
@@ -135,21 +140,25 @@ impl PullCommand {
             .await?)
     }
 
-    async fn pull_with_progress(&self) -> Result<Vec<PullResponse>, CLIError> {
+    async fn pull_with_progress(
+        &self,
+        current_account_name: Option<AccountName>,
+    ) -> Result<Vec<PullResponse>, CLIError> {
         let pull_progress =
             PrettyPullProgress::new(self.fetch_uncacheable, self.dataset_repo.is_multi_tenant());
         let listener = Arc::new(pull_progress.clone());
-        self.pull(Some(listener)).await
+        self.pull(Some(listener), current_account_name).await
     }
 
     async fn pull(
         &self,
         listener: Option<Arc<dyn PullMultiListener>>,
+        current_account_name: Option<AccountName>,
     ) -> Result<Vec<PullResponse>, CLIError> {
         if self.as_name.is_some() {
             self.sync_from(listener).await
         } else {
-            self.pull_multi(listener).await
+            self.pull_multi(listener, current_account_name).await
         }
     }
 
@@ -186,14 +195,26 @@ impl Command for PullCommand {
                 "Invalid combination of arguments".to_owned(),
             )),
         }?;
+        let account_name = if self.dataset_repo.is_multi_tenant() {
+            match self.current_account_subject.as_ref() {
+                CurrentAccountSubject::Anonymous(_) => {
+                    return Err(CLIError::usage_error(
+                        "Anonymous account misused, use multi-tenant alias",
+                    ))
+                }
+                CurrentAccountSubject::Logged(l) => Some(l.account_name.clone()),
+            }
+        } else {
+            None
+        };
 
         let pull_results = if self.output_config.is_tty
             && self.output_config.verbosity_level == 0
             && !self.output_config.quiet
         {
-            self.pull_with_progress().await?
+            self.pull_with_progress(account_name).await?
         } else {
-            self.pull(None).await?
+            self.pull(None, account_name).await?
         };
 
         let mut updated = 0;

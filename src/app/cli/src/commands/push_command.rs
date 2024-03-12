@@ -93,7 +93,6 @@ impl PushCommand {
                         remote_ref: Some(remote_ref.clone()),
                     }],
                     PushMultiOptions {
-                        all: self.all,
                         recursive: self.recursive,
                         add_aliases: self.add_aliases,
                         sync_options: self.sync_options(),
@@ -106,6 +105,8 @@ impl PushCommand {
                 self.dataset_repo.as_ref(),
                 self.search_svc.clone(),
                 self.refs.clone(),
+                None,
+                self.all,
             )
             .try_collect()
             .await?;
@@ -115,7 +116,6 @@ impl PushCommand {
                 .push_multi(
                     dataset_refs,
                     PushMultiOptions {
-                        all: self.all,
                         recursive: self.recursive,
                         add_aliases: self.add_aliases,
                         sync_options: self.sync_options(),
@@ -145,6 +145,11 @@ impl Command for PushCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
         if self.refs.is_empty() && !self.all {
             return Err(CLIError::usage_error("Specify a dataset or pass --all"));
+        }
+        if self.all {
+            return Err(CLIError::usage_error(
+                "Pushing all datasets is not yet supported",
+            ));
         }
 
         if self.refs.len() > 1 && self.to.is_some() {
