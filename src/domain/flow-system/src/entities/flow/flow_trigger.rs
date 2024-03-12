@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use chrono::{DateTime, Utc};
 use opendatafabric::{AccountID, AccountName, DatasetID};
 
 use crate::*;
@@ -22,6 +23,15 @@ pub enum FlowTrigger {
 }
 
 impl FlowTrigger {
+    pub fn trigger_time(&self) -> DateTime<Utc> {
+        match self {
+            Self::Manual(t) => t.trigger_time,
+            Self::AutoPolling(t) => t.trigger_time,
+            Self::Push(t) => t.trigger_time,
+            Self::InputDatasetFlow(t) => t.trigger_time,
+        }
+    }
+
     pub fn initiator_account_name(&self) -> Option<&AccountName> {
         if let FlowTrigger::Manual(manual) = self {
             Some(&manual.initiator_account_name)
@@ -70,6 +80,7 @@ impl FlowTrigger {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FlowTriggerManual {
+    pub trigger_time: DateTime<Utc>,
     pub initiator_account_id: AccountID,
     pub initiator_account_name: AccountName,
 }
@@ -77,20 +88,24 @@ pub struct FlowTriggerManual {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct FlowTriggerAutoPolling {}
+pub struct FlowTriggerAutoPolling {
+    pub trigger_time: DateTime<Utc>,
+}
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FlowTriggerPush {
     // TODO: source (HTTP, MQTT, CMD, ...)
-    source_name: Option<String>,
+    pub trigger_time: DateTime<Utc>,
+    pub source_name: Option<String>,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FlowTriggerInputDatasetFlow {
+    pub trigger_time: DateTime<Utc>,
     pub dataset_id: DatasetID,
     pub flow_type: DatasetFlowType,
     pub flow_id: FlowID,
@@ -116,15 +131,21 @@ mod tests {
     lazy_static! {
         static ref TEST_DATASET_ID: DatasetID = DatasetID::new_seeded_ed25519(b"test");
         static ref AUTO_POLLING_TRIGGER: FlowTrigger =
-            FlowTrigger::AutoPolling(FlowTriggerAutoPolling {});
+            FlowTrigger::AutoPolling(FlowTriggerAutoPolling {
+                trigger_time: Utc::now(),
+            });
         static ref MANUAL_TRIGGER: FlowTrigger = FlowTrigger::Manual(FlowTriggerManual {
+            trigger_time: Utc::now(),
             initiator_account_id: String::from(FAKE_ACCOUNT_ID),
             initiator_account_name: AccountName::new_unchecked(DEFAULT_ACCOUNT_NAME),
         });
-        static ref PUSH_SOURCE_TRIGGER: FlowTrigger =
-            FlowTrigger::Push(FlowTriggerPush { source_name: None });
+        static ref PUSH_SOURCE_TRIGGER: FlowTrigger = FlowTrigger::Push(FlowTriggerPush {
+            trigger_time: Utc::now(),
+            source_name: None
+        });
         static ref INPUT_DATASET_TRIGGER: FlowTrigger =
             FlowTrigger::InputDatasetFlow(FlowTriggerInputDatasetFlow {
+                trigger_time: Utc::now(),
                 dataset_id: TEST_DATASET_ID.clone(),
                 flow_type: DatasetFlowType::Ingest,
                 flow_id: FlowID::new(5),
@@ -158,6 +179,7 @@ mod tests {
 
         assert!(
             MANUAL_TRIGGER.is_unique_vs(&[FlowTrigger::Manual(FlowTriggerManual {
+                trigger_time: Utc::now(),
                 initiator_account_id: String::from("23456"),
                 initiator_account_name: AccountName::new_unchecked("different"),
             })])
@@ -177,6 +199,7 @@ mod tests {
 
         assert!(
             PUSH_SOURCE_TRIGGER.is_unique_vs(&[FlowTrigger::Push(FlowTriggerPush {
+                trigger_time: Utc::now(),
                 source_name: Some("different".to_string())
             })])
         );
@@ -197,6 +220,7 @@ mod tests {
         assert!(
             INPUT_DATASET_TRIGGER.is_unique_vs(&[FlowTrigger::InputDatasetFlow(
                 FlowTriggerInputDatasetFlow {
+                    trigger_time: Utc::now(),
                     dataset_id: TEST_DATASET_ID.clone(),
                     flow_type: DatasetFlowType::Compaction, // unrelated
                     flow_id: FlowID::new(7),
@@ -209,6 +233,7 @@ mod tests {
         assert!(
             INPUT_DATASET_TRIGGER.is_unique_vs(&[FlowTrigger::InputDatasetFlow(
                 FlowTriggerInputDatasetFlow {
+                    trigger_time: Utc::now(),
                     dataset_id: DatasetID::new_seeded_ed25519(b"different"),
                     flow_type: DatasetFlowType::Ingest,
                     flow_id: FlowID::new(7),
