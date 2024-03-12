@@ -19,6 +19,8 @@ use kamu_core::*;
 use kamu_ingest_datafusion::DataWriterDataFusion;
 use opendatafabric::*;
 
+use crate::SearchSetVocabVisitor;
+
 pub struct TransformServiceImpl {
     dataset_repo: Arc<dyn DatasetRepository>,
     dataset_action_authorizer: Arc<dyn auth::DatasetActionAuthorizer>,
@@ -508,14 +510,16 @@ impl TransformServiceImpl {
         dataset_ref: &DatasetRef,
     ) -> Result<DatasetVocabulary, InternalError> {
         let dataset = self.dataset_repo.get_dataset(dataset_ref).await.int_err()?;
-        Ok(dataset
+        let mut search_set_vocab_visitor = SearchSetVocabVisitor::<InternalError>::default();
+
+        dataset
             .as_metadata_chain()
-            .iter_blocks()
-            .filter_map_ok(|(_, b)| b.event.into_variant::<SetVocab>())
-            .try_first()
-            .await
-            .int_err()?
-            .unwrap_or_default()
+            .accept(&mut [&mut search_set_vocab_visitor])
+            .await?;
+
+        Ok(search_set_vocab_visitor
+            .into_found_hashed_block()
+            .map_or_else(Default::default, |(_, block)| block.event)
             .into())
     }
 
