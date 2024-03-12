@@ -61,6 +61,10 @@ where
     pub fn into_found_hashed_block(self) -> Option<(Multihash, MetadataBlockTyped<T>)> {
         self.found_hashed_block
     }
+
+    pub fn into_block(self) -> Option<MetadataBlockTyped<T>> {
+        self.found_hashed_block.map(|(_, block)| block)
+    }
 }
 
 impl<T, E, const F: u32> MetadataChainVisitor for SearchSingleTypedBlockVisitor<T, E, F>
