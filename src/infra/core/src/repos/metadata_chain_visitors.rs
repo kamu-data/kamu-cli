@@ -21,6 +21,8 @@ use opendatafabric::{
     MetadataBlockTyped,
     MetadataEvent,
     Multihash,
+    Seed,
+    SetPollingSource,
     SetVocab,
     VariantOf,
 };
@@ -29,6 +31,9 @@ use opendatafabric::{
 
 pub type SearchSetVocabVisitor<E> =
     SearchSingleTypedBlockVisitor<SetVocab, E, { Flag::SET_VOCAB.bits() }>;
+pub type SearchSeedVisitor<E> = SearchSingleTypedBlockVisitor<Seed, E, { Flag::SEED.bits() }>;
+pub type SearchSetPollingSourceVisitor<E> =
+    SearchSingleTypedBlockVisitor<SetPollingSource, E, { Flag::SET_POLLING_SOURCE.bits() }>;
 
 ///////////////////////////////////////////////////////////////////////////////
 
