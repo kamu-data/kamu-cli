@@ -9,6 +9,7 @@
 
 use chrono::prelude::*;
 use futures::TryStreamExt;
+use kamu::SearchSeedVisitor;
 use kamu_core::{self as domain, MetadataChainExt, TryStreamExtExt};
 use opendatafabric as odf;
 
@@ -108,15 +109,18 @@ impl Dataset {
     /// Creation time of the first metadata block in the chain
     async fn created_at(&self, ctx: &Context<'_>) -> Result<DateTime<Utc>> {
         let dataset = self.get_dataset(ctx).await?;
-        let seed = dataset
+        let mut search_seed_visitor = SearchSeedVisitor::<InternalError>::default();
+
+        dataset
             .as_metadata_chain()
-            .iter_blocks_ref(&domain::BlockRef::Head)
-            .map_ok(|(_, b)| b)
-            .try_last()
-            .await
-            .int_err()?
+            .accept(&mut [&mut search_seed_visitor])
+            .await?;
+
+        let seed_block = search_seed_visitor
+            .into_block()
             .expect("Dataset without blocks");
-        Ok(seed.system_time)
+
+        Ok(seed_block.system_time)
     }
 
     /// Creation time of the most recent metadata block in the chain
