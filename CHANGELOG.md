@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Updated
+- Extended flow history: start condition update event now holds a snapshot of the start condition
 ### Fixed
 - Zero value handling for `per_page` value in GraphQL
 - Flow history: more corrections to show natural time of flow events and keep flow system testable

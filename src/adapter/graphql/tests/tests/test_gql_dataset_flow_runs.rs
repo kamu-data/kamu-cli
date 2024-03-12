@@ -1600,7 +1600,9 @@ async fn test_history_of_completed_flow() {
                                         {
                                             "__typename": "FlowEventStartConditionUpdated",
                                             "eventId": "2",
-                                            "startConditionKind": "EXECUTOR"
+                                            "startCondition": {
+                                                "__typename" : "FlowStartConditionExecutor"
+                                            }
                                         },
                                         {
                                             "__typename": "FlowEventTaskChanged",
@@ -2027,7 +2029,9 @@ impl FlowRunsHarness {
                                                     }
                                                 }
                                                 ... on FlowEventStartConditionUpdated {
-                                                    startConditionKind
+                                                    startCondition {
+                                                        __typename
+                                                    }
                                                 }
                                                 ... on FlowEventTriggerAdded {
                                                     trigger {

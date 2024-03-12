@@ -8,9 +8,10 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
+use kamu_core::DatasetChangesService;
 use {event_sourcing as evs, kamu_flow_system as fs, kamu_task_system as ts};
 
-use super::FlowTrigger;
+use super::{FlowStartCondition, FlowTrigger};
 use crate::prelude::*;
 use crate::queries::Task;
 use crate::utils;
@@ -36,11 +37,26 @@ pub enum FlowEvent {
 }
 
 impl FlowEvent {
-    pub fn new(event_id: evs::EventID, event: fs::FlowEvent) -> Self {
-        match event {
+    pub async fn build(
+        event_id: evs::EventID,
+        event: fs::FlowEvent,
+        flow_state: &fs::FlowState,
+        dataset_changes_service: &dyn DatasetChangesService,
+    ) -> Result<Self, InternalError> {
+        Ok(match event {
             fs::FlowEvent::Initiated(e) => Self::Initiated(FlowEventInitiated::new(event_id, e)),
             fs::FlowEvent::StartConditionUpdated(e) => {
-                Self::StartConditionUpdated(FlowEventStartConditionUpdated::new(event_id, &e))
+                let start_condition = FlowStartCondition::create_from_raw_flow_data(
+                    &e.start_condition,
+                    &flow_state.triggers[0..e.last_trigger_index],
+                    dataset_changes_service,
+                )
+                .await?;
+                Self::StartConditionUpdated(FlowEventStartConditionUpdated::new(
+                    event_id,
+                    e.event_time,
+                    start_condition,
+                ))
             }
             fs::FlowEvent::TriggerAdded(e) => {
                 Self::TriggerAdded(FlowEventTriggerAdded::new(event_id, e))
@@ -64,7 +80,7 @@ impl FlowEvent {
                 TaskStatus::Finished,
             )),
             fs::FlowEvent::Aborted(e) => Self::Aborted(FlowEventAborted::new(event_id, &e)),
-        }
+        })
     }
 }
 
@@ -93,30 +109,21 @@ impl FlowEventInitiated {
 pub struct FlowEventStartConditionUpdated {
     event_id: EventID,
     event_time: DateTime<Utc>,
-    start_condition_kind: FlowStartConditionKind,
+    start_condition: FlowStartCondition,
 }
 
 impl FlowEventStartConditionUpdated {
-    fn new(event_id: evs::EventID, event: &fs::FlowEventStartConditionUpdated) -> Self {
+    fn new(
+        event_id: evs::EventID,
+        event_time: DateTime<Utc>,
+        start_condition: FlowStartCondition,
+    ) -> Self {
         Self {
             event_id: event_id.into(),
-            event_time: event.event_time,
-            start_condition_kind: match event.start_condition {
-                fs::FlowStartCondition::Schedule(_) => FlowStartConditionKind::Schedule,
-                fs::FlowStartCondition::Throttling(_) => FlowStartConditionKind::Throttling,
-                fs::FlowStartCondition::Batching(_) => FlowStartConditionKind::Batching,
-                fs::FlowStartCondition::Executor(_) => FlowStartConditionKind::Executor,
-            },
+            event_time,
+            start_condition,
         }
     }
-}
-
-#[derive(Enum, Debug, Copy, Clone, PartialEq, Eq)]
-pub enum FlowStartConditionKind {
-    Schedule,
-    Throttling,
-    Batching,
-    Executor,
 }
 
 ///////////////////////////////////////////////////////////////////////////////
