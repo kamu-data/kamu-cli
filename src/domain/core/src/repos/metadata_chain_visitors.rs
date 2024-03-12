@@ -10,12 +10,6 @@
 use std::error::Error;
 use std::marker::PhantomData;
 
-use kamu_core::{
-    HashedMetadataBlockRef,
-    MetadataBlockTypeFlags as Flag,
-    MetadataChainVisitor,
-    MetadataVisitorDecision as Decision,
-};
 use opendatafabric::{
     AsTypedBlock,
     MetadataBlockTyped,
@@ -25,6 +19,13 @@ use opendatafabric::{
     SetPollingSource,
     SetVocab,
     VariantOf,
+};
+
+use crate::{
+    HashedMetadataBlockRef,
+    MetadataBlockTypeFlags as Flag,
+    MetadataChainVisitor,
+    MetadataVisitorDecision as Decision,
 };
 
 ///////////////////////////////////////////////////////////////////////////////
