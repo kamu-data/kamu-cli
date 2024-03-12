@@ -864,7 +864,7 @@ type FlowTriggerAutoPolling {
 }
 
 type FlowTriggerInputDatasetFlow {
-	datasetId: DatasetID!
+	dataset: Dataset!
 	flowType: DatasetFlowType!
 	flowId: FlowID!
 }

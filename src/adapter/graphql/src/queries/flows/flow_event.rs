@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
-use kamu_core::DatasetChangesService;
 use {event_sourcing as evs, kamu_flow_system as fs, kamu_task_system as ts};
 
 use super::{FlowStartCondition, FlowTrigger};
@@ -41,15 +40,17 @@ impl FlowEvent {
         event_id: evs::EventID,
         event: fs::FlowEvent,
         flow_state: &fs::FlowState,
-        dataset_changes_service: &dyn DatasetChangesService,
+        ctx: &Context<'_>,
     ) -> Result<Self, InternalError> {
         Ok(match event {
-            fs::FlowEvent::Initiated(e) => Self::Initiated(FlowEventInitiated::new(event_id, e)),
+            fs::FlowEvent::Initiated(e) => {
+                Self::Initiated(FlowEventInitiated::build(event_id, e, ctx).await?)
+            }
             fs::FlowEvent::StartConditionUpdated(e) => {
                 let start_condition = FlowStartCondition::create_from_raw_flow_data(
                     &e.start_condition,
                     &flow_state.triggers[0..e.last_trigger_index],
-                    dataset_changes_service,
+                    ctx,
                 )
                 .await?;
                 Self::StartConditionUpdated(FlowEventStartConditionUpdated::new(
@@ -59,7 +60,7 @@ impl FlowEvent {
                 ))
             }
             fs::FlowEvent::TriggerAdded(e) => {
-                Self::TriggerAdded(FlowEventTriggerAdded::new(event_id, e))
+                Self::TriggerAdded(FlowEventTriggerAdded::build(event_id, e, ctx).await?)
             }
             fs::FlowEvent::TaskScheduled(e) => Self::TaskChanged(FlowEventTaskChanged::new(
                 event_id,
@@ -94,12 +95,16 @@ pub struct FlowEventInitiated {
 }
 
 impl FlowEventInitiated {
-    fn new(event_id: evs::EventID, event: fs::FlowEventInitiated) -> Self {
-        Self {
+    pub(crate) async fn build(
+        event_id: evs::EventID,
+        event: fs::FlowEventInitiated,
+        ctx: &Context<'_>,
+    ) -> Result<Self, InternalError> {
+        Ok(Self {
             event_id: event_id.into(),
             event_time: event.event_time,
-            trigger: event.trigger.into(),
-        }
+            trigger: FlowTrigger::build(event.trigger, ctx).await?,
+        })
     }
 }
 
@@ -136,12 +141,16 @@ pub struct FlowEventTriggerAdded {
 }
 
 impl FlowEventTriggerAdded {
-    fn new(event_id: evs::EventID, event: fs::FlowEventTriggerAdded) -> Self {
-        Self {
+    pub(crate) async fn build(
+        event_id: evs::EventID,
+        event: fs::FlowEventTriggerAdded,
+        ctx: &Context<'_>,
+    ) -> Result<Self, InternalError> {
+        Ok(Self {
             event_id: event_id.into(),
             event_time: event.event_time,
-            trigger: event.trigger.into(),
-        }
+            trigger: FlowTrigger::build(event.trigger, ctx).await?,
+        })
     }
 }
 

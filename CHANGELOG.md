@@ -6,7 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Updated
-- Extended flow history: start condition update event now holds a snapshot of the start condition
+- Extended flow history: 
+   - start condition update event now holds a snapshot of the start condition
+   - input dataset trigger now returns a queryable Dataset object instead of simply identifier
 ### Fixed
 - Zero value handling for `per_page` value in GraphQL
 - Flow history: more corrections to show natural time of flow events and keep flow system testable

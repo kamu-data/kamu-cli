@@ -27,7 +27,7 @@ impl FlowStartCondition {
     pub async fn create_from_raw_flow_data(
         start_condition: &fs::FlowStartCondition,
         matching_triggers: &[fs::FlowTrigger],
-        dataset_changes_service: &dyn DatasetChangesService,
+        ctx: &Context<'_>,
     ) -> Result<Self, InternalError> {
         Ok(match start_condition {
             fs::FlowStartCondition::Schedule(s) => Self::Schedule(FlowStartConditionSchedule {
@@ -35,6 +35,9 @@ impl FlowStartCondition {
             }),
             fs::FlowStartCondition::Throttling(t) => Self::Throttling((*t).into()),
             fs::FlowStartCondition::Batching(b) => {
+                let dataset_changes_service =
+                    from_catalog::<dyn DatasetChangesService>(ctx).unwrap();
+
                 // Start from zero increment
                 let mut total_increment = DatasetIntervalIncrement::default();
 

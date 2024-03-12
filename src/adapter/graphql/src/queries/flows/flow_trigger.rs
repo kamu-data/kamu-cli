@@ -7,10 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use kamu_core::DatasetRepository;
 use kamu_flow_system as fs;
 
 use crate::prelude::*;
-use crate::queries::Account;
+use crate::queries::{Account, Dataset};
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -22,14 +23,25 @@ pub(crate) enum FlowTrigger {
     InputDatasetFlow(FlowTriggerInputDatasetFlow),
 }
 
-impl From<fs::FlowTrigger> for FlowTrigger {
-    fn from(value: fs::FlowTrigger) -> Self {
-        match value {
+impl FlowTrigger {
+    pub async fn build(trigger: fs::FlowTrigger, ctx: &Context<'_>) -> Result<Self, InternalError> {
+        Ok(match trigger {
             fs::FlowTrigger::Manual(manual) => Self::Manual(manual.into()),
             fs::FlowTrigger::AutoPolling(auto_polling) => Self::AutoPolling(auto_polling.into()),
             fs::FlowTrigger::Push(push) => Self::Push(push.into()),
-            fs::FlowTrigger::InputDatasetFlow(input) => Self::InputDatasetFlow(input.into()),
-        }
+            fs::FlowTrigger::InputDatasetFlow(input) => {
+                let dataset_repository = from_catalog::<dyn DatasetRepository>(ctx).unwrap();
+                let hdl = dataset_repository
+                    .resolve_dataset_ref(&input.dataset_id.as_local_ref())
+                    .await
+                    .int_err()?;
+                Self::InputDatasetFlow(FlowTriggerInputDatasetFlow::new(
+                    Dataset::new(Account::from_dataset_alias(ctx, &hdl.alias), hdl),
+                    input.flow_type.into(),
+                    input.flow_id.into(),
+                ))
+            }
+        })
     }
 }
 
@@ -70,17 +82,17 @@ impl From<fs::FlowTriggerPush> for FlowTriggerPush {
 
 #[derive(SimpleObject)]
 pub(crate) struct FlowTriggerInputDatasetFlow {
-    dataset_id: DatasetID,
+    dataset: Dataset,
     flow_type: DatasetFlowType,
     flow_id: FlowID,
 }
 
-impl From<fs::FlowTriggerInputDatasetFlow> for FlowTriggerInputDatasetFlow {
-    fn from(value: fs::FlowTriggerInputDatasetFlow) -> Self {
+impl FlowTriggerInputDatasetFlow {
+    pub fn new(dataset: Dataset, flow_type: DatasetFlowType, flow_id: FlowID) -> Self {
         Self {
-            dataset_id: value.dataset_id.into(),
-            flow_type: value.flow_type.into(),
-            flow_id: value.flow_id.into(),
+            dataset,
+            flow_type,
+            flow_id,
         }
     }
 }

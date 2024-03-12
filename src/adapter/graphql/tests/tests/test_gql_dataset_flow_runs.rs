@@ -1954,7 +1954,10 @@ impl FlowRunsHarness {
                                         primaryTrigger {
                                             __typename
                                             ... on FlowTriggerInputDatasetFlow {
-                                                datasetId
+                                                dataset {
+                                                    id
+                                                    name
+                                                }
                                                 flowType
                                                 flowId
                                             }
