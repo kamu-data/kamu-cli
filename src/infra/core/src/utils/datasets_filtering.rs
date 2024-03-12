@@ -181,7 +181,7 @@ pub fn matches_remote_ref_pattern(
 
 ////////////////////////////////////////////////////////////////////////////////
 
-fn get_local_datasets_stream(
+pub fn get_local_datasets_stream(
     dataset_repo: &dyn DatasetRepository,
     dataset_ref_patterns: Vec<DatasetRefAnyPattern>,
     current_account_name_maybe: Option<AccountName>,
