@@ -13,6 +13,7 @@ use chrono::{DateTime, Utc};
 use opendatafabric::*;
 use thiserror::Error;
 
+use self::auth::DEFAULT_ACCOUNT_NAME;
 use crate::auth::DatasetActionUnauthorizedError;
 use crate::*;
 
@@ -122,6 +123,10 @@ impl Default for PullOptions {
 pub struct PullMultiOptions {
     /// Pull all dataset dependencies recursively in depth-first order
     pub recursive: bool,
+    /// Pull all known datasets
+    pub all: bool,
+    /// Owner of datasets
+    pub current_account_name: AccountName,
     /// Whether the datasets pulled from remotes should be permanently
     /// associated with them
     pub add_aliases: bool,
@@ -135,6 +140,8 @@ impl Default for PullMultiOptions {
     fn default() -> Self {
         Self {
             recursive: false,
+            all: false,
+            current_account_name: AccountName::new_unchecked(DEFAULT_ACCOUNT_NAME),
             add_aliases: true,
             ingest_options: PollingIngestOptions::default(),
             sync_options: SyncOptions::default(),

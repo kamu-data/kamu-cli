@@ -475,9 +475,11 @@ impl PullService for PullServiceImpl {
                 vec![request.clone()],
                 PullMultiOptions {
                     recursive: false,
+                    all: false,
                     add_aliases: options.add_aliases,
                     ingest_options: options.ingest_options,
                     sync_options: options.sync_options,
+                    ..PullMultiOptions::default()
                 },
                 listener,
             )
@@ -509,6 +511,20 @@ impl PullService for PullServiceImpl {
         options: PullMultiOptions,
         listener: Option<Arc<dyn PullMultiListener>>,
     ) -> Result<Vec<PullResponse>, InternalError> {
+        let requests: Vec<_> = if !options.all {
+            requests
+        } else {
+            use futures::TryStreamExt;
+            self.dataset_repo
+                .get_datasets_by_owner(options.current_account_name.clone())
+                .map_ok(|hdl| PullRequest {
+                    local_ref: Some(hdl.into()),
+                    remote_ref: None,
+                })
+                .try_collect()
+                .await?
+        };
+
         tracing::info!(?requests, ?options, "Performing pull");
 
         let (mut plan, errors) = self.collect_pull_graph(&requests, &options).await;
@@ -522,7 +538,7 @@ impl PullService for PullServiceImpl {
             return Ok(errors);
         }
 
-        if !(options.recursive) {
+        if !(options.recursive || options.all) {
             // Leave only datasets explicitly mentioned, preserving the depth order
             plan.retain(|pi| pi.original_request.is_some());
         }

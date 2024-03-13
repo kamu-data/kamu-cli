@@ -20,6 +20,7 @@ use kamu::utils::datasets_filtering::{
     matches_remote_ref_pattern,
 };
 use kamu::{DatasetRepositoryLocalFs, DependencyGraphServiceInMemory};
+use kamu_core::auth::DEFAULT_ACCOUNT_NAME;
 use kamu_core::{auth, CurrentAccountSubject, DatasetRepository};
 use opendatafabric::{
     AccountName,
@@ -163,13 +164,13 @@ async fn test_get_local_datasets_stream_single_tenant() {
     let baz_handle = dataset_filtering_harness
         .create_root_dataset(None, "baz")
         .await;
+    let dafault_account_name = AccountName::new_unchecked(DEFAULT_ACCOUNT_NAME);
 
     let pattern = DatasetRefAnyPattern::from_str("f%").unwrap();
     let res: Vec<_> = get_local_datasets_stream(
         dataset_filtering_harness.dataset_repo.as_ref(),
         vec![pattern],
-        None,
-        false,
+        dafault_account_name.clone(),
     )
     .try_collect()
     .await
@@ -181,8 +182,7 @@ async fn test_get_local_datasets_stream_single_tenant() {
     let mut res: Vec<_> = get_local_datasets_stream(
         dataset_filtering_harness.dataset_repo.as_ref(),
         vec![pattern],
-        None,
-        false,
+        dafault_account_name.clone(),
     )
     .try_collect()
     .await
@@ -195,37 +195,16 @@ async fn test_get_local_datasets_stream_single_tenant() {
     let res: Vec<_> = get_local_datasets_stream(
         dataset_filtering_harness.dataset_repo.as_ref(),
         vec![pattern.clone()],
-        None,
-        false,
+        dafault_account_name.clone(),
     )
     .try_collect()
     .await
     .unwrap();
 
     assert_eq!(res, vec![]);
-
-    let mut res: Vec<_> = get_local_datasets_stream(
-        dataset_filtering_harness.dataset_repo.as_ref(),
-        vec![pattern],
-        None,
-        true,
-    )
-    .try_collect()
-    .await
-    .unwrap();
-    DatasetFilteringHarness::sort_datasets_by_dataset_name(&mut res);
-
-    assert_eq!(
-        res,
-        vec![
-            bar_handle.as_any_ref(),
-            baz_handle.as_any_ref(),
-            foo_handle.as_any_ref(),
-        ]
-    );
 }
 
-////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_get_local_datasets_stream_multi_tenant() {
@@ -247,8 +226,7 @@ async fn test_get_local_datasets_stream_multi_tenant() {
     let res: Vec<_> = get_local_datasets_stream(
         dataset_filtering_harness.dataset_repo.as_ref(),
         vec![pattern],
-        Some(account_1.clone()),
-        false,
+        account_1.clone(),
     )
     .try_collect()
     .await
@@ -260,8 +238,7 @@ async fn test_get_local_datasets_stream_multi_tenant() {
     let res: Vec<_> = get_local_datasets_stream(
         dataset_filtering_harness.dataset_repo.as_ref(),
         vec![pattern],
-        Some(account_2.clone()),
-        false,
+        account_2.clone(),
     )
     .try_collect()
     .await
@@ -273,27 +250,13 @@ async fn test_get_local_datasets_stream_multi_tenant() {
     let res: Vec<_> = get_local_datasets_stream(
         dataset_filtering_harness.dataset_repo.as_ref(),
         vec![pattern],
-        Some(account_1.clone()),
-        false,
+        account_1.clone(),
     )
     .try_collect()
     .await
     .unwrap();
 
     assert_eq!(res, vec![baz_handle.as_any_ref()]);
-
-    let mut res: Vec<_> = get_local_datasets_stream(
-        dataset_filtering_harness.dataset_repo.as_ref(),
-        vec![],
-        Some(account_1.clone()),
-        true,
-    )
-    .try_collect()
-    .await
-    .unwrap();
-    DatasetFilteringHarness::sort_datasets_by_dataset_name(&mut res);
-
-    assert_eq!(res, vec![baz_handle.as_any_ref(), foo_handle.as_any_ref()]);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

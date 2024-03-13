@@ -59,6 +59,8 @@ pub struct PushResponse {
 pub struct PushMultiOptions {
     /// Push all dataset dependencies recursively in depth-first order
     pub recursive: bool,
+    /// Push all known datasets
+    pub all: bool,
     /// Add remote aliases to datasets if they don't already exist
     pub add_aliases: bool,
     /// Sync options
@@ -69,6 +71,7 @@ impl Default for PushMultiOptions {
     fn default() -> Self {
         Self {
             recursive: false,
+            all: false,
             add_aliases: true,
             sync_options: SyncOptions::default(),
         }

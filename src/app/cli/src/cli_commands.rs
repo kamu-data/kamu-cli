@@ -243,7 +243,6 @@ pub fn get_command(
         )),
         Some(("pull", submatches)) => {
             let datasets = submatches.get_many("dataset").unwrap_or_default().cloned();
-            let current_account_subject = cli_catalog.get_one::<CurrentAccountSubject>()?;
 
             if submatches.contains_id("set-watermark") {
                 Box::new(SetWatermarkCommand::new(
@@ -265,7 +264,7 @@ pub fn get_command(
                     cli_catalog.get_one()?,
                     cli_catalog.get_one()?,
                     datasets,
-                    current_account_subject,
+                    cli_catalog.get_one()?,
                     submatches.get_flag("all"),
                     submatches.get_flag("recursive"),
                     submatches.get_flag("fetch-uncacheable"),
@@ -283,6 +282,7 @@ pub fn get_command(
                 .get_many("dataset")
                 .unwrap_or_default()
                 .cloned(),
+            cli_catalog.get_one()?,
             push_matches.get_flag("all"),
             push_matches.get_flag("recursive"),
             !push_matches.get_flag("no-alias"),

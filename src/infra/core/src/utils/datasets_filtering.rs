@@ -77,8 +77,7 @@ pub fn filter_datasets_by_any_pattern(
     dataset_repo: &dyn DatasetRepository,
     search_svc: Arc<dyn SearchService>,
     dataset_ref_any_patterns: Vec<DatasetRefAnyPattern>,
-    current_account_name_maybe: Option<AccountName>,
-    is_all: bool,
+    current_account_name: AccountName,
 ) -> FilteredDatasetRefAnyStream {
     let is_multitenant_mode = dataset_repo.is_multi_tenant();
 
@@ -90,20 +89,11 @@ pub fn filter_datasets_by_any_pattern(
         .into_iter()
         .partition(|pattern| pattern.is_remote_pattern(is_multitenant_mode));
 
-    let local_patterns_stream = get_local_datasets_stream(
-        dataset_repo,
-        local_ref_patterns,
-        current_account_name_maybe,
-        is_all,
-    );
-
-    if is_all {
-        return local_patterns_stream.boxed();
-    };
-
     let static_datasets_stream = get_static_datasets_stream(static_refs);
     let remote_patterns_stream =
         get_remote_datasets_stream(search_svc, remote_ref_patterns, is_multitenant_mode);
+    let local_patterns_stream =
+        get_local_datasets_stream(dataset_repo, local_ref_patterns, current_account_name);
 
     static_datasets_stream
         .chain(remote_patterns_stream)
@@ -184,23 +174,14 @@ pub fn matches_remote_ref_pattern(
 pub fn get_local_datasets_stream(
     dataset_repo: &dyn DatasetRepository,
     dataset_ref_patterns: Vec<DatasetRefAnyPattern>,
-    current_account_name_maybe: Option<AccountName>,
-    is_all: bool,
+    current_account_name: AccountName,
 ) -> impl Stream<Item = Result<DatasetRefAny, GetDatasetError>> + '_ {
-    let datasets_stream = if let Some(current_account_name) = current_account_name_maybe {
-        dataset_repo.get_datasets_by_owner(current_account_name)
-    } else {
-        dataset_repo.get_all_datasets()
-    };
-
-    datasets_stream
+    dataset_repo
+        .get_datasets_by_owner(current_account_name)
         .try_filter(move |dataset_handle| {
-            future::ready(
-                is_all
-                    || dataset_ref_patterns.iter().any(|dataset_ref_pattern| {
-                        matches_local_ref_pattern(dataset_ref_pattern, dataset_handle)
-                    }),
-            )
+            future::ready(dataset_ref_patterns.iter().any(|dataset_ref_pattern| {
+                matches_local_ref_pattern(dataset_ref_pattern, dataset_handle)
+            }))
         })
         .map_ok(|dataset_handle| dataset_handle.as_any_ref())
         .map_err(Into::into)

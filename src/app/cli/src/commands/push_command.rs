@@ -27,6 +27,7 @@ pub struct PushCommand {
     dataset_repo: Arc<dyn DatasetRepository>,
     search_svc: Arc<dyn SearchService>,
     refs: Vec<DatasetRefAnyPattern>,
+    current_account_subject: Arc<CurrentAccountSubject>,
     all: bool,
     recursive: bool,
     add_aliases: bool,
@@ -41,6 +42,7 @@ impl PushCommand {
         dataset_repo: Arc<dyn DatasetRepository>,
         search_svc: Arc<dyn SearchService>,
         refs: I,
+        current_account_subject: Arc<CurrentAccountSubject>,
         all: bool,
         recursive: bool,
         add_aliases: bool,
@@ -56,6 +58,7 @@ impl PushCommand {
             dataset_repo,
             search_svc,
             refs: refs.collect(),
+            current_account_subject,
             all,
             recursive,
             add_aliases,
@@ -69,6 +72,15 @@ impl PushCommand {
         &self,
         listener: Option<Arc<dyn SyncMultiListener>>,
     ) -> Result<Vec<PushResponse>, CLIError> {
+        let current_account_name = match self.current_account_subject.as_ref() {
+            CurrentAccountSubject::Anonymous(_) => {
+                return Err(CLIError::usage_error(
+                    "Anonymous account misused, use multi-tenant alias",
+                ))
+            }
+            CurrentAccountSubject::Logged(l) => l.account_name.clone(),
+        };
+
         if let Some(remote_ref) = &self.to {
             let local_ref = match self.refs[0].as_dataset_ref_any() {
                 Some(dataset_ref_any) => dataset_ref_any
@@ -93,6 +105,7 @@ impl PushCommand {
                         remote_ref: Some(remote_ref.clone()),
                     }],
                     PushMultiOptions {
+                        all: self.all,
                         recursive: self.recursive,
                         add_aliases: self.add_aliases,
                         sync_options: self.sync_options(),
@@ -105,8 +118,7 @@ impl PushCommand {
                 self.dataset_repo.as_ref(),
                 self.search_svc.clone(),
                 self.refs.clone(),
-                None,
-                self.all,
+                current_account_name,
             )
             .try_collect()
             .await?;
@@ -116,6 +128,7 @@ impl PushCommand {
                 .push_multi(
                     dataset_refs,
                     PushMultiOptions {
+                        all: self.all,
                         recursive: self.recursive,
                         add_aliases: self.add_aliases,
                         sync_options: self.sync_options(),
@@ -145,11 +158,6 @@ impl Command for PushCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
         if self.refs.is_empty() && !self.all {
             return Err(CLIError::usage_error("Specify a dataset or pass --all"));
-        }
-        if self.all {
-            return Err(CLIError::usage_error(
-                "Pushing all datasets is not yet supported",
-            ));
         }
 
         if self.refs.len() > 1 && self.to.is_some() {
