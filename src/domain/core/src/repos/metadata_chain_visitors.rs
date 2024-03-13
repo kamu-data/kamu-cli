@@ -16,6 +16,7 @@ use opendatafabric::{
     MetadataEvent,
     Multihash,
     Seed,
+    SetDataSchema,
     SetPollingSource,
     SetTransform,
     SetVocab,
@@ -23,6 +24,7 @@ use opendatafabric::{
 };
 
 use crate::{
+    AppendError,
     HashedMetadataBlockRef,
     MetadataBlockTypeFlags as Flag,
     MetadataChainVisitor,
@@ -38,6 +40,8 @@ pub type SearchSetPollingSourceVisitor<E> =
     SearchSingleTypedBlockVisitor<SetPollingSource, E, { Flag::SET_POLLING_SOURCE.bits() }>;
 pub type SearchSetTransformVisitor<E> =
     SearchSingleTypedBlockVisitor<SetTransform, E, { Flag::SET_TRANSFORM.bits() }>;
+pub type SearchSetDataSchemaVisitor<E> =
+    SearchSingleTypedBlockVisitor<SetDataSchema, E, { Flag::SET_DATA_SCHEMA.bits() }>;
 
 ///////////////////////////////////////////////////////////////////////////////
 
