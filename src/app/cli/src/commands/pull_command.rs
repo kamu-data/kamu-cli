@@ -29,6 +29,7 @@ pub struct PullCommand {
     search_svc: Arc<dyn SearchService>,
     output_config: Arc<OutputConfig>,
     refs: Vec<DatasetRefAnyPattern>,
+    current_account_subject: Arc<CurrentAccountSubject>,
     all: bool,
     recursive: bool,
     fetch_uncacheable: bool,
@@ -44,6 +45,7 @@ impl PullCommand {
         search_svc: Arc<dyn SearchService>,
         output_config: Arc<OutputConfig>,
         refs: I,
+        current_account_subject: Arc<CurrentAccountSubject>,
         all: bool,
         recursive: bool,
         fetch_uncacheable: bool,
@@ -60,6 +62,7 @@ impl PullCommand {
             search_svc,
             output_config,
             refs: refs.into_iter().collect(),
+            current_account_subject,
             all,
             recursive,
             fetch_uncacheable,
@@ -104,14 +107,20 @@ impl PullCommand {
     async fn pull_multi(
         &self,
         listener: Option<Arc<dyn PullMultiListener>>,
+        current_account_name: AccountName,
     ) -> Result<Vec<PullResponse>, CLIError> {
-        let dataset_refs: Vec<_> = filter_datasets_by_any_pattern(
-            self.dataset_repo.as_ref(),
-            self.search_svc.clone(),
-            self.refs.clone(),
-        )
-        .try_collect()
-        .await?;
+        let dataset_refs: Vec<_> = if !self.all {
+            filter_datasets_by_any_pattern(
+                self.dataset_repo.as_ref(),
+                self.search_svc.clone(),
+                self.refs.clone(),
+                current_account_name.clone(),
+            )
+            .try_collect()
+            .await?
+        } else {
+            vec![]
+        };
 
         Ok(self
             .pull_svc
@@ -146,10 +155,18 @@ impl PullCommand {
         &self,
         listener: Option<Arc<dyn PullMultiListener>>,
     ) -> Result<Vec<PullResponse>, CLIError> {
+        let current_account_name = match self.current_account_subject.as_ref() {
+            CurrentAccountSubject::Anonymous(_) => {
+                return Err(CLIError::usage_error(
+                    "Anonymous account misused, use multi-tenant alias",
+                ))
+            }
+            CurrentAccountSubject::Logged(l) => l.account_name.clone(),
+        };
         if self.as_name.is_some() {
             self.sync_from(listener).await
         } else {
-            self.pull_multi(listener).await
+            self.pull_multi(listener, current_account_name).await
         }
     }
 
