@@ -129,7 +129,6 @@ impl PullCommand {
                 PullMultiOptions {
                     recursive: self.recursive,
                     all: self.all,
-                    current_account_name,
                     add_aliases: self.add_aliases,
                     ingest_options: PollingIngestOptions {
                         fetch_uncacheable: self.fetch_uncacheable,

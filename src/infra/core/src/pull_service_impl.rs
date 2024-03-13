@@ -479,7 +479,6 @@ impl PullService for PullServiceImpl {
                     add_aliases: options.add_aliases,
                     ingest_options: options.ingest_options,
                     sync_options: options.sync_options,
-                    ..PullMultiOptions::default()
                 },
                 listener,
             )
@@ -511,12 +510,18 @@ impl PullService for PullServiceImpl {
         options: PullMultiOptions,
         listener: Option<Arc<dyn PullMultiListener>>,
     ) -> Result<Vec<PullResponse>, InternalError> {
+        let current_account_name = match self.current_account_subject.as_ref() {
+            CurrentAccountSubject::Anonymous(_) => {
+                return Err("Anonymous account misused, use multi-tenant alias").int_err()
+            }
+            CurrentAccountSubject::Logged(l) => l.account_name.clone(),
+        };
         let requests: Vec<_> = if !options.all {
             requests
         } else {
             use futures::TryStreamExt;
             self.dataset_repo
-                .get_datasets_by_owner(options.current_account_name.clone())
+                .get_datasets_by_owner(current_account_name)
                 .map_ok(|hdl| PullRequest {
                     local_ref: Some(hdl.into()),
                     remote_ref: None,
