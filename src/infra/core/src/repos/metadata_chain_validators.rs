@@ -331,14 +331,14 @@ impl<'a> MetadataChainVisitor for ValidateOffsetsAreSequentialVisitor<'a> {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-pub struct ValidateLogicalStructureAddDataVisitorState<'a> {
+struct AddDataVisitorState<'a> {
     appended_add_data: &'a AddData,
     prev_schema: Option<SetDataSchema>,
     prev_add_data: Option<AddData>,
     next_block_flags: MetadataBlockTypeFlags,
 }
 
-pub struct ValidateLogicalStructureExecuteTransformVisitorState<'a> {
+struct ExecuteTransformVisitorState<'a> {
     appended_execute_transform: &'a ExecuteTransform,
     prev_transform: Option<SetTransform>,
     prev_schema: Option<SetDataSchema>,
@@ -346,12 +346,18 @@ pub struct ValidateLogicalStructureExecuteTransformVisitorState<'a> {
     next_block_flags: MetadataBlockTypeFlags,
 }
 
-pub enum ValidateLogicalStructureVisitor<'a> {
-    AddData(ValidateLogicalStructureAddDataVisitorState<'a>),
-    ExecuteTransform(ValidateLogicalStructureExecuteTransformVisitorState<'a>),
+enum ValidateLogicalStructureVisitorState<'a> {
+    AddData(AddDataVisitorState<'a>),
+    ExecuteTransform(ExecuteTransformVisitorState<'a>),
     SetPollingSource,
     AddPushSource,
     Stopped,
+}
+
+type State<'a> = ValidateLogicalStructureVisitorState<'a>;
+
+pub struct ValidateLogicalStructureVisitor<'a> {
+    state: ValidateLogicalStructureVisitorState<'a>,
 }
 
 impl<'a> ValidateLogicalStructureVisitor<'a> {
@@ -391,7 +397,12 @@ impl<'a> ValidateLogicalStructureVisitor<'a> {
             MetadataEvent::SetDataSchema(_) => {
                 // TODO: Consider schema evolution rules
                 // TODO: Consider what happens with previously defined sources
-                Ok((Decision::Stop, Self::Stopped))
+                Ok((
+                    Decision::Stop,
+                    Self {
+                        state: State::Stopped,
+                    },
+                ))
             }
             MetadataEvent::AddData(e) => {
                 // TODO: ensure only used on Root datasets
@@ -411,12 +422,14 @@ impl<'a> ValidateLogicalStructureVisitor<'a> {
 
                 Ok((
                     Decision::NextOfType(next_block_flags),
-                    Self::AddData(ValidateLogicalStructureAddDataVisitorState {
-                        appended_add_data: e,
-                        prev_schema: None,
-                        prev_add_data: None,
-                        next_block_flags,
-                    }),
+                    Self {
+                        state: State::AddData(AddDataVisitorState {
+                            appended_add_data: e,
+                            prev_schema: None,
+                            prev_add_data: None,
+                            next_block_flags,
+                        }),
+                    },
                 ))
             }
             // TODO: ensure only used on Derivative datasets
@@ -433,13 +446,15 @@ impl<'a> ValidateLogicalStructureVisitor<'a> {
 
                 Ok((
                     Decision::NextOfType(next_block_flags),
-                    Self::ExecuteTransform(ValidateLogicalStructureExecuteTransformVisitorState {
-                        appended_execute_transform: e,
-                        prev_transform: None,
-                        prev_schema: None,
-                        prev_query: None,
-                        next_block_flags,
-                    }),
+                    Self {
+                        state: State::ExecuteTransform(ExecuteTransformVisitorState {
+                            appended_execute_transform: e,
+                            prev_transform: None,
+                            prev_schema: None,
+                            prev_query: None,
+                            next_block_flags,
+                        }),
+                    },
                 ))
             }
             MetadataEvent::SetPollingSource(e) => {
@@ -451,7 +466,9 @@ impl<'a> ValidateLogicalStructureVisitor<'a> {
                 // Ensure no active push sources
                 Ok((
                     Decision::NextOfType(Flag::ADD_PUSH_SOURCE),
-                    Self::SetPollingSource {},
+                    Self {
+                        state: State::SetPollingSource,
+                    },
                 ))
             }
             MetadataEvent::DisablePollingSource(_) => {
@@ -474,7 +491,9 @@ impl<'a> ValidateLogicalStructureVisitor<'a> {
 
                 Ok((
                     Decision::NextOfType(Flag::SET_POLLING_SOURCE),
-                    Self::AddPushSource {},
+                    Self {
+                        state: State::AddPushSource,
+                    },
                 ))
             }
             MetadataEvent::DisablePushSource(_) => {
@@ -500,37 +519,41 @@ impl<'a> ValidateLogicalStructureVisitor<'a> {
                 // Queries must be normalized
                 Self::validate_transform(&block.event, &e.transform)?;
 
-                Ok((Decision::Stop, Self::Stopped))
+                Ok((
+                    Decision::Stop,
+                    Self {
+                        state: State::Stopped,
+                    },
+                ))
             }
             MetadataEvent::Seed(_)
             | MetadataEvent::SetVocab(_)
             | MetadataEvent::SetAttachments(_)
             | MetadataEvent::SetInfo(_)
-            | MetadataEvent::SetLicense(_) => Ok((Decision::Stop, Self::Stopped)),
+            | MetadataEvent::SetLicense(_) => Ok((
+                Decision::Stop,
+                Self {
+                    state: State::Stopped,
+                },
+            )),
         }
     }
 
     pub fn post_visit(self) -> Result<Decision, AppendError> {
-        match self {
-            ValidateLogicalStructureVisitor::AddData(state) => {
-                Self::handle_post_visit_add_data(state)
-            }
-            ValidateLogicalStructureVisitor::ExecuteTransform(state) => {
-                Self::handle_post_visit_execute_transform(state)
-            }
-            ValidateLogicalStructureVisitor::SetPollingSource
-            | ValidateLogicalStructureVisitor::AddPushSource
-            | ValidateLogicalStructureVisitor::Stopped => Ok(Decision::Stop),
+        match self.state {
+            State::AddData(state) => Self::handle_post_visit_add_data(state),
+            State::ExecuteTransform(state) => Self::handle_post_visit_execute_transform(state),
+            State::SetPollingSource | State::AddPushSource | State::Stopped => Ok(Decision::Stop),
         }
     }
 
     fn handle_post_visit_add_data(
-        ValidateLogicalStructureAddDataVisitorState {
+        AddDataVisitorState {
             appended_add_data: e,
             prev_schema,
             prev_add_data,
             ..
-        }: ValidateLogicalStructureAddDataVisitorState,
+        }: AddDataVisitorState,
     ) -> Result<Decision, AppendError> {
         // Validate schema was defined before adding any data
         if prev_schema.is_none() && e.new_data.is_some() {
@@ -576,13 +599,13 @@ impl<'a> ValidateLogicalStructureVisitor<'a> {
     }
 
     fn handle_post_visit_execute_transform(
-        ValidateLogicalStructureExecuteTransformVisitorState {
+        ExecuteTransformVisitorState {
             appended_execute_transform: e,
             prev_transform,
             prev_schema,
             prev_query,
             ..
-        }: ValidateLogicalStructureExecuteTransformVisitorState,
+        }: ExecuteTransformVisitorState,
     ) -> Result<Decision, AppendError> {
         // Validate schema was defined if we're adding data
         if prev_schema.is_none() && e.new_data.is_some() {
@@ -693,8 +716,8 @@ impl<'a> MetadataChainVisitor for ValidateLogicalStructureVisitor<'a> {
     type Error = AppendError;
 
     fn visit(&mut self, (_, block): HashedMetadataBlockRef) -> Result<Decision, Self::Error> {
-        match self {
-            ValidateLogicalStructureVisitor::AddData(state) => {
+        match &mut self.state {
+            State::AddData(state) => {
                 match &block.event {
                     MetadataEvent::AddData(e) => {
                         state.prev_add_data = Some(e.clone());
@@ -709,7 +732,7 @@ impl<'a> MetadataChainVisitor for ValidateLogicalStructureVisitor<'a> {
 
                 Ok(MetadataVisitorDecision::NextOfType(state.next_block_flags))
             }
-            ValidateLogicalStructureVisitor::ExecuteTransform(state) => {
+            State::ExecuteTransform(state) => {
                 match &block.event {
                     MetadataEvent::SetDataSchema(e) => {
                         state.prev_schema = Some(e.clone());
@@ -733,7 +756,7 @@ impl<'a> MetadataChainVisitor for ValidateLogicalStructureVisitor<'a> {
 
                 Ok(MetadataVisitorDecision::NextOfType(state.next_block_flags))
             }
-            ValidateLogicalStructureVisitor::SetPollingSource => {
+            State::SetPollingSource => {
                 let MetadataEvent::AddPushSource(e) = &block.event else {
                     unreachable!()
                 };
@@ -743,7 +766,7 @@ impl<'a> MetadataChainVisitor for ValidateLogicalStructureVisitor<'a> {
                     "Cannot add a polling source while some push sources are still active",
                 );
             }
-            ValidateLogicalStructureVisitor::AddPushSource => {
+            State::AddPushSource => {
                 let MetadataEvent::SetPollingSource(e) = &block.event else {
                     unreachable!()
                 };
@@ -753,7 +776,7 @@ impl<'a> MetadataChainVisitor for ValidateLogicalStructureVisitor<'a> {
                     "Cannot add a push source while polling source is still active",
                 );
             }
-            ValidateLogicalStructureVisitor::Stopped => {
+            State::Stopped => {
                 unreachable!()
             }
         }
