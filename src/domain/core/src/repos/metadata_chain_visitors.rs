@@ -47,7 +47,7 @@ pub type SearchSetDataSchemaVisitor<E> =
 
 pub struct SearchSingleTypedBlockVisitor<T, E, const F: u32> {
     requested_flag: Flag,
-    found_hashed_block: Option<(Multihash, MetadataBlockTyped<T>)>,
+    hashed_block: Option<(Multihash, MetadataBlockTyped<T>)>,
     _phantom: PhantomData<E>,
 }
 
@@ -55,7 +55,7 @@ impl<T, E, const F: u32> Default for SearchSingleTypedBlockVisitor<T, E, F> {
     fn default() -> Self {
         Self {
             requested_flag: Flag::from_bits_retain(F),
-            found_hashed_block: None,
+            hashed_block: None,
             _phantom: PhantomData,
         }
     }
@@ -66,12 +66,12 @@ where
     T: VariantOf<MetadataEvent> + Send + Sync,
     E: Error + Send + Sync,
 {
-    pub fn into_found_hashed_block(self) -> Option<(Multihash, MetadataBlockTyped<T>)> {
-        self.found_hashed_block
+    pub fn into_hashed_block(self) -> Option<(Multihash, MetadataBlockTyped<T>)> {
+        self.hashed_block
     }
 
     pub fn into_block(self) -> Option<MetadataBlockTyped<T>> {
-        self.found_hashed_block.map(|(_, block)| block)
+        self.hashed_block.map(|(_, block)| block)
     }
 }
 
@@ -89,7 +89,7 @@ where
             return Ok(Decision::NextOfType(self.requested_flag));
         }
 
-        self.found_hashed_block = Some((hash.clone(), block.clone().into_typed().unwrap()));
+        self.hashed_block = Some((hash.clone(), block.clone().into_typed().unwrap()));
 
         Ok(Decision::Stop)
     }

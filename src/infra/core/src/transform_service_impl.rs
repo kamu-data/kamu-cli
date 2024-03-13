@@ -516,7 +516,7 @@ impl TransformServiceImpl {
             .await?;
 
         Ok(search_set_vocab_visitor
-            .into_found_hashed_block()
+            .into_hashed_block()
             .map_or_else(Default::default, |(_, block)| block.event)
             .into())
     }
@@ -741,7 +741,7 @@ impl TransformService for TransformServiceImpl {
             .await?;
 
         // TODO: Support transform evolution
-        let source = visitor.into_found_hashed_block();
+        let source = visitor.into_hashed_block();
 
         Ok(source)
     }

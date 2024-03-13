@@ -589,7 +589,7 @@ impl PollingIngestService for PollingIngestServiceImpl {
             .await?;
 
         // TODO: Support source evolution
-        let source = visitor.into_found_hashed_block();
+        let source = visitor.into_hashed_block();
 
         Ok(source)
     }

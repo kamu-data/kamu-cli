@@ -183,7 +183,7 @@ impl QueryService for QueryServiceImpl {
             .await?;
 
         let vocab: DatasetVocabulary = search_set_vocab_visitor
-            .into_found_hashed_block()
+            .into_hashed_block()
             .map_or_else(Default::default, |(_, block)| block.event)
             .into();
 
