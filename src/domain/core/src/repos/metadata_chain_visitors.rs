@@ -24,7 +24,6 @@ use opendatafabric::{
 };
 
 use crate::{
-    AppendError,
     HashedMetadataBlockRef,
     MetadataBlockTypeFlags as Flag,
     MetadataChainVisitor,
