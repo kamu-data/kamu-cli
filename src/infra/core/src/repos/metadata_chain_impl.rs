@@ -8,11 +8,11 @@
 // by the Apache License, Version 2.0.
 
 use async_trait::async_trait;
-use futures::TryStreamExt;
 use kamu_core::*;
 use opendatafabric::*;
 
 use crate::{
+    ValidateLogicalStructureVisitor,
     ValidateOffsetsAreSequentialVisitor,
     ValidatePrevBlockExistsVisitor,
     ValidateSeedBlockOrderVisitor,
@@ -591,8 +591,9 @@ where
             let (d4, mut v4) = ValidateSystemTimeIsMonotonicVisitor::new(&block)?;
             let (d5, mut v5) = ValidateWatermarkIsMonotonicVisitor::new(&block)?;
             let (d6, mut v6) = ValidateOffsetsAreSequentialVisitor::new(&block)?;
+            let (d7, mut v7) = ValidateLogicalStructureVisitor::new(&block)?;
 
-            let mut decisions = [d1, d2, d3, d4, d5, d6];
+            let mut decisions = [d1, d2, d3, d4, d5, d6, d7];
             let mut validators = [
                 &mut v1 as &mut dyn MetadataChainVisitor<Error = _>,
                 &mut v2,
@@ -600,6 +601,7 @@ where
                 &mut v4,
                 &mut v5,
                 &mut v6,
+                &mut v7,
             ];
 
             self.accept_append_validators(
@@ -609,7 +611,7 @@ where
             )
             .await?;
 
-            self.validate_append_event_logical_structure(&block).await?;
+            v7.post_visit()?;
         }
 
         if opts.update_ref.is_some()

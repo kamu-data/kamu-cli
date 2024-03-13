@@ -422,7 +422,7 @@ impl From<IterBlocksError> for InternalError {
     fn from(v: IterBlocksError) -> Self {
         match v {
             IterBlocksError::Internal(e) => e,
-            e @ _ => e.int_err(),
+            e => e.int_err(),
         }
     }
 }
