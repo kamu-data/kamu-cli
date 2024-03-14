@@ -442,7 +442,7 @@ impl<'a> ValidateLogicalStructureVisitor<'a> {
                 }
 
                 let next_block_flags =
-                    Flag::SET_DATA_SCHEMA | Flag::SET_TRANSFORM | Flag::SET_TRANSFORM;
+                    Flag::SET_DATA_SCHEMA | Flag::SET_TRANSFORM | Flag::EXECUTE_TRANSFORM;
 
                 Ok((
                     Decision::NextOfType(next_block_flags),

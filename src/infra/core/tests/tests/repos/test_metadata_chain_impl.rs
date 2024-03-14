@@ -168,16 +168,13 @@ async fn test_append_prev_block_not_found() {
 
     assert_eq!(chain.resolve_ref(&BlockRef::Head).await.unwrap(), hash_1);
 
-    let block_2 = MetadataFactory::metadata_block(
-        MetadataFactory::add_data()
-            .new_offset_interval(0, 1)
-            .build(),
-    )
-    .prev(
-        &Multihash::from_digest_sha3_256(b"does-not-exist"),
-        block_1_sequence_number,
-    )
-    .build();
+    let block_2 =
+        MetadataFactory::metadata_block(MetadataFactory::add_data().some_new_data().build())
+            .prev(
+                &Multihash::from_digest_sha3_256(b"does-not-exist"),
+                block_1_sequence_number,
+            )
+            .build();
 
     assert_matches!(
         chain.append(block_2, AppendOpts::default()).await,
