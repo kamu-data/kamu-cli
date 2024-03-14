@@ -14,7 +14,7 @@ use kamu_core::{
     HashedMetadataBlockRef,
     MetadataBlockTypeFlags,
     MetadataChainVisitor,
-    MetadataVisitorDecision,
+    MetadataVisitorDecision as Decision,
 };
 use opendatafabric::{
     AddData,
@@ -205,10 +205,7 @@ impl<'a> DataWriterDataFusionMetaDataStateVisitor<'a> {
 impl<'a> MetadataChainVisitor for DataWriterDataFusionMetaDataStateVisitor<'a> {
     type Error = ScanMetadataError;
 
-    fn visit(
-        &mut self,
-        (_, block): HashedMetadataBlockRef,
-    ) -> Result<MetadataVisitorDecision, Self::Error> {
+    fn visit(&mut self, (_, block): HashedMetadataBlockRef) -> Result<Decision, Self::Error> {
         match &block.event {
             MetadataEvent::SetDataSchema(e) => {
                 self.handle_set_data_schema(e)?;
@@ -254,7 +251,7 @@ impl<'a> MetadataChainVisitor for DataWriterDataFusionMetaDataStateVisitor<'a> {
             }
         }
 
-        Ok(MetadataVisitorDecision::NextOfType(self.next_block_flags))
+        Ok(Decision::NextOfType(self.next_block_flags))
     }
 }
 
