@@ -12,6 +12,8 @@ use std::marker::PhantomData;
 
 use opendatafabric::{
     AsTypedBlock,
+    IntoDataStreamBlock,
+    MetadataBlockDataStream,
     MetadataBlockTyped,
     MetadataEvent,
     Multihash,
@@ -89,6 +91,57 @@ where
         }
 
         self.hashed_block = Some((hash.clone(), block.clone().into_typed().unwrap()));
+
+        Ok(Decision::Stop)
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+pub struct SearchDataBlocksVisitor<E> {
+    hashed_data_block: Option<(Multihash, MetadataBlockDataStream)>,
+    _phantom: PhantomData<E>,
+}
+
+impl<E> Default for SearchDataBlocksVisitor<E> {
+    fn default() -> Self {
+        Self {
+            hashed_data_block: None,
+            _phantom: PhantomData,
+        }
+    }
+}
+
+impl<E> SearchDataBlocksVisitor<E>
+where
+    E: Error + Send + Sync,
+{
+    pub fn into_hashed_data_block(self) -> Option<(Multihash, MetadataBlockDataStream)> {
+        self.hashed_data_block
+    }
+
+    pub fn into_data_block(self) -> Option<MetadataBlockDataStream> {
+        self.hashed_data_block.map(|(_, block)| block)
+    }
+}
+
+impl<E> MetadataChainVisitor for SearchDataBlocksVisitor<E>
+where
+    E: Error + Send + Sync,
+{
+    type Error = E;
+
+    fn visit(&mut self, (hash, block): HashedMetadataBlockRef) -> Result<Decision, Self::Error> {
+        let flag = Flag::from(block);
+
+        if !Flag::DATA_BLOCK.contains(flag) {
+            return Ok(Decision::NextOfType(Flag::DATA_BLOCK));
+        }
+
+        self.hashed_data_block = Some((
+            hash.clone(),
+            block.clone().into_data_stream_block().unwrap(),
+        ));
 
         Ok(Decision::Stop)
     }
