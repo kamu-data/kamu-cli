@@ -108,7 +108,7 @@ impl Dataset {
     /// Creation time of the first metadata block in the chain
     async fn created_at(&self, ctx: &Context<'_>) -> Result<DateTime<Utc>> {
         let dataset = self.get_dataset(ctx).await?;
-        let mut search_seed_visitor = SearchSeedVisitor::<InternalError>::default();
+        let mut search_seed_visitor = <SearchSeedVisitor>::default();
 
         dataset
             .as_metadata_chain()

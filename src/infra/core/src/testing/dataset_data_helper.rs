@@ -94,7 +94,7 @@ impl DatasetDataHelper {
     }
 
     pub async fn get_last_set_data_schema_block(&self) -> MetadataBlockTyped<SetDataSchema> {
-        let mut visitor = SearchSetDataSchemaVisitor::<InternalError>::default();
+        let mut visitor = <SearchSetDataSchemaVisitor>::default();
 
         self.dataset
             .as_metadata_chain()

@@ -175,7 +175,7 @@ impl QueryService for QueryServiceImpl {
             .into());
         }
 
-        let mut search_set_vocab_visitor = SearchSetVocabVisitor::<QueryError>::default();
+        let mut search_set_vocab_visitor = <SearchSetVocabVisitor>::default();
 
         dataset
             .as_metadata_chain()

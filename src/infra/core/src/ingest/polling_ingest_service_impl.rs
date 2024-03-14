@@ -581,7 +581,7 @@ impl PollingIngestService for PollingIngestServiceImpl {
         dataset_ref: &DatasetRef,
     ) -> Result<Option<(Multihash, MetadataBlockTyped<SetPollingSource>)>, GetDatasetError> {
         let dataset = self.dataset_repo.get_dataset(dataset_ref).await?;
-        let mut visitor = SearchSetPollingSourceVisitor::<InternalError>::default();
+        let mut visitor = <SearchSetPollingSourceVisitor>::default();
 
         dataset
             .as_metadata_chain()

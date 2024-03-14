@@ -10,6 +10,7 @@
 use std::error::Error;
 use std::marker::PhantomData;
 
+use internal_error::InternalError;
 use opendatafabric::{
     AsTypedBlock,
     IntoDataStreamBlock,
@@ -34,14 +35,15 @@ use crate::{
 
 ///////////////////////////////////////////////////////////////////////////////
 
-pub type SearchSetVocabVisitor<E> =
+pub type SearchSetVocabVisitor<E = InternalError> =
     SearchSingleTypedBlockVisitor<SetVocab, E, { Flag::SET_VOCAB.bits() }>;
-pub type SearchSeedVisitor<E> = SearchSingleTypedBlockVisitor<Seed, E, { Flag::SEED.bits() }>;
-pub type SearchSetPollingSourceVisitor<E> =
+pub type SearchSeedVisitor<E = InternalError> =
+    SearchSingleTypedBlockVisitor<Seed, E, { Flag::SEED.bits() }>;
+pub type SearchSetPollingSourceVisitor<E = InternalError> =
     SearchSingleTypedBlockVisitor<SetPollingSource, E, { Flag::SET_POLLING_SOURCE.bits() }>;
-pub type SearchSetTransformVisitor<E> =
+pub type SearchSetTransformVisitor<E = InternalError> =
     SearchSingleTypedBlockVisitor<SetTransform, E, { Flag::SET_TRANSFORM.bits() }>;
-pub type SearchSetDataSchemaVisitor<E> =
+pub type SearchSetDataSchemaVisitor<E = InternalError> =
     SearchSingleTypedBlockVisitor<SetDataSchema, E, { Flag::SET_DATA_SCHEMA.bits() }>;
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -98,7 +100,7 @@ where
 
 ///////////////////////////////////////////////////////////////////////////////
 
-pub struct SearchDataBlocksVisitor<E> {
+pub struct SearchDataBlocksVisitor<E = InternalError> {
     hashed_data_block: Option<(Multihash, MetadataBlockDataStream)>,
     _phantom: PhantomData<E>,
 }

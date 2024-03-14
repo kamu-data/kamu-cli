@@ -508,14 +508,14 @@ impl TransformServiceImpl {
         dataset_ref: &DatasetRef,
     ) -> Result<DatasetVocabulary, InternalError> {
         let dataset = self.dataset_repo.get_dataset(dataset_ref).await.int_err()?;
-        let mut search_set_vocab_visitor = SearchSetVocabVisitor::<InternalError>::default();
+        let mut visitor = <SearchSetVocabVisitor>::default();
 
         dataset
             .as_metadata_chain()
-            .accept(&mut [&mut search_set_vocab_visitor])
+            .accept(&mut [&mut visitor])
             .await?;
 
-        Ok(search_set_vocab_visitor
+        Ok(visitor
             .into_hashed_block()
             .map_or_else(Default::default, |(_, block)| block.event)
             .into())
@@ -733,7 +733,7 @@ impl TransformService for TransformServiceImpl {
         dataset_ref: &DatasetRef,
     ) -> Result<Option<(Multihash, MetadataBlockTyped<SetTransform>)>, GetDatasetError> {
         let dataset = self.dataset_repo.get_dataset(dataset_ref).await?;
-        let mut visitor = SearchSetTransformVisitor::<InternalError>::default();
+        let mut visitor = <SearchSetTransformVisitor>::default();
 
         dataset
             .as_metadata_chain()
