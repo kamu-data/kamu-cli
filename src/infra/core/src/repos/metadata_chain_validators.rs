@@ -14,10 +14,8 @@ use kamu_core::{
     BlockNotFoundError,
     HashedMetadataBlockRef,
     MetadataBlockTypeFlags as Flag,
-    MetadataBlockTypeFlags,
     MetadataChainVisitor,
     MetadataVisitorDecision as Decision,
-    MetadataVisitorDecision,
     OffsetsNotSequentialError,
     SequenceIntegrityError,
 };
@@ -335,7 +333,7 @@ struct AddDataVisitorState<'a> {
     appended_add_data: &'a AddData,
     prev_schema: Option<SetDataSchema>,
     prev_add_data: Option<AddData>,
-    next_block_flags: MetadataBlockTypeFlags,
+    next_block_flags: Flag,
 }
 
 struct ExecuteTransformVisitorState<'a> {
@@ -343,7 +341,7 @@ struct ExecuteTransformVisitorState<'a> {
     prev_transform: Option<SetTransform>,
     prev_schema: Option<SetDataSchema>,
     prev_query: Option<ExecuteTransform>,
-    next_block_flags: MetadataBlockTypeFlags,
+    next_block_flags: Flag,
 }
 
 enum ValidateLogicalStructureVisitorState<'a> {
@@ -357,7 +355,7 @@ enum ValidateLogicalStructureVisitorState<'a> {
 type State<'a> = ValidateLogicalStructureVisitorState<'a>;
 
 pub struct ValidateLogicalStructureVisitor<'a> {
-    state: ValidateLogicalStructureVisitorState<'a>,
+    state: State<'a>,
 }
 
 impl<'a> ValidateLogicalStructureVisitor<'a> {
@@ -730,7 +728,7 @@ impl<'a> MetadataChainVisitor for ValidateLogicalStructureVisitor<'a> {
                     _ => unreachable!(),
                 }
 
-                Ok(MetadataVisitorDecision::NextOfType(state.next_block_flags))
+                Ok(Decision::NextOfType(state.next_block_flags))
             }
             State::ExecuteTransform(state) => {
                 match &block.event {
@@ -754,7 +752,7 @@ impl<'a> MetadataChainVisitor for ValidateLogicalStructureVisitor<'a> {
                     state.next_block_flags -= Flag::SET_TRANSFORM;
                 }
 
-                Ok(MetadataVisitorDecision::NextOfType(state.next_block_flags))
+                Ok(Decision::NextOfType(state.next_block_flags))
             }
             State::SetPollingSource => {
                 let MetadataEvent::AddPushSource(e) = &block.event else {
