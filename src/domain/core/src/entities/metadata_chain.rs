@@ -219,6 +219,7 @@ pub trait MetadataChainExt: MetadataChain {
                     }
                     MetadataVisitorDecision::NextOfType(type_flags) if type_flags.is_empty() => {
                         stopped_visitors += 1;
+                        *decision = MetadataVisitorDecision::Stop;
                     }
                     MetadataVisitorDecision::Next => {
                         *decision = visitor.visit(hashed_block_ref)?;
