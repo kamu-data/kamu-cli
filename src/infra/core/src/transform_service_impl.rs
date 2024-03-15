@@ -375,12 +375,18 @@ impl TransformServiceImpl {
 
         // Determine unprocessed block and offset range
         let last_unprocessed_block = input_chain.resolve_ref(&BlockRef::Head).await.int_err()?;
-        let last_unprocessed_offset = input_chain
-            .iter_blocks_interval(&last_unprocessed_block, last_processed_block, false)
-            .filter_map_ok(|(_, b)| b.into_data_stream_block())
-            .try_next()
-            .await
-            .int_err()?
+        let mut visitor = <SearchDataBlocksVisitor>::default();
+
+        input_chain
+            .accept_by_interval(
+                &mut [&mut visitor],
+                &last_unprocessed_block,
+                last_processed_block,
+            )
+            .await?;
+
+        let last_unprocessed_offset = visitor
+            .into_data_block()
             .and_then(|b| b.event.last_offset())
             .or(last_processed_offset);
 
