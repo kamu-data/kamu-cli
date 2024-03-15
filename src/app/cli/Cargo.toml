@@ -37,6 +37,7 @@ ftp = ["kamu/ftp"]
 
 [dependencies]
 # Kamu
+database-gateway = { workspace = true }
 internal-error = { workspace = true }
 container-runtime = { workspace = true }
 event-bus = { workspace = true }

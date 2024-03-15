@@ -107,6 +107,28 @@ pub async fn run(
         cli_catalog.get_one::<GcService>()?.evict_cache()?;
     }
 
+    // TEMP
+    let db_result = database_gateway::dummy_test::dummy_database_test()
+        .await
+        .map_err(CLIError::critical);
+    match &db_result {
+        Ok(()) => {
+            tracing::info!("DB test successful");
+        }
+        Err(err) => {
+            tracing::error!(
+                error_dbg = ?err,
+                error = %err.pretty(true),
+                "DB test failed",
+            );
+
+            if output_config.is_tty && output_config.verbosity_level == 0 {
+                eprintln!("{}", err.pretty(false));
+            }
+            return Ok(());
+        }
+    }
+
     let result = match cli_commands::get_command(&base_catalog, &cli_catalog, &matches) {
         Ok(mut command) => {
             if command.needs_workspace() && !workspace_svc.is_in_workspace() {
