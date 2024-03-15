@@ -161,6 +161,25 @@ pub trait MetadataChainExt: MetadataChain {
         self.accept_by_ref(visitors, &BlockRef::Head).await
     }
 
+    /// Same as [Self::accept()], allowing us to define the block interval under
+    /// which we will be making the traverse.
+    ///
+    /// Note: the interval is `[head, tail)` - tail is exclusive
+    async fn accept_by_interval<E>(
+        &self,
+        visitors: &mut [&mut dyn MetadataChainVisitor<Error = E>],
+        head_hash: &Multihash,
+        tail_hash: Option<&Multihash>,
+    ) -> Result<(), E>
+    where
+        E: Error + From<IterBlocksError>,
+    {
+        let mut decisions = vec![MetadataVisitorDecision::Next; visitors.len()];
+
+        self.accept_by_interval_with_decisions(&mut decisions, visitors, head_hash, tail_hash)
+            .await
+    }
+
     /// Same as [Self::accept()], allowing us to define the block (by hash) from
     /// which we will start the traverse
     async fn accept_by_hash<E>(
@@ -173,7 +192,7 @@ pub trait MetadataChainExt: MetadataChain {
     {
         let mut decisions = vec![MetadataVisitorDecision::Next; visitors.len()];
 
-        self.accept_by_hash_with_decisions(&mut decisions, visitors, head_hash)
+        self.accept_by_interval_with_decisions(&mut decisions, visitors, head_hash, None)
             .await
     }
 
@@ -196,11 +215,12 @@ pub trait MetadataChainExt: MetadataChain {
     /// to specify their initial decisions.
     ///
     /// See also [Self::accept()]
-    async fn accept_by_hash_with_decisions<E>(
+    async fn accept_by_interval_with_decisions<E>(
         &self,
         decisions: &mut [MetadataVisitorDecision],
         visitors: &mut [&mut dyn MetadataChainVisitor<Error = E>],
         head_hash: &Multihash,
+        tail_hash: Option<&Multihash>,
     ) -> Result<(), E>
     where
         E: Error + From<IterBlocksError>,
@@ -213,6 +233,7 @@ pub trait MetadataChainExt: MetadataChain {
         // TODO: PERF: Add traversal optimizations such as skip-lists
         while let Some(hash) = current_hash
             && !all_visitors_finished
+            && tail_hash != Some(&hash)
         {
             let block = self.get_block(&hash).await.map_err(Into::into)?;
             let hashed_block_ref = (&hash, &block);
