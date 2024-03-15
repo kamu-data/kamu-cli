@@ -53,6 +53,11 @@ kamu-adapter-oauth = { workspace = true }
 kamu-adapter-odata = { workspace = true }
 kamu-datafusion-cli = { workspace = true }
 
+# Database
+database-common = { workspace = true }
+database-sqlx-postgres = { workspace = true }
+database-sqlx-mysql =  { workspace = true }
+
 # CLI
 chrono-humanize = "0.2"  # Human readable durations
 clap = "4"

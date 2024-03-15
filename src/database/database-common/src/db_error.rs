@@ -7,14 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-#![feature(let_chains)]
+use thiserror::Error;
 
-// Re-exports
-pub use kamu_flow_system as domain;
+/////////////////////////////////////////////////////////////////////////////////////////
 
-mod dataset_flow_key;
-mod repos;
-mod services;
+#[derive(Error, Debug)]
+pub enum DatabaseError {
+    #[error(transparent)]
+    SqlxError(sqlx::Error),
+}
 
-pub use repos::*;
-pub use services::*;
+/////////////////////////////////////////////////////////////////////////////////////////

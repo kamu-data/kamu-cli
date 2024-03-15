@@ -7,14 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-#![feature(let_chains)]
+mod postgres_plugin;
+mod postgres_transaction_manager;
+mod repositories;
 
-// Re-exports
-pub use kamu_flow_system as domain;
-
-mod dataset_flow_key;
-mod repos;
-mod services;
-
-pub use repos::*;
-pub use services::*;
+pub use postgres_plugin::*;
+pub use postgres_transaction_manager::*;
+pub use repositories::*;
