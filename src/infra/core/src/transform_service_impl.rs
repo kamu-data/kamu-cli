@@ -467,13 +467,13 @@ impl TransformServiceImpl {
             h.clone()
         } else {
             // TODO: This will not work with schema evolution
-            input_chain
-                .iter_blocks()
-                .filter_data_stream_blocks()
-                .filter_map_ok(|(_, b)| b.event.new_data)
-                .try_first()
-                .await
-                .int_err()?
+            let mut visitor = <SearchDataBlocksVisitor>::default();
+
+            input_chain.accept(&mut [&mut visitor]).await?;
+
+            visitor
+                .into_data_block()
+                .and_then(|b| b.event.new_data)
                 .unwrap() // Already checked that none of the inputs are empty
                 .physical_hash
         };
