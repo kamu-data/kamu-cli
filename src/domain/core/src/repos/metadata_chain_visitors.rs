@@ -80,6 +80,10 @@ where
     pub fn into_block(self) -> Option<MetadataBlockTyped<T>> {
         self.hashed_block.map(|(_, block)| block)
     }
+
+    pub fn into_event(self) -> Option<T> {
+        self.hashed_block.map(|(_, block)| block.event)
+    }
 }
 
 impl<T, E, const F: u32> MetadataChainVisitor for SearchSingleTypedBlockVisitor<T, E, F>

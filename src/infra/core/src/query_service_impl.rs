@@ -182,8 +182,8 @@ impl QueryService for QueryServiceImpl {
             .await?;
 
         let vocab: DatasetVocabulary = search_set_vocab_visitor
-            .into_hashed_block()
-            .map_or_else(Default::default, |(_, block)| block.event)
+            .into_event()
+            .unwrap_or_default()
             .into();
 
         let ctx = self.session_context(QueryOptions {

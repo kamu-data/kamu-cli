@@ -226,14 +226,15 @@ impl TransformServiceImpl {
                 .await?;
 
             (
-                set_transform_visitor.into_block().map(|b| b.event),
+                set_transform_visitor.into_event(),
                 set_data_schema_visitor
-                    .into_block()
-                    .map(|b| b.event.schema_as_arrow())
+                    .into_event()
+                    .as_ref()
+                    .map(SetDataSchema::schema_as_arrow)
                     .transpose() // Option<Result<SchemaRef, E>> -> Result<Option<SchemaRef>, E>
                     .int_err()?,
-                set_vocab_visitor.into_block().map(|b| b.event),
-                execute_transform_visitor.into_block().map(|b| b.event),
+                set_vocab_visitor.into_event(),
+                execute_transform_visitor.into_event(),
             )
         };
 
@@ -500,10 +501,7 @@ impl TransformServiceImpl {
             .accept(&mut [&mut visitor])
             .await?;
 
-        Ok(visitor
-            .into_hashed_block()
-            .map_or_else(Default::default, |(_, block)| block.event)
-            .into())
+        Ok(visitor.into_event().unwrap_or_default().into())
     }
 
     // TODO: Improve error handling
