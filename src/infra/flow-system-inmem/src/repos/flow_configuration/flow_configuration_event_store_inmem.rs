@@ -63,12 +63,12 @@ impl EventStore<FlowConfigurationState> for FlowConfigurationEventStoreInMem {
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(?query, ?opts))]
-    fn get_events(
+    async fn get_events(
         &self,
         query: &FlowKey,
         opts: GetEventsOpts,
     ) -> EventStream<FlowConfigurationEvent> {
-        self.inner.get_events(query, opts)
+        self.inner.get_events(query, opts).await
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(?query, num_events = events.len()))]

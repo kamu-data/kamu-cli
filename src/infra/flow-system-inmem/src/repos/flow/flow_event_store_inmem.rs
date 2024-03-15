@@ -259,8 +259,8 @@ impl EventStore<FlowState> for FlowEventStoreInMem {
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(%query, ?opts))]
-    fn get_events(&self, query: &FlowID, opts: GetEventsOpts) -> EventStream<FlowEvent> {
-        self.inner.get_events(query, opts)
+    async fn get_events(&self, query: &FlowID, opts: GetEventsOpts) -> EventStream<FlowEvent> {
+        self.inner.get_events(query, opts).await
     }
 
     #[tracing::instrument(level = "debug", skip_all, fields(%query, num_events = events.len()))]

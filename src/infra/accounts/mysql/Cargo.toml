@@ -1,0 +1,46 @@
+[package]
+name = "kamu-accounts-mysql"
+description = "MySql-specific implementation of accounts domain"
+version = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+authors = { workspace = true }
+readme = { workspace = true }
+license-file = { workspace = true }
+keywords = { workspace = true }
+include = { workspace = true }
+edition = { workspace = true }
+publish = { workspace = true }
+
+
+[lints]
+workspace = true
+
+
+[lib]
+doctest = false
+
+
+[dependencies]
+database-common = { workspace = true }
+kamu-accounts = { workspace = true }
+internal-error = { workspace = true }
+
+async-trait = { version = "0.1", default-features = false }
+chrono = { version = "0.4", default-features = false }
+dill = "0.8"
+sqlx = { version = "0.7", default-features = false, features = [
+    "runtime-tokio-rustls",
+    "macros",
+    "mysql",
+    "uuid",
+    "chrono"
+]}
+thiserror = { version = "1", default-features = false }
+tracing = { version = "0.1", default-features = false }
+uuid = { version = "1", features = ["v4"] }
+
+
+[dev-dependencies]
+test-log = { version = "0.2", features = ["trace"] }
+test-group = { version = "1" }

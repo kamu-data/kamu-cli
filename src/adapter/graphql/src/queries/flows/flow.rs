@@ -155,6 +155,7 @@ impl Flow {
 
         let flow_events: Vec<_> = flow_event_store
             .get_events(&self.flow_state.flow_id, Default::default())
+            .await
             .try_collect()
             .await
             .int_err()?;

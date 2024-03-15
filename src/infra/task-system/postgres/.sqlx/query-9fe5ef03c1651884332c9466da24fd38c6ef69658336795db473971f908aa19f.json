@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO task_events (task_id, dataset_id, event_time, event_type, event_payload)\n                SELECT * FROM UNNEST(\n                    $1::INT8[],\n                    $2::TEXT[],\n                    $3::timestamptz[],\n                    $4::TEXT[],\n                    $5::JSONB[]\n                ) RETURNING task_event_id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "task_event_id",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8Array",
+        "TextArray",
+        "TimestamptzArray",
+        "TextArray",
+        "JsonbArray"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "9fe5ef03c1651884332c9466da24fd38c6ef69658336795db473971f908aa19f"
+}

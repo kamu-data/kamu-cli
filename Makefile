@@ -3,6 +3,9 @@ ODF_CRATE_DIR=./src/domain/opendatafabric
 LICENSE_HEADER=docs/license_header.txt
 TEST_LOG_PARAMS=RUST_LOG_SPAN_EVENTS=new,close RUST_LOG=debug
 
+POSTGRES_CRATES := ./src/infra/accounts/postgres ./src/infra/task-system/postgres
+MYSQL_CRATES := ./src/infra/accounts/mysql
+ALL_DATABASE_CRATES := $(POSTGRES_CRATES) $(MYSQL_CRATES)
 
 ###############################################################################
 # Lint
@@ -15,6 +18,7 @@ lint:
 	cargo deny check
 	# cargo udeps --all-targets
 	cargo clippy --workspace --all-targets -- -D warnings
+	$(foreach crate,$(ALL_DATABASE_CRATES),(cd $(crate) && cargo sqlx prepare --check);)
 
 
 ###############################################################################
@@ -28,6 +32,59 @@ lint-fix:
 
 
 ###############################################################################
+# Sqlx Local Setup (create databases for local work)
+###############################################################################
+
+define Setup_EnvFile
+echo "DATABASE_URL=$(1)://root:root@localhost:$(2)/kamu-api-server" > $(3)/.env;
+echo "SQLX_OFFLINE=false" >> $(3)/.env;
+endef
+
+.PHONY: sqlx-local-setup
+sqlx-local-setup: sqlx-local-setup-postgres sqlx-local-setup-mariadb
+
+.PHONY: sqlx-local-setup-postgres
+sqlx-local-setup-postgres:
+	docker pull postgres:latest
+	docker stop kamu-postgres || true && docker rm kamu-postgres || true
+	docker run --name kamu-postgres -p 5432:5432 -e POSTGRES_USER=root -e POSTGRES_PASSWORD=root -d postgres:latest
+	$(foreach crate,$(POSTGRES_CRATES),$(call Setup_EnvFile,postgres,5432,$(crate)))
+	sleep 3  # Letting the container to start
+	until PGPASSWORD=root psql -h localhost -U root -p 5432 -d root -c '\q'; do sleep 3; done
+	$(foreach crate,$(POSTGRES_CRATES),( cd $(crate) && sqlx database create && sqlx migrate run --source ../../../database/migrations/postgres );)
+
+.PHONY: sqlx-local-setup-mariadb
+sqlx-local-setup-mariadb:
+	docker pull mariadb:latest
+	docker stop kamu-mariadb || true && docker rm kamu-mariadb || true
+	docker run --name kamu-mariadb -p 3306:3306 -e MARIADB_ROOT_PASSWORD=root -d mariadb:latest
+	$(foreach crate,$(MYSQL_CRATES),$(call Setup_EnvFile,mysql,3306,$(crate)))
+	sleep 3  # Letting the container to start
+	until mariadb -h localhost -P 3306 -u root --password=root sys --protocol=tcp -e "SELECT 'Hello'" -b; do sleep 3; done	
+	$(foreach crate,$(MYSQL_CRATES),( cd $(crate) && sqlx database create && sqlx migrate run --source ../../../database/migrations/mysql );)
+
+.PHONY: sqlx-local-clean
+sqlx-local-clean: sqlx-local-clean-postgres sqlx-local-clean-mariadb
+
+.PHONY: sqlx-local-clean-postgres
+sqlx-local-clean-postgres:
+	docker stop kamu-postgres || true && docker rm kamu-postgres || true
+	$(foreach crate,$(POSTGRES_CRATES),rm $(crate)/.env -f ;)
+
+.PHONY: sqlx-local-clean-mariadb
+sqlx-local-clean-mariadb:
+	docker stop kamu-mariadb || true && docker rm kamu-mariadb || true
+	$(foreach crate,$(MYSQL_CRATES),rm $(crate)/.env -f ;)	
+
+###############################################################################
+# Sqlx Prepare (update data for offline compilation)
+###############################################################################
+
+.PHONY: sqlx-prepare
+sqlx-prepare:
+	$(foreach crate,$(ALL_DATABASE_CRATES),(cd $(crate) && cargo sqlx prepare );)
+
+###############################################################################
 # Test
 ###############################################################################
 
@@ -36,15 +93,19 @@ lint-fix:
 test-setup:
 	$(TEST_LOG_PARAMS) cargo nextest run -E 'test(::setup::)' --no-capture
 
-# Run all tests using nextest and configured concurrency limits
+# Run all tests excluding databases using nextest and configured concurrency limits
 .PHONY: test
 test:
+	$(TEST_LOG_PARAMS) cargo nextest run -E 'not (test(::database::))'
+
+.PHONY: test-full
+test-full:
 	$(TEST_LOG_PARAMS) cargo nextest run
 
-# Run all tests excluding the heavy engines
+# Run all tests excluding the heavy engines and databases
 .PHONY: test-fast
 test-fast:
-	$(TEST_LOG_PARAMS) cargo nextest run -E 'not (test(::spark::) | test(::flink::))'
+	$(TEST_LOG_PARAMS) cargo nextest run -E 'not (test(::spark::) | test(::flink::) | test(::database::))'
 
 
 ###############################################################################

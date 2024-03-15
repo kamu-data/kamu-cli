@@ -1,0 +1,30 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                SELECT task_event_id, event_payload FROM task_events\n                    WHERE task_id = $1\n                         AND (cast($2 as INT8) IS NULL or task_event_id > $2)\n                         AND (cast($3 as INT8) IS NULL or task_event_id <= $3)\n                ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "task_event_id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "event_payload",
+        "type_info": "Jsonb"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "5288ee8374f108b09725880f540af384f080c43f8a06c4aadd738589c02221d5"
+}
