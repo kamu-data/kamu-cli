@@ -42,20 +42,28 @@ use crate::{
 
 pub type SearchSetVocabVisitor<E = InternalError> =
     SearchSingleTypedBlockVisitor<SetVocab, E, { Flag::SET_VOCAB.bits() }>;
+
 pub type SearchSeedVisitor<E = InternalError> =
     SearchSingleTypedBlockVisitor<Seed, E, { Flag::SEED.bits() }>;
+
 pub type SearchSetPollingSourceVisitor<E = InternalError> =
     SearchSingleTypedBlockVisitor<SetPollingSource, E, { Flag::SET_POLLING_SOURCE.bits() }>;
+
 pub type SearchSetTransformVisitor<E = InternalError> =
     SearchSingleTypedBlockVisitor<SetTransform, E, { Flag::SET_TRANSFORM.bits() }>;
+
 pub type SearchSetDataSchemaVisitor<E = InternalError> =
     SearchSingleTypedBlockVisitor<SetDataSchema, E, { Flag::SET_DATA_SCHEMA.bits() }>;
+
 pub type SearchExecuteTransformVisitor<E = InternalError> =
     SearchSingleTypedBlockVisitor<ExecuteTransform, E, { Flag::EXECUTE_TRANSFORM.bits() }>;
+
 pub type SearchSetInfoVisitor<E = InternalError> =
     SearchSingleTypedBlockVisitor<SetInfo, E, { Flag::SET_INFO.bits() }>;
+
 pub type SearchSetAttachmentsVisitor<E = InternalError> =
     SearchSingleTypedBlockVisitor<SetAttachments, E, { Flag::SET_ATTACHMENTS.bits() }>;
+
 pub type SearchSetLicenseVisitor<E = InternalError> =
     SearchSingleTypedBlockVisitor<SetLicense, E, { Flag::SET_LICENSE.bits() }>;
 
