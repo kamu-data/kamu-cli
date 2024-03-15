@@ -21,8 +21,9 @@ use kamu_core::{
     GetIncrementError,
     GetRefError,
     InternalError,
+    MetadataChainExt,
     ResultIntoInternal,
-    TryStreamExtExt,
+    SearchDataBlocksVisitor,
 };
 use opendatafabric::{DataSlice, DatasetID, MetadataEvent, Multihash};
 
@@ -70,6 +71,7 @@ impl DatasetChangesServiceImpl {
             })
     }
 
+    // TODO: PERF: Avoid multiple passes over metadata chain
     async fn make_increment_from_interval(
         &self,
         dataset: Arc<dyn Dataset>,
@@ -135,7 +137,7 @@ impl DatasetChangesServiceImpl {
         }
 
         // Drop stream to unborrow old_head/new_head references
-        std::mem::drop(block_stream);
+        drop(block_stream);
 
         // We have reach the end of pulled interval.
         // If we've seen some watermark, but not the previous one within the changed
@@ -146,14 +148,16 @@ impl DatasetChangesServiceImpl {
             // Did we have any head before?
             if let Some(old_head) = &old_head {
                 // Yes, so try locating the previous watermark containing node
-                let previous_nearest_watermark = dataset
+                let mut visitor = <SearchDataBlocksVisitor>::default();
+
+                dataset
                     .as_metadata_chain()
-                    .iter_blocks_interval(old_head, None, false)
-                    .filter_data_stream_blocks()
-                    .filter_map_ok(|(_, b)| b.event.new_watermark)
-                    .try_first()
-                    .await
-                    .int_err()?;
+                    .accept_by_hash(&mut [&mut visitor], old_head)
+                    .await?;
+
+                let previous_nearest_watermark = visitor
+                    .into_data_block()
+                    .and_then(|b| b.event.new_watermark);
 
                 // The "latest" watermark is only an update, if we can find a different
                 // watermark before the searched interval, or if it's a first watermark
