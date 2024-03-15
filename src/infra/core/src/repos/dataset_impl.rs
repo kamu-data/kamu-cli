@@ -133,74 +133,71 @@ where
         current_head: &Multihash,
         last_seen: Option<&Multihash>,
     ) -> Result<UpdateSummaryIncrement, GetSummaryError> {
-        use tokio_stream::StreamExt;
+        type Flag = MetadataBlockTypeFlags;
+        type Decision = MetadataVisitorDecision;
 
-        let mut block_stream =
-            self.metadata_chain
-                .iter_blocks_interval(current_head, last_seen, true);
-        let mut increment = UpdateSummaryIncrement {
-            seen_head: Some(current_head.clone()),
-            ..Default::default()
-        };
+        struct VisitorState {
+            requested_flags: MetadataBlockTypeFlags,
+            increment: UpdateSummaryIncrement,
+        }
 
-        while let Some((_, block)) = block_stream.try_next().await.int_err()? {
-            match block.event {
-                MetadataEvent::Seed(seed) => {
-                    increment.seen_id.get_or_insert(seed.dataset_id);
-                    increment.seen_kind.get_or_insert(seed.dataset_kind);
-                }
-                MetadataEvent::SetTransform(set_transform) => {
-                    if increment.seen_dependencies.is_none() {
-                        increment.seen_dependencies = Some(
-                            set_transform
-                                .inputs
-                                .into_iter()
+        let mut visitor = GenericCallbackVisitor::new(
+            VisitorState {
+                requested_flags: Flag::SEED | Flag::SET_TRANSFORM | Flag::DATA_BLOCK,
+                increment: UpdateSummaryIncrement {
+                    seen_head: Some(current_head.clone()),
+                    ..Default::default()
+                },
+            },
+            |state, (_, block)| {
+                match &block.event {
+                    MetadataEvent::Seed(e) => {
+                        state.increment.seen_id = Some(e.dataset_id.clone());
+                        state.increment.seen_kind = Some(e.dataset_kind);
+
+                        state.requested_flags -= Flag::SEED;
+                    }
+                    MetadataEvent::SetTransform(e) => {
+                        state.increment.seen_dependencies = Some(
+                            e.inputs
+                                .iter()
                                 .map(|i| i.dataset_ref.id().cloned().unwrap())
                                 .collect(),
                         );
+
+                        state.requested_flags -= Flag::SET_TRANSFORM;
                     }
-                }
-                MetadataEvent::AddData(add_data) => {
-                    increment.seen_last_pulled.get_or_insert(block.system_time);
+                    MetadataEvent::AddData(_) | MetadataEvent::ExecuteTransform(_) => {
+                        let Some(data_block) = block.as_data_stream_block() else {
+                            unreachable!()
+                        };
 
-                    if let Some(output_data) = add_data.new_data {
-                        let iv = output_data.offset_interval;
-                        increment.seen_num_records += iv.end - iv.start + 1;
+                        state
+                            .increment
+                            .seen_last_pulled
+                            .get_or_insert(block.system_time);
 
-                        increment.seen_data_size += output_data.size;
+                        if let Some(output_data) = data_block.event.new_data {
+                            state.increment.seen_num_records += output_data.num_records();
+                            state.increment.seen_data_size += output_data.size;
+                        }
+
+                        if let Some(checkpoint) = data_block.event.new_checkpoint {
+                            state.increment.seen_checkpoints_size += checkpoint.size;
+                        }
                     }
+                    _ => {}
+                };
 
-                    if let Some(checkpoint) = add_data.new_checkpoint {
-                        increment.seen_checkpoints_size += checkpoint.size;
-                    }
-                }
-                MetadataEvent::ExecuteTransform(execute_transform) => {
-                    increment.seen_last_pulled.get_or_insert(block.system_time);
+                Ok(Decision::NextOfType(state.requested_flags))
+            },
+        );
 
-                    if let Some(output_data) = execute_transform.new_data {
-                        let iv = output_data.offset_interval;
-                        increment.seen_num_records += iv.end - iv.start + 1;
+        self.metadata_chain
+            .accept_by_interval::<InternalError>(&mut [&mut visitor], current_head, last_seen)
+            .await?;
 
-                        increment.seen_data_size += output_data.size;
-                    }
-
-                    if let Some(checkpoint) = execute_transform.new_checkpoint {
-                        increment.seen_checkpoints_size += checkpoint.size;
-                    }
-                }
-                MetadataEvent::SetDataSchema(_)
-                | MetadataEvent::SetAttachments(_)
-                | MetadataEvent::SetInfo(_)
-                | MetadataEvent::SetLicense(_)
-                | MetadataEvent::SetVocab(_)
-                | MetadataEvent::SetPollingSource(_)
-                | MetadataEvent::DisablePollingSource(_)
-                | MetadataEvent::AddPushSource(_)
-                | MetadataEvent::DisablePushSource(_) => (),
-            }
-        }
-
-        Ok(increment)
+        Ok(visitor.into_state().increment)
     }
 
     async fn prepare_objects(
