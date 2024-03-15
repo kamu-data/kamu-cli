@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::prelude::*;
-use kamu_core::{self as domain, MetadataChainExt, TryStreamExtExt};
+use kamu_core::{self as domain, MetadataChainExt, SearchDataBlocksVisitor, TryStreamExtExt};
 use opendatafabric as odf;
 use opendatafabric::{AsTypedBlock, VariantOf};
 
@@ -59,15 +59,17 @@ impl DatasetMetadata {
 
     /// Last recorded watermark
     async fn current_watermark(&self, ctx: &Context<'_>) -> Result<Option<DateTime<Utc>>> {
-        let ds = self.get_dataset(ctx).await?;
-        Ok(ds
+        let dataset = self.get_dataset(ctx).await?;
+        let mut visitor = <SearchDataBlocksVisitor>::default();
+
+        dataset
             .as_metadata_chain()
-            .iter_blocks_ref(&domain::BlockRef::Head)
-            .filter_data_stream_blocks()
-            .filter_map_ok(|(_, b)| b.event.new_watermark)
-            .try_first()
-            .await
-            .int_err()?)
+            .accept(&mut [&mut visitor])
+            .await?;
+
+        Ok(visitor
+            .into_data_block()
+            .and_then(|b| b.event.new_watermark))
     }
 
     /// Latest data schema
