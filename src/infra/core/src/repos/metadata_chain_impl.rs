@@ -73,7 +73,7 @@ where
             return Ok(());
         };
 
-        self.accept_by_hash_with_decisions(decisions, visitors, prev_block_hash)
+        self.accept_by_interval_with_decisions(decisions, visitors, prev_block_hash, None)
             .await
     }
 }

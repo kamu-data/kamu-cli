@@ -193,3 +193,43 @@ where
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+
+pub struct GenericCallbackVisitor<S, F, E = InternalError> {
+    state: S,
+    visit_callback: F,
+    _phantom: PhantomData<E>,
+}
+
+impl<S, F, E> GenericCallbackVisitor<S, F, E>
+where
+    S: Send + Sync,
+    F: Fn(&mut S, HashedMetadataBlockRef) -> Result<Decision, E> + Send + Sync,
+    E: Error + Send + Sync,
+{
+    pub fn new(state: S, visit_callback: F) -> Self {
+        Self {
+            state,
+            visit_callback,
+            _phantom: PhantomData,
+        }
+    }
+
+    pub fn into_state(self) -> S {
+        self.state
+    }
+}
+
+impl<S, F, E> MetadataChainVisitor for GenericCallbackVisitor<S, F, E>
+where
+    S: Send + Sync,
+    F: Fn(&mut S, HashedMetadataBlockRef) -> Result<Decision, E> + Send + Sync,
+    E: Error + Send + Sync,
+{
+    type Error = E;
+
+    fn visit(&mut self, hashed_block_ref: HashedMetadataBlockRef) -> Result<Decision, Self::Error> {
+        (self.visit_callback)(&mut self.state, hashed_block_ref)
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
