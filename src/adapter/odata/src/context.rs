@@ -23,7 +23,7 @@ use chrono::{DateTime, Utc};
 use datafusion::arrow::datatypes::{Schema, SchemaRef};
 use datafusion::dataframe::DataFrame;
 use datafusion_odata::collection::QueryParams;
-use datafusion_odata::context::{CollectionContext, ServiceContext};
+use datafusion_odata::context::{CollectionContext, OnUnsupported, ServiceContext};
 use dill::Catalog;
 use kamu_core::*;
 use opendatafabric::*;
@@ -100,6 +100,10 @@ impl ServiceContext for ODataServiceContext {
         }
 
         collections
+    }
+
+    fn on_unsupported_feature(&self) -> OnUnsupported {
+        OnUnsupported::Warn
     }
 }
 
@@ -223,5 +227,9 @@ impl CollectionContext for ODataCollectionContext {
             .unwrap();
 
         query.apply(df, DEFAULT_RECORDS_PER_PAGE, MAX_RECORDS_PER_PAGE)
+    }
+
+    fn on_unsupported_feature(&self) -> OnUnsupported {
+        OnUnsupported::Warn
     }
 }
