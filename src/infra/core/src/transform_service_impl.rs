@@ -452,13 +452,35 @@ impl TransformServiceImpl {
             h.clone()
         } else {
             // TODO: This will not work with schema evolution
-            let mut visitor = <SearchDataBlocksVisitor>::default();
+            struct VisitorState {
+                slice: Option<DataSlice>,
+            }
 
-            input_chain.accept(&mut [&mut visitor]).await?;
+            let mut visitor =
+                GenericCallbackVisitor::new(VisitorState { slice: None }, |state, (_, block)| {
+                    type Flag = MetadataBlockTypeFlags;
+                    type Decision = MetadataVisitorDecision;
+
+                    let Some(data_block) = block.as_data_stream_block() else {
+                        return Ok(Decision::NextOfType(Flag::DATA_BLOCK));
+                    };
+
+                    let Some(slice) = data_block.event.new_data else {
+                        return Ok(Decision::NextOfType(Flag::DATA_BLOCK));
+                    };
+
+                    state.slice = Some(slice.clone());
+
+                    Ok(Decision::Stop)
+                });
+
+            input_chain
+                .accept::<InternalError>(&mut [&mut visitor])
+                .await?;
 
             visitor
-                .into_data_block()
-                .and_then(|b| b.event.new_data)
+                .into_state()
+                .slice
                 .unwrap() // Already checked that none of the inputs are empty
                 .physical_hash
         };
