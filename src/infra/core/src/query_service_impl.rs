@@ -357,27 +357,56 @@ impl KamuSchema {
         dataset: &dyn Dataset,
         last_records_to_consider: Option<u64>,
     ) -> Result<Vec<Multihash>, InternalError> {
-        let mut files = Vec::new();
-        let mut num_records = 0;
-
-        let mut slices = dataset
-            .as_metadata_chain()
-            .iter_blocks()
-            .filter_data_stream_blocks()
-            .filter_map_ok(|(_, b)| b.event.new_data);
-
-        while let Some(slice) = slices.try_next().await.int_err()? {
-            num_records += slice.num_records();
-            files.push(slice.physical_hash);
-
-            if last_records_to_consider.is_some()
-                && last_records_to_consider.unwrap() <= num_records
-            {
-                break;
-            }
+        struct DataSliceCollectorVisitorState {
+            files: Vec<Multihash>,
+            num_records: u64,
+            last_records_to_consider: Option<u64>,
         }
 
-        Ok(files)
+        let mut slice_collector_visitor = GenericCallbackVisitor::new(
+            DataSliceCollectorVisitorState {
+                files: Vec::new(),
+                num_records: 0,
+                last_records_to_consider,
+            },
+            |state, (_, block)| {
+                type Flag = MetadataBlockTypeFlags;
+                type Decision = MetadataVisitorDecision;
+
+                let block_flag = Flag::from(block);
+
+                if !Flag::DATA_BLOCK.contains(block_flag) {
+                    return Ok(Decision::NextOfType(Flag::DATA_BLOCK));
+                }
+
+                let new_data = match &block.event {
+                    MetadataEvent::AddData(e) => e.new_data.as_ref(),
+                    MetadataEvent::ExecuteTransform(e) => e.new_data.as_ref(),
+                    _ => unreachable!(),
+                };
+                let Some(slice) = new_data else {
+                    return Ok(Decision::NextOfType(Flag::DATA_BLOCK));
+                };
+
+                state.num_records += slice.num_records();
+                state.files.push(slice.physical_hash.clone());
+
+                if let Some(last_records_to_consider) = &state.last_records_to_consider
+                    && *last_records_to_consider <= state.num_records
+                {
+                    return Ok(Decision::Stop);
+                }
+
+                Ok(Decision::NextOfType(Flag::DATA_BLOCK))
+            },
+        );
+
+        dataset
+            .as_metadata_chain()
+            .accept::<InternalError>(&mut [&mut slice_collector_visitor])
+            .await?;
+
+        Ok(slice_collector_visitor.into_state().files)
     }
 
     fn options_for(&self, dataset_handle: &DatasetHandle) -> Option<&DatasetQueryOptions> {
