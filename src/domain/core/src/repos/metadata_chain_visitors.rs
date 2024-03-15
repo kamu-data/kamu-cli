@@ -21,7 +21,10 @@ use opendatafabric::{
     MetadataEvent,
     Multihash,
     Seed,
+    SetAttachments,
     SetDataSchema,
+    SetInfo,
+    SetLicense,
     SetPollingSource,
     SetTransform,
     SetVocab,
@@ -49,6 +52,12 @@ pub type SearchSetDataSchemaVisitor<E = InternalError> =
     SearchSingleTypedBlockVisitor<SetDataSchema, E, { Flag::SET_DATA_SCHEMA.bits() }>;
 pub type SearchExecuteTransformVisitor<E = InternalError> =
     SearchSingleTypedBlockVisitor<ExecuteTransform, E, { Flag::EXECUTE_TRANSFORM.bits() }>;
+pub type SearchSetInfoVisitor<E = InternalError> =
+    SearchSingleTypedBlockVisitor<SetInfo, E, { Flag::SET_INFO.bits() }>;
+pub type SearchSetAttachmentsVisitor<E = InternalError> =
+    SearchSingleTypedBlockVisitor<SetAttachments, E, { Flag::SET_ATTACHMENTS.bits() }>;
+pub type SearchSetLicenseVisitor<E = InternalError> =
+    SearchSingleTypedBlockVisitor<SetLicense, E, { Flag::SET_LICENSE.bits() }>;
 
 ///////////////////////////////////////////////////////////////////////////////
 
