@@ -334,15 +334,16 @@ impl TransformServiceImpl {
     // This will require passing the schema explicitly instead of relying on a file
     async fn is_never_pulled(&self, dataset_ref: &DatasetRef) -> Result<bool, InternalError> {
         let dataset = self.dataset_repo.get_dataset(dataset_ref).await.int_err()?;
-        let last_data_block = dataset
+        let mut visitor = <SearchDataBlocksVisitor>::default();
+
+        dataset
             .as_metadata_chain()
-            .iter_blocks()
-            .filter_data_stream_blocks()
-            .try_next()
-            .await
-            .int_err()?;
-        Ok(last_data_block
-            .and_then(|(_, b)| b.event.last_offset())
+            .accept(&mut [&mut visitor])
+            .await?;
+
+        Ok(visitor
+            .into_data_block()
+            .and_then(|b| b.event.last_offset())
             .is_none())
     }
 
