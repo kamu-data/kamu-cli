@@ -204,60 +204,38 @@ impl TransformServiceImpl {
         let block_ref = BlockRef::Head;
         let head = output_chain.resolve_ref(&block_ref).await.int_err()?;
 
-        let mut source = None;
-        let mut schema = None;
-        let mut set_vocab = None;
-        let mut prev_query = None;
-
         // TODO: PERF: Search for source, vocab, and data schema result in full scan
-        {
-            let mut block_stream = output_chain.iter_blocks_interval(&head, None, false);
-            while let Some((_, block)) = block_stream.try_next().await.int_err()? {
-                match block.event {
-                    MetadataEvent::SetVocab(e) => {
-                        if set_vocab.is_none() {
-                            set_vocab = Some(e);
-                        }
-                    }
-                    MetadataEvent::SetTransform(e) => {
-                        if source.is_none() {
-                            source = Some(e);
-                        } else {
-                            unimplemented!("Transform evolution is not yet supported");
-                        }
-                    }
-                    MetadataEvent::SetDataSchema(e) => {
-                        if schema.is_none() {
-                            schema = Some(e.schema_as_arrow().int_err()?);
-                        }
-                    }
-                    MetadataEvent::ExecuteTransform(e) => {
-                        if prev_query.is_none() {
-                            prev_query = Some(e);
-                        }
-                    }
-                    MetadataEvent::Seed(_)
-                    | MetadataEvent::SetAttachments(_)
-                    | MetadataEvent::SetInfo(_)
-                    | MetadataEvent::SetLicense(_) => {}
-                    MetadataEvent::AddData(_)
-                    | MetadataEvent::SetPollingSource(_)
-                    | MetadataEvent::AddPushSource(_)
-                    | MetadataEvent::DisablePushSource(_)
-                    | MetadataEvent::DisablePollingSource(_) => {
-                        unreachable!()
-                    }
-                }
+        let (source, schema, set_vocab, prev_query) = {
+            // TODO: Support transform evolution
+            let mut set_transform_visitor = <SearchSetTransformVisitor>::default();
+            let mut set_vocab_visitor = <SearchSetVocabVisitor>::default();
+            let mut set_data_schema_visitor = <SearchSetDataSchemaVisitor>::default();
+            let mut execute_transform_visitor = <SearchExecuteTransformVisitor>::default();
 
-                if source.is_some()
-                    && schema.is_some()
-                    && set_vocab.is_some()
-                    && prev_query.is_some()
-                {
-                    break;
-                }
-            }
-        }
+            dataset
+                .as_metadata_chain()
+                .accept_by_hash(
+                    &mut [
+                        &mut set_transform_visitor,
+                        &mut set_vocab_visitor,
+                        &mut set_data_schema_visitor,
+                        &mut execute_transform_visitor,
+                    ],
+                    &head,
+                )
+                .await?;
+
+            (
+                set_transform_visitor.into_block().map(|b| b.event),
+                set_data_schema_visitor
+                    .into_block()
+                    .map(|b| b.event.schema_as_arrow())
+                    .transpose() // Option<Result<SchemaRef, E>> -> Result<Option<SchemaRef>, E>
+                    .int_err()?,
+                set_vocab_visitor.into_block().map(|b| b.event),
+                execute_transform_visitor.into_block().map(|b| b.event),
+            )
+        };
 
         let Some(source) = source else {
             return Err(TransformNotDefinedError {}.into());

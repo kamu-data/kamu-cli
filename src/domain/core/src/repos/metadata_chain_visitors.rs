@@ -13,6 +13,7 @@ use std::marker::PhantomData;
 use internal_error::InternalError;
 use opendatafabric::{
     AsTypedBlock,
+    ExecuteTransform,
     IntoDataStreamBlock,
     MetadataBlock,
     MetadataBlockDataStream,
@@ -46,6 +47,8 @@ pub type SearchSetTransformVisitor<E = InternalError> =
     SearchSingleTypedBlockVisitor<SetTransform, E, { Flag::SET_TRANSFORM.bits() }>;
 pub type SearchSetDataSchemaVisitor<E = InternalError> =
     SearchSingleTypedBlockVisitor<SetDataSchema, E, { Flag::SET_DATA_SCHEMA.bits() }>;
+pub type SearchExecuteTransformVisitor<E = InternalError> =
+    SearchSingleTypedBlockVisitor<ExecuteTransform, E, { Flag::EXECUTE_TRANSFORM.bits() }>;
 
 ///////////////////////////////////////////////////////////////////////////////
 
