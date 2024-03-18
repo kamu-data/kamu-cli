@@ -80,9 +80,7 @@ impl DatasetMetadata {
             .accept(&mut [&mut visitor])
             .await?;
 
-        Ok(visitor
-            .into_data_block()
-            .and_then(|b| b.event.new_watermark))
+        Ok(visitor.into_event().and_then(|e| e.new_watermark))
     }
 
     /// Latest data schema

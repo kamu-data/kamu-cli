@@ -176,9 +176,7 @@ impl DatasetChangesServiceImpl {
                     .accept_by_hash(&mut [&mut visitor], old_head)
                     .await?;
 
-                let previous_nearest_watermark = visitor
-                    .into_data_block()
-                    .and_then(|b| b.event.new_watermark);
+                let previous_nearest_watermark = visitor.into_event().and_then(|e| e.new_watermark);
 
                 // The "latest" watermark is only an update, if we can find a different
                 // watermark before the searched interval, or if it's a first watermark

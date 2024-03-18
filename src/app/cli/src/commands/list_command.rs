@@ -271,8 +271,8 @@ impl Command for ListCommand {
                     .into_block()
                     .map_or(0, |b| b.sequence_number);
                 let last_watermark = data_block_visitor
-                    .into_data_block()
-                    .and_then(|b| b.event.new_watermark);
+                    .into_event()
+                    .and_then(|e| e.new_watermark);
 
                 id.push(hdl.id.as_did_str().to_string());
                 head.push(current_head.as_multibase().to_string());

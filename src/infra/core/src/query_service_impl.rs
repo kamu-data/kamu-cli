@@ -102,7 +102,7 @@ impl QueryServiceImpl {
             })?;
 
         // TODO: Update to use SetDataSchema event
-        let last_data_slice_opt = visitor.into_data_block().and_then(|b| b.event.new_data);
+        let last_data_slice_opt = visitor.into_event().and_then(|e| e.new_data);
 
         match last_data_slice_opt {
             Some(last_data_slice) => {

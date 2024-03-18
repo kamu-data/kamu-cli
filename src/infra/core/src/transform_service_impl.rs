@@ -320,10 +320,7 @@ impl TransformServiceImpl {
             .accept(&mut [&mut visitor])
             .await?;
 
-        Ok(visitor
-            .into_data_block()
-            .and_then(|b| b.event.last_offset())
-            .is_none())
+        Ok(visitor.into_event().and_then(|e| e.last_offset()).is_none())
     }
 
     async fn get_transform_input(
@@ -365,8 +362,8 @@ impl TransformServiceImpl {
             .await?;
 
         let last_unprocessed_offset = visitor
-            .into_data_block()
-            .and_then(|b| b.event.last_offset())
+            .into_event()
+            .and_then(|e| e.last_offset())
             .or(last_processed_offset);
 
         let query_input = ExecuteTransformInput {
@@ -452,35 +449,15 @@ impl TransformServiceImpl {
             h.clone()
         } else {
             // TODO: This will not work with schema evolution
-            struct VisitorState {
-                slice: Option<DataSlice>,
-            }
-
-            let mut visitor =
-                GenericCallbackVisitor::new(VisitorState { slice: None }, |state, (_, block)| {
-                    type Flag = MetadataBlockTypeFlags;
-                    type Decision = MetadataVisitorDecision;
-
-                    let Some(data_block) = block.as_data_stream_block() else {
-                        return Ok(Decision::NextOfType(Flag::DATA_BLOCK));
-                    };
-
-                    let Some(slice) = data_block.event.new_data else {
-                        return Ok(Decision::NextOfType(Flag::DATA_BLOCK));
-                    };
-
-                    state.slice = Some(slice.clone());
-
-                    Ok(Decision::Stop)
-                });
+            let mut visitor = <SearchDataBlocksVisitor>::next_filled_new_data();
 
             input_chain
                 .accept::<InternalError>(&mut [&mut visitor])
                 .await?;
 
             visitor
-                .into_state()
-                .slice
+                .into_event()
+                .and_then(|e| e.new_data)
                 .unwrap() // Already checked that none of the inputs are empty
                 .physical_hash
         };
