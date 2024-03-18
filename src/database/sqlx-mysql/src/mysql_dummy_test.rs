@@ -20,7 +20,9 @@ use crate::MySQLConnectionPool;
 pub async fn dummy_mysql_db_test(
     db_configuration: &DatabaseConfiguration,
 ) -> Result<(), InternalError> {
-    let db_connection_pool = MySQLConnectionPool::new(db_configuration).int_err()?;
+    let db_connection_pool = MySQLConnectionPool::new(
+        MySQLConnectionPool::build_mysql_pool(db_configuration).int_err()?,
+    );
 
     let mut db_transaction = db_connection_pool.begin_transaction().await.int_err()?;
 

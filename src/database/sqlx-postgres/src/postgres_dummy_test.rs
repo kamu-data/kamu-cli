@@ -20,7 +20,9 @@ use crate::PostgresConnectionPool;
 pub async fn postgres_dummy_test(
     db_configuration: &DatabaseConfiguration,
 ) -> Result<(), InternalError> {
-    let db_connection_pool = PostgresConnectionPool::new(db_configuration).int_err()?;
+    let db_connection_pool = PostgresConnectionPool::new(
+        PostgresConnectionPool::build_pg_pool(db_configuration).int_err()?,
+    );
 
     let mut db_transaction = db_connection_pool.begin_transaction().await.int_err()?;
 

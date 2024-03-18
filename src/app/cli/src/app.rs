@@ -71,6 +71,18 @@ pub async fn run(
         let mut base_catalog_builder =
             configure_base_catalog(&workspace_layout, workspace_svc.is_multi_tenant_workspace());
 
+        // let database_configuration = DatabaseConfiguration::local_postgres();
+        // let database_catalog_initializer =
+        // database_sqlx_postgres::PostgresCatalogInitializer {};
+
+        // let database_configuration = DatabaseConfiguration::local_mariadb();
+        // let database_catalog_initializer =
+        // database_sqlx_mysql::MySQLCatalogInitializer {};
+
+        //database_catalog_initializer
+        //    .init_database_components(&mut base_catalog_builder,
+        // &database_configuration)?;
+
         base_catalog_builder
             .add_value(dependencies_graph_repository)
             .bind::<dyn domain::DependencyGraphRepository, DependencyGraphRepositoryInMemory>();
@@ -102,58 +114,22 @@ pub async fn run(
         (guards, base_catalog, cli_catalog, output_config)
     };
 
+    // Temp
+    let account_repository = cli_catalog
+        .get_one::<dyn auth::AccountRepository>()
+        .unwrap();
+    println!(
+        "{:?}",
+        account_repository
+            .find_account_by_email("test@example.com")
+            .await
+            .int_err()?
+    );
+
     // Evict cache
     if workspace_svc.is_in_workspace() && !workspace_svc.is_upgrade_needed()? {
         cli_catalog.get_one::<GcService>()?.evict_cache()?;
     }
-
-    // TEMP
-    /*
-    let postgres_result = database_sqlx_postgres::postgres_dummy_test(
-        &database_common::DatabaseConfiguration::local_postgres(),
-    )
-    .await
-    .map_err(CLIError::critical);
-    match &postgres_result {
-        Ok(()) => {
-            tracing::info!("Postgres test successful");
-        }
-        Err(err) => {
-            tracing::error!(
-                error_dbg = ?err,
-                error = %err.pretty(true),
-                "Postgres test failed",
-            );
-
-            if output_config.is_tty && output_config.verbosity_level == 0 {
-                eprintln!("{}", err.pretty(false));
-            }
-            return Ok(());
-        }
-    }
-
-    let maria_db_result = database_sqlx_mysql::dummy_mysql_db_test(
-        &database_common::DatabaseConfiguration::local_mariadb(),
-    )
-    .await
-    .map_err(CLIError::critical);
-    match &maria_db_result {
-        Ok(()) => {
-            tracing::info!("MariaDB test successful");
-        }
-        Err(err) => {
-            tracing::error!(
-                error_dbg = ?err,
-                error = %err.pretty(true),
-                "MariaDB test failed",
-            );
-
-            if output_config.is_tty && output_config.verbosity_level == 0 {
-                eprintln!("{}", err.pretty(false));
-            }
-            return Ok(());
-        }
-    }*/
 
     let result = match cli_commands::get_command(&base_catalog, &cli_catalog, &matches) {
         Ok(mut command) => {

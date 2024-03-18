@@ -1963,6 +1963,8 @@ name = "database-common"
 version = "0.165.0"
 dependencies = [
  "chrono",
+ "dill",
+ "internal-error",
  "secrecy",
  "serde",
  "sqlx",
@@ -1974,9 +1976,13 @@ dependencies = [
 name = "database-sqlx-mysql"
 version = "0.165.0"
 dependencies = [
+ "async-trait",
  "chrono",
  "database-common",
+ "dill",
  "internal-error",
+ "kamu-core",
+ "opendatafabric",
  "secrecy",
  "serde",
  "sqlx",
@@ -1988,9 +1994,13 @@ dependencies = [
 name = "database-sqlx-postgres"
 version = "0.165.0"
 dependencies = [
+ "async-trait",
  "chrono",
  "database-common",
+ "dill",
  "internal-error",
+ "kamu-core",
+ "opendatafabric",
  "secrecy",
  "serde",
  "sqlx",

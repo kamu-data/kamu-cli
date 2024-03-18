@@ -9,16 +9,18 @@
 
 use secrecy::{ExposeSecret, Secret};
 
+use crate::DatabaseProvider;
+
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug)]
 pub struct DatabaseConfiguration {
-    pub provider: String,
+    pub provider: DatabaseProvider,
     pub user: String,
     pub password: Secret<String>,
     pub database_name: String,
     pub host: String,
-    pub port: u32,
+    pub port: Option<u32>,
 }
 
 impl DatabaseConfiguration {
@@ -29,30 +31,30 @@ impl DatabaseConfiguration {
             self.user,
             self.password.expose_secret(),
             self.host,
-            self.port,
+            self.port.unwrap_or_else(|| self.provider.default_port()),
             self.database_name
         )
     }
 
     pub fn local_postgres() -> Self {
         Self {
-            provider: String::from("postgres"),
+            provider: DatabaseProvider::Postgres,
             user: String::from("root"),
             password: Secret::new(String::from("root")),
             database_name: String::from("kamu-api-server"),
             host: String::from("localhost"),
-            port: 5432,
+            port: None,
         }
     }
 
     pub fn local_mariadb() -> Self {
         Self {
-            provider: String::from("mariadb"),
+            provider: DatabaseProvider::MariaDB,
             user: String::from("root"),
             password: Secret::new(String::from("root")),
             database_name: String::from("kamu-api-server"),
             host: String::from("localhost"),
-            port: 3306,
+            port: None,
         }
     }
 }
