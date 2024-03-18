@@ -126,6 +126,7 @@ where
 
 ///////////////////////////////////////////////////////////////////////////////
 
+#[allow(clippy::enum_variant_names)]
 enum SearchDataBlocksVisitorKind {
     NextDataBlock,
     NextFilledNewWatermark,
