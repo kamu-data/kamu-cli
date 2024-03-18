@@ -269,7 +269,7 @@ impl Command for ListCommand {
                 // TODO: Should be precomputed
                 let num_blocks = next_block_visitor
                     .into_block()
-                    .map_or(0, |b| b.sequence_number);
+                    .map_or(0, |b| b.sequence_number + 1);
                 let last_watermark = data_block_visitor
                     .into_event()
                     .and_then(|e| e.new_watermark);
