@@ -17,7 +17,6 @@ use opendatafabric::{
     IntoDataStreamBlock,
     MetadataBlock,
     MetadataBlockDataStream,
-    MetadataBlockDataStreamRef,
     MetadataBlockTyped,
     MetadataEvent,
     MetadataEventDataStream,
@@ -127,24 +126,38 @@ where
 
 ///////////////////////////////////////////////////////////////////////////////
 
-pub struct SearchDataBlocksVisitor<F, E = InternalError>
-where
-    F: Fn(&MetadataBlockDataStreamRef) -> bool + Send + Sync,
-{
+enum SearchDataBlocksVisitorKind {
+    NextDataBlock,
+    NextFilledNewWatermark,
+    NextFilledNewData,
+}
+
+pub struct SearchDataBlocksVisitor<E = InternalError> {
+    kind: SearchDataBlocksVisitorKind,
     hashed_data_block: Option<(Multihash, MetadataBlockDataStream)>,
-    stop_checker: F,
     _phantom: PhantomData<E>,
 }
 
-impl<F, E> SearchDataBlocksVisitor<F, E>
+impl<E> SearchDataBlocksVisitor<E>
 where
-    F: Fn(&MetadataBlockDataStreamRef) -> bool + Send + Sync,
     E: Error + Send + Sync,
 {
-    fn new(stop_checker: F) -> Self {
+    pub fn next_data_block() -> Self {
+        Self::new(SearchDataBlocksVisitorKind::NextDataBlock)
+    }
+
+    pub fn next_filled_new_watermark() -> Self {
+        Self::new(SearchDataBlocksVisitorKind::NextFilledNewWatermark)
+    }
+
+    pub fn next_filled_new_data() -> Self {
+        Self::new(SearchDataBlocksVisitorKind::NextFilledNewData)
+    }
+
+    fn new(kind: SearchDataBlocksVisitorKind) -> Self {
         Self {
+            kind,
             hashed_data_block: None,
-            stop_checker,
             _phantom: PhantomData,
         }
     }
@@ -166,36 +179,8 @@ pub struct SearchDataBlocksVisitorFactory<E = InternalError> {
     _phantom: PhantomData<E>,
 }
 
-impl<E> SearchDataBlocksVisitorFactory<E>
+impl<E> MetadataChainVisitor for SearchDataBlocksVisitor<E>
 where
-    E: Error + Send + Sync,
-{
-    pub fn next_data_block(
-    ) -> SearchDataBlocksVisitor<impl Fn(&MetadataBlockDataStreamRef) -> bool + Send + Sync, E>
-    {
-        SearchDataBlocksVisitor::new(|_: &MetadataBlockDataStreamRef| -> bool { true })
-    }
-
-    pub fn next_filled_new_watermark(
-    ) -> SearchDataBlocksVisitor<impl Fn(&MetadataBlockDataStreamRef) -> bool + Send + Sync, E>
-    {
-        SearchDataBlocksVisitor::new(|data_block: &MetadataBlockDataStreamRef| -> bool {
-            data_block.event.new_watermark.is_some()
-        })
-    }
-
-    pub fn next_filled_new_data(
-    ) -> SearchDataBlocksVisitor<impl Fn(&MetadataBlockDataStreamRef) -> bool + Send + Sync, E>
-    {
-        SearchDataBlocksVisitor::new(|data_block: &MetadataBlockDataStreamRef| {
-            data_block.event.new_data.is_some()
-        })
-    }
-}
-
-impl<F, E> MetadataChainVisitor for SearchDataBlocksVisitor<F, E>
-where
-    F: Fn(&MetadataBlockDataStreamRef) -> bool + Send + Sync,
     E: Error + Send + Sync,
 {
     type Error = E;
@@ -208,17 +193,24 @@ where
         }
 
         let data_block = block.as_data_stream_block().unwrap();
+        let has_data_block_found = match self.kind {
+            SearchDataBlocksVisitorKind::NextDataBlock => true,
+            SearchDataBlocksVisitorKind::NextFilledNewWatermark => {
+                data_block.event.new_watermark.is_some()
+            }
+            SearchDataBlocksVisitorKind::NextFilledNewData => data_block.event.new_data.is_some(),
+        };
 
-        if !(self.stop_checker)(&data_block) {
-            return Ok(Decision::NextOfType(Flag::DATA_BLOCK));
+        if has_data_block_found {
+            self.hashed_data_block = Some((
+                hash.clone(),
+                block.clone().into_data_stream_block().unwrap(),
+            ));
+
+            Ok(Decision::Stop)
+        } else {
+            Ok(Decision::NextOfType(Flag::DATA_BLOCK))
         }
-
-        self.hashed_data_block = Some((
-            hash.clone(),
-            block.clone().into_data_stream_block().unwrap(),
-        ));
-
-        Ok(Decision::Stop)
     }
 }
 
