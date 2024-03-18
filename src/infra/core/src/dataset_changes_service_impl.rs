@@ -169,7 +169,7 @@ impl DatasetChangesServiceImpl {
             // Did we have any head before?
             if let Some(old_head) = &old_head {
                 // Yes, so try locating the previous watermark containing node
-                let mut visitor = <SearchDataBlocksVisitor>::default();
+                let mut visitor = <SearchDataBlocksVisitor>::next_filled_new_watermark();
 
                 dataset
                     .as_metadata_chain()

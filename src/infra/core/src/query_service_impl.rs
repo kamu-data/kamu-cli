@@ -90,7 +90,7 @@ impl QueryServiceImpl {
             .dataset_repo
             .get_dataset(&dataset_handle.as_local_ref())
             .await?;
-        let mut visitor = <SearchDataBlocksVisitor>::default();
+        let mut visitor = <SearchDataBlocksVisitor>::next_filled_new_data();
 
         dataset
             .as_metadata_chain()

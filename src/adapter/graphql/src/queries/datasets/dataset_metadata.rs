@@ -73,7 +73,7 @@ impl DatasetMetadata {
     /// Last recorded watermark
     async fn current_watermark(&self, ctx: &Context<'_>) -> Result<Option<DateTime<Utc>>> {
         let dataset = self.get_dataset(ctx).await?;
-        let mut visitor = <SearchDataBlocksVisitor>::default();
+        let mut visitor = <SearchDataBlocksVisitor>::next_filled_new_watermark();
 
         dataset
             .as_metadata_chain()

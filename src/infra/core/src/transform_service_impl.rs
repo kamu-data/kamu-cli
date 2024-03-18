@@ -313,7 +313,7 @@ impl TransformServiceImpl {
     // This will require passing the schema explicitly instead of relying on a file
     async fn is_never_pulled(&self, dataset_ref: &DatasetRef) -> Result<bool, InternalError> {
         let dataset = self.dataset_repo.get_dataset(dataset_ref).await.int_err()?;
-        let mut visitor = <SearchDataBlocksVisitor>::default();
+        let mut visitor = <SearchDataBlocksVisitor>::next_data_block();
 
         dataset
             .as_metadata_chain()
@@ -354,7 +354,7 @@ impl TransformServiceImpl {
 
         // Determine unprocessed block and offset range
         let last_unprocessed_block = input_chain.resolve_ref(&BlockRef::Head).await.int_err()?;
-        let mut visitor = <SearchDataBlocksVisitor>::default();
+        let mut visitor = <SearchDataBlocksVisitor>::next_data_block();
 
         input_chain
             .accept_by_interval(
