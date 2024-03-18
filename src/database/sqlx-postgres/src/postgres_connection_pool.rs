@@ -9,58 +9,61 @@
 
 use std::borrow::{Borrow, BorrowMut};
 
-use sqlx::{MySql, MySqlPool, Transaction};
-
-use crate::{DatabaseConfiguration, DatabaseConnectionPoolError, DatabaseTransactionError};
+use database_common::{
+    DatabaseConfiguration,
+    DatabaseConnectionPoolError,
+    DatabaseTransactionError,
+};
+use sqlx::{PgPool, Postgres, Transaction};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct MySQLConnectionPool {
-    mysql_pool: MySqlPool,
+pub struct PostgresConnectionPool {
+    pg_pool: PgPool,
 }
 
-impl MySQLConnectionPool {
+impl PostgresConnectionPool {
     pub fn new(
         db_configuration: &DatabaseConfiguration,
     ) -> Result<Self, DatabaseConnectionPoolError> {
         Ok(Self {
-            mysql_pool: MySqlPool::connect_lazy(db_configuration.connection_string().as_str())
+            pg_pool: PgPool::connect_lazy(db_configuration.connection_string().as_str())
                 .map_err(DatabaseConnectionPoolError::SqlxError)?,
         })
     }
 
     pub async fn begin_transaction<'c>(
         &self,
-    ) -> Result<MySqlConnectionPoolTransaction<'c>, DatabaseConnectionPoolError> {
-        let mysql_transaction = self
-            .mysql_pool
+    ) -> Result<PostgresConnectionPoolTransaction<'c>, DatabaseConnectionPoolError> {
+        let pg_transaction = self
+            .pg_pool
             .begin()
             .await
             .map_err(DatabaseConnectionPoolError::SqlxError)?;
 
-        Ok(MySqlConnectionPoolTransaction(mysql_transaction))
+        Ok(PostgresConnectionPoolTransaction(pg_transaction))
     }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct MySqlConnectionPoolTransaction<'c>(Transaction<'c, MySql>);
+pub struct PostgresConnectionPoolTransaction<'c>(Transaction<'c, Postgres>);
 
-impl<'c> std::ops::Deref for MySqlConnectionPoolTransaction<'c> {
-    type Target = Transaction<'c, MySql>;
+impl<'c> std::ops::Deref for PostgresConnectionPoolTransaction<'c> {
+    type Target = Transaction<'c, Postgres>;
 
     fn deref(&self) -> &Self::Target {
         self.0.borrow()
     }
 }
 
-impl<'c> std::ops::DerefMut for MySqlConnectionPoolTransaction<'c> {
+impl<'c> std::ops::DerefMut for PostgresConnectionPoolTransaction<'c> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.0.borrow_mut()
     }
 }
 
-impl<'c> MySqlConnectionPoolTransaction<'c> {
+impl<'c> PostgresConnectionPoolTransaction<'c> {
     pub async fn commit(self) -> Result<(), DatabaseTransactionError> {
         self.0
             .commit()

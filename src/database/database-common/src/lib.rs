@@ -7,15 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-pub mod db_configuration;
-pub mod db_connection_pool;
-pub mod db_transaction;
+mod accounts_model;
+mod db_configuration;
+mod db_connection_pool;
+mod db_transaction;
 
+pub use accounts_model::*;
 pub use db_configuration::*;
 pub use db_connection_pool::*;
 pub use db_transaction::*;
-
-pub mod dummy_test;
-
-mod mysql;
-mod postgres;

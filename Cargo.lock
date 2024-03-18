@@ -1959,11 +1959,37 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7e962a19be5cfc3f3bf6dd8f61eb50107f356ad6270fbb3ed41476571db78be5"
 
 [[package]]
-name = "database-gateway"
+name = "database-common"
 version = "0.165.0"
 dependencies = [
- "async-trait",
  "chrono",
+ "secrecy",
+ "serde",
+ "sqlx",
+ "thiserror",
+ "uuid",
+]
+
+[[package]]
+name = "database-sqlx-mysql"
+version = "0.165.0"
+dependencies = [
+ "chrono",
+ "database-common",
+ "internal-error",
+ "secrecy",
+ "serde",
+ "sqlx",
+ "thiserror",
+ "uuid",
+]
+
+[[package]]
+name = "database-sqlx-postgres"
+version = "0.165.0"
+dependencies = [
+ "chrono",
+ "database-common",
  "internal-error",
  "secrecy",
  "serde",
@@ -3663,7 +3689,9 @@ dependencies = [
  "console",
  "container-runtime",
  "ctrlc",
- "database-gateway",
+ "database-common",
+ "database-sqlx-mysql",
+ "database-sqlx-postgres",
  "datafusion",
  "dill",
  "dirs",

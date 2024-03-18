@@ -1,0 +1,43 @@
+[package]
+name = "database-sqlx-mysql"
+description = "MySQL/MariaDB specific implementation of database access layer"
+version = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+authors = { workspace = true }
+readme = { workspace = true }
+license-file = { workspace = true }
+keywords = { workspace = true }
+include = { workspace = true }
+edition = { workspace = true }
+publish = { workspace = true }
+
+
+[lints]
+workspace = true
+
+
+[lib]
+doctest = false
+
+
+[dependencies]
+database-common = { workspace = true }
+chrono = { version = "0.4", default-features = false }
+internal-error = { workspace = true }
+secrecy = "0.8"
+thiserror = { version = "1", default-features = false }
+serde = "1"
+uuid = "1"
+
+[dependencies.sqlx]
+version = "0.7"
+default-features = false
+features = [
+    "runtime-tokio-rustls",
+    "macros",
+    "mysql",
+    "uuid",
+    "chrono",
+    "migrate"
+]

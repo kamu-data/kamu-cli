@@ -108,18 +108,43 @@ pub async fn run(
     }
 
     // TEMP
-    let db_result = database_gateway::dummy_test::dummy_database_test()
-        .await
-        .map_err(CLIError::critical);
-    match &db_result {
+    let postgres_result = database_sqlx_postgres::postgres_dummy_test(
+        &database_common::DatabaseConfiguration::local_postgres(),
+    )
+    .await
+    .map_err(CLIError::critical);
+    match &postgres_result {
         Ok(()) => {
-            tracing::info!("DB test successful");
+            tracing::info!("Postgres test successful");
         }
         Err(err) => {
             tracing::error!(
                 error_dbg = ?err,
                 error = %err.pretty(true),
-                "DB test failed",
+                "Postgres test failed",
+            );
+
+            if output_config.is_tty && output_config.verbosity_level == 0 {
+                eprintln!("{}", err.pretty(false));
+            }
+            return Ok(());
+        }
+    }
+
+    let maria_db_result = database_sqlx_mysql::dummy_mysql_db_test(
+        &database_common::DatabaseConfiguration::local_mariadb(),
+    )
+    .await
+    .map_err(CLIError::critical);
+    match &maria_db_result {
+        Ok(()) => {
+            tracing::info!("MariaDB test successful");
+        }
+        Err(err) => {
+            tracing::error!(
+                error_dbg = ?err,
+                error = %err.pretty(true),
+                "MariaDB test failed",
             );
 
             if output_config.is_tty && output_config.verbosity_level == 0 {

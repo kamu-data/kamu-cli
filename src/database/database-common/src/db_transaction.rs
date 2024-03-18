@@ -7,6 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod postgres_db_connection_pool;
+use thiserror::Error;
 
-pub use postgres_db_connection_pool::*;
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum DatabaseTransactionError {
+    #[error(transparent)]
+    SqlxError(sqlx::Error),
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////

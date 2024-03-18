@@ -37,7 +37,6 @@ ftp = ["kamu/ftp"]
 
 [dependencies]
 # Kamu
-database-gateway = { workspace = true }
 internal-error = { workspace = true }
 container-runtime = { workspace = true }
 event-bus = { workspace = true }
@@ -52,6 +51,11 @@ kamu-adapter-graphql = { workspace = true }
 kamu-adapter-http = { workspace = true }
 kamu-adapter-oauth = { workspace = true }
 kamu-datafusion-cli = { workspace = true }
+
+# Database
+database-common = { workspace = true }
+database-sqlx-postgres = { workspace = true }
+database-sqlx-mysql =  { workspace = true }
 
 # CLI
 chrono-humanize = "0.2"  # Human readable durations

@@ -1,5 +1,5 @@
 [package]
-name = "database-gateway"
+name = "database-common"
 description = "Base code to organize interaction with a database"
 version = { workspace = true }
 homepage = { workspace = true }
@@ -22,9 +22,7 @@ doctest = false
 
 
 [dependencies]
-async-trait = "0.1"
 chrono = { version = "0.4", default-features = false }
-internal-error = { workspace = true }
 secrecy = "0.8"
 thiserror = { version = "1", default-features = false }
 serde = "1"
@@ -37,7 +35,6 @@ features = [
     "runtime-tokio-rustls",
     "macros",
     "mysql",
-    "postgres",
     "uuid",
     "chrono",
     "migrate"
