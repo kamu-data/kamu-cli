@@ -15,6 +15,7 @@ env:
   RUST_LOG: "debug"
   RUST_LOG_SPAN_EVENTS: "new,close"
   RUST_BACKTRACE: "1"
+  SQLX_OFFLINE: "true"
 jobs:
   lint_fmt:
     name: Lint / Code
