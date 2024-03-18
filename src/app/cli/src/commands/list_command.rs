@@ -258,7 +258,7 @@ impl Command for ListCommand {
             size.push(summary.data_size);
 
             if self.detail_level > 0 {
-                let mut data_block_visitor = <SearchDataBlocksVisitor>::next_filled_new_watermark();
+                let mut data_block_visitor = <SearchDataBlocksVisitor>::next_data_block();
                 let mut next_block_visitor = <SearchNextBlockVisitor>::default();
 
                 dataset
