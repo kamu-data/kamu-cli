@@ -17,8 +17,10 @@ use opendatafabric::{
     IntoDataStreamBlock,
     MetadataBlock,
     MetadataBlockDataStream,
+    MetadataBlockDataStreamRef,
     MetadataBlockTyped,
     MetadataEvent,
+    MetadataEventDataStream,
     Multihash,
     Seed,
     SetAttachments,
@@ -125,24 +127,28 @@ where
 
 ///////////////////////////////////////////////////////////////////////////////
 
-pub struct SearchDataBlocksVisitor<E = InternalError> {
+pub struct SearchDataBlocksVisitor<F, E = InternalError>
+where
+    F: Fn(&MetadataBlockDataStreamRef) -> bool + Send + Sync,
+{
     hashed_data_block: Option<(Multihash, MetadataBlockDataStream)>,
+    stop_checker: F,
     _phantom: PhantomData<E>,
 }
 
-impl<E> Default for SearchDataBlocksVisitor<E> {
-    fn default() -> Self {
+impl<F, E> SearchDataBlocksVisitor<F, E>
+where
+    F: Fn(&MetadataBlockDataStreamRef) -> bool + Send + Sync,
+    E: Error + Send + Sync,
+{
+    fn new(stop_checker: F) -> Self {
         Self {
             hashed_data_block: None,
+            stop_checker,
             _phantom: PhantomData,
         }
     }
-}
 
-impl<E> SearchDataBlocksVisitor<E>
-where
-    E: Error + Send + Sync,
-{
     pub fn into_hashed_data_block(self) -> Option<(Multihash, MetadataBlockDataStream)> {
         self.hashed_data_block
     }
@@ -150,10 +156,46 @@ where
     pub fn into_data_block(self) -> Option<MetadataBlockDataStream> {
         self.hashed_data_block.map(|(_, block)| block)
     }
+
+    pub fn into_event(self) -> Option<MetadataEventDataStream> {
+        self.hashed_data_block.map(|(_, block)| block.event)
+    }
 }
 
-impl<E> MetadataChainVisitor for SearchDataBlocksVisitor<E>
+pub struct SearchDataBlocksVisitorFactory<E = InternalError> {
+    _phantom: PhantomData<E>,
+}
+
+impl<E> SearchDataBlocksVisitorFactory<E>
 where
+    E: Error + Send + Sync,
+{
+    pub fn next_data_block(
+    ) -> SearchDataBlocksVisitor<impl Fn(&MetadataBlockDataStreamRef) -> bool + Send + Sync, E>
+    {
+        SearchDataBlocksVisitor::new(|_: &MetadataBlockDataStreamRef| -> bool { true })
+    }
+
+    pub fn next_filled_new_watermark(
+    ) -> SearchDataBlocksVisitor<impl Fn(&MetadataBlockDataStreamRef) -> bool + Send + Sync, E>
+    {
+        SearchDataBlocksVisitor::new(|data_block: &MetadataBlockDataStreamRef| -> bool {
+            data_block.event.new_watermark.is_some()
+        })
+    }
+
+    pub fn next_filled_new_data(
+    ) -> SearchDataBlocksVisitor<impl Fn(&MetadataBlockDataStreamRef) -> bool + Send + Sync, E>
+    {
+        SearchDataBlocksVisitor::new(|data_block: &MetadataBlockDataStreamRef| {
+            data_block.event.new_data.is_some()
+        })
+    }
+}
+
+impl<F, E> MetadataChainVisitor for SearchDataBlocksVisitor<F, E>
+where
+    F: Fn(&MetadataBlockDataStreamRef) -> bool + Send + Sync,
     E: Error + Send + Sync,
 {
     type Error = E;
@@ -162,6 +204,12 @@ where
         let flag = Flag::from(block);
 
         if !Flag::DATA_BLOCK.contains(flag) {
+            return Ok(Decision::NextOfType(Flag::DATA_BLOCK));
+        }
+
+        let data_block = block.as_data_stream_block().unwrap();
+
+        if !(self.stop_checker)(&data_block) {
             return Ok(Decision::NextOfType(Flag::DATA_BLOCK));
         }
 
