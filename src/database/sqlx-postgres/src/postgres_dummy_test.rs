@@ -8,12 +8,8 @@
 // by the Apache License, Version 2.0.
 
 use chrono::Utc;
-use database_common::{
-    AccountModel,
-    AccountOrigin,
-    DatabaseConfiguration,
-    DatabaseTransactionError,
-};
+use database_common::models::{AccountModel, AccountOrigin};
+use database_common::{DatabaseConfiguration, DatabaseError};
 use internal_error::{InternalError, ResultIntoInternal};
 use uuid::Uuid;
 
@@ -43,7 +39,7 @@ pub async fn postgres_dummy_test(
     )
     .execute(&mut **db_transaction)
     .await
-    .map_err(DatabaseTransactionError::SqlxError)
+    .map_err(DatabaseError::SqlxError)
     .int_err()?;
 
     let res = sqlx::query_as!(
@@ -53,7 +49,7 @@ pub async fn postgres_dummy_test(
         "#
     ).fetch_all(&mut **db_transaction)
     .await
-    .map_err(DatabaseTransactionError::SqlxError).int_err()?;
+    .map_err(DatabaseError::SqlxError).int_err()?;
 
     println!("Accounts: {res:?}");
 

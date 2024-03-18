@@ -9,11 +9,7 @@
 
 use std::borrow::{Borrow, BorrowMut};
 
-use database_common::{
-    DatabaseConfiguration,
-    DatabaseConnectionPoolError,
-    DatabaseTransactionError,
-};
+use database_common::{DatabaseConfiguration, DatabaseError};
 use sqlx::{MySql, MySqlPool, Transaction};
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -23,23 +19,21 @@ pub struct MySQLConnectionPool {
 }
 
 impl MySQLConnectionPool {
-    pub fn new(
-        db_configuration: &DatabaseConfiguration,
-    ) -> Result<Self, DatabaseConnectionPoolError> {
+    pub fn new(db_configuration: &DatabaseConfiguration) -> Result<Self, DatabaseError> {
         Ok(Self {
             mysql_pool: MySqlPool::connect_lazy(db_configuration.connection_string().as_str())
-                .map_err(DatabaseConnectionPoolError::SqlxError)?,
+                .map_err(DatabaseError::SqlxError)?,
         })
     }
 
     pub async fn begin_transaction<'c>(
         &self,
-    ) -> Result<MySqlConnectionPoolTransaction<'c>, DatabaseConnectionPoolError> {
+    ) -> Result<MySqlConnectionPoolTransaction<'c>, DatabaseError> {
         let mysql_transaction = self
             .mysql_pool
             .begin()
             .await
-            .map_err(DatabaseConnectionPoolError::SqlxError)?;
+            .map_err(DatabaseError::SqlxError)?;
 
         Ok(MySqlConnectionPoolTransaction(mysql_transaction))
     }
@@ -64,19 +58,13 @@ impl<'c> std::ops::DerefMut for MySqlConnectionPoolTransaction<'c> {
 }
 
 impl<'c> MySqlConnectionPoolTransaction<'c> {
-    pub async fn commit(self) -> Result<(), DatabaseTransactionError> {
-        self.0
-            .commit()
-            .await
-            .map_err(DatabaseTransactionError::SqlxError)
+    pub async fn commit(self) -> Result<(), DatabaseError> {
+        self.0.commit().await.map_err(DatabaseError::SqlxError)
     }
 
     #[allow(dead_code)]
-    pub async fn rollback(self) -> Result<(), DatabaseTransactionError> {
-        self.0
-            .rollback()
-            .await
-            .map_err(DatabaseTransactionError::SqlxError)
+    pub async fn rollback(self) -> Result<(), DatabaseError> {
+        self.0.rollback().await.map_err(DatabaseError::SqlxError)
     }
 }
 

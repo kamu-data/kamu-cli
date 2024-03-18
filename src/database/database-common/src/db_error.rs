@@ -12,7 +12,7 @@ use thiserror::Error;
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
-pub enum DatabaseTransactionError {
+pub enum DatabaseError {
     #[error(transparent)]
     SqlxError(sqlx::Error),
 }
