@@ -108,6 +108,7 @@ pub async fn run(
     }
 
     // TEMP
+    /*
     let postgres_result = database_sqlx_postgres::postgres_dummy_test(
         &database_common::DatabaseConfiguration::local_postgres(),
     )
@@ -152,7 +153,7 @@ pub async fn run(
             }
             return Ok(());
         }
-    }
+    }*/
 
     let result = match cli_commands::get_command(&base_catalog, &cli_catalog, &matches) {
         Ok(mut command) => {
