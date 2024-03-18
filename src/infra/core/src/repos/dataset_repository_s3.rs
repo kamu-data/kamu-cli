@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -17,13 +18,11 @@ use kamu_core::*;
 use opendatafabric::*;
 use url::Url;
 
-use super::DatasetFactoryImpl;
-use crate::create_dataset_from_snapshot_impl;
 use crate::utils::s3_context::S3Context;
+use crate::*;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[component(pub)]
 pub struct DatasetRepositoryS3 {
     s3_context: S3Context,
     current_account_subject: Arc<CurrentAccountSubject>,
@@ -31,10 +30,12 @@ pub struct DatasetRepositoryS3 {
     dependency_graph_service: Arc<dyn DependencyGraphService>,
     event_bus: Arc<EventBus>,
     multi_tenant: bool,
+    metadata_cache_local_fs_path: Option<Arc<PathBuf>>,
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+#[component(pub)]
 impl DatasetRepositoryS3 {
     pub fn new(
         s3_context: S3Context,
@@ -43,6 +44,7 @@ impl DatasetRepositoryS3 {
         dependency_graph_service: Arc<dyn DependencyGraphService>,
         event_bus: Arc<EventBus>,
         multi_tenant: bool,
+        metadata_cache_local_fs_path: Option<Arc<PathBuf>>,
     ) -> Self {
         Self {
             s3_context,
@@ -51,15 +53,102 @@ impl DatasetRepositoryS3 {
             dependency_graph_service,
             event_bus,
             multi_tenant,
+            metadata_cache_local_fs_path,
         }
     }
 
-    fn get_dataset_impl(&self, dataset_id: &DatasetID) -> Result<impl Dataset, InternalError> {
+    fn get_dataset_impl(&self, dataset_id: &DatasetID) -> Result<Arc<dyn Dataset>, InternalError> {
         let s3_context = self
             .s3_context
             .sub_context(&format!("{}/", &dataset_id.as_multibase()));
 
-        DatasetFactoryImpl::get_s3_from_context(s3_context, self.event_bus.clone())
+        let client = s3_context.client;
+        let endpoint = s3_context.endpoint;
+        let bucket = s3_context.bucket;
+        let key_prefix = s3_context.key_prefix;
+
+        // TODO: Consider switching DatasetImpl to dynamic dispatch to simplify
+        // configurability
+        if let Some(metadata_cache_local_fs_path) = &self.metadata_cache_local_fs_path {
+            Ok(Arc::new(DatasetImpl::new(
+                self.event_bus.clone(),
+                MetadataChainImpl::new(
+                    MetadataBlockRepositoryCachingInMem::new(MetadataBlockRepositoryImpl::new(
+                        ObjectRepositoryCachingLocalFs::new(
+                            ObjectRepositoryS3Sha3::new(S3Context::new(
+                                client.clone(),
+                                endpoint.clone(),
+                                bucket.clone(),
+                                format!("{key_prefix}blocks/"),
+                            )),
+                            metadata_cache_local_fs_path.clone(),
+                        ),
+                    )),
+                    ReferenceRepositoryImpl::new(NamedObjectRepositoryS3::new(S3Context::new(
+                        client.clone(),
+                        endpoint.clone(),
+                        bucket.clone(),
+                        format!("{key_prefix}refs/"),
+                    ))),
+                ),
+                ObjectRepositoryS3Sha3::new(S3Context::new(
+                    client.clone(),
+                    endpoint.clone(),
+                    bucket.clone(),
+                    format!("{key_prefix}data/"),
+                )),
+                ObjectRepositoryS3Sha3::new(S3Context::new(
+                    client.clone(),
+                    endpoint.clone(),
+                    bucket.clone(),
+                    format!("{key_prefix}checkpoints/"),
+                )),
+                NamedObjectRepositoryS3::new(S3Context::new(
+                    client.clone(),
+                    endpoint.clone(),
+                    bucket.clone(),
+                    format!("{key_prefix}info/"),
+                )),
+            )))
+        } else {
+            Ok(Arc::new(DatasetImpl::new(
+                self.event_bus.clone(),
+                MetadataChainImpl::new(
+                    MetadataBlockRepositoryCachingInMem::new(MetadataBlockRepositoryImpl::new(
+                        ObjectRepositoryS3Sha3::new(S3Context::new(
+                            client.clone(),
+                            endpoint.clone(),
+                            bucket.clone(),
+                            format!("{key_prefix}blocks/"),
+                        )),
+                    )),
+                    ReferenceRepositoryImpl::new(NamedObjectRepositoryS3::new(S3Context::new(
+                        client.clone(),
+                        endpoint.clone(),
+                        bucket.clone(),
+                        format!("{key_prefix}refs/"),
+                    ))),
+                ),
+                ObjectRepositoryS3Sha3::new(S3Context::new(
+                    client.clone(),
+                    endpoint.clone(),
+                    bucket.clone(),
+                    format!("{key_prefix}data/"),
+                )),
+                ObjectRepositoryS3Sha3::new(S3Context::new(
+                    client.clone(),
+                    endpoint.clone(),
+                    bucket.clone(),
+                    format!("{key_prefix}checkpoints/"),
+                )),
+                NamedObjectRepositoryS3::new(S3Context::new(
+                    client.clone(),
+                    endpoint.clone(),
+                    bucket.clone(),
+                    format!("{key_prefix}info/"),
+                )),
+            )))
+        }
     }
 
     async fn delete_dataset_s3_objects(&self, dataset_id: &DatasetID) -> Result<(), InternalError> {
@@ -107,7 +196,7 @@ impl DatasetRepositoryS3 {
 
                 if let Ok(id) = DatasetID::from_multibase_string(&prefix) {
                     let dataset = self.get_dataset_impl(&id)?;
-                    let dataset_alias = self.resolve_dataset_alias(&dataset).await?;
+                    let dataset_alias = self.resolve_dataset_alias(dataset.as_ref()).await?;
                     if alias_filter(&dataset_alias) {
                         let hdl = DatasetHandle::new(id, dataset_alias);
                         yield hdl;
@@ -181,7 +270,7 @@ impl DatasetRepository for DatasetRepositoryS3 {
                     .await?
                 {
                     let dataset = self.get_dataset_impl(id)?;
-                    let dataset_alias = self.resolve_dataset_alias(&dataset).await?;
+                    let dataset_alias = self.resolve_dataset_alias(dataset.as_ref()).await?;
                     Ok(DatasetHandle::new(id.clone(), dataset_alias))
                 } else {
                     Err(GetDatasetError::NotFound(DatasetNotFoundError {
@@ -217,7 +306,7 @@ impl DatasetRepository for DatasetRepositoryS3 {
     ) -> Result<Arc<dyn Dataset>, GetDatasetError> {
         let dataset_handle = self.resolve_dataset_ref(dataset_ref).await?;
         let dataset = self.get_dataset_impl(&dataset_handle.id)?;
-        Ok(Arc::new(dataset))
+        Ok(dataset)
     }
 
     async fn create_dataset(
@@ -298,7 +387,8 @@ impl DatasetRepository for DatasetRepositoryS3 {
         };
 
         let normalized_alias = self.normalize_alias(dataset_alias);
-        self.save_dataset_alias(&dataset, normalized_alias).await?;
+        self.save_dataset_alias(dataset.as_ref(), normalized_alias)
+            .await?;
 
         let dataset_handle = DatasetHandle::new(dataset_id, dataset_alias.clone());
 
@@ -317,7 +407,7 @@ impl DatasetRepository for DatasetRepositoryS3 {
 
         Ok(CreateDatasetResult {
             dataset_handle,
-            dataset: Arc::new(dataset),
+            dataset,
             head,
         })
     }
@@ -358,7 +448,7 @@ impl DatasetRepository for DatasetRepositoryS3 {
             .await?;
 
         // It's safe to rename dataset
-        self.save_dataset_alias(&dataset, new_alias).await?;
+        self.save_dataset_alias(dataset.as_ref(), new_alias).await?;
 
         Ok(())
     }

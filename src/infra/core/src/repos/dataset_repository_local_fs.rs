@@ -82,11 +82,25 @@ impl DatasetRepositoryLocalFs {
         ))
     }
 
-    // TODO: Make dataset factory (and thus the hashing algo) configurable
-    fn get_dataset_impl(&self, dataset_handle: &DatasetHandle) -> impl Dataset {
-        let layout = DatasetLayout::new(self.storage_strategy.get_dataset_path(dataset_handle));
+    fn build_dataset(layout: DatasetLayout, event_bus: Arc<EventBus>) -> Arc<dyn Dataset> {
+        Arc::new(DatasetImpl::new(
+            event_bus,
+            MetadataChainImpl::new(
+                MetadataBlockRepositoryCachingInMem::new(MetadataBlockRepositoryImpl::new(
+                    ObjectRepositoryLocalFSSha3::new(layout.blocks_dir),
+                )),
+                ReferenceRepositoryImpl::new(NamedObjectRepositoryLocalFS::new(layout.refs_dir)),
+            ),
+            ObjectRepositoryLocalFSSha3::new(layout.data_dir),
+            ObjectRepositoryLocalFSSha3::new(layout.checkpoints_dir),
+            NamedObjectRepositoryLocalFS::new(layout.info_dir),
+        ))
+    }
 
-        DatasetFactoryImpl::get_local_fs(layout, self.event_bus.clone())
+    // TODO: Make dataset factory (and thus the hashing algo) configurable
+    fn get_dataset_impl(&self, dataset_handle: &DatasetHandle) -> Arc<dyn Dataset> {
+        let layout = DatasetLayout::new(self.storage_strategy.get_dataset_path(dataset_handle));
+        Self::build_dataset(layout, self.event_bus.clone())
     }
 
     // TODO: Used only for testing, but should be removed it in future to discourage
@@ -173,7 +187,7 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
     ) -> Result<Arc<dyn Dataset>, GetDatasetError> {
         let dataset_handle = self.resolve_dataset_ref(dataset_ref).await?;
         let dataset = self.get_dataset_impl(&dataset_handle);
-        Ok(Arc::new(dataset))
+        Ok(dataset)
     }
 
     async fn create_dataset(
@@ -226,14 +240,11 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
         }
 
         // It's okay to create a new dataset by this point
-
         let dataset_id = seed_block.event.dataset_id.clone();
         let dataset_handle = DatasetHandle::new(dataset_id, dataset_alias.clone());
         let dataset_path = self.storage_strategy.get_dataset_path(&dataset_handle);
-
         let layout = DatasetLayout::create(&dataset_path).int_err()?;
-
-        let dataset = DatasetFactoryImpl::get_local_fs(layout, self.event_bus.clone());
+        let dataset = Self::build_dataset(layout, self.event_bus.clone());
 
         // There are three possibilities at this point:
         // - Dataset did not exist before - continue normally
@@ -259,7 +270,7 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
         };
 
         self.storage_strategy
-            .handle_dataset_created(&dataset, &dataset_handle.alias)
+            .handle_dataset_created(dataset.as_ref(), &dataset_handle.alias)
             .await?;
 
         tracing::info!(
@@ -277,7 +288,7 @@ impl DatasetRepository for DatasetRepositoryLocalFs {
 
         Ok(CreateDatasetResult {
             dataset_handle,
-            dataset: Arc::new(dataset),
+            dataset,
             head,
         })
     }
@@ -467,7 +478,7 @@ impl DatasetSingleTenantStorageStrategy {
         dataset_alias: &DatasetAlias,
     ) -> Result<DatasetSummary, ResolveDatasetError> {
         let layout = DatasetLayout::new(dataset_path);
-        let dataset = DatasetFactoryImpl::get_local_fs(layout, self.event_bus.clone());
+        let dataset = DatasetRepositoryLocalFs::build_dataset(layout, self.event_bus.clone());
         dataset
             .get_summary(GetSummaryOpts::default())
             .await
@@ -643,7 +654,7 @@ impl DatasetMultiTenantStorageStrategy {
         dataset_id: &DatasetID,
     ) -> Result<DatasetAlias, ResolveDatasetError> {
         let layout = DatasetLayout::new(dataset_path);
-        let dataset = DatasetFactoryImpl::get_local_fs(layout, self.event_bus.clone());
+        let dataset = DatasetRepositoryLocalFs::build_dataset(layout, self.event_bus.clone());
         match dataset.as_info_repo().get("alias").await {
             Ok(bytes) => {
                 let dataset_alias_str = std::str::from_utf8(&bytes[..]).int_err()?.trim();
@@ -871,11 +882,12 @@ impl DatasetStorageStrategy for DatasetMultiTenantStorageStrategy {
     ) -> Result<(), InternalError> {
         let dataset_path = self.get_dataset_path(dataset_handle);
         let layout = DatasetLayout::new(dataset_path);
-        let dataset = DatasetFactoryImpl::get_local_fs(layout, self.event_bus.clone());
+        let dataset = DatasetRepositoryLocalFs::build_dataset(layout, self.event_bus.clone());
 
         let new_alias =
             DatasetAlias::new(dataset_handle.alias.account_name.clone(), new_name.clone());
-        self.save_dataset_alias(&dataset, &new_alias).await?;
+        self.save_dataset_alias(dataset.as_ref(), &new_alias)
+            .await?;
 
         Ok(())
     }
