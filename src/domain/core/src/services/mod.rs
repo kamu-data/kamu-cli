@@ -10,6 +10,7 @@
 // Re-exports
 pub use container_runtime::{NullPullImageListener, PullImageListener};
 
+pub mod compact_service;
 pub mod dataset_changes_service;
 pub mod dependency_graph_repository;
 pub mod dependency_graph_service;

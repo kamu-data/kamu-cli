@@ -330,6 +330,34 @@ pub fn cli() -> Command {
                             kamu delete my.dataset.%
                         "#
                     )),
+                Command::new("compact")
+                    .about("Compact a dataset")
+                    .args([
+                        Arg::new("dataset")
+                            .action(ArgAction::Append)
+                            .index(1)
+                            .required(true)
+                            .value_parser(value_parse_dataset_ref_local)
+                            .help("Local dataset reference(s)"),
+                        Arg::new("yes")
+                            .short('y')
+                            .long("yes")
+                            .action(ArgAction::SetTrue)
+                            .help("Don't ask for confirmation"),
+                    ])
+                    .after_help(indoc::indoc!(
+                        r#"
+                        This command commpact all files in the dataset into a few depends from max-slice-size.
+
+                        Take great care when compacting datasets. You will lose all history of metadata.
+
+                        **Examples:**
+
+                        Compact a local dataset:
+
+                            kamu compact my.dataset
+                        "#
+                    )),
                 Command::new("ingest")
                     .about("Adds data to the root dataset according to its push source configuration")
                     .args([

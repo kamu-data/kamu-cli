@@ -23,6 +23,7 @@ use kamu_core::{
 use opendatafabric::serde::flatbuffers::FlatbuffersMetadataBlockSerializer;
 use opendatafabric::serde::MetadataBlockSerializer;
 use opendatafabric::{MetadataBlock, Multihash};
+use url::Url;
 
 use crate::repos::metadata_block_repository_helpers;
 
@@ -90,6 +91,10 @@ where
             .await
             .map(Into::into)
             .map_err(Into::into)
+    }
+
+    async fn get_internal_url(&self, hash: &Multihash) -> Url {
+        self.obj_repo.get_internal_url(hash).await
     }
 }
 

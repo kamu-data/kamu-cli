@@ -234,6 +234,8 @@ pub fn configure_base_catalog(
 
     b.add::<VerificationServiceImpl>();
 
+    b.add::<CompactServiceImpl>();
+
     b.add::<SearchServiceImpl>();
 
     b.add::<SyncServiceImpl>();

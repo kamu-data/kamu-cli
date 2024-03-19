@@ -15,6 +15,7 @@ To regenerate this schema from existing code, use the following command:
 * `completions` — Generate tab-completion scripts for your shell
 * `config` — Get or set configuration options
 * `delete` — Delete a dataset
+* `compact` — Compact a dataset
 * `ingest` — Adds data to the root dataset according to its push source configuration
 * `init` — Initialize an empty workspace in the current directory
 * `inspect` — Group of commands for exploring dataset metadata
@@ -248,6 +249,30 @@ Delete a local dataset:
 Delete local datasets matching pattern:
 
     kamu delete my.dataset.%
+
+
+
+
+## `kamu compact`
+
+Compact a dataset
+
+**Usage:** `kamu compact [OPTIONS] <dataset>...`
+
+**Arguments:**
+
+* `<DATASET>` — Local dataset reference(s)
+
+
+This command commpact all files in the dataset into a few depends from max-slice-size.
+
+Take great care when compacting datasets. You will lose all history of metadata.
+
+**Examples:**
+
+Compact a local dataset:
+
+    kamu compact my.dataset
 
 
 

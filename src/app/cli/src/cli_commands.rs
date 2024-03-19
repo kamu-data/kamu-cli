@@ -97,6 +97,20 @@ pub fn get_command(
             submatches.get_flag("recursive"),
             submatches.get_flag("yes"),
         )),
+        Some(("compact", submatches)) => {
+            let workspace_svc = cli_catalog.get_one::<WorkspaceService>()?;
+
+            Box::new(CompactCommand::new(
+                cli_catalog.get_one()?,
+                cli_catalog.get_one()?,
+                cli_catalog.get_one()?,
+                validate_dataset_ref(
+                    cli_catalog,
+                    submatches.get_one::<DatasetRef>("dataset").unwrap().clone(),
+                )?,
+                workspace_svc.layout().unwrap().datasets_dir.clone(),
+            ))
+        }
         Some(("ingest", submatches)) => Box::new(IngestCommand::new(
             cli_catalog.get_one()?,
             cli_catalog.get_one()?,
