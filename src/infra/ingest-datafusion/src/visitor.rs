@@ -12,7 +12,6 @@ use datafusion::arrow::datatypes::SchemaRef;
 use internal_error::ResultIntoInternal;
 use kamu_core::{
     HashedMetadataBlockRef,
-    MetadataBlockTypeFlags,
     MetadataChainVisitor,
     MetadataVisitorDecision as Decision,
 };
@@ -23,6 +22,7 @@ use opendatafabric::{
     MergeStrategy,
     MergeStrategyAppend,
     MetadataEvent,
+    MetadataEventTypeFlags as Flag,
     Multihash,
     Seed,
     SetDataSchema,
@@ -35,15 +35,11 @@ use crate::{DataWriterMetadataState, ScanMetadataError, SourceNotFoundError};
 
 ///////////////////////////////////////////////////////////////////////////////
 
-type Flag = MetadataBlockTypeFlags;
-
-///////////////////////////////////////////////////////////////////////////////
-
 pub struct DataWriterDataFusionMetaDataStateVisitor<'a> {
     head: Multihash,
     maybe_source_name: Option<&'a str>,
 
-    next_block_flags: MetadataBlockTypeFlags,
+    next_block_flags: Flag,
     data_slices: Vec<Multihash>,
 
     maybe_schema: Option<SchemaRef>,

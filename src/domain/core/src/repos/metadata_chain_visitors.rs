@@ -20,6 +20,7 @@ use opendatafabric::{
     MetadataBlockTyped,
     MetadataEvent,
     MetadataEventDataStream,
+    MetadataEventTypeFlags as Flag,
     Multihash,
     Seed,
     SetAttachments,
@@ -32,12 +33,7 @@ use opendatafabric::{
     VariantOf,
 };
 
-use crate::{
-    HashedMetadataBlockRef,
-    MetadataBlockTypeFlags as Flag,
-    MetadataChainVisitor,
-    MetadataVisitorDecision as Decision,
-};
+use crate::{HashedMetadataBlockRef, MetadataChainVisitor, MetadataVisitorDecision as Decision};
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -112,7 +108,7 @@ where
     type Error = E;
 
     fn visit(&mut self, (hash, block): HashedMetadataBlockRef) -> Result<Decision, Self::Error> {
-        let flag = Flag::from(block);
+        let flag = Flag::from(&block.event);
 
         if !self.requested_flag.contains(flag) {
             return Ok(Decision::NextOfType(self.requested_flag));
@@ -187,7 +183,7 @@ where
     type Error = E;
 
     fn visit(&mut self, (hash, block): HashedMetadataBlockRef) -> Result<Decision, Self::Error> {
-        let flag = Flag::from(block);
+        let flag = Flag::from(&block.event);
 
         if !Flag::DATA_BLOCK.contains(flag) {
             return Ok(Decision::NextOfType(Flag::DATA_BLOCK));

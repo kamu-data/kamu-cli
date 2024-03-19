@@ -370,10 +370,10 @@ impl KamuSchema {
                 last_records_to_consider,
             },
             |state, (_, block)| {
-                type Flag = MetadataBlockTypeFlags;
+                type Flag = MetadataEventTypeFlags;
                 type Decision = MetadataVisitorDecision;
 
-                let block_flag = Flag::from(block);
+                let block_flag = Flag::from(&block.event);
 
                 if !Flag::DATA_BLOCK.contains(block_flag) {
                     return Ok(Decision::NextOfType(Flag::DATA_BLOCK));

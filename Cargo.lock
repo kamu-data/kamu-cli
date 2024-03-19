@@ -3609,7 +3609,6 @@ version = "0.165.0"
 dependencies = [
  "async-stream",
  "async-trait",
- "bitflags 2.4.2",
  "bytes",
  "chrono",
  "container-runtime",
@@ -4511,6 +4510,7 @@ version = "0.165.0"
 dependencies = [
  "arrow",
  "base64 0.21.7",
+ "bitflags 2.4.2",
  "chrono",
  "digest",
  "ed25519-dalek",

@@ -12,7 +12,7 @@ use std::fmt::Display;
 
 use async_trait::async_trait;
 use internal_error::*;
-use opendatafabric::{MetadataBlock, MetadataEvent, Multihash};
+use opendatafabric::{MetadataBlock, MetadataEvent, MetadataEventTypeFlags, Multihash};
 use thiserror::Error;
 
 use super::metadata_stream::DynMetadataStream;
@@ -230,7 +230,7 @@ pub trait MetadataChainExt: MetadataChain {
                         }
                     }
                     MetadataVisitorDecision::NextOfType(requested_flags) => {
-                        let block_flag = MetadataBlockTypeFlags::from(&block);
+                        let block_flag = MetadataEventTypeFlags::from(&block.event);
 
                         if requested_flags.contains(block_flag) {
                             *decision = visitor.visit(hashed_block_ref)?;
