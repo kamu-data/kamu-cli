@@ -371,7 +371,7 @@ impl<'a> ValidateLogicalStructureVisitor<'a> {
 
         let queries = transform.queries.as_ref().unwrap();
 
-        if queries[queries.len() - 1].alias.is_some() {
+        if queries.last().unwrap().alias.is_some() {
             invalid_event!(
                 e.clone(),
                 "Last query in a transform must have no alias an will be treated as an output"
