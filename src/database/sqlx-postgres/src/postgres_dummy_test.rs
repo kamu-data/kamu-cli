@@ -10,19 +10,25 @@
 use chrono::Utc;
 use database_common::models::{AccountModel, AccountOrigin};
 use database_common::{DatabaseConfiguration, DatabaseError};
+use dill::CatalogBuilder;
 use internal_error::{InternalError, ResultIntoInternal};
 use uuid::Uuid;
 
-use crate::PostgresConnectionPool;
+use crate::{PostgresCatalogInitializer, PostgresConnectionPool};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn postgres_dummy_test(
     db_configuration: &DatabaseConfiguration,
 ) -> Result<(), InternalError> {
-    let db_connection_pool = PostgresConnectionPool::new(
-        PostgresConnectionPool::build_pg_pool(db_configuration).int_err()?,
-    );
+    let mut catalog_builder = CatalogBuilder::new();
+    PostgresCatalogInitializer::init_database_components(&mut catalog_builder, db_configuration)
+        .int_err()?;
+    let postgres_catalog = catalog_builder.build();
+
+    let db_connection_pool = postgres_catalog
+        .get_one::<PostgresConnectionPool>()
+        .unwrap();
 
     let mut db_transaction = db_connection_pool.begin_transaction().await.int_err()?;
 

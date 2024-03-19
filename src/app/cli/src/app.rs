@@ -11,6 +11,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use container_runtime::{ContainerRuntime, ContainerRuntimeConfig};
+use database_common::{DatabaseConfiguration, DatabaseProvider};
 use dill::*;
 use kamu::domain::*;
 use kamu::*;
@@ -71,17 +72,11 @@ pub async fn run(
         let mut base_catalog_builder =
             configure_base_catalog(&workspace_layout, workspace_svc.is_multi_tenant_workspace());
 
-        // let database_configuration = DatabaseConfiguration::local_postgres();
-        // let database_catalog_initializer =
-        // database_sqlx_postgres::PostgresCatalogInitializer {};
-
-        // let database_configuration = DatabaseConfiguration::local_mariadb();
-        // let database_catalog_initializer =
-        // database_sqlx_mysql::MySQLCatalogInitializer {};
-
-        //database_catalog_initializer
-        //    .init_database_components(&mut base_catalog_builder,
-        // &database_configuration)?;
+        // TODO: read database settings from configuration, and make it optional
+        configure_database_components(
+            &mut base_catalog_builder,
+            &DatabaseConfiguration::local_mariadb(),
+        )?;
 
         base_catalog_builder
             .add_value(dependencies_graph_repository)
@@ -114,17 +109,17 @@ pub async fn run(
         (guards, base_catalog, cli_catalog, output_config)
     };
 
-    // Temp
-    let account_repository = cli_catalog
-        .get_one::<dyn auth::AccountRepository>()
-        .unwrap();
-    println!(
-        "{:?}",
-        account_repository
-            .find_account_by_email("test@example.com")
-            .await
-            .int_err()?
-    );
+    // Temp: remove this
+    let maybe_account_repository = cli_catalog.get_one::<dyn auth::AccountRepository>().ok();
+    if let Some(account_repository) = maybe_account_repository {
+        println!(
+            "{:?}",
+            account_repository
+                .find_account_by_email("test@example.com")
+                .await
+                .int_err()?
+        );
+    }
 
     // Evict cache
     if workspace_svc.is_in_workspace() && !workspace_svc.is_upgrade_needed()? {
@@ -319,6 +314,26 @@ pub fn configure_base_catalog(
     b.add::<kamu_adapter_auth_oso::OsoDatasetAuthorizer>();
 
     b
+}
+
+fn configure_database_components(
+    catalog_builder: &mut CatalogBuilder,
+    db_configuration: &DatabaseConfiguration,
+) -> Result<(), InternalError> {
+    match db_configuration.provider {
+        DatabaseProvider::Postgres => {
+            database_sqlx_postgres::PostgresCatalogInitializer::init_database_components(
+                catalog_builder,
+                db_configuration,
+            )
+        }
+        DatabaseProvider::MySQL | DatabaseProvider::MariaDB => {
+            database_sqlx_mysql::MySQLCatalogInitializer::init_database_components(
+                catalog_builder,
+                db_configuration,
+            )
+        }
+    }
 }
 
 // Public only for tests

@@ -9,7 +9,7 @@
 
 use std::borrow::{Borrow, BorrowMut};
 
-use database_common::{DatabaseConfiguration, DatabaseError};
+use database_common::DatabaseError;
 use dill::{component, scope, Singleton};
 use sqlx::{MySql, MySqlPool, Transaction};
 
@@ -22,13 +22,6 @@ pub struct MySQLConnectionPool {
 #[component(pub)]
 #[scope(Singleton)]
 impl MySQLConnectionPool {
-    pub fn build_mysql_pool(
-        db_configuration: &DatabaseConfiguration,
-    ) -> Result<MySqlPool, DatabaseError> {
-        MySqlPool::connect_lazy(db_configuration.connection_string().as_str())
-            .map_err(DatabaseError::SqlxError)
-    }
-
     pub fn new(mysql_pool: MySqlPool) -> Self {
         Self { mysql_pool }
     }

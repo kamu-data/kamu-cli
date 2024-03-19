@@ -9,7 +9,7 @@
 
 use std::borrow::{Borrow, BorrowMut};
 
-use database_common::{DatabaseConfiguration, DatabaseError};
+use database_common::DatabaseError;
 use dill::{component, scope, Singleton};
 use sqlx::{PgPool, Postgres, Transaction};
 
@@ -22,13 +22,6 @@ pub struct PostgresConnectionPool {
 #[component(pub)]
 #[scope(Singleton)]
 impl PostgresConnectionPool {
-    pub fn build_pg_pool(
-        db_configuration: &DatabaseConfiguration,
-    ) -> Result<PgPool, DatabaseError> {
-        PgPool::connect_lazy(db_configuration.connection_string().as_str())
-            .map_err(DatabaseError::SqlxError)
-    }
-
     pub fn new(pg_pool: PgPool) -> Self {
         Self { pg_pool }
     }

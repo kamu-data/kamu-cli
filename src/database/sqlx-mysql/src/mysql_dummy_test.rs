@@ -10,19 +10,23 @@
 use chrono::Utc;
 use database_common::models::{AccountModel, AccountOrigin};
 use database_common::{DatabaseConfiguration, DatabaseError};
+use dill::CatalogBuilder;
 use internal_error::{InternalError, ResultIntoInternal};
 use uuid::Uuid;
 
-use crate::MySQLConnectionPool;
+use crate::{MySQLCatalogInitializer, MySQLConnectionPool};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn dummy_mysql_db_test(
     db_configuration: &DatabaseConfiguration,
 ) -> Result<(), InternalError> {
-    let db_connection_pool = MySQLConnectionPool::new(
-        MySQLConnectionPool::build_mysql_pool(db_configuration).int_err()?,
-    );
+    let mut catalog_builder = CatalogBuilder::new();
+    MySQLCatalogInitializer::init_database_components(&mut catalog_builder, db_configuration)
+        .int_err()?;
+    let mysql_catalog = catalog_builder.build();
+
+    let db_connection_pool = mysql_catalog.get_one::<MySQLConnectionPool>().unwrap();
 
     let mut db_transaction = db_connection_pool.begin_transaction().await.int_err()?;
 
