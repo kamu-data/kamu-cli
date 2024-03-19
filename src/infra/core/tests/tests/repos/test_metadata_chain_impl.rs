@@ -1003,11 +1003,11 @@ async fn test_accept() {
 
     let mut always_stop_visitor = create_always_stop_visitor();
     let mut next_of_data_visitor = create_next_of_type_visitor(
-        MetadataBlockTypeFlags::DATA_BLOCK,
+        MetadataEventTypeFlags::DATA_BLOCK,
         NextOfTypeVisitorState::with_expected_visit_call_count(3),
     );
     let mut next_of_set_data_schema_visitor = create_next_of_type_visitor(
-        MetadataBlockTypeFlags::SET_DATA_SCHEMA,
+        MetadataEventTypeFlags::SET_DATA_SCHEMA,
         NextOfTypeVisitorState::with_expected_visit_call_count(2),
     );
     let mut always_next_visitor = create_always_next_visitor_with_expected_visit_call_count(6);
@@ -1065,7 +1065,7 @@ async fn test_accept_stop_on_first_error() {
     let mut always_stop_visitor = create_always_stop_visitor();
     let mut always_next_visitor = create_always_next_visitor_with_expected_visit_call_count(2);
     let mut failed_on_type_visitor = create_failed_on_type_visitor_with_expected_visit_call_count(
-        MetadataBlockTypeFlags::SET_INFO,
+        MetadataEventTypeFlags::SET_INFO,
         2,
     );
 
@@ -1116,7 +1116,7 @@ mockall::mock! {
 ///////////////////////////////////////////////////////////////////////////////
 
 fn create_failed_on_type_visitor_with_expected_visit_call_count(
-    fail_on_type_flags: MetadataBlockTypeFlags,
+    fail_on_type_flags: MetadataEventTypeFlags,
     visit_call_count: usize,
 ) -> MockMetadataChainVisitor {
     let mut always_stop_visitor = MockMetadataChainVisitor::new();
@@ -1125,7 +1125,7 @@ fn create_failed_on_type_visitor_with_expected_visit_call_count(
         .expect_visit()
         .times(visit_call_count)
         .returning(move |(_, block)| {
-            let block_flag = MetadataBlockTypeFlags::from(block);
+            let block_flag = MetadataEventTypeFlags::from(&block.event);
 
             if fail_on_type_flags.contains(block_flag) {
                 Err(MockError::SomethingFailed)
@@ -1182,7 +1182,7 @@ impl NextOfTypeVisitorState {
 }
 
 fn create_next_of_type_visitor(
-    flags: MetadataBlockTypeFlags,
+    flags: MetadataEventTypeFlags,
     state: NextOfTypeVisitorState,
 ) -> MockMetadataChainVisitor {
     let state = Arc::new(Mutex::new(state));

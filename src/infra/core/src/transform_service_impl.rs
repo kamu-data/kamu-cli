@@ -538,7 +538,7 @@ impl TransformServiceImpl {
                     finished_range: false,
                 },
                 |state, (hash, block)| {
-                    type Flag = MetadataBlockTypeFlags;
+                    type Flag = MetadataEventTypeFlags;
                     type Decision = MetadataVisitorDecision;
 
                     if Some(block.sequence_number) < state.tail_sequence_number {
@@ -547,7 +547,7 @@ impl TransformServiceImpl {
                         return Ok(Decision::Stop);
                     };
 
-                    let block_flag = Flag::from(block);
+                    let block_flag = Flag::from(&block.event);
 
                     if Flag::EXECUTE_TRANSFORM.contains(block_flag) {
                         state.blocks.push((hash.clone(), block.clone()));

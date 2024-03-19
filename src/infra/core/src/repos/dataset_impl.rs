@@ -133,11 +133,11 @@ where
         current_head: &Multihash,
         last_seen: Option<&Multihash>,
     ) -> Result<UpdateSummaryIncrement, GetSummaryError> {
-        type Flag = MetadataBlockTypeFlags;
+        type Flag = MetadataEventTypeFlags;
         type Decision = MetadataVisitorDecision;
 
         struct VisitorState {
-            requested_flags: MetadataBlockTypeFlags,
+            requested_flags: Flag,
             increment: UpdateSummaryIncrement,
         }
 

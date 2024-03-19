@@ -101,6 +101,8 @@ codegen-odf-serde:
 		| rustfmt > $(ODF_CRATE_DIR)/src/dtos/dtos_generated.rs
 	python $(ODF_SPEC_DIR)/tools/jsonschema_to_rust_traits.py $(ODF_SPEC_DIR)/schemas \
 		| rustfmt > $(ODF_CRATE_DIR)/src/dtos/dtos_dyntraits_generated.rs
+	python $(ODF_SPEC_DIR)/tools/jsonschema_to_rust_dto_enum_flags.py $(ODF_SPEC_DIR)/schemas \
+		| rustfmt > $(ODF_CRATE_DIR)/src/dtos/dtos_enum_flags_generated.rs
 	python $(ODF_SPEC_DIR)/tools/jsonschema_to_rust_serde_yaml.py $(ODF_SPEC_DIR)/schemas \
 		| rustfmt > $(ODF_CRATE_DIR)/src/serde/yaml/derivations_generated.rs
 	python $(ODF_SPEC_DIR)/tools/jsonschema_to_rust_flatbuffers.py $(ODF_SPEC_DIR)/schemas \
@@ -109,6 +111,7 @@ codegen-odf-serde:
 	$(call add_license_header, "$(ODF_CRATE_DIR)/src/serde/flatbuffers/proxies_generated.rs")
 	$(call add_license_header, "$(ODF_CRATE_DIR)/src/dtos/dtos_generated.rs")
 	$(call add_license_header, "$(ODF_CRATE_DIR)/src/dtos/dtos_dyntraits_generated.rs")
+	$(call add_license_header, "$(ODF_CRATE_DIR)/src/dtos/dtos_enum_flags_generated.rs")
 	$(call add_license_header, "$(ODF_CRATE_DIR)/src/serde/yaml/derivations_generated.rs")
 	$(call add_license_header, "$(ODF_CRATE_DIR)/src/serde/flatbuffers/convertors_generated.rs")
 
