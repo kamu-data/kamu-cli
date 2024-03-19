@@ -504,7 +504,7 @@ impl TransformServiceImpl {
     }
 
     // TODO: Improve error handling
-    // Need an inconsistent medata error?
+    // Need an inconsistent metadata error?
     #[tracing::instrument(level = "info", skip_all)]
     pub async fn get_verification_plan(
         &self,
@@ -522,62 +522,87 @@ impl TransformServiceImpl {
             Some(hash) => hash,
         };
         let tail = block_range.0;
+        let tail_sequence_number = match tail.as_ref() {
+            Some(tail) => {
+                let block = metadata_chain.get_block(tail).await?;
 
-        let mut source = None;
-        let mut set_vocab = None;
-        let mut schema = None;
-        let mut blocks = Vec::new();
-        let mut finished_range = false;
-
-        {
-            let mut block_stream = metadata_chain.iter_blocks_interval(&head, None, false);
-
-            // TODO: PERF: Search for source, vocab, and data schema result in full scan
-            while let Some((block_hash, block)) = block_stream.try_next().await? {
-                match block.event {
-                    MetadataEvent::SetTransform(st) => {
-                        if source.is_none() {
-                            source = Some(st);
-                        } else {
-                            // TODO: Support dataset evolution
-                            unimplemented!(
-                                "Verifying datasets with evolving queries is not yet supported"
-                            );
-                        }
-                    }
-                    MetadataEvent::SetVocab(sv) => {
-                        if set_vocab.is_none() {
-                            set_vocab = Some(sv);
-                        }
-                    }
-                    MetadataEvent::SetDataSchema(e) => {
-                        if schema.is_none() {
-                            schema = Some(e.schema_as_arrow().int_err()?);
-                        }
-                    }
-                    MetadataEvent::ExecuteTransform(_) => {
-                        if !finished_range {
-                            blocks.push((block_hash.clone(), block));
-                        }
-                    }
-                    MetadataEvent::AddData(_)
-                    | MetadataEvent::SetPollingSource(_)
-                    | MetadataEvent::DisablePollingSource(_)
-                    | MetadataEvent::AddPushSource(_)
-                    | MetadataEvent::DisablePushSource(_) => {
-                        unreachable!()
-                    }
-                    MetadataEvent::Seed(_)
-                    | MetadataEvent::SetAttachments(_)
-                    | MetadataEvent::SetInfo(_)
-                    | MetadataEvent::SetLicense(_) => (),
-                }
-
-                if !finished_range && Some(&block_hash) == tail.as_ref() {
-                    finished_range = true;
-                }
+                Some(block.sequence_number)
             }
-        }
+            None => None,
+        };
+
+        let (source, set_vocab, schema, blocks, finished_range) = {
+            // TODO: Support dataset evolution
+            let mut set_transform_visitor = <SearchSetTransformVisitor>::default();
+            let mut set_vocab_visitor = <SearchSetVocabVisitor>::default();
+            let mut set_data_schema_visitor = <SearchSetDataSchemaVisitor>::default();
+
+            struct ExecuteTransformCollectorVisitor {
+                tail_sequence_number: Option<u64>,
+                blocks: Vec<(Multihash, MetadataBlock)>,
+                finished_range: bool,
+            }
+
+            let mut execute_transform_collector_visitor = GenericCallbackVisitor::new(
+                ExecuteTransformCollectorVisitor {
+                    tail_sequence_number,
+                    blocks: Vec::new(),
+                    finished_range: false,
+                },
+                |state, (hash, block)| {
+                    type Flag = MetadataBlockTypeFlags;
+                    type Decision = MetadataVisitorDecision;
+
+                    if Some(block.sequence_number) < state.tail_sequence_number {
+                        state.finished_range = true;
+
+                        return Ok(Decision::Stop);
+                    };
+
+                    let block_flag = Flag::from(block);
+
+                    if Flag::EXECUTE_TRANSFORM.contains(block_flag) {
+                        state.blocks.push((hash.clone(), block.clone()));
+                    };
+
+                    if Some(block.sequence_number) == state.tail_sequence_number {
+                        state.finished_range = true;
+
+                        Ok(Decision::Stop)
+                    } else {
+                        Ok(Decision::NextOfType(Flag::EXECUTE_TRANSFORM))
+                    }
+                },
+            );
+
+            metadata_chain
+                .accept::<InternalError>(&mut [
+                    &mut set_transform_visitor,
+                    &mut set_vocab_visitor,
+                    &mut set_data_schema_visitor,
+                    &mut execute_transform_collector_visitor,
+                ])
+                .await?;
+
+            let ExecuteTransformCollectorVisitor {
+                blocks,
+                finished_range,
+                ..
+            } = execute_transform_collector_visitor.into_state();
+
+            (
+                set_transform_visitor.into_event(),
+                set_vocab_visitor.into_event(),
+                set_data_schema_visitor
+                    .into_event()
+                    .as_ref()
+                    .map(SetDataSchema::schema_as_arrow)
+                    .transpose() // Option<Result<SchemaRef, E>> -> Result<Option<SchemaRef>, E>
+                    .int_err()?,
+                blocks,
+                finished_range,
+            )
+        };
 
         // Ensure start_block was found if specified
         if tail.is_some() && !finished_range {
