@@ -79,6 +79,7 @@ impl DatasetChangesServiceImpl {
         old_head: Option<&Multihash>,
         new_head: &Multihash,
     ) -> Result<DatasetIntervalIncrement, InternalError> {
+        #[derive(Default)]
         struct DataBlockAnalysisVisitorState {
             // Analysis outputs
             num_blocks: u64,
@@ -90,12 +91,7 @@ impl DatasetChangesServiceImpl {
 
         // Scan blocks (from new head to old head)
         let mut data_block_analysis_visitor = GenericCallbackVisitor::new(
-            DataBlockAnalysisVisitorState {
-                num_blocks: 0,
-                num_records: 0,
-                updated_watermark: None,
-                latest_watermark: None,
-            },
+            DataBlockAnalysisVisitorState::default(),
             |state, (_, block)| {
                 // Each block counts
                 state.num_blocks += 1;
