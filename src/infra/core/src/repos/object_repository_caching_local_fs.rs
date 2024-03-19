@@ -23,7 +23,7 @@ use crate::utils::s3_context::AsyncReadObj;
 /////////////////////////////////////////////////////////////////////////////////////////
 
 /// A read-through and (partially) a write-through caching layer for
-/// [ObjectRepository] using a local file system.
+/// [`ObjectRepository`] using a local file system.
 ///
 /// Currently caches objects forever, so a cache directory cleanup has to be
 /// handled separately.
@@ -140,7 +140,7 @@ where
     ) -> Result<InsertResult, InsertError> {
         let res = self.wrapped.insert_bytes(data, options).await?;
         let cache_path = self.cache_path(&res.hash);
-        std::fs::write(&cache_path, data).int_err()?;
+        std::fs::write(cache_path, data).int_err()?;
         Ok(res)
     }
 
