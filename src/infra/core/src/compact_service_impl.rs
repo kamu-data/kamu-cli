@@ -19,12 +19,20 @@ use domain::compact_service::{
     CompactionListener,
     CompactionMultiListener,
     CompactionPhase,
+    InvalidDatasetKindError,
     NullCompactionListener,
 };
 use futures::stream::TryStreamExt;
 use kamu_core::compact_service::CompactService;
 use kamu_core::*;
-use opendatafabric::{DatasetHandle, DatasetName, MetadataEvent, Multihash, OffsetInterval};
+use opendatafabric::{
+    DatasetHandle,
+    DatasetKind,
+    DatasetName,
+    MetadataEvent,
+    Multihash,
+    OffsetInterval,
+};
 
 use crate::*;
 
@@ -233,12 +241,25 @@ impl CompactService for CompactServiceImpl {
             .check_action_allowed(dataset_handle, domain::auth::DatasetAction::Read)
             .await?;
 
-        let compact_dir_path = self.create_compact_dir(dataset_dir_path)?;
-
         let dataset = self
             .dataset_repo
             .get_dataset(&dataset_handle.as_local_ref())
             .await?;
+
+        let dataset_kind = dataset
+            .get_summary(GetSummaryOpts::default())
+            .await
+            .int_err()?
+            .kind;
+
+        if dataset_kind != DatasetKind::Root {
+            return Err(CompactError::InvalidDatasetKind(InvalidDatasetKindError {
+                dataset_name: dataset_handle.alias.dataset_name.clone(),
+            }));
+        }
+
+        let compact_dir_path = self.create_compact_dir(dataset_dir_path)?;
+
         listener.begin_phase(CompactionPhase::GatherChainInfo);
 
         let chain_files_info = self.get_chain_files_info(dataset.clone()).await?;

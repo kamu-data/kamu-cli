@@ -257,12 +257,11 @@ Delete local datasets matching pattern:
 
 Compact a dataset
 
-**Usage:** `kamu compact [OPTIONS] <dataset>...`
+**Usage:** `kamu compact <dataset>...`
 
 **Arguments:**
 
 * `<DATASET>` — Local dataset reference(s)
-
 
 This command commpact all files in the dataset into a few depends from max-slice-size.
 

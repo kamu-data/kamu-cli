@@ -339,11 +339,6 @@ pub fn cli() -> Command {
                             .required(true)
                             .value_parser(value_parse_dataset_ref_local)
                             .help("Local dataset reference(s)"),
-                        Arg::new("yes")
-                            .short('y')
-                            .long("yes")
-                            .action(ArgAction::SetTrue)
-                            .help("Don't ask for confirmation"),
                     ])
                     .after_help(indoc::indoc!(
                         r#"

@@ -91,6 +91,12 @@ pub enum CompactError {
         #[backtrace]
         AppendError,
     ),
+    #[error(transparent)]
+    InvalidDatasetKind(
+        #[from]
+        #[backtrace]
+        InvalidDatasetKindError,
+    ),
 }
 
 impl From<GetDatasetError> for CompactError {
@@ -154,6 +160,12 @@ impl From<CommitError> for CompactError {
             CommitError::Internal(e) => CompactError::Internal(e),
         }
     }
+}
+
+#[derive(Error, Debug)]
+#[error("Dataset {dataset_name} in not root kind")]
+pub struct InvalidDatasetKindError {
+    pub dataset_name: DatasetName,
 }
 
 ///////////////////////////////////////////////////////////////////////////////
