@@ -12,14 +12,14 @@
 #[derive(Debug)]
 pub enum DatabaseProvider {
     Postgres,
-    MySQL,
+    MySql,
     MariaDB,
 }
 
 impl DatabaseProvider {
     pub fn default_port(&self) -> u32 {
         match self {
-            DatabaseProvider::MariaDB | DatabaseProvider::MySQL => 3306,
+            DatabaseProvider::MariaDB | DatabaseProvider::MySql => 3306,
             DatabaseProvider::Postgres => 5432,
         }
     }
@@ -32,7 +32,7 @@ impl std::fmt::Display for DatabaseProvider {
             "{}",
             match self {
                 DatabaseProvider::Postgres => "postgres",
-                DatabaseProvider::MySQL => "mysql",
+                DatabaseProvider::MySql => "mysql",
                 DatabaseProvider::MariaDB => "mariadb",
             }
         )

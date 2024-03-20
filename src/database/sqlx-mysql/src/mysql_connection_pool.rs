@@ -7,65 +7,33 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::borrow::{Borrow, BorrowMut};
-
 use database_common::DatabaseError;
 use dill::{component, scope, Singleton};
 use sqlx::{MySql, MySqlPool, Transaction};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct MySQLConnectionPool {
+pub struct MySqlConnectionPool {
     mysql_pool: MySqlPool,
 }
 
 #[component(pub)]
 #[scope(Singleton)]
-impl MySQLConnectionPool {
+impl MySqlConnectionPool {
     pub fn new(mysql_pool: MySqlPool) -> Self {
         Self { mysql_pool }
     }
 
-    pub async fn begin_transaction<'c>(
-        &self,
-    ) -> Result<MySqlConnectionPoolTransaction<'c>, DatabaseError> {
-        let mysql_transaction = self
-            .mysql_pool
+    pub(crate) async fn begin_transaction(&self) -> Result<MySqlTransaction, DatabaseError> {
+        self.mysql_pool
             .begin()
             .await
-            .map_err(DatabaseError::SqlxError)?;
-
-        Ok(MySqlConnectionPoolTransaction(mysql_transaction))
+            .map_err(DatabaseError::SqlxError)
     }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct MySqlConnectionPoolTransaction<'c>(Transaction<'c, MySql>);
-
-impl<'c> std::ops::Deref for MySqlConnectionPoolTransaction<'c> {
-    type Target = Transaction<'c, MySql>;
-
-    fn deref(&self) -> &Self::Target {
-        self.0.borrow()
-    }
-}
-
-impl<'c> std::ops::DerefMut for MySqlConnectionPoolTransaction<'c> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        self.0.borrow_mut()
-    }
-}
-
-impl<'c> MySqlConnectionPoolTransaction<'c> {
-    pub async fn commit(self) -> Result<(), DatabaseError> {
-        self.0.commit().await.map_err(DatabaseError::SqlxError)
-    }
-
-    #[allow(dead_code)]
-    pub async fn rollback(self) -> Result<(), DatabaseError> {
-        self.0.rollback().await.map_err(DatabaseError::SqlxError)
-    }
-}
+pub type MySqlTransaction = Transaction<'static, MySql>;
 
 /////////////////////////////////////////////////////////////////////////////////////////

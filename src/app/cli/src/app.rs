@@ -11,7 +11,13 @@ use std::path::Path;
 use std::sync::Arc;
 
 use container_runtime::{ContainerRuntime, ContainerRuntimeConfig};
-use database_common::{DatabaseConfiguration, DatabaseProvider};
+use database_common::{
+    run_transactional,
+    DatabaseConfiguration,
+    DatabaseProvider,
+    DatabaseTransactionManager,
+    TransactionSubject,
+};
 use dill::*;
 use kamu::domain::*;
 use kamu::*;
@@ -73,10 +79,17 @@ pub async fn run(
             configure_base_catalog(&workspace_layout, workspace_svc.is_multi_tenant_workspace());
 
         // TODO: read database settings from configuration, and make it optional
-        configure_database_components(
-            &mut base_catalog_builder,
-            &DatabaseConfiguration::local_mariadb(),
-        )?;
+        let db_configuration = DatabaseConfiguration::local_mariadb();
+        configure_database_components(&mut base_catalog_builder, &db_configuration)?;
+
+        // TODO: remove this test
+        // match database_sqlx_postgres::postgres_dummy_test(&db_configuration).await {
+        // match database_sqlx_mysql::mysql_dummy_test(&db_configuration).await {
+        /*    Ok(_) => {}
+            Err(e) => {
+                eprintln!("DB test failed: {e:?}",);
+            }
+        }*/
 
         base_catalog_builder
             .add_value(dependencies_graph_repository)
@@ -110,15 +123,31 @@ pub async fn run(
     };
 
     // Temp: remove this
-    let maybe_account_repository = cli_catalog.get_one::<dyn auth::AccountRepository>().ok();
-    if let Some(account_repository) = maybe_account_repository {
-        println!(
-            "{:?}",
-            account_repository
-                .find_account_by_email("test@example.com")
-                .await
-                .int_err()?
-        );
+    let maybe_db_transaction_manager = base_catalog
+        .get_one::<dyn DatabaseTransactionManager>()
+        .ok();
+    if let Some(db_transaction_manager) = maybe_db_transaction_manager {
+        async fn repository_test(
+            catalog: Catalog,
+            mut transaction_subject: TransactionSubject,
+        ) -> Result<TransactionSubject, InternalError> {
+            let account_repository = catalog.get_one::<dyn auth::AccountRepository>().unwrap();
+            println!(
+                "{:?}",
+                account_repository
+                    .find_account_by_email(&mut transaction_subject, "test@example.com")
+                    .await
+                    .int_err()?
+            );
+            Ok(transaction_subject)
+        }
+
+        run_transactional(
+            db_transaction_manager.as_ref(),
+            base_catalog.clone(),
+            repository_test,
+        )
+        .await?;
     }
 
     // Evict cache
@@ -322,13 +351,13 @@ fn configure_database_components(
 ) -> Result<(), InternalError> {
     match db_configuration.provider {
         DatabaseProvider::Postgres => {
-            database_sqlx_postgres::PostgresCatalogInitializer::init_database_components(
+            database_sqlx_postgres::PostgresPlugin::init_database_components(
                 catalog_builder,
                 db_configuration,
             )
         }
-        DatabaseProvider::MySQL | DatabaseProvider::MariaDB => {
-            database_sqlx_mysql::MySQLCatalogInitializer::init_database_components(
+        DatabaseProvider::MySql | DatabaseProvider::MariaDB => {
+            database_sqlx_mysql::MySqlPlugin::init_database_components(
                 catalog_builder,
                 db_configuration,
             )

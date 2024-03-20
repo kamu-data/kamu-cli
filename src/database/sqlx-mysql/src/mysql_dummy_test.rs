@@ -9,26 +9,51 @@
 
 use chrono::Utc;
 use database_common::models::{AccountModel, AccountOrigin};
-use database_common::{DatabaseConfiguration, DatabaseError};
-use dill::CatalogBuilder;
+use database_common::{
+    run_transactional,
+    DatabaseConfiguration,
+    DatabaseError,
+    DatabaseTransactionManager,
+    TransactionSubject,
+};
+use dill::{Catalog, CatalogBuilder};
 use internal_error::{InternalError, ResultIntoInternal};
 use uuid::Uuid;
 
-use crate::{MySQLCatalogInitializer, MySQLConnectionPool};
+use crate::{MySqlPlugin, MySqlTransaction};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn dummy_mysql_db_test(
+pub async fn mysql_dummy_test(
     db_configuration: &DatabaseConfiguration,
 ) -> Result<(), InternalError> {
     let mut catalog_builder = CatalogBuilder::new();
-    MySQLCatalogInitializer::init_database_components(&mut catalog_builder, db_configuration)
-        .int_err()?;
-    let mysql_catalog = catalog_builder.build();
+    MySqlPlugin::init_database_components(&mut catalog_builder, db_configuration).int_err()?;
+    let base_catalog = catalog_builder.build();
 
-    let db_connection_pool = mysql_catalog.get_one::<MySQLConnectionPool>().unwrap();
+    let db_transaction_manager = base_catalog
+        .get_one::<dyn DatabaseTransactionManager>()
+        .unwrap();
 
-    let mut db_transaction = db_connection_pool.begin_transaction().await.int_err()?;
+    run_transactional(
+        db_transaction_manager.as_ref(),
+        base_catalog,
+        mysql_transaction_scenario,
+    )
+    .await
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[allow(clippy::no_effect_underscore_binding)]
+async fn mysql_transaction_scenario(
+    _catalog: Catalog,
+    mut transaction_subject: TransactionSubject,
+) -> Result<TransactionSubject, InternalError> {
+    let mysql_transaction = transaction_subject
+        .transaction
+        .downcast_mut::<MySqlTransaction>()
+        .unwrap();
 
     sqlx::query_as!(
         AccountModel,
@@ -43,7 +68,7 @@ pub async fn dummy_mysql_db_test(
         AccountOrigin::Cli as AccountOrigin,
         Utc::now()
     )
-    .execute(&mut **db_transaction)
+    .execute(&mut **mysql_transaction)
     .await
     .map_err(DatabaseError::SqlxError)
     .int_err()?;
@@ -53,15 +78,13 @@ pub async fn dummy_mysql_db_test(
         r#"
         SELECT id as "id: uuid::fmt::Hyphenated", email, account_name, display_name, origin as "origin: AccountOrigin", registered_at FROM accounts
         "#
-    ).fetch_all(&mut **db_transaction)
+    ).fetch_all(&mut **mysql_transaction)
     .await
     .map_err(DatabaseError::SqlxError).int_err()?;
 
     println!("Accounts: {res:?}");
 
-    db_transaction.commit().await.int_err()?;
-
-    Ok(())
+    Ok(transaction_subject)
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

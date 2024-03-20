@@ -7,26 +7,23 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::sync::Arc;
-
 use database_common::models::AccountModel;
+use database_common::TransactionSubject;
 use dill::{component, interface};
 use kamu_core::auth::{AccountRepository, AccountRepositoryError};
 use kamu_core::ResultIntoInternal;
 
-use crate::PostgresConnectionPool;
+use crate::PostgresTransaction;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct PostgresAccountRepository {
-    pg_connection_pool: Arc<PostgresConnectionPool>,
-}
+pub struct PostgresAccountRepository {}
 
 #[component(pub)]
 #[interface(dyn AccountRepository)]
 impl PostgresAccountRepository {
-    pub fn new(pg_connection_pool: Arc<PostgresConnectionPool>) -> Self {
-        Self { pg_connection_pool }
+    pub fn new() -> Self {
+        Self {}
     }
 }
 
@@ -34,14 +31,13 @@ impl PostgresAccountRepository {
 impl AccountRepository for PostgresAccountRepository {
     async fn find_account_by_email(
         &self,
+        transaction_subject: &mut TransactionSubject,
         email: &str,
     ) -> Result<Option<opendatafabric::AccountID>, AccountRepositoryError> {
-        let mut pg_transaction = self
-            .pg_connection_pool
-            .begin_transaction()
-            .await
-            .int_err()
-            .map_err(AccountRepositoryError::Internal)?;
+        let pg_transaction = transaction_subject
+            .transaction
+            .downcast_mut::<PostgresTransaction>()
+            .unwrap();
 
         let account_data = sqlx::query_as!(
             AccountModel,

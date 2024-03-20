@@ -9,12 +9,18 @@
 
 use chrono::Utc;
 use database_common::models::{AccountModel, AccountOrigin};
-use database_common::{DatabaseConfiguration, DatabaseError};
-use dill::CatalogBuilder;
+use database_common::{
+    run_transactional,
+    DatabaseConfiguration,
+    DatabaseError,
+    DatabaseTransactionManager,
+    TransactionSubject,
+};
+use dill::{Catalog, CatalogBuilder};
 use internal_error::{InternalError, ResultIntoInternal};
 use uuid::Uuid;
 
-use crate::{PostgresCatalogInitializer, PostgresConnectionPool};
+use crate::{PostgresPlugin, PostgresTransaction};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -22,15 +28,32 @@ pub async fn postgres_dummy_test(
     db_configuration: &DatabaseConfiguration,
 ) -> Result<(), InternalError> {
     let mut catalog_builder = CatalogBuilder::new();
-    PostgresCatalogInitializer::init_database_components(&mut catalog_builder, db_configuration)
-        .int_err()?;
-    let postgres_catalog = catalog_builder.build();
+    PostgresPlugin::init_database_components(&mut catalog_builder, db_configuration).int_err()?;
+    let base_catalog = catalog_builder.build();
 
-    let db_connection_pool = postgres_catalog
-        .get_one::<PostgresConnectionPool>()
+    let db_transaction_manager = base_catalog
+        .get_one::<dyn DatabaseTransactionManager>()
         .unwrap();
 
-    let mut db_transaction = db_connection_pool.begin_transaction().await.int_err()?;
+    run_transactional(
+        db_transaction_manager.as_ref(),
+        base_catalog,
+        postgres_transaction_scenario,
+    )
+    .await
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+#[allow(clippy::no_effect_underscore_binding)]
+async fn postgres_transaction_scenario(
+    _catalog: Catalog,
+    mut transaction_subject: TransactionSubject,
+) -> Result<TransactionSubject, InternalError> {
+    let pg_transaction = transaction_subject
+        .transaction
+        .downcast_mut::<PostgresTransaction>()
+        .unwrap();
 
     sqlx::query_as!(
         AccountModel,
@@ -45,7 +68,7 @@ pub async fn postgres_dummy_test(
         AccountOrigin::Cli as AccountOrigin,
         Utc::now()
     )
-    .execute(&mut **db_transaction)
+    .execute(&mut **pg_transaction)
     .await
     .map_err(DatabaseError::SqlxError)
     .int_err()?;
@@ -55,15 +78,13 @@ pub async fn postgres_dummy_test(
         r#"
         SELECT id, email, account_name, display_name, origin as "origin: _", registered_at FROM accounts
         "#
-    ).fetch_all(&mut **db_transaction)
+    ).fetch_all(&mut **pg_transaction)
     .await
     .map_err(DatabaseError::SqlxError).int_err()?;
 
     println!("Accounts: {res:?}");
 
-    db_transaction.commit().await.int_err()?;
-
-    Ok(())
+    Ok(transaction_subject)
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

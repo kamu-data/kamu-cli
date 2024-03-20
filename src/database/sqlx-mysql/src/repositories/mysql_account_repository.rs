@@ -7,43 +7,37 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::sync::Arc;
-
 use database_common::models::{AccountModel, AccountOrigin};
+use database_common::TransactionSubject;
 use dill::{component, interface};
 use kamu_core::auth::{AccountRepository, AccountRepositoryError};
 use kamu_core::ResultIntoInternal;
 
-use crate::MySQLConnectionPool;
+use crate::MySqlTransaction;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct MySQLAccountRepository {
-    mysql_connection_pool: Arc<MySQLConnectionPool>,
-}
+pub struct MySqlAccountRepository {}
 
 #[component(pub)]
 #[interface(dyn AccountRepository)]
-impl MySQLAccountRepository {
-    pub fn new(mysql_connection_pool: Arc<MySQLConnectionPool>) -> Self {
-        Self {
-            mysql_connection_pool,
-        }
+impl MySqlAccountRepository {
+    pub fn new() -> Self {
+        Self {}
     }
 }
 
 #[async_trait::async_trait]
-impl AccountRepository for MySQLAccountRepository {
+impl AccountRepository for MySqlAccountRepository {
     async fn find_account_by_email(
         &self,
+        transaction_subject: &mut TransactionSubject,
         email: &str,
     ) -> Result<Option<opendatafabric::AccountID>, AccountRepositoryError> {
-        let mut mysql_transaction = self
-            .mysql_connection_pool
-            .begin_transaction()
-            .await
-            .int_err()
-            .map_err(AccountRepositoryError::Internal)?;
+        let mysql_transaction = transaction_subject
+            .transaction
+            .downcast_mut::<MySqlTransaction>()
+            .unwrap();
 
         let account_data = sqlx::query_as!(
             AccountModel,
@@ -54,9 +48,9 @@ impl AccountRepository for MySQLAccountRepository {
             "#,
             email
         ).fetch_optional(&mut **mysql_transaction)
-        .await
-        .int_err()
-        .map_err(AccountRepositoryError::Internal)?;
+            .await
+            .int_err()
+            .map_err(AccountRepositoryError::Internal)?;
 
         Ok(account_data.map(|a| opendatafabric::AccountID::from(a.id.as_simple().to_string())))
     }

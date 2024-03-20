@@ -1962,6 +1962,7 @@ checksum = "7e962a19be5cfc3f3bf6dd8f61eb50107f356ad6270fbb3ed41476571db78be5"
 name = "database-common"
 version = "0.165.0"
 dependencies = [
+ "async-trait",
  "chrono",
  "dill",
  "internal-error",
@@ -1969,6 +1970,7 @@ dependencies = [
  "serde",
  "sqlx",
  "thiserror",
+ "tokio",
  "uuid",
 ]
 
@@ -1987,6 +1989,7 @@ dependencies = [
  "serde",
  "sqlx",
  "thiserror",
+ "tokio",
  "uuid",
 ]
 
@@ -2005,6 +2008,7 @@ dependencies = [
  "serde",
  "sqlx",
  "thiserror",
+ "tokio",
  "uuid",
 ]
 
@@ -3779,6 +3783,7 @@ dependencies = [
  "bytes",
  "chrono",
  "container-runtime",
+ "database-common",
  "datafusion",
  "dill",
  "futures",

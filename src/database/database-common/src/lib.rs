@@ -10,9 +10,11 @@
 mod db_configuration;
 mod db_error;
 mod db_provider;
+mod db_transaction_manager;
 
 pub mod models;
 
 pub use db_configuration::*;
 pub use db_error::*;
 pub use db_provider::*;
+pub use db_transaction_manager::*;
