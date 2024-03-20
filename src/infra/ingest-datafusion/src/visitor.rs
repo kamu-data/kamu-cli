@@ -53,23 +53,23 @@ pub struct DataWriterDataFusionMetaDataStateVisitor<'a> {
 }
 
 impl<'a> DataWriterDataFusionMetaDataStateVisitor<'a> {
-    pub fn new(head: Multihash, maybe_source_name: Option<&'a str>) -> (Decision, Self) {
-        let next_block_flags = Flag::SET_DATA_SCHEMA
-            | Flag::ADD_DATA
-            | Flag::SET_POLLING_SOURCE
-            | Flag::DISABLE_POLLING_SOURCE
-            | Flag::ADD_PUSH_SOURCE
-            | Flag::DISABLE_PUSH_SOURCE
-            | Flag::SET_VOCAB
-            | Flag::SEED;
+    const INITIAL_NEXT_BLOCK_FLAGS: Flag = Flag::SET_DATA_SCHEMA
+        .union(Flag::ADD_DATA)
+        .union(Flag::SET_POLLING_SOURCE)
+        .union(Flag::DISABLE_POLLING_SOURCE)
+        .union(Flag::ADD_PUSH_SOURCE)
+        .union(Flag::DISABLE_PUSH_SOURCE)
+        .union(Flag::SET_VOCAB)
+        .union(Flag::SEED);
 
+    pub fn new(head: Multihash, maybe_source_name: Option<&'a str>) -> (Decision, Self) {
         (
-            Decision::NextOfType(next_block_flags),
+            Decision::NextOfType(Self::INITIAL_NEXT_BLOCK_FLAGS),
             Self {
                 head,
                 maybe_source_name,
 
-                next_block_flags,
+                next_block_flags: Self::INITIAL_NEXT_BLOCK_FLAGS,
                 data_slices: Vec::new(),
 
                 maybe_schema: None,
@@ -200,6 +200,10 @@ impl<'a> DataWriterDataFusionMetaDataStateVisitor<'a> {
 
 impl<'a> MetadataChainVisitor for DataWriterDataFusionMetaDataStateVisitor<'a> {
     type Error = ScanMetadataError;
+
+    fn initial_decision(&self) -> Result<Decision, Self::Error> {
+        Ok(Decision::NextOfType(Self::INITIAL_NEXT_BLOCK_FLAGS))
+    }
 
     fn visit(&mut self, (_, block): HashedMetadataBlockRef) -> Result<Decision, Self::Error> {
         match &block.event {

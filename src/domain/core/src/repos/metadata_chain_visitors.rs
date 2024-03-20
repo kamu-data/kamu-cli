@@ -107,11 +107,15 @@ where
 {
     type Error = E;
 
+    fn initial_decision(&self) -> Result<Decision, Self::Error> {
+        Ok(Decision::NextOfType(self.requested_flag))
+    }
+
     fn visit(&mut self, (hash, block): HashedMetadataBlockRef) -> Result<Decision, Self::Error> {
         let flag = Flag::from(&block.event);
 
         if !self.requested_flag.contains(flag) {
-            return Ok(Decision::NextOfType(self.requested_flag));
+            unreachable!();
         }
 
         self.hashed_block = Some((hash.clone(), block.clone().into_typed().unwrap()));
@@ -182,14 +186,15 @@ where
 {
     type Error = E;
 
+    fn initial_decision(&self) -> Result<Decision, Self::Error> {
+        Ok(Decision::NextOfType(Flag::DATA_BLOCK))
+    }
+
     fn visit(&mut self, (hash, block): HashedMetadataBlockRef) -> Result<Decision, Self::Error> {
-        let flag = Flag::from(&block.event);
+        let Some(data_block) = block.as_data_stream_block() else {
+            unreachable!()
+        };
 
-        if !Flag::DATA_BLOCK.contains(flag) {
-            return Ok(Decision::NextOfType(Flag::DATA_BLOCK));
-        }
-
-        let data_block = block.as_data_stream_block().unwrap();
         let has_data_block_found = match self.kind {
             SearchDataBlocksVisitorKind::NextDataBlock => true,
             SearchDataBlocksVisitorKind::NextFilledNewWatermark => {
@@ -246,6 +251,10 @@ where
 {
     type Error = E;
 
+    fn initial_decision(&self) -> Result<Decision, Self::Error> {
+        Ok(Decision::Next)
+    }
+
     fn visit(&mut self, (hash, block): HashedMetadataBlockRef) -> Result<Decision, Self::Error> {
         self.hashed_block = Some((hash.clone(), block.clone()));
 
@@ -257,6 +266,7 @@ where
 
 pub struct GenericCallbackVisitor<S, F, E = InternalError> {
     state: S,
+    initial_decision: Decision,
     visit_callback: F,
     _phantom: PhantomData<E>,
 }
@@ -267,9 +277,10 @@ where
     F: Fn(&mut S, HashedMetadataBlockRef) -> Result<Decision, E> + Send + Sync,
     E: Error + Send + Sync,
 {
-    pub fn new(state: S, visit_callback: F) -> Self {
+    pub fn new(state: S, initial_decision: Decision, visit_callback: F) -> Self {
         Self {
             state,
+            initial_decision,
             visit_callback,
             _phantom: PhantomData,
         }
@@ -287,6 +298,10 @@ where
     E: Error + Send + Sync,
 {
     type Error = E;
+
+    fn initial_decision(&self) -> Result<Decision, Self::Error> {
+        Ok(self.initial_decision.clone())
+    }
 
     fn visit(&mut self, hashed_block_ref: HashedMetadataBlockRef) -> Result<Decision, Self::Error> {
         (self.visit_callback)(&mut self.state, hashed_block_ref)
