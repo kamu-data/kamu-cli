@@ -60,7 +60,7 @@
           "type": "Timestamp",
           "flags": "NOT_NULL | UNSIGNED | BINARY | NO_DEFAULT_VALUE",
           "char_set": 63,
-          "max_size": 19
+          "max_size": 26
         }
       }
     ],

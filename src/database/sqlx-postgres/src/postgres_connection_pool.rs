@@ -24,9 +24,7 @@ impl PostgresConnectionPool {
         Self { pg_pool }
     }
 
-    pub(crate) async fn begin_transaction(
-        &self,
-    ) -> Result<Transaction<'static, Postgres>, DatabaseError> {
+    pub async fn begin_transaction(&self) -> Result<PostgresTransaction, DatabaseError> {
         self.pg_pool.begin().await.map_err(DatabaseError::SqlxError)
     }
 }

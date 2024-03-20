@@ -1988,8 +1988,8 @@ dependencies = [
  "secrecy",
  "serde",
  "sqlx",
+ "test-log",
  "thiserror",
- "tokio",
  "uuid",
 ]
 
@@ -2007,8 +2007,8 @@ dependencies = [
  "secrecy",
  "serde",
  "sqlx",
+ "test-log",
  "thiserror",
- "tokio",
  "uuid",
 ]
 

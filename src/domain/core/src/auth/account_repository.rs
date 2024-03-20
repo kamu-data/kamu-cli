@@ -7,20 +7,26 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use database_common::models::AccountModel;
 use database_common::TransactionSubject;
 use internal_error::InternalError;
-use opendatafabric::AccountID;
 use thiserror::Error;
 
 ///////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 pub trait AccountRepository: Send + Sync {
+    async fn create_account(
+        &self,
+        transaction_subject: &mut TransactionSubject,
+        account_model: &AccountModel,
+    ) -> Result<(), AccountRepositoryError>;
+
     async fn find_account_by_email(
         &self,
         transaction_subject: &mut TransactionSubject,
         email: &str,
-    ) -> Result<Option<AccountID>, AccountRepositoryError>;
+    ) -> Result<Option<AccountModel>, AccountRepositoryError>;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

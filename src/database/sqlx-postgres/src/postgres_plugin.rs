@@ -33,8 +33,8 @@ impl PostgresPlugin {
     pub fn init_database_components(
         catalog_builder: &mut CatalogBuilder,
         db_configuration: &DatabaseConfiguration,
-    ) -> Result<(), InternalError> {
-        let pg_pool = Self::build_pg_pool(db_configuration).int_err()?;
+    ) -> Result<(), DatabaseError> {
+        let pg_pool = Self::open_pg_pool(db_configuration)?;
 
         catalog_builder.add::<Self>();
         catalog_builder.add_builder(PostgresConnectionPool::builder().with_pg_pool(pg_pool));
@@ -43,7 +43,7 @@ impl PostgresPlugin {
         Ok(())
     }
 
-    fn build_pg_pool(db_configuration: &DatabaseConfiguration) -> Result<PgPool, DatabaseError> {
+    fn open_pg_pool(db_configuration: &DatabaseConfiguration) -> Result<PgPool, DatabaseError> {
         PgPool::connect_lazy(db_configuration.connection_string().as_str())
             .map_err(DatabaseError::SqlxError)
     }
@@ -73,6 +73,19 @@ impl DatabaseTransactionManager for PostgresPlugin {
             .unwrap();
 
         postgres_transaction.commit().await.int_err()?;
+        Ok(())
+    }
+
+    async fn rollback_transaction(
+        &self,
+        transaction_subject: TransactionSubject,
+    ) -> Result<(), InternalError> {
+        let postgres_transaction = transaction_subject
+            .transaction
+            .downcast::<PostgresTransaction>()
+            .unwrap();
+
+        postgres_transaction.rollback().await.int_err()?;
         Ok(())
     }
 }

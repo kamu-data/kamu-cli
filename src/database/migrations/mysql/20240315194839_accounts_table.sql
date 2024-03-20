@@ -5,7 +5,7 @@ CREATE TABLE accounts(
     account_name TEXT NOT NULL,
     display_name TEXT NOT NULL,
     origin ENUM('cli', 'github') NOT NULL,
-    registered_at TIMESTAMP NOT NULL
+    registered_at TIMESTAMP(6) NOT NULL
 );
 
 CREATE INDEX accounts_name_idx ON accounts (account_name);

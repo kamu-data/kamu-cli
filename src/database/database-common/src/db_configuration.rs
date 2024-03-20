@@ -36,6 +36,17 @@ impl DatabaseConfiguration {
         )
     }
 
+    pub fn connection_string_no_db(&self) -> String {
+        format!(
+            "{}://{}:{}@{}:{}",
+            self.provider,
+            self.user,
+            self.password.expose_secret(),
+            self.host,
+            self.port.unwrap_or_else(|| self.provider.default_port()),
+        )
+    }
+
     pub fn local_postgres() -> Self {
         Self {
             provider: DatabaseProvider::Postgres,

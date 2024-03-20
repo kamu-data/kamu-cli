@@ -25,6 +25,11 @@ pub trait DatabaseTransactionManager: Send + Sync {
         &self,
         transaction_subject: TransactionSubject,
     ) -> Result<(), InternalError>;
+
+    async fn rollback_transaction(
+        &self,
+        transaction_subject: TransactionSubject,
+    ) -> Result<(), InternalError>;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

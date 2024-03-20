@@ -29,11 +29,42 @@ impl MySqlAccountRepository {
 
 #[async_trait::async_trait]
 impl AccountRepository for MySqlAccountRepository {
+    async fn create_account(
+        &self,
+        transaction_subject: &mut TransactionSubject,
+        account_model: &AccountModel,
+    ) -> Result<(), AccountRepositoryError> {
+        let mysql_transaction = transaction_subject
+            .transaction
+            .downcast_mut::<MySqlTransaction>()
+            .unwrap();
+
+        sqlx::query_as!(
+            AccountModel,
+            r#"
+            INSERT INTO accounts (id, email, account_name, display_name, origin, registered_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+            "#,
+            account_model.id,
+            account_model.email,
+            account_model.account_name,
+            account_model.display_name,
+            account_model.origin as AccountOrigin,
+            account_model.registered_at,
+        )
+        .execute(&mut **mysql_transaction)
+        .await
+        .int_err()
+        .map_err(AccountRepositoryError::Internal)?;
+
+        Ok(())
+    }
+
     async fn find_account_by_email(
         &self,
         transaction_subject: &mut TransactionSubject,
         email: &str,
-    ) -> Result<Option<opendatafabric::AccountID>, AccountRepositoryError> {
+    ) -> Result<Option<AccountModel>, AccountRepositoryError> {
         let mysql_transaction = transaction_subject
             .transaction
             .downcast_mut::<MySqlTransaction>()
@@ -52,7 +83,7 @@ impl AccountRepository for MySqlAccountRepository {
             .int_err()
             .map_err(AccountRepositoryError::Internal)?;
 
-        Ok(account_data.map(|a| opendatafabric::AccountID::from(a.id.as_simple().to_string())))
+        Ok(account_data)
     }
 }
 

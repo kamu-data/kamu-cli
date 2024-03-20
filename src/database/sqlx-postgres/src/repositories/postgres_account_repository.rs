@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::models::AccountModel;
+use database_common::models::{AccountModel, AccountOrigin};
 use database_common::TransactionSubject;
 use dill::{component, interface};
 use kamu_core::auth::{AccountRepository, AccountRepositoryError};
@@ -29,11 +29,42 @@ impl PostgresAccountRepository {
 
 #[async_trait::async_trait]
 impl AccountRepository for PostgresAccountRepository {
+    async fn create_account(
+        &self,
+        transaction_subject: &mut TransactionSubject,
+        account_model: &AccountModel,
+    ) -> Result<(), AccountRepositoryError> {
+        let pg_transaction = transaction_subject
+            .transaction
+            .downcast_mut::<PostgresTransaction>()
+            .unwrap();
+
+        sqlx::query_as!(
+            AccountModel,
+            r#"
+            INSERT INTO accounts (id, email, account_name, display_name, origin, registered_at)
+                VALUES ($1, $2, $3, $4, ($5::text)::account_origin, $6)
+            "#,
+            account_model.id,
+            account_model.email,
+            account_model.account_name,
+            account_model.display_name,
+            account_model.origin as AccountOrigin,
+            account_model.registered_at,
+        )
+        .execute(&mut **pg_transaction)
+        .await
+        .int_err()
+        .map_err(AccountRepositoryError::Internal)?;
+
+        Ok(())
+    }
+
     async fn find_account_by_email(
         &self,
         transaction_subject: &mut TransactionSubject,
         email: &str,
-    ) -> Result<Option<opendatafabric::AccountID>, AccountRepositoryError> {
+    ) -> Result<Option<AccountModel>, AccountRepositoryError> {
         let pg_transaction = transaction_subject
             .transaction
             .downcast_mut::<PostgresTransaction>()
@@ -53,7 +84,7 @@ impl AccountRepository for PostgresAccountRepository {
         .int_err()
         .map_err(AccountRepositoryError::Internal)?;
 
-        Ok(account_data.map(|a| opendatafabric::AccountID::from(a.id.as_simple().to_string())))
+        Ok(account_data)
     }
 }
 

@@ -7,10 +7,4 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod mysql_connection_pool;
-mod mysql_plugin;
-mod repositories;
-
-pub use mysql_connection_pool::*;
-pub use mysql_plugin::*;
-pub use repositories::*;
+mod test_postgres_account_repository;

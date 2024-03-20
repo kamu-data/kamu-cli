@@ -13,14 +13,14 @@ use uuid::Uuid;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Serialize, Deserialize, sqlx::Type)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, sqlx::Type, PartialEq, Eq)]
 #[sqlx(type_name = "account_origin", rename_all = "lowercase")]
 pub enum AccountOrigin {
     Cli,
     Github,
 }
 
-#[derive(Debug, sqlx::FromRow)]
+#[derive(Debug, sqlx::FromRow, PartialEq, Eq)]
 #[allow(dead_code)]
 pub struct AccountModel {
     pub id: Uuid,

@@ -8,11 +8,9 @@
 // by the Apache License, Version 2.0.
 
 mod postgres_connection_pool;
-mod postgres_dummy_test;
 mod postgres_plugin;
 mod repositories;
 
 pub use postgres_connection_pool::*;
-pub use postgres_dummy_test::*;
 pub use postgres_plugin::*;
 pub use repositories::*;

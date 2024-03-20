@@ -79,17 +79,8 @@ pub async fn run(
             configure_base_catalog(&workspace_layout, workspace_svc.is_multi_tenant_workspace());
 
         // TODO: read database settings from configuration, and make it optional
-        let db_configuration = DatabaseConfiguration::local_mariadb();
-        configure_database_components(&mut base_catalog_builder, &db_configuration)?;
-
-        // TODO: remove this test
-        // match database_sqlx_postgres::postgres_dummy_test(&db_configuration).await {
-        // match database_sqlx_mysql::mysql_dummy_test(&db_configuration).await {
-        /*    Ok(_) => {}
-            Err(e) => {
-                eprintln!("DB test failed: {e:?}",);
-            }
-        }*/
+        // let db_configuration = DatabaseConfiguration::local_mariadb();
+        // configure_database_components(&mut base_catalog_builder, &db_configuration)?;
 
         base_catalog_builder
             .add_value(dependencies_graph_repository)
@@ -355,12 +346,14 @@ fn configure_database_components(
                 catalog_builder,
                 db_configuration,
             )
+            .int_err()
         }
         DatabaseProvider::MySql | DatabaseProvider::MariaDB => {
             database_sqlx_mysql::MySqlPlugin::init_database_components(
                 catalog_builder,
                 db_configuration,
             )
+            .int_err()
         }
     }
 }

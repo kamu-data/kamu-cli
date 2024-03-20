@@ -30,6 +30,15 @@ lint-fix:
 
 
 ###############################################################################
+# Sqlx Prepare (update data for offline compilation)
+###############################################################################
+
+.PHONY: sqlx-prepare
+sqlx-prepare:
+	( cd ./src/database/sqlx-mysql && cargo sqlx prepare )
+	( cd ./src/database/sqlx-postgres && cargo sqlx prepare )
+
+###############################################################################
 # Test
 ###############################################################################
 

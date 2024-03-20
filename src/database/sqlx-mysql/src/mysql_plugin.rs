@@ -33,8 +33,8 @@ impl MySqlPlugin {
     pub fn init_database_components(
         catalog_builder: &mut CatalogBuilder,
         db_configuration: &DatabaseConfiguration,
-    ) -> Result<(), InternalError> {
-        let mysql_pool = Self::build_mysql_pool(db_configuration).int_err()?;
+    ) -> Result<(), DatabaseError> {
+        let mysql_pool = Self::open_mysql_pool(db_configuration)?;
 
         catalog_builder.add::<Self>();
         catalog_builder.add_builder(MySqlConnectionPool::builder().with_mysql_pool(mysql_pool));
@@ -43,7 +43,7 @@ impl MySqlPlugin {
         Ok(())
     }
 
-    fn build_mysql_pool(
+    fn open_mysql_pool(
         db_configuration: &DatabaseConfiguration,
     ) -> Result<MySqlPool, DatabaseError> {
         MySqlPool::connect_lazy(db_configuration.connection_string().as_str())
@@ -72,6 +72,19 @@ impl DatabaseTransactionManager for MySqlPlugin {
             .unwrap();
 
         mysql_transaction.commit().await.int_err()?;
+        Ok(())
+    }
+
+    async fn rollback_transaction(
+        &self,
+        transaction_subject: TransactionSubject,
+    ) -> Result<(), InternalError> {
+        let mysql_transaction = transaction_subject
+            .transaction
+            .downcast::<MySqlTransaction>()
+            .unwrap();
+
+        mysql_transaction.rollback().await.int_err()?;
         Ok(())
     }
 }
