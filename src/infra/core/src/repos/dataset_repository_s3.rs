@@ -355,6 +355,11 @@ impl DatasetRepository for DatasetRepositoryS3 {
         dataset_alias: &DatasetAlias,
         seed_block: MetadataBlockTyped<Seed>,
     ) -> Result<CreateDatasetResult, CreateDatasetError> {
+        // TODO: AUTH: Introduce AccountActionAuthorizer to check whether the current
+        // subject has permissions to create dataset under the account specified in the
+        // dataset_alias.
+        let dataset_alias = self.normalize_alias(dataset_alias);
+
         // Check if a dataset with the same alias can be resolved successfully
         let maybe_existing_dataset_handle = match self
             .resolve_dataset_ref(&dataset_alias.as_local_ref())
@@ -401,8 +406,9 @@ impl DatasetRepository for DatasetRepositoryS3 {
 
         // It's okay to create a new dataset by this point
 
-        let dataset_id = seed_block.event.dataset_id.clone();
-        let dataset = self.get_dataset_impl(&dataset_id);
+        let dataset_handle =
+            DatasetHandle::new(seed_block.event.dataset_id.clone(), dataset_alias.clone());
+        let dataset = self.get_dataset_impl(&dataset_handle.id);
 
         // There are three possibilities at this point:
         // - Dataset did not exist before - continue normally
@@ -427,11 +433,8 @@ impl DatasetRepository for DatasetRepositoryS3 {
             Err(err) => return Err(err.int_err().into()),
         };
 
-        let normalized_alias = self.normalize_alias(dataset_alias);
-        self.save_dataset_alias(dataset.as_ref(), &normalized_alias)
+        self.save_dataset_alias(dataset.as_ref(), &dataset_alias)
             .await?;
-
-        let dataset_handle = DatasetHandle::new(dataset_id, dataset_alias.clone());
 
         // Update cache if enabled
         if let Some(cache) = &self.registry_cache {
