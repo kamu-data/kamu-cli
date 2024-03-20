@@ -141,14 +141,19 @@ where
             increment: UpdateSummaryIncrement,
         }
 
+        const INITIAL_REQUESTED_FLAGS: Flag = Flag::SEED
+            .union(Flag::SET_TRANSFORM)
+            .union(Flag::DATA_BLOCK);
+
         let mut visitor = GenericCallbackVisitor::new(
             VisitorState {
-                requested_flags: Flag::SEED | Flag::SET_TRANSFORM | Flag::DATA_BLOCK,
+                requested_flags: INITIAL_REQUESTED_FLAGS,
                 increment: UpdateSummaryIncrement {
                     seen_head: Some(current_head.clone()),
                     ..Default::default()
                 },
             },
+            Decision::NextOfType(INITIAL_REQUESTED_FLAGS),
             |state, (_, block)| {
                 match &block.event {
                     MetadataEvent::Seed(e) => {
@@ -194,7 +199,7 @@ where
         );
 
         self.metadata_chain
-            .accept_by_interval::<InternalError>(&mut [&mut visitor], current_head, last_seen)
+            .accept_by_interval::<InternalError>(&mut [&mut visitor], Some(current_head), last_seen)
             .await?;
 
         Ok(visitor.into_state().increment)

@@ -92,6 +92,7 @@ impl DatasetChangesServiceImpl {
         // Scan blocks (from new head to old head)
         let mut data_block_analysis_visitor = GenericCallbackVisitor::new(
             DataBlockAnalysisVisitorState::default(),
+            MetadataVisitorDecision::Next,
             |state, (_, block)| {
                 // Each block counts
                 state.num_blocks += 1;
@@ -144,7 +145,7 @@ impl DatasetChangesServiceImpl {
             .as_metadata_chain()
             .accept_by_interval::<InternalError>(
                 &mut [&mut data_block_analysis_visitor],
-                new_head,
+                Some(new_head),
                 old_head,
             )
             .await?;

@@ -581,18 +581,15 @@ impl PollingIngestService for PollingIngestServiceImpl {
         &self,
         dataset_ref: &DatasetRef,
     ) -> Result<Option<(Multihash, MetadataBlockTyped<SetPollingSource>)>, GetDatasetError> {
-        let dataset = self.dataset_repo.get_dataset(dataset_ref).await?;
-        let mut visitor = <SearchSetPollingSourceVisitor>::default();
-
-        dataset
+        Ok(self
+            .dataset_repo
+            .get_dataset(dataset_ref)
+            .await?
             .as_metadata_chain()
-            .accept(&mut [&mut visitor])
-            .await?;
-
-        // TODO: Support source evolution
-        let source = visitor.into_hashed_block();
-
-        Ok(source)
+            // TODO: Support source evolution
+            .accept_one(<SearchSetPollingSourceVisitor>::default())
+            .await?
+            .into_hashed_block())
     }
 
     #[tracing::instrument(level = "info", skip_all, fields(%dataset_ref))]

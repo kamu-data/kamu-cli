@@ -854,12 +854,11 @@ impl DataWriterDataFusionBuilder {
             .await
             .int_err()?;
 
-        let (decision, mut visitor) =
-            DataWriterDataFusionMetaDataStateVisitor::new(head.clone(), source_name);
+        let mut visitor = DataWriterDataFusionMetaDataStateVisitor::new(head.clone(), source_name);
 
         self.dataset
             .as_metadata_chain()
-            .accept_by_interval_with_decisions(&mut [decision], &mut [&mut visitor], &head, None)
+            .accept_by_hash(&mut [&mut visitor], &head)
             .await?;
 
         let metadata_state = visitor.get_metadata_state()?;

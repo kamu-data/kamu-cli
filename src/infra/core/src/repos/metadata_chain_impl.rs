@@ -54,28 +54,6 @@ where
             ref_repo,
         }
     }
-
-    async fn accept_append_validators<'a>(
-        &'a self,
-        decisions: &'a mut [MetadataVisitorDecision],
-        visitors: &mut [&mut dyn MetadataChainVisitor<Error = AppendError>],
-        prev_append_block_hash: Option<&'a Multihash>,
-    ) -> Result<(), AppendError> {
-        let have_already_stopped = decisions
-            .iter()
-            .all(|decision| *decision == MetadataVisitorDecision::Stop);
-
-        if have_already_stopped {
-            return Ok(());
-        }
-
-        let Some(prev_block_hash) = prev_append_block_hash else {
-            return Ok(());
-        };
-
-        self.accept_by_interval_with_decisions(decisions, visitors, prev_block_hash, None)
-            .await
-    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -227,33 +205,23 @@ where
         opts: AppendOpts<'a>,
     ) -> Result<Multihash, AppendError> {
         if opts.validation == AppendValidation::Full {
-            let (d1, mut v1) = ValidateSeedBlockOrderVisitor::new(&block)?;
-            let (d2, mut v2) = ValidatePrevBlockExistsVisitor::new(&block)?;
-            let (d3, mut v3) = ValidateSequenceNumbersIntegrityVisitor::new(&block)?;
-            let (d4, mut v4) = ValidateSystemTimeIsMonotonicVisitor::new(&block)?;
-            let (d5, mut v5) = ValidateWatermarkIsMonotonicVisitor::new(&block)?;
-            let (d6, mut v6) = ValidateOffsetsAreSequentialVisitor::new(&block)?;
-            let (d7, mut v7) = ValidateLogicalStructureVisitor::new(&block)?;
-
-            let mut decisions = [d1, d2, d3, d4, d5, d6, d7];
+            let mut validate_logical_structure_visitor =
+                ValidateLogicalStructureVisitor::new(&block);
             let mut validators = [
-                &mut v1 as &mut dyn MetadataChainVisitor<Error = _>,
-                &mut v2,
-                &mut v3,
-                &mut v4,
-                &mut v5,
-                &mut v6,
-                &mut v7,
+                &mut ValidateSeedBlockOrderVisitor::new(&block)
+                    as &mut dyn MetadataChainVisitor<Error = _>,
+                &mut ValidatePrevBlockExistsVisitor::new(&block),
+                &mut ValidateSequenceNumbersIntegrityVisitor::new(&block),
+                &mut ValidateSystemTimeIsMonotonicVisitor::new(&block),
+                &mut ValidateWatermarkIsMonotonicVisitor::new(&block),
+                &mut ValidateOffsetsAreSequentialVisitor::new(&block),
+                &mut validate_logical_structure_visitor,
             ];
 
-            self.accept_append_validators(
-                &mut decisions,
-                &mut validators,
-                block.prev_block_hash.as_ref(),
-            )
-            .await?;
+            self.accept_by_interval(&mut validators, block.prev_block_hash.as_ref(), None)
+                .await?;
 
-            v7.post_visit()?;
+            validate_logical_structure_visitor.post_visit()?;
         }
 
         if opts.update_ref.is_some()

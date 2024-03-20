@@ -25,6 +25,13 @@ impl AddData {
             .map(|d| d.offset_interval.end)
             .or(self.prev_offset)
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.new_data.is_none()
+            && self.new_checkpoint.is_none()
+            && self.new_watermark.is_none()
+            && self.new_source_state.is_none()
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -38,6 +45,10 @@ impl ExecuteTransform {
             .as_ref()
             .map(|d| d.offset_interval.end)
             .or(self.prev_offset)
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.new_data.is_none() && self.new_checkpoint.is_none() && self.new_watermark.is_none()
     }
 }
 

@@ -94,15 +94,13 @@ impl DatasetDataHelper {
     }
 
     pub async fn get_last_set_data_schema_block(&self) -> MetadataBlockTyped<SetDataSchema> {
-        let mut visitor = <SearchSetDataSchemaVisitor>::default();
-
         self.dataset
             .as_metadata_chain()
-            .accept(&mut [&mut visitor])
+            .accept_one(<SearchSetDataSchemaVisitor>::default())
             .await
-            .unwrap();
-
-        visitor.into_block().unwrap()
+            .unwrap()
+            .into_block()
+            .unwrap()
     }
 
     pub async fn assert_last_data_schema_eq(&self, expected: &str) {

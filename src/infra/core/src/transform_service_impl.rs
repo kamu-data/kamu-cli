@@ -300,15 +300,17 @@ impl TransformServiceImpl {
     // TODO: Allow derivative datasets to function with inputs containing no data
     // This will require passing the schema explicitly instead of relying on a file
     async fn is_never_pulled(&self, dataset_ref: &DatasetRef) -> Result<bool, InternalError> {
-        let dataset = self.dataset_repo.get_dataset(dataset_ref).await.int_err()?;
-        let mut visitor = <SearchDataBlocksVisitor>::next_data_block();
-
-        dataset
+        Ok(self
+            .dataset_repo
+            .get_dataset(dataset_ref)
+            .await
+            .int_err()?
             .as_metadata_chain()
-            .accept(&mut [&mut visitor])
-            .await?;
-
-        Ok(visitor.into_event().and_then(|e| e.last_offset()).is_none())
+            .accept_one(<SearchDataBlocksVisitor>::next_data_block())
+            .await?
+            .into_event()
+            .and_then(|e| e.last_offset())
+            .is_none())
     }
 
     async fn get_transform_input(
@@ -344,7 +346,7 @@ impl TransformServiceImpl {
         input_chain
             .accept_by_interval(
                 &mut [&mut visitor],
-                &last_unprocessed_block,
+                Some(&last_unprocessed_block),
                 last_processed_block,
             )
             .await?;
@@ -480,15 +482,17 @@ impl TransformServiceImpl {
         &self,
         dataset_ref: &DatasetRef,
     ) -> Result<DatasetVocabulary, InternalError> {
-        let dataset = self.dataset_repo.get_dataset(dataset_ref).await.int_err()?;
-        let mut visitor = <SearchSetVocabVisitor>::default();
-
-        dataset
+        Ok(self
+            .dataset_repo
+            .get_dataset(dataset_ref)
+            .await
+            .int_err()?
             .as_metadata_chain()
-            .accept(&mut [&mut visitor])
-            .await?;
-
-        Ok(visitor.into_event().unwrap_or_default().into())
+            .accept_one(<SearchSetVocabVisitor>::default())
+            .await?
+            .into_event()
+            .unwrap_or_default()
+            .into())
     }
 
     // TODO: Improve error handling
@@ -525,6 +529,9 @@ impl TransformServiceImpl {
             let mut set_vocab_visitor = <SearchSetVocabVisitor>::default();
             let mut set_data_schema_visitor = <SearchSetDataSchemaVisitor>::default();
 
+            type Flag = MetadataEventTypeFlags;
+            type Decision = MetadataVisitorDecision;
+
             struct ExecuteTransformCollectorVisitor {
                 tail_sequence_number: Option<u64>,
                 blocks: Vec<(Multihash, MetadataBlock)>,
@@ -537,10 +544,8 @@ impl TransformServiceImpl {
                     blocks: Vec::new(),
                     finished_range: false,
                 },
+                Decision::NextOfType(Flag::EXECUTE_TRANSFORM),
                 |state, (hash, block)| {
-                    type Flag = MetadataEventTypeFlags;
-                    type Decision = MetadataVisitorDecision;
-
                     if Some(block.sequence_number) < state.tail_sequence_number {
                         state.finished_range = true;
 
@@ -727,18 +732,15 @@ impl TransformService for TransformServiceImpl {
         &self,
         dataset_ref: &DatasetRef,
     ) -> Result<Option<(Multihash, MetadataBlockTyped<SetTransform>)>, GetDatasetError> {
-        let dataset = self.dataset_repo.get_dataset(dataset_ref).await?;
-        let mut visitor = <SearchSetTransformVisitor>::default();
-
-        dataset
+        Ok(self
+            .dataset_repo
+            .get_dataset(dataset_ref)
+            .await?
             .as_metadata_chain()
-            .accept(&mut [&mut visitor])
-            .await?;
-
-        // TODO: Support transform evolution
-        let source = visitor.into_hashed_block();
-
-        Ok(source)
+            // TODO: Support transform evolution
+            .accept_one(<SearchSetTransformVisitor>::default())
+            .await?
+            .into_hashed_block())
     }
 
     async fn transform(

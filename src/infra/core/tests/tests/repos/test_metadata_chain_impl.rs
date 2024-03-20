@@ -1109,6 +1109,8 @@ mockall::mock! {
     impl MetadataChainVisitor for MetadataChainVisitor {
         type Error = MockError;
 
+        fn initial_decision(&self) -> Result<MetadataVisitorDecision, MockError>;
+
         fn visit<'a>(&mut self, hashed_block_ref: HashedMetadataBlockRef<'a>) -> Result<MetadataVisitorDecision, MockError>;
     }
 }
