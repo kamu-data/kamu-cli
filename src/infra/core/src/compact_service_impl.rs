@@ -51,7 +51,7 @@ struct DataSliceBatchInfo {
 
 struct ChainFilesInfo {
     block_file_urls: Vec<Url>,
-    block_hash_to_reset: Multihash,
+    new_head: Multihash,
     data_slice_batches: Vec<DataSliceBatchInfo>,
 }
 
@@ -72,12 +72,12 @@ impl CompactServiceImpl {
         &self,
         dataset: Arc<dyn Dataset>,
         dataset_name: &DatasetName,
-        compact_dir_path: &str,
+        compact_dir_path: &Path,
         max_slice_size: u64,
     ) -> Result<ChainFilesInfo, CompactError> {
         // Declare mut values for result
 
-        let mut block_hash_to_reset: Option<Multihash> = None;
+        let mut new_head: Option<Multihash> = None;
         let mut block_file_urls: Vec<Url> = vec![];
         let mut data_slice_batch_info: DataSliceBatchInfo = DataSliceBatchInfo {
             prev_offset: None,
@@ -102,7 +102,7 @@ impl CompactServiceImpl {
             match block.event {
                 MetadataEvent::AddData(add_data_event) => {
                     if let Some(output_slice) = &add_data_event.new_data {
-                        block_hash_to_reset = block.prev_block_hash.clone();
+                        new_head = block.prev_block_hash.clone();
 
                         let data_slice_url = object_data_repo
                             .get_internal_url(&output_slice.physical_hash)
@@ -114,6 +114,7 @@ impl CompactServiceImpl {
                         if batch_size + output_slice.size > max_slice_size {
                             if !data_slice_batch_info.data_slices_batch.is_empty() {
                                 data_slice_batches.push(data_slice_batch_info.clone());
+                                // Reset values for next batch
                                 data_slice_batch_info.new_file_path = None;
                                 data_slice_batch_info.new_offset_interval = None;
                                 new_end_offset_interval = output_slice.offset_interval.end;
@@ -127,12 +128,11 @@ impl CompactServiceImpl {
                         }
 
                         if data_slice_batch_info.new_file_path.is_none() {
-                            data_slice_batch_info.new_file_path =
-                                Some(Path::new(compact_dir_path).join(
-                                    Self::get_random_operation_name_with_prefix(
-                                        format!("{dataset_name}-").as_str(),
-                                    ),
-                                ));
+                            data_slice_batch_info.new_file_path = Some(compact_dir_path.join(
+                                Self::get_random_operation_name_with_prefix(
+                                    format!("{dataset_name}-").as_str(),
+                                ),
+                            ));
                         }
                         data_slice_batch_info.prev_offset = add_data_event.prev_offset;
                         data_slice_batch_info.new_offset_interval = Some(OffsetInterval {
@@ -151,7 +151,7 @@ impl CompactServiceImpl {
         Ok(ChainFilesInfo {
             data_slice_batches,
             block_file_urls,
-            block_hash_to_reset: block_hash_to_reset.unwrap(),
+            new_head: new_head.unwrap(),
         })
     }
 
@@ -192,8 +192,8 @@ impl CompactServiceImpl {
         Ok(())
     }
 
-    fn create_compact_dir(&self, dataset_dir_path: &Path) -> Result<String, CompactError> {
-        let compact_dir_path = format!("{}-compact", dataset_dir_path.display());
+    fn create_run_compact_dir(&self, dataset_dir_path: &Path) -> Result<PathBuf, CompactError> {
+        let compact_dir_path = dataset_dir_path.join("compact");
         fs::create_dir_all(&compact_dir_path).int_err()?;
         Ok(compact_dir_path)
     }
@@ -202,20 +202,10 @@ impl CompactServiceImpl {
         &self,
         dataset: Arc<dyn Dataset>,
         chain_files_info: &ChainFilesInfo,
-    ) -> Result<Vec<Url>, CompactError> {
+    ) -> Result<(Vec<Url>, Multihash), CompactError> {
         let chain = dataset.as_metadata_chain();
-        chain
-            .set_ref(
-                &BlockRef::Head,
-                &chain_files_info.block_hash_to_reset,
-                SetRefOpts {
-                    validate_block_present: true,
-                    check_ref_is: None,
-                },
-            )
-            .await?;
 
-        let mut new_head = chain_files_info.block_hash_to_reset.clone();
+        let mut new_head = chain_files_info.new_head.clone();
         let mut old_data_slices: Vec<Url> = vec![];
 
         for data_slice_batch_info in chain_files_info.data_slice_batches.iter().rev() {
@@ -239,6 +229,7 @@ impl CompactServiceImpl {
                         system_time: Some(Utc::now()),
                         prev_block_hash: Some(Some(&new_head)),
                         check_object_refs: false,
+                        is_reset_head: false,
                     },
                 )
                 .await
@@ -267,7 +258,7 @@ impl CompactServiceImpl {
             old_data_slices.extend(data_slice_batch_info.data_slices_batch.clone());
         }
 
-        Ok(old_data_slices)
+        Ok((old_data_slices, new_head))
     }
 
     fn remove_old_files(
@@ -279,15 +270,10 @@ impl CompactServiceImpl {
             fs::remove_file(file_url.to_file_path().unwrap()).int_err()?;
         }
 
-        let block_hash_to_reset_string = chain_files_info
-            .block_hash_to_reset
-            .as_multibase()
-            .to_string();
+        let new_head_string = chain_files_info.new_head.as_multibase().to_string();
         for block_file_url in &chain_files_info.block_file_urls {
-            if block_file_url
-                .as_str()
-                .contains(&block_hash_to_reset_string)
-            {
+            // Stop cleaning up once we reach block where new chain started
+            if block_file_url.as_str().contains(&new_head_string) {
                 break;
             }
             fs::remove_file(block_file_url.to_file_path().unwrap()).int_err()?;
@@ -317,7 +303,7 @@ impl CompactService for CompactServiceImpl {
     async fn compact_dataset(
         &self,
         dataset_handle: &DatasetHandle,
-        dataset_dir_path: &Path,
+        run_info_dir: &Path,
         max_slice_size: u64,
         multi_listener: Option<Arc<dyn CompactionMultiListener>>,
     ) -> Result<(), CompactError> {
@@ -345,7 +331,7 @@ impl CompactService for CompactServiceImpl {
             }));
         }
 
-        let compact_dir_path = self.create_compact_dir(dataset_dir_path)?;
+        let compact_dir_path = self.create_run_compact_dir(run_info_dir)?;
 
         listener.begin_phase(CompactionPhase::GatherChainInfo);
         let chain_files_info = self
@@ -362,11 +348,22 @@ impl CompactService for CompactServiceImpl {
             .await?;
 
         listener.begin_phase(CompactionPhase::ReplaceChainHead);
-        let old_data_slices = self
+        let (old_data_slices, new_head) = self
             .replace_data_files(dataset.clone(), &chain_files_info)
             .await?;
 
         listener.begin_phase(CompactionPhase::CleanOldFiles);
+        dataset
+            .as_metadata_chain()
+            .set_ref(
+                &BlockRef::Head,
+                &new_head,
+                SetRefOpts {
+                    validate_block_present: true,
+                    check_ref_is: None,
+                },
+            )
+            .await?;
         self.remove_old_files(&chain_files_info, &old_data_slices)?;
         listener.success();
 

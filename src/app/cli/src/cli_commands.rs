@@ -486,7 +486,7 @@ pub fn get_command(
                         cli_catalog,
                         submatches.get_one::<DatasetRef>("dataset").unwrap().clone(),
                     )?,
-                    workspace_svc.layout().unwrap().datasets_dir.clone(),
+                    workspace_svc.layout().unwrap().run_info_dir.clone(),
                     *(submatches.get_one("max-slice-size").unwrap()),
                     submatches.get_flag("hard"),
                 ))

@@ -442,16 +442,17 @@ where
 
         tracing::info!(?block, "Committing new block");
 
-        let new_head = chain
-            .append(
-                block,
-                AppendOpts {
-                    update_ref: Some(opts.block_ref),
-                    check_ref_is_prev_block: true,
-                    ..AppendOpts::default()
-                },
-            )
-            .await?;
+        let append_opts = if !opts.is_reset_head {
+            AppendOpts {
+                update_ref: None,
+                check_ref_is_prev_block: false,
+                ..AppendOpts::default()
+            }
+        } else {
+            AppendOpts::default()
+        };
+
+        let new_head = chain.append(block, append_opts).await?;
 
         tracing::info!(%new_head, "Committed new block");
 

@@ -20,7 +20,7 @@ pub trait CompactService: Send + Sync {
     async fn compact_dataset(
         &self,
         dataset_handle: &DatasetHandle,
-        dataset_dir_path: &Path,
+        run_info_dir: &Path,
         max_slice_size: u64,
         listener: Option<Arc<dyn CompactionMultiListener>>,
     ) -> Result<(), CompactError>;

@@ -98,6 +98,8 @@ pub struct CommitOpts<'a> {
     /// Whether to check for presence of linked objects like data and
     /// checkpoints in the respective repos
     pub check_object_refs: bool,
+    // Whether to reset head to new commited block
+    pub is_reset_head: bool,
 }
 
 impl<'a> Default for CommitOpts<'a> {
@@ -107,6 +109,7 @@ impl<'a> Default for CommitOpts<'a> {
             system_time: None,
             prev_block_hash: None,
             check_object_refs: true,
+            is_reset_head: true,
         }
     }
 }

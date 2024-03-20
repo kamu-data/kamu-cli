@@ -26,7 +26,7 @@ pub struct CompactCommand {
     verification_svc: Arc<dyn VerificationService>,
     compact_svc: Arc<dyn CompactService>,
     dataset_ref: DatasetRef,
-    dataset_dir_path: PathBuf,
+    run_info_dir: PathBuf,
     max_slice_size: u64,
     is_hard: bool,
 }
@@ -37,7 +37,7 @@ impl CompactCommand {
         verification_svc: Arc<dyn VerificationService>,
         compact_svc: Arc<dyn CompactService>,
         dataset_ref: DatasetRef,
-        dataset_dir_path: PathBuf,
+        run_info_dir: PathBuf,
         max_slice_size: u64,
         is_hard: bool,
     ) -> Self {
@@ -46,7 +46,7 @@ impl CompactCommand {
             verification_svc,
             compact_svc,
             dataset_ref,
-            dataset_dir_path,
+            run_info_dir,
             max_slice_size,
             is_hard,
         }
@@ -108,7 +108,7 @@ impl Command for CompactCommand {
         self.compact_svc
             .compact_dataset(
                 &dataset_handle,
-                &self.dataset_dir_path,
+                &self.run_info_dir,
                 self.max_slice_size,
                 Some(listener.clone()),
             )
