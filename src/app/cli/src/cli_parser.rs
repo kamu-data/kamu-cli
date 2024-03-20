@@ -330,29 +330,6 @@ pub fn cli() -> Command {
                             kamu delete my.dataset.%
                         "#
                     )),
-                Command::new("compact")
-                    .about("Compact a dataset")
-                    .args([
-                        Arg::new("dataset")
-                            .action(ArgAction::Append)
-                            .index(1)
-                            .required(true)
-                            .value_parser(value_parse_dataset_ref_local)
-                            .help("Local dataset reference(s)"),
-                    ])
-                    .after_help(indoc::indoc!(
-                        r#"
-                        This command commpact all files in the dataset into a few depends from max-slice-size.
-
-                        Take great care when compacting datasets. You will lose all history of metadata.
-
-                        **Examples:**
-
-                        Compact a local dataset:
-
-                            kamu compact my.dataset
-                        "#
-                    )),
                 Command::new("ingest")
                     .about("Adds data to the root dataset according to its push source configuration")
                     .args([
@@ -1267,6 +1244,39 @@ pub fn cli() -> Command {
                                     .required(true)
                                     .help("An existing GitHub access token"),
                             ]),
+                        Command::new("compact")
+                            .about("Compact a dataset")
+                            .args([
+                                Arg::new("dataset")
+                                    .action(ArgAction::Append)
+                                    .index(1)
+                                    .required(true)
+                                    .value_parser(value_parse_dataset_ref_local)
+                                    .help("Local dataset reference(s)"),
+                                Arg::new("max-slice-size")
+                                    .long("max-slice-size")
+                                    .value_parser(value_parser!(u64))
+                                    .default_value("0")
+                                    .value_name("SIZE")
+                                    .help("Maximum size of a single data slice file in bytes"),
+                                Arg::new("hard")
+                                    .long("hard")
+                                    .action(ArgAction::SetTrue)
+                                    .help("Run a hard dataset compaction"),
+                            ])
+                            .after_help(indoc::indoc!(
+                                r#"
+                                This command commpact all files in the dataset into a few depends from max-slice-size.
+        
+                                Take great care when compacting datasets. You will lose all history of metadata.
+        
+                                **Examples:**
+        
+                                Compact a local dataset:
+        
+                                    kamu compact my.dataset
+                                "#
+                            )),
                     ]),
                 tabular_output_params(
                     Command::new("tail")

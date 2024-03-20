@@ -27,6 +27,8 @@ pub struct CompactCommand {
     compact_svc: Arc<dyn CompactService>,
     dataset_ref: DatasetRef,
     dataset_dir_path: PathBuf,
+    max_slice_size: u64,
+    is_hard: bool,
 }
 
 impl CompactCommand {
@@ -36,6 +38,8 @@ impl CompactCommand {
         compact_svc: Arc<dyn CompactService>,
         dataset_ref: DatasetRef,
         dataset_dir_path: PathBuf,
+        max_slice_size: u64,
+        is_hard: bool,
     ) -> Self {
         Self {
             dataset_repo,
@@ -43,6 +47,8 @@ impl CompactCommand {
             compact_svc,
             dataset_ref,
             dataset_dir_path,
+            max_slice_size,
+            is_hard,
         }
     }
 
@@ -73,6 +79,11 @@ impl CompactCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for CompactCommand {
     async fn run(&mut self) -> Result<(), CLIError> {
+        if !self.is_hard {
+            return Err(CLIError::usage_error(
+                "Soft compactions are not yet supported",
+            ));
+        }
         let dataset_handle = self
             .dataset_repo
             .resolve_dataset_ref(&self.dataset_ref)
@@ -98,6 +109,7 @@ impl Command for CompactCommand {
             .compact_dataset(
                 &dataset_handle,
                 &self.dataset_dir_path,
+                self.max_slice_size,
                 Some(listener.clone()),
             )
             .await

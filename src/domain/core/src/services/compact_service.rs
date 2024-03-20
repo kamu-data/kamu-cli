@@ -21,6 +21,7 @@ pub trait CompactService: Send + Sync {
         &self,
         dataset_handle: &DatasetHandle,
         dataset_dir_path: &Path,
+        max_slice_size: u64,
         listener: Option<Arc<dyn CompactionMultiListener>>,
     ) -> Result<(), CompactError>;
 }
@@ -200,9 +201,7 @@ impl CompactionMultiListener for NullCompactionMultiListener {}
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CompactionPhase {
     GatherChainInfo,
-    ReadDatasliceFiles,
-    WriteDataasliceFiles,
+    MergeDataslices,
     ReplaceChainHead,
-    CleanDatasliceFiles,
-    CleanBlockFiles,
+    CleanOldFiles,
 }

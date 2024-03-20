@@ -20,6 +20,7 @@ use kamu::*;
 use kamu_core::{auth, CurrentAccountSubject};
 use opendatafabric::*;
 const FILE_DATA_ARRAY_SIZE: usize = 32;
+const MAX_SLICE_SIZE: u64 = 1024 * 1024 * 1024;
 
 #[tokio::test]
 async fn test_dataset_compact() {
@@ -87,6 +88,7 @@ async fn test_dataset_compact() {
             .compact_dataset(
                 &dataset_handle,
                 compact_tempdir.path(),
+                MAX_SLICE_SIZE,
                 Some(Arc::new(NullCompactionMultiListener {}))
             )
             .await,
@@ -128,6 +130,7 @@ async fn test_dataset_compact() {
             .compact_dataset(
                 &dataset_handle,
                 compact_tempdir.path(),
+                MAX_SLICE_SIZE,
                 Some(Arc::new(NullCompactionMultiListener {}))
             )
             .await,

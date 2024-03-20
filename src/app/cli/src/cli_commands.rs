@@ -97,20 +97,6 @@ pub fn get_command(
             submatches.get_flag("recursive"),
             submatches.get_flag("yes"),
         )),
-        Some(("compact", submatches)) => {
-            let workspace_svc = cli_catalog.get_one::<WorkspaceService>()?;
-
-            Box::new(CompactCommand::new(
-                cli_catalog.get_one()?,
-                cli_catalog.get_one()?,
-                cli_catalog.get_one()?,
-                validate_dataset_ref(
-                    cli_catalog,
-                    submatches.get_one::<DatasetRef>("dataset").unwrap().clone(),
-                )?,
-                workspace_svc.layout().unwrap().datasets_dir.clone(),
-            ))
-        }
         Some(("ingest", submatches)) => Box::new(IngestCommand::new(
             cli_catalog.get_one()?,
             cli_catalog.get_one()?,
@@ -489,6 +475,22 @@ pub fn get_command(
                 )),
                 _ => return Err(CommandInterpretationFailed.into()),
             },
+            Some(("compact", submatches)) => {
+                let workspace_svc = cli_catalog.get_one::<WorkspaceService>()?;
+
+                Box::new(CompactCommand::new(
+                    cli_catalog.get_one()?,
+                    cli_catalog.get_one()?,
+                    cli_catalog.get_one()?,
+                    validate_dataset_ref(
+                        cli_catalog,
+                        submatches.get_one::<DatasetRef>("dataset").unwrap().clone(),
+                    )?,
+                    workspace_svc.layout().unwrap().datasets_dir.clone(),
+                    *(submatches.get_one("max-slice-size").unwrap()),
+                    submatches.get_flag("hard"),
+                ))
+            }
             _ => return Err(CommandInterpretationFailed.into()),
         },
         Some(("tail", submatches)) => Box::new(TailCommand::new(
