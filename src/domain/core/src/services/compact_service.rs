@@ -39,36 +39,6 @@ pub enum CompactError {
         DatasetNotFoundError,
     ),
     #[error(transparent)]
-    RefNotFound(
-        #[from]
-        #[backtrace]
-        RefNotFoundError,
-    ),
-    #[error(transparent)]
-    BlockNotFound(
-        #[from]
-        #[backtrace]
-        BlockNotFoundError,
-    ),
-    #[error(transparent)]
-    BlockVersion(
-        #[from]
-        #[backtrace]
-        BlockVersionError,
-    ),
-    #[error(transparent)]
-    BlockMalformed(
-        #[from]
-        #[backtrace]
-        BlockMalformedError,
-    ),
-    #[error(transparent)]
-    InvalidInterval(
-        #[from]
-        #[backtrace]
-        InvalidIntervalError,
-    ),
-    #[error(transparent)]
     Access(
         #[from]
         #[backtrace]
@@ -79,18 +49,6 @@ pub enum CompactError {
         #[from]
         #[backtrace]
         InternalError,
-    ),
-    #[error(transparent)]
-    ObjectNotFound(
-        #[from]
-        #[backtrace]
-        ObjectNotFoundError,
-    ),
-    #[error(transparent)]
-    MetadataAppendError(
-        #[from]
-        #[backtrace]
-        AppendError,
     ),
     #[error(transparent)]
     InvalidDatasetKind(
@@ -121,8 +79,8 @@ impl From<auth::DatasetActionUnauthorizedError> for CompactError {
 impl From<GetRefError> for CompactError {
     fn from(v: GetRefError) -> Self {
         match v {
-            GetRefError::NotFound(e) => Self::RefNotFound(e),
-            GetRefError::Access(e) => Self::Internal(e.int_err()),
+            GetRefError::NotFound(e) => Self::Internal(e.int_err()),
+            GetRefError::Access(e) => Self::Access(e),
             GetRefError::Internal(e) => Self::Internal(e),
         }
     }
@@ -131,13 +89,9 @@ impl From<GetRefError> for CompactError {
 impl From<IterBlocksError> for CompactError {
     fn from(v: IterBlocksError) -> Self {
         match v {
-            IterBlocksError::RefNotFound(e) => CompactError::RefNotFound(e),
-            IterBlocksError::BlockNotFound(e) => CompactError::BlockNotFound(e),
-            IterBlocksError::BlockVersion(e) => CompactError::BlockVersion(e),
-            IterBlocksError::BlockMalformed(e) => CompactError::BlockMalformed(e),
-            IterBlocksError::InvalidInterval(e) => CompactError::InvalidInterval(e),
             IterBlocksError::Access(e) => CompactError::Access(e),
             IterBlocksError::Internal(e) => CompactError::Internal(e),
+            _ => CompactError::Internal(v.int_err()),
         }
     }
 }
@@ -147,18 +101,7 @@ impl From<SetRefError> for CompactError {
         match v {
             SetRefError::Access(e) => CompactError::Access(e),
             SetRefError::Internal(e) => CompactError::Internal(e),
-            SetRefError::BlockNotFound(e) => CompactError::Internal(e.int_err()),
-            SetRefError::CASFailed(e) => CompactError::Internal(e.int_err()),
-        }
-    }
-}
-
-impl From<CommitError> for CompactError {
-    fn from(v: CommitError) -> Self {
-        match v {
-            CommitError::ObjectNotFound(e) => CompactError::ObjectNotFound(e),
-            CommitError::MetadataAppendError(e) => CompactError::MetadataAppendError(e),
-            CommitError::Internal(e) => CompactError::Internal(e),
+            _ => CompactError::Internal(v.int_err()),
         }
     }
 }

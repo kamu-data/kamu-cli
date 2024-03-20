@@ -241,8 +241,13 @@ impl CompactServiceImpl {
                         check_object_refs: false,
                     },
                 )
-                .await?;
+                .await
+                .int_err()?;
             new_head = commit_result.new_head;
+
+            // Check is new commited block equals to old one
+            // It is possible when `max-slice-size` is smaller
+            // than size of one data slice
             if data_slice_batch_info.data_slices_batch.len() == 1 {
                 let new_block = chain.get_block(&new_head).await.int_err()?;
                 if let MetadataEvent::AddData(add_event) = new_block.event {

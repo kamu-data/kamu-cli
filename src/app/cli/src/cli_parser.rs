@@ -1267,13 +1267,13 @@ pub fn cli() -> Command {
                             .after_help(indoc::indoc!(
                                 r#"
                                 This command commpact all files in the dataset into a few depends from max-slice-size.
-        
+
                                 Take great care when compacting datasets. You will lose all history of metadata.
-        
+
                                 **Examples:**
-        
+
                                 Compact a local dataset:
-        
+
                                     kamu compact my.dataset
                                 "#
                             )),

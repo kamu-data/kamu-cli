@@ -15,7 +15,6 @@ To regenerate this schema from existing code, use the following command:
 * `completions` — Generate tab-completion scripts for your shell
 * `config` — Get or set configuration options
 * `delete` — Delete a dataset
-* `compact` — Compact a dataset
 * `ingest` — Adds data to the root dataset according to its push source configuration
 * `init` — Initialize an empty workspace in the current directory
 * `inspect` — Group of commands for exploring dataset metadata
@@ -249,29 +248,6 @@ Delete a local dataset:
 Delete local datasets matching pattern:
 
     kamu delete my.dataset.%
-
-
-
-
-## `kamu compact`
-
-Compact a dataset
-
-**Usage:** `kamu compact <dataset>...`
-
-**Arguments:**
-
-* `<DATASET>` — Local dataset reference(s)
-
-This command commpact all files in the dataset into a few depends from max-slice-size.
-
-Take great care when compacting datasets. You will lose all history of metadata.
-
-**Examples:**
-
-Compact a local dataset:
-
-    kamu compact my.dataset
 
 
 
@@ -1044,6 +1020,7 @@ Command group for system-level functionality
 * `ipfs` — IPFS helpers
 * `check-token` — Validate a Kamu token
 * `generate-token` — Generate a platform token from a known secret for debugging
+* `compact` — Compact a dataset
 
 
 
@@ -1190,6 +1167,36 @@ Generate a platform token from a known secret for debugging
 
 * `--gh-login <GH-LOGIN>` — GitHub account login
 * `--gh-access-token <GH-ACCESS-TOKEN>` — An existing GitHub access token
+
+
+
+## `kamu system compact`
+
+Compact a dataset
+
+**Usage:** `kamu system compact [OPTIONS] <dataset>...`
+
+**Arguments:**
+
+* `<DATASET>` — Local dataset reference(s)
+
+**Options:**
+
+* `--max-slice-size <SIZE>` — Maximum size of a single data slice file in bytes
+
+  Default value: `0`
+* `--hard` — Run a hard dataset compaction
+
+This command commpact all files in the dataset into a few depends from max-slice-size.
+
+Take great care when compacting datasets. You will lose all history of metadata.
+
+**Examples:**
+
+Compact a local dataset:
+
+    kamu compact my.dataset
+
 
 
 
