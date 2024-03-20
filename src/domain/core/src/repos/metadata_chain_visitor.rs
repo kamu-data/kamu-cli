@@ -28,13 +28,13 @@ pub enum MetadataVisitorDecision {
     /// # Examples
     /// ```
     /// // Request for SetVocab block
-    /// return MetadataVisitorDecision::NextOfType(MetadataBlockTypeFlags::SET_VOCAB);
+    /// return MetadataVisitorDecision::NextOfType(MetadataEventTypeFlags::SET_VOCAB);
     ///
     /// // Request for data blocks (ADD_DATA || EXECUTE_TRANSFORM)
-    /// return MetadataVisitorDecision::NextOfType(MetadataBlockTypeFlags::DATA_BLOCK);
+    /// return MetadataVisitorDecision::NextOfType(MetadataEventTypeFlags::DATA_BLOCK);
     ///
     /// // Request for a list of blocks of different types
-    /// return MetadataVisitorDecision::NextOfType(MetadataBlockTypeFlags::SET_ATTACHMENTS | MetadataBlockTypeFlags::SET_LICENSE);
+    /// return MetadataVisitorDecision::NextOfType(MetadataEventTypeFlags::SET_ATTACHMENTS | MetadataEventTypeFlags::SET_LICENSE);
     /// ```
     NextOfType(MetadataEventTypeFlags),
 }
