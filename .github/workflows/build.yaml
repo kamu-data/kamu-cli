@@ -105,6 +105,13 @@ jobs:
           POSTGRES_DB: kamu-test
         ports:
           - 5432:5432
+      mariadb:
+        image: ${{ matrix.database && 'mariadb:11' || '' }}
+        env:
+          MARIADB_ROOT_PASSWORD: root
+          MARIADB_DATABASE: kamu-test
+        ports:
+          - 3306:3306
     steps:
       - name: Setup IPFS
         uses: ibnesayeed/setup-ipfs@master
@@ -154,6 +161,15 @@ jobs:
         run: |
           sqlx migrate run --source ./src/database/migrations/postgres
           cargo nextest run ${{ matrix.nextest-flags }} -E 'test(::postgres::)'
+
+      - name: MariaDB database tests
+        if: matrix.database
+        env:
+          SQLX_OFFLINE: false
+          DATABASE_URL: mariadb://root:root@localhost:3306/kamu-test
+        run: |
+          sqlx migrate run --source ./src/database/migrations/mysql
+          cargo nextest run ${{ matrix.nextest-flags }} -E 'test(::mysql::)'
 
       - name: Run main set of tests
         run: cargo nextest run ${{ matrix.nextest-flags }} ${{ matrix.nextest-exclusions }}
