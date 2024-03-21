@@ -93,8 +93,7 @@ jobs:
     runs-on: ${{ matrix.runs-on }}
     services:
       postgres:
-        if: matrix.database
-        image: postgres:1atest
+        image: ${{ matrix.database && 'postgres:16' || '' }}
         env:
           POSTGRES_USER: root
           POSTGRES_PASSWORD: root
