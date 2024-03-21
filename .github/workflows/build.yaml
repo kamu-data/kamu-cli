@@ -125,7 +125,7 @@ jobs:
       - name: Install SQLX-CLI
         if: matrix.database
         run: |
-          cargo install sqlx-cli --no-default-features --features rustls,postgres -y
+          cargo install sqlx-cli --no-default-features --features rustls,postgres
 
       - name: Configure runtime
         if: matrix.container-runtime != ''
