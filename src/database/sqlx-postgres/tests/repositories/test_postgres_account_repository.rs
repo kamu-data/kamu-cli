@@ -7,8 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::sync::Arc;
-
 use chrono::{SubsecRound, Utc};
 use database_common::models::{AccountModel, AccountOrigin};
 use database_common::run_transactional;
@@ -23,16 +21,17 @@ use uuid::Uuid;
 #[test_log::test(sqlx::test(migrations = "../migrations/postgres"))]
 async fn test_missing_account_not_found(pg_pool: PgPool) {
     let harness = PostgresSqlxTestHarness::new(pg_pool);
-    let account_repo = harness.account_repository();
 
-    run_transactional(&harness.catalog, async move |_, mut transaction_subject| {
+    run_transactional(&harness.catalog, async move |catalog: Catalog| {
+        let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
+
         let maybe_account = account_repo
-            .find_account_by_email(&mut transaction_subject, "test@example.com")
+            .find_account_by_email("test@example.com")
             .await
             .unwrap();
 
         assert!(maybe_account.is_none());
-        Ok(transaction_subject)
+        Ok(())
     })
     .await
     .unwrap();
@@ -43,9 +42,8 @@ async fn test_missing_account_not_found(pg_pool: PgPool) {
 #[test_log::test(sqlx::test(migrations = "../migrations/postgres"))]
 async fn test_insert_and_locate_account(pg_pool: PgPool) {
     let harness = PostgresSqlxTestHarness::new(pg_pool);
-    let account_repo = harness.account_repository();
 
-    run_transactional(&harness.catalog, async move |_, mut transaction_subject| {
+    run_transactional(&harness.catalog, async move |catalog: Catalog| {
         let account_model = AccountModel {
             id: Uuid::new_v4(),
             email: String::from("test@example.com"),
@@ -55,18 +53,18 @@ async fn test_insert_and_locate_account(pg_pool: PgPool) {
             registered_at: Utc::now().round_subsecs(6),
         };
 
-        account_repo
-            .create_account(&mut transaction_subject, &account_model)
-            .await
-            .unwrap();
+        let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
+
+        account_repo.create_account(&account_model).await.unwrap();
 
         let maybe_account = account_repo
-            .find_account_by_email(&mut transaction_subject, "test@example.com")
+            .find_account_by_email("test@example.com")
             .await
             .unwrap();
         assert!(maybe_account.is_some());
         assert_eq!(maybe_account, Some(account_model));
-        Ok(transaction_subject)
+
+        Ok(())
     })
     .await
     .unwrap();
@@ -85,13 +83,10 @@ impl PostgresSqlxTestHarness {
         catalog_builder.add::<PostgresPlugin>();
         catalog_builder.add_builder(PostgresConnectionPool::builder().with_pg_pool(pg_pool));
         catalog_builder.add::<PostgresAccountRepository>();
-        let catalog = catalog_builder.build();
 
-        Self { catalog }
-    }
-
-    pub fn account_repository(&self) -> Arc<dyn AccountRepository> {
-        self.catalog.get_one::<dyn AccountRepository>().unwrap()
+        Self {
+            catalog: catalog_builder.build(),
+        }
     }
 }
 

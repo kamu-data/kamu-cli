@@ -15,7 +15,7 @@ use database_common::{
     run_transactional,
     DatabaseConfiguration,
     DatabaseProvider,
-    TransactionSubject,
+    DatabaseTransactionManager,
 };
 use dill::*;
 use kamu::domain::*;
@@ -78,8 +78,8 @@ pub async fn run(
             configure_base_catalog(&workspace_layout, workspace_svc.is_multi_tenant_workspace());
 
         // TODO: read database settings from configuration, and make it optional
-        // let db_configuration = DatabaseConfiguration::local_mariadb();
-        // configure_database_components(&mut base_catalog_builder, &db_configuration)?;
+        //let db_configuration = DatabaseConfiguration::local_postgres();
+        //configure_database_components(&mut base_catalog_builder, &db_configuration)?;
 
         base_catalog_builder
             .add_value(dependencies_graph_repository)
@@ -164,28 +164,18 @@ pub async fn run(
 }
 
 async fn database_test(catalog: &Catalog) -> Result<(), InternalError> {
-    let maybe_account_repository = catalog.get_one::<dyn auth::AccountRepository>().ok();
-    if maybe_account_repository.is_some() {
-        async fn account_check(
-            catalog: Catalog,
-            mut transaction_subject: TransactionSubject,
-        ) -> Result<TransactionSubject, InternalError> {
+    let maybe_transaction_manager = catalog.get_one::<dyn DatabaseTransactionManager>().ok();
+    if maybe_transaction_manager.is_some() {
+        async fn account_check(catalog: Catalog) -> Result<(), InternalError> {
             let account_repository = catalog.get_one::<dyn auth::AccountRepository>().unwrap();
             println!(
                 "{:?}",
                 account_repository
-                    .find_account_by_email(&mut transaction_subject, "test@example.com")
+                    .find_account_by_email("test@example.com")
                     .await
                     .int_err()?
             );
-            println!(
-                "{:?}",
-                account_repository
-                    .find_account_by_email(&mut transaction_subject, "test@example.com")
-                    .await
-                    .int_err()?
-            );
-            Ok(transaction_subject)
+            Ok(())
         }
 
         run_transactional(catalog, account_check).await?;

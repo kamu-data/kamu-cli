@@ -8,8 +8,9 @@
 // by the Apache License, Version 2.0.
 
 use std::any::Any;
+use std::sync::Arc;
 
-use dill::Catalog;
+use dill::{Catalog, CatalogBuilder};
 use internal_error::InternalError;
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -39,8 +40,8 @@ pub async fn run_transactional<H, HFut>(
     callback: H,
 ) -> Result<(), InternalError>
 where
-    H: FnOnce(Catalog, TransactionSubject) -> HFut + Send + Sync + 'static,
-    HFut: std::future::Future<Output = Result<TransactionSubject, InternalError>> + Send + 'static,
+    H: FnOnce(Catalog) -> HFut + Send + Sync + 'static,
+    HFut: std::future::Future<Output = Result<(), InternalError>> + Send + 'static,
 {
     // Extract transaction manager, specific for the database
     let db_transaction_manager = base_catalog
@@ -52,9 +53,24 @@ where
         .make_transaction_subject(base_catalog)
         .await?;
 
+    // Wrap transaction into a pointer behind asynchronous mutex
+    let transaction_subject_ptr = Arc::new(tokio::sync::Mutex::new(transaction_subject));
+
+    // Create a chained catalog for transaction-aware components, but keep a local
+    // copy of transaction pointer
+    let chained_catalog = CatalogBuilder::new_chained(base_catalog)
+        .add_value(transaction_subject_ptr.clone())
+        .build();
+
     // Run transactional code in the callback
     // Note: in case of error, the transaction rolls back automatically
-    let transaction_subject = callback(base_catalog.clone(), transaction_subject).await?;
+    callback(chained_catalog).await?;
+
+    // Unwrap transaction subject from pointer and mutex, as catalog is already
+    // consumed
+    let transaction_subject = Arc::try_unwrap(transaction_subject_ptr)
+        .unwrap()
+        .into_inner();
 
     // Commit transaction
     db_transaction_manager

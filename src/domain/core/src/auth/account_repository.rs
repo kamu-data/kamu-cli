@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use database_common::models::AccountModel;
-use database_common::TransactionSubject;
 use internal_error::InternalError;
 use thiserror::Error;
 
@@ -18,13 +17,11 @@ use thiserror::Error;
 pub trait AccountRepository: Send + Sync {
     async fn create_account(
         &self,
-        transaction_subject: &mut TransactionSubject,
         account_model: &AccountModel,
     ) -> Result<(), AccountRepositoryError>;
 
     async fn find_account_by_email(
         &self,
-        transaction_subject: &mut TransactionSubject,
         email: &str,
     ) -> Result<Option<AccountModel>, AccountRepositoryError>;
 }

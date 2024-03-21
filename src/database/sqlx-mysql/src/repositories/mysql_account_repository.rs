@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::sync::Arc;
+
 use database_common::models::{AccountModel, AccountOrigin};
 use database_common::TransactionSubject;
 use dill::{component, interface};
@@ -17,13 +19,17 @@ use crate::MySqlTransaction;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct MySqlAccountRepository {}
+pub struct MySqlAccountRepository {
+    // TODO: hide Arc<Arc<..>> somehow
+    #[allow(clippy::redundant_allocation)]
+    transaction_ptr: Arc<Arc<tokio::sync::Mutex<TransactionSubject>>>,
+}
 
 #[component(pub)]
 #[interface(dyn AccountRepository)]
 impl MySqlAccountRepository {
-    pub fn new() -> Self {
-        Self {}
+    pub fn new(transaction_ptr: Arc<Arc<tokio::sync::Mutex<TransactionSubject>>>) -> Self {
+        Self { transaction_ptr }
     }
 }
 
@@ -31,10 +37,11 @@ impl MySqlAccountRepository {
 impl AccountRepository for MySqlAccountRepository {
     async fn create_account(
         &self,
-        transaction_subject: &mut TransactionSubject,
         account_model: &AccountModel,
     ) -> Result<(), AccountRepositoryError> {
-        let mysql_transaction = transaction_subject
+        let mut transaction_guard = self.transaction_ptr.lock().await;
+
+        let mysql_transaction = transaction_guard
             .transaction
             .downcast_mut::<MySqlTransaction>()
             .unwrap();
@@ -62,10 +69,11 @@ impl AccountRepository for MySqlAccountRepository {
 
     async fn find_account_by_email(
         &self,
-        transaction_subject: &mut TransactionSubject,
         email: &str,
     ) -> Result<Option<AccountModel>, AccountRepositoryError> {
-        let mysql_transaction = transaction_subject
+        let mut transaction_guard = self.transaction_ptr.lock().await;
+
+        let mysql_transaction = transaction_guard
             .transaction
             .downcast_mut::<MySqlTransaction>()
             .unwrap();

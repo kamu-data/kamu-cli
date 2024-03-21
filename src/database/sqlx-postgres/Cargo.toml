@@ -32,6 +32,7 @@ dill = "0.8"
 chrono = { version = "0.4", default-features = false }
 secrecy = "0.8"
 thiserror = { version = "1", default-features = false }
+tokio = { version = "1", default-features = false, features = ["sync"] }
 serde = "1"
 uuid = { version = "1", features = ["v4"] }
 

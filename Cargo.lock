@@ -1990,6 +1990,7 @@ dependencies = [
  "sqlx",
  "test-log",
  "thiserror",
+ "tokio",
  "uuid",
 ]
 
@@ -2009,6 +2010,7 @@ dependencies = [
  "sqlx",
  "test-log",
  "thiserror",
+ "tokio",
  "uuid",
 ]
 
