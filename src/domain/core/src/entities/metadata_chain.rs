@@ -225,6 +225,18 @@ pub trait MetadataChainExt: MetadataChain {
 
         Ok(())
     }
+
+    /// An auxiliary method that simplifies the work if only one Visitor is
+    /// used.
+    async fn accept_one<V, E>(&self, mut visitor: V) -> Result<V, E>
+    where
+        V: MetadataChainVisitor<Error = E>,
+        E: Error + From<IterBlocksError>,
+    {
+        self.accept(&mut [&mut visitor]).await?;
+
+        Ok(visitor)
+    }
 }
 
 impl<T> MetadataChainExt for T where T: MetadataChain + ?Sized {}
