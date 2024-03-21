@@ -5,7 +5,7 @@ fail-fast = false
 setup = { max-threads = 1 }  # Serialize the setup steps
 containerized = { max-threads = 8 }  # Don't use too much memory
 engine = { max-threads = 2 }  # Engine tests are very memory-hungry
-database = { max_threads = 8 }  # Don't use too much memory
+database = { max-threads = 8 }  # Don't use too much memory
 
 [[profile.default.overrides]]
 filter = "test(::setup::)"
