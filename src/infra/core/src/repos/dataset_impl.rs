@@ -194,7 +194,7 @@ where
         );
 
         self.metadata_chain
-            .accept_by_interval::<InternalError>(&mut [&mut visitor], current_head, last_seen)
+            .accept_by_interval::<InternalError>(&mut [&mut visitor], Some(current_head), last_seen)
             .await?;
 
         Ok(visitor.into_state().increment)

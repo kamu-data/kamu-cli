@@ -144,7 +144,7 @@ impl DatasetChangesServiceImpl {
             .as_metadata_chain()
             .accept_by_interval::<InternalError>(
                 &mut [&mut data_block_analysis_visitor],
-                new_head,
+                Some(new_head),
                 old_head,
             )
             .await?;

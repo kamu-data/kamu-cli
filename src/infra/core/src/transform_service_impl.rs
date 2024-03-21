@@ -356,7 +356,7 @@ impl TransformServiceImpl {
         input_chain
             .accept_by_interval(
                 &mut [&mut visitor],
-                &last_unprocessed_block,
+                Some(&last_unprocessed_block),
                 last_processed_block,
             )
             .await?;
