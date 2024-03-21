@@ -45,14 +45,11 @@ pub struct ValidateSeedBlockOrderVisitor<'a> {
 }
 
 impl<'a> ValidateSeedBlockOrderVisitor<'a> {
-    pub fn new(block: &'a MetadataBlock) -> Result<(Decision, Self), AppendError> {
-        Ok((
-            Decision::Stop,
-            Self {
-                is_seed_appended_block: matches!(&block.event, MetadataEvent::Seed(_)),
-                appended_prev_block_hash: block.prev_block_hash.as_ref(),
-            },
-        ))
+    pub fn new(block: &'a MetadataBlock) -> Self {
+        Self {
+            is_seed_appended_block: matches!(&block.event, MetadataEvent::Seed(_)),
+            appended_prev_block_hash: block.prev_block_hash.as_ref(),
+        }
     }
 }
 
@@ -82,13 +79,10 @@ pub struct ValidatePrevBlockExistsVisitor<'a> {
 }
 
 impl<'a> ValidatePrevBlockExistsVisitor<'a> {
-    pub fn new(block: &'a MetadataBlock) -> Result<(Decision, Self), AppendError> {
-        Ok((
-            Decision::Stop,
-            Self {
-                appended_prev_block_hash: block.prev_block_hash.as_ref(),
-            },
-        ))
+    pub fn new(block: &'a MetadataBlock) -> Self {
+        Self {
+            appended_prev_block_hash: block.prev_block_hash.as_ref(),
+        }
     }
 }
 
@@ -129,14 +123,11 @@ pub struct ValidateSequenceNumbersIntegrityVisitor {
 }
 
 impl ValidateSequenceNumbersIntegrityVisitor {
-    pub fn new(block: &MetadataBlock) -> Result<(Decision, Self), AppendError> {
-        Ok((
-            Decision::Next,
-            Self {
-                has_appended_prev_block_hash: block.prev_block_hash.is_some(),
-                appended_sequence_number: block.sequence_number,
-            },
-        ))
+    pub fn new(block: &MetadataBlock) -> Self {
+        Self {
+            has_appended_prev_block_hash: block.prev_block_hash.is_some(),
+            appended_sequence_number: block.sequence_number,
+        }
     }
 }
 
@@ -181,13 +172,10 @@ pub struct ValidateSystemTimeIsMonotonicVisitor<'a> {
 }
 
 impl<'a> ValidateSystemTimeIsMonotonicVisitor<'a> {
-    pub fn new(block: &'a MetadataBlock) -> Result<(Decision, Self), AppendError> {
-        Ok((
-            Decision::Next,
-            Self {
-                appended_system_time: &block.system_time,
-            },
-        ))
+    pub fn new(block: &'a MetadataBlock) -> Self {
+        Self {
+            appended_system_time: &block.system_time,
+        }
     }
 }
 
@@ -215,18 +203,15 @@ pub struct ValidateWatermarkIsMonotonicVisitor {
 }
 
 impl ValidateWatermarkIsMonotonicVisitor {
-    pub fn new(block: &MetadataBlock) -> Result<(Decision, Self), AppendError> {
+    pub fn new(block: &MetadataBlock) -> Self {
         let appended_new_watermark = block
             .event
             .as_data_stream_event()
             .map(|data_block| data_block.new_watermark.copied());
 
-        Ok((
-            Decision::Stop,
-            Self {
-                appended_new_watermark,
-            },
-        ))
+        Self {
+            appended_new_watermark,
+        }
     }
 }
 
@@ -292,14 +277,11 @@ impl<'a> ValidateOffsetsAreSequentialVisitor<'a> {
         Ok(())
     }
 
-    pub fn new(block: &'a MetadataBlock) -> Result<(Decision, Self), AppendError> {
-        Ok((
-            Decision::Stop,
-            Self {
-                appended_block_event: &block.event,
-                appended_data_block: block.as_data_stream_block(),
-            },
-        ))
+    pub fn new(block: &'a MetadataBlock) -> Self {
+        Self {
+            appended_block_event: &block.event,
+            appended_data_block: block.as_data_stream_block(),
+        }
     }
 }
 
@@ -431,90 +413,59 @@ impl<'a> ValidateLogicalStructureVisitor<'a> {
         Ok(())
     }
 
-    pub fn new(block: &'a MetadataBlock) -> Result<(Decision, Self), AppendError> {
-        match &block.event {
+    pub fn new(block: &'a MetadataBlock) -> Self {
+        let state = match &block.event {
             MetadataEvent::SetDataSchema(_) => {
                 // TODO: Consider schema evolution rules
                 // TODO: Consider what happens with previously defined sources
-                Ok((
-                    Decision::Stop,
-                    Self {
-                        state: State::Stopped,
-                    },
-                ))
+                State::Stopped
             }
-            MetadataEvent::AddData(e) => Ok((
-                Decision::Stop,
-                Self {
-                    state: State::AddData(AddDataVisitorState {
-                        appended_add_data: e,
-                        prev_schema: None,
-                        prev_add_data: None,
-                        next_block_flags: Flag::SET_DATA_SCHEMA | Flag::ADD_DATA,
-                    }),
-                },
-            )),
+            MetadataEvent::AddData(e) => State::AddData(AddDataVisitorState {
+                appended_add_data: e,
+                prev_schema: None,
+                prev_add_data: None,
+                next_block_flags: Flag::SET_DATA_SCHEMA | Flag::ADD_DATA,
+            }),
             // TODO: ensure only used on Derivative datasets
-            MetadataEvent::ExecuteTransform(e) => Ok((
-                Decision::Stop,
-                Self {
-                    state: State::ExecuteTransform(ExecuteTransformVisitorState {
-                        appended_execute_transform: e,
-                        prev_transform: None,
-                        prev_schema: None,
-                        prev_query: None,
-                        next_block_flags: Flag::SET_DATA_SCHEMA
-                            | Flag::SET_TRANSFORM
-                            | Flag::EXECUTE_TRANSFORM,
-                    }),
-                },
-            )),
-            MetadataEvent::SetPollingSource(e) => Ok((
-                Decision::Stop,
-                Self {
-                    state: State::SetPollingSource {
-                        appended_set_polling_source: e,
-                        appended_event: &block.event,
-                    },
-                },
-            )),
+            MetadataEvent::ExecuteTransform(e) => {
+                State::ExecuteTransform(ExecuteTransformVisitorState {
+                    appended_execute_transform: e,
+                    prev_transform: None,
+                    prev_schema: None,
+                    prev_query: None,
+                    next_block_flags: Flag::SET_DATA_SCHEMA
+                        | Flag::SET_TRANSFORM
+                        | Flag::EXECUTE_TRANSFORM,
+                })
+            }
+            MetadataEvent::SetPollingSource(e) => State::SetPollingSource {
+                appended_set_polling_source: e,
+                appended_event: &block.event,
+            },
             MetadataEvent::DisablePollingSource(_) => {
                 // TODO: Ensure has previously active polling source
                 unimplemented!("Disabling sources is not yet fully supported")
             }
-            MetadataEvent::AddPushSource(e) => Ok((
-                Decision::Stop,
-                Self {
-                    state: State::AddPushSource {
-                        appended_add_push_source: e,
-                        appended_event: &block.event,
-                    },
-                },
-            )),
+            MetadataEvent::AddPushSource(e) => State::AddPushSource {
+                appended_add_push_source: e,
+                appended_event: &block.event,
+            },
             MetadataEvent::DisablePushSource(_) => {
                 // TODO: Ensure has previous push source with matching name
                 unimplemented!("Disabling sources is not yet fully supported")
             }
-            MetadataEvent::SetTransform(e) => Ok((
-                Decision::Stop,
-                Self {
-                    state: State::SetTransform {
-                        appended_set_transform: e,
-                        appended_event: &block.event,
-                    },
-                },
-            )),
+            MetadataEvent::SetTransform(e) => State::SetTransform {
+                appended_set_transform: e,
+                appended_event: &block.event,
+            },
             MetadataEvent::Seed(_)
             | MetadataEvent::SetVocab(_)
             | MetadataEvent::SetAttachments(_)
             | MetadataEvent::SetInfo(_)
-            | MetadataEvent::SetLicense(_) => Ok((
-                Decision::Stop,
-                Self {
-                    state: State::Stopped,
-                },
-            )),
-        }
+            | MetadataEvent::SetLicense(_) => State::Stopped,
+        };
+
+        Self { state }
     }
 
     pub fn post_visit(self) -> Result<(), AppendError> {

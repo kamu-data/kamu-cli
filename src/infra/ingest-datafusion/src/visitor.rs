@@ -53,35 +53,32 @@ pub struct DataWriterDataFusionMetaDataStateVisitor<'a> {
 }
 
 impl<'a> DataWriterDataFusionMetaDataStateVisitor<'a> {
-    const INITIAL_NEXT_BLOCK_FLAGS: Flag = Flag::SET_DATA_SCHEMA
-        .union(Flag::ADD_DATA)
-        .union(Flag::SET_POLLING_SOURCE)
-        .union(Flag::DISABLE_POLLING_SOURCE)
-        .union(Flag::ADD_PUSH_SOURCE)
-        .union(Flag::DISABLE_PUSH_SOURCE)
-        .union(Flag::SET_VOCAB)
-        .union(Flag::SEED);
+    pub fn new(head: Multihash, maybe_source_name: Option<&'a str>) -> Self {
+        const INITIAL_NEXT_BLOCK_FLAGS: Flag = Flag::SET_DATA_SCHEMA
+            .union(Flag::ADD_DATA)
+            .union(Flag::SET_POLLING_SOURCE)
+            .union(Flag::DISABLE_POLLING_SOURCE)
+            .union(Flag::ADD_PUSH_SOURCE)
+            .union(Flag::DISABLE_PUSH_SOURCE)
+            .union(Flag::SET_VOCAB)
+            .union(Flag::SEED);
 
-    pub fn new(head: Multihash, maybe_source_name: Option<&'a str>) -> (Decision, Self) {
-        (
-            Decision::NextOfType(Self::INITIAL_NEXT_BLOCK_FLAGS),
-            Self {
-                head,
-                maybe_source_name,
+        Self {
+            head,
+            maybe_source_name,
 
-                next_block_flags: Self::INITIAL_NEXT_BLOCK_FLAGS,
-                data_slices: Vec::new(),
+            next_block_flags: INITIAL_NEXT_BLOCK_FLAGS,
+            data_slices: Vec::new(),
 
-                maybe_schema: None,
-                maybe_source_event: None,
-                maybe_set_vocab: None,
+            maybe_schema: None,
+            maybe_source_event: None,
+            maybe_set_vocab: None,
 
-                maybe_prev_checkpoint: None,
-                maybe_prev_watermark: None,
-                maybe_prev_source_state: None,
-                maybe_prev_offset: None,
-            },
-        )
+            maybe_prev_checkpoint: None,
+            maybe_prev_watermark: None,
+            maybe_prev_source_state: None,
+            maybe_prev_offset: None,
+        }
     }
 
     pub fn get_metadata_state(self) -> Result<DataWriterMetadataState, ScanMetadataError> {
@@ -202,7 +199,7 @@ impl<'a> MetadataChainVisitor for DataWriterDataFusionMetaDataStateVisitor<'a> {
     type Error = ScanMetadataError;
 
     fn initial_decision(&self) -> Result<Decision, Self::Error> {
-        Ok(Decision::NextOfType(Self::INITIAL_NEXT_BLOCK_FLAGS))
+        Ok(Decision::NextOfType(self.next_block_flags))
     }
 
     fn visit(&mut self, (_, block): HashedMetadataBlockRef) -> Result<Decision, Self::Error> {
