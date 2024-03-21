@@ -134,11 +134,6 @@ jobs:
         run: |
           cargo binstall cargo-nextest -y
 
-      - name: Install SQLX-CLI
-        if: matrix.database
-        run: |
-          cargo install sqlx-cli --no-default-features --features rustls,postgres,mysql
-
       - name: Configure runtime
         if: matrix.container-runtime != ''
         run: |
@@ -158,18 +153,14 @@ jobs:
         env:
           SQLX_OFFLINE: false
           DATABASE_URL: postgres://root:root@localhost:5432/kamu-test
-        run: |
-          sqlx migrate run --source ./src/database/migrations/postgres
-          cargo nextest run ${{ matrix.nextest-flags }} -E 'test(::postgres::)'
+        run: cargo nextest run ${{ matrix.nextest-flags }} -E 'test(::postgres::)'
 
       - name: MariaDB database tests
         if: matrix.database
         env:
           SQLX_OFFLINE: false
           DATABASE_URL: mariadb://root:root@localhost:3306/kamu-test
-        run: |
-          sqlx migrate run --source ./src/database/migrations/mysql
-          cargo nextest run ${{ matrix.nextest-flags }} -E 'test(::mysql::)'
+        run: cargo nextest run ${{ matrix.nextest-flags }} -E 'test(::mysql::)'
 
       - name: Run main set of tests
         run: cargo nextest run ${{ matrix.nextest-flags }} ${{ matrix.nextest-exclusions }}
