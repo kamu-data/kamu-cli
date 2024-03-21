@@ -106,34 +106,28 @@ impl Dataset {
     // TODO: PERF: Avoid traversing the entire chain
     /// Creation time of the first metadata block in the chain
     async fn created_at(&self, ctx: &Context<'_>) -> Result<DateTime<Utc>> {
-        let dataset = self.get_dataset(ctx).await?;
-        let mut search_seed_visitor = <SearchSeedVisitor>::default();
-
-        dataset
+        Ok(self
+            .get_dataset(ctx)
+            .await?
             .as_metadata_chain()
-            .accept(&mut [&mut search_seed_visitor])
-            .await?;
-
-        let seed_block = search_seed_visitor
+            .accept_one(<SearchSeedVisitor>::default())
+            .await?
             .into_block()
-            .expect("Dataset without blocks");
-
-        Ok(seed_block.system_time)
+            .expect("Dataset without blocks")
+            .system_time)
     }
 
     /// Creation time of the most recent metadata block in the chain
     async fn last_updated_at(&self, ctx: &Context<'_>) -> Result<DateTime<Utc>> {
-        let dataset = self.get_dataset(ctx).await?;
-        let mut visitor = <SearchNextBlockVisitor>::default();
-
-        dataset
+        Ok(self
+            .get_dataset(ctx)
+            .await?
             .as_metadata_chain()
-            .accept(&mut [&mut visitor])
-            .await?;
-
-        let block = visitor.into_block().expect("Dataset without blocks");
-
-        Ok(block.system_time)
+            .accept_one(<SearchNextBlockVisitor>::default())
+            .await?
+            .into_block()
+            .expect("Dataset without blocks")
+            .system_time)
     }
 
     /// Permissions of the current user
