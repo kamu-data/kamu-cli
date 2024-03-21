@@ -15,7 +15,6 @@ env:
   RUST_LOG: "debug"
   RUST_LOG_SPAN_EVENTS: "new,close"
   RUST_BACKTRACE: "1"
-  SQLX_OFFLINE: "true"
 jobs:
   lint_fmt:
     name: Lint / Code
@@ -88,6 +87,15 @@ jobs:
             ipfs: false
     name: Test / ${{ matrix.name }}
     runs-on: ${{ matrix.runs-on }}
+    services:
+      postgres:
+        image: postgres:1atest
+        env:
+          POSTGRES_USER: root
+          POSTGRES_PASSWORD: root
+          POSTGRES_DB: kamu-test
+        ports:
+          - 5432:5432
     steps:
       - name: Setup IPFS
         uses: ibnesayeed/setup-ipfs@master
@@ -103,10 +111,13 @@ jobs:
         with:
           cache-on-failure: true
 
+      - uses: cargo-bins/cargo-binstall@main
+
       - name: Install cargo tools
         # TODO: Restore --locked switch as soon as `cargo-nextest` releases version with `ahash>=0.8.7`
         run: |
-          cargo install cargo-nextest
+          cargo binstall cargo-nextest -y
+          cargo binstall sqlx-cli --no-default-features --features rustls,postgres,mysql -y
 
       - name: Configure runtime
         if: matrix.container-runtime != ''
@@ -115,11 +126,16 @@ jobs:
           echo "KAMU_CONTAINER_RUNTIME_TYPE=${{ matrix.container-runtime }}" >> $GITHUB_ENV
 
       - name: Build
-        run: cargo test ${{ matrix.cargo-flags }} --no-run
+        run: SQLX_OFFLINE=true cargo test ${{ matrix.cargo-flags }} --no-run
 
       - name: Pull test images
         if: matrix.container-runtime != ''
         run: cargo nextest run ${{ matrix.nextest-flags }} -E 'test(::setup::)' --no-capture
+
+      - name: Prepare Postgres database
+        run: |
+          export DATABASE_URL=postgres://root:root@localhost:5432/kamu-test
+          sqlx migrate run --source ./source/database/migrations/postgres
 
       - name: Run tests
         run: cargo nextest run ${{ matrix.nextest-flags }}
