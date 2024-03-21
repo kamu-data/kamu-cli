@@ -58,7 +58,7 @@ jobs:
           - name: Linux / amd64
             runs-on: ubuntu-latest
             cargo-flags: --profile ci --features ftp
-            nextest-flags: --cargo-profile ci --features ftp
+            nextest-flags: --cargo-profile ci --features ftp -E '!test(::mysql::)'
             container-runtime: podman
             ipfs: true
             database: true
@@ -67,7 +67,7 @@ jobs:
           - name: MacOS / amd64
             runs-on: macos-13
             cargo-flags: --profile ci --features ftp
-            nextest-flags: --cargo-profile ci --features ftp -E '!test(::containerized::)'
+            nextest-flags: --cargo-profile ci --features ftp -E '!(test(::containerized::) | test(::database::))'
             container-runtime: ''
             ipfs: false
             database: false
@@ -76,7 +76,7 @@ jobs:
           - name: MacOS / arm64
             runs-on: macos-14
             cargo-flags: --profile ci
-            nextest-flags: --cargo-profile ci -E '!test(::containerized::)'
+            nextest-flags: --cargo-profile ci -E '!(test(::containerized::) | test(::database::))'
             container-runtime: ''
             ipfs: false
             database: false
@@ -85,7 +85,7 @@ jobs:
           - name: Windows / amd64
             runs-on: windows-latest
             cargo-flags: --profile ci
-            nextest-flags: --cargo-profile ci -E 'not (test(::containerized::) | test(::datafusion::))'
+            nextest-flags: --cargo-profile ci -E 'not (test(::containerized::) | test(::datafusion::) | test(::database::))'
             container-runtime: ''
             ipfs: false
             database: false
@@ -147,7 +147,7 @@ jobs:
         run: |
           export DATABASE_URL=postgres://root:root@localhost:5432/kamu-test
           export SQLX_OFFLINE=false
-          sqlx migrate run --source ./source/database/migrations/postgres
+          sqlx migrate run --source ./src/database/migrations/postgres
 
       - name: Run tests
         run: cargo nextest run ${{ matrix.nextest-flags }}

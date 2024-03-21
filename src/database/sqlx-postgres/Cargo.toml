@@ -50,3 +50,4 @@ features = [
 
 [dev-dependencies]
 test-log = { version = "0.2", features = ["trace"] }
+test-group = { version = "1" }

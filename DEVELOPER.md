@@ -59,7 +59,7 @@ Prerequisites:
 * Database tools:
   * Install Postgres command line client `psql`: `sudo apt-get install -y postgresql-client`
   * Install MariaDB command line client `mariadb`: `sudo apt install -y mariadb-client`
-  * Install `sqlx-cli`: `cargo binstall sqlx-cli --no-default-features --features rustls,postgres,mysql -y`
+  * Install `sqlx-cli`: `cargo install sqlx-cli --no-default-features --features rustls,postgres,mysql`
 
 Clone the repository:
 ```shell
@@ -292,8 +292,11 @@ We use the homegrown [`test-group`](https://crates.io/crates/test-group) crate t
   - `datafusion` - tests that use Apache DataFusion
   - `spark` - tests that use Apache Spark
   - `flink` - tests that use Apache Flink
+- `database` - for tests that involve any database interaction, subsequently grouped by:
+  - `mysql` - tests that use MySQL/MariaDB
+  - `postgres` - tests that use PostreSQL
 - `ingest` - tests that test data ingestion path
-- `transfrom` - tests that test data transformation path
+- `transform` - tests that test data transformation path
 - `query` - tests that test data query path
 - `flaky` - special group for tests that sometimes fail and need to be retried (use very sparingly and create tickets)
 - `setup` - special group for tests that initialize the environment (e.g. pull container images) - this group is run by CI before executing the rest of the tests
