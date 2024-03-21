@@ -90,19 +90,18 @@ impl QueryServiceImpl {
             .dataset_repo
             .get_dataset(&dataset_handle.as_local_ref())
             .await?;
-        let mut visitor = <SearchDataBlocksVisitor>::next_filled_new_data();
 
-        dataset
+        // TODO: Update to use SetDataSchema event
+        let last_data_slice_opt = dataset
             .as_metadata_chain()
-            .accept(&mut [&mut visitor])
+            .accept_one(<SearchDataBlocksVisitor>::next_filled_new_data())
             .await
             .map_err(|e| {
                 tracing::error!(error = ?e, "Resolving last data slice failed");
                 e
-            })?;
-
-        // TODO: Update to use SetDataSchema event
-        let last_data_slice_opt = visitor.into_event().and_then(|e| e.new_data);
+            })?
+            .into_event()
+            .and_then(|e| e.new_data);
 
         match last_data_slice_opt {
             Some(last_data_slice) => {
