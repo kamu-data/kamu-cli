@@ -537,6 +537,9 @@ impl TransformServiceImpl {
             let mut set_vocab_visitor = <SearchSetVocabVisitor>::default();
             let mut set_data_schema_visitor = <SearchSetDataSchemaVisitor>::default();
 
+            type Flag = MetadataEventTypeFlags;
+            type Decision = MetadataVisitorDecision;
+
             struct ExecuteTransformCollectorVisitor {
                 tail_sequence_number: Option<u64>,
                 blocks: Vec<(Multihash, MetadataBlock)>,
@@ -549,10 +552,8 @@ impl TransformServiceImpl {
                     blocks: Vec::new(),
                     finished_range: false,
                 },
+                Decision::NextOfType(Flag::EXECUTE_TRANSFORM),
                 |state, (hash, block)| {
-                    type Flag = MetadataEventTypeFlags;
-                    type Decision = MetadataVisitorDecision;
-
                     if Some(block.sequence_number) < state.tail_sequence_number {
                         state.finished_range = true;
 

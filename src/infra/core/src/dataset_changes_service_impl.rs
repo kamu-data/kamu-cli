@@ -92,6 +92,7 @@ impl DatasetChangesServiceImpl {
         // Scan blocks (from new head to old head)
         let mut data_block_analysis_visitor = GenericCallbackVisitor::new(
             DataBlockAnalysisVisitorState::default(),
+            MetadataVisitorDecision::Next,
             |state, (_, block)| {
                 // Each block counts
                 state.num_blocks += 1;

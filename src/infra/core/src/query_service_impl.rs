@@ -357,6 +357,9 @@ impl KamuSchema {
         dataset: &dyn Dataset,
         last_records_to_consider: Option<u64>,
     ) -> Result<Vec<Multihash>, InternalError> {
+        type Flag = MetadataEventTypeFlags;
+        type Decision = MetadataVisitorDecision;
+
         struct DataSliceCollectorVisitorState {
             files: Vec<Multihash>,
             num_records: u64,
@@ -369,20 +372,12 @@ impl KamuSchema {
                 num_records: 0,
                 last_records_to_consider,
             },
+            Decision::NextOfType(Flag::DATA_BLOCK),
             |state, (_, block)| {
-                type Flag = MetadataEventTypeFlags;
-                type Decision = MetadataVisitorDecision;
-
-                let block_flag = Flag::from(&block.event);
-
-                if !Flag::DATA_BLOCK.contains(block_flag) {
-                    return Ok(Decision::NextOfType(Flag::DATA_BLOCK));
-                }
-
                 let new_data = match &block.event {
                     MetadataEvent::AddData(e) => e.new_data.as_ref(),
                     MetadataEvent::ExecuteTransform(e) => e.new_data.as_ref(),
-                    _ => unreachable!(),
+                    _ => return Ok(Decision::NextOfType(Flag::DATA_BLOCK)),
                 };
                 let Some(slice) = new_data else {
                     return Ok(Decision::NextOfType(Flag::DATA_BLOCK));
