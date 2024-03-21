@@ -20,7 +20,7 @@ use uuid::Uuid;
 
 #[test_log::test(sqlx::test(migrations = "../migrations/postgres"))]
 async fn test_missing_account_not_found(pg_pool: PgPool) {
-    let harness = PostgresSqlxTestHarness::new(pg_pool);
+    let harness = PostgresAccountRepositoryHarness::new(pg_pool);
 
     run_transactional(&harness.catalog, async move |catalog: Catalog| {
         let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
@@ -41,7 +41,7 @@ async fn test_missing_account_not_found(pg_pool: PgPool) {
 
 #[test_log::test(sqlx::test(migrations = "../migrations/postgres"))]
 async fn test_insert_and_locate_account(pg_pool: PgPool) {
-    let harness = PostgresSqlxTestHarness::new(pg_pool);
+    let harness = PostgresAccountRepositoryHarness::new(pg_pool);
 
     run_transactional(&harness.catalog, async move |catalog: Catalog| {
         let account_model = AccountModel {
@@ -72,11 +72,11 @@ async fn test_insert_and_locate_account(pg_pool: PgPool) {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-struct PostgresSqlxTestHarness {
+struct PostgresAccountRepositoryHarness {
     catalog: Catalog,
 }
 
-impl PostgresSqlxTestHarness {
+impl PostgresAccountRepositoryHarness {
     pub fn new(pg_pool: PgPool) -> Self {
         // Initialize catalog with predefined Postgres pool
         let mut catalog_builder = CatalogBuilder::new();

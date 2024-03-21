@@ -20,7 +20,7 @@ use uuid::Uuid;
 
 #[test_log::test(sqlx::test(migrations = "../migrations/mysql"))]
 async fn test_missing_account_not_found(mysql_pool: MySqlPool) {
-    let harness = MySqlSqlxTestHarness::new(mysql_pool);
+    let harness = MySqlAccountRepositoryHarness::new(mysql_pool);
 
     run_transactional(&harness.catalog, async move |catalog: Catalog| {
         let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
@@ -41,7 +41,7 @@ async fn test_missing_account_not_found(mysql_pool: MySqlPool) {
 
 #[test_log::test(sqlx::test(migrations = "../migrations/mysql"))]
 async fn test_insert_and_locate_account(mysql_pool: MySqlPool) {
-    let harness = MySqlSqlxTestHarness::new(mysql_pool);
+    let harness = MySqlAccountRepositoryHarness::new(mysql_pool);
 
     run_transactional(&harness.catalog, async move |catalog: Catalog| {
         let account_model = AccountModel {
@@ -72,11 +72,11 @@ async fn test_insert_and_locate_account(mysql_pool: MySqlPool) {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-struct MySqlSqlxTestHarness {
+struct MySqlAccountRepositoryHarness {
     catalog: Catalog,
 }
 
-impl MySqlSqlxTestHarness {
+impl MySqlAccountRepositoryHarness {
     pub fn new(mysql_pool: MySqlPool) -> Self {
         // Initialize catalog with predefined MySql pool
         let mut catalog_builder = CatalogBuilder::new();
