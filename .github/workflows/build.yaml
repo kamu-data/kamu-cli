@@ -61,6 +61,7 @@ jobs:
             nextest-flags: --cargo-profile ci --features ftp
             container-runtime: podman
             ipfs: true
+            database: true
           # TODO: Not running docker as it takes ~7 minutes to install
           # See: https://github.com/actions/runner/issues/1456
           - name: MacOS / amd64
@@ -69,6 +70,7 @@ jobs:
             nextest-flags: --cargo-profile ci --features ftp -E '!test(::containerized::)'
             container-runtime: ''
             ipfs: false
+            database: false
           # TODO: M1 cannot run docker due to lack of nested virtualization
           # See: https://github.com/marketplace/actions/setup-docker-on-macos#arm64-processors-m1-m2-m3-series-used-on-macos-14-images-are-unsupported
           - name: MacOS / arm64
@@ -77,6 +79,7 @@ jobs:
             nextest-flags: --cargo-profile ci -E '!test(::containerized::)'
             container-runtime: ''
             ipfs: false
+            database: false
           # TODO: DataFusion tests are temporarily disabled
           # See: https://github.com/kamu-data/kamu-cli/issues/226
           - name: Windows / amd64
@@ -85,10 +88,12 @@ jobs:
             nextest-flags: --cargo-profile ci -E 'not (test(::containerized::) | test(::datafusion::))'
             container-runtime: ''
             ipfs: false
+            database: false
     name: Test / ${{ matrix.name }}
     runs-on: ${{ matrix.runs-on }}
     services:
       postgres:
+        if: matrix.database
         image: postgres:1atest
         env:
           POSTGRES_USER: root
@@ -126,15 +131,19 @@ jobs:
           echo "KAMU_CONTAINER_RUNTIME_TYPE=${{ matrix.container-runtime }}" >> $GITHUB_ENV
 
       - name: Build
-        run: SQLX_OFFLINE=true cargo test ${{ matrix.cargo-flags }} --no-run
+        run: |
+          export SQLX_OFFLINE=true
+          cargo test ${{ matrix.cargo-flags }} --no-run
 
       - name: Pull test images
         if: matrix.container-runtime != ''
         run: cargo nextest run ${{ matrix.nextest-flags }} -E 'test(::setup::)' --no-capture
 
       - name: Prepare Postgres database
+        if: matrix.database
         run: |
           export DATABASE_URL=postgres://root:root@localhost:5432/kamu-test
+          export SQLX_OFFLINE=false
           sqlx migrate run --source ./source/database/migrations/postgres
 
       - name: Run tests
