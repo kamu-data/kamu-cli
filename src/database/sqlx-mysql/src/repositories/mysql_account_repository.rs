@@ -20,15 +20,13 @@ use crate::MySqlTransaction;
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct MySqlAccountRepository {
-    // TODO: hide Arc<Arc<..>> somehow
-    #[allow(clippy::redundant_allocation)]
-    transaction_ptr: Arc<Arc<tokio::sync::Mutex<TransactionSubject>>>,
+    transaction_ptr: Arc<tokio::sync::Mutex<TransactionSubject>>,
 }
 
 #[component(pub)]
 #[interface(dyn AccountRepository)]
 impl MySqlAccountRepository {
-    pub fn new(transaction_ptr: Arc<Arc<tokio::sync::Mutex<TransactionSubject>>>) -> Self {
+    pub fn new(transaction_ptr: Arc<tokio::sync::Mutex<TransactionSubject>>) -> Self {
         Self { transaction_ptr }
     }
 }

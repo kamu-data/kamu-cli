@@ -59,7 +59,7 @@ where
     // Create a chained catalog for transaction-aware components, but keep a local
     // copy of transaction pointer
     let chained_catalog = CatalogBuilder::new_chained(base_catalog)
-        .add_value(transaction_subject_ptr.clone())
+        .add_builder(transaction_subject_ptr.clone())
         .build();
 
     // Run transactional code in the callback
@@ -97,7 +97,5 @@ impl TransactionSubject {
 }
 
 unsafe impl Send for TransactionSubject {}
-
-unsafe impl Sync for TransactionSubject {}
 
 /////////////////////////////////////////////////////////////////////////////////////////
