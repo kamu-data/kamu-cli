@@ -151,8 +151,9 @@ jobs:
         env:
           SQLX_OFFLINE: false
           DATABASE_URL: postgres://root:root@localhost:5432/kamu-test
-        run: sqlx migrate run --source ./src/database/migrations/postgres
-        run: cargo nextest run ${{ matrix.nextest-flags }} -E 'test(::postgres::)'
+        run: |
+          sqlx migrate run --source ./src/database/migrations/postgres
+          cargo nextest run ${{ matrix.nextest-flags }} -E 'test(::postgres::)'
 
       - name: Run main set of tests
         run: cargo nextest run ${{ matrix.nextest-flags }} ${{ matrix.nextest-exclusions }}
