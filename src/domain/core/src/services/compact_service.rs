@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::path::Path;
 use std::sync::Arc;
 
 use opendatafabric::*;
@@ -20,7 +19,6 @@ pub trait CompactService: Send + Sync {
     async fn compact_dataset(
         &self,
         dataset_handle: &DatasetHandle,
-        run_info_dir: &Path,
         max_slice_size: u64,
         listener: Option<Arc<dyn CompactionMultiListener>>,
     ) -> Result<(), CompactError>;

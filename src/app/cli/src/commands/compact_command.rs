@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::path::PathBuf;
 use std::sync::Arc;
 
 use kamu::domain::compact_service::CompactService;
@@ -26,7 +25,6 @@ pub struct CompactCommand {
     verification_svc: Arc<dyn VerificationService>,
     compact_svc: Arc<dyn CompactService>,
     dataset_ref: DatasetRef,
-    run_info_dir: PathBuf,
     max_slice_size: u64,
     is_hard: bool,
 }
@@ -37,7 +35,6 @@ impl CompactCommand {
         verification_svc: Arc<dyn VerificationService>,
         compact_svc: Arc<dyn CompactService>,
         dataset_ref: DatasetRef,
-        run_info_dir: PathBuf,
         max_slice_size: u64,
         is_hard: bool,
     ) -> Self {
@@ -46,7 +43,6 @@ impl CompactCommand {
             verification_svc,
             compact_svc,
             dataset_ref,
-            run_info_dir,
             max_slice_size,
             is_hard,
         }
@@ -106,12 +102,7 @@ impl Command for CompactCommand {
         });
 
         self.compact_svc
-            .compact_dataset(
-                &dataset_handle,
-                &self.run_info_dir,
-                self.max_slice_size,
-                Some(listener.clone()),
-            )
+            .compact_dataset(&dataset_handle, self.max_slice_size, Some(listener.clone()))
             .await
             .map_err(CLIError::failure)?;
 

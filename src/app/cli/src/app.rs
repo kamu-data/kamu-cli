@@ -12,6 +12,7 @@ use std::sync::Arc;
 
 use container_runtime::{ContainerRuntime, ContainerRuntimeConfig};
 use dill::*;
+use kamu::domain::compact_service::CompactService;
 use kamu::domain::*;
 use kamu::*;
 
@@ -234,7 +235,10 @@ pub fn configure_base_catalog(
 
     b.add::<VerificationServiceImpl>();
 
-    b.add::<CompactServiceImpl>();
+    b.add_builder(
+        CompactServiceImpl::builder().with_run_info_dir(workspace_layout.run_info_dir.clone()),
+    );
+    b.bind::<dyn CompactService, CompactServiceImpl>();
 
     b.add::<SearchServiceImpl>();
 

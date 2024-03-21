@@ -39,6 +39,7 @@ use crate::*;
 pub struct CompactServiceImpl {
     dataset_repo: Arc<dyn DatasetRepository>,
     dataset_authorizer: Arc<dyn domain::auth::DatasetActionAuthorizer>,
+    run_info_dir: PathBuf,
 }
 
 #[derive(Debug, Clone)]
@@ -61,10 +62,12 @@ impl CompactServiceImpl {
     pub fn new(
         dataset_authorizer: Arc<dyn domain::auth::DatasetActionAuthorizer>,
         dataset_repo: Arc<dyn DatasetRepository>,
+        run_info_dir: PathBuf,
     ) -> Self {
         Self {
             dataset_repo,
             dataset_authorizer,
+            run_info_dir,
         }
     }
 
@@ -192,8 +195,8 @@ impl CompactServiceImpl {
         Ok(())
     }
 
-    fn create_run_compact_dir(&self, dataset_dir_path: &Path) -> Result<PathBuf, CompactError> {
-        let compact_dir_path = dataset_dir_path.join("compact");
+    fn create_run_compact_dir(&self) -> Result<PathBuf, CompactError> {
+        let compact_dir_path = self.run_info_dir.join("compact");
         fs::create_dir_all(&compact_dir_path).int_err()?;
         Ok(compact_dir_path)
     }
@@ -303,7 +306,6 @@ impl CompactService for CompactServiceImpl {
     async fn compact_dataset(
         &self,
         dataset_handle: &DatasetHandle,
-        run_info_dir: &Path,
         max_slice_size: u64,
         multi_listener: Option<Arc<dyn CompactionMultiListener>>,
     ) -> Result<(), CompactError> {
@@ -331,7 +333,7 @@ impl CompactService for CompactServiceImpl {
             }));
         }
 
-        let compact_dir_path = self.create_run_compact_dir(run_info_dir)?;
+        let compact_dir_path = self.create_run_compact_dir()?;
 
         listener.begin_phase(CompactionPhase::GatherChainInfo);
         let chain_files_info = self
