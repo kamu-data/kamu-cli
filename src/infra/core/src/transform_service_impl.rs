@@ -740,18 +740,15 @@ impl TransformService for TransformServiceImpl {
         &self,
         dataset_ref: &DatasetRef,
     ) -> Result<Option<(Multihash, MetadataBlockTyped<SetTransform>)>, GetDatasetError> {
-        let dataset = self.dataset_repo.get_dataset(dataset_ref).await?;
-        let mut visitor = <SearchSetTransformVisitor>::default();
-
-        dataset
+        Ok(self
+            .dataset_repo
+            .get_dataset(dataset_ref)
+            .await?
             .as_metadata_chain()
-            .accept(&mut [&mut visitor])
-            .await?;
-
-        // TODO: Support transform evolution
-        let source = visitor.into_hashed_block();
-
-        Ok(source)
+            // TODO: Support transform evolution
+            .accept_one(<SearchSetTransformVisitor>::default())
+            .await?
+            .into_hashed_block())
     }
 
     async fn transform(
