@@ -15,7 +15,6 @@ use database_common::{
     run_transactional,
     DatabaseConfiguration,
     DatabaseProvider,
-    DatabaseTransactionManager,
     TransactionSubject,
 };
 use dill::*;
@@ -114,32 +113,7 @@ pub async fn run(
     };
 
     // Temp: remove this
-    let maybe_db_transaction_manager = base_catalog
-        .get_one::<dyn DatabaseTransactionManager>()
-        .ok();
-    if let Some(db_transaction_manager) = maybe_db_transaction_manager {
-        async fn repository_test(
-            catalog: Catalog,
-            mut transaction_subject: TransactionSubject,
-        ) -> Result<TransactionSubject, InternalError> {
-            let account_repository = catalog.get_one::<dyn auth::AccountRepository>().unwrap();
-            println!(
-                "{:?}",
-                account_repository
-                    .find_account_by_email(&mut transaction_subject, "test@example.com")
-                    .await
-                    .int_err()?
-            );
-            Ok(transaction_subject)
-        }
-
-        run_transactional(
-            db_transaction_manager.as_ref(),
-            base_catalog.clone(),
-            repository_test,
-        )
-        .await?;
-    }
+    database_test(&base_catalog).await?;
 
     // Evict cache
     if workspace_svc.is_in_workspace() && !workspace_svc.is_upgrade_needed()? {
@@ -187,6 +161,37 @@ pub async fn run(
     }
 
     result
+}
+
+async fn database_test(catalog: &Catalog) -> Result<(), InternalError> {
+    let maybe_account_repository = catalog.get_one::<dyn auth::AccountRepository>().ok();
+    if maybe_account_repository.is_some() {
+        async fn account_check(
+            catalog: Catalog,
+            mut transaction_subject: TransactionSubject,
+        ) -> Result<TransactionSubject, InternalError> {
+            let account_repository = catalog.get_one::<dyn auth::AccountRepository>().unwrap();
+            println!(
+                "{:?}",
+                account_repository
+                    .find_account_by_email(&mut transaction_subject, "test@example.com")
+                    .await
+                    .int_err()?
+            );
+            println!(
+                "{:?}",
+                account_repository
+                    .find_account_by_email(&mut transaction_subject, "test@example.com")
+                    .await
+                    .int_err()?
+            );
+            Ok(transaction_subject)
+        }
+
+        run_transactional(catalog, account_check).await?;
+    }
+
+    Ok(())
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -336,6 +341,7 @@ pub fn configure_base_catalog(
     b
 }
 
+#[allow(dead_code)]
 fn configure_database_components(
     catalog_builder: &mut CatalogBuilder,
     db_configuration: &DatabaseConfiguration,

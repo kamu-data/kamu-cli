@@ -35,22 +35,26 @@ pub trait DatabaseTransactionManager: Send + Sync {
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn run_transactional<H, HFut>(
-    db_transaction_manager: &dyn DatabaseTransactionManager,
-    base_catalog: Catalog,
+    base_catalog: &Catalog,
     callback: H,
 ) -> Result<(), InternalError>
 where
     H: FnOnce(Catalog, TransactionSubject) -> HFut + Send + Sync + 'static,
     HFut: std::future::Future<Output = Result<TransactionSubject, InternalError>> + Send + 'static,
 {
+    // Extract transaction manager, specific for the database
+    let db_transaction_manager = base_catalog
+        .get_one::<dyn DatabaseTransactionManager>()
+        .unwrap();
+
     // Start transaction
     let transaction_subject = db_transaction_manager
-        .make_transaction_subject(&base_catalog)
+        .make_transaction_subject(base_catalog)
         .await?;
 
     // Run transactional code in the callback
     // Note: in case of error, the transaction rolls back automatically
-    let transaction_subject = callback(base_catalog, transaction_subject).await?;
+    let transaction_subject = callback(base_catalog.clone(), transaction_subject).await?;
 
     // Commit transaction
     db_transaction_manager

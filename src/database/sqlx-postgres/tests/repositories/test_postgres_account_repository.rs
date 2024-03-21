@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use chrono::{SubsecRound, Utc};
 use database_common::models::{AccountModel, AccountOrigin};
-use database_common::{DatabaseTransactionManager, TransactionSubject};
+use database_common::run_transactional;
 use database_sqlx_postgres::{PostgresAccountRepository, PostgresConnectionPool, PostgresPlugin};
 use dill::{Catalog, CatalogBuilder, Component};
 use kamu_core::auth::AccountRepository;
@@ -22,57 +22,60 @@ use uuid::Uuid;
 
 #[test_log::test(sqlx::test(migrations = "../migrations/postgres"))]
 async fn test_missing_account_not_found(pg_pool: PgPool) {
-    let mut harness = PostgresSqlxTestHarness::new(pg_pool);
-
+    let harness = PostgresSqlxTestHarness::new(pg_pool);
     let account_repo = harness.account_repository();
 
-    let transaction_subject = harness.begin_transaction().await;
+    run_transactional(&harness.catalog, async move |_, mut transaction_subject| {
+        let maybe_account = account_repo
+            .find_account_by_email(&mut transaction_subject, "test@example.com")
+            .await
+            .unwrap();
 
-    let maybe_account = account_repo
-        .find_account_by_email(transaction_subject, "test@example.com")
-        .await
-        .unwrap();
-
-    assert!(maybe_account.is_none());
+        assert!(maybe_account.is_none());
+        Ok(transaction_subject)
+    })
+    .await
+    .unwrap();
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(sqlx::test(migrations = "../migrations/postgres"))]
 async fn test_insert_and_locate_account(pg_pool: PgPool) {
-    let mut harness = PostgresSqlxTestHarness::new(pg_pool);
-
+    let harness = PostgresSqlxTestHarness::new(pg_pool);
     let account_repo = harness.account_repository();
 
-    let transaction_subject = harness.begin_transaction().await;
+    run_transactional(&harness.catalog, async move |_, mut transaction_subject| {
+        let account_model = AccountModel {
+            id: Uuid::new_v4(),
+            email: String::from("test@example.com"),
+            account_name: String::from("wasya"),
+            display_name: String::from("Wasya Pupkin"),
+            origin: AccountOrigin::Cli,
+            registered_at: Utc::now().round_subsecs(6),
+        };
 
-    let account_model = AccountModel {
-        id: Uuid::new_v4(),
-        email: String::from("test@example.com"),
-        account_name: String::from("wasya"),
-        display_name: String::from("Wasya Pupkin"),
-        origin: AccountOrigin::Cli,
-        registered_at: Utc::now().round_subsecs(6),
-    };
+        account_repo
+            .create_account(&mut transaction_subject, &account_model)
+            .await
+            .unwrap();
 
-    account_repo
-        .create_account(transaction_subject, &account_model)
-        .await
-        .unwrap();
-
-    let maybe_account = account_repo
-        .find_account_by_email(transaction_subject, "test@example.com")
-        .await
-        .unwrap();
-    assert!(maybe_account.is_some());
-    assert_eq!(maybe_account, Some(account_model));
+        let maybe_account = account_repo
+            .find_account_by_email(&mut transaction_subject, "test@example.com")
+            .await
+            .unwrap();
+        assert!(maybe_account.is_some());
+        assert_eq!(maybe_account, Some(account_model));
+        Ok(transaction_subject)
+    })
+    .await
+    .unwrap();
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 struct PostgresSqlxTestHarness {
     catalog: Catalog,
-    transaction_subject: Option<TransactionSubject>,
 }
 
 impl PostgresSqlxTestHarness {
@@ -84,31 +87,11 @@ impl PostgresSqlxTestHarness {
         catalog_builder.add::<PostgresAccountRepository>();
         let catalog = catalog_builder.build();
 
-        Self {
-            catalog,
-            transaction_subject: None,
-        }
+        Self { catalog }
     }
 
     pub fn account_repository(&self) -> Arc<dyn AccountRepository> {
         self.catalog.get_one::<dyn AccountRepository>().unwrap()
-    }
-
-    fn transaction_manager(&self) -> Arc<dyn DatabaseTransactionManager> {
-        self.catalog
-            .get_one::<dyn DatabaseTransactionManager>()
-            .unwrap()
-    }
-
-    pub async fn begin_transaction(&mut self) -> &mut TransactionSubject {
-        let transaction_manager = self.transaction_manager();
-        let transaction_subject = transaction_manager
-            .make_transaction_subject(&self.catalog)
-            .await
-            .unwrap();
-
-        self.transaction_subject = Some(transaction_subject);
-        self.transaction_subject.as_mut().unwrap()
     }
 }
 
