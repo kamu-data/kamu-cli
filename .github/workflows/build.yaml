@@ -121,7 +121,11 @@ jobs:
         # TODO: Restore --locked switch as soon as `cargo-nextest` releases version with `ahash>=0.8.7`
         run: |
           cargo binstall cargo-nextest -y
-          cargo binstall sqlx-cli -- --no-default-features --features rustls,postgres,mysql -y
+
+      - name: Install SQLX-CLI
+        if: matrix.database
+        run: |
+          cargo binstall sqlx-cli -- --no-default-features --features rustls,postgres -y
 
       - name: Configure runtime
         if: matrix.container-runtime != ''
