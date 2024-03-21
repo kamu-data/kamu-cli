@@ -15,6 +15,7 @@ env:
   RUST_LOG: "debug"
   RUST_LOG_SPAN_EVENTS: "new,close"
   RUST_BACKTRACE: "1"
+  SQLX_OFFLINE: true
 jobs:
   lint_fmt:
     name: Lint / Code
@@ -58,7 +59,8 @@ jobs:
           - name: Linux / amd64
             runs-on: ubuntu-latest
             cargo-flags: --profile ci --features ftp
-            nextest-flags: --cargo-profile ci --features ftp -E '!test(::mysql::)'
+            nextest-flags: --cargo-profile ci --features ftp
+            nextest-exclusions: -E '!test(::database::)'
             container-runtime: podman
             ipfs: true
             database: true
@@ -67,7 +69,8 @@ jobs:
           - name: MacOS / amd64
             runs-on: macos-13
             cargo-flags: --profile ci --features ftp
-            nextest-flags: --cargo-profile ci --features ftp -E '!(test(::containerized::) | test(::database::))'
+            nextest-flags: --cargo-profile ci --features ftp
+            nextest-exclusions: -E '!(test(::containerized::) | test(::database::))'
             container-runtime: ''
             ipfs: false
             database: false
@@ -76,7 +79,8 @@ jobs:
           - name: MacOS / arm64
             runs-on: macos-14
             cargo-flags: --profile ci
-            nextest-flags: --cargo-profile ci -E '!(test(::containerized::) | test(::database::))'
+            nextest-flags: --cargo-profile ci 
+            nextest-exclusions: -E '!(test(::containerized::) | test(::database::))'
             container-runtime: ''
             ipfs: false
             database: false
@@ -85,7 +89,8 @@ jobs:
           - name: Windows / amd64
             runs-on: windows-latest
             cargo-flags: --profile ci
-            nextest-flags: --cargo-profile ci -E 'not (test(::containerized::) | test(::datafusion::) | test(::database::))'
+            nextest-flags: --cargo-profile ci -E 
+            nextest-exclusions: 'not (test(::containerized::) | test(::datafusion::) | test(::database::))'
             container-runtime: ''
             ipfs: false
             database: false
@@ -135,22 +140,22 @@ jobs:
 
       - name: Build
         run: |
-          export SQLX_OFFLINE=true
           cargo test ${{ matrix.cargo-flags }} --no-run
 
       - name: Pull test images
         if: matrix.container-runtime != ''
         run: cargo nextest run ${{ matrix.nextest-flags }} -E 'test(::setup::)' --no-capture
 
-      - name: Prepare Postgres database
+      - name: Postgres Database Tests
         if: matrix.database
-        run: |
-          export DATABASE_URL=postgres://root:root@localhost:5432/kamu-test
-          export SQLX_OFFLINE=false
-          sqlx migrate run --source ./src/database/migrations/postgres
+        env:
+          SQLX_OFFLINE: false
+          DATABASE_URL: postgres://root:root@localhost:5432/kamu-test
+        run: sqlx migrate run --source ./src/database/migrations/postgres
+        run: cargo nextest run ${{ matrix.nextest-flags }} -E 'test(::postgres::)'
 
-      - name: Run tests
-        run: cargo nextest run ${{ matrix.nextest-flags }}
+      - name: Run main set of tests
+        run: cargo nextest run ${{ matrix.nextest-flags }} ${{ matrix.nextest-exclusions }}
 
       # Not running on windows due to line ending differences
       - name: Check generated files
