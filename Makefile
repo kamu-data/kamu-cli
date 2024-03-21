@@ -30,6 +30,33 @@ lint-fix:
 
 
 ###############################################################################
+# Sqlx Local Setup (create databases for local work)
+###############################################################################
+
+.PHONY: sqlx-local-setup
+sqlx-local-setup: sqlx-local-setup-postgres sqlx-local-setup-mariadb
+
+.PHONY: sqlx-local-setup-postgres
+sqlx-local-setup-postgres:
+	docker pull postgres:latest
+	docker stop kamu-postgres || true && docker rm kamu-postgres || true
+	docker run --name kamu-postgres -p 5432:5432 -e POSTGRES_USER=root -e POSTGRES_PASSWORD=root -d postgres:latest
+	echo "DATABASE_URL=postgres://root:root@localhost:5432/kamu-api-server" > ./src/database/sqlx-postgres/.env
+	sleep 3  # Letting the container to start
+	until PGPASSWORD=root psql -h localhost -U root -p 5432 -d root -c '\q'; do sleep 3; done
+	( cd ./src/database/sqlx-postgres && sqlx database create && sqlx migrate run --source ../migrations/postgres )
+
+.PHONY: sqlx-local-setup-mariadb
+sqlx-local-setup-mariadb:
+	docker pull mariadb:latest
+	docker stop kamu-mariadb || true && docker rm kamu-mariadb || true
+	docker run --name kamu-mariadb -p 3306:3306 -e MARIADB_ROOT_PASSWORD=root -d mariadb:latest
+	echo "DATABASE_URL=mariadb://root:root@localhost:3306/kamu-api-server" > ./src/database/sqlx-mysql/.env
+	sleep 3  # Letting the container to start
+	until mariadb -h localhost -P 3306 -u root --password=root sys --protocol=tcp -e "SELECT 'Hello'" -b; do sleep 3; done	
+	( cd ./src/database/sqlx-mysql && sqlx database create && sqlx migrate run --source ../migrations/mysql )		
+
+###############################################################################
 # Sqlx Prepare (update data for offline compilation)
 ###############################################################################
 

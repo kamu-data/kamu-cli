@@ -56,15 +56,29 @@ Prerequisites:
     * `cargo binstall cargo-deny -y` - for linting dependencies
     * `cargo binstall cargo-udeps -y` - for linting dependencies (detecting unused)
   * To keep all these cargo tools up-to-date use `cargo install-update -a`
+* Database tools:
+  * Install Postgres command line client `psql`: `sudo apt-get install -y postgresql-client`
+  * Install MariaDB command line client `mariadb`: `sudo apt install -y mariadb-client`
+  * Install `sqlx-cli`: `cargo binstall sqlx-cli --no-default-features --features rustls,postgres,mysql -y`
 
 Clone the repository:
 ```shell
 git clone git@github.com:kamu-data/kamu-cli.git
+cd kamu-cli
 ```
 
-Build it:
+Setup local databases for `sqlx`:
 ```shell
-cd kamu-cli
+make sqlx-setup-local
+```
+Note: this step is mandatory for project build to succeed as `sqlx` framework demands database to be accessible at compile-time:
+ * it creates Docker containers with empty databases
+ * it applies all database migrations from scratch
+ * it generates `.env` files in specific crates to point to databases running in Docker containers by setting `DATABASE_URL` variables.
+
+
+Build the project:
+```shell
 cargo build
 ```
 
@@ -94,6 +108,39 @@ If you need to run some tests under `Docker` use:
 ```shell
 KAMU_CONTAINER_RUNTIME_TYPE=docker cargo test <some_test>
 ```
+
+### Run Linters
+Use the following command:
+```sh
+make lint
+```
+This will do a number of highly useful checks:
+* Rust formatting check
+* License headers check
+* Dependecies check: detecting issues with existing dependencies, detecting unused dependencies
+* Rust coding practices checks (Clippy)
+* SQLX offline data check (`sqlx` data for offline compliation must be up-to-date with the database schema)
+
+
+### Prepare SQLX offline data
+If any of the existing SQL queries were modified or new queries were added, `sqlx` data for offline compilation must be re-generated:
+```sh
+make sqlx-prepare
+```
+
+Note that running `make lint` will detect if re-generation is necessary before pushing changes.
+Otherwise, GitHub CI flows will likely fail to build the project due to database schema differences.
+
+
+### Database migrations
+Any change to the database structure requires writing SQL migration scripts.
+The scripts are stored in `./src/database/migrations/<db-engine>` folders, and they are unique per database type.
+The migration commands should be launched within database-specific crate folders, such as `./src/database/sqlx-postgres`. Alternatively, you will need to define `DATABASE_URL` variable manually.
+
+Typical commands to work with migrations include:
+* `sqlx migrate add --source <migrations_dir_path> <descriptoin>` to add a new migration
+* `sqlx migrate run --source <migrations_dir_path>` to apply migrations to the database
+* `sqlx migrate info --source <migrations_dir_path> ` to print information about currently applied migration within the database
 
 
 ### Run Tests
@@ -209,6 +256,9 @@ In the `/src` directory you will find:
   - Crates here contain **specific implementations of services and repositories** (e.g. repository that stores data in S3)
   - Crate directories are named as `<domain>-<technology>`, e.g. `object-repository-s3` while crate names will typically have `kamu-<domain>-<technology>` prefix
   - Infrastructure layer only operates on entities and interfaces defined in `domain` layer
+- `database`
+  - Crates here utilize `sqlx` framework and contain **database-specific repository implementations**
+  - Crate directories are named as `sqlx-<database>`, e.g. `sqlx-postgres` or `sqlx-mysql`
 - `app`
   - Crates here **combine all layers above into functional applications**
 
