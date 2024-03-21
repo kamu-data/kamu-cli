@@ -173,14 +173,10 @@ impl QueryService for QueryServiceImpl {
             .into());
         }
 
-        let mut search_set_vocab_visitor = <SearchSetVocabVisitor>::default();
-
-        dataset
+        let vocab: DatasetVocabulary = dataset
             .as_metadata_chain()
-            .accept(&mut [&mut search_set_vocab_visitor])
-            .await?;
-
-        let vocab: DatasetVocabulary = search_set_vocab_visitor
+            .accept_one(<SearchSetVocabVisitor>::default())
+            .await?
             .into_event()
             .unwrap_or_default()
             .into();
