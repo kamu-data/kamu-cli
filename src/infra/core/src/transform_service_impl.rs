@@ -312,15 +312,17 @@ impl TransformServiceImpl {
     // TODO: Allow derivative datasets to function with inputs containing no data
     // This will require passing the schema explicitly instead of relying on a file
     async fn is_never_pulled(&self, dataset_ref: &DatasetRef) -> Result<bool, InternalError> {
-        let dataset = self.dataset_repo.get_dataset(dataset_ref).await.int_err()?;
-        let mut visitor = <SearchDataBlocksVisitor>::next_data_block();
-
-        dataset
+        Ok(self
+            .dataset_repo
+            .get_dataset(dataset_ref)
+            .await
+            .int_err()?
             .as_metadata_chain()
-            .accept(&mut [&mut visitor])
-            .await?;
-
-        Ok(visitor.into_event().and_then(|e| e.last_offset()).is_none())
+            .accept_one(<SearchDataBlocksVisitor>::next_data_block())
+            .await?
+            .into_event()
+            .and_then(|e| e.last_offset())
+            .is_none())
     }
 
     async fn get_transform_input(
