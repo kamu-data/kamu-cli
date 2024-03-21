@@ -494,15 +494,17 @@ impl TransformServiceImpl {
         &self,
         dataset_ref: &DatasetRef,
     ) -> Result<DatasetVocabulary, InternalError> {
-        let dataset = self.dataset_repo.get_dataset(dataset_ref).await.int_err()?;
-        let mut visitor = <SearchSetVocabVisitor>::default();
-
-        dataset
+        Ok(self
+            .dataset_repo
+            .get_dataset(dataset_ref)
+            .await
+            .int_err()?
             .as_metadata_chain()
-            .accept(&mut [&mut visitor])
-            .await?;
-
-        Ok(visitor.into_event().unwrap_or_default().into())
+            .accept_one(<SearchSetVocabVisitor>::default())
+            .await?
+            .into_event()
+            .unwrap_or_default()
+            .into())
     }
 
     // TODO: Improve error handling
