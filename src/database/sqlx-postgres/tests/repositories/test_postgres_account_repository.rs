@@ -10,7 +10,11 @@
 use chrono::{SubsecRound, Utc};
 use database_common::models::{AccountModel, AccountOrigin};
 use database_common::run_transactional;
-use database_sqlx_postgres::{PostgresAccountRepository, PostgresConnectionPool, PostgresPlugin};
+use database_sqlx_postgres::{
+    PostgresAccountRepository,
+    PostgresConnectionPool,
+    PostgresTransactionManager,
+};
 use dill::{Catalog, CatalogBuilder, Component};
 use kamu_core::auth::AccountRepository;
 use sqlx::PgPool;
@@ -82,8 +86,8 @@ impl PostgresAccountRepositoryHarness {
     pub fn new(pg_pool: PgPool) -> Self {
         // Initialize catalog with predefined Postgres pool
         let mut catalog_builder = CatalogBuilder::new();
-        catalog_builder.add::<PostgresPlugin>();
         catalog_builder.add_builder(PostgresConnectionPool::builder().with_pg_pool(pg_pool));
+        catalog_builder.add::<PostgresTransactionManager>();
         catalog_builder.add::<PostgresAccountRepository>();
 
         Self {

@@ -17,7 +17,7 @@ use internal_error::InternalError;
 
 #[async_trait::async_trait]
 pub trait DatabaseTransactionManager: Send + Sync {
-    async fn make_transaction(&self, base_catalog: &Catalog) -> Result<Transaction, InternalError>;
+    async fn make_transaction(&self) -> Result<Transaction, InternalError>;
 
     async fn commit_transaction(&self, transaction: Transaction) -> Result<(), InternalError>;
 
@@ -40,9 +40,7 @@ where
         .unwrap();
 
     // Start transaction
-    let transaction = db_transaction_manager
-        .make_transaction(base_catalog)
-        .await?;
+    let transaction = db_transaction_manager.make_transaction().await?;
 
     // Wrap transaction into a pointer behind asynchronous mutex
     let transaction_ptr = Arc::new(tokio::sync::Mutex::new(transaction));

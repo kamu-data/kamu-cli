@@ -9,8 +9,10 @@
 
 mod postgres_connection_pool;
 mod postgres_plugin;
+mod postgres_transaction_manager;
 mod repositories;
 
 pub use postgres_connection_pool::*;
 pub use postgres_plugin::*;
+pub use postgres_transaction_manager::*;
 pub use repositories::*;

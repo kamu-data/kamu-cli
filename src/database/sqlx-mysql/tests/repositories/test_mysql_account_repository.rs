@@ -10,7 +10,7 @@
 use chrono::{SubsecRound, Utc};
 use database_common::models::{AccountModel, AccountOrigin};
 use database_common::run_transactional;
-use database_sqlx_mysql::{MySqlAccountRepository, MySqlConnectionPool, MySqlPlugin};
+use database_sqlx_mysql::{MySqlAccountRepository, MySqlConnectionPool, MySqlTransactionManager};
 use dill::{Catalog, CatalogBuilder, Component};
 use kamu_core::auth::AccountRepository;
 use sqlx::MySqlPool;
@@ -82,8 +82,8 @@ impl MySqlAccountRepositoryHarness {
     pub fn new(mysql_pool: MySqlPool) -> Self {
         // Initialize catalog with predefined MySql pool
         let mut catalog_builder = CatalogBuilder::new();
-        catalog_builder.add::<MySqlPlugin>();
         catalog_builder.add_builder(MySqlConnectionPool::builder().with_mysql_pool(mysql_pool));
+        catalog_builder.add::<MySqlTransactionManager>();
         catalog_builder.add::<MySqlAccountRepository>();
 
         Self {
