@@ -7,54 +7,40 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::sync::Arc;
-
-use database_common::{DatabaseTransactionManager, Transaction};
+use database_common::{DatabaseTransactionManager, TransactionRef};
 use dill::*;
 use kamu_core::{InternalError, ResultIntoInternal};
 use sqlx::PgPool;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub type PostgresTransaction = sqlx::Transaction<'static, sqlx::Postgres>;
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
 pub struct PostgresTransactionManager {
-    pg_pool: Arc<PgPool>,
+    pg_pool: PgPool,
 }
 
 #[component(pub)]
 #[interface(dyn DatabaseTransactionManager)]
 impl PostgresTransactionManager {
-    pub fn new(pg_pool: Arc<PgPool>) -> Self {
+    pub fn new(pg_pool: PgPool) -> Self {
         Self { pg_pool }
     }
 }
 
 #[async_trait::async_trait]
 impl DatabaseTransactionManager for PostgresTransactionManager {
-    async fn make_transaction(&self) -> Result<Transaction, InternalError> {
+    async fn make_transaction(&self) -> Result<TransactionRef, InternalError> {
         let postgres_transaction = self.pg_pool.begin().await.int_err()?;
-        Ok(Transaction::new(postgres_transaction))
+        Ok(TransactionRef::new(postgres_transaction))
     }
 
-    async fn commit_transaction(&self, transaction: Transaction) -> Result<(), InternalError> {
-        let postgres_transaction = transaction
-            .transaction
-            .downcast::<PostgresTransaction>()
-            .unwrap();
-
+    async fn commit_transaction(&self, transaction: TransactionRef) -> Result<(), InternalError> {
+        let postgres_transaction = transaction.into_inner::<sqlx::Postgres>();
         postgres_transaction.commit().await.int_err()?;
         Ok(())
     }
 
-    async fn rollback_transaction(&self, transaction: Transaction) -> Result<(), InternalError> {
-        let postgres_transaction = transaction
-            .transaction
-            .downcast::<PostgresTransaction>()
-            .unwrap();
-
+    async fn rollback_transaction(&self, transaction: TransactionRef) -> Result<(), InternalError> {
+        let postgres_transaction = transaction.into_inner::<sqlx::Postgres>();
         postgres_transaction.rollback().await.int_err()?;
         Ok(())
     }

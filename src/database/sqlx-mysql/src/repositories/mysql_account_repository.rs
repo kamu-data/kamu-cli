@@ -7,27 +7,25 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::sync::Arc;
-
 use database_common::models::{AccountModel, AccountOrigin};
-use database_common::Transaction;
+use database_common::{TransactionRef, TransactionRefT};
 use dill::{component, interface};
 use kamu_core::auth::{AccountRepository, AccountRepositoryError};
 use kamu_core::ResultIntoInternal;
 
-use crate::MySqlTransaction;
-
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct MySqlAccountRepository {
-    transaction_ptr: Arc<tokio::sync::Mutex<Transaction>>,
+    transaction: TransactionRefT<sqlx::MySql>,
 }
 
 #[component(pub)]
 #[interface(dyn AccountRepository)]
 impl MySqlAccountRepository {
-    pub fn new(transaction_ptr: Arc<tokio::sync::Mutex<Transaction>>) -> Self {
-        Self { transaction_ptr }
+    pub fn new(transaction: TransactionRef) -> Self {
+        Self {
+            transaction: transaction.into(),
+        }
     }
 }
 
@@ -37,12 +35,7 @@ impl AccountRepository for MySqlAccountRepository {
         &self,
         account_model: &AccountModel,
     ) -> Result<(), AccountRepositoryError> {
-        let mut transaction_guard = self.transaction_ptr.lock().await;
-
-        let mysql_transaction = transaction_guard
-            .transaction
-            .downcast_mut::<MySqlTransaction>()
-            .unwrap();
+        let mut tr = self.transaction.lock().await;
 
         sqlx::query_as!(
             AccountModel,
@@ -57,7 +50,7 @@ impl AccountRepository for MySqlAccountRepository {
             account_model.origin as AccountOrigin,
             account_model.registered_at,
         )
-        .execute(&mut **mysql_transaction)
+        .execute(tr.connection_mut())
         .await
         .int_err()
         .map_err(AccountRepositoryError::Internal)?;
@@ -69,12 +62,7 @@ impl AccountRepository for MySqlAccountRepository {
         &self,
         email: &str,
     ) -> Result<Option<AccountModel>, AccountRepositoryError> {
-        let mut transaction_guard = self.transaction_ptr.lock().await;
-
-        let mysql_transaction = transaction_guard
-            .transaction
-            .downcast_mut::<MySqlTransaction>()
-            .unwrap();
+        let mut tr = self.transaction.lock().await;
 
         let account_data = sqlx::query_as!(
             AccountModel,
@@ -84,7 +72,7 @@ impl AccountRepository for MySqlAccountRepository {
               WHERE email = ?
             "#,
             email
-        ).fetch_optional(&mut **mysql_transaction)
+        ).fetch_optional(tr.connection_mut())
             .await
             .int_err()
             .map_err(AccountRepositoryError::Internal)?;

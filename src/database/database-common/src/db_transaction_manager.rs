@@ -8,20 +8,22 @@
 // by the Apache License, Version 2.0.
 
 use std::any::Any;
+use std::marker::PhantomData;
 use std::sync::Arc;
 
 use dill::{Catalog, CatalogBuilder};
 use internal_error::InternalError;
+use tokio::sync::Mutex;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 pub trait DatabaseTransactionManager: Send + Sync {
-    async fn make_transaction(&self) -> Result<Transaction, InternalError>;
+    async fn make_transaction(&self) -> Result<TransactionRef, InternalError>;
 
-    async fn commit_transaction(&self, transaction: Transaction) -> Result<(), InternalError>;
+    async fn commit_transaction(&self, transaction: TransactionRef) -> Result<(), InternalError>;
 
-    async fn rollback_transaction(&self, transaction: Transaction) -> Result<(), InternalError>;
+    async fn rollback_transaction(&self, transaction: TransactionRef) -> Result<(), InternalError>;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -42,20 +44,14 @@ where
     // Start transaction
     let transaction = db_transaction_manager.make_transaction().await?;
 
-    // Wrap transaction into a pointer behind asynchronous mutex
-    let transaction_ptr = Arc::new(tokio::sync::Mutex::new(transaction));
-
     // Create a chained catalog for transaction-aware components,
     // but keep a local copy of transaction pointer
     let chained_catalog = CatalogBuilder::new_chained(base_catalog)
-        .add_builder(transaction_ptr.clone())
+        .add_value(transaction.clone())
         .build();
 
     // Run transactional code in the callback
     let result = callback(chained_catalog).await;
-
-    // Unwrap transaction from pointer and mutex, as catalog is already consumed
-    let transaction = Arc::try_unwrap(transaction_ptr).unwrap().into_inner();
 
     // Commit or rollback transaction depending on the result
     match result {
@@ -79,16 +75,81 @@ where
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug)]
-pub struct Transaction {
-    pub transaction: Box<dyn Any + Send>,
+/// Represents a shared reference to [`sqlx::Transaction`] that unifies how we
+/// propagate transactions across different database implementations. This
+/// reference can appear in multiple components simultaneously, but can be used
+/// from only one place at a time via locking. Despite its async nature, this
+/// lock must be held only for the duration of the DB query and released when
+/// passing control into other components.
+#[derive(Clone)]
+pub struct TransactionRef {
+    p: Arc<Mutex<Box<dyn Any + Send>>>,
 }
 
-impl Transaction {
+impl TransactionRef {
     pub fn new<DB: sqlx::Database>(transaction: sqlx::Transaction<'static, DB>) -> Self {
         Self {
-            transaction: Box::new(transaction),
+            p: Arc::new(Mutex::new(Box::new(transaction))),
         }
+    }
+
+    /// Extracts the inner [`sqlx::Transaction`]. Will panic if there are any
+    /// outstanding strong reference held.
+    pub fn into_inner<DB: sqlx::Database>(self) -> sqlx::Transaction<'static, DB> {
+        let m = Arc::try_unwrap(self.p).unwrap().into_inner();
+        let tr = *m.downcast::<sqlx::Transaction<'static, DB>>().unwrap();
+        tr
+    }
+}
+
+/// A typed wrapper over the [`TransactionRef`]. It propagates the type
+/// information to [`TransactionGuard`] to safely access typed
+/// [`sqlx::Transaction`] object.
+pub struct TransactionRefT<DB: sqlx::Database> {
+    tr: TransactionRef,
+    _phantom: PhantomData<DB>,
+}
+
+impl<DB: sqlx::Database> TransactionRefT<DB> {
+    pub fn new(tr: TransactionRef) -> Self {
+        Self {
+            tr,
+            _phantom: PhantomData,
+        }
+    }
+
+    pub async fn lock<'a>(&'a self) -> TransactionGuard<'a, DB> {
+        TransactionGuard::new(self.tr.p.lock().await)
+    }
+}
+
+impl<DB: sqlx::Database> From<TransactionRef> for TransactionRefT<DB> {
+    fn from(value: TransactionRef) -> Self {
+        Self::new(value)
+    }
+}
+
+/// Represents a lock held over shared [`TransactionRef`] that allows to safely
+/// access typed [`sqlx::Transaction`] object. Despite its async nature, this
+/// lock must be held only for the duration of the DB query and released when
+/// passing control into other components.
+pub struct TransactionGuard<'a, DB: sqlx::Database> {
+    guard: tokio::sync::MutexGuard<'a, Box<dyn Any + Send>>,
+    _phantom: PhantomData<DB>,
+}
+
+impl<'a, DB: sqlx::Database> TransactionGuard<'a, DB> {
+    pub fn new(guard: tokio::sync::MutexGuard<'a, Box<dyn Any + Send>>) -> Self {
+        Self {
+            guard,
+            _phantom: PhantomData,
+        }
+    }
+
+    pub fn connection_mut(&mut self) -> &mut DB::Connection {
+        self.guard
+            .downcast_mut::<sqlx::Transaction<'static, DB>>()
+            .unwrap()
     }
 }
 

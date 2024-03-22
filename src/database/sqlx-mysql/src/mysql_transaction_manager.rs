@@ -7,54 +7,40 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::sync::Arc;
-
-use database_common::{DatabaseTransactionManager, Transaction};
+use database_common::{DatabaseTransactionManager, TransactionRef};
 use dill::*;
 use kamu_core::{InternalError, ResultIntoInternal};
 use sqlx::MySqlPool;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
-pub type MySqlTransaction = sqlx::Transaction<'static, sqlx::MySql>;
-
-/////////////////////////////////////////////////////////////////////////////////////////
-
 pub struct MySqlTransactionManager {
-    mysql_pool: Arc<MySqlPool>,
+    mysql_pool: MySqlPool,
 }
 
 #[component(pub)]
 #[interface(dyn DatabaseTransactionManager)]
 impl MySqlTransactionManager {
-    pub fn new(mysql_pool: Arc<MySqlPool>) -> Self {
+    pub fn new(mysql_pool: MySqlPool) -> Self {
         Self { mysql_pool }
     }
 }
 
 #[async_trait::async_trait]
 impl DatabaseTransactionManager for MySqlTransactionManager {
-    async fn make_transaction(&self) -> Result<Transaction, InternalError> {
+    async fn make_transaction(&self) -> Result<TransactionRef, InternalError> {
         let mysql_transaction = self.mysql_pool.begin().await.int_err()?;
-        Ok(Transaction::new(mysql_transaction))
+        Ok(TransactionRef::new(mysql_transaction))
     }
 
-    async fn commit_transaction(&self, transaction: Transaction) -> Result<(), InternalError> {
-        let mysql_transaction = transaction
-            .transaction
-            .downcast::<MySqlTransaction>()
-            .unwrap();
-
+    async fn commit_transaction(&self, transaction: TransactionRef) -> Result<(), InternalError> {
+        let mysql_transaction = transaction.into_inner::<sqlx::MySql>();
         mysql_transaction.commit().await.int_err()?;
         Ok(())
     }
 
-    async fn rollback_transaction(&self, transaction: Transaction) -> Result<(), InternalError> {
-        let mysql_transaction = transaction
-            .transaction
-            .downcast::<MySqlTransaction>()
-            .unwrap();
-
+    async fn rollback_transaction(&self, transaction: TransactionRef) -> Result<(), InternalError> {
+        let mysql_transaction = transaction.into_inner::<sqlx::MySql>();
         mysql_transaction.rollback().await.int_err()?;
         Ok(())
     }

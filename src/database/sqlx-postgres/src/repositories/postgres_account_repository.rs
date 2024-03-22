@@ -7,27 +7,25 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::sync::Arc;
-
 use database_common::models::{AccountModel, AccountOrigin};
-use database_common::Transaction;
+use database_common::{TransactionRef, TransactionRefT};
 use dill::{component, interface};
 use kamu_core::auth::{AccountRepository, AccountRepositoryError};
 use kamu_core::ResultIntoInternal;
 
-use crate::PostgresTransaction;
-
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct PostgresAccountRepository {
-    transaction_ptr: Arc<tokio::sync::Mutex<Transaction>>,
+    transaction: TransactionRefT<sqlx::Postgres>,
 }
 
 #[component(pub)]
 #[interface(dyn AccountRepository)]
 impl PostgresAccountRepository {
-    pub fn new(transaction_ptr: Arc<tokio::sync::Mutex<Transaction>>) -> Self {
-        Self { transaction_ptr }
+    pub fn new(transaction: TransactionRef) -> Self {
+        Self {
+            transaction: transaction.into(),
+        }
     }
 }
 
@@ -37,12 +35,7 @@ impl AccountRepository for PostgresAccountRepository {
         &self,
         account_model: &AccountModel,
     ) -> Result<(), AccountRepositoryError> {
-        let mut transaction_guard = self.transaction_ptr.lock().await;
-
-        let pg_transaction = transaction_guard
-            .transaction
-            .downcast_mut::<PostgresTransaction>()
-            .unwrap();
+        let mut tr = self.transaction.lock().await;
 
         sqlx::query_as!(
             AccountModel,
@@ -57,7 +50,7 @@ impl AccountRepository for PostgresAccountRepository {
             account_model.origin as AccountOrigin,
             account_model.registered_at,
         )
-        .execute(&mut **pg_transaction)
+        .execute(tr.connection_mut())
         .await
         .int_err()
         .map_err(AccountRepositoryError::Internal)?;
@@ -69,12 +62,7 @@ impl AccountRepository for PostgresAccountRepository {
         &self,
         email: &str,
     ) -> Result<Option<AccountModel>, AccountRepositoryError> {
-        let mut transaction_guard = self.transaction_ptr.lock().await;
-
-        let pg_transaction = transaction_guard
-            .transaction
-            .downcast_mut::<PostgresTransaction>()
-            .unwrap();
+        let mut tr = self.transaction.lock().await;
 
         let account_data = sqlx::query_as!(
             AccountModel,
@@ -85,7 +73,7 @@ impl AccountRepository for PostgresAccountRepository {
             "#,
             email
         )
-        .fetch_optional(&mut **pg_transaction)
+        .fetch_optional(tr.connection_mut())
         .await
         .int_err()
         .map_err(AccountRepositoryError::Internal)?;

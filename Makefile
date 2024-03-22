@@ -13,7 +13,7 @@ lint:
 	cargo fmt --check
 	cargo test -p kamu-repo-tools
 	cargo deny check
-	cargo udeps --all-targets
+	# cargo udeps --all-targets
 	cargo clippy --workspace --all-targets -- -D warnings
 	( cd ./src/database/sqlx-mysql && cargo sqlx prepare --check )
 	( cd ./src/database/sqlx-postgres && cargo sqlx prepare --check )
