@@ -11,7 +11,7 @@ use database_common::{DatabaseConfiguration, DatabaseError};
 use dill::*;
 use sqlx::MySqlPool;
 
-use crate::{MySqlAccountRepository, MySqlConnectionPool, MySqlTransactionManager};
+use crate::{MySqlAccountRepository, MySqlTransactionManager};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -30,7 +30,7 @@ impl MySqlPlugin {
         let mysql_pool = Self::open_mysql_pool(db_configuration)?;
 
         catalog_builder.add::<Self>();
-        catalog_builder.add_builder(MySqlConnectionPool::builder().with_mysql_pool(mysql_pool));
+        catalog_builder.add_value(mysql_pool);
         catalog_builder.add::<MySqlTransactionManager>();
         catalog_builder.add::<MySqlAccountRepository>();
 

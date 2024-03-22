@@ -7,12 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod postgres_connection_pool;
 mod postgres_plugin;
 mod postgres_transaction_manager;
 mod repositories;
 
-pub use postgres_connection_pool::*;
 pub use postgres_plugin::*;
 pub use postgres_transaction_manager::*;
 pub use repositories::*;

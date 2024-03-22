@@ -11,7 +11,7 @@ use database_common::{DatabaseConfiguration, DatabaseError};
 use dill::*;
 use sqlx::PgPool;
 
-use crate::{PostgresAccountRepository, PostgresConnectionPool, PostgresTransactionManager};
+use crate::{PostgresAccountRepository, PostgresTransactionManager};
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -30,7 +30,7 @@ impl PostgresPlugin {
         let pg_pool = Self::open_pg_pool(db_configuration)?;
 
         catalog_builder.add::<Self>();
-        catalog_builder.add_builder(PostgresConnectionPool::builder().with_pg_pool(pg_pool));
+        catalog_builder.add_value(pg_pool);
         catalog_builder.add::<PostgresTransactionManager>();
         catalog_builder.add::<PostgresAccountRepository>();
 

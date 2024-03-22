@@ -12,33 +12,30 @@ use std::sync::Arc;
 use database_common::{DatabaseTransactionManager, Transaction};
 use dill::*;
 use kamu_core::{InternalError, ResultIntoInternal};
+use sqlx::MySqlPool;
 
-use crate::{MySqlConnectionPool, MySqlTransaction};
+/////////////////////////////////////////////////////////////////////////////////////////
+
+pub type MySqlTransaction = sqlx::Transaction<'static, sqlx::MySql>;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct MySqlTransactionManager {
-    mysql_connection_pool: Arc<MySqlConnectionPool>,
+    mysql_pool: Arc<MySqlPool>,
 }
 
 #[component(pub)]
 #[interface(dyn DatabaseTransactionManager)]
 impl MySqlTransactionManager {
-    pub fn new(mysql_connection_pool: Arc<MySqlConnectionPool>) -> Self {
-        Self {
-            mysql_connection_pool,
-        }
+    pub fn new(mysql_pool: Arc<MySqlPool>) -> Self {
+        Self { mysql_pool }
     }
 }
 
 #[async_trait::async_trait]
 impl DatabaseTransactionManager for MySqlTransactionManager {
     async fn make_transaction(&self) -> Result<Transaction, InternalError> {
-        let mysql_transaction = self
-            .mysql_connection_pool
-            .begin_transaction()
-            .await
-            .int_err()?;
+        let mysql_transaction = self.mysql_pool.begin().await.int_err()?;
         Ok(Transaction::new(mysql_transaction))
     }
 

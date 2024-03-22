@@ -12,33 +12,30 @@ use std::sync::Arc;
 use database_common::{DatabaseTransactionManager, Transaction};
 use dill::*;
 use kamu_core::{InternalError, ResultIntoInternal};
+use sqlx::PgPool;
 
-use crate::{PostgresConnectionPool, PostgresTransaction};
+/////////////////////////////////////////////////////////////////////////////////////////
+
+pub type PostgresTransaction = sqlx::Transaction<'static, sqlx::Postgres>;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct PostgresTransactionManager {
-    postgres_connection_pool: Arc<PostgresConnectionPool>,
+    pg_pool: Arc<PgPool>,
 }
 
 #[component(pub)]
 #[interface(dyn DatabaseTransactionManager)]
 impl PostgresTransactionManager {
-    pub fn new(postgres_connection_pool: Arc<PostgresConnectionPool>) -> Self {
-        Self {
-            postgres_connection_pool,
-        }
+    pub fn new(pg_pool: Arc<PgPool>) -> Self {
+        Self { pg_pool }
     }
 }
 
 #[async_trait::async_trait]
 impl DatabaseTransactionManager for PostgresTransactionManager {
     async fn make_transaction(&self) -> Result<Transaction, InternalError> {
-        let postgres_transaction = self
-            .postgres_connection_pool
-            .begin_transaction()
-            .await
-            .int_err()?;
+        let postgres_transaction = self.pg_pool.begin().await.int_err()?;
         Ok(Transaction::new(postgres_transaction))
     }
 
