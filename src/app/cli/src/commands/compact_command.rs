@@ -26,6 +26,7 @@ pub struct CompactCommand {
     compact_svc: Arc<dyn CompactService>,
     dataset_ref: DatasetRef,
     max_slice_size: u64,
+    max_slice_records: u64,
     is_hard: bool,
 }
 
@@ -36,6 +37,7 @@ impl CompactCommand {
         compact_svc: Arc<dyn CompactService>,
         dataset_ref: DatasetRef,
         max_slice_size: u64,
+        max_slice_records: u64,
         is_hard: bool,
     ) -> Self {
         Self {
@@ -44,6 +46,7 @@ impl CompactCommand {
             compact_svc,
             dataset_ref,
             max_slice_size,
+            max_slice_records,
             is_hard,
         }
     }
@@ -102,7 +105,12 @@ impl Command for CompactCommand {
         });
 
         self.compact_svc
-            .compact_dataset(&dataset_handle, self.max_slice_size, Some(listener.clone()))
+            .compact_dataset(
+                &dataset_handle,
+                self.max_slice_size,
+                self.max_slice_records,
+                Some(listener.clone()),
+            )
             .await
             .map_err(CLIError::failure)?;
 

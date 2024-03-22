@@ -1256,9 +1256,15 @@ pub fn cli() -> Command {
                                 Arg::new("max-slice-size")
                                     .long("max-slice-size")
                                     .value_parser(value_parser!(u64))
-                                    .default_value("0")
                                     .value_name("SIZE")
+                                    .default_value("1073741824")
                                     .help("Maximum size of a single data slice file in bytes"),
+                                Arg::new("max-slice-records")
+                                    .long("max-slice-records")
+                                    .value_parser(value_parser!(u64))
+                                    .value_name("RECORDS")
+                                    .default_value("10000")
+                                    .help("Maximum amount of records in a single data slice file"),
                                 Arg::new("hard")
                                     .long("hard")
                                     .action(ArgAction::SetTrue)

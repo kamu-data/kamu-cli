@@ -77,6 +77,7 @@ impl CompactServiceImpl {
         dataset_name: &DatasetName,
         compact_dir_path: &Path,
         max_slice_size: u64,
+        max_slice_records: u64,
     ) -> Result<ChainFilesInfo, CompactError> {
         // Declare mut values for result
 
@@ -89,7 +90,8 @@ impl CompactServiceImpl {
             new_file_path: None,
         };
         let mut data_slice_batches: Vec<DataSliceBatchInfo> = vec![];
-        let (mut batch_size, mut new_end_offset_interval): (u64, u64) = (0, 0);
+        let (mut batch_size, mut new_end_offset_interval, mut batch_records): (u64, u64, u64) =
+            (0, 0, 0);
 
         ////////////////////////////////////////////////////////////////////////////////
 
@@ -114,7 +116,13 @@ impl CompactServiceImpl {
                             new_end_offset_interval = output_slice.offset_interval.end;
                         }
 
-                        if batch_size + output_slice.size > max_slice_size {
+                        let current_records = output_slice.offset_interval.end
+                            - output_slice.offset_interval.start
+                            + 1;
+
+                        if batch_size + output_slice.size >= max_slice_size
+                            || batch_records + current_records >= max_slice_records
+                        {
                             if !data_slice_batch_info.data_slices_batch.is_empty() {
                                 data_slice_batches.push(data_slice_batch_info.clone());
                                 // Reset values for next batch
@@ -125,9 +133,11 @@ impl CompactServiceImpl {
 
                             data_slice_batch_info.data_slices_batch = vec![data_slice_url];
                             batch_size = output_slice.size;
+                            batch_records = current_records;
                         } else {
                             data_slice_batch_info.data_slices_batch.push(data_slice_url);
                             batch_size += output_slice.size;
+                            batch_records += current_records;
                         }
 
                         if data_slice_batch_info.new_file_path.is_none() {
@@ -307,6 +317,7 @@ impl CompactService for CompactServiceImpl {
         &self,
         dataset_handle: &DatasetHandle,
         max_slice_size: u64,
+        max_slice_records: u64,
         multi_listener: Option<Arc<dyn CompactionMultiListener>>,
     ) -> Result<(), CompactError> {
         let listener = multi_listener
@@ -342,6 +353,7 @@ impl CompactService for CompactServiceImpl {
                 &dataset_handle.alias.dataset_name,
                 &compact_dir_path,
                 max_slice_size,
+                max_slice_records,
             )
             .await?;
 

@@ -21,35 +21,27 @@ use kamu::*;
 use kamu_core::{auth, CurrentAccountSubject};
 use opendatafabric::*;
 
-const FILE_DATA_ARRAY_SIZE: usize = 32;
+const FILE_DATA_ARRAY_SIZE: usize = 1024;
 const MAX_SLICE_SIZE: u64 = 1024 * 1024 * 1024;
+const MAX_SLICE_RECORDS: u64 = 10000;
 
 #[tokio::test]
 async fn test_dataset_compact() {
     let harness = CompactTestHarness::new();
 
-    let root_dataset_alias = DatasetAlias::new(None, DatasetName::new_unchecked("foo"));
-    let derive_dataset_alias = DatasetAlias::new(None, DatasetName::new_unchecked("derive-foo"));
+    let root_dataset_name = DatasetName::new_unchecked("foo");
+    let root_dataset_alias = DatasetAlias::new(None, root_dataset_name.clone());
 
     harness
-        .dataset_repo
-        .create_dataset_from_snapshot(
+        .create_dataset(
             MetadataFactory::dataset_snapshot()
-                .name("foo")
+                .name(root_dataset_name.as_str())
                 .kind(DatasetKind::Root)
                 .push_event(MetadataFactory::set_polling_source().build())
                 .push_event(MetadataFactory::set_data_schema().build())
                 .build(),
         )
-        .await
-        .unwrap();
-
-    let head = DatasetTestHelper::append_random_data(
-        harness.dataset_repo.as_ref(),
-        root_dataset_alias.as_local_ref(),
-        FILE_DATA_ARRAY_SIZE,
-    )
-    .await;
+        .await;
 
     let dataset_handle = harness
         .dataset_repo
@@ -57,18 +49,13 @@ async fn test_dataset_compact() {
         .await
         .unwrap();
 
-    let dataset = harness
-        .dataset_repo
-        .get_dataset(&dataset_handle.as_local_ref())
-        .await
-        .unwrap();
+    harness
+        .append_add_data_block(&root_dataset_alias.as_local_ref(), FILE_DATA_ARRAY_SIZE)
+        .await;
 
-    let old_blocks: Vec<_> = dataset
-        .as_metadata_chain()
-        .iter_blocks_interval(&head, None, false)
-        .try_collect()
-        .await
-        .unwrap();
+    let old_blocks = harness
+        .get_dataset_blocks(&root_dataset_alias.as_local_ref())
+        .await;
 
     assert_matches!(
         harness
@@ -76,37 +63,85 @@ async fn test_dataset_compact() {
             .compact_dataset(
                 &dataset_handle,
                 MAX_SLICE_SIZE,
+                MAX_SLICE_RECORDS,
                 Some(Arc::new(NullCompactionMultiListener {}))
             )
             .await,
         Ok(()),
     );
 
-    let new_blocks: Vec<_> = dataset
-        .as_metadata_chain()
-        .iter_blocks_interval(&head, None, false)
-        .try_collect()
-        .await
-        .unwrap();
-
+    let new_blocks = harness
+        .get_dataset_blocks(&root_dataset_alias.as_local_ref())
+        .await;
     assert_eq!(old_blocks.len(), new_blocks.len());
 
     harness
-        .dataset_repo
-        .create_dataset_from_snapshot(
+        .append_add_data_block(&root_dataset_alias.as_local_ref(), FILE_DATA_ARRAY_SIZE)
+        .await;
+    let old_blocks = harness
+        .get_dataset_blocks(&root_dataset_alias.as_local_ref())
+        .await;
+
+    assert_matches!(
+        harness
+            .compact_svc
+            .compact_dataset(
+                &dataset_handle,
+                MAX_SLICE_SIZE,
+                MAX_SLICE_RECORDS,
+                Some(Arc::new(NullCompactionMultiListener {}))
+            )
+            .await,
+        Ok(()),
+    );
+
+    let new_blocks = harness
+        .get_dataset_blocks(&root_dataset_alias.as_local_ref())
+        .await;
+
+    // We compacted two data slices and blocks into one
+    assert_eq!(old_blocks.len() - 1, new_blocks.len());
+
+    harness
+        .append_add_data_block(&root_dataset_alias.as_local_ref(), FILE_DATA_ARRAY_SIZE)
+        .await;
+    let old_blocks = harness
+        .get_dataset_blocks(&root_dataset_alias.as_local_ref())
+        .await;
+
+    assert_matches!(
+        harness
+            .compact_svc
+            .compact_dataset(
+                &dataset_handle,
+                1024,
+                MAX_SLICE_RECORDS,
+                Some(Arc::new(NullCompactionMultiListener {}))
+            )
+            .await,
+        Ok(()),
+    );
+
+    let new_blocks = harness
+        .get_dataset_blocks(&root_dataset_alias.as_local_ref())
+        .await;
+
+    // Shoud save original amount of blocks
+    // such as size is equal to max-slice-size
+    assert_eq!(old_blocks.len(), new_blocks.len());
+
+    let derive_dataset_name = DatasetName::new_unchecked("derive-foo");
+    let derive_dataset_alias = DatasetAlias::new(None, derive_dataset_name.clone());
+
+    harness
+        .create_dataset(
             MetadataFactory::dataset_snapshot()
-                .name("derive-foo")
+                .name(derive_dataset_name.as_str())
                 .kind(DatasetKind::Derivative)
-                .push_event(
-                    MetadataFactory::set_transform()
-                        .inputs_from_refs(["foo"])
-                        .build(),
-                )
                 .push_event(MetadataFactory::set_data_schema().build())
                 .build(),
         )
-        .await
-        .unwrap();
+        .await;
 
     let dataset_handle = harness
         .dataset_repo
@@ -120,6 +155,7 @@ async fn test_dataset_compact() {
             .compact_dataset(
                 &dataset_handle,
                 MAX_SLICE_SIZE,
+                MAX_SLICE_RECORDS,
                 Some(Arc::new(NullCompactionMultiListener {}))
             )
             .await,
@@ -134,17 +170,15 @@ struct CompactTestHarness {
 
 impl CompactTestHarness {
     fn new() -> Self {
-        Self::new_with_authorizer(kamu_core::auth::AlwaysHappyDatasetActionAuthorizer::new())
+        Self::new_local_with_authorizer(kamu_core::auth::AlwaysHappyDatasetActionAuthorizer::new())
     }
 
-    fn new_with_authorizer<TDatasetAuthorizer: auth::DatasetActionAuthorizer + 'static>(
+    fn new_local_with_authorizer<TDatasetAuthorizer: auth::DatasetActionAuthorizer + 'static>(
         dataset_action_authorizer: TDatasetAuthorizer,
     ) -> Self {
         let temp_dir = tempfile::tempdir().unwrap();
         let run_info_dir = temp_dir.path().join("run");
-        let cache_dir = temp_dir.path().join("cache");
         std::fs::create_dir(&run_info_dir).unwrap();
-        std::fs::create_dir(cache_dir).unwrap();
 
         let catalog = dill::CatalogBuilder::new()
             .add::<EventBus>()
@@ -174,5 +208,56 @@ impl CompactTestHarness {
             dataset_repo,
             compact_svc,
         }
+    }
+
+    async fn get_dataset_head(&self, dataset_ref: &DatasetRef) -> Multihash {
+        let dataset = self.dataset_repo.get_dataset(dataset_ref).await.unwrap();
+
+        dataset
+            .as_metadata_chain()
+            .resolve_ref(&BlockRef::Head)
+            .await
+            .unwrap()
+    }
+
+    async fn get_dataset_blocks(
+        &self,
+        dataset_ref: &DatasetRef,
+    ) -> Vec<(Multihash, MetadataBlock)> {
+        let dataset = self.dataset_repo.get_dataset(dataset_ref).await.unwrap();
+        let head = self.get_dataset_head(dataset_ref).await;
+
+        dataset
+            .as_metadata_chain()
+            .iter_blocks_interval(&head, None, false)
+            .try_collect()
+            .await
+            .unwrap()
+    }
+
+    async fn create_dataset(&self, dataset_snapshot: DatasetSnapshot) {
+        self.dataset_repo
+            .create_dataset_from_snapshot(dataset_snapshot)
+            .await
+            .unwrap();
+    }
+
+    // async fn dataset_data_helper(&self, dataset_alias: &DatasetAlias) ->
+    // DatasetDataHelper {     let dataset = self
+    //         .dataset_repo
+    //         .get_dataset(&dataset_alias.as_local_ref())
+    //         .await
+    //         .unwrap();
+
+    //     DatasetDataHelper::new_with_context(dataset, self.ctx.clone())
+    // }
+
+    async fn append_add_data_block(&self, dataset_ref: &DatasetRef, data_slice_size: usize) {
+        DatasetTestHelper::append_random_data(
+            self.dataset_repo.as_ref(),
+            dataset_ref.clone(),
+            data_slice_size,
+        )
+        .await;
     }
 }

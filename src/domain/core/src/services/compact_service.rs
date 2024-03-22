@@ -20,6 +20,7 @@ pub trait CompactService: Send + Sync {
         &self,
         dataset_handle: &DatasetHandle,
         max_slice_size: u64,
+        max_slice_records: u64,
         listener: Option<Arc<dyn CompactionMultiListener>>,
     ) -> Result<(), CompactError>;
 }

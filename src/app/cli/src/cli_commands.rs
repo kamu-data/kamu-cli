@@ -484,6 +484,7 @@ pub fn get_command(
                     submatches.get_one::<DatasetRef>("dataset").unwrap().clone(),
                 )?,
                 *(submatches.get_one("max-slice-size").unwrap()),
+                *(submatches.get_one("max-slice-records").unwrap()),
                 submatches.get_flag("hard"),
             )),
             _ => return Err(CommandInterpretationFailed.into()),
