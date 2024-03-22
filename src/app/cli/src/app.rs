@@ -78,8 +78,8 @@ pub async fn run(
             configure_base_catalog(&workspace_layout, workspace_svc.is_multi_tenant_workspace());
 
         // TODO: read database settings from configuration, and make it optional
-        //let db_configuration = DatabaseConfiguration::local_postgres();
-        //configure_database_components(&mut base_catalog_builder, &db_configuration)?;
+        // let db_configuration = DatabaseConfiguration::local_mariadb();
+        // configure_database_components(&mut base_catalog_builder, &db_configuration)?;
 
         base_catalog_builder
             .add_value(dependencies_graph_repository)
@@ -166,7 +166,7 @@ pub async fn run(
 async fn database_test(catalog: &Catalog) -> Result<(), InternalError> {
     let maybe_transaction_manager = catalog.get_one::<dyn DatabaseTransactionManager>().ok();
     if maybe_transaction_manager.is_some() {
-        async fn account_check(catalog: Catalog) -> Result<(), InternalError> {
+        run_transactional(catalog, |catalog| async move {
             let account_repository = catalog.get_one::<dyn auth::AccountRepository>().unwrap();
             println!(
                 "{:?}",
@@ -176,9 +176,8 @@ async fn database_test(catalog: &Catalog) -> Result<(), InternalError> {
                     .int_err()?
             );
             Ok(())
-        }
-
-        run_transactional(catalog, account_check).await?;
+        })
+        .await?;
     }
 
     Ok(())

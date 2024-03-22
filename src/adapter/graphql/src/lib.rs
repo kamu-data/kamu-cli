@@ -10,7 +10,6 @@
 #![feature(error_generic_member_access)]
 #![feature(error_in_core)]
 #![feature(int_roundings)]
-#![feature(async_closure)]
 #![feature(let_chains)]
 
 pub mod extensions;

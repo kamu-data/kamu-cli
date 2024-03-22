@@ -23,7 +23,7 @@ use uuid::Uuid;
 async fn test_missing_account_not_found(pg_pool: PgPool) {
     let harness = PostgresAccountRepositoryHarness::new(pg_pool);
 
-    run_transactional(&harness.catalog, async move |catalog: Catalog| {
+    run_transactional(&harness.catalog, |catalog: Catalog| async move {
         let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
 
         let maybe_account = account_repo
@@ -45,7 +45,7 @@ async fn test_missing_account_not_found(pg_pool: PgPool) {
 async fn test_insert_and_locate_account(pg_pool: PgPool) {
     let harness = PostgresAccountRepositoryHarness::new(pg_pool);
 
-    run_transactional(&harness.catalog, async move |catalog: Catalog| {
+    run_transactional(&harness.catalog, |catalog: Catalog| async move {
         let account_model = AccountModel {
             id: Uuid::new_v4(),
             email: String::from("test@example.com"),
